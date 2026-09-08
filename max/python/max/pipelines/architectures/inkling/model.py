@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from max.driver import Buffer, Device, is_virtual_device_mode
+from max.driver import Device, is_virtual_device_mode
 from max.engine import InferenceSession, Model
-from max.graph import Graph, Module, ops
+from max.graph import Graph, Module
 from max.graph.weights import Weights, WeightsAdapter
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
 from max.pipelines.context import TextAndVisionContext
@@ -109,10 +109,6 @@ class InklingModel(
         assert isinstance(self._batch_processor, InklingBatchProcessor)
         self._batch_processor.bind_runtime_state(self._state_cache, model)
 
-    @property
-    def emits_folded_sampled_tokens(self) -> bool:
-        return self.pipeline_config.runtime.fold_sampler_into_graph
-
     @override
     def _load_state_dict(self) -> dict[str, Any]:
         """Splits the checkpoint between the two graphs the towers compile to."""
@@ -176,29 +172,15 @@ class InklingModel(
             "inkling", input_types=nn_model.input_types(), module=module
         ) as graph:
             outputs = nn_model(*nn_model.unpack_inputs(graph.inputs))
-            if self.emits_folded_sampled_tokens:
-                # argmax is a pure device op (no host readback), so folding it
-                # into the captured graph is capture-safe.
-                sampled_tokens = ops.argmax(outputs[0], axis=-1)
-                graph.output(*outputs, sampled_tokens)
-            else:
-                graph.output(*outputs)
+            graph.output(*outputs)
         return graph, nn_model.state_dict()
 
     def execute(self, model_inputs: ModelInputs) -> ModelOutputs:
         assert isinstance(model_inputs, InklingInputs)
         model_outputs = list(self.model.execute(*model_inputs.buffers))
 
-        sampled_tokens: Buffer | None = None
-        if self.emits_folded_sampled_tokens:
-            popped = model_outputs.pop()
-            assert isinstance(popped, Buffer)
-            sampled_tokens = popped
-
         assert self._batch_processor is not None
-        outputs = self._batch_processor.process_outputs(model_outputs)
-        outputs.sampled_tokens = sampled_tokens
-        return outputs
+        return self._batch_processor.process_outputs(model_outputs)
 
     def release(self, request_id: RequestID) -> None:
         """Drops the request's convolution state, freeing its slot."""

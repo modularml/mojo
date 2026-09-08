@@ -70,7 +70,7 @@ a great way to define defaulted field values, e.g.:
    struct Thing:
        # This is not actually supported right now, but imagine it were.
        let field = 42
-       fn __init__(out self):
+       def __init__(out self):
            self.field = 17  # shouldn't be able to overwrite field?
    ```
 

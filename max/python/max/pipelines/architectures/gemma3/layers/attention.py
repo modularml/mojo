@@ -57,7 +57,7 @@ class Gemma3Attention(Module, Shardable):
         hidden_size: int,
         kv_params: KVCacheParams,
         layer_idx: int,
-        sliding_window_pattern: int = 6,
+        is_sliding: bool,
         dtype: DType = DType.float32,
         devices: list[DeviceRef],
         linear_cls: Callable[..., Linear] = Linear,
@@ -97,6 +97,7 @@ class Gemma3Attention(Module, Shardable):
         self.rope_local = rope_local
         self.n_heads = num_attention_heads
         self.layer_idx = layer_idx
+        self.is_sliding = is_sliding
         self.kv_params = kv_params
         self.has_bias = has_bias
         self.devices = devices
@@ -107,7 +108,6 @@ class Gemma3Attention(Module, Shardable):
             else math.sqrt(1.0 / self.kv_params.head_dim)
         )
         self.local_window_size = local_window_size
-        self.sliding_window_pattern = sliding_window_pattern
         self.qk_norm_eps = qk_norm_eps
         self.quant_config = quant_config
 
@@ -179,7 +179,7 @@ class Gemma3Attention(Module, Shardable):
         # Re-concat and apply RoPE + KV cache store
         qkv = ops.concat((x_q, x_k, x_v), axis=-1)
 
-        use_local = bool((self.layer_idx + 1) % self.sliding_window_pattern)
+        use_local = self.is_sliding
         rope = self.rope_local if use_local else self.rope_global
 
         freqs_cis = ops.cast(rope.freqs_cis, qkv.dtype).to(qkv.device)
@@ -366,7 +366,7 @@ class Gemma3Attention(Module, Shardable):
                 hidden_size=self.q_weight_dim + self.kv_weight_dim * 2,
                 kv_params=self.kv_params,
                 layer_idx=self.layer_idx,
-                sliding_window_pattern=self.sliding_window_pattern,
+                is_sliding=self.is_sliding,
                 dtype=self.o_proj.weight.dtype,
                 devices=[device],
                 linear_cls=self.o_proj.__class__,

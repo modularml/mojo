@@ -693,7 +693,7 @@ struct IndexList[size: Int, *, element_type: DType = .int64](
         """
 
         comptime for i in range(Self.size):
-            hasher.update(self.data[i])
+            self.data[i].__hash__(hasher)
 
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]

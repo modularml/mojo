@@ -19,9 +19,9 @@ In library A:
 ```mojo
 struct Spaceship:
     var location: String
-    fn liftoff(self):
+    def liftoff(self):
         ...
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 ```
 
@@ -31,7 +31,7 @@ In library B’s `spaceship_extensions.mojo`:
 import A.Spaceship
 
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 ```
@@ -44,7 +44,7 @@ And now, some code (also in library B) can use it like a method on any
 import A's struct Spaceship
 import B's extension Spaceship
 
-fn do_things(ship: Spaceship):
+def do_things(ship: Spaceship):
     ship.fly_to("Corneria")
 ```
 
@@ -62,13 +62,13 @@ User starts with this:
 struct Spaceship:
     var location: String
 
-    fn liftoff(self):
+    def liftoff(self):
         ...
 
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 ```
@@ -80,15 +80,15 @@ struct Spaceship:
 
 struct Spaceship:
     var location: String
-    fn liftoff(self):
+    def liftoff(self):
         ...
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 
 # Library L's spaceship_extensions.mojo
 
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 ```
@@ -108,13 +108,13 @@ import python.PythonObject
 struct Spaceship:
     var location: String
 
-    fn liftoff(self):
+    def liftoff(self):
         ...
 
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 
-    fn __init__(init self, py_obj: PythonObject):
+    def __init__(init self, py_obj: PythonObject):
         self.location = py_obj.something()
 ```
 
@@ -128,9 +128,9 @@ So they’d break it up into this:
 
 struct Spaceship:
     var location: String
-    fn liftoff(self):
+    def liftoff(self):
         ...
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 
 # Library L's spaceship_extensions.mojo
@@ -138,11 +138,11 @@ struct Spaceship:
 import python.PythonObject
 
 extension Spaceship:
-    fn __init__(init self, py_obj: PythonObject):
+    def __init__(init self, py_obj: PythonObject):
         self.location = py_obj.something()
 ```
 
-For example, these `fn __init__(out self, obj: PythonObject) raises: ...` (to
+For example, these `def __init__(out self, obj: PythonObject) raises: ...` (to
 conform to `ConvertibleFromPython`) methods exist:
 
 - in the`Bool` struct in `Mojo/stdlib/std/builtin/bool.mojo`
@@ -174,7 +174,7 @@ present if a certain user-config flag is passed in. Examples:
   - (in our `Cargo.toml`-or-whatever equivalent)
     `[features]  my_embedded_library = ["UseArduinoSupport"]`
 - The library method would `requires` it, like
-  `fn arduino_blink() requires UseArduinoSupport: ...`
+  `def arduino_blink() requires UseArduinoSupport: ...`
 
 Note this user journey would be somewhat foiled by decision 6 ("Are extensions
 automatically imported?") option B ("Struct imports automatically import their
@@ -202,7 +202,7 @@ struct Int(
 
 ```mojo
     @implicit
-    fn __init__(out self, value: Int):
+    def __init__(out self, value: Int):
         ...
 ```
 
@@ -222,13 +222,13 @@ import python.PythonObject
 struct Spaceship[engine_type: EngineTrait]:
     var engine: engine_type
 
-    fn warp(self) requires engine_type: WarpEngineTrait:
+    def warp(self) requires engine_type: WarpEngineTrait:
         ...
 
-    fn shear_spacetime(self) requires engine_type: WarpEngineTrait:
+    def shear_spacetime(self) requires engine_type: WarpEngineTrait:
         ...
 
-    fn invert_polarity(self) requires engine_type: WarpEngineTrait:
+    def invert_polarity(self) requires engine_type: WarpEngineTrait:
         ...
 ```
 
@@ -244,13 +244,13 @@ struct Spaceship[engine_type: EngineTrait]:
     var engine: engine_type
 
 extension Spaceship requires engine_type: WarpEngineTrait:
-    fn warp(self) requires:
+    def warp(self) requires:
         ...
 
-    fn shear_spacetime(self):
+    def shear_spacetime(self):
         ...
 
-    fn invert_polarity(self):
+    def invert_polarity(self):
         ...
 ```
 
@@ -266,10 +266,10 @@ python code “just work” when copy and pasted, one should be able to write:
 from logging import Logger, LogLevel
 
 extension Logger:
-   fn setLevel(mut self, level: LogLevel):
+   def setLevel(mut self, level: LogLevel):
        ...
 
-   fn isEnabledFor(self, level: LogLevel) -> Bool:
+   def isEnabledFor(self, level: LogLevel) -> Bool:
        ...
 
 # In some arbitrary file
@@ -277,7 +277,7 @@ from python_compat import * # allows the extension to work for Logger()
 from logging import Logger, LogLevel
 import logging
 
-fn foo():
+def foo():
     var logger = Logger()
     logger.isEnabledFor(logging.INFO)
 ```
@@ -293,7 +293,7 @@ struct List[T: AnyType]:
     ...
 
 extension List(Copyable) requires T: Copyable:
-    fn __init__(out self, *, copy: Self, /):
+    def __init__(out self, *, copy: Self, /):
     self = List(capacity=len(other))
     # ...
 ```
@@ -316,7 +316,7 @@ struct Foo[T: AnyType](
 too:
 
 ```mojo
-    fn __init__(out self, *, copy: Self, /) requires T: Copyable:
+    def __init__(out self, *, copy: Self, /) requires T: Copyable:
     self = List(capacity=len(other))
     # ...
 ```
@@ -329,7 +329,7 @@ If the extension conforms to trait, like this:
 
 ```mojo
 extension List(Copyable) requires T: Copyable:
-    fn __init__(out self, *, copy: Self, /):
+    def __init__(out self, *, copy: Self, /):
         self = List(capacity=len(other))
         # ...
 ```
@@ -362,15 +362,15 @@ Example of a non-conforming extension:
 
 struct Spaceship:
     var location: String
-    fn liftoff(self):
+    def liftoff(self):
         ...
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 
 # Library L's spaceship_extensions.mojo
 
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 ```
@@ -448,7 +448,7 @@ this library, they’ll import the extension. Like:
 ```mojo
 import library_b.Spaceship  # <-- imports the extension
 
-fn main():
+def main():
     ...
 ```
 
@@ -495,14 +495,14 @@ Q: What if two extensions offer the same methods? Like:
 # Library L's spaceship_extensions.mojo
 
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 
 # Library X's spaceship_extensions.mojo
 
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         do_something_else()
 ```
 
@@ -513,7 +513,7 @@ call them though:
 from L import Spaceship
 from X import Spaceship
 
-fn flamscrankle(mut ship: Spaceship):
+def flamscrankle(mut ship: Spaceship):
     ship.fly_to("Corneria")  # Error: ambiguous call
 ```
 
@@ -532,15 +532,15 @@ For example, this Library A:
 
 struct Spaceship:
     var location: String
-    fn liftoff(self):
+    def liftoff(self):
         ...
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 
 # Library A's spaceship_extensions.mojo
 
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 
@@ -558,7 +558,7 @@ The user can then `import` them, like in this `main.mojo`:
 ```mojo
 from A import Spaceship
 
-fn main():
+def main():
     var ship = Spaceship("Corneria")
     ship.fly_to("Korhal")
 ```
@@ -575,15 +575,15 @@ implicit.
 
 struct Spaceship:
     var location: String
-    fn liftoff(self):
+    def liftoff(self):
         ...
-    fn set_location(mut self, new_location: String):
+    def set_location(mut self, new_location: String):
         self.location = new_location
 
 # Library A's spaceship_extensions.mojo
 
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 
@@ -598,7 +598,7 @@ User’s `main.mojo` is the same either way:
 ```mojo
 from A import Spaceship   # imports both
 
-fn main():
+def main():
     var ship = Spaceship("Corneria")
     ship.fly_to("Korhal")
 ```
@@ -611,7 +611,7 @@ However, if the `extension` is in a different module, like this Library B:
 from A import Spaceship
 
 extension Spaceship:
-    fn barrel_roll(mut self):
+    def barrel_roll(mut self):
         self.roll(360)
         maniacal_laughter()
 ```
@@ -622,7 +622,7 @@ extension Spaceship:
 from A import Spaceship  # imports A's struct and A's extension
 from B import Spaceship  # imports B's extension
 
-fn main():
+def main():
     var ship = Spaceship("Corneria")
     ship.fly_to("Korhal")
 ```
@@ -651,7 +651,7 @@ library A:
 from A import Spaceship
 
 extension Spaceship:
-    fn barrel_roll(mut self):
+    def barrel_roll(mut self):
         self.roll(360)
         maniacal_laughter()
 ```
@@ -662,7 +662,7 @@ and the user explicitly imported it:
 from A import Spaceship  # imports A's struct and A's extension
 from B import Spaceship  # imports B's extension
 
-fn main():
+def main():
     var ship = Spaceship("Corneria")
     ship.fly_to("Korhal")
 ```
@@ -690,7 +690,7 @@ library A:
 from A import Spaceship
 
 extension Spaceship:
-    fn barrel_roll(mut self):
+    def barrel_roll(mut self):
         self.roll(360)
         maniacal_laughter()
 ```
@@ -701,7 +701,7 @@ What happens if the user *only* imports the B extension? Like:
 # from A import Spaceship  # user didn't import either of these
 from B import Spaceship  # imports B's extension
 
-fn main():
+def main():
     var ship = Spaceship("Corneria")
     ship.barrel_roll()
 ```
@@ -723,7 +723,7 @@ It’s unnecessary to mention the struct as well, but it’s allowed:
 import A.Spaceship  # unnecessary but allowed
 import B.Spaceship
 
-fn do_things(ship: Spaceship):
+def do_things(ship: Spaceship):
     ship.fly_to("Corneria")
     ship.barrel_roll()
 ```
@@ -741,7 +741,7 @@ import B.Spaceship
 import C.Spaceship
 import D.Spaceship
 
-fn do_things(ship: Spaceship):
+def do_things(ship: Spaceship):
     ship.fly_to("Corneria")
     ship.barrel_roll()
     ship.some_c_method()
@@ -754,7 +754,7 @@ Recommended: yes let’s allow it. Don’t see much reason not to.
 
 ```mojo
 extension List(Copyable) requires T: Copyable:
-    fn __init__(out self, *, copy: Self):
+    def __init__(out self, *, copy: Self):
         ...
 ```
 
@@ -790,7 +790,7 @@ We’ll one day want something like this:
 # In list_iterator_extensions.mojo
 
 extension Iterator requires T: Copyable
-  fn to_list(self) -> List[T]:
+  def to_list(self) -> List[T]:
       var result = List[T]()
       for x in self:
           result.append(x)
@@ -816,11 +816,11 @@ For example, this:
 
 ```mojo
 extension Spaceship:
-    fn fly_to(mut self, new_location: String):
+    def fly_to(mut self, new_location: String):
         self.liftoff()
         self.set_location(new_location)
 
-    fn barrel_roll(mut self):
+    def barrel_roll(mut self):
         self.spin(3)
 ```
 
@@ -828,11 +828,11 @@ Is basically just two functions that can add themselves to an existing scope,
 like (pseudocode):
 
 ```mojo
-fn Spaceship.fly_to(mut self, new_location: String):
+def Spaceship.fly_to(mut self, new_location: String):
     self.liftoff()
     self.set_location(new_location)
 
-fn Spaceship.barrel_roll(mut self):
+def Spaceship.barrel_roll(mut self):
     self.spin(3)
 ```
 

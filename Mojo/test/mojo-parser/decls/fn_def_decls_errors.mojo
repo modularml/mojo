@@ -244,11 +244,3 @@ def testOverloadedMethod():
 
   _: Int = x^.method()
   _: String = x^.method() # expected-error {{cannot implicitly convert 'Int' value to 'String'}}
-
-# expected-error @+1 {{'fn' has been removed; use 'def' instead}}
-fn fn_keyword_error():
-    pass
-
-# expected-error @below {{'fn' has been removed; use 'def' instead}}
-def uses_fn_type(_x: fn () thin -> None):
-    pass

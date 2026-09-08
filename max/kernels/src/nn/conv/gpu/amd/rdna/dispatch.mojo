@@ -323,6 +323,8 @@ def dispatch_rdna_conv2d[
                 type_of(filter_nk_tt).LayoutType,
                 elementwise_lambda_fn=_epilogue,
                 BLOCK_K=BLOCK_K,
+                out_engine=type_of(out_tt).Engine,
+                filter_nk_engine=type_of(filter_nk_tt).Engine,
             ]
 
             ctx.enqueue_function[conv_kernel](

@@ -106,9 +106,9 @@ def test_vectorize_evl() raises:
 def test_vectorize_unroll() raises:
     comptime buf_len = 23
 
-    var vec_stack = Array[Float32, buf_len](uninitialized=True)
+    var vec_stack = Array[Float32, buf_len](fill={})
     var vec = Span(vec_stack)
-    var buf_stack = Array[Float32, buf_len](uninitialized=True)
+    var buf_stack = Array[Float32, buf_len](fill={})
     var buf = Span(buf_stack)
 
     for i in range(buf_len):

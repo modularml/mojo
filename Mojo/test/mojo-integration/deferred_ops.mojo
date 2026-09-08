@@ -15,7 +15,7 @@
 
 
 def test0(a: Int, b: Int) raises -> Bool:
-    comptime pred_attr = __mlir_attr.`#index<cmp_predicate sle>`
+    comptime pred_attr = __mlir_attr.`#index.cmp_predicate<sle>`
 
     var res = __mlir_op.`index.cmp`[pred=pred_attr](
         a.__mlir_index__(), b.__mlir_index__()
@@ -26,9 +26,9 @@ def test0(a: Int, b: Int) raises -> Bool:
 def test1[cmp: Bool](a: Int, b: Int) raises -> Bool:
     def select_pred[cmp: Bool]() -> __mlir_type.`!kgen.deferred`:
         comptime if cmp:
-            return __mlir_attr.`#index<cmp_predicate sle>`
+            return __mlir_attr.`#index.cmp_predicate<sle>`
         else:
-            return __mlir_attr.`#index<cmp_predicate sgt>`
+            return __mlir_attr.`#index.cmp_predicate<sgt>`
 
     comptime pred_attr = select_pred[cmp]()
 
@@ -54,7 +54,7 @@ def to_string[
 def test2[pred: StaticString](x: Int, y: Int) -> Bool:
     def get_pred[pred: StaticString]() -> __mlir_type.`!kgen.deferred`:
         return __mlir_deferred_attr[
-            `#index<cmp_predicate `, +to_string[pred](), `>`
+            `#index.cmp_predicate<`, +to_string[pred](), `>`
         ]
 
     var z = __mlir_op.`index.cmp`[pred=get_pred[pred]()](

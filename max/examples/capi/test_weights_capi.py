@@ -41,7 +41,8 @@ def build_graph() -> None:
     dummy_weights = {"weight": np.zeros(4, dtype=np.float32)}
 
     session = engine.InferenceSession(devices=[CPU()])
-    model = session.load(graph, weights_registry=dummy_weights)
+    compiled = session.compile(graph)
+    model = session.init(compiled, weights_registry=dummy_weights)
     model._export_mef("weights_graph.mef")
 
 

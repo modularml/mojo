@@ -23,6 +23,7 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef
 from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams
 from max.pipelines.kv_cache import PagedKVCacheManagerInterface, load_kv_manager
+from max.pipelines.kv_cache.registry import _use_jenga_kv_cache
 
 
 def create_kv_params(
@@ -61,6 +62,51 @@ def _load_kv_manager_with_defaults(
         is_di_enabled=is_di_enabled,
         model_name=model_name,
     )
+
+
+class TestUseJengaKvCache:
+    """Allowlist and opt-out behavior for the Jenga manager."""
+
+    @pytest.mark.parametrize(
+        ("model_name", "expected"),
+        [
+            ("meta-llama/Llama-3.1-8B-Instruct", True),
+            ("google/gemma-4-31B-it", True),
+            ("openai/gpt-oss-20b", True),
+            ("openai/gpt-oss-120b", True),
+            ("GptOssForCausalLM", True),
+            ("allenai/Olmo-3-7B-Instruct", True),
+            ("Olmo3ForCausalLM", True),
+            ("allenai/OLMo-2-1124-7B-Instruct", True),
+            ("stepfun-ai/Step-3.5-Flash", True),
+            ("Step3p5ForCausalLM", True),
+            ("modularai/inkling", True),
+            ("Qwen/Qwen3-8B", False),
+            ("FAKE", False),
+        ],
+    )
+    def test_model_allowlist(
+        self, model_name: str, expected: bool, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("MODULAR_USE_LEGACY_KV_CACHE", raising=False)
+        assert (
+            _use_jenga_kv_cache(
+                create_kv_params(),
+                is_di_enabled=False,
+                model_name=model_name,
+            )
+            is expected
+        )
+
+    def test_legacy_env_disables_jenga(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("MODULAR_USE_LEGACY_KV_CACHE", "1")
+        assert not _use_jenga_kv_cache(
+            create_kv_params(),
+            is_di_enabled=False,
+            model_name="openai/gpt-oss-20b",
+        )
 
 
 class TestLoadKvManager:

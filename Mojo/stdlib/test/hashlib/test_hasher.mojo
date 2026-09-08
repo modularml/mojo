@@ -33,7 +33,7 @@ struct DummyHasher(Hasher):
     def _update_with_simd(mut self, value: SIMD[_, _]):
         self._dummy_value += value.cast[.uint64]().reduce_add()
 
-    def update(mut self, value: Some[Hashable]):
+    def update(mut self, value: ImmSpan[Byte, _]):
         value.__hash__(self)
 
     def finish(var self) -> UInt64:
@@ -48,7 +48,7 @@ struct SomeHashableStruct(Hashable, ImplicitlyCopyable):
 def test_hasher() raises:
     var hasher = DummyHasher()
     var hashable = SomeHashableStruct(42)
-    hasher.update(hashable)
+    hashable.__hash__(hasher)
     assert_equal(hasher^.finish(), 42)
 
 
@@ -63,8 +63,8 @@ struct ComplexHashableStruct(Hashable):
     var _value2: SomeHashableStruct
 
     def __hash__[H: Hasher](self, mut hasher: H):
-        hasher.update(self._value1)
-        hasher.update(self._value2)
+        self._value1.__hash__(hasher)
+        self._value2.__hash__(hasher)
 
 
 def test_complex_hasher() raises:
@@ -72,7 +72,7 @@ def test_complex_hasher() raises:
     var hashable = ComplexHashableStruct(
         SomeHashableStruct(42), SomeHashableStruct(10)
     )
-    hasher.update(hashable)
+    hashable.__hash__(hasher)
     assert_equal(hasher^.finish(), 52)
 
 
@@ -90,8 +90,8 @@ struct ComplexHashableStructWithList(Hashable):
     var _value3: List[UInt8]
 
     def __hash__[H: Hasher](self, mut hasher: H):
-        hasher.update(self._value1)
-        hasher.update(self._value2)
+        self._value1.__hash__(hasher)
+        self._value2.__hash__(hasher)
         # This is okay because self is passed as read-only so the pointer will
         # be valid until at least the end of the function
         hasher._update_with_bytes(
@@ -107,14 +107,14 @@ struct ComplexHashableStructWithListAndWideSIMD(Hashable):
     var _value4: SIMD[.uint32, 4]
 
     def __hash__[H: Hasher](self, mut hasher: H):
-        hasher.update(self._value1)
-        hasher.update(self._value2)
+        self._value1.__hash__(hasher)
+        self._value2.__hash__(hasher)
         # This is okay because self is passed as read-only so the pointer will
         # be valid until at least the end of the function
         hasher._update_with_bytes(
             Span(unsafe_ptr=self._value3.unsafe_ptr(), length=len(self._value3))
         )
-        hasher.update(self._value4)
+        self._value4.__hash__(hasher)
 
 
 def test_update_with_bytes() raises:
@@ -122,7 +122,7 @@ def test_update_with_bytes() raises:
     var hashable = ComplexHashableStructWithList(
         SomeHashableStruct(42), SomeHashableStruct(10), [UInt8(1), 2, 3]
     )
-    hasher.update(hashable)
+    hashable.__hash__(hasher)
     assert_equal(hasher^.finish(), 58)
 
 

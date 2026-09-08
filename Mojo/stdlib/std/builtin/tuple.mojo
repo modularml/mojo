@@ -356,7 +356,7 @@ struct Tuple[*Ts: Movable](
 
     @always_inline
     def __lt__(
-        self, other: Self
+        self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
         """Compare this tuple to another tuple using less than comparison.
 
@@ -370,7 +370,7 @@ struct Tuple[*Ts: Movable](
 
     @always_inline
     def __le__(
-        self, other: Self
+        self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
         """Compare this tuple to another tuple using less than or equal to comparison.
 
@@ -384,7 +384,7 @@ struct Tuple[*Ts: Movable](
 
     @always_inline
     def __gt__(
-        self, other: Self
+        self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
         """Compare this tuple to another tuple using greater than comparison.
 
@@ -399,7 +399,7 @@ struct Tuple[*Ts: Movable](
 
     @always_inline
     def __ge__(
-        self, other: Self
+        self, other: Self, /
     ) -> Bool where Self.Ts.all_conforms_to[Comparable]():
         """Compare this tuple to another tuple using greater than or equal to comparison.
 

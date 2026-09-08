@@ -220,6 +220,33 @@ def test_property_name_escapes_cannot_forge_a_cache_key() -> None:
     )
 
 
+def test_property_key_with_embedded_quote_enforces_value_type() -> None:
+    key = 'foo"bar'
+    compiled = _compiler().compile_json_schema(
+        json.dumps(
+            {
+                "properties": {key: {"$ref": "#/definitions/foo%22bar"}},
+                "definitions": {key: {"type": "number"}},
+            }
+        )
+    )
+    assert _accepts(compiled, json.dumps({key: 1}))
+    assert not _accepts(compiled, json.dumps({key: "1"}))
+
+
+def test_property_key_with_embedded_backslash_enforces_value_type() -> None:
+    key = "a\\b"
+    compiled = _compiler().compile_json_schema(
+        json.dumps(
+            {
+                "properties": {key: {"type": "number"}},
+            }
+        )
+    )
+    assert _accepts(compiled, json.dumps({key: 1}))
+    assert not _accepts(compiled, json.dumps({key: "1"}))
+
+
 # Rejection of unenforceable keywords is opt-in: it happens only when the caller
 # passes reject_unsupported=True. The default (exercised by the guard tests below)
 # falls back to best-effort decoding instead.
@@ -904,6 +931,28 @@ def test_oneof_const_disjoint_compiles_and_enforces() -> None:
     assert _accepts(compiled, '"a"')
     assert _accepts(compiled, '"b"')
     assert not _accepts(compiled, '"ab"')
+
+
+def test_const_enum_control_char_string_is_escaped() -> None:
+    # A const/enum string value with a control char must render as its escaped
+    # JSON form; the grammar must reject the raw control byte (invalid JSON).
+    nl = _compiler().compile_json_schema(
+        json.dumps({"const": "a\nb"}), reject_unsupported=True
+    )
+    assert _accepts(nl, '"a\\nb"')  # escaped newline -> valid JSON, accepted
+    assert not _accepts(nl, '"a\nb"')  # raw newline -> invalid JSON, rejected
+
+    en = _compiler().compile_json_schema(
+        json.dumps({"enum": ["a\nb"]}), reject_unsupported=True
+    )
+    assert _accepts(en, '"a\\nb"')
+    assert not _accepts(en, '"a\nb"')
+
+    nul = _compiler().compile_json_schema(
+        json.dumps({"const": "x\x00y"}), reject_unsupported=True
+    )
+    assert _accepts(nul, '"x\\u0000y"')  # escaped NUL -> valid, accepted
+    assert not _accepts(nul, '"x\x00y"')  # raw NUL -> invalid, rejected
 
 
 def test_oneof_enum_disjoint_compiles_and_enforces() -> None:
@@ -3169,6 +3218,81 @@ def test_cache_key_distinguishes_property_names_default_type() -> None:
     )
     assert _accepts(compiled, '{"b": 1, "a": {"a": 1}}')
     assert not _accepts(compiled, '{"b": 1, "a": {1: 1}}')
+
+
+def test_property_names_non_string_shape_rejected() -> None:
+    for property_names in (
+        {"type": ["integer", "string"]},
+        {"type": ["string"]},
+        {"anyOf": [{"type": "string"}, {"type": ["integer"]}]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": property_names,
+        }
+        with pytest.raises(Exception, match="non-string"):
+            _gemma_compile(schema)
+        with pytest.raises(Exception, match="non-string"):
+            _compiler().compile_json_schema(json.dumps(schema))
+
+
+def test_property_names_non_string_const_enum_rejected() -> None:
+    for property_names in (
+        {"const": 42},
+        {"const": True},
+        {"const": None},
+        {"enum": [1, 2]},
+        {"enum": ["a", 2]},
+        {"enum": [None]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": property_names,
+        }
+        with pytest.raises(Exception, match="non-string"):
+            _gemma_compile(schema)
+        with pytest.raises(Exception, match="non-string"):
+            _compiler().compile_json_schema(json.dumps(schema))
+
+
+def test_property_names_string_const_enum_accepted() -> None:
+    for property_names in ({"const": "foo"}, {"enum": ["a", "b"]}):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": property_names,
+        }
+        _gemma_compile(schema)
+        _compiler().compile_json_schema(json.dumps(schema))
+
+
+def test_property_names_allof_folds_to_string_shape() -> None:
+    for accepted in (
+        {"allOf": [{"type": "string"}]},
+        {"allOf": [{"type": "string"}, {"minLength": 1}]},
+        {"allOf": [{"const": "foo"}]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": accepted,
+        }
+        _compiler().compile_json_schema(json.dumps(schema))
+    for rejected in (
+        {"allOf": [{"type": "number"}]},
+        {"allOf": [{"type": "string"}, {"type": "number"}]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": rejected,
+        }
+        with pytest.raises(
+            Exception, match="must be an object that validates string"
+        ):
+            _compiler().compile_json_schema(json.dumps(schema))
 
 
 def test_cache_key_not_forgeable_via_property_name() -> None:

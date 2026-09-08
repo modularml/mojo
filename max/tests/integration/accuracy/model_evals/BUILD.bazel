@@ -265,3 +265,40 @@ modular_py_test(
         ":eval_common",
     ],
 )
+
+# Logit-shift GPQA stop/accuracy gate. Stdlib + click only.
+# gpqa_logit_gate.py lives only on the binary so find_duplicate_srcs
+# does not flag it against the library.
+modular_py_library(
+    name = "gpqa_logit_gate_lib",
+    testonly = True,
+    srcs = [
+        "calibration/__init__.py",
+        "calibration/gpqa_gate.py",
+    ],
+    data = ["calibration/data/gpqa_gate_hist.json"],
+    imports = ["."],
+)
+
+modular_py_binary(
+    name = "gpqa_logit_gate",
+    testonly = True,
+    srcs = ["calibration/gpqa_logit_gate.py"],
+    imports = ["."],
+    main = "calibration/gpqa_logit_gate.py",
+    tags = ["manual"],
+    deps = [
+        ":gpqa_logit_gate_lib",
+        requirement("click"),
+    ],
+)
+
+modular_py_test(
+    name = "test_gpqa_logit_gate",
+    size = "medium",
+    srcs = ["calibration/test_gpqa_logit_gate.py"],
+    deps = [
+        ":gpqa_logit_gate",
+        ":gpqa_logit_gate_lib",
+    ],
+)

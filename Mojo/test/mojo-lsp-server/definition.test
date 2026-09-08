@@ -8,7 +8,7 @@
   "uri":"test:///foo.mojo",
   "languageId":"mojo",
   "version":1,
-  "text":"import collections.vector\nfn function():\n  var foo: Int = 420\n  var bar = 1 + foo\n  print(bar)"
+  "text":"import collections.vector\ndef function():\n  var foo: Int = 420\n  var bar = 1 + foo\n  print(bar)"
 }}}
 // -----
 {"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{

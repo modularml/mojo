@@ -200,7 +200,7 @@ def generate_max_outputs(
         dtype=dtype,
         devices=[device_ref],
         layer_idx=layer_idx,
-        sliding_window_pattern=text_config.sliding_window_pattern,
+        is_sliding=bool((layer_idx + 1) % text_config.sliding_window_pattern),
     )
     attention.load_state_dict(state_dict)
 

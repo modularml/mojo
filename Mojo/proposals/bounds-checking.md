@@ -12,7 +12,7 @@ Today, collections allow negative indexing e.g. `x[-1]` to get the last element.
 This requires every index operation to normalize negative values (simplified):
 
 ```python
-fn __getitem__(self, var i: Int):
+def __getitem__(self, var i: Int):
     if i < 0:
         i += len(self)
 ```
@@ -54,7 +54,7 @@ compile-time check via comptime assert. The error shows the indexing call site
 directly above the error:
 
 ```mojo
-fn main():
+def main():
     var x = [1, 2, 3]
     print(x[-1])
 ```
@@ -78,7 +78,7 @@ large unsigned values that fail the `< len` comparison, so negative indices are
 rejected for free, with no extra branch:
 
 ```mojo
-fn main():
+def main():
     var x = [1, 2, 3]
     var i = -1
     print(x[i])
@@ -118,7 +118,7 @@ Remove `normalize_index` from each collections `__getitem__` method, using
 ```mojo
 struct List:
     @always_inline
-    fn __getitem__(ref self, idx: Some[Indexer]) -> ref[self] Self.T:
+    def __getitem__(ref self, idx: Some[Indexer]) -> ref[self] Self.T:
         check_bounds(idx, len(self), call_location())
         return (self._data + idx)[]
 

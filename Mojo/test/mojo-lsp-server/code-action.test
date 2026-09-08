@@ -5,7 +5,7 @@
   "uri":"test:///foo.mojo",
   "languageId":"mojo",
   "version":1,
-  "text":"from std.builtin.simd import Int\nfn foo():\n Int()\n"
+  "text":"from std.builtin.simd import Int\ndef foo():\n Int()\n"
 }}}
 // -----
 {"jsonrpc":"2.0","id":1,"method":"textDocument/codeAction","params":{

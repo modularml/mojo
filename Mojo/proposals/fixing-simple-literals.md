@@ -19,11 +19,11 @@ converted to a reasonable size before they are “materialized” at runtime:
 ```mojo
 alias biggg_number = 2 << 255 # Very large value
 
-fn use_number() -> Int:
+def use_number() -> Int:
   # Ok, not as big at runtime.
   return biggg_number // (2 << 246)
 
-fn fail_to_use_big() -> Int:
+def fail_to_use_big() -> Int:
   # error: integer value 115792089237316195423570985008687907853269984665640564039457584007913129639936 requires 258 bits to store, but the destination bit width is only 64 bits wide
   return biggg_number
 
@@ -39,11 +39,11 @@ alias pi = 3.1415926535897932384626433832795028841971693993751058209749445923
 alias tau = 2 * pi # maintains full precision
 alias e = 2.7182818284590452353602874713526624977572470936999595749669676277
 
-fn fast_circle_area(r: Float16) -> Float16:
+def fast_circle_area(r: Float16) -> Float16:
   return pi*r*r
-fn more_precise_circle_area(r: Float64) -> Float64:
+def more_precise_circle_area(r: Float64) -> Float64:
   return pi*r*r
-fn fast_circle_diameter(r: Float16) -> Float16:
+def fast_circle_diameter(r: Float16) -> Float16:
   return tau*r
 
 ```
@@ -85,7 +85,7 @@ For example, the current behavior for integers is (floating point works the same
 way):
 
 ```mojo
-fn integers():
+def integers():
    alias a1 = 42 # typeof(a1) is IntLiteral
    var v1 = 42   # typeof(v1) is Int
 
@@ -104,7 +104,7 @@ implementation of `IntLiteral` , a simplified version of which looks like this:
 struct IntLiteral:
     var value: __mlir_type.`!pop.int_literal`
 
-    fn __sub__(self, rhs: Self) -> Self:
+    def __sub__(self, rhs: Self) -> Self:
         return Self(
             __mlir_op.`pop.int_literal.binop<sub>`(self.value, rhs.value)
         )
@@ -119,7 +119,7 @@ can’t work in full generality. Consider something like this:
 
 ```mojo
 @export
-fn test(a: IntLiteral) -> IntLiteral: return a-1
+def test(a: IntLiteral) -> IntLiteral: return a-1
 ```
 
 In this case, the `IntLiteral` type is being used at runtime. This fails with a
@@ -127,10 +127,10 @@ rather inglorious error:
 
 ```text
 example.mojo:3:4: error: failed to convert func signature
-fn test(a: IntLiteral) -> IntLiteral: return a-1
+def test(a: IntLiteral) -> IntLiteral: return a-1
    ^
 example.mojo:3:4: error: failed to legalize operation 'kgen.func' that was explicitly marked illegal
-fn test(a: IntLiteral) -> IntLiteral: return a-1
+def test(a: IntLiteral) -> IntLiteral: return a-1
    ^
 example.mojo:3:4: note: see current operation:
 "kgen.func"() ({
@@ -158,7 +158,7 @@ doesn’t materialize to `String` for historical reasons, so we get this behavio
 ```text
 $ cat test.mojo
 @export
-fn example(a: Int):
+def example(a: Int):
     var x = "foo"   # typeof(x) is StringLiteral not String
     for i in range(a):
         x += "bar"
@@ -248,7 +248,7 @@ We enable this easily in our literal type with an initializer:
 struct IntLiteral[value: __mlir_type.`!pop.int_literal`]:
     # no var or other state
 
-    fn __init__(out self): pass
+    def __init__(out self): pass
 ```
 
 Take a minute to grok what this says - because there is no state at all inside
@@ -274,7 +274,7 @@ makes this easy enough:
 ```mojo
 struct IntLiteral[value: __mlir_type.`!pop.int_literal`]:
     ...
-    fn __sub__(
+    def __sub__(
         self,
         rhs: IntLiteral[_]) -> IntLiteral[??]):
       ?????
@@ -297,7 +297,7 @@ of `__sub__` looks like:
 
 ```mojo
  struct IntLiteral[value: __mlir_type.`!pop.int_literal`]:
-   fn __sub__(
+   def __sub__(
         self,
         rhs: IntLiteral[_]) -> IntLiteral[
             __mlir_attr[
@@ -333,7 +333,7 @@ an improved implementation of `__sub__` looks like:
 
 ```mojo
  struct IntLiteral[value: __mlir_type.`!pop.int_literal`]:
-     fn __sub__(self, rhs: IntLiteral[_])
+     def __sub__(self, rhs: IntLiteral[_])
         -> IntLiteral[
             __mlir_attr[
                 `#pop<int_literal_bin<sub `,
@@ -362,7 +362,7 @@ it even works correctly!). We have to write this function as a type function,
 and we don’t want to utter that MLIR attribute, so we can write it like this:
 
 ```mojo
-fn sub_two(a: IntLiteral[_]) -> __typeof(a-2):
+def sub_two(a: IntLiteral[_]) -> __typeof(a-2):
     return {}
 
 ...
@@ -383,10 +383,10 @@ are aggregates of more primitive things, for example, `-x` is just `0-x` and
 ```mojo
 struct IntLiteral[value: __mlir_type.`!pop.int_literal`]:
     ...
-    fn __neg__(self) -> type_of(0 - self):
+    def __neg__(self) -> type_of(0 - self):
         return {}
 
-    fn __invert__(self) -> type_of(self ^ -1):
+    def __invert__(self) -> type_of(self ^ -1):
         return {}
 ```
 
@@ -402,7 +402,7 @@ implementation of less than looks like:
 ```mojo
 struct IntLiteral[value: __mlir_type.`!pop.int_literal`]:
     ...
-    fn __lt__(self, rhs: IntLiteral[_]) -> Bool:
+    def __lt__(self, rhs: IntLiteral[_]) -> Bool:
         return __mlir_attr[
             `#pop<int_literal_cmp<lt `,
             self.value,
@@ -429,10 +429,10 @@ pieces work, we can take more at once:
 @__nonmaterializable(Float64)
 struct FloatLiteral[value: __mlir_type.`!pop.float_literal`]:
     # Create from a float literal parameter expression.
-    fn __init__(out self):
+    def __init__(out self):
         pass
 
-    fn __sub__(self, rhs: FloatLiteral)
+    def __sub__(self, rhs: FloatLiteral)
         -> FloatLiteral[
             __mlir_attr[
                 `#pop<float_literal_bin<sub `,
@@ -456,7 +456,7 @@ struct FloatLiteral[value: __mlir_type.`!pop.float_literal`]:
 ...
 
     @implicit
-    fn __init__(
+    def __init__(
         value: IntLiteral[_],
         out result: FloatLiteral[
             __mlir_attr[
@@ -468,7 +468,7 @@ struct FloatLiteral[value: __mlir_type.`!pop.float_literal`]:
     ):
         return {}
 
-    fn __rsub__(self, rhs: FloatLiteral) -> type_of(rhs - self):
+    def __rsub__(self, rhs: FloatLiteral) -> type_of(rhs - self):
         return {}
 ```
 
@@ -495,7 +495,7 @@ Let’s go back to one of our examples:
 
 ```mojo
 @export
-fn test(a: IntLiteral) -> IntLiteral: return a-1
+def test(a: IntLiteral) -> IntLiteral: return a-1
 ```
 
 When you compile this with the new design, you get a reasonable compile time
@@ -504,7 +504,7 @@ error:
 ```text
 $ mojo test.mojo
 test.mojo:3:27: error: 'IntLiteral' missing required parameter 'value'
-fn test(a: IntLiteral) -> IntLiteral: return a-1
+def test(a: IntLiteral) -> IntLiteral: return a-1
                           ^
 ```
 
@@ -513,7 +513,7 @@ harder - we know how to make parametric functions with `IntLiteral` now. You’d
 write this function like this:
 
 ```mojo
-fn test(a: IntLiteral) -> __typeof(a-1):
+def test(a: IntLiteral) -> __typeof(a-1):
     return {}
 ```
 
@@ -542,7 +542,7 @@ types on operations - one example of this is `CeilDivable` :
 
 ```mojo
 trait CeilDivable:
-    fn __ceildiv__(self, denominator: Self) -> Self:
+    def __ceildiv__(self, denominator: Self) -> Self:
 ```
 
 This operation cannot be implemented on `IntLiteral` or `FloatLiteral` because
@@ -551,11 +551,11 @@ doesn’t seem like this matters: it did require defining one overload of the
 global `ceildiv` function:
 
 ```mojo
-fn ceildiv[T: CeilDivable, //](numerator: T, denominator: T) -> T:
+def ceildiv[T: CeilDivable, //](numerator: T, denominator: T) -> T:
     # return -(numerator // -denominator)
     return numerator.__ceildiv__(denominator)
 
-fn ceildiv(numerator: IntLiteral, denominator: IntLiteral)
+def ceildiv(numerator: IntLiteral, denominator: IntLiteral)
   -> type_of(numerator.__ceildiv__(denominator):
     return {}
 ```
@@ -580,7 +580,7 @@ The other subtle thing I discovered is due to type merging, consider logic like
 this:
 
 ```mojo
-fn do_thing[dt: DType]():
+def do_thing[dt: DType]():
     alias value = 1e-06 if type == DType.float32 else 1e-1
     ...
 ```

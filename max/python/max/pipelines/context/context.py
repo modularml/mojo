@@ -574,12 +574,6 @@ class TextContext:
     _cache_metrics_emitted: bool = field(default=False)
     """Set to ``True`` after the first CE batch to prevent re-emitting cache hit metrics on chunked-prefill follow-up calls."""
 
-    _pending_future_count: int = field(default=0)
-    """Number of unrealized ``FUTURE_TOKEN`` placeholders trailing the token
-    buffer. Incremented by :meth:`update_with_future_token` and decremented by
-    :meth:`realize_future_token`; the placeholders always occupy the last
-    ``_pending_future_count`` positions of ``tokens.all``."""
-
     trace_carrier: dict[str, str] | None = field(default=None)
     """Serialized W3C trace context (via ``opentelemetry.propagate.inject``)
     captured from the inbound request's OTel context. Threaded onto this
@@ -651,22 +645,24 @@ class TextContext:
         """Whether text generation has finished."""
         return self.status.is_done
 
-    @property
-    def pending_future_count(self) -> int:
-        """Number of unrealized future-token placeholders trailing the buffer."""
-        return self._pending_future_count
+    def _has_pending_future_token(self) -> bool:
+        """Whether the last generated token is an unrealized overlap placeholder."""
+        return (
+            self.tokens.generated_length > 0
+            and int(self.tokens[-1]) == FUTURE_TOKEN
+        )
 
     @property
     def last_realized_token(self) -> int:
         """The most recent realized (non-placeholder) token in the buffer.
 
-        With ``k`` unrealized future-token placeholders trailing the buffer,
-        this is the token immediately before them. Readers that assume the
-        last buffer slot holds a real token must use this instead of
-        ``tokens[-1]``, which may be an unrealized placeholder while forwards
-        are in flight.
+        Overlap decode appends a single ``FUTURE_TOKEN`` placeholder while a
+        forward is in flight, so ``tokens[-1]`` may be unrealized. Readers that
+        need a real token must use this instead.
         """
-        return int(self.tokens[-1 - self._pending_future_count])
+        if self._has_pending_future_token():
+            return int(self.tokens[-2])
+        return int(self.tokens[-1])
 
     @property
     def min_tokens(self) -> int:
@@ -828,41 +824,21 @@ class TextContext:
             TextGenerationOutput: The completion tokens and their associated
             log probabilities, if available.
         """
-        # With unrealized future tokens still in flight (schedule-ahead
-        # decoding), a MAXIMUM_LENGTH status set by a placeholder append may
-        # precede the realization of wanted tokens. Report ACTIVE until the
-        # realized prefix actually reaches the limit so the serving scheduler
-        # does not release the request (dropping its final in-flight tokens)
-        # early. EOS is unaffected: tokens past a realized EOS are extras that
-        # the scheduler's released-request filter drops, so it reports done
-        # immediately. At the classic depth of one pending future, responses
-        # are always built right after realization (count == 0), so this is
-        # inert there.
-        final_status = self.status
-        if (
-            self.status is GenerationStatus.MAXIMUM_LENGTH
-            and self._pending_future_count > 0
-            and len(self.tokens) - self._pending_future_count < self.max_length
-        ):
-            final_status = GenerationStatus.ACTIVE
-
         # Return early, if we have no outstanding generated tokens
         if not self.tokens.has_outstanding_generated_tokens:
             return TextGenerationOutput(
                 request_id=self.request_id,
                 tokens=[],
                 log_probabilities=None,
-                final_status=final_status,
+                final_status=self.status,
                 num_cached_tokens=self.cached_prefix_length,
             )
 
-        # Trailing unrealized future-token placeholders are not consumable:
-        # each is realized (and only then streamed) by a later overlap step.
-        # Clamp the consumed window to the realized prefix so a request with
-        # in-flight forwards never streams a placeholder.
+        # Hold back an in-flight overlap placeholder so it cannot stream.
+        trailing_future = 1 if self._has_pending_future_token() else 0
         consumable_end = max(
             self.tokens._completion_range.start,
-            self.tokens._completion_range.end - self._pending_future_count,
+            self.tokens._completion_range.end - trailing_future,
         )
         element_ids = range(
             self.tokens._completion_range.start,
@@ -872,10 +848,11 @@ class TextContext:
         if len(element_ids) > 0:
             generated_tokens = [
                 int(x)
-                for x in self.tokens.consume_recently_generated_tokens(
-                    num_trailing_to_exclude=self._pending_future_count
-                )
+                for x in self.tokens.array[
+                    self.tokens._completion_range.start : consumable_end
+                ]
             ]
+            self.tokens._completion_range.bump_start(len(element_ids))
             if FUTURE_TOKEN in generated_tokens:
                 raise ValueError(
                     "Attempted to create generation output while future token is not yet realized."
@@ -907,7 +884,7 @@ class TextContext:
             request_id=self.request_id,
             tokens=generated_tokens,
             log_probabilities=log_probabilities,
-            final_status=final_status,
+            final_status=self.status,
             num_cached_tokens=self.cached_prefix_length,
         )
 
@@ -941,19 +918,11 @@ class TextContext:
                 log_probabilities
             )
 
-        # Real-token appends are forbidden while placeholders are live: the
-        # unrealized positions must stay the trailing suffix of the buffer so
-        # realization can target them by offset from the end. Additional
-        # FUTURE_TOKEN placeholders may still be appended (schedule-ahead
-        # enqueues forward n+1 before step n's token is realized).
-        if self._pending_future_count > 0 and new_token != FUTURE_TOKEN:
+        if self.tokens.all[-1] == FUTURE_TOKEN:
             raise ValueError("Cannot append a token after a future token.")
 
         self.tokens.advance_with_token(new_token)
 
-        # Placeholder appends cannot trigger EOS: FUTURE_TOKEN is never an EOS
-        # token id and never the suffix of an EOS sequence, so skip the check
-        # rather than evaluating it on a slice containing the placeholder.
         if new_token != FUTURE_TOKEN and self.eos_tracker.is_eos_from_tokens(
             self.tokens.generated
         ):
@@ -1059,38 +1028,16 @@ class TextContext:
         self.advance_token_buffer(new_token, log_probabilities)
         self.advance_fsm(new_token)
 
-    def update_with_future_token(self, max_pending_futures: int = 1) -> None:
+    def update_with_future_token(self) -> None:
         """Append a placeholder future token to the generated tokens.
 
         This is primarily used for overlap scheduling. For structured output
         contexts (those with a matcher), only the token buffer is advanced.
         The FSM will be advanced later when the future token is realized
         with the actual generated token.
-
-        Args:
-            max_pending_futures: Maximum number of unrealized placeholders the
-                context may hold at once. The default of 1 preserves the
-                classic overlap-scheduler invariant of a single pending
-                future token.
         """
-        if self._pending_future_count >= max_pending_futures:
+        if self._has_pending_future_token():
             raise ValueError("Cannot have multiple future tokens.")
-
-        # NOTE: advance_token_buffer forbids REAL-token appends while
-        # placeholders are live but allows additional FUTURE_TOKEN appends, so
-        # with max_pending_futures > 1 the placeholders accumulate as the
-        # trailing suffix of the buffer and are realized oldest-first.
-        #
-        # A chunked-prefill continuation swallows the placeholder append:
-        # advance_token_buffer early-returns for an actively-chunked context
-        # (it advances the chunk instead of writing FUTURE_TOKEN), so no
-        # placeholder actually becomes pending. Capture that here and skip the
-        # count bump, mirroring the baseline sentinel model where no
-        # FUTURE_TOKEN was written for such contexts. Incrementing regardless
-        # would desync the count from the buffer and spuriously trip the guard
-        # above on the request's next chunked step -- the realize path is also
-        # skipped for these contexts, since generated_length stays 0.
-        appended_placeholder = not self.tokens.actively_chunked
 
         if self.matcher is not None:
             # For structured output, only advance the token buffer.
@@ -1100,25 +1047,19 @@ class TextContext:
         else:
             self.update(new_token=FUTURE_TOKEN)
 
-        if appended_placeholder:
-            self._pending_future_count += 1
-
     def realize_future_token(
         self, new_token: int, log_probabilities: LogProbabilities | None = None
     ) -> None:
-        """Overwrite the oldest placeholder future token with the actual token.
+        """Overwrite the placeholder future token with the actual token.
 
-        This is primarily used for overlap scheduling. Placeholders are
-        realized oldest-first: with ``pending_future_count == k``, the target
-        is the token ``k`` positions from the end of the buffer.
+        This is primarily used for overlap scheduling.
         """
         if self.tokens.generated_length == 0:
             raise ValueError(
                 "Cannot realize a future token when there are no generated tokens."
             )
 
-        count = self._pending_future_count
-        if count == 0:
+        if not self._has_pending_future_token():
             raise ValueError(
                 "Attempted to realize a non-future token. Found token: ",
                 self.tokens.all[-1],
@@ -1126,27 +1067,20 @@ class TextContext:
 
         # Overwrite the log probabilities data
         if log_probabilities:
-            self._log_probabilities_data[
-                self.tokens.current_position - count
-            ] = log_probabilities
+            self._log_probabilities_data[self.tokens.current_position - 1] = (
+                log_probabilities
+            )
 
-        self.tokens.overwrite_token_at_offset_from_end(count, new_token)
-        self._pending_future_count = count - 1
+        self.tokens.overwrite_last_token(new_token)
 
-        # EOS is only ever evaluated on the realized (placeholder-free) prefix
-        # of the generated tokens.
-        realized = self.tokens.generated
-        if self._pending_future_count > 0:
-            realized = realized[: -self._pending_future_count]
-        if realized.size > 0 and self.eos_tracker.is_eos_from_tokens(realized):
+        if self.eos_tracker.is_eos_from_tokens(self.tokens.generated):
             self.status = GenerationStatus.END_OF_SEQUENCE
 
     def reset(self) -> None:
         """Resets the context's state by combining all tokens into a new prompt."""
         self.tokens.reset_as_new_prompt(
-            num_trailing_tokens_to_delete=self._pending_future_count
+            delete_last_generated_token=self._has_pending_future_token()
         )
-        self._pending_future_count = 0
         self._is_initial_prompt = True
         self._spec_decoding_state = None
 

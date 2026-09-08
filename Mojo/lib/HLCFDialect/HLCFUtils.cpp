@@ -54,26 +54,17 @@ Operation *HLCF::getParentNode(HLCF::ControlFlowTerminator term) {
 HLCF::IfOp HLCF::replaceElifWithIfOps(ElifOp elifOp) {
   ImplicitLocOpBuilder builder(elifOp->getLoc(), elifOp);
   builder.setInsertionPoint(elifOp);
-  Region *currentRegion = elifOp->getParentRegion();
 
-  // Lift condition ops into parent region.
-  Block &firstBlock = elifOp.getElifRegions().front().front();
-  assert(firstBlock.getNumArguments() == 0);
-  auto firstElifYieldOp = cast<HLCF::ElifYieldOp>(firstBlock.getTerminator());
-  currentRegion->front().getOperations().splice(builder.getInsertionPoint(),
-                                                firstBlock.getOperations());
-  // Replace ElifYield with IfOp.
-  HLCF::IfOp outerMostIfOp = HLCF::IfOp::create(
-      builder, elifOp.getResultTypes(), firstElifYieldOp->getOperand(0));
-  currentRegion = &outerMostIfOp.getThenRegion();
-  firstElifYieldOp->erase();
+  // First condition is an SSA operand; build the outermost if from it.
+  HLCF::IfOp outerMostIfOp =
+      HLCF::IfOp::create(builder, elifOp.getResultTypes(), elifOp.getCond());
+  outerMostIfOp.getThenRegion().takeBody(elifOp.getThenRegion());
+  Region *currentRegion = &outerMostIfOp.getElseRegion();
 
-  // Nest Elif Regions into IfOp Else Regions.
-  for (Region &region : elifOp.getElifRegions().slice(1)) {
+  // Nest additional (cond, then) pairs into the current else region.
+  for (Region &region : elifOp.getElifRegions()) {
     currentRegion->takeBody(region);
     builder.setInsertionPointToEnd(&currentRegion->front());
-    // We moved Elif Condition region into If's Else region. Spawn a new IfOp
-    // and update current region to If's Then region.
     Operation *terminator = currentRegion->front().getTerminator();
     if (auto elifYieldOp = dyn_cast<HLCF::ElifYieldOp>(terminator)) {
       auto newIfOp = HLCF::IfOp::create(builder, elifOp.getResultTypes(),
@@ -84,8 +75,7 @@ HLCF::IfOp HLCF::replaceElifWithIfOps(ElifOp elifOp) {
       currentRegion = &newIfOp.getThenRegion();
       continue;
     }
-    // Otherwise, we moved Elif then region into If's Then region. Update the
-    // current region to If's Else region.
+    // Moved a then region into If's Then region; continue into its Else.
     auto ifOpParent = terminator->getParentOfType<HLCF::IfOp>();
     currentRegion = &ifOpParent.getElseRegion();
   }

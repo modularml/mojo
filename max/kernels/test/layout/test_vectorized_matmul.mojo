@@ -45,15 +45,15 @@ def test_tiled_and_vectorized_matmul():
     comptime TN = 2
 
     comptime a_layout = Layout(IntTuple(M, K), IntTuple(K, 1))
-    var a_stack = Array[Float32, a_layout.size()](uninitialized=True)
+    var a_stack = Array[Float32, a_layout.size()](fill={})
     var tensor_a = LayoutTensor[.float32, a_layout](a_stack)
 
     comptime b_layout = Layout(IntTuple(K, N), IntTuple(N, 1))
-    var b_stack = Array[Float32, b_layout.size()](uninitialized=True)
+    var b_stack = Array[Float32, b_layout.size()](fill={})
     var tensor_b = LayoutTensor[.float32, b_layout](b_stack)
 
     comptime c_layout = Layout(IntTuple(M, N), IntTuple(N, 1))
-    var c_stack = Array[Float32, c_layout.size()](uninitialized=True)
+    var c_stack = Array[Float32, c_layout.size()](fill={})
     var tensor_c = LayoutTensor[.float32, c_layout](c_stack)
 
     arange(tensor_a)

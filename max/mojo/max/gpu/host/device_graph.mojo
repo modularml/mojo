@@ -32,10 +32,12 @@ from max.gpu.host import (
 from std.collections.optional import OptionalReg
 from std.ffi import c_size_t, external_call
 from std.logger import Logger
-from std.sys import bit_width_of, size_of
+from std.sys import align_of, bit_width_of, size_of
+from std.memory import unsafe_memcpy
 from std.memory.unsafe import bitcast
 from std.reflection import call_location, SourceLocation
 from std.utils.lock import BlockingScopedLock, BlockingSpinLock
+from std.utils.static_tuple import StaticTuple
 from std.builtin.device_passable import DevicePassable
 
 from max.runtime.async_value import AnyAsyncValueRef
@@ -54,6 +56,7 @@ from max.gpu.host.device_context import (
     _DeviceFunctionPtr,
     _DumpPath,
     _FunctionEnqueuer,
+    _LaunchBits,
 )
 
 comptime _logger = Logger()
@@ -1136,8 +1139,9 @@ struct DeviceGraphBuilder[arena_origin: ImmOrigin](Movable):
         Takes the kernel as a compile-time function pointer (`thin`) and
         compiles it with the `DeviceContext` that created this builder. This
         is the same identity as `DeviceContext.compile_function[kernel]()`.
-        Capturing kernels use `DeviceContext.enqueue_function` or
-        `recording_context()`, not `add_function`.
+        Capturing closures (unified closures with a `{}` capture list) use
+        the `DevicePassable`- and `RegisterPassable`-constrained `add_function`
+        overloads below.
 
         Parameters:
             declared_arg_types: Types of the arguments to pass to the device
@@ -1235,6 +1239,250 @@ struct DeviceGraphBuilder[arena_origin: ImmOrigin](Movable):
             constant_memory=constant_memory^,
             location=location.or_else(call_location()),
         )
+
+    @no_inline
+    def add_function[
+        FuncType: DevicePassable & def() -> None,
+        //,
+        dump_asm: _DumpPath = False,
+        dump_llvm: _DumpPath = False,
+        _dump_sass: _DumpPath = False,
+        _ptxas_info_verbose: Bool = False,
+    ](
+        self,
+        func: FuncType,
+        grid_dim: Dim,
+        block_dim: Dim,
+        var dependencies: List[Self.Node] = [],
+        cluster_dim: OptionalReg[Dim] = None,
+        shared_mem_bytes: OptionalReg[Int] = None,
+        var attributes: List[LaunchAttribute] = [],
+        var constant_memory: List[ConstantMemoryMapping] = [],
+        func_attribute: OptionalReg[FuncAttribute] = None,
+        location: Optional[SourceLocation] = None,
+    ) raises -> Self.Node:
+        """Compiles a `DevicePassable` capturing closure and adds it as a node.
+
+        This overload is for closures that conform to `DevicePassable`: the
+        closure (a unified closure with a `{}` capture list) is encoded via
+        its `device_type` so host handles such as `DevicePointer` become
+        device addresses, and `FuncType.__call__` is compiled as the kernel.
+        The encoded closure is the single launch argument. Captures flow from
+        the host scope into the kernel through the `DevicePassable` encoding
+        rather than through explicit positional arguments.
+
+        Parameters:
+            FuncType: The closure type (usually inferred). Must conform to
+                `DevicePassable` and be callable with no arguments.
+            dump_asm: To dump the compiled assembly, pass `True`, or a file
+                path to dump to, or a function returning a file path.
+            dump_llvm: To dump the generated LLVM code, pass `True`, or a file
+                path to dump to, or a function returning a file path.
+            _dump_sass: Only runs on NVIDIA targets, and requires CUDA Toolkit
+                to be installed. Pass `True`, or a file path to dump to, or a
+                function returning a file path.
+            _ptxas_info_verbose: Only runs on NVIDIA targets, and requires CUDA
+                Toolkit to be installed. Changes `dump_asm` to output verbose
+                PTX assembly (default `False`).
+
+        Args:
+            func: The capturing closure to compile and add as a graph node.
+            grid_dim: Dimensions of the compute grid.
+            block_dim: Dimensions of each thread block.
+            dependencies: Explicit list of predecessor node handles, unioned
+                with the implicit predecessor of the enclosing `region` scope
+                if there is one. Outside such a scope an empty list makes the
+                new node a graph root with no predecessors.
+            cluster_dim: Cluster dimensions (optional).
+            shared_mem_bytes: Amount of dynamic shared memory per block.
+            attributes: Launch attributes.
+            constant_memory: Constant memory mappings.
+            func_attribute: `CUfunction_attribute` enum.
+            location: Source location for the function call.
+
+        Returns:
+            A handle to the newly added kernel-dispatch node.
+
+        Raises:
+            If compiling the closure or adding the node fails.
+        """
+        _check_dim["DeviceGraphBuilder.add_function", "grid_dim"](
+            grid_dim, location=call_location()
+        )
+        _check_dim["DeviceGraphBuilder.add_function", "block_dim"](
+            block_dim, location=call_location()
+        )
+        dependencies = self._merge_implicit(dependencies^)
+
+        # The compiled kernel is `FuncType.__call__`; the launch argument is
+        # the encoded `FuncType.device_type` instance. Layout punning is only
+        # safe while those sizes and alignments coincide on the launch target.
+        comptime launch_target = DeviceContext.default_device_info.target()
+        comptime host_size = size_of[FuncType, target=launch_target]()
+        comptime device_size = size_of[
+            FuncType.device_type, target=launch_target
+        ]()
+        comptime host_align = align_of[FuncType, target=launch_target]()
+        comptime device_align = align_of[
+            FuncType.device_type, target=launch_target
+        ]()
+        comptime assert host_size == device_size, String(
+            "capturing add_function requires size_of[FuncType] to match",
+            " size_of[FuncType.device_type] on the launch target; host=",
+            host_size,
+            " device=",
+            device_size,
+        )
+        comptime assert host_align == device_align, String(
+            "capturing add_function requires align_of[FuncType] to match",
+            " align_of[FuncType.device_type] on the launch target; host=",
+            host_align,
+            " device=",
+            device_align,
+        )
+
+        var gpu_kernel = DeviceFunction[
+            FuncType.__call__,
+            TypeList.of[Trait=AnyType, FuncType.device_type](),
+            target=launch_target,
+            _ptxas_info_verbose=_ptxas_info_verbose,
+        ](self._ctx, func_attribute=func_attribute)
+        gpu_kernel.dump_rep[
+            dump_asm=dump_asm,
+            dump_llvm=dump_llvm,
+            _dump_sass=_dump_sass,
+        ]()
+
+        # Build a transient enqueuer that pairs the builder handle with the
+        # caller-supplied deps; see the other `add_function` overloads.
+        var enqueuer = _DeviceGraphBuilderEnqueuer(self, dependencies^)
+        gpu_kernel._call_with_pack_checked(
+            enqueuer,
+            func,
+            grid_dim=grid_dim,
+            block_dim=block_dim,
+            cluster_dim=cluster_dim,
+            shared_mem_bytes=shared_mem_bytes,
+            attributes=attributes^,
+            constant_memory=constant_memory^,
+            location=location.or_else(call_location()),
+        )
+        return self._last_node().value()
+
+    @no_inline
+    def add_function[
+        FuncType: RegisterPassable & def() -> None,
+        //,
+        dump_asm: _DumpPath = False,
+        dump_llvm: _DumpPath = False,
+        _dump_sass: _DumpPath = False,
+        _ptxas_info_verbose: Bool = False,
+    ](
+        self,
+        func: FuncType,
+        grid_dim: Dim,
+        block_dim: Dim,
+        var dependencies: List[Self.Node] = [],
+        cluster_dim: OptionalReg[Dim] = None,
+        shared_mem_bytes: OptionalReg[Int] = None,
+        var attributes: List[LaunchAttribute] = [],
+        var constant_memory: List[ConstantMemoryMapping] = [],
+        func_attribute: OptionalReg[FuncAttribute] = None,
+        location: Optional[SourceLocation] = None,
+    ) raises -> Self.Node where not conforms_to(FuncType, DevicePassable):
+        """Bit-copies a register-passable capturing closure and adds it as a
+        node.
+
+        Callable values parameterized by a capturing function type cannot
+        implement `DevicePassable` (that bound makes every method `capturing
+        thin`). This overload is for such closures: it bit-copies the closure
+        into a `DevicePassable` bag (`_LaunchBits`), compiles
+        `FuncType.__call__`, and launches the bag as the single argument.
+        Capturing closures that do conform to `DevicePassable` use the
+        encoding overload above instead.
+
+        Parameters:
+            FuncType: The closure type (usually inferred). Must conform to
+                `RegisterPassable` and be callable with no arguments, and must
+                not conform to `DevicePassable`.
+            dump_asm: To dump the compiled assembly, pass `True`, or a file
+                path to dump to, or a function returning a file path.
+            dump_llvm: To dump the generated LLVM code, pass `True`, or a file
+                path to dump to, or a function returning a file path.
+            _dump_sass: Only runs on NVIDIA targets, and requires CUDA Toolkit
+                to be installed. Pass `True`, or a file path to dump to, or a
+                function returning a file path.
+            _ptxas_info_verbose: Only runs on NVIDIA targets, and requires CUDA
+                Toolkit to be installed. Changes `dump_asm` to output verbose
+                PTX assembly (default `False`).
+
+        Args:
+            func: The register-passable capturing closure to compile and add
+                as a graph node.
+            grid_dim: Dimensions of the compute grid.
+            block_dim: Dimensions of each thread block.
+            dependencies: Explicit list of predecessor node handles, unioned
+                with the implicit predecessor of the enclosing `region` scope
+                if there is one. Outside such a scope an empty list makes the
+                new node a graph root with no predecessors.
+            cluster_dim: Cluster dimensions (optional).
+            shared_mem_bytes: Amount of dynamic shared memory per block.
+            attributes: Launch attributes.
+            constant_memory: Constant memory mappings.
+            func_attribute: `CUfunction_attribute` enum.
+            location: Source location for the function call.
+
+        Returns:
+            A handle to the newly added kernel-dispatch node.
+
+        Raises:
+            If compiling the closure or adding the node fails.
+        """
+        _check_dim["DeviceGraphBuilder.add_function", "grid_dim"](
+            grid_dim, location=call_location()
+        )
+        _check_dim["DeviceGraphBuilder.add_function", "block_dim"](
+            block_dim, location=call_location()
+        )
+        dependencies = self._merge_implicit(dependencies^)
+
+        comptime launch_target = DeviceContext.default_device_info.target()
+        comptime n = size_of[FuncType, target=launch_target]()
+        comptime a = align_of[FuncType, target=launch_target]()
+        var bits = _LaunchBits[n, a](StaticTuple[UInt8, n]())
+        unsafe_memcpy(
+            dest=Pointer(to=bits.storage).unsafe_bitcast[FuncType](),
+            src=Pointer(to=func),
+            count=1,
+        )
+
+        var gpu_kernel = DeviceFunction[
+            FuncType.__call__,
+            TypeList.of[Trait=AnyType, _LaunchBits[n, a]](),
+            target=launch_target,
+            _ptxas_info_verbose=_ptxas_info_verbose,
+        ](self._ctx, func_attribute=func_attribute)
+        gpu_kernel.dump_rep[
+            dump_asm=dump_asm,
+            dump_llvm=dump_llvm,
+            _dump_sass=_dump_sass,
+        ]()
+
+        # Build a transient enqueuer that pairs the builder handle with the
+        # caller-supplied deps; see the other `add_function` overloads.
+        var enqueuer = _DeviceGraphBuilderEnqueuer(self, dependencies^)
+        gpu_kernel._call_with_pack_checked(
+            enqueuer,
+            bits,
+            grid_dim=grid_dim,
+            block_dim=block_dim,
+            cluster_dim=cluster_dim,
+            shared_mem_bytes=shared_mem_bytes,
+            attributes=attributes^,
+            constant_memory=constant_memory^,
+            location=location.or_else(call_location()),
+        )
+        return self._last_node().value()
 
     @no_inline
     def add_copy[

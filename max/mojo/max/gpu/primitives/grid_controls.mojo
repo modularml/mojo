@@ -109,7 +109,7 @@ def launch_dependent_grids():
     """
 
     comptime if _SUPPORT_PDL_LAUNCH:
-        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action launch_dependents`
+        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action<launch_dependents>`
         __mlir_op.`nvvm.griddepcontrol`[kind=kind_attr, _type=None]()
 
 
@@ -129,7 +129,7 @@ def wait_on_dependent_grids():
     """
 
     comptime if _SUPPORT_PDL_LAUNCH:
-        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action wait`
+        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action<wait>`
         __mlir_op.`nvvm.griddepcontrol`[kind=kind_attr, _type=None]()
 
 

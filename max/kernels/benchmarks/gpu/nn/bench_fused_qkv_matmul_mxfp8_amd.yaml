@@ -24,11 +24,22 @@ file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_fused_qkv_matmul_mxfp8_amd.mojo
 
 params:
 
-# Decode: one token per prompt, swept over batch. has_indexer=False is the
-# dense band set [Wq|Wk|Wv] (N_total=2304); True adds IndexQ/IndexK (2560).
+# Decode: one token per prompt, swept over batch. has_indexer=False is the dense
+# band set [Wq|Wk|Wv] (N_total=2304); True adds IndexQ/IndexK (2560).
 - $seq_len: 1
-  $batch_size: [1, 8, 16, 32, 64, 128, 256]
+  $batch_size: [1, 4, 8, 16, 32, 64, 128, 256]
   $has_indexer: [False, True]
+  $is_verify: False
+  metadata:
+    MODEL: minimax-m3
+
+# MTP target verification: one prompt containing the sampled token and three
+# draft tokens. This has the same total M as decode batch 4 but a different
+# ragged-row topology for the fused KV-cache scatter.
+- $seq_len: 4
+  $batch_size: 1
+  $has_indexer: [False, True]
+  $is_verify: True
   metadata:
     MODEL: minimax-m3
 
@@ -36,5 +47,6 @@ params:
 - $seq_len: 256
   $batch_size: 2
   $has_indexer: [False, True]
+  $is_verify: False
   metadata:
     MODEL: minimax-m3

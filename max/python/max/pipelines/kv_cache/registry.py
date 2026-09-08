@@ -29,6 +29,18 @@ from .paged_kv_cache.jenga_cache_manager import JengaKVCacheManager
 
 logger = logging.getLogger("max.pipelines")
 
+# Temporary allowlist for the Jenga cutover.
+_JENGA_MODEL_NAME_SUBSTRINGS = (
+    "llama",  # Llama 3/4: full
+    "gemma",  # Gemma 3/4: full + SWA
+    "gpt-oss",  # full + SWA
+    "gptoss",  # same as gpt-oss
+    "olmo",  # Olmo 2: full; Olmo 3: 3:1 SWA:full
+    "step-3",  # Step-3.5: full + SWA
+    "step3",  # same as step-3
+    "inkling",  # full + SWA
+)
+
 
 def _use_jenga_kv_cache(
     params: KVCacheParamInterface, is_di_enabled: bool, model_name: str
@@ -39,9 +51,8 @@ def _use_jenga_kv_cache(
 
     TODO: temporary flag for the Jenga cutover. Delete once the transition is complete.
     """
-    # Only try enabling for llama / gemma to minimize the risk of breaking models.
-    model_name = model_name.lower()
-    if "llama" not in model_name and "gemma" not in model_name:
+    name = model_name.lower()
+    if not any(token in name for token in _JENGA_MODEL_NAME_SUBSTRINGS):
         return False
     prefer_legacy = os.getenv("MODULAR_USE_LEGACY_KV_CACHE", "0").lower() in (
         "1",

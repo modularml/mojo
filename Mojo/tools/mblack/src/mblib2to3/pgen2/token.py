@@ -93,7 +93,7 @@ N_TOKENS: Final = 60
 # Mojo constants
 # 61 was FN, removed
 STRUCT: Final = 62
-ALIAS: Final = 63
+# 63 was ALIAS, removed.
 REF: Final = 64
 VAR: Final = 65
 MLIR_REGION: Final = 66

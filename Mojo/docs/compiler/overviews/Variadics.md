@@ -55,7 +55,7 @@ There are a few main differences:
 3. How we iterate over them.
    - For VariadicList, it’s easy, just use a regular for-loop.
    - For VariadicPack, since all the types might be different at run-time, one
-     must use `@parameter for` or `pack.each` or `pack.each_idx`.
+     must use `comptime for` or `pack.each` or `pack.each_idx`.
 4. How we can index into them.
     1. For VariadicList, we can index into them at compile-time or run-time
        easily because it’s basically just a run-time array.
@@ -220,7 +220,7 @@ struct VariadicStruct[*arg_types: MyTrait]:
 
 def variadic_capturing[
     *arg_types: MyTrait, //,
-    func: fn (*args: *arg_types) -> Int,
+    func: def (*args: *arg_types) -> Int,
 ]() -> VariadicStruct[*arg_types]:
     ...
 ```
@@ -265,7 +265,7 @@ struct DeviceFunction[*arg_types: MyTrait]:
 
 def infer_variadic[
     *arg_types: MyTrait, //, # paraphrased
-    func: fn (*args: *arg_types) -> Int,
+    func: def (*args: *arg_types) -> Int,
 ]() -> DeviceFunction[*arg_types]:
     return DeviceFunction[*arg_types]()
 

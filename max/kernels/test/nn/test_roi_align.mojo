@@ -27,9 +27,9 @@ def test_roi_align_avg[scale_type: DType]() raises:
         fill_with=lambda (idx: Int) -> Float32: Float32(idx)
     )
     var input = TileTensor(input_stack, in_layout)
-    var output_stack = Array[Float32, out_layout.product()](uninitialized=True)
+    var output_stack = Array[Float32, out_layout.product()](fill={})
     var output = TileTensor(output_stack, out_layout)
-    var rois_stack = Array[Float32, roi_layout.product()](uninitialized=True)
+    var rois_stack = Array[Float32, roi_layout.product()](fill={})
     var rois = TileTensor(rois_stack, roi_layout)
 
     rois[0, 0] = 0
@@ -90,9 +90,9 @@ def test_roi_align_max() raises:
         fill_with=lambda (idx: Int) -> Float32: Float32(idx)
     )
     var input = TileTensor(input_stack, in_layout)
-    var output_stack = Array[Float32, out_layout.product()](uninitialized=True)
+    var output_stack = Array[Float32, out_layout.product()](fill={})
     var output = TileTensor(output_stack, out_layout)
-    var rois_stack = Array[Float32, roi_layout.product()](uninitialized=True)
+    var rois_stack = Array[Float32, roi_layout.product()](fill={})
     var rois = TileTensor(rois_stack, roi_layout)
 
     rois[0, 0] = 0
@@ -153,9 +153,9 @@ def test_roi_align_KERN_692() raises:
         fill_with=lambda (idx: Int) -> Float32: Float32(idx + 1)
     )
     var input = TileTensor(input_stack, in_layout)
-    var output_stack = Array[Float32, out_layout.product()](uninitialized=True)
+    var output_stack = Array[Float32, out_layout.product()](fill={})
     var output = TileTensor(output_stack, out_layout)
-    var rois_stack = Array[Float32, roi_layout.product()](uninitialized=True)
+    var rois_stack = Array[Float32, roi_layout.product()](fill={})
     var rois = TileTensor(rois_stack, roi_layout)
 
     rois[0, 0] = 0

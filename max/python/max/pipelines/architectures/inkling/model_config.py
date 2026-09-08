@@ -444,7 +444,10 @@ class InklingConfig(ArchConfigWithKVCache):
         )
 
         def params_for(
-            n_kv_heads: int, head_dim: int, num_layers: int
+            n_kv_heads: int,
+            head_dim: int,
+            num_layers: int,
+            window_size: int | None = None,
         ) -> KVCacheParams:
             return kv_cache_config.to_params(
                 dtype=cache_dtype,
@@ -457,6 +460,7 @@ class InklingConfig(ArchConfigWithKVCache):
                 # keeps the page budget and the captured-graph buckets large
                 # enough for requests at the context limit.
                 num_draft_tokens=mtp_depths,
+                window_size=window_size,
             )
 
         target = MultiKVCacheParams.from_params(
@@ -470,6 +474,7 @@ class InklingConfig(ArchConfigWithKVCache):
                     text_config.swa_num_key_value_heads,
                     text_config.swa_head_dim,
                     text_config.num_local_layers,
+                    window_size=text_config.sliding_window_size,
                 ),
             }
         )

@@ -84,6 +84,7 @@ bool Token::isStatementKeyword() const {
   case kw_yield:
   case kw_match:
   case kw_case:
+  case kw___match:
   case kw_async:
   case kw_await:
   case kw_global:

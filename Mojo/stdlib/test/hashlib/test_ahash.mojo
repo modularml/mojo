@@ -62,8 +62,7 @@ def test_hash_byte_array() raises:
 def test_avalanche() raises:
     # test that values which differ just in one bit,
     # produce significatly different hash values
-    var data = Array[UInt8, 256](uninitialized=True)
-    unsafe_memset_zero(data.unsafe_ptr(), 256)
+    var data = Array[UInt8, 256](fill={})
     var hashes0 = List[UInt64]()
     var hashes1 = List[UInt64]()
     hashes0.append(hash[hasher0](data.unsafe_ptr(), 256))
@@ -92,8 +91,7 @@ def test_avalanche() raises:
 def test_trailing_zeros() raises:
     # checks that a value with different amount of trailing zeros,
     # results in significantly different hash values
-    var data = Array[UInt8, 8](uninitialized=True)
-    unsafe_memset_zero(data.unsafe_ptr(), 8)
+    var data = Array[UInt8, 8](fill={})
     data[0] = 23
     var hashes0 = List[UInt64]()
     var hashes1 = List[UInt64]()
@@ -118,8 +116,7 @@ def test_seeded_zero_matches_unseeded() raises:
     # An all-zero seed must reproduce the unseeded hash exactly, so
     # existing callers that never pass a seed see no behavior change.
     comptime a = StaticString("a")
-    var data = Array[UInt8, 256](uninitialized=True)
-    unsafe_memset_zero(data.unsafe_ptr(), 256)
+    var data = Array[UInt8, 256](fill={})
 
     assert_equal(
         hash_seeded_bytes(data.unsafe_ptr(), 256, seed0),
@@ -131,8 +128,7 @@ def test_seeded_zero_matches_unseeded() raises:
 def test_seeded_diffusion() raises:
     # Two distinct seeds hashing identical data must diffuse into
     # significantly different hash values (mirrors test_avalanche).
-    var data = Array[UInt8, 256](uninitialized=True)
-    unsafe_memset_zero(data.unsafe_ptr(), 256)
+    var data = Array[UInt8, 256](fill={})
     var hashes0 = List[UInt64]()
     var hashes1 = List[UInt64]()
     hashes0.append(hash_seeded_bytes(data.unsafe_ptr(), 256, seed0))

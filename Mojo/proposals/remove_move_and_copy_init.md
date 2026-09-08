@@ -72,11 +72,11 @@ overloads that differ only in argument convention:
 ```mojo
 # Copy constructor/initializer: same behavior as today's __init__
 # Constructs by copying from the source value (Copyable)
-fn __init__(out self, *, copy: Self)
+def __init__(out self, *, copy: Self)
 
 # Move constructor/initializer: consume the source (Movable)
 # Requires a keyword at the call site to indicate movement
-fn __init__(out self, *, deinit take: Self)
+def __init__(out self, *, deinit take: Self)
 ```
 
 - `copy` is self-evident.

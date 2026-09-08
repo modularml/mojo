@@ -93,6 +93,52 @@ async def test_file_uri_directory_blocked(tmp_path) -> None:  # noqa: ANN001
 
 
 @pytest.mark.asyncio
+async def test_file_uri_outside_root_missing_is_forbidden(
+    tmp_path,  # noqa: ANN001
+) -> None:
+    """Containment is checked before existence.
+
+    A nonexistent path outside the allowed roots must be rejected as
+    ``forbidden`` rather than ``not found`` — the ordering must not let the
+    server stat attacker-chosen paths and leak their existence.
+    """
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+
+    settings = NonCallableMock(spec=Settings)
+    settings.allowed_image_roots = [str(allowed)]
+    settings.max_local_image_bytes = 20_000_000
+
+    missing_outside = tmp_path / "missing.jpg"
+    with pytest.raises(ValueError, match="forbidden"):
+        await resolve_image_from_url(
+            AnyUrl(f"file://{missing_outside}"), settings
+        )
+
+
+@pytest.mark.asyncio
+async def test_file_uri_outside_root_directory_is_forbidden(
+    tmp_path,  # noqa: ANN001
+) -> None:
+    """Containment is checked before the directory type probe.
+
+    A directory outside the allowed roots must be rejected as ``forbidden``
+    rather than leaking that the path is a directory.
+    """
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    outside_dir = tmp_path / "outside_dir"
+    outside_dir.mkdir()
+
+    settings = NonCallableMock(spec=Settings)
+    settings.allowed_image_roots = [str(allowed)]
+    settings.max_local_image_bytes = 20_000_000
+
+    with pytest.raises(ValueError, match="forbidden"):
+        await resolve_image_from_url(AnyUrl(f"file://{outside_dir}"), settings)
+
+
+@pytest.mark.asyncio
 async def test_file_uri_size_limit(tmp_path) -> None:  # noqa: ANN001
     """Test file size limit enforcement."""
     large_file = tmp_path / "large.jpg"

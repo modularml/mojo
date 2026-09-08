@@ -94,7 +94,7 @@ def unsafe_stack_allocation[
                 _mlir_value = __mlir_op.`pop.global_alloc`[
                     name=_get_kgen_string[global_name](),
                     count=count.__mlir_index__(),
-                    memoryType=__mlir_attr.`#pop<global_alloc_addr_space gpu_shared>`,
+                    memoryType=__mlir_attr.`#pop.global_alloc_addr_space<gpu_shared>`,
                     _type=Pointer[
                         type, MutUntrackedOrigin, address_space=address_space
                     ]._mlir_type,

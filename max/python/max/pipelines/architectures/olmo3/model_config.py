@@ -20,9 +20,12 @@ from max.dtype import DType
 from max.graph import DeviceRef
 from max.graph.weights import WeightData
 from max.nn import ReturnLogits, YarnScalingParams
-from max.nn.kv_cache import KVCacheParamInterface
+from max.nn.kv_cache import KVCacheParamInterface, MultiKVCacheParams
+from max.pipelines.architectures.gpt_oss.hybrid_kv_params_util import (
+    hybrid_swa_full_kv_params,
+)
 from max.pipelines.kv_cache import cache_dtype_for_encoding
-from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
 from max.pipelines.lib.config.model_config import (
     _interleaved_rope_weights,
     _select_quantization_encoding,
@@ -148,9 +151,44 @@ class Olmo3Config(
     """Whether to return the last token, all logits, or a variable number of logits."""
 
     kv_params: KVCacheParamInterface
-    """KV cache parameters."""
+    """KV cache parameters (sliding-window and full-attention groups)."""
 
     quantization_encoding: SupportedEncoding | None = None
+
+    @classmethod
+    def construct_kv_params(
+        cls,
+        huggingface_config: AutoConfig,
+        pipeline_config: PipelineConfig,
+        devices: list[DeviceRef],
+        kv_cache_config: KVCacheConfig,
+        cache_dtype: DType,
+        *,
+        allow_kv_head_replication: bool = False,
+    ) -> MultiKVCacheParams:
+        """Constructor for hybrid sliding + full KV tree."""
+        layer_types = getattr(
+            huggingface_config,
+            "layer_types",
+            [
+                "sliding_attention",
+                "sliding_attention",
+                "sliding_attention",
+                "full_attention",
+            ]
+            * (huggingface_config.num_hidden_layers // 4),
+        )
+        return hybrid_swa_full_kv_params(
+            layer_types=layer_types,
+            sliding_window=huggingface_config.sliding_window,
+            pipeline_config=pipeline_config,
+            devices=devices,
+            kv_cache_config=kv_cache_config,
+            cache_dtype=cache_dtype,
+            n_kv_heads=huggingface_config.num_key_value_heads,
+            head_dim=cls.get_head_dim(huggingface_config),
+            allow_kv_head_replication=allow_kv_head_replication,
+        )
 
     @override
     @classmethod

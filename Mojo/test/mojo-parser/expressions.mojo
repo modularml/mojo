@@ -313,7 +313,7 @@ def precedence_associativity(a: Int):
   # CHECK-NEXT: %[[TEN:.*]] = kgen.param.constant: !Int = <{:scalar<index> 10}>
   # CHECK-NEXT: %[[EQ:.*]] = lit.call {{.*}}__eq__{{.*}}(%[[C]], %[[TEN]])
   # CHECK-NEXT: %[[EQSB:.*]] = lit.call {{.*}}__mlir_bool__{{.*}}%[[EQ]]
-  # CHECK-NEXT: %[[RESULT:.*]] = hlcf.if %[[EQSB]] -> !alias_Int1 {
+  # CHECK-NEXT: %[[RESULT:.*]] = hlcf.elif %[[EQSB]] -> !alias_Int1 {
   # CHECK-NEXT:   %[[ZERO:.*]] = kgen.param.constant: !alias_Int1 = <rebind(:!Int {:scalar<index> 0})>
   # CHECK-NEXT:   hlcf.yield %[[ZERO]] : !alias_Int1
   # CHECK-NEXT: } else {
@@ -322,7 +322,7 @@ def precedence_associativity(a: Int):
   # CHECK-NEXT:  %[[ELEVEN:.*]] = kgen.param.constant: !Int = <{:scalar<index> 11}>
   # CHECK-NEXT:  %[[EQ:.*]] = lit.call {{.*}}__eq__{{.*}}(%[[C]], %[[ELEVEN]])
   # CHECK-NEXT:  %[[EQSB:.*]] = lit.call {{.*}}__mlir_bool__{{.*}}(%[[EQ]])
-  # CHECK-NEXT:  %[[RIGHT_IF_RESULT:.*]] = hlcf.if %[[EQSB]] -> !alias_Int1 {
+  # CHECK-NEXT:  %[[RIGHT_IF_RESULT:.*]] = hlcf.elif %[[EQSB]] -> !alias_Int1 {
   # CHECK-NEXT:    %[[ONE:.*]] = kgen.param.constant: !alias_Int1 = <rebind(:!Int {:scalar<index> 1})>
   # CHECK-NEXT:    hlcf.yield %[[ONE]] : !alias_Int1
   # CHECK-NEXT:  } else {
@@ -485,7 +485,7 @@ def andOr1(a: Boolish, b: Boolish):
 
   # CHECK: [[BOOL:%.*]] = lit.call {{.*}}__bool__{{.*}}(%a)
   # CHECK: [[SB:%.*]] = lit.call {{.*}}__mlir_bool__{{.*}}([[BOOL]])
-  # CHECK: hlcf.if [[SB]] -> !Boolish {
+  # CHECK: hlcf.elif [[SB]] -> !Boolish {
   # CHECK:   = lit.call {{.*}}__init__{{.*}}"{{.*}}(%b){{.*}}*, "copy"
   # CHECK:   hlcf.yield
   # CHECK: } else {
@@ -502,7 +502,7 @@ def andOr2(a: Boolish, b: Boolish):
 
   # CHECK: [[ABOOL:%.*]] = lit.call {{.*}}Boolish::@"__bool__{{.*}}(
   # CHECK-NEXT: [[SB:%.*]] = lit.call {{.*}}@Bool::@"__mlir_bool__{{.*}}([[ABOOL]])
-  # CHECK-NEXT:  = hlcf.if [[SB]] -> !Boolish {
+  # CHECK-NEXT:  = hlcf.elif [[SB]] -> !Boolish {
   # CHECK-NEXT:   [[TMP:%.*]] = lit.call {{.*}}Boolish::@"__init__{{.*}}"{{.*}}(%a){{.*}}*, "copy"
   # CHECK:        hlcf.yield [[TMP]]
   # CHECK-NEXT: } else {
@@ -517,7 +517,7 @@ def andOr3(a: Boolish, c: Bool):
 
   # CHECK: [[ABOOL:%.*]] = lit.call {{.*}}__bool__{{.*}}(%a)
   # CHECK-NEXT: [[SB:%.*]] = lit.call {{.*}}__mlir_bool__{{.*}}([[ABOOL]])
-  # CHECK-NEXT:  = hlcf.if [[SB]] -> !Bool {
+  # CHECK-NEXT:  = hlcf.elif [[SB]] -> !Bool {
   # CHECK-NEXT:   hlcf.yield %c
   # CHECK-NEXT: } else {
   # CHECK-NEXT:   [[TMP:%.*]] = lit.call {{.*}}__init__{{.*}}([[SB]])
@@ -530,7 +530,7 @@ def andOr4(b: Boolish, c: Bool):
   # Check incompatible types that are nevertheless boolish.
   # CHECK: [[BBOOL:%.*]] = lit.call {{.*}}__bool__{{.*}}(%b)
   # CHECK-NEXT: [[BSB:%.*]] = lit.call {{.*}}__mlir_bool__{{.*}}([[BBOOL]])
-  # CHECK-NEXT: = hlcf.if [[BSB]] -> !Bool {
+  # CHECK-NEXT: = hlcf.elif [[BSB]] -> !Bool {
   # CHECK-NEXT:   [[TMP:%.*]] = lit.call {{.*}}__init__{{.*}}([[BSB]])
   # CHECK:        hlcf.yield [[TMP]]
   # CHECK: } else {
@@ -546,7 +546,7 @@ def andOr2(b: Boolish, d: MemBoolish):
   # CHECK: [[DBOOL:%.*]] = lit.call {{.*}}__bool__{{.*}}(%d)
   # CHECK-NEXT: [[DSB:%.*]] = lit.call {{.*}}__mlir_bool__{{.*}}([[DBOOL]])
   # CHECK-NEXT: [[IFRESULT:%.*]] = lit.var.decl {{.*}} : !lit.ref<!MemBoolish
-  # CHECK-NEXT: hlcf.if [[DSB]] {
+  # CHECK-NEXT: hlcf.elif [[DSB]] {
   # CHECK-NEXT:   lit.call {{.*}}__init__{{.*}}"{{.*}}(%d, [[ANON:%[^)]*]]){{.*}}*, "copy"
   # CHECK-NEXT:   hlcf.yield
   # CHECK-NEXT: } else {
@@ -603,7 +603,7 @@ z
 def test_if_cond(var cond: Bool, memCond: MemBoolish):
     # CHECK: %[[COND:.*]] = lit.ref.load %cond
     # CHECK: %[[LIT_BOOLSB:.*]] = lit.call {{.*}}__mlir_bool__{{.*}}(%[[COND]])
-    # CHECK-NEXT: %[[IF_RES:.*]] = hlcf.if %[[LIT_BOOLSB]]
+    # CHECK-NEXT: %[[IF_RES:.*]] = hlcf.elif %[[LIT_BOOLSB]]
     # CHECK-NEXT:   %[[INT_TWO:.*]] = kgen{{.*}}{:scalar<index> 2}
     # CHECK-NEXT:   hlcf.yield %[[INT_TWO]]
     # CHECK-NEXT: } else {
@@ -809,7 +809,6 @@ def walrus_assign() raises:
   _ = simpleMath(a := 3, a)
   # CHECK-NEXT: lit.ownership.use [[TMP]]
 
-  # CHECK-NEXT: hlcf.elif {
   # CHECK-NEXT: [[FOUR:%.*]] = kgen.param.constant: !alias_Int1 = <rebind(:!Int {:scalar<index> 4})>
   # CHECK-NEXT: lit.ref.store [[FOUR]], %b
   if b := 4:

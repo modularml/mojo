@@ -101,7 +101,7 @@ def check_pointer_pack_lifetime():
     var value = NoisyDeinit(42)
     var ptr_tuple = Tuple(Pointer(to=value).as_unsafe_any_origin())
     comptime PackType = VariadicPack[
-        origin=MutAnyOrigin,
+        origin=MutUnsafeAnyOrigin,
         element_trait=AnyType,
         False,
         NoisyDeinit,
@@ -112,6 +112,38 @@ def check_pointer_pack_lifetime():
         )
     )
     use_noisy_deinit(*pack)
+
+
+# ===----------------------------------------------------------------------=== #
+# Regression test for MOCO-4756
+# ===----------------------------------------------------------------------=== #
+
+
+def return_pack[
+    Args: TypeList[Trait=AnyType, ...]
+](*args: *Args) -> VariadicPack[
+    origin=args.origin,
+    element_trait=AnyType,
+    False,
+    *Args,
+]:
+    return args.copy()
+
+
+def take_pack[*Ts: AnyType](*args: *Ts):
+    pass
+
+
+def check_returned_pack_forwarding():
+    var a = 1
+    var b = "hello"
+    var c = [1, 2, 3]
+
+    # Returning a `VariadicPack` from one function...
+    var pack = return_pack(a, b, c)
+
+    # ...and then unpacking it in a call to another function should work.
+    take_pack(*pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -132,3 +164,5 @@ def main():
     # CHECK: called: 42
     # CHECK-NEXT: destroyed: 42
     check_pointer_pack_lifetime()
+
+    check_returned_pack_forwarding()

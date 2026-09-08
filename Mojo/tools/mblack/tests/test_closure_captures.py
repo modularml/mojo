@@ -153,7 +153,7 @@ def test_raises_typed_exception_then_captures(raises_type, space):
     """Preserves the ``raises`` type expression unchanged before ``{var}``."""
     source = (
         "struct Foo:\n"
-        "    alias Bar = Error\n"
+        "    comptime Bar = Error\n"
         "\n"
         "\n"
         "def main() raises:\n"
@@ -165,7 +165,7 @@ def test_raises_typed_exception_then_captures(raises_type, space):
     )
     expected = (
         "struct Foo:\n"
-        "    alias Bar = Error\n"
+        "    comptime Bar = Error\n"
         "\n"
         "\n"
         "def main() raises:\n"

@@ -33,9 +33,13 @@ from .tokenizer import MAX_PROMPT_TOKENS, MiniMaxMusic3Tokenizer
 
 @dataclass(kw_only=True)
 class MiniMaxMusic3ArchConfig(ArchConfig):
-    """Pipeline-level config. No KV cache here: the autoregressive stage owns
-    its own cache manager, because its positions are frames rather than the
-    request's tokens."""
+    """Configures the MiniMax Music 3 pipeline without a KV cache.
+
+    Unlike text models, this pipeline does not cache the request's tokens.
+    The autoregressive stage caches generated audio frames instead, so it
+    allocates that cache itself and this config has no KV cache parameters
+    to set.
+    """
 
     DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
     # Only bfloat16 was gated against the reference, and it is also the only
@@ -46,12 +50,7 @@ class MiniMaxMusic3ArchConfig(ArchConfig):
     quantization_encoding: SupportedEncoding | None = None
 
     def get_max_seq_len(self) -> int:
-        """The prompt's ceiling, which is the tokenizer's.
-
-        Not the autoregressive model's 10240 positions: those are shared
-        between the prompt and the frames it generates, so the executor -- not
-        the tokenizer -- is where that budget is divided.
-        """
+        """Returns the tokenizer's maximum prompt length in tokens."""
         return MAX_PROMPT_TOKENS
 
     @classmethod
@@ -60,8 +59,11 @@ class MiniMaxMusic3ArchConfig(ArchConfig):
         huggingface_config: AutoConfig,
         model_config: MAXModelConfig,
     ) -> int:
-        """The prompt's ceiling, which is model metadata rather than a
-        deployment length: see :meth:`get_max_seq_len`."""
+        """Returns the tokenizer's fixed prompt limit of ``MAX_PROMPT_TOKENS``.
+
+        Other architectures bound the user's requested ``max_length`` here.
+        This model has one prompt limit, so a requested length has no effect.
+        """
         del huggingface_config, model_config
         return MAX_PROMPT_TOKENS
 
@@ -73,11 +75,14 @@ class MiniMaxMusic3ArchConfig(ArchConfig):
         *,
         max_seq_len: int,
     ) -> Self:
-        """Validates that this checkpoint can run at all.
+        """Validates that the checkpoint can run.
 
-        ``max_seq_len`` is ignored: this model's sequence length is the
-        tokenizer's prompt ceiling rather than a length the deployment can
-        clamp.
+        Args:
+            pipeline_config: The pipeline configuration.
+            model_config: The model configuration to read from.
+            max_seq_len: Ignored. The :class:`ArchConfig` protocol requires
+                this argument, but this model's sequence length is fixed by
+                the tokenizer.
 
         Raises:
             ValueError: If the manifest has no ``transformer`` component, or if

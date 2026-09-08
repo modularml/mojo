@@ -204,7 +204,7 @@ by the cache is the A10 measurement.
 Created a GPU memcpy function in Mojo
 
 ```mojo
-fn copy[simd_size: Int, align: Int](
+def copy[simd_size: Int, align: Int](
     a_ptr: UnsafePointer[Scalar[dtype]],
     b_ptr: UnsafePointer[Scalar[dtype]],
     n: Int,
@@ -224,7 +224,7 @@ fn copy[simd_size: Int, align: Int](
 Call the function like this
 
 ```mojo
-fn run_func(ctx: DeviceContext, iteration: Int) raises:
+def run_func(ctx: DeviceContext, iteration: Int) raises:
     var offset = (iteration*n2)%n
     #var offset = 0
     ctx.enqueue_function(
@@ -302,7 +302,7 @@ Primarily three optimizations
 We have simple examples of these methods for memcpy in `memcpy.mojo`:
 
 ```mojo
-fn copy_naive(
+def copy_naive(
     a_ptr: UnsafePointer[Scalar[dtype]],
     b_ptr: UnsafePointer[Scalar[dtype]],
     n: Int,
@@ -318,7 +318,7 @@ Grid stride loops:
 
 ```mojo
 #https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/
-fn copy_grid_stride_loops(
+def copy_grid_stride_loops(
     a_ptr: UnsafePointer[Scalar[dtype]],
     b_ptr: UnsafePointer[Scalar[dtype]],
     n: Int,
@@ -334,7 +334,7 @@ Vectorized loads and stores:
 
 ```mojo
 #https://developer.nvidia.com/blog/cuda-pro-tip-increase-performance-with-vectorized-memory-access/
-fn copy_vector[simd_size: Int, align: Int](
+def copy_vector[simd_size: Int, align: Int](
     a_ptr: UnsafePointer[Scalar[dtype]],
     b_ptr: UnsafePointer[Scalar[dtype]],
     n: Int,
@@ -604,7 +604,7 @@ It needs 14 instructions or 5 more than the 32-bit iterator version.
 What about Mojo?
 
 ```mojo
-fn copy[simd_size: Int, align: Int](
+def copy[simd_size: Int, align: Int](
     a_ptr: UnsafePointer[Scalar[dtype]],
     b_ptr: UnsafePointer[Scalar[dtype]],
     n: Int,

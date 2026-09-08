@@ -34,7 +34,7 @@ aliases, this already works today:
 trait Equatable:
     alias ComparisonResult: Boolable
 
-    fn __eq__(self, other: Self) -> ComparisonResult:
+    def __eq__(self, other: Self) -> ComparisonResult:
         ...
 ```
 
@@ -45,7 +45,7 @@ trait Equatable:
 struct SIMD[dtype: DType, size: Int](...):
     alias _Mask = SIMD[DType.bool, size]
 
-    fn __eq__(self, rhs: Self) -> Self._Mask:
+    def __eq__(self, rhs: Self) -> Self._Mask:
         ...
 ```
 
@@ -62,7 +62,7 @@ struct SIMD[dtype: DType, size: Int](
     alias _Mask = SIMD[DType.bool, size]
     alias ComparisonResult = Self._Mask
 
-    fn __eq__(self, rhs: Self) -> Self._Mask:
+    def __eq__(self, rhs: Self) -> Self._Mask:
         ...
 ```
 
@@ -72,16 +72,16 @@ introduce a new trait defining a stricter equivalence relation:
 
 ```mojo
 trait HasEquivalence:  # name could be improved
-    fn equivalent(self, other: Self) -> Bool:
+    def equivalent(self, other: Self) -> Bool:
         ...
 
 trait Equatable(HasEquivalence):
     alias ComparisonType: Boolable
 
-    fn __eq__(self, other: Self) -> ComparisonType:
+    def __eq__(self, other: Self) -> ComparisonType:
         ...
 
-    fn equivalent(self, other: Self) -> bool:
+    def equivalent(self, other: Self) -> bool:
         return self == other  # needs default trait implementations
 ```
 
@@ -98,11 +98,11 @@ values of any `size` to be compared exactly:
 struct SIMD(Equatable):
     alias ComparisonType: Self._Mask
 
-    fn __eq__(self, other: Self) -> Self._Mask:
+    def __eq__(self, other: Self) -> Self._Mask:
         # remains element-wise comparison
         ...
 
-    fn equivalent(self, other: Self) -> bool:
+    def equivalent(self, other: Self) -> bool:
         return all(self == other)
 ```
 
@@ -149,10 +149,10 @@ struct SIMD[dtype: DType, size: Int](
 ):
     alias _Mask = SIMD[DType.bool, size]
 
-  fn eq(self: , rhs: Self) -> Self._Mask:
+  def eq(self: , rhs: Self) -> Self._Mask:
         ...
 
-    fn __eq__(self: Self, rhs: Self) -> Bool:
+    def __eq__(self: Self, rhs: Self) -> Bool:
         ...
 ```
 

@@ -207,16 +207,15 @@ def test_token_buffer__reset_as_new_prompt() -> None:
         _ = token_buffer.consume_recently_generated_tokens()
 
 
-def test_token_buffer__reset_as_new_prompt_deletes_trailing_tokens() -> None:
-    """Counted trailing deletion drops the requested tokens before reset."""
+def test_token_buffer__reset_as_new_prompt_deletes_last_generated_token() -> (
+    None
+):
+    """Bool trailing deletion drops the last generated token before reset."""
     token_buffer = TokenBuffer(array=np.array([9, 10], dtype=np.int64))
     token_buffer.advance_with_token(11)
     token_buffer.advance_with_token(12)
 
-    with pytest.raises(ValueError):
-        token_buffer.reset_as_new_prompt(num_trailing_tokens_to_delete=3)
-
-    token_buffer.reset_as_new_prompt(num_trailing_tokens_to_delete=1)
+    token_buffer.reset_as_new_prompt(delete_last_generated_token=True)
 
     assert token_buffer.generated_length == 0
     np.testing.assert_array_equal(
@@ -224,76 +223,9 @@ def test_token_buffer__reset_as_new_prompt_deletes_trailing_tokens() -> None:
     )
     assert token_buffer.prompt_length == 3
 
-
-def test_token_buffer__overwrite_token_at_offset_from_end() -> None:
-    """Offset-from-end overwrite targets the expected positions."""
-    token_buffer = TokenBuffer(array=np.array([1, 2, 3], dtype=np.int64))
-    token_buffer.advance_with_token(4)
-    token_buffer.advance_with_token(5)
-
-    # Offset 1 is the last token: identical to overwrite_last_token.
-    token_buffer.overwrite_token_at_offset_from_end(1, 50)
-    np.testing.assert_array_equal(
-        token_buffer.all, np.array([1, 2, 3, 4, 50], dtype=np.int64)
-    )
-
-    token_buffer.overwrite_last_token(51)
-    np.testing.assert_array_equal(
-        token_buffer.all, np.array([1, 2, 3, 4, 51], dtype=np.int64)
-    )
-
-    # Offset 2 targets the second-to-last token (the "oldest" of two).
-    token_buffer.overwrite_token_at_offset_from_end(2, 40)
-    np.testing.assert_array_equal(
-        token_buffer.all, np.array([1, 2, 3, 40, 51], dtype=np.int64)
-    )
-
+    prompt_only = TokenBuffer(array=np.array([9, 10], dtype=np.int64))
     with pytest.raises(ValueError):
-        token_buffer.overwrite_token_at_offset_from_end(0, 99)
-
-    with pytest.raises(ValueError):
-        token_buffer.overwrite_token_at_offset_from_end(
-            len(token_buffer) + 1, 99
-        )
-
-
-def test_token_buffer__consume_with_trailing_exclusion() -> None:
-    """Consumption can hold back trailing tokens for later consumption.
-
-    This is the depth-2 overlap contract: unrealized future-token
-    placeholders trail the buffer and must not be streamed until realized.
-    """
-    token_buffer = TokenBuffer(array=np.array([1, 2, 3], dtype=np.int64))
-    token_buffer.advance_with_token(4)
-    token_buffer.advance_with_token(5)
-    token_buffer.advance_with_token(6)
-
-    # Hold back the last two tokens; only the first is consumed.
-    consumed = token_buffer.consume_recently_generated_tokens(
-        num_trailing_to_exclude=2
-    )
-    np.testing.assert_array_equal(consumed, np.array([4], dtype=np.int64))
-
-    # The held-back tokens are consumed by a later call.
-    consumed = token_buffer.consume_recently_generated_tokens()
-    np.testing.assert_array_equal(consumed, np.array([5, 6], dtype=np.int64))
-
-    # Excluding more than the unconsumed window raises.
-    token_buffer.advance_with_token(7)
-    with pytest.raises(ValueError, match=r"Cannot exclude 2 trailing tokens"):
-        token_buffer.consume_recently_generated_tokens(
-            num_trailing_to_exclude=2
-        )
-
-    # Excluding the entire window consumes nothing (empty slice, no bump).
-    consumed = token_buffer.consume_recently_generated_tokens(
-        num_trailing_to_exclude=1
-    )
-    assert consumed.size == 0
-    np.testing.assert_array_equal(
-        token_buffer.consume_recently_generated_tokens(),
-        np.array([7], dtype=np.int64),
-    )
+        prompt_only.reset_as_new_prompt(delete_last_generated_token=True)
 
 
 def test_token_buffer__getitem_access() -> None:

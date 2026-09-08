@@ -23,7 +23,7 @@ from . import test
       server,
       "test:///test.mojo",
       `
-alias Value = 10
+comptime Value = 10
 
 def foo(a: Pointer[mut=True, Float32, MutAnyOrigin]) -> Float32:
   var variable = 15

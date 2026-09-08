@@ -643,7 +643,6 @@ def generate_tokens(
     # NOTE: If extending also update any lists of keywords in the testsuite.
     mojo_keyword_tokens = {
         "struct": STRUCT,
-        "alias": ALIAS,
         "comptime": COMPTIME,
         "var": VAR,
         "__mlir_region": MLIR_REGION,

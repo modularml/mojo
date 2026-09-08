@@ -444,7 +444,7 @@ def grouped_matmul_block_scaled[
         }
 
     # When AB_swapped, swap A/B operands and their scale factors for TMA
-    # and kernel launch. The @parameter if ensures compile-time branching.
+    # and kernel launch. The comptime if ensures compile-time branching.
     comptime if config.AB_swapped:
         var a_tma_op = create_tma_tile[
             KernelType.ATileLayout,

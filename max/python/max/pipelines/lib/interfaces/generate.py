@@ -177,7 +177,12 @@ class GenerateMixin(Protocol[TextGenerationContextType, RequestType]):
                                 f"{request_id}"
                             )
 
+                        # Disjoint layers, not a double free: concrete
+                        # `release` implementations leave the primary KV
+                        # cache alone and free what the manager cannot --
+                        # recurrent state slots and encoder-cache refs.
                         self.kv_manager.release(done_ctx)
+                        self.release(request_id)
 
                 if outputs:
                     yield outputs
@@ -195,3 +200,4 @@ class GenerateMixin(Protocol[TextGenerationContextType, RequestType]):
                 for context in batch:
                     if self.kv_manager.contains(context):
                         self.kv_manager.release(context)
+                    self.release(context.request_id)

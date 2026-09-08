@@ -67,7 +67,7 @@ void InferenceState::setInferredValue(size_t paramIdx, TypedAttr paramVal,
     IREmitter emitter(declScope, EC_TypeParamValue);
     if (auto nmTarget = ASTType(paramVal).getNonmaterializableTarget(shared)) {
       TypedAttr nmTargetAttr = PValue(nmTarget).get();
-      FailureOr<TriState> typeUpCastable = IREmitter::canMetaTypeUpCastTo(
+      FailureOr<TriBool> typeUpCastable = IREmitter::canMetaTypeUpCastTo(
           shared, declScope.getLoc(), nmTargetAttr.getType(), targetType,
           &declScope);
       // If the nonmaterializable type can be upcast to the target type, then

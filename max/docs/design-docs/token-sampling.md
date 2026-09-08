@@ -110,7 +110,7 @@ predictable, it may not always produce the most natural or creative text.
 #### Implementation
 
 ```mojo
-fn greedy_sampling(x):
+def greedy_sampling(x):
  return argmax(x)
 ```
 
@@ -133,7 +133,7 @@ the vocabulary, where $p_i$ is the probability of the $i^{th}$ word, the
 #### Implementation
 
 ```mojo
-fn top_k(x, k):
+def top_k(x, k):
  return sample(sort(x)[:k])
 ```
 
@@ -169,7 +169,7 @@ quality and diversity of generated text.
 #### Implementation
 
 ```mojo
-fn top_p(x, p):
+def top_p(x, p):
   accum = 0
   elems = []
   for item in sorted(x):

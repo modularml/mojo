@@ -14,16 +14,25 @@
 
 
 @fieldwise_init
-struct Foo[T: Writable](def(T) __param_trait__):
+struct Foo[T: Writable](def(x: T) __param_trait__):
     def __call__(mut self, arg: Self.T):
-        print(arg)
+        print("via struct:", arg)
 
 
-def call_int[T: def(Int) __param_trait__](mut closure: T):
+def call_int[T: def(x: Int) __param_trait__](mut closure: T):
     closure.__call__(1)
 
 
 def main():
     var fi = Foo[Int]()
-    # CHECK: 1
+    # CHECK: via struct: 1
     call_int(fi)
+
+    var y = 1
+
+    def closure(x: Int) __param_trait__ {mut y}:
+        y += x
+
+    call_int(closure)
+    # CHECK: via closure: 2
+    print("via closure:", y)

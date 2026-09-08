@@ -86,6 +86,8 @@ const char *LIT::getContextMessage(ExprContext context) {
     return " in 'with' context manager";
   case EC_WithExitResult:
     return " in 'with' call to '__exit__' on context manager";
+  case EC_MatchSubject:
+    return " in 'match' subject";
   case EC_ComptimeAssert:
     return " in 'comptime assert' expression";
   case EC_RaiseValue:

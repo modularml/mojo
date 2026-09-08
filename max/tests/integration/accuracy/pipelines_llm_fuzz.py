@@ -530,6 +530,15 @@ def _run_fuzz_with_crash_detection(
 )
 @click.option("--model-profile", type=str)
 @click.option("--scenarios", type=str, default="")
+@click.option(
+    "--exclude",
+    type=str,
+    default="",
+    help=(
+        "Comma-separated scenarios to exclude, forwarded to llm-fuzz"
+        " --exclude. Use scenario:test for a single test."
+    ),
+)
 @click.option("--k2vv-mode", type=str, default="")
 @click.option("--circuit-breaker", type=int, default=None)
 @click.option("--extra-fuzz-arg", "extra_fuzz_args", multiple=True)
@@ -556,6 +565,7 @@ def main(
     model_path: str | None,
     model_profile: str | None,
     scenarios: str,
+    exclude: str,
     k2vv_mode: str,
     circuit_breaker: int | None,
     extra_fuzz_args: Sequence[str],
@@ -607,6 +617,8 @@ def main(
     ]
     if scenarios:
         fuzz_cmd.extend(["--scenarios", scenarios])
+    if exclude:
+        fuzz_cmd.extend(["--exclude", exclude])
     if k2vv_mode:
         fuzz_cmd.extend(["--k2vv-mode", k2vv_mode])
     if circuit_breaker is not None:

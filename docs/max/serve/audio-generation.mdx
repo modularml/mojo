@@ -12,84 +12,56 @@ import { requirementsWithGPU } from '../requirements';
 
 With MAX, you can deploy open-source music generation models on your local
 system or in the cloud and send inference requests with our REST API. This page
-explains how to use the `v1/audio/speech` endpoint to generate a song from a
-style caption and lyrics, including full-length songs of several minutes.
+explains how to use the [`v1/audio/speech`](/rest-api/create-speech/) endpoint
+to generate a song from a style caption and lyrics.
 
 ## Endpoint
 
-MAX serves audio generation on OpenAI's speech endpoint,
-`v1/audio/speech`, extended with the controls a music model has and a
-text-to-speech model does not. A request is one round trip: the server returns
-the finished waveform as a WAV body, because a model that generates a whole
-song in one pass has nothing to stream.
+MAX serves audio generation on the `v1/audio/speech` endpoint. This endpoint
+currently only supports music generation. It does not support text-to-speech.
 
-The two prompts play different roles. `input` is the text the model sings, so
-for a music model it carries the lyrics. `instructions` is OpenAI's field for
-describing how the audio should sound, so it carries the style caption:
-genre, tempo, key, instrumentation, and voice. Both matter, and
-`instructions` is required, since a music model has no default voice to fall
-back on.
+:::note
+
+The [`v1/responses`](/rest-api/create-response/) endpoint also supports music
+generation. Use that instead if it better fits your workflow.
+
+:::
 
 ### Request fields
 
-| Field             | Type    | Default  | Description                                                                              |
-|-------------------|---------|----------|------------------------------------------------------------------------------------------|
-| `model`           | string  | required | The model being served.                                                                  |
-| `input`           | string  | required | Lyrics to sing. Section tags such as `[verse]` and `[chorus]` shape the arrangement.     |
-| `instructions`    | string  | required | Style caption: genre, tempo, key, mood, vocal, and arrangement.                          |
-| `audio_duration`  | number  | `60`     | Upper bound on the song's length, in seconds.                                            |
-| `steps`           | integer | `30`     | Denoising steps for the flow-matching stage.                                             |
-| `guidance_scale`  | number  | `1.7`    | Classifier-free guidance. Higher values follow the caption more literally.               |
-| `seed`            | integer | `0`      | Seed for the sampling and noise draws. The same seed and prompt reproduce the same song. |
-| `voice`           | string  | ignored  | Required by the OpenAI schema. A music model has no voice catalog, so MAX ignores it.    |
-| `response_format` | string  | `wav`    | Only `wav` is supported.                                                                 |
+The following table lists fields that the speech endpoint accepts.
 
-MAX refuses a request it cannot answer as asked rather than silently
-ignoring the field, so asking for `mp3`, for `speed`, or for a streamed
-response returns a `400` naming the reason. `voice` is the exception, accepted
-and ignored because OpenAI's schema requires it.
-
-Two defaults are worth knowing. An omitted `seed` is `0` rather than a fresh
-random number, so the same request returns the same song every time; vary the
-seed to hear a different take on one prompt. And `audio_duration` is a ceiling
-rather than a target: the model can end a song early, and a long prompt leaves
-less room for audio, so the length of the waveform you get back is the
-authority on what was generated.
-
-`guidance_scale` has a narrower useful range than its lack of an upper bound
-suggests. The default already peaks near full scale; 3.5 clips a fraction of a
-percent of samples, and 6.0 clips several percent outright. Lower it for a
-quieter, looser take on the caption rather than raising it far for a literal
-one.
+| Field             | Type    | Default  | Description                                                                                             |
+|-------------------|---------|----------|---------------------------------------------------------------------------------------------------------|
+| `model`           | string  | Required | ID of the model you send the request to.                                                                |
+| `input`           | string  | Required | Lyrics to sing.                                                                                         |
+| `instructions`    | string  | Required | The song description, covering genre, tempo, key, mood, vocal, and arrangement.                         |
+| `audio_duration`  | number  | `60`     | Upper bound on the song's length, in seconds. The model may produce songs shorter than the upper bound. |
+| `steps`           | integer | `30`     | Denoising steps for the flow-matching stage.                                                            |
+| `guidance_scale`  | number  | `1.7`    | Classifier-free guidance. Raise it to follow the caption more literally.                                |
+| `seed`            | integer | `0`      | Seed for the sampling and noise draws. The same seed and prompt reproduce the same song.                |
+| `voice`           | string  | Ignored  | OpenAI's schema and Python SDK require it, but MAX has no voice catalog and ignores it.                 |
+| `response_format` | string  | `wav`    | MAX supports only `wav`.                                                                                |
 
 ### Response format
 
-The response body is the audio itself, with content type `audio/wav`: 16-bit
-PCM at the model's own sample rate. Write the bytes to a file and play them.
-
-If you also enable the [`v1/responses`](/rest-api/create-response/) endpoint
-by setting `MAX_SERVE_API_TYPES`, the same model answers there too, returning
-a URL to the generated audio instead of the bytes. The speech endpoint needs
-no such setting: it's part of the OpenAI API surface MAX serves by default.
+The response body is the audio itself. Its content type is `audio/wav`, and the
+format is 16-bit PCM at the model's own sample rate. Write the bytes to a file
+and play them.
 
 ## Write the prompt
 
-A music model conditions on a description rather than on a voice ID, so the
-caption is where most of your control lives.
+### Song description
 
-### Style caption
-
-MiniMax-Music3 is trained on captions in three sections, and follows them
-closely:
+[MiniMax-Music3](https://huggingface.co/MiniMaxAI/MiniMax-Music3) recognizes
+three song descriptors from its training:
 
 - **Global metadata**: genre, tempo in BPM, key, mood, and production style.
 - **Vocal details**: the singer's range and timbre, delivery, and effects.
 - **Arrangement**: the instruments, and how they enter and leave across the
   song.
 
-The arrangement section earns its keep at full length. A three-minute song
-told nothing about how it develops has no reason to develop, so describing
-what each section does keeps the song moving:
+Therefore, your prompt should also use these descriptors. For example:
 
 ```text
 Global Metadata: dream pop, 92 BPM, A minor, wistful turning hopeful,
@@ -102,16 +74,16 @@ verse, the chorus opens wide with octave guitars, the bridge drops to pad and
 voice, and the outro decays into tape hiss.
 ```
 
-Tempo and key are hints rather than constraints. A caption asking for 92 BPM
-gets a song near that tempo, not a click track locked to it.
-
 ### Lyrics and section tags
 
-Lyrics go in `input`, with section tags on their own lines. MiniMax-Music3
-recognizes `[intro]`, `[verse]`, `[pre-chorus]`, `[chorus]`, `[post-chorus]`,
-`[bridge]`, `[instrumental]`, `[solo]`, and `[outro]`, in any capitalization.
-A tag with no words under it asks for a passage with no vocal, which is how
-you get an instrumental intro or a solo:
+MiniMax-Music3 accepts lyrics that are organized with certain case-insensitive
+tags.
+
+These include `[intro]`, `[verse]`, `[pre-chorus]`, `[chorus]`,
+`[post-chorus]`, `[bridge]`, `[instrumental]`, `[solo]`, and `[outro]`.
+Each tag needs its own line in the prompt.
+
+Here are some example lyrics you can send with a request:
 
 ```text
 [intro]
@@ -125,31 +97,18 @@ Hold the night a little longer
 Every mile makes the morning stronger
 ```
 
-Repeating a chorus verbatim gets you a chorus that returns, so write the
-song out in full rather than leaving the repeats implied.
-
-:::caution Keep tags on their own line
-
-The checkpoint is trained on one tag per line, and MAX normalizes lyrics to
-match: a line that starts with a tag keeps only the tag, so the words in
-`[verse] Headlights paint the empty road` are dropped and the model sings
-nothing for that verse. Put the tag on its own line and the lyrics under it.
-
-:::
-
 ## Quickstart
 
-In this quickstart, learn how to set up and run
-[MiniMax-Music3](https://huggingface.co/MiniMaxAI/MiniMax-Music3) to generate
-a song from a caption and lyrics.
+This quickstart shows you how to set up and run MiniMax-Music3 to generate a
+song from a caption and lyrics.
 
 :::caution GPU required
 
 To run MiniMax-Music3, your system must have a [compatible
 GPU](/packages#gpu-compatibility) with sufficient GPU RAM. Music generation is
-GPU-intensive and a full-length song takes several minutes to render. The
-checkpoint is around 27 GiB across its three stages, but MAX loads and frees
-one stage at a time, so a 24 GB card is enough to serve it.
+GPU-intensive, and a full-length song takes several minutes to render. The
+checkpoint's weights don't all fit on a 24 GB card at once, but MAX loads and
+frees one stage at a time, so a 24 GB card is enough to serve it.
 
 :::
 
@@ -184,9 +143,11 @@ For a complete list of `max` CLI commands and options, refer to the
 
 ### Generate a song
 
-Send the caption and lyrics to the server and write the WAV it returns. The
-first request after startup also compiles the model, so it takes several
-minutes longer than the ones after it.
+The example below sends the song description and lyrics to the server. Then, it
+saves the WAV file that it returns.
+
+Note that the first request after startup also compiles the model, so it takes
+several minutes longer than later requests.
 
 <Tabs>
 <TabItem value="python" label="Python">
@@ -244,7 +205,7 @@ python generate-song.py
 <TabItem value="curl" label="curl">
 
 Send a request to the `v1/audio/speech` endpoint and write the WAV body
-straight to a file:
+directly to a file:
 
 ```bash
 curl -X POST http://localhost:8000/v1/audio/speech \
@@ -252,7 +213,7 @@ curl -X POST http://localhost:8000/v1/audio/speech \
   -o song.wav \
   -d '{
     "model": "MiniMaxAI/MiniMax-Music3",
-    "instructions": "Global Metadata: dream pop, 92 BPM, A minor, wistful turning hopeful, late-night drive. Vocal Details: female lead, airy breathy timbre, stacked harmonies in the chorus. Arrangement: shimmering electric guitar and analog pad, soft brushed drums, round sub bass.",
+    "instructions": "Global Metadata: dream pop, 92 BPM, A minor, wistful turning hopeful, late-night drive, warm analog production with tape saturation. Vocal Details: female lead, airy breathy timbre, intimate delivery, stacked harmonies in the chorus, generous plate reverb. Arrangement: shimmering electric guitar and analog pad, soft brushed drums, round sub bass, chorus opens up with a wide guitar double.",
     "input": "[intro]\n\n[verse]\nHeadlights paint the empty road\nRadio hums a song I almost know\n\n[chorus]\nHold the night a little longer\nEvery mile makes the morning stronger",
     "audio_duration": 30,
     "seed": 1235
@@ -262,57 +223,14 @@ curl -X POST http://localhost:8000/v1/audio/speech \
 </TabItem>
 </Tabs>
 
-## Full-length songs
-
-Nothing about the request changes with length: ask for `audio_duration` of
-165 instead of 30 and you get a song of up to 2:45. What changes is how much
-work the model does, and it's worth knowing why, because it explains both the
-cost and the one artifact worth listening for.
-
-MiniMax-Music3 is trained for songs up to about five minutes. The hard limit
-is the model's position budget, which the prompt shares with the audio: a
-short caption leaves room for a little over six minutes of song, and a very
-long one leaves closer to three and a half. A request for more than fits logs
-a warning and generates what fits.
-
-MiniMax-Music3 doesn't denoise a whole song at once. It works on overlapping
-windows of a 25 Hz timeline: 200 frames wide, advancing 100 frames at a time,
-which is an 8-second window every 4 seconds. A 30-second clip is 7 windows; a
-2:45 song is 41. Neighboring windows are made to agree on the region they
-share while they're still being denoised, rather than crossfaded together
-afterwards, so the joins are part of the generation instead of an edit applied
-to it.
-
-Two consequences follow. First, render time scales with length, so a song
-twice as long takes about twice as long to generate. Lowering `steps` buys
-back less than you might expect, because it only shortens the flow-matching
-stage, and most of a render goes to generating frames one at a time before
-that stage begins. Second, the joins are the place a long-form artifact would
-show up if one existed, as a click or a jump in level at a predictable offset.
-
-Try the
-[music generation example](https://github.com/modular/modular/tree/main/max/examples/music_generation),
-which renders a full-length song and can check those joins for you. It measures
-the waveform at each predicted seam and compares it against thousands of
-arbitrary offsets in the same song, so the verdict accounts for the fact that
-music is full of transients anyway:
-
-```bash
-python generate_song.py --out song.wav --server http://localhost:8000 \
-  --check-seams
-```
-
-The example also takes songs as JSON files and can render in your own process
-instead of through a server. Its README covers both.
-
 ## Next steps
 
 Now that you can generate music, explore other inference capabilities and
 deployment options.
 
+- [Music generation](https://github.com/modular/modular/tree/main/max/examples/music_generation):
+  Renders a full-length song rather than a short clip.
 - [Image generation](/serve/image-generation): Generate images from text
   prompts or transform existing images using the MAX v1/responses endpoint.
 - [Video generation](/serve/video-generation): Generate videos from text
   prompts or animate existing images.
-- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
-  Learn how to deploy MAX pipelines to cloud.

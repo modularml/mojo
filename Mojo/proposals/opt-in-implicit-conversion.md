@@ -5,7 +5,7 @@
 ## Background
 
 `Conversion`: Any mechanism which allows a value of type `S` to be treated as a
-different type `T`, without manually calling some function `fn (S) -> T`.
+different type `T`, without manually calling some function `def (S) -> T`.
 
 For the purposes of this discussion I'm omitting conversions to interfaces or
 supertypes, since these are conceptually polymorphism, ie. the function is
@@ -71,7 +71,7 @@ let foo: Foo = 10
 ```python
 struct Foo:
   @implicit_conversion
-  fn __init__(out self, i: Int):
+  def __init__(out self, i: Int):
     pass
 
 var foo: Foo = 10

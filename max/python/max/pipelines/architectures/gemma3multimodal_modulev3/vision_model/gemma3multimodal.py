@@ -22,7 +22,7 @@ from max.experimental.nn import Module
 from max.experimental.nn.common_layers.kv_cache import PagedCacheValues
 from max.experimental.nn.norm.layer_norm import LayerNorm
 from max.experimental.tensor import Tensor
-from max.nn.kv_cache import KVCacheInputs, KVCacheParamInterface
+from max.nn.kv_cache import KVCacheParamInterface
 from max.nn.transformer import ReturnLogits
 from max.pipelines.architectures.gemma3_modulev3.gemma3 import Gemma3TextModel
 from max.pipelines.lib.vlm_utils import F_merge_multimodal_embeddings
@@ -65,11 +65,14 @@ class Gemma3LanguageModel(Module[..., tuple[Tensor, ...]]):
         image_token_indices = image_token_indices.to(self.language_model.mesh)
 
         kv_inputs = iter(x._graph_value for x in variadic_args)
-        symbolic_inputs = self.kv_params.unflatten_kv_inputs(kv_inputs)
-        assert isinstance(symbolic_inputs, KVCacheInputs)
-        kv_collections = symbolic_inputs.inputs
-        kv_collection = PagedCacheValues.from_upstream(
-            kv_collections, tokens.mapping
+        kv_cache_local, kv_cache_global = (
+            self.kv_params.unflatten_basic_kv_tree(kv_inputs)
+        )
+        sliding_kv = PagedCacheValues.from_upstream(
+            kv_cache_local, tokens.mapping
+        )
+        global_kv = PagedCacheValues.from_upstream(
+            kv_cache_global, tokens.mapping
         )
 
         # Get text embeddings
@@ -81,6 +84,11 @@ class Gemma3LanguageModel(Module[..., tuple[Tensor, ...]]):
             inputs_embeds, image_embeddings, image_token_indices
         )
 
+        kv_by_type = {
+            "sliding_attention": sliding_kv,
+            "full_attention": global_kv,
+        }
+
         # Run through transformer layers
         h = merged
         for idx, layer in enumerate(self.language_model.layers):
@@ -88,7 +96,7 @@ class Gemma3LanguageModel(Module[..., tuple[Tensor, ...]]):
             h = layer(
                 layer_idx_tensor,
                 h,
-                kv_collection,
+                kv_by_type[self.language_model._layer_kv_key[idx]],
                 input_row_offsets=input_row_offsets,
             )
 

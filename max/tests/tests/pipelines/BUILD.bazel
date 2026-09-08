@@ -25,6 +25,7 @@ modular_py_test(
         "//max/python/max/graph",
         "//max/python/max/pipelines/architectures",
         "//max/python/max/pipelines/architectures/deepseekV3_modulev3",
+        "//max/python/max/pipelines/architectures/eagle_common",
         "//max/python/max/pipelines/architectures/flux2",
         "//max/python/max/pipelines/architectures/gemma3multimodal",
         "//max/python/max/pipelines/architectures/gemma3multimodal_modulev3",

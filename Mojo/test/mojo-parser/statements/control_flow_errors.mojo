@@ -44,8 +44,8 @@ def test_bool_context(a: NotBoolConvertible) raises:
      pass
 
 def test_if_decorator(a: Bool):
-  @not_good() # expected-error {{'if' statement does not support decorators; remove the decorator}}
-  if a:
+  @not_good()
+  if a: # expected-error {{'if' statement does not support decorators; remove the decorator}}
     pass
 
   comptime if 1:
@@ -60,10 +60,6 @@ def test_comptime_if_dynamic_elif(a: Bool):
     pass
 
 def test_decorator_with_comptime_if():
-  @parameter
-  comptime if True:  # expected-error {{@parameter decorator is redundant on 'comptime if'}}
-    pass
-
   @not_good()
   comptime if True:  # expected-error {{'comptime if' statement does not support decorators; remove the decorator}}
     pass

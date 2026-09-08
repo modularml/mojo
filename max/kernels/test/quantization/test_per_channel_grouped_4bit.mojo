@@ -157,9 +157,7 @@ def _read_write_to_tensors[
     comptime assert num_elements % group_size == 0
     comptime num_blocks = ceildiv(num_elements, group_size)
     comptime block_size = size_of[Q4sym[group_size]]()
-    var packed_blob_backing = Array[UInt8, num_blocks * block_size](
-        uninitialized=True
-    )
+    var packed_blob_backing = Array[UInt8, num_blocks * block_size](fill={})
     var packed_blob = TileTensor(
         packed_blob_backing, row_major[num_blocks * block_size]()
     )

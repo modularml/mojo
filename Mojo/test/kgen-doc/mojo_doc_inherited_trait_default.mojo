@@ -12,11 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: kgen-doc %s | FileCheck %s
 
-# An inheriting trait's copy of a default cannot be documented on its own, so
-# its doc string has to come from the method the declaring trait defines. The
-# copy carries `defaultFnRef` naming that method, and a copy of a copy keeps the
-# original's, so this holds however many traits the default is inherited
-# through.
+# A refining trait does not materialize the defaults it inherits, so a default
+# is documented only on the trait that declares it.
 
 """Module docstring."""
 
@@ -44,7 +41,7 @@ trait Middle(Base):
     pass
 
 
-# CHECK:      "summary": "Declared in Base."
+# CHECK:      "functions": [],
 # CHECK:      "kind": "trait"
 # CHECK-NEXT: "name": "Middle"
 
@@ -55,6 +52,6 @@ trait Leaf(Middle):
     pass
 
 
-# CHECK:      "summary": "Declared in Base."
+# CHECK:      "functions": [],
 # CHECK:      "kind": "trait"
 # CHECK-NEXT: "name": "Leaf"

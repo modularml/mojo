@@ -713,7 +713,7 @@ struct Variant[*Ts: AnyType](
         comptime for i in range(Self.Ts.length):
             comptime T = Self.Ts[i]
             if self.isa[T]():
-                hasher.update(UInt8(i))
+                UInt8(i).__hash__(hasher)
                 self.unsafe_get[T]().__hash__(hasher)
                 return
 

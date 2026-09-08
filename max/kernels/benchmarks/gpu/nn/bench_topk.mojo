@@ -1053,55 +1053,64 @@ def bench_dispatch_all() raises:
 
 
 def bench_gumbel_from_probs() raises:
-    comptime dtype = DType.float32
-    comptime vocab = 200064
+    # The fused sampler's `from_probs` path refuses to build on Apple
+    # (`_block_reduce_topk` caps its shared storage at WARP_SIZE there while
+    # the kernel launches full-sized blocks), so the benchmark cannot be
+    # instantiated for Metal.
+    comptime if has_apple_gpu_accelerator():
+        raise Error("the gumbel_from_probs benchmark requires a non-Apple GPU")
+    else:
+        comptime dtype = DType.float32
+        comptime vocab = 200064
 
-    with DeviceContext() as ctx:
-        var b = Bench()
-        b.config.max_iters = 200
-        b.config.show_progress = False
-        for rows in [32, 96]:
-            var probs_buf = ctx.enqueue_create_buffer[dtype](rows * vocab)
-            var out_buf = ctx.enqueue_create_buffer[.int64](rows)
-            var seed_buf = ctx.enqueue_create_buffer[.uint64](rows)
-            probs_buf.enqueue_fill(Scalar[dtype](1.0 / vocab))
-            seed_buf.enqueue_fill(UInt64(42))
-            ctx.synchronize()
+        with DeviceContext() as ctx:
+            var b = Bench()
+            b.config.max_iters = 200
+            b.config.show_progress = False
+            for rows in [32, 96]:
+                var probs_buf = ctx.enqueue_create_buffer[dtype](rows * vocab)
+                var out_buf = ctx.enqueue_create_buffer[.int64](rows)
+                var seed_buf = ctx.enqueue_create_buffer[.uint64](rows)
+                probs_buf.enqueue_fill(Scalar[dtype](1.0 / vocab))
+                seed_buf.enqueue_fill(UInt64(42))
+                ctx.synchronize()
 
-            var probs = (
-                TileTensor(probs_buf, row_major(rows, vocab))
-                .as_unsafe_any_origin()
-                .as_immut()
-            )
-            var out = TileTensor(out_buf, row_major(rows))
-            var seeds = (
-                TileTensor(seed_buf, row_major(rows))
-                .as_unsafe_any_origin()
-                .as_immut()
-            )
+                var probs = (
+                    TileTensor(probs_buf, row_major(rows, vocab))
+                    .as_unsafe_any_origin()
+                    .as_immut()
+                )
+                var out = TileTensor(out_buf, row_major(rows))
+                var seeds = (
+                    TileTensor(seed_buf, row_major(rows))
+                    .as_unsafe_any_origin()
+                    .as_immut()
+                )
 
-            @always_inline
-            def bench_fn(mut bb: Bencher) raises {imm}:
                 @always_inline
-                def launch(dctx: DeviceContext) raises {imm}:
-                    gumbel_sampling_fused_gpu[from_probs=True](
-                        dctx, probs, out, seed=seeds
-                    )
+                def bench_fn(mut bb: Bencher) raises {imm}:
+                    @always_inline
+                    def launch(dctx: DeviceContext) raises {imm}:
+                        gumbel_sampling_fused_gpu[from_probs=True](
+                            dctx, probs, out, seed=seeds
+                        )
 
-                bencher_iter_custom(bb, launch, ctx)
+                    bencher_iter_custom(bb, launch, ctx)
 
-            b.bench_function(
-                bench_fn,
-                BenchId(
-                    String("gumbel_from_probs/rows=", rows, "/vocab=", vocab)
-                ),
-            )
-            _ = probs_buf^
-            _ = out_buf^
-            _ = seed_buf^
+                b.bench_function(
+                    bench_fn,
+                    BenchId(
+                        String(
+                            "gumbel_from_probs/rows=", rows, "/vocab=", vocab
+                        )
+                    ),
+                )
+                _ = probs_buf^
+                _ = out_buf^
+                _ = seed_buf^
 
-        print()
-        b.dump_report()
+            print()
+            b.dump_report()
 
 
 def bench_bitonic_topk(

@@ -51,14 +51,12 @@ def _make_ctx(
     ``isinstance`` check that fails for SimpleNamespace), and
     ``ctx.cache_salt`` (direct attribute access — the real ``TextContext``
     always defines this attribute, so the stub must too, even when no
-    caller-supplied salt is set), and ``ctx.pending_future_count`` (trailing
-    future-token placeholders are excluded from hashing).
+    caller-supplied salt is set).
     """
     ctx = SimpleNamespace(
         request_id=request_id,
         tokens=tokens,
         cache_salt=cache_salt,
-        pending_future_count=0,
     )
     return cast(TextContext, ctx)
 

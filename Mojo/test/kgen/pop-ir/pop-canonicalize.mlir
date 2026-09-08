@@ -1289,8 +1289,8 @@ kgen.func @fptrunc_and_fptrunc(%v0 : !kgen.simd<2, f64>) -> !kgen.simd<2, f16> {
 kgen.func @fptrunc_and_fptrunc_fast(
     %v0 : !kgen.simd<2, f64>) -> !kgen.simd<2, f16> {
   // CHECK-NEXT: pop.cast %arg0 : !kgen.simd<2, f64> to !kgen.simd<2, f16>
-  %v1 = pop.cast %v0 {fastmathFlags = #pop<fmf fast>} : !kgen.simd<2, f64> to !kgen.simd<2, f32>
-  %v2 = pop.cast %v1 {fastmathFlags = #pop<fmf fast>} : !kgen.simd<2, f32> to !kgen.simd<2, f16>
+  %v1 = pop.cast %v0 {fastmathFlags = #pop.fmf<fast>} : !kgen.simd<2, f64> to !kgen.simd<2, f32>
+  %v2 = pop.cast %v1 {fastmathFlags = #pop.fmf<fast>} : !kgen.simd<2, f32> to !kgen.simd<2, f16>
   kgen.return %v2 : !kgen.simd<2, f16>
 }
 
@@ -1298,9 +1298,9 @@ kgen.func @fptrunc_and_fptrunc_fast(
 // CHECK-LABEL: @fptrunc_and_fptrunc_inner_fast_only
 kgen.func @fptrunc_and_fptrunc_inner_fast_only(
     %v0 : !kgen.simd<2, f64>) -> !kgen.simd<2, f16> {
-  // CHECK-NEXT: pop.cast %arg0 {fastmathFlags = #pop<fmf fast>} : !kgen.simd<2, f64> to !kgen.simd<2, f32>
+  // CHECK-NEXT: pop.cast %arg0 {fastmathFlags = #pop.fmf<fast>} : !kgen.simd<2, f64> to !kgen.simd<2, f32>
   // CHECK-NEXT: pop.cast {{.*}} : !kgen.simd<2, f32> to !kgen.simd<2, f16>
-  %v1 = pop.cast %v0 {fastmathFlags = #pop<fmf fast>} : !kgen.simd<2, f64> to !kgen.simd<2, f32>
+  %v1 = pop.cast %v0 {fastmathFlags = #pop.fmf<fast>} : !kgen.simd<2, f64> to !kgen.simd<2, f32>
   %v2 = pop.cast %v1 : !kgen.simd<2, f32> to !kgen.simd<2, f16>
   kgen.return %v2 : !kgen.simd<2, f16>
 }
