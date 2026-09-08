@@ -105,8 +105,14 @@ class ShortConvolution(Module, Shardable):
         conv_state_pool: BufferValue,
         slot_idx: TensorValue,
         input_row_offsets: TensorValue,
+        has_initial_state: TensorValue,
     ) -> TensorValue:
-        """Returns ``x + conv(x)``; updates ``conv_state_pool`` in place."""
+        """Returns ``x + conv(x)``; updates ``conv_state_pool`` in place.
+
+        ``has_initial_state`` is false for a request's first chunk, which has
+        no convolution history: the kernel then reads zeros instead of the
+        slot, so the slot never has to be cleared on admission.
+        """
         device = x.device
         channels, _, kernel_size = self.weight.shape
         x_f32 = ops.cast(x, _COMPUTE_DTYPE)
@@ -123,12 +129,7 @@ class ShortConvolution(Module, Shardable):
             conv_state_pool,
             ops.cast(input_row_offsets, DType.int32),
             ops.cast(slot_idx, DType.int32),
-            # A freshly claimed slot is zeroed, so reading the pool window is
-            # right at a sequence start too.
-            ops.broadcast_to(
-                ops.constant(True, DType.bool, device=device),
-                [slot_idx.shape[0]],
-            ),
+            has_initial_state,
             activation="none",
             channels_last=True,
         )

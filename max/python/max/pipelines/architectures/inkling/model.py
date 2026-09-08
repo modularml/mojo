@@ -191,7 +191,7 @@ class InklingModel(
         """Frees the slots a graph-capture warmup probe claimed.
 
         Without this the second probe finds no free slot and serving never
-        starts; ``claim`` zeros a slot when a real request takes it.
+        starts.
         """
         for request_id in request_ids:
             self.release(request_id)
