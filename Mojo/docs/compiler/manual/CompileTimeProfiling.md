@@ -302,66 +302,48 @@ is ten identical rows.
 
 ## The tracked benchmark
 
-The steps above time one compile on one machine. To watch compile time move
-over weeks, CI runs the same measurement daily through
+The steps above time one compile on one machine. To watch compile time move over
+weeks, the `Mojo Compile Time` workflow runs the same measurement daily through
 `utils/benchmarking/kepler/mojo_compilation/`, which has two targets:
 
-| Target                     | What it does                                                 |
-|----------------------------|--------------------------------------------------------------|
-| `make_snapshot`            | Builds the frozen input and publishes it to S3.              |
-| `bench_mojo_compile_time`  | Compiles that input and reports the breakdown.               |
+| Target                    | What it does                                            |
+|---------------------------|---------------------------------------------------------|
+| `make_artifacts`          | Runs the graph compiler and keeps the Mojo it emits.    |
+| `bench_mojo_compile_time` | Compiles that Mojo and reports the pipeline breakdown.  |
 
-The input is frozen because a compile time only means something against a fixed
-input. The emitted Mojo changes whenever the graph compiler or the kernel
-library changes, and either can move compile time as much as the Mojo compiler
-can. A snapshot pins all of it, so a step in the series is attributable.
+Both run at one commit, so the graph compiler, the kernel library and the Mojo
+compiler all move together. A step in the series therefore says compile time
+moved, not what moved it — which is bisected like any other regression. The
+`input.*` series record what the compiler was given, so a step that comes from
+the graph compiler emitting more code is visible beside the timings.
 
-The snapshot holds the library as **source**, not as precompiled `.mojoc`. A
-`.mojoc` loads only in a compiler whose MLIR dialect checksum matches, and that
-checksum hashes the dialect `.td` text, so it changes most days — a snapshot of
-compiled packages is unusable within a day of being taken. Source stays
-compilable for as long as the language accepts it, so the benchmark rebuilds the
-packages with the compiler under test on every invocation. That rebuild is not
-overhead: it compiles the whole standard library and every kernel library, far
-more code than one emitted model, and is reported as `precompile.*`.
+They are separate targets because emitting is expensive: it downloads a
+checkpoint and builds a 31B graph. Locally you pay that once and then compile
+the result as often as you like.
 
-### Generating a snapshot
+### Emitting the sources
 
 ```bash
-./bazelw run //utils/benchmarking/kepler/mojo_compilation:make_snapshot -- \
-  --out ~/mojo-compile-snapshot --skip-upload
+./bazelw run //utils/benchmarking/kepler/mojo_compilation:make_artifacts -- \
+  --out ~/mojo-artifacts
 ```
 
-`--skip-upload` builds and archives the snapshot without publishing it, which is
-what a local run wants. It also bypasses the cadence check, so the snapshot is
-always rebuilt.
+| Option      | Meaning                                                    |
+|-------------|------------------------------------------------------------|
+| `--out`     | Directory to emit into; created if absent.                 |
+| `--inputs`  | Model manifest (default: `model_inputs.yaml`).             |
+| `--model`   | Emit one model by name, rather than every model.           |
 
-The run emits the Mojo for every model in `model_inputs.yaml` the same way
-[step 1 above](#1-get-the-emitted-mojo) does, copies the library sources, reads
-the precompile recipe out of `bazel aquery`, rebuilds the packages once to
-confirm the frozen tree compiles, and counts each source's offload kernels. It
-produces:
+It writes the emitted `.mojo` files plus an `ARTIFACTS.yaml` recording the
+commit and what each file looks like. The graph compiler run needs HuggingFace
+access and fails on a target it cannot reach from here; its output is kept in a
+log and only shown if a source is missing, which is the real failure.
 
-```text
-~/mojo-compile-snapshot/
-├── SNAPSHOT.yaml               the recipe, plus a hash and size per file
-├── library/                    stdlib, kernel and max sources at their repo paths
-├── sources/<dir>/              the emitted .mojo files
-└── mojo_compile_snapshot.tar.gz
-```
-
-Two things to expect. The graph compiler run needs HuggingFace access to the
-model and fails on the target it cannot reach from here, exactly as in step 1;
-its output is kept in a log and only shown if a source is missing, which is the
-real failure. And `--skip-emit` reuses the `.mojo` already under `--out` instead
-of running the graph compiler again, which is much faster when iterating on
-everything downstream of the emit.
-
-### Running the benchmark locally
+### Measuring
 
 ```bash
 ./bazelw run //utils/benchmarking/kepler/mojo_compilation:bench_mojo_compile_time -- \
-  --snapshot ~/mojo-compile-snapshot \
+  --sources ~/mojo-artifacts \
   --runs 1 \
   --results /tmp/compile-time.json
 ```
@@ -369,59 +351,31 @@ everything downstream of the emit.
 | Option        | Meaning                                                             |
 |---------------|---------------------------------------------------------------------|
 | `--list`      | Print the benchmark names the manifest declares, and exit.          |
-| `--snapshot`  | Compile an unpacked snapshot instead of fetching the published one. |
+| `--sources`   | Directory `make_artifacts` emitted into.                            |
 | `--runs`      | Repeats per source, each two full compiles (default: 3).            |
 | `--results`   | Also write the results to a file; `.json` or `.yaml` by extension.  |
 | `--benchmark` | Run only the named benchmark. Repeatable.                           |
 
-The first four are this benchmark's own. `--benchmark` comes from the shared
-Kepler runner, as does everything else on that command line not listed here.
-
-To see what there is to measure:
-
-```bash
-./bazelw run //utils/benchmarking/kepler/mojo_compilation:bench_mojo_compile_time \
-  -- --list
-```
-
-```text
-gemma-4-31b.language            sm_100a  gemma4/gemma4_vision+gemma4_language.mojo
-gemma-4-31b.constant-subgraphs  sm_100a  gemma4/gemma4_vision_constant_subgraphs.mojo
-```
-
-Then measure one of them, naming it exactly as `--list` printed it:
-
-```bash
-./bazelw run //utils/benchmarking/kepler/mojo_compilation:bench_mojo_compile_time -- \
-  --snapshot ~/mojo-compile-snapshot \
-  --runs 1 \
-  --benchmark gemma-4-31b.language
-```
-
-The library rebuild happens either way: it is the input to whatever is being
-measured, so filtering saves the model compiles and nothing else.
+The first four are this benchmark's own; `--benchmark` comes from the shared
+Kepler runner, as does everything else on that command line. In CI the sources
+directory is named by `MOJO_COMPILE_SOURCES` instead, because the benchmark runs
+as a bazel test and cannot take arguments.
 
 Each repeat compiles the source twice: once with no timing flags at the
 compiler's default thread count, reported as `wall.total`, and once with
 `--mlir-timing --llvm-timing` for the phase breakdown. Only the first is a
-latency figure, for the reason in [the flags](#the-flags) — the second is
-single threaded.
+latency figure, for the reason in [the flags](#the-flags) — the second is single
+threaded.
 
-Omitting `--snapshot` fetches the most recently published snapshot over HTTPS,
-which is what CI does.
-
-Budget for the cost in compiles rather than in minutes, which vary by machine.
-An invocation is one library rebuild plus, per source, two full compiles per
-repeat. The rebuild happens once per invocation and not once per repeat, since
-every source compiles against the same packages, and the large emitted source
-dominates everything else. Start with `--runs 1`.
+Budget for the cost in compiles rather than in minutes, which vary by machine:
+per source, two full compiles per repeat, and the large emitted source dominates
+everything else. Start with `--runs 1`.
 
 ### Adding a model
 
-Every series the benchmark tracks comes from `model_inputs.yaml` beside the two
-targets. A model there is one extraction — one run of the graph compiler — and
-the files that extraction produces are its sources, each compiled and plotted on
-its own.
+Every series comes from `model_inputs.yaml` beside the two targets. A model
+there is one extraction — one run of the graph compiler — and the files it
+produces are its sources, each compiled and plotted on its own.
 
 To add one:
 
@@ -446,26 +400,22 @@ To add one:
          file: my-model/the_emitted_file.mojo
    ```
 
-3. Regenerate the snapshot. The emit, the offload-kernel count and the source
-   statistics all follow from the manifest, so nothing else needs editing.
+3. Re-emit. The statistics and the series follow from the manifest, so nothing
+   else needs editing.
 
-Four things to get right:
+Three things to get right:
 
-- `file` is the path **inside the snapshot**, not where the extraction wrote it.
-  Only its basename has to match an emitted file; the leading directory is
-  yours to choose, and exists to keep one model's sources away from another's.
-- `emitted_by` is not read at benchmark time. It is recorded so that a refresh
-  is reproducible, since what the graph compiler emits depends on those
-  settings — so keep `command` in step with the fields above it.
+- `file` is the path **inside the output directory**. Only its basename has to
+  match an emitted file; the leading directory is yours to choose, and exists to
+  keep one model's sources away from another's.
+- `emitted_by` is what the emitter runs, so keep `command` in step with the
+  fields above it.
 - `name` and each source's `name` form the series name, `<model>.<source>`.
   They are the dashboard's identity for the series: renaming one starts a fresh
   line rather than continuing the existing one. A model name must not contain a
-  dot, because the BigQuery view splits the series name on the first one.
-- Each source costs two full compiles per repeat on every CI run, so add
-  sources that answer a question, not every file an extraction happens to
-  produce.
+  dot.
 
-The results land in BigQuery and Looker. See the Kepler docs for the tables and
+The results land in BigQuery and Looker. See the Kepler docs for the table and
 the dashboard: `docs/internal/KeplerBenchmarking.md`.
 
 ## Notes for benchmarking
