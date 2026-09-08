@@ -991,6 +991,80 @@ def build_modelopt_nvfp4_config(
     )
 
 
+def _parse_compressed_tensors_float4_config(
+    huggingface_config: AutoConfig,
+    state_dict: Mapping[str, WeightData],
+    dtype: DType,
+    *,
+    state_dict_name_prefix: str = "",
+    ignored_modules_prefix: str = "model.",
+) -> QuantConfig | None:
+    """Parses an NVFP4 ``QuantConfig`` from a compressed-tensors checkpoint.
+
+    Compressed-tensors NVFP4 (e.g. ``RedHatAI/gemma-4-*-NVFP4``) stores the same
+    block-scaled E2M1 weights with FP8-E4M3 scales as the modelopt NVFP4 format,
+    so it maps to the same ``QuantFormat.NVFP4`` and kernel path (including the
+    pre-Blackwell fallback); only the HF config schema differs. See
+    modular/modular#6697.
+    """
+    hf_quant_config = getattr(huggingface_config, "quantization_config", None)
+    if not hf_quant_config:
+        return None
+
+    group_config = hf_quant_config.get("config_groups", {}).get("group_0")
+    if not group_config:
+        return None
+    weight_config = group_config.get("weights", {})
+
+    # NVFP4 = 4-bit float weights. Anything else in this group is not NVFP4.
+    if (
+        weight_config.get("num_bits") != 4
+        or weight_config.get("type") != "float"
+    ):
+        return None
+
+    # NVFP4 block-scaled specs: E2M1 weights with FP8-E4M3 block scales over a
+    # 16-wide group, matching the modelopt NVFP4 path above. Verified against
+    # RedHatAI/gemma-4-31B-it-NVFP4: group_size=16, weight_scale is a plain
+    # [N, K/16] FP8-E4M3 block-scale tensor (not pre-interleaved), and the
+    # per-tensor global scales ship as weight_global_scale / input_global_scale.
+    # The Gemma 4 weight_adapters reconcile those names (and squeeze the [1]
+    # global scales to scalar) onto weight / weight_scale_2 / input_scale.
+    group_size = weight_config.get("group_size", 16)
+    input_spec = InputScaleSpec(
+        granularity=ScaleGranularity.BLOCK,
+        origin=ScaleOrigin.STATIC,
+        dtype=DType.float32,
+        block_size=(1, group_size),
+    )
+    weight_spec = WeightScaleSpec(
+        granularity=ScaleGranularity.BLOCK,
+        dtype=DType.float8_e4m3fn,
+        block_size=(1, group_size),
+    )
+
+    ignore_modules = set(hf_quant_config.get("ignore", []))
+    mlp_quantized_layers, attn_quantized_layers, embedding_output_dtype = (
+        _quantized_layers_and_embedding_dtype(
+            huggingface_config,
+            ignore_modules,
+            state_dict,
+            state_dict_name_prefix=state_dict_name_prefix,
+            ignored_modules_prefix=ignored_modules_prefix,
+        )
+    )
+
+    return QuantConfig(
+        input_scale=input_spec,
+        weight_scale=weight_spec,
+        mlp_quantized_layers=mlp_quantized_layers,
+        attn_quantized_layers=attn_quantized_layers,
+        embedding_output_dtype=embedding_output_dtype,
+        bias_dtype=_bias_dtype(state_dict),
+        format=QuantFormat.NVFP4,
+    )
+
+
 def _is_mxfp4_config(hf_quant_config: dict[str, Any]) -> bool:
     """Checks whether a HuggingFace quantization config describes MXFP4."""
     quant_method = hf_quant_config.get("quant_method", "")
@@ -1190,6 +1264,14 @@ def _parse_float4_config(
             dtype,
             quant_method_override=quant_method,
             quant_algo_override=quant_config.get("quant_algo"),
+            state_dict_name_prefix=state_dict_name_prefix,
+            ignored_modules_prefix=ignored_modules_prefix,
+        )
+    elif quant_method == "compressed-tensors":
+        return _parse_compressed_tensors_float4_config(
+            huggingface_config,
+            state_dict,
+            dtype,
             state_dict_name_prefix=state_dict_name_prefix,
             ignored_modules_prefix=ignored_modules_prefix,
         )

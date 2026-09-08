@@ -60,10 +60,45 @@ def convert_safetensor_language_state_dict(
         for before, after in GEMMA4_LANGUAGE_SAFETENSOR_MAP.items():
             max_name = max_name.replace(before, after)
 
+        # compressed-tensors NVFP4 checkpoints (e.g. RedHatAI/gemma-4-*-NVFP4)
+        # store the same block-scaled E2M1 weights as the modelopt export but
+        # under different tensor names. Reconcile them to the modelopt names
+        # the quantized Linear expects so both NVFP4 formats load through the
+        # same graph weights. The shared block-scale tensor (``weight_scale``)
+        # already matches and is left untouched.
+        ct_global_scale = False
+        if max_name.endswith(".weight_packed"):
+            max_name = max_name.removesuffix(".weight_packed") + ".weight"
+        elif max_name.endswith(".weight_global_scale"):
+            max_name = (
+                max_name.removesuffix(".weight_global_scale")
+                + ".weight_scale_2"
+            )
+            ct_global_scale = True
+        elif max_name.endswith(".input_global_scale"):
+            max_name = (
+                max_name.removesuffix(".input_global_scale") + ".input_scale"
+            )
+            ct_global_scale = True
+
         data = value.data()
 
         if max_name.endswith(".weight_scale") and data.dtype == DType.uint8:
             data = dataclasses.replace(data, dtype=DType.float8_e8m0fnu)
+
+        # compressed-tensors stores the per-tensor global scales as the
+        # reciprocal of the modelopt convention (llm-compressor stores
+        # ``(FP4_MAX * FP8_MAX) / amax`` while modelopt stores
+        # ``amax / (FP4_MAX * FP8_MAX)``), shaped ``[1]`` rather than scalar.
+        # The NVFP4 kernels multiply activations/weights by ``input_scale`` /
+        # ``weight_scale_2``, so invert to the modelopt convention and squeeze
+        # ``[1]`` -> scalar to match the shape the quantized Linear registers.
+        # modelopt checkpoints arrive scalar under these names and skip this.
+        if ct_global_scale:
+            inv = (1.0 / np.from_dlpack(data.data).astype(np.float32)).reshape(
+                ()
+            )
+            data = WeightData(inv, max_name, data.dtype, Shape([]))
 
         # Stacked MoE expert weights: split into individual per-expert weights.
         # HF stores gate_up_proj [num_experts, 2*moe_dim, hidden_dim]

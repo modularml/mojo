@@ -35,6 +35,12 @@ modular_py_test(
 )
 
 modular_py_test(
+    name = "test_nvfp4_weight_adapter",
+    srcs = ["test_nvfp4_weight_adapter.py"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+
     name = "test_fused_projection_weights",
     srcs = ["test_fused_projection_weights.py"],
     deps = [
@@ -48,6 +54,8 @@ modular_py_test(
 )
 
 modular_py_test(
+
+
     name = "test_batch_vision_inputs_cpu",
     srcs = ["test_batch_vision_inputs.py"],
     deps = [
@@ -69,6 +77,8 @@ modular_py_test(
             "test_attention.py",
             "test_batch_vision_inputs.py",
             "test_config_init.py",
+            "test_nvfp4_weight_adapter.py",
+
             "test_fused_projection_weights.py",
             "test_image_processor.py",
             "test_reasoning.py",
