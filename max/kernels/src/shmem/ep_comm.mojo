@@ -5404,7 +5404,7 @@ def fused_silu_nvfp4_interleaved_kernel[
 
 
 @always_inline
-def _sigmoid[
+def sigmoid[
     dtype: DType,
     width: SIMDLength,
     accum: DType = get_accum_type[dtype](),
@@ -5529,7 +5529,7 @@ def fused_silu_mx_kernel[
             comptime if clamp_activation:
                 var g_c = min(gate_proj, limit)
                 var u_c = up_proj.clamp(-limit, limit)
-                output_val = (g_c * _sigmoid(g_c * alpha)) * (u_c + 1.0)
+                output_val = (g_c * sigmoid(g_c * alpha)) * (u_c + 1.0)
             else:
                 gate_proj = gate_proj / (1.0 + exp(-gate_proj))
                 output_val = gate_proj * up_proj
@@ -5938,7 +5938,7 @@ def fused_silu_mxfp6_kernel[
             comptime if clamp_activation:
                 var g_c = min(gate_proj, limit)
                 var u_c = up_proj.clamp(-limit, limit)
-                output_val = (g_c * _sigmoid(g_c * alpha)) * (u_c + 1.0)
+                output_val = (g_c * sigmoid(g_c * alpha)) * (u_c + 1.0)
             else:
                 gate_proj = gate_proj / (1.0 + exp(-gate_proj))
                 output_val = gate_proj * up_proj
