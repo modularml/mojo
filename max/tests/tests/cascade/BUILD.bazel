@@ -57,6 +57,8 @@ modular_py_test(
     name = "test_echo_textgen",
     size = "small",
     srcs = ["test_echo_textgen.py"],
+    # Import-bound; see test_cascade_tool_calling below.
+    tags = ["skip-ci-macos"],
     deps = [
         "//max/python/max/experimental/cascade",
         "//max/python/max/experimental/cascade/core",
@@ -70,6 +72,8 @@ modular_py_test(
     name = "test_chat_completions",
     size = "small",
     srcs = ["test_chat_completions.py"],
+    # Import-bound; see test_cascade_tool_calling below.
+    tags = ["skip-ci-macos"],
     deps = [
         "//max/python/max/experimental/cascade",
         "//max/python/max/experimental/cascade/pipelines",
