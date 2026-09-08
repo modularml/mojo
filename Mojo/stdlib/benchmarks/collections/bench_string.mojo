@@ -119,6 +119,33 @@ def bench_string_split[
 
 
 # ===-----------------------------------------------------------------------===#
+# Benchmark string split dense
+# ===-----------------------------------------------------------------------===#
+def bench_string_split_dense[count: Int](mut b: Bencher) raises:
+    """Benchmark split with dense separators producing many items.
+
+    This measures the allocation strategy when split produces many items
+    (e.g. CSV-like data with dense separators).
+    """
+    # Build a string "item,item,item,..." with `count` items.
+    var buf = String(capacity_bytes=count * 5)
+    for i in range(count):
+        if i > 0:
+            buf += ","
+        buf += "item"
+
+    @always_inline
+    def call_fn() {imm}:
+        var s = StringSlice(buf).as_imm()
+        var res = _split[has_maxsplit=False](
+            black_box(s), black_box(StaticString(",")), black_box(-1)
+        )
+        keep(res)
+
+    b.iter(call_fn)
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark string join
 # ===-----------------------------------------------------------------------===#
 def bench_string_join[short: Bool](mut b: Bencher) raises:
@@ -492,6 +519,27 @@ def main() raises:
     m.bench_function(
         bench_string_join[False],
         BenchId(String("bench_string_join_long")),
+    )
+
+    m.bench_function(
+        bench_string_split_dense[10],
+        BenchId(String("bench_string_split_dense[10]"),
+    )
+    )
+    m.bench_function(
+        bench_string_split_dense[100],
+        BenchId(String("bench_string_split_dense[100]"),
+    )
+    )
+    m.bench_function(
+        bench_string_split_dense[1000],
+        BenchId(String("bench_string_split_dense[1000]"),
+    )
+    )
+    m.bench_function(
+        bench_string_split_dense[10000],
+        BenchId(String("bench_string_split_dense[10000]"),
+    )
     )
 
     # NOTE: do not delete this. This is supposed to measure the average for
