@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 
 import numpy as np
+from fusion_utils import xfail_under_adv_fusion
 from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import DeviceRef, Graph, TensorType, ops
@@ -53,6 +54,9 @@ def _reference(
     return r2 + d
 
 
+@xfail_under_adv_fusion(
+    "correctness: the new fusion system does not fully fuse this graph yet"
+)
 def test_static_shapes(session: InferenceSession) -> None:
     with Graph(
         "canonical_fused_graph_static",
@@ -87,6 +91,9 @@ def test_static_shapes(session: InferenceSession) -> None:
     )
 
 
+@xfail_under_adv_fusion(
+    "correctness: the new fusion system does not fully fuse this graph yet"
+)
 def test_dynamic_shapes(session: InferenceSession) -> None:
     """Same graph, symbolic dims on `A`/`B`/`D` (`m`, `n`, `k`).
 

@@ -21,10 +21,14 @@ with mixed static/dynamic shapes (symbolic ``batch``/``seq_len``, static
 ``window_size``/``num_heads``/``head_size``) in the same graph.
 Compile-only, no correctness/numeric checks and no benchmarking.
 
-Not env-gated: this graph shape aborts the process
+This graph shape aborts the process
 (``MAP::SliceSpecAttr::verifyInvariants``) under
 ``MAX_GC_USE_ADV_FUSION=1`` today -- a known new-system gap, not
-addressed here -- so this runs under the legacy pipeline instead.
+addressed here. An uncatchable abort can't be ``xfail``'d, so the
+``adv-fusion-`` variant of this target ``skipif``'s the body (below)
+rather than running it; the default target still runs it under the
+legacy pipeline. Both keep the test tracked in the new-system
+regression suite until the gap is fixed.
 
 ``mo.mha.no_cache`` (the attention op `_AttentionBlock` calls through
 ``F.custom``) has only a GPU kernel registration
@@ -35,9 +39,11 @@ is skipped without one, like `test_tile_based_fusion.py`.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from typing import cast
 
+import pytest
 from max.driver import Accelerator
 from max.dtype import DType
 from max.experimental import functional as F
@@ -291,6 +297,12 @@ class _Model(Module[..., tuple[Tensor, ...]]):
         return types
 
 
+@pytest.mark.skipif(
+    "MAX_GC_USE_ADV_FUSION" in os.environ,
+    reason="Does not compile under the new fusion system yet: aborts in "
+    "MAP::SliceSpecAttr::verifyInvariants (known gap). Tracked here as a skip "
+    "since an uncatchable abort can't be xfail'd.",
+)
 def test_typical_llm_compiles_with_mixed_static_dynamic_shapes() -> None:
     device_ref = DeviceRef.GPU()
     cfg = _SNIFFTEST_CONFIG

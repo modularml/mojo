@@ -25,6 +25,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from fusion_utils import xfail_under_adv_fusion
 from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -451,6 +452,7 @@ class TestCustomDeviceValidation:
 class TestCustomOperationExecution:
     """Integration tests that verify actual execution behavior."""
 
+    @xfail_under_adv_fusion("compile error under the new fusion system")
     def test_custom__execution_with_session(
         self, kernel_verification_ops_path: Path, session: InferenceSession
     ) -> None:
@@ -479,6 +481,7 @@ class TestCustomOperationExecution:
         input_tensor = Buffer.from_numpy(np.array([42], dtype=np.int32))
         compiled_model.execute(input_tensor)
 
+    @xfail_under_adv_fusion("compile error under the new fusion system")
     def test_inplace_custom__execution_with_session(
         self, kernel_verification_ops_path: Path, session: InferenceSession
     ) -> None:

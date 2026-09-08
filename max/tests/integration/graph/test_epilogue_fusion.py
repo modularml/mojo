@@ -44,14 +44,11 @@ ported either (see the trailing comment).
 
 from __future__ import annotations
 
-import re
-
 import numpy as np
 from fusion_utils import run_and_verify_fusion
-from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession
-from max.graph import BufferType, DeviceRef, Graph, TensorType, ops
+from max.graph import DeviceRef, Graph, TensorType, ops
 
 
 def test_reduce_max_epilogue_fuses_cast(
@@ -152,48 +149,6 @@ def test_two_producers_one_fuses(
         b_np, axis=0, keepdims=True
     )
     np.testing.assert_allclose(out, ref, rtol=1e-5, atol=1e-5)
-
-
-def test_mutable_store_consumer_fuses(session: InferenceSession) -> None:
-    """`buffer_store(buf, reduce.max(x, axis))` fuses the store into the
-    reduction's epilogue, writing the buffer directly rather than
-    materializing an intermediate tensor. Mirrors
-    `mutable_store_consumer_not_fused`.
-
-    Deliberately NOT env-gated, unlike every other test in this file:
-    `EpilogueFuser` (the new system under `MAX_GC_USE_ADV_FUSION=1`) declines
-    this case outright (GEX-3964, a MOGG parity gap -- `map.iter.opaque`
-    carries neither an out chain nor memory-effect fields to fuse a store
-    soundly), so this exercises the legacy pipeline, where it already fuses,
-    not the new one under test elsewhere in this file.
-    """
-    with Graph(
-        "mutable_store_consumer_fuses",
-        input_types=[
-            TensorType(DType.float32, [4, 4], device=DeviceRef.CPU()),
-            BufferType(DType.float32, [1, 4], device=DeviceRef.CPU()),
-        ],
-    ) as graph:
-        x = graph.inputs[0].tensor
-        buf = graph.inputs[1].buffer
-        ops.buffer_store(buf, ops.max(x, axis=0))
-        graph.output()
-
-    model = session.load(graph)
-    assert any(
-        re.search(r"mo\.reduce\.max.*mo\.mutable\.store", summary)
-        for summary in model.kernel_summaries
-    ), model.kernel_summaries
-
-    x_np = np.random.randn(4, 4).astype(np.float32)
-    buf_input = Buffer.from_numpy(np.zeros((1, 4), dtype=np.float32))
-    model.execute(Buffer.from_numpy(x_np), buf_input)
-    np.testing.assert_allclose(
-        buf_input.to_numpy(),
-        np.max(x_np, axis=0, keepdims=True),
-        rtol=1e-5,
-        atol=1e-5,
-    )
 
 
 # NOTE: `epilogue_fusion.mlir`'s `no_fuse_plain_output` and

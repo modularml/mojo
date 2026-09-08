@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from fusion_utils import xfail_under_adv_fusion
 from max.driver import CPU, Accelerator, Buffer, accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -40,6 +41,7 @@ def _gpu_device_configs() -> list[tuple[str, list[int]]]:
     [c[1] for c in _gpu_device_configs()],
     ids=[c[0] for c in _gpu_device_configs()],
 )
+@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_parallel_relu(
     session: InferenceSession, device_ids: list[int]
 ) -> None:
@@ -90,6 +92,7 @@ def test_parallel_relu(
     [c[1] for c in _gpu_device_configs()],
     ids=[c[0] for c in _gpu_device_configs()],
 )
+@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_parallel_relu_symbolic_dim(
     session: InferenceSession, device_ids: list[int]
 ) -> None:

@@ -24,12 +24,37 @@ divergence between the two.
 
 from __future__ import annotations
 
+import os
 import re
 
 import numpy as np
+import pytest
 from max.driver import Buffer
 from max.engine import InferenceSession
 from max.graph import Graph
+
+
+def xfail_under_adv_fusion(reason: str) -> pytest.MarkDecorator:
+    """Marks a test xfail only when the new MAP-dialect fusion system is on.
+
+    The ``graph-adv-fusion`` bazel target sets ``MAX_GC_USE_ADV_FUSION`` in the
+    process environment; the default ``graph`` target does not. So a decorated
+    test runs normally (and must pass) under ``graph`` and is expected to fail
+    under ``graph-adv-fusion``. ``strict`` makes an unexpected pass a failure --
+    the signal that the underlying new-system gap is fixed and the marker
+    should be removed.
+
+    This is the single marker for "still broken under the new fusion system":
+    grep for it to find every remaining gap, and delete it once none remain.
+    Only usable for tests that fail with a catchable Python error; a compile
+    that aborts the process (SIGABRT) can't be xfail'd and stays file-excluded
+    from the mirror instead.
+    """
+    return pytest.mark.xfail(
+        "MAX_GC_USE_ADV_FUSION" in os.environ,
+        reason=reason,
+        strict=True,
+    )
 
 
 def run_and_verify_fusion(
