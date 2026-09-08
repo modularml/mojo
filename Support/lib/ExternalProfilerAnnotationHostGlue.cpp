@@ -35,6 +35,9 @@
 // m_ext_profiler_set_enabled right after loading, so the two master
 // switches cannot disagree.
 //
+// Exhausting the default search warns once: a requested annotation that
+// emits nothing is otherwise indistinguishable from a broken profiler.
+//
 // Unlike ProfilerHostGlue there is no Tracy gate: vendor annotation
 // libraries do not contend for CUPTI, so Tracy builds keep this loader.
 //
@@ -194,8 +197,22 @@ static const ShimAPI *attemptLoad() {
     }
     if (handle == nullptr)
       handle = ::dlopen(kShimSoname, kFlags);
-    if (handle == nullptr)
+    if (handle == nullptr) {
+      // Annotation was requested, so silence here reads as "the profiler is
+      // broken" rather than "the shim is missing", which is expensive to
+      // diagnose. Once per process, on the first emission attempt.
+      std::fprintf(
+          stderr,
+          "warning: M::Profiling could not find the external "
+          "profiler annotation shim: tried '%s', then '%s' on "
+          "the default dlopen search path; set MODULAR_PROFILER_SHIM to "
+          "its location (in a source build, `./bazelw run //:install` "
+          "builds it). External profiler annotations are unavailable "
+          "in this process\n",
+          sibling.empty() ? "<self directory unresolved>" : sibling.c_str(),
+          kShimSoname);
       return nullptr;
+    }
   }
 
   ShimAPI api = {};
