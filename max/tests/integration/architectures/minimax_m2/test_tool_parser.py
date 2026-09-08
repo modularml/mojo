@@ -1035,3 +1035,74 @@ def test_non_object_root_raises(schema: dict[str, Any]) -> None:
     )
     with pytest.raises(Exception):
         _compile_structural_tag(grammar)
+
+
+@pytest.mark.parametrize(
+    "property_names",
+    [
+        {"const": "foo"},
+        {"enum": ["foo", "bar"]},
+        {"maxLength": 3},
+        {"minLength": 3},
+    ],
+)
+def test_variable_key_expressible_property_names_compiles(
+    property_names: dict[str, Any],
+) -> None:
+    """An XML-key-expressible propertyNames constraint compiles."""
+    grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
+        tools=_tools_with_schemas(
+            {
+                "f": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "propertyNames": property_names,
+                }
+            }
+        ),
+        tool_choice="required",
+    )
+    assert isinstance(_compile_structural_tag(grammar), xgr.CompiledGrammar)
+
+
+@pytest.mark.parametrize(
+    "property_names",
+    [
+        {"pattern": "^a+$"},
+        {"format": "email"},
+    ],
+)
+def test_variable_key_pattern_format_property_names_enforced(
+    property_names: dict[str, Any],
+) -> None:
+    """A pattern/format key compiles."""
+    grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
+        tools=_tools_with_schemas(
+            {
+                "f": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "propertyNames": property_names,
+                }
+            }
+        ),
+        tool_choice="required",
+    )
+    assert isinstance(_compile_structural_tag(grammar), xgr.CompiledGrammar)
+
+
+def test_variable_key_pattern_properties_fails_closed() -> None:
+    """A patternProperties key fails closed."""
+    grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
+        tools=_tools_with_schemas(
+            {
+                "f": {
+                    "type": "object",
+                    "patternProperties": {"\\wcole": {"type": "string"}},
+                }
+            }
+        ),
+        tool_choice="required",
+    )
+    with pytest.raises(Exception):
+        _compile_structural_tag(grammar)
