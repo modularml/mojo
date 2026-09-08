@@ -109,6 +109,42 @@ class ParameterEvaluationContext {
 public:
   virtual ~ParameterEvaluationContext();
 
+  //===--------------------------------------------------------------------===//
+  // Function interpretation frames
+  //===--------------------------------------------------------------------===//
+  //
+  // Interpreting a function re-enters evaluation on the same call stack. The
+  // callee's body is itself an expression that may interpret further
+  // functions. A recursive callee terminates only once its parameters fold to
+  // constants. Bounding the nesting turns an otherwise unbounded stack into an
+  // expression that is left unevaluated.
+
+  /// The maximum number of function interpretations that may nest.
+  static constexpr size_t kMaxFunctionInterpretationDepth = 32;
+
+  /// An RAII guard for interpreting one function. Entering is fallible:
+  /// exceeding the maximum depth leaves the frame unentered, and the guard
+  /// converts to false. Callers must check it and give up on interpreting
+  /// rather than proceed.
+  class [[nodiscard]] FunctionInterpretationFrame {
+  public:
+    explicit FunctionInterpretationFrame(ParameterEvaluationContext &context);
+    ~FunctionInterpretationFrame();
+
+    FunctionInterpretationFrame(const FunctionInterpretationFrame &) = delete;
+    FunctionInterpretationFrame &
+    operator=(const FunctionInterpretationFrame &) = delete;
+
+    explicit operator bool() const { return entered; }
+
+  private:
+    bool entered;
+  };
+
+  /// The number of function interpretations currently nested on this call
+  /// stack.
+  size_t getFunctionInterpretationDepth() const;
+
   /// Evaluate the provided attribute. First tries context-specific evaluation
   /// via evaluateContextSpecific(), then falls back to the attribute's
   /// evaluateWithContext() interface method.
@@ -188,6 +224,17 @@ public:
   /// context.
   virtual FuncInterface resolveFunctionDecl(SymbolRefAttr symbol) = 0;
 };
+
+/// Marks a generator whose `inlinedForm` can reach an apply of itself, directly
+/// or around a cycle of other generators.
+inline constexpr llvm::StringLiteral kRecursiveInlinedFormAttrName =
+    "kgen.recursive_inlined_form";
+
+/// Whether expanding `generator`'s inlined form under `paramValues` can
+/// terminate. Only meaningful for an argument-less generator; see the
+/// implementation.
+bool canExpandInlinedForm(GeneratorOp generator,
+                          ArrayRef<TypedAttr> paramValues);
 
 /// An evaluation context that exposes a LockedSymbolTableCollection.
 class SymTabEvaluationContext : public ParameterEvaluationContext {
