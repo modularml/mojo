@@ -15,7 +15,7 @@ from std.pathlib import Path
 from std.ffi import OwnedDLHandle
 
 from std.sys.info import CompilationTarget
-from std.testing import assert_equal, assert_raises, assert_true
+from std.testing import assert_equal, assert_false, assert_raises, assert_true
 from std.testing import TestSuite
 
 
@@ -359,8 +359,10 @@ def test_owned_dlhandle_automatic_cleanup() raises:
 
 
 def test_owned_dlhandle_destroy_null_handle() raises:
+    # `_find_dylib` hands back an uninitialized handle when a library is
+    # missing; destroying it must not reach `dlclose(NULL)`.
     var lib = OwnedDLHandle(unsafe_uninitialized=True)
-    assert_true(not lib.__bool__(), "uninitialized handle should be null")
+    assert_false(lib, "uninitialized handle should be null")
     _ = lib^
 
 

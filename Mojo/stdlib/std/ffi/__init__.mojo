@@ -254,7 +254,7 @@ struct _DLCallable[
         return typed_fn(*args)
 
 
-struct OwnedDLHandle(Movable):
+struct OwnedDLHandle(Boolable, Movable):
     """Represents an owned handle to a dynamically linked library with RAII
     semantics.
 
@@ -679,6 +679,9 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
             using `OwnedDLHandle` which automatically manages the library
             lifetime.
         """
+        # `dlclose` on a handle not returned by `dlopen` is undefined; on glibc
+        # a null handle segfaults, and a null handle is reachable (e.g.
+        # `_find_dylib` hands back an `unsafe_uninitialized` handle on failure).
         if self.handle:
             _ = dlclose(self.handle)
         self.handle = {}
