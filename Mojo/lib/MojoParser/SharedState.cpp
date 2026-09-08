@@ -1559,7 +1559,7 @@ SharedState::resolveDeclFromBytecode(ASTDecl &decl,
       for (FlatSymbolRefAttr dep : deps) {
         ASTDecl *depDecl =
             &importModule({dep.getValue()},
-                          /*currentPackage=*/nullptr, decl.getLoc());
+                          /*currentPackage=*/nullptr, packageImportLoc);
         if (failed(declResolver->resolveBody(*depDecl, decl.getLoc())))
           return failure();
       }
