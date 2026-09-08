@@ -140,6 +140,8 @@ This version is still a work in progress.
 
 ## Library changes
 
+- [`OwnedDLHandle`](/docs/std/ffi/OwnedDLHandle/) now conforms to `Boolable`.
+
 - `Coord` has a new `replace[at](value)` method that returns a `Coord` with
   the element at `at` swapped for `value`, keeping the other elements' types. A
   statically known element (`ComptimeInt`) has no runtime storage to assign
@@ -526,6 +528,9 @@ This release completes the removal of APIs deprecated during the v1.0 cycle.
   `.mojoc` files instead.
 
 ## Fixed
+
+- Destroying an [`OwnedDLHandle`](/docs/std/ffi/OwnedDLHandle/) that holds a
+  null handle no longer crashes the process.
 
 - `unsafe_uninit_move_n()` and `unsafe_uninit_copy_n()` with `overlapping=True`
   now handle an overlap in either direction when `T` is not trivially movable
