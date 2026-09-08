@@ -46,7 +46,7 @@ from std.sys import simd_width_of
 from std.ffi import c_char, CStringSlice
 from std.sys.intrinsics import likely, unlikely
 
-from std.bit import count_trailing_zeros
+from std.bit import count_leading_zeros, count_trailing_zeros
 from std.bit.mask import is_negative, splat
 from std.memory import (
     unsafe_memcmp,
@@ -2819,18 +2819,96 @@ def _memrmem[
         return {}
     if len(needle) == 1:
         return _memrchr[dtype](haystack, needle.unsafe_get(0))
-    for i in reversed(range(len(haystack) - len(needle) + 1)):
-        if haystack.unsafe_get(i) != needle.unsafe_get(0):
+    if (
+        __is_run_in_comptime_interpreter
+        or len(haystack) < simd_width_of[DType.bool]()
+    ):
+        var haystack_ptr = haystack.unsafe_ptr()
+        var needle_ptr = needle.unsafe_ptr()
+        var needle_len = len(needle)
+        for i in reversed(range(len(haystack) - needle_len + 1)):
+            if haystack.unsafe_get(i) != needle.unsafe_get(0):
+                continue
+            if (
+                unsafe_memcmp(
+                    haystack_ptr.unsafe_offset(i + 1),
+                    needle_ptr.unsafe_offset(1),
+                    needle_len - 1,
+                )
+                == 0
+            ):
+                return haystack_ptr.unsafe_offset(i)
+        return {}
+    return _memrmem_impl(haystack, needle)
+
+
+@always_inline
+def _memrmem_impl[
+    dtype: DType, //
+](
+    haystack_span: ImmSpan[Scalar[dtype], _],
+    needle_span: ImmSpan[Scalar[dtype], _],
+) -> OptionalPointer[Scalar[dtype], haystack_span.origin]:
+    var haystack = haystack_span.unsafe_ptr()
+    var haystack_len = len(haystack_span)
+    var needle = needle_span.unsafe_ptr()
+    var needle_len = len(needle_span)
+
+    comptime bool_mask_width = simd_width_of[DType.bool]()
+    var search_len = haystack_len - needle_len + 1
+    var vectorized_end = align_down(search_len, bool_mask_width)
+
+    var first_needle = SIMD[dtype, bool_mask_width](needle[unsafe_offset=0])
+    var last_needle = SIMD[dtype, bool_mask_width](
+        needle[unsafe_offset=needle_len - 1]
+    )
+
+    # Scalar tail: positions [vectorized_end, search_len) from right to left.
+    for i in reversed(range(vectorized_end, search_len)):
+        if haystack[unsafe_offset=i] != needle[unsafe_offset=0]:
             continue
         if (
             unsafe_memcmp(
-                hp.unsafe_offset(i + 1),
-                needle.unsafe_ptr().unsafe_offset(1),
-                len(needle) - 1,
+                haystack.unsafe_offset(i + 1),
+                needle.unsafe_offset(1),
+                needle_len - 1,
             )
             == 0
         ):
-            return hp.unsafe_offset(i)
+            return haystack.unsafe_offset(i)
+
+    # SIMD blocks from right to left: each block covers bool_mask_width
+    # candidate positions. Within each block, process candidates from right
+    # to left (highest index first) using count_leading_zeros.
+    var i = vectorized_end - bool_mask_width
+    while i >= 0:
+        var first_block = haystack.unsafe_load[width=bool_mask_width](i)
+        var last_block = haystack.unsafe_load[width=bool_mask_width](
+            i + needle_len - 1
+        )
+        var bool_mask = first_needle.eq(first_block) & last_needle.eq(
+            last_block
+        )
+        var mask = pack_bits(bool_mask)
+
+        while mask:
+            var pos_in_block = (
+                type_of(mask)(bool_mask_width - 1) - count_leading_zeros(mask)
+            )
+            var offset = i + Int(pos_in_block)
+            if (
+                unsafe_memcmp(
+                    haystack.unsafe_offset(offset + 1),
+                    needle.unsafe_offset(1),
+                    needle_len - 1,
+                )
+                == 0
+            ):
+                return haystack.unsafe_offset(offset)
+            mask = mask ^ (type_of(mask)(1) << pos_in_block)
+
+        i -= bool_mask_width
+
     return {}
 
 

@@ -19,6 +19,7 @@ from std.collections.string.string_span import _to_string_list
 from std.math import isinf, isnan
 
 from std.memory import unsafe_memcpy
+from std.sys import simd_width_of
 from std.python import Python, PythonObject
 from std.testing import (
     assert_equal,
@@ -704,6 +705,68 @@ def test_rfind() raises:
     # TODO(#26444): Support unicode strings.
     # assert_equal(String("こんにちは").rfind("にち"), 2)
     # assert_equal(String("🔥🔥").rfind("🔥"), 1)
+
+
+def test_rfind_large_strings() raises:
+    # Tests targeting the SIMD path in _memrmem_impl (multi-char needles,
+    # haystack >= simd_width). Sizes are above the maximum possible SIMD width
+    # (64 bytes on AVX-512) to ensure the SIMD code path is always exercised.
+    #
+    # For each size we test needle positions that stress all branches:
+    #   - needle at start (pos 0):    full reverse scan across all SIMD blocks
+    #   - needle at end:              found in scalar tail or last SIMD block
+    #   - needle in middle:           found in an interior SIMD block
+    #   - no match:                   returns -1
+    #   - multiple matches:           last occurrence returned
+    #   - at SIMD block boundary:     needle straddles vectorized_end boundary
+    comptime needle = "XY"
+    comptime needle_len = needle.byte_length()
+    comptime sizes = (65, 128, 129, 256, 257)
+    comptime for k in range(len(sizes)):
+        comptime n = rebind[Int](sizes[k])
+        var base = String("a") * n
+
+        # Needle at position 0 only.
+        var s_first = String(needle) + String("a") * (n - needle_len)
+        assert_equal(s_first.rfind(needle), 0)
+
+        # Needle at the last valid position.
+        comptime last_pos = n - needle_len
+        var s_last = String("a") * last_pos + String(needle)
+        assert_equal(s_last.rfind(needle), last_pos)
+
+        # Needle in the middle.
+        comptime mid = n // 2
+        var s_mid = (
+            String("a") * mid
+            + String(needle)
+            + String("a") * (n - mid - needle_len)
+        )
+        assert_equal(s_mid.rfind(needle), mid)
+
+        # No match.
+        assert_equal(base.rfind(needle), -1)
+
+        # Multiple matches — rfind must return the last occurrence.
+        var s_multi = (
+            String(needle)
+            + String("a") * (mid - needle_len)
+            + String(needle)
+            + String("a") * (n - mid - needle_len)
+        )
+        assert_equal(s_multi.rfind(needle), mid)
+
+        # Needle at the SIMD block boundary.
+        comptime w = simd_width_of[DType.uint8]()
+        comptime if n > w + needle_len:
+            # Needle whose first byte is at position w-1 (straddles the
+            # boundary between the first SIMD block and the scalar tail).
+            var s_boundary = (
+                String("a") * (w - 1)
+                + String(needle)
+                + String("a") * (n - w - needle_len + 1)
+            )
+            assert_equal(s_boundary.rfind(needle), w - 1)
 
 
 def test_split() raises:
