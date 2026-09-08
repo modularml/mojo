@@ -21,7 +21,15 @@ import numpy as np
 from max.driver import Buffer, Device, load_devices
 from max.dtype import DType
 from max.engine import InferenceSession, Model
-from max.graph import DeviceRef, Graph, TensorType, TensorValue, Weight, ops
+from max.graph import (
+    DeviceRef,
+    Graph,
+    ProfileScopeColor,
+    TensorType,
+    TensorValue,
+    Weight,
+    ops,
+)
 from max.graph import Module as GraphModule
 from max.graph.weights import Weights, load_weights
 from max.nn.layer import Module
@@ -83,53 +91,60 @@ class PreprocessAndEncode(Module):
         )
 
     def __call__(self, image: TensorValue) -> TensorValue:
-        # Preprocess: (H, W, C) uint8 -> (1, C, H, W) model-dtype [-1, 1].
-        image = ops.cast(image, DType.float32)
-        image = image / ops.constant(127.5, DType.float32, device=self._device)
-        image = image - ops.constant(1.0, DType.float32, device=self._device)
-        image = ops.permute(image, [2, 0, 1])  # HWC -> CHW
-        image = ops.unsqueeze(image, 0)  # (1, C, H, W)
-        image = ops.cast(image, self._dtype)
-
-        # VAE encode -> (B, 2*C, H/8, W/8) mean|logvar concatenated.
-        encoder_moments = self.encoder(image)
-
-        batch = encoder_moments.shape[0]
-        full_c = encoder_moments.shape[1]
-        c = full_c // 2
-        h = encoder_moments.shape[2]
-        w = encoder_moments.shape[3]
-
-        # Extract mode (first half of channels = mean).
-        mean = encoder_moments[:, :c, :, :]
-
-        # Patchify: (B, C, H, W) -> (B, C, H//2, 2, W//2, 2)
-        mean = ops.rebind(mean, [batch, c, (h // 2) * 2, (w // 2) * 2])
-        latents_6d = ops.reshape(mean, (batch, c, h // 2, 2, w // 2, 2))
-        h2 = latents_6d.shape[2]
-        w2 = latents_6d.shape[4]
-
-        # (B, C, H', 2, W', 2) -> (B, C, 2, 2, H', W') -> (B, C*4, H', W')
-        latents = ops.permute(latents_6d, [0, 1, 3, 5, 2, 4])
-        latents = ops.reshape(latents, (batch, c * 4, h2, w2))
-
-        # BN normalize: (latents - mean) / sqrt(var + eps)
-        bn_mean = self.encoder_bn_mean.to(self._device)
-        bn_var = self.encoder_bn_var.to(self._device)
-        bn_mean_r = ops.reshape(bn_mean, (1, self._num_channels, 1, 1))
-        bn_var_r = ops.reshape(bn_var, (1, self._num_channels, 1, 1))
-        bn_std = ops.sqrt(
-            bn_var_r
-            + ops.constant(
-                self._batch_norm_eps, self._dtype, device=self._device
+        with Graph.current.profile_scope(
+            "flux2_encode_image", color=ProfileScopeColor.ORANGE
+        ):
+            # Preprocess: (H, W, C) uint8 -> (1, C, H, W) model-dtype [-1, 1].
+            image = ops.cast(image, DType.float32)
+            image = image / ops.constant(
+                127.5, DType.float32, device=self._device
             )
-        )
-        latents = (latents - bn_mean_r) / bn_std
+            image = image - ops.constant(
+                1.0, DType.float32, device=self._device
+            )
+            image = ops.permute(image, [2, 0, 1])  # HWC -> CHW
+            image = ops.unsqueeze(image, 0)  # (1, C, H, W)
+            image = ops.cast(image, self._dtype)
 
-        # Pack: (B, C*4, H', W') -> (B, H'*W', C*4)
-        num_ch = latents.shape[1]
-        latents = ops.reshape(latents, (batch, num_ch, h2 * w2))
-        latents = ops.permute(latents, [0, 2, 1])
+            # VAE encode -> (B, 2*C, H/8, W/8) mean|logvar concatenated.
+            encoder_moments = self.encoder(image)
+
+            batch = encoder_moments.shape[0]
+            full_c = encoder_moments.shape[1]
+            c = full_c // 2
+            h = encoder_moments.shape[2]
+            w = encoder_moments.shape[3]
+
+            # Extract mode (first half of channels = mean).
+            mean = encoder_moments[:, :c, :, :]
+
+            # Patchify: (B, C, H, W) -> (B, C, H//2, 2, W//2, 2)
+            mean = ops.rebind(mean, [batch, c, (h // 2) * 2, (w // 2) * 2])
+            latents_6d = ops.reshape(mean, (batch, c, h // 2, 2, w // 2, 2))
+            h2 = latents_6d.shape[2]
+            w2 = latents_6d.shape[4]
+
+            # (B, C, H', 2, W', 2) -> (B, C, 2, 2, H', W') -> (B, C*4, H', W')
+            latents = ops.permute(latents_6d, [0, 1, 3, 5, 2, 4])
+            latents = ops.reshape(latents, (batch, c * 4, h2, w2))
+
+            # BN normalize: (latents - mean) / sqrt(var + eps)
+            bn_mean = self.encoder_bn_mean.to(self._device)
+            bn_var = self.encoder_bn_var.to(self._device)
+            bn_mean_r = ops.reshape(bn_mean, (1, self._num_channels, 1, 1))
+            bn_var_r = ops.reshape(bn_var, (1, self._num_channels, 1, 1))
+            bn_std = ops.sqrt(
+                bn_var_r
+                + ops.constant(
+                    self._batch_norm_eps, self._dtype, device=self._device
+                )
+            )
+            latents = (latents - bn_mean_r) / bn_std
+
+            # Pack: (B, C*4, H', W') -> (B, H'*W', C*4)
+            num_ch = latents.shape[1]
+            latents = ops.reshape(latents, (batch, num_ch, h2 * w2))
+            latents = ops.permute(latents, [0, 2, 1])
 
         return latents
 

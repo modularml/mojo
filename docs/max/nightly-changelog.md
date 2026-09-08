@@ -550,6 +550,10 @@ the [container](/container) page now links to the new page.
   device addresses rather than raw host bytes.
 - Added `max.nn.state_space.kda_decode`, a wrapper over the Kimi Delta
   Attention recurrence op.
+- Added `Graph.profile_scope`, a context manager that labels every op
+  for profiling. The scope name is appended to the op name in profile
+  output. Profiler ranges are also created from sequential ops with the same
+  scope, which is enabled with `MODULAR_MAX_DEBUG_PROFILE_SCOPE_TRACING=1`.
 
 ### Inference server
 

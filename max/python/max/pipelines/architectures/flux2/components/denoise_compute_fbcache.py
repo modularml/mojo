@@ -47,6 +47,7 @@ from max.graph import (
     BufferValue,
     DeviceRef,
     Graph,
+    ProfileScopeColor,
     TensorType,
     TensorValue,
     ops,
@@ -141,21 +142,6 @@ class DenoiseComputeFBCacheStep(Module):
             [latent_image_ids, image_latent_ids], axis=1
         )
 
-        # Preamble + block 0.
-        preamble = self.transformer.forward_preamble(
-            latents_concat,
-            encoder_hidden_states,
-            timestep,
-            latent_image_ids_concat,
-            guidance,
-            txt_ids,
-            signal_buffers=signal_buffers,
-        )
-        # Image stream before block 0 (device 0), for the residual delta.
-        img_before = preamble.hidden_states_d[0]
-        state_after_first = self.transformer.run_first_block(preamble)
-        img_after = state_after_first[1][0]  # hidden_states_d[0] after block 0
-
         # Number of image tokens to keep from the (image, text) sequence.
         # ``latents.shape[1]`` is the original latent seq (excludes any img2img
         # image_latents concatenated above), matching the sliced noise_pred
@@ -172,54 +158,77 @@ class DenoiseComputeFBCacheStep(Module):
                 ],
             )
 
-        # FBCache residual: block-0 delta on the image tokens only.  The
-        # slice labels the seq dim ``num_tokens``; rebind it to the
-        # ``prev_residual`` seq dim (``image_seq_len``) since they are equal
-        # at runtime (``latents.shape[1] == image_seq_len`` for t2i, and the
-        # host allocates prev_residual at exactly ``latents.shape[1]``).
-        first_block_residual = ops.rebind(
-            _slice_seq(img_after) - _slice_seq(img_before),
-            prev_residual.shape,
-        )
-
-        use_fbcache = self._relative_diff_lt_threshold(
-            first_block_residual, prev_residual, residual_threshold
-        )
-        # ops.cond requires the predicate on CPU.
-        use_fbcache_cpu = ops.transfer_to(use_fbcache, DeviceRef.CPU())
-
-        def then_fn() -> tuple[TensorValue, TensorValue]:
-            # Skip remaining blocks + postamble: reuse prev_output.
-            return (first_block_residual, prev_output)
-
-        def else_fn() -> tuple[TensorValue, TensorValue]:
-            hidden_states_d = self.transformer.run_remaining_blocks(
-                preamble, state_after_first
+        with Graph.current.profile_scope(
+            "flux2_denoiser_forward", color=ProfileScopeColor.ORANGE
+        ):
+            # Preamble + block 0.
+            preamble = self.transformer.forward_preamble(
+                latents_concat,
+                encoder_hidden_states,
+                timestep,
+                latent_image_ids_concat,
+                guidance,
+                txt_ids,
+                signal_buffers=signal_buffers,
             )
-            noise_pred = self.transformer.forward_postamble(
-                preamble, hidden_states_d
-            )
-            # Rebind the sliced seq dim to ``prev_output``'s so both cond
-            # branches yield the same output type.
-            noise_pred = ops.rebind(_slice_seq(noise_pred), prev_output.shape)
-            return (first_block_residual, noise_pred)
+            # Image stream before block 0 (device 0), for the residual delta.
+            img_before = preamble.hidden_states_d[0]
+            state_after_first = self.transformer.run_first_block(preamble)
+            img_after = state_after_first[1][
+                0
+            ]  # hidden_states_d[0] after block 0
 
-        residual_type = TensorType(
-            first_block_residual.dtype,
-            shape=first_block_residual.shape,
-            device=first_block_residual.device,
-        )
-        output_type = TensorType(
-            prev_output.dtype,
-            shape=prev_output.shape,
-            device=prev_output.device,
-        )
-        result = ops.cond(
-            use_fbcache_cpu,
-            [residual_type, output_type],
-            then_fn,
-            else_fn,
-        )
+            # FBCache residual: block-0 delta on the image tokens only.  The
+            # slice labels the seq dim ``num_tokens``; rebind it to the
+            # ``prev_residual`` seq dim (``image_seq_len``) since they are equal
+            # at runtime (``latents.shape[1] == image_seq_len`` for t2i, and the
+            # host allocates prev_residual at exactly ``latents.shape[1]``).
+            first_block_residual = ops.rebind(
+                _slice_seq(img_after) - _slice_seq(img_before),
+                prev_residual.shape,
+            )
+
+            use_fbcache = self._relative_diff_lt_threshold(
+                first_block_residual, prev_residual, residual_threshold
+            )
+            # ops.cond requires the predicate on CPU.
+            use_fbcache_cpu = ops.transfer_to(use_fbcache, DeviceRef.CPU())
+
+            def then_fn() -> tuple[TensorValue, TensorValue]:
+                # Skip remaining blocks + postamble: reuse prev_output.
+                return (first_block_residual, prev_output)
+
+            def else_fn() -> tuple[TensorValue, TensorValue]:
+                hidden_states_d = self.transformer.run_remaining_blocks(
+                    preamble, state_after_first
+                )
+                noise_pred = self.transformer.forward_postamble(
+                    preamble, hidden_states_d
+                )
+                # Rebind the sliced seq dim to ``prev_output``'s so both cond
+                # branches yield the same output type.
+                noise_pred = ops.rebind(
+                    _slice_seq(noise_pred), prev_output.shape
+                )
+                return (first_block_residual, noise_pred)
+
+            residual_type = TensorType(
+                first_block_residual.dtype,
+                shape=first_block_residual.shape,
+                device=first_block_residual.device,
+            )
+            output_type = TensorType(
+                prev_output.dtype,
+                shape=prev_output.shape,
+                device=prev_output.device,
+            )
+            result = ops.cond(
+                use_fbcache_cpu,
+                [residual_type, output_type],
+                then_fn,
+                else_fn,
+            )
+
         # Also surface the (CPU) skip predicate so the host loop can count
         # how many steps actually reused the cache without an extra device
         # read-back of the residuals.  True == the remaining blocks were

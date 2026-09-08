@@ -21,6 +21,7 @@ from .graph import (
     GraphDebugConfig,
     KernelLibrary,
     Module,
+    ProfileScopeColor,
 )
 from .graph import (
     default_custom_extensions as default_custom_extensions,

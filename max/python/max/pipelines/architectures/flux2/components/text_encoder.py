@@ -19,7 +19,7 @@ from typing import Any
 
 from max.driver import Buffer, load_devices
 from max.engine import InferenceSession, Model
-from max.graph import Graph
+from max.graph import Graph, ProfileScopeColor
 from max.graph import Module as GraphModule
 from max.graph.weights import Weights, load_weights
 from max.pipelines.lib.compiled_component import CompiledComponent
@@ -85,7 +85,10 @@ class TextEncoder(CompiledComponent):
             input_types=module.input_types(),
             module=self._graphs_module,
         ) as graph:
-            outputs = module(*(v.tensor for v in graph.inputs))
+            with graph.profile_scope(
+                "flux2_encode_text", color=ProfileScopeColor.BLUE
+            ):
+                outputs = module(*(v.tensor for v in graph.inputs))
             graph.output(outputs)
 
         self._load_graph(graph, weights_registry=module.state_dict())
