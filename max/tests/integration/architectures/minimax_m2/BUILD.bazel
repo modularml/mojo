@@ -9,15 +9,14 @@ package(default_visibility = [
 modular_py_test(
     name = "test_tool_parser",
     srcs = [
-        "_grammar_fixtures.py",
         "test_tool_parser.py",
     ],
     deps = [
+        "//max/python/max/_xgrammar",
         "//max/python/max/pipelines/architectures/minimax_m2",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
-        requirement("llguidance"),
-        requirement("transformers"),
     ],
 )
 

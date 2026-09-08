@@ -20,7 +20,7 @@ from std.collections import Optional, OptionalReg
 from std.sys import align_of, is_amd_gpu, is_nvidia_gpu, simd_width_of, size_of
 from std.sys._assembly import inlined_assembly
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.algorithm import vectorize
 
 from max.algorithm import sync_parallelize
@@ -36,7 +36,7 @@ from max.gpu.primitives.grid_controls import (
     pdl_launch_attributes,
 )
 from std.bit import log2_floor
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     block_idx,
     grid_dim,
@@ -56,10 +56,10 @@ from layout import (
     Idx,
     Layout,
     LayoutTensor,
-    PointerStorage,
+    DefaultEngine,
     RowMajorLayout,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     UNKNOWN_VALUE,
     coord_to_index_list,
@@ -847,7 +847,7 @@ def softmax_kernel[
     rank: Int,
     OutputLayoutType: TensorLayout,
     output_origin: MutOrigin,
-    OutputStorage: TensorStorage,
+    OutputEngine: TensorEngine,
     SinkWeightsLayoutType: TensorLayout,
     accum_type: DType = get_accum_type[dtype](),
     *,
@@ -856,7 +856,7 @@ def softmax_kernel[
 ](
     shape: IndexList[rank],
     output: TileTensor[
-        dtype, OutputLayoutType, output_origin, Storage=OutputStorage
+        dtype, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
     sink_weights: TileTensor[sink_type, SinkWeightsLayoutType, ImmutAnyOrigin],
 ):
@@ -874,7 +874,7 @@ def softmax_kernel[
         rank: The rank of the input and output tensors.
         OutputLayoutType: The layout type of the output tensor.
         output_origin: The origin of the output tensor.
-        OutputStorage: The storage type of the output tensor.
+        OutputEngine: Engine of the output tensor.
         SinkWeightsLayoutType: The layout type of the sink weights tensor.
         accum_type: The accumulation dtype (defaults to the accumulation type for `dtype`).
         sink: Whether to apply sink-attention bias to the row max.
@@ -1025,11 +1025,11 @@ def _softmax_warp_kernel[
     rank: Int,
     OutputLayoutType: TensorLayout,
     output_origin: MutOrigin,
-    OutputStorage: TensorStorage,
+    OutputEngine: TensorEngine,
     accum_type: DType = get_accum_type[dtype](),
 ](
     output: TileTensor[
-        mut=True, dtype, OutputLayoutType, output_origin, Storage=OutputStorage
+        mut=True, dtype, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
 ):
     """Warp-local softmax for short inner axes (no shared memory).
@@ -1156,7 +1156,7 @@ def _softmax_gpu[
                     rank,
                     output.LayoutType,
                     output.origin,
-                    output.Storage,
+                    output.Engine,
                 ]
                 ctx.enqueue_function[warp_kernel](
                     output,
@@ -1247,7 +1247,7 @@ def _softmax_gpu[
                             rank,
                             output.LayoutType,
                             output.origin,
-                            output.Storage,
+                            output.Engine,
                         ]
                         ctx.enqueue_function[combine_kernel](
                             shape_il,
@@ -1273,7 +1273,7 @@ def _softmax_gpu[
                         rank,
                         output.LayoutType,
                         output.origin,
-                        output.Storage,
+                        output.Engine,
                     ]
                     ctx.enqueue_function[kernel](
                         shape_il,
@@ -1306,7 +1306,7 @@ def _softmax_gpu[
             rank,
             output.LayoutType,
             output.origin,
-            output.Storage,
+            output.Engine,
             _SinkWeightsTTLayout,
             sink=sink,
             logsoftmax=logsoftmax,
@@ -1413,12 +1413,12 @@ def _softmax_temperature_kernel[
     rank: Int,
     OutputLayoutType: TensorLayout,
     output_origin: MutOrigin,
-    OutputStorage: TensorStorage,
+    OutputEngine: TensorEngine,
     accum_type: DType = get_accum_type[dtype](),
 ](
     shape: IndexList[rank],
     output: TileTensor[
-        dtype, OutputLayoutType, output_origin, Storage=OutputStorage
+        dtype, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
     temperature: Float32,
     temperature_arr: Optional[
@@ -1665,12 +1665,12 @@ def _softmax_split_combine_kernel[
     rank: Int,
     OutputLayoutType: TensorLayout,
     output_origin: MutOrigin,
-    OutputStorage: TensorStorage,
+    OutputEngine: TensorEngine,
     accum_type: DType = get_accum_type[dtype](),
 ](
     shape: IndexList[rank],
     output: TileTensor[
-        dtype, OutputLayoutType, output_origin, Storage=OutputStorage
+        dtype, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
     temperature: Scalar[temp_dtype],
     temperature_arr: Optional[
@@ -1755,7 +1755,7 @@ def softmax_with_temperature[
     dtype: DType,
     temp_dtype: DType = .float32,
     TempLayoutType: TensorLayout = RowMajorLayout[Int64],
-    TempStorageType: TensorStorage = PointerStorage[element_width=1],
+    TempEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     ctx: DeviceContext,
     input: TileTensor[mut=False, dtype, ...],
@@ -1763,7 +1763,7 @@ def softmax_with_temperature[
     temperature: Scalar[temp_dtype] = Float32(1.0),
     temperature_arr: Optional[
         TileTensor[
-            temp_dtype, TempLayoutType, ImmutAnyOrigin, Storage=TempStorageType
+            temp_dtype, TempLayoutType, ImmutAnyOrigin, Engine=TempEngine
         ]
     ] = None,
 ) raises:
@@ -1777,7 +1777,7 @@ def softmax_with_temperature[
         dtype: The data type of the input and output tensors.
         temp_dtype: The data type for temperature values (default float32).
         TempLayoutType: The layout type for the optional temperature array.
-        TempStorageType: The storage type for the optional temperature array.
+        TempEngine: Engine for the optional temperature array.
 
     Args:
         ctx: Device context for kernel execution.
@@ -1829,7 +1829,7 @@ def softmax_with_temperature[
         2,
         output.LayoutType,
         output.origin,
-        output.Storage,
+        output.Engine,
     ]
     ctx.enqueue_function[kernel](
         IndexList[2](batch_size, d),

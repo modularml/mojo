@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import block_idx
+from max.gpu import block_idx
 from max.gpu.host import DeviceBuffer, DeviceContext
 from max.gpu.memory import (
     async_copy_commit_group,

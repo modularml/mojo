@@ -48,8 +48,8 @@ from layout.tma_async import RaggedTMA3DTile, SharedMemBarrier
 from layout import TileTensor
 from layout.tile_layout import row_major as tt_row_major
 from max.gpu.host import DeviceAttribute, DeviceContext, FuncAttribute
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, thread_idx, warp_id
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, thread_idx, warp_id
 from max.gpu.sync import barrier
 from max.gpu.primitives.grid_controls import (
     PDLLevel,
@@ -57,7 +57,7 @@ from max.gpu.primitives.grid_controls import (
     pdl_launch_attributes,
     wait_on_dependent_grids,
 )
-from std.gpu.primitives.warp import broadcast
+from max.gpu.primitives.warp import broadcast
 from nn.attention.mha_utils import (
     _is_decoding,
     MHAConfig,

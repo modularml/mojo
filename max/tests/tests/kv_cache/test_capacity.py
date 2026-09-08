@@ -19,32 +19,31 @@ from types import SimpleNamespace
 
 import pytest
 from max.pipelines.kv_cache.connectors import rust_tier_connector
-from max.pipelines.kv_cache.paged_kv_cache import block_copy_engine
 
 
 def test_host_capacity_rejects_oversized(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        block_copy_engine.psutil,
+        rust_tier_connector.psutil,
         "virtual_memory",
         lambda: SimpleNamespace(available=1024),
     )
 
     with pytest.raises(RuntimeError, match="host_offload_max_gb"):
-        block_copy_engine._check_host_memory_capacity(2048)
+        rust_tier_connector._check_host_memory_capacity(2048)
 
 
 def test_host_capacity_accepts_fitting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        block_copy_engine.psutil,
+        rust_tier_connector.psutil,
         "virtual_memory",
         lambda: SimpleNamespace(available=4096),
     )
 
-    block_copy_engine._check_host_memory_capacity(4096)
+    rust_tier_connector._check_host_memory_capacity(4096)
 
 
 def test_host_capacity_skips_when_unknown(
@@ -54,9 +53,9 @@ def test_host_capacity_skips_when_unknown(
     def _raise() -> None:
         raise OSError("host memory unavailable")
 
-    monkeypatch.setattr(block_copy_engine.psutil, "virtual_memory", _raise)
+    monkeypatch.setattr(rust_tier_connector.psutil, "virtual_memory", _raise)
 
-    block_copy_engine._check_host_memory_capacity(1 << 60)
+    rust_tier_connector._check_host_memory_capacity(1 << 60)
     assert "skipping KV cache host capacity preflight" in caplog.text
 
 

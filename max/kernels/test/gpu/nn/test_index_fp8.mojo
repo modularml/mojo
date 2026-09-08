@@ -123,7 +123,7 @@ def test_index_fp8[
         row_major(batch_size + 1),
     )
 
-    var cache_row_offsets_device = TileTensor[mut=False, Storage=_](
+    var cache_row_offsets_device = TileTensor[mut=False, Engine=_](
         cache_row_offsets_device_ptr,
         row_major(batch_size + 1),
     )
@@ -200,6 +200,15 @@ def main() raises:
         test_index_fp8[num_heads=64, depth=128](1, 501, 501, ctx)
         test_index_fp8[num_heads=64, depth=128](3, 600, 600, ctx)
         test_index_fp8[num_heads=64, depth=128](4, 722, 722, ctx)
+        # k-scale TMA alignment. The SM100 scorer stages the per-key scales
+        # through a flat `1 x total_keys` TMA view, where a key index IS the
+        # innermost coordinate and so must be 16-byte (4-f32) aligned. The
+        # per-tile term is always a multiple of `BM_key`, leaving the ragged
+        # batch base `b * num_keys` as the only misaligning term -- and 723
+        # walks all four residues in one case (0, 3, 2, 1). Before the producer
+        # rounded that base down, this faulted `CUDA_ERROR_ILLEGAL_INSTRUCTION`
+        # on the odd-residue entries; 722 above covers residue 2 alone.
+        test_index_fp8[num_heads=64, depth=128](4, 723, 723, ctx)
         test_index_fp8[num_heads=64, depth=128](5, 32, 64, ctx)
         test_index_fp8[num_heads=64, depth=128](2, 128, 256, ctx)
 

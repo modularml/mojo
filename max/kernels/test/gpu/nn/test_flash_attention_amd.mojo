@@ -16,7 +16,7 @@ from std.random import rand
 from std.sys import argv
 
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from layout import (
     Idx,

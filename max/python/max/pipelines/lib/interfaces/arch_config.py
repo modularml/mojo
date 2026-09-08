@@ -218,10 +218,11 @@ class ArchConfigWithBoundedMaxSeqLen:
 class ArchConfigWithStoredKVParams(ArchConfigWithBoundedMaxSeqLen):
     """Mixin that implements :meth:`get_kv_params` as the ``kv_params`` field.
 
-    Architecture dataclasses that precompute :class:`~max.nn.kv_cache.KVCacheParams`
-    (or another :class:`KVCacheParamInterface`) during ``initialize`` can inherit
-    this mixin together with :class:`ArchConfigWithKVCache` to avoid duplicating
-    the trivial accessor.
+    Architecture dataclasses that precompute a :class:`KVCacheParamInterface`
+    (typically :class:`~max.nn.kv_cache.KVCacheParams`, or
+    :class:`~max.nn.kv_cache.MultiKVCacheParams` for hybrid SWA + full trees)
+    during ``initialize`` can inherit this mixin together with
+    :class:`ArchConfigWithKVCache` to avoid duplicating the trivial accessor.
 
     Also provides a default :meth:`construct_kv_params` for the common grouped
     attention case. Speculative decoding defaults to ``None`` via
@@ -230,9 +231,9 @@ class ArchConfigWithStoredKVParams(ArchConfigWithBoundedMaxSeqLen):
     mapping or MLA should override ``construct_kv_params``.
     """
 
-    kv_params: KVCacheParams
+    kv_params: KVCacheParamInterface
 
-    def get_kv_params(self) -> KVCacheParams:
+    def get_kv_params(self) -> KVCacheParamInterface:
         """Returns the KV cache parameters computed for this config."""
         return self.kv_params
 
@@ -262,7 +263,7 @@ class ArchConfigWithStoredKVParams(ArchConfigWithBoundedMaxSeqLen):
         cache_dtype: DType,
         *,
         allow_kv_head_replication: bool = False,
-    ) -> KVCacheParams:
+    ) -> KVCacheParamInterface:
         """Default KV params for standard grouped attention.
 
         Overrides for models with fewer KV heads than the tensor-parallel
@@ -347,7 +348,7 @@ class ArchVLConfigWithTextSubconfig:
         cache_dtype: DType,
         *,
         allow_kv_head_replication: bool = False,
-    ) -> KVCacheParams:
+    ) -> KVCacheParamInterface:
         """Delegates to the annotated text config class."""
         return cls._text_config_cls().construct_kv_params(
             huggingface_config=cls._hf_text_config(huggingface_config),

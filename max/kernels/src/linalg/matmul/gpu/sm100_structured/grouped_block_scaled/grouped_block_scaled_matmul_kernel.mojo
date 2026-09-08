@@ -39,7 +39,7 @@ from std.math.uutils import ufloordiv
 from std.memory import UnsafePointer, Pointer
 from std.sys import size_of
 
-from std.gpu import WARP_SIZE, block_idx, lane_id
+from max.gpu import WARP_SIZE, block_idx, lane_id
 from max.gpu.memory import external_memory, fence_mbarrier_init
 from max.gpu.primitives.cluster import cluster_sync, elect_one_sync
 from max.gpu.sync import syncwarp

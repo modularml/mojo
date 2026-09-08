@@ -58,13 +58,13 @@ Two hard M5 constraints, both satisfied by the width-16 decode:
 """
 
 from std.collections import Optional
-from std.gpu import WARP_SIZE, global_idx, lane_id
+from max.gpu import WARP_SIZE, global_idx, lane_id
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.utils import IndexList
 
-from layout import Coord, TensorStorage, TileTensor, TensorLayout
+from layout import Coord, TensorEngine, TileTensor, TensorLayout
 from layout.tile_layout import row_major
 
 from linalg.fp4_utils import decode_e2m1_to_f16, NVFP4_SF_VECTOR_SIZE
@@ -78,21 +78,21 @@ def fp4_gemv_kernel[
     a_layout: TensorLayout,
     p_layout: TensorLayout,
     s_layout: TensorLayout,
-    c_storage: TensorStorage,
-    a_storage: TensorStorage,
-    p_storage: TensorStorage,
-    s_storage: TensorStorage,
+    c_engine: TensorEngine,
+    a_engine: TensorEngine,
+    p_engine: TensorEngine,
+    s_engine: TensorEngine,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type],
 ](
-    c: TileTensor[c_type, c_layout, MutAnyOrigin, Storage=c_storage],  # [1, N]
+    c: TileTensor[c_type, c_layout, MutAnyOrigin, Engine=c_engine],  # [1, N]
     a: TileTensor[
-        .bfloat16, a_layout, ImmutAnyOrigin, Storage=a_storage
+        .bfloat16, a_layout, ImmutAnyOrigin, Engine=a_engine
     ],  # [1, K]
     packed: TileTensor[
-        .uint8, p_layout, ImmutAnyOrigin, Storage=p_storage
+        .uint8, p_layout, ImmutAnyOrigin, Engine=p_engine
     ],  # [N, K//2]
     scales: TileTensor[
-        .float8_e4m3fn, s_layout, ImmutAnyOrigin, Storage=s_storage
+        .float8_e4m3fn, s_layout, ImmutAnyOrigin, Engine=s_engine
     ],  # [N,K//16]
     n_arg: Int32,
     k_arg: Int32,
@@ -109,10 +109,10 @@ def fp4_gemv_kernel[
         a_layout: `TileTensor` layout of the activation `a`.
         p_layout: `TileTensor` layout of the packed FP4 weight.
         s_layout: `TileTensor` layout of the FP8 block scales.
-        c_storage: `TensorStorage` of the output `c`.
-        a_storage: `TensorStorage` of the activation `a`.
-        p_storage: `TensorStorage` of the packed FP4 weight.
-        s_storage: `TensorStorage` of the FP8 block scales.
+        c_engine: `TensorEngine` of the output `c`.
+        a_engine: `TensorEngine` of the activation `a`.
+        p_engine: `TensorEngine` of the packed FP4 weight.
+        s_engine: `TensorEngine` of the FP8 block scales.
         elementwise_lambda_fn: Optional fused epilogue applied on the
             width-1 store.
 
@@ -223,10 +223,10 @@ def enqueue_apple_fp4_gemv[
         type_of(a).LayoutType,
         type_of(packed).LayoutType,
         type_of(scales).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(packed).Storage,
-        type_of(scales).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(packed).Engine,
+        type_of(scales).Engine,
         elementwise_lambda_fn,
     ]
     ctx.enqueue_function[kernel](

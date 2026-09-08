@@ -21,7 +21,6 @@ from max.pipelines.context import (
     EOSTracker,
     GenerationStatus,
     ImageMetadata,
-    LogProbabilities,
     PixelContext,
     SamplingParams,
     SpecDecodingState,
@@ -489,6 +488,26 @@ def test_context_serializable() -> None:
     assert dataclass_equal(msgpack_decoded, original_context)
 
 
+def test_dkv_cache_hint_survives_serialization() -> None:
+    # The hint is carried, never read, so the only thing MAX owes it is that
+    # the bytes reaching the model worker are the bytes that arrived on the
+    # request (CLIN-1630). Its predecessor needed a tagged msgspec struct to
+    # cross this boundary; raw bytes need nothing, and this pins that.
+    hint = b'{"version":2,"instances":[{"instance_name":"dkv-peer"}]}'
+    original_context = TextContext(
+        request_id=RequestID(),
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
+        dkv_cache_hint=hint,
+    )
+
+    serialize = msgpack_numpy_encoder()
+    deserialize = msgpack_numpy_decoder(TextContext)
+    decoded = deserialize(serialize(original_context))
+
+    assert decoded.dkv_cache_hint == hint
+
+
 def test_context_tuple_serializable() -> None:
     # Test that we can encode a tuple of (str, TextContext) with Pickle
     original_context = TextContext(
@@ -646,74 +665,14 @@ def test_text_context_update_with_future_token() -> None:
     assert context.to_generation_output().tokens == [42]
 
 
-def test_text_context_pending_future_count_depth_one_invariant() -> None:
-    """The counted pending-future model preserves the depth-1 invariant.
-
-    With ``max_pending_futures == 1`` (the default), a second pending future
-    token must still raise, and the counted realize path must target the same
-    position as the classic last-token overwrite.
-    """
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_token_ids={42}),
-    )
-    assert context.pending_future_count == 0
-
-    context.update_with_future_token()
-    assert context.pending_future_count == 1
-
-    # A second pending future raises, via the default and explicitly.
-    with pytest.raises(ValueError, match=r"Cannot have multiple future tokens"):
-        context.update_with_future_token()
-    with pytest.raises(ValueError, match=r"Cannot have multiple future tokens"):
-        context.update_with_future_token(max_pending_futures=1)
-
-    # Real-token appends are forbidden while a placeholder is live.
-    with pytest.raises(
-        ValueError, match=r"Cannot append a token after a future token"
-    ):
-        context.advance_token_buffer(7)
-
-    # At count=1 the realize path computes the identical position to the
-    # classic trailing overwrite: the placeholder slot itself.
-    assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, FUTURE_TOKEN]
-    context.realize_future_token(5)
-    assert context.pending_future_count == 0
-    assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 5]
-    assert context.status == GenerationStatus.ACTIVE
-
-    # Realizing with no pending future still raises.
-    with pytest.raises(
-        ValueError, match=r"Attempted to realize a non-future token"
-    ):
-        context.realize_future_token(6)
-
-    # Reset with a pending placeholder deletes exactly the placeholder and
-    # clears the count.
-    context.update_with_future_token()
-    assert context.pending_future_count == 1
-    context.reset()
-    assert context.pending_future_count == 0
-    assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 5]
-    context.update_with_future_token()
-    context.realize_future_token(42)
-    assert context.status == GenerationStatus.END_OF_SEQUENCE
-
-
 def test_text_context_future_token_skipped_during_chunked_prefill() -> None:
-    """Chunked-prefill continuations must not accumulate a pending-future count.
+    """Chunked-prefill continuations must not write a future-token placeholder.
 
     The overlap pipeline calls ``update_with_future_token`` on every context in
     the batch each step, including requests still in (chunked) prefill. For an
     actively-chunked context, ``advance_token_buffer`` advances the chunk and
-    early-returns WITHOUT writing a ``FUTURE_TOKEN``, so no placeholder becomes
-    pending. The counted model must not increment ``_pending_future_count`` in
-    that case; otherwise a request whose prefill spans two or more chunks trips
-    "Cannot have multiple future tokens." on its second chunked step. That is
-    the saturation-only worker crash this test guards against (it fails with an
-    unhandled ValueError on the second chunked ``update_with_future_token``
-    before the fix).
+    early-returns WITHOUT writing a ``FUTURE_TOKEN``, so a later chunked step
+    must not raise "Cannot have multiple future tokens."
     """
     context = TextContext(
         max_length=50,
@@ -721,286 +680,28 @@ def test_text_context_future_token_skipped_during_chunked_prefill() -> None:
         eos_tracker=EOSTracker(eos_token_ids={42}),
     )
 
-    # Prefill chunk 1: chunk the prompt, then the overlap pipeline appends a
-    # future to every batched context. The append is swallowed by the
-    # actively-chunked early-return, so nothing is written.
     context.tokens.chunk(4)
     assert context.tokens.actively_chunked
     context.update_with_future_token()
-    assert context.pending_future_count == 0
     assert context.tokens.generated_length == 0
     assert FUTURE_TOKEN not in context.tokens.all.tolist()
 
-    # Prefill chunk 2: pre-fix this second call raised "Cannot have multiple
-    # future tokens." because the count was stuck at 1 from chunk 1.
     context.tokens.chunk(2)
     assert context.tokens.actively_chunked
     context.update_with_future_token()
-    assert context.pending_future_count == 0
     assert context.tokens.generated_length == 0
     assert FUTURE_TOKEN not in context.tokens.all.tolist()
 
-    # Final (non-chunked) step: prefill is complete, so a real placeholder is
-    # appended and the count reaches exactly 1, as in the non-chunked path.
     assert not context.tokens.actively_chunked
     context.update_with_future_token()
-    assert context.pending_future_count == 1
     assert context.tokens.all.tolist()[-1] == FUTURE_TOKEN
 
-    # It realizes cleanly back to 0.
     context.realize_future_token(9)
-    assert context.pending_future_count == 0
     assert context.tokens.all.tolist()[-1] == 9
 
 
-def test_text_context_two_pending_futures_fifo_realize() -> None:
-    """Depth 2: two placeholders may be outstanding and realize oldest-first.
-
-    This is the schedule-ahead lifecycle: forward n and forward n+1 are both
-    enqueued (one placeholder each) before step n's token is realized.
-    """
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_token_ids={42}),
-    )
-
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-    assert context.pending_future_count == 2
-    assert context.tokens.all.tolist() == [
-        0,
-        1,
-        2,
-        3,
-        4,
-        FUTURE_TOKEN,
-        FUTURE_TOKEN,
-    ]
-
-    # A third placeholder exceeds the configured depth.
-    with pytest.raises(ValueError, match=r"Cannot have multiple future tokens"):
-        context.update_with_future_token(max_pending_futures=2)
-
-    # Real-token appends stay forbidden while placeholders are live.
-    with pytest.raises(
-        ValueError, match=r"Cannot append a token after a future token"
-    ):
-        context.advance_token_buffer(7)
-
-    # Realization is FIFO: the first realize targets the OLDER placeholder
-    # (two positions from the end), not the newest one.
-    context.realize_future_token(10)
-    assert context.pending_future_count == 1
-    assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 10, FUTURE_TOKEN]
-
-    context.realize_future_token(11)
-    assert context.pending_future_count == 0
-    assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 10, 11]
-    assert context.status == GenerationStatus.ACTIVE
-
-    # Steady state: append the next placeholder and keep decoding.
-    context.update_with_future_token(max_pending_futures=2)
-    assert context.pending_future_count == 1
-    context.realize_future_token(12)
-    assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 10, 11, 12]
-
-
-def test_text_context_depth2_generation_output_excludes_unrealized_tail() -> (
-    None
-):
-    """Depth 2: the consumed output slice excludes the unrealized tail.
-
-    With two forwards in flight, each sync realizes only the OLDEST
-    placeholder; the newer one is still pending when the response is built.
-    ``to_generation_output`` must stream the realized prefix and hold back the
-    placeholder (streaming -999 to a user is the bug this guards against).
-    """
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_token_ids={42}),
-    )
-
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-
-    # Nothing realized yet: the output must be empty and consume nothing.
-    output = context.to_generation_output()
-    assert output.tokens == []
-    assert context.tokens.has_outstanding_generated_tokens
-
-    # Realize the older step; the newer placeholder must not be consumed.
-    context.realize_future_token(10)
-    output = context.to_generation_output()
-    assert output.tokens == [10]
-
-    # Realizing the second placeholder streams it on the next consumption.
-    context.realize_future_token(11)
-    output = context.to_generation_output()
-    assert output.tokens == [11]
-    assert not context.tokens.has_outstanding_generated_tokens
-
-
-def test_text_context_depth2_eos_realized_with_pending_placeholder() -> None:
-    """Depth 2: EOS realized on the older step terminates at the right token.
-
-    The speculative step n+1 already ran past the EOS, so a second placeholder
-    is live when the EOS token is realized. The context must (a) go
-    END_OF_SEQUENCE immediately, evaluated on the realized prefix only, and
-    (b) stream the EOS token without the trailing placeholder. The extra
-    speculative token is realized by the NEXT sync into an already-done
-    context; the serving scheduler drops that response because the request
-    was already released (text_generation_scheduler filters responses for
-    requests no longer in the batch constructor) -- no buffer rollback is
-    performed, matching the depth-1 extra-token-after-EOS quirk.
-    """
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_token_ids={42}),
-    )
-
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-
-    # Step n realizes EOS while step n+1's placeholder is still live.
-    context.realize_future_token(42)
-    assert context.status == GenerationStatus.END_OF_SEQUENCE
-    assert context.is_done
-    assert context.pending_future_count == 1
-
-    output = context.to_generation_output()
-    assert output.tokens == [42]
-    assert output.final_status == GenerationStatus.END_OF_SEQUENCE
-
-    # The speculative step's token still gets realized (the forward already
-    # ran); it must not resurrect the context or corrupt its status.
-    context.realize_future_token(7)
-    assert context.pending_future_count == 0
-    assert context.status == GenerationStatus.END_OF_SEQUENCE
-    # The post-EOS extra token surfaces here, exactly like the depth-1
-    # extra-token quirk; the scheduler layer is responsible for dropping it.
-    output = context.to_generation_output()
-    assert output.tokens == [7]
-
-
-def test_text_context_depth2_stop_sequence_realized_with_pending() -> None:
-    """Depth 2: a multi-token stop sequence completed by the realized token
-    must match on the realized prefix, unaffected by the trailing placeholder.
-    """
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_sequences=[[10, 11]]),
-    )
-
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-
-    # First realized token: only [10] realized so far -- no stop match (the
-    # placeholder after it must not be read as part of the suffix).
-    context.realize_future_token(10)
-    assert context.status == GenerationStatus.ACTIVE
-
-    # Enqueue the next step, then realize 11: realized suffix is [10, 11].
-    context.update_with_future_token(max_pending_futures=2)
-    context.realize_future_token(11)
-    assert context.status == GenerationStatus.END_OF_SEQUENCE
-    # The stop match excludes the still-pending newest placeholder.
-    assert context.pending_future_count == 1
-
-
-def test_text_context_depth2_reset_deletes_both_placeholders() -> None:
-    """Depth 2 preemption: reset deletes BOTH trailing placeholders."""
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_token_ids={42}),
-    )
-
-    # One realized token, then two in-flight placeholders.
-    context.update(5)
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-    assert context.pending_future_count == 2
-
-    context.reset()
-    assert context.pending_future_count == 0
-    # The realized token survives as prompt; both placeholders are gone.
-    assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 5]
-    assert context.tokens.generated_length == 0
-    assert context.tokens.prompt_length == 6
-
-    # The reset context restarts the lifecycle cleanly at depth 2.
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-    context.realize_future_token(6)
-    context.realize_future_token(42)
-    assert context.status == GenerationStatus.END_OF_SEQUENCE
-
-
-def test_text_context_depth2_chunked_prefill_swallows_placeholders() -> None:
-    """Depth 2: chunked-prefill continuations still swallow placeholder
-    appends (the slice-1 crash class): the count must stay 0 across multiple
-    chunked steps at depth 2, then reach exactly 2 once prefill completes.
-    """
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_token_ids={42}),
-    )
-
-    # Two prefill chunks: both placeholder appends are swallowed, the count
-    # stays 0 at depth 2 exactly as at depth 1.
-    context.tokens.chunk(4)
-    context.update_with_future_token(max_pending_futures=2)
-    assert context.pending_future_count == 0
-    context.tokens.chunk(2)
-    context.update_with_future_token(max_pending_futures=2)
-    assert context.pending_future_count == 0
-    assert FUTURE_TOKEN not in context.tokens.all.tolist()
-
-    # Prefill complete: the schedule-ahead steps append two real placeholders.
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-    assert context.pending_future_count == 2
-    context.realize_future_token(8)
-    context.realize_future_token(9)
-    assert context.tokens.all.tolist()[-2:] == [8, 9]
-
-
-def test_text_context_depth2_log_probabilities_lag() -> None:
-    """Depth 2: log probs realized one step late attach to the right index."""
-    lp_a = LogProbabilities(
-        token_log_probabilities=[-0.1], top_log_probabilities=[{10: -0.1}]
-    )
-    lp_b = LogProbabilities(
-        token_log_probabilities=[-0.2], top_log_probabilities=[{11: -0.2}]
-    )
-    context = TextContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        eos_tracker=EOSTracker(eos_token_ids={42}),
-    )
-
-    context.update_with_future_token(max_pending_futures=2)
-    context.update_with_future_token(max_pending_futures=2)
-
-    # Realize the older placeholder with its log probs; consume immediately.
-    context.realize_future_token(10, log_probabilities=lp_a)
-    output = context.to_generation_output()
-    assert output.tokens == [10]
-    assert output.log_probabilities == [lp_a]
-
-    context.realize_future_token(11, log_probabilities=lp_b)
-    output = context.to_generation_output()
-    assert output.tokens == [11]
-    assert output.log_probabilities == [lp_b]
-
-
 def test_text_context_last_realized_token() -> None:
-    """last_realized_token skips the unrealized placeholder tail."""
+    """last_realized_token skips an unrealized overlap placeholder."""
     context = TextContext(
         max_length=50,
         tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
@@ -1011,18 +712,12 @@ def test_text_context_last_realized_token() -> None:
     context.update(5)
     assert context.last_realized_token == 5
 
-    # tokens[-1] is now a placeholder; the property must not read it.
-    context.update_with_future_token(max_pending_futures=2)
+    context.update_with_future_token()
     assert context.tokens.all.tolist()[-1] == FUTURE_TOKEN
-    assert context.last_realized_token == 5
-
-    context.update_with_future_token(max_pending_futures=2)
     assert context.last_realized_token == 5
 
     context.realize_future_token(6)
     assert context.last_realized_token == 6
-    context.realize_future_token(7)
-    assert context.last_realized_token == 7
 
 
 def test_text_context_update_with_preemption_and_future_token() -> None:

@@ -14,7 +14,7 @@
 from std.math import ceildiv
 from std.atomic import Atomic
 
-from std.gpu import global_idx, thread_idx
+from max.gpu import global_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.memory import AddressSpace, unsafe_stack_allocation

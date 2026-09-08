@@ -21,7 +21,7 @@ Reference: https://gpuopen.com/learn/wmma_on_rdna3/
 from std.sys import llvm_intrinsic
 from std.sys.info import _is_amd_rdna3, _is_amd_rdna4
 from std.memory import bitcast
-from std.gpu import lane_id
+from std._gpu import lane_id
 
 # Import helper functions from parent module
 from ..mma import _has_type, _has_shape, _unsupported_mma_op

@@ -33,11 +33,11 @@ from std.utils.coord import _coerce_dynamic
 
 from .swizzle import Swizzle
 
-from .tensor_storage import (
-    DevicePointerStorage,
+from .tensor_engine import (
+    DevicePointerEngine,
     TensorOps,
-    TensorStorage,
-    PointerStorage,
+    TensorEngine,
+    DefaultEngine,
 )
 from .tile_layout import (
     Layout,
@@ -78,7 +78,7 @@ struct TileTensor[
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
     *,
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
     address_space: AddressSpace = .GENERIC,
     linear_idx_type: DType = _get_index_type[LayoutType](address_space),
 ](DevicePassable, ImplicitlyCopyable, TrivialRegisterPassable, Writable):
@@ -106,7 +106,10 @@ struct TileTensor[
             shape and stride structure. Common types include `Layout` (with
             `Coord`-based shapes/strides) and `RowMajorLayout`.
         origin: The origin of the underlying pointer for lifetime tracking.
-        Storage: TODO.
+        Engine: A type implementing `TensorEngine` that supplies the storage
+            handle and the load/store/offset operations acting on it. Defaults
+            to `DefaultEngine[element_width=1]`, a plain `Pointer` handle over
+            non-vectorized elements.
         address_space: Memory address space (GENERIC, SHARED, CONSTANT, etc.).
             Defaults to GENERIC.
         linear_idx_type: Integer type for memory indexing. Defaults to int32 for
@@ -145,8 +148,8 @@ struct TileTensor[
     For nested layouts (e.g., from blocked_product), flat_rank > rank.
     """
 
-    comptime element_size = Self.Storage.element_size
-    """Number of scalar elements per logical element, derived from `Storage`."""
+    comptime element_size = Self.Engine.element_size
+    """Number of scalar elements per logical element, derived from `Engine`."""
 
     comptime ElementType = SIMD[Self.dtype, Self.element_size]
     """The SIMD type used for element access.
@@ -166,7 +169,7 @@ struct TileTensor[
             stride_types=_NestedTileResultStrideTypes[Self.LayoutType],
         ],
         Self.origin,
-        Storage=Self.Storage.OffsetResultType[
+        Engine=Self.Engine.OffsetResultType[
             TypeList.of[Scalar[linear_idx_type]]()
         ],
         address_space=Self.address_space,
@@ -233,7 +236,7 @@ struct TileTensor[
         i: The dimension index.
     """
 
-    var _storage: Self.Storage.StorageType[
+    var _storage: Self.Engine.StorageType[
         Self.dtype, Self.origin, Self.address_space
     ]
     """Pointer to the tensor's underlying data storage."""
@@ -268,10 +271,10 @@ struct TileTensor[
             The host type's name.
         """
         var writer = String()
-        t"TileTensor[mut={Self.mut}, dtype={Self.dtype}, Storage=".write_to(
+        t"TileTensor[mut={Self.mut}, dtype={Self.dtype}, Engine=".write_to(
             writer
         )
-        Self.Storage.write_type_name_to(writer)
+        Self.Engine.write_type_name_to(writer)
         (
             t", address_space={Self.address_space},"
             t" linear_idx_type={Self.linear_idx_type}]"
@@ -282,7 +285,7 @@ struct TileTensor[
         Self.dtype,
         Self.LayoutType,
         Self.origin,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
         address_space=.GENERIC,
         linear_idx_type=Self.linear_idx_type,
     ]
@@ -296,11 +299,11 @@ struct TileTensor[
         Self.dtype,
         Self.LayoutType,
         origin,
-        Storage=DevicePointerStorage[element_width=1],
+        Engine=DevicePointerEngine[element_width=1],
         address_space=.GENERIC,
         linear_idx_type=Self.linear_idx_type,
     ]
-    """Type alias for this tensor backed by `DevicePointerStorage`.
+    """Type alias for this tensor backed by `DevicePointerEngine`.
 
     Used by the `DeviceBuffer` and `DevicePointer` constructors, which carry the
     buffer's `DevicePointer` (its owning reference plus offset and size) to the
@@ -314,7 +317,7 @@ struct TileTensor[
     @always_inline
     def __init__(
         out self,
-        var storage: Self.Storage.StorageType[
+        var storage: Self.Engine.StorageType[
             Self.dtype, Self.origin, Self.address_space
         ],
         var layout: Self.LayoutType,
@@ -345,8 +348,8 @@ struct TileTensor[
             layout: The layout defining the tensor's shape and strides.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-        ), "TileTensor.__init__ from Pointer requires PointerStorage"
+            Self.Engine == DefaultEngine[element_width=1]
+        ), "TileTensor.__init__ from Pointer requires DefaultEngine"
         self._storage = rebind[type_of(self._storage)](ptr)
         self.layout = layout
 
@@ -362,8 +365,8 @@ struct TileTensor[
             layout: The layout defining the tensor's shape and strides.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-        ), "TileTensor.__init__ from Span requires PointerStorage"
+            Self.Engine == DefaultEngine[element_width=1]
+        ), "TileTensor.__init__ from Span requires DefaultEngine"
         self._storage = rebind[type_of(self._storage)](span.unsafe_ptr())
         self.layout = layout
 
@@ -418,8 +421,8 @@ struct TileTensor[
             layout: The layout of the tensor.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-        ), "TileTensor.__init__ from DeviceBuffer requires PointerStorage"
+            Self.Engine == DefaultEngine[element_width=1]
+        ), "TileTensor.__init__ from DeviceBuffer requires DefaultEngine"
         self._storage = rebind[type_of(self._storage)](
             device_buffer.unsafe_ptr()
         )
@@ -431,11 +434,11 @@ struct TileTensor[
         var device_pointer: DevicePointer[Self.dtype, Self.origin],
         var layout: Self.LayoutType,
     ):
-        """Create a `DevicePointerStorage`-backed `TileTensor` from a
+        """Create a `DevicePointerEngine`-backed `TileTensor` from a
         `DevicePointer`.
 
         Like the `DeviceBuffer` constructor, this produces a
-        `DevicePointerStorage`-backed tile that carries the full `DevicePointer`
+        `DevicePointerEngine`-backed tile that carries the full `DevicePointer`
         (its non-owning reference to the owning `DeviceBuffer` plus an element
         offset and size) to the kernel boundary, where
         `DevicePointer._to_device_type` encodes it to a bare device pointer.
@@ -486,8 +489,8 @@ struct TileTensor[
             layout: The layout of the tensor.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-        ), "TileTensor.__init__ from HostBuffer requires PointerStorage"
+            Self.Engine == DefaultEngine[element_width=1]
+        ), "TileTensor.__init__ from HostBuffer requires DefaultEngine"
         self._storage = rebind[type_of(self._storage)](host_buffer.unsafe_ptr())
         self.layout = layout
 
@@ -537,7 +540,7 @@ struct TileTensor[
             name == "ptr"
         ), "TileTensor.__getattr_param__ only support 'ptr'"
         try:
-            result = Self.Storage.unsafe_ptr(self._storage)
+            result = Self.Engine.unsafe_ptr(self._storage)
         except e:
             abort(t"TileTensor.ptr access not possible: {e}")
 
@@ -548,8 +551,8 @@ struct TileTensor[
         to_dtype: DType = Self.dtype,
         to_origin: Origin[mut=to_mut] = Self.origin.unsafe_mut_cast[to_mut](),
         to_address_space: AddressSpace = Self.address_space,
-    ](self) -> Self.Storage.StorageType[to_dtype, to_origin, to_address_space]:
-        return Self.Storage.unsafe_cast[
+    ](self) -> Self.Engine.StorageType[to_dtype, to_origin, to_address_space]:
+        return Self.Engine.unsafe_cast[
             to_dtype,
             to_origin,
             to_address_space,
@@ -558,13 +561,13 @@ struct TileTensor[
     @always_inline("nodebug")
     def _offset_storage(
         self, offset: Some[CoordLike]
-    ) -> Self.Storage.OffsetResultType[
+    ) -> Self.Engine.OffsetResultType[
         TypeList.of[type_of(offset)]()
     ].StorageType[Self.dtype, Self.origin, Self.address_space]:
         """Advances `self`'s storage handle by `offset` elements via the
-        storage policy.
+        engine.
         """
-        return Self.Storage.offset(self._storage, Coord(offset))
+        return Self.Engine.offset(self._storage, Coord(offset))
 
     @always_inline("nodebug")
     def _load_storage[
@@ -574,8 +577,8 @@ struct TileTensor[
         non_temporal: Bool = False,
     ](self, offset: Some[Indexer]) -> SIMD[Self.dtype, width]:
         """Loads `width` elements from `self`'s storage handle at `offset` via
-        the storage policy."""
-        return Self.Storage.load[
+        the engine."""
+        return Self.Engine.load[
             width=width,
             alignment=alignment,
             invariant=invariant,
@@ -591,8 +594,8 @@ struct TileTensor[
         non_temporal: Bool = False,
     ](self, offset: Some[Indexer], value: SIMD[Self.dtype, _]) where Self.mut:
         """Stores `value` into `self`'s storage handle at `offset` via the
-        storage policy."""
-        Self.Storage.store[
+        engine."""
+        Self.Engine.store[
             alignment=alignment,
             non_temporal=non_temporal,
         ](self._unsafe_storage_cast[to_mut=True](), offset, value)
@@ -1016,7 +1019,7 @@ struct TileTensor[
         target_dtype,
         Self.LayoutType,
         Self.origin,
-        Storage=Self.Storage,
+        Engine=Self.Engine,
         address_space=Self.address_space,
         linear_idx_type=Self.linear_idx_type,
     ]:
@@ -1057,8 +1060,8 @@ struct TileTensor[
             A pointer offset at the given flattened coordinates.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-        ), "TileTensor.ptr_at_offset requires PointerStorage"
+            Self.Engine == DefaultEngine[element_width=1]
+        ), "TileTensor.ptr_at_offset requires DefaultEngine"
         return rebind[type_of(result)](self._storage).unsafe_offset(
             self.layout[linear_idx_type=Self.linear_idx_type](coords)
         )
@@ -1126,7 +1129,7 @@ struct TileTensor[
         the copy widens to SIMD load + cast + SIMD store,
         using the narrower of the two dtypes' native SIMD widths.
 
-        The copy loop lives in the storage policy (`Self.Storage.copy_from`);
+        The copy loop lives in the engine (`Self.Engine.copy_from`);
         this forwards `self` and `other` as `(storage, layout)` pairs.
 
         Constraints:
@@ -1140,9 +1143,9 @@ struct TileTensor[
             other: The source tensor to copy data from. Must have the same
                 total number of elements as `self`.
         """
-        # `other` may carry a different (e.g. offset-derived) storage policy;
-        # the storage-level copy takes it as a distinct `OtherStorage` operand.
-        Self.Storage.copy_from(
+        # `other` may carry a different (e.g. offset-derived) engine;
+        # the storage-level copy takes it as a distinct `OtherEngine` operand.
+        Self.Engine.copy_from(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (other._storage, other.layout),
         )
@@ -1168,10 +1171,10 @@ struct TileTensor[
             The number of elements between `self` and `other`.
         """
         # Storages are assumed copy-compatible: `other` may carry a different
-        # (e.g. offset-derived) `Storage` policy, so reinterpret its handle as
+        # (e.g. offset-derived) `Engine`, so reinterpret its handle as
         # `self`'s before measuring the scalar-element distance.
         return Scalar[Self.linear_idx_type](
-            Self.Storage.distance(
+            Self.Engine.distance(
                 self._storage,
                 rebind[type_of(self._storage)](other._storage),
             )
@@ -1412,7 +1415,7 @@ struct TileTensor[
         Self.dtype,
         LayoutType=new_layout,
         origin=Self.origin,
-        Storage=Self.Storage,
+        Engine=Self.Engine,
         address_space=Self.address_space,
     ]
     """A TileTensor type with the same data properties but a different layout.
@@ -1431,14 +1434,14 @@ struct TileTensor[
         Self.dtype,
         LayoutType=LayoutType,
         origin=Self.origin,
-        Storage=Self.Storage.OffsetResultType[offsets],
+        Engine=Self.Engine.OffsetResultType[offsets],
         address_space=Self.address_space,
     ]
     """The TileTensor type produced by offsetting into this tensor's storage.
 
     Names the return type of offset-producing operations (slicing, tiling,
     distribution). It preserves dtype, origin, and address_space, optionally
-    changes the layout, and carries the storage policy's
+    changes the layout, and carries the engine's
     `OffsetResultType[offsets]` so an offset that yields a different storage
     handle is reflected in the view's type.
 
@@ -1597,7 +1600,7 @@ struct TileTensor[
                     Self.LayoutType._stride_types, thread_layout.shape_types
                 ],
             ],
-            Storage=Self.Storage.OffsetResultType[TypeList.of[Int]()],
+            Engine=Self.Engine.OffsetResultType[TypeList.of[Int]()],
             address_space=Self.address_space,
         ],
         IndexList[thread_layout.shape_types.length],
@@ -1786,7 +1789,7 @@ struct TileTensor[
             Self.LayoutType._stride_types,
         ],
         ImmOrigin(Self.origin),
-        Storage=Self.Storage.OffsetResultType[TypeList.of[Int]()],
+        Engine=Self.Engine.OffsetResultType[TypeList.of[Int]()],
         address_space=Self.address_space,
         linear_idx_type=Self.linear_idx_type,
     ]
@@ -1871,7 +1874,7 @@ struct TileTensor[
 
         comptime for i in range(count):
             tiles[i] = Self.SplitElementType[count, axis](
-                Self.Storage.offset(
+                Self.Engine.offset(
                     self._unsafe_storage_cast[to_mut=False](),
                     Coord(i * tile_size * axis_stride),
                 ),
@@ -1891,7 +1894,7 @@ struct TileTensor[
             Self.LayoutType._stride_types,
         ],
         ImmOrigin(Self.origin),
-        Storage=Self.Storage.OffsetResultType[TypeList.of[Int]()],
+        Engine=Self.Engine.OffsetResultType[TypeList.of[Int]()],
         address_space=Self.address_space,
         linear_idx_type=Self.linear_idx_type,
     ]
@@ -1977,7 +1980,7 @@ struct TileTensor[
                 )
 
         return Self.DynamicSplitType[axis](
-            Self.Storage.offset(
+            Self.Engine.offset(
                 self._unsafe_storage_cast[to_mut=False](),
                 Coord(idx * axis_partition_dim * axis_stride),
             ),
@@ -2013,7 +2016,7 @@ struct TileTensor[
             stride_types=Self.LayoutType._stride_types,
         ],
         Self.origin,
-        Storage=Self.Storage.OffsetResultType[
+        Engine=Self.Engine.OffsetResultType[
             TypeList.of[Scalar[Self.linear_idx_type]]()
         ],
         address_space=Self.address_space,
@@ -2115,7 +2118,7 @@ struct TileTensor[
             Self.LayoutType._stride_types,
         ],
         Self.origin,
-        Storage=Self.Storage.OffsetResultType[
+        Engine=Self.Engine.OffsetResultType[
             TypeList.of[Scalar[Self.linear_idx_type]]()
         ],
         address_space=Self.address_space,
@@ -2183,7 +2186,7 @@ struct TileTensor[
                 Self.LayoutType._stride_types, _IntToComptimeInt[*vector_shape]
             ],
         ],
-        Storage=PointerStorage[
+        Engine=DefaultEngine[
             element_width=Coord[
                 *_IntToComptimeInt[*vector_shape]
             ].static_product
@@ -2241,12 +2244,9 @@ struct TileTensor[
         - Zero-cost abstraction at compile time when used with static shapes.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-            or Self.Storage == DevicePointerStorage[element_width=1]
-        ), (
-            "TileTensor.vectorize requires PointerStorage or"
-            " DevicePointerStorage"
-        )
+            Self.Engine == DefaultEngine[element_width=1]
+            or Self.Engine == DevicePointerEngine[element_width=1]
+        ), "TileTensor.vectorize requires DefaultEngine or DevicePointerEngine"
 
         return _vectorize(self, coord[*vector_shape])
 
@@ -2530,9 +2530,9 @@ struct TileTensor[
 
         This is a utility to help with porting LayoutTensor methods to this type.
 
-        Supports `PointerStorage` and `DevicePointerStorage`-backed tiles. For a
-        `DevicePointerStorage`-backed tile the raw device pointer is recovered
-        from the handle (via `Storage.unsafe_ptr`), so the resulting
+        Supports `DefaultEngine` and `DevicePointerEngine`-backed tiles. For a
+        `DevicePointerEngine`-backed tile the raw device pointer is recovered
+        from the handle (via `Engine.unsafe_ptr`), so the resulting
         `LayoutTensor` no longer carries the owning `DevicePointer`. This is a
         temporary workaround until `LayoutTensor` support is removed as part of
         GPUA-6.
@@ -2542,11 +2542,11 @@ struct TileTensor[
             this tensor.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-            or Self.Storage == DevicePointerStorage[element_width=1]
+            Self.Engine == DefaultEngine[element_width=1]
+            or Self.Engine == DevicePointerEngine[element_width=1]
         ), (
-            "TileTensor.to_layout_tensor requires PointerStorage or"
-            " DevicePointerStorage"
+            "TileTensor.to_layout_tensor requires DefaultEngine or"
+            " DevicePointerEngine"
         )
         return {
             self.ptr,
@@ -2574,7 +2574,7 @@ struct TileTensor[
         Self.dtype,
         Self.LayoutType,
         origin,
-        Storage=Self.Storage,
+        Engine=Self.Engine,
         address_space=Self.address_space,
         linear_idx_type=Self.linear_idx_type,
     ]
@@ -2633,7 +2633,7 @@ struct TileTensor[
         Self.dtype,
         origin=Self.origin,
         LayoutType=Self.LayoutType,
-        Storage=Self.Storage,
+        Engine=Self.Engine,
         address_space=address_space,
         linear_idx_type=Self.linear_idx_type,
     ]
@@ -2680,9 +2680,9 @@ struct TileTensor[
     def to_device_buffer(self, ctx: DeviceContext) -> DeviceBuffer[Self.dtype]:
         """Convert the tensor to a `DeviceBuffer`.
 
-        Works for tensors backed by either `PointerStorage` or
-        `DevicePointerStorage`. In both cases the base pointer is recovered
-        through the storage policy (`self.ptr`), so the resulting non-owning
+        Works for tensors backed by either `DefaultEngine` or
+        `DevicePointerEngine`. In both cases the base pointer is recovered
+        through the engine (`self.ptr`), so the resulting non-owning
         `DeviceBuffer` covers exactly this tensor's elements, honoring any
         offset baked into the storage handle.
 
@@ -2693,11 +2693,11 @@ struct TileTensor[
             A `DeviceBuffer` containing the tensor's data.
         """
         comptime assert (
-            Self.Storage == PointerStorage[element_width=1]
-            or Self.Storage == DevicePointerStorage[element_width=1]
+            Self.Engine == DefaultEngine[element_width=1]
+            or Self.Engine == DevicePointerEngine[element_width=1]
         ), (
-            "TileTensor.to_device_buffer requires PointerStorage or"
-            " DevicePointerStorage"
+            "TileTensor.to_device_buffer requires DefaultEngine or"
+            " DevicePointerEngine"
         )
         comptime assert (
             Self.address_space == Self.address_space.GENERIC
@@ -2712,19 +2712,19 @@ struct TileTensor[
     @always_inline
     def __iadd__(
         self, rhs: TileTensor[Self.dtype, ...]
-    ) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Adds `rhs` into this tensor elementwise, in place.
 
         Args:
             rhs: The tensor to add, broadcast against this tensor's layout.
         """
         comptime assert (
-            Self.Storage._BASE_TYPE_NAME == rhs.Storage._BASE_TYPE_NAME
-        ), "in-place binary ops require operands with the same storage class"
+            Self.Engine._BASE_TYPE_NAME == rhs.Engine._BASE_TYPE_NAME
+        ), "in-place binary ops require operands with the same engine"
         comptime assert (
             self.element_size == rhs.element_size
         ), "in-place binary ops require operands with the same element size"
-        Self.Storage.iadd(
+        Self.Engine.iadd(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (rhs._storage, rhs.layout),
         )
@@ -2732,7 +2732,7 @@ struct TileTensor[
     @always_inline
     def __imul__(
         self, rhs: TileTensor[Self.dtype, ...]
-    ) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Multiplies this tensor by `rhs` elementwise, in place.
 
         Args:
@@ -2740,12 +2740,12 @@ struct TileTensor[
                 layout.
         """
         comptime assert (
-            Self.Storage._BASE_TYPE_NAME == rhs.Storage._BASE_TYPE_NAME
-        ), "in-place binary ops require operands with the same storage class"
+            Self.Engine._BASE_TYPE_NAME == rhs.Engine._BASE_TYPE_NAME
+        ), "in-place binary ops require operands with the same engine"
         comptime assert (
             self.element_size == rhs.element_size
         ), "in-place binary ops require operands with the same element size"
-        Self.Storage.imul(
+        Self.Engine.imul(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (rhs._storage, rhs.layout),
         )
@@ -2753,19 +2753,19 @@ struct TileTensor[
     @always_inline
     def __isub__(
         self, rhs: TileTensor[Self.dtype, ...]
-    ) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Subtracts `rhs` from this tensor elementwise, in place.
 
         Args:
             rhs: The tensor to subtract, broadcast against this tensor's layout.
         """
         comptime assert (
-            Self.Storage._BASE_TYPE_NAME == rhs.Storage._BASE_TYPE_NAME
-        ), "in-place binary ops require operands with the same storage class"
+            Self.Engine._BASE_TYPE_NAME == rhs.Engine._BASE_TYPE_NAME
+        ), "in-place binary ops require operands with the same engine"
         comptime assert (
             self.element_size == rhs.element_size
         ), "in-place binary ops require operands with the same element size"
-        Self.Storage.isub(
+        Self.Engine.isub(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (rhs._storage, rhs.layout),
         )
@@ -2773,7 +2773,7 @@ struct TileTensor[
     @always_inline
     def __ifloordiv__(
         self, rhs: TileTensor[Self.dtype, ...]
-    ) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Floor-divides this tensor by `rhs` elementwise, in place.
 
         Args:
@@ -2781,12 +2781,12 @@ struct TileTensor[
                 layout.
         """
         comptime assert (
-            Self.Storage._BASE_TYPE_NAME == rhs.Storage._BASE_TYPE_NAME
-        ), "in-place binary ops require operands with the same storage class"
+            Self.Engine._BASE_TYPE_NAME == rhs.Engine._BASE_TYPE_NAME
+        ), "in-place binary ops require operands with the same engine"
         comptime assert (
             self.element_size == rhs.element_size
         ), "in-place binary ops require operands with the same element size"
-        Self.Storage.ifloordiv(
+        Self.Engine.ifloordiv(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (rhs._storage, rhs.layout),
         )
@@ -2794,7 +2794,7 @@ struct TileTensor[
     @always_inline
     def __itruediv__(
         self, rhs: TileTensor[Self.dtype, ...]
-    ) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """True-divides this tensor by `rhs` elementwise, in place.
 
         Args:
@@ -2802,12 +2802,12 @@ struct TileTensor[
                 layout.
         """
         comptime assert (
-            Self.Storage._BASE_TYPE_NAME == rhs.Storage._BASE_TYPE_NAME
-        ), "in-place binary ops require operands with the same storage class"
+            Self.Engine._BASE_TYPE_NAME == rhs.Engine._BASE_TYPE_NAME
+        ), "in-place binary ops require operands with the same engine"
         comptime assert (
             self.element_size == rhs.element_size
         ), "in-place binary ops require operands with the same element size"
-        Self.Storage.itruediv(
+        Self.Engine.itruediv(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (rhs._storage, rhs.layout),
         )
@@ -2815,7 +2815,7 @@ struct TileTensor[
     @always_inline
     def min(
         self, rhs: TileTensor[Self.dtype, ...]
-    ) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Takes the elementwise minimum with `rhs`, in place.
 
         Args:
@@ -2823,12 +2823,12 @@ struct TileTensor[
                 tensor's layout.
         """
         comptime assert (
-            Self.Storage._BASE_TYPE_NAME == rhs.Storage._BASE_TYPE_NAME
-        ), "in-place binary ops require operands with the same storage class"
+            Self.Engine._BASE_TYPE_NAME == rhs.Engine._BASE_TYPE_NAME
+        ), "in-place binary ops require operands with the same engine"
         comptime assert (
             self.element_size == rhs.element_size
         ), "in-place binary ops require operands with the same element size"
-        Self.Storage.imin(
+        Self.Engine.imin(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (rhs._storage, rhs.layout),
         )
@@ -2836,7 +2836,7 @@ struct TileTensor[
     @always_inline
     def max(
         self, rhs: TileTensor[Self.dtype, ...]
-    ) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Takes the elementwise maximum with `rhs`, in place.
 
         Args:
@@ -2844,26 +2844,26 @@ struct TileTensor[
                 tensor's layout.
         """
         comptime assert (
-            Self.Storage._BASE_TYPE_NAME == rhs.Storage._BASE_TYPE_NAME
-        ), "in-place binary ops require operands with the same storage class"
+            Self.Engine._BASE_TYPE_NAME == rhs.Engine._BASE_TYPE_NAME
+        ), "in-place binary ops require operands with the same engine"
         comptime assert (
             self.element_size == rhs.element_size
         ), "in-place binary ops require operands with the same element size"
-        Self.Storage.imax(
+        Self.Engine.imax(
             (self._unsafe_storage_cast[to_mut=True](), self.layout),
             (rhs._storage, rhs.layout),
         )
 
     @always_inline
-    def abs(self) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    def abs(self) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Takes the elementwise absolute value of this tensor, in place.
 
         For unsigned dtypes this is the identity.
         """
-        Self.Storage.iabs(self._unsafe_storage_cast[to_mut=True](), self.layout)
+        Self.Engine.iabs(self._unsafe_storage_cast[to_mut=True](), self.layout)
 
     @always_inline
-    def recip(self) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    def recip(self) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Replaces each element of this tensor with its reciprocal, in place.
 
         Elements equal to zero produce infinity, following IEEE 754 division
@@ -2872,14 +2872,14 @@ struct TileTensor[
         Constraints:
             The tensor's dtype must be a floating-point type.
         """
-        Self.Storage.irecip(
+        Self.Engine.irecip(
             self._unsafe_storage_cast[to_mut=True](), self.layout
         )
 
     @always_inline
     def exp[
         scale_dtype: DType = Self.dtype, //, scale: Scalar[scale_dtype] = 1
-    ](self) where Self.mut and conforms_to(Self.Storage, TensorOps):
+    ](self) where Self.mut and conforms_to(Self.Engine, TensorOps):
         """Replaces each element `x` of this tensor with `exp(scale * x)`,
         in place.
 
@@ -2898,7 +2898,7 @@ struct TileTensor[
         Constraints:
             The tensor's dtype must be a floating-point type.
         """
-        Self.Storage.iexp[scale](
+        Self.Engine.iexp[scale](
             self._unsafe_storage_cast[to_mut=True](), self.layout
         )
 
@@ -3864,7 +3864,7 @@ def _vectorize[
     data_layout_tensor.origin,
     address_space=data_layout_tensor.address_space,
     linear_idx_type=data_layout_tensor.linear_idx_type,
-    Storage=PointerStorage[
+    Engine=DefaultEngine[
         element_width=Coord[*vector_shape_types].static_product
     ],
 ]:

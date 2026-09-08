@@ -30,6 +30,7 @@
         "serve/audio-generation",
         "serve/embeddings",
         "serve/function-calling",
+        "serve/reasoning",
         "serve/structured-output",
         "develop/max-pipeline-bring-your-own-model",
         "models"

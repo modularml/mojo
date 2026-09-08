@@ -43,13 +43,13 @@ from layout.tile_tensor import TileTensor
 from layout.tile_layout import row_major as tt_row_major
 from layout.coord import Idx, Coord
 from layout.layout_tensor import LayoutTensor
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, thread_idx, warp_id
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, thread_idx, warp_id
 from max.gpu.sync import barrier
-from std.gpu.primitives.warp import broadcast
+from max.gpu.primitives.warp import broadcast
 from max.gpu.host import DeviceAttribute, DeviceContext, FuncAttribute
 from max.gpu.compute.arch.tcgen05 import tcgen05_alloc
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from std.utils.index import Index
 from nn.attention.gpu.mha import q_num_matrix_view_rows
 from nn.attention.gpu.nvidia.sm100.smem import SM100AttentionSMem

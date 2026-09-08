@@ -151,21 +151,25 @@ def lamport_allreduce_test[
     comptime InTensorType = TileTensor[
         dtype, type_of(row_major(length)), ImmutAnyOrigin
     ]
-    var in_tensors = Array[InTensorType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_tensors[i] = TileTensor(
+    var in_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InTensorType: TileTensor(
             rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                 in_dev[i].unsafe_ptr()
             ),
             row_major(length),
         )
+    )
 
     comptime OutTensorType = TileTensor[
         dtype, type_of(row_major(length)), MutAnyOrigin
     ]
-    var out_tensors = Array[OutTensorType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        out_tensors[i] = TileTensor(out_dev[i], row_major(length))
+    var out_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) {
+            mut out_dev, imm
+        } -> OutTensorType: TileTensor(
+            out_dev[i], row_major(length)
+        ).as_unsafe_any_origin()
+    )
 
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
@@ -230,6 +234,7 @@ def lamport_allreduce_test[
                 rank_sigs,
                 lamport_cfg,
                 list_of_ctx[i],
+                i,
             )
         for i in range(ngpus):
             list_of_ctx[i].synchronize()
@@ -394,21 +399,22 @@ def lamport_mixed_size_test[
             comptime OutType = TileTensor[
                 dtype, type_of(row_major(length)), MutAnyOrigin
             ]
-            var in_tensors = Array[InType, ngpus](uninitialized=True)
-            var out_tensors = Array[OutType, ngpus](uninitialized=True)
-            for i in range(ngpus):
-                in_tensors[i] = TileTensor(
+            var in_tensors = Array[_, ngpus](
+                fill_with=lambda (i: Int) -> InType: TileTensor(
                     rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                         in_dev[i].unsafe_ptr()
                     ),
                     row_major(length),
                 )
-                out_tensors[i] = TileTensor(
+            )
+            var out_tensors = Array[_, ngpus](
+                fill_with=lambda (i: Int) -> OutType: TileTensor(
                     rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](
                         out_dev[i].unsafe_ptr()
                     ),
                     row_major(length),
                 )
+            )
 
             var cfg = AllReduceTuningConfig(
                 ngpus=ngpus,
@@ -429,6 +435,7 @@ def lamport_mixed_size_test[
                     rank_sigs,
                     cfg,
                     list_of_ctx[i],
+                    i,
                 )
             for i in range(ngpus):
                 list_of_ctx[i].synchronize()
@@ -535,16 +542,19 @@ def lamport_coexist_test[
     comptime LOutType = TileTensor[
         dtype, type_of(row_major(large_len)), MutAnyOrigin
     ]
-    var lin_tensors = Array[LType, ngpus](uninitialized=True)
-    var lout_tensors = Array[LOutType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        lin_tensors[i] = LType(
+    var lin_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> LType: LType(
             rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                 lin_dev[i].unsafe_ptr()
             ),
             row_major(large_len),
         )
-        lout_tensors[i] = LOutType(lout_dev[i], row_major(large_len))
+    )
+    var lout_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) {mut lout_dev, imm} -> LOutType: TileTensor(
+            lout_dev[i], row_major(large_len)
+        ).as_unsafe_any_origin()
+    )
 
     comptime SInType = TileTensor[
         dtype, type_of(row_major(small_len)), ImmutAnyOrigin
@@ -552,16 +562,19 @@ def lamport_coexist_test[
     comptime SOutType = TileTensor[
         dtype, type_of(row_major(small_len)), MutAnyOrigin
     ]
-    var sin_tensors = Array[SInType, ngpus](uninitialized=True)
-    var sout_tensors = Array[SOutType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        sin_tensors[i] = SInType(
+    var sin_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> SInType: SInType(
             rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                 sin_dev[i].unsafe_ptr()
             ),
             row_major(small_len),
         )
-        sout_tensors[i] = SOutType(sout_dev[i], row_major(small_len))
+    )
+    var sout_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) {mut sout_dev, imm} -> SOutType: TileTensor(
+            sout_dev[i], row_major(small_len)
+        ).as_unsafe_any_origin()
+    )
 
     var out_capture = StaticTuple[SOutType, ngpus]()
     for i in range(ngpus):
@@ -626,6 +639,7 @@ def lamport_coexist_test[
                 rank_sigs,
                 cfg,
                 list_of_ctx[i],
+                i,
             )
         for i in range(ngpus):
             list_of_ctx[i].synchronize()
@@ -749,15 +763,16 @@ def lamport_unsynced_skew_test[
         comptime OutType = TileTensor[
             dtype, type_of(row_major(length)), MutAnyOrigin
         ]
-        var in_tensors = Array[InType, ngpus](uninitialized=True)
-        var out_capture = StaticTuple[OutType, ngpus]()
-        for i in range(ngpus):
-            in_tensors[i] = InType(
+        var in_tensors = Array[_, ngpus](
+            fill_with=lambda (i: Int) -> InType: InType(
                 rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                     in_dev[i].unsafe_ptr() + base
                 ),
                 row_major(length),
             )
+        )
+        var out_capture = StaticTuple[OutType, ngpus]()
+        for i in range(ngpus):
             out_capture[i] = OutType(
                 rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](
                     out_dev[i].unsafe_ptr() + base
@@ -800,6 +815,7 @@ def lamport_unsynced_skew_test[
                 rank_sigs,
                 cfg,
                 list_of_ctx[i],
+                i,
             )
         # NO synchronize() here -- ranks are free to drift in `flag`.
 

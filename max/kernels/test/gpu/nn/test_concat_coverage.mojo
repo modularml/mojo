@@ -114,7 +114,7 @@ def test_concat_d2d_copy_path(ctx: DeviceContext) raises:
                 dtype,
                 input_0_dyn.LayoutType,
                 ImmutAnyOrigin,
-                Storage=input_0_dyn.Storage,
+                Engine=input_0_dyn.Engine,
             ],
             3,
         ](
@@ -234,7 +234,7 @@ def test_concat_non_last_axis(ctx: DeviceContext) raises:
                 dtype,
                 input_0_dyn.LayoutType,
                 ImmutAnyOrigin,
-                Storage=input_0_dyn.Storage,
+                Engine=input_0_dyn.Engine,
             ],
             2,
         ](
@@ -338,7 +338,7 @@ def test_concat_last_axis_vectorized(ctx: DeviceContext) raises:
                 dtype,
                 input_0_dyn.LayoutType,
                 ImmutAnyOrigin,
-                Storage=input_0_dyn.Storage,
+                Engine=input_0_dyn.Engine,
             ],
             2,
         ](
@@ -441,7 +441,7 @@ def test_concat_last_axis_unaligned(ctx: DeviceContext) raises:
                 dtype,
                 input_0_dyn.LayoutType,
                 ImmutAnyOrigin,
-                Storage=input_0_dyn.Storage,
+                Engine=input_0_dyn.Engine,
             ],
             2,
         ](
@@ -654,7 +654,7 @@ def test_concat_with_epilogue(ctx: DeviceContext) raises:
                 dtype,
                 input_0_dyn.LayoutType,
                 ImmutAnyOrigin,
-                Storage=input_0_dyn.Storage,
+                Engine=input_0_dyn.Engine,
             ],
             2,
         ](
@@ -757,7 +757,7 @@ def test_concat_different_dtypes(ctx: DeviceContext) raises:
                 dtype,
                 input_0_dyn.LayoutType,
                 ImmutAnyOrigin,
-                Storage=input_0_dyn.Storage,
+                Engine=input_0_dyn.Engine,
             ],
             2,
         ](
@@ -858,7 +858,7 @@ def test_concat_high_rank(ctx: DeviceContext) raises:
                 dtype,
                 input_0_dyn.LayoutType,
                 ImmutAnyOrigin,
-                Storage=input_0_dyn.Storage,
+                Engine=input_0_dyn.Engine,
             ],
             2,
         ](

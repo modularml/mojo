@@ -33,8 +33,7 @@ here would lower to `ds_bpermute_b32` (LDS-routed), so we go through
 `permlane_swap` directly.
 """
 
-from std.gpu.intrinsics import permlane_swap
-from std.gpu.primitives.warp import vote as warp_vote
+from max.gpu.intrinsics import permlane_swap
 from std.math import exp2 as math_exp2, recip
 from std.sys.intrinsics import unlikely
 
@@ -617,8 +616,11 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
         clusters), rolls back `max_vec` to `max_vec_prev` and resets
         `scale_vec` to 1.
 
-        Wave-AND reduce via 64-bit ballot against full-exec mask
-        (`attend_ker` always runs all 64 lanes active).
+        Per-lane decision (each lane's column of the col_l rt_32x32
+        fragment is an independent Q row; see this struct's docstring),
+        not a wave-wide AND -- a warp-vote here would let one row's
+        growth force a rescale onto a sibling row whose own growth
+        didn't warrant it.
 
         SCALE_VEC INVARIANT: `scale_vec` is exactly 1 whenever no
         rescale fired in the most recent C2/C6. The else-branch reset
@@ -645,9 +647,15 @@ struct OnlineSoftmax[att_dtype: DType = .float32](ImplicitlyCopyable):
                 before a rescale fires. When `max_vec - max_vec_prev`
                 exceeds this, the rescale is applied.
         """
+        # Per-lane predicate, not a warp vote: the col_l rt_32x32 fragment
+        # gives each lane an INDEPENDENT Q row (one column of the 32x32
+        # tile, per this struct's own docstring), so an AND across the
+        # wavefront would let one row's growth force a rescale (a real,
+        # non-identity `exp2` multiply of `o_reg`/`att_bf16_full`, plus a
+        # `max_vec` state change that persists into later clusters) onto a
+        # sibling row whose own growth didn't warrant it.
         var lane_ok = (self.max_vec - self.max_vec_prev) <= threshold
-        var ballot = warp_vote[.uint64](lane_ok)
-        var all_ok = ballot == UInt64(0xFFFFFFFFFFFFFFFF)
+        var all_ok = lane_ok
         var pending_scale = False
         if unlikely(not all_ok):
             self.scale_vec = math_exp2(self.max_vec_prev - self.max_vec)

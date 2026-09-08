@@ -33,11 +33,11 @@ library](/api/mojo/), allows you to develop GPU-enabled applications.
 The [`max.gpu`](/api/mojo/max/gpu/) package of the MAX accelerator library
 includes several subpackages for interacting with GPUs, with the
 [`max.gpu.host`](/api/mojo/max/gpu/host/) package providing most of the commonly
-used APIs. A few APIs that you use inside kernel functions—such as the thread
-and block indices—remain in the Mojo standard library's
-[`gpu`](https://mojolang.org/docs/std/gpu/) package. And the standard library's
-[`sys`](https://mojolang.org/docs/std/sys/info/) package contains a few basic
-introspection functions for determining whether a system has a supported GPU:
+used APIs. The APIs that you use inside kernel functions—such as the thread and
+block indices—come from the [`max.gpu`](/api/mojo/max/gpu/) package itself. The
+Mojo standard library's [`sys`](https://mojolang.org/docs/std/sys/info/) package
+contains a few basic introspection functions for determining whether a system
+has a supported GPU:
 
 - [`has_accelerator()`](https://mojolang.org/docs/std/sys/info/has_accelerator/):
   Returns `True` if the host system has an accelerator and `False` otherwise.
@@ -116,7 +116,7 @@ from std.math import iota
 from std.sys import exit, has_accelerator
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 
 comptime num_elements = 20
 
@@ -315,13 +315,13 @@ From within a kernel function, you can access the grid and thread block
 dimensions and the assigned thread block and thread indices of the individual
 threads executing the kernel using the following structures:
 
-| Comptime value                                                              | Description                                                                                                                                                                                                                                                |
-|-----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [`grid_dim`](https://mojolang.org/docs/std/gpu/primitives/id/#grid_dim)     | Dimensions of the grid as `x`, `y`, and `z` values (for example, `grid_dim.y`).                                                                                                                                                                            |
-| [`block_dim`](https://mojolang.org/docs/std/gpu/primitives/id/#block_dim)   | Dimensions of the thread block as `x`, `y`, and `z` values.                                                                                                                                                                                                |
-| [`block_idx`](https://mojolang.org/docs/std/gpu/primitives/id/#block_idx)   | Index of the block within the grid as `x`, `y`, and `z` values.                                                                                                                                                                                            |
-| [`thread_idx`](https://mojolang.org/docs/std/gpu/primitives/id/#thread_idx) | Index of the thread within the block as `x`, `y`, and `z` values.                                                                                                                                                                                          |
-| [`global_idx`](https://mojolang.org/docs/std/gpu/primitives/id/#global_idx) | The global offset of the thread as `x`, `y`, and `z` values. That is, `global_idx.x = block_dim.x * block_idx.x + thread_idx.x`, `global_idx.y = block_dim.y * block_idx.y + thread_idx.y`, and `global_idx.z = block_dim.z * block_idx.z + thread_idx.z`. |
+| Comptime value                                                        | Description                                                                                                                                                                                                                                                |
+|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [`grid_dim`](https://docs.modular.com/api/mojo/max/gpu/#grid_dim)     | Dimensions of the grid as `x`, `y`, and `z` values (for example, `grid_dim.y`).                                                                                                                                                                            |
+| [`block_dim`](https://docs.modular.com/api/mojo/max/gpu/#block_dim)   | Dimensions of the thread block as `x`, `y`, and `z` values.                                                                                                                                                                                                |
+| [`block_idx`](https://docs.modular.com/api/mojo/max/gpu/#block_idx)   | Index of the block within the grid as `x`, `y`, and `z` values.                                                                                                                                                                                            |
+| [`thread_idx`](https://docs.modular.com/api/mojo/max/gpu/#thread_idx) | Index of the thread within the block as `x`, `y`, and `z` values.                                                                                                                                                                                          |
+| [`global_idx`](https://docs.modular.com/api/mojo/max/gpu/#global_idx) | The global offset of the thread as `x`, `y`, and `z` values. That is, `global_idx.x = block_dim.x * block_idx.x + thread_idx.x`, `global_idx.y = block_dim.y * block_idx.y + thread_idx.y`, and `global_idx.z = block_dim.z * block_idx.z + thread_idx.z`. |
 
 :::note
 
@@ -337,7 +337,7 @@ thread block index, thread index, and global index for each thread.
 from std.sys import has_accelerator
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_dim, block_idx, global_idx, thread_idx
+from max.gpu import block_dim, block_idx, global_idx, thread_idx
 
 
 def print_threads():
@@ -465,7 +465,7 @@ could perform a boundary check like this to ensure that it doesn't attempt to
 process out-of-bounds elements:
 
 ```mojo
-from std.gpu import global_idx
+from max.gpu import global_idx
 
 def process_vector(vector: Pointer[Float32, MutAnyOrigin], size: Int32):
     if global_idx.x < Int(size):

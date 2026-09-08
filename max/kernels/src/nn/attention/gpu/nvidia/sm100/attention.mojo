@@ -16,7 +16,7 @@ from std.math import ceildiv, align_up, align_down, gcd
 from std.sys import size_of
 from std.sys import get_defined_bool
 from std.bit import prev_power_of_two
-from std.gpu.globals import WARP_SIZE, WARPGROUP_SIZE
+from max.gpu.globals import WARP_SIZE, WARPGROUP_SIZE
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host.info import B200
 from max.gpu.primitives.grid_controls import PDLLevel

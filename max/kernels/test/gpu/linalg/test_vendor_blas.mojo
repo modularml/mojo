@@ -15,7 +15,7 @@ from std.math import ceildiv
 from std.random import random_float64
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import block_dim
+from max.gpu import block_dim
 from max.gpu.host import DeviceContext
 from layout import Coord, Idx, TileTensor, row_major
 from linalg.matmul.gpu import matmul_kernel_naive

@@ -26,7 +26,7 @@ from std.collections import OptionalReg
 from std.math import ceildiv, clamp
 from std.math.constants import log2e
 from std.sys import size_of
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -35,9 +35,9 @@ from std.gpu import (
     warp_id,
 )
 from max.gpu.sync import barrier
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.primitives.grid_controls import launch_dependent_grids
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.memory import (
     CacheEviction,
     cp_async_bulk_tensor_2d_gather4,
@@ -56,7 +56,14 @@ from layout.tma_async import (
     TMATensorTile,
     _gather4_box_width,
 )
-from layout import ComptimeInt, CoordLike, RowMajorLayout, TileTensor
+from layout import (
+    ComptimeInt,
+    CoordLike,
+    DefaultEngine,
+    RowMajorLayout,
+    TensorEngine,
+    TileTensor,
+)
 from nn.attention.gpu.nvidia.common import (
     OptionalPointer,
 )
@@ -117,6 +124,7 @@ struct MLA_SM100_Decode_Sparse_KV_BF16[
     has_attn_sink: Bool = False,
     has_extra_kv: Bool = False,
     has_variable_topk: Bool = False,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](TrivialRegisterPassable):
     comptime kv_type = Self.KVLUTType.dtype
     comptime AccumType = get_accum_type[Self.q_type]()
@@ -252,7 +260,10 @@ struct MLA_SM100_Decode_Sparse_KV_BF16[
         extra_topk_lengths: OptionalReg[UnsafePointer[Int32, MutAnyOrigin]],
         extra_indices_stride: Int32,
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # The upstream dispatcher monomorphizes the kernel struct for both

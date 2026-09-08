@@ -158,11 +158,11 @@ def grouped_matmul_1d2d_blockwise_fp8[
             Int32(config.cluster_shape[1]),
             Int32(config.cluster_shape[2]),
         ),
-        b_scales_storage=type_of(b_scales_2d).Storage,
-        c_device_storage=type_of(c_device).Storage,
-        offsets_storage=type_of(a_offsets).Storage,
-        expert_ids_storage=type_of(expert_ids).Storage,
-        expert_scales_storage=type_of(expert_scales).Storage,
+        b_scales_engine=type_of(b_scales_2d).Engine,
+        c_device_engine=type_of(c_device).Engine,
+        offsets_engine=type_of(a_offsets).Engine,
+        expert_ids_engine=type_of(expert_ids).Engine,
+        expert_scales_engine=type_of(expert_scales).Engine,
     ]
     comptime kernel = KernelType.run
 

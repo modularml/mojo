@@ -52,17 +52,12 @@ def _make_ctx(
     tokens: np.ndarray,
     request_id: RequestID = RequestID("req-1"),  # noqa: B008
 ) -> TextContext:
-    """Build a minimal TextContext-like stub (see test_block_manager_sha256).
-
-    ``compute_block_hashes`` reads ``ctx.pending_future_count`` (trailing
-    future-token placeholders are excluded from hashing); the real
-    ``TextContext`` always defines it (defaults to 0), so the stub must too.
-    """
+    """Build a minimal TextContext-like stub (see test_block_manager_sha256)."""
     ctx = SimpleNamespace(
         request_id=request_id,
         tokens=tokens,
         cache_salt=None,
-        pending_future_count=0,
+        dkv_cache_hint=None,
     )
     return cast(TextContext, ctx)
 
@@ -151,6 +146,8 @@ class _TierStubConnector:
         self,
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
+        replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> int:
         raise NotImplementedError("must not be called by count paths")
 
@@ -201,6 +198,7 @@ class _ReusableTierStubConnector:
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> CompletedTransfer:
         # Serve the leading run this stub holds; the manager frees the surplus
         # staging blocks past what we report as loaded.

@@ -25,6 +25,7 @@ narrow.
 """
 
 import json
+import logging
 import os
 import tempfile
 from collections.abc import Iterator
@@ -277,6 +278,42 @@ class TestMixedEncodingInference:
             config = _make_config(tmpdir, device_specs=[GPU_DEVICE_SPEC])
             config = _resolve_encoding(config)
             assert config.quantization_encoding == "float4_e2m1fnx2"
+
+    def test_unknown_dtypes_reported_once_per_dtype(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An unmappable dtype warns once per scan, not once per tensor."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _make_local_repo(
+                tmpdir,
+                {
+                    "model-00001-of-00002.safetensors": {
+                        "layers.0.weight": "BF16",
+                        "layers.0.original_shape": "I64",
+                        "layers.1.original_shape": "I64",
+                    },
+                    "model-00002-of-00002.safetensors": {
+                        "layers.2.weight": "BF16",
+                        "layers.2.original_shape": "I64",
+                        "layers.2.g_idx": "I32",
+                    },
+                },
+            )
+            repo = HuggingFaceRepo(repo_id=tmpdir)
+            with caplog.at_level(logging.WARNING, logger="max.pipelines"):
+                assert "bfloat16" in repo.supported_encodings
+
+        messages = sorted(
+            record.getMessage()
+            for record in caplog.records
+            if "unknown dtype" in record.getMessage()
+        )
+        # Four unmappable tensors across two shards, two distinct dtypes.
+        assert len(messages) == 2
+        assert "I32" in messages[0] and "(1 tensor," in messages[0]
+        assert "I64" in messages[1] and "(3 tensors," in messages[1]
+        # Shard read order is glob order, so only the shared suffix is stable.
+        assert "original_shape" in messages[1]
 
     def test_mixed_bf16_and_f32_selects_bf16_on_gpu(self) -> None:
         """On GPU, bf16 should be preferred over f32."""

@@ -46,8 +46,6 @@ modular_py_test(
         "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
-        requirement("llguidance"),
-        requirement("numpy"),
     ],
 )
 

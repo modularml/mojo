@@ -15,7 +15,7 @@ from std.collections import OptionalReg
 
 from max.gpu.primitives.cluster import block_rank_in_cluster
 from max.gpu.host import DeviceContext, Dim
-from std.gpu import block_idx, cluster_idx
+from max.gpu import block_idx, cluster_idx
 
 
 def test_thread_block_cluster():

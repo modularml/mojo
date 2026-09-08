@@ -16,9 +16,9 @@ from std.math import ceildiv
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
-from std.gpu import block_idx, lane_id, thread_idx, warp_id
+from max.gpu import block_idx, lane_id, thread_idx, warp_id
 from max.gpu.primitives.cluster import block_rank_in_cluster
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle

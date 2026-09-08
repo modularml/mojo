@@ -61,7 +61,7 @@ __extension DeviceBuffer:
         oob_fill: Int32,
     ) raises:
         """Encodes a tiled TMA descriptor for this buffer via AsyncRT. Used by
-        `std.gpu.host._tensormap.create_tensormap`."""
+        `max.gpu.host._tensormap.create_tensormap`."""
         _checked(
             external_call["AsyncRT_cuda_tensorMapEncodeTiled", _CString[]](
                 tensor_map,
@@ -97,7 +97,7 @@ __extension DeviceBuffer:
         oob_fill: Int32,
     ) raises:
         """Encodes an im2col TMA descriptor for this buffer via AsyncRT. Used by
-        `std.gpu.host._tensormap.create_tensormap_im2col`."""
+        `max.gpu.host._tensormap.create_tensormap_im2col`."""
         _checked(
             external_call["AsyncRT_cuda_tensorMapEncodeIm2col", _CString[]](
                 tensor_map,

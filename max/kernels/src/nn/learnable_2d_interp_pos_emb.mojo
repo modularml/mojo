@@ -32,9 +32,9 @@ Tensor layout (all row-major):
 
 from std.math import clamp, floor
 
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.host import DeviceContext
-from layout import TensorLayout, TensorStorage, TileTensor
+from layout import TensorLayout, TensorEngine, TileTensor
 
 
 # ---------------------------------------------------------------------------
@@ -67,32 +67,32 @@ def _gpu_kernel[
     dtype: DType,
     OutputLayoutType: TensorLayout,
     output_origin: MutOrigin,
-    OutputStorage: TensorStorage,
+    OutputEngine: TensorEngine,
     XLayoutType: TensorLayout,
     x_origin: ImmOrigin,
-    XStorage: TensorStorage,
+    XEngine: TensorEngine,
     WeightLayoutType: TensorLayout,
     weight_origin: ImmOrigin,
-    WeightStorage: TensorStorage,
+    WeightEngine: TensorEngine,
     GridLayoutType: TensorLayout,
     grid_origin: ImmOrigin,
-    GridStorage: TensorStorage,
+    GridEngine: TensorEngine,
     TimeLayoutType: TensorLayout,
     time_origin: ImmOrigin,
-    TimeStorage: TensorStorage,
+    TimeEngine: TensorEngine,
 ](
     output: TileTensor[
-        dtype, OutputLayoutType, output_origin, Storage=OutputStorage
+        dtype, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
-    x: TileTensor[dtype, XLayoutType, x_origin, Storage=XStorage],
+    x: TileTensor[dtype, XLayoutType, x_origin, Engine=XEngine],
     weight: TileTensor[
-        dtype, WeightLayoutType, weight_origin, Storage=WeightStorage
+        dtype, WeightLayoutType, weight_origin, Engine=WeightEngine
     ],
     grid_thws: TileTensor[
-        .int64, GridLayoutType, grid_origin, Storage=GridStorage
+        .int64, GridLayoutType, grid_origin, Engine=GridEngine
     ],
     time_weight: TileTensor[
-        .float32, TimeLayoutType, time_origin, Storage=TimeStorage
+        .float32, TimeLayoutType, time_origin, Engine=TimeEngine
     ],
     N: Int32,
     dim: Int32,
@@ -245,19 +245,19 @@ def learnable_2d_interp_pos_emb[
         dtype,
         output.LayoutType,
         output.origin,
-        output.Storage,
+        output.Engine,
         x.LayoutType,
         ImmOrigin(x.origin),
-        x.Storage,
+        x.Engine,
         weight.LayoutType,
         ImmOrigin(weight.origin),
-        weight.Storage,
+        weight.Engine,
         grid_thws.LayoutType,
         ImmOrigin(grid_thws.origin),
-        grid_thws.Storage,
+        grid_thws.Engine,
         time_weight.LayoutType,
         ImmOrigin(time_weight.origin),
-        time_weight.Storage,
+        time_weight.Engine,
     ]
     ctx.enqueue_function[kernel](
         output,

@@ -61,7 +61,7 @@ modular_py_binary(
     tags = ["no-pydeps"],  # TODO: Fix and re-enable
     deps = [
         ":lint_helpers",
-        "//KGEN/tools/mblack",
+        "//Mojo/tools/mblack",
     ],
 )
 

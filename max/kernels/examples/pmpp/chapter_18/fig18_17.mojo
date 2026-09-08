@@ -16,7 +16,7 @@
 Note: Original CUDA uses grid sync; this uses multi-launch instead.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.memory import unsafe_stack_allocation

@@ -27,7 +27,7 @@ MI355X (gfx950) only.
 """
 
 from std.atomic import Atomic, Ordering, fence
-from std.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
+from max.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.testing import assert_equal

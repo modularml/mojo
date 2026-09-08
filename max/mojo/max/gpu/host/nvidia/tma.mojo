@@ -24,7 +24,7 @@ support for various data types and memory layouts.
 from .. import DeviceBuffer
 from std.sys import size_of
 
-from std.gpu._utils import to_llvm_ptr
+from std._gpu._utils import to_llvm_ptr
 
 from std.utils import IndexList, StaticTuple
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
@@ -409,12 +409,22 @@ def create_tma_descriptor[
         " but is: ",
         global_strides_arg[0],
     )
+    # cuTensorMapEncodeTiled requires globalAddress aligned to 32 bytes for
+    # PACKED_FP4_ALIGN16B and 16 bytes otherwise.
+    comptime required_addr_align = 32 if unpack_fp4 else 16
+    debug_assert(
+        Int(global_buf.unsafe_ptr()) % required_addr_align == 0,
+        "TMA globalAddress must be ",
+        required_addr_align,
+        "-byte aligned, but is: ",
+        Int(global_buf.unsafe_ptr()),
+    )
     comptime if unpack_fp4:
         comptime assert (
             dtype == .uint8
         ), "packed FP4 must be presented as uint8, two E2M1 values per byte"
         # `cuTensorMapEncodeTiled` requires globalDim[0] % 128 == 0 for the
-        # ALIGN16B packed types, and 32-byte alignment on globalAddress.
+        # ALIGN16B packed types.
         debug_assert(
             global_dim_arg[0] % 128 == 0,
             (

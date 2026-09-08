@@ -32,11 +32,11 @@ scale-fold are follow-ups.
 
 from std.math import ceildiv, exp2, sqrt
 from std.math.constants import log2e
-from std.memory import alloc
+from std.memory import UnsafePointer, alloc
 from std.random import randn, seed
 from std.sys import has_nvidia_gpu_accelerator, size_of
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceBuffer, DeviceContext
 from max.gpu.host.info import _is_sm10x_gpu
 from kv_cache.types import KVCacheStaticParams, PagedKVCacheCollection
@@ -110,9 +110,9 @@ def _coprime_multiplier(n: Int) -> Int:
 def host_reference[
     q_type: DType,
 ](
-    q_ptr: Pointer[Scalar[q_type], _],
-    kv_sparse_ptr: Pointer[Scalar[q_type], _],
-    output_ptr: MutPointer[Scalar[q_type], _],
+    q_ptr: UnsafePointer[Scalar[q_type], _],
+    kv_sparse_ptr: UnsafePointer[Scalar[q_type], _],
+    output_ptr: UnsafePointer[mut=True, Scalar[q_type], _],
     batch_size: Int,
     seq_len: Int,
     num_heads: Int,
@@ -469,19 +469,19 @@ def run_test_prefill_sparse_qkv_fp8[
     var kv_cache = kv_collection.get_key_cache(layer_idx)
 
     var q_tt = TileTensor(
-        q_device.unsafe_ptr(),
+        q_device,
         row_major((total_q_tokens, Idx[num_heads], Idx[row_depth])),
     )
     var out_tt = TileTensor(
-        out_device.unsafe_ptr(),
+        out_device,
         row_major((total_q_tokens, Idx[num_heads], Idx[V_DEPTH])),
     )
     var indices_tt = TileTensor(
-        indices_device.unsafe_ptr(),
+        indices_device,
         row_major(total_indices),
     )
     var topk_lengths_tt = TileTensor(
-        topk_lengths_device.unsafe_ptr(),
+        topk_lengths_device,
         row_major(total_q_tokens),
     )
 
@@ -520,7 +520,7 @@ def run_test_prefill_sparse_qkv_fp8[
         group=num_heads,
     )
 
-    var attn_sink_ptr = Optional[ImmPointer[Float32, ImmutAnyOrigin]](None)
+    var attn_sink_ptr = Optional[UnsafePointer[Float32, ImmutAnyOrigin]](None)
     var sink_len = len(sink_values) if len(sink_values) > 0 else 1
     var sink_device = ctx.enqueue_create_buffer[.float32](sink_len)
     if len(sink_values) > 0:
@@ -530,7 +530,7 @@ def run_test_prefill_sparse_qkv_fp8[
         ctx.enqueue_copy(sink_device, sink_host)
         ctx.synchronize()
         sink_host.free()
-        attn_sink_ptr = Optional[ImmPointer[Float32, ImmutAnyOrigin]](
+        attn_sink_ptr = Optional[UnsafePointer[Float32, ImmutAnyOrigin]](
             sink_device.unsafe_ptr().bitcast[Float32]().as_unsafe_any_origin()
         )
 

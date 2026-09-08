@@ -50,7 +50,7 @@ the mbarrier did not establish the cross-CTA happens-before that the combine
 relies on. Passing for `P in {2, 4, 8}` clears the M4 #1 risk.
 """
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.host import DeviceContext, Dim
 from max.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
 from std.memory import unsafe_stack_allocation

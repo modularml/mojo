@@ -121,10 +121,11 @@ struct _Matmul[dtype: DType, simd_width: Int]:
         def loop_body[
             lane_count: Int
         ](k: Int) {mut ak_ptr, mut bk_ptr, mut c_tile, imm}:
-            var a_tile = Array[SIMD[Self.dtype, lane_count], tile_m](fill=0)
-
-            comptime for m in range(tile_m):
-                a_tile[m] = ak_ptr.load[width=lane_count](m * a_stride)
+            var a_tile = Array[_, tile_m](
+                fill_with=lambda (m: Int) -> SIMD[
+                    Self.dtype, lane_count
+                ]: ak_ptr.load[width=lane_count](m * a_stride)
+            )
 
             ak_ptr += lane_count
 

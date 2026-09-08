@@ -25,7 +25,7 @@ from max._core import Attribute, NamedAttribute
 from max._core import Type as _Type
 from max._core import graph as _graph
 from max._core.dialects import builtin, m, mo
-from max.driver import CPU, NPU, Accelerator, Device
+from max.driver import CPU, Accelerator, Device
 from max.dtype import DType
 
 from .dim import SymbolicDim
@@ -105,7 +105,6 @@ class DeviceKind(str, Enum):
 
     CPU = "cpu"
     GPU = "gpu"
-    NPU = "npu"
 
     def __str__(self) -> str:
         return self.value
@@ -117,8 +116,6 @@ class DeviceKind(str, Enum):
             return DeviceKind.CPU
         elif txt == str(DeviceKind.GPU):
             return DeviceKind.GPU
-        elif txt == str(DeviceKind.NPU):
-            return DeviceKind.NPU
         else:
             raise ValueError(f"Unknown device kind {txt}")
 
@@ -155,11 +152,6 @@ class DeviceRef:
         """Creates a GPU device reference."""
         return DeviceRef(DeviceKind.GPU, id)
 
-    @staticmethod
-    def NPU(id: int = 0) -> DeviceRef:
-        """Creates an NPU device reference."""
-        return DeviceRef(DeviceKind.NPU, id)
-
     def __init__(self, device_type: DeviceKind | str, id: int = 0) -> None:
         if isinstance(device_type, DeviceKind):
             self.device_type = device_type
@@ -194,8 +186,6 @@ class DeviceRef:
             return CPU(self.id)
         elif self.device_type is DeviceKind.GPU:
             return Accelerator(self.id)
-        elif self.device_type is DeviceKind.NPU:
-            return NPU(self.id)
         else:
             raise ValueError(f"Unsupported device type: {self.device_type}")
 
@@ -206,10 +196,6 @@ class DeviceRef:
     def is_gpu(self) -> bool:
         """Returns ``True`` if the device is a GPU device."""
         return self.device_type is DeviceKind.GPU
-
-    def is_npu(self) -> bool:
-        """Returns ``True`` if the device is an NPU device."""
-        return self.device_type is DeviceKind.NPU
 
     @staticmethod
     def from_mlir(attr: m.DeviceRefAttr) -> DeviceRef:
@@ -432,7 +418,7 @@ class TensorType(_TensorTypeBase[mo.TensorType]):
             The tensor type represented by the MLIR Type value.
         """
         device_ref = DeviceRef.from_mlir(type.device_ref)
-        self = cls(type.dtype, Shape.from_mlir(type.shape_attr), device_ref)
+        self = cls(type.dtype, Shape.from_mlir(type.shape), device_ref)
         for name, attr in type.metadata.value:
             if name == "layout":
                 assert isinstance(attr, mo.LayoutAttr)
@@ -477,7 +463,7 @@ class BufferType(_TensorTypeBase[mo.BufferType]):
             The buffer type represented by the MLIR Type value.
         """
         device_ref = DeviceRef.from_mlir(type.device_ref)
-        return cls(type.dtype, Shape.from_mlir(type.shape_attr), device_ref)
+        return cls(type.dtype, Shape.from_mlir(type.shape), device_ref)
 
     def to_mlir(self) -> mo.BufferType:
         """Converts to an ``mlir.Type`` instance.

@@ -26,8 +26,7 @@ from max.nn.kv_cache import (
     MHAKVCacheParams,
     PagedCacheValues,
 )
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
 @dataclass(frozen=True)
@@ -168,17 +167,9 @@ def test_fused_qk_rms_norm_matches_unfused_gpu() -> None:
     )
     unfused_model = session.load(unfused_graph)
 
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=4,
-        session=session,
-        max_batch_size=4,
+    graph_inputs = paged_kv_cache_inputs(
+        kv_params, [seq_len], total_num_pages=4
     )
-    context = create_text_context(np.empty(seq_len))
-    kv_manager.claim(context)
-    kv_manager.alloc(context)
-    batch = [context]
-    graph_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
 
     rng = np.random.default_rng(0)
     q_np = rng.standard_normal(

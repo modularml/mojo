@@ -14,7 +14,7 @@
 from std.math import ceildiv
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx
+from max.gpu import block_idx
 from nn.attention.gpu.nvidia.sm90.attention import NullPointer
 from nn.attention.gpu.nvidia.mha_tile_scheduler import (
     MHASchedule,

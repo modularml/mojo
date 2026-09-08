@@ -153,7 +153,7 @@ _FILECHECK_EXTRA_DEPS = {
     )
 ]
 
-# `DevicePointerStorage` probe. It only imports `layout` and `std`, so it gets
+# `DevicePointerEngine` probe. It only imports `layout` and `std`, so it gets
 # a dedicated target with minimal dependencies rather than the heavy
 # `nn`/`linalg`/`kv_cache` set the glob above attaches to every other test.
 mojo_test(

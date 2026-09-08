@@ -285,8 +285,8 @@ modular_cc_library(
     # CUDA compilation driver resolves the dlopened NVPTX compiler with it, and
     # the mojo driver hands its runfiles down to the lldb it spawns.
     visibility = [
-        "//KGEN/tools/mojo:__pkg__",
         "//MLRT:__subpackages__",
+        "//Mojo/tools/mojo:__pkg__",
         "//max/python/max:__pkg__",
     ],
     deps = [
@@ -452,12 +452,20 @@ modular_cc_library(
 # cost. Binaries without the glue get safe no-ops.
 modular_cc_library(
     name = "ProfilingRanges",
-    srcs = ["lib/Profiling/Ranges.cpp"],
-    hdrs = ["include/Support/Profiling/Ranges.h"],
+    srcs = [
+        "lib/Profiling/ExternalProfilerAnnotation.cpp",
+        "lib/Profiling/Ranges.cpp",
+    ],
+    hdrs = [
+        "include/Support/Profiling/ExternalProfilerAnnotation.h",
+        "include/Support/Profiling/Ranges.h",
+    ],
     deps = [
         # Holds the process-global gates + cached sink, so every statically
         # linked copy of the shim observes the same state (see Ranges.h).
         ":Globals",
+        ":Base",
+        "@llvm-project//llvm:Support",
     ],
 )
 
@@ -470,6 +478,7 @@ modular_cc_library(
     name = "ProfilingRangesHeaders",
     hdrs = ["include/Support/Profiling/Ranges.h"],
     visibility = ["//max/internal/profiler:__pkg__"],
+    deps = [":Base"],
 )
 
 # The C ABI between :ProfilerHostGlue and the runtime-loaded profiler plugin
@@ -500,8 +509,8 @@ modular_cc_library(
         "//conditions:default": ["MODULAR_TRACY_BUILD=0"],
     }),
     visibility = [
-        "//KGEN:__pkg__",
         "//MLRT:__pkg__",
+        "//Mojo:__pkg__",
         "//mach/crates/max-sys-internal:__pkg__",
         "//max/internal:__pkg__",
         "//max/internal/profiler:__pkg__",
@@ -514,6 +523,32 @@ modular_cc_library(
         ":Configuration",
         ":ProfilerPluginABI",
         ":ProfilingRanges",
+        "@llvm-project//llvm:Support",
+    ],
+    alwayslink = True,
+)
+
+# Host-side glue for the external profiler annotation sink (:ProfilingRanges'
+# ExternalProfilerAnnotation.h): provides the STRONG
+# Detail::acquireExternalProfilerAnnotationSink() override (the weak default
+# no-ops) and the dlopen loader for the external profiler annotation shim,
+# libmax_profiler_shim.so. Same wiring model as :ProfilerHostGlue — linking
+# this target is the only wiring, alwayslink keeps the override in the
+# archive, KGEN CompilerRT reaches it via internal_deps, and OSS builds drop
+# it and keep the inert weak default.
+modular_cc_library(
+    name = "ExternalProfilerAnnotationHostGlue",
+    srcs = ["lib/ExternalProfilerAnnotationHostGlue.cpp"],
+    visibility = [
+        "//Mojo:__pkg__",
+        "//max/internal/profiler:__pkg__",
+    ],
+    deps = [
+        # StringExtras backs the MODULAR_ENABLE_PROFILING truthiness rule
+        # (isTrueLike), shared with the Python profiler bindings.
+        ":Base",
+        ":ProfilingRanges",
+        "@llvm-project//llvm:Support",
     ],
     alwayslink = True,
 )
@@ -1165,6 +1200,7 @@ modular_cc_library(
 mlir_nanobind(
     name = "MDialectNanobindInc",
     srcs = glob(["include/Support/MDialect/*.td"]),
+    allowlist = "//max/python/max/_core/internal/modules/dialects:allowlist.txt",
     output_dir = "include/Support/MDialect/Nanobind",
     deps = [
         ":MTdFiles",

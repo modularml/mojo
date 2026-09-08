@@ -44,7 +44,7 @@ from std.memory import Pointer, UnsafePointer, bitcast
 from std.math.uutils import ufloordiv, umod
 from std.sys import align_of, size_of
 
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     block_id_in_cluster,
     block_idx,
@@ -63,7 +63,7 @@ from max.gpu.primitives.grid_controls import (
     launch_dependent_grids,
     wait_on_dependent_grids,
 )
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
     cluster_sync,
@@ -82,10 +82,10 @@ from layout import (
     Coord,
     Idx,
     Layout,
-    PointerStorage,
+    DefaultEngine,
     RowMajorLayout,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -706,11 +706,11 @@ struct Grouped1D1DMatmulKernel[
     # cta_group=1 layout. False (default) keeps the cooperative
     # scatter path.
     swiglu_use_inplace: Bool = False,
-    c_device_storage: TensorStorage = PointerStorage[element_width=1],
-    offsets_storage: TensorStorage = PointerStorage[element_width=1],
-    a_scale_offsets_storage: TensorStorage = PointerStorage[element_width=1],
-    expert_ids_storage: TensorStorage = PointerStorage[element_width=1],
-    expert_scales_storage: TensorStorage = PointerStorage[element_width=1],
+    c_device_engine: TensorEngine = DefaultEngine[element_width=1],
+    offsets_engine: TensorEngine = DefaultEngine[element_width=1],
+    a_scale_offsets_engine: TensorEngine = DefaultEngine[element_width=1],
+    expert_ids_engine: TensorEngine = DefaultEngine[element_width=1],
+    expert_scales_engine: TensorEngine = DefaultEngine[element_width=1],
 ]:
     """Grouped 1D-1D block-scaled matmul kernel.
 
@@ -765,13 +765,13 @@ struct Grouped1D1DMatmulKernel[
             register path that skips the `bfloat16` SMEM scratchpad via
             cross-lane shuffles; `False` (default) keeps the cooperative
             scatter path.
-        c_device_storage: Storage policy of the C `TileTensor`.
-        offsets_storage: Storage policy of the per-expert offsets
+        c_device_engine: Engine of the C `TileTensor`.
+        offsets_engine: Engine of the per-expert offsets
             `TileTensor`.
-        a_scale_offsets_storage: Storage policy of the per-expert A-scale
+        a_scale_offsets_engine: Engine of the per-expert A-scale
             offsets `TileTensor`.
-        expert_ids_storage: Storage policy of the expert-IDs `TileTensor`.
-        expert_scales_storage: Storage policy of the expert-scales
+        expert_ids_engine: Engine of the expert-IDs `TileTensor`.
+        expert_scales_engine: Engine of the expert-scales
             `TileTensor`.
     """
 
@@ -976,9 +976,9 @@ struct Grouped1D1DMatmulKernel[
         cluster=Self.config.cluster_shape,
         cta_group=Self.cta_group,
         AB_swapped=Self.config.AB_swapped,
-        OffsetsStorage=Self.offsets_storage,
-        ExpertIdsStorage=Self.expert_ids_storage,
-        ExpertScalesStorage=Self.expert_scales_storage,
+        OffsetsEngine=Self.offsets_engine,
+        ExpertIdsEngine=Self.expert_ids_engine,
+        ExpertScalesEngine=Self.expert_scales_engine,
     ]
 
     # ========== TMA Load Size Constants ==========
@@ -1109,19 +1109,19 @@ struct Grouped1D1DMatmulKernel[
 
     # 1D data TileTensor types (offsets, expert IDs, scales)
     comptime OffsetsTile = TileTensor[
-        .uint32, GMEMLayout1D, MutAnyOrigin, Storage=Self.offsets_storage
+        .uint32, GMEMLayout1D, MutAnyOrigin, Engine=Self.offsets_engine
     ]
     comptime AScaleOffsetsTile = TileTensor[
         .uint32,
         GMEMLayout1D,
         MutAnyOrigin,
-        Storage=Self.a_scale_offsets_storage,
+        Engine=Self.a_scale_offsets_engine,
     ]
     comptime ExpertIdsTile = TileTensor[
-        .int32, GMEMLayout1D, MutAnyOrigin, Storage=Self.expert_ids_storage
+        .int32, GMEMLayout1D, MutAnyOrigin, Engine=Self.expert_ids_engine
     ]
     comptime ExpertScalesTile = TileTensor[
-        .float32, GMEMLayout1D, MutAnyOrigin, Storage=Self.expert_scales_storage
+        .float32, GMEMLayout1D, MutAnyOrigin, Engine=Self.expert_scales_engine
     ]
 
     # C device tensor type (for bounds-checked stores)
@@ -1129,7 +1129,7 @@ struct Grouped1D1DMatmulKernel[
         Self.c_type,
         Self.c_device_layout,
         MutAnyOrigin,
-        Storage=Self.c_device_storage,
+        Engine=Self.c_device_engine,
     ]
 
     # TMA load size constants (from desc layout dimensions)

@@ -42,7 +42,7 @@ a written proposal. The proposal process:
 architecture
 
 **To submit a proposal, create a GitHub Pull Request that adds a document to the
-[`modular/mojo/proposals`](https://github.com/modular/modular/tree/main/mojo/proposals)
+[`modular/Mojo/proposals`](https://github.com/modular/modular/tree/main/Mojo/proposals)
 directory.**
 
 Contributors are encouraged to react with a 👍 to proposal PRs if they support

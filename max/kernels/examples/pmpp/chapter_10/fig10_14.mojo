@@ -11,11 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import thread_idx, warp_id, WARP_SIZE
+from max.gpu import thread_idx, warp_id, WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.memory import unsafe_stack_allocation
-from std.gpu.primitives.warp import shuffle_down
+from max.gpu.primitives.warp import shuffle_down
 from std.random import random_float64
 from std.math import abs
 from std.bit import log2_floor

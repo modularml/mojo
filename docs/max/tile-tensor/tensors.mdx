@@ -55,7 +55,7 @@ data in one view changes the data seen by all of the views.
 
 Each element in a tensor can be either a single (scalar) value or a SIMD vector
 of values. This is reflected by the tensor's `element_size`, which is derived
-from its `Storage` parameter (`PointerStorage[element_width=N]`). For more
+from its `Engine` parameter (`DefaultEngine[element_width=N]`). For more
 information, see [Vectorizing tensors](#vectorizing-tensors).
 
 :::note TileTensor and LayoutTensor
@@ -128,12 +128,12 @@ the vector is equal to the `element_size` of the tensor (default 1). As long
 as the `element_size` is known to be 1 at the call site, you can treat the
 return value as a scalar value. For example, the following function constrains
 its parameter to a non-vectorized tensor using the default storage
-(`Storage=PointerStorage[element_width=1]`), so you can cast the element value
+(`Engine=DefaultEngine[element_width=1]`), so you can cast the element value
 directly to an `Int`.
 
 ```mojo
 def takes_scalar_tensor(
-    tensor: TileTensor[.int32, Storage=PointerStorage[element_width=1], ...]
+    tensor: TileTensor[.int32, Engine=DefaultEngine[element_width=1], ...]
 ) -> Int:
     comptime assert tensor.flat_rank == 2
     return Int(tensor[1, 1])
@@ -292,7 +292,7 @@ on the buffer prior to invoking the kernel. The following example shows
 initializing a `TileTensor` from the CPU and passing it to a GPU kernel.
 
 ```mojo
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from layout import TileTensor, stack_allocation
 from layout.tile_layout import row_major
@@ -597,7 +597,7 @@ var thread_id = thread_idx.z * block_dim.y * block_dim.x
 ```
 
 When dividing work across a single warp, you can use
-[`lane_id()`](https://mojolang.org/docs/std/gpu/primitives/id/lane_id/) as the
+[`lane_id()`](https://docs.modular.com/api/mojo/max/gpu/lane_id/) as the
 thread ID. Lane ID represents a thread's ID within the warp (from 0 to
 `WARP_SIZE - 1`).
 
@@ -745,7 +745,7 @@ The following example exercises the `GenericToSharedAsyncTileCopier` and
 `SharedToGenericTileCopier` types.
 
 ```mojo
-from std.gpu import (
+from max.gpu import (
     thread_idx,
     block_idx,
     global_idx,

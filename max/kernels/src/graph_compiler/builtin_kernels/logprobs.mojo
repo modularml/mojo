@@ -17,7 +17,7 @@ from std.math import ceildiv, exp, inf, log
 
 from max.algorithm.functional import parallelize
 from extensibility import register, register_shape_function
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import is_cpu, is_gpu
 from nn._ragged_utils import get_batch_from_row_offsets

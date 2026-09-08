@@ -25,6 +25,7 @@ Architecture config
    ArchConfigWithKVCache
    ArchConfigWithPermissiveMaxSeqLen
    ArchConfigWithStoredKVParams
+   ArchConfigWithVisionCache
    ArchVLConfigWithTextSubconfig
 
 Batch processing
@@ -38,3 +39,13 @@ Batch processing
    BatchProcessor
    BatchProcessorRuntime
    RaggedBatchProcessor
+
+Functions
+---------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated
+   :template: autosummary/function.rst
+
+   arch_has_vision_tower

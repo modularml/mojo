@@ -44,7 +44,10 @@ def check_invariants(pool: JengaBlockPool) -> None:
             assert huge_block.ref_cnt == 0
         for cache_id, blocks in huge_block.little_blocks.items():
             queue = pool.free_little_blocks[cache_id]
-            claimed = not parked and huge_block.little_block_type == cache_id
+            # A parked huge block's little blocks stay directly allocable on
+            # its owning cache's free list (see the class docstring), so
+            # "claimed" here means typed to this cache, parked or not.
+            claimed = huge_block.little_block_type == cache_id
             for block in blocks:
                 if not claimed:
                     assert block.ref_cnt == 0
@@ -198,11 +201,27 @@ def test_partly_freed_huge_block_stays_with_its_cache() -> None:
 
     pool.free_block(blocks[1])
     assert len(pool.free_huge_blocks) == 2
-    # The huge block went idle, so its little blocks left circulation rather
-    # than staying on the global cache's free list where only it could reach
-    # them.
-    assert len(pool.free_little_blocks[GLOBAL]) == 0
+    # The huge block went idle, but its little blocks stay on the global
+    # cache's free list -- still directly allocable without a reclaim.
+    assert len(pool.free_little_blocks[GLOBAL]) == 2
     assert pool.num_free_blocks(SLIDING) == 4
+
+
+def test_freeing_a_pristine_block_is_reused_before_a_committed_one() -> None:
+    pool = JengaBlockPool(num_huge_blocks=2, cache_ratios={GLOBAL: 2})
+
+    blocks = [pool.alloc_block(GLOBAL) for _ in range(2)]
+    pool.commit_into_prefix_cache(b"prefix", blocks[0])
+    # Free the committed block first, then the pristine one -- despite that
+    # order, the pristine one is reused first.
+    pool.free_block(blocks[0])
+    pool.free_block(blocks[1])
+
+    next_block = pool.alloc_block(GLOBAL)
+
+    assert next_block is blocks[1]
+    assert blocks[0].block_hash == b"prefix"
+    check_invariants(pool)
 
 
 def test_idle_huge_block_can_be_retyped() -> None:
@@ -217,7 +236,30 @@ def test_idle_huge_block_can_be_retyped() -> None:
     assert pool.huge_blocks[0].little_block_type == SLIDING
     assert retyped.cache_id == SLIDING
     assert block.ref_cnt == 0
+    # The stolen-from cache must not still think its parked-and-typed huge
+    # block counts as headroom now that it's gone.
     assert pool.num_free_blocks(GLOBAL) == 0
+    check_invariants(pool)
+
+
+def test_prefer_claim_huge_avoids_evicting_a_commit() -> None:
+    pool = JengaBlockPool(num_huge_blocks=3, cache_ratios={GLOBAL: 2})
+
+    blocks = [pool.alloc_block(GLOBAL) for _ in range(2)]
+    pool.commit_into_prefix_cache(b"apple", blocks[0])
+    pool.free_block(blocks[0])
+    pool.commit_into_prefix_cache(b"banana", blocks[1])
+    pool.free_block(blocks[1])
+
+    # Huge block 2 is still virgin, so the next alloc claims it instead of
+    # evicting either commit.
+    new = pool.alloc_block(GLOBAL)
+
+    assert new.huge_block.bid == 2
+    assert pool.prefix_caches[GLOBAL] == {
+        b"apple": blocks[0],
+        b"banana": blocks[1],
+    }
     check_invariants(pool)
 
 
@@ -405,3 +447,69 @@ def test_the_null_block_cannot_be_committed() -> None:
         )
 
     assert pool.prefix_caches[GLOBAL] == {}
+
+
+def test_can_satisfy_demand_charges_every_cache_to_one_budget() -> None:
+    # 4 allocatable huge blocks: 8 GLOBAL pages or 16 SCALES pages on their
+    # own, but only 3 huge blocks' worth once both are asked for at once.
+    pool = JengaBlockPool(
+        num_huge_blocks=5, cache_ratios={GLOBAL: 2, SCALES: 4}
+    )
+    assert pool.num_free_blocks(GLOBAL) == 8
+    assert pool.num_free_blocks(SCALES) == 16
+
+    assert pool.can_satisfy_demand({GLOBAL: 8})
+    assert pool.can_satisfy_demand({SCALES: 16})
+    # 8 GLOBAL pages take all 4 huge blocks, leaving none for the scales.
+    assert not pool.can_satisfy_demand({GLOBAL: 8, SCALES: 1})
+    assert pool.can_satisfy_demand({GLOBAL: 6, SCALES: 4})
+
+
+def test_can_satisfy_demand_credits_pages_already_carved() -> None:
+    pool = JengaBlockPool(
+        num_huge_blocks=3, cache_ratios={GLOBAL: 2, SCALES: 4}
+    )
+    # Carve one huge block for each cache and hand a page back, so both have
+    # free pages while no huge block is left to claim.
+    for cache_id in (GLOBAL, SCALES):
+        pool.free_block(pool.alloc_block(cache_id))
+
+    # Each cache alone would retype the other's parked huge block, so on its
+    # own it counts far more than the pages both can hold at once.
+    assert pool.num_free_blocks(GLOBAL) == 4
+    assert pool.num_free_blocks(SCALES) == 8
+    assert pool.can_satisfy_demand({GLOBAL: 2, SCALES: 4})
+    assert not pool.can_satisfy_demand({GLOBAL: 3, SCALES: 4})
+    assert not pool.can_satisfy_demand({GLOBAL: 4, SCALES: 8})
+    check_invariants(pool)
+
+
+def test_can_satisfy_demand_retypes_surplus_parked_pages() -> None:
+    pool = JengaBlockPool(
+        num_huge_blocks=5, cache_ratios={GLOBAL: 2, SCALES: 4}
+    )
+    scales_blocks = [pool.alloc_block(SCALES) for _ in range(8)]
+    for block in scales_blocks:
+        pool.free_block(block)
+
+    # One parked SCALES huge block satisfies its demand. The other can be
+    # retyped with the two pristine blocks to satisfy GLOBAL's demand.
+    assert pool.can_satisfy_demand({GLOBAL: 6, SCALES: 4})
+    check_invariants(pool)
+
+
+def test_can_satisfy_demand_at_capacity_ignores_what_is_out() -> None:
+    pool = JengaBlockPool(
+        num_huge_blocks=5, cache_ratios={GLOBAL: 2, SCALES: 4}
+    )
+    demand = {GLOBAL: 6, SCALES: 4}
+    assert pool.can_satisfy_demand(demand)
+
+    # Drain the pool: the live answer flips, the geometric one does not.
+    for _ in range(8):
+        pool.alloc_block(GLOBAL)
+
+    assert not pool.can_satisfy_demand(demand)
+    assert pool.can_satisfy_demand(demand, at_capacity=True)
+    # Still bounded by the geometry -- 4 huge blocks is all there ever is.
+    assert not pool.can_satisfy_demand({GLOBAL: 8, SCALES: 1}, at_capacity=True)

@@ -60,7 +60,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import *
+from max.gpu import *
 
 from max.gpu.host import DeviceContext
 

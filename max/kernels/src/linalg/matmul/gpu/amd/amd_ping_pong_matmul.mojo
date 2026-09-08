@@ -20,7 +20,7 @@ from std.math import ceildiv
 from std.sys import align_of, simd_width_of, size_of
 from layout.tile_tensor import stack_allocation
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -36,7 +36,7 @@ from std.sys.intrinsics import readfirstlane
 from std.utils import Index, IndexList, StaticTuple
 from std.utils.numerics import get_accum_type
 
-from layout import TensorLayout, TensorStorage, TileTensor
+from layout import TensorLayout, TensorEngine, TileTensor
 from layout.swizzle import Swizzle
 from layout.tile_layout import row_major, col_major
 from layout.tensor_core import num_matrix_reg
@@ -306,13 +306,13 @@ struct AMDPingPongMatmul[
         a_layout: TensorLayout,
         b_layout: TensorLayout,
         c_layout: TensorLayout,
-        a_store: TensorStorage,
-        b_store: TensorStorage,
-        c_store: TensorStorage,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
+        c_engine: TensorEngine,
     ](
-        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin, Storage=a_store],
-        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Storage=b_store],
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Storage=c_store],
+        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
     ):
         """Structured ping-pong GEMM kernel entry point.
 
@@ -320,9 +320,9 @@ struct AMDPingPongMatmul[
             a_layout: Memory layout of the `a` input tile (inferred).
             b_layout: Memory layout of the `b` input tile (inferred).
             c_layout: Memory layout of the `c` output tile (inferred).
-            a_store: Storage policy of the `a` input tile (inferred).
-            b_store: Storage policy of the `b` input tile (inferred).
-            c_store: Storage policy of the `c` output tile (inferred).
+            a_engine: Engine of the `a` input tile (inferred).
+            b_engine: Engine of the `b` input tile (inferred).
+            c_engine: Engine of the `c` output tile (inferred).
 
         Args:
             a: LHS input matrix tile of shape `M` x `K` in `a_type`.
@@ -734,9 +734,9 @@ def amd_ping_pong_matmul[
             type_of(a).LayoutType,
             type_of(b).LayoutType,
             type_of(c).LayoutType,
-            type_of(a).Storage,
-            type_of(b).Storage,
-            type_of(c).Storage,
+            type_of(a).Engine,
+            type_of(b).Engine,
+            type_of(c).Engine,
         ]
 
         ctx.enqueue_function[kernel](

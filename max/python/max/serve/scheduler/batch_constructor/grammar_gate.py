@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
 from max.pipelines.context import GrammarMatcher
@@ -34,6 +35,7 @@ from max.pipelines.lib.pipeline_variants.utils import (
     get_structured_output_helper,
 )
 from max.pipelines.modeling.types import RequestID
+from max.serve.telemetry.metrics import METRICS
 
 logger = logging.getLogger("max.serve")
 
@@ -86,8 +88,26 @@ class AsyncGrammarGate:
                 thread_name_prefix="grammar-compile",
             )
         self._futures[ctx.request_id] = self._executor.submit(
-            self._structured_output.build_matcher, ctx.grammar, ctx.json_schema
+            self._timed_build_matcher, ctx.grammar, ctx.json_schema
         )
+
+    def _timed_build_matcher(
+        self, grammar: str | None, json_schema: str | None
+    ) -> GrammarMatcher:
+        """Runs on a worker thread; records the build's own duration.
+
+        Submitted at admission time, this build is meant to overlap
+        prefill's round trip rather than land on the handoff's critical
+        path -- this metric is how to tell whether a given build actually
+        won that race.
+        """
+        start = time.monotonic()
+        try:
+            return self._structured_output.build_matcher(grammar, json_schema)
+        finally:
+            METRICS.structured_output_grammar_build_time(
+                (time.monotonic() - start) * 1000
+            )
 
     def is_ready(self, ctx: TextContext) -> bool:
         """Whether a request's build has finished. Non-blocking.

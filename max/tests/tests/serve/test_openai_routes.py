@@ -31,6 +31,13 @@ from async_asgi_testclient import TestClient as AsyncTestClient
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.testclient import TestClient as SyncTestClient
+from max.pipelines.architectures.kimik2_5.tokenizer import (
+    TOOL_CALL_ARGUMENT_BEGIN,
+    TOOL_CALL_BEGIN,
+    TOOL_CALL_END,
+    TOOL_CALLS_SECTION_BEGIN,
+    TOOL_CALLS_SECTION_END,
+)
 from max.pipelines.architectures.kimik2_5.tool_parser import KimiToolParser
 from max.pipelines.architectures.qwen3_5.tool_parser import Qwen3_5ToolParser
 from max.pipelines.context import (
@@ -317,6 +324,41 @@ def test_get_tool_parser_unknown_parser_raises(
 
     with pytest.raises(ValueError, match="Unknown tool parser"):
         get_tool_parser(app)
+
+
+_KIMI_TOOL_CALL_MARKUP = (
+    f"{TOOL_CALLS_SECTION_BEGIN}{TOOL_CALL_BEGIN}functions.list_skills:0"
+    f"{TOOL_CALL_ARGUMENT_BEGIN}{{}}{TOOL_CALL_END}{TOOL_CALLS_SECTION_END}"
+)
+
+
+@pytest.mark.parametrize(
+    "runtime_overrides", [{"tool_parser": "kimik2_5"}], indirect=True
+)
+@pytest.mark.asyncio
+async def test_chat_completion_leaves_tool_markup_alone_without_declared_tools(
+    app,  # noqa: ANN001
+) -> None:
+    """Parsing a request that declares no tools is MiniMax-M3-only.
+
+    Every other model keeps the pre-existing behavior: with no declared
+    inventory the parser does not run, so tool-call markup stays in
+    ``content``. `<tool_call>` is plain text for several tag-based parsers,
+    which would otherwise let an ordinary chat answer be swallowed.
+    """
+    async with AsyncTestClient(app) as client:
+        response_json = await client.post(
+            "/v1/chat/completions",
+            json=simple_openai_request(
+                model_name="echo", content=_KIMI_TOOL_CALL_MARKUP
+            ),
+        )
+
+    response = CreateChatCompletionResponse.model_validate(response_json.json())
+    choice = response.choices[0]
+    assert choice.finish_reason == "stop"
+    assert choice.message.tool_calls is None
+    assert choice.message.content == _KIMI_TOOL_CALL_MARKUP
 
 
 @pytest.mark.asyncio

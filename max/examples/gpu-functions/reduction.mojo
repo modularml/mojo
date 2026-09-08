@@ -25,10 +25,10 @@ from std.benchmark import (
     ThroughputMeasure,
 )
 from std.bit import log2_floor
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.sync import barrier
-from std.gpu.primitives import warp
-from std.gpu.globals import WARP_SIZE
+from max.gpu.primitives import warp
+from max.gpu.globals import WARP_SIZE
 from max.gpu.host import DeviceContext, DeviceBuffer
 from std.memory import unsafe_stack_allocation
 from std.testing import assert_equal

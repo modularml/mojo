@@ -39,7 +39,7 @@ default; set `MODULAR_ENABLE_APPLE_FA_PREFILL=0` to fall back to `mha_gpu_naive`
 """
 
 from std.collections import OptionalReg
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     block_idx,
     lane_id,
@@ -51,7 +51,7 @@ from max.gpu.compute.arch.mma_apple import (
     _mma_apple_transposable,
 )
 from max.gpu.host import DeviceContext
-from std.gpu.primitives.warp import shuffle_xor
+from max.gpu.primitives.warp import shuffle_xor
 from std.math import ceildiv, exp2
 from std.math.constants import log2e
 from std.os.env import getenv
@@ -61,7 +61,14 @@ from std.utils.index import Index
 from std.utils.numerics import get_accum_type
 
 
-from layout import UNKNOWN_VALUE, Idx, Layout, LayoutTensor, TileTensor
+from layout import (
+    UNKNOWN_VALUE,
+    Idx,
+    Layout,
+    LayoutTensor,
+    TensorEngine,
+    TileTensor,
+)
 from layout.coord import Coord
 from layout.tile_layout import (
     Layout as TileLayout,
@@ -219,15 +226,17 @@ def _softmax_update[
       5. `output *= alpha`
     """
     var m_tile = _softmax_row_max[num_n_mmas](scores)
-    var m_new = Array[Float32, _SOFTMAX_FRAG_ROWS](uninitialized=True)
-    m_new[0] = max(sm_m[0], m_tile[0])
-    m_new[1] = max(sm_m[1], m_tile[1])
+    var m_new = Array[_, _SOFTMAX_FRAG_ROWS](
+        fill_with_unrolled=lambda [i: Int]() -> Float32: max(sm_m[i], m_tile[i])
+    )
     # A still-fully-masked row keeps its running max at the finite NEG_INF floor
     # (finite, so the subtraction never NaNs), and resolves once its first real
     # key arrives in a later tile.
-    var alpha = Array[Float32, _SOFTMAX_FRAG_ROWS](uninitialized=True)
-    alpha[0] = exp2(sm_m[0] - m_new[0])
-    alpha[1] = exp2(sm_m[1] - m_new[1])
+    var alpha = Array[_, _SOFTMAX_FRAG_ROWS](
+        fill_with_unrolled=lambda [i: Int]() -> Float32: exp2(
+            sm_m[i] - m_new[i]
+        )
+    )
 
     # Accumulate `l` from each P fragment while it is still register-live (vs a
     # second pass re-reading the written-back scores), shortening the softmax
@@ -275,9 +284,11 @@ def _softmax_normalize[
     window and the key range; causal always attends its own position and the sink
     seed keeps `l >= 1`, so the guard is a no-op there.
     """
-    var inv = Array[Float32, _SOFTMAX_FRAG_ROWS](uninitialized=True)
-    inv[0] = Float32(1) / sm_l[0] if sm_l[0] > Float32(0) else Float32(0)
-    inv[1] = Float32(1) / sm_l[1] if sm_l[1] > Float32(0) else Float32(0)
+    var inv = Array[_, _SOFTMAX_FRAG_ROWS](
+        fill_with_unrolled=lambda [i: Int]() -> Float32: (
+            Float32(1) / sm_l[i] if sm_l[i] > Float32(0) else Float32(0)
+        )
+    )
     comptime for ni in range(out_num_n_mmas):
         var o = output[ni]
         var o_lo = o.slice[4, offset=0]() * SIMD[.float32, 4](inv[0])
@@ -300,6 +311,10 @@ def fa_prefill_apple_core[
     output_layout: TensorLayout,
     valid_length_layout: TensorLayout,
     sink_layout: TensorLayout,
+    output_engine: TensorEngine,
+    q_engine: TensorEngine,
+    valid_length_engine: TensorEngine,
+    sink_engine: TensorEngine,
     ragged: Bool = False,
     sink: Bool = False,
     _use_valid_length: Bool = False,
@@ -309,13 +324,19 @@ def fa_prefill_apple_core[
     NumNMmas: Int,
     NumSimdgroups: Int = 1,
 ](
-    output: TileTensor[output_type, output_layout, MutAnyOrigin],
-    q: TileTensor[q_type, q_layout, ImmutAnyOrigin],
+    output: TileTensor[
+        output_type, output_layout, MutAnyOrigin, Engine=output_engine
+    ],
+    q: TileTensor[q_type, q_layout, ImmutAnyOrigin, Engine=q_engine],
     k: k_t,
     v: v_t,
     mask_functor: mask_t,
-    valid_length: TileTensor[.uint32, valid_length_layout, ImmutAnyOrigin],
-    sink_weights: OptionalReg[TileTensor[q_type, sink_layout, ImmutAnyOrigin]],
+    valid_length: TileTensor[
+        .uint32, valid_length_layout, ImmutAnyOrigin, Engine=valid_length_engine
+    ],
+    sink_weights: OptionalReg[
+        TileTensor[q_type, sink_layout, ImmutAnyOrigin, Engine=sink_engine]
+    ],
     scale: Float32,
     batch_size: Int32,
     max_prompt_len: Int32,
@@ -351,6 +372,11 @@ def fa_prefill_apple_core[
         valid_length_layout: The `TensorLayout` of the flattened
             `valid_length` `TileTensor`.
         sink_layout: The `TensorLayout` of the sink weights `TileTensor`.
+        output_engine: The `TensorEngine` of the `output` `TileTensor`.
+        q_engine: The `TensorEngine` of the `q` `TileTensor`.
+        valid_length_engine: The `TensorEngine` of the `valid_length`
+            `TileTensor`.
+        sink_engine: The `TensorEngine` of the sink weights `TileTensor`.
         ragged: If True, `valid_length` is a cumulative offset buffer
             over variable-length sequences in the batch (defaults to
             False).
@@ -1008,6 +1034,10 @@ def fa_prefill_apple[
                     type_of(output_flat).LayoutType,
                     type_of(valid_length_flat).LayoutType,
                     type_of(sink_layout_val),
+                    type_of(output_flat).Engine,
+                    type_of(q_flat).Engine,
+                    type_of(valid_length_flat).Engine,
+                    SinkTile.Engine,
                     ragged=ragged,
                     sink=sink,
                     _use_valid_length=_use_valid_length,

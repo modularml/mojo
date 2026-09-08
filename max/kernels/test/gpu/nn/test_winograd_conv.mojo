@@ -24,7 +24,7 @@
 from std.math import ceildiv
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from layout import Idx, IntTuple, Layout, LayoutTensor, TileTensor, row_major
 from layout.int_tuple import product
 from layout._fillers import random

@@ -57,7 +57,7 @@
 from std.math import ceildiv, exp, max, min, sqrt
 from std.random import random_ui64, seed
 from std.sys.defines import get_defined_int
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from std.utils.numerics import inf, isnan, max_finite, min_finite, nan, neg_inf
 
 from max.gpu.host import DeviceContext
@@ -459,13 +459,13 @@ def _run_case[
                     attn_res_mix_gpu[
                         dtype,
                         out_tt.LayoutType,
-                        out_tt.Storage,
+                        out_tt.Engine,
                         cands_tt.LayoutType,
-                        cands_tt.Storage,
+                        cands_tt.Engine,
                         proj_tt.LayoutType,
-                        proj_tt.Storage,
+                        proj_tt.Engine,
                         norm_tt.LayoutType,
-                        norm_tt.Storage,
+                        norm_tt.Engine,
                         c,
                         BLOCK,
                     ]

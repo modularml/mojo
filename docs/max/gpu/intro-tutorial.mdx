@@ -6,6 +6,9 @@ github_url: https://github.com/modular/modular/tree/main/max/examples/gpu-intro
 image: /images/artwork/mojo-motorcycle.jpg
 ---
 
+import ConditionalVersionDocs from '@site/src/components/ConditionalVersionDocs'
+import CodeBlock from '@theme/CodeBlock';
+
 This tutorial introduces you to GPU programming with Mojo. You'll learn how to
 write a simple program that performs vector addition on a GPU, exploring
 fundamental concepts of GPU programming along the way.
@@ -50,24 +53,31 @@ other options, see [Packages](/packages/)).
 
     ```bash
     pixi init gpu-intro \
-      -c https://conda.modular.com/max/ -c conda-forge \
+      -c https://conda.modular.com/max-nightly/ -c conda-forge \
       && cd gpu-intro
     ```
 
-    This creates a project directory named `gpu-intro`, adds the Modular conda
-    package channel, and enters the directory.
+   This creates a project directory named `gpu-intro`, adds the MAX conda
+   package channel, and enters the directory.
 
 3. Install the `max` package, which includes the Mojo compiler and the MAX
    accelerator library where the GPU APIs live:
 
-    ```bash
-    pixi add max
-    ```
+   <ConditionalVersionDocs version="nightly">
+   <CodeBlock language="sh">
+   {`pixi add max`}
+   </CodeBlock>
+   </ConditionalVersionDocs>
+   <ConditionalVersionDocs version="stable">
+   <CodeBlock language="sh">
+   {`pixi add "max==26.5"`}
+   </CodeBlock>
+   </ConditionalVersionDocs>
 
-    This tutorial needs nothing more than `max`. If you also want the rest of
-    the Mojo developer tools, or the serving and benchmarking commands, install
-    `max-all` instead (`max[all]` with pip or uv). For a breakdown of each
-    package, see [Packages](/packages/).
+   This tutorial needs nothing more than `max`. If you also want the rest of
+   the Mojo developer tools, or the serving and benchmarking commands, install
+   `max-all` instead (`max[all]` with pip or uv). For a breakdown of each
+   package, see [Packages](/packages/).
 
 4. Verify the project is configured correctly by checking the version of Mojo
    that's installed within our project's virtual environment:
@@ -76,16 +86,13 @@ other options, see [Packages](/packages/)).
     pixi run mojo --version
     ```
 
-    You should see a version string indicating the version of Mojo installed.
-    By default, this should be the latest nightly version.
-
 5. Activate the project's virtual environment:
 
     ```bash
     pixi shell
     ```
 
-    Later on, when you want to exit the virtual environment, just type `exit`.
+   Later on, when you want to exit the virtual environment, just type `exit`.
 
 ## 2. Get a reference to the GPU device
 
@@ -184,7 +191,7 @@ write a simple kernel function that prints the thread block and thread indices.
 Add the following code to your `vector_addition.mojo` file:
 
 ```mojo title="vector_addition.mojo"
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 
 def print_threads():
     """Print thread IDs."""
@@ -205,7 +212,7 @@ Modify the `main()` function so that your program looks like this:
 from std.sys import has_accelerator
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 
 
 def print_threads():
@@ -475,7 +482,7 @@ this:
 
 ```mojo title="vector_addition.mojo"
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from std.sys import has_accelerator
 
 # Vector data type and size
@@ -662,7 +669,7 @@ Now we're ready to write the kernel function. First, add the following imports
 (note that we've added `block_dim` to the list of imports from `gpu`):
 
 ```mojo title="vector_addition.mojo"
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from std.math import ceildiv
 ```
 
@@ -712,13 +719,13 @@ on.
 
 :::note
 
-As a convenience, the [`gpu`](https://mojolang.org/docs/std/gpu/) package
-includes a `global_idx` `comptime` value that contains the unique "global" `x`,
-`y`, and `z` indices of the thread within the grid of thread blocks. So for our
-one-dimensional grid of one-dimensional thread blocks, `global_idx.x` is
-equivalent to the value of `tid` that we calculated above. However, for this
-tutorial, it's best that you learn how to calculate `tid` manually so that you
-understand how the grid and thread block dimensions work.
+As a convenience, the [`gpu`](https://docs.modular.com/api/mojo/max/gpu/)
+package includes a `global_idx` `comptime` value that contains the unique
+"global" `x`, `y`, and `z` indices of the thread within the grid of thread
+blocks. So for our one-dimensional grid of one-dimensional thread blocks,
+`global_idx.x` is equivalent to the value of `tid` that we calculated above.
+However, for this tutorial, it's best that you learn how to calculate `tid`
+manually so that you understand how the grid and thread block dimensions work.
 
 :::
 
@@ -766,7 +773,7 @@ from std.math import ceildiv
 from std.sys import has_accelerator
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from layout import TileTensor, row_major
 
 # Vector data type and size

@@ -26,8 +26,8 @@ Key characteristics:
 from std.math import ceildiv
 from std.math.uutils import ufloordiv
 
-from std.gpu import block_idx, grid_dim
-from layout import PointerStorage, TensorStorage, TileTensor
+from max.gpu import block_idx, grid_dim
+from layout import DefaultEngine, TensorEngine, TileTensor
 
 from structured_kernels.tile_types import GMEMLayout1D
 
@@ -208,9 +208,9 @@ struct GroupedWorkIterator1D1D[
     cta_group: Int = 1,
     swizzle: Bool = False,
     AB_swapped: Bool = False,
-    OffsetsStorage: TensorStorage = PointerStorage[element_width=1],
-    ExpertIdsStorage: TensorStorage = PointerStorage[element_width=1],
-    ExpertScalesStorage: TensorStorage = PointerStorage[element_width=1],
+    OffsetsEngine: TensorEngine = DefaultEngine[element_width=1],
+    ExpertIdsEngine: TensorEngine = DefaultEngine[element_width=1],
+    ExpertScalesEngine: TensorEngine = DefaultEngine[element_width=1],
 ](Copyable, Iterable, Iterator):
     """Work iterator for 1D-1D grouped block-scaled matmul.
 
@@ -237,9 +237,9 @@ struct GroupedWorkIterator1D1D[
             the M (token) dimension strides by `BN` and the N (weight)
             dimension strides by `BM`; otherwise M strides by `BM` and N
             strides by `BN` (defaults to False).
-        OffsetsStorage: Storage policy of the group-offsets `TileTensor`.
-        ExpertIdsStorage: Storage policy of the expert-IDs `TileTensor`.
-        ExpertScalesStorage: Storage policy of the expert-scales `TileTensor`.
+        OffsetsEngine: Engine of the group-offsets `TileTensor`.
+        ExpertIdsEngine: Engine of the expert-IDs `TileTensor`.
+        ExpertScalesEngine: Engine of the expert-scales `TileTensor`.
 
     Usage:
         for ctx in work_iter:
@@ -254,13 +254,13 @@ struct GroupedWorkIterator1D1D[
 
     # 1D TileTensor types: dynamic shape, stride 1 (flat arrays)
     comptime OffsetsTile = TileTensor[
-        .uint32, GMEMLayout1D, MutAnyOrigin, Storage=Self.OffsetsStorage
+        .uint32, GMEMLayout1D, MutAnyOrigin, Engine=Self.OffsetsEngine
     ]
     comptime ExpertIdsTile = TileTensor[
-        .int32, GMEMLayout1D, MutAnyOrigin, Storage=Self.ExpertIdsStorage
+        .int32, GMEMLayout1D, MutAnyOrigin, Engine=Self.ExpertIdsEngine
     ]
     comptime ExpertScalesTile = TileTensor[
-        .float32, GMEMLayout1D, MutAnyOrigin, Storage=Self.ExpertScalesStorage
+        .float32, GMEMLayout1D, MutAnyOrigin, Engine=Self.ExpertScalesEngine
     ]
 
     var num_active_experts: Int

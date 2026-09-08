@@ -35,7 +35,7 @@ TileTensor is used throughout:
 from std.math import ceildiv
 from std.math.uutils import umod, ufloordiv
 from std.sys import simd_width_of, llvm_intrinsic
-from std.gpu import WARP_SIZE, lane_id
+from max.gpu import WARP_SIZE, lane_id
 from layout import (
     ComptimeInt,
     Coord,
@@ -45,7 +45,7 @@ from layout import (
     MixedLayout,
     TensorLayout,
     TileTensor,
-    PointerStorage,
+    DefaultEngine,
 )
 from layout.tile_layout import row_major
 from layout.tile_tensor import stack_allocation
@@ -1007,7 +1007,7 @@ struct DecodeStreamingKVBuffer[
         strip_idx: Int
     ](
         self,
-        gmem_tile: TileTensor[Self.kv_t.dtype, Storage=PointerStorage[], ...],
+        gmem_tile: TileTensor[Self.kv_t.dtype, Engine=DefaultEngine[], ...],
     ):
         """Load one BK-wide strip from an external DRAM tile to SMEM.
 

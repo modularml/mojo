@@ -50,6 +50,48 @@ def test_model_aliases_in_custom_models() -> None:
     )
 
 
+def test_nightly_models_are_known_models() -> None:
+    unknown = sorted(
+        smoke_test_github_matrix.NIGHTLY_MODELS
+        - set(smoke_test_github_matrix.MODELS)
+    )
+    assert not unknown, (
+        f"NIGHTLY_MODELS entries must also appear in MODELS: {unknown}"
+    )
+
+
+def test_nightly_tier_is_a_subset_of_all() -> None:
+    """The nightly tier narrows the full matrix; it never adds to it."""
+    for gpu in smoke_test_github_matrix.RUNNERS:
+        flag = f"--run-on-{gpu.lower()}"
+        tiers: dict[str, set[str]] = {}
+        for tier in smoke_test_github_matrix.TIERS:
+            result = CliRunner().invoke(
+                smoke_test_github_matrix.main,
+                ["--framework", "max-ci", "--tier", tier, flag],
+            )
+            assert result.exit_code == 0
+            tiers[tier] = {
+                job["model"] for job in json.loads(result.output)["include"]
+            }
+        assert tiers["nightly"] <= tiers["all"], gpu
+
+
+def test_nightly_8xb200_pinned() -> None:
+    """Pins the nightly 8xB200 set; widen it only deliberately."""
+    result = CliRunner().invoke(
+        smoke_test_github_matrix.main,
+        ["--framework", "max-ci", "--tier", "nightly", "--run-on-8xb200"],
+    )
+    assert result.exit_code == 0
+    scheduled = {job["model"] for job in json.loads(result.output)["include"]}
+    assert scheduled == {
+        "MiniMaxAI/MiniMax-M3-MXFP8__mtp",
+        "nvidia/GLM-5.2-NVFP4__mtp_tpep",
+        "nvidia/Kimi-K2.7-Code-NVFP4",
+    }
+
+
 def test_8xmi355_stays_opt_in() -> None:
     """8xMI355 nodes are scarce, so landing there must be a deliberate choice.
 

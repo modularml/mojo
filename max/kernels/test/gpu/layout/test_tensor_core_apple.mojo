@@ -25,7 +25,7 @@ accumulator type. Verify D[i] is close to the original A[i].
 
 from std.sys.info import _accelerator_arch
 
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.compute.arch.mma_apple import (
     _mma_apple,
     _mma_apple_transposable,

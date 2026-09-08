@@ -23,7 +23,7 @@ atomic operations which can be a performance bottleneck.
 
 from std.math import sqrt
 from std.atomic import Atomic
-from std.gpu import block_idx, thread_idx, block_dim
+from max.gpu import block_idx, thread_idx, block_dim
 from max.gpu.host import DeviceContext
 
 from dcs_utils import GridDim, init_atoms, verify_grid

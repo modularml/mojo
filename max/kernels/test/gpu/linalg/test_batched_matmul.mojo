@@ -17,7 +17,7 @@ from std.sys import has_nvidia_gpu_accelerator, simd_width_of
 import linalg.matmul.vendor.blas as vendor_blas
 from max.algorithm.functional import elementwise
 from max.gpu.host import DeviceContext, get_gpu_target
-from layout import Coord, Idx, PointerStorage, TileTensor, row_major
+from layout import Coord, Idx, DefaultEngine, TileTensor, row_major
 from layout.tile_layout import Layout
 from linalg.bmm import _batched_matmul_gpu
 
@@ -53,28 +53,28 @@ def run_bmm_and_check_result[
         dtype,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     b_host: TileTensor[
         mut=True,
         dtype,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     c_host: TileTensor[
         mut=True,
         dtype,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     c_host_ref: TileTensor[
         mut=True,
         dtype,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     ctx: DeviceContext,
     rtol: Float64 = 1e-3 if dtype == .float32 else 1e-2,

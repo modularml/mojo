@@ -21,9 +21,9 @@ target has no clusters.
 """
 
 from std.bit import next_power_of_two
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, thread_idx
-from std.gpu.primitives import warp
-from std.gpu.primitives.id import cluster_dim
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, thread_idx
+from max.gpu.primitives import warp
+from max.gpu.primitives.id import cluster_dim
 from max.gpu.primitives import block
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
@@ -45,9 +45,9 @@ from layout import (
     ComptimeInt,
     Coord,
     Idx,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     coord_to_index_list,
     row_major,
@@ -65,6 +65,7 @@ from .topk_fi import (
     ValueCount,
     device_sampling_from_prob,
     _block_reduce_value_count,
+    _topp_budget,
 )
 
 # The largest cluster that these kernels use. All CTAs of a cluster must run
@@ -219,8 +220,13 @@ def _cluster_cutoff_search[
         var lo_bits = max(low, Float32(0)).to_bits[.uint32]()
         var hi_bits = max(high, Float32(0)).to_bits[.uint32]()
         var span = hi_bits - lo_bits
-        var pivot_0 = bitcast[.float32](lo_bits + span // 3)
-        var pivot_1 = bitcast[.float32](lo_bits + 2 * (span // 3))
+        # A span below three bits can round both pivots down to `low` and
+        # stall the search.
+        var third = span // 3
+        var off_0 = max(third, UInt32(1))
+        var off_1 = max(2 * third, off_0 + 1)
+        var pivot_0 = bitcast[.float32](lo_bits + off_0)
+        var pivot_1 = bitcast[.float32](lo_bits + off_1)
 
         # Accumulate thread-local counts/masses across the slice. The
         # accumulators stay scalar on purpose: at block_size 1024 only 64
@@ -304,8 +310,11 @@ def TopKTopPMaskedProbsClusterKernel[
     LogitsLayoutType: TensorLayout,
     logits_origin: ImmOrigin,
     cluster_size: Int,
+    LogitsEngine: TensorEngine,
 ](
-    logits: TileTensor[dtype, LogitsLayoutType, logits_origin],
+    logits: TileTensor[
+        dtype, LogitsLayoutType, logits_origin, Engine=LogitsEngine
+    ],
     probs_ptr: UnsafePointer[Float32, MutAnyOrigin],
     top_k_arr: Optional[UnsafePointer[Int64, ImmutAnyOrigin]],
     top_k_val: Int32,
@@ -445,7 +454,7 @@ def TopKTopPMaskedProbsClusterKernel[
     )
     var z = totals[0]
     var total_count = Int32(totals[1])
-    var p_eff = p * z
+    var p_eff = _topp_budget(p, z)
 
     var cut = Float32(0)
     var mass_s = z
@@ -503,6 +512,9 @@ def topk_topp_masked_probs_cluster[
         shape_types=Coord[Int64, Int64].element_types,
         stride_types=Coord[Int64, ComptimeInt[1]].element_types,
     ],
+    TopKArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     ctx: DeviceContext,
     logits: TileTensor[mut=False, dtype, ...],
@@ -510,13 +522,22 @@ def topk_topp_masked_probs_cluster[
     top_k_val: Int,
     top_p_val: Float32 = 1.0,
     top_k_arr: Optional[
-        TileTensor[.int64, TopKArrLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .int64, TopKArrLayoutType, ImmutAnyOrigin, Engine=TopKArrEngine
+        ]
     ] = None,
     top_p_arr: Optional[
-        TileTensor[.float32, TopPArrLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32, TopPArrLayoutType, ImmutAnyOrigin, Engine=TopPArrEngine
+        ]
     ] = None,
     temperature: Optional[
-        TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TemperatureLayoutType,
+            ImmutAnyOrigin,
+            Engine=TemperatureEngine,
+        ]
     ] = None,
 ) raises:
     """Computes per-row top-k/top-p masked softmax on a cluster device.
@@ -533,6 +554,9 @@ def topk_topp_masked_probs_cluster[
         TopPArrLayoutType: Memory layout of `top_p_arr`.
         TemperatureLayoutType: Memory layout of `temperature`.
         ProbsLayoutType: Memory layout of `probs`.
+        TopKArrEngine: Engine policy of `top_k_arr`.
+        TopPArrEngine: Engine policy of `top_p_arr`.
+        TemperatureEngine: Engine policy of `temperature`.
 
     Args:
         ctx: Device context.
@@ -615,6 +639,7 @@ def topk_topp_masked_probs_cluster[
                 logits.LayoutType,
                 ImmOrigin(logits.origin),
                 cluster_size,
+                LogitsEngine=logits.Engine,
             ]
             var smem_bytes = _stage_smem_bytes(d, vec_size, cluster_size)
             ctx.enqueue_function[kernel](
@@ -654,6 +679,7 @@ def topk_topp_masked_probs_cluster[
                 top_p_val,
                 temperature_ptr,
                 Int32(d),
+                Optional[UnsafePointer[Int32, MutAnyOrigin]](None),
                 grid_dim=batch_size,
                 block_dim=block_size,
                 attributes=pdl_launch_attributes(PDLLevel.ON),
@@ -951,14 +977,12 @@ def TopKTopPSamplingEmitDistClusterKernel[
     deterministic: Bool,
     cluster_size: Int,
     dist_dtype: DType = .float32,
-    ProbsStorageType: TensorStorage = PointerStorage[element_width=1],
-    OutputStorageType: TensorStorage = PointerStorage[element_width=1],
+    ProbsEngine: TensorEngine = DefaultEngine[element_width=1],
+    OutputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
-    probs: TileTensor[
-        dtype, ProbsLayoutType, probs_origin, Storage=ProbsStorageType
-    ],
+    probs: TileTensor[dtype, ProbsLayoutType, probs_origin, Engine=ProbsEngine],
     output: TileTensor[
-        out_idx_type, OutputLayoutType, output_origin, Storage=OutputStorageType
+        out_idx_type, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
     out_dist: UnsafePointer[Scalar[dist_dtype], MutAnyOrigin],
     indices: Optional[UnsafePointer[Scalar[out_idx_type], ImmutAnyOrigin]],
@@ -1002,8 +1026,8 @@ def TopKTopPSamplingEmitDistClusterKernel[
         deterministic: If True, use deterministic sampling.
         cluster_size: Number of CTAs sharing each row.
         dist_dtype: Element type of `out_dist`.
-        ProbsStorageType: Storage type of the input `probs` tile.
-        OutputStorageType: Storage type of the output `output` tile.
+        ProbsEngine: Engine of the input `probs` tile.
+        OutputEngine: Engine of the output `output` tile.
 
     Args:
         probs: Input logits [batch_size, d].
@@ -1153,7 +1177,7 @@ def TopKTopPSamplingEmitDistClusterKernel[
 
     # Top-p budget in the unnormalized domain. Identical on every CTA because
     # z came out of the rank-ordered cluster fold.
-    var p_eff = p * z
+    var p_eff = _topp_budget(p, z)
 
     # The loop reads staged elements that other threads of this block wrote;
     # it never touches a peer CTA's slice, so a block barrier is enough.
@@ -1254,12 +1278,12 @@ def topk_topp_sampling_from_prob_cluster[
         shape_types=Coord[Int64].element_types,
         stride_types=Coord[ComptimeInt[1]].element_types,
     ],
-    TopKArrStorageType: TensorStorage = PointerStorage[element_width=1],
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    TopPArrStorageType: TensorStorage = PointerStorage[element_width=1],
-    SeedStorageType: TensorStorage = PointerStorage[element_width=1],
-    TemperatureStorageType: TensorStorage = PointerStorage[element_width=1],
-    MinPStorageType: TensorStorage = PointerStorage[element_width=1],
+    TopKArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    SeedEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
+    MinPEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     ctx: DeviceContext,
     probs: TileTensor[mut=False, dtype, ...],
@@ -1268,9 +1292,7 @@ def topk_topp_sampling_from_prob_cluster[
     top_p_val: Float32 = 1.0,
     deterministic: Bool = False,
     rng_seed: Optional[
-        TileTensor[
-            .uint64, SeedLayoutType, ImmutAnyOrigin, Storage=SeedStorageType
-        ]
+        TileTensor[.uint64, SeedLayoutType, ImmutAnyOrigin, Engine=SeedEngine]
     ] = None,
     rng_offset: UInt64 = 0,
     indices: Optional[
@@ -1278,7 +1300,7 @@ def topk_topp_sampling_from_prob_cluster[
             out_idx_type,
             IndicesLayoutType,
             ImmutAnyOrigin,
-            Storage=IndicesStorageType,
+            Engine=IndicesEngine,
         ]
     ] = None,
     top_k_arr: Optional[
@@ -1286,7 +1308,7 @@ def topk_topp_sampling_from_prob_cluster[
             out_idx_type,
             TopKArrLayoutType,
             ImmutAnyOrigin,
-            Storage=TopKArrStorageType,
+            Engine=TopKArrEngine,
         ]
     ] = None,
     top_p_arr: Optional[
@@ -1294,7 +1316,7 @@ def topk_topp_sampling_from_prob_cluster[
             .float32,
             TopPArrLayoutType,
             ImmutAnyOrigin,
-            Storage=TopPArrStorageType,
+            Engine=TopPArrEngine,
         ]
     ] = None,
     temperature: Optional[
@@ -1302,13 +1324,11 @@ def topk_topp_sampling_from_prob_cluster[
             .float32,
             TemperatureLayoutType,
             ImmutAnyOrigin,
-            Storage=TemperatureStorageType,
+            Engine=TemperatureEngine,
         ]
     ] = None,
     min_p: Optional[
-        TileTensor[
-            .float32, MinPLayoutType, ImmutAnyOrigin, Storage=MinPStorageType
-        ]
+        TileTensor[.float32, MinPLayoutType, ImmutAnyOrigin, Engine=MinPEngine]
     ] = None,
     out_dist: Optional[
         TileTensor[dist_dtype, DistLayoutType, MutAnyOrigin]
@@ -1350,13 +1370,13 @@ def topk_topp_sampling_from_prob_cluster[
         TemperatureLayoutType: Memory layout of the optional `temperature`
             tensor.
         MinPLayoutType: Memory layout of the optional `min_p` tensor.
-        TopKArrStorageType: Storage type of the optional `top_k_arr` tensor.
-        IndicesStorageType: Storage type of the optional `indices` tensor.
-        TopPArrStorageType: Storage type of the optional `top_p_arr` tensor.
-        SeedStorageType: Storage type of the optional `rng_seed` tensor.
-        TemperatureStorageType: Storage type of the optional `temperature`
+        TopKArrEngine: Engine of the optional `top_k_arr` tensor.
+        IndicesEngine: Engine of the optional `indices` tensor.
+        TopPArrEngine: Engine of the optional `top_p_arr` tensor.
+        SeedEngine: Engine of the optional `rng_seed` tensor.
+        TemperatureEngine: Engine of the optional `temperature`
             tensor.
-        MinPStorageType: Storage type of the optional `min_p` tensor.
+        MinPEngine: Engine of the optional `min_p` tensor.
 
     Args:
         ctx: Device context for kernel execution.
@@ -1492,8 +1512,8 @@ def topk_topp_sampling_from_prob_cluster[
                     deterministic,
                     cluster_size,
                     dist_dtype,
-                    ProbsStorageType=probs.Storage,
-                    OutputStorageType=output.Storage,
+                    ProbsEngine=probs.Engine,
+                    OutputEngine=output.Engine,
                 ]
                 var smem_bytes = _stage_smem_bytes(d, vec_size, cluster_size)
                 ctx.enqueue_function[kernel](
@@ -1535,8 +1555,8 @@ def topk_topp_sampling_from_prob_cluster[
                 from_logits,
                 emit_dist,
                 dist_dtype,
-                ProbsStorageType=probs.Storage,
-                OutputStorageType=output.Storage,
+                ProbsEngine=probs.Engine,
+                OutputEngine=output.Engine,
             ]
             ctx.enqueue_function[kernel](
                 probs.as_immut(),
@@ -1552,6 +1572,7 @@ def topk_topp_sampling_from_prob_cluster[
                 rng_offset,
                 temperature_ptr,
                 min_p_ptr,
+                Optional[UnsafePointer[Int32, MutAnyOrigin]](None),
                 grid_dim=batch_size,
                 block_dim=block_size,
                 attributes=pdl_launch_attributes(PDLLevel.ON),

@@ -19,11 +19,11 @@ reference, exercising all three backends: NVIDIA's `vote.ballot.sync`, AMD's
 `ballot`, and the Apple Silicon `simd_ballot`.
 """
 
-from std.gpu import lane_id
-from std.gpu.globals import WARP_SIZE
+from max.gpu import lane_id
+from max.gpu.globals import WARP_SIZE
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import GPUInfo
-from std.gpu.primitives.warp import vote
+from max.gpu.primitives.warp import vote
 from std.sys.info import _accelerator_arch
 from std.testing import assert_equal, TestSuite
 

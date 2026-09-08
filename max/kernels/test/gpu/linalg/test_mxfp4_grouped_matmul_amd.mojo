@@ -20,7 +20,7 @@ Usage:
   br test_mxfp4_grouped_matmul_amd.mojo.test
 """
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.memory import bitcast

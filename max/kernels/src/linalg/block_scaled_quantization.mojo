@@ -16,7 +16,7 @@
 from std.math import align_up, ceildiv
 from std.math.uutils import uceildiv, udivmod, ufloordiv
 from std.memory import unsafe_stack_allocation
-from std.gpu import (
+from max.gpu import (
     block_idx,
     thread_idx,
     grid_dim,
@@ -39,8 +39,8 @@ from layout import (
 )
 from layout.tile_layout import TensorLayout
 from std.logger import Logger
-from std.gpu.primitives import warp
-from std.gpu.primitives.warp import lane_group_max, shuffle_xor
+from max.gpu.primitives import warp
+from max.gpu.primitives.warp import lane_group_max, shuffle_xor
 from std.math import recip
 from .block_scaled_utils import compute_mxfp8_block_scale
 from .fp4_utils import (
@@ -72,7 +72,7 @@ from std.utils.index import Index, IndexList
 from linalg.matmul.vendor.blas import matmul
 from std.memory import bitcast
 from max.gpu.sync import named_barrier
-from std.gpu.intrinsics import warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_dealloc
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout.tma_async import (
     SharedMemBarrier,
@@ -2889,7 +2889,7 @@ def _mxfp4_dotprod[
     for ko in range(k_groups):
         var a_scale = a_scales_ptr[ko].cast[.float32]()
         var b_scale = Array[_, BLOCK_N](
-            fill_with=lambda (bn: Int) {
+            fill_with_unrolled=lambda [bn: Int]() {
                 imm b_scales_ptr, imm k_groups, imm ko
             } -> Float32: b_scales_ptr[bn * k_groups + ko].cast[.float32]()
         )
@@ -2897,7 +2897,7 @@ def _mxfp4_dotprod[
         comptime for ki in range(0, MXFP4_SF_VECTOR_SIZE // 2, 4):
             var a_data = bitcast[.int32, 1](a_local_ptr.load[width=4](ki))
             var b_data = Array[_, BLOCK_N](
-                fill_with=lambda (bn: Int) {
+                fill_with_unrolled=lambda [bn: Int]() {
                     imm b_local_ptr, imm K
                 } -> Int32: bitcast[.int32, 1](
                     b_local_ptr.load[width=4](bn * (K // 2) + ki)

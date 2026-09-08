@@ -106,6 +106,7 @@ from msa.sparse_indexer_decode import (
     sparse_indexer_decode_score_mtp,
     sparse_indexer_decode_topk_mtp,
 )
+from msa.msa_config import MSAConfig
 from msa.msa_1q import msa_sm100_decode
 from msa.msa_2q import msa_sm100_prefill_plan, msa_sm100_prefill_run
 from msa.amd.decode import msa_amd_decode_dispatch
@@ -565,6 +566,7 @@ struct Struct_msa_attention_ragged_paged:
         //,
         group: Int,
         topk: Int,
+        sparse_block_size: Int,
     ](
         output: OutputTensor[dtype=.bfloat16, rank=3, ...],
         q: InputTensor[dtype=kv_type, rank=3, ...],
@@ -619,6 +621,9 @@ struct Struct_msa_attention_ragged_paged:
             group: Query heads per kv-head (`n_heads // n_kv_heads`); asserts
                 `group <= MMA_M` in the kernel.
             topk: Number of gathered KV blocks per token (`d_indices` stride).
+            sparse_block_size: KV block size in tokens, from the model's
+                `sparse_attention_config`. Must equal the KV cache
+                `page_size` and the forward's `BN`; asserted below.
 
         Args:
             output: Output `[num_rows, n_heads, head_dim]` BF16.
@@ -659,6 +664,15 @@ struct Struct_msa_attention_ragged_paged:
         comptime head_dim = Int(kv_blocks.static_spec.shape_tuple[5])
         comptime page_size = Int(kv_blocks.static_spec.shape_tuple[3])
         comptime num_heads = group * k_num_heads
+        # The selection granularity must equal the KV cache page size:
+        # one KV tile == one page == one sparse block.  Asserted here
+        # because a mismatch has no fault to catch downstream:
+        # `k2q_csr_sizes`' bounds stop holding and the block gather
+        # silently drops selections the indexer made.
+        comptime assert (
+            sparse_block_size == page_size
+        ), "sparse_block_size must equal the KV cache page_size"
+        comptime msa = MSAConfig(block_size=sparse_block_size, topk=topk)
         comptime config = MHAConfig[kv_type](num_heads, head_dim)
 
         # `num_rows` == total query tokens (== batch on decode, 1 token/seq).
@@ -879,6 +893,7 @@ struct Struct_msa_attention_ragged_paged:
                 config=config,
                 group=group,
                 topk=topk,
+                msa=msa,
             ](
                 num_rows,
                 Int(total_context_length[0]),
@@ -962,6 +977,7 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
         //,
         group: Int,
         topk: Int,
+        sparse_block_size: Int,
     ](
         output: OutputTensor[dtype=.float8_e4m3fn, rank=3, ...],
         output_scales: OutputTensor[dtype=.float8_e8m0fnu, rank=2, ...],
@@ -1006,6 +1022,9 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
         Parameters:
             group: Query heads per kv-head (`n_heads // n_kv_heads`).
             topk: Number of gathered KV blocks per token (`d_indices` stride).
+            sparse_block_size: KV block size in tokens, from the model's
+                `sparse_attention_config`. Must equal the KV cache
+                `page_size` and the forward's `BN`; asserted below.
 
         Args:
             output: Quantized output `[num_rows, n_heads, head_dim]` FP8 e4m3.
@@ -1050,6 +1069,15 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
             comptime head_dim = Int(kv_blocks.static_spec.shape_tuple[5])
             comptime page_size = Int(kv_blocks.static_spec.shape_tuple[3])
             comptime num_heads = group * k_num_heads
+            # The selection granularity must equal the KV cache page size:
+            # one KV tile == one page == one sparse block.  Asserted here
+            # because a mismatch has no fault to catch downstream:
+            # `k2q_csr_sizes`' bounds stop holding and the block gather
+            # silently drops selections the indexer made.
+            comptime assert (
+                sparse_block_size == page_size
+            ), "sparse_block_size must equal the KV cache page_size"
+            comptime msa = MSAConfig(block_size=sparse_block_size, topk=topk)
             comptime config = MHAConfig[kv_type](num_heads, head_dim)
             comptime row_width = num_heads * head_dim
             comptime scale_cols = row_width // MSA_MX_SF_VECTOR_SIZE
@@ -1189,6 +1217,7 @@ struct Struct_msa_attention_ragged_paged_mxfp8:
                     config=config,
                     group=group,
                     topk=topk,
+                    msa=msa,
                 ](
                     num_rows,
                     Int(total_context_length[0]),

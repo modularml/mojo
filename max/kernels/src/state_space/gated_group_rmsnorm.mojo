@@ -51,12 +51,12 @@ strided `y`/`gate`/`output` view (a split of the fused in-proj) is read correctl
 with no host-side stride plumbing.
 """
 
-from std.gpu import WARP_SIZE, global_idx, lane_id
+from max.gpu import WARP_SIZE, global_idx, lane_id
 from max.gpu.host import DeviceContext
 from std.math import ceildiv, rsqrt
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 
-from layout import Coord, TensorLayout, TensorStorage, TileTensor
+from layout import Coord, TensorLayout, TensorEngine, TileTensor
 
 from nn.activations import silu
 
@@ -74,18 +74,16 @@ def gated_group_rmsnorm_kernel[
     YLayout: TensorLayout,
     GateLayout: TensorLayout,
     WeightLayout: TensorLayout,
-    OutStorage: TensorStorage,
-    YStorage: TensorStorage,
-    GateStorage: TensorStorage,
-    WeightStorage: TensorStorage,
+    OutEngine: TensorEngine,
+    YEngine: TensorEngine,
+    GateEngine: TensorEngine,
+    WeightEngine: TensorEngine,
 ](
-    output: TileTensor[dtype, OutLayout, MutAnyOrigin, Storage=OutStorage],
-    y: TileTensor[dtype, YLayout, ImmutAnyOrigin, Storage=YStorage],
-    gate: TileTensor[
-        gate_dtype, GateLayout, ImmutAnyOrigin, Storage=GateStorage
-    ],
+    output: TileTensor[dtype, OutLayout, MutAnyOrigin, Engine=OutEngine],
+    y: TileTensor[dtype, YLayout, ImmutAnyOrigin, Engine=YEngine],
+    gate: TileTensor[gate_dtype, GateLayout, ImmutAnyOrigin, Engine=GateEngine],
     weight: TileTensor[
-        .float32, WeightLayout, ImmutAnyOrigin, Storage=WeightStorage
+        .float32, WeightLayout, ImmutAnyOrigin, Engine=WeightEngine
     ],
     n_rows_dev: Int32,
     num_groups_dev: Int32,
@@ -167,10 +165,10 @@ def gated_group_rmsnorm_gpu[
         type_of(y).LayoutType,
         type_of(gate).LayoutType,
         type_of(weight).LayoutType,
-        type_of(output).Storage,
-        type_of(y).Storage,
-        type_of(gate).Storage,
-        type_of(weight).Storage,
+        type_of(output).Engine,
+        type_of(y).Engine,
+        type_of(gate).Engine,
+        type_of(weight).Engine,
     ]
     ctx.enqueue_function[kernel](
         output,

@@ -19,10 +19,10 @@ three backends: NVIDIA's `match.all.sync`, the CDNA `readfirstlane`/ballot fold,
 and the Apple Silicon shuffle check.
 """
 
-from std.gpu import lane_id
-from std.gpu.globals import WARP_SIZE
+from max.gpu import lane_id
+from max.gpu.globals import WARP_SIZE
 from max.gpu.host import DeviceContext
-from std.gpu.primitives.warp import match_all
+from max.gpu.primitives.warp import match_all
 from std.testing import assert_equal, TestSuite
 
 

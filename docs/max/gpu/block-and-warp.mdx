@@ -65,7 +65,7 @@ for coordinating parallel work on the GPU. Key topics include:
   synchronization with
   [`syncwarp()`](/api/mojo/max/gpu/sync/sync/syncwarp/) and
   leverage high-speed data exchange using
-  [`gpu.primitives.warp`](https://mojolang.org/docs/std/gpu/primitives/warp/)
+  [`gpu.primitives.warp`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/)
   primitives.
 - [Best practices and common pitfalls](#best-practices-and-common-pitfalls): How
   to use these primitives correctly to write reliable and portable GPU code.
@@ -247,7 +247,7 @@ from std.sys import exit, has_accelerator
 # GPU programming imports from open source stdlib and max accelerator library
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu import thread_idx, block_idx
+from max.gpu import thread_idx, block_idx
 
 # TileTensor support from open source layout package
 from layout import TileTensor, stack_allocation
@@ -512,11 +512,12 @@ to achieve near-zero latency data exchange. This makes them ideal for:
 
 #### Warp shuffle operations
 
-The [`gpu.primitives.warp`](https://mojolang.org/docs/std/gpu/primitives/warp/)
+The
+[`gpu.primitives.warp`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/)
 module provides five shuffle primitives, each optimized for specific data
 movement patterns:
 
-- [`shuffle_up(value, offset)`](https://mojolang.org/docs/std/gpu/primitives/warp/shuffle_up/):
+- [`shuffle_up(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_up/):
   Each thread receives the value from a thread with a lower lane ID (that is,
   from lane current_lane - `offset`). If the resulting lane ID is less than 0,
   the thread receives an undefined value.
@@ -532,7 +533,7 @@ movement patterns:
 
   </figure>
 
-- [`shuffle_down(value, offset)`](https://mojolang.org/docs/std/gpu/primitives/warp/shuffle_down/):
+- [`shuffle_down(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_down/):
   Each thread receives a value from a thread with a higher lane ID (that is,
   from lane current_lane + `offset`). If the resulting lane ID is greater than
   or equal to the warp size, the thread receives an undefined value.
@@ -548,7 +549,7 @@ movement patterns:
 
   </figure>
 
-- [`shuffle_xor(value, offset)`](https://mojolang.org/docs/std/gpu/primitives/warp/shuffle_xor/):
+- [`shuffle_xor(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_xor/):
   Each thread exchanges its value with the thread at lane current_lane XOR
   `offset`. This is particularly useful for implementing butterfly patterns
   common in algorithms like FFTs and parallel reductions.
@@ -564,7 +565,7 @@ movement patterns:
 
   </figure>
 
-- [`shuffle_idx(value, offset)`](https://mojolang.org/docs/std/gpu/primitives/warp/shuffle_idx/):
+- [`shuffle_idx(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_idx/):
   Each thread receives the value from the thread at the specified `offset`. This
   is effectively a broadcast from one lane to all others in the warp. Essential
   for sharing computed results or constants across the entire warp.
@@ -580,7 +581,7 @@ movement patterns:
 
   </figure>
 
-- [`broadcast(value)`](https://mojolang.org/docs/std/gpu/primitives/warp/broadcast/):
+- [`broadcast(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/broadcast/):
   A convenience wrapper around `shuffle_idx()` that distributes the value from
   lane 0 to all other threads in the warp.
 
@@ -676,19 +677,19 @@ performing common reduction computations across all threads in a warp. These
 functions take advantage of hardware-specific intrinsics where possible, and
 fall back to shuffle-based reduction on other architectures:
 
-- [`max(value)`](https://mojolang.org/docs/std/gpu/primitives/warp/max/):
+- [`max(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/max/):
   Computes the maximum `value` across all threads in the warp. The result is
   broadcast to all lanes.
 
-- [`min(value)`](https://mojolang.org/docs/std/gpu/primitives/warp/min/):
+- [`min(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/min/):
   Computes the minimum `value` across all threads in the warp. The result is
   broadcast to all lanes.
 
-- [`sum(value)`](https://mojolang.org/docs/std/gpu/primitives/warp/sum/):
+- [`sum(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/sum/):
   Computes the sum of `value` across all threads in the warp. The result is
   broadcast to all lanes.
 
-- [`prefix_sum[exclusive=False](value)`](https://mojolang.org/docs/std/gpu/primitives/warp/prefix_sum/):
+- [`prefix_sum[exclusive=False](value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/prefix_sum/):
   Computes an inclusive (default) or exclusive prefix sum (scan) across threads
   in the warp. A prefix sum transforms an input sequence into cumulative sums:
   given $[x_0, x_1, x_2, x_3]$, an *inclusive* scan produces $[x_0, x_0+x_1,
@@ -768,7 +769,7 @@ Mechanisms currently available only on NVIDIA GPUs:
   [`gpu.sync.mbarrier_try_wait_parity_shared()`](/api/mojo/max/gpu/sync/sync/mbarrier_try_wait_parity_shared/)).
 
 - **Thread fence**
-  ([`gpu.intrinsics.threadfence()`](https://mojolang.org/docs/std/gpu/intrinsics/threadfence/)):
+  ([`gpu.intrinsics.threadfence()`](https://docs.modular.com/api/mojo/max/gpu/intrinsics/threadfence/)):
   Memory ordering fence (no execution barrier) that ensures memory operations
   are visible within a specified scope (block, GPU-wide, or system). Essential
   for lock-free algorithms and cross-block communication.
@@ -946,7 +947,7 @@ and correctness everywhere else.
 
 Second, always avoid hardcoding hardware-specific values. The most common
 mistake is assuming a warp size of 32. Use the
-[`gpu.WARP_SIZE`](https://mojolang.org/docs/std/gpu/globals/#warp_size) constant
+[`gpu.WARP_SIZE`](https://docs.modular.com/api/mojo/max/gpu/#warp_size) constant
 to ensure your code works correctly on all vendors' hardware.
 
 Finally, for highly-tuned kernels, you can use `comptime if` blocks to write

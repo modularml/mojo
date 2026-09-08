@@ -21,7 +21,7 @@ from std.math import align_up, ceildiv
 from std.math.uutils import umod, ufloordiv, udivmod_unchecked
 from std.sys import align_of, size_of
 
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
@@ -33,7 +33,7 @@ from max.gpu.primitives.cluster import (
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host.info import B200
-from std.gpu import block_id_in_cluster, lane_id, warp_id as get_warp_id
+from max.gpu import block_id_in_cluster, lane_id, warp_id as get_warp_id
 from max.gpu.memory import (
     async_copy,
     external_memory,

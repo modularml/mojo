@@ -14,8 +14,8 @@
 from std.math import ceildiv
 from std.random import randn, seed, random_float64
 
-import std.gpu.primitives.warp as warp
-from std.gpu import WARP_SIZE
+import max.gpu.primitives.warp as warp
+from max.gpu import WARP_SIZE
 from max.gpu.host import DeviceContext, get_gpu_target
 from std.sys import simd_width_of
 from linalg.gemv import gemv_kernel, gemv_split_k, gevm_kernel
@@ -424,9 +424,9 @@ def run_split_k_gemm[
             type_of(c_nd).LayoutType,
             type_of(a_nd).LayoutType,
             type_of(w_nd).LayoutType,
-            type_of(c_nd).Storage,
-            type_of(a_nd).Storage,
-            type_of(w_nd).Storage,
+            type_of(c_nd).Engine,
+            type_of(a_nd).Engine,
+            type_of(w_nd).Engine,
             simd_width=simd_width,
             tile_m=tile_m,
             tile_n=tile_n,
@@ -456,9 +456,9 @@ def run_split_k_gemm[
             type_of(c_nd).LayoutType,
             type_of(a_nd).LayoutType,
             type_of(w_nd).LayoutType,
-            type_of(c_nd).Storage,
-            type_of(a_nd).Storage,
-            type_of(w_nd).Storage,
+            type_of(c_nd).Engine,
+            type_of(a_nd).Engine,
+            type_of(w_nd).Engine,
             simd_width=simd_width,
             tile_m=tile_m,
             tile_n=tile_n,

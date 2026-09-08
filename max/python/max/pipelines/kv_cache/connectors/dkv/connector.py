@@ -30,7 +30,6 @@ import os
 import time
 from collections.abc import Callable, Mapping, Sequence
 
-import msgspec
 from max.driver import Buffer, Device
 from max.nn.kv_cache import KVCacheGroupId
 from max.nn.kv_cache.cache_params import (
@@ -110,20 +109,21 @@ def _group_units_by_shard(
 
     Each unit carries every TP shard, so shard ``s`` is ``mem.buffers[s]``
     whether the unit is replicated or sharded; the two layouts need no separate
-    handling. The Rust client concatenates each shard's units in this order into
-    one dKV block, matching the CPU block the tiered connector builds from the
-    same units.
+    handling. The Rust client concatenates each shard's units in this order
+    into one dKV block. That block matches the CPU block the tiered connector
+    builds only when every unit is sharded, because the tiered connector
+    stores a replicated unit once while dKV stores it once per shard.
 
     Args:
         kv_memory: One replica's offload-ready KV memory units.
 
     Returns:
-        A ``(shards, is_mla)`` pair, where ``shards`` has one
+        A ``(shards, shards_are_identical)`` pair, where ``shards`` has one
         ``(device_id, [(ptr, nbytes), ...])`` entry per TP shard in canonical
-        device order, and ``is_mla`` reports whether every unit is replicated.
+        device order, and ``shards_are_identical`` reports whether every unit
+        is replicated.
 
     Raises:
-        NotImplementedError: If replicated and non-replicated units are mixed.
         ValueError: If unit page counts disagree, or if units span different
             device topologies.
     """
@@ -139,16 +139,9 @@ def _group_units_by_shard(
             f"{unique_total_num_pages}"
         )
 
-    # ``is_mla`` lets the Rust client dedup byte-identical shards, which one
-    # sharded unit falsifies for the concatenated block.
-    replicated = [mem for mem in kv_memory if mem.replicated]
-    is_mla = bool(replicated)
-    if is_mla and len(replicated) != len(kv_memory):
-        raise NotImplementedError(
-            "the dKV connector cannot mix replicated (MLA) and "
-            "non-replicated KV memory units in one replica; every unit "
-            "must be replicated across the same TP shards"
-        )
+    # every unit replicated makes each shard's block byte-identical, so the
+    # client may store shard 0 alone; one sharded unit makes them differ.
+    shards_are_identical = all(mem.replicated for mem in kv_memory)
 
     # every unit must span the same device topology so shard s names the same
     # device in every unit (mirrors BlockOffloadEngine)
@@ -175,7 +168,7 @@ def _group_units_by_shard(
         )
         for rank, device_id in enumerate(topology)
     ]
-    return shards, is_mla
+    return shards, shards_are_identical
 
 
 def _shard_unit_strides(kv_memory: Sequence[KVCacheMemory]) -> list[int]:
@@ -184,7 +177,7 @@ def _shard_unit_strides(kv_memory: Sequence[KVCacheMemory]) -> list[int]:
     A dKV block holds one shard's buffer units concatenated, so the layout
     fingerprint folds the strides of a single shard's unit list rather than
     the flat per-physical-buffer list. This keeps the folded shape identical
-    between replicated (MLA) and sharded layouts, where the flat list would
+    between replicated and sharded layouts, where the flat list would
     otherwise repeat each unit once per shard. Shard 0 stands in for every
     shard because each shard carries one entry per unit by construction and
     the Rust config validates that the stride vectors match.
@@ -208,12 +201,44 @@ def _shard_unit_strides(kv_memory: Sequence[KVCacheMemory]) -> list[int]:
 
 # Default wall-clock budget for admitting (connect + handshake) one per-replica
 # dKV client. dKV is co-located and usually up within seconds, but a still-
-# starting server (connection refused) or a cold slab warm-up (deferred region
-# carve) can take longer; admission retries transient failures until this budget
-# is spent, then fails model load. Override via MODULAR_DKV_ADMISSION_TIMEOUT_S.
-_DEFAULT_ADMISSION_TIMEOUT_S = 120.0
+# starting server (connection refused), a cold slab warm-up (deferred region
+# carve), or a node with no room until a departed tenant's pages drain can all
+# take much longer; admission retries transient failures until this budget is
+# spent, then fails model load. Override via MODULAR_DKV_ADMISSION_TIMEOUT_S.
+#
+# Sized above a worst-case cold carve, which budgets to roughly 600s for a
+# 1.6 TiB slab. A single attempt does not have to cover that carve, because the
+# server builds a share single-flight and a retry blocks on the in-flight build
+# rather than starting a second one, so what matters is that the budget spans
+# enough attempts to outlast it.
+_DEFAULT_ADMISSION_TIMEOUT_S = 600.0
 _ADMISSION_INITIAL_BACKOFF_S = 1.0
 _ADMISSION_MAX_BACKOFF_S = 10.0
+
+# The Rust client's default per-attempt handshake bound, mirrored from
+# DEFAULT_HANDSHAKE_REQUEST_TIMEOUT in dkv-connector/src/transport.rs, purely to
+# size the admission floor below.
+#
+# Deliberately the constant and not MODULAR_DKV_HANDSHAKE_TIMEOUT_S. That
+# variable belongs to the transport, which reads it permissively (anything
+# unparsable, non-positive, or above its 3600s cap silently falls back), and a
+# second parser here would disagree with it in both directions: rejecting values
+# the transport accepts, and sizing the floor off values the transport ignores.
+_DEFAULT_HANDSHAKE_TIMEOUT_S = 60.0
+
+# An admission budget has to cover several whole attempts. At or just above the
+# per-attempt timeout it is spent inside the first attempt and retries nothing,
+# so a refusal that would clear in seconds fails model load instead. That is the
+# shape of CLIN-1842.
+#
+# The floor is computed against the DEFAULT per-attempt timeout, not the
+# configured one. An operator raising the handshake timeout is covering one long
+# cold carve, not asking for a proportionally longer budget: a retry blocks on
+# the in-flight single-flight build rather than starting a second one, so the
+# per-attempt bound does not multiply the work. Scaling the floor by it would
+# reject configurations that raise both together, which is exactly what the
+# in-tree kimi26 deployment and transport.rs both instruct.
+_MIN_ADMISSION_ATTEMPTS = 4
 
 
 # Env-var overrides for the Rust client's background heartbeat poller, mapped to
@@ -388,7 +413,7 @@ def _kv_config_hash(
       tree, so any change to the unit set or its ordering makes stored blocks
       byte-incompatible and must flip the hash. Folding one shard's subsequence
       rather than the flat physical buffer list keeps the folded shape identical
-      between replicated (MLA) and sharded layouts; the shard count is already
+      between replicated and sharded layouts; the shard count is already
       pinned by ``tensor_parallel_degree``.
 
     Model/weights identity is deliberately NOT folded here: a different model is
@@ -514,6 +539,62 @@ def _is_permanent_admission_error(exc: Exception) -> bool:
     return "[retriable=false]" in str(exc)
 
 
+def _resolve_admission_timeout_s(env: Mapping[str, str] | None = None) -> float:
+    """Resolves the admission retry budget, raising it to cover several attempts.
+
+    A budget too small to retry is corrected with a warning rather than
+    rejected. The point of the floor is to guarantee that a transient refusal is
+    retried; failing model load at construction would trade one broken outcome
+    for another, and would do it to deployments that merely pinned the old
+    default.
+
+    Args:
+        env: Environment to read; defaults to :data:`os.environ`. Injectable for
+            tests.
+
+    Returns:
+        The admission budget in seconds, never below the floor.
+
+    Raises:
+        ValueError: If ``MODULAR_DKV_ADMISSION_TIMEOUT_S`` is set but not a
+            positive, finite number. This shim is its only reader, so there is
+            no permissive parser to mirror and a typo is worth surfacing.
+    """
+    env = os.environ if env is None else env
+
+    raw = env.get("MODULAR_DKV_ADMISSION_TIMEOUT_S")
+    if raw is None:
+        admission_s = _DEFAULT_ADMISSION_TIMEOUT_S
+    else:
+        try:
+            admission_s = float(raw)
+        except ValueError:
+            raise ValueError(
+                f"MODULAR_DKV_ADMISSION_TIMEOUT_S={raw!r} is not a number"
+            ) from None
+        if not (0 < admission_s < float("inf")):
+            raise ValueError(
+                f"MODULAR_DKV_ADMISSION_TIMEOUT_S={raw!r} must be a positive, "
+                f"finite number"
+            )
+
+    minimum = _MIN_ADMISSION_ATTEMPTS * _DEFAULT_HANDSHAKE_TIMEOUT_S
+    if admission_s < minimum:
+        _logger.warning(
+            "dKV admission budget %gs is below %.0fs, the time %d handshake "
+            "attempts can take, so a transient refusal would fail model load "
+            "instead of being retried; using %.0fs. Set "
+            "MODULAR_DKV_ADMISSION_TIMEOUT_S at or above %.0fs to silence this.",
+            admission_s,
+            minimum,
+            _MIN_ADMISSION_ATTEMPTS,
+            minimum,
+            minimum,
+        )
+        return minimum
+    return admission_s
+
+
 def _admit_with_retry(
     factory: Callable[[], object],
     *,
@@ -567,27 +648,6 @@ def _admit_with_retry(
             backoff *= 2
 
 
-class DKVExternalBlockMetadata(
-    msgspec.Struct, tag=True, kw_only=True, omit_defaults=True
-):
-    """Marker that a block hash is referenced by the orchestrator hint.
-
-    The slim hint only carries ``seq_hash``; the dKV server resolves slab
-    location and length when the connector reads the block. We still wrap the
-    hash in a typed struct so the context payload survives the
-    API-server -> model-worker process boundary via msgspec's tagged-struct
-    serialization.
-
-    The struct is intentionally retained even though it degenerates to a single
-    ``seq_hash`` field today. The orchestrator's hint shape is expected to evolve
-    to mix blocks from multiple source dKV instances in a single hint (per-block
-    ``instance_name`` for routing); keeping the per-block container in place now
-    lets that land without re-introducing a context-side data structure.
-    """
-
-    seq_hash: int
-
-
 class DKVConnector(KVConnector):
     """``KVConnector`` backed by the ``dkv_connector`` Rust client.
 
@@ -631,9 +691,9 @@ class DKVConnector(KVConnector):
                 no default/legacy single-tenant path, so it fails model load
                 rather than silently keying an unfenced shared store.
         """
-        # Deferred so importing this module (e.g. for DKVExternalBlockMetadata,
-        # or by non-dKV pipelines) does not require the optional, runtime-
-        # provided dkv_connector extension to be installed.
+        # Deferred so importing this module (e.g. by a non-dKV pipeline) does
+        # not require the optional, runtime-provided dkv_connector extension to
+        # be installed.
         from dkv_connector import DkvConnector as _DkvConnectorClient
 
         # The Rust client creates a NIXL agent, which dlopens the transport
@@ -688,7 +748,30 @@ class DKVConnector(KVConnector):
         # because every DP replica runs the same model and config and so the
         # same layout; folded into the layout hash because a shard's dKV block
         # is these strides concatenated
-        unit_strides = _shard_unit_strides(replica_kv_memory[0])
+        units = replica_kv_memory[0]
+        unit_strides = _shard_unit_strides(units)
+        # A mixed tree rides the per-shard path, where a replicated unit is
+        # stored once per TP shard rather than once, so this tenant's dKV
+        # footprint exceeds what the tiered connector's host row needs for the
+        # same model. The multiplier is on the offloaded AND loaded bytes, not
+        # just on capacity, and it is small only when the replicated unit is,
+        # as M3's one-head index-K cache is; an MLA target paired with a
+        # non-MLA draft replicates the whole latent cache. Say it at model
+        # load rather than leave it to be inferred from a share that never
+        # fills.
+        if {mem.replicated for mem in units} == {True, False}:
+            replicated_bytes = sum(
+                mem.bytes_per_page for mem in units if mem.replicated
+            )
+            _logger.warning(
+                "dKV KV tree mixes replicated and sharded caches, so each of "
+                "the %d TP shards stores its own copy of %d replicated byte(s) "
+                "per block. This tenant needs %d byte(s) per block more than "
+                "the tiered connector's sizing.",
+                params.tensor_parallel_degree,
+                replicated_bytes,
+                replicated_bytes * (params.tensor_parallel_degree - 1),
+            )
         kv_config_hash, replica_identities = _resolve_replica_identities(
             num_replicas, params, unit_strides
         )
@@ -715,12 +798,7 @@ class DKVConnector(KVConnector):
         # than a restatement of it.
         devices_per_replica = split_into_groups(list(devices), num_replicas)
 
-        admission_timeout_s = float(
-            os.getenv(
-                "MODULAR_DKV_ADMISSION_TIMEOUT_S",
-                str(_DEFAULT_ADMISSION_TIMEOUT_S),
-            )
-        )
+        admission_timeout_s = _resolve_admission_timeout_s()
 
         heartbeat_overrides = _heartbeat_overrides()
         if heartbeat_overrides:
@@ -795,10 +873,12 @@ class DKVConnector(KVConnector):
             )
 
         # Surface the Rust connector's MLA NVLink-broadcast status to the serve
-        # process: the Rust side logs it via ``tracing``, which has no subscriber
-        # under MAX. ``broadcast_peer_count`` is ``tp - 1`` once the broadcast
-        # armed at handshake, and 0 for a non-MLA model, a single device, or a
-        # topology without peer access, so log only when it engaged.
+        # process: the Rust side logs it through ``tracing`` at ``info``, and the
+        # subscriber the connector now installs defaults to ``warn``, so it stays
+        # quiet unless ``RUST_LOG`` raises it. ``broadcast_peer_count`` is
+        # ``tp - 1`` once the broadcast armed at handshake, and 0 for a non-MLA
+        # model, a single device, or a topology without peer access, so log only
+        # when it engaged.
         for idx, client in enumerate(self._clients):
             peers = client.broadcast_peer_count()
             if peers:
@@ -842,10 +922,12 @@ class DKVConnector(KVConnector):
         # per TP shard. The Rust client concatenates each shard's units, in
         # this order, into one dKV block, so a quantized cache's scale buffers
         # and a multi-cache buffer's extra caches (speculative draft and
-        # target) all land inside the block rather than being dropped, and the
-        # stored bytes are identical to the shard's portion of the CPU block
-        # the local and tiered connectors build (CLIN-1460).
-        shards, is_mla = _group_units_by_shard(kv_memory)
+        # target) all land inside the block rather than being dropped. The
+        # stored bytes are the shard's portion of the CPU block the local and
+        # tiered connectors build (CLIN-1460) only for an all-sharded tree;
+        # those connectors keep one copy of a replicated unit, dKV one per
+        # shard.
+        shards, shards_are_identical = _group_units_by_shard(kv_memory)
 
         # MAX's compute stream per device ordinal, so the same-host offload can
         # order each device's D2H after the forward pass that wrote its blocks
@@ -891,7 +973,9 @@ class DKVConnector(KVConnector):
             0,  # page_size (tokens): unused by the Rust client
             total_num_pages,
             len(shards),
-            is_mla,
+            # the client's parameter is still named ``is_mla``, but
+            # replication is not MLA-specific: M3's index-K cache replicates.
+            shards_are_identical,
             listen_port=listen_port,
             backend=backend,
             compute_streams=compute_streams,
@@ -913,6 +997,7 @@ class DKVConnector(KVConnector):
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
         """Loads external blocks into ``replica_idx``'s device memory by hash.
 
@@ -920,6 +1005,11 @@ class DKVConnector(KVConnector):
         ``ahash64`` / ``sha256_64`` or 32 bytes for full ``sha256``. 32-byte
         digests are truncated to their first 8 bytes at the dkv boundary (see
         :func:`_to_dkv_u64`).
+
+        ``hint`` is the request's ``dkv_cache_hint`` JSON bytes, forwarded
+        unparsed: the Rust client reads it to route each block to the peer that
+        holds it, and treats anything unusable as no hint, which costs a miss
+        rather than a failed load.
 
         Routes to the processing replica's single client (backend dedup: one
         client per DP replica, registering that replica's full TP GPU set). The
@@ -941,6 +1031,7 @@ class DKVConnector(KVConnector):
             group_id=_DKV_GROUP_FULL_ATTENTION,
             block_ids=leaf_block_ids,
             block_hashes=dkv_hashes,
+            hint=hint,
         )
         # dKV orders its posted READs before the forward in the deprecated
         # ``wait_for_loads`` barrier, so the manager treats the load as already

@@ -1,0 +1,136 @@
+---
+title: Initialization state
+sidebar_position: 3
+description: >
+  Understand when a value is initialized and ready to use.
+---
+
+Mojo tracks two kinds of initialization for structs: *fieldwise* and
+*logical*.
+
+Fieldwise initialization means every field contains a valid value. Logical
+initialization means the instance as a whole is valid and ready to use. A
+struct needs both before you can use it.
+
+## The basics
+
+You create struct instances by calling the `__init__()` initializer:
+
+```mojo
+struct Person:
+    var name: String
+    var age: Int
+
+    def __init__(out self, name: String, age: Int):
+        self.name = name
+        self.age = age
+
+def main():
+    var me = Person("Alice", 30)
+```
+
+Calling `Person("Alice", 30)` is syntactic sugar for calling the
+initializer directly:
+
+```mojo
+var me: Person
+me = Person.__init__("Alice", 30) # Identical
+```
+
+When constructing a Person, the compiler allocates the
+necessary storage and `__init__()` initializes that memory.
+
+## Fieldwise vs logical initialization
+
+Initializing a struct by assigning values directly to its fields may
+populate the data, but it doesn't make the instance usable:
+
+```mojo
+@fieldwise_init
+struct Person(Writable):
+    var name: String
+    var age: Int
+
+def main():
+    var me: Person
+    me.name = "Alice"
+    me.age = 25
+    print(me)  # Error
+    # error: 'me' used with all fields manually initialized
+    # but without calling an '__init__' method
+```
+
+In this example, all fields contain valid values, but the instance is still
+not considered initialized.
+
+Assigning every field satisfies *fieldwise* initialization, but without
+running an `__init__()` method, it doesn't satisfy *logical* initialization.
+
+Construct the value with an initializer to establish both:
+
+```mojo
+var me: Person      # Not initialized
+me = Person("Alice", 30)  # Logically and fieldwise initialized after call
+print(me)
+```
+
+After `__init__()` completes, the instance is safe to use.
+
+## Inside `__init__()`
+
+Within `__init__()`, `self` is logically initialized, but its fields are
+uninitialized. This reverses the situation before calling `__init__()`,
+where the fields are initialized but `self` is not:
+
+```mojo
+def __init__(out self, name: String, age: Int):
+    # At this point:
+    # - Logically initialized (self is valid as an instance)
+    # - Fieldwise uninitialized (fields have no values yet)
+
+    self.name = name
+    self.age = age
+
+    # Now both logically and fieldwise initialized
+```
+
+Entering `__init__()` establishes the instance. It's your responsibility to
+populate every field:
+
+```mojo
+def __init__(out self, name: String, age: Int):
+    self.name = name
+    # Error: field 'age' not initialized in __init__
+```
+
+The `__init__()` signature doesn't have to mirror the struct's fields.
+You can use parameters, constants, or external values to initialize them:
+
+```mojo
+# Parameters can be used to initialize fields
+self._store = List[T](capacity=Count)
+
+# Constants can be used to initialize fields
+self.string = ""
+
+# External values can be used to initialize fields
+from std.math import pi
+self.default_angle = pi / 2.0
+self.uuid = MyUUIDImplementation.uuid()
+```
+
+### Calling methods
+
+You can't call methods until all fields are initialized:
+
+```mojo
+def __init__(out self, name: String):
+    self.greet()      # Error: self not fully initialized
+    self.name = name
+    self.greet()      # OK: all fields initialized
+```
+
+Field initialization is limited to `__init__()` methods.
+
+Regular methods can't initialize individual fields of an `out` argument,
+but `__init__()` methods can.

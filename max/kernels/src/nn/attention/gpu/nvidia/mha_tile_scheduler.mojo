@@ -23,11 +23,11 @@ from std.collections import OptionalReg
 
 from std.atomic import Atomic
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from max.gpu.host.info import H100
-from std.gpu import block_idx, thread_idx
-from std.gpu.primitives.id import cluster_dim
+from max.gpu import block_idx, thread_idx
+from max.gpu.primitives.id import cluster_dim
 from max.gpu.sync import barrier, named_barrier
 from nn.attention.gpu.nvidia.common import NullPointer, OptionalPointer
 

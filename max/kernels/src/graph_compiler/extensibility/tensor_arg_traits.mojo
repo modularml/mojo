@@ -37,6 +37,8 @@ the host or is projected to a device.
 from layout import (
     Coord,
     CoordLike,
+    DefaultEngine,
+    TensorEngine,
     TensorLayout,
     TileTensor,
 )
@@ -76,6 +78,62 @@ trait Fused:
     pass
 
 
+trait UnsafeFusedView(Fused, TrivialRegisterPassable):
+    """Flags a fused trait argument whose host and device views share a
+    byte-identical layout.
+
+    Conformance here is the legacy gate for the `unsafe_fused_view` rebind;
+    it exists to keep that one host-built-closure construction compiling
+    while kernels migrate. Prefer the supported pattern in new accelerator
+    kernels: pass the fused trait arg straight through `enqueue_function`
+    to a device kernel parameterized by `XHost: DevicePassable`, where the
+    capability is reached via `downcast[XHost.device_type, ...]`. The
+    canonical exemplars in `GraphCompiler/test/kernels/testing_kernels.mojo`
+    follow that shape:
+
+    - `TraitFusedLoadNegate` (`_gpu_fused_load_negate_kernel`).
+    - `TraitFusedStoreDouble` (`_gpu_fused_store_double_kernel`).
+    - `TraitFusedTransformBias` (`_gpu_fused_transform_bias_kernel`).
+
+    `FusedViewType` is the trait's contract field -- the access-enabled
+    view the rebind returns. It is `Self.device_type` on every conformer
+    today, so the free function next door is the single place the
+    byte-identity check lives. The day the two stop being byte-identical
+    (e.g., NPU), the rebind becomes a real builder on the concrete type
+    and the free function routes through it.
+    """
+
+    comptime FusedViewType: TrivialRegisterPassable
+
+
+@always_inline
+def unsafe_fused_view[
+    T: UnsafeFusedView,
+    *,
+](t: T) -> T.FusedViewType:
+    """Rebinds a fused trait argument to its access-enabled projected view.
+
+    On `_Mogg*FusionTensor` conformers this is `Self.device_type`: the same
+    fields with `_device_passable` and `_access_enabled` swapped. The host
+    proxy and projected view are byte-identical today, so the rebind is just a
+    bit cast; the `comptime assert` below is the guard for the day that
+    property stops holding (e.g., NPU).
+
+    Parameters:
+        T: The fused trait argument type. Constrained to `UnsafeFusedView`.
+
+    Args:
+        t: The fused trait argument to rebind.
+
+    Returns:
+        The access-enabled projected view, byte-identical to `t`.
+    """
+    comptime assert type_of(reflect[T].field_types()) == type_of(
+        reflect[T.FusedViewType].field_types()
+    ), "fused view rebind: proxy and view no longer share field types"
+    return rebind[T.FusedViewType](t)
+
+
 # ===----------------------------------------------------------------------=== #
 # Metadata traits
 # ===----------------------------------------------------------------------=== #
@@ -101,13 +159,22 @@ trait Tensor:
 trait DenseTensor(Tensor):
     """Metadata trait: a `Tensor` backed by a dense (contiguous) layout.
 
-    Adds the layout type and preferred alignment on top of `Tensor`, giving the
-    kernel enough to build a `TileTensor` view over the argument's storage. The
-    dense-vs-plain distinction is invisible to the distilled contract.
+    Adds the layout type, preferred alignment, and engine on top of
+    `Tensor`, giving the kernel enough to build a `TileTensor` view over the
+    argument's storage. The dense-vs-plain distinction is invisible to the
+    distilled contract.
     """
 
     comptime LayoutType: TensorLayout
     comptime alignment: Int
+    comptime Engine: TensorEngine = DefaultEngine[element_width=1]
+    """How the argument's backing memory is referenced.
+
+    Per-target instantiation metadata like `alignment`, not part of the
+    distilled contract: the graph compiler picks it per device label when it
+    instantiates the argument, so a host-pointer argument and a device-pointer
+    argument differ here while sharing one contract.
+    """
 
     def layout(self) -> Self.LayoutType:
         """Returns the tensor's layout (shape and strides).
@@ -237,6 +304,11 @@ trait TileTensorable(DenseTensor):
     Lets the kernel work on a non-fused argument directly as a `TileTensor` (via
     `to_tile_tensor`) instead of going through the fused load/store/transform
     access.
+
+    The projection's origin is `UntrackedOrigin` because the backing memory
+    belongs to the graph executor: its liveness guarantee is invisible to the
+    origin system, and the generated argument has no call-site origin it could
+    name instead.
     """
 
     comptime mut: Bool
@@ -247,6 +319,7 @@ trait TileTensorable(DenseTensor):
         Self.dtype,
         LayoutType=Self.LayoutType,
         origin=UntrackedOrigin[mut=Self.mut],
+        Engine=Self.Engine,
     ]:
         """Projects the argument to a `TileTensor` over its storage.
 

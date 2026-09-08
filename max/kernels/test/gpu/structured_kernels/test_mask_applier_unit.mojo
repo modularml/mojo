@@ -38,7 +38,7 @@ positions were leaking in. This test confirms that the mask
 write itself produces values that flush `exp2` to exactly 0.0.
 """
 
-from std.gpu import lane_id
+from max.gpu import lane_id
 from max.gpu.host import DeviceContext
 from std.math import exp2 as math_exp2
 from std.testing import assert_true

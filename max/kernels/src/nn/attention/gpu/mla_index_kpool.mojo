@@ -32,7 +32,7 @@ from std.math import exp, max
 
 from layout import TensorLayout, TileTensor
 
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 
 
 @always_inline

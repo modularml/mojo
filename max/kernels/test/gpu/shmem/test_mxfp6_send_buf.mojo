@@ -25,8 +25,8 @@ mis-strided write still dequantizes to plausible-looking numbers.
 """
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_dim, thread_idx
-from std.gpu.host.info import MI355X
+from max.gpu import block_dim, thread_idx
+from max.gpu.host.info import MI355X
 from std.random import random_float64, seed
 from std.memory import bitcast
 from std.testing import assert_equal, assert_true

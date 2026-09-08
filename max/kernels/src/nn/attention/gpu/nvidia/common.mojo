@@ -25,7 +25,7 @@ from std.memory import (
 from std.sys import size_of
 from std.sys._assembly import inlined_assembly
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.host import DeviceContext
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.compute.mma import st_matrix
@@ -35,10 +35,10 @@ from layout import (
     IntTuple,
     Layout,
     LayoutTensor,
-    PointerStorage,
+    DefaultEngine,
     RuntimeLayout,
     RuntimeTuple,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     UNKNOWN_VALUE,
     row_major,
@@ -128,8 +128,8 @@ comptime _1d_row_major_tt_layout = InternalLayout[
     stride_types=Coord[ComptimeInt[1]].element_types,
 ]
 comptime ImmutTileTensor1D[
-    dtype: DType, *, Storage: TensorStorage = PointerStorage[element_width=1]
-] = TileTensor[dtype, _1d_row_major_tt_layout, ImmutAnyOrigin, Storage=Storage]
+    dtype: DType, *, Engine: TensorEngine = DefaultEngine[element_width=1]
+] = TileTensor[dtype, _1d_row_major_tt_layout, ImmutAnyOrigin, Engine=Engine]
 
 
 struct Pack[

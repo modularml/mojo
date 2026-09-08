@@ -959,6 +959,28 @@ def test_chunk_gqa_hv4_safe_probability_vfirst() raises:
     )
 
 
+def test_chunk_hv64_h64_noGQA_safe_kfirst() raises:
+    """HV=H=64, no GQA expansion, using dims from GLM-5.3-Flash.
+    (`linear_num_heads=64`, no query/key-value head split). Varlen [300, 212],
+    chunk 64, safe/logits (matches `linear_lower_bound=-5.0`), K_FIRST fp32.
+    """
+    comptime assert has_accelerator(), "Requires GPU"
+    var ctx = DeviceContext()
+    _check[
+        DType.bfloat16, DType.float32, 128, 128, "safe", "logits", "K_FIRST"
+    ](
+        "hv64-h64-noGQA",
+        batch_size=2,
+        num_value_heads=64,
+        num_key_heads=64,
+        total_T=512,
+        chunk_size=64,
+        seq_lengths=[300, 212],
+        ctx=ctx,
+        tol_output=0.006,
+    )
+
+
 def test_chunk_zero_init_original_kfirst() raises:
     """Zero initial state, T=100, chunk 64, original/logits, K_FIRST fp32."""
     comptime assert has_accelerator(), "Requires GPU"

@@ -1,0 +1,262 @@
+# Crash-only LSP-parse smoke over real .mojo trees, via a single `kgen -lsp`
+# invocation per file. See the module docstring in lsp_smoke_all.py for what
+# that reproduces, what counts as a failure, and what is NOT covered.
+#
+# Unresolved imports surface as errors, so any scan root added here must be
+# covered by `mojo_deps` below. Since #90643, this also covers trees like
+# max/kernels/src whose files resolve other packages from a PRECOMPILED
+# `.mojoc` dependency rather than source -- `cloneDeclModuleForCompilation`
+# used to give such imported stubs an invalid 0-block body, which spuriously
+# failed MLIR verification; it now gives them a canonical unresolved body,
+# matching the real server.
+#
+# --- Running ---
+#   Whole stdlib:
+#     bt //Mojo/test/mojo-lsp-server/parse-tree:lsp-parse-smoke-stdlib
+#   Whole kernel tree:
+#     bt //Mojo/test/mojo-lsp-server/parse-tree:lsp-parse-smoke-kernels
+#   Single file (fast, for debugging a failure -- sets up
+#   MODULAR_MOJO_MAX_IMPORT_PATH automatically):
+#     br //Mojo/test/mojo-lsp-server/parse-tree:lsp-smoke-one -- \
+#         Mojo/stdlib/std/sys/info.mojo
+
+load("@mojo//:mojo.bzl", "ALL_MOJOPKGS")
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test")
+load("//bazel:mojo_aliases.bzl", "INTERNAL_PACKAGES")
+
+package(default_visibility = ["//visibility:private"])
+
+# The actual smoke-test implementation, kept as a single py_library so it has
+# exactly one owning rule. lsp-parse-smoke-stdlib and lsp-smoke-one each get a
+# thin `main` wrapper importing from here instead of both listing
+# lsp_smoke_all.py directly -- otherwise the same file would be `main` for two
+# rules and trip bazel/internal/find_duplicate_srcs.py. lsp_smoke_all.py
+# remains directly runnable too (see its module docstring's manual usage).
+modular_py_library(
+    name = "lsp_smoke_lib",
+    srcs = ["lsp_smoke_all.py"],
+    imports = ["."],
+)
+
+# LSP parse tests are excluded from sanitizer builds: instrumentation overhead
+# makes them time out reliably.
+_SANITIZER_INCOMPATIBLE = select({
+    "//:asan": ["@platforms//:incompatible"],
+    "//:ubsan": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
+# Emergency escape hatch: files that crash/hang the parse and block the build.
+# Paths are relative to the stdlib root (Mojo/stdlib/std). This
+# should normally be empty -- only add files that genuinely crash, not files
+# that merely emit diagnostics. To re-enable: remove from this list.
+_NO_RUN_LIST = [
+]
+
+modular_py_test(
+    name = "lsp-parse-smoke-stdlib",
+    # "large" (900s timeout), not "medium" (300s): files run sequentially within
+    # a shard and a heavy source-reparse is ~60s each, so a few per shard needs
+    # headroom. It also must exceed the script's own 300s per-file hang timeout
+    # so a real hang is reported by the script, not killed by bazel first.
+    size = "large",
+    srcs = ["lsp_smoke_stdlib_main.py"],
+    args = [
+        "--scan-root-file",
+        "$(rootpath @mojo//:__init__.mojo)",
+    ] + [
+        arg
+        for f in _NO_RUN_LIST
+        for arg in [
+            "--skip-file",
+            f,
+        ]
+    ],
+    data = [
+        "//Mojo/tools/kgen",
+        "@mojo//:__init__.mojo",
+        "@mojo//:std_srcs",
+    ],
+    main = "lsp_smoke_stdlib_main.py",
+    # mojo_deps drives the auto-set MODULAR_MOJO_MAX_IMPORT_PATH, giving the
+    # parser the same library-resolution branch the LSP server uses.
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    # ~240 enabled files / 50 shards ~= 5 files per shard, well within medium.
+    shard_count = 50,
+    tags = [
+        "manual",
+        "no-pydeps",
+    ],
+    target_compatible_with = _SANITIZER_INCOMPATIBLE,
+    deps = [":lsp_smoke_lib"],
+)
+
+# Convenience runner for a single file, e.g. to debug a `lsp-parse-smoke-stdlib`
+# failure without hand-wiring MODULAR_MOJO_MAX_IMPORT_PATH:
+#   br //Mojo/test/mojo-lsp-server/parse-tree:lsp-smoke-one -- \
+#       Mojo/stdlib/std/sys/info.mojo
+modular_py_binary(
+    name = "lsp-smoke-one",
+    srcs = ["lsp_smoke_one_main.py"],
+    args = [
+        "--kgen-path",
+        "$(rootpath //Mojo/tools/kgen)",
+    ],
+    data = [
+        "//Mojo/tools/kgen",
+        # __init__.mojo is already pulled in via std_srcs's glob; no need to
+        # list it separately (this target doesn't need its own
+        # $(rootpath ...) reference to it, unlike lsp-parse-smoke-stdlib).
+        "@mojo//:std_srcs",
+    ],
+    main = "lsp_smoke_one_main.py",
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    tags = [
+        "manual",
+        "no-pydeps",
+    ],
+    target_compatible_with = _SANITIZER_INCOMPATIBLE,
+    deps = [":lsp_smoke_lib"],
+)
+
+# Top-level kernel library packages under //max/kernels/src. Drives `data`
+# (via each package's `:srcs` filegroup) and, indirectly, `mojo_deps` pruning
+# below. NOTE: this does NOT curate the actual scanned file set --
+# `--scan-root-file` resolves through the runfiles symlink to the real on-disk
+# max/kernels/src tree, so the script always sees the full tree on disk. Real
+# exclusion happens via `--skip-file` (_KERNELS_NO_RUN_LIST). This list exists
+# so the intentionally-supported package set is visible in one place and so
+# `mojo_deps` only carries .mojoc's this test's *scanned* files actually need.
+#
+# graph_compiler's sub-packages (builtin_kernels, builtin_primitives,
+# extensibility) are excluded from this list: they have no `:srcs` filegroup
+# of their own, but per the NOTE above that doesn't matter for the scan --
+# file discovery always goes through the on-disk tree, not `data`.
+#
+# graph_compiler itself has no `__init__.mojo` (it's a container, not a
+# package -- see max/kernels/src/BUILD.bazel's own _EXCLUDED_KERNEL_LIBS), so
+# its sub-packages sit one directory level deeper than every other kernel
+# package. This used to be documented here as a suspected real gap in
+# import-path resolution for doubly-nested Mojo packages; as of 2026-07-09
+# that's confirmed false. Their imports are flat names (`import
+# extensibility`, not `graph_compiler.extensibility`), `resolveModulePath`
+# (Mojo/lib/MojoParser/SharedState.cpp) resolves by flat name against each
+# import-path directory with nothing nesting-specific about it, and
+# `//:install` ships their `.mojoc`s flat, same as every other kernel
+# package -- confirmed by direct `kgen -lsp` runs. The actual cause of the
+# old "unable to locate module" failures was this file's own
+# _KERNEL_MOJOPKGS excluding those 3 targets from the import path; see its
+# comment below.
+_KERNEL_PACKAGES = [
+    "comm",
+    "internal_utils",
+    "kv_cache",
+    "layout",
+    "linalg",
+    "nn",
+    "pipeline",
+    "profiling_range",
+    "quantization",
+    "shmem",
+    "state_space",
+    "structured_kernels",
+    "weights_registry",
+]
+
+# Same escape hatch as _NO_RUN_LIST, but paths are relative to max/kernels/src.
+# //Kernels/lib/... OSS-layering gap: these files import `matmul_rs`/`msa`,
+# packages that live in the closed-source `Kernels/` tree rather than the
+# open-sourced max/kernels/src (see _KERNEL_MOJOPKGS's comment below). Known
+# issue, not specific to this test. "unable to locate module" is the only
+# error; no crash, no other diagnostic.
+_KERNELS_NO_RUN_LIST = [
+    "graph_compiler/builtin_kernels/distributed.mojo",
+    "graph_compiler/builtin_kernels/kda.mojo",
+    "graph_compiler/builtin_kernels/msa.mojo",
+]
+
+# ALL_MOJOPKGS minus the internal //Kernels/... packages (msa, matmul_rs,
+# mega_ffn): these live in the closed-source `Kernels/` tree rather than the
+# open-sourced max/kernels/src, and are unreachable from here. Known
+# OSS-layering issue, not specific to this test (see _KERNELS_NO_RUN_LIST's
+# comment above: msa.mojo, distributed.mojo).
+#
+# The graph_compiler sub-package targets (extensibility, builtin_kernels,
+# builtin_primitives) were excluded here too until 2026-07-09, on the theory
+# that a mojo_library target's MojoInfo carries its own SOURCE .mojo files
+# (not just the compiled .mojoc) and that those would propagate into this
+# test's runfiles and silently re-add files to the scan. That's confirmed
+# false: `collect()`'s file discovery walks the *resolved* on-disk tree (see
+# the NOTE on _KERNEL_PACKAGES above), independent of whatever `mojo_deps`
+# puts in runfiles -- there's no duplication to worry about. Excluding these
+# 3 targets only meant their compiled `.mojoc` was missing from the import
+# path, which is exactly why every file inside or importing them failed with
+# "unable to locate module". Restored 2026-07-09 after a direct `kgen -lsp`
+# run (using this same computed import path) confirmed it fixes 16 of the 34
+# previously-skipped files outright and unmasks -- rather than causes -- a
+# real bytecode-reader crash behind 17 more, since fixed in
+# SharedState::finalizeImportedBytecodeModules (see its comment); see
+# _KERNELS_NO_RUN_LIST for what's left.
+_KERNEL_MOJOPKGS = [
+    dep
+    for dep in ALL_MOJOPKGS
+    if dep not in INTERNAL_PACKAGES
+]
+
+# Same `kgen -lsp` mechanism as lsp-parse-smoke-stdlib, scanning
+# max/kernels/src instead. Kernel files cross-import each other's packages
+# (e.g. nn -> layout, linalg -> comm) and universally import `std`, so every
+# precompiled kernel .mojopkg needs to be on the import path -- otherwise
+# cross-package imports fail to resolve and every such file shows a spurious
+# error. _KERNEL_MOJOPKGS (std + every //max:<pkg>) is the same set
+# `//:install` ships precompiled, so this matches production resolution
+# without recompiling anything per-test.
+#
+# size="large" (900s), not "medium": kernel files are heavier than stdlib's
+# and shard_count is capped at 50 (Bazel's hard limit) for ~480 files, so a
+# shard can see ~10 files instead of stdlib's ~5 -- large gives headroom for a
+# shard that draws several heavy files.
+modular_py_test(
+    name = "lsp-parse-smoke-kernels",
+    size = "large",
+    srcs = ["lsp_smoke_kernels_main.py"],
+    args = [
+        "--scan-root-file",
+        "$(rootpath //max/kernels/src:index.md)",
+        # `data` below stages each package's raw `:srcs` at the same runfiles
+        # path as its mojo_deps-precompiled `.mojoc`, which makes
+        # `resolveModulePath` treat that path as "inside a package" and skip
+        # it -- masking the `.mojoc` from every *other* package's imports.
+        # Passing the shared parent directory here too gives it a non-package
+        # root to find each package under instead.
+        "--extra-import-root",
+        "$(rootpath //max/kernels/src:index.md)",
+    ] + [
+        arg
+        for f in _KERNELS_NO_RUN_LIST
+        for arg in [
+            "--skip-file",
+            f,
+        ]
+    ],
+    data = [
+        "//Mojo/tools/kgen",
+        "//max/kernels/src:index.md",
+    ] + [
+        "//max/kernels/src/%s:srcs" % pkg
+        for pkg in _KERNEL_PACKAGES
+    ],
+    main = "lsp_smoke_kernels_main.py",
+    mojo_deps = _KERNEL_MOJOPKGS,
+    shard_count = 50,
+    tags = [
+        "manual",
+        "no-pydeps",
+    ],
+    target_compatible_with = _SANITIZER_INCOMPATIBLE,
+    deps = [":lsp_smoke_lib"],
+)

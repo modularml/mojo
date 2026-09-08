@@ -26,14 +26,14 @@ requires per-K-iteration scaling in CUDA cores:
 from std.math import gcd
 from std.math.uutils import umod, ufloordiv
 
-from std.gpu import WARP_SIZE, lane_id, warp_id as get_warp_id
+from max.gpu import WARP_SIZE, lane_id, warp_id as get_warp_id
 from max.gpu.sync import syncwarp
 from layout import (
     Coord,
     Idx,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major,
     stack_allocation,
@@ -210,7 +210,7 @@ struct BlockwiseFP8Accumulator[
         # Type parameters
         b_scales_dtype: DType,
         b_scales_layout: TensorLayout,
-        b_scales_storage: TensorStorage,
+        b_scales_engine: TensorEngine,
         a_scales_dtype: DType,
         # A-scales tile dimensions
         a_scales_dim0: Int,
@@ -221,7 +221,7 @@ struct BlockwiseFP8Accumulator[
             b_scales_dtype,
             b_scales_layout,
             ImmutAnyOrigin,
-            Storage=b_scales_storage,
+            Engine=b_scales_engine,
         ],
         a_scales_tiles: SMemTileArray2DRowMajor[
             a_scales_dtype,
@@ -252,7 +252,7 @@ struct BlockwiseFP8Accumulator[
             b_scales_dtype: Element type of the B-scales tensor; must be
                 `float32`.
             b_scales_layout: Memory layout of the B-scales tensor.
-            b_scales_storage: Storage policy of the B-scales tensor.
+            b_scales_engine: Engine of the B-scales tensor.
             a_scales_dtype: Element type of the A-scales SMEM tiles; must
                 be `float32`.
             a_scales_dim0: Row count of each A-scales SMEM tile.

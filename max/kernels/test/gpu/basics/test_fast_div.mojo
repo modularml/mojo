@@ -13,7 +13,7 @@
 
 
 from max.algorithm.functional import elementwise
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from std.testing import *
 
@@ -84,9 +84,9 @@ log2_shift: 6
 def run_elementwise[type: DType](ctx: DeviceContext) raises:
     comptime length = 256
 
-    var divisors_stack = Array[Scalar[type], length](uninitialized=True)
+    var divisors_stack = Array[Scalar[type], length](fill={})
     var divisors = TileTensor(divisors_stack, row_major[length]())
-    var remainders_stack = Array[Scalar[type], length](uninitialized=True)
+    var remainders_stack = Array[Scalar[type], length](fill={})
     var remainders = TileTensor(remainders_stack, row_major[length]())
 
     var out_divisors = ctx.enqueue_create_buffer[type](length)

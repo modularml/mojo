@@ -19,8 +19,8 @@ from std.math import ceildiv, recip
 from std.math.uutils import umod, ufloordiv
 from std.sys import simd_width_of, size_of
 
-from std.gpu import lane_id, WARP_SIZE
-from std.gpu.intrinsics import cvt_pk_fp8_f32_raw
+from max.gpu import lane_id, WARP_SIZE
+from max.gpu.intrinsics import cvt_pk_fp8_f32_raw
 from layout import TensorLayout, TileTensor
 from layout.coord import Coord, ComptimeInt, Idx
 from layout.swizzle import Swizzle

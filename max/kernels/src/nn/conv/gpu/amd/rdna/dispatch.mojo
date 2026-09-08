@@ -24,7 +24,7 @@ Provides two paths for 2-D convolution on RDNA 3+:
 """
 
 from std.math import ceildiv
-from std.gpu import global_idx, WARP_SIZE
+from max.gpu import global_idx, WARP_SIZE
 from max.gpu.host import DeviceContext
 from layout import Coord, Idx, TileTensor, row_major
 from linalg.matmul.gpu import _matmul_gpu
@@ -323,6 +323,8 @@ def dispatch_rdna_conv2d[
                 type_of(filter_nk_tt).LayoutType,
                 elementwise_lambda_fn=_epilogue,
                 BLOCK_K=BLOCK_K,
+                out_engine=type_of(out_tt).Engine,
+                filter_nk_engine=type_of(filter_nk_tt).Engine,
             ]
 
             ctx.enqueue_function[conv_kernel](

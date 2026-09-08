@@ -15,7 +15,7 @@ from std.math import ceildiv
 from std.sys import argv
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.host import DeviceContext
 from layout import Layout, LayoutTensor
 from layout._fillers import random

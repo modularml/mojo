@@ -1,0 +1,11 @@
+load("//bazel:api.bzl", "modular_cc_test")
+
+package(default_visibility = ["//visibility:private"])
+
+modular_cc_test(
+    name = "GlobalsTest",
+    srcs = ["GlobalsTest.cpp"],
+    deps = [
+        "//Mojo:CompilerRT",
+    ],
+)

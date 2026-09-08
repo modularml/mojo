@@ -16,7 +16,7 @@ import linalg.matmul.vendor.blas as vendor_blas
 from std.math.uutils import udivmod
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu import lane_id, thread_idx, warp_id
+from max.gpu import lane_id, thread_idx, warp_id
 from max.gpu.compute.mma import (
     wgmma_async,
     wgmma_commit_group_sync,

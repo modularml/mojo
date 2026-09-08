@@ -13,12 +13,12 @@
 
 """Variable-length selective scan kernels for Mamba SSM architecture."""
 
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     thread_idx,
 )
-from layout import PointerStorage, TensorLayout, TensorStorage, TileTensor
+from layout import DefaultEngine, TensorLayout, TensorEngine, TileTensor
 from std.utils.index import IndexList
 from max.algorithm import sync_parallelize
 from max.gpu.host import DeviceContext
@@ -52,7 +52,7 @@ def varlen_selective_state_update_gpu[
     output_LT: TensorLayout,
     dt_bias_LT: TensorLayout,
     state_batch_indices_LT: TensorLayout,
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     # Grid dimensions
     total_threads: Int32,  # batch * nheads * dim / BLOCK_SIZE_M
@@ -65,23 +65,23 @@ def varlen_selective_state_update_gpu[
     has_state_batch_indices: Int8,
     # Tensors
     state: TileTensor[
-        kernel_dtype, state_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, state_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Storage=Storage],
-    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Storage=Storage],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage],
-    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage],
-    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage],
-    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Storage=Storage],
-    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Storage=Storage],
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Engine=Engine],
     output: TileTensor[
-        kernel_dtype, output_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, output_LT, MutUntrackedOrigin, Engine=Engine
     ],
     dt_bias: TileTensor[
-        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],
     state_batch_indices: TileTensor[
-        .int32, state_batch_indices_LT, MutUntrackedOrigin, Storage=Storage
+        .int32, state_batch_indices_LT, MutUntrackedOrigin, Engine=Engine
     ],
     state_strides: Strides4D,  # (batch, nheads, dim, dstate)
     x_strides: Strides3D,  # (batch, nheads, dim)
@@ -264,7 +264,7 @@ def varlen_selective_scan_fwd_gpu[
     query_start_loc_LT: TensorLayout,
     cache_indices_LT: TensorLayout,
     has_initial_state_LT: TensorLayout,
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     dim: Int32,
     ngroups: Int32,
@@ -272,36 +272,36 @@ def varlen_selective_scan_fwd_gpu[
     pad_slot_id: Int32,
     delta_softplus: Int8,
     # Tensors - varlen format: (dim, total_length) for u, delta, z, out
-    u: TileTensor[kernel_dtype, u_LT, MutUntrackedOrigin, Storage=Storage],
+    u: TileTensor[kernel_dtype, u_LT, MutUntrackedOrigin, Engine=Engine],
     delta: TileTensor[
-        kernel_dtype, delta_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, delta_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
     B: TileTensor[
-        kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (ngroups, dstate, total_length)
     C: TileTensor[
-        kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (ngroups, dstate, total_length)
-    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Storage=Storage],
-    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Storage=Storage],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Engine=Engine],
     delta_bias: TileTensor[
-        kernel_dtype, delta_bias_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, delta_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],
     ssm_states: TileTensor[
-        kernel_dtype, ssm_states_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, ssm_states_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch, dim, dstate)
     output: TileTensor[
-        kernel_dtype, output_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, output_LT, MutUntrackedOrigin, Engine=Engine
     ],  # Output written here (or to z if z is present)
     query_start_loc: TileTensor[
-        .int32, query_start_loc_LT, MutUntrackedOrigin, Storage=Storage
+        .int32, query_start_loc_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch + 1,)
     cache_indices: TileTensor[
-        .int32, cache_indices_LT, MutUntrackedOrigin, Storage=Storage
+        .int32, cache_indices_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch,)
     has_initial_state: TileTensor[
-        .bool, has_initial_state_LT, MutUntrackedOrigin, Storage=Storage
+        .bool, has_initial_state_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch,)
     u_strides: Strides2D,  # (dim, total_length)
     delta_strides: Strides2D,  # (dim, total_length)

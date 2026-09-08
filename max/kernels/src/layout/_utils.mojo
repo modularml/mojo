@@ -16,7 +16,7 @@ from std.sys import size_of
 from std.sys.intrinsics import readfirstlane
 
 from max.gpu.host import DeviceBuffer, DeviceContext, HostBuffer
-from std.gpu.intrinsics import AMDBufferResource
+from max.gpu.intrinsics import AMDBufferResource
 from max.gpu.compute.mma import mma
 from layout import *
 from layout.layout_tensor import LayoutTensor, LayoutTensorIter

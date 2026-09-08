@@ -16,7 +16,7 @@ from std.math.uutils import udivmod
 from std.random import rand, randint, random_float64
 from std.sys import align_of, argv, size_of
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -24,7 +24,7 @@ from std.gpu import (
 )
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.intrinsics import lop
+from max.gpu.intrinsics import lop
 from max.gpu.memory import external_memory
 
 from internal_utils import assert_almost_equal

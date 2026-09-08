@@ -1,6 +1,7 @@
 # Test for pipeline unit tests.
 
 load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("//max/tests/integration/xarch_warm:eager_py_test.bzl", "modular_eager_py_test")
 
 package(default_visibility = [
     "//:__pkg__",
@@ -24,19 +25,27 @@ modular_py_test(
     ],
 )
 
-modular_py_test(
+# Builds real Module weights, so unwarmed the first eager dispatch
+# cold-compiles a GC model and blows the 60s budget.
+modular_eager_py_test(
     name = "test_modulev3_lora_manager",
     size = "small",
     srcs = ["test_modulev3_lora_manager.py"],
-    # Import-bound: ~80% of the wall time is importing the max stack, not the
-    # 13 assertions themselves. That startup cost starves on contended macOS
-    # workers and trips the timeout, and the LoRA manager logic under test is
-    # platform-independent, so macOS coverage buys nothing here.
+    cpu_only = True,
+    env = {
+        # Don't background-compile every eager graph (SDLC-4307 CI cpu/mem).
+        "MAX_EAGER_EXECUTOR": "fallback-internal",
+    },
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
     target_compatible_with = select({
-        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
         "//conditions:default": [],
     }),
     deps = [
+        "//max/python/max/_interpreter_ops",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/experimental",

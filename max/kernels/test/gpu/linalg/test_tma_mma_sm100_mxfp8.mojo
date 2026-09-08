@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from std.sys import size_of, argv
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     warp_id as get_warp_id,
     block_idx,

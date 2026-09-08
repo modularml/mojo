@@ -256,6 +256,21 @@ def test_budget_that_holds_one_huge_block_is_rejected() -> None:
     )
 
 
+def test_one_huge_block_suffices_without_a_null_block() -> None:
+    page = mha_page_bytes(50, 16, 256)
+
+    # The Rust host pool hands out every huge block it is given, so a caller
+    # that reserves no null block can use the budget the null block would have
+    # taken -- but an empty budget is still no pool.
+    assert compute_jenga_ratios(
+        page, {"values": page}, include_null_block=False
+    ) == (1, page, {"values": 1})
+    with pytest.raises(ValueError, match="at least one of them"):
+        compute_jenga_ratios(
+            page // 2, {"values": page}, include_null_block=False
+        )
+
+
 def test_budget_smaller_than_the_lcm_is_rejected() -> None:
     # Neither page alone is large, but their lcm is, which is the failure mode
     # worth naming in the error: sizing looks fine per cache and still fails.

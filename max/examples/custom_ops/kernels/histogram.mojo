@@ -17,7 +17,7 @@ from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.atomic import Atomic
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     global_idx,
     thread_idx,

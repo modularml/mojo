@@ -72,12 +72,12 @@ from std.sys import (
     simd_width_of,
     size_of,
 )
-from std.gpu import lane_id, thread_idx, WARP_SIZE
-from std.gpu.intrinsics import (
+from max.gpu import lane_id, thread_idx, WARP_SIZE
+from max.gpu.intrinsics import (
     AMDBufferResource,
     ds_read_tr8_b64,
 )
-from std.gpu._utils import to_i32, to_i64
+from max.gpu._utils import to_i32, to_i64
 from max.gpu.memory import CacheOperation
 from std.memory import AddressSpace
 from std.memory.unsafe import bitcast
@@ -91,7 +91,7 @@ from layout.coord import crd2idx
 from layout._utils import make_amd_buffer_resource
 from layout.tile_layout import Layout, row_major, col_major
 from layout.swizzle import Swizzle
-from layout.tensor_storage import PointerStorage
+from layout.tensor_engine import DefaultEngine
 from layout.tile_tensor import stack_allocation as tt_stack_allocation
 from std.itertools import product
 
@@ -1697,7 +1697,7 @@ struct SubTileLoaderLDS[
     @always_inline
     def __init__(
         out self,
-        gmem_tile: TileTensor[Self.dtype, Storage=PointerStorage[], ...],
+        gmem_tile: TileTensor[Self.dtype, Engine=DefaultEngine[], ...],
     ):
         """Create a loader from a DRAM tile.
 
@@ -2001,7 +2001,7 @@ struct SubTileLoaderLDS_st_8x32[
     @always_inline
     def __init__(
         out self,
-        gmem_tile: TileTensor[Self.dtype, Storage=PointerStorage[], ...],
+        gmem_tile: TileTensor[Self.dtype, Engine=DefaultEngine[], ...],
     ):
         """Create a loader from a DRAM tile.
 

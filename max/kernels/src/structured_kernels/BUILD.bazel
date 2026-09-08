@@ -7,7 +7,7 @@ package(default_visibility = ["//max:consumers"])
 filegroup(
     name = "srcs",
     srcs = glob(["**/*.mojo"]),
-    visibility = ["//KGEN/test/mojo-lsp-server/parse-tree:__pkg__"],
+    visibility = ["//Mojo/test/mojo-lsp-server/parse-tree:__pkg__"],
 )
 
 mojo_library(

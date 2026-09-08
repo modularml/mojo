@@ -13,7 +13,7 @@
 
 from std.math import exp
 
-from std.gpu import (
+from max.gpu import (
     thread_idx,
     block_dim,
     grid_dim,
@@ -27,16 +27,16 @@ from max.gpu.sync import (
     s_waitcnt,
     s_waitcnt_barrier,
 )
-from std.gpu.globals import WARP_SIZE
+from max.gpu.globals import WARP_SIZE
 from max.gpu.host import get_gpu_target
 from max.gpu.host.compile import _compile_code
-from std.gpu.intrinsics import (
+from max.gpu.intrinsics import (
     ds_read_tr8_b64,
     ds_read_tr16_b64,
     permlane_shuffle,
     permlane_swap,
 )
-from std.gpu.primitives.warp import (
+from max.gpu.primitives.warp import (
     shuffle_down,
     shuffle_idx,
     shuffle_up,

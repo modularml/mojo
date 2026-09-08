@@ -16,7 +16,7 @@ from std.random import random_float64
 
 from max.algorithm.functional import parallelize_over_rows
 from std.benchmark import Bench, Bencher, BenchId
-from layout import Coord, Idx, PointerStorage, TileTensor, row_major
+from layout import Coord, Idx, DefaultEngine, TileTensor, row_major
 from nn.toppminp import min_p_sampling, top_p_sampling
 from std.testing import assert_equal
 
@@ -26,9 +26,7 @@ comptime DEBUG_BENCH = False
 comptime PRINT_OUTPUT = False
 
 comptime FillFnType = def[dtype: DType](
-    mut TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
-    ]
+    mut TileTensor[mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]]
 ) -> None
 
 
@@ -74,7 +72,7 @@ def fill_random[
     dtype: DType
 ](
     mut buffer: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ]
 ):
     comptime min_val = -1e6
@@ -89,7 +87,7 @@ def fill_iota[
     dtype: DType
 ](
     mut buf: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ]
 ):
     iota(buf._storage, buf.num_elements())

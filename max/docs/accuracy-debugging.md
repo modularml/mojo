@@ -267,7 +267,7 @@ Check that weights are loaded and transformed correctly.
 ### FMA contraction differences
 
 MAX enables FMA (fused multiply-add) contraction by default via the LLVM
-`contract` fastmath flag (set in `KGEN/lib/KGENToLLVM/LLVMLoweringUtils.h`).
+`contract` fastmath flag (set in `Mojo/lib/KGENToLLVM/LLVMLoweringUtils.h`).
 This allows the compiler to fuse a `fmul + fadd` into a single FMA instruction,
 which rounds once instead of twice.
 

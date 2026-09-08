@@ -27,7 +27,7 @@
 # `//max/kernels/test/gpu/...` wildcard expansion -- it must never run (and
 # "fail") in the normal GPU suite or the nightly sanitizer lane.
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.host import DeviceContext
 
 

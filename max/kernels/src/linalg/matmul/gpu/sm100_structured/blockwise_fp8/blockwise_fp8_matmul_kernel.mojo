@@ -30,7 +30,7 @@ Key differences from standard/block-scaled kernels:
 
 from std.sys import size_of
 
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.primitives.cluster import (
     cluster_sync,
     elect_one_sync,
@@ -44,9 +44,9 @@ from max.gpu.sync import named_barrier
 from max.gpu.compute.arch.tcgen05 import *
 from layout import (
     Layout,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
 )
 
@@ -125,7 +125,7 @@ struct BlackwellBlockwiseFP8MatmulKernel[
     cluster_shape: StaticTuple[Int32, 3] = StaticTuple[Int32, 3](1),
     # B-scale N-direction block size (independent of BK_kernel).
     n_scale_granularity: Int = 128,
-    b_scales_storage: TensorStorage = PointerStorage[element_width=1],
+    b_scales_engine: TensorEngine = DefaultEngine[element_width=1],
 ]:
     """Blockwise FP8 matmul kernel with register-based accumulation.
 
@@ -147,7 +147,7 @@ struct BlackwellBlockwiseFP8MatmulKernel[
             (defaults to `(1, 1, 1)`).
         n_scale_granularity: B-scales N-direction block size in elements
             (defaults to 128).
-        b_scales_storage: Storage policy of the B-scales `TileTensor`.
+        b_scales_engine: Engine of the B-scales `TileTensor`.
     """
 
     # ========== Derived Constants (from config) ==========
@@ -289,7 +289,7 @@ struct BlackwellBlockwiseFP8MatmulKernel[
         Self.b_scales_type,
         Self.b_scales_layout,
         ImmutAnyOrigin,
-        Storage=Self.b_scales_storage,
+        Engine=Self.b_scales_engine,
     ]
 
     # ========== Shared Memory Type ==========

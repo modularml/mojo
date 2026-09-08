@@ -28,7 +28,7 @@ within the `(N+1)`-page buffer.
 Complements the Python-layer regression tests for the KV cache manager.
 """
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.memory import unsafe_memset_zero
 from std.utils import IndexList

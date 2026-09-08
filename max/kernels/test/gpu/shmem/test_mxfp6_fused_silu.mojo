@@ -23,12 +23,12 @@ tensor full of misplaced bytes, so the reference is compared element by
 element, not just in aggregate.
 
 Usage (plain `mojo` is shadowed by the installed shmem package -- use bazel):
-  ./bazelw run //KGEN/tools/mojo -- \
+  ./bazelw run //Mojo/tools/mojo -- \
       max/kernels/test/gpu/shmem/test_mxfp6_fused_silu.mojo
 """
 
 from max.gpu.host import DeviceContext, HostBuffer
-from std.gpu.host.info import MI355X
+from max.gpu.host.info import MI355X
 from std.math import exp, isfinite
 from std.random import random_float64, seed
 from std.testing import assert_almost_equal, assert_true
@@ -135,6 +135,7 @@ def _run_case[
         scales_tt,
         input_tt,
         off_tt,
+        Int32(0),  # max_padded_M unused when the fold is off
         alpha,
         limit,
         grid_dim=hw.sm_count,

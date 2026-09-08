@@ -34,7 +34,7 @@ from std.sys import (
     size_of,
 )
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -161,7 +161,9 @@ def _reducescatter_rmsnorm_kernel[
     # non-multimem).
     comptime PtrType = ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]
     var ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: src_ptrs[(my_rank + i) % ngpus]
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: src_ptrs[
+            (my_rank + i) % ngpus
+        ]
     )
 
     # Gamma is a model weight, not predecessor output, so it can be loaded ahead

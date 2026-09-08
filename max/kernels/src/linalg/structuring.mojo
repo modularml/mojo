@@ -15,7 +15,7 @@
 
 from std.collections import Optional
 
-from std.gpu.intrinsics import AMDBufferResource
+from max.gpu.intrinsics import AMDBufferResource
 from max.gpu.memory import external_memory
 from layout import Layout, LayoutTensor
 from layout._utils import _get_bounds, make_amd_buffer_resource

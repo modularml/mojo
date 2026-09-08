@@ -19,14 +19,14 @@ from std.sys import align_of, size_of
 
 from max.algorithm import parallelize_over_rows
 from std.bit import log2_floor
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     block_dim,
     block_idx,
     thread_idx,
 )
 from max.gpu.sync import barrier
-from std.gpu.primitives import warp
+from max.gpu.primitives import warp
 from max.gpu.memory import external_memory
 from std.collections import Span
 

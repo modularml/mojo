@@ -45,8 +45,8 @@ from std.sys.info import _is_sm_100x_or_newer, simd_width_of, size_of
 from std.time import global_perf_counter_ns
 
 import max.gpu.primitives.block as block
-import std.gpu.primitives.warp as warp
-from std.gpu import (
+import max.gpu.primitives.warp as warp
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -68,6 +68,7 @@ from layout import (
     Coord,
     Idx,
     TensorLayout,
+    TensorEngine,
     TileTensor,
     row_major,
     stack_allocation as tt_stack_allocation,
@@ -137,6 +138,11 @@ def gemv_partial_norm_kernel[
     a_layout: TensorLayout,
     b_layout: TensorLayout,
     gamma_layout: TensorLayout,
+    normed_engine: TensorEngine,
+    unnormed_engine: TensorEngine,
+    a_engine: TensorEngine,
+    b_engine: TensorEngine,
+    gamma_engine: TensorEngine,
     TraceBufT: TraceBuf,
     //,
     simd_width: Int,
@@ -145,11 +151,17 @@ def gemv_partial_norm_kernel[
     enable_trace: Bool = False,
     pdl_level: PDLLevel = PDLLevel(),
 ](
-    normed_output: TileTensor[c_type, normed_layout, MutAnyOrigin],
-    unnormed_output: TileTensor[c_type, unnormed_layout, MutAnyOrigin],
-    act: TileTensor[a_type, a_layout, ImmutAnyOrigin],
-    weight: TileTensor[b_type, b_layout, ImmutAnyOrigin],
-    gamma: TileTensor[a_type, gamma_layout, ImmutAnyOrigin],
+    normed_output: TileTensor[
+        c_type, normed_layout, MutAnyOrigin, Engine=normed_engine
+    ],
+    unnormed_output: TileTensor[
+        c_type, unnormed_layout, MutAnyOrigin, Engine=unnormed_engine
+    ],
+    act: TileTensor[a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+    weight: TileTensor[b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
+    gamma: TileTensor[
+        a_type, gamma_layout, ImmutAnyOrigin, Engine=gamma_engine
+    ],
     finish_counter: MutPointer[Int32, MutAnyOrigin],
     trace_buf: TraceBufT,
     eps: Float32,
@@ -177,6 +189,11 @@ def gemv_partial_norm_kernel[
         a_layout: Layout of `act`.
         b_layout: Layout of `weight`.
         gamma_layout: Layout of `gamma`.
+        normed_engine: Engine policy of `normed_output`.
+        unnormed_engine: Engine policy of `unnormed_output`.
+        a_engine: Engine policy of `act`.
+        b_engine: Engine policy of `weight`.
+        gamma_engine: Engine policy of `gamma`.
         TraceBufT: Trace-buffer implementation (`NullTrace` or
             `GmemTrace`). Pass `NullTrace` for zero-overhead untraced
             runs.
@@ -495,6 +512,11 @@ def _gemv_partial_norm_fused[
     comptime assert act.rank == 2 and weight.rank == 2
     comptime assert normed_output.rank == 2 and unnormed_output.rank == 2
     comptime assert gamma.flat_rank == 1
+    comptime assert normed_output.element_size == 1
+    comptime assert unnormed_output.element_size == 1
+    comptime assert act.element_size == 1
+    comptime assert weight.element_size == 1
+    comptime assert gamma.element_size == 1
 
     var m = Int(act.dim[0]())
     assert m == 1, (
@@ -529,6 +551,11 @@ def _gemv_partial_norm_fused[
         a_layout=type_of(act).LayoutType,
         b_layout=type_of(weight).LayoutType,
         gamma_layout=type_of(gamma).LayoutType,
+        normed_engine=type_of(normed_output).Engine,
+        unnormed_engine=type_of(unnormed_output).Engine,
+        a_engine=type_of(act).Engine,
+        b_engine=type_of(weight).Engine,
+        gamma_engine=type_of(gamma).Engine,
         TraceBufT=TraceBufT,
         simd_width=simd_width,
         tile_n=tile_n,

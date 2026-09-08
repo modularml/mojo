@@ -30,10 +30,10 @@ from max.gpu.primitives.grid_controls import pdl_launch_attributes, PDLLevel
 from layout import (
     Coord,
     Idx,
-    PointerStorage,
+    DefaultEngine,
     RowMajorLayout,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major as tt_row_major,
 )
@@ -74,7 +74,7 @@ def _blackwell_matmul_tma_umma_warp_specialized[
     pdl_level: PDLLevel = PDLLevel(),
     max_profiled_tiles_per_SM: Optional[UInt32] = None,
     EpilogueLayoutType: TensorLayout = RowMajorLayout[Int64],
-    EpilogueStorageType: TensorStorage = PointerStorage[element_width=1],
+    EpilogueEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     c_device: TileTensor,
     a_device: TileTensor,
@@ -85,7 +85,7 @@ def _blackwell_matmul_tma_umma_warp_specialized[
             config.c_type,
             EpilogueLayoutType,
             ImmutAnyOrigin,
-            Storage=EpilogueStorageType,
+            Engine=EpilogueEngine,
         ]
     ] = None,
 ) raises:
@@ -399,7 +399,7 @@ def blackwell_matmul_tma_umma_warp_specialized[
     pdl_level: PDLLevel = PDLLevel(),
     max_profiled_tiles_per_SM: Optional[UInt32] = None,
     EpilogueLayoutType: TensorLayout = RowMajorLayout[Int64, Int64],
-    EpilogueStorageType: TensorStorage = PointerStorage[element_width=1],
+    EpilogueEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     c_device: TileTensor,
     a_device: TileTensor,
@@ -410,7 +410,7 @@ def blackwell_matmul_tma_umma_warp_specialized[
             config.c_type,
             EpilogueLayoutType,
             ImmutAnyOrigin,
-            Storage=EpilogueStorageType,
+            Engine=EpilogueEngine,
         ]
     ] = None,
 ) raises:
@@ -435,8 +435,8 @@ def blackwell_matmul_tma_umma_warp_specialized[
             when set, enables kernel profiling (defaults to None).
         EpilogueLayoutType: Layout type of the epilogue tensor (defaults to
             RowMajorLayout[Int64, Int64]).
-        EpilogueStorageType: Storage type of the epilogue tensor (defaults to
-            PointerStorage[element_width=1]).
+        EpilogueEngine: Engine of the epilogue tensor (defaults to
+            DefaultEngine[element_width=1]).
     Args:
         c_device: Output TileTensor of shape (M, N).
         a_device: LHS TileTensor of shape (M, K).
@@ -753,7 +753,7 @@ def blackwell_batched_matmul_tma_umma_warp_specialized[
     pdl_level: PDLLevel = PDLLevel(),
     max_profiled_tiles_per_SM: Optional[UInt32] = None,
     EpilogueLayoutType: TensorLayout = RowMajorLayout[Int64, Int64],
-    EpilogueStorageType: TensorStorage = PointerStorage[element_width=1],
+    EpilogueEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     c_device: TileTensor,
     a_device: TileTensor,
@@ -764,7 +764,7 @@ def blackwell_batched_matmul_tma_umma_warp_specialized[
             config.c_type,
             EpilogueLayoutType,
             ImmutAnyOrigin,
-            Storage=EpilogueStorageType,
+            Engine=EpilogueEngine,
         ]
     ] = None,
 ) raises:
@@ -789,8 +789,8 @@ def blackwell_batched_matmul_tma_umma_warp_specialized[
             when set, enables kernel profiling (defaults to None).
         EpilogueLayoutType: Layout type of the epilogue tensor (defaults to
             RowMajorLayout[Int64, Int64]).
-        EpilogueStorageType: Storage type of the epilogue tensor (defaults to
-            PointerStorage[element_width=1]).
+        EpilogueEngine: Engine of the epilogue tensor (defaults to
+            DefaultEngine[element_width=1]).
     Args:
         c_device: Output TileTensor of shape (M, N) or (B, M, N).
         a_device: LHS TileTensor of shape (M, K) or (B, M, K).
@@ -808,7 +808,7 @@ def blackwell_batched_matmul_tma_umma_warp_specialized[
                     new_config.c_type,
                     EpilogueLayoutType,
                     ImmutAnyOrigin,
-                    Storage=EpilogueStorageType,
+                    Engine=EpilogueEngine,
                 ]
             ]
             _blackwell_matmul_tma_umma_warp_specialized[
@@ -848,7 +848,7 @@ def blackwell_batched_matmul_tma_umma_warp_specialized[
                     new_config.c_type,
                     EpilogueLayoutType,
                     ImmutAnyOrigin,
-                    Storage=EpilogueStorageType,
+                    Engine=EpilogueEngine,
                 ]
             ]
             _blackwell_matmul_tma_umma_warp_specialized[

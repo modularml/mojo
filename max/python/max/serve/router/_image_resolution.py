@@ -705,17 +705,19 @@ async def resolve_image_from_url(
                 "File URI access denied: no allowed roots configured"
             )
 
-        # Resolve the path, following symlinks.
+        # Canonicalize the path (resolving symlinks and ``..``) so containment
+        # is decided against the real target rather than the requested
+        # spelling. Resolve non-strictly: a nonexistent path must not raise
+        # here, because the allowed-roots check has to run *before* any
+        # existence or type probe. Statting an attacker-chosen absolute path
+        # that lies outside the roots would turn this into a filesystem
+        # existence/type oracle.
         try:
-            resolved_path = file_path.resolve(strict=True)
+            resolved_path = file_path.resolve()
         except (OSError, RuntimeError) as e:
-            raise ValueError(f"File not found: {file_path}") from e
+            raise ValueError(f"Invalid file path: {file_path}") from e
 
-        # Check if it's a directory.
-        if resolved_path.is_dir():
-            raise ValueError(f"Path is a directory: {resolved_path}")
-
-        # Check if path is within allowed roots.
+        # Check if path is within allowed roots before touching the filesystem.
         path_allowed = False
         for root in allowed_roots:
             try:
@@ -729,6 +731,14 @@ async def resolve_image_from_url(
             raise ValueError(
                 f"Path forbidden: {resolved_path} is outside allowed roots"
             )
+
+        # Only now that the path is contained within an allowed root do we
+        # probe the filesystem for existence and type.
+        if not resolved_path.exists():
+            raise ValueError(f"File not found: {file_path}")
+
+        if resolved_path.is_dir():
+            raise ValueError(f"Path is a directory: {resolved_path}")
 
         # Read the file with size limit.
         max_bytes = settings.max_local_image_bytes

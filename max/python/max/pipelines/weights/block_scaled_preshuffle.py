@@ -34,6 +34,7 @@ import logging
 import re
 import time
 from collections import defaultdict
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -74,6 +75,17 @@ _SHARED_EXPERT_SCALE_RE = re.compile(
     rf"^(?P<prefix>(?:.+\.)?{_LAYER}\.mlp\.shared_experts)"
     r"\.(?P<proj>gate_proj|up_proj|down_proj)\.weight_scale$"
 )
+
+# What an expert projection weight/scale looks like regardless of how the layer
+# prefix is spelled. Used only to tell "this checkpoint has no experts" from
+# "the strict patterns above no longer match this checkpoint's naming"; never
+# to select what gets permuted.
+_LOOSE_EXPERT_WEIGHT_RE = re.compile(r"(?:^|\.)mlp\.experts\..*_proj\.weight$")
+
+_LOOSE_EXPERT_SCALE_RE = re.compile(
+    r"(?:^|\.)mlp\.experts\..*_proj\.weight_scale$"
+)
+
 
 # MFMA geometry, mirroring the constants of the same name in
 # `max/kernels/src/linalg/matmul/gpu/amd/mxfp4_preshuffle_layouts.mojo`.
@@ -227,7 +239,7 @@ def preshuffle_block_scaled_b_experts(
     *,
     include_shared_weights: bool = False,
     lane_bytes: int = 16,
-) -> None:
+) -> int:
     """MX B preshuffle of all per-expert weights in-place on CPU.
 
     Walks ``state_dict``, groups expert weights by ``(prefix, proj)``,
@@ -249,6 +261,11 @@ def preshuffle_block_scaled_b_experts(
         lane_bytes: Bytes one lane feeds the MFMA. 16 for MXFP4 and MXFP8
             (``b_5d_grouped_layout``); :data:`MXFP6_LANE_BYTES` for MXFP6,
             which selects the plane-split layout instead.
+
+    Returns:
+        How many expert weights the FQN patterns matched. Counted under
+        virtual devices too, where the byte permutation is skipped, so a
+        caller can tell "matched nothing" from "did the work" in both modes.
     """
     if lane_bytes not in (_MFMA_LANE_BYTES, MXFP6_LANE_BYTES):
         raise ValueError(
@@ -270,7 +287,16 @@ def preshuffle_block_scaled_b_experts(
                 continue
 
     if not groups:
-        return
+        if unmatched := [
+            n for n in state_dict if _LOOSE_EXPERT_WEIGHT_RE.search(n)
+        ]:
+            raise ValueError(
+                "MX expert preshuffle matched no weights, but this checkpoint "
+                f"has expert tensors (e.g. {unmatched[0]!r}), so the preb "
+                "kernel would read them row-major. Teach this module's FQN "
+                "patterns about this naming."
+            )
+        return 0
 
     t0 = time.perf_counter()
     n_total = 0
@@ -323,13 +349,14 @@ def preshuffle_block_scaled_b_experts(
         len(groups),
         time.perf_counter() - t0,
     )
+    return n_total
 
 
 def preshuffle_block_scaled_b_scales(
     state_dict: dict[str, WeightData],
     *,
     include_shared_weights: bool = False,
-) -> None:
+) -> int:
     """MXFP4 B-scale preshuffle of all per-expert scales in-place on CPU.
 
     Walks ``state_dict``, groups expert scales by ``(prefix, proj)``,
@@ -342,6 +369,10 @@ def preshuffle_block_scaled_b_scales(
 
     Companion to :func:`preshuffle_block_scaled_b_experts`; should be called
     immediately after it so weight and scale layouts stay in sync.
+
+    Returns:
+        How many expert scales the FQN patterns matched, on the same terms
+        as :func:`preshuffle_block_scaled_b_experts`.
     """
     groups: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
     for name in state_dict:
@@ -355,7 +386,16 @@ def preshuffle_block_scaled_b_scales(
                 continue
 
     if not groups:
-        return
+        if unmatched := [
+            n for n in state_dict if _LOOSE_EXPERT_SCALE_RE.search(n)
+        ]:
+            raise ValueError(
+                "MX expert B-scale preshuffle matched no scales, but this "
+                f"checkpoint has expert scales (e.g. {unmatched[0]!r}), so the "
+                "preb kernel would read them row-major. Teach this module's "
+                "FQN patterns about this naming."
+            )
+        return 0
 
     t0 = time.perf_counter()
     n_total = 0
@@ -403,5 +443,114 @@ def preshuffle_block_scaled_b_scales(
         "" if permute else " (dummy op under virtual compilation)",
         n_total,
         len(groups),
+        time.perf_counter() - t0,
+    )
+    return n_total
+
+
+def shuffle_block_scaled_b_dense_arrays(
+    b: np.ndarray,
+    b_scale: np.ndarray,
+    *,
+    lane_bytes: int = MXFP6_LANE_BYTES,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Permutes a raw dense B weight and its E8M0 scales into preshuffled layouts.
+
+    Thin numpy-only counterpart to :func:`preshuffle_block_scaled_b_dense`,
+    for callers that hold plain ``[N, K_BYTES]`` / ``[N, K_SCALES]`` arrays
+    rather than checkpoint ``WeightData`` -- e.g. a benchmark harness that
+    generates synthetic weights directly.
+
+    Args:
+        b: Dense B weight, uint8 ``[N, K_BYTES]``.
+        b_scale: B's E8M0 scales, uint8-viewed ``[N, K_SCALES]``.
+        lane_bytes: Bytes one lane feeds the MFMA. Only
+            :data:`MXFP6_LANE_BYTES` (24) is supported today.
+
+    Returns:
+        The ``(b, b_scale)`` pair with bytes permuted into the plane-split /
+        packed-scale layouts.
+    """
+    if lane_bytes != MXFP6_LANE_BYTES:
+        raise ValueError(
+            "shuffle_block_scaled_b_dense_arrays only supports MXFP6 "
+            f"(lane_bytes={MXFP6_LANE_BYTES}) today, got {lane_bytes}"
+        )
+    b_dst = np.empty_like(b)
+    _shuffle_b_planes(b, b_dst)
+    scale_dst = np.empty_like(b_scale)
+    _shuffle_scale_4d(b_scale, scale_dst)
+    return b_dst, scale_dst
+
+
+def preshuffle_block_scaled_b_dense(
+    state_dict: dict[str, WeightData],
+    names: Iterable[str],
+    *,
+    lane_bytes: int = MXFP6_LANE_BYTES,
+) -> None:
+    """MX B preshuffle of dense (non-expert) weights in-place on CPU.
+
+    The single-tensor counterpart of :func:`preshuffle_block_scaled_b_experts`
+    + :func:`preshuffle_block_scaled_b_scales`: each name in ``names`` is
+    already one complete ``[N, K_BYTES]`` dense weight (a plain Linear layer,
+    not a batch of per-expert weights), so this shuffles the weight and its
+    ``.weight_scale`` sibling directly with no expert-name grouping. Raises on
+    any name whose weight or scale isn't shuffleable, for the same reason the
+    expert helpers do: the caller flips the matmul op's ``preshuffled_b``
+    parameter for the whole weight, so a silently-skipped tensor would be read
+    as if it had been permuted.
+
+    Args:
+        state_dict: Weights to permute in place.
+        names: Names of dense ``.weight`` tensors to preshuffle; each name's
+            ``f"{name}_scale"`` sibling is preshuffled too.
+        lane_bytes: Bytes one lane feeds the MFMA. Only
+            :data:`MXFP6_LANE_BYTES` (24, the plane-split layout) is
+            supported today; dense MXFP4/MXFP8 matmul has no preshuffled path
+            yet.
+    """
+    if lane_bytes != MXFP6_LANE_BYTES:
+        raise ValueError(
+            "preshuffle_block_scaled_b_dense only supports MXFP6 "
+            f"(lane_bytes={MXFP6_LANE_BYTES}) today, got {lane_bytes}"
+        )
+
+    t0 = time.perf_counter()
+    n_total = 0
+    for name in names:
+        wd = state_dict[name]
+        arr = _as_shuffleable_mxfp4_b(wd, lane_bytes)
+        if arr is None:
+            raise ValueError(
+                f"{name!r} is not a shuffleable MX weight (dtype "
+                f"{wd.dtype}, shape {wd.shape}); needs uint8/float8_e4m3fn "
+                f"with N % 16 == 0 and K_BYTES a multiple of {4 * lane_bytes}"
+            )
+        scale_name = f"{name}_scale"
+        sf_wd = state_dict[scale_name]
+        sf_arr = _as_shuffleable_mxfp4_b_scale(sf_wd)
+        if sf_arr is None:
+            raise ValueError(
+                f"{scale_name!r} is not a shuffleable E8M0 scale (dtype "
+                f"{sf_wd.dtype}, shape {sf_wd.shape}); needs N % 32 == 0 "
+                "and K_SCALES % 8 == 0"
+            )
+
+        dst, sf_dst = shuffle_block_scaled_b_dense_arrays(
+            arr, sf_arr, lane_bytes=lane_bytes
+        )
+        state_dict[name] = dataclasses.replace(
+            WeightData.from_numpy(dst, name=wd.name), dtype=wd.dtype
+        )
+        state_dict[scale_name] = dataclasses.replace(
+            WeightData.from_numpy(sf_dst, name=sf_wd.name),
+            dtype=DType.float8_e8m0fnu,
+        )
+        n_total += 1
+
+    logger.info(
+        "MXFP6 dense B preshuffle: %d weights in %.1fs",
+        n_total,
         time.perf_counter() - t0,
     )

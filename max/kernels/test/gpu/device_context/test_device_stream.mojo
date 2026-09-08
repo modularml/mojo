@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from std.math import ceildiv
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceBuffer, DeviceContext, DeviceStream
 from std.testing import assert_equal, assert_true
 

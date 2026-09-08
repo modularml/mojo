@@ -16,7 +16,7 @@
 
 from std.math import align_up
 from std.sys import simd_width_of, size_of
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     thread_idx,
     warp_id,
@@ -27,9 +27,9 @@ from max.gpu.primitives.grid_controls import (
     launch_dependent_grids,
     wait_on_dependent_grids,
 )
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.compute.arch.mma_nvidia_sm100 import MMASmemDescriptorPair
-from std.gpu.primitives.warp import broadcast
+from max.gpu.primitives.warp import broadcast
 from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
     tcgen05_dealloc,

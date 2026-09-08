@@ -20,7 +20,7 @@ different `Layout[...]` specializations) avoids the Mojo conditional-type
 unification failure: see `feedback_mojo_conditional_field_type`.
 """
 
-from std.gpu import warp_id as get_warp_id
+from max.gpu import warp_id as get_warp_id
 from std.math.uutils import udivmod
 
 

@@ -20,13 +20,15 @@ import pytest
 from max.nn.kv_cache import KVCacheGroupId
 from max.pipelines.kv_cache.paged_kv_cache.block_utils import LittleKVCacheBlock
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
-    FullKVGroupCoordinator,
-    KVGroupCoordinatorInterface,
-    SlidingWindowKVGroupCoordinator,
     create_kv_group_coordinator,
 )
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_pool import (
     JengaBlockPool,
+)
+from max.pipelines.kv_cache.paged_kv_cache.kv_group_coordinator import (
+    FullKVGroupCoordinator,
+    KVGroupCoordinatorInterface,
+    SlidingWindowKVGroupCoordinator,
 )
 
 BLOCK_SIZE = 4
@@ -117,6 +119,17 @@ def test_blocks_in_window_excludes_the_query_token(
     group = sliding_group(make_pool(), window=window)
     assert isinstance(group, SlidingWindowKVGroupCoordinator)
     assert group._blocks_in_window == expected
+
+
+@pytest.mark.parametrize(
+    ("num_hashes", "expected"),
+    [(0, 0), (2, 2), (10, WINDOW_BLOCKS)],
+)
+def test_sliding_connector_load_staging_is_capped_to_its_window(
+    num_hashes: int, expected: int
+) -> None:
+    group = sliding_group(make_pool())
+    assert group.num_blocks_needed_for_connector_load(num_hashes) == expected
 
 
 def test_a_hash_is_present_only_when_every_leaf_holds_it() -> None:

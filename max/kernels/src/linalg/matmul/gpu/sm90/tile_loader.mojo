@@ -30,9 +30,9 @@ from layout import (
     Coord,
     Idx,
     MixedLayout,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
 )
 from max.gpu.memory import (
@@ -40,8 +40,8 @@ from max.gpu.memory import (
 )
 from ....structuring import SMemBarrier
 from layout.swizzle import make_swizzle
-from std.gpu import thread_idx
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu import thread_idx
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.sync import async_copy_arrive
 from structured_kernels.pipeline import (
     ProducerConsumerPipeline,
@@ -66,7 +66,7 @@ trait TileLoader(TrivialRegisterPassable):
         dst: TileTensor[
             mut=True,
             address_space=.SHARED,
-            Storage=PointerStorage[element_width=1],
+            Engine=DefaultEngine[element_width=1],
             ...,
         ],
         mem_barrier: SMemBarrier,
@@ -247,7 +247,7 @@ struct TileLoaderTMA[
         dst: TileTensor[
             mut=True,
             address_space=.SHARED,
-            Storage=PointerStorage[element_width=1],
+            Engine=DefaultEngine[element_width=1],
             ...,
         ],
         mem_barrier: SMemBarrier,
@@ -334,7 +334,7 @@ struct TileLoaderCPAsync[
     thread_layout: MixedLayout,
     swizzle_mode: TensorMapSwizzle,
     vector_size: Int,
-    src_storage: TensorStorage = PointerStorage[element_width=1],
+    src_engine: TensorEngine = DefaultEngine[element_width=1],
 ](TileLoader):
     """Software-based tile loader using cp.async instructions.
 
@@ -348,8 +348,8 @@ struct TileLoaderCPAsync[
         thread_layout: Thread arrangement for distributed copying.
         swizzle_mode: Swizzling pattern for shared memory access.
         vector_size: Number of elements loaded per thread.
-        src_storage: Storage policy of the source tensor (defaults to
-            `PointerStorage`).
+        src_engine: Engine of the source tensor (defaults to
+            `DefaultEngine`).
     """
 
     comptime _dtype = Self.dtype
@@ -361,7 +361,7 @@ struct TileLoaderCPAsync[
         LayoutType=Self.src_layout,
         origin=ImmutAnyOrigin,
         address_space=.GENERIC,
-        Storage=Self.src_storage,
+        Engine=Self.src_engine,
     ]
 
     @always_inline
@@ -373,7 +373,7 @@ struct TileLoaderCPAsync[
             LayoutType=Self.src_layout,
             origin=ImmutAnyOrigin,
             address_space=.GENERIC,
-            Storage=Self.src_storage,
+            Engine=Self.src_engine,
         ],
     ):
         """Initialize the cp.async tile loader.
@@ -388,7 +388,7 @@ struct TileLoaderCPAsync[
         dst: TileTensor[
             mut=True,
             address_space=.SHARED,
-            Storage=PointerStorage[element_width=1],
+            Engine=DefaultEngine[element_width=1],
             ...,
         ],
         mem_barrier: SMemBarrier,
@@ -424,7 +424,7 @@ struct TileLoaderCPAsync[
         # through an exact destination type so the dtype parameter can unify
         # across the source and destination TileTensor arguments.
         # Materialize an exact, any-origin destination tile from the raw
-        # pointer (non-vectorized `PointerStorage[element_width=1]`), then vectorize it.
+        # pointer (non-vectorized `DefaultEngine[element_width=1]`), then vectorize it.
         # Vectorized tiles cannot be reconstructed directly from a pointer.
         var dst_exact = TileTensor[
             mut=True,
@@ -461,7 +461,7 @@ def async_copy_with_bound_check[
         LayoutType=src_layout,
         origin=ImmutAnyOrigin,
         address_space=.GENERIC,
-        Storage=PointerStorage[element_width=src_element_width],
+        Engine=DefaultEngine[element_width=src_element_width],
         ...,
     ],
     dst: TileTensor[
@@ -470,7 +470,7 @@ def async_copy_with_bound_check[
         LayoutType=dst_layout,
         origin=MutAnyOrigin,
         address_space=.SHARED,
-        Storage=PointerStorage[element_width=dst_element_width],
+        Engine=DefaultEngine[element_width=dst_element_width],
         ...,
     ],
 ):

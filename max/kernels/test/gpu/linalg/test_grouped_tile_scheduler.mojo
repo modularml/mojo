@@ -19,7 +19,7 @@ These tests verify:
 4. K-tile count is correct for each group
 """
 
-from std.gpu import block_idx, grid_dim, thread_idx
+from max.gpu import block_idx, grid_dim, thread_idx
 from std.iter import zip
 from std.itertools import count
 from max.gpu.host import DeviceContext

@@ -12,13 +12,13 @@
 # ===----------------------------------------------------------------------=== #
 """8x8 `simdgroup_matrix` GEMM kernel for Apple Silicon GPUs (M1-M4)."""
 
-from std.gpu import (
+from max.gpu import (
     block_idx,
     lane_id,
     warp_id,
 )
 from max.gpu.compute.arch.mma_apple import _mma_apple_8x8
-from layout import TensorLayout, TensorStorage, TileTensor
+from layout import TensorLayout, TensorEngine, TileTensor
 from std.utils import Index
 from std.utils.numerics import get_accum_type
 
@@ -59,9 +59,9 @@ def _simdgroup8x8_matmul_kernel[
     BLOCK_K: Int,
     NUM_SIMDGROUPS: Int,
 ](
-    c: TileTensor[c_type, c_layout, MutAnyOrigin, Storage=_],
-    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Storage=_],
-    b: TileTensor[b_type, b_layout, ImmutAnyOrigin, Storage=_],
+    c: TileTensor[c_type, c_layout, MutAnyOrigin, Engine=_],
+    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Engine=_],
+    b: TileTensor[b_type, b_layout, ImmutAnyOrigin, Engine=_],
     m: Int,
     n: Int,
     k: Int,
@@ -169,9 +169,9 @@ def gemm_kernel_apple_8x8[
     c_layout: TensorLayout,
     a_layout: TensorLayout,
     b_layout: TensorLayout,
-    c_storage: TensorStorage,
-    a_storage: TensorStorage,
-    b_storage: TensorStorage,
+    c_engine: TensorEngine,
+    a_engine: TensorEngine,
+    b_engine: TensorEngine,
     transpose_b: Bool = False,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
     s_type: DType = get_accum_type[c_type](),
@@ -180,9 +180,9 @@ def gemm_kernel_apple_8x8[
     BLOCK_K: Int = 16,
     NUM_SIMDGROUPS: Int = 4,
 ](
-    c: TileTensor[c_type, c_layout, MutAnyOrigin, Storage=c_storage],
-    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Storage=a_storage],
-    b: TileTensor[b_type, b_layout, ImmutAnyOrigin, Storage=b_storage],
+    c: TileTensor[c_type, c_layout, MutAnyOrigin, Engine=c_engine],
+    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+    b: TileTensor[b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
     m: Int32,
     n: Int32,
     k: Int32,

@@ -48,7 +48,7 @@ When accepted, the dispatcher:
 Mirrors the structure of `nn.conv.gpu.amd.dispatch`.
 """
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.math.uutils import udivmod

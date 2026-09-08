@@ -30,9 +30,9 @@ from std.sys._assembly import inlined_assembly
 from std.sys.info import CompilationTarget, _is_amd_cdna
 from std.sys.defines import get_defined_bool
 
-from std.gpu.intrinsics import Scope
+from std._gpu.intrinsics import Scope
 
-from std.gpu._utils import to_i32, to_llvm_shared_mem_ptr
+from std._gpu._utils import to_i32, to_llvm_shared_mem_ptr
 
 # ===-----------------------------------------------------------------------===#
 # barrier

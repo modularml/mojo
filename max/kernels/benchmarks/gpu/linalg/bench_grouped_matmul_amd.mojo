@@ -31,7 +31,7 @@ from std.sys import (
     get_defined_int,
     get_defined_string,
 )
-from std.gpu import block_dim, block_idx, global_idx, grid_dim, thread_idx
+from max.gpu import block_dim, block_idx, global_idx, grid_dim, thread_idx
 
 from max.benchmark import bencher_iter_custom
 from std.benchmark import (

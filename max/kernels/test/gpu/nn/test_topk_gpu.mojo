@@ -28,7 +28,7 @@ from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     Idx,
-    PointerStorage,
+    DefaultEngine,
     TileTensor,
     coord_to_index_list,
     row_major,
@@ -84,7 +84,7 @@ def test_case_batched[
             dtype: DType
         ](
             TileTensor[
-                mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+                mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
             ]
         ) -> None
     ],
@@ -341,7 +341,7 @@ def test_case_multi_rank[
             dtype: DType
         ](
             TileTensor[
-                mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+                mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
             ]
         ) -> None
     ],
@@ -505,7 +505,7 @@ def fill_random[
     dtype: DType
 ](
     buffer: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ]
 ):
     comptime min_val = -1e9
@@ -520,7 +520,7 @@ def fill_constant[
     dtype: DType
 ](
     buffer: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ]
 ):
     var total_elements = buffer.num_elements()
@@ -535,7 +535,7 @@ def fill_nan[
     dtype: DType
 ](
     buffer: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ]
 ):
     """Fill all elements with NaN — regression guard for Bug 1 (all-NaN row
@@ -548,11 +548,7 @@ def fill_nan[
 
 def fill_iota[
     dtype: DType
-](
-    buf: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
-    ]
-):
+](buf: TileTensor[mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]]):
     iota(
         buf._storage,
         coord_to_index_list(buf.layout.shape_coord()).flattened_length(),

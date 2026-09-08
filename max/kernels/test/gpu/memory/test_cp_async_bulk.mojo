@@ -13,7 +13,7 @@
 
 from std.sys import size_of
 
-from std.gpu import thread_idx, block_dim, warp_id
+from max.gpu import thread_idx, block_dim, warp_id
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.memory import (

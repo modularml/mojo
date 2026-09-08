@@ -58,7 +58,7 @@ from std.memory.unsafe import bitcast
 from std.utils import IndexList, StaticTuple
 from std.utils.numerics import get_accum_type
 
-from std.gpu._utils import (
+from std._gpu._utils import (
     to_i16,
     to_i32,
     to_i64,
@@ -68,10 +68,10 @@ from std.gpu._utils import (
     to_llvm_shared_cluster_mem_ptr,
 )
 
-from std.gpu.intrinsics import Scope
+from std._gpu.intrinsics import Scope
 
 # Re-exports from the standard library
-from std.gpu.intrinsics import CacheOperation
+from std._gpu.intrinsics import CacheOperation
 
 # ===-----------------------------------------------------------------------===#
 # CacheEviction
@@ -3264,7 +3264,7 @@ def multimem_st[
 
     ```mojo
     from max.gpu.memory.memory import multimem_st, Consistency
-    from std.gpu.intrinsics import Scope
+    from max.gpu.intrinsics import Scope
     from std.utils import StaticTuple
     var addr = Pointer[Float32, MutAnyOrigin, address_space=.GLOBAL].unsafe_dangling()
     %# val1, val2 = Float32(0), Float32(0)

@@ -13,7 +13,7 @@
 # DOC: max/tile-tensor/tensors.mdx
 
 # start-initialize-tensor-from-cpu-example
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from layout import TileTensor, stack_allocation, row_major
 from std.sys import has_accelerator

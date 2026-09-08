@@ -22,7 +22,7 @@ reference -- plus a strided load.
 
 from std.sys.info import _accelerator_arch
 
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.compute.arch.mma_apple import (
     _mma_apple_8x8,
     apple_mma_load_8x8,

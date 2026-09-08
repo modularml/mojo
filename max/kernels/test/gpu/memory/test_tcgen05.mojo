@@ -13,7 +13,7 @@
 
 from max.gpu.host import DeviceContext
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import thread_idx, warp_id
+from max.gpu import thread_idx, warp_id
 from max.gpu.compute.arch.mma_nvidia_sm100 import *
 from max.gpu.sync import barrier
 from max.gpu.compute.arch.tcgen05 import *
@@ -43,9 +43,9 @@ def tcgen05_st_ld_roundtrip_kernel[
 
     var tmem_addr = ptr_tmem_addr[0]
 
-    var data_st = Array[Float32, width](uninitialized=True)
-    for n in range(N):
-        data_st[n] = Float32(thread_idx.x * N + n)
+    var data_st = Array[_, width](
+        fill_with=lambda (n: Int) -> Float32: Float32(thread_idx.x * N + n)
+    )
 
     tcgen05_st[
         datapaths=16,

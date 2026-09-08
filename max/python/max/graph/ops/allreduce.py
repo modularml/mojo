@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from max._core.dialects import mo
+from max._core.dialects.builtin import IntegerAttr, IntegerType
 
 from ..graph import Graph
 from ..type import _ChainType
@@ -25,7 +26,9 @@ from .utils import _buffer_values, _tensor_values
 
 
 def sum(
-    inputs: Iterable[TensorValueLike], signal_buffers: Iterable[BufferValueLike]
+    inputs: Iterable[TensorValueLike],
+    signal_buffers: Iterable[BufferValueLike],
+    group_size: int | None = None,
 ) -> list[TensorValue]:
     """Collective allreduce summation operation.
 
@@ -39,6 +42,8 @@ def sum(
     Args:
         inputs: The input tensors to reduce.
         signal_buffers: Device buffer values used for synchronization.
+        group_size: Optional number of contiguous devices per independent
+            allreduce group. Defaults to all devices.
 
     Returns:
         An iterable outputs which all hold the reduction output.
@@ -52,12 +57,29 @@ def sum(
         )
 
     devices = [input.device for input in inputs]
+    num_devices = len(devices)
+    group_size = group_size or num_devices
 
-    if not all(input.shape == inputs[0].shape for input in inputs[1:]):
+    if group_size < 1:
         raise ValueError(
-            "allreduce.sum operation must have the same shape across all"
-            f" input tensors. Got: {inputs=}"
+            "allreduce.sum operation requires group_size to be at least 1. "
+            f"Got: {group_size=}"
         )
+    if num_devices % group_size != 0:
+        raise ValueError(
+            "allreduce.sum operation requires group_size to evenly divide "
+            f"the number of input tensors. Got: {group_size=} and "
+            f"{num_devices=}"
+        )
+    for group_start in range(0, num_devices, group_size):
+        group_inputs = inputs[group_start : group_start + group_size]
+        if not all(
+            input.shape == group_inputs[0].shape for input in group_inputs[1:]
+        ):
+            raise ValueError(
+                "allreduce.sum operation must have the same shape across all"
+                f" input tensors in each group. Got: {inputs=}"
+            )
     if len(set(devices)) < len(devices):
         raise ValueError(
             "allreduce.sum operation must have unique devices across its input "
@@ -70,6 +92,7 @@ def sum(
     in_chain = graph.device_chains.merge_for(devices)
 
     # Stage a single allreduce op across all devices.
+    group_size_attr = IntegerAttr(IntegerType(64), group_size)
     *results, out_chain = graph._add_op_generated(
         mo.DistributedAllreduceSumOp,
         [inp.type for inp in inputs],
@@ -77,6 +100,7 @@ def sum(
         inputs,
         signal_buffers,
         in_chain,
+        group_size_attr,
     )
 
     # Update all chains.

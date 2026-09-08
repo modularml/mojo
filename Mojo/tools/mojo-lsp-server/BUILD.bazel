@@ -1,0 +1,40 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(default_visibility = ["//Mojo:consumers"])
+
+modular_cc_binary(
+    name = "mojo-lsp-server",
+    srcs = glob([
+        "*.cpp",
+        "*.h",
+    ]),
+    internal_deps = select({
+        # Under --config=hal-device-context we don't link the full DeviceContext,
+        # but we need CompilationDevice and the HAL-only CompilerDeviceArch.
+        "//:hal_device_context_enabled": [
+            "//MLRT:Driver/CompilationDeviceImpl",
+            "//MLRT:Driver/CompilerDeviceArch",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Config",
+        "//Init",
+        "//Mojo:LITDialect",
+        "//Mojo:MojoParser",
+        "//Mojo:MojoTooling",
+        "//Mojo:ObjectCompiler",
+        "//Mojo:Pipeline",
+        "//Mojo:Support",
+        "//Mojo:ToolCommon",
+        "//Mojo/tools/common/lsp-protocol",
+        "//Support:Base",
+        "//Support:Context",
+        "//Support:Globals",
+        "//Support:Telemetry",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:MlirLspServerLib",
+    ],
+)

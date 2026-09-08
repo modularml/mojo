@@ -36,7 +36,7 @@ from std.sys import exit, has_accelerator
 # GPU programming imports from open source stdlib and max accelerator library
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu import thread_idx, block_idx
+from max.gpu import thread_idx, block_idx
 
 # TileTensor support from open source layout package
 from layout import TileTensor, stack_allocation

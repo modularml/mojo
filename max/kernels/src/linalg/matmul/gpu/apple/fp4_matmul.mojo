@@ -46,7 +46,7 @@ tail loop, cast/epilogue store). The dense fp16/bf16/fp32 path is untouched.
 """
 
 from std.collections import Optional
-from std.gpu import WARP_SIZE, block_idx, thread_idx
+from max.gpu import WARP_SIZE, block_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
@@ -54,7 +54,7 @@ from std.memory import unsafe_stack_allocation
 from std.sys import align_of
 from std.utils import IndexList
 
-from layout import TileTensor, Idx
+from layout import TensorEngine, TileTensor, Idx
 from layout.tile_layout import Layout, TensorLayout, row_major
 from layout.coord import Coord
 
@@ -174,11 +174,19 @@ struct AppleM5Fp4MatMul[
         a_layout: TensorLayout,
         packed_layout: TensorLayout,
         scale_layout: TensorLayout,
+        c_engine: TensorEngine,
+        a_engine: TensorEngine,
+        packed_engine: TensorEngine,
+        scale_engine: TensorEngine,
     ](
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin],
-        a: TileTensor[Self.in_type, a_layout, ImmutAnyOrigin],
-        packed: TileTensor[.uint8, packed_layout, ImmutAnyOrigin],
-        scales: TileTensor[.float8_e4m3fn, scale_layout, ImmutAnyOrigin],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
+        a: TileTensor[Self.in_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        packed: TileTensor[
+            .uint8, packed_layout, ImmutAnyOrigin, Engine=packed_engine
+        ],
+        scales: TileTensor[
+            .float8_e4m3fn, scale_layout, ImmutAnyOrigin, Engine=scale_engine
+        ],
         log2_grid_m: UInt32,
         log2_grid_n: UInt32,
     ):
@@ -191,6 +199,10 @@ struct AppleM5Fp4MatMul[
                 weight `packed`.
             scale_layout: Compile-time `TensorLayout` of the FP8 block
                 scales `scales`.
+            c_engine: `TensorEngine` of the output tile `c`.
+            a_engine: `TensorEngine` of the activation tile `a`.
+            packed_engine: `TensorEngine` of the packed FP4 weight `packed`.
+            scale_engine: `TensorEngine` of the FP8 block scales `scales`.
 
         Args:
             c: Output tile `(M, N)` of dtype `c_type`, row-major; receives
@@ -796,9 +808,9 @@ def _enqueue_apple_fp4_materialize_dense[
             type_of(c).LayoutType,
             type_of(a).LayoutType,
             type_of(wdense_tt).LayoutType,
-            type_of(c).Storage,
-            type_of(a).Storage,
-            type_of(wdense_tt).Storage,
+            type_of(c).Engine,
+            type_of(a).Engine,
+            type_of(wdense_tt).Engine,
             transpose_b=True,
             elementwise_lambda_fn=elementwise_lambda_fn,
             BLOCK_M=64,
@@ -876,6 +888,10 @@ def _launch_apple_fp4_matmul[
         type_of(a).LayoutType,
         type_of(packed).LayoutType,
         type_of(scales).LayoutType,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(packed).Engine,
+        type_of(scales).Engine,
     ]
     ctx.enqueue_function[kernel](
         c,

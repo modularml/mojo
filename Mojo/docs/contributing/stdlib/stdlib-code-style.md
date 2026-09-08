@@ -1,0 +1,469 @@
+# Coding standards & style guide
+
+This document describes conventions that Mojo standard library code should
+adhere to. Its coverage ranges from non-semantic conventions like code
+formatting, to semantics like value lifecycle behavior that standard library
+types should generally conform to.
+
+## Structure and formatting
+
+### Files & layout
+
+#### File structure
+
+The Mojo standard library uses the following high-level organization:
+
+- Group related functions within the same file.
+- Group related files within the same directory.
+- Do not add dependencies to the `stdlib` module because, by definition, it is
+required to be a leaf dependency.
+
+```text
+> stdlib               # stdlib root directory
+    > doc              # folder containing markdown documentation
+    > scripts          # scripts for compiling and running the tests
+    > src              # stdlib mojo source files
+        > builtin      # mojo source for stdlib builtins
+        > collections  # mojo source for stdlib collections
+        > memory       # mojo source for stdlib memory primitives
+        ...
+    > test             # stdlib unit tests
+```
+
+All Mojo source files must end with the extension `.mojo`.
+
+#### Mojo format
+
+Mojo provides a command line formatting utility, `mojo format`, designed to
+automatically format your code according to the official Mojo style guidelines.
+It adjusts indentation, spacing, and line breaks, making code more readable and
+consistent.
+
+```bash
+> mojo format example.mojo
+All done! ✨ 🍰 ✨
+1 file left unchanged.
+```
+
+Unless otherwise noted, Mojo standard library code should follow the formatting
+produced by `mojo format`.
+
+It is advised, to avoid forgetting, to set-up `pre-commit`, which will format
+your changes automatically at each commit, and will also ensure that you
+always have the latest linting tools applied.
+
+To do so, install pre-commit:
+
+```bash
+pixi x pre-commit install
+```
+
+and that's it!
+
+#### API Doc String Validation
+
+Mojo provides a command line utility, `mojo doc`, to validate the API doc
+strings in your code. This ensures that your doc strings are correctly
+formatted and consistent with the Mojo style guidelines.
+Note that you should not have any warnings.
+
+```bash
+mojo doc --diagnose-missing-doc-strings -Werror -o /dev/null stdlib/src/
+```
+
+Note that this is also included in the pre-commit. So if you have `pre-commit`
+enabled, this will run automatically before committing. If you want to run it
+manually with pre-commit, just run
+
+```bash
+pixi x pre-commit run --all-files
+```
+
+#### Whitespace
+
+- Use vertical whitespace only as needed to organize code into logical sections.
+
+#### File license header
+
+Every file in the open source Mojo standard library should begin with the
+following license information header:
+
+```mojo
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+```
+
+#### Code header comments
+
+Code in the Mojo standard library should use the following conventional
+structure of header comments separating the various kinds of methods that can be
+defined on structs.
+
+```mojo
+# ===-----------------------------------------------------------------------===#
+# MyStruct
+# ===-----------------------------------------------------------------------===#
+
+
+struct MyStruct(Sized, Writable):
+    """Description goes here."""
+
+    # ===-------------------------------------------------------------------===#
+    # Aliases
+    # ===-------------------------------------------------------------------===#
+
+    alias factor = 5
+
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
+    var field: Int
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
+    def __init__(...)
+    def __init__(out self, *, copy: Self)
+    def __init__(out self, *, deinit move: Self)
+
+    def __deinit__(...)
+
+    # ===-------------------------------------------------------------------===#
+    # Factory methods
+    # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    def foo(...) -> Self[...]
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
+    # Anything that "backs" special syntax: [..], *, +, /, //, etc...
+
+    def __getitem__
+    def __setitem__
+
+    def __getattr__
+    def __setattr__
+
+    def __iter__     # `for x in self`
+    def __next__
+    def __contains__ # `x in self`
+    def __is__       # `x is self`
+
+    def __add__
+    def __iadd__
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    def __bool__
+    def __len__
+    def __str__
+
+    def __abs__
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    def unsafe_ptr(..)   # e.g.
+```
+
+## Code conventions
+
+### Python Standard Library
+
+We want to be a good member of the Python family and aim to become a full
+superset, so we inherit naming from the Python standard library, including any
+inconsistencies. These naming inconsistencies are the only exceptions to the
+naming conventions outlined below.
+
+### Identifier naming conventions
+
+There are several ways to capitalize and separate words, known as "case
+styles." By following the same set of case styles in our code, Mojo developers
+ensure their code is accessible and understandable to others in the community.
+
+This first table is just a definition of the various "case styles."
+
+| Case style             | Description                               | Example          |
+|------------------------|-------------------------------------------|------------------|
+| `snake_case`           | All lowercase with underscores            | `variable_name`  |
+| `PascalCase`           | Each word starts with an uppercase letter | `StructName`     |
+| `SCREAMING_SNAKE_CASE` | All uppercase with underscores            | `CONSTANT_VALUE` |
+| `kebab-case`           | All lowercase with hyphens                | `project-name`   |
+| `flatcase`             | All lowercase without separators          | `basename`       |
+
+The following table shows our preferred use of different case styles.
+
+| Code kind                          | Example                                           | Case style                            |
+|------------------------------------|---------------------------------------------------|---------------------------------------|
+| `def`                              | `def engage_hyperdrive()`                         | `snake_case`                          |
+| `struct`                           | `struct Point`                                    | `PascalCase`                          |
+| `trait`                            | `trait Copyable`                                  | `PascalCase`                          |
+| `enum`                             | `enum StatusCode`                                 | `PascalCase`                          |
+| `var`                              | `var the_value = 5`                               | `snake_case`                          |
+| `module` / `package`               | `io.mojo` / `os/__init__.mojo`                    | `flatcase` / `snake_case`             |
+| dunder                             | `__init__`                                        | `flatcase`                            |
+| decorator                          | `@no_inline`                                      | `snake_case`                          |
+| **Parameters — type or value**     | &nbsp;                                            | &nbsp;                                |
+| `alias` type                       | `alias Int8 = Scalar[DType.int8]`                 | `PascalCase`                          |
+| `alias` value global / local scope | `alias CHUNK_SIZE = 32` / `alias chunk_size = 32` | `SCREAMING_SNAKE_CASE` / `snake_case` |
+| `struct` type parameter            | `struct List[ElementType: Movable]`               | `PascalCase`                          |
+| `struct` value parameter           | `struct Array[ElementType: Movable, length: Int]` | `snake_case`                          |
+| `def` type parameter               | `def do_it[Action: Actionable](action: Action)`   | `PascalCase`                          |
+| `def` value parameter              | `def repeat[count: Int]()`                        | `snake_case`                          |
+
+Although these are our style conventions, not all code currently adheres to it.
+When preparing a new change, it is important to adhere to the style and naming
+conventions already established in that module. Therefore, if the module you
+are working on uses a different style, continue using that style to maintain
+consistency. We are not currently accepting pull requests that propose
+extensive formatting or renaming changes.
+
+### Naming guidelines
+
+#### ℹ️ Prefer descriptive parameter names over single-letter names
+
+```mojo
+struct LinkedList[T: Movable]           # 🔴 Avoid
+struct LinkedList[ElementType: Movable] # 🟢 Preferred
+```
+
+#### ℹ️ Order type parameters ahead of value parameters
+
+```mojo
+struct Array[length: Int, ElementType: Movable] # 🔴 Avoid
+struct Array[ElementType: Movable, length: Int] # 🟢 Preferred
+```
+
+#### Use the `Some[]` utility instead of named type parameters when appropriate
+
+Consider using the `Some[]` utility if a named (and inferred) type parameter
+is not reused in a function signature or body.
+
+```mojo
+def foo[Str: Writable, //](arg: Str): ... # 🔴 Avoid
+def foo(arg: Some[Writable]): ...         # 🟢 Preferred
+```
+
+Avoid using the `Some[]` utility if a named type parameter is reused in a
+function signature or body.
+
+```mojo
+def foo(arg0: Some[Writable], arg1: type_of(arg0)): ... # 🔴 Avoid
+def foo[Str: Writable, //](arg0: Str, arg1: Str): ...     # 🟢 Preferred
+```
+
+### Container lifecycle semantics
+
+#### ℹ️ Prefer explicit copy constructors; avoid allowing implicit copies
+
+```mojo
+var copy = original                 # 🔴 Avoid
+var copy = MyStruct(copy=original)  # 🟢 Preferred
+```
+
+Where you intend to make a copy, favor an explicit copy constructor to make your
+intention clear.
+
+Copying types that conform to `RegisterPassable` like `Int`, `Bool`, `Pointer`,
+and `SIMD` is
+safe and inexpensive. However, copying types that dynamically allocate memory
+can be expensive. This includes common types like `List`, `Dict`, `Set`,
+and `String`.
+
+Some standard library types allow implicit copies where they shouldn’t. We will
+resolve this shortly as new Mojo language features are shipped to help with this
+very situation.
+
+When designing a new type, don’t allow implicit copies unless
+the copy is trivial (order `O(1)`). In other words, just conform to `Copyable`
+but not `ImplicitlyCopyable`.
+
+#### ℹ️ Use `copy` initializer for explicit copying
+
+Copyable types provide a `copy` initializer that creates an explicit copy:
+
+```mojo
+var original = List[Int]()
+var explicit_copy = List[Int](copy=original)  # 🟢 Preferred
+```
+
+This pattern is used throughout the stdlib for types like `Optional`, `String`,
+and collections.
+
+### Import statements
+
+- Explicitly import entities used (functions, structs, aliases), rather
+  than rely on transitive imports.
+- Import only what you use; in general, avoid using
+  `from some_package import *`.
+- Import statements should be sorted lexicographically.
+
+### API docstrings
+
+Every public function and public struct (including data fields) in the standard
+library must have docstrings (code comments that describe the API behavior).
+Mojo includes tooling to ensure that public functions include docstrings.
+
+You can run `./stdlib/scripts/check-docstrings.py` to validate
+docstrings. If the command exits with a `0` exit code, the docstrings are
+compliant; otherwise, an error will be shown. This is also enforced by the LSP
+with warnings for anything that doesn’t conform, you can generate docstrings
+based on the signature using an LSP Quick Fix:
+
+<img src="./images/doc-lint-quick-fix.png" width=350 />
+
+We follow Google's Python convention for
+[docstrings outlined here](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods)
+which looks like this:
+
+```mojo
+def add_param_arg[foo: Int](bar: Int) -> Int:
+    """[summary].
+
+    Parameters:
+        foo: [description].
+
+    Args:
+        bar: [description].
+
+    Returns:
+        [description].
+    """
+    return foo + bar
+```
+
+The additions to the Google style guide for docstrings are `Parameters:` and
+`Constraints:`.
+
+`Constraints:` should be used to document requirements when using the
+`comptime assert` statement:
+
+```mojo
+def add_param_arg[foo: Int](bar: Int) -> Int:
+    """Shortened doc string.
+
+    Constraints:
+        `foo` must be more than 0.
+    """
+    comptime assert foo > 0
+    return foo + bar
+```
+
+For more detailed style guidelines, see the
+[Mojo docstring style guide](docstring-style-guide.md).
+
+### Assertions
+
+You should use assertions liberally when there is a condition you expect for the
+following code to behave correctly. Assertions may be present even in
+"unsafe" methods and types. You should format the message to be descriptive with
+the expected and actual values:
+
+```mojo
+actual = 41
+expected = 42
+debug_assert(actual == expected, "expected: ", expected, " but got: ", actual)
+```
+
+Make sure that you don't allocate anything in the call to `debug_assert` to
+ensure there is no runtime penalty when assertions are disabled. If you must
+have a side-effect in the condition such as allocating a `String`, you can pass
+a closure that only runs when assertions are enabled:
+
+```mojo
+tensor = Tensor[DType.uint8, 1](TensorShape(1), cpu_device())
+
+def _test_cpu() {tensor} -> Bool:
+    return "cpu" in String(tensor._device)
+
+debug_assert(_test_cpu, "This code is only runnable on CPU")
+```
+
+### Target Specific Code
+
+When writing code that uses `comptime if` to tailor logic based on the target
+hardware platform or features, do not use trailing `else` statements that
+"fallthrough" to a particular hardware vendor.
+
+This leads to poor error messages when an unsupported hardware vendor is
+targeted.
+
+```mojo
+# 🔴 Avoid
+comptime if is_nvidia_gpu():
+    return "llvm.nvvm..."
+else:
+    # BAD: Assumes only non-NVIDIA target is AMD
+    return "llvm.amdgcn..."
+```
+
+Always gate hardware-specific logic on an explicit check that the vendor or
+feature is being targeted:
+
+```mojo
+# 🟢 Prefer
+
+comptime if is_nvidia_gpu():
+    ...
+elif is_amd_gpu():
+    ...
+else:
+    CompilationTarget.unsupported_target_error()
+```
+
+In cases where a generic, cross-platform compatible fallback implementation
+is available, it is okay to use an unguarded `else` condition:
+
+```mojo
+@always_inline("nodebug")
+def prefetch[...](...):
+    comptime if is_nvidia_gpu():
+        inlined_assembly["prefetch.global.L2 [$0];", ...](...)
+    else:
+        llvm_intrinsic["llvm.prefetch", NoneType](...)
+```
+
+### Testing
+
+#### Unit test filenames
+
+All test filenames should be prefixed with `test_`.
+For example `test_sort.mojo`.
+
+#### Test organization
+
+- Tests should mirror the source structure
+  - e.g., `stdlib/collections/list.mojo` tests are in
+  `test/collections/test_list.mojo`
+- Use the `testing` module assertions (`assert_equal`, `assert_true`, etc.) for
+  new tests
+- Test files should focus on testing the public API and critical edge cases
+
+#### Performance tests and benchmarks
+
+- Benchmarks are located in the `benchmarks/` directory
+- Use the `benchmark` module for performance testing
+- Benchmark files should be prefixed with `bench_` (e.g., `bench_sort.mojo`)
+
+#### Integration with build system
+
+- See the [bazel usage docs](../../../../bazel/docs/usage.md) for more details
+  on how to run tests.

@@ -34,20 +34,6 @@
 MODULAR_API_EXPORT M_Device *M_newDevice(M_DeviceType type, int id,
                                          M_Status *status);
 
-/// Creates a new NPU accelerator device.
-///
-/// Distinct from `M_newDevice(M_ACCELERATOR, ...)` so callers can explicitly
-/// request the NPU dispatch path on platforms that support it. On platforms
-/// without an NPU backend the resulting device will still be created, but
-/// downstream graph compilation will fail with an unsupported-target error.
-///
-/// @param id The device ID. Use 0 for the default NPU device.
-/// @param status The status object for reporting errors.
-///
-/// @returns A pointer to the device. Caller-owned; free with `M_freeDevice()`.
-/// Returns `NULL` if the device could not be created, with the status set.
-MODULAR_API_EXPORT M_Device *M_newNPUDevice(int id, M_Status *status);
-
 /// Gets the type of a device.
 ///
 /// @param device The device.

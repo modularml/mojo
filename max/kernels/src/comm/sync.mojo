@@ -25,7 +25,7 @@ from std.sys import size_of, is_amd_gpu
 
 from std.atomic import Atomic, Ordering
 from max.gpu.host import DeviceBuffer, DeviceContext
-from std.gpu import (
+from max.gpu import (
     block_idx,
     grid_dim,
     thread_idx,

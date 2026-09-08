@@ -13,7 +13,7 @@
 
 from max.gpu.host import get_gpu_target
 from max.gpu.host.compile import _compile_code
-from std.gpu.intrinsics import ldg
+from max.gpu.intrinsics import ldg
 from layout import Layout, LayoutTensor
 from std.testing import assert_true
 

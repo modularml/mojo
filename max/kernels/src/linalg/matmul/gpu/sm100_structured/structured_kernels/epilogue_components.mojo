@@ -26,7 +26,7 @@ The SM100 epilogue pipeline flows as:
 
 from std.sys import align_of, size_of, simd_width_of
 
-from std.gpu import WARP_SIZE, lane_id, warp_id
+from max.gpu import WARP_SIZE, lane_id, warp_id
 from max.gpu.primitives.cluster import elect_one_sync
 from max.gpu.memory import (
     fence_async_view_proxy,
@@ -41,7 +41,7 @@ from layout import (
     Idx,
     IntTuple,
     Layout,
-    PointerStorage,
+    DefaultEngine,
     RuntimeTuple,
     TileTensor,
     UNKNOWN_VALUE,
@@ -157,7 +157,7 @@ def st_shared_frag_to_smem[
 ](
     vec: Array[Scalar[vec_dtype], vec_size],
     dst: TileTensor[
-        address_space=.SHARED, Storage=PointerStorage[element_width=1], ...
+        address_space=.SHARED, Engine=DefaultEngine[element_width=1], ...
     ],
     warp_offset: UInt32 = 0,
 ):
@@ -274,7 +274,7 @@ def store_fragment_to_smem[
 ](
     vec: Array[Scalar[vec_dtype], vec_size],
     dst: TileTensor[
-        address_space=.SHARED, Storage=PointerStorage[element_width=1], ...
+        address_space=.SHARED, Engine=DefaultEngine[element_width=1], ...
     ],
     warp_offset: UInt32 = 0,
 ):
@@ -725,7 +725,7 @@ struct TMAReduceExecutor[
         c_smem_tile: TileTensor[
             Self.c_type,
             address_space=.SHARED,
-            Storage=PointerStorage[element_width=1],
+            Engine=DefaultEngine[element_width=1],
             ...,
         ],
         store_coords: TMAStoreCoords[
@@ -1387,7 +1387,7 @@ struct TMEMToSMemWriter[
             Scalar[Self.c_type], Self.Config.fragment_size * repeat
         ],
         c_smem_tile: TileTensor[
-            address_space=.SHARED, Storage=PointerStorage[element_width=1], ...
+            address_space=.SHARED, Engine=DefaultEngine[element_width=1], ...
         ],
     ):
         """Write pre-loaded fragments to SMEM."""
@@ -1414,7 +1414,7 @@ struct TMEMToSMemWriter[
             Scalar[Self.c_type], Self.Config.fragment_size * repeat
         ],
         c_smem_tile: TileTensor[
-            address_space=.SHARED, Storage=PointerStorage[element_width=1], ...
+            address_space=.SHARED, Engine=DefaultEngine[element_width=1], ...
         ],
     ):
         """Transposed output using reshape.
@@ -1581,7 +1581,7 @@ struct TMEMToSMemWriter[
             Scalar[Self.c_type], Self.Config.fragment_size * repeat
         ],
         c_smem_tile: TileTensor[
-            address_space=.SHARED, Storage=PointerStorage[element_width=1], ...
+            address_space=.SHARED, Engine=DefaultEngine[element_width=1], ...
         ],
     ):
         """Non-transposed output."""
@@ -1724,7 +1724,7 @@ struct SMemEpilogueWriter[
         c_smem_tile: TileTensor[
             Self.c_type,
             address_space=.SHARED,
-            Storage=PointerStorage[element_width=1],
+            Engine=DefaultEngine[element_width=1],
             ...,
         ],
     ):
@@ -1877,7 +1877,7 @@ struct SMemEpilogueWriter[
         c_smem_tile: TileTensor[
             Self.c_type,
             address_space=.SHARED,
-            Storage=PointerStorage[element_width=1],
+            Engine=DefaultEngine[element_width=1],
             ...,
         ],
     ):
@@ -1978,7 +1978,7 @@ def shared_memory_epilogue_transpose[
     c_smem: TileTensor[
         c_type,
         address_space=.SHARED,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
         ...,
     ],
     warp_i: Int,
@@ -2163,13 +2163,13 @@ def shared_memory_epilogue[
     c_smem_warp_tile_upper: TileTensor[
         c_type,
         address_space=.SHARED,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
         ...,
     ],
     c_smem_warp_tile_lower: TileTensor[
         c_type,
         address_space=.SHARED,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
         ...,
     ],
 ):

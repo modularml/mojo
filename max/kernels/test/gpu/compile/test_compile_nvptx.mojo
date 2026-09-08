@@ -15,7 +15,7 @@ from std.math import exp2
 from std.pathlib import Path
 from std.sys._assembly import inlined_assembly
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.host.compile import _compile_code

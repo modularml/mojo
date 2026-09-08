@@ -18,13 +18,15 @@ from std.math import align_up, ceildiv, exp, log1p
 from std.math.uutils import umod
 from std.memory import unsafe_stack_allocation
 
-from std.atomic import Atomic
-from std.sys import has_apple_gpu_accelerator, is_apple_gpu
-from std.sys.info import simd_width_of
+from std.atomic import Atomic, Ordering
+from shmem.ep_comm import BLOCK_SCOPE
+from std.sys import has_apple_gpu_accelerator
+from std.sys.info import is_amd_gpu, is_nvidia_gpu
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
+import max.gpu.primitives.block as block
 from std.bit import pop_count, log2_floor
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -51,7 +53,6 @@ from layout import (
 from max.runtime.tracing import Trace, TraceLevel
 
 from std.utils.index import IndexList, StaticTuple
-from std.builtin.dtype import _uint_type_of_width
 
 from nn.activations import sigmoid
 from nn.topk import TopK_2
@@ -64,392 +65,45 @@ from max.gpu.memory import (
 )
 
 
+# Experts are visited in chunks of one block width, carrying the running token
+# and aligned-scale offsets across chunks, so an expert count above the block
+# width costs another pass over the tokens instead of another kernel. Every
+# expert count in use today fits in a single chunk.
+comptime _BLOCK_THREADS = 512
+
+
 @always_inline
-def calculate_warp_offset[
-    MaskType: DType
-](state: Bool) -> Tuple[UInt64, UInt64]:
-    """Computes warp-level write counts and per-thread offsets using warp voting.
-
-    Given a per-thread boolean vote, returns the total number of threads in the
-    warp that voted true and this thread's write offset among the preceding
-    threads that voted true.
-
-    Parameters:
-        MaskType: Unsigned integer DType wide enough to hold one bit per thread
-            in the warp.
-
-    Args:
-        state: Per-thread boolean indicating whether this thread contributes a
-            write.
+def _cta_atomic_scope() -> StaticString:
+    """Returns the narrowest atomic scope the target has for CTA-local counters.
 
     Returns:
-        A tuple of (writes, offset) where writes is the total number of threads
-        in the warp that voted true, and offset is the number of preceding
-        threads (lower thread IDs) that voted true.
+        The block-scope syncscope on NVIDIA and AMD, and the default (system)
+        scope elsewhere: Metal exposes no block scope, and system scope is
+        still correct for shared memory, only slower.
     """
-    # sets bits to 1 for all threads that voted true
-    var mask = UInt64(warp.vote[MaskType](state))
-
-    # counts the number of bits that are set to 1
-    var writes = pop_count(mask)
-
-    # masks out all bits that are set to 1 for higher thread IDs
-    var preceding_mask = mask & ((UInt64(1) << UInt64(thread_idx.x)) - 1)
-
-    # counts the number of bits that are set to 1 in the preceding mask
-    var offset = pop_count(preceding_mask)
-
-    return writes, offset
-
-
-struct _BucketGroupParams[num_threads: Int, input_type: DType]:
-    comptime MaskType = _uint_type_of_width[Self.num_threads]()
-    comptime width = simd_width_of[Self.input_type]()
-
-    var expert: Int
-    var reads_per_iteration: Int
-    var topk_ids_length: Int
-    var topk_ids_length_rounded: Int
-    var start_idx: Int
-    var remainder_start_idx: Int
-
-    def __init__(out self, top_k_length: Int):
-        self.expert = block_idx.x
-        self.reads_per_iteration = Self.num_threads * Self.width
-        self.topk_ids_length = top_k_length
-        self.topk_ids_length_rounded = align_up(
-            self.topk_ids_length, self.reads_per_iteration
-        )
-        self.start_idx = thread_idx.x * Self.width
-        self.remainder_start_idx = (
-            self.topk_ids_length // Self.width
-        ) * Self.width + thread_idx.x
-
-
-@always_inline
-def _count_expert_tokens[
-    num_threads: Int,
-    input_type: DType,
-    //,
-    expected_count: Int,
-](
-    topk_ids: TileTensor[mut=False, input_type, ...],
-    smem: TileTensor[mut=True, .uint32, ...],
-    bg_params: _BucketGroupParams[num_threads, input_type],
-) -> UInt64:
-    comptime assert topk_ids.flat_rank == 2
-    comptime assert smem.flat_rank == 2
-    comptime assert topk_ids.flat_rank >= 2
-
-    comptime width = bg_params.width
-    comptime MaskType = bg_params.MaskType
-
-    var total_writes: UInt64 = 0
-
-    # Vectorized scan of expert IDs from global memory
-    # Each thread loads 'width' expert IDs and checks which match this block's expert
-    for idx in range(
-        bg_params.start_idx,
-        bg_params.topk_ids_length_rounded,
-        bg_params.reads_per_iteration,
-    ):
-        var g_vector: SIMD[input_type, width]
-
-        if idx + width <= bg_params.topk_ids_length:
-            g_vector = topk_ids.load[width=width](Coord(Idx[0], idx))
-        else:
-            g_vector = SIMD[input_type, width](bg_params.expert + 1)
-
-        # Use warp-level voting to efficiently count matching tokens
-        # All threads in the warp vote, and we count how many threads
-        # before us also voted true to determine our write offset
-        comptime for i in range(width):
-            var expert_id = g_vector[i]
-            var state = expert_id == Scalar[input_type](bg_params.expert)
-
-            var offset = total_writes
-
-            # if state is true this thread will write to smem
-            # but we need to know how many threads will write to smem before us
-            # to get the correct offset. So all threads vote and we tally the votes
-            # before us
-
-            var warp_writes, preceding_thread_writes = calculate_warp_offset[
-                MaskType
-            ](state)
-            total_writes += warp_writes
-            offset += preceding_thread_writes
-
-            # If this token matches, store its index in shared memory
-            if state and offset < UInt64(expected_count):
-                smem[Coord(Idx[0], offset)] = UInt32(idx + i)
-
-    var expert_id = (
-        topk_ids[
-            0, bg_params.remainder_start_idx
-        ] if bg_params.remainder_start_idx
-        < bg_params.topk_ids_length else Scalar[input_type](bg_params.expert)
-        + 1
-    )
-    var state = expert_id == Scalar[input_type](bg_params.expert)
-
-    # Use same warp voting technique for remainder elements
-    var warp_writes, preceding_thread_writes = calculate_warp_offset[MaskType](
-        state
-    )
-    var offset = total_writes + preceding_thread_writes
-    total_writes += warp_writes
-
-    if state and offset < UInt64(expected_count):
-        smem[Coord(Idx[0], offset)] = UInt32(bg_params.remainder_start_idx)
-
-    return total_writes
-
-
-@always_inline
-def _get_index_and_offset(
-    lock: TileTensor[mut=True, .uint64, ...],
-    total_writes: UInt32,
-    aligned_total_writes: UInt32,
-) -> Tuple[UInt32, UInt32, UInt32]:
-    # in order to write back to gmem we need to know the current available
-    # offset so we use atomics to get the next available offset.
-
-    comptime if is_apple_gpu():
-        # Apple AGX has no 64-bit device atomics: a u64 Atomic.fetch_add
-        # crashes the Metal shader compiler (AGCLLVMAirBuiltins::buildAtomic).
-        # Pack the expert counter and the token-write offset into a SINGLE
-        # 32-bit atomic so (expert_idx, base_g_offset) stay jointly consistent
-        # -- the CSR expert_start_indices build at the call site requires
-        # base_g_offset to be the prefix sum in expert_idx order, which a
-        # single atomic guarantees (two separate atomics would race):
-        #   bits [31:23] expert counter (<= 512 experts)
-        #   bits  [22:0] total writes   (<= 8_388_607 grouped tokens)
-        # The aligned offset feeds only the FP8/block-scaled `scales_offset_p`
-        # path, which has no Apple kernel (Apple serves bf16 MoE), so it is not
-        # tracked here; returning base_g_offset makes the (unused) call-site
-        # subtraction a benign zero.
-        #
-        # The packing ceilings -- <= 512 experts (9-bit counter), <= 8_388_607
-        # grouped tokens (23-bit offset field, which overflows on the
-        # ACCUMULATED offset, not a single expert's delta), and no scales
-        # offset -- are enforced on the host in `moe_create_indices`, not with a
-        # device `debug_assert` here: device asserts are a no-op on Apple GPU
-        # (MOCO-2405), and all three quantities are known before launch.
-        _ = aligned_total_writes
-        var packed: UInt32 = 0
-        if thread_idx.x == 0:
-            # bitcast: the u64 lock's low 32-bit word IS the packed u32 counter
-            # (valid because Apple GPUs are little-endian).
-            packed = Atomic.fetch_add(
-                lock.ptr.bitcast[UInt32](),
-                (UInt32(1) << 23) | (total_writes & 0x007FFFFF),
-            )
-        packed = warp.broadcast(packed)
-        var expert_idx = packed >> 23
-        var base_g_offset = packed & 0x007FFFFF
-        return expert_idx, base_g_offset, base_g_offset
+    comptime if is_nvidia_gpu() or is_amd_gpu():
+        return BLOCK_SCOPE
     else:
-        var expert_idx_and_offsets: UInt64 = 0
-
-        if thread_idx.x == 0:
-            # Pack expert index (12 bits), current total writes (26 bits), and
-            # aligned total writes (26 bits) into single atomic update
-            # Upper 12 bits: expert counter (which expert slot to use)
-            # Middle 26 bits: current total writes
-            # Lower 26 bits: aligned total writes
-            expert_idx_and_offsets = Atomic.fetch_add(
-                lock.ptr,
-                (UInt64(1) << 52)
-                | (UInt64(total_writes) << 26)
-                | UInt64(aligned_total_writes),
-            )
-
-        # Broadcast the atomic result to all threads in the warp
-        expert_idx_and_offsets = warp.broadcast(expert_idx_and_offsets)
-        var expert_idx = UInt32(expert_idx_and_offsets >> 52)
-        var base_g_offset = UInt32(expert_idx_and_offsets >> 26) & 0x03FFFFFF
-        var aligned_g_offset = UInt32(expert_idx_and_offsets) & 0x03FFFFFF
-
-        return expert_idx, base_g_offset, aligned_g_offset
-
-
-@always_inline
-def _copy_tokens_smem_to_gmem[
-    num_threads: Int,
-    input_type: DType,
-    //,
-    expected_count: Int,
-](
-    token_expert_order: TileTensor[mut=True, .uint32, ...],
-    restore_token_order: TileTensor[mut=True, .uint32, ...],
-    smem: TileTensor[mut=False, .uint32, ...],
-    g_offset: UInt32,
-    total_writes: UInt64,
-    bg_params: _BucketGroupParams[num_threads, input_type],
-):
-    comptime assert smem.flat_rank == 2
-    comptime assert token_expert_order.flat_rank == 1
-    comptime assert restore_token_order.flat_rank == 1
-    comptime assert smem.flat_rank >= 2
-    comptime assert token_expert_order.flat_rank >= 1
-
-    var g_offset_copy = g_offset
-    comptime width = bg_params.width
-
-    var total_reads_rounded = align_up(
-        Int(total_writes), bg_params.reads_per_iteration
-    )
-
-    var total_smem_reads = align_up(
-        expected_count, bg_params.reads_per_iteration
-    )
-    var rounded_smem_reads = min(total_smem_reads, total_reads_rounded)
-    var smem_writes = min(UInt64(expected_count), total_writes)
-
-    for smem_idx in range(
-        bg_params.start_idx, rounded_smem_reads, bg_params.reads_per_iteration
-    ):
-        if smem_idx + width <= Int(smem_writes):
-            var source_vector = smem.load[width=width](Coord(Idx[0], smem_idx))
-
-            comptime for i in range(width):
-                token_expert_order[
-                    Coord(g_offset_copy + UInt32(smem_idx) + UInt32(i))
-                ] = source_vector[i]
-                restore_token_order[Int(source_vector[i])] = (
-                    g_offset_copy + UInt32(smem_idx) + UInt32(i)
-                )
-
-    var start_idx: UInt64 = (smem_writes // UInt64(width)) * UInt64(width)
-
-    g_offset_copy += UInt32(start_idx)
-
-    if UInt64(thread_idx.x) < smem_writes - start_idx:
-        var smem_val = smem[Coord(Idx[0], start_idx + UInt64(thread_idx.x))]
-        token_expert_order.store(
-            Coord(Int(g_offset_copy + UInt32(thread_idx.x))),
-            smem_val,
-        )
-
-        restore_token_order[Int(smem_val)] = g_offset_copy + UInt32(
-            thread_idx.x
-        )
-
-
-@always_inline
-def _copy_tokens_to_gmem[
-    num_threads: Int,
-    input_type: DType,
-    //,
-    expected_count: Int,
-](
-    topk_ids: TileTensor[mut=False, input_type, ...],
-    smem: TileTensor[mut=False, .uint32, ...],
-    token_expert_order: TileTensor[mut=True, .uint32, ...],
-    restore_token_order: TileTensor[mut=True, .uint32, ...],
-    total_writes: UInt64,
-    g_offset: UInt32,
-    bg_params: _BucketGroupParams[num_threads, input_type],
-):
-    comptime assert topk_ids.flat_rank == 2
-    comptime assert token_expert_order.flat_rank == 1
-    comptime assert restore_token_order.flat_rank == 1
-    comptime assert topk_ids.flat_rank >= 2
-
-    comptime width = bg_params.width
-    comptime MaskType = bg_params.MaskType
-
-    var g_offset_copy = g_offset
-
-    # keep track of how many tokens we have come across
-    var tokens_seen: UInt64 = 0
-
-    # load all tokens in vectorized manner from global memory into registers
-    for idx in range(
-        bg_params.start_idx,
-        bg_params.topk_ids_length_rounded,
-        bg_params.reads_per_iteration,
-    ):
-        var g_vector: SIMD[input_type, width]
-
-        if idx + width <= bg_params.topk_ids_length:
-            g_vector = topk_ids.load[width=width](Coord(Idx[0], idx))
-        else:
-            g_vector = SIMD[input_type, width](bg_params.expert + 1)
-
-        comptime for i in range(width):
-            var expert_id = g_vector[i]
-            var state = expert_id == Scalar[input_type](bg_params.expert)
-
-            var warp_writes, preceding_thread_writes = calculate_warp_offset[
-                MaskType
-            ](state)
-            var thr_tokens_seen = (
-                tokens_seen
-                + preceding_thread_writes
-                + UInt64(1 if state else 0)
-            )
-
-            # we have already writeen expected_count tokens to global memory since they were in shared memory.
-            # so we only need to write the remaining tokens to global memory.
-            if thr_tokens_seen >= UInt64(expected_count) and state:
-                token_expert_order[
-                    Coord(g_offset_copy + UInt32(preceding_thread_writes))
-                ] = UInt32(idx + i)
-                restore_token_order[idx + i] = g_offset_copy + UInt32(
-                    preceding_thread_writes
-                )
-
-            tokens_seen += warp_writes
-            g_offset_copy += UInt32(warp_writes)
-
-    # Handle remainder elements that couldn't be vectorized
-    var expert_id = (
-        topk_ids[
-            0, bg_params.remainder_start_idx
-        ] if bg_params.remainder_start_idx
-        < bg_params.topk_ids_length else Scalar[input_type](bg_params.expert)
-        + 1
-    )
-    var state = expert_id == Scalar[input_type](bg_params.expert)
-
-    # Use same warp voting technique for remainder elements
-    var _, preceding_thread_writes = calculate_warp_offset[MaskType](state)
-    var temp_current_writes = (
-        tokens_seen + preceding_thread_writes + UInt64(1 if state else 0)
-    )
-
-    if temp_current_writes >= UInt64(expected_count) and state:
-        token_expert_order[
-            Coord(g_offset_copy + UInt32(preceding_thread_writes))
-        ] = UInt32(bg_params.remainder_start_idx)
-        restore_token_order[
-            bg_params.remainder_start_idx
-        ] = g_offset_copy + UInt32(preceding_thread_writes)
+        return ""
 
 
 @__llvm_metadata(
-    MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](Int32(num_threads))
+    MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](Int32(_BLOCK_THREADS))
 )
-@__name(t"moe_create_indices_bucket_group_{input_type}_t{num_threads}")
-def moe_create_indices_bucket_group_kernel[
+@__name(t"moe_create_indices_{input_type}")
+def moe_create_indices_kernel[
     input_type: DType,
     TokenExpertOrderLayoutType: TensorLayout,
-    LockLayoutType: TensorLayout,
     ExpertStartIndicesLayoutType: TensorLayout,
     RestoreTokenOrderLayoutType: TensorLayout,
     ExpertIdsLayoutType: TensorLayout,
     ExpertUsageStatsLayoutType: TensorLayout,
     TopkIdsLayoutType: TensorLayout,
-    num_threads: Int = WARP_SIZE,
-    expected_count: Int = 8192,
     _scale_alignment: UInt32 = 128,
 ](
     token_expert_order: TileTensor[
         mut=True, .uint32, TokenExpertOrderLayoutType, MutAnyOrigin
     ],
-    lock: TileTensor[.uint64, LockLayoutType, MutAnyOrigin],
     expert_start_indices: TileTensor[
         mut=True, .uint32, ExpertStartIndicesLayoutType, MutAnyOrigin
     ],
@@ -463,128 +117,138 @@ def moe_create_indices_bucket_group_kernel[
     topk_ids: TileTensor[input_type, TopkIdsLayoutType, ImmutAnyOrigin],
     scales_offset_p: Optional[UnsafePointer[UInt32, MutAnyOrigin]],
 ):
-    """Create indices for MoE routing using bucket sort algorithm.
+    """Builds MoE routing indices in one CTA using a block-wide scan.
 
-    The main goal of this kernel is to group tokens that use the same expert together.
-    This allows for efficient batching when used by other kernels such as grouped matmul.
+    Groups tokens by their assigned expert so downstream kernels such as
+    grouped matmul can process each expert's tokens contiguously. Every expert
+    in `[0, num_experts)` gets a slot, including ones with zero tokens;
+    `expert_usage_stats` holds the largest per-expert token count and
+    `num_experts`.
 
-    This is a GPU-optimized bucket sort implementation that uses:
-    - Warp-level voting to count matching tokens
-    - Shared memory for temporary storage
-    - Atomic operations for thread-safe global memory updates
-
-    topk_ids: a 1D tensor of expert ids, the index of each expert_id corresponds to a token.
-    For example if topk_ids is [1, 0, 1, 3, 4, 2], then the corresponding tokens are [0, 1, 2, 3, 4, 5]
-
-    token_expert_order: a 1D tensor of tokens grouped together by expert id.
-    Using the previous topk_ids, the token expert order could be [0, 2, 1, 3, 4, 5]
-
-    expert_ids: a 1D tensor of all the experts that are being used. Using the previous topk_ids the
-    our expert_ids would be [1, 0, 3, 4, 2]
-
-    expert_start_indices: tells us where each expert starts and end in the token_expert_order. Based on the
-    order of our expert_ids our expert_start_indices would be [0, 2, 3, 4, 5, 6]. So if you wanted to see where
-    expert 1 starts and ends you would get the index 'i' of expert 1 in expert_ids and would query expert_start_indices[i]
-    and query expert_start_indices[i + 1] which is 0 and 2 respectively.
-
-    lock: a 1D tensor that holds a single scalar value, this single integer will be used to atomically
-    synchronize the writes back to global memory. It will do this by storing how many blocks have finished
-    writing and the current global memory offset.
-
-    expert_usage_stats: contains two values, the maximum number of tokens assigned to any expert and the
-    number of active experts. For our example the stats would be [2, 5]
-
-    restore_token_order: a 1D tensor where each index represents a corresponding token and holds the new index of the token
-    in the token_expert_order tensor. For our example the restore_token_order would be [0, 2, 1, 3, 4, 5]
+    Slot order is ascending expert id; token order within a slot follows the
+    shared cursor. Neither is load-bearing: consumers pair
+    `expert_start_indices[g]` and `[g + 1]` with `expert_ids[g]`, and invert
+    through `restore_token_order`.
     """
-
     comptime assert token_expert_order.flat_rank == 1
-    comptime assert lock.flat_rank == 1
     comptime assert expert_start_indices.flat_rank == 1
     comptime assert restore_token_order.flat_rank == 1
     comptime assert expert_ids.flat_rank == 1
     comptime assert expert_usage_stats.flat_rank == 1
-    comptime assert topk_ids.flat_rank == 2
+    comptime assert topk_ids.flat_rank == 1
 
-    comptime assert num_threads in (
-        32,
-        64,
-    ), "Only support 32 or 64 threads per warp"
+    comptime atomic_scope = _cta_atomic_scope()
 
-    comptime BucketParamsType = _BucketGroupParams[num_threads, input_type]
+    var total_tokens = Int(topk_ids.dim(0))
+    var num_experts = Int(expert_ids.dim(0))
+    var tid = Int(thread_idx.x)
 
-    # Allocate shared memory for temporary storage of matching token indices
-    # alignment=128,
-    var smem = tensor_alloc[.uint32, address_space=.SHARED](
-        row_major[1, expected_count]()
+    var counts = tensor_alloc[.uint32, address_space=.SHARED](
+        row_major[_BLOCK_THREADS]()
     )
 
-    comptime assert (
-        expected_count % BucketParamsType.width == 0
-    ), "Expected count must be a multiple of the simd width"
+    # Tokens, and aligned scale slots, placed by the preceding expert chunks.
+    var token_carry = UInt32(0)
+    var scale_carry = UInt32(0)
+    var max_count = UInt32(0)
 
-    var bucket_group_params = BucketParamsType(Int(topk_ids.dim(1)))
+    for base in range(0, num_experts, _BLOCK_THREADS):
+        var chunk_experts = min(_BLOCK_THREADS, num_experts - base)
+        var expert = base + tid
 
-    # count tokens per expert and store as many we can in shared memory
-    var total_writes = _count_expert_tokens[expected_count](
-        topk_ids, smem, bucket_group_params
-    )
+        counts[Coord(tid)] = 0
+        barrier()
 
-    var aligned_total_writes = align_up(UInt32(total_writes), _scale_alignment)
+        # Counts commute, so increment order does not matter.
+        # Block scope and relaxed are load-bearing: the default is system
+        # scope and sequentially consistent, which fences every increment
+        # and costs about 5x. The barrier below is what publishes these
+        # counts to their readers. That holds on NVIDIA, where the barrier
+        # fences shared memory; on AMD it rests on the backend emitting
+        # s_waitcnt lgkmcnt(0) ahead of s_barrier.
+        for i in range(tid, total_tokens, _BLOCK_THREADS):
+            var e = Int(topk_ids[i]) - base
+            if e < 0 or e >= chunk_experts:
+                continue
+            _ = Atomic[UInt32, scope=atomic_scope].fetch_add[
+                ordering=Ordering.RELAXED
+            ](counts.ptr + e, UInt32(1))
+        barrier()
 
-    var expert_idx, g_offset, aligned_g_offset = _get_index_and_offset(
-        lock, UInt32(total_writes), aligned_total_writes
-    )
+        var count_val = counts[Coord(tid)]
+        var aligned_val = align_up(count_val, _scale_alignment)
 
-    if scales_offset_p:
-        var _ptr = scales_offset_p.value()
-        _ptr[expert_idx] = (
-            aligned_g_offset // _scale_alignment - g_offset // _scale_alignment
+        # These collectives do not leave the block synchronized, so each needs
+        # a barrier before the next reuses its scratch.
+        var g_offset = token_carry + block.prefix_sum[
+            block_size=_BLOCK_THREADS, exclusive=True
+        ](count_val)
+        barrier()
+
+        var aligned_g_offset = scale_carry + block.prefix_sum[
+            block_size=_BLOCK_THREADS, exclusive=True
+        ](aligned_val)
+        barrier()
+
+        # broadcast=False leaves the reduced value in warp 0 lane 0 only,
+        # which is why expert_usage_stats[0] is written from tid 0 below. That
+        # output sizes downstream grouped-matmul work, so if the primitive ever
+        # changes which thread holds the result, that write has to follow.
+        max_count = max(
+            max_count,
+            block.max[block_size=_BLOCK_THREADS, broadcast=False](count_val),
         )
 
-    # Record which expert is active at this index
-    # this signals this expert is being used
-    expert_ids[Coord(expert_idx)] = Int32(bucket_group_params.expert)
+        if expert < num_experts:
+            expert_ids[Coord(expert)] = Int32(expert)
+            expert_start_indices[Coord(expert)] = g_offset
+            if scales_offset_p:
+                var _ptr = scales_offset_p.value()
+                _ptr[expert] = (
+                    aligned_g_offset // _scale_alignment
+                    - g_offset // _scale_alignment
+                )
 
-    # Store the ending index for this expert (start of next expert)
-    # NOTE: expert_start_indices must be zero-initialized for this to work correctly
-    expert_start_indices[Coord(expert_idx + 1)] = g_offset + UInt32(
-        total_writes
-    )
+        if expert == num_experts - 1:
+            # Last expert's exclusive prefix plus its own count is the grand
+            # total: the final `expert_start_indices` entry.
+            expert_start_indices[Coord(num_experts)] = g_offset + count_val
 
-    # First expert always starts at index 0
-    if expert_idx == 0:
-        expert_start_indices[Coord(expert_idx)] = 0
-
-    if total_writes > 0:
-        # Copy all tokens in shared memory back to global memory
-        _copy_tokens_smem_to_gmem[expected_count](
-            token_expert_order,
-            restore_token_order,
-            smem,
-            g_offset,
-            total_writes,
-            bucket_group_params,
-        )
-
-        # write the rest of the tokens not in shared memory into global memory
-        if total_writes > UInt64(expected_count):
-            _copy_tokens_to_gmem[expected_count](
-                topk_ids,
-                smem,
-                token_expert_order,
-                restore_token_order,
-                total_writes,
-                g_offset,
-                bucket_group_params,
+        # The last thread's exclusive prefix plus its own count is the chunk
+        # total. Only another chunk needs it, so a single chunk pays nothing.
+        # A block collective does not leave the block synchronized and its
+        # scratch is private to the primitive, so every pair of them gets a
+        # barrier between. That is what the three here are for.
+        if base + _BLOCK_THREADS < num_experts:
+            barrier()
+            token_carry = block.broadcast[block_size=_BLOCK_THREADS](
+                g_offset + count_val, src_thread=_BLOCK_THREADS - 1
             )
+            barrier()
+            scale_carry = block.broadcast[block_size=_BLOCK_THREADS](
+                aligned_g_offset + aligned_val, src_thread=_BLOCK_THREADS - 1
+            )
+            barrier()
 
-    # update expert_usage_stats.
-    if thread_idx.x == 0:
-        _ = Atomic.fetch_add(expert_usage_stats.ptr + 1, 1)
+        # Reuse `counts` as the scatter cursor: seed each slot with its own
+        # start offset, then atomically claim positions from it.
+        counts[Coord(tid)] = g_offset
+        barrier()
 
-        # NOTE: must be zero initialized otherwise atomic max will not work
-        _ = Atomic.max(expert_usage_stats.ptr, UInt32(total_writes))
+        for i in range(tid, total_tokens, _BLOCK_THREADS):
+            var e = Int(topk_ids[i]) - base
+            if e < 0 or e >= chunk_experts:
+                continue
+            var pos = Atomic[UInt32, scope=atomic_scope].fetch_add[
+                ordering=Ordering.RELAXED
+            ](counts.ptr + e, UInt32(1))
+            token_expert_order[Coord(pos)] = UInt32(i)
+            restore_token_order[Coord(i)] = pos
+        barrier()
+
+    if tid == 0:
+        expert_usage_stats[Coord(0)] = max_count
+        expert_usage_stats[Coord(1)] = UInt32(num_experts)
 
 
 @always_inline
@@ -592,7 +256,6 @@ def moe_create_indices[
     input_type: DType,
     //,
     target: StaticString,
-    expected_count: Int = 8192,
 ](
     token_expert_order: TileTensor[mut=True, .uint32, ...],
     expert_start_indices: TileTensor[mut=True, .uint32, ...],
@@ -605,17 +268,14 @@ def moe_create_indices[
 ) raises:
     """Launches the MoE index creation kernel on GPU.
 
-    Groups tokens by their assigned expert using a bucket sort algorithm so
-    that downstream kernels such as grouped matmul can process each expert's
-    tokens contiguously. Allocates and zero-initializes the atomic lock buffer
-    and expert usage stats, reshapes topk_ids to 2D, and launches one block per
-    expert.
+    Groups tokens by their assigned expert so that downstream kernels such as
+    grouped matmul can process each expert's tokens contiguously. One CTA
+    histograms the expert ids in shared memory, scans the histogram into CSR
+    offsets, and scatters the tokens.
 
     Parameters:
         input_type: DType of the topk_ids tensor.
         target: The target device to run the kernel on.
-        expected_count: Maximum number of token indices cached per expert in
-            shared memory before spilling to global memory.
 
     Args:
         token_expert_order: Output 1D tensor of token indices grouped by expert.
@@ -623,9 +283,10 @@ def moe_create_indices[
             each expert in token_expert_order.
         restore_token_order: Output 1D tensor mapping each token to its new
             position in token_expert_order.
-        expert_ids: Output 1D tensor of the active expert IDs in output order.
+        expert_ids: Output 1D tensor of the expert IDs in output order, one
+            slot per expert in ascending ID order.
         expert_usage_stats: Output 1D tensor holding the maximum tokens
-            assigned to any expert and the count of active experts.
+            assigned to any expert and the expert count.
         topk_ids: Input 1D tensor of expert IDs, one per token.
         context: The device context.
         scales_offset_p: Optional pointer receiving the aligned scale offsets
@@ -636,84 +297,39 @@ def moe_create_indices[
     ](), "Creating MoE indices is only supported on GPU"
 
     comptime if has_apple_gpu_accelerator():
-        # Apple AGX has no 64-bit device atomics, so `_get_index_and_offset`
-        # packs the CSR bookkeeping into a single 32-bit atomic: a 9-bit expert
-        # counter (bits [31:23]) and a 23-bit grouped-token offset (bits
-        # [22:0]). That caps the Apple path at 512 experts and 8_388_607
-        # grouped tokens and leaves no bits to track the FP8/block-scaled
-        # aligned-scale offset. Enforce those limits here on the host: a device
-        # `debug_assert` is a no-op on Apple GPU (MOCO-2405), so it could not
-        # fail loudly, and all three quantities are known before launch.
-        if expert_ids.dim(0) > 512:
+        # Above one chunk the kernel repeats its block collectives in a loop,
+        # which desynchronizes warps on Metal (see the Apple path in
+        # `nn/sampling/topk_fi.mojo`). Apple rejected these expert counts
+        # before this kernel existed too, so nothing that worked is lost.
+        if expert_ids.dim(0) > _BLOCK_THREADS:
             raise Error(
                 t"Apple MoE: num_experts={expert_ids.dim(0)} exceeds the"
-                t" 512-expert cap of the 32-bit-atomic path"
-            )
-        if topk_ids.dim(0) > 0x007FFFFF:
-            raise Error(
-                t"Apple MoE: {topk_ids.dim(0)} grouped tokens exceed the"
-                t" 8_388_607-token cap of the 32-bit-atomic path"
-            )
-        if scales_offset_p:
-            raise Error(
-                t"Apple MoE: FP8/block-scaled scales_offset is unsupported on"
-                t" the 32-bit-atomic path (the aligned scale offset is not"
-                t" tracked)"
+                t" 512-expert single-chunk cap"
             )
 
     with Trace[TraceLevel.OP, target=target](
         "mo.moe.create_indices", task_id=Int(context.id())
     ):
-        var lock_buffer = context.enqueue_create_buffer[.uint64](1)
-
-        def fill_zero_kernel(
-            lock_ptr: UnsafePointer[UInt64, MutAnyOrigin],
-            expert_usage_stats_ptr: UnsafePointer[UInt32, MutAnyOrigin],
-        ):
-            lock_ptr.store(0)
-            expert_usage_stats_ptr.store(0)
-            expert_usage_stats_ptr.store(1, 0)
-
-        context.enqueue_function[fill_zero_kernel](
-            lock_buffer,
-            expert_usage_stats.ptr,
-            grid_dim=(1,),
-            block_dim=(1,),
-            attributes=pdl_launch_attributes(PDLLevel.ON),
-        )
-
-        var lock = TileTensor(lock_buffer, row_major[1]())
-
-        var topk_2D = TileTensor(
-            topk_ids.ptr,
-            row_major(Coord(Idx[1], Int(topk_ids.dim(0)))),
-        )
-
-        var num_experts = expert_ids.dim(0)
-
-        comptime kernel = moe_create_indices_bucket_group_kernel[
+        comptime kernel = moe_create_indices_kernel[
             input_type,
             token_expert_order.LayoutType,
-            lock.LayoutType,
             expert_start_indices.LayoutType,
             restore_token_order.LayoutType,
             expert_ids.LayoutType,
             expert_usage_stats.LayoutType,
-            topk_2D.LayoutType,
-            expected_count=expected_count,
+            topk_ids.LayoutType,
         ]
 
         context.enqueue_function[kernel](
             token_expert_order,
-            lock,
             expert_start_indices,
             restore_token_order,
             expert_ids,
             expert_usage_stats,
-            topk_2D,
+            topk_ids,
             scales_offset_p,
-            grid_dim=(num_experts),
-            block_dim=(WARP_SIZE),
+            grid_dim=1,
+            block_dim=_BLOCK_THREADS,
         )
 
 

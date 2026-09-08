@@ -60,21 +60,6 @@ modular_py_binary(
 )
 
 modular_py_binary(
-    name = "di_smoke_test",
-    testonly = True,
-    srcs = ["di_smoke_test.py"],
-    imports = [".."],
-    tags = ["no-pydeps"],  # TODO: Fix and re-enable
-    deps = [
-        ":eval_runner",
-        ":inference_server_harness",
-        requirement("click"),
-        requirement("pyyaml"),
-        requirement("requests"),
-    ],
-)
-
-modular_py_binary(
     name = "smoke_test_github_matrix",
     srcs = ["smoke_test_github_matrix.py"],
     imports = [".."],

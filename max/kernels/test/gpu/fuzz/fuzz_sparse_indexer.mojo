@@ -62,7 +62,7 @@
 #   num_rows, num_blocks, k, block_dim, dist, force (0/1), seed.
 
 from std.collections import Set
-from std.gpu import block_idx
+from max.gpu import block_idx
 from max.gpu.host import DeviceBuffer, DeviceContext
 from std.math import max, min
 from std.random import rand, random_ui64, seed as set_seed

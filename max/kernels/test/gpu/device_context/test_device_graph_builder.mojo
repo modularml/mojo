@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from std.math import ceildiv
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.reflection import get_function_name
 from std.testing import (
@@ -198,6 +198,55 @@ def test_scaled_kernel_node(ctx: DeviceContext) raises:
 
     var graph = DeviceGraph.create(ctx, build)
     graph.replay()
+
+    with out_dev.map_to_host() as out_host:
+        for i in range(length):
+            assert_equal(out_host[i], Float32(length) * scale)
+
+
+def test_closure_node(ctx: DeviceContext) raises:
+    print("Test using a closure as a device graph node.")
+    comptime length = 1024
+    comptime block_dim = 256
+    var scale = Float32(2.0)
+
+    var in0_dev = ctx.enqueue_create_buffer[.float32](length)
+    var in1_dev = ctx.enqueue_create_buffer[.float32](length)
+    var out_dev = ctx.enqueue_create_buffer[.float32](length)
+
+    with in0_dev.map_to_host() as in0_host, in1_dev.map_to_host() as in1_host:
+        for i in range(length):
+            in0_host[i] = Float32(i)
+            in1_host[i] = Float32(length - i)
+
+    var out_ptr = out_dev.unsafe_ptr()
+    var in0_ptr = in0_dev.unsafe_ptr()
+    var in1_ptr = in1_dev.unsafe_ptr()
+
+    # Closure captures device pointers and scale from the enclosing scope.
+    # Dispatches to the `DevicePassable` capturing-closure `add_function`
+    # overload, which encodes the closure so the captured `DevicePointer`s
+    # become device addresses at the launch boundary.
+    def scaled_vec_add() {var scale, var out_ptr, var in0_ptr, var in1_ptr}:
+        var tid = global_idx.x
+        if tid >= length:
+            return
+        out_ptr[unsafe_offset=tid] = (
+            in0_ptr[unsafe_offset=tid] + in1_ptr[unsafe_offset=tid]
+        ) * scale
+
+    def build(mut builder: DeviceGraphBuilder) raises {imm}:
+        _ = builder.add_function(
+            scaled_vec_add,
+            grid_dim=ceildiv(length, block_dim),
+            block_dim=block_dim,
+        )
+
+    var graph = DeviceGraph.create(ctx, build)
+    graph.replay()
+
+    _ = in0_dev^
+    _ = in1_dev^
 
     with out_dev.map_to_host() as out_host:
         for i in range(length):
@@ -524,8 +573,8 @@ def test_add_copy_with_dependencies(ctx: DeviceContext) raises:
 
 def test_region(ctx: DeviceContext) raises:
     print(
-        "Test region joins scope nodes into a single"
-        " empty node usable as a downstream node's sole dependency."
+        "Test region returns its last node, usable as a downstream node's"
+        " sole dependency covering everything the scope added."
     )
     comptime length = 64
 
@@ -534,8 +583,8 @@ def test_region(ctx: DeviceContext) raises:
     var buf_c = ctx.enqueue_create_buffer[.uint8](length)
 
     def build(mut builder: DeviceGraphBuilder) raises {imm}:
-        # Pre-existing root node added before the scope. It must NOT be a
-        # predecessor of the join node returned by the scope.
+        # Pre-existing root node added before the scope. The scope's
+        # `dependencies=` names it, so the scope runs after it.
         var pre_scope = builder.add_memset(buf_a, UInt8(0x01), dependencies=[])
 
         # Two producer nodes added inside the scope. The work is a named
@@ -577,7 +626,7 @@ def test_region(ctx: DeviceContext) raises:
 
 def test_region_empty(ctx: DeviceContext) raises:
     print(
-        "Test region still returns a usable join node"
+        "Test region still returns a usable node"
         " when the scope adds no nodes (empty node becomes a graph root)."
     )
     comptime length = 64
@@ -632,8 +681,8 @@ def test_region_with_dependencies(ctx: DeviceContext) raises:
         var join_a = builder.region(producer)
 
         # Consumer scope: increment `buf` by 10. Passing dependencies=[join_a]
-        # injects join_a as an ambient predecessor of the incr node, so it
-        # runs strictly after the producer. Final value must be 15, not 10.
+        # makes join_a a predecessor of the scope's first node, so it runs
+        # strictly after the producer. Final value must be 15, not 10.
         def consumer(mut b: DeviceGraphBuilder) raises {imm}:
             _ = b.add_function(
                 incr,
@@ -660,7 +709,7 @@ def test_region_passthrough_dependencies(
     ctx: DeviceContext,
 ) raises:
     print(
-        "Test region returns a join that still gates on"
+        "Test region returns a node that still gates on"
         " `dependencies` when the scope adds no nodes (zero-node fallback)."
     )
     comptime length = 1024
@@ -687,9 +736,8 @@ def test_region_passthrough_dependencies(
 
         var join_a = builder.region(producer)
 
-        # Empty scope depending on join_a: adds no nodes, so its returned join
-        # falls back to depending on join_a directly (it must chain the
-        # barrier).
+        # Empty scope depending on join_a: adds no nodes, so its returned
+        # handle falls back to an empty node depending on join_a directly.
         def add_nothing(mut b: DeviceGraphBuilder) raises {imm}:
             return
 
@@ -707,6 +755,232 @@ def test_region_passthrough_dependencies(
             block_dim=block_dim,
             dependencies=[passthrough],
         )
+
+    var graph = DeviceGraph.create(ctx, build)
+    graph.replay()
+    ctx.synchronize()
+
+    with buf.map_to_host() as host:
+        for i in range(length):
+            assert_equal(host[i], Float32(15))
+
+
+def test_region_node_structure(ctx: DeviceContext) raises:
+    print(
+        "Test region chains its nodes, returns the last one, and adds no"
+        " join node."
+    )
+    comptime length = 64
+    var buf = ctx.enqueue_create_buffer[.uint8](length)
+
+    # Node ids are dense and monotonic, so the builder's last-node id doubles
+    # as a node count. That is what pins the contract here: the *behaviour* of
+    # a chain edge is not observable through replay (an unordered pair of root
+    # nodes still runs in insertion order in practice), but the node count and
+    # the returned handle are exact.
+    def build(mut builder: DeviceGraphBuilder) raises {imm}:
+        def two_nodes(mut b: DeviceGraphBuilder) raises {imm}:
+            _ = b.add_memset(buf, UInt8(0x11))
+            _ = b.add_memset(buf, UInt8(0x22))
+
+        var chained = builder.region(two_nodes)
+
+        # Two nodes in, two nodes added: chaining makes the second the scope's
+        # sole sink, so there is no third (join) node, and the handle returned
+        # is that sink.
+        assert_equal(Int(builder._last_node_id().value()), 1)
+        assert_equal(Int(chained.id), 1)
+
+        # An outer scope spanning a nested scope adds one node per `add_*` and
+        # nothing more, which is what proves the floor bookkeeping nests.
+        def outer(mut b: DeviceGraphBuilder) raises {imm}:
+            _ = b.add_memset(buf, UInt8(0x33))
+
+            def inner(mut inner_b: DeviceGraphBuilder) raises {imm}:
+                _ = inner_b.add_memset(buf, UInt8(0x44))
+
+            var inner_sink = b.region(inner)
+            assert_equal(Int(inner_sink.id), 3)
+
+            _ = b.add_memset(buf, UInt8(0x55))
+
+        var outer_sink = builder.region(outer)
+        assert_equal(Int(builder._last_node_id().value()), 4)
+        assert_equal(Int(outer_sink.id), 4)
+
+        # A scope that adds nothing still materializes its fallback empty node.
+        def nothing(mut b: DeviceGraphBuilder) raises {imm}:
+            return
+
+        var empty_sink = builder.region(nothing)
+        assert_equal(Int(builder._last_node_id().value()), 5)
+        assert_equal(Int(empty_sink.id), 5)
+
+    var graph = DeviceGraph.create(ctx, build)
+    graph.replay()
+    ctx.synchronize()
+
+    with buf.map_to_host() as host:
+        for i in range(length):
+            assert_equal(host[i], UInt8(0x55))
+
+
+def test_region_chain_edges(ctx: DeviceContext) raises:
+    print(
+        "Test the predecessor set a region hands each node: incoming"
+        " predecessors for the first, the previous node for the rest."
+    )
+    comptime length = 64
+    var buf = ctx.enqueue_create_buffer[.uint8](length)
+
+    # `_merge_implicit` is the whole chain rule, and it is a pure function of
+    # the builder's state, so probing it asserts the edges directly. Replay
+    # cannot: two unordered root nodes still run in insertion order in
+    # practice, so a missing edge is invisible end to end.
+    def build(mut builder: DeviceGraphBuilder) raises {imm}:
+        var pre = builder.add_memset(buf, UInt8(0x01))
+
+        # Outside a region there is no implicit predecessor at all.
+        assert_equal(
+            len(builder._merge_implicit(List[type_of(builder).Node]())), 0
+        )
+
+        def probe(mut b: DeviceGraphBuilder) raises {imm}:
+            # First node of the scope: gated on the scope's incoming
+            # predecessors.
+            var first = b._merge_implicit(List[type_of(b).Node]())
+            assert_equal(len(first), 1)
+            assert_equal(Int(first[0].id), Int(pre.id))
+
+            var n0 = b.add_memset(buf, UInt8(0x02))
+
+            # Every later node chains after the one before it instead, so the
+            # incoming predecessors are named once rather than on every node.
+            var second = b._merge_implicit(List[type_of(b).Node]())
+            assert_equal(len(second), 1)
+            assert_equal(Int(second[0].id), Int(n0.id))
+
+            var n1 = b.add_memset(buf, UInt8(0x03))
+
+            # An explicit dependency is unioned with the chain edge, not
+            # replaced by it.
+            var both = b._merge_implicit([n0])
+            assert_equal(len(both), 2)
+            assert_equal(Int(both[0].id), Int(n0.id))
+            assert_equal(Int(both[1].id), Int(n1.id))
+
+            # Naming the chain predecessor explicitly does not repeat it: the
+            # graph APIs reject a duplicated predecessor.
+            var same = b._merge_implicit([n1])
+            assert_equal(len(same), 1)
+            assert_equal(Int(same[0].id), Int(n1.id))
+
+        _ = builder.region(probe, dependencies=[pre])
+
+        # The scope is popped again on the way out.
+        assert_equal(
+            len(builder._merge_implicit(List[type_of(builder).Node]())), 0
+        )
+
+    var graph = DeviceGraph.create(ctx, build)
+    graph.replay()
+    ctx.synchronize()
+
+    with buf.map_to_host() as host:
+        for i in range(length):
+            assert_equal(host[i], UInt8(0x03))
+
+
+def test_region_serializes_nodes(ctx: DeviceContext) raises:
+    print(
+        "Test a region whose nodes have a RAW dependency on one buffer"
+        " replays to the chained result."
+    )
+    comptime length = 1024
+    comptime block_dim = 256
+    comptime grid_dim = ceildiv(length, block_dim)
+
+    var buf = ctx.enqueue_create_buffer[.float32](length)
+
+    var fill = ctx.compile_function[Kernels.fill_constant]()
+    var incr = ctx.compile_function[Kernels.add_in_place]()
+
+    def build(mut builder: DeviceGraphBuilder) raises {imm}:
+        # Neither node names a dependency and both write `buf`, so only the
+        # region's chaining orders them. See `test_region_node_structure` for
+        # the assertion that actually pins the edge.
+        def stage(mut b: DeviceGraphBuilder) raises {imm}:
+            _ = b.add_function(
+                fill,
+                buf,
+                Int32(5),
+                Int32(length),
+                grid_dim=grid_dim,
+                block_dim=block_dim,
+            )
+            _ = b.add_function(
+                incr,
+                buf,
+                Int32(10),
+                Int32(length),
+                grid_dim=grid_dim,
+                block_dim=block_dim,
+            )
+
+        _ = builder.region(stage)
+
+    var graph = DeviceGraph.create(ctx, build)
+    graph.replay()
+    ctx.synchronize()
+
+    with buf.map_to_host() as host:
+        for i in range(length):
+            assert_equal(host[i], Float32(15))
+
+
+def test_region_chains_after_recording_context(ctx: DeviceContext) raises:
+    print(
+        "Test a region's chain picks up nodes recorded through"
+        " recording_context(), which the C++ builder adds directly."
+    )
+    comptime length = 1024
+    comptime block_dim = 256
+    comptime grid_dim = ceildiv(length, block_dim)
+
+    var buf = ctx.enqueue_create_buffer[.float32](length)
+
+    var fill = ctx.compile_function[Kernels.fill_constant]()
+    var incr = ctx.compile_function[Kernels.add_in_place]()
+
+    def build(mut builder: DeviceGraphBuilder) raises {imm}:
+        # The fill is recorded through the recording context, so it never
+        # passes through `_merge_implicit`. The following `add_function` must
+        # still chain after it, which it does because the chain predecessor is
+        # read from the builder's node ids rather than tracked on the Mojo
+        # side: the seed plus the recorded launch are node 0 and 1, so the
+        # increment lands on node 2 depending on node 1.
+        def stage(mut b: DeviceGraphBuilder) raises {imm}:
+            with b.recording_context() as rec:
+                rec.enqueue_function(
+                    fill,
+                    buf,
+                    Int32(5),
+                    Int32(length),
+                    grid_dim=grid_dim,
+                    block_dim=block_dim,
+                )
+
+            _ = b.add_function(
+                incr,
+                buf,
+                Int32(10),
+                Int32(length),
+                grid_dim=grid_dim,
+                block_dim=block_dim,
+            )
+
+        var sink = builder.region(stage)
+        assert_equal(Int(sink.id), 2)
 
     var graph = DeviceGraph.create(ctx, build)
     graph.replay()

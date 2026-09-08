@@ -23,7 +23,7 @@ fed directly to the shared QK/SV MMA pipeline.  The dtype-agnostic machinery
 from std.sys import size_of
 from std.utils.index import Index, IndexList
 from std.utils.static_tuple import StaticTuple
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     block_idx,
     warp_id,
@@ -35,7 +35,7 @@ from std.math import ceildiv, exp2
 from std.math.constants import log2e
 from max.gpu.primitives.cluster import elect_one_sync
 from max.gpu.primitives.cluster import cluster_sync
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.memory import (
     cp_async_bulk_tensor_shared_cluster_global,
     external_memory,
@@ -47,10 +47,10 @@ from max.gpu.sync import (
     cp_async_bulk_commit_group,
     cp_async_bulk_wait_group,
 )
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host import DeviceContext, FuncAttribute
 from std.ffi import UnsafeUnion
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
     tcgen05_dealloc,
@@ -100,6 +100,7 @@ from layout import (
     row_major,
     Idx,
     TensorLayout,
+    TensorEngine,
     Coord,
     stack_allocation as tt_stack_allocation,
 )
@@ -297,6 +298,8 @@ struct MLAPrefillSparse[
     def kernel[
         TopKLengthLayout: TensorLayout,
         IndicesLayout: TensorLayout,
+        TopKLengthEngine: TensorEngine,
+        IndicesEngine: TensorEngine,
     ](
         q_tma_op: TMATensorTile[
             Self.qkv_dtype,
@@ -322,8 +325,12 @@ struct MLAPrefillSparse[
             Self.o_tile_shape,
             Self.o_desc_shape,
         ],
-        topk_lengths: TileTensor[.uint32, TopKLengthLayout, MutAnyOrigin],
-        indices: TileTensor[.uint32, IndicesLayout, MutAnyOrigin],
+        topk_lengths: TileTensor[
+            .uint32, TopKLengthLayout, MutAnyOrigin, Engine=TopKLengthEngine
+        ],
+        indices: TileTensor[
+            .uint32, IndicesLayout, MutAnyOrigin, Engine=IndicesEngine
+        ],
         kv_lut: Self.KVLUTType,
         scale: Float32,
         attn_sink_ptr: Optional[UnsafePointer[Float32, ImmutAnyOrigin]],
@@ -335,7 +342,7 @@ struct MLAPrefillSparse[
         var warp_idx = warp_id()
         var lane_idx = thread_idx.x % WARP_SIZE
         var warpgroup_idx = warp.broadcast(thread_idx.x // WARPGROUP_SIZE)
-        var top_k_length = topk_lengths[seq_idx]
+        var top_k_length = topk_lengths.load[width=1](Coord(seq_idx))
         var num_k_blocks = max(
             ceildiv(top_k_length, UInt32(Self.config.B_TOPK)), 1
         )
@@ -595,12 +602,14 @@ struct MLAPrefillSparse[
                 )
                 real_mi = max(real_mi, cur_pi_max)
 
-                # Warp-uniform "should we rescale O?" decision (>6 log2-units
+                # Per-lane decision for the STATE update (new_max/mi/li):
+                # `idx_in_wg` packs one independent head-row's softmax
+                # state per lane, so an OR here would leak a sibling
+                # head's rescale trajectory into this one's (>6 log2-units
                 # means rescaling lifts mass by < 1/64 — phase1.cuh skips
-                # the rescale below that threshold to reduce TMEM traffic).
-                var should_scale_o = warp.vote[.uint32](
-                    cur_pi_max - mi > Float32(6.0)
-                ) != UInt32(0)
+                # the rescale below that threshold to reduce TMEM
+                # traffic).
+                var should_scale_o = cur_pi_max - mi > Float32(6.0)
 
                 var new_max: Float32
                 var scale_for_old: Float32
@@ -612,6 +621,19 @@ struct MLAPrefillSparse[
                     scale_for_old = exp2(mi - new_max)
                 mi = new_max
                 li = mul_ftz(li, scale_for_old)
+
+                # The O-rescale WALK below touches TMEM via tcgen05_ld/st,
+                # which are warp-collective ops (datapaths=32) requiring
+                # every lane to participate uniformly -- a per-lane branch
+                # here would diverge the warp on those ops and hang. Vote
+                # ANY (not the state above): any lane needing a rescale
+                # pulls every lane through the walk, but each lane applies
+                # its OWN `scale_for_old` (exactly 1.0 for a lane that
+                # didn't need it), so a coerced lane's contribution is an
+                # exact no-op multiply, not a value substitution.
+                var any_rescale = warp.vote[.uint32](should_scale_o) != UInt32(
+                    0
+                )
 
                 var s_bf16 = Array[Scalar[Self.qkv_dtype], P_PER_THREAD](
                     uninitialized=True
@@ -644,7 +666,7 @@ struct MLAPrefillSparse[
                 var o_chunk_prefetch = Array[Float32, O_RESCALE_CHUNK](
                     uninitialized=True
                 )
-                if k > 0 and should_scale_o:
+                if k > 0 and any_rescale:
                     tcgen05_fence_after()
                     o_chunk_prefetch = tcgen05_ld[
                         datapaths=32,
@@ -679,16 +701,13 @@ struct MLAPrefillSparse[
 
                 # Rescale O (in TMEM) if mi changed materially; chunk 0
                 # was prefetched above, chunks 1..N-1 load sequentially.
-                if k > 0 and should_scale_o:
+                if k > 0 and any_rescale:
                     tcgen05_load_wait()
-                    var o_scaled_0 = Array[Float32, O_RESCALE_CHUNK](
-                        uninitialized=True
-                    )
-                    comptime for j in range(O_RESCALE_CHUNK):
-                        o_scaled_0[j] = mul_ftz(
-                            o_chunk_prefetch[j],
-                            scale_for_old,
+                    var o_scaled_0 = Array[_, O_RESCALE_CHUNK](
+                        fill_with_unrolled=lambda [j: Int]() -> Float32: (
+                            mul_ftz(o_chunk_prefetch[j], scale_for_old)
                         )
+                    )
                     tcgen05_st[
                         datapaths=32,
                         bits=32,
@@ -708,14 +727,11 @@ struct MLAPrefillSparse[
                             + UInt32(chunk_idx * O_RESCALE_CHUNK)
                         )
                         tcgen05_load_wait()
-                        var o_scaled = Array[Float32, O_RESCALE_CHUNK](
-                            uninitialized=True
-                        )
-                        comptime for j in range(O_RESCALE_CHUNK):
-                            o_scaled[j] = mul_ftz(
-                                o_chunk[j],
-                                scale_for_old,
+                        var o_scaled = Array[_, O_RESCALE_CHUNK](
+                            fill_with_unrolled=lambda [j: Int]() -> Float32: (
+                                mul_ftz(o_chunk[j], scale_for_old)
                             )
+                        )
                         tcgen05_st[
                             datapaths=32,
                             bits=32,
@@ -1503,6 +1519,8 @@ def mla_prefill_sparse[
 
     comptime assert type_of(topk_lengths).flat_rank == 1
     comptime assert type_of(indices).flat_rank == 1
+    comptime assert topk_lengths.element_size == 1
+    comptime assert indices.element_size == 1
     comptime kernel = MLAPrefillSparse[
         KVLUTType=type_of(kv_operand),
         output_dtype=output_dtype,
@@ -1510,6 +1528,8 @@ def mla_prefill_sparse[
     ].kernel[
         type_of(topk_lengths).LayoutType,
         type_of(indices).LayoutType,
+        type_of(topk_lengths).Engine,
+        type_of(indices).Engine,
     ]
 
     comptime smem_size = size_of[MLASparseSharedMemory[config]]()

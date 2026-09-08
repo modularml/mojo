@@ -76,6 +76,8 @@ class DeepseekV3_2Config(DeepseekV3Config):
     DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "float8_e4m3fn"
     SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {"float8_e4m3fn"}
 
+    unpadded_vocab_size: int | None = None
+
     # Added parameters for the Indexer used in DeepSeek Sparse Attention.
     index_head_dim: int = 128
     index_n_heads: int = 64

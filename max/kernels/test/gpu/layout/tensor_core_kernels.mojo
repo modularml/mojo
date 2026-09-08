@@ -13,10 +13,10 @@
 
 from std.io.io import _printf
 
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from layout import Layout, LayoutTensor
 from layout._fillers import arange
 from layout._utils import ManagedLayoutTensor, load_to_simd

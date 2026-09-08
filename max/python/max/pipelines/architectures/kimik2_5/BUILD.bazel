@@ -18,7 +18,6 @@ modular_py_library(
         requirement("tiktoken"),
     ],
     deps = [
-        requirement("llguidance"),
         requirement("numpy"),
         requirement("pillow"),
         requirement("tiktoken"),  # Required by HF custom tokenizer for Kimi K2.5

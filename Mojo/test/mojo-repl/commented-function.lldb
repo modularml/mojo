@@ -1,0 +1,25 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+comptime x = 5 # some comment
+# another comment
+def foo() raises:
+  print("foo")
+  # another comment
+# a tricky comment
+  print("bar")
+  # another comment
+# some other comment
+print("foo defined")
+
+foo()
+# CHECK: foo defined
+# CHECK-NEXT: foo
+# CHECK-NEXT: bar

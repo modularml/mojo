@@ -13,7 +13,7 @@
 
 """Figures 13.11, 13.12, 13.13: Tiled merge kernel implementation in Mojo."""
 
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.memory import unsafe_stack_allocation

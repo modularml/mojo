@@ -20,7 +20,7 @@ from std.sys.info import has_accelerator, has_amd_gpu_accelerator, simd_width_of
 import extensibility
 
 from max.gpu.host import DeviceContext
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_dim,

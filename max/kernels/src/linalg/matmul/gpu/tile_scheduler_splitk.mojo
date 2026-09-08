@@ -24,9 +24,9 @@ from std.atomic import Atomic
 from std.sys import size_of
 
 from max.gpu.sync import NamedBarrierSemaphore
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host.info import H100
-from std.gpu import block_idx, grid_dim, thread_idx
+from max.gpu import block_idx, grid_dim, thread_idx
 from layout import Layout, LayoutTensor, RuntimeLayout, TensorLayout, TileTensor
 from std.bit import log2_floor
 

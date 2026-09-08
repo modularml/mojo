@@ -139,7 +139,11 @@ class KVConnectorTransfer(Protocol):
 
     @property
     def g0_blocks_per_leaf(self) -> Mapping[str, Sequence[int]]:
-        """Device (G0) block ids this transfer pins until it completes, per leaf."""
+        """Device (G0) block ids this transfer pins until it completes, per leaf.
+
+        Each leaf should have the same number of blocks. For SWA groups, the list
+        of blocks may be null padded with block_id=0.
+        """
         ...
 
     def is_complete(self) -> bool:
@@ -193,14 +197,14 @@ class CompletedTransfer:
         return
 
     @classmethod
-    def load(cls) -> CompletedTransfer:
+    def load(cls, leaves: Sequence[str] | None = None) -> CompletedTransfer:
         """Create a completed load transfer."""
-        return cls(TransferDirection.LOAD)
+        return cls(TransferDirection.LOAD, leaves)
 
     @classmethod
-    def offload(cls) -> CompletedTransfer:
+    def offload(cls, leaves: Sequence[str] | None = None) -> CompletedTransfer:
         """Create a completed offload transfer."""
-        return cls(TransferDirection.OFFLOAD)
+        return cls(TransferDirection.OFFLOAD, leaves)
 
 
 @runtime_checkable
@@ -255,17 +259,26 @@ class KVConnector(Protocol):
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
         """Load data from external cache into device blocks.
 
         Args:
-            block_ids: Device block IDs to load data into per leaf.
+            block_ids: Device block IDs to load data into per leaf. Each leaf
+                may have a different number of blocks depending on the group type.
+                For example, a full attn group may need 100 pages to load 100 hashes
+                while a sliding window group may only need 8 pages.
             block_hashes: Hashes to load data for, in canonical bytes form
                 (8 big-endian bytes for ahash64-family, 32 bytes for
                 SHA-256).
             replica_idx: DP replica whose device buffers receive the loaded
                 blocks. The external tier itself is replica-agnostic (keyed by
                 hash); this only selects the H2D destination.
+            hint: The request's ``dkv_cache_hint`` as raw JSON bytes, or
+                ``None`` when it carried none. Opaque to the manager: only the
+                dKV connector reads it, to route blocks to the peer that holds
+                them. It never affects correctness, since an unusable hint
+                costs a cache miss and nothing else.
 
         Returns:
             A :class:`KVConnectorTransfer` for the H2D copy. ``g0_blocks_per_leaf``
@@ -274,6 +287,9 @@ class KVConnector(Protocol):
             Synchronous connectors return a :class:`CompletedTransfer`;
             asynchronous ones return a handle the manager polls before reading
             the loaded KV.
+            Note that all leaves must have the same number of blocks. This number
+            should be equal to the number of loaded hashes. For sliding window
+            groups, the list of blocks may be null padded with block_id=0.
         """
         ...
 

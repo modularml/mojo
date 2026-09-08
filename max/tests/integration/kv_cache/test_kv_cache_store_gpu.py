@@ -24,20 +24,17 @@ from max.nn.kernels import (
     store_k_scale_cache_ragged,
 )
 from max.nn.kv_cache import (
-    KVCacheInputsPerDevice,
-    KVCacheParams,
     KVCacheQuantizationConfig,
     MHAKVCacheParams,
     PagedCacheValues,
 )
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import paged_kv_cache_inputs
+
+TOTAL_NUM_PAGES = 16
 
 
-def _make_session_and_kv_manager() -> tuple[Accelerator, PagedKVCacheManager]:
-    device = Accelerator()
-    session = InferenceSession(devices=[device])
-    kv_params = MHAKVCacheParams(
+def _kv_params() -> MHAKVCacheParams:
+    return MHAKVCacheParams(
         dtype=DType.float32,
         n_kv_heads=8,
         head_dim=64,
@@ -45,32 +42,11 @@ def _make_session_and_kv_manager() -> tuple[Accelerator, PagedKVCacheManager]:
         page_size=32,
         devices=[DeviceRef.GPU()],
     )
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=16,
-        session=session,
-        max_batch_size=128,
-    )
-    return device, kv_manager
-
-
-def _allocate_batch(
-    kv_manager: PagedKVCacheManager, prompt_lens: list[int]
-) -> KVCacheInputsPerDevice[Buffer, Buffer]:
-    batch = []
-    for prompt_len in prompt_lens:
-        context = create_text_context(np.empty(prompt_len, dtype=np.int64))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-    return kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
 
 
 def test_kv_cache_store_ragged_executes() -> None:
-    device, kv_manager = _make_session_and_kv_manager()
-    kv_params = kv_manager.params
-    assert isinstance(kv_params, MHAKVCacheParams)
-    assert isinstance(kv_params, KVCacheParams)
+    device = Accelerator()
+    kv_params = _kv_params()
 
     prompt_lens = [33, 66, 1]
     batch_size = len(prompt_lens)
@@ -132,7 +108,9 @@ def test_kv_cache_store_ragged_executes() -> None:
 
     session = InferenceSession(devices=[device])
     model = session.load(graph)
-    runtime_inputs = _allocate_batch(kv_manager, prompt_lens)
+    runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=TOTAL_NUM_PAGES
+    )
     assert not runtime_inputs.kv_blocks.to_numpy().any()
 
     offsets = np.array(
@@ -159,10 +137,8 @@ def test_kv_cache_store_ragged_executes() -> None:
 
 
 def test_kv_cache_store_padded_executes() -> None:
-    device, kv_manager = _make_session_and_kv_manager()
-    kv_params = kv_manager.params
-    assert isinstance(kv_params, MHAKVCacheParams)
-    assert isinstance(kv_params, KVCacheParams)
+    device = Accelerator()
+    kv_params = _kv_params()
 
     valid_lengths = [33, 66, 1]
     batch_size = len(valid_lengths)
@@ -224,7 +200,9 @@ def test_kv_cache_store_padded_executes() -> None:
 
     session = InferenceSession(devices=[device])
     model = session.load(graph)
-    runtime_inputs = _allocate_batch(kv_manager, valid_lengths)
+    runtime_inputs = paged_kv_cache_inputs(
+        kv_params, valid_lengths, total_num_pages=TOTAL_NUM_PAGES
+    )
     assert not runtime_inputs.kv_blocks.to_numpy().any()
 
     lengths = np.array(valid_lengths, dtype=np.uint32)
@@ -247,13 +225,9 @@ def test_kv_cache_store_padded_executes() -> None:
     assert runtime_inputs.kv_blocks.to_numpy().any()
 
 
-def _make_session_and_kv_manager_fp8() -> tuple[
-    Accelerator, PagedKVCacheManager
-]:
-    """Create session and KV manager with FP8 quantized cache (includes kv_scales)."""
-    device = Accelerator()
-    session = InferenceSession(devices=[device])
-    kv_params = MHAKVCacheParams(
+def _kv_params_fp8() -> MHAKVCacheParams:
+    """Page layout for an FP8 quantized cache, which also carries kv_scales."""
+    return MHAKVCacheParams(
         dtype=DType.float8_e4m3fn,
         n_kv_heads=1,
         head_dim=128,
@@ -265,21 +239,12 @@ def _make_session_and_kv_manager_fp8() -> tuple[
             quantization_granularity=128,
         ),
     )
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-    return device, kv_manager
 
 
 def test_store_k_scale_cache_executes() -> None:
     """Test that store_k_scale_cache kernel executes and writes to kv_scales buffer."""
-    device, kv_manager = _make_session_and_kv_manager_fp8()
-    kv_params = kv_manager.params
-    assert isinstance(kv_params, MHAKVCacheParams)
-    assert isinstance(kv_params, KVCacheParams)
+    device = Accelerator()
+    kv_params = _kv_params_fp8()
 
     prompt_lens = [33, 66, 1]
     batch_size = len(prompt_lens)
@@ -343,7 +308,9 @@ def test_store_k_scale_cache_executes() -> None:
     session = InferenceSession(devices=[device])
     model = session.load(graph)
 
-    runtime_inputs = _allocate_batch(kv_manager, prompt_lens)
+    runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    )
     assert runtime_inputs.kv_scales is not None
     assert not runtime_inputs.kv_scales.to_numpy().any()
 

@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
-from std.gpu import block_dim, block_idx, global_idx
+from max.gpu import block_dim, block_idx, global_idx
 from std.memory import Pointer, alloc
 from std.ffi import c_size_t
 from shmem import *

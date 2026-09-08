@@ -17,7 +17,7 @@ from std.math import ceildiv
 from std.math.uutils import umod, ufloordiv
 from std.sys import align_of, simd_width_of, size_of
 
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
     cluster_sync,
@@ -27,7 +27,7 @@ from max.gpu.primitives.cluster import (
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host.info import B200, _is_sm10x_gpu
-from std.gpu import (
+from max.gpu import (
     block_id_in_cluster,
     lane_id,
     thread_idx,

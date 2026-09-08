@@ -692,12 +692,12 @@ def constant(
         result = F.constant([[1.0, 2.0], [3.0, 4.0]], DType.float32)
         # result holds [[1.0, 2.0], [3.0, 4.0]].
 
-    .. warning::
+    .. caution::
 
         Loading a constant can lose precision. For example, loading
         ``16777217`` as a ``float32`` produces ``16777216.0``.
 
-    .. warning::
+    .. caution::
 
         When ``device`` is a multi-device
         :class:`~max.experimental.sharding.DeviceMapping`, the full

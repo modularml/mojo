@@ -129,7 +129,7 @@ def test_blackwell_matmul_with_1d_bias[
         matmul_config.c_type,
         type_of(bias_shape),
         ImmutAnyOrigin,
-        Storage=bias_tile.Storage,
+        Engine=bias_tile.Engine,
     ]
     blackwell_matmul_tma_umma_warp_specialized[
         transpose_b=transpose_b,

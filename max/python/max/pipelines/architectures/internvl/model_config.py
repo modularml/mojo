@@ -20,7 +20,7 @@ from typing import ClassVar, Literal
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.graph.weights import WeightData
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParamInterface
 from max.nn.transformer import ReturnLogits
 from max.pipelines.architectures.llama3.model_config import (
     Llama3Config as Qwen2Config,
@@ -166,7 +166,7 @@ class InternVLConfig(ArchConfigWithKVCache):
 
     quantization_encoding: SupportedEncoding | None = None
 
-    def get_kv_params(self) -> KVCacheParams:
+    def get_kv_params(self) -> KVCacheParamInterface:
         """Returns the KV cache parameters from the embedded LLM config."""
         return self.llm_config.get_kv_params()
 
@@ -181,7 +181,7 @@ class InternVLConfig(ArchConfigWithKVCache):
         devices: list[DeviceRef],
         kv_cache_config: KVCacheConfig,
         cache_dtype: DType,
-    ) -> KVCacheParams:
+    ) -> KVCacheParamInterface:
         # Delegate to the selected decoder family for language model parameters.
         llm_hf_cfg = getattr(
             huggingface_config, "llm_config", huggingface_config

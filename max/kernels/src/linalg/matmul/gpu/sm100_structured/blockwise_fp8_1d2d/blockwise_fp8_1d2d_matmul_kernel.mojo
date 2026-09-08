@@ -30,7 +30,7 @@ from std.math import ceildiv
 from std.math.uutils import ufloordiv, umod
 from std.sys import size_of
 
-from std.gpu import WARP_SIZE, thread_idx
+from max.gpu import WARP_SIZE, thread_idx
 from max.gpu.memory import external_memory, fence_mbarrier_init
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
@@ -39,7 +39,7 @@ from max.gpu.primitives.cluster import (
     elect_one_sync_with_mask,
 )
 from max.gpu.sync import named_barrier, syncwarp
-from layout import PointerStorage, TensorLayout, TensorStorage, TileTensor
+from layout import DefaultEngine, TensorLayout, TensorEngine, TileTensor
 from structured_kernels.tile_types import (
     TmaOpType,
     static_row_major,
@@ -109,11 +109,11 @@ struct BlockwiseFP8_1D2DMatmulKernel[
     static_K: Int,
     # Cluster shape
     cluster_shape: StaticTuple[Int32, 3] = StaticTuple[Int32, 3](1),
-    b_scales_storage: TensorStorage = PointerStorage[element_width=1],
-    c_device_storage: TensorStorage = PointerStorage[element_width=1],
-    offsets_storage: TensorStorage = PointerStorage[element_width=1],
-    expert_ids_storage: TensorStorage = PointerStorage[element_width=1],
-    expert_scales_storage: TensorStorage = PointerStorage[element_width=1],
+    b_scales_engine: TensorEngine = DefaultEngine[element_width=1],
+    c_device_engine: TensorEngine = DefaultEngine[element_width=1],
+    offsets_engine: TensorEngine = DefaultEngine[element_width=1],
+    expert_ids_engine: TensorEngine = DefaultEngine[element_width=1],
+    expert_scales_engine: TensorEngine = DefaultEngine[element_width=1],
 ]:
     """Blockwise FP8 1D2D matmul kernel with register-based accumulation.
 
@@ -144,12 +144,12 @@ struct BlockwiseFP8_1D2DMatmulKernel[
             B-scales row stride as `static_K // 128`.
         cluster_shape: Thread block cluster shape as a
             `StaticTuple[Int32, 3]` (defaults to `(1, 1, 1)`).
-        b_scales_storage: Storage policy of the B-scales `TileTensor`.
-        c_device_storage: Storage policy of the output C `TileTensor`.
-        offsets_storage: Storage policy of the per-expert offsets
+        b_scales_engine: Engine of the B-scales `TileTensor`.
+        c_device_engine: Engine of the output C `TileTensor`.
+        offsets_engine: Engine of the per-expert offsets
             `TileTensor`.
-        expert_ids_storage: Storage policy of the expert-IDs `TileTensor`.
-        expert_scales_storage: Storage policy of the expert-scales
+        expert_ids_engine: Engine of the expert-IDs `TileTensor`.
+        expert_scales_engine: Engine of the expert-scales
             `TileTensor`.
     """
 
@@ -376,9 +376,9 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         tile_shape=Self.config.block_tile_shape,
         cluster=Self.config.cluster_shape,
         cta_group=Self.cta_group,
-        OffsetsStorage=Self.offsets_storage,
-        ExpertIdsStorage=Self.expert_ids_storage,
-        ExpertScalesStorage=Self.expert_scales_storage,
+        OffsetsEngine=Self.offsets_engine,
+        ExpertIdsEngine=Self.expert_ids_engine,
+        ExpertScalesEngine=Self.expert_scales_engine,
     ]
 
     # ========== Validation ==========
@@ -404,11 +404,11 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         Self.b_scales_type,
         Self.b_scales_layout,
         MutAnyOrigin,
-        Storage=Self.b_scales_storage,
+        Engine=Self.b_scales_engine,
     ]
 
     # Same tile re-based on one expert's B-scale rows. Offsetting the storage
-    # handle can change the storage policy, so name the result type through
+    # handle can change the engine, so name the result type through
     # `OffsetViewType` rather than assuming it is still `BScalesTile`.
     comptime BScalesExpertTile = Self.BScalesTile.OffsetViewType[
         TypeList.of[Scalar[Self.BScalesTile.linear_idx_type]]()
@@ -418,7 +418,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         Self.c_type,
         Self.c_device_layout,
         MutAnyOrigin,
-        Storage=Self.c_device_storage,
+        Engine=Self.c_device_engine,
     ]
 
     # ========== Static Helper Methods ==========

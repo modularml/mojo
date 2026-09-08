@@ -20,7 +20,7 @@ from std.collections import Optional
 from std.math import ceildiv
 from std.sys import size_of
 
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import (
@@ -203,11 +203,11 @@ def grouped_matmul_sm90[
         promotion_frequency=1,
         pdl_level=config.pdl_level(),
         elementwise_lambda_fn=elementwise_lambda_fn,
-        a_storage=type_of(a).Storage,
-        b_storage=type_of(b_flat).Storage,
-        c_storage=type_of(c).Storage,
-        a_offsets_storage=type_of(a_offsets).Storage,
-        expert_ids_storage=type_of(expert_ids).Storage,
+        a_engine=type_of(a).Engine,
+        b_engine=type_of(b_flat).Engine,
+        c_engine=type_of(c).Engine,
+        a_offsets_engine=type_of(a_offsets).Engine,
+        expert_ids_engine=type_of(expert_ids).Engine,
     ].run_grouped[
         type_of(a_tma_op).rank,
         type_of(b_tma_op).rank,

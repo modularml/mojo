@@ -18,7 +18,7 @@ from std.os import abort
 from std.sys import _RegisterPackType, size_of
 from std.sys._assembly import inlined_assembly
 from std.sys.info import _has_blackwell_tcgen05
-from std.gpu.intrinsics import _get_nvtx_register_constraint
+from std._gpu.intrinsics import _get_nvtx_register_constraint
 from std.memory import bitcast
 
 from max.gpu import external_memory

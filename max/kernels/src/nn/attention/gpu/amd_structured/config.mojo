@@ -22,7 +22,7 @@ Matches amd/mha.mojo config target:
 """
 
 from std.math.uutils import umod, ufloordiv
-from std.gpu import block_idx, lane_id
+from max.gpu import block_idx, lane_id
 from std.utils import IndexList
 from nn.attention.mha_utils import MHAConfig
 

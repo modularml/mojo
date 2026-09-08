@@ -24,7 +24,7 @@ Supports two write modes:
 
 from std.sys import align_of, simd_width_of, size_of
 
-from std.gpu import WARP_SIZE, thread_idx, lane_id, warp_id as get_warp_id
+from max.gpu import WARP_SIZE, thread_idx, lane_id, warp_id as get_warp_id
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.memory import fence_async_view_proxy
 from max.gpu.sync import named_barrier

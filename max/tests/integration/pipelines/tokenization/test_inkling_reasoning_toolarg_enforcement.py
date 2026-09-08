@@ -235,7 +235,6 @@ def test_real_tokenizer_compiles_the_grammar(
     backend = XgrammarBackend.from_tokenizer_delegate(
         inkling_delegate,
         len(inkling_delegate),
-        reject_unsupported=True,
         stop_token_ids=[inkling_delegate.convert_tokens_to_ids(STOP)],
         special_token_ids=special_token_ids_for("inkling", inkling_delegate),
     )

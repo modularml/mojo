@@ -17,9 +17,9 @@ from std.memory import bitcast
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
-from std.gpu import warp_id, block_idx, thread_idx
+from max.gpu import warp_id, block_idx, thread_idx
 from max.gpu.primitives.cluster import block_rank_in_cluster
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle

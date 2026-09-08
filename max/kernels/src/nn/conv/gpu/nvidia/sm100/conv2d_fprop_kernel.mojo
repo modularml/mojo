@@ -39,7 +39,7 @@ from std.math import ceildiv
 
 from std.sys import size_of
 
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import cluster_sync, elect_one_sync
 from max.gpu.memory import external_memory, fence_mbarrier_init

@@ -21,7 +21,7 @@ kernel should check once per simdgroup, not per load.
 """
 
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
-from std.gpu import lane_id
+from max.gpu import lane_id
 from max.gpu.compute.arch.mma_apple import _mma_apple_transposable
 from max.gpu.memory import build_edge_mask, gmem_edge_masked_load
 from std.math import divmod
@@ -974,11 +974,13 @@ struct MmaOpApple[
 
         Caller guarantees all elements are in-bounds.
         """
-        var accum = Self.AccumType(uninitialized=True)
-        comptime for mi in range(Self.num_m_mmas):
-            comptime for ni in range(Self.num_n_mmas):
-                var sub = d_tile.tile[16, 16](mi, ni)
-                accum[mi * Self.num_n_mmas + ni] = self.load_fragment[
-                    Self.out_type
-                ](sub)
-        return accum^
+
+        def fragment_at[
+            idx: Int
+        ]() {imm} -> SIMD[Self.out_type, Self.FRAG_SIZE]:
+            comptime mi, ni = divmod(idx, Self.num_n_mmas)
+            return self.load_fragment[Self.out_type](
+                d_tile.tile[16, 16](mi, ni)
+            )
+
+        return Self.AccumType(fill_with_unrolled=fragment_at)

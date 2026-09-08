@@ -67,7 +67,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.compute.arch.mma_nvidia_sm100 import (
     MMASmemDescriptor,
@@ -85,7 +85,7 @@ from max.gpu.compute.arch.tcgen05 import (
 )
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import thread_idx, warp_id as get_warp_id
+from max.gpu import thread_idx, warp_id as get_warp_id
 from max.gpu.memory import external_memory
 from layout import Layout, LayoutTensor
 from layout._utils import ManagedLayoutTensor

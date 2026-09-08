@@ -67,7 +67,7 @@ Declined shapes fall through to `dispatch_im2col_matmul_conv3d`.
 from std.collections import OptionalReg
 from std.math import ceildiv, gcd
 from std.math.uutils import udivmod
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceBuffer, DeviceContext, get_gpu_target
 from max.gpu.host.info import _is_sm10x_gpu
 from layout import Coord, Idx, TileTensor, row_major

@@ -23,6 +23,7 @@ from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext, TokenBuffer
 from max.pipelines.kv_cache import InsufficientBlocksError
 from max.pipelines.kv_cache.kv_connector import BlockCount
+from max.pipelines.kv_cache.paged_kv_cache.block_manager import PrefixCacheHits
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
     JengaBlockManager,
     KVLeafInfo,
@@ -151,10 +152,11 @@ def test_release() -> None:
     bm.release(ctxA)
     assert bm.huge_block_count().free == 3
 
-    # Allocate blocks for B. A is released tail first, so its last block is the
-    # first one handed back out -- see test_release_recycles_the_tail_first.
+    # Allocate blocks for B. A's blocks were never committed, so each release
+    # puts one at the *front* of the free list -- releasing tail first (3,
+    # then 2, then 1) hands them back out in 1, 2, 3 order.
     bm.alloc(ctxB)
-    assert bm.get_req_blocks_per_leaf(ctxB)[FULL] == [3, 2, 1]
+    assert bm.get_req_blocks_per_leaf(ctxB)[FULL] == [1, 2, 3]
 
 
 def test_release_recycles_the_tail_first() -> None:
@@ -272,9 +274,11 @@ def test_little_block_cannot_be_shared_by_different_req() -> None:
     with pytest.raises(InsufficientBlocksError):
         bm.alloc(ctxB)
     assert bm.huge_block_count().free == 1
-    # A's blocks are 1 and 3, not 1 and 2: the round above released its blocks
-    # tail first, so the pool hands them back in that order.
-    assert bm.get_req_blocks_per_leaf(ctxA)[FULL] == [1, 3]
+    # A's blocks are 2 and 3, not 1 and 2: the round above released its blocks
+    # tail first (3, then 2, then 1), and each release puts an uncommitted
+    # block at the *front* of the free list, so the pool hands them back out
+    # in 2, 3, 1 order.
+    assert bm.get_req_blocks_per_leaf(ctxA)[FULL] == [2, 3]
     assert bm.get_req_blocks_per_leaf(ctxB)[FULL] == []
 
 
@@ -499,10 +503,11 @@ def test_swa_reuses_the_blocks_it_freed() -> None:
         assert len([bid for bid in row if bid != 0]) == 3
 
     # The row still spans every block index, and every page in it came from the
-    # five the pool can back.
+    # five the pool can back. Each is uncommitted when freed, so it goes back
+    # onto the *front* of the free list and is the next one reused.
     row = bm.get_req_blocks_per_leaf(ctx)[SLIDING]
     assert len(row) == 52
-    assert row[-3:] == [5, 1, 2]
+    assert row[-3:] == [2, 3, 4]
 
 
 def test_swa_reuses_a_window_it_still_holds() -> None:
@@ -557,7 +562,9 @@ def test_swa_resumes_below_a_hole_in_its_history() -> None:
     bm.claim(ctxB)
     bm.alloc(ctxB)
     assert ctxB.tokens.processed_length == 2
-    assert bm.get_req_blocks_per_leaf(ctxB)[SLIDING] == [1, 2, 7, 8, 9, 10]
+    # Block 3 is uncommitted but was never evicted from circulation when it
+    # was freed, so it is reused directly instead of costing a fresh claim.
+    assert bm.get_req_blocks_per_leaf(ctxB)[SLIDING] == [1, 2, 3, 7, 8, 9]
 
 
 def test_swa_refuses_a_window_it_cannot_complete() -> None:
@@ -590,7 +597,9 @@ def test_swa_refuses_a_window_it_cannot_complete() -> None:
     bm.claim(ctxB)
     bm.alloc(ctxB)
     assert ctxB.tokens.processed_length == 0
-    assert bm.get_req_blocks_per_leaf(ctxB)[SLIDING] == [7, 8, 9, 10, 11, 12]
+    # Blocks 1-3 are uncommitted but were never evicted from circulation when
+    # they were freed, so they are reused directly before any fresh claim.
+    assert bm.get_req_blocks_per_leaf(ctxB)[SLIDING] == [3, 2, 1, 7, 8, 9]
 
 
 # ===--------------------------------------------------------------------=== #
@@ -680,7 +689,9 @@ def test_reset_prefix_cache_drops_commits_nobody_holds() -> None:
     bm.claim(ctxB)
     bm.alloc(ctxB)
     assert ctxB.tokens.processed_length == 0
-    assert bm.get_req_blocks_per_leaf(ctxB)[FULL] == [5, 6, 7, 8]
+    # Dropping the commit does not evict the block from circulation, so A's
+    # blocks are reused directly rather than costing a fresh claim.
+    assert bm.get_req_blocks_per_leaf(ctxB)[FULL] == [4, 3, 2, 1]
 
 
 def test_reset_prefix_cache_keeps_commits_a_request_holds() -> None:
@@ -794,10 +805,13 @@ def test_a_dropped_sliding_window_blocks_all_reuse() -> None:
     bm.alloc(ctxB)
 
     assert ctxB.tokens.processed_length == 0
-    # Nothing adopted anywhere, so both caches draw a fresh row.
+    # Nothing adopted anywhere, so full draws a fresh row -- its own released
+    # blocks are still committed, and claiming a virgin huge block beats
+    # evicting them. Sliding's released blocks were uncommitted above, so it
+    # reuses them directly instead of claiming anything new.
     assert bm.get_req_blocks_per_leaf(ctxB) == {
         FULL: [13, 14, 15, 16, 17, 18],
-        SLIDING: [19, 9, 8, 7, 6, 5],
+        SLIDING: [9, 8, 7, 12, 11, 10],
     }
 
 
@@ -942,9 +956,11 @@ def test_alphabet() -> None:
     bm.claim(ctx)
     bm.alloc(ctx)
     assert ctx.tokens.processed_length == 9
+    # J's blocks are uncommitted but were never evicted from circulation, so
+    # both caches reuse them directly instead of a fresh claim.
     assert bm.get_req_blocks_per_leaf(ctx) == {
-        FULL: [1, 2, 3, 4, 5, 6, 7, 8, 9, 21],
-        SLIDING: [0, 0, 0, 0, 0, 0, 0, 18, 19, 22],
+        FULL: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        SLIDING: [0, 0, 0, 0, 0, 0, 0, 18, 19, 17],
     }
     bm.release(ctx)
 
@@ -970,9 +986,12 @@ def test_alphabet() -> None:
     bm.claim(ctx)
     bm.alloc(ctx)
     assert ctx.tokens.processed_length == 4
+    # Blocks 10 (full's J) and 17 (sliding's G) are uncommitted but were never
+    # evicted from circulation, so they are reused directly ahead of a fresh
+    # claim for the rest.
     assert bm.get_req_blocks_per_leaf(ctx) == {
-        FULL: [1, 2, 3, 4, 23, 24, 25, 26, 27, 28],
-        SLIDING: [0, 0, 13, 14, 29, 17, 16, 15, 12, 11],
+        FULL: [1, 2, 3, 4, 10, 21, 22, 23, 24, 25],
+        SLIDING: [0, 0, 13, 14, 17, 26, 27, 28, 29, 16],
     }
 
 
@@ -1088,11 +1107,95 @@ def test_two_windows_converge_on_prefix_cache_hit() -> None:
     bm.claim(ctx)
     bm.alloc(ctx)
     assert ctx.tokens.processed_length == 5
+    # Full's block 12 (L) and near's block 22 (J) are uncommitted but were
+    # never evicted from circulation, so each cache reuses its own directly
+    # ahead of a fresh claim for the rest.
     assert bm.get_req_blocks_per_leaf(ctx) == {
-        FULL: [1, 2, 3, 4, 5, 37, 38, 39, 40, 41, 42, 43],
-        NEAR: [0, 0, 0, 16, 17, 44, 45, 46, 47, 48, 49, 50],
-        FAR: [0, 0, 27, 28, 29, 51, 52, 53, 54, 55, 56, 57],
+        FULL: [1, 2, 3, 4, 5, 12, 37, 38, 39, 40, 41, 42],
+        NEAR: [0, 0, 0, 16, 17, 22, 43, 44, 45, 46, 47, 48],
+        FAR: [0, 0, 27, 28, 29, 49, 50, 51, 52, 53, 54, 55],
     }
+
+
+# ===--------------------------------------------------------------------=== #
+# get_req_blocks
+# ===--------------------------------------------------------------------=== #
+
+
+def test_get_req_blocks_returns_first_leaf_blocks() -> None:
+    bm = make_manager(
+        {FULL: full(ratio=1), SLIDING: sliding(ratio=1, window=10)},
+        block_size=1,
+    )
+    ctx = make_ctx(num_tokens=3)
+    bm.claim(ctx)
+    bm.alloc(ctx)
+
+    per_leaf = bm.get_req_blocks_per_leaf(ctx)
+    assert bm.get_req_blocks(ctx) == next(iter(per_leaf.values()))
+
+
+def test_get_req_blocks_empty_when_claimed_not_allocated() -> None:
+    bm = make_manager({FULL: full(ratio=1)}, block_size=1)
+    ctx = make_ctx(num_tokens=3)
+    bm.claim(ctx)
+
+    assert bm.get_req_blocks(ctx) == []
+    assert not bm.get_req_blocks(ctx)
+
+
+# ===--------------------------------------------------------------------=== #
+# get_prefix_cache_hit_counts
+# ===--------------------------------------------------------------------=== #
+
+
+def test_get_prefix_cache_hit_counts_reports_device_hits() -> None:
+    bm = make_manager(
+        {FULL: full(ratio=1)},
+        block_size=1,
+        enable_prefix_caching=True,
+    )
+    ctx_a = make_ctx(num_tokens=5)
+    bm.claim(ctx_a)
+    bm.alloc(ctx_a)
+    ctx_a.update(42)
+    bm.step(ctx_a)
+    bm.release(ctx_a)
+
+    ctx_b = make_ctx(num_tokens=5)
+    hits = bm.get_prefix_cache_hit_counts(ctx_b)
+
+    assert len(hits) == 1
+    assert hits[0].device_blocks > 0
+    assert hits[0].host_blocks == 0
+    assert hits[0].disk_blocks == 0
+
+    assert bm.get_prefix_cache_hit_counts(
+        make_ctx_with_tokens([100, 101, 102, 103, 104])
+    ) == [PrefixCacheHits()]
+
+
+def test_get_prefix_cache_hit_counts_is_per_replica() -> None:
+    bm = make_manager(
+        {FULL: full(ratio=1)},
+        block_size=1,
+        num_huge_blocks=8,
+        num_replicas=2,
+        enable_prefix_caching=True,
+    )
+    ctx_a = make_ctx(num_tokens=4)
+    bm.claim(ctx_a, replica_idx=0)
+    bm.alloc(ctx_a)
+    ctx_a.update(42)
+    bm.step(ctx_a)
+    bm.release(ctx_a)
+
+    ctx_b = make_ctx(num_tokens=4)
+    hits = bm.get_prefix_cache_hit_counts(ctx_b)
+
+    assert len(hits) == 2
+    assert hits[0].device_blocks > 0
+    assert hits[1].device_blocks == 0
 
 
 # ===--------------------------------------------------------------------=== #

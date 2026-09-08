@@ -20,15 +20,15 @@ from layout import (
     Idx,
     Layout,
     LayoutTensor,
-    PointerStorage,
+    DefaultEngine,
     RuntimeLayout,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     UNKNOWN_VALUE,
 )
 from layout.tile_layout import row_major
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.sync import barrier
 from max.gpu.memory import external_memory
@@ -79,25 +79,23 @@ def fp8_index_kernel[
     # When True: num_keys = cache_length (cache_length already includes new tokens).
     _is_cache_length_accurate: Bool = False,
     *,
-    OutputStorageType: TensorStorage = PointerStorage[element_width=1],
-    QStorageType: TensorStorage = PointerStorage[element_width=1],
-    QSStorageType: TensorStorage = PointerStorage[element_width=1],
-    VLStorageType: TensorStorage = PointerStorage[element_width=1],
+    OutputEngine: TensorEngine = DefaultEngine[element_width=1],
+    QEngine: TensorEngine = DefaultEngine[element_width=1],
+    QSEngine: TensorEngine = DefaultEngine[element_width=1],
+    VLEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     output_tt: TileTensor[
-        .float32, OutputLT, MutAnyOrigin, Storage=OutputStorageType
+        .float32, OutputLT, MutAnyOrigin, Engine=OutputEngine
     ],
     # [total_seq_len, num_heads, depth]
-    q_tt: TileTensor[dtype, QLT, ImmutAnyOrigin, Storage=QStorageType],
+    q_tt: TileTensor[dtype, QLT, ImmutAnyOrigin, Engine=QEngine],
     # [total_seq_len, num_heads]
-    q_s_tt: TileTensor[.float32, QSLT, MutAnyOrigin, Storage=QSStorageType],
+    q_s_tt: TileTensor[.float32, QSLT, MutAnyOrigin, Engine=QSEngine],
     # MHAOperand for K values
     k_operand: k_operand_type,
     # MHAOperand for K scales
     ks_operand: ks_operand_type,
-    valid_length_tt: TileTensor[
-        .uint32, VLLT, ImmutAnyOrigin, Storage=VLStorageType
-    ],
+    valid_length_tt: TileTensor[.uint32, VLLT, ImmutAnyOrigin, Engine=VLEngine],
 ):
     """Computes the scalar FP8 index/gather score kernel as a Blackwell tensor-core fallback.
 
@@ -117,10 +115,10 @@ def fp8_index_kernel[
         num_heads: Number of attention heads.
         depth: Per-head feature depth.
         _is_cache_length_accurate: When True, `cache_length` already includes new tokens.
-        OutputStorageType: Storage policy of the `output_tt` tile.
-        QStorageType: Storage policy of the `q_tt` tile.
-        QSStorageType: Storage policy of the `q_s_tt` tile.
-        VLStorageType: Storage policy of the `valid_length_tt` tile.
+        OutputEngine: Engine of the `output_tt` tile.
+        QEngine: Engine of the `q_tt` tile.
+        QSEngine: Engine of the `q_s_tt` tile.
+        VLEngine: Engine of the `valid_length_tt` tile.
 
     Args:
         output_tt: Output score tensor of shape `[total_seq_len, num_keys]`.
@@ -497,10 +495,10 @@ def fp8_index[
             num_heads,
             depth,
             _is_cache_length_accurate=True,
-            OutputStorageType=output.Storage,
-            QStorageType=q.Storage,
-            QSStorageType=q_s.Storage,
-            VLStorageType=valid_length.Storage,
+            OutputEngine=output.Engine,
+            QEngine=q.Engine,
+            QSEngine=q_s.Engine,
+            VLEngine=valid_length.Engine,
         ]
 
         ctx.enqueue_function[kernel](

@@ -21,7 +21,7 @@ from block_idx.x >> 1.
 from std.collections import OptionalReg
 from std.math import ceildiv
 from max.gpu.host import DeviceContext, Dim, FuncAttribute, DeviceBuffer
-from layout import TensorStorage
+from layout import TensorEngine
 from layout.tma_async import RaggedTMA3DTile
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.logger import Logger
@@ -62,7 +62,7 @@ def mha_sm100_depth512_dispatch[
     output_type: DType,
     MaxPromptLenType: OptionallyStaticInt,
     PartitionType: MHAPartitionScheme,
-    KVRowOffsetsStorage: TensorStorage,
+    KVRowOffsetsEngine: TensorEngine,
     //,
     config: MHAConfig,
     group: Int,
@@ -80,7 +80,7 @@ def mha_sm100_depth512_dispatch[
     max_cache_valid_length_arg: Int,
     scale: Float32,
     kv_input_row_offsets: OptionalReg[
-        ImmutTileTensor1D[.uint32, Storage=KVRowOffsetsStorage]
+        ImmutTileTensor1D[.uint32, Engine=KVRowOffsetsEngine]
     ],
     batch_size_arg: Int,
     partition: PartitionType,
@@ -104,7 +104,7 @@ def mha_sm100_depth512_dispatch[
         MaxPromptLenType: The maximum prompt length as a static or runtime
             value (inferred).
         PartitionType: The KV cache partition scheme (inferred).
-        KVRowOffsetsStorage: `TensorStorage` policy of `kv_input_row_offsets`
+        KVRowOffsetsEngine: `TensorEngine` policy of `kv_input_row_offsets`
             (inferred).
         config: The MHA configuration with head count, depth, and swizzle
             mode used to build the `Depth512SM100Config`.

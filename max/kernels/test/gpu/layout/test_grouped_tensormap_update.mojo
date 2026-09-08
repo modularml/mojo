@@ -37,7 +37,7 @@ from std.sys import size_of
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.host.nvidia.tma import TMADescriptor
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.sync import syncwarp
 from layout import Layout, LayoutTensor
 from layout._fillers import arange

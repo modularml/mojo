@@ -15,7 +15,7 @@
 # Compute vector sum C = A + B
 # Each thread performs pairwise addition
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 
 # ========================== KERNEL CODE ==========================
 

@@ -1,0 +1,36 @@
+load("//bazel:api.bzl", "lit_tests", "requirement")
+
+package(default_visibility = ["//visibility:private"])
+
+lit_tests(
+    name = "test",
+    srcs = glob(["**/*.lldb"]),
+    custom_substitutions = {
+        "%repl": "$(rlocationpath //Mojo/tools/mojo) repl --source-quietly -S $(rlocationpath //Mojo/unittests:lit-lldb-init.in)",
+        "%mojo-lldb": "$(rlocationpath //Mojo:mojo-lldb)",
+    },
+    data = glob(["Inputs/**/*.mojo"]) + [
+        "//Mojo:MojoLLDB",
+        "//Mojo:gdb-server",
+        "//Mojo:mojo-lldb",
+        "//Mojo/tools/mojo-repl-entry-point",
+        "//Mojo/unittests:lit-lldb-init.in",
+    ],
+    force_strip = True,  # TODO(MOTO-1190): Debug and fix this duplicate symbol issue
+    mojo_deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],  # __jit_debug_descriptor exists in liblldb and libMojoLLDB
+        "//:tsan": ["@platforms//:incompatible"],
+        "//:ubsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    tools = [
+        "//Mojo/tools/mojo",
+    ],
+    deps = [
+        requirement("matplotlib"),
+    ],
+)

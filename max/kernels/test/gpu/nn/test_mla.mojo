@@ -18,7 +18,7 @@ from std.sys import (
     has_nvidia_gpu_accelerator,
 )
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from layout import (
     Idx,

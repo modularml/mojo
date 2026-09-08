@@ -309,11 +309,11 @@ def grouped_matmul_block_scaled[
         swiglu_enable_trace=swiglu_enable_trace,
         TraceBufT=TraceBufT,
         swiglu_use_inplace=swiglu_use_inplace,
-        c_device_storage=type_of(c_device).Storage,
-        offsets_storage=type_of(a_offsets).Storage,
-        a_scale_offsets_storage=type_of(a_scale_offsets).Storage,
-        expert_ids_storage=type_of(expert_ids).Storage,
-        expert_scales_storage=type_of(expert_scales).Storage,
+        c_device_engine=type_of(c_device).Engine,
+        offsets_engine=type_of(a_offsets).Engine,
+        a_scale_offsets_engine=type_of(a_scale_offsets).Engine,
+        expert_ids_engine=type_of(expert_ids).Engine,
+        expert_scales_engine=type_of(expert_scales).Engine,
     ]
     comptime KernelType = type_of(matmul_kernel)
 
@@ -431,7 +431,7 @@ def grouped_matmul_block_scaled[
         target_type,
         GMEMLayout1D,
         MutAnyOrigin,
-        Storage=t.Storage,
+        Engine=t.Engine,
         address_space=t.address_space,
     ]:
         var shape = Coord(Int64(t.layout.shape[0]().value()))
@@ -444,7 +444,7 @@ def grouped_matmul_block_scaled[
         }
 
     # When AB_swapped, swap A/B operands and their scale factors for TMA
-    # and kernel launch. The @parameter if ensures compile-time branching.
+    # and kernel launch. The comptime if ensures compile-time branching.
     comptime if config.AB_swapped:
         var a_tma_op = create_tma_tile[
             KernelType.ATileLayout,

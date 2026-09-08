@@ -69,8 +69,12 @@ def broadcast_subgroup_test[
     var in_tile = TileTensor(input_dev, row_major(length)).as_immut()
 
     var signal_buffers = List[DeviceBuffer[.uint8]](capacity=ngpus)
-    var rank_sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
-        uninitialized=True
+    # Production leaves the slots past the group size uninitialized; poison
+    # them so an out-of-group read faults deterministically.
+    var rank_sigs = Array[_, MAX_GPUS](
+        fill=MutPointer[Signal, MutAnyOrigin](
+            unsafe_from_address=0xDEAD_BEEF_0000
+        )
     )
     for i in range(ngpus):
         var ctx = list_of_ctxs[i]
@@ -82,13 +86,6 @@ def broadcast_subgroup_test[
 
     var num_bytes = length * size_of[dtype]()
     var signal_buf_size = size_of[Signal]() + ceildiv(num_bytes, ngpus)
-
-    # Production leaves the slots past the group size uninitialized; poison
-    # them so an out-of-group read faults deterministically.
-    for i in range(MAX_GPUS):
-        rank_sigs[i] = MutPointer[Signal, MutAnyOrigin](
-            unsafe_from_address=0xDEAD_BEEF_0000
-        )
 
     for i in range(ngpus):
         signal_buffers.append(

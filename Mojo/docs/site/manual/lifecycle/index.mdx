@@ -1,0 +1,33 @@
+---
+title: Value lifecycles
+sidebar_position: 1
+description: How Mojo values are created, initialized, and destroyed.
+---
+
+import ListingCard from '@site/src/components/Listing/ListingCard';
+import ListingCards from '@site/src/components/Listing/ListingCards';
+
+A Mojo value has a beginning and an end. Mojo creates and initializes the
+value before you use it, then destroys it when it's no longer needed.
+
+Lifecycle methods define what happens at each stage. Use them to control how
+your types initialize their state, transfer values, and release resources.
+
+<!-- markdownlint-disable MD033 MD013 -->
+
+<ListingCards>
+  <ListingCard title="Creating values"
+    url="/docs/manual/lifecycle/life"
+    description="Construct values with generated and custom initializers." />
+  <ListingCard title="Initialization state"
+    url="/docs/manual/lifecycle/init"
+    description="Understand when a value is initialized and ready to use." />
+  <ListingCard title="Automatic destruction"
+    url="/docs/manual/lifecycle/death"
+    description="Let Mojo destroy values automatically after their last use." />
+  <ListingCard title="Explicit destruction"
+    url="/docs/manual/lifecycle/explicit-destroy"
+    description="Require values to be deliberately destroyed in code." />
+</ListingCards>
+
+<!-- markdownlint-enable MD033 MD013 -->

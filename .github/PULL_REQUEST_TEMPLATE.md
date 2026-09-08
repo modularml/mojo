@@ -70,7 +70,7 @@ Describe how you validated your changes.
       approval
 - [ ] PR is small and focused — I've split larger changes into a sequence of
       smaller PRs where possible (see
-      [pull request sizes](https://github.com/modular/modular/blob/main/mojo/CONTRIBUTING.md#about-pull-request-sizes))
+      [pull request sizes](https://github.com/modular/modular/blob/main/Mojo/docs/contributing/issue-pr-etiquette.md#keep-pull-requests-small))
 - [ ] I ran `./bazelw run format` to format my changes
 - [ ] I added or updated tests to cover my changes
 - [ ] If AI tools assisted with this contribution, I have included an

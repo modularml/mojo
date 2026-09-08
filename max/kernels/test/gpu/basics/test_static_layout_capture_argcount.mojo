@@ -25,7 +25,7 @@
 # `_call_with_pack_checked`).
 
 from std.sys import align_of
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.testing import assert_equal
 from layout import Coord, TileTensor, row_major

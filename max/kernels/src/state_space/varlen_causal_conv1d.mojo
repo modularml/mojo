@@ -31,15 +31,17 @@ vLLM Interface:
     - pad_slot_id: int - for identifying padded entries
 """
 
+from std.bit import next_power_of_two
+from std.algorithm import vectorize
 from std.math import ceildiv
 
 
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 
 
 from layout import TensorLayout, TileTensor
 from layout.coord import Coord
-from layout.tensor_storage import TensorStorage
+from layout.tensor_engine import TensorEngine
 
 from nn.activations import silu
 
@@ -49,6 +51,11 @@ from nn.activations import silu
 # ============================================================================
 
 comptime PAD_SLOT_ID: Int32 = -1
+
+# Lane count of a tap vector holding a WIDTH-tap filter. WIDTH dispatches in
+# {1, 2, 3, 4} and 3 is not a valid SIMD width, so round up and zero the
+# padding lane; a padded dot product still sums to the WIDTH-tap result.
+comptime _TAP_LANES[WIDTH: Int] = Int(next_power_of_two(WIDTH))
 
 
 # ============================================================================
@@ -89,39 +96,39 @@ def _channel_weights[
     weight_dtype: DType,
     WIDTH: Int,
     weight_LT: TensorLayout,
-    weight_store: TensorStorage,
+    weight_engine: TensorEngine,
 ](
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin, Storage=weight_store
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],
     d: Int,
-) -> Array[Scalar[weight_dtype], WIDTH]:
-    """Load channel `d`'s `WIDTH` conv weights into a register buffer.
+) -> SIMD[weight_dtype, _TAP_LANES[WIDTH]]:
+    """Load channel `d`'s `WIDTH` conv weights into a register vector.
 
     Factored out of the fwd / update GPU kernels, which each preloaded the
-    per-channel weights into a fixed 8-wide SIMD. The width is now the exact
-    comptime `WIDTH` (no magic 8), so the buffer holds exactly the taps used.
+    per-channel weights into a fixed 8-wide SIMD. The vector is now the
+    padded `WIDTH` (no magic 8), so it holds the taps used plus at most one
+    power-of-two rounding lane.
 
     Parameters:
         weight_dtype: The weight element type.
         WIDTH: The convolution width (number of taps).
         weight_LT: Layout type of the weight tensor.
-        weight_store: Storage policy of the weight tensor.
+        weight_engine: Engine of the weight tensor.
 
     Args:
         weight: The `(dim, width)` weight tensor.
         d: The channel index.
 
     Returns:
-        A `WIDTH`-element `Array` of channel `d`'s weights, tap `w_idx` at index
-        `w_idx`.
+        Channel `d`'s weights, tap `w_idx` in lane `w_idx`, with the padding
+        lanes zeroed so a padded dot product still sums to the `WIDTH`-tap
+        result.
     """
-    # WIDTH dispatches in {1, 2, 3, 4}; 3 is not a valid SIMD width, and every
-    # consumer indexes the taps one lane at a time, so hold them in an Array.
-    var weights = Array[Scalar[weight_dtype], WIDTH](fill=0)
+    var weights = SIMD[weight_dtype, _TAP_LANES[WIDTH]](0)
     comptime for w_idx in range(WIDTH):
         weights[w_idx] = weight.load[width=1, alignment=1](Coord(d, w_idx))
-    return weights^
+    return weights
 
 
 # ============================================================================
@@ -143,10 +150,10 @@ struct VarlenConvIO[
     weight_layout: TensorLayout,
     bias_layout: TensorLayout,
     out_layout: TensorLayout,
-    x_store: TensorStorage,
-    weight_store: TensorStorage,
-    bias_store: TensorStorage,
-    out_store: TensorStorage,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    bias_engine: TensorEngine,
+    out_engine: TensorEngine,
     x_addr: AddressSpace,
     weight_addr: AddressSpace,
     bias_addr: AddressSpace,
@@ -206,10 +213,10 @@ struct VarlenConvIO[
         weight_layout: Layout type of the `(dim, width)` weight view.
         bias_layout: Layout type of the `(dim,)` bias view.
         out_layout: Layout type of the `(dim, seqlen)` output view.
-        x_store: Inferred storage of the input view.
-        weight_store: Inferred storage of the weight view.
-        bias_store: Inferred storage of the bias view.
-        out_store: Inferred storage of the output view.
+        x_engine: Inferred engine of the input view.
+        weight_engine: Inferred engine of the weight view.
+        bias_engine: Inferred engine of the bias view.
+        out_engine: Inferred engine of the output view.
         x_addr: Inferred address space of the input view.
         weight_addr: Inferred address space of the weight view.
         bias_addr: Inferred address space of the bias view.
@@ -224,7 +231,7 @@ struct VarlenConvIO[
         Self.x_dtype,
         Self.x_layout,
         Self.x_origin,
-        Storage=Self.x_store,
+        Engine=Self.x_engine,
         address_space=Self.x_addr,
         linear_idx_type=Self.x_idx,
     ]
@@ -232,7 +239,7 @@ struct VarlenConvIO[
         Self.weight_dtype,
         Self.weight_layout,
         Self.weight_origin,
-        Storage=Self.weight_store,
+        Engine=Self.weight_engine,
         address_space=Self.weight_addr,
         linear_idx_type=Self.weight_idx,
     ]
@@ -240,7 +247,7 @@ struct VarlenConvIO[
         Self.bias_dtype,
         Self.bias_layout,
         Self.bias_origin,
-        Storage=Self.bias_store,
+        Engine=Self.bias_engine,
         address_space=Self.bias_addr,
         linear_idx_type=Self.bias_idx,
     ]
@@ -248,7 +255,7 @@ struct VarlenConvIO[
         Self.out_dtype,
         Self.out_layout,
         Self.out_origin,
-        Storage=Self.out_store,
+        Engine=Self.out_engine,
         address_space=Self.out_addr,
         linear_idx_type=Self.out_idx,
     ]
@@ -842,25 +849,25 @@ def causal_conv1d_varlen_states_gpu[
     x_LT: TensorLayout,
     cu_seqlens_LT: TensorLayout,
     states_LT: TensorLayout,
-    x_store: TensorStorage,
-    cu_seqlens_store: TensorStorage,
-    states_store: TensorStorage,
+    x_engine: TensorEngine,
+    cu_seqlens_engine: TensorEngine,
+    states_engine: TensorEngine,
 ](
     total_tokens: Int32,
     dim: Int32,
     batch: Int32,
     state_len: Int32,
     x: TileTensor[
-        x_dtype, x_LT, MutUntrackedOrigin, Storage=x_store
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
     ],  # Shape (total_tokens, dim)
     cu_seqlens: TileTensor[
         cu_seqlens_dtype,
         cu_seqlens_LT,
         MutUntrackedOrigin,
-        Storage=cu_seqlens_store,
+        Engine=cu_seqlens_engine,
     ],  # Shape (batch + 1,)
     states: TileTensor[
-        states_dtype, states_LT, MutUntrackedOrigin, Storage=states_store
+        states_dtype, states_LT, MutUntrackedOrigin, Engine=states_engine
     ],  # Shape (batch, dim, state_len)
     x_seqlen_stride: UInt32,
     x_dim_stride: UInt32,
@@ -882,9 +889,9 @@ def causal_conv1d_varlen_states_gpu[
         x_LT: Layout type of input tensor.
         cu_seqlens_LT: Layout type of cumulative sequence lengths tensor.
         states_LT: Layout type of output states tensor.
-        x_store: Storage policy of input tensor.
-        cu_seqlens_store: Storage policy of cumulative sequence lengths tensor.
-        states_store: Storage policy of output states tensor.
+        x_engine: Engine of input tensor.
+        cu_seqlens_engine: Engine of cumulative sequence lengths tensor.
+        states_engine: Engine of output states tensor.
 
     Args:
         total_tokens: Total number of tokens.
@@ -960,51 +967,51 @@ def causal_conv1d_varlen_fwd_gpu[
     has_initial_state_LT: TensorLayout,
     conv_states_LT: TensorLayout,
     output_LT: TensorLayout,
-    x_store: TensorStorage,
-    weight_store: TensorStorage,
-    bias_store: TensorStorage,
-    query_start_loc_store: TensorStorage,
-    cache_indices_store: TensorStorage,
-    has_initial_state_store: TensorStorage,
-    conv_states_store: TensorStorage,
-    output_store: TensorStorage,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    bias_engine: TensorEngine,
+    query_start_loc_engine: TensorEngine,
+    cache_indices_engine: TensorEngine,
+    has_initial_state_engine: TensorEngine,
+    conv_states_engine: TensorEngine,
+    output_engine: TensorEngine,
 ](
     dim: Int32,
     total_seqlen: Int32,
     batch: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Storage=x_store],
+    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine],
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin, Storage=weight_store
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin, Storage=bias_store
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],
     query_start_loc: TileTensor[
         cu_seqlens_dtype,
         query_start_loc_LT,
         MutUntrackedOrigin,
-        Storage=query_start_loc_store,
+        Engine=query_start_loc_engine,
     ],
     cache_indices: TileTensor[
         cache_indices_dtype,
         cache_indices_LT,
         MutUntrackedOrigin,
-        Storage=cache_indices_store,
+        Engine=cache_indices_engine,
     ],
     has_initial_state: TileTensor[
         has_initial_state_dtype,
         has_initial_state_LT,
         MutUntrackedOrigin,
-        Storage=has_initial_state_store,
+        Engine=has_initial_state_engine,
     ],
     conv_states: TileTensor[
         conv_states_dtype,
         conv_states_LT,
         MutUntrackedOrigin,
-        Storage=conv_states_store,
+        Engine=conv_states_engine,
     ],
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin, Storage=output_store
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],
     x_dim_stride: UInt32,
     x_seqlen_stride: UInt32,
@@ -1164,6 +1171,14 @@ def causal_conv1d_varlen_fwd_gpu[
             conv_states.raw_store(state_offset, val)
 
 
+# Outputs per steady-state trip of the seq-parallel prefill kernel below.
+# The register sliding window reduces each output to one global load; the
+# UNROLL-wide trip keeps that many independent loads in flight so the walk
+# runs at bandwidth instead of at HBM-latency rate. 16 was measured on B200
+# at the Inkling prefill shapes; other parts are untuned.
+comptime _CONV1D_SEQPARALLEL_UNROLL: Int = 16
+
+
 def causal_conv1d_varlen_fwd_seqparallel_gpu[
     x_dtype: DType,
     weight_dtype: DType,
@@ -1184,51 +1199,51 @@ def causal_conv1d_varlen_fwd_seqparallel_gpu[
     has_initial_state_LT: TensorLayout,
     conv_states_LT: TensorLayout,
     output_LT: TensorLayout,
-    x_store: TensorStorage,
-    weight_store: TensorStorage,
-    bias_store: TensorStorage,
-    query_start_loc_store: TensorStorage,
-    cache_indices_store: TensorStorage,
-    has_initial_state_store: TensorStorage,
-    conv_states_store: TensorStorage,
-    output_store: TensorStorage,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    bias_engine: TensorEngine,
+    query_start_loc_engine: TensorEngine,
+    cache_indices_engine: TensorEngine,
+    has_initial_state_engine: TensorEngine,
+    conv_states_engine: TensorEngine,
+    output_engine: TensorEngine,
 ](
     dim_dev: Int32,
     total_seqlen_dev: Int32,
     batch_dev: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Storage=x_store],
+    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine],
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin, Storage=weight_store
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin, Storage=bias_store
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],
     query_start_loc: TileTensor[
         cu_seqlens_dtype,
         query_start_loc_LT,
         MutUntrackedOrigin,
-        Storage=query_start_loc_store,
+        Engine=query_start_loc_engine,
     ],
     cache_indices: TileTensor[
         cache_indices_dtype,
         cache_indices_LT,
         MutUntrackedOrigin,
-        Storage=cache_indices_store,
+        Engine=cache_indices_engine,
     ],
     has_initial_state: TileTensor[
         has_initial_state_dtype,
         has_initial_state_LT,
         MutUntrackedOrigin,
-        Storage=has_initial_state_store,
+        Engine=has_initial_state_engine,
     ],
     conv_states: TileTensor[
         conv_states_dtype,
         conv_states_LT,
         MutUntrackedOrigin,
-        Storage=conv_states_store,
+        Engine=conv_states_engine,
     ],
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin, Storage=output_store
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],
     x_dim_stride: UInt32,
     x_seqlen_stride: UInt32,
@@ -1268,7 +1283,8 @@ def causal_conv1d_varlen_fwd_seqparallel_gpu[
     kernel above unmodified. Per
     `Kernels/claude_kb` patterns/kv-buffer-pipeline-style host-vs-device
     tiling notes: `num_tiles_ub` is a safe host-side upper bound
-    (`ceildiv(total_seqlen, TILE_SEQ) + batch`) that avoids a host-side
+    (`ceildiv(total_seqlen, TILE_SEQ)`; grid-z indexes each sequence's LOCAL
+    tile and no sequence exceeds total_seqlen) that avoids a host-side
     max-reduction over ragged per-sequence lengths; blocks whose z-index
     exceeds a given sequence's actual tile count early-return.
 
@@ -1326,60 +1342,83 @@ def causal_conv1d_varlen_fwd_seqparallel_gpu[
         bias_val = Scalar[output_dtype](bias.raw_load(d))
 
     # Load weights into registers
-    var weights = SIMD[weight_dtype, 8](0)  # Initialize with zeros
-    for w_idx in range(WIDTH):
-        var weight_offset = (
-            UInt32(d) * weight_dim_stride + UInt32(w_idx) * weight_width_stride
-        )
-        weights[w_idx] = weight.raw_load(weight_offset)
+    var weights = _channel_weights[weight_dtype, WIDTH](weight, d)
 
     comptime WIDTH_MINUS_1 = WIDTH - 1
+    comptime UNROLL = _CONV1D_SEQPARALLEL_UNROLL
+    comptime TAP_LANES = _TAP_LANES[WIDTH]
+    var tap_weights = weights.cast[x_dtype]()
 
-    # Process this tile's slice of the sequence
-    for l in range(tile_start, tile_end):
-        var conv_sum = bias_val
-
-        # Gather inputs and compute convolution
-        comptime for w_idx in range(WIDTH):
-            var input_l = l - (WIDTH_MINUS_1 - w_idx)
-            var input_val: Scalar[x_dtype] = 0
-
-            if input_l >= 0:
-                var x_offset = (
-                    UInt32(d) * x_dim_stride
-                    + UInt32((seq_start + input_l)) * x_seqlen_stride
-                )
-                input_val = x.raw_load(x_offset)
-            elif use_initial_state and has_conv_states != 0:
-                var state_idx = WIDTH_MINUS_1 + input_l
-                if state_idx >= 0:
-                    var state_offset = (
+    # Register sliding window over the WIDTH-1 inputs preceding the current
+    # position, so the steady state costs one global load per output instead
+    # of WIDTH. The window is preloaded once per tile: positions inside the
+    # sequence come from global read-only x (tiles may overlap reads, never
+    # writes), and negative positions fall back to the continuing sequence's
+    # initial state (state slot WIDTH_MINUS_1 + pos of its pool entry).
+    var win = Array[Scalar[x_dtype], WIDTH_MINUS_1](fill=0)
+    comptime for i in range(WIDTH_MINUS_1):
+        var pos = tile_start - WIDTH_MINUS_1 + i
+        var v: Scalar[x_dtype] = 0
+        if pos >= 0:
+            v = x.raw_load(
+                UInt32(d) * x_dim_stride
+                + UInt32((seq_start + pos)) * x_seqlen_stride
+            )
+        elif use_initial_state and has_conv_states != 0:
+            var state_idx = WIDTH_MINUS_1 + pos
+            if state_idx >= 0:
+                v = Scalar[x_dtype](
+                    conv_states.raw_load(
                         UInt32(cache_idx) * conv_states_batch_stride
                         + UInt32(d) * conv_states_dim_stride
                         + UInt32(state_idx) * conv_states_width_stride
                     )
-                    input_val = Scalar[x_dtype](
-                        conv_states.raw_load(state_offset)
-                    )
+                )
+        win[i] = v
 
-            conv_sum += Scalar[output_dtype](
-                input_val * Scalar[x_dtype](weights[w_idx])
+    # One U-output trip. The steady state calls this with U=UNROLL so the U
+    # loads share no dependencies and can all be in flight; the tile remainder
+    # reuses it with U=1.
+    def _emit_chunk[U: Int](tile_off: Int) {mut win, imm}:
+        var l0 = tile_start + tile_off
+        # Carried window followed by this trip's loads, so `taps[j]` is
+        # position `l0 - WIDTH_MINUS_1 + j` throughout and output `u` folds
+        # `taps[u ..< u + WIDTH]` against the taps.
+        var taps = Array[Scalar[x_dtype], WIDTH_MINUS_1 + U](fill=0)
+        comptime for i in range(WIDTH_MINUS_1):
+            taps[i] = win[i]
+        comptime for u in range(U):
+            taps[WIDTH_MINUS_1 + u] = x.raw_load(
+                UInt32(d) * x_dim_stride
+                + UInt32((seq_start + l0 + u)) * x_seqlen_stride
             )
 
-        # Apply activation
-        var out_val = conv_sum
-        if silu_activation != 0:
-            comptime if output_dtype.is_floating_point():
-                out_val = silu(out_val)
-            else:
-                out_val = silu(out_val.cast[.float32]()).cast[output_dtype]()
+        comptime for u in range(U):
+            var window = SIMD[x_dtype, TAP_LANES](0)
+            comptime for w in range(WIDTH):
+                window[w] = taps[u + w]
+            var conv_sum = (
+                bias_val
+                + (window * tap_weights).reduce_add().cast[output_dtype]()
+            )
 
-        # Store output
-        var out_offset = (
-            UInt32(d) * out_dim_stride
-            + UInt32((seq_start + l)) * out_seqlen_stride
-        )
-        output.raw_store(out_offset, out_val)
+            # Apply activation
+            var out_val = _apply_silu[output_dtype](
+                conv_sum, silu_activation != 0
+            )
+
+            # Store output
+            var out_offset = (
+                UInt32(d) * out_dim_stride
+                + UInt32((seq_start + l0 + u)) * out_seqlen_stride
+            )
+            output.raw_store(out_offset, out_val)
+
+        # Carry the last WIDTH-1 taps into the next trip.
+        comptime for i in range(WIDTH_MINUS_1):
+            win[i] = taps[U + i]
+
+    vectorize[UNROLL](tile_end - tile_start, _emit_chunk)
 
     # Update conv_states exactly once, from the tail tile of this sequence.
     if has_conv_states != 0 and tile_end == seqlen:
@@ -1432,45 +1471,45 @@ def causal_conv1d_varlen_update_gpu[
     cache_seqlens_LT: TensorLayout,
     conv_state_indices_LT: TensorLayout,
     output_LT: TensorLayout,
-    x_store: TensorStorage,
-    weight_store: TensorStorage,
-    bias_store: TensorStorage,
-    conv_state_store: TensorStorage,
-    cache_seqlens_store: TensorStorage,
-    conv_state_indices_store: TensorStorage,
-    output_store: TensorStorage,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    bias_engine: TensorEngine,
+    conv_state_engine: TensorEngine,
+    cache_seqlens_engine: TensorEngine,
+    conv_state_indices_engine: TensorEngine,
+    output_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     state_len: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Storage=x_store],
+    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine],
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin, Storage=weight_store
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin, Storage=bias_store
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],
     conv_state: TileTensor[
         conv_state_dtype,
         conv_state_LT,
         MutUntrackedOrigin,
-        Storage=conv_state_store,
+        Engine=conv_state_engine,
     ],
     cache_seqlens: TileTensor[
         cache_seqlens_dtype,
         cache_seqlens_LT,
         MutUntrackedOrigin,
-        Storage=cache_seqlens_store,
+        Engine=cache_seqlens_engine,
     ],
     conv_state_indices: TileTensor[
         conv_state_indices_dtype,
         conv_state_indices_LT,
         MutUntrackedOrigin,
-        Storage=conv_state_indices_store,
+        Engine=conv_state_indices_engine,
     ],
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin, Storage=output_store
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],
     x_batch_stride: UInt32,
     x_dim_stride: UInt32,

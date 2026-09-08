@@ -1,0 +1,48 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(default_visibility = ["//Mojo:consumers"])
+
+modular_cc_binary(
+    name = "kgen",
+    srcs = glob(["*.cpp"]),
+    internal_deps = select({
+        # Under --config=hal-device-context the compiler links neither the
+        # legacy nor the HAL DeviceContext runtime, only the legacy-DeviceContext-free
+        # CompilationDevice plus a plugin-direct arch query
+        # (Driver/CompilerDeviceArch).
+        "//:hal_device_context_enabled": [
+            "//MLRT:Driver/CompilationDeviceImpl",
+            "//MLRT:Driver/CompilerDeviceArch",
+        ],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-Wl,--export-dynamic-symbol=__jit_debug_*",
+            "-Wl,--export-dynamic-symbol=mlir*",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Config",
+        "//Init",
+        "//Mojo:Compiler",
+        "//Mojo:ExecutionEngine",
+        "//Mojo:KGENDialect",
+        "//Mojo:MojoParser",
+        "//Mojo:MojoTooling",
+        "//Mojo:ObjectCompiler",
+        "//Mojo:Pipeline",
+        "//Mojo:Support",
+        "//Mojo:SupportForceLinkMLIRC",
+        "//Mojo:TargetTraits",
+        "//Mojo:ToolCommon",
+        "//Support:Base",
+        "//Support:Compiler",
+        "//Support:Globals",
+        "//Support:MArchTarget",
+        "@llvm-project//mlir:BytecodeWriter",
+    ],
+)

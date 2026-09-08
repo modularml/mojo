@@ -35,7 +35,7 @@ Example:
     x = Tensor.ones((4, 8))
     y = F.matmul(x, x.T)
 
-.. warning::
+.. caution::
 
     Experimental. The public API is not stable; names and module structure
     may change.

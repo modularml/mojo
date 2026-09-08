@@ -22,12 +22,12 @@ from std.sys.info import (
     has_apple_gpu_accelerator,
 )
 
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host.info import H100, _is_sm10x_gpu, is_gpu
-from std.gpu import block_idx, global_idx, warp_id, lane_id, thread_idx
+from max.gpu import block_idx, global_idx, warp_id, lane_id, thread_idx
 from max.gpu.memory import external_memory
 from max.gpu.primitives.grid_controls import PDLLevel
 from max.runtime.tracing import Trace, TraceLevel, get_safe_task_id
@@ -45,7 +45,7 @@ from layout import (
     row_major,
     RuntimeLayout,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     UNKNOWN_VALUE,
 )
@@ -667,7 +667,16 @@ def grouped_matmul_amd_kernel_launcher[
             Optional[elementwise_epilogue_type](
                 elementwise_epilogue_fn_wrapper
             ) if elementwise_lambda_fn else None,
-        ].run(c_tile, a_tile, b_tile)
+        ].run[
+            type_of(c_tile).LayoutType,
+            type_of(a_tile).LayoutType,
+            type_of(b_tile).LayoutType,
+            type_of(c_tile).Engine,
+            type_of(a_tile).Engine,
+            type_of(b_tile).Engine,
+        ](
+            c_tile, a_tile, b_tile
+        )
 
     # Perform the epilogue function separately if expert_id is -1
     else:
@@ -1189,7 +1198,7 @@ def grouped_matmul[
                     type_of(a).origin,
                     address_space=type_of(a).address_space,
                     linear_idx_type=type_of(a).linear_idx_type,
-                    Storage=type_of(a).Storage,
+                    Engine=type_of(a).Engine,
                 ]
                 comptime BFp8 = TileTensor[
                     .float8_e4m3fn,
@@ -1197,7 +1206,7 @@ def grouped_matmul[
                     type_of(b).origin,
                     address_space=type_of(b).address_space,
                     linear_idx_type=type_of(b).linear_idx_type,
-                    Storage=type_of(b).Storage,
+                    Engine=type_of(b).Engine,
                 ]
                 enqueue_grouped_matmul2d_fp8[c_type=c_type](
                     c,
@@ -1386,47 +1395,47 @@ def grouped_matmul_rowwise_scaled_fp8_kernel[
     BScalesLayout: TensorLayout,
     AOffsetsLayout: TensorLayout,
     ExpertIdsLayout: TensorLayout,
-    c_storage: TensorStorage,
-    a_storage: TensorStorage,
-    b_storage: TensorStorage,
-    a_scales_storage: TensorStorage,
-    b_scales_storage: TensorStorage,
-    a_offsets_storage: TensorStorage,
-    expert_ids_storage: TensorStorage,
+    c_engine: TensorEngine,
+    a_engine: TensorEngine,
+    b_engine: TensorEngine,
+    a_scales_engine: TensorEngine,
+    b_scales_engine: TensorEngine,
+    a_offsets_engine: TensorEngine,
+    expert_ids_engine: TensorEngine,
     *,
     transpose_b: Bool = True,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    c: TileTensor[mut=True, c_type, CLayout, MutAnyOrigin, Storage=c_storage],
-    a: TileTensor[mut=False, a_type, ALayout, MutAnyOrigin, Storage=a_storage],
-    b: TileTensor[mut=False, b_type, BLayout, MutAnyOrigin, Storage=b_storage],
+    c: TileTensor[mut=True, c_type, CLayout, MutAnyOrigin, Engine=c_engine],
+    a: TileTensor[mut=False, a_type, ALayout, MutAnyOrigin, Engine=a_engine],
+    b: TileTensor[mut=False, b_type, BLayout, MutAnyOrigin, Engine=b_engine],
     a_scales: TileTensor[
         mut=False,
         a_scales_type,
         AScalesLayout,
         MutAnyOrigin,
-        Storage=a_scales_storage,
+        Engine=a_scales_engine,
     ],
     b_scales: TileTensor[
         mut=False,
         b_scales_type,
         BScalesLayout,
         MutAnyOrigin,
-        Storage=b_scales_storage,
+        Engine=b_scales_engine,
     ],
     a_offsets: TileTensor[
         mut=False,
         .uint32,
         AOffsetsLayout,
         MutAnyOrigin,
-        Storage=a_offsets_storage,
+        Engine=a_offsets_engine,
     ],
     expert_ids: TileTensor[
         mut=False,
         .int32,
         ExpertIdsLayout,
         MutAnyOrigin,
-        Storage=expert_ids_storage,
+        Engine=expert_ids_engine,
     ],
 ):
     """Computes the naive grouped FP8 matmul with rowwise weight scales and per-token activation scales, accumulating in fp32 and applying a single post-reduction scale.
@@ -1518,20 +1527,20 @@ def grouped_matmul_rowwise_dynamic_scaled_fp8[
     target: StaticString = "cpu",
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    c: TileTensor[mut=True, c_type, address_space=.GENERIC, Storage=_, ...],
-    a: TileTensor[mut=False, a_type, address_space=.GENERIC, Storage=_, ...],
-    b: TileTensor[mut=False, b_type, address_space=.GENERIC, Storage=_, ...],
+    c: TileTensor[mut=True, c_type, address_space=.GENERIC, Engine=_, ...],
+    a: TileTensor[mut=False, a_type, address_space=.GENERIC, Engine=_, ...],
+    b: TileTensor[mut=False, b_type, address_space=.GENERIC, Engine=_, ...],
     a_scales: TileTensor[
-        mut=False, a_scales_type, address_space=.GENERIC, Storage=_, ...
+        mut=False, a_scales_type, address_space=.GENERIC, Engine=_, ...
     ],
     b_scales: TileTensor[
-        mut=False, b_scales_type, address_space=.GENERIC, Storage=_, ...
+        mut=False, b_scales_type, address_space=.GENERIC, Engine=_, ...
     ],
     a_offsets: TileTensor[
-        mut=False, a_offsets_type, address_space=.GENERIC, Storage=_, ...
+        mut=False, a_offsets_type, address_space=.GENERIC, Engine=_, ...
     ],
     expert_ids: TileTensor[
-        mut=False, expert_ids_type, address_space=.GENERIC, Storage=_, ...
+        mut=False, expert_ids_type, address_space=.GENERIC, Engine=_, ...
     ],
     max_num_tokens_per_expert: Int,
     num_active_experts: Int,
@@ -1620,13 +1629,13 @@ def grouped_matmul_rowwise_dynamic_scaled_fp8[
         type_of(b_scales).LayoutType,
         type_of(a_offsets).LayoutType,
         type_of(expert_ids).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b).Storage,
-        type_of(a_scales).Storage,
-        type_of(b_scales).Storage,
-        type_of(a_offsets).Storage,
-        type_of(expert_ids).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b).Engine,
+        type_of(a_scales).Engine,
+        type_of(b_scales).Engine,
+        type_of(a_offsets).Engine,
+        type_of(expert_ids).Engine,
         transpose_b=transpose_b,
         elementwise_lambda_fn=elementwise_lambda_fn,
     ]

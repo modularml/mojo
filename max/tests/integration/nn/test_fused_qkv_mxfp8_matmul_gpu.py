@@ -66,9 +66,8 @@ from max.nn.quant_config import (
     WeightScaleSpec,
 )
 from max.nn.quant_ops import quantized_fused_qkv_index_matmul
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
 from test_common.graph_utils import is_b100_b200
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
 def _skip_if_not_supported() -> None:
@@ -131,42 +130,17 @@ def _cosine_and_rel_l2(out: np.ndarray, ref: np.ndarray) -> tuple[float, float]:
 
 
 def _make_cache(
-    kv_params: KVCacheParams,
-    session: InferenceSession,
-    seq_len: int,
+    kv_params: KVCacheParams, seq_len: int
 ) -> KVCacheInputsPerDevice[Buffer, Buffer]:
     """Allocate a single request's KV cache and return its runtime inputs."""
-    manager = PagedKVCacheManager(
-        params=kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=8,
-    )
-    context = create_text_context(np.empty(seq_len))
-    manager.claim(context)
-    manager.alloc(context)
-    return manager.runtime_inputs_for_leaf([[context]]).inputs[0]
+    return paged_kv_cache_inputs(kv_params, [seq_len], total_num_pages=8)
 
 
 def _make_cache_batch(
-    kv_params: KVCacheParams,
-    session: InferenceSession,
-    prompt_lens: list[int],
+    kv_params: KVCacheParams, prompt_lens: list[int]
 ) -> KVCacheInputsPerDevice[Buffer, Buffer]:
     """Allocate one request per prompt length and return the runtime inputs."""
-    manager = PagedKVCacheManager(
-        params=kv_params,
-        total_num_pages=32,
-        session=session,
-        max_batch_size=8,
-    )
-    contexts = []
-    for n in prompt_lens:
-        context = create_text_context(np.empty(n))
-        manager.claim(context)
-        manager.alloc(context)
-        contexts.append(context)
-    return manager.runtime_inputs_for_leaf([contexts]).inputs[0]
+    return paged_kv_cache_inputs(kv_params, prompt_lens, total_num_pages=32)
 
 
 def _build_qkv_value(
@@ -279,7 +253,7 @@ def _run_path(
         graph.output(q_out)
 
     model = session.load(graph)
-    kv_runtime = _make_cache(kv_params, session, seq_len)
+    kv_runtime = _make_cache(kv_params, seq_len)
 
     a_buf = Buffer.from_dlpack(torch.from_numpy(a_np).to(torch.bfloat16)).to(
         device
@@ -548,8 +522,8 @@ def test_fused_qkv_index_mxfp8_matmul_fp8_main_cache() -> None:
             graph.output(q, index_q)
 
         model = session.load(graph)
-        main_rt = _make_cache(main_params, session, seq_len)
-        index_rt = _make_cache(index_params, session, seq_len)
+        main_rt = _make_cache(main_params, seq_len)
+        index_rt = _make_cache(index_params, seq_len)
 
         a_buf = Buffer.from_dlpack(
             torch.from_numpy(a_np).to(torch.bfloat16)
@@ -782,8 +756,8 @@ def test_fused_qkv_index_mxfp8_matmul_amd_stacked(
             graph.output(q, index_q)
 
         model = session.load(graph)
-        main_rt = _make_cache_batch(main_params, session, prompt_lens)
-        index_rt = _make_cache_batch(index_params, session, prompt_lens)
+        main_rt = _make_cache_batch(main_params, prompt_lens)
+        index_rt = _make_cache_batch(index_params, prompt_lens)
 
         a_buf = Buffer.from_dlpack(
             torch.from_numpy(a_np).to(torch.bfloat16)

@@ -23,7 +23,7 @@ Calls `_softmax_update` (which reduces via `_softmax_row_max`) x2 then
 value rather than a real P.V product, so the test isolates the softmax algebra.
 """
 
-from std.gpu import WARP_SIZE, lane_id
+from max.gpu import WARP_SIZE, lane_id
 from max.gpu.host import DeviceContext
 from std.math import exp2
 from std.sys.info import _accelerator_arch

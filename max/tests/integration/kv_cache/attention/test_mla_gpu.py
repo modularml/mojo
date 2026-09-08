@@ -21,8 +21,7 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.kernels import flare_mla_decompress_k_cache, flare_mla_prefill_plan
 from max.nn.kv_cache import MHAKVCacheParams, MLAKVCacheParams
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 from torch.utils.dlpack import from_dlpack
 
 
@@ -48,13 +47,6 @@ def test_mla_prefill_plan() -> None:
     # Set MLIR types for the graph.
     input_row_offsets_type = TensorType(
         DType.uint32, shape=["input_row_offsets_len"], device=DeviceRef.GPU()
-    )
-
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
     )
 
     def construct() -> Graph:
@@ -90,14 +82,6 @@ def test_mla_prefill_plan() -> None:
     # Compile and init the model.
     model = session.load(graph)
 
-    # Create contexts
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
     # Compute input row offsets for ragged tensors.
     input_row_offsets = Buffer(DType.uint32, [batch_size + 1])
     running_sum = 0
@@ -106,7 +90,7 @@ def test_mla_prefill_plan() -> None:
         running_sum += prompt_lens[i]
     input_row_offsets[batch_size] = running_sum
 
-    kv_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
+    kv_inputs = paged_kv_cache_inputs(kv_params, prompt_lens, total_num_pages=8)
 
     results = model.execute(input_row_offsets.to(device0), *kv_inputs.flatten())
 
@@ -162,13 +146,6 @@ def test_mla_decompress_k_cache() -> None:
         device=DeviceRef.GPU(),
     )
 
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-
     def construct() -> Graph:
         with Graph(
             "call_mla_decompress_k_cache",
@@ -222,14 +199,6 @@ def test_mla_decompress_k_cache() -> None:
     # Compile and init the model.
     model = session.load(graph)
 
-    # Create contexts
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
     # Compute input row offsets for ragged tensors.
     input_row_offsets = Buffer(DType.uint32, [batch_size + 1])
     running_sum = 0
@@ -238,17 +207,19 @@ def test_mla_decompress_k_cache() -> None:
         running_sum += prompt_lens[i]
     input_row_offsets[batch_size] = running_sum
 
-    kv_runtime_inputs = kv_manager.runtime_inputs_for_leaf([batch])
-
-    new_blocks = torch.randn(
-        size=kv_runtime_inputs.inputs[0].kv_blocks.shape, dtype=torch.float32
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
     )
 
-    kv_runtime_inputs.inputs[0].kv_blocks = Buffer.from_numpy(
-        new_blocks.numpy()
-    ).to(device0)
+    new_blocks = torch.randn(
+        size=kv_runtime_inputs.kv_blocks.shape, dtype=torch.float32
+    )
 
-    assert kv_runtime_inputs.inputs[0].attention_dispatch_metadata is not None
+    kv_runtime_inputs.kv_blocks = Buffer.from_numpy(new_blocks.numpy()).to(
+        device0
+    )
+
+    assert kv_runtime_inputs.attention_dispatch_metadata is not None
 
     weight = (
         torch.randn(size=weight_type.shape.static_dims, dtype=torch.float32)

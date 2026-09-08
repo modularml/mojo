@@ -28,7 +28,7 @@ discriminators and split-K plumbing — are `_`-prefixed.
 """
 
 from std.memory import UnsafePointer
-from std.gpu.host.info import is_cpu
+from max.gpu.host.info import is_cpu
 from std.utils.coord import Coord, DynamicCoord
 
 
@@ -84,7 +84,8 @@ def tile_alignment[dtype: DType, ws: Int, target: StaticString]() -> Int:
 # ===-----------------------------------------------------------------------===#
 
 
-struct ReduceTier(ImplicitlyCopyable, TrivialRegisterPassable):
+@fieldwise_init
+struct ReduceTier(Equatable, ImplicitlyCopyable, TrivialRegisterPassable):
     """GPU tier discriminator for the row-wise scaffolder. Mutually
     exclusive by construction (a single field, not independent bools):
     `Block` is the default (also every CPU tier, where only
@@ -109,18 +110,6 @@ struct ReduceTier(ImplicitlyCopyable, TrivialRegisterPassable):
     comptime Splitk = ReduceTier(3)
     """Multiple blocks cooperate on one row when `num_rows < sm_count`
     would otherwise leave SMs idle (GPU only)."""
-
-    @always_inline
-    def __init__(out self, value: Int):
-        self.value = value
-
-    @always_inline
-    def __eq__(self, other: Self) -> Bool:
-        return self.value == other.value
-
-    @always_inline
-    def __ne__(self, other: Self) -> Bool:
-        return self.value != other.value
 
 
 struct ContextParams(TrivialRegisterPassable):

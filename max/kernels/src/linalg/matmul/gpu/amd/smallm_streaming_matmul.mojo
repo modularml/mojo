@@ -29,7 +29,7 @@ to be L2-resident. C is ``[m, n]``.
 """
 
 from std.math import ceildiv
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     block_idx,
     global_idx,
@@ -44,7 +44,7 @@ from max.gpu.compute.mma import mma
 from max.gpu.host import DeviceContext
 from max.gpu.sync import barrier
 
-from layout import TensorLayout, TensorStorage, TileTensor
+from layout import TensorLayout, TensorEngine, TileTensor
 from linalg.utils import elementwise_epilogue_type
 
 comptime _MFMA_K = 32
@@ -99,14 +99,14 @@ def _smallm_preshuffle_b_kernel[
 def _smallm_shuffle_a_kernel[
     a_type: DType,
     a_layout: TensorLayout,
-    a_storage: TensorStorage,
+    a_engine: TensorEngine,
     *,
     k_static: Int,
     warps_per_block: Int,
     m_tiles: Int,
 ](
     dst: UnsafePointer[Scalar[a_type], MutAnyOrigin],
-    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Storage=a_storage],
+    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
     m: Int32,
 ):
     """Permutes the activation ``[m, k]`` into fragment-major order per call.
@@ -154,7 +154,7 @@ def _gemm_smallm_streaming_kernel[
     a_type: DType,
     b_type: DType,
     c_layout: TensorLayout,
-    c_storage: TensorStorage,
+    c_engine: TensorEngine,
     *,
     k_static: Int,
     warps_per_block: Int,
@@ -163,7 +163,7 @@ def _gemm_smallm_streaming_kernel[
     col_tiles: Int = 1,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    c: TileTensor[c_type, c_layout, MutAnyOrigin, Storage=c_storage],  # m * n
+    c: TileTensor[c_type, c_layout, MutAnyOrigin, Engine=c_engine],  # m * n
     a_shuffled: UnsafePointer[Scalar[a_type], ImmutAnyOrigin],
     b_shuffled: UnsafePointer[Scalar[b_type], ImmutAnyOrigin],
     m: Int32,
@@ -413,16 +413,16 @@ def smallm_streaming_matmul[
     b_type: DType,
     c_layout: TensorLayout,
     a_layout: TensorLayout,
-    c_storage: TensorStorage,
-    a_storage: TensorStorage,
+    c_engine: TensorEngine,
+    a_engine: TensorEngine,
     *,
     k_static: Int,
     warps_per_block: Int = 8,
     max_grid_blocks: Int = 512,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    c: TileTensor[c_type, c_layout, MutAnyOrigin, Storage=c_storage],
-    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Storage=a_storage],
+    c: TileTensor[c_type, c_layout, MutAnyOrigin, Engine=c_engine],
+    a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
     b_shuffled: UnsafePointer[Scalar[b_type], ImmutAnyOrigin],
     a_scratch: UnsafePointer[Scalar[a_type], MutAnyOrigin],
     m: Int,
@@ -450,7 +450,7 @@ def smallm_streaming_matmul[
         comptime shuffle_kernel = _smallm_shuffle_a_kernel[
             a_type,
             a_layout,
-            a_storage,
+            a_engine,
             k_static=k_static,
             warps_per_block=warps_per_block,
             m_tiles=m_tiles,
@@ -468,7 +468,7 @@ def smallm_streaming_matmul[
             a_type,
             b_type,
             c_layout,
-            c_storage,
+            c_engine,
             k_static=k_static,
             warps_per_block=warps_per_block,
             m_tiles=m_tiles,

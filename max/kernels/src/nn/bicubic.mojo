@@ -20,12 +20,12 @@ from std.math import clamp, floor
 
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import is_gpu
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from layout import (
     Coord,
     Idx,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     coord,
     coord_to_index_list,
@@ -199,15 +199,13 @@ def gpu_bicubic_kernel[
     output_origin: MutOrigin,
     InputLayoutType: TensorLayout,
     input_origin: ImmOrigin,
-    OutputStorage: TensorStorage,
-    InputStorage: TensorStorage,
+    OutputEngine: TensorEngine,
+    InputEngine: TensorEngine,
 ](
     output: TileTensor[
-        dtype, OutputLayoutType, output_origin, Storage=OutputStorage
+        dtype, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
-    input: TileTensor[
-        dtype, InputLayoutType, input_origin, Storage=InputStorage
-    ],
+    input: TileTensor[dtype, InputLayoutType, input_origin, Engine=InputEngine],
 ) -> None:
     """Perform bicubic interpolation using GPU.
 
@@ -217,8 +215,8 @@ def gpu_bicubic_kernel[
         output_origin: Mutable `Origin` of the output tensor.
         InputLayoutType: `TensorLayout` of the input tensor.
         input_origin: Immutable `Origin` of the input tensor.
-        OutputStorage: Storage policy of the output tensor.
-        InputStorage: Storage policy of the input tensor.
+        OutputEngine: Engine of the output tensor.
+        InputEngine: Engine of the input tensor.
 
     Args:
         output: Output tensor with desired dimensions on the device.
@@ -332,10 +330,10 @@ def resize_bicubic[
             output.dtype,
             output_origin=output.origin,
             OutputLayoutType=output.LayoutType,
-            OutputStorage=output.Storage,
+            OutputEngine=output.Engine,
             input_origin=ImmOrigin(input.origin),
             InputLayoutType=input.LayoutType,
-            InputStorage=input.Storage,
+            InputEngine=input.Engine,
         ]
         ctx.enqueue_function[kernel](
             output,

@@ -22,7 +22,7 @@ from std.benchmark import (
     ThroughputMeasure,
 )
 from std.builtin._closure import __ownership_keepalive
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from internal_utils import update_bench_config_args
 from std.testing import assert_equal

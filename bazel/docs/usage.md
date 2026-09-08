@@ -48,7 +48,7 @@ subset of the repository. For example to package only the `stdlib`, you
 can run:
 
 ```sh
-./bazelw build //mojo/stdlib/std
+./bazelw build //Mojo/stdlib/std
 ```
 
 Similarly to run all the tests in the repository you can run:
@@ -61,7 +61,7 @@ You can also scope build or test commands to specific directories. For
 example to run only the `stdlib` tests you can run:
 
 ```sh
-./bazelw test //mojo/stdlib/...
+./bazelw test //Mojo/stdlib/...
 ```
 
 To see what targets are available to build or test you can run:
@@ -79,7 +79,7 @@ When building the Mojo compiler, you can run arbitrary Mojo code using the
 following command:
 
 ```sh
-./bazelw run --config=build-mojo //KGEN:mojo -- run my_file.mojo
+./bazelw run --config=build-mojo //Mojo:mojo -- run my_file.mojo
 ```
 
 ## Testing one-off scripts

@@ -16,7 +16,7 @@ package_group(
     packages = [
         "//Cache/...",
         "//GraphCompiler/...",
-        "//KGEN/...",
+        "//Mojo/...",
     ],
 )
 

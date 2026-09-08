@@ -110,6 +110,13 @@ reference, special-value contract, or split-K decomposition exists; likewise
 the corresponding flag (`--rerun` / `--batch-invariance` / `--batch-variance`).
 Cross-run comparisons always live inside the target process — the orchestrator
 issues one verdict per subprocess and never holds two cases' outputs.
+The M3 decode pair carries the cross-run oracles: `msa_decode` supports
+`determinism` (`--rerun`), and `sparse_indexer_decode` supports
+`batch_invariance` (`--batch-invariance`) on top of its `schedule` mode. The
+indexer's gate is the load-bearing one -- its scorer sizes split-K from the
+batch size, so a request really is decomposed differently depending on its
+neighbours, and its scores pick the blocks attention reads.
+
 Targets that fuzz the input value distribution expose a `dist` spec field
 (uniform/normal/sparse/large/all-equal); NaN/Inf specials are reachable but kept
 out of the auto-mix — they drive the `contract` oracle, not `ref`.
@@ -118,6 +125,34 @@ out of the auto-mix — they drive the `contract` oracle, not `ref`.
 > reads**; OOB **reads** need `memcheck` with the device pool disabled (the
 > orchestrator sets `MEMORY_MANAGER_SIZE=0` in the subprocess env, which works
 > because it runs the built binary directly rather than via `bazel test`).
+
+## Build-time configs
+
+A target compiles once per dtype/config and reads shapes at run time, so any
+parameter the kernel specializes on is a `-D` define rather than a spec field.
+Build the target by name with the define, then run with `--no-build`:
+
+```bash
+./bazelw build //max/kernels/test/gpu/fuzz:fuzz_topk_topp_sampling_dist.mojo.test \
+    --mojocopt=-D --mojocopt=ttsd_bf16=1 --curses=no --noshow_progress
+python3 max/kernels/test/gpu/fuzz/fuzz.py --target topk_topp_sampling_dist \
+    --oracle ref --no-build --budget 24
+```
+
+The sampler targets carry a dtype axis because speculative decoding runs them
+at both precisions: `float32` under `draft_proposal: argmax` and `bfloat16`
+under `draft_proposal: sampled`, which switches `sampling_logits_dtype` for the
+whole sampling path. The in-source default is `float32`, so the bfloat16 arm
+only gets covered when it is built explicitly.
+
+| Define        | Target                    | Effect             |
+|---------------|---------------------------|--------------------|
+| `ttsd_bf16=1` | `topk_topp_sampling_dist` | bfloat16 logits in |
+| `ttmp_bf16=1` | `topk_topp_masked_probs`  | bfloat16 logits in |
+
+The corpus records a spec, not a build config, so a replay entry always runs
+under the in-source default. Alternate configs belong in a live sweep, not the
+replay gate.
 
 ## Adding a kernel target
 

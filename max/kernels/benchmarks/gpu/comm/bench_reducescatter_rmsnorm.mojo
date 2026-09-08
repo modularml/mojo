@@ -170,14 +170,14 @@ def _verify_results[
     comptime OutShardType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0, num_cols)))), MutAnyOrigin
     ]
-    var in_bufs = Array[InTensorType, ngpus](uninitialized=True)
-    comptime for _i in range(ngpus):
-        in_bufs[_i] = InTensorType(
+    var in_bufs = Array[InTensorType, ngpus](
+        fill_with=lambda (i: Int) -> InTensorType: InTensorType(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
-                cb_inputs[_i].offset_ptr(0)
+                cb_inputs[i].offset_ptr(0)
             ),
             row_major(Coord(Index(num_rows, num_cols))),
         )
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -613,30 +613,39 @@ def bench_reducescatter_rmsnorm[
     comptime GammaShardType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0)))), ImmutAnyOrigin
     ]
-    var in_bufs = Array[InTensorType, ngpus](uninitialized=True)
-    var out_shards = Array[OutShardType, ngpus](uninitialized=True)
-    # Fused-kernel output-shard views: normed + sum, both [rank_units, cols].
-    var normed_shards = Array[OutShardType, ngpus](uninitialized=True)
-    var fused_sum_shards = Array[OutShardType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_bufs[i] = InTensorType(
+    var in_bufs = Array[InTensorType, ngpus](
+        fill_with=lambda (i: Int) -> InTensorType: InTensorType(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
                 cb_inputs[i].unsafe_ptr()
             ),
             row_major(Coord(Index(num_rows, num_cols))),
         )
-        out_shards[i] = OutShardType(
+    )
+    var out_shards = Array[OutShardType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref rs_out_shard, imm config
+        } -> OutShardType: OutShardType(
             rs_out_shard[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
-        normed_shards[i] = OutShardType(
+    )
+    # Fused-kernel output-shard views: normed + sum, both [rank_units, cols].
+    var normed_shards = Array[OutShardType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref normed, imm config
+        } -> OutShardType: OutShardType(
             normed[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
-        fused_sum_shards[i] = OutShardType(
+    )
+    var fused_sum_shards = Array[OutShardType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref fused_sum, imm config
+        } -> OutShardType: OutShardType(
             fused_sum[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
+    )
     # Shared gamma view (GPU 0; peer-read on other ranks via P2P, matching the
     # standalone-norm variant).
     var gamma_shard = GammaShardType(
@@ -648,23 +657,27 @@ def bench_reducescatter_rmsnorm[
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
+    comptime InDTypePointer = Pointer[Scalar[in_dtype], MutAnyOrigin]
+
     # Per-GPU norm shard pointers, captured once for the timed closures.
     var cold_ptrs = Array[MutPointer[Scalar[in_dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+        fill_with=lambda (i: Int) {ref} -> InDTypePointer: cold_shard[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
     var rs_out_ptrs = Array[MutPointer[Scalar[in_dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+        fill_with=lambda (i: Int) {ref} -> InDTypePointer: rs_out_shard[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
     var normed_ptrs = Array[MutPointer[Scalar[in_dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+        fill_with=lambda (i: Int) {ref} -> InDTypePointer: normed[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
     var gamma_ptr = rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
         gamma_dev.unsafe_ptr().as_unsafe_any_origin()
     )
-    for i in range(ngpus):
-        cold_ptrs[i] = cold_shard[i].unsafe_ptr().as_unsafe_any_origin()
-        rs_out_ptrs[i] = rs_out_shard[i].unsafe_ptr().as_unsafe_any_origin()
-        normed_ptrs[i] = normed[i].unsafe_ptr().as_unsafe_any_origin()
 
     var total_bytes = ngpus * length * size_of[in_dtype]()
     var bench_name_prefix = String(

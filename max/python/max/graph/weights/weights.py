@@ -439,11 +439,11 @@ class WeightData(DLPackArray):
         data. Special handling is provided for bfloat16 conversions using
         PyTorch when available.
 
-        During cross-compilation (warm-cache) scenarios where no GPU is available,
-        this method skips the actual data conversion but still returns a WeightData
-        with the target dtype. This is safe because the weight data won't be used
-        for inference during compilation - only the dtype metadata matters for
-        graph construction.
+        During cross-compilation (warm-cache) scenarios there is no device to
+        run the conversion on, so the result holds an uninitialized buffer of
+        the target dtype. The values are never read in that mode, and
+        ``dtype`` still describes ``data``, which consumers that read the
+        DLPack payload rather than this metadata rely on.
 
         .. code-block:: python
 
@@ -469,12 +469,11 @@ class WeightData(DLPackArray):
         """
         if self.dtype == dtype:
             return self
-        # In virtual device mode (warm-cache/cross-compilation), skip actual
-        # data casting but update the dtype metadata. The weight data won't be
-        # used for inference - only the dtype matters for graph construction.
+        # Uninitialized, but at the target dtype: nothing reads the values
+        # here, while `dtype` describes `data` everywhere.
         if is_virtual_device_mode():
             return WeightData(
-                data=self.data,
+                data=Buffer(dtype, [int(dim) for dim in self.shape]),
                 name=self.name,
                 dtype=dtype,
                 shape=self.shape,

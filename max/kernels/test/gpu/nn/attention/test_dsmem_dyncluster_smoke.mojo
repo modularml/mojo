@@ -43,8 +43,8 @@ pattern, a `cluster_sync()` publishes it, every CTA reads **every** peer's smem
 `[P,P,W]` matrix against the sentinel-filled buffer.
 """
 
-from std.gpu import thread_idx
-from std.gpu.primitives.id import cluster_dim as rt_cluster_dim
+from max.gpu import thread_idx
+from max.gpu.primitives.id import cluster_dim as rt_cluster_dim
 from max.gpu.host import DeviceContext, Dim
 from max.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
 from std.memory import unsafe_stack_allocation

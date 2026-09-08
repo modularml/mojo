@@ -17,7 +17,7 @@ import linalg.matmul.vendor.blas as vendor_blas
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.memory import (
     async_copy_commit_group,
     async_copy_wait_group,

@@ -13,7 +13,7 @@
 
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import grid_dim
+from max.gpu import grid_dim
 from max.gpu.host import DeviceContext, FuncAttribute
 from internal_utils import assert_almost_equal
 from layout.layout import *

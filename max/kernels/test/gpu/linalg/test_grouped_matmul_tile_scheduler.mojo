@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import block_idx
+from max.gpu import block_idx
 from max.gpu.host import DeviceContext
 from layout import Layout, LayoutTensor
 from linalg.grouped_matmul_tile_scheduler import TileScheduler

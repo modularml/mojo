@@ -24,8 +24,8 @@ from std.collections import Optional
 from std.memory import Pointer, UnsafePointer
 from std.sys import simd_width_of, size_of, align_of
 
-from std.gpu import WARP_SIZE, thread_idx
-from std.gpu import lane_id, warp_id as get_warp_id
+from max.gpu import WARP_SIZE, thread_idx
+from max.gpu import lane_id, warp_id as get_warp_id
 from max.gpu.memory import fence_async_view_proxy
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import (
@@ -1533,24 +1533,22 @@ struct TileWriter[
                 and c_col + UInt32(Self.MMA_N) <= c_shape[1]
             )
 
-        var upper_frag_casted = Array[
-            Scalar[Self.epilogue_dtype], Self.rep_frag_size
-        ](uninitialized=True)
-        var lower_frag_casted = Array[
-            Scalar[Self.epilogue_dtype], Self.rep_frag_size
-        ](uninitialized=True)
-
         comptime for stage in range(Self.num_stages):
             # 1. Load fragments from TMEM tile
             var frags = accum_tiles[stage].load_fragments[Self.rep]()
             Self.AccumTmemArray.Tile.wait_load()
             var casted = frags.cast[Self.epilogue_dtype]()
 
-            comptime for _i in range(Self.rep_frag_size):
-                upper_frag_casted[_i] = casted.upper[_i]
-
-            comptime for _i in range(Self.rep_frag_size):
-                lower_frag_casted[_i] = casted.lower[_i]
+            var upper_frag_casted = Array[_, Self.rep_frag_size](
+                fill_with_unrolled=lambda [i: Int]() -> Scalar[
+                    Self.epilogue_dtype
+                ]: casted.upper[i]
+            )
+            var lower_frag_casted = Array[_, Self.rep_frag_size](
+                fill_with_unrolled=lambda [i: Int]() -> Scalar[
+                    Self.epilogue_dtype
+                ]: casted.lower[i]
+            )
 
             comptime if stage == Self.num_stages - 1:
                 AccumBarrier[Self.cta_group].arrive(

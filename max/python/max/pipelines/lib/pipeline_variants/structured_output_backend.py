@@ -505,12 +505,9 @@ class XgrammarBackend(GrammarBackend[Any]):
     def __init__(
         self,
         compiler: Any,
-        # TODO(CENG-813): remove this Gemma-only scoping once require_object_root and reject_unsupported default on for all models.
-        reject_unsupported: bool = False,
         any_whitespace: bool = False,
     ) -> None:
         self._compiler = compiler
-        self._reject_unsupported = reject_unsupported
         self._any_whitespace = any_whitespace
 
     @classmethod
@@ -518,8 +515,6 @@ class XgrammarBackend(GrammarBackend[Any]):
         cls,
         tokenizer_delegate: PreTrainedTokenizerBase,
         vocab_size: int,
-        # TODO(CENG-813): remove this Gemma-only scoping once require_object_root and reject_unsupported default on for all models.
-        reject_unsupported: bool = False,
         stop_token_ids: Collection[int] | None = None,
         special_token_ids: Collection[int] = (),
         any_whitespace: bool = False,
@@ -549,7 +544,6 @@ class XgrammarBackend(GrammarBackend[Any]):
             xgrammar.GrammarCompiler(
                 tokenizer_info, max_memory_bytes=_xgrammar_cache_limit_bytes()
             ),
-            reject_unsupported=reject_unsupported,
             any_whitespace=any_whitespace,
         )
 
@@ -574,8 +568,9 @@ class XgrammarBackend(GrammarBackend[Any]):
                 if self._any_whitespace
                 else None
             ),
-            # TODO(CENG-813): remove this Gemma-only scoping once require_object_root and reject_unsupported default on for all models.
-            reject_unsupported=self._reject_unsupported,
+            # MAX fails closed: reject schemas the engine cannot faithfully
+            # enforce rather than fall back to unconstrained decoding.
+            reject_unsupported=True,
         )
 
     @_log_if_slow
@@ -616,8 +611,24 @@ class XgrammarBackend(GrammarBackend[Any]):
         bitmask: npt.NDArray[np.int32],
         index: int,
     ) -> None:
-        """Fill ``bitmask`` row ``index`` with the matcher's allowed tokens."""
+        """Fill ``bitmask`` row ``index`` with the matcher's allowed tokens.
+
+        Once ``matcher`` is stopped, xgrammar's own fill raises a fatal C++
+        check rather than returning a mask -- unlike llguidance, which
+        computes a real EOS-only mask in that state. ``stop_token_ids`` is a
+        plain property, safe to read even after termination, so the row is
+        built by hand here instead: only the stop tokens stay allowed,
+        giving xgrammar the same forced termination llguidance already
+        provides rather than leaving the row unconstrained.
+        """
         assert isinstance(matcher, XgrammarMatcher)
+        if matcher.is_stopped():
+            bitmask[index, :] = 0
+            for stop_id in matcher._matcher.stop_token_ids:
+                bitmask[index, stop_id // 32] |= np.int32(1) << np.int32(
+                    stop_id % 32
+                )
+            return
         matcher._matcher.fill_next_token_bitmask(bitmask, index)
 
 
@@ -668,9 +679,7 @@ def build_xgrammar_tool_grammar(
             json_schema=response_format_schema,
             any_whitespace=False,
             separators=(",", ":"),
-            # TODO(CENG-813): drop this per-model scoping once
-            # require_object_root/reject_unsupported default on for all models.
-            reject_unsupported=model_format in ("gemma_4", "glm_4_7"),
+            reject_unsupported=True,
         )
         if model_format == "inkling":
             # An Inkling turn is a sequence of framed messages; bare JSON is
@@ -715,9 +724,6 @@ def make_grammar_backend(
         return XgrammarBackend.from_tokenizer_delegate(
             tokenizer_delegate,
             vocab_size,
-            # TODO(CENG-813): drop this per-model scoping once
-            # require_object_root/reject_unsupported default on for all models.
-            reject_unsupported=tool_parser_name in ("gemma4", "glm45"),
             stop_token_ids=stop_token_ids,
             special_token_ids=special_token_ids_for(
                 tool_parser_name, tokenizer_delegate

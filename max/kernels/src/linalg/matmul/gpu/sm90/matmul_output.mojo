@@ -22,12 +22,12 @@ swapAB small-M strategy.
 from std.math import ceildiv
 from std.sys import simd_width_of, size_of
 
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.sync import named_barrier
 from layout import Coord, Idx, Layout, TensorLayout, TileTensor, row_major
 from layout.swizzle import make_ldmatrix_swizzle
-from layout.tensor_storage import TensorStorage
+from layout.tensor_engine import TensorEngine
 from layout.tma_async import TMATensorTile
 
 from std.utils.index import IndexList
@@ -50,7 +50,7 @@ import std.itertools
 struct MatmulTileWriter[
     dtype: DType,
     tensor_layout: TensorLayout,
-    tensor_storage: TensorStorage,
+    output_engine: TensorEngine,
     linear_idx_type: DType,
     smem_tile_layout: TensorLayout,
     //,
@@ -80,7 +80,7 @@ struct MatmulTileWriter[
             (inferred).
         tensor_layout: Memory layout of the output tensor in global memory
             (inferred).
-        tensor_storage: Storage backing the output tensor in global memory
+        output_engine: Engine backing the output tensor in global memory
             (inferred).
         linear_idx_type: Integer type used for linear index arithmetic
             into the output tensor (inferred).
@@ -128,7 +128,7 @@ struct MatmulTileWriter[
         Self.dtype,
         LayoutType=Self.tensor_layout,
         origin=MutAnyOrigin,
-        Storage=Self.tensor_storage,
+        Engine=Self.output_engine,
         address_space=.GENERIC,
         linear_idx_type=Self.linear_idx_type,
     ]

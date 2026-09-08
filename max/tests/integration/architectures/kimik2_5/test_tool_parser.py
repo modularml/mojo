@@ -16,17 +16,14 @@ import uuid
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-import llguidance.numpy
-import numpy as np
 import pytest
-from llguidance import LLMatcher, LLTokenizer
-from llguidance._tokenizer import TokenizerWrapper
 from max import _xgrammar as xgrammar
-from max.pipelines.architectures.kimik2_5.tool_parser import (
-    _MAX_TOOL_CALL_SECTIONS,
+from max.pipelines.architectures.kimik2_5.tokenizer import (
     IM_END,
     THINK_END,
     THINK_START,
+)
+from max.pipelines.architectures.kimik2_5.tool_parser import (
     TOOL_CALL_ARGUMENT_BEGIN,
     TOOL_CALL_BEGIN,
     TOOL_CALL_END,
@@ -34,19 +31,10 @@ from max.pipelines.architectures.kimik2_5.tool_parser import (
     TOOL_CALLS_SECTION_END,
     KimiToolParser,
 )
-from max.pipelines.context import (
-    GrammarEnforcementState,
-    StructuredOutputRegionDelimiters,
-    TextContext,
-    TokenBuffer,
-)
-from max.pipelines.lib.pipeline_variants.overlap_text_generation import (
-    MAGIC_DRAFT_TOKEN_ID,
-)
+from max.pipelines.context.exceptions import InputError
 from max.pipelines.lib.pipeline_variants.structured_output_backend import (
     XgrammarBackend,
 )
-from max.pipelines.lib.pipeline_variants.utils import StructuredOutputHelper
 from max.pipelines.lib.tool_parsing import StreamingToolCallState
 from max.pipelines.modeling.types import (
     ParsedToolCall,
@@ -60,11 +48,10 @@ class _MinimalTokenizer:
     """Byte tokenizer extended with Kimi K2.5 special tokens.
 
     Maps byte values 0-255 to token IDs 0-255, then assigns dedicated IDs to
-    each Kimi structural / reasoning / turn-terminator token so that grammar
-    generation can resolve them via ``convert_tokens_to_ids`` and the
-    ``LLMatcher`` sees them as single tokens — matching how the real Kimi
-    tokenizer encodes these markers. This is what lets the grammar's
-    ``/[\\s\\S]*/`` bodies terminate atomically at the closing marker.
+    each Kimi structural / reasoning / turn-terminator token so that the
+    xgrammar matcher sees them as single tokens — matching how the real Kimi
+    tokenizer encodes these markers. This is what lets the grammar frame each
+    tool-call body atomically between its structural markers.
     """
 
     _SPECIAL_TOKENS: dict[str, int] = {
@@ -124,13 +111,6 @@ def mock_tokenizer(
     stub = cast(PipelineTokenizer[Any, Any, Any], MagicMock())
     stub.delegate = minimal_tokenizer  # type: ignore[attr-defined]
     return stub
-
-
-@pytest.fixture(scope="module")
-def ll_tokenizer(minimal_tokenizer: _MinimalTokenizer) -> LLTokenizer:
-    """Create a minimal LLTokenizer for grammar validation tests."""
-    wrapper = TokenizerWrapper(minimal_tokenizer)
-    return LLTokenizer(wrapper, n_vocab=_MinimalTokenizer._N_VOCAB)
 
 
 def test_single_tool_call_parsing() -> None:
@@ -799,31 +779,19 @@ def _section(name: str, idx: int, args: str) -> str:
     )
 
 
-# Backends that must both accept the combined tool-call + response_format
-# grammar. llguidance builds a Lark ``tool_calls | json_response`` alternation;
-# xgrammar builds an ``OrFormat`` structural tag around the built-in Kimi
-# tool-call envelope. Both are validated by the same behavioral tests below.
-_STRUCTURED_OUTPUT_BACKENDS = ["llguidance", "xgrammar"]
-
-
 def _make_grammar_matcher(
-    backend: str,
     grammar: str,
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
 ) -> Any:
-    """Compile ``grammar`` for ``backend`` and return a stepping matcher.
+    """Compile ``grammar`` on the xgrammar backend and return a stepping matcher.
 
-    Both returned matchers satisfy the ``GrammarMatcher`` interface used by the
-    decode path (``try_consume_tokens`` / ``is_accepting``), so a single
-    behavioral test can drive either backend. Compilation raising is itself the
-    signal that the grammar is invalid for that backend.
+    The returned matcher satisfies the ``GrammarMatcher`` interface used by the
+    decode path (``try_consume_tokens`` / ``is_accepting``). Compilation raising
+    is itself the signal that the grammar is invalid.
     """
-    if backend == "llguidance":
-        return LLMatcher(ll_tokenizer, grammar)
-    # xgrammar: build a RAW-vocab tokenizer info from the same byte+special
-    # vocab the llguidance matcher uses, then compile the structural tag through
-    # the production backend path (str -> StructuralTag -> compile_structural_tag).
+    # Build a RAW-vocab tokenizer info from the byte+special vocab, then compile
+    # the structural tag through the production backend path
+    # (str -> StructuralTag -> compile_structural_tag).
     tokenizer_info = xgrammar.TokenizerInfo(
         minimal_tokenizer.tokens,
         vocab_type=xgrammar.VocabType.RAW,
@@ -835,147 +803,59 @@ def _make_grammar_matcher(
 
 
 def test_generate_tool_call_grammar_with_tool_names(
-    ll_tokenizer: LLTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
+    minimal_tokenizer: _MinimalTokenizer,
 ) -> None:
-    """Test generating a Lark grammar for constrained decoding with tools."""
+    """Test generating an xgrammar StructuralTag for constrained decoding."""
     grammar = KimiToolParser.generate_tool_call_grammar(
         tools=_tools("get_weather", "search"),
         tokenizer=mock_tokenizer,
-        backend="llguidance",
+        backend="xgrammar",
     )
 
     assert isinstance(grammar, str)
     assert len(grammar) > 0
 
-    # Verify LLMatcher can compile the grammar (will raise if invalid)
-    matcher = LLMatcher(ll_tokenizer, grammar)
+    # Compiling the structural tag raises if it is invalid.
+    matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
     assert matcher is not None
 
 
 def test_generate_tool_call_grammar_without_tool_names(
-    ll_tokenizer: LLTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
+    minimal_tokenizer: _MinimalTokenizer,
 ) -> None:
     """Test generating a grammar that accepts any valid identifier."""
     grammar = KimiToolParser.generate_tool_call_grammar(
         tools=None,
         tokenizer=mock_tokenizer,
-        backend="llguidance",
+        backend="xgrammar",
     )
 
     assert isinstance(grammar, str)
     assert len(grammar) > 0
 
-    matcher = LLMatcher(ll_tokenizer, grammar)
+    matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
     assert matcher is not None
 
 
-def test_generate_tool_call_grammar_escapes_special_chars(
-    ll_tokenizer: LLTokenizer,
+def test_generate_tool_call_grammar_rejects_non_xgrammar_backend(
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
-    """Test that special characters in tool names are escaped for Lark."""
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather.v2", "search+plus", "tool[0]"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-def test_generate_tool_call_grammar_requires_tokenizer() -> None:
-    """Grammar generation must raise without a tokenizer to resolve IDs."""
-    with pytest.raises(ValueError, match=r"tokenizer is required"):
+    """Grammar generation must reject any backend other than xgrammar."""
+    with pytest.raises(InputError, match=r"xgrammar"):
         KimiToolParser.generate_tool_call_grammar(
-            tools=_tools("get_weather"), backend="llguidance"
+            tools=_tools("get_weather"),
+            tokenizer=mock_tokenizer,
+            backend="some_other_backend",
         )
 
 
-def test_generate_tool_call_grammar_uses_single_token_refs(
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Structural markers are emitted as ``<[id]>`` single-token references.
-
-    Literal ``<|...|>`` marker text must NOT appear in the grammar — the
-    ``|`` would collide with Lark's alternation operator, and byte-literal
-    matching is what the migration away from ``grammar_from_regex`` removed.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-
-    assert "<[256]>" in grammar  # section-begin id from _MinimalTokenizer
-    assert TOOL_CALLS_SECTION_BEGIN not in grammar
-    assert "%json" not in grammar
-
-
-def test_generate_tool_call_grammar_with_response_format_schema(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test generating a combined grammar with tools and response_format_schema."""
-    response_format_schema = {
-        "type": "object",
-        "properties": {
-            "answer": {"type": "string"},
-            "confidence": {"type": "number"},
-        },
-        "required": ["answer"],
-    }
-
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather", "search"),
-        response_format_schema=response_format_schema,
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-
-    # Combined grammar references both the tool_calls branch and json_response.
-    assert "tool_calls" in grammar
-    assert "json_response" in grammar
-    assert "%json" in grammar  # JSON schema embedding
-
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-def test_generate_tool_call_grammar_combined_accepts_json_object_type(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test combined grammar with json_object type (any valid JSON)."""
-    response_format_schema = {"type": "object"}
-
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("calculate"),
-        response_format_schema=response_format_schema,
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-    assert "json_response" in grammar
-
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-# --- Combined tool-call + response_format, both structured-output backends ---
+# --- Combined tool-call + response_format on the xgrammar backend ---
 #
-# Each backend should support serving tool-calling and response_format=json_schema in one request.
-# Both backends are driven through the same behavioral assertions via ``_make_grammar_matcher``.
+# xgrammar must support serving tool-calling and response_format=json_schema in
+# one request: an ``OrFormat`` structural tag around the Kimi tool-call
+# envelope. The behavioral assertions below drive it via ``_make_grammar_matcher``.
 
 _COMBINED_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -984,37 +864,28 @@ _COMBINED_RESPONSE_SCHEMA: dict[str, Any] = {
 }
 
 
-@pytest.mark.parametrize("backend", _STRUCTURED_OUTPUT_BACKENDS)
 def test_combined_tool_and_response_format_grammar_compiles(
-    backend: str,
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
-    """The combined grammar compiles on both backends.
+    """The combined grammar compiles on xgrammar.
 
     Compilation raising is the failure signal: the xgrammar path must produce a
-    valid ``OrFormat`` structural tag and the llguidance path a valid Lark
-    alternation.
+    valid ``OrFormat`` structural tag.
     """
     grammar = KimiToolParser.generate_tool_call_grammar(
         tools=_tools("get_weather", "search"),
         response_format_schema=_COMBINED_RESPONSE_SCHEMA,
         tokenizer=mock_tokenizer,
-        backend=backend,
+        backend="xgrammar",
     )
     assert isinstance(grammar, str) and grammar
 
-    matcher = _make_grammar_matcher(
-        backend, grammar, ll_tokenizer, minimal_tokenizer
-    )
+    matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
     assert matcher is not None
 
 
-@pytest.mark.parametrize("backend", _STRUCTURED_OUTPUT_BACKENDS)
 def test_combined_grammar_accepts_conforming_json_response(
-    backend: str,
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
@@ -1022,96 +893,83 @@ def test_combined_grammar_accepts_conforming_json_response(
 
     The grammar pins JSON to a compact form (no inter-token whitespace,
     separators ``","`` / ``":"``), so the payload is emitted with matching
-    ``separators``. xgrammar enforces the compact form; llguidance accepts
-    it too, so the same payload validates on either backend.
+    ``separators`` and xgrammar accepts it.
     """
     grammar = KimiToolParser.generate_tool_call_grammar(
         tools=_tools("get_weather"),
         response_format_schema=_COMBINED_RESPONSE_SCHEMA,
         tokenizer=mock_tokenizer,
-        backend=backend,
+        backend="xgrammar",
     )
-    matcher = _make_grammar_matcher(
-        backend, grammar, ll_tokenizer, minimal_tokenizer
-    )
+    matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
 
     tokens = minimal_tokenizer(
         json.dumps({"answer": "sunny"}, separators=(",", ":"))
     )
     consumed = matcher.try_consume_tokens(tokens)
     assert consumed == len(tokens), (
-        f"[{backend}] rejected a conforming JSON response at offset "
+        f"rejected a conforming JSON response at offset "
         f"{consumed} of {len(tokens)}; error: {matcher.get_error()}"
     )
     assert matcher.is_accepting(), (
-        f"[{backend}] matcher not at an accepting state after a complete "
-        f"schema-conforming JSON response"
+        "matcher not at an accepting state after a complete "
+        "schema-conforming JSON response"
     )
 
 
-@pytest.mark.parametrize("backend", _STRUCTURED_OUTPUT_BACKENDS)
 def test_combined_grammar_enforces_response_schema(
-    backend: str,
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
-    """The response_format branch enforces the schema on both backends.
+    """The response_format branch enforces the schema.
 
     A JSON object missing the required ``answer`` field must not be a complete,
-    accepted output. Both backends model the combined grammar as "a full tool
-    call OR a schema-conforming JSON" with no free-text branch, so ``{}`` reaches
-    no accepting state on either.
+    accepted output. The combined grammar is "a full tool call OR a
+    schema-conforming JSON" with no free-text branch, so ``{}`` reaches no
+    accepting state.
     """
     grammar = KimiToolParser.generate_tool_call_grammar(
         tools=_tools("get_weather"),
         response_format_schema=_COMBINED_RESPONSE_SCHEMA,
         tokenizer=mock_tokenizer,
-        backend=backend,
+        backend="xgrammar",
     )
-    matcher = _make_grammar_matcher(
-        backend, grammar, ll_tokenizer, minimal_tokenizer
-    )
+    matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
 
     matcher.try_consume_tokens(minimal_tokenizer("{}"))  # missing "answer"
     assert not matcher.is_accepting(), (
-        f"[{backend}] accepted a JSON response missing a required field — "
-        f"the response schema was not enforced"
+        "accepted a JSON response missing a required field — "
+        "the response schema was not enforced"
     )
 
 
-@pytest.mark.parametrize("backend", _STRUCTURED_OUTPUT_BACKENDS)
 def test_combined_grammar_still_accepts_tool_call(
-    backend: str,
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
     """Adding response_format must not break the tool-call branch.
 
     Reasoning is handled by the runtime tool/thinking region mechanism, not
-    the grammar, so on both backends the grammar starts at the tool-call
-    section itself and must accept a complete tool call.
+    the grammar, so the grammar starts at the tool-call section itself and must
+    accept a complete tool call.
     """
     grammar = KimiToolParser.generate_tool_call_grammar(
         tools=_tools("get_weather"),
         response_format_schema=_COMBINED_RESPONSE_SCHEMA,
         tokenizer=mock_tokenizer,
-        backend=backend,
+        backend="xgrammar",
     )
-    matcher = _make_grammar_matcher(
-        backend, grammar, ll_tokenizer, minimal_tokenizer
-    )
+    matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
 
     section = _section("get_weather", 0, json.dumps({"location": "NYC"}))
     tokens = minimal_tokenizer(section)
     consumed = matcher.try_consume_tokens(tokens)
     assert consumed == len(tokens), (
-        f"[{backend}] rejected a tool call in the combined grammar at offset "
+        f"rejected a tool call in the combined grammar at offset "
         f"{consumed} of {len(tokens)}; error: {matcher.get_error()}"
     )
     assert matcher.is_accepting(), (
-        f"[{backend}] matcher not accepting after a complete tool call"
+        "matcher not accepting after a complete tool call"
     )
 
 
@@ -1145,7 +1003,6 @@ def test_combined_grammar_xgrammar_structural_tag_shape(
 
 
 def test_combined_grammar_xgrammar_rejects_reasoning_prefix(
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
@@ -1162,9 +1019,7 @@ def test_combined_grammar_xgrammar_rejects_reasoning_prefix(
         tokenizer=mock_tokenizer,
         backend="xgrammar",
     )
-    matcher = _make_grammar_matcher(
-        "xgrammar", grammar, ll_tokenizer, minimal_tokenizer
-    )
+    matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
 
     tokens = minimal_tokenizer(
         THINK_END + json.dumps({"answer": "sunny"}, separators=(",", ":"))
@@ -1177,18 +1032,16 @@ def test_combined_grammar_xgrammar_rejects_reasoning_prefix(
 
 
 def test_xgrammar_enforces_tool_argument_schema(
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
     """xgrammar constrains each tool call's arguments to the tool's JSON schema.
 
-    This is xgrammar's value-add over llguidance's freeform argument body: a
-    call whose arguments violate the tool's parameter schema (missing a required
-    field, wrong value type) never reaches an accepting state. ``required`` tool
-    choice forces the section from the first token, so no reasoning prefix is
-    needed. (The combined-grammar tests above only exercise the *response*
-    schema; this pins the *tool-argument* schema.)
+    A call whose arguments violate the tool's parameter schema (missing a
+    required field, wrong value type) never reaches an accepting state.
+    ``required`` tool choice forces the section from the first token, so no
+    reasoning prefix is needed. (The combined-grammar tests above only exercise
+    the *response* schema; this pins the *tool-argument* schema.)
     """
     tools = [
         {
@@ -1212,9 +1065,7 @@ def test_xgrammar_enforces_tool_argument_schema(
     )
 
     def accepts(args: str) -> bool:
-        matcher = _make_grammar_matcher(
-            "xgrammar", grammar, ll_tokenizer, minimal_tokenizer
-        )
+        matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
         tokens = minimal_tokenizer(_section("get_weather", 0, args))
         return (
             matcher.try_consume_tokens(tokens) == len(tokens)
@@ -1227,16 +1078,15 @@ def test_xgrammar_enforces_tool_argument_schema(
 
 
 def test_xgrammar_rejects_nonjson_tool_argument_body(
-    ll_tokenizer: LLTokenizer,
     minimal_tokenizer: _MinimalTokenizer,
     mock_tokenizer: PipelineTokenizer[Any, Any, Any],
 ) -> None:
     """xgrammar frames the tool-argument body as a JSON value, so trailing
     non-JSON garbage is rejected.
 
-    Direct contrast to ``test_grammar_accepts_less_than_in_arguments`` (the
-    freeform llguidance body accepts ``{"done": true} < extra``): xgrammar does
-    not, since the JSON value ends at ``}`` and ``< extra`` has no continuation.
+    The JSON value ends at ``}`` and a trailing ``< extra`` has no continuation,
+    so ``{"done": true} < extra`` is rejected while ``{"done": true}`` alone is
+    accepted.
     """
     grammar = KimiToolParser.generate_tool_call_grammar(
         tools=_tools("get_weather"),
@@ -1246,9 +1096,7 @@ def test_xgrammar_rejects_nonjson_tool_argument_body(
     )
 
     def accepts(args: str) -> bool:
-        matcher = _make_grammar_matcher(
-            "xgrammar", grammar, ll_tokenizer, minimal_tokenizer
-        )
+        matcher = _make_grammar_matcher(grammar, minimal_tokenizer)
         tokens = minimal_tokenizer(_section("get_weather", 0, args))
         return (
             matcher.try_consume_tokens(tokens) == len(tokens)
@@ -1258,299 +1106,6 @@ def test_xgrammar_rejects_nonjson_tool_argument_body(
     assert not accepts('{"done": true} < extra')
     # Sanity: the same body without the trailing garbage IS accepted.
     assert accepts('{"done": true}')
-
-
-def test_grammar_accepts_up_to_max_sections(
-    ll_tokenizer: LLTokenizer,
-    minimal_tokenizer: _MinimalTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Matcher accepts up to ``_MAX_TOOL_CALL_SECTIONS`` back-to-back.
-
-    Multiple back-to-back sections are what ``tool_choice=auto`` produces
-    when the model re-enters tool calling after content; the matcher must
-    accept the re-entry rather than rejecting the second section-begin (the
-    prod desync this change fixes). Derives the count from the constant so
-    the bound and the test stay in lockstep.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    max_sections = "".join(
-        _section("get_weather", i, '{"location": "NYC"}')
-        for i in range(_MAX_TOOL_CALL_SECTIONS)
-    )
-    tokens = minimal_tokenizer(max_sections)
-    consumed = matcher.try_consume_tokens(tokens)
-    assert consumed == len(tokens), (
-        f"matcher should accept {_MAX_TOOL_CALL_SECTIONS} sections but "
-        f"rejected at offset {consumed} of {len(tokens)}; "
-        f"error: {matcher.get_error()}"
-    )
-
-
-def test_grammar_caps_at_max_sections(
-    ll_tokenizer: LLTokenizer,
-    minimal_tokenizer: _MinimalTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """The section past ``_MAX_TOOL_CALL_SECTIONS`` must be refused.
-
-    Guards against silently lifting the cap; the cap is a secondary backstop
-    (``max_tokens`` is the primary ceiling) that keeps a stuck model from
-    holding a GPU slot. Derives the count from the constant.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    max_sections = "".join(
-        _section("get_weather", i, '{"location": "NYC"}')
-        for i in range(_MAX_TOOL_CALL_SECTIONS)
-    )
-    consumed = matcher.try_consume_tokens(minimal_tokenizer(max_sections))
-    assert consumed == len(minimal_tokenizer(max_sections))
-
-    over_cap_begin = minimal_tokenizer(TOOL_CALLS_SECTION_BEGIN)
-    consumed_over = matcher.try_consume_tokens(over_cap_begin)
-    assert consumed_over == 0, (
-        f"matcher should reject section-begin #{_MAX_TOOL_CALL_SECTIONS + 1} "
-        f"past the cap but accepted {consumed_over} of "
-        f"{len(over_cap_begin)} tokens"
-    )
-
-
-def test_grammar_accepts_interleaved_thinking(
-    ll_tokenizer: LLTokenizer,
-    minimal_tokenizer: _MinimalTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Interleaved thinking between sections never desyncs the matcher.
-
-    Kimi interleaves ``<think>...</think>`` blocks between tool sections.
-    Reasoning is not grammar content — under ``tool_choice=auto`` the
-    enforcement state machine has enforcement OFF between sections, so
-    reasoning (and any other inter-section text) is never fed to the
-    matcher. This drives the production enforcement path over an
-    interleaved stream and asserts no token the state machine feeds is
-    rejected.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather", "search"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    state = GrammarEnforcementState(
-        grammar_enforced=False,
-        tools_forced=False,
-        tool_region=StructuredOutputRegionDelimiters(
-            start_token_ids=minimal_tokenizer(TOOL_CALLS_SECTION_BEGIN),
-            end_token_ids=minimal_tokenizer(TOOL_CALLS_SECTION_END),
-        ),
-    )
-
-    interleaved = (
-        _section("get_weather", 0, '{"location": "NYC"}')
-        + f"{THINK_START}Now let me search for x < y markup</p>{THINK_END}"
-        + _section("search", 1, '{"q": "if (a < b)"}')
-    )
-    rejected, token = _simulate_auto_enforcement(
-        state, matcher, minimal_tokenizer, interleaved
-    )
-    assert not rejected, (
-        f"matcher rejected token {token} on an interleaved think+sections "
-        f"stream; error: {matcher.get_error()}"
-    )
-
-
-def test_grammar_rejects_im_end_mid_section(
-    ll_tokenizer: LLTokenizer,
-    minimal_tokenizer: _MinimalTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """``<|im_end|>`` is only allowed at accepting states, not mid-section."""
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    # Open a section, then try to terminate before closing it.
-    prefix = (
-        f"{TOOL_CALLS_SECTION_BEGIN}{TOOL_CALL_BEGIN}functions.get_weather:0"
-    )
-    consumed_prefix = matcher.try_consume_tokens(minimal_tokenizer(prefix))
-    assert consumed_prefix == len(minimal_tokenizer(prefix))
-
-    im_end_tokens = minimal_tokenizer(IM_END)
-    consumed = matcher.try_consume_tokens(im_end_tokens)
-    assert consumed == 0, (
-        "matcher should reject <|im_end|> in the middle of an open section"
-    )
-
-
-def test_grammar_accepts_unbounded_argument_body(
-    ll_tokenizer: LLTokenizer,
-    minimal_tokenizer: _MinimalTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Argument body has no length cap; matcher must accept >8192 chars.
-
-    The argument body is intentionally unbounded — only ``max_tokens`` /
-    context bounds it — so legitimate large arguments (file blobs, embedded
-    documents, search-result payloads) are not silently truncated. Feeds a
-    ~10 KB argument and verifies every token is consumed.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("echo_document"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    filler = ("abcdefghijklmnopqrstuvwxyz0123456789 " * 300)[:10_000]
-    assert len(filler) > 8192
-
-    tool_call = _section("echo_document", 0, f'{{"content": "{filler}"}}')
-    tokens = minimal_tokenizer(tool_call)
-    # Feed in chunks so a partial reject is localisable to its context.
-    chunk = 64
-    consumed = 0
-    for start in range(0, len(tokens), chunk):
-        batch = tokens[start : start + chunk]
-        n = matcher.try_consume_tokens(batch)
-        if n != len(batch):
-            raise AssertionError(
-                f"matcher rejected token at offset {start + n} of "
-                f"{len(tokens)} (consumed {consumed + n} so far); "
-                f"context={tool_call[max(0, start + n - 20) : start + n + 20]!r}"
-            )
-        consumed += n
-
-    assert consumed == len(tokens)
-
-
-def test_grammar_accepts_less_than_in_arguments(
-    ll_tokenizer: LLTokenizer,
-    minimal_tokenizer: _MinimalTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Grammar accepts ``<`` anywhere in the argument body.
-
-    Because ``<|tool_call_end|>`` is referenced as an atomic single token
-    (not a byte literal), the argument body terminates cleanly at the
-    closing marker and may contain ``<`` freely — code comparisons,
-    HTML/XML, JSX, and git-diff conflict markers — without triggering
-    premature tag detection. This is a deliberate relaxation from the old
-    byte-level regex grammar, which had to reject ``<`` outside JSON strings.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("write_file"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-
-    test_payloads = [
-        '{"content": "if (x < y) { return x; }"}',
-        '{"content": "<html><body><p>Hello</p></body></html>"}',
-        '{"content": "const App = () => <div><span>Hi</span></div>;"}',
-        '{"content": "<<<<<<< HEAD\\nold\\n=======\\nnew\\n>>>>>>> branch"}',
-        '{"code": "a < b", "html": "<p>text</p>", "note": "x<y<z"}',
-        # < even outside JSON strings is fine: the atomic end marker frames
-        # the body, so the grammar no longer needs to detect tags via "<".
-        '{"done": true} < extra',
-    ]
-
-    for payload in test_payloads:
-        matcher = LLMatcher(ll_tokenizer, grammar)
-        tokens = minimal_tokenizer(_section("write_file", 0, payload))
-        consumed = matcher.try_consume_tokens(tokens)
-        assert consumed == len(tokens), (
-            f"matcher rejected payload at offset {consumed} of "
-            f"{len(tokens)}; payload={payload!r}"
-        )
-
-
-def _simulate_auto_enforcement(
-    state: GrammarEnforcementState,
-    matcher: LLMatcher,
-    tokenizer: _MinimalTokenizer,
-    text: str,
-) -> tuple[bool, int | None]:
-    """Drives ``tool_choice=auto`` enforcement token-by-token over ``text``.
-
-    Mirrors the committed-token path of
-    ``StructuredOutputHelper.advance_fsm_and_compute_bitmasks``: each token
-    advances the enforcement state machine, and tokens are fed to the matcher
-    only while ``update_enforcement_state`` says to. Returns
-    ``(rejected, token)`` where ``rejected`` is True if the matcher refused a
-    token the state machine fed it (the prod desync fingerprint).
-    """
-    for token in tokenizer(text):
-        if state.update_enforcement_state(token):
-            if matcher.try_consume_tokens([token]) != 1:
-                return True, token
-    return False, None
-
-
-def test_auto_mode_multi_section_no_matcher_desync(
-    ll_tokenizer: LLTokenizer,
-    minimal_tokenizer: _MinimalTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Regression for the prod ``Async matcher rejected token`` desync.
-
-    In ``tool_choice=auto`` the enforcement state machine flips enforcement
-    off at ``<|tool_calls_section_end|>`` and back on at the next
-    ``<|tool_calls_section_begin|>``. With the old single-section grammar the
-    matcher was terminal after the first section, so re-feeding a second
-    section-begin was rejected (``role=bonus``) and enforcement was disabled
-    for the rest of the request. With the multi-section grammar the matcher
-    accepts re-entry; this drives two sections separated by free content
-    (as auto mode produces) and asserts no rejection.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather", "search"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    state = GrammarEnforcementState(
-        grammar_enforced=False,
-        tools_forced=False,
-        tool_region=StructuredOutputRegionDelimiters(
-            start_token_ids=minimal_tokenizer(TOOL_CALLS_SECTION_BEGIN),
-            end_token_ids=minimal_tokenizer(TOOL_CALLS_SECTION_END),
-        ),
-    )
-
-    stream = (
-        _section("get_weather", 0, '{"location": "NYC"}')
-        # Free content between sections — NOT fed to the matcher because
-        # enforcement is off here; this is the gap the old grammar tripped on.
-        + "Let me also check the time."
-        + _section("search", 1, '{"q": "time in NYC"}')
-    )
-
-    rejected, token = _simulate_auto_enforcement(
-        state, matcher, minimal_tokenizer, stream
-    )
-    assert not rejected, (
-        f"matcher rejected token {token} mid-stream — the multi-section "
-        f"re-entry desync regressed; matcher error: {matcher.get_error()}"
-    )
-    # Enforcement ends off: the final section-end flipped it back off.
-    assert state.grammar_enforced is False
 
 
 def test_parse_complete_multiple_sections() -> None:
@@ -1594,367 +1149,3 @@ def test_parser_handles_json_content_when_no_tool_calls() -> None:
     assert len(result.tool_calls) == 0
     # Content should be returned as-is
     assert result.content == json_response
-
-
-def _unpack_bitmask(packed: np.ndarray, vocab_size: int) -> np.ndarray:
-    """Unpack a packed int32 bitmask ``[..., ceil(vocab/32)]`` to bool
-    ``[..., vocab]`` so tests can index by token id and use ``.all()`` to mean
-    "fully unconstrained".
-
-    Mirrors the GPU ``apply_packed_bitmask`` layout: bit ``t`` lives in word
-    ``t >> 5`` at position ``t & 31``.
-    """
-    masks = np.int32(1) << np.arange(32, dtype=np.int32)
-    bits = (packed[..., np.newaxis] & masks) != 0
-    bits = bits.reshape(*packed.shape[:-1], -1)
-    return bits[..., :vocab_size]
-
-
-def test_sync_fill_constrains_name_only_after_section_consumed(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Slot 0 is constrained only once the FSM has consumed the section opener.
-
-    With ``grammar_enforced`` still False (section opener not yet consumed)
-    the first sampled slot is unconstrained; after the
-    FSM advances through the section / call / "functions." prefix it is
-    constrained to the menu. This is why the sync path must wait for the
-    callback's FSM advance.
-    """
-    section_begin = 256  # _MinimalTokenizer special-token id
-    section_end = 257
-    call_begin = 258
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    helper = StructuredOutputHelper(
-        enabled=True,
-        vocab_size=_MinimalTokenizer._N_VOCAB,
-        tool_call_region_delimiters=StructuredOutputRegionDelimiters(
-            start_token_ids=[section_begin], end_token_ids=[section_end]
-        ),
-    )
-
-    ctx = TextContext(max_length=4096, tokens=TokenBuffer(np.array([1])))
-    ctx._matcher = matcher
-    ctx.set_tool_region(
-        start_token_ids=[section_begin], end_token_ids=[section_end]
-    )
-    assert not ctx.grammar_enforced  # auto mode, before the section opener
-
-    num_positions = 2
-    drafts = np.zeros((1, num_positions - 1), dtype=np.int64)
-
-    # Stale FSM: section opener not yet consumed -> the name slot (slot 0) is
-    # left fully unconstrained, so the model could sample any name.
-    stale = _unpack_bitmask(
-        helper.compute_speculative_bitmasks([ctx], drafts, num_positions),
-        _MinimalTokenizer._N_VOCAB,
-    )
-    assert stale[0, 0].all()
-
-    # Advance the FSM through the section/call/"functions." prefix, exactly as
-    # the async callback's Part 1 would before the sync fill reads it.
-    prefix = [section_begin, call_begin] + list(b"functions.")
-    for tok in prefix:
-        if ctx.update_enforcement_state(tok):
-            assert matcher.try_consume_tokens([tok]) == 1
-    assert ctx.grammar_enforced
-
-    # Current FSM: the name slot is now constrained to the menu. The first
-    # byte of "get_weather" is allowed; a byte no menu name starts with is not.
-    current = _unpack_bitmask(
-        helper.compute_speculative_bitmasks([ctx], drafts, num_positions),
-        _MinimalTokenizer._N_VOCAB,
-    )
-    assert not current[0, 0].all()
-    assert current[0, 0, ord("g")]  # tool: get_weather
-    assert not current[0, 0, ord("z")]
-
-
-def test_sync_fill_with_placeholder_drafts_leaves_bonus_slot_unconstrained(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Reproduces the residual composition-change desync.
-
-    On the sync-prime path the draft tokens are MAGIC placeholders (the real
-    drafts live only on-device, scattered in by ``realize_future_tokens``). The
-    speculative fill breaks at the first invalid placeholder, leaving every
-    slot after slot 0 -- including the bonus position -- unconstrained. With
-    ``num_accepted >= 1`` the bonus is then sampled freely and the matcher
-    rejects it on replay. A real draft constrains that slot, which is what
-    gather-by-rid restores by reusing the callback's real-draft precompute.
-    """
-    section_begin, section_end, call_begin = 256, 257, 258
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    helper = StructuredOutputHelper(
-        enabled=True,
-        vocab_size=_MinimalTokenizer._N_VOCAB,
-        tool_call_region_delimiters=StructuredOutputRegionDelimiters(
-            start_token_ids=[section_begin], end_token_ids=[section_end]
-        ),
-    )
-    ctx = TextContext(max_length=4096, tokens=TokenBuffer(np.array([1])))
-    ctx._matcher = matcher
-    ctx.set_tool_region(
-        start_token_ids=[section_begin], end_token_ids=[section_end]
-    )
-    # Advance into the tool-call header so the name slot is constrained.
-    for tok in [section_begin, call_begin] + list(b"functions."):
-        if ctx.update_enforcement_state(tok):
-            assert matcher.try_consume_tokens([tok]) == 1
-    assert ctx.grammar_enforced
-
-    num_positions = 2  # K=1 -> slot 0 (first sampled) + slot 1 (bonus)
-
-    # Placeholder draft (what the sync path actually has): the fill breaks at
-    # the invalid placeholder, leaving the bonus slot unconstrained.
-    magic = np.full((1, 1), MAGIC_DRAFT_TOKEN_ID, dtype=np.int64)
-    bad = _unpack_bitmask(
-        helper.compute_speculative_bitmasks([ctx], magic, num_positions),
-        _MinimalTokenizer._N_VOCAB,
-    )
-    assert not bad[0, 0].all()  # slot 0 still constrained
-    assert bad[0, 1].all()  # bonus slot UNCONSTRAINED -- the bug
-
-    # Real draft (what adopt / gather provides): the bonus slot is constrained.
-    real = np.array([[ord("g")]], dtype=np.int64)  # first byte of get_weather
-    good = _unpack_bitmask(
-        helper.compute_speculative_bitmasks([ctx], real, num_positions),
-        _MinimalTokenizer._N_VOCAB,
-    )
-    assert not good[0, 1].all()  # bonus slot constrained
-    assert good[0, 1, ord("e")]  # "get_weather" continues with 'e'
-    assert not good[0, 1, ord("z")]  # an out-of-name byte is forbidden
-
-
-def _build_auto_ctx(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> tuple[StructuredOutputHelper, Any, LLMatcher]:
-    """A ``tool_choice=auto`` helper + context wired to the real Kimi grammar."""
-    section_begin, section_end = 256, 257
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    helper = StructuredOutputHelper(
-        enabled=True,
-        vocab_size=_MinimalTokenizer._N_VOCAB,
-        tool_call_region_delimiters=StructuredOutputRegionDelimiters(
-            start_token_ids=[section_begin], end_token_ids=[section_end]
-        ),
-    )
-    ctx = TextContext(max_length=4096, tokens=TokenBuffer(np.array([1])))
-    ctx._matcher = matcher
-    ctx.set_tool_region(
-        start_token_ids=[section_begin], end_token_ids=[section_end]
-    )
-    return helper, ctx, matcher
-
-
-def _commit(ctx: Any, matcher: LLMatcher, tokens: list[int]) -> None:
-    """Advance enforcement + matcher over committed tokens (Part-1 mirror)."""
-    for tok in tokens:
-        if ctx.update_enforcement_state(tok):
-            assert matcher.try_consume_tokens([tok]) == 1, (
-                f"prefix token {tok} unexpectedly rejected"
-            )
-
-
-@pytest.mark.parametrize(
-    "prefix, structural_tag, tail, label",
-    [
-        # Matcher sits right after ``functions.get_weather:0``; the next
-        # token is ``<|tool_call_argument_begin|>`` (260).
-        (
-            [256, 258] + list(b"functions.get_weather:0"),
-            260,
-            list(b'{"'),
-            "arg_begin",
-        ),
-        # Matcher sits right after the section opener; the next token is
-        # ``<|tool_call_begin|>`` (258).
-        ([256], 258, list(b"functions."), "call_begin"),
-    ],
-)
-def test_spec_decode_walk_preserves_matcher_state_across_structural_tag(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    prefix: list[int],
-    structural_tag: int,
-    tail: list[int],
-    label: str,
-) -> None:
-    """Speculative walk must preserve matcher state across structural tags.
-
-    The walk consumes draft tokens that cross a tool-call structural tag
-    (``<|tool_call_begin|>`` / ``<|tool_call_argument_begin|>``) and must leave
-    the matcher unchanged, so the next batch can still consume that same tag.
-    Guards the ``deep_copy`` fix against the ``rollback()`` desync.
-    """
-    helper, ctx, matcher = _build_auto_ctx(ll_tokenizer, mock_tokenizer)
-
-    # Commit up to just before the structural tag.
-    _commit(ctx, matcher, prefix)
-    assert ctx.grammar_enforced, f"[{label}] enforcement should be on"
-
-    # Sanity: the structural tag is legal at the current (pre-walk) state.
-    pre = _unpack_bitmask(
-        helper.compute_speculative_bitmasks(
-            [ctx], np.zeros((1, 0), dtype=np.int64), 1
-        ),
-        _MinimalTokenizer._N_VOCAB,
-    )
-    assert pre[0, 0, structural_tag], (
-        f"[{label}] structural tag {structural_tag} not legal pre-walk"
-    )
-
-    # Speculative walk over real drafts that cross the structural tag.
-    drafts = np.array([[structural_tag, *tail]], dtype=np.int64)
-    helper.compute_speculative_bitmasks(
-        [ctx], drafts, num_positions=drafts.shape[1] + 1
-    )
-
-    # The walk must leave the matcher unchanged. The next committed token is
-    # the same structural tag; it must still be consumable.
-    assert ctx.update_enforcement_state(structural_tag), (
-        f"[{label}] tag should still be grammar content after walk"
-    )
-    assert matcher.try_consume_tokens([structural_tag]) == 1, (
-        f"[{label}] matcher drifted past structural tag {structural_tag} "
-        f"-- speculative walk did not preserve matcher state"
-    )
-
-
-@pytest.mark.parametrize(
-    "prefix, walk, retry, rollback_is_inverse, label",
-    [
-        # Cross the ``(tool_call){0,N}`` repetition boundary: CALL_BEGIN is the
-        # entry token of the repeated ``tool_call`` non-terminal. rollback is
-        # NOT a perfect inverse here -- this is the defect that motivates the
-        # deep_copy fix in ``_speculatively_fill_bitmask_window``.
-        ([256], [258] + list(b"functions."), 258, False, "call_begin_entry"),
-        # Stay inside the single ``tool_call`` rule body: ARG_BEGIN is mid-rule.
-        # rollback IS a perfect inverse here.
-        (
-            [256, 258] + list(b"functions.get_weather:0"),
-            [260] + list(b'{"'),
-            260,
-            True,
-            "arg_begin_mid_rule",
-        ),
-    ],
-)
-def test_llguidance_rollback_inverse_behavior_across_rule_boundary(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    prefix: list[int],
-    walk: list[int],
-    retry: int,
-    rollback_is_inverse: bool,
-    label: str,
-) -> None:
-    """Characterizes ``LLMatcher.rollback``: inverse mid-rule, NOT across a
-    rule/repetition boundary.
-
-    Bypasses all MAX code (raw llguidance matcher only). This is a tripwire: it
-    pins the upstream behavior that ``_speculatively_fill_bitmask_window`` works
-    around by speculating on a ``deep_copy`` instead of consume+rollback. If a
-    future llguidance bump makes rollback a perfect inverse across rule
-    boundaries, the ``call_begin_entry`` case will flip and this test will fail
-    -- signalling that the deep_copy workaround could be simplified back to
-    rollback.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    for tok in prefix:
-        assert matcher.try_consume_tokens([tok]) == 1
-
-    before = llguidance.numpy.allocate_token_bitmask(
-        1, _MinimalTokenizer._N_VOCAB
-    )
-    llguidance.numpy.fill_next_token_bitmask(matcher, before, index=0)
-
-    consumed = 0
-    for tok in walk:
-        if matcher.try_consume_tokens([tok]) == 1:
-            consumed += 1
-        else:
-            break
-    matcher.rollback(consumed)
-
-    after = llguidance.numpy.allocate_token_bitmask(
-        1, _MinimalTokenizer._N_VOCAB
-    )
-    llguidance.numpy.fill_next_token_bitmask(matcher, after, index=0)
-
-    restored = bool(np.array_equal(before, after)) and (
-        matcher.try_consume_tokens([retry]) == 1
-    )
-    assert restored == rollback_is_inverse, (
-        f"[{label}] rollback({consumed}) inverse={restored}, "
-        f"expected {rollback_is_inverse} -- upstream llguidance rollback "
-        f"behavior across this boundary changed"
-    )
-
-
-def test_deep_copy_walk_avoids_rule_boundary_rollback_desync(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Validates the fix direction: speculate on a ``deep_copy``, never rollback.
-
-    Walking draft tokens on ``matcher.deep_copy()`` leaves the real matcher
-    completely untouched, so the rule-boundary ``rollback`` defect cannot
-    desync it. The original matcher must still accept ``<|tool_call_begin|>``
-    (258) as the next committed token -- the exact case ``rollback`` breaks.
-    """
-    grammar = KimiToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-        backend="llguidance",
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher.try_consume_tokens([256]) == 1  # section_begin
-
-    before = llguidance.numpy.allocate_token_bitmask(
-        1, _MinimalTokenizer._N_VOCAB
-    )
-    llguidance.numpy.fill_next_token_bitmask(matcher, before, index=0)
-
-    # Speculative walk on a throwaway copy across the rule-entry boundary.
-    scratch = matcher.deep_copy()
-    for tok in [258, *list(b"functions.")]:
-        if scratch.try_consume_tokens([tok]) != 1:
-            break
-
-    after = llguidance.numpy.allocate_token_bitmask(
-        1, _MinimalTokenizer._N_VOCAB
-    )
-    llguidance.numpy.fill_next_token_bitmask(matcher, after, index=0)
-
-    assert np.array_equal(before, after), (
-        "real matcher mask changed despite walking only the deep_copy"
-    )
-    assert matcher.try_consume_tokens([258]) == 1, (
-        "real matcher should still accept <|tool_call_begin|> -- deep_copy "
-        "speculation leaves it untouched (the rollback desync is avoided)"
-    )

@@ -22,8 +22,8 @@ from std.sys import (
     size_of,
 )
 
-import std.gpu.primitives.warp as warp
-from std.gpu import (
+import max.gpu.primitives.warp as warp
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -909,7 +909,7 @@ def multistage_gemm_kernel[
     var warp_col = Int(block_idx_swizzle[0]) * BN + Int(warp_x) * WN
     comptime store_vec_rows = 1 if is_nvidia_gpu() else 4
     var c_tile_in_range = (
-        warp_row < M and warp_col + WN <= N and M % store_vec_rows == 0
+        warp_row + WM <= M and warp_col + WN <= N and M % store_vec_rows == 0
     )
 
     @always_inline
@@ -1241,7 +1241,16 @@ def multistage_gemm_split_k_kernel[
             work_space_type,
             transpose_b,
             k_partition_config,
-        ].run(ws_tt, a_amd, b_amd)
+        ].run[
+            type_of(ws_tt).LayoutType,
+            type_of(a_amd).LayoutType,
+            type_of(b_amd).LayoutType,
+            type_of(ws_tt).Engine,
+            type_of(a_amd).Engine,
+            type_of(b_amd).Engine,
+        ](
+            ws_tt, a_amd, b_amd
+        )
 
     else:
         # If K is not divisible by num_partitions, the first

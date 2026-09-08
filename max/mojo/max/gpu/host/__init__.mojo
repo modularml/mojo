@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the gpu host package."""
 
-from std.gpu.host import get_gpu_target
+from std._gpu.host import get_gpu_target
 
 from .constant_memory_mapping import ConstantMemoryMapping
 from .device_attribute import DeviceAttribute

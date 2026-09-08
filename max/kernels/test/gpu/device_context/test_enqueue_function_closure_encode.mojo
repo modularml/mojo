@@ -11,17 +11,17 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Capturing `enqueue_function` encodes `DevicePointerStorage` tiles.
+"""Capturing `enqueue_function` encodes `DevicePointerEngine` tiles.
 
 A unified closure that captures a `TileTensor` backed by
-`DevicePointerStorage` must go through `DevicePassable` at
+`DevicePointerEngine` must go through `DevicePassable` at
 `DeviceContext.enqueue_function(kernel, grid_dim=, block_dim=)`. Packing the
 host bytes would leave a host `DevicePointer` on the device; encoding writes
 the real device address so the kernel store is visible after copy-back.
 """
 
 from layout import TileTensor, row_major
-from layout.tensor_storage import DevicePointerStorage
+from layout.tensor_engine import DevicePointerEngine
 
 from max.gpu.host import DeviceContext
 from std.testing import assert_equal
@@ -34,7 +34,7 @@ def test_capturing_enqueue_encodes_device_pointer_tile(
     buf.enqueue_fill(Float32(0))
 
     var tile = TileTensor(buf.device_ptr(), row_major[1]())
-    comptime assert tile.Storage == DevicePointerStorage[element_width=1]
+    comptime assert tile.Engine == DevicePointerEngine[element_width=1]
 
     def kernel() {var tile}:
         tile[0] = 42.0

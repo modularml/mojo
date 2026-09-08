@@ -13,7 +13,7 @@
 """Shared helpers for RDNA Wave32 attention kernels."""
 
 from std.sys import simd_width_of
-from std.gpu import warp_id as get_warp_id
+from max.gpu import warp_id as get_warp_id
 from std.math.uutils import udivmod
 from std.utils import IndexList
 

@@ -30,8 +30,8 @@ from std.collections import OptionalReg
 from std.math import ceildiv, exp2, log2, max, min
 from std.math.constants import log2e
 
-import std.gpu.primitives.warp as warp
-from std.gpu import WARP_SIZE, block_idx, lane_id, warp_id
+import max.gpu.primitives.warp as warp
+from max.gpu import WARP_SIZE, block_idx, lane_id, warp_id
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.primitives.grid_controls import (
@@ -321,15 +321,13 @@ def mla_combine_kernel[
     ).as_imm()
 
     # Prefetch first split's data into registers
-    var datas = Array[SIMD[output_type, vec_size], elems_per_thread](
-        uninitialized=True
-    )
-
-    comptime for i in range(elems_per_thread):
-        var offset = (
+    var datas = Array[_, elems_per_thread](
+        fill_with_unrolled=lambda [i: Int]() -> SIMD[
+            output_type, vec_size
+        ]: oaccum_base.load[width=vec_size](
             head_dim_offset + lane_idx * vec_size + i * (WARP_SIZE * vec_size)
         )
-        datas[i] = oaccum_base.load[width=vec_size](offset)
+    )
 
     # =========================================================================
     # Step 2: Load LSE values and compute global LSE

@@ -19,7 +19,7 @@ core matrix multiplication.
 """
 
 from std.sys import align_of, simd_width_of
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.compute.mma import mma
 from std.itertools import product
 from layout import Layout, LayoutTensor

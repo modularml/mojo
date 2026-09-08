@@ -13,10 +13,10 @@
 
 from std.math import ceildiv, iota
 
-from std.gpu import global_idx
-from std.gpu.primitives import warp
+from max.gpu import global_idx
+from max.gpu.primitives import warp
 from max.gpu.primitives import block
-from std.gpu.globals import WARP_SIZE
+from max.gpu.globals import WARP_SIZE
 from max.gpu.host import DeviceContext
 from std.testing import assert_equal
 

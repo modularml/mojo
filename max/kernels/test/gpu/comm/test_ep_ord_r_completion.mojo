@@ -37,7 +37,7 @@ from comm.sync import enable_p2p
 from max.gpu.host import DeviceBuffer, DeviceContext
 from shmem.ep_comm import ep_signal_completion
 from std.atomic import Atomic, Ordering
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from std.testing import assert_equal, assert_true
 
 comptime N_EXPERTS = 16  # producers per direction = destination local experts

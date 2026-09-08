@@ -12,13 +12,13 @@
 # ===----------------------------------------------------------------------=== #
 """Implements spatial merge, which compresses vision token grids by merging spatial blocks before attention."""
 
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     Idx,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -31,22 +31,20 @@ def spatial_merge_kernel[
     dtype: DType,
     InputLayoutType: TensorLayout,
     input_origin: ImmOrigin,
-    InputStorage: TensorStorage,
+    InputEngine: TensorEngine,
     OutputLayoutType: TensorLayout,
     output_origin: MutOrigin,
-    OutputStorage: TensorStorage,
+    OutputEngine: TensorEngine,
     GridThwLayoutType: TensorLayout,
     grid_thw_origin: ImmOrigin,
-    GridThwStorage: TensorStorage,
+    GridThwEngine: TensorEngine,
 ](
     output: TileTensor[
-        dtype, OutputLayoutType, output_origin, Storage=OutputStorage
+        dtype, OutputLayoutType, output_origin, Engine=OutputEngine
     ],
-    input: TileTensor[
-        dtype, InputLayoutType, input_origin, Storage=InputStorage
-    ],
+    input: TileTensor[dtype, InputLayoutType, input_origin, Engine=InputEngine],
     grid_thw: TileTensor[
-        .int64, GridThwLayoutType, grid_thw_origin, Storage=GridThwStorage
+        .int64, GridThwLayoutType, grid_thw_origin, Engine=GridThwEngine
     ],
     batch_size: Int32,
     hidden_size: Int32,
@@ -62,14 +60,14 @@ def spatial_merge_kernel[
         dtype: Element type of the input and output tensors.
         InputLayoutType: Compile-time `TensorLayout` of the input tensor.
         input_origin: Immutable origin of the input tensor.
-        InputStorage: Storage policy of the input tensor.
+        InputEngine: Engine of the input tensor.
         OutputLayoutType: Compile-time `TensorLayout` of the output tensor.
         output_origin: Mutable origin of the output tensor.
-        OutputStorage: Storage policy of the output tensor.
+        OutputEngine: Engine of the output tensor.
         GridThwLayoutType: Compile-time `TensorLayout` of the `grid_thw`
             tensor.
         grid_thw_origin: Immutable origin of the `grid_thw` tensor.
-        GridThwStorage: Storage policy of the `grid_thw` tensor.
+        GridThwEngine: Engine of the `grid_thw` tensor.
 
     Args:
         output: Output tensor.
@@ -239,13 +237,13 @@ def spatial_merge[
         dtype,
         input.LayoutType,
         ImmOrigin(input.origin),
-        input.Storage,
+        input.Engine,
         output.LayoutType,
         output.origin,
-        output.Storage,
+        output.Engine,
         grid_thw.LayoutType,
         ImmOrigin(grid_thw.origin),
-        grid_thw.Storage,
+        grid_thw.Engine,
     ]
 
     ctx.enqueue_function[kernel](

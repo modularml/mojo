@@ -1,0 +1,107 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
+
+# gazelle:default_visibility //visibility:public
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "LICENSE",
+])
+
+modular_py_library(
+    name = "mblack-lib",
+    srcs = glob(
+        ["src/**/*.py"],
+        exclude = ["src/mblack/__main__.py"],
+    ),
+    data = glob(["src/**/*.txt"]),
+    ignore_unresolved_imports = [
+        "IPython",
+        "colorama",
+        "tokenize_rt",
+        "uvloop",
+    ],
+    imports = ["src"],
+    deps = [
+        requirement("click"),
+        requirement("mypy-extensions"),
+        requirement("pathspec"),
+        requirement("platformdirs"),
+        requirement("tomli"),
+    ],
+)
+
+modular_py_binary(
+    name = "mblack",
+    srcs = ["src/mblack/__main__.py"],
+    main = "src/mblack/__main__.py",
+    deps = [":mblack-lib"],
+)
+
+modular_py_test(
+    name = "unit_tests",
+    # One layer deep, don't grab `data`
+    srcs = glob(["tests/*.py"]),
+    data = glob(["tests/data/**"]) + [
+        "tests/empty.toml",
+        "tests/test.toml",
+    ],
+    imports = ["."],
+    deps = [
+        ":mblack-lib",
+        requirement("click"),
+        requirement("pathspec"),
+    ],
+)
+
+# Files whose samples are known to fail `mojo build` as-of today.
+_VALIDATE_EXCLUDE = [
+    "tests/test_ftstrings.py",
+    "tests/test_kwargs_brace_initializers.py",
+    # MLIR `__mlir_attr` samples need their dialect to `mojo build`; the test
+    # only exercises the formatter's backtick bracket-scan behavior.
+    "tests/test_backtick_bracket_scan.py",
+    # `__match` is parsed but not yet implemented in the Mojo compiler.
+    "tests/test_match_formatting.py",
+]
+
+# Companion to `unit_tests` that compiles every sample with `mojo build`.
+# Only runs when manually specified. This validation is slow.
+modular_py_test(
+    name = "unit_tests_validate",
+    srcs = glob(
+        ["tests/*.py"],
+        exclude = _VALIDATE_EXCLUDE,
+    ),
+    args = ["--validate-with-mojo-build"],
+    data = glob(["tests/data/**"]) + [
+        "tests/empty.toml",
+        "tests/test.toml",
+    ],
+    imports = ["."],
+    mojo_deps = ["@mojo//:std"],
+    tags = ["manual"],
+    test_name_prefix = "validate/",
+    deps = [
+        ":mblack-lib",
+        requirement("click"),
+        requirement("pathspec"),
+    ],
+)
+
+# TODO: Should we do anything with these? Maybe delete some of them?
+filegroup(
+    name = "unreferenced-files",
+    srcs = [
+        "action/main.py",
+        "scripts/__init__.py",
+        "scripts/check_pre_commit_rev_in_example.py",
+        "scripts/check_version_in_basics_example.py",
+        "scripts/diff_shades_gha_helper.py",
+        "scripts/fuzz.py",
+        "scripts/migrate-black.py",
+        "src/mblib2to3/LICENSE",
+        "src/mblib2to3/README",
+    ],
+    tags = ["maybe-unused"],
+)

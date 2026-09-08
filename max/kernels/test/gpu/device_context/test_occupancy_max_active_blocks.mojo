@@ -17,7 +17,7 @@
 from std.sys import align_of
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_dim, global_idx, thread_idx
+from max.gpu import block_dim, global_idx, thread_idx
 from max.gpu.memory import external_memory
 from max.gpu.sync import barrier
 from std.testing import assert_almost_equal, assert_equal

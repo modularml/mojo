@@ -21,6 +21,8 @@ from .hf_utils import (
     validate_hf_repo_access,
 )
 from .quant import (
+    apply_fused_kernel_flags,
+    build_modelopt_nvfp4_config,
     gptq_quant_config,
     parse_quant_config,
     resolve_hf_quant_config,
@@ -32,7 +34,9 @@ __all__ = [
     "AUTO_CAST_ENV_VAR",
     "HuggingFaceRepo",
     "WeightPathParser",
+    "apply_fused_kernel_flags",
     "auto_cast_weights_from_env",
+    "build_modelopt_nvfp4_config",
     "download_weight_files",
     "generate_local_model_path",
     "gptq_quant_config",

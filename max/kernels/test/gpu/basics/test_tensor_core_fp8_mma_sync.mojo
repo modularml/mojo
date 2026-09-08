@@ -14,7 +14,7 @@
 from std.io.io import _printf
 
 from max.gpu.host import DeviceContext
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.compute.mma import mma
 
 

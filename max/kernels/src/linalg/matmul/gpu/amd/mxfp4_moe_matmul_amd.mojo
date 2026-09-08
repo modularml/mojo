@@ -29,7 +29,7 @@ applied to the lane's `(M=lane%16, K-group=lane/16)` slot) see the AMD
 CDNA4 ISA section 7.2.1.
 """
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -48,7 +48,7 @@ from layout import (
     Coord,
     Idx,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
 )
 from layout._utils import make_amd_buffer_resource
@@ -499,23 +499,23 @@ def _mxfp4_moe_matmul_routed_kernel[
     BK_ELEMS: Int,
     num_warps_m: Int,
     num_warps_n: Int,
-    CStorage: TensorStorage,
-    AStorage: TensorStorage,
-    BStorage: TensorStorage,
-    SFAStorage: TensorStorage,
-    SFBStorage: TensorStorage,
-    STIStorage: TensorStorage,
-    EIStorage: TensorStorage,
+    CEngine: TensorEngine,
+    AEngine: TensorEngine,
+    BEngine: TensorEngine,
+    SFAEngine: TensorEngine,
+    SFBEngine: TensorEngine,
+    STIEngine: TensorEngine,
+    EIEngine: TensorEngine,
 ](
-    c: TileTensor[mut=True, out_dtype, CLayout, MutAnyOrigin, Storage=CStorage],
-    a: TileTensor[.uint8, ALayout, ImmutAnyOrigin, Storage=AStorage],
-    b_pre: TileTensor[.uint8, BLayout, ImmutAnyOrigin, Storage=BStorage],
-    sfa_pre: TileTensor[.uint8, SFALayout, ImmutAnyOrigin, Storage=SFAStorage],
-    sfb_pre: TileTensor[.uint8, SFBLayout, ImmutAnyOrigin, Storage=SFBStorage],
+    c: TileTensor[mut=True, out_dtype, CLayout, MutAnyOrigin, Engine=CEngine],
+    a: TileTensor[.uint8, ALayout, ImmutAnyOrigin, Engine=AEngine],
+    b_pre: TileTensor[.uint8, BLayout, ImmutAnyOrigin, Engine=BEngine],
+    sfa_pre: TileTensor[.uint8, SFALayout, ImmutAnyOrigin, Engine=SFAEngine],
+    sfb_pre: TileTensor[.uint8, SFBLayout, ImmutAnyOrigin, Engine=SFBEngine],
     sorted_token_ids: TileTensor[
-        .uint32, STILayout, ImmutAnyOrigin, Storage=STIStorage
+        .uint32, STILayout, ImmutAnyOrigin, Engine=STIEngine
     ],
-    expert_ids: TileTensor[.int32, EILayout, ImmutAnyOrigin, Storage=EIStorage],
+    expert_ids: TileTensor[.int32, EILayout, ImmutAnyOrigin, Engine=EIEngine],
     num_tokens: Int32,
     size_expert_ids: Int32,
 ):
@@ -635,13 +635,13 @@ def mxfp4_moe_matmul_amd_routed[
         BK_ELEMS,
         num_warps_m,
         num_warps_n,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b_pre).Storage,
-        type_of(sfa_pre).Storage,
-        type_of(sfb_pre).Storage,
-        type_of(sorted_token_ids).Storage,
-        type_of(expert_ids).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b_pre).Engine,
+        type_of(sfa_pre).Engine,
+        type_of(sfb_pre).Engine,
+        type_of(sorted_token_ids).Engine,
+        type_of(expert_ids).Engine,
     ]
     ctx.enqueue_function[kernel](
         c,

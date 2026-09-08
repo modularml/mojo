@@ -1,0 +1,14 @@
+load("//bazel:api.bzl", "lit_tests")
+
+package(default_visibility = ["//visibility:private"])
+
+lit_tests(
+    name = "compilation-server",
+    srcs = glob(["**/*.test"]),
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    tools = [
+        "//Mojo/tools/compilation-server",
+    ],
+)

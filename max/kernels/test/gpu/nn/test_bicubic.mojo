@@ -679,10 +679,10 @@ def test_large_image_gpu_launch[dtype: DType](ctx: DeviceContext) raises:
         dtype,
         output_origin=output_dev_nd.origin,
         OutputLayoutType=output_dev_nd.LayoutType,
-        OutputStorage=output_dev_nd.Storage,
+        OutputEngine=output_dev_nd.Engine,
         input_origin=ImmOrigin(input_dev_nd.origin),
         InputLayoutType=input_dev_nd.LayoutType,
-        InputStorage=input_dev_nd.Storage,
+        InputEngine=input_dev_nd.Engine,
     ]
 
     # This would fail with block_dim=(64, 64) = 4096 threads.

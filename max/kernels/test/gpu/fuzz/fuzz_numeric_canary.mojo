@@ -22,7 +22,7 @@
 # i.e. it proves the numerical oracle catches what the memory-safety/diff oracle
 # cannot, and that boundary generation finds the shape-dependent numeric bug.
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.random import rand, seed

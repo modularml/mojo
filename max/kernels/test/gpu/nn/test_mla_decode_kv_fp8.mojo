@@ -15,7 +15,7 @@ from std.collections import Optional
 from std.random import randn
 from std.sys import argv, has_nvidia_gpu_accelerator
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from layout import (
     Idx,

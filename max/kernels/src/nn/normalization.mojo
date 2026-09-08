@@ -16,7 +16,7 @@ from std.math import align_down, align_up, ceildiv, clamp, rsqrt
 from std.math.uutils import umod, ufloordiv, uceildiv
 from std.sys.info import align_of, simd_width_of, size_of
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.algorithm import vectorize
 from max.algorithm import map_reduce, mean, variance
 from max.algorithm.functional import (
@@ -25,7 +25,7 @@ from max.algorithm.functional import (
 )
 from max.algorithm.reduction import _simd_sum, _simd_sum_elementwise
 from std.bit import log2_floor
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     thread_idx,
     block_dim,
@@ -52,7 +52,7 @@ from layout import (
     CoordLike,
     Idx,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     coord_to_index_list,
     row_major,
@@ -71,7 +71,6 @@ from std.utils.static_tuple import StaticTuple
 from std.utils.numerics import get_accum_type, max_finite, min_finite
 from comm.rms_norm_fp8 import rms_norm_fused_fp8
 from internal_utils.fp8_utils import compute_dynamic_fp8_scale, fp8_quantize
-from max.gpu.primitives.grid_controls import PDLLevel
 
 # Free-form row-wise scaffolder (Row) + monoids.
 from algorithm import rowwise
@@ -368,7 +367,7 @@ def rms_norm_gpu_warp_tiling_128[
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
     dtype: DType,
-    Storage: TensorStorage,
+    Engine: TensorEngine,
     //,
     simd_width: Int,
     warps_per_block: Int,
@@ -381,7 +380,7 @@ def rms_norm_gpu_warp_tiling_128[
     multiply_before_cast: Bool,
     pdl_level: PDLLevel = PDLLevel.ON,
 ](
-    gamma: TileTensor[dtype, LayoutType, origin, Storage=Storage],
+    gamma: TileTensor[dtype, LayoutType, origin, Engine=Engine],
     epsilon: Float32,
     weight_offset: Float32,
     num_rows: Int32,
@@ -452,7 +451,7 @@ def rms_norm_gpu_warp_per_row[
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
     dtype: DType,
-    Storage: TensorStorage,
+    Engine: TensorEngine,
     //,
     simd_width: Int,
     rows_per_block: Int,
@@ -467,7 +466,7 @@ def rms_norm_gpu_warp_per_row[
     multiply_before_cast: Bool,
     pdl_level: PDLLevel = PDLLevel.ON,
 ](
-    gamma: TileTensor[dtype, LayoutType, origin, Storage=Storage],
+    gamma: TileTensor[dtype, LayoutType, origin, Engine=Engine],
     epsilon: Float32,
     weight_offset: Float32,
     num_rows: Int32,
@@ -629,7 +628,7 @@ def rms_norm_gpu_warp_tiling[
     origin: Origin[mut=mut],
     dtype: DType,
     rank: Int,
-    Storage: TensorStorage,
+    Engine: TensorEngine,
     //,
     simd_width: Int,
     max_warps_per_block: Int,
@@ -643,7 +642,7 @@ def rms_norm_gpu_warp_tiling[
     pdl_level: PDLLevel = PDLLevel.ON,
 ](
     shape: IndexList[rank],
-    gamma: TileTensor[dtype, LayoutType, origin, Storage=Storage],
+    gamma: TileTensor[dtype, LayoutType, origin, Engine=Engine],
     epsilon: Float32,
     weight_offset: Float32,
     num_cols: Int32,
@@ -806,7 +805,7 @@ def rms_norm_gpu_block[
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
     dtype: DType,
-    Storage: TensorStorage,
+    Engine: TensorEngine,
     //,
     simd_width: Int,
     max_warps_per_block: Int,
@@ -819,7 +818,7 @@ def rms_norm_gpu_block[
     multiply_before_cast: Bool,
     pdl_level: PDLLevel = PDLLevel.ON,
 ](
-    gamma: TileTensor[dtype, LayoutType, origin, Storage=Storage],
+    gamma: TileTensor[dtype, LayoutType, origin, Engine=Engine],
     epsilon: Float32,
     weight_offset: Float32,
     num_cols: Int32,
@@ -1034,7 +1033,7 @@ def rms_norm_gpu[
                 mut=gamma.mut,
                 LayoutType=gamma.LayoutType,
                 origin=gamma.origin,
-                Storage=gamma.Storage,
+                Engine=gamma.Engine,
                 rank=rank,
                 eff_simd,
                 max_warps_per_block,
@@ -1078,7 +1077,7 @@ def rms_norm_gpu[
                 mut=gamma.mut,
                 LayoutType=gamma.LayoutType,
                 origin=gamma.origin,
-                Storage=gamma.Storage,
+                Engine=gamma.Engine,
                 simd_width,
                 warps_per_block,
                 input_fn_2d,
@@ -1125,7 +1124,7 @@ def rms_norm_gpu[
                             mut=gamma.mut,
                             LayoutType=gamma.LayoutType,
                             origin=gamma.origin,
-                            Storage=gamma.Storage,
+                            Engine=gamma.Engine,
                             simd_width,
                             rows_per_block,
                             True,
@@ -1150,7 +1149,7 @@ def rms_norm_gpu[
                     mut=gamma.mut,
                     LayoutType=gamma.LayoutType,
                     origin=gamma.origin,
-                    Storage=gamma.Storage,
+                    Engine=gamma.Engine,
                     simd_width,
                     rows_per_block,
                     False,
@@ -1212,7 +1211,7 @@ def rms_norm_gpu[
                 mut=gamma.mut,
                 LayoutType=gamma.LayoutType,
                 origin=gamma.origin,
-                Storage=gamma.Storage,
+                Engine=gamma.Engine,
                 simd_width,
                 max_warps_per_block,
                 input_fn_2d,
@@ -1234,7 +1233,7 @@ def rms_norm_gpu[
             mut=gamma.mut,
             LayoutType=gamma.LayoutType,
             origin=gamma.origin,
-            Storage=gamma.Storage,
+            Engine=gamma.Engine,
             1,
             max_warps_per_block,
             input_fn_2d,
@@ -1530,47 +1529,47 @@ def apply_qk_rms_norm_gpu_block[
     q_out_mut: Bool,
     q_out_layout: TensorLayout,
     q_out_origin: Origin[mut=q_out_mut],
-    q_out_storage: TensorStorage,
+    q_out_engine: TensorEngine,
     k_out_mut: Bool,
     k_out_layout: TensorLayout,
     k_out_origin: Origin[mut=k_out_mut],
-    k_out_storage: TensorStorage,
+    k_out_engine: TensorEngine,
     gamma_q_mut: Bool,
     gamma_q_layout: TensorLayout,
     gamma_q_origin: Origin[mut=gamma_q_mut],
-    gamma_q_storage: TensorStorage,
+    gamma_q_engine: TensorEngine,
     gamma_k_mut: Bool,
     gamma_k_layout: TensorLayout,
     gamma_k_origin: Origin[mut=gamma_k_mut],
-    gamma_k_storage: TensorStorage,
+    gamma_k_engine: TensorEngine,
     var_mut: Bool,
     var_layout: TensorLayout,
     var_origin: Origin[mut=var_mut],
-    var_storage: TensorStorage,
+    var_engine: TensorEngine,
     q_layout: TensorLayout,
     q_origin: Origin,
-    q_storage: TensorStorage,
+    q_engine: TensorEngine,
     k_layout: TensorLayout,
     k_origin: Origin,
-    k_storage: TensorStorage,
+    k_engine: TensorEngine,
     //,
     simd_width: Int,
 ](
     q_out: TileTensor[
-        out_dtype, q_out_layout, q_out_origin, Storage=q_out_storage
+        out_dtype, q_out_layout, q_out_origin, Engine=q_out_engine
     ],
     k_out: TileTensor[
-        out_dtype, k_out_layout, k_out_origin, Storage=k_out_storage
+        out_dtype, k_out_layout, k_out_origin, Engine=k_out_engine
     ],
     gamma_q: TileTensor[
-        .float32, gamma_q_layout, gamma_q_origin, Storage=gamma_q_storage
+        .float32, gamma_q_layout, gamma_q_origin, Engine=gamma_q_engine
     ],
     gamma_k: TileTensor[
-        .float32, gamma_k_layout, gamma_k_origin, Storage=gamma_k_storage
+        .float32, gamma_k_layout, gamma_k_origin, Engine=gamma_k_engine
     ],
-    qk_var: TileTensor[.float32, var_layout, var_origin, Storage=var_storage],
-    q: TileTensor[in_dtype, q_layout, q_origin, Storage=q_storage],
-    k: TileTensor[in_dtype, k_layout, k_origin, Storage=k_storage],
+    qk_var: TileTensor[.float32, var_layout, var_origin, Engine=var_engine],
+    q: TileTensor[in_dtype, q_layout, q_origin, Engine=q_engine],
+    k: TileTensor[in_dtype, k_layout, k_origin, Engine=k_engine],
     epsilon: Float32,
     q_cols: Int32,
     k_cols: Int32,
@@ -1679,29 +1678,29 @@ def apply_qk_rms_norm_gpu[
             q_out_mut=q_out.mut,
             q_out_layout=q_out.LayoutType,
             q_out_origin=q_out.origin,
-            q_out_storage=q_out.Storage,
+            q_out_engine=q_out.Engine,
             k_out_mut=k_out.mut,
             k_out_layout=k_out.LayoutType,
             k_out_origin=k_out.origin,
-            k_out_storage=k_out.Storage,
+            k_out_engine=k_out.Engine,
             gamma_q_mut=gamma_q.mut,
             gamma_q_layout=gamma_q.LayoutType,
             gamma_q_origin=gamma_q.origin,
-            gamma_q_storage=gamma_q.Storage,
+            gamma_q_engine=gamma_q.Engine,
             gamma_k_mut=gamma_k.mut,
             gamma_k_layout=gamma_k.LayoutType,
             gamma_k_origin=gamma_k.origin,
-            gamma_k_storage=gamma_k.Storage,
+            gamma_k_engine=gamma_k.Engine,
             var_mut=qk_var.mut,
             var_layout=qk_var.LayoutType,
             var_origin=qk_var.origin,
-            var_storage=qk_var.Storage,
+            var_engine=qk_var.Engine,
             q_layout=q.LayoutType,
             q_origin=q.origin,
-            q_storage=q.Storage,
+            q_engine=q.Engine,
             k_layout=k.LayoutType,
             k_origin=k.origin,
-            k_storage=k.Storage,
+            k_engine=k.Engine,
             simd_width=simd_width,
         ]
         ctx.enqueue_function[kernel](
@@ -1731,29 +1730,29 @@ def apply_qk_rms_norm_gpu[
             q_out_mut=q_out.mut,
             q_out_layout=q_out.LayoutType,
             q_out_origin=q_out.origin,
-            q_out_storage=q_out.Storage,
+            q_out_engine=q_out.Engine,
             k_out_mut=k_out.mut,
             k_out_layout=k_out.LayoutType,
             k_out_origin=k_out.origin,
-            k_out_storage=k_out.Storage,
+            k_out_engine=k_out.Engine,
             gamma_q_mut=gamma_q.mut,
             gamma_q_layout=gamma_q.LayoutType,
             gamma_q_origin=gamma_q.origin,
-            gamma_q_storage=gamma_q.Storage,
+            gamma_q_engine=gamma_q.Engine,
             gamma_k_mut=gamma_k.mut,
             gamma_k_layout=gamma_k.LayoutType,
             gamma_k_origin=gamma_k.origin,
-            gamma_k_storage=gamma_k.Storage,
+            gamma_k_engine=gamma_k.Engine,
             var_mut=qk_var.mut,
             var_layout=qk_var.LayoutType,
             var_origin=qk_var.origin,
-            var_storage=qk_var.Storage,
+            var_engine=qk_var.Engine,
             q_layout=q.LayoutType,
             q_origin=q.origin,
-            q_storage=q.Storage,
+            q_engine=q.Engine,
             k_layout=k.LayoutType,
             k_origin=k.origin,
-            k_storage=k.Storage,
+            k_engine=k.Engine,
             simd_width=1,
         ]
         ctx.enqueue_function[kernel](

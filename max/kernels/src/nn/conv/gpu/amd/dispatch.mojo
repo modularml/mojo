@@ -40,7 +40,7 @@ Mirrors the structure of `nn.conv.gpu.amd.rdna.dispatch` and
 `nn.conv.gpu.nvidia.sm100.dispatch`.
 """
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.sys import simd_width_of

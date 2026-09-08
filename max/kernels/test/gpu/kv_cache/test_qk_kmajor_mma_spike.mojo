@@ -59,14 +59,14 @@ from std.math import sqrt
 from std.memory import bitcast
 from std.sys import size_of, has_nvidia_gpu_accelerator
 
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     lane_id,
     thread_idx,
     warp_id as get_warp_id,
 )
 from max.gpu.sync import barrier
-from std.gpu import block_idx
+from max.gpu import block_idx
 from max.gpu.primitives.cluster import block_rank_in_cluster
 from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle, create_tma_descriptor

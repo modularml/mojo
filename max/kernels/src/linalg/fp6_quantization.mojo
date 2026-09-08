@@ -24,12 +24,12 @@ scale, so the group reduction stays in registers and the store is three aligned
 """
 
 from std.math import ceildiv, isfinite, recip
-from std.gpu import block_idx, thread_idx, grid_dim, block_dim
+from max.gpu import block_idx, thread_idx, grid_dim, block_dim
 from max.gpu.host import DeviceContext
 from std.memory import bitcast
 from std.utils import StaticTuple
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA
-from layout import TensorStorage, TileTensor
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA
+from layout import TensorEngine, TileTensor
 from layout.coord import Coord
 from layout.tile_layout import TensorLayout
 
@@ -55,21 +55,21 @@ def _quantize_mxfp6_amd_kernel[
     output_layout: TensorLayout,
     scales_layout: TensorLayout,
     input_layout: TensorLayout,
-    output_storage: TensorStorage,
-    scales_storage: TensorStorage,
-    input_storage: TensorStorage,
+    output_engine: TensorEngine,
+    scales_engine: TensorEngine,
+    input_engine: TensorEngine,
     *,
     fmt: FP6Format,
     SF_VECTOR_SIZE: Int = 32,
 ](
     output: TileTensor[
-        .uint8, output_layout, MutAnyOrigin, Storage=output_storage
+        .uint8, output_layout, MutAnyOrigin, Engine=output_engine
     ],
     scales: TileTensor[
-        scales_dtype, scales_layout, MutAnyOrigin, Storage=scales_storage
+        scales_dtype, scales_layout, MutAnyOrigin, Engine=scales_engine
     ],
     input: TileTensor[
-        in_dtype, input_layout, MutAnyOrigin, Storage=input_storage
+        in_dtype, input_layout, MutAnyOrigin, Engine=input_engine
     ],
     num_rows: Int32,
     num_cols: Int32,
@@ -196,7 +196,7 @@ def quantize_mxfp6_amd[
             in_dtype,
             type_of(input).LayoutType,
             MutAnyOrigin,
-            Storage=type_of(input).Storage,
+            Engine=type_of(input).Engine,
         ]
     ](input)
 
@@ -206,9 +206,9 @@ def quantize_mxfp6_amd[
         type_of(output).LayoutType,
         type_of(scales).LayoutType,
         type_of(input_tt).LayoutType,
-        type_of(output).Storage,
-        type_of(scales).Storage,
-        type_of(input_tt).Storage,
+        type_of(output).Engine,
+        type_of(scales).Engine,
+        type_of(input_tt).Engine,
         fmt=fmt,
         SF_VECTOR_SIZE=SF_VECTOR_SIZE,
     ]

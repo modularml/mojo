@@ -50,7 +50,7 @@ from max.benchmark import (
     bencher_iter_custom,
 )
 from comm.sync import enable_p2p
-from std.gpu import (
+from max.gpu import (
     global_idx,
     grid_dim,
     MAX_THREADS_PER_BLOCK_METADATA,

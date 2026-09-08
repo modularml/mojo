@@ -22,7 +22,7 @@ matmul kernels.
 from std.math import ceildiv
 from std.math.uutils import udivmod
 
-from std.gpu import block_idx, grid_dim
+from max.gpu import block_idx, grid_dim
 
 from std.utils.fast_div import FastDiv
 from std.utils.index import Index, IndexList

@@ -13,8 +13,8 @@
 
 # Functional tests for dynamic external memory (mainly for Apple Silicon).
 
-from std.gpu import block_idx
-from std.gpu import thread_idx
+from max.gpu import block_idx
+from max.gpu import thread_idx
 from max.gpu.host import DeviceContext
 from max.gpu.memory import external_memory
 from max.gpu.sync import barrier

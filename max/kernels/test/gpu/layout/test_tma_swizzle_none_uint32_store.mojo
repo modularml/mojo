@@ -32,7 +32,7 @@
 # offset`` yields ``x[i, j] == i*64 + j`` -- which is exactly what the test
 # checks.
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.host.nvidia.tma import TensorMapSwizzle

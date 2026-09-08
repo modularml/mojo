@@ -47,7 +47,7 @@ CDNA4 only: the fused epilogue and the block-scaled AMD matmul are MI355X paths.
 
 A run covers ONE variant at ONE shape, defaulting to dense at decode batch 1.
 The sibling yaml holds the sweep: `$has_indexer` over both variants crossed with
-`$batch_size` / `$seq_len` over the decode and prefill shapes.
+`$batch_size` / `$seq_len` over the decode, verify, and prefill shapes.
 
 Run the default (dense, decode bs=1):
     ./bazelw run //max/kernels/benchmarks:gpu/nn/bench_fused_qkv_matmul_mxfp8_amd
@@ -590,12 +590,17 @@ def main() raises:
     var has_indexer = arg_parse("has_indexer", False)
     var batch_size = Int(arg_parse("batch_size", 1))
     var seq_len = Int(arg_parse("seq_len", 1))
+    var is_verify = arg_parse("is_verify", False)
 
     seed(0)
     var m = Bench()
     with DeviceContext() as ctx:
         var prompt_lens = List[Int](length=batch_size, fill=seq_len)
-        var regime: String = "decode" if seq_len == 1 else "prefill"
+        var regime = "prefill"
+        if is_verify:
+            regime = "verify"
+        elif seq_len == 1:
+            regime = "decode"
         if has_indexer:
             bench_shape[True](ctx, m, prompt_lens, regime)
         else:

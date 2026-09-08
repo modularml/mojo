@@ -15,7 +15,7 @@ from std.math import ceildiv
 from std.math.uutils import umod, ufloordiv
 from std.random import random_si64
 
-from std.gpu import WARP_SIZE, lane_id, thread_idx
+from max.gpu import WARP_SIZE, lane_id, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.compute.mma import ld_matrix, mma

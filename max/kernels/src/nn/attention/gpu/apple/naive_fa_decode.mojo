@@ -46,7 +46,7 @@ Partial-buffer layout (partition-last / contiguous):
 """
 
 from std.collections import OptionalReg
-from std.gpu import WARP_SIZE, block_idx, lane_id, thread_idx
+from max.gpu import WARP_SIZE, block_idx, lane_id, thread_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv, exp
 from std.sys import llvm_intrinsic
@@ -58,8 +58,8 @@ from layout import (
     Idx,
     Layout,
     LayoutTensor,
-    PointerStorage,
-    TensorStorage,
+    DefaultEngine,
+    TensorEngine,
     TileTensor,
 )
 from layout.coord import Coord
@@ -158,31 +158,31 @@ def naive_fa_decode_apple_core[
     *,
     Depth: Int,
     SplitSize: Int,
-    OPartialStorageType: TensorStorage = PointerStorage[element_width=1],
-    MPartialStorageType: TensorStorage = PointerStorage[element_width=1],
-    LPartialStorageType: TensorStorage = PointerStorage[element_width=1],
-    QStorageType: TensorStorage = PointerStorage[element_width=1],
-    VLStorageType: TensorStorage = PointerStorage[element_width=1],
-    SinkStorageType: TensorStorage = PointerStorage[element_width=1],
+    OPartialEngine: TensorEngine = DefaultEngine[element_width=1],
+    MPartialEngine: TensorEngine = DefaultEngine[element_width=1],
+    LPartialEngine: TensorEngine = DefaultEngine[element_width=1],
+    QEngine: TensorEngine = DefaultEngine[element_width=1],
+    VLEngine: TensorEngine = DefaultEngine[element_width=1],
+    SinkEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     o_partial: TileTensor[
-        p_type, p_layout, MutAnyOrigin, Storage=OPartialStorageType
+        p_type, p_layout, MutAnyOrigin, Engine=OPartialEngine
     ],
     m_partial: TileTensor[
-        p_type, p_layout, MutAnyOrigin, Storage=MPartialStorageType
+        p_type, p_layout, MutAnyOrigin, Engine=MPartialEngine
     ],
     l_partial: TileTensor[
-        p_type, p_layout, MutAnyOrigin, Storage=LPartialStorageType
+        p_type, p_layout, MutAnyOrigin, Engine=LPartialEngine
     ],
-    q: TileTensor[q_type, q_layout, ImmutAnyOrigin, Storage=QStorageType],
+    q: TileTensor[q_type, q_layout, ImmutAnyOrigin, Engine=QEngine],
     k: k_t,
     v: v_t,
     mask_functor: mask_t,
     valid_length: TileTensor[
-        .uint32, valid_length_layout, ImmutAnyOrigin, Storage=VLStorageType
+        .uint32, valid_length_layout, ImmutAnyOrigin, Engine=VLEngine
     ],
     sink_weights: OptionalReg[
-        TileTensor[q_type, sink_layout, ImmutAnyOrigin, Storage=SinkStorageType]
+        TileTensor[q_type, sink_layout, ImmutAnyOrigin, Engine=SinkEngine]
     ],
     scale: Float32,
     batch_size: Int32,
@@ -230,12 +230,12 @@ def naive_fa_decode_apple_core[
         Depth: Compile-time head dimension; must be a multiple of
             `WARP_SIZE`.
         SplitSize: Per-partition KV span in keys.
-        OPartialStorageType: Storage policy of the `o_partial` tile.
-        MPartialStorageType: Storage policy of the `m_partial` tile.
-        LPartialStorageType: Storage policy of the `l_partial` tile.
-        QStorageType: Storage policy of the `q` tile.
-        VLStorageType: Storage policy of the `valid_length` tile.
-        SinkStorageType: Storage policy of the `sink_weights` tile.
+        OPartialEngine: Engine of the `o_partial` tile.
+        MPartialEngine: Engine of the `m_partial` tile.
+        LPartialEngine: Engine of the `l_partial` tile.
+        QEngine: Engine of the `q` tile.
+        VLEngine: Engine of the `valid_length` tile.
+        SinkEngine: Engine of the `sink_weights` tile.
 
     Args:
         o_partial: Flat 1D partial output buffer; one accumulator per
@@ -473,27 +473,27 @@ def naive_fa_decode_apple_stitch[
     _is_cache_length_accurate: Bool = False,
     *,
     SplitSize: Int,
-    OutStorageType: TensorStorage = PointerStorage[element_width=1],
-    OPartialStorageType: TensorStorage = PointerStorage[element_width=1],
-    MPartialStorageType: TensorStorage = PointerStorage[element_width=1],
-    LPartialStorageType: TensorStorage = PointerStorage[element_width=1],
-    VLStorageType: TensorStorage = PointerStorage[element_width=1],
+    OutEngine: TensorEngine = DefaultEngine[element_width=1],
+    OPartialEngine: TensorEngine = DefaultEngine[element_width=1],
+    MPartialEngine: TensorEngine = DefaultEngine[element_width=1],
+    LPartialEngine: TensorEngine = DefaultEngine[element_width=1],
+    VLEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     output: TileTensor[
-        output_type, output_layout, MutAnyOrigin, Storage=OutStorageType
+        output_type, output_layout, MutAnyOrigin, Engine=OutEngine
     ],
     o_partial: TileTensor[
-        p_type, p_layout, ImmutAnyOrigin, Storage=OPartialStorageType
+        p_type, p_layout, ImmutAnyOrigin, Engine=OPartialEngine
     ],
     m_partial: TileTensor[
-        p_type, p_layout, ImmutAnyOrigin, Storage=MPartialStorageType
+        p_type, p_layout, ImmutAnyOrigin, Engine=MPartialEngine
     ],
     l_partial: TileTensor[
-        p_type, p_layout, ImmutAnyOrigin, Storage=LPartialStorageType
+        p_type, p_layout, ImmutAnyOrigin, Engine=LPartialEngine
     ],
     k: k_t,
     valid_length: TileTensor[
-        .uint32, valid_length_layout, ImmutAnyOrigin, Storage=VLStorageType
+        .uint32, valid_length_layout, ImmutAnyOrigin, Engine=VLEngine
     ],
     max_prompt_len: Int32,
     # Full key count for the dense decode path; mirrors the producer so the
@@ -704,7 +704,7 @@ def naive_fa_decode_apple[
     # Flat 1D TileTensor views over the q/output/partial buffers. The kernels
     # bake the per-(batch, head, split, depth) offset into a linear index
     # (`_o_idx`/`_ml_idx`) and the BSHD/ragged q/out offset, so the flat views
-    # just carry the device pointers with TileTensor typing (no raw pointers /
+    # just carry the storage handles with TileTensor typing (no raw pointers /
     # DeviceBuffer-as-pointer inside the kernels).
     var q_flat = TileTensor(
         q.ptr.as_imm().as_unsafe_any_origin(),
@@ -718,27 +718,12 @@ def naive_fa_decode_apple[
         valid_length.ptr.as_imm().as_unsafe_any_origin(),
         row_major(Coord(Int(valid_length.size()))),
     )
-    var o_partial_t = TileTensor(
-        o_partial_dev.unsafe_ptr(), row_major(Coord(o_partial_n))
-    )
-    var m_partial_t = TileTensor(
-        m_partial_dev.unsafe_ptr(), row_major(Coord(ml_partial_n))
-    )
-    var l_partial_t = TileTensor(
-        l_partial_dev.unsafe_ptr(), row_major(Coord(ml_partial_n))
-    )
-    var o_partial_imm = TileTensor(
-        o_partial_dev.unsafe_ptr().as_imm().as_unsafe_any_origin(),
-        row_major(Coord(o_partial_n)),
-    )
-    var m_partial_imm = TileTensor(
-        m_partial_dev.unsafe_ptr().as_imm().as_unsafe_any_origin(),
-        row_major(Coord(ml_partial_n)),
-    )
-    var l_partial_imm = TileTensor(
-        l_partial_dev.unsafe_ptr().as_imm().as_unsafe_any_origin(),
-        row_major(Coord(ml_partial_n)),
-    )
+    var o_partial_t = TileTensor(o_partial_dev, row_major(Coord(o_partial_n)))
+    var m_partial_t = TileTensor(m_partial_dev, row_major(Coord(ml_partial_n)))
+    var l_partial_t = TileTensor(l_partial_dev, row_major(Coord(ml_partial_n)))
+    var o_partial_imm = o_partial_t.as_immut()
+    var m_partial_imm = m_partial_t.as_immut()
+    var l_partial_imm = l_partial_t.as_immut()
 
     # Sink weights: a nullable `OptionalReg[TileTensor]` passed by value (NOT a
     # dangling `UnsafePointer` -- KB `unsafepointer-is-non-nullable`). When
@@ -787,12 +772,12 @@ def naive_fa_decode_apple[
                     _is_cache_length_accurate=_is_cache_length_accurate,
                     Depth=D,
                     SplitSize=SplitSize,
-                    OPartialStorageType=o_partial_t.Storage,
-                    MPartialStorageType=m_partial_t.Storage,
-                    LPartialStorageType=l_partial_t.Storage,
-                    QStorageType=q_flat.Storage,
-                    VLStorageType=valid_length_flat.Storage,
-                    SinkStorageType=SinkTile.Storage,
+                    OPartialEngine=o_partial_t.Engine,
+                    MPartialEngine=m_partial_t.Engine,
+                    LPartialEngine=l_partial_t.Engine,
+                    QEngine=q_flat.Engine,
+                    VLEngine=valid_length_flat.Engine,
+                    SinkEngine=SinkTile.Engine,
                 ]
                 ctx.enqueue_function[core_kernel](
                     o_partial_t,
@@ -830,11 +815,11 @@ def naive_fa_decode_apple[
         _use_valid_length=_use_valid_length,
         _is_cache_length_accurate=_is_cache_length_accurate,
         SplitSize=SplitSize,
-        OutStorageType=output_flat.Storage,
-        OPartialStorageType=o_partial_imm.Storage,
-        MPartialStorageType=m_partial_imm.Storage,
-        LPartialStorageType=l_partial_imm.Storage,
-        VLStorageType=valid_length_flat.Storage,
+        OutEngine=output_flat.Engine,
+        OPartialEngine=o_partial_imm.Engine,
+        MPartialEngine=m_partial_imm.Engine,
+        LPartialEngine=l_partial_imm.Engine,
+        VLEngine=valid_length_flat.Engine,
     ]
     ctx.enqueue_function[stitch_kernel](
         output_flat,

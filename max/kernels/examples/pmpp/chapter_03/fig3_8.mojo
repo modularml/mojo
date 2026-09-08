@@ -15,7 +15,7 @@
 # Applies a box blur filter to an image
 
 from std.math import ceildiv
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.itertools import product
 

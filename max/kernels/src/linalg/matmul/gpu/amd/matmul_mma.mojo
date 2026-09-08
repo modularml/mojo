@@ -25,7 +25,7 @@ live in structured_kernels.amd_tile_io.
 """
 
 from max.gpu.compute.mma import mma as gpu_mma
-from std.gpu import lane_id, WARP_SIZE
+from max.gpu import lane_id, WARP_SIZE
 from std.utils import IndexList
 from layout import TensorLayout, TileTensor
 from layout.swizzle import Swizzle

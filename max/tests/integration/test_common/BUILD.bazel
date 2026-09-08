@@ -192,6 +192,19 @@ modular_py_library(
 )
 
 modular_py_library(
+    name = "simple_kv_cache",
+    testonly = True,
+    srcs = ["simple_kv_cache.py"],
+    imports = [".."],
+    deps = [
+        requirement("numpy"),
+        "//max/python/max/driver",
+        "//max/python/max/nn",
+        "//max/python/max/support",
+    ],
+)
+
+modular_py_library(
     name = "registry",
     testonly = True,
     srcs = ["registry.py"],

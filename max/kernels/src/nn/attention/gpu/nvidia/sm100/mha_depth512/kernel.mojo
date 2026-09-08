@@ -29,14 +29,14 @@ Warp assignment (384 threads = 12 warps, 3 warp groups of 128):
 
 from std.math import align_up, ceildiv, min
 from std.sys import size_of
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     thread_idx,
     warp_id,
 )
-from std.gpu.globals import WARPGROUP_SIZE, WARP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE, WARP_SIZE
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.memory import external_memory, fence_mbarrier_init
 from max.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
 from max.gpu.compute.arch.tcgen05 import (

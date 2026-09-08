@@ -277,6 +277,8 @@ def generate_qwen3_max_outputs(
         max_seq_len=MAX_SEQ_LEN,
         available_cache_memory=30 * 1024 * 1024,
         session=session,
+        is_di_enabled=False,
+        model_name="FAKE",
     )
     assert isinstance(kv_manager, PagedKVCacheManager)
 

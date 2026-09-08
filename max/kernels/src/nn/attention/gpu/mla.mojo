@@ -43,7 +43,7 @@ from nn.attention.gpu.mha import (
 from nn.attention.gpu.mha_decode_partition_heuristic import (
     mha_decoding_num_partitions,
 )
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.primitives.grid_controls import pdl_launch_attributes
 from std.algorithm.functional import (
     tile_and_unswitch,
@@ -53,7 +53,7 @@ from std.algorithm.functional import (
 from max.algorithm.functional import (
     _elementwise_impl_gpu,
 )
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     thread_idx,
@@ -134,7 +134,6 @@ from nn.softmax import (
 from .amd_structured.mla_decode import Attention
 from .amd_structured.mla_prefill import Attention
 from .nvidia.sm100.mla_prefill import mla_sm100_prefill
-from max.gpu.host.info import B200, _is_sm10x_gpu
 from nn.attention.gpu.nvidia.sm100.mla_decode_dispatch import (
     MLADispatchScalarArgs,
     mla_decode_sm100_dispatch,

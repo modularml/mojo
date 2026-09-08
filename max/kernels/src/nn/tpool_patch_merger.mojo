@@ -15,14 +15,14 @@
 from std.math import ceildiv, divmod
 from std.sys.info import simd_width_of
 
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     Idx,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
 )
 
@@ -37,20 +37,20 @@ def tpool_patch_merger_kernel[
     dtype: DType,
     XLayout: TensorLayout,
     x_origin: ImmOrigin,
-    XStorage: TensorStorage,
+    XEngine: TensorEngine,
     OutLayout: TensorLayout,
     out_origin: MutOrigin,
-    OutStorage: TensorStorage,
+    OutEngine: TensorEngine,
     GridThwLayout: TensorLayout,
     grid_thw_origin: ImmOrigin,
-    GridThwStorage: TensorStorage,
+    GridThwEngine: TensorEngine,
     vec_width: Int,
     num_threads: Int,
 ](
-    x_tile: TileTensor[dtype, XLayout, x_origin, Storage=XStorage],
-    out_tile: TileTensor[dtype, OutLayout, out_origin, Storage=OutStorage],
+    x_tile: TileTensor[dtype, XLayout, x_origin, Engine=XEngine],
+    out_tile: TileTensor[dtype, OutLayout, out_origin, Engine=OutEngine],
     grid_thws: TileTensor[
-        .int64, GridThwLayout, grid_thw_origin, Storage=GridThwStorage
+        .int64, GridThwLayout, grid_thw_origin, Engine=GridThwEngine
     ],
     kH: Int32,
     kW: Int32,
@@ -73,14 +73,14 @@ def tpool_patch_merger_kernel[
         dtype: Element type of the input and output tensors.
         XLayout: Memory layout of the input tensor `x_tile`.
         x_origin: Immutable origin of the input tensor `x_tile`.
-        XStorage: Storage policy of the input tensor `x_tile`.
+        XEngine: Engine of the input tensor `x_tile`.
         OutLayout: Memory layout of the output tensor `out_tile`.
         out_origin: Mutable origin of the output tensor `out_tile`.
-        OutStorage: Storage policy of the output tensor `out_tile`.
+        OutEngine: Engine of the output tensor `out_tile`.
         GridThwLayout: Memory layout of the grid dimensions tensor `grid_thws`.
         grid_thw_origin: Immutable origin of the grid dimensions tensor
             `grid_thws`.
-        GridThwStorage: Storage policy of the grid dimensions tensor
+        GridThwEngine: Engine of the grid dimensions tensor
             `grid_thws`.
         vec_width: SIMD vector width for loads and stores along the hidden
             dimension.
@@ -182,16 +182,14 @@ def tpool_patch_merger[
     output_layout: TensorLayout,
     x_layout: TensorLayout,
     bounds_layout: TensorLayout,
-    OutputStorage: TensorStorage = PointerStorage[element_width=1],
-    XStorage: TensorStorage = PointerStorage[element_width=1],
-    BoundsStorage: TensorStorage = PointerStorage[element_width=1],
+    OutputEngine: TensorEngine = DefaultEngine[element_width=1],
+    XEngine: TensorEngine = DefaultEngine[element_width=1],
+    BoundsEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
-    output: TileTensor[
-        dtype, output_layout, MutAnyOrigin, Storage=OutputStorage
-    ],
-    x: TileTensor[dtype, x_layout, ImmutAnyOrigin, Storage=XStorage],
+    output: TileTensor[dtype, output_layout, MutAnyOrigin, Engine=OutputEngine],
+    x: TileTensor[dtype, x_layout, ImmutAnyOrigin, Engine=XEngine],
     bounds: TileTensor[
-        .int64, bounds_layout, ImmutAnyOrigin, Storage=BoundsStorage
+        .int64, bounds_layout, ImmutAnyOrigin, Engine=BoundsEngine
     ],
     kH: Int,
     kW: Int,
@@ -206,9 +204,9 @@ def tpool_patch_merger[
         output_layout: Memory layout of the output tensor.
         x_layout: Memory layout of the input tensor.
         bounds_layout: Memory layout of the bounds tensor.
-        OutputStorage: Storage policy of the output tensor.
-        XStorage: Storage policy of the input tensor.
-        BoundsStorage: Storage policy of the bounds tensor.
+        OutputEngine: Engine of the output tensor.
+        XEngine: Engine of the input tensor.
+        BoundsEngine: Engine of the bounds tensor.
 
     Args:
         output: Contiguous output tensor [total_output_patches, D].
@@ -235,13 +233,13 @@ def tpool_patch_merger[
             dtype,
             x.LayoutType,
             ImmOrigin(x.origin),
-            x.Storage,
+            x.Engine,
             output.LayoutType,
             output.origin,
-            output.Storage,
+            output.Engine,
             bounds.LayoutType,
             ImmOrigin(bounds.origin),
-            bounds.Storage,
+            bounds.Engine,
             simd_width,
             num_threads,
         ]
@@ -262,13 +260,13 @@ def tpool_patch_merger[
             dtype,
             x.LayoutType,
             ImmOrigin(x.origin),
-            x.Storage,
+            x.Engine,
             output.LayoutType,
             output.origin,
-            output.Storage,
+            output.Engine,
             bounds.LayoutType,
             ImmOrigin(bounds.origin),
-            bounds.Storage,
+            bounds.Engine,
             1,
             num_threads,
         ]

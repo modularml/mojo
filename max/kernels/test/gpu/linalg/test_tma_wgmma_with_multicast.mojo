@@ -19,8 +19,8 @@ from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
 from max.gpu.host import DeviceContext, Dim
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, thread_idx
-from std.gpu import warp_id as get_warp_id
+from max.gpu import block_idx, thread_idx
+from max.gpu import warp_id as get_warp_id
 from max.gpu.memory import fence_mbarrier_init
 from layout import Layout, LayoutTensor
 from layout._fillers import arange

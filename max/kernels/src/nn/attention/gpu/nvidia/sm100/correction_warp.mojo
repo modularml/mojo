@@ -13,15 +13,15 @@
 """Correction warp group logic for FA4 (SM100 Flash Attention)."""
 
 from std.sys import size_of
-from std.gpu import thread_idx
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu import thread_idx
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.compute.arch.tcgen05 import (
     tcgen05_ld,
     tcgen05_st,
     tcgen05_store_wait,
     tcgen05_fence_before,
 )
-from std.gpu.primitives.warp import _vote_nvidia_helper
+from max.gpu.primitives.warp import _vote_nvidia_helper
 from max.gpu.sync import umma_arrive_leader_cta
 from linalg.matmul.gpu.sm100_structured.structured_kernels.tmem import (
     TmemAddress,

@@ -28,7 +28,7 @@ K and V are extensively sub-staged to fit in SMEM:
 from std.math import align_down
 from std.sys import size_of
 from std.bit import prev_power_of_two
-from std.gpu.globals import WARP_SIZE, WARPGROUP_SIZE
+from max.gpu.globals import WARP_SIZE, WARPGROUP_SIZE
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host.info import B200
 

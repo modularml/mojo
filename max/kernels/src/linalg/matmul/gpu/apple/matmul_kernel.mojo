@@ -27,12 +27,12 @@ tails. Operands load DRAM->register directly -- threadgroup-memory staging
 """
 
 from std.collections import Array, Optional
-from std.gpu import WARP_SIZE, block_dim, block_idx, lane_id, thread_idx
+from max.gpu import WARP_SIZE, block_dim, block_idx, lane_id, thread_idx
 from std.math import align_down, ceildiv
 from max.gpu.host import DeviceContext
 from std.sys import align_of, size_of
 from std.utils import IndexList
-from layout import TensorStorage, TileTensor, Idx
+from layout import TensorEngine, TileTensor, Idx
 from layout.tile_layout import Layout, TensorLayout, row_major
 from layout.coord import Coord
 from linalg.arch.apple.mma import ConvIm2colParams, MmaOpApple
@@ -708,8 +708,8 @@ struct AppleM5MatMul[
         seed_from_output: Bool = False,
     ](
         mut loader: L,
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Storage=_],
-        b: TileTensor[L.b_type, b_layout, ImmutAnyOrigin, Storage=_],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=_],
+        b: TileTensor[L.b_type, b_layout, ImmutAnyOrigin, Engine=_],
         k: Int,
         conv: ConvIm2colParams,
         log2_grid_m: UInt32,
@@ -1177,15 +1177,13 @@ struct AppleM5MatMul[
         c_layout: TensorLayout,
         a_layout: TensorLayout,
         b_layout: TensorLayout,
-        c_storage: TensorStorage,
-        a_storage: TensorStorage,
-        b_storage: TensorStorage,
+        c_engine: TensorEngine,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
     ](
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Storage=c_storage],
-        a: TileTensor[
-            Self.in_type, a_layout, ImmutAnyOrigin, Storage=a_storage
-        ],
-        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Storage=b_storage],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
+        a: TileTensor[Self.in_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
         log2_grid_m: UInt32,
         log2_grid_n: UInt32,
     ):
@@ -1204,9 +1202,9 @@ struct AppleM5MatMul[
             c_layout: `TensorLayout` of the output `C` operand.
             a_layout: `TensorLayout` of the A operand.
             b_layout: `TensorLayout` of the B operand.
-            c_storage: `TensorStorage` of the output `C` operand.
-            a_storage: `TensorStorage` of the A operand.
-            b_storage: `TensorStorage` of the B operand.
+            c_engine: `TensorEngine` of the output `C` operand.
+            a_engine: `TensorEngine` of the A operand.
+            b_engine: `TensorEngine` of the B operand.
 
         Args:
             c: Output matrix `(M, N)` row-major; `M` and `N` derive from its
@@ -1267,16 +1265,14 @@ struct AppleM5MatMul[
         c_layout: TensorLayout,
         a_layout: TensorLayout,
         b_layout: TensorLayout,
-        c_storage: TensorStorage,
-        a_storage: TensorStorage,
-        b_storage: TensorStorage,
+        c_engine: TensorEngine,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
         seed_from_output: Bool = False,
     ](
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Storage=c_storage],
-        a: TileTensor[
-            Self.in_type, a_layout, ImmutAnyOrigin, Storage=a_storage
-        ],
-        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Storage=b_storage],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
+        a: TileTensor[Self.in_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
         log2_grid_m: UInt32,
         log2_grid_n: UInt32,
         k_strip_start_dev: Int32,
@@ -1366,21 +1362,19 @@ struct AppleM5MatMul[
         c_layout: TensorLayout,
         input_layout: TensorLayout,
         b_layout: TensorLayout,
-        c_storage: TensorStorage,
-        input_storage: TensorStorage,
-        b_storage: TensorStorage,
+        c_engine: TensorEngine,
+        input_engine: TensorEngine,
+        b_engine: TensorEngine,
         c_aligned: Bool = False,
     ](
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Storage=c_storage],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
         input: TileTensor[
-            Self.in_type, input_layout, ImmutAnyOrigin, Storage=input_storage
+            Self.in_type, input_layout, ImmutAnyOrigin, Engine=input_engine
         ],
         # Conv filter is `in_type` (the `Im2colALoader`'s `b_type == in_type`);
         # the body's `b` param keys on the loader's `b_type`, so this stays
         # `Self.in_type`, not `Self.b_type`.
-        b: TileTensor[
-            Self.in_type, b_layout, ImmutAnyOrigin, Storage=b_storage
-        ],
+        b: TileTensor[Self.in_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
         conv: ConvIm2colParams,
         log2_grid_m: UInt32,
         log2_grid_n: UInt32,
@@ -1403,9 +1397,9 @@ struct AppleM5MatMul[
             c_layout: `TensorLayout` of the output `C` operand.
             input_layout: `TensorLayout` of the NHWC `input` operand.
             b_layout: `TensorLayout` of the filter `B` operand.
-            c_storage: `TensorStorage` of the output `C` operand.
-            input_storage: `TensorStorage` of the NHWC `input` operand.
-            b_storage: `TensorStorage` of the filter `B` operand.
+            c_engine: `TensorEngine` of the output `C` operand.
+            input_engine: `TensorEngine` of the NHWC `input` operand.
+            b_engine: `TensorEngine` of the filter `B` operand.
             c_aligned: When True, assume `conv.C` is a multiple of 8 so the
                 channel run is contiguous and a single width-8 load suffices
                 (defaults to False).
@@ -1471,16 +1465,12 @@ struct AppleM5MatMul[
     def run_split_k_partial[
         a_layout: TensorLayout,
         b_layout: TensorLayout,
-        a_storage: TensorStorage,
-        b_storage: TensorStorage,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
     ](
         partials_ptr: UnsafePointer[Float32, MutAnyOrigin],
-        a: TileTensor[
-            Self.in_type, a_layout, ImmutAnyOrigin, Storage=a_storage
-        ],
-        b: TileTensor[
-            Self.in_type, b_layout, ImmutAnyOrigin, Storage=b_storage
-        ],
+        a: TileTensor[Self.in_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.in_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
         log2_grid_m: UInt32,
         log2_grid_n: UInt32,
         k_per_split: Int32,
@@ -1497,8 +1487,8 @@ struct AppleM5MatMul[
         Parameters:
             a_layout: `TensorLayout` of the A operand.
             b_layout: `TensorLayout` of the B operand.
-            a_storage: `TensorStorage` of the A operand.
-            b_storage: `TensorStorage` of the B operand.
+            a_engine: `TensorEngine` of the A operand.
+            b_engine: `TensorEngine` of the B operand.
 
         Args:
             partials_ptr: Pointer to the fp32 partials workspace; split `s`
@@ -1663,9 +1653,9 @@ struct AppleM5MatMul[
     @staticmethod
     def run_split_k_reduce[
         c_layout: TensorLayout,
-        c_storage: TensorStorage,
+        c_engine: TensorEngine,
     ](
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Storage=c_storage],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
         partials_ptr: UnsafePointer[Float32, ImmutAnyOrigin],
         num_splits: Int32,
     ):
@@ -1677,7 +1667,7 @@ struct AppleM5MatMul[
 
         Parameters:
             c_layout: `TensorLayout` of the output `C` operand.
-            c_storage: `TensorStorage` of the output `C` operand.
+            c_engine: `TensorEngine` of the output `C` operand.
 
         Args:
             c: Output matrix `(M, N)` row-major; `M` and `N` derive from its
@@ -1919,9 +1909,9 @@ def enqueue_apple_matmul[
         type_of(c).LayoutType,
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b).Engine,
     ]
     comptime MM_i32 = AppleM5MatMul[
         in_type,
@@ -1937,9 +1927,9 @@ def enqueue_apple_matmul[
         type_of(c).LayoutType,
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b).Engine,
     ]
     if fits_i32:
         ctx.enqueue_function[kernel_i32](
@@ -2094,9 +2084,9 @@ def enqueue_apple_conv2d[
             type_of(c).LayoutType,
             type_of(input).LayoutType,
             type_of(filter_nk).LayoutType,
-            type_of(c).Storage,
-            type_of(input).Storage,
-            type_of(filter_nk).Storage,
+            type_of(c).Engine,
+            type_of(input).Engine,
+            type_of(filter_nk).Engine,
             c_aligned=c_aligned,
         ]
         ctx.enqueue_function[kernel](
@@ -2250,14 +2240,14 @@ def enqueue_apple_matmul_split_k[
     comptime partial_kernel_i64 = MM.run_split_k_partial[
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(a).Engine,
+        type_of(b).Engine,
     ]
     comptime partial_kernel_i32 = MM_i32.run_split_k_partial[
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(a).Engine,
+        type_of(b).Engine,
     ]
     if fits_i32:
         ctx.enqueue_function[partial_kernel_i32](
@@ -2282,7 +2272,7 @@ def enqueue_apple_matmul_split_k[
             block_dim=(MM.THREADS_PER_BLOCK),
         )
     comptime reduce_kernel = MM.run_split_k_reduce[
-        type_of(c).LayoutType, type_of(c).Storage
+        type_of(c).LayoutType, type_of(c).Engine
     ]
     var n_elems = m * n
     ctx.enqueue_function[reduce_kernel](
@@ -2385,36 +2375,36 @@ def enqueue_apple_matmul_clamp_chain[
         type_of(c).LayoutType,
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b).Engine,
         seed_from_output=False,
     ]
     comptime pass1_i64 = MM.run_chained[
         type_of(c).LayoutType,
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b).Engine,
         seed_from_output=True,
     ]
     comptime pass0_i32 = MM_i32.run_chained[
         type_of(c).LayoutType,
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b).Engine,
         seed_from_output=False,
     ]
     comptime pass1_i32 = MM_i32.run_chained[
         type_of(c).LayoutType,
         type_of(a).LayoutType,
         type_of(b).LayoutType,
-        type_of(c).Storage,
-        type_of(a).Storage,
-        type_of(b).Storage,
+        type_of(c).Engine,
+        type_of(a).Engine,
+        type_of(b).Engine,
         seed_from_output=True,
     ]
 

@@ -38,7 +38,11 @@ from max.pipelines.lib import (
     max_tokens_to_generate,
 )
 from max.pipelines.lib.config import PipelineConfig
-from max.pipelines.lib.tokenizer import open_image, resolve_single_special_token
+from max.pipelines.lib.tokenizer import (
+    encode_dkv_cache_hint,
+    open_image,
+    resolve_single_special_token,
+)
 from max.pipelines.modeling.types import (
     TextGenerationRequest,
     TextGenerationRequestMessage,
@@ -744,6 +748,7 @@ class Gemma4Tokenizer(TextAndVisionTokenizer):
             request_id=request.request_id,
             eos_tracker=eos_tracker,
             target_endpoint=request.target_endpoint,
+            dkv_cache_hint=encode_dkv_cache_hint(request.dkv_cache_hint),
             mm_token_type_ids=mm_token_type_ids.astype(np.int64, copy=False),
             pixel_position_ids=pixel_position_ids_ordered,
             tokens=TokenBuffer(

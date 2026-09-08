@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.gpu.host import DeviceContext
-from layout import Coord, Idx, PointerStorage, TileTensor, row_major
+from layout import Coord, Idx, DefaultEngine, TileTensor, row_major
 
 from nn.pad import pad_constant as pad_cpu
 from nn.pad_gpu import get_padding_output_shape, pad_constant
@@ -30,7 +30,7 @@ def test_pad_constant_gpu[
         .int,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     ctx: DeviceContext,
     verbose: Bool = False,
@@ -134,34 +134,25 @@ def main() raises:
     comptime dtype = DType.float32
     with DeviceContext() as ctx:
         # 1D test
-        var paddings_1d_stack = Array[Int, 2](uninitialized=True)
+        # Pre/post pad per axis: axis-0 2/1.
+        var paddings_1d_stack: Array[Int, _] = [2, 1]
         var paddings_1d = TileTensor(paddings_1d_stack, row_major[2]())
-        paddings_1d[0] = 2  # axis-0 pre-pad
-        paddings_1d[1] = 1  # axis-0 post-pad
         var input_shape_1d = IndexList[1](32)
         test_pad_constant_gpu[dtype, 1](input_shape_1d, paddings_1d, ctx)
         # CHECK: PASS: rank=1
 
         # 2D test
-        var paddings_2d_stack = Array[Int, 4](uninitialized=True)
+        # Pre/post pad per axis: axis-0 2/1, axis-1 3/3.
+        var paddings_2d_stack: Array[Int, _] = [2, 1, 3, 3]
         var paddings_2d = TileTensor(paddings_2d_stack, row_major[4]())
-        paddings_2d[0] = 2  # axis-0 pre-pad
-        paddings_2d[1] = 1  # axis-0 post-pad
-        paddings_2d[2] = 3  # axis-1 pre-pad
-        paddings_2d[3] = 3  # axis-1 post-pad
         var input_shape_2d = IndexList[2](32, 32)
         test_pad_constant_gpu[dtype](input_shape_2d, paddings_2d, ctx)
         # CHECK: PASS: rank=2
 
         # 3D test
-        var paddings_3d_stack = Array[Int, 6](uninitialized=True)
+        # Pre/post pad per axis: axis-0 2/1, axis-1 3/3, axis-2 5/7.
+        var paddings_3d_stack: Array[Int, _] = [2, 1, 3, 3, 5, 7]
         var paddings_3d = TileTensor(paddings_3d_stack, row_major[6]())
-        paddings_3d[0] = 2  # axis-0 pre-pad
-        paddings_3d[1] = 1  # axis-0 post-pad
-        paddings_3d[2] = 3  # axis-1 pre-pad
-        paddings_3d[3] = 3  # axis-1 post-pad
-        paddings_3d[4] = 5  # axis-2 pre-pad
-        paddings_3d[5] = 7  # axis-2 post-pad
         var input_shape_3d = IndexList[3](32, 32, 32)
         test_pad_constant_gpu[dtype](input_shape_3d, paddings_3d, ctx)
         # CHECK: PASS: rank=3
@@ -173,16 +164,9 @@ def main() raises:
         # filled entirely with the constant value (no input rows to
         # copy).  The kernel must early-return rather than dispatching
         # with ``grid_dim=(0)``.
-        var paddings_4d_stack = Array[Int, 8](uninitialized=True)
+        # N pre/post, C pre/post and H/W pre are 0; H post and W post are 1.
+        var paddings_4d_stack: Array[Int, _] = [0, 0, 0, 0, 0, 1, 0, 1]
         var paddings_4d = TileTensor(paddings_4d_stack, row_major[8]())
-        paddings_4d[0] = 0  # N pre
-        paddings_4d[1] = 0  # N post
-        paddings_4d[2] = 0  # C pre
-        paddings_4d[3] = 0  # C post
-        paddings_4d[4] = 0  # H pre
-        paddings_4d[5] = 1  # H post
-        paddings_4d[6] = 0  # W pre
-        paddings_4d[7] = 1  # W post
         var input_shape_4d_zero = IndexList[4](1, 128, 0, 0)
         test_pad_constant_gpu[dtype](input_shape_4d_zero, paddings_4d, ctx)
         # CHECK: PASS: rank=4

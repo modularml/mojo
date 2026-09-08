@@ -16,7 +16,7 @@ from std.math import ceildiv
 from std.sys import has_accelerator
 
 from max.gpu.host import DeviceContext
-from std.gpu import global_idx
+from max.gpu import global_idx
 from layout import TileTensor, row_major
 
 comptime WIDTH = 5

@@ -161,7 +161,7 @@ def _create_tma_and_launch[
 
     This function accepts already-reshaped tensors (3D for A/B/C, 5D for
     scale factors) so that TMA descriptor creation and kernel launch live
-    in the same scope -- avoiding scoping issues with @parameter if
+    in the same scope -- avoiding scoping issues with comptime if
     branches (TMA descriptors are scoped references).
     """
     comptime a_type = config.a_type

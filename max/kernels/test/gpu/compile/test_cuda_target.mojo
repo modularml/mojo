@@ -16,10 +16,10 @@ from std.math import erf
 from std.math.uutils import ufloordiv, udivmod
 from std.sys.info import is_nvidia_gpu, simd_width_of
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.algorithm.functional import elementwise
 from std.bit import log2_floor
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     thread_idx,
     block_dim,

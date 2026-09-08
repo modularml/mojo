@@ -21,8 +21,8 @@ introducing a comm → nn → comm circular dependency.
 from std.math import rsqrt
 from std.sys import align_of, simd_width_of
 from max.algorithm.functional import _get_start_indices_of_nth_subvolume
-from std.gpu import WARP_SIZE, block_idx, thread_idx
-import std.gpu.primitives.warp as warp
+from max.gpu import WARP_SIZE, block_idx, thread_idx
+import max.gpu.primitives.warp as warp
 from max.gpu.host import DeviceContext, get_gpu_target
 from max.gpu.primitives import block
 from max.gpu.primitives.grid_controls import (
@@ -34,7 +34,7 @@ from layout import (
     Coord,
     Idx,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -279,13 +279,13 @@ def _rms_norm_fused_fp8_kernel_warp_tiling[
     mut: Bool,
     origin: Origin[mut=mut],
     LayoutType: TensorLayout,
-    Storage: TensorStorage,
+    Engine: TensorEngine,
     in_dtype: DType,
     out_dtype: DType,
     scales_dtype: DType,
     scale_origin: MutOrigin,
     ScaleLayoutType: TensorLayout,
-    ScaleStorage: TensorStorage,
+    ScaleEngine: TensorEngine,
     //,
     simd_width: Int,
     threads_per_block: Int,
@@ -296,13 +296,13 @@ def _rms_norm_fused_fp8_kernel_warp_tiling[
         row: Int, col: Int, val: SIMD[out_dtype, width]
     ) capturing -> None,
 ](
-    gamma: TileTensor[in_dtype, LayoutType, origin, Storage=Storage],
+    gamma: TileTensor[in_dtype, LayoutType, origin, Engine=Engine],
     scale_buffer: TileTensor[
         mut=True,
         scales_dtype,
         ScaleLayoutType,
         scale_origin,
-        Storage=ScaleStorage,
+        Engine=ScaleEngine,
     ],
     epsilon: Float32,
     weight_offset: Float32,
@@ -436,13 +436,13 @@ def _rms_norm_fused_fp8_gpu_launch[
             mut=gamma.mut,
             origin=gamma.origin,
             LayoutType=gamma.LayoutType,
-            Storage=gamma.Storage,
+            Engine=gamma.Engine,
             in_dtype=in_dtype,
             out_dtype=out_dtype,
             scales_dtype=scales_dtype,
             scale_origin=scale_output.origin,
             ScaleLayoutType=scale_output.LayoutType,
-            ScaleStorage=scale_output.Storage,
+            ScaleEngine=scale_output.Engine,
             simd_width=simd_width,
             threads_per_block=threads_per_block,
             input_fn=input_fn,
@@ -467,13 +467,13 @@ def _rms_norm_fused_fp8_gpu_launch[
             mut=gamma.mut,
             origin=gamma.origin,
             LayoutType=gamma.LayoutType,
-            Storage=gamma.Storage,
+            Engine=gamma.Engine,
             in_dtype=in_dtype,
             out_dtype=out_dtype,
             scales_dtype=scales_dtype,
             scale_origin=scale_output.origin,
             ScaleLayoutType=scale_output.LayoutType,
-            ScaleStorage=scale_output.Storage,
+            ScaleEngine=scale_output.Engine,
             simd_width=simd_width,
             threads_per_block=threads_per_block,
             input_fn=input_fn,
@@ -500,13 +500,13 @@ def _rms_norm_fused_fp8_kernel_block[
     mut: Bool,
     origin: Origin[mut=mut],
     LayoutType: TensorLayout,
-    Storage: TensorStorage,
+    Engine: TensorEngine,
     in_dtype: DType,
     out_dtype: DType,
     scales_dtype: DType,
     scale_origin: MutOrigin,
     ScaleLayoutType: TensorLayout,
-    ScaleStorage: TensorStorage,
+    ScaleEngine: TensorEngine,
     //,
     simd_width: Int,
     threads_per_block: Int,
@@ -517,13 +517,13 @@ def _rms_norm_fused_fp8_kernel_block[
         row: Int, col: Int, val: SIMD[out_dtype, width]
     ) capturing -> None,
 ](
-    gamma: TileTensor[in_dtype, LayoutType, origin, Storage=Storage],
+    gamma: TileTensor[in_dtype, LayoutType, origin, Engine=Engine],
     scale_buffer: TileTensor[
         mut=True,
         scales_dtype,
         ScaleLayoutType,
         scale_origin,
-        Storage=ScaleStorage,
+        Engine=ScaleEngine,
     ],
     epsilon: Float32,
     weight_offset: Float32,

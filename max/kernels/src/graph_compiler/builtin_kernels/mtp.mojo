@@ -21,7 +21,7 @@ import extensibility
 from extensibility import InputTensor, OutputTensor
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import is_gpu
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 
 from nn.mtp_eh_norm import mtp_eh_norm_kernel
 
@@ -104,6 +104,11 @@ struct MTPEhNorm:
             ImmOrigin(hw_tt.origin),
             hidden_size,
             max_warps,
+            out_tt.Engine,
+            type_of(embed_tt.as_immut()).Engine,
+            type_of(prev_tt.as_immut()).Engine,
+            type_of(ew_tt.as_immut()).Engine,
+            type_of(hw_tt.as_immut()).Engine,
         ]
         ctx.enqueue_function[kernel](
             out_tt,

@@ -12,20 +12,16 @@
 # ===----------------------------------------------------------------------=== #
 
 import json
-import os
-import struct
-import sys
 import uuid
 from typing import Any
 from unittest.mock import patch
 
-import llguidance.hf
 import pytest
-from llguidance import LLMatcher, LLTokenizer
-from llguidance._tokenizer import TokenizerWrapper
+from max import _xgrammar as xgr
 from max.pipelines.architectures.minimax_m2.tool_parser import (
     MinimaxM2ToolParser,
 )
+from max.pipelines.context.exceptions import InputError
 from max.pipelines.lib.tool_parsing import (
     _TOOL_CALL_ID_LENGTH,
     StreamingToolCallState,
@@ -35,7 +31,6 @@ from max.pipelines.modeling.types import (
     ParsedToolCallDelta,
     ParsedToolResponse,
 )
-from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 
 def test_single_tool_call_parsing() -> None:
@@ -894,184 +889,149 @@ def test_parse_delta_streaming_empty_invoke() -> None:
         ]
 
 
-# ---- Grammar tests (PR1) -----------------------------------------------------
+# ---- Constrained-decoding grammar tests (xgrammar StructuralTag) -------------
 
 
-def _tool_def(name: str) -> dict[str, Any]:
-    """Build a minimal OpenAI-style tool definition for grammar tests."""
-    return {"type": "function", "function": {"name": name, "parameters": {}}}
+def _tools(*names: str) -> list[dict[str, Any]]:
+    """Build a minimal OpenAI-style tools list from function names."""
+    return [
+        {"type": "function", "function": {"name": n, "parameters": {}}}
+        for n in names
+    ]
 
 
-class _MinimalTokenizer:
-    """Minimal byte tokenizer for grammar compilation validation tests.
+def _tools_with_schemas(
+    schemas: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Build a tools list with parameter schemas attached."""
+    return [
+        {"type": "function", "function": {"name": n, "parameters": s}}
+        for n, s in schemas.items()
+    ]
 
-    Maps each byte value to a token ID, providing a 256-token vocabulary
-    sufficient for testing grammar compilation without loading a real model.
+
+_WEATHER_SCHEMA = {
+    "type": "object",
+    "properties": {"location": {"type": "string"}},
+    "required": ["location"],
+}
+
+
+def _minimax_compiler() -> xgr.GrammarCompiler:
+    """Byte-vocab compiler for compiling MiniMax structural tags.
+
+    MiniMax delimiters (``<minimax:tool_call>``, ``<invoke name="...">``, ...)
+    are plain byte strings in the structural tag, so a raw byte vocabulary is
+    sufficient to compile them without loading a real tokenizer.
     """
-
-    eos_token_id: int = 0
-    bos_token_id: int | None = None
-    tokens: list[bytes] = [bytes([i]) for i in range(256)]
-
-    def __call__(self, s: bytes | str) -> list[int]:
-        if isinstance(s, str):
-            s = s.encode("utf-8")
-        return list(s)
-
-
-@pytest.fixture(scope="module")
-def ll_tokenizer() -> LLTokenizer:
-    """Minimal LLTokenizer for grammar compile smoke tests."""
-    wrapper = TokenizerWrapper(_MinimalTokenizer())
-    return LLTokenizer(wrapper, n_vocab=256)
+    vocab = [bytes([i]) for i in range(256)] + [b"<eos>"]
+    info = xgr.TokenizerInfo(
+        vocab,
+        vocab_type=xgr.VocabType.RAW,
+        vocab_size=len(vocab),
+        stop_token_ids=[256],
+    )
+    return xgr.GrammarCompiler(info)
 
 
-def test_generate_tool_call_grammar_compiles_with_tool_names(
-    ll_tokenizer: LLTokenizer,
-) -> None:
-    """Grammar with explicit tool names compiles cleanly."""
+def _compile_structural_tag(grammar: str) -> xgr.CompiledGrammar:
+    """Validate the StructuralTag JSON string and compile it on xgrammar.
+
+    Compilation raising is itself the signal that the grammar is invalid.
+    """
+    tag = xgr.StructuralTag.model_validate_json(grammar)
+    return _minimax_compiler().compile_structural_tag(tag)
+
+
+def test_generate_tool_call_grammar_returns_structural_tag() -> None:
+    """The xgrammar path returns a serialized, compilable MiniMax StructuralTag.
+
+    The tag frames the ``<minimax:tool_call>`` envelope and compiles cleanly.
+    """
     grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
-        tools=[_tool_def("get_weather"), _tool_def("search")]
+        tools=_tools("get_weather", "search"),
+        backend="xgrammar",
     )
     assert isinstance(grammar, str)
     assert len(grammar) > 0
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
+    assert "<minimax:tool_call>" in grammar
+
+    tag = xgr.StructuralTag.model_validate_json(grammar)
+    assert isinstance(tag, xgr.StructuralTag)
+    compiled = _compile_structural_tag(grammar)
+    assert isinstance(compiled, xgr.CompiledGrammar)
 
 
-def test_generate_tool_call_grammar_compiles_without_tool_names(
-    ll_tokenizer: LLTokenizer,
-) -> None:
-    """Grammar with ``tools=None`` (any identifier) compiles cleanly."""
-    grammar = MinimaxM2ToolParser.generate_tool_call_grammar(tools=None)
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-def test_generate_tool_call_grammar_escapes_special_chars(
-    ll_tokenizer: LLTokenizer,
-) -> None:
-    """Tool names containing regex metacharacters are escaped."""
+def test_generate_tool_call_grammar_typed_schema_compiles() -> None:
+    """A tool with a typed-object parameter schema compiles cleanly."""
     grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
-        tools=[
-            _tool_def("get_weather.v2"),
-            _tool_def("search+plus"),
-            _tool_def("tool[0]"),
-        ]
+        tools=_tools_with_schemas({"get_weather": _WEATHER_SCHEMA}),
+        backend="xgrammar",
+        tool_choice="required",
     )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
+    compiled = _compile_structural_tag(grammar)
+    assert isinstance(compiled, xgr.CompiledGrammar)
 
 
-def test_generate_tool_call_grammar_compiles_with_response_format_schema(
-    ll_tokenizer: LLTokenizer,
-) -> None:
-    """Combined tool-call + JSON-schema grammar compiles cleanly."""
+def test_generate_tool_call_grammar_with_response_format_schema() -> None:
+    """With ``response_format_schema`` the grammar wraps the tool-call envelope
+    and the response schema in an ``OrFormat`` alternation.
+
+    Mirrors the Kimi/Gemma4 xgrammar path: the model may emit either a tool
+    call or a schema-conforming JSON response. Verifies the serialized
+    StructuralTag has that shape (an ``or`` with a ``json_schema`` branch that
+    carries the response schema) and that the combined grammar compiles.
+    """
     schema = {
         "type": "object",
         "properties": {"answer": {"type": "string"}},
         "required": ["answer"],
     }
     grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
-        tools=[_tool_def("get_weather")],
+        tools=_tools_with_schemas({"get_weather": _WEATHER_SCHEMA}),
         response_format_schema=schema,
+        backend="xgrammar",
+        tool_choice="auto",
     )
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
+
+    tag = xgr.StructuralTag.model_validate_json(grammar)
+    or_format = tag.format
+    assert or_format.type == "or"
+    json_branch = next(
+        element
+        for element in or_format.elements
+        if element.type == "json_schema"
+    )
+    assert json_branch.json_schema == schema
+
+    compiled = _compile_structural_tag(grammar)
+    assert isinstance(compiled, xgr.CompiledGrammar)
 
 
-# ---- Real-tokenizer acceptance tests (PR1.3) ---------------------------------
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import _grammar_fixtures  # type: ignore[import-not-found]
-
-_MINIMAX_HF_REPO = "MiniMaxAI/MiniMax-M2.7"
-
-
-def _token_allowed(bitmask: bytes, tok_id: int) -> bool:
-    """Return True if *tok_id* is set in the packed-int32 *bitmask*."""
-    word = struct.unpack_from("<I", bitmask, (tok_id // 32) * 4)[0]
-    return bool(word & (1 << (tok_id % 32)))
-
-
-@pytest.fixture(scope="module")
-def minimax_ll_tokenizer() -> tuple[LLTokenizer, PreTrainedTokenizerFast]:
-    """Real MiniMax HF tokenizer wrapped for llguidance.
-
-    Skipped if the tokenizer can't be downloaded (no HF_TOKEN, offline, etc).
-    """
-    try:
-        tok = AutoTokenizer.from_pretrained(_MINIMAX_HF_REPO)
-    except Exception as e:
-        pytest.skip(f"Could not download MiniMax tokenizer: {e}")
-    assert isinstance(tok, PreTrainedTokenizerFast)
-    return llguidance.hf.from_tokenizer(tok, n_vocab=len(tok)), tok
+def test_generate_tool_call_grammar_rejects_non_xgrammar_backend() -> None:
+    """Grammar generation must reject any backend other than xgrammar."""
+    with pytest.raises(InputError, match=r"xgrammar"):
+        MinimaxM2ToolParser.generate_tool_call_grammar(
+            tools=_tools("get_weather"),
+            backend="some_other_backend",
+        )
 
 
 @pytest.mark.parametrize(
-    "fixture", _grammar_fixtures.GOOD_ENVELOPES, ids=lambda f: f.name
+    "schema",
+    [
+        {"type": "string"},
+        {"type": "number"},
+        {"type": "boolean"},
+        {"const": 2},
+        {"enum": [0]},
+    ],
 )
-def test_grammar_accepts_known_good_envelope(
-    minimax_ll_tokenizer: tuple[LLTokenizer, PreTrainedTokenizerFast],
-    fixture: "_grammar_fixtures.GoodEnvelope",
-) -> None:
-    """Walk each known-good envelope token-by-token; grammar must accept all.
-
-    Uses the real MiniMax HF tokenizer so token-boundary edge cases are
-    exercised (e.g., ``<minimax:tool_call>`` is token ID 200052 — a single
-    token — and must be accepted atomically by the Lark grammar rule rather
-    than byte-by-byte via a regex prefix).
-    """
-    ll_tok, hf_tok = minimax_ll_tokenizer
-    tool_names = sorted({name for name, _ in fixture.expected_calls})
+def test_non_object_root_raises(schema: dict[str, Any]) -> None:
+    """A bare non-object ``parameters`` root raises at grammar compile time."""
     grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
-        tools=[_tool_def(n) for n in tool_names]
+        tools=_tools_with_schemas({"f": schema}),
+        tool_choice="required",
     )
-    matcher = LLMatcher(ll_tok, grammar)
-
-    token_ids = hf_tok.encode(fixture.envelope, add_special_tokens=False)
-    for i, tok_id in enumerate(token_ids):
-        bitmask = matcher.compute_bitmask()
-        assert _token_allowed(bitmask, tok_id), (
-            f"Grammar rejected valid token at step {i} "
-            f"(token_id={tok_id}, decoded={hf_tok.decode([tok_id])!r}) "
-            f"in fixture {fixture.name!r}"
-        )
-        matcher.consume_token(tok_id)
-    assert matcher.is_accepting(), (
-        f"Matcher did not reach accepting state for fixture {fixture.name!r}"
-    )
-
-
-@pytest.mark.parametrize(
-    "fixture", _grammar_fixtures.BAD_ENVELOPES, ids=lambda f: f.name
-)
-def test_grammar_rejects_malformed_envelope(
-    minimax_ll_tokenizer: tuple[LLTokenizer, PreTrainedTokenizerFast],
-    fixture: "_grammar_fixtures.BadEnvelope",
-) -> None:
-    """Walk each malformed envelope token-by-token; grammar must reject."""
-    ll_tok, hf_tok = minimax_ll_tokenizer
-    # tools=None uses the permissive name pattern; rejection must hold
-    # even when names are unconstrained.
-    grammar = MinimaxM2ToolParser.generate_tool_call_grammar(tools=None)
-    matcher = LLMatcher(ll_tok, grammar)
-
-    token_ids = hf_tok.encode(fixture.envelope, add_special_tokens=False)
-    rejected = False
-    for tok_id in token_ids:
-        bitmask = matcher.compute_bitmask()
-        if not _token_allowed(bitmask, tok_id):
-            rejected = True
-            break
-        matcher.consume_token(tok_id)
-
-    if not rejected and matcher.is_accepting():
-        pytest.fail(
-            f"Grammar accepted malformed envelope {fixture.name!r}; "
-            f"expected rejection because: {fixture.rejection_hint}"
-        )
+    with pytest.raises(Exception):
+        _compile_structural_tag(grammar)

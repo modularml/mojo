@@ -1,0 +1,304 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+
+"""
+We make use of the following papers for the implementation, note that there
+are some small differences.
+
+Wojciech Muła, Daniel Lemire, Base64 encoding and decoding at almost the
+speed of a memory copy, Software: Practice and Experience 50 (2), 2020.
+https://arxiv.org/abs/1910.05109
+
+Wojciech Muła, Daniel Lemire, Faster Base64 Encoding and Decoding using AVX2
+Instructions, ACM Transactions on the Web 12 (3), 2018.
+https://arxiv.org/abs/1704.00605
+"""
+
+from std.bit import rotate_bits_right
+from std.math import iota, ceildiv
+from std.sys import llvm_intrinsic, simd_byte_width
+
+from std.memory import bitcast, unsafe_memcpy
+from std.collections import Span
+
+from std.utils import IndexList
+
+comptime Bytes = SIMD[.uint8, _]
+
+
+def _base64_simd_mask[
+    simd_width: Int
+](nb_value_to_load: Int) -> SIMD[.bool, simd_width]:
+    comptime mask = iota[.uint8, simd_width]()
+    return mask.lt(UInt8(nb_value_to_load))
+
+
+# |                |---- byte 2 ----|---- byte 1 ----|---- byte 0 ----|
+# |                |c₁c₀d₅d₄d₃d₂d₁d₀|b₃b₂b₁b₀c₅c₄c₃c₂|a₅a₄a₃a₂a₁a₀b₅b₄|
+# <----------------|----------------|----------------|----------------|
+# |31 . . . . . .24|23 . . . . . .16|15 . . . . . .08| 7 6 5 4 3 2 1 0|
+# |                                                                   |
+# |---- byte 1 ----|---- byte 2 ----|---- byte 0 ----|---- byte 1 ----|
+# |b₃b₂b₁b₀c₅c₄c₃c₂|c₁c₀d₅d₄d₃d₂d₁d₀|a₅a₄a₃a₂a₁a₀b₅b₄|b₃b₂b₁b₀c₅c₄c₃c₂|
+# |        -------------____________ ------------_____________        |
+# |        [     C     ][     D    ] [    A     ][     B     ]        |
+# |                                                                   |
+# |--- ascii(d) ---|--- ascii(c) ---|--- ascii(b) ---|--- ascii(a) ---|
+# |. . d₅d₄d₃d₂d₁d₀|. . c₅c₄c₃c₂c₁c₀|. . b₅b₄b₃b₂b₁b₀|. . a₅a₄a₃a₂a₁a₀|
+def _6bit_to_byte[width: SIMDLength](input: Bytes[width]) -> Bytes[width]:
+    comptime assert width in [
+        4,
+        8,
+        16,
+        32,
+        64,
+    ], "width must be between 4 and 64"
+
+    def indices() -> IndexList[width]:
+        var perm = [1, 0, 2, 1]
+        var res = IndexList[width]()
+        for i in range(width // 4):
+            for j in range(4):
+                res[4 * i + j] = 3 * i + perm[j]
+        return res
+
+    @always_inline
+    def combine[
+        mask: Bytes[4], shift: Int
+    ](shuffled: Bytes[width]) -> Bytes[width]:
+        var `6bit` = shuffled & _repeat_until[width](mask)
+        return _rshift_bits_in_u16[shift](`6bit`)
+
+    var shuffled = input.shuffle[mask=indices()]()
+    var a = combine[
+        Bytes[4](0b0000_0000, 0b1111_1100, 0b0000_0000, 0b0000_0000), 10
+    ](shuffled)
+    var b = combine[
+        Bytes[4](0b1111_0000, 0b0000_0011, 0b0000_0000, 0b0000_0000), -4
+    ](shuffled)
+    var c = combine[
+        Bytes[4](0b0000_0000, 0b0000_0000, 0b1100_0000, 0b0000_1111), 6
+    ](shuffled)
+    var d = combine[
+        Bytes[4](0b0000_0000, 0b0000_0000, 0b0011_1111, 0b0000_0000), 8
+    ](shuffled)
+    return a | b | c | d
+
+
+# | 6-bit Value | ASCII Range | Target index | Offset (6-bit to ASCII) |
+# |-------------|-------------|--------------|-------------------------|
+# |  0 ... 25   | A ... Z     | 13           | 65                      |
+# | 26 ... 51   | a ... z     |  0           | 71                      |
+# | 52 ... 61   | 0 ... 9     |  1 ... 10    | -4                      |
+# | 62          | +           | 11           | -19                     |
+# | 63          | /           | 12           | -16                     |
+# fmt: off
+comptime UNUSED = 0
+comptime OFFSETS = Bytes[16](
+    71,                                     # a ... z
+    -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, # 0 ... 9
+    -19,                                    # +
+    -16,                                    # /
+    65,                                     # A ... Z
+    UNUSED, UNUSED
+)
+comptime END_FIRST_RANGE = 25
+comptime END_SECOND_RANGE = 51
+# fmt: on
+
+
+def _to_b64_ascii[width: SIMDLength, //](input: Bytes[width]) -> Bytes[width]:
+    var abcd = _6bit_to_byte(input)
+    var target_indices = _sub_with_saturation(abcd, END_SECOND_RANGE)
+    var offset_indices = abcd.gt(END_FIRST_RANGE).select(target_indices, 13)
+    return abcd + OFFSETS._dynamic_shuffle(offset_indices)
+
+
+def _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load[
+    width: Int
+]() -> SIMD[.uint8, width]:
+    """This is a lookup table to know how many bytes we need to store in the output buffer
+    for a given number of bytes to encode in base64. Including the '=' sign.
+
+    This table lookup is smaller than the simd size, because we only use it for the last chunk.
+    This should be called at compile time, otherwise it's quite slow.
+    """
+    var result = SIMD[.uint8, width](0)
+    for i in range(1, width):
+        # We have "i" bytes to encode in base64, how many bytes do
+        # we need to store in the output buffer? Including the '=' sign.
+
+        # math.ceil cannot be called at compile time, this is a workaround
+        var group_of_3_bytes = i // 3
+        if i % 3 != 0:
+            group_of_3_bytes += 1
+
+        result[i] = UInt8(group_of_3_bytes * 4)
+    return result
+
+
+def _get_number_of_bytes_to_store_from_number_of_bytes_to_load[
+    max_size: Int
+](nb_of_elements_to_load: Int) -> Int:
+    comptime table = _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load[
+        max_size
+    ]()
+    return Int(table[nb_of_elements_to_load])
+
+
+def _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equal_sign[
+    width: Int
+]() -> SIMD[.uint8, width]:
+    """This is a lookup table to know how many bytes we need to store in the output buffer
+    for a given number of bytes to encode in base64. This is **not** including the '=' sign.
+
+    This table lookup is smaller than the simd size, because we only use it for the last chunk.
+    This should be called at compile time, otherwise it's quite slow.
+    """
+    var result = SIMD[.uint8, width]()
+    for i in range(width):
+        # We have "i" bytes to encode in base64, how many bytes do
+        # we need to store in the output buffer? NOT including the '=' sign.
+        # We count the number of groups of 6 bits and we add 1 byte if there is an incomplete group.
+        var number_of_bits = i * 8
+        var complete_groups_of_6_bits = number_of_bits // 6
+        var incomplete_groups_of_6_bits: Int
+        if i * 8 % 6 == 0:
+            incomplete_groups_of_6_bits = 0
+        else:
+            incomplete_groups_of_6_bits = 1
+
+        result[i] = UInt8(
+            complete_groups_of_6_bits + incomplete_groups_of_6_bits
+        )
+    return result
+
+
+def _get_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equal_sign[
+    max_size: Int
+](nb_of_elements_to_load: Int) -> Int:
+    comptime table = _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equal_sign[
+        max_size
+    ]()
+    return Int(table[nb_of_elements_to_load])
+
+
+def load_incomplete_simd[
+    width: Int
+](pointer: ImmPointer[UInt8, _], nb_of_elements_to_load: Int) -> SIMD[
+    DType.uint8, width
+]:
+    var result = SIMD[.uint8, width](0)
+    var tmp_buffer_pointer = Pointer(to=result).unsafe_bitcast[UInt8]()
+    unsafe_memcpy(
+        dest=tmp_buffer_pointer, src=pointer, count=nb_of_elements_to_load
+    )
+    return result
+
+
+@no_inline
+def _b64encode(input_bytes: ImmSpan[Byte, _], mut result: String):
+    comptime simd_width = simd_byte_width()
+    comptime input_simd_width = simd_width * 3 // 4
+    comptime equal_vector = SIMD[.uint8, simd_width](ord("="))
+
+    # 4 character bytes for each 3 bytes (or less) block
+    result.resize(unsafe_uninit_length=4 * ceildiv(len(input_bytes), 3))
+    var input_bytes_len = len(input_bytes)
+    var input_index = 0
+    var res_ptr = result.unsafe_as_bytes_mut().unsafe_ptr()
+    var res_offset = 0
+
+    # Main loop
+    while input_index + simd_width <= input_bytes_len:
+        var start_of_input_chunk = input_bytes.unsafe_ptr().unsafe_offset(
+            input_index
+        )
+
+        var input_vector = start_of_input_chunk.unsafe_load[width=simd_width]()
+
+        var result_vector = _to_b64_ascii(input_vector)
+        res_ptr.unsafe_offset(res_offset).unsafe_store(result_vector)
+        res_offset += result_vector.length
+        input_index += input_simd_width
+
+    # We handle the last 0, 1 or 2 chunks
+    while input_index < input_bytes_len:
+        var start_of_input_chunk = input_bytes.unsafe_ptr().unsafe_offset(
+            input_index
+        )
+        var nb_of_elements_to_load = min(
+            input_simd_width, input_bytes_len - input_index
+        )
+
+        # We don't want to read past the input buffer
+        var input_vector = load_incomplete_simd[simd_width](
+            start_of_input_chunk,
+            nb_of_elements_to_load=nb_of_elements_to_load,
+        )
+
+        var result_vector = _to_b64_ascii(input_vector)
+
+        # We place the '=' where needed
+        var non_equal_chars_number = _get_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equal_sign[
+            simd_width
+        ](
+            nb_of_elements_to_load
+        )
+        var equal_mask = _base64_simd_mask[simd_width](non_equal_chars_number)
+
+        var result_vector_with_equals = equal_mask.select(
+            result_vector, equal_vector
+        )
+
+        var nb_of_elements_to_store = (
+            _get_number_of_bytes_to_store_from_number_of_bytes_to_load[
+                simd_width
+            ](nb_of_elements_to_load)
+        )
+
+        var v_ptr = Pointer(to=result_vector_with_equals).unsafe_bitcast[Byte]()
+        unsafe_memcpy(
+            dest=res_ptr.unsafe_offset(res_offset),
+            src=v_ptr,
+            count=nb_of_elements_to_store,
+        )
+        res_offset += nb_of_elements_to_store
+        input_index += input_simd_width
+
+    result.resize(res_offset)
+
+
+# Utility functions
+
+
+def _repeat_until[width: Int](v: SIMD) -> SIMD[v.dtype, width]:
+    comptime assert width >= v.length, "width must be at least v.length"
+
+    comptime if width == v.length:
+        return v._refine[new_size=width]()
+    return _repeat_until[width](v.join(v))
+
+
+def _rshift_bits_in_u16[shift: Int](input: Bytes) -> type_of(input):
+    var u16 = bitcast[.uint16, input.length // 2](input)
+    var res = rotate_bits_right[shift](u16)
+    return bitcast[.uint8, input.length](res)
+
+
+@always_inline
+def _sub_with_saturation[
+    width: SIMDLength, //
+](a: SIMD[.uint8, width], b: SIMD[.uint8, width]) -> SIMD[.uint8, width]:
+    # generates a single `vpsubusb` on x86 with AVX
+    return llvm_intrinsic["llvm.usub.sat", type_of(a)](a, b)

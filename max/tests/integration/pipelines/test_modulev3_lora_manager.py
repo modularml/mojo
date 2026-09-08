@@ -43,6 +43,10 @@ from max.pipelines.lora.lora_types import LoRAStatus
 
 BASE = "base-model"
 
+# bf16 has no CPU cast in the eager interpreter, so it would cold-compile a
+# graph per weight; these tests only read parameter names.
+_WEIGHT_DTYPE = DType.float32
+
 
 class _StubLoRA(LoRAModel):
     """A LoRAModel that skips safetensors loading, for manager-only tests."""
@@ -222,7 +226,7 @@ class _Model(Module[..., Tensor]):
 def test_wrap_applies_lora_and_wraps_model() -> None:
     target = LoRATargetModule(path="self_attn.o_proj", projections=("o_proj",))
     mgr = _manager(targets=(target,))
-    with default_dtype(DType.bfloat16):
+    with default_dtype(_WEIGHT_DTYPE):
         model = _Model()
     wrapped = mgr.wrap(model)
 
@@ -351,7 +355,7 @@ def test_lora_adapter_matches_wrapped_model_base_param_names() -> None:
     compile time (the FinGPT serve KeyError).
     """
     mgr = _manager(targets=_QKV_TARGETS)
-    with default_dtype(DType.bfloat16):
+    with default_dtype(_WEIGHT_DTYPE):
         model = _NestedModel()
     wrapped = mgr.wrap(model)
     expected = {name for name, _ in wrapped.parameters}

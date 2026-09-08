@@ -21,7 +21,7 @@ This module provides:
 """
 
 from std.math.uutils import umod
-from std.gpu import thread_idx, WARP_SIZE
+from max.gpu import thread_idx, WARP_SIZE
 from linalg.structuring import SMemArray
 from std.atomic import Atomic
 from std.sys._assembly import inlined_assembly

@@ -23,7 +23,7 @@ from layout import (
     row_major,
 )
 
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.host import DeviceContext, FuncAttribute
 
 from kv_cache.types import KVCollectionT

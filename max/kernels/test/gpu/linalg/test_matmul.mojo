@@ -490,3 +490,24 @@ def main() raises:
             N=Int(128256),
             K=Int(4096),
         ](ctx, 600, 128256, 4096)
+
+        # Unaligned N: N * size_of(bfloat16) % 16 != 0, so a tile GEMM's TMA
+        # output descriptor is misaligned and the dispatcher has to route
+        # around it. At m <= 64 the split-K GEMV takes these, odd N included.
+        # The three m values land in its three tile_m bands.
+        print("===> bfloat16 unaligned N")
+        test[.bfloat16, transpose_b=True, N=Int(258), K=Int(4096)](
+            ctx, 6, 258, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(258), K=Int(4096)](
+            ctx, 12, 258, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(258), K=Int(4096)](
+            ctx, 64, 258, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(257), K=Int(4096)](
+            ctx, 6, 257, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(514), K=Int(4096)](
+            ctx, 32, 514, 4096
+        )

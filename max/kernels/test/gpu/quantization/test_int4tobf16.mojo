@@ -19,7 +19,7 @@
 from std.sys.info import is_amd_gpu, is_apple_gpu
 
 from max.gpu.host import DeviceContext
-from std.gpu.intrinsics import lop
+from max.gpu.intrinsics import lop
 from std.memory.unsafe import bitcast
 from std.testing import assert_equal
 from layout import TileTensor, row_major
@@ -68,7 +68,7 @@ def call_int4tobf16[
 
 
 def test_int4tobfloat16[no_lop: Bool](ctx: DeviceContext) raises:
-    var stack = Array[BFloat16, 8](uninitialized=True)
+    var stack = Array[BFloat16, 8](fill={})
     var out_host = TileTensor(stack, row_major[8]())
     var out_device = ctx.enqueue_create_buffer[.bfloat16](8)
 

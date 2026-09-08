@@ -13,7 +13,7 @@
 
 # DOC: max/layout/tensors.mdx
 
-from std.gpu import (
+from max.gpu import (
     thread_idx,
     block_idx,
     global_idx,

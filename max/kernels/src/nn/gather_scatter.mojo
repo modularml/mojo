@@ -26,7 +26,7 @@ from max.gpu.host.info import is_cpu, is_gpu
 from layout import (
     Coord,
     Idx,
-    PointerStorage,
+    DefaultEngine,
     TileTensor,
     UNKNOWN_VALUE,
     coord_to_index_list,
@@ -358,12 +358,12 @@ def gather[
         comptime assert input_coords.flat_rank == input.flat_rank
 
         # `ptr_at_offset` (the software index-prefetch below) is only defined
-        # for `PointerStorage`-backed tiles; skip the prefetch hint for other
-        # storages (e.g. `DevicePointerStorage`). Correctness is unaffected.
+        # for `DefaultEngine`-backed tiles; skip the prefetch hint for other
+        # storages (e.g. `DevicePointerEngine`). Correctness is unaffected.
         comptime if (
             prefetch_offset > 0
-            and indices.Storage == PointerStorage[element_width=1]
-            and input.Storage == PointerStorage[element_width=1]
+            and indices.Engine == DefaultEngine[element_width=1]
+            and input.Engine == DefaultEngine[element_width=1]
         ):
             var indices_ptr = indices.ptr_at_offset(indices_coords)
             var indices_remaining = (

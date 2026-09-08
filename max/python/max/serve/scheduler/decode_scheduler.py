@@ -27,6 +27,7 @@ from max.pipelines.context import (
 )
 from max.pipelines.kv_cache import (
     InsufficientBlocksError,
+    JengaKVCacheManager,
     KVTransferEngine,
     KVTransferEngineMetadata,
     PagedKVCacheManagerInterface,
@@ -134,6 +135,10 @@ class DecodeScheduler(Scheduler):
         dispatcher: DecodeDispatcherClient,
         dp_padder: DPBatchPadder | None = None,
     ) -> None:
+        # TODO(SERVOPT-1590): remove once Jenga supports DI.
+        assert not isinstance(kv_cache, JengaKVCacheManager), (
+            "Jenga KV cache is incompatible with Disaggregated Inference"
+        )
         # Initialize Pipeline and Config
         self.scheduler_config = scheduler_config
         self.pipeline = pipeline
@@ -176,6 +181,13 @@ class DecodeScheduler(Scheduler):
         # a re-insert after InsufficientBlocksError, so the eventual wait
         # covers the full time including any failed-alloc retries).
         self._admission_enqueue_time: dict[RequestID, float] = {}
+        # request_id -> time.monotonic() when a prefill-to-decode handoff
+        # landed (handle_prefill_response's constrained-request branch),
+        # popped once the real first token is actually sent from
+        # schedule() (or discarded if the request is cancelled/evicted
+        # before that). Only ever populated when the handoff feature flag
+        # is on.
+        self._handoff_landed_at: dict[RequestID, float] = {}
         self._last_batch_activity: float = time.monotonic()
         # None corresponds to the default destination address.
         # TODO: delete the default destination address.
@@ -198,6 +210,7 @@ class DecodeScheduler(Scheduler):
         if pending is None:
             return
         self.prefill_reqs_per_replica[pending.replica_idx] -= 1
+        self.batch_constructor.release_grammar_build(message.id)
         self.kv_cache.release(pending.context)
         self.pipeline.release(message.id)
         self.response_queue.put_nowait(
@@ -233,43 +246,61 @@ class DecodeScheduler(Scheduler):
                 (postprocess_start - pending.ce_done_ping_at) * 1000
             )
 
-        # Update the context with the generated token
         context = pending.context
-        context.update(message.generated_token_id)
+        is_constrained = (
+            context.json_schema is not None or context.grammar is not None
+        )
+        if is_constrained and self.batch_constructor.structured_output_enabled:
+            # Prefill ran this request fully unconstrained, so its sampled
+            # token cannot be trusted to satisfy the grammar and must be
+            # discarded (draft tokens too -- decode's spec-decode state
+            # cold-starts like any other fresh context). Treat the handoff
+            # as a chunked-CE continuation with one token still to process:
+            # decode re-forwards it through the ordinary batch pipeline to
+            # sample token 1 itself, under its own matcher. No output is
+            # sent here; the real first token arrives later via the normal
+            # `schedule()` response path once that CE step executes -- see
+            # `_handoff_landed_at` there for the TTFT contribution this
+            # wait adds.
+            context.tokens.skip_processing(context.tokens.active_length - 1)
+            self._handoff_landed_at[request_id] = time.monotonic()
+        else:
+            # Update the context with the generated token
+            context.update(message.generated_token_id)
 
-        # Restore draft tokens from Eagle/MTP prefill so the first
-        # decode iteration can verify them without re-running draft prefill.
-        # When speculative decoding is active, the prefill worker always
-        # sends draft tokens.
-        if (
-            self.scheduler_config.num_speculative_tokens > 0
-            and not context.is_done
-        ):
-            # Done contexts (max_gen_tokens=1) need no further TG steps, so
-            # the prefill pod sends draft_tokens=None. For all other contexts,
-            # draft tokens must arrive with the PrefillResponse.
-            if message.draft_tokens is None:
-                raise ValueError(
-                    f"Expected draft tokens in PrefillResponse for request "
-                    f"{request_id} with speculative decoding enabled, but "
-                    f"none were received."
+            # Restore draft tokens from Eagle/MTP prefill so the first
+            # decode iteration can verify them without re-running draft
+            # prefill. When speculative decoding is active, the prefill
+            # worker always sends draft tokens.
+            if (
+                self.scheduler_config.num_speculative_tokens > 0
+                and not context.is_done
+            ):
+                # Done contexts (max_gen_tokens=1) need no further TG steps,
+                # so the prefill pod sends draft_tokens=None. For all other
+                # contexts, draft tokens must arrive with the PrefillResponse.
+                if message.draft_tokens is None:
+                    raise ValueError(
+                        f"Expected draft tokens in PrefillResponse for "
+                        f"request {request_id} with speculative decoding "
+                        f"enabled, but none were received."
+                    )
+                context.spec_decoding_state.draft_tokens_to_verify = (
+                    message.draft_tokens
                 )
-            context.spec_decoding_state.draft_tokens_to_verify = (
-                message.draft_tokens
-            )
 
-        # Send singular token to the API process
-        output = context.to_generation_output()
-        self.response_queue.put_nowait(
-            {request_id: SchedulerResult.create(output)}
-        )
-        # Decode-local postprocessing before the result leaves this
-        # process. Does not cover the subsequent API-process hop -- see
-        # maxserve.response_queue_time for the tail end of that on the API
-        # side.
-        METRICS.di_decode_postprocess_time(
-            (time.monotonic() - postprocess_start) * 1000
-        )
+            # Send singular token to the API process
+            output = context.to_generation_output()
+            self.response_queue.put_nowait(
+                {request_id: SchedulerResult.create(output)}
+            )
+            # Decode-local postprocessing before the result leaves this
+            # process. Does not cover the subsequent API-process hop -- see
+            # maxserve.response_queue_time for the tail end of that on the
+            # API side.
+            METRICS.di_decode_postprocess_time(
+                (time.monotonic() - postprocess_start) * 1000
+            )
 
         pending.phase = DecodeRequestPhase.TRANSFERRING
         pending.phase_entered_at = time.monotonic()
@@ -448,6 +479,12 @@ class DecodeScheduler(Scheduler):
                     (admitted_at - enqueued_at) * 1000
                 )
             self.prefill_reqs_per_replica[replica_idx] += 1
+            if self.batch_constructor.structured_output_enabled:
+                # Start this request's grammar build now, the instant it's
+                # admitted, so it overlaps with prefill's forward + KV
+                # transfer instead of stacking sequentially onto TTFT after
+                # the handoff lands.
+                self.batch_constructor.submit_grammar_build(context)
             self._send_admitted_request_to_prefill(
                 req_id, context, replica_idx, load_event
             )
@@ -457,6 +494,9 @@ class DecodeScheduler(Scheduler):
             if self.batch_constructor.contains(req_id):
                 # Remove it from the active batch.
                 self.batch_constructor.release_request(req_id)
+                # A handoff may have landed and been enqueued here before
+                # its CE step ever ran; nothing will ever read it back.
+                self._handoff_landed_at.pop(req_id, None)
                 # Send the cancelled result back to the response q
                 self.response_queue.put_nowait(
                     {req_id: SchedulerResult.cancelled()}
@@ -490,6 +530,14 @@ class DecodeScheduler(Scheduler):
                 # immediately.
                 del self.requests[req_id]
                 self.prefill_reqs_per_replica[dst_replica_idx] -= 1
+                # A grammar build may already be running for this request
+                # (started at admission, before it ever reaches prefill);
+                # nothing will ever read it back. A handoff can't have
+                # landed yet -- that always leaves phase TRANSFERRING,
+                # which routes here to the deferred branch above instead --
+                # but pop defensively rather than lean on that invariant.
+                self.batch_constructor.release_grammar_build(req_id)
+                self._handoff_landed_at.pop(req_id, None)
                 self.kv_cache.release(data)
 
             # TODO: Do not crash the scheduler if a request does not have a target endpoint.
@@ -538,6 +586,11 @@ class DecodeScheduler(Scheduler):
         for req_id in expired:
             pending = self.requests.pop(req_id)
             self.prefill_reqs_per_replica[pending.replica_idx] -= 1
+            # A handoff may have landed and started this wait before the
+            # request got stuck; nothing will ever read it back. A grammar
+            # build may also still be running from admission time.
+            self._handoff_landed_at.pop(req_id, None)
+            self.batch_constructor.release_grammar_build(req_id)
 
             if pending.phase is DecodeRequestPhase.TRANSFERRING:
                 assert pending.transfer is not None
@@ -621,6 +674,12 @@ class DecodeScheduler(Scheduler):
 
             if pending.cancelled:
                 self.kv_cache.release(pending.context)
+                # A handoff may have landed and started this wait before
+                # the cancellation raced in; nothing will ever read it back.
+                # A grammar build may still be running too, from admission
+                # time.
+                self._handoff_landed_at.pop(request_id, None)
+                self.batch_constructor.release_grammar_build(request_id)
                 continue
 
             self.batch_constructor.enqueue_new_request(
@@ -667,6 +726,19 @@ class DecodeScheduler(Scheduler):
 
         # Send the responses to the API process
         if responses:
+            if self._handoff_landed_at:
+                # Any of these responses could be a handoff's first real
+                # token -- the one case with no equivalent wait in the
+                # ordinary path, whose token already arrives with the
+                # PrefillResponse. Pop rather than peek: this fires at most
+                # once per request, the first time its output is sent.
+                now = time.monotonic()
+                for req_id in responses:
+                    landed_at = self._handoff_landed_at.pop(req_id, None)
+                    if landed_at is not None:
+                        METRICS.di_handoff_to_first_token_time(
+                            (now - landed_at) * 1000
+                        )
             self.response_queue.put_nowait(
                 {
                     req_id: SchedulerResult.create(response)
@@ -721,6 +793,18 @@ class DecodeScheduler(Scheduler):
         inputs = self.batch_constructor.construct_batch()
         t1 = time.monotonic()
         batch_creation_time_s = t1 - t0
+
+        # A request whose admission-time grammar build failed was never
+        # admitted and is already released; forward the failure now so the
+        # client gets a response instead of hanging, same as the aggregated
+        # scheduler.
+        for failed_id, error in self.batch_constructor.take_grammar_failed():
+            # A handoff may have landed and started this wait before its
+            # grammar build failed; nothing will ever read it back.
+            self._handoff_landed_at.pop(failed_id, None)
+            self.response_queue.put_nowait(
+                {failed_id: SchedulerResult.failed(error)}
+            )
 
         total_pending = len(self.pending_reqs) + len(self.requests)
         if inputs or total_pending == 0:

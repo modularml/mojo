@@ -37,7 +37,7 @@ the helpers above.
 
 from std.atomic import Atomic, Ordering, fence
 from std.bit import log2_floor, next_power_of_two
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     MAX_THREADS_PER_BLOCK_METADATA,
     block_idx,
@@ -49,8 +49,8 @@ from std.gpu import (
 from max.gpu import barrier, syncwarp
 from max.gpu.host import DeviceContext, FuncAttribute, get_gpu_target
 from max.gpu.primitives import block
-from std.gpu.intrinsics import threadfence
-from std.gpu.primitives import warp
+from max.gpu.intrinsics import threadfence
+from max.gpu.primitives import warp
 from max.gpu.primitives.grid_controls import (
     PDL,
     PDLLevel,

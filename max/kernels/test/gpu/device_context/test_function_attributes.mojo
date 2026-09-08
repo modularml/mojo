@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from std.testing import assert_equal
 
 from max.gpu.host import DeviceContext

@@ -27,10 +27,10 @@ from std.math.constants import log2e
 
 from std.sys import size_of
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.algorithm.functional import unswitch
-from std.gpu import thread_idx
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu import thread_idx
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import (
     IntTuple,

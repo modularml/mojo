@@ -27,7 +27,7 @@ from std.sys.info import align_of
 from std.utils.index import Index, IndexList
 
 from max.algorithm.functional import _elementwise_impl_gpu
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,

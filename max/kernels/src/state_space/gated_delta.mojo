@@ -100,7 +100,7 @@ Outputs:
 """
 
 import std.math
-from std.gpu import (
+from max.gpu import (
     block_idx,
     thread_idx,
 )

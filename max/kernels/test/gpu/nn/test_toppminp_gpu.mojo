@@ -21,7 +21,7 @@ from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Coord,
-    PointerStorage,
+    DefaultEngine,
     TileTensor,
     row_major,
 )
@@ -80,7 +80,7 @@ def fill_random[
     dtype: DType
 ](
     mut buffer: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ]
 ):
     comptime min_val = -1e6
@@ -95,7 +95,7 @@ def fill_iota[
     dtype: DType
 ](
     mut buf: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ]
 ):
     iota(buf._storage, buf.layout.product())
@@ -105,7 +105,7 @@ def merge[
     dtype: DType,
 ](
     mut buf: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ],
     start: Int,
     mid: Int,
@@ -155,7 +155,7 @@ def merge_sort_recursive[
     dtype: DType
 ](
     mut buf: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ],
     start: Int,
     end: Int,
@@ -172,7 +172,7 @@ def sort_buf_descending[
     dtype: DType
 ](
     mut buf: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ],
     vocab_size: Int,
 ):
@@ -191,7 +191,7 @@ def test_is_sorted_descending[
     dtype: DType
 ](
     mut buf: TileTensor[
-        mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+        mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
     ],
     vocab_size: Int,
 ) -> Bool:
@@ -261,7 +261,7 @@ def test_case_sampling(
             dtype: DType
         ](
             mut TileTensor[
-                mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+                mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
             ]
         ) -> None
     ],
@@ -446,7 +446,7 @@ def test_toppminp_gpu[
             dtype: DType
         ](
             mut TileTensor[
-                mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+                mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
             ]
         ) -> None
     ],
@@ -478,7 +478,7 @@ def test_all_out_idx_types[
             dtype: DType
         ](
             mut TileTensor[
-                mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+                mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
             ]
         ) -> None
     ],
@@ -495,7 +495,7 @@ def test_all_types(
             dtype: DType
         ](
             mut TileTensor[
-                mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+                mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
             ]
         ) -> None
     ],

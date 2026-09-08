@@ -38,8 +38,12 @@ if [[ ! -x "$VENV/bin/python" ]]; then
   [[ -z "$UV" ]] && { echo "ERROR: uv not found; install uv or set SCICODE_VENV to a prebuilt venv." >&2; exit 1; }
   echo "[scicode] building harness venv at $VENV"
   "$UV" venv "$VENV" --python 3.11
+  # pyarrow/numpy pinned: see the matching comment in
+  # minimaxM3ScicodeEval.yaml — an unpinned install can resolve a numpy/
+  # pyarrow pair with mismatched compiled ABIs (pyarrow==14.0.2 needs
+  # numpy<2), breaking every test subprocess before it runs.
   "$UV" pip install --python "$VENV/bin/python" \
-    openai "datasets>=2.0" tqdm h5py requests \
+    openai "datasets>=2.0" tqdm h5py requests "pyarrow==14.0.2" "numpy<2" \
     "scicode @ git+https://github.com/scicode-bench/SciCode.git@${PIN}"
 else
   echo "[scicode] reusing harness venv at $VENV"

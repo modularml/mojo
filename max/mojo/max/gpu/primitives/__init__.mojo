@@ -10,21 +10,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# TODO(MSTDL-2788): Restore the `warp` and `id` entries below once those modules
-# move here from `std/gpu/primitives/`. They are listed in
-# `std/gpu/primitives/__init__.mojo` and belong in this list, but naming them
-# here today advertises modules this package does not contain.
-"""GPU primitives package - block, cluster, and grid-level operations.
+"""GPU primitives package - warp, block, and cluster operations.
 
 This package provides low-level GPU execution primitives at various levels
 of the GPU hierarchy:
 
+- **warp**: Warp-level operations (shuffle, reduce, broadcast)
 - **block**: Block-level operations (reductions across thread blocks)
 - **cluster**: Cluster-level synchronization (SM90+)
 - **grid_controls**: Grid dependency control (Hopper PDL)
+- **id**: Thread/block/grid indexing and dimensions
 
 These primitives form the foundation for GPU kernel development.
 """
+
+# Thread/block/grid indexing
+from .id import (
+    block_dim,
+    block_id_in_cluster,
+    block_idx,
+    cluster_dim,
+    cluster_idx,
+    global_idx,
+    grid_dim,
+    lane_id,
+    sm_id,
+    thread_idx,
+    warp_id,
+)
 
 # Grid control operations (Hopper PDL)
 from .grid_controls import (

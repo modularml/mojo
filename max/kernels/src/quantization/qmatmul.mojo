@@ -25,7 +25,7 @@ from layout import (
     LayoutTensor,
     RuntimeLayout,
     TileTensor,
-    PointerStorage,
+    DefaultEngine,
 )
 from linalg.accumulate import _Accumulator
 from linalg.arch.cpu.neon_intrinsics import _neon_dotprod_lane, _neon_matmul
@@ -58,10 +58,10 @@ def matmul_qint4_pack_b[
     group_size: Int
 ](
     b: TileTensor[
-        mut=False, .uint8, address_space=.GENERIC, Storage=PointerStorage[], ...
+        mut=False, .uint8, address_space=.GENERIC, Engine=DefaultEngine[], ...
     ],
     b_rot: TileTensor[
-        mut=True, .uint8, address_space=.GENERIC, Storage=PointerStorage[], ...
+        mut=True, .uint8, address_space=.GENERIC, Engine=DefaultEngine[], ...
     ],
 ) raises:
     """Repacks block-wise quantized int4 weights into the tiled layout

@@ -17,7 +17,7 @@ blocks for grid-level parallelism.
 """
 
 from std.collections import OptionalReg
-from std.gpu import block_idx
+from max.gpu import block_idx
 from max.gpu.sync import barrier
 from std.utils.numerics import get_accum_type, min_or_neg_inf
 

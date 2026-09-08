@@ -1,0 +1,343 @@
+---
+title: Mojo roadmap
+sidebar_label: Roadmap
+description: A summary of our plans and priorities to improve the Mojo language.
+---
+
+import { Alert } from '@mantine/core';
+
+This page provides a high-level roadmap of how we expect the Mojo programming
+language to evolve over a series of phases. It offers **directional guidance**
+(not an engineering plan) and is **subject to change**. As we build, learn, and
+expand Mojo's use cases, we'll iterate, adapt, and invest wherever necessary to
+unblock priorities.
+
+We also periodically share roadmap updates in the [Modular forum
+announcements section](https://forum.modular.com/c/modular/announcements/9).
+
+:::note Phases
+
+The phases below are conceptual groups of work—not version numbers—and they
+have no timeline for completion. Mojo now has versioned releases, but these
+phases remain roadmap categories rather than release commitments. The status
+markers below describe our current direction and may change as the language and
+standard library evolve.
+
+:::
+
+:::caution Work items
+
+An empty box ⬜ indicates work that's **not started**, a barricade 🚧 is for
+work **in progress**, and a checked box ✅ means it's **done**. However, this
+isn't an exhaustive list of work, and the status might be out of date. Also, the
+items in each list aren't necessarily ordered by priority, and some items may be
+"nice to have" rather than required to complete the phase.
+
+:::
+
+[Jump to current phase](#phase-2)
+
+## Mojo's north star
+
+As described in the [Mojo vision](/docs/vision/), we created Mojo to unite
+developers with a single language that provides ergonomic programming features
+for accelerator hardware and that scales to solve other challenges in AI and
+systems programming.
+
+Our goals are ambitious, and we're taking on challenges that many languages and
+systems have struggled with for decades. We believe Mojo has the right blend of
+**technology, design principles, and community-first philosophy** to succeed,
+but it'll work only if we stay focused and make deliberate tradeoffs aligned
+with our long-term vision.
+
+The stakes are high—programming languages that succeed shape entire ecosystems,
+support millions of developers, and define how software is built. That means we
+must **resist the urge to chase short-term wins** at the expense of long-term
+clarity, consistency, and quality.
+
+Our approach is to keep short-term development focused and anchored on
+measurable outcomes, while building for generality so Mojo can eventually
+become a general-purpose language spanning CPUs, GPUs, and other hardware,
+addressing a myriad of applications.
+
+We know the path won't be perfect and we'll make mistakes. But with a
+strong foundation and an engaged, thoughtful community, we can **learn,
+iterate, and improve together**.
+
+## Phase 0: Initial bring-up
+
+<Alert icon="✅" title="COMPLETE" color="success"
+       style={{ marginTop: '-20px' }} />
+
+[Jump to current phase](#phase-2)
+
+Phase 0 focused on foundational language work: implementing the core parser,
+defining memory types, functions, structs, initializers, argument conventions,
+and more.
+
+As development accelerated, multiple libraries emerged to fill immediate needs,
+often overlapping in functionality (for example, multiple pointer types). As the
+language stabilized, we consolidated these libraries into a coherent and
+consistent foundation.
+
+## Phase 1: High-performance CPU + accelerator coding
+
+<Alert icon="✅" title="COMPLETE" color="success"
+       style={{ marginTop: '-20px' }} />
+
+[Jump to current phase](#phase-2)
+
+Phase 1 took Mojo from a "prototype kernel DSL" to a viable foundation for
+systems programming and accelerated compute workloads. This phase focused on
+making Mojo a powerful and expressive language for writing high-performance
+kernels on CPUs, GPUs, and ASICs, as well as unlocking other performance
+use cases for CPUs, particularly the ability to extend Python packages in a
+seamless way.
+
+But performance alone isn't enough. We're equally focused on:
+
+- **Expressiveness** for building robust libraries
+- **Good error messages** for developer productivity
+- **Fast compile times** to support iteration speed
+
+We wrapped up phase 1 by **open sourcing the Mojo compiler**.
+
+### Parameterized types and metaprogramming features
+
+The backbone of phase 1 is Mojo's **metaprogramming system**, combined with a
+**modern parameterized type system** that catches errors at compile time, before
+code is instantiated.
+
+- ✅ **Compile-time constructs**: Built out the parameter system, compile-time
+  interpreter, `comptime if` and `for` loops, etc.
+
+- ✅ **Predictable dependent types**: Supported advanced parametric algorithms
+  while avoiding rebinding.
+
+- ✅ **Parametric comptime values**: Implemented computed parametric values,
+  going beyond types and functions.
+
+- ✅ **Traits**: Added traits letting you group types by shared behavior so you
+  can write generic code that works for any conforming type.
+
+- ✅ **Trait compositions**: Allowed `Copyable & Defaultable` intersections for
+  precise trait conformance.
+
+- ✅ **Default trait methods**: Enable static composition (mixin-style).
+
+- ✅ **Parametric raises**: Added the ability to throw types other than `Error`
+  and therefore support higher-order functions like `map()` that propagate the
+  "raisability" of their closure argument.
+
+- ✅ **Closure refinement**: Unified representation for compile-time/runtime
+  closures.
+
+- ✅ **`where` clauses**: Enabled early constraint checking and better error
+  messages for parameterized declarations.
+
+- ✅ **Conditional conformance**: Allowed trait conformance based on predicates
+  over parameters.
+
+### Python interoperability
+
+We want Mojo to be an approachable way to extend and speed up existing Python
+code. We've used the key features of popular libraries like "nanobind" as a
+guideline:
+
+- ✅ **Build integration**: Added seamless connection between Mojo's build
+  system and Python packaging.
+
+- ✅ **Python export**: Supported exposing functions and initializers to Python.
+
+### Core language usability and ergonomics
+
+Mojo should "just work" for core programming tasks, while offering the control
+systems programmers expect:
+
+- ✅ **Basic constructs**: Built out functions, structs, control flow (`if`,
+  `for`, etc.).
+
+- ✅ **Literal support**: Supported infinite-precision integer and
+  floating-point literals, collection literals, and comprehensions.
+
+- ✅ **Collections**: Rounded out core types like `List`, `Dict`, `Iterator`,
+  `SIMD`, `String`, etc., to use the language feature set of phase 1.
+
+- ✅ **Unsafe programming**: Refined `Pointer` and low-level primitives.
+
+- ✅ **Variadic args**: Added support for `*args`, `**kwargs`.
+
+- ✅ **Lambda syntax**: Added lambdas for inline closure declarations.
+
+- ✅ **Explicitly destroyed (linear) types**: Created types that require an
+  explicit call to deinitialize a value at end of its lifetime.
+
+- ✅ **Stabilization markers**: Added mechanism to tag standard library APIs
+  with maturity levels.
+
+- 🚧 **Mojo toolchain**: Created Mojo LSP and the VS Code extension, some
+  testing and benchmarking infrastructure, and an LLDB-based debugger, but
+  there's much more to do in phase 2.
+
+- ✅ **GPU programmability abstractions**: Built rich and easy-to-use
+  abstractions for a tensor type, data layout, and basic algorithms.
+
+### Syntax and surface language polish
+
+These may seem small, but they significantly impact developer ergonomics and
+reduce future source incompatibilities:
+
+- ✅ **Argument conventions**: Refined lifecycle behaviors, convention naming,
+  and default conventions.
+
+- ✅ **Literal refinements**: Improved reliability of infinite-precision
+  literals using dependent types.
+
+- 🚧 **Attribute macros**: Replaced ad-hoc constructs like `@__parameter`,
+  `@value`, etc., using traits and other existing language features (shrinking
+  the language), but there's still more work to do here.
+
+### Non-goals
+
+We intentionally *didn't* pursue the following in phase 1:
+
+- **Syntax sugar**: We deferred most sugar until the core language was stable
+  and composable.
+
+- **Untyped Python-style code**: For now, Mojo requires explicit `PythonObject`
+  type annotations.
+
+- **Python library parity**: We've focused on getting our core language and
+  library abstractions right, rather than expanding coverage.
+
+## Phase 2: Systems application programming {#phase-2}
+
+<Alert icon="🚧" title="IN PROGRESS" color="warning"
+       style={{ marginTop: '-20px' }} />
+
+Now that the core parameterized type system and systems programming features
+have converged and stabilized, we'll begin expanding Mojo to support
+application-level programming—the kinds of problems that languages like Rust and
+C++ typically address.
+
+That said, **we are not aiming to match Rust or C++ feature-for-feature**. Our
+goal is to keep Mojo a relatively small and teachable language—one that solves
+specific problems while maintaining a focus on
+[composability and simplicity](/docs/vision#managing-language-complexity).
+
+If phase 1 built a strong foundation, the major theme of phase 2 is
+*deepening* our core investment in systems programming and heterogeneous
+hardware, while *broadening* our ecosystem by supporting new use cases, from
+servers and networking code to microcontrollers and robotics.
+
+### Language features
+
+- ⬜ **First-class `async` support**: Fully integrated with Mojo's type and
+  memory models.
+
+- ⬜ **Existentials / dynamic traits**: For building flexible runtime
+  abstractions.
+
+- ⬜ **Richer metatypes**: Extending support for type-level programming.
+
+- ⬜ **Struct extensions**: Post-hoc type extension and better modular
+  refactoring. See the
+  [struct extension proposal](https://github.com/modular/modular/blob/main/Mojo/proposals/struct-extensions.md).
+
+- ⬜ **Algebraic data types & pattern matching**: Enabling expressive state
+  modeling.
+
+- ⬜ **Dynamic reflection features**: To complement Mojo's powerful compile-time
+  reflection support.
+
+- ⬜ **Initial distributed programming support**. Leveraging Mojo across
+  multiple machines.
+
+- ⬜ **Access control features**: For example, `private` modifiers (or
+  formalizing the underscore convention) to prevent violating abstraction
+  boundaries.
+
+### Memory safety model: fast, expressive, gradual
+
+Mojo code should be memory-safe by default, while still being fast, expressive,
+and gradually more complex for beginners. Although phase 1 provides a strong
+framework for [memory safety](/docs/manual/values/), some situations still
+aren't safe by default, and we don't expect to resolve them fully until
+phase 2. This will likely require:
+
+- ⬜ **Finalizing internal origins**: Providing memory-safe references to
+  values held in collections.
+
+- ⬜ **Supporting mutable aliasing**. Making memory safety more ergonomic.
+
+### Broadening the ecosystem
+
+Expanding the ecosystem means meeting more developers where they are, and
+improving developer productivity with better tools.
+
+- ⬜ **Expand platform support**: Supporting new types of hardware.
+
+- ⬜ **Keep improving interop**: Interop with other languages is
+  increasingly important.
+
+- ⬜ **Packaging and package management**: To enable a vibrant ecosystem of Mojo
+  libraries.
+  [Join our conversation about a package manager](https://forum.modular.com/t/open-question-what-would-you-like-to-see-from-a-mojo-package-manager/2799).
+
+- 🚧 **Stable and robust toolchain**: Continue building out Mojo's
+  toolchain: cross-compilation, testing and benchmarking framework in the
+  standard library, debugger, profiler, etc.
+  - 🚧 Mojo Language Server Protocol support and VS Code extension
+  - 🚧 Testing framework
+  - 🚧 Benchmarking framework
+  - 🚧 Debugger
+  - ⬜ Profiler
+
+## Phase 3: Dynamic object-oriented programming
+
+<Alert icon="⏰" title="NOT STARTED" color="danger"
+       style={{ marginTop: '-20px' }} />
+
+Eventually, we want Mojo to support the core dynamic features that make Python
+great, including untyped variables, classes, inheritance, etc. We have some
+thoughts about how these features will compose with the language's other
+features, but defer detailed planning and scoping until the earlier phases are
+done.
+
+As Mojo matures through phase 3, we believe it will become increasingly
+compatible with Python code and deeply familiar to Python users, but more
+efficient, powerful, coherent, and safe. Mojo may or may not evolve into a full
+superset of Python, and it's okay if it doesn't.
+
+We're encouraged by how well AI-assisted coding tools already help migrate
+Python to Mojo today, and we're confident that future tooling and ecosystem
+maturity will make this evolution even smoother.
+
+## Continuous investments
+
+The following topics remain in progress throughout Mojo's lifetime and aren't
+tied to any specific phase:
+
+- **Error messages and diagnostics**: Always room for improvement, but
+  parameter inference and elaborator errors need particular attention.
+
+- **Compile times**: We'll continue pushing for faster developer iteration
+  cycles.
+
+- **Standard library cleanup**: API consolidation, regularization, and new
+  capabilities.
+
+- **Hardware support**: Extending Mojo's backend to support new architectures.
+
+## Contributing to Mojo
+
+Mojo is fully open source on GitHub, and we're accepting contributions in
+several areas, including the standard library and docs. We aren't yet
+accepting contributions to the Mojo compiler, but we're working on
+putting the appropriate tools and workflows in place.
+
+You can learn more about contributing to Mojo from the
+[Mojo contributor guide](https://github.com/modular/modular/blob/main/Mojo/CONTRIBUTING.md).
+
+If you encounter any bugs with Mojo, please
+[submit an issue on GitHub](https://github.com/modular/modular/issues).

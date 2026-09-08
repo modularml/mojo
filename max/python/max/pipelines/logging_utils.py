@@ -173,26 +173,37 @@ def log_basic_config(
         ("device_graph_capture", pipeline_config.runtime.device_graph_capture)
     )
 
+    if pipeline_config.runtime.experimental_device_graph_synthesis:
+        config_entries.append(("experimental_device_graph_synthesis", True))
+
     if pipeline_config.speculative is not None:
+        spec = pipeline_config.speculative
+        config_entries.append(("speculative_method", spec.speculative_method))
         config_entries.append(
-            (
-                "speculative_method",
-                pipeline_config.speculative.speculative_method,
-            )
+            ("num_speculative_tokens", spec.num_speculative_tokens)
+        )
+        config_entries.append(("draft_proposal", spec.draft_proposal))
+        # The two fields AcceptanceSampler dispatches on, so the acceptance
+        # rule a run used is attributable after the fact.
+        config_entries.append(
+            ("synthetic_acceptance_rate", spec.synthetic_acceptance_rate)
         )
         config_entries.append(
+            ("use_greedy_acceptance", spec.use_greedy_acceptance)
+        )
+        # Nothing reads rejection_sampling_strategy. Print the request and
+        # its inertness together, so an A/B over the flag is not credited to
+        # an acceptance-rule change that never happened.
+        config_entries.append(
             (
-                "num_speculative_tokens",
-                pipeline_config.speculative.num_speculative_tokens,
+                "rejection_sampling_strategy",
+                f"{spec.rejection_sampling_strategy or 'unset'} (inert:"
+                " the architecture's AcceptanceSampler decides)",
             )
         )
-        if pipeline_config.speculative.use_relaxed_acceptance_for_thinking:
-            config_entries.append(
-                ("relaxed_topk", pipeline_config.speculative.relaxed_topk)
-            )
-            config_entries.append(
-                ("relaxed_delta", pipeline_config.speculative.relaxed_delta)
-            )
+        if spec.use_relaxed_acceptance_for_thinking:
+            config_entries.append(("relaxed_topk", spec.relaxed_topk))
+            config_entries.append(("relaxed_delta", spec.relaxed_delta))
 
     _logger.info("")
     _logger.info("=" * 60)

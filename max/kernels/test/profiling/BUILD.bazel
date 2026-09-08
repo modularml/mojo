@@ -4,10 +4,10 @@ load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 package(default_visibility = ["//max:consumers"])
 
 # End-to-end test for the Mojo `Range` context manager. Lives under //max
-# (alongside the implementation) rather than //KGEN/test so that KGEN stays
+# (alongside the implementation) rather than //Mojo/test so that KGEN stays
 # buildable and testable without the MAX/Kernels trees. The lower-level
 # KGEN_CompilerRT_Range* FFI symbols keep their own coverage in
-# //KGEN/test/internal/profiling:test_range_bridge.mojo.test.
+# //Mojo/test/internal/profiling:test_range_bridge.mojo.test.
 mojo_test(
     name = "test_range_struct.mojo.test",
     srcs = ["test_range_struct.mojo"],

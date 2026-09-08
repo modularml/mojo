@@ -18,7 +18,7 @@ from std.memory import bitcast
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
@@ -29,8 +29,8 @@ from max.gpu.primitives.cluster import (
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host.info import B200
-from std.gpu import block_id_in_cluster, block_idx, lane_id
-from std.gpu import warp_id as get_warp_id
+from max.gpu import block_id_in_cluster, block_idx, lane_id
+from max.gpu import warp_id as get_warp_id
 from max.gpu.memory import fence_async_view_proxy, external_memory
 from max.gpu.compute.mma import st_matrix
 from max.gpu.compute.arch.mma_nvidia_sm100 import *

@@ -29,7 +29,7 @@ counts and require no call.
 Cross-compiles to gfx950, so it needs no AMD GPU.
 """
 
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE, lane_id
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE, lane_id
 from std.testing import assert_equal, assert_true
 from std.utils import StaticTuple
 

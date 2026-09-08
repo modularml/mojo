@@ -418,6 +418,14 @@ def test_frozen_kv_connector_config_matches_interface() -> None:
     assert isinstance(connector, KVConnectorConfigInterface)
 
 
+def test_kv_connector_config_disk_budget_bounds() -> None:
+    # 0 drops the disk tier; None auto-sizes it. Negative is meaningless.
+    assert KVConnectorConfig(disk_offload_max_gb=0).disk_offload_max_gb == 0
+    assert KVConnectorConfig().disk_offload_max_gb is None
+    with pytest.raises(ValidationError, match="disk_offload_max_gb"):
+        KVConnectorConfig(disk_offload_max_gb=-1)
+
+
 def test_kv_cache_config_model_copy_update() -> None:
     kv_cache_config = KVCacheConfig()
     patched = kv_cache_config.model_copy(

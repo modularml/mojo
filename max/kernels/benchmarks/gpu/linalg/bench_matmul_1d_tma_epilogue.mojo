@@ -34,7 +34,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
+from max.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
 from max.gpu.host import DeviceBuffer, DeviceContext
 from max.gpu.host.info import _is_sm10x_gpu
 from max.gpu.primitives import block

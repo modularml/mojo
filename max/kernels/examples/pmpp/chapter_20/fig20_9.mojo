@@ -14,16 +14,16 @@
 from std.math import exp, sqrt
 from std.random import rand
 from std.collections import Array
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.memory import unsafe_stack_allocation
-from std.gpu.primitives.warp import (
+from max.gpu.primitives.warp import (
     shuffle_idx,
     lane_group_max,
     lane_group_sum,
 )
-from std.gpu.primitives.id import (
+from max.gpu.primitives.id import (
     lane_id,
     warp_id,
 )

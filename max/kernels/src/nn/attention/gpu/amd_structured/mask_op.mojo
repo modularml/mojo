@@ -32,7 +32,7 @@ from std.math.constants import log2e
 from std.math.uutils import umod
 from std.sys import _RegisterPackType
 from std.sys._assembly import inlined_assembly
-from std.gpu import block_idx, lane_id
+from max.gpu import block_idx, lane_id
 from std.utils import IndexList
 
 from layout import TileTensor

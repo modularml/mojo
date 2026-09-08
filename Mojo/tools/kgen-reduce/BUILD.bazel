@@ -1,0 +1,29 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(default_visibility = ["//Mojo:consumers"])
+
+modular_cc_binary(
+    name = "kgen-reduce",
+    srcs = glob([
+        "*.cpp",
+        "*.h",
+    ]),
+    deps = [
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+        "//Mojo:Compiler",
+        "//Mojo:CompilerRT",
+        "//Mojo:ExecutionEngine",
+        "//Mojo:HLCFDialect",
+        "//Mojo:KGENDialect",
+        "//Mojo:MojoParser",
+        "//Mojo:ObjectCompiler",
+        "//Mojo:Pipeline",
+        "//Mojo:ToolCommon",
+        "//Mojo:TransformUtils",
+        "//Support:Base",
+        "//Support:Context",
+        "//Support:Globals",
+        "@llvm-project//mlir:MlirOptLib",
+    ],
+)

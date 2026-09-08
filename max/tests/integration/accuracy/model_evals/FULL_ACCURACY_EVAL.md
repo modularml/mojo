@@ -91,6 +91,12 @@ re-running exact dataset rows; see `--row-ids` on the de-embedded evals.
 - The multimodal and agent-class benchmarks are not yet in the
   collector's `--expect` list (their score directory names need one
   validation run to pin down); their scores still appear in `results.json`
-  whenever present.
+  whenever present. MMMU-Video previously wrote only `summary.json` and so
+  never appeared in the collector's output at all (it only globs
+  `score.json`); it now writes both.
+- The provider verifier's unexpected-failure list (format-correctness tests
+  that failed and are not on its `KNOWN_FAILURES` allowlist) and pass@10
+  batch-verification metrics are folded into its own `score.json` and
+  rendered as extra sections below the main score table.
 - Verdicts (PASS/FAIL/CONSULT vs baselines) attach to the consolidated
   output once the report-only eval gate lands.

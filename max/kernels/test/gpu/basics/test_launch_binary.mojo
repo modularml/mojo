@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """This test showcases how one can launch a precompiled device binary from Mojo."""
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from std.testing import assert_equal
 
 from max.gpu.host import DeviceContext

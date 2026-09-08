@@ -146,13 +146,21 @@ class KVConnectorConfig(ConfigFileModel):
 
     disk_offload_max_gb: float | None = Field(
         default=None,
+        ge=0,
         description=(
             "Maximum disk space (GiB) for KV cache offloading. When unset, "
-            "sized to hold twice the device page pool."
+            "sized to hold twice the device page pool. 0 drops the disk tier, "
+            "leaving a host-only connector."
         ),
     )
-    """Maximum disk space in GiB for KV cache offloading. ``None`` sizes it to
-    twice the device page pool."""
+    """Maximum disk space in GiB for KV cache offloading.
+
+    ``None`` sizes it to twice the device page pool. ``0`` builds the connector
+    with no disk last level: nothing is written to disk and no offload
+    directory is created. 0 cannot mean "unlimited" here, because the disk tier
+    derives its block capacity from this budget -- a 0 that still opened a disk
+    tier would disable eviction and grow without bound.
+    """
 
     num_disk_workers: int = Field(
         default=32,
@@ -175,11 +183,9 @@ class KVConnectorConfig(ConfigFileModel):
     )
     """Endpoint for the co-located dKV service.
 
-    Remote dKV endpoints are discovered at runtime through the
-    Orchestrator (via ``external_block_metadata`` on the request
-    context), not configured statically. For multi-store reads, the
-    discovered metadata must include MAX-native transfer-engine metadata so
-    the connector can reuse ``KVTransferEngine.connect()``.
+    Remote dKV endpoints are discovered at runtime from the Orchestrator's
+    per-request ``dkv_cache_hint``, not configured statically. The connector
+    parses the hint in Rust and dials each named instance itself.
     """
 
 

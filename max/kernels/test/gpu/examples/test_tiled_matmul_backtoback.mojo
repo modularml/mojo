@@ -18,7 +18,7 @@ from std.os import abort
 from std.sys import size_of
 from std.sys.info import align_of, simd_width_of
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -684,12 +684,10 @@ def test_b2b_matmul(ctx: DeviceContext) raises:
     var mat_b = ManagedLayoutTensor[src_type, layout_b](ctx)
     var mat_c = ManagedLayoutTensor[src_type, layout_c](ctx)
     var mat_d = ManagedLayoutTensor[dst_type, layout_d](ctx)
-    var stack_d = Array[Scalar[dst_type], layout_d.size()](uninitialized=True)
+    var stack_d = Array[Scalar[dst_type], layout_d.size()](fill={})
     comptime layout_ab = Layout.row_major(M, L)
-    var stack_ab = Array[Scalar[dst_type], layout_ab.size()](uninitialized=True)
-    var stack_ab_downcast = Array[Scalar[src_type], layout_ab.size()](
-        uninitialized=True
-    )
+    var stack_ab = Array[Scalar[dst_type], layout_ab.size()](fill={})
+    var stack_ab_downcast = Array[Scalar[src_type], layout_ab.size()](fill={})
     var host_d_ref = LayoutTensor[dst_type, layout_d](stack_d)
     var host_ab = LayoutTensor[dst_type, layout_ab](stack_ab)
     var host_ab_downcast = LayoutTensor[src_type, layout_ab](stack_ab_downcast)

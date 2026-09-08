@@ -31,56 +31,22 @@ import re
 import uuid
 from typing import Any
 
-from llguidance import LLMatcher
+from max.pipelines.architectures.kimik2_5.tokenizer import (
+    TOOL_CALL_ARGUMENT_BEGIN,
+    TOOL_CALL_BEGIN,
+    TOOL_CALL_END,
+    TOOL_CALLS_SECTION_BEGIN,
+    TOOL_CALLS_SECTION_END,
+)
+from max.pipelines.context.exceptions import InputError
 from max.pipelines.lib.pipeline_variants.structured_output_backend import (
     build_xgrammar_tool_grammar,
 )
 from max.pipelines.lib.tool_parsing import (
     StructuralTagToolParser,
-    escape_for_lark_string,
-    get_token_id,
-    names_from_tools,
     register,
-    resolve_lark_token_reference,
 )
 from max.pipelines.modeling.types import ParsedToolCall, PipelineTokenizer
-
-# Structural tags used by Kimi K2.5
-TOOL_CALLS_SECTION_BEGIN = "<|tool_calls_section_begin|>"
-TOOL_CALLS_SECTION_END = "<|tool_calls_section_end|>"
-TOOL_CALL_BEGIN = "<|tool_call_begin|>"
-TOOL_CALL_END = "<|tool_call_end|>"
-TOOL_CALL_ARGUMENT_BEGIN = "<|tool_call_argument_begin|>"
-
-# Reasoning and turn-terminator tokens. Kimi K2.5 interleaves
-# ``<think>...</think>`` reasoning blocks with tool-call sections and ends
-# the assistant turn with ``<|im_end|>``. Reasoning tokens are stripped by
-# the pipeline's thinking-region handling before they reach the grammar
-# matcher and are never part of the constrained-decoding grammar.
-THINK_START = "<think>"
-THINK_END = "</think>"
-IM_END = "<|im_end|>"
-
-# Bounds on the constrained-decoding grammar quantifiers. Without these,
-# a model can spin emitting digits in the call index or an unbounded
-# number of back-to-back calls/sections, holding a GPU slot until
-# ``max_tokens``. The argument body is intentionally unbounded — tool
-# arguments can be arbitrarily large (e.g. code blobs, embedded documents,
-# search-result payloads being re-emitted) and a fixed cap would silently
-# drop them. The ``max_tokens`` ceiling is the only meaningful upper bound
-# there.
-_MAX_TOOL_CALL_INDEX_DIGITS = 8  # up to 99_999_999 tool calls per turn
-_MAX_TOOL_CALLS_PER_SECTION = 64
-# Kimi interleaves multiple tool-call sections with reasoning in a single
-# turn ("interleaved thinking"). The grammar admits up to this many
-# sections; the model stops earlier by emitting ``<|im_end|>`` (allowed at
-# every accepting state). A bounded cap keeps a stuck model from holding a
-# slot forever (``max_tokens`` is the primary ceiling; this is a secondary
-# backstop). Set with headroom for long interleaved turns so a legitimate
-# extra section never trips the matcher-desync this grammar fixes — the
-# bound is a counter in the compiled grammar, so raising it has no
-# compile/per-token cost.
-_MAX_TOOL_CALL_SECTIONS = 8
 
 # Regex for one ``<|tool_call_begin|>...<|tool_call_end|>`` body. The
 # function id and arguments are captured; the call markers are anchored.
@@ -193,107 +159,6 @@ class KimiToolParser(StructuralTagToolParser):
         tool_name, tool_id = _parse_function_id(header)
         return tool_id, tool_name
 
-    # ----- Constrained decoding grammar (Kimi-specific) -----------------
-
-    @staticmethod
-    def _build_envelope(
-        tool_names: list[str] | None,
-        refs: dict[str, str],
-    ) -> tuple[str, list[str]]:
-        """Builds the tool-call envelope rule and shared grammar lines.
-
-        Returns the ``start``-body fragment (the repeated section sequence
-        with an optional trailing ``<|im_end|>``) and the list of shared
-        rule/terminal lines it references. Both the no-schema and
-        json_schema branches reuse the same envelope.
-
-        ``refs`` maps each marker to its single-token Lark reference
-        (``<[id]>``). ``IM_END`` is optional: when absent the grammar simply
-        omits early termination rather than failing. Reasoning is never
-        modeled here — the pipeline strips ``<think>...</think>`` (including
-        the closing token) before tokens reach the matcher.
-        """
-        # ``functions.NAME:INDEX`` header. ``NAME`` is an alternation of the
-        # offered tool names (or a length-capped fallback identifier).
-        if tool_names is not None:
-            name_terminal = "NAME: " + " | ".join(
-                f'"{escape_for_lark_string(n)}"' for n in tool_names
-            )
-        else:
-            name_terminal = r"NAME: /[a-zA-Z0-9_-]{1,128}/"
-
-        # ``<|im_end|>`` lets the model stop before the section cap; it is
-        # an EOS-class token (handled by ``eos_tracker``) and is allowed at
-        # every accepting state via this optional trailing reference.
-        im_end_opt = f" {refs['IM_END']}?" if "IM_END" in refs else ""
-
-        envelope = (
-            f"section (section){{0,{_MAX_TOOL_CALL_SECTIONS - 1}}}{im_end_opt}"
-        )
-
-        rules = [
-            (
-                f"section: {refs['SECTION_BEGIN']} tool_call "
-                f"(tool_call){{0,{_MAX_TOOL_CALLS_PER_SECTION - 1}}} "
-                f"{refs['SECTION_END']}"
-            ),
-            (
-                f'tool_call: {refs["CALL_BEGIN"]} "functions." NAME ":" '
-                f"INDEX {refs['ARG_BEGIN']} ARGS {refs['CALL_END']}"
-            ),
-            name_terminal,
-            rf"INDEX: /[0-9]{{1,{_MAX_TOOL_CALL_INDEX_DIGITS}}}/",
-            # The argument body is a byte-level ``/.*/`` terminal; it
-            # terminates naturally at the atomic closing special token
-            # (``<|tool_call_end|>``), so it accepts ``<`` and other markup
-            # freely. Real argument validation happens at parse time — the
-            # grammar only frames structure.
-            r"ARGS: /[\s\S]*/",
-        ]
-
-        return envelope, rules
-
-    @staticmethod
-    def _resolve_token_refs(
-        tokenizer: PipelineTokenizer[Any, Any, Any] | None,
-    ) -> dict[str, str]:
-        """Resolves Kimi structural tokens to single-token Lark references.
-
-        Returns a ``name -> "<[id]>"`` map. The five tool-call markers are
-        required (a missing one raises). ``<|im_end|>`` is optional and
-        simply absent from the map when the tokenizer does not define it.
-        """
-        if tokenizer is None:
-            raise ValueError(
-                "tokenizer is required to generate the Kimi tool-call grammar"
-            )
-
-        required = {
-            "SECTION_BEGIN": TOOL_CALLS_SECTION_BEGIN,
-            "SECTION_END": TOOL_CALLS_SECTION_END,
-            "CALL_BEGIN": TOOL_CALL_BEGIN,
-            "CALL_END": TOOL_CALL_END,
-            "ARG_BEGIN": TOOL_CALL_ARGUMENT_BEGIN,
-        }
-        optional = {
-            "IM_END": IM_END,
-        }
-
-        refs: dict[str, str] = {}
-        for name, token in required.items():
-            tid = get_token_id(tokenizer, token)
-            if tid is None:
-                raise ValueError(
-                    f"tokenizer does not define required Kimi tool-call "
-                    f"token {token!r}; cannot build constrained grammar"
-                )
-            refs[name] = resolve_lark_token_reference(tid)
-        for name, token in optional.items():
-            tid = get_token_id(tokenizer, token)
-            if tid is not None:
-                refs[name] = resolve_lark_token_reference(tid)
-        return refs
-
     XGRAMMAR_FORMAT = "kimi"
 
     @staticmethod
@@ -305,66 +170,35 @@ class KimiToolParser(StructuralTagToolParser):
         tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> str:
-        """Generates a grammar for constrained decoding of Kimi tool calls.
+        """Generates a constrained-decoding grammar for Kimi tool calls.
 
-        With the default ``backend="xgrammar"`` this returns a serialized
-        xgrammar StructuralTag (which constrains each call's arguments to that
-        tool's JSON schema). With ``backend="llguidance"`` it returns a Lark
-        grammar whose argument body is freeform.
-
-        Structural markers and ``<|im_end|>`` are referenced as single-token
-        symbols (``<[id]>``) resolved from ``tokenizer`` — they are atomic
-        special tokens, so the freeform ``/[\\s\\S]*/`` argument body
-        terminates cleanly at the closing marker.
-
-        When ``response_format_schema`` is provided, the grammar also accepts
-        a JSON response matching the schema (the model's first tokens select
-        the branch).
+        Returns a serialized xgrammar ``StructuralTag`` that frames the Kimi
+        tool-call envelope and constrains each call's arguments to that
+        tool's JSON schema. When ``response_format_schema`` is provided, the
+        grammar also accepts a JSON response matching the schema (the model's
+        first tokens select the branch).
 
         Args:
             response_format_schema: Optional JSON schema dict. When provided,
                 the grammar also accepts a JSON response matching the schema.
-            tools: Optional list of OpenAI-style tool dicts. ``None`` accepts
-                any length-capped identifier as the function name.
-            tokenizer: Pipeline tokenizer used to resolve special-token IDs.
-                Required.
+            tools: Optional list of OpenAI-style tool dicts.
+            tokenizer: Unused (the xgrammar tag references literal markers).
+            backend: Structured-output backend; must be ``"xgrammar"``.
+            tool_choice: ``"auto"``, ``"required"``, or a named choice.
             **kwargs: Ignored; accepts future kwargs.
 
         Returns:
-            A grammar string compatible with the selected backend.
+            The StructuralTag serialized as a JSON string.
         """
-        if backend == "xgrammar":
-            normalized_choice = (
-                tool_choice if tool_choice is not None else "auto"
+        if backend != "xgrammar":
+            raise InputError(
+                "Kimi constrained tool calling requires the xgrammar "
+                "backend; run with --structured-output-backend=xgrammar."
             )
-            return build_xgrammar_tool_grammar(
-                KimiToolParser.XGRAMMAR_FORMAT,
-                tools or [],
-                normalized_choice,
-                response_format_schema=response_format_schema,
-            )
-
-        tool_names = names_from_tools(tools)
-        refs = KimiToolParser._resolve_token_refs(tokenizer)
-        envelope, shared_rules = KimiToolParser._build_envelope(
-            tool_names, refs
+        normalized_choice = tool_choice if tool_choice is not None else "auto"
+        return build_xgrammar_tool_grammar(
+            KimiToolParser.XGRAMMAR_FORMAT,
+            tools or [],
+            normalized_choice,
+            response_format_schema=response_format_schema,
         )
-
-        if response_format_schema is None:
-            start_rule = f"start: {envelope}"
-            extra_rules: list[str] = []
-        else:
-            schema_str = json.dumps(response_format_schema)
-            start_rule = "start: tool_calls | json_response"
-            extra_rules = [
-                f"tool_calls: {envelope}",
-                f"json_response: %json {schema_str}",
-            ]
-
-        lark = (
-            "\n".join(
-                ["%llguidance {}", start_rule, *extra_rules, *shared_rules]
-            )
-            + "\n"
-        )
-        return LLMatcher.grammar_from_lark(lark)

@@ -15,7 +15,7 @@ from std.math import exp
 from std.random import rand, seed
 from std.sys import argv
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from std.sys import has_amd_gpu_accelerator
 from max.gpu.host.info import (

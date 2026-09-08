@@ -13,7 +13,7 @@
 from std.math.fast import exp_approx_f32
 from std.math import exp as ref_exp
 from max.algorithm.functional import elementwise
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext, get_gpu_target
 from std.testing import *
 from std.utils import Index, IndexList

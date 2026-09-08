@@ -19,8 +19,8 @@ result, and that result matches the expected value computed over all linearized
 thread IDs in the block.
 """
 
-from std.gpu import thread_idx
-from std.gpu.globals import WARP_SIZE
+from max.gpu import thread_idx
+from max.gpu.globals import WARP_SIZE
 from std.testing import assert_equal, TestSuite
 
 from max.gpu.host import DeviceContext

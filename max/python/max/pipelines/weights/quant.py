@@ -894,16 +894,55 @@ def _parse_modelopt_float4_config(
     if not quant_method or not quant_algo:
         return None
     if quant_algo != "NVFP4":
-        # Everything below hard-codes the NVFP4 two-level scheme. Returning it
+        # The builder below hard-codes the NVFP4 two-level scheme. Returning it
         # for another algorithm silently reinterprets the payload: a
         # MIXED_PRECISION checkpoint's FP8 bases would be read as packed FP4.
         raise ValueError(
             f"modelopt quant_algo {quant_algo!r} cannot be loaded as NVFP4. "
             "Only 'NVFP4' is uniform enough for a single QuantConfig; a "
             "mixed-precision checkpoint needs per-module handling in its "
-            "architecture (see Qwen3.5's `_parse_quant_config`)."
+            "architecture (see Qwen3.5's `_parse_quant_config`, or MiniMax-M3's "
+            "for one built on `build_modelopt_nvfp4_config`)."
         )
 
+    return build_modelopt_nvfp4_config(
+        huggingface_config,
+        state_dict,
+        resolved_quant_config,
+        state_dict_name_prefix=state_dict_name_prefix,
+        ignored_modules_prefix=ignored_modules_prefix,
+    )
+
+
+def build_modelopt_nvfp4_config(
+    huggingface_config: AutoConfig,
+    state_dict: Mapping[str, WeightData],
+    resolved_quant_config: Mapping[str, Any] | None,
+    *,
+    state_dict_name_prefix: str = "",
+    ignored_modules_prefix: str = "model.",
+) -> QuantConfig:
+    """Builds the QuantConfig for modelopt's NVFP4 two-level scheme.
+
+    Skips the whole-checkpoint ``quant_algo == "NVFP4"`` check that a
+    ``MIXED_PRECISION`` export cannot pass, so the caller must have established
+    which modules are NVFP4: handing this config to one quantized some other
+    way reads its payload as packed FP4 and yields garbage.
+
+    Args:
+        huggingface_config: The config the layer count is read from.
+        state_dict: The checkpoint weights, read for the bias and embedding
+            dtypes.
+        resolved_quant_config: The resolved quantization config, from
+            :func:`resolve_hf_quant_config`. Only its ``ignore`` globs are read;
+            ``None`` means nothing is ignored.
+        state_dict_name_prefix: Optional prefix on the ``state_dict`` keys.
+        ignored_modules_prefix: Prefix the ``ignore`` globs are written against.
+
+    Returns:
+        The NVFP4 config, with the fused-kernel flags left at their defaults
+        for :func:`apply_fused_kernel_flags` to set.
+    """
     input_spec = InputScaleSpec(
         granularity=ScaleGranularity.BLOCK,
         origin=ScaleOrigin.STATIC,
@@ -1231,40 +1270,61 @@ def parse_quant_config(
         config = None
 
     if config is not None:
-        config.can_use_fused_mlp = can_use_fused_mlp(
-            state_dict,
-            tensor_wise=(
-                config.weight_scale.is_tensor
-                and config.input_scale.is_tensor
-                and not config.is_static
-            ),
+        apply_fused_kernel_flags(config, state_dict)
+
+    return config
+
+
+def apply_fused_kernel_flags(
+    config: QuantConfig, state_dict: Mapping[str, WeightData]
+) -> QuantConfig:
+    """Sets the fused-kernel eligibility flags on a freshly built QuantConfig.
+
+    The last step of :func:`parse_quant_config`, split out for callers that
+    build a config through one of the format-specific builders. Skipping it
+    leaves both flags off, silently dropping the fused MoE path.
+
+    Args:
+        config: The config to finish, mutated in place.
+        state_dict: The checkpoint weights, read to decide MLP fusion.
+
+    Returns:
+        ``config``, for chaining.
+    """
+    config.can_use_fused_mlp = can_use_fused_mlp(
+        state_dict,
+        tensor_wise=(
+            config.weight_scale.is_tensor
+            and config.input_scale.is_tensor
+            and not config.is_static
+        ),
+    )
+    if not config.can_use_fused_mlp:
+        _logger.warning(
+            "Fused MLP is not supported for this model. "
+            "This may impact performance."
         )
-        if not config.can_use_fused_mlp:
-            _logger.warning(
-                "Fused MLP is not supported for this model. "
-                "This may impact performance."
-            )
-        # Default-on for NVFP4: the SM100 fused SwiGLU+NVFP4 grouped matmul
-        # kernel folds the MoE gate/up matmul + SwiGLU + NVFP4 quant into a
-        # single launch, saving one BF16 HBM round trip per MoE layer.
-        # Process-time kill-switch: ``MAX_DISABLE_FUSED_SWIGLU_NVFP4=1``.
-        # The kill-switch flips the QuantConfig flag so the model's
-        # ``gate_up_proj`` and ``gate_up_proj_scales`` properties (which
-        # gate the sigma-permutation on this flag) stay byte-equal to the
-        # historical chained-kernel path.
-        # NOTE: `accelerator_api()` probes the LOCAL machine, so this flag --
-        # and with it the sigma-permutation applied to `gate_up_proj` -- is a
-        # function of the build host, not the target device. Parsing the same
-        # checkpoint on a CPU-only host yields a different weight layout. The
-        # assumption is build-host == inference-target; fixing it properly
-        # means threading the target device spec in here.
-        # MXFP8 is cuda-only here: the fused kernel is SM100, and on AMD the
-        # MoE gate/up SwiGLU is fused by `fused_silu_mx_kernel` off the
-        # chained path instead (as MXFP4 already does). Gating the flag rather
-        # than the call site keeps the sigma-permutation and the kernel choice
-        # consistent.
-        config.can_use_fused_swiglu = (
-            config.is_nvfp4 or (config.is_mxfp8 and accelerator_api() == "cuda")
-        ) and (os.environ.get("MAX_DISABLE_FUSED_SWIGLU_NVFP4") != "1")
+    # Default-on for NVFP4: the SM100 fused SwiGLU+NVFP4 grouped matmul
+    # kernel folds the MoE gate/up matmul + SwiGLU + NVFP4 quant into a
+    # single launch, saving one BF16 HBM round trip per MoE layer.
+    # Process-time kill-switch: ``MAX_DISABLE_FUSED_SWIGLU_NVFP4=1``.
+    # The kill-switch flips the QuantConfig flag so the model's
+    # ``gate_up_proj`` and ``gate_up_proj_scales`` properties (which
+    # gate the sigma-permutation on this flag) stay byte-equal to the
+    # historical chained-kernel path.
+    # NOTE: `accelerator_api()` probes the LOCAL machine, so this flag --
+    # and with it the sigma-permutation applied to `gate_up_proj` -- is a
+    # function of the build host, not the target device. Parsing the same
+    # checkpoint on a CPU-only host yields a different weight layout. The
+    # assumption is build-host == inference-target; fixing it properly
+    # means threading the target device spec in here.
+    # MXFP8 is cuda-only here: the fused kernel is SM100, and on AMD the
+    # MoE gate/up SwiGLU is fused by `fused_silu_mx_kernel` off the
+    # chained path instead (as MXFP4 already does). Gating the flag rather
+    # than the call site keeps the sigma-permutation and the kernel choice
+    # consistent.
+    config.can_use_fused_swiglu = (
+        config.is_nvfp4 or (config.is_mxfp8 and accelerator_api() == "cuda")
+    ) and (os.environ.get("MAX_DISABLE_FUSED_SWIGLU_NVFP4") != "1")
 
     return config

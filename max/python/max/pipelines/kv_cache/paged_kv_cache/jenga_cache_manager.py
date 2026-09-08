@@ -36,20 +36,25 @@ from max.nn.kv_cache.cache_params import (
     KVCacheAssignments,
     KVCacheBufferInterface,
     KVConnectorType,
+    spec_decode_cache_slack,
 )
 from max.nn.kv_cache.data_parallelism_utils import split_into_groups
 from max.nn.kv_cache.metrics import KVCacheMetrics
-from max.nn.kv_cache.utils import build_max_lengths_tensors
+from max.nn.kv_cache.utils import build_max_lengths_tensors, padded_lut_cols
 from max.pipelines.context import TextContext
-from max.pipelines.kv_cache.kv_connector import BlockCount, ByteCount
+from max.pipelines.kv_cache.kv_connector import (
+    BlockCount,
+    ByteCount,
+    KVConnector,
+)
 from max.profiler import traced
 from max.support import to_human_readable_bytes
 from max.support.math import ceildiv
 
-from .block_manager import PrefixCacheHits, _compute_seq_len
+from ..connectors import create_connector
+from .block_manager import _compute_seq_len
 from .cache_manager import (
     _contiguous_prefix_2d,
-    _padded_lut_cols,
     cache_valid_length_for_context,
     prompt_tokens_for_context,
 )
@@ -84,7 +89,7 @@ class _PersistentKVDeviceInputBuffers:
         # Pad the inner dim so the SIMD ``populate`` in ``PagedKVCache``
         # can always load up to 16 consecutive uint32s past any valid
         # ``first_lut_idx`` without going OOB of this backing allocation.
-        padded_inner = _padded_lut_cols(max_lut_size)
+        padded_inner = padded_lut_cols(max_lut_size)
         for device in devices:
             lut_table_by_device.append(
                 {
@@ -112,7 +117,7 @@ class _PersistentKVDeviceInputBuffers:
     def view(
         self, batch_size: int, lut_num_pages: int
     ) -> tuple[list[dict[str, Buffer]], list[Buffer]]:
-        padded_lut_num_pages = _padded_lut_cols(lut_num_pages)
+        padded_lut_num_pages = padded_lut_cols(lut_num_pages)
         luts = [
             {
                 leaf_id: _contiguous_prefix_2d(
@@ -149,22 +154,52 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         available_bytes: int,
         max_batch_size: int,
         max_num_input_tokens: int | None = None,
+        max_seq_len: int | None = None,
     ) -> JengaKVCacheManager:
-        """Creates a JengaKVCacheManager."""
+        """Creates a JengaKVCacheManager.
+
+        ``available_bytes`` is the KV budget across all devices from memory
+        estimation (same contract as ``compute_num_device_blocks``). Each
+        device slab is sized from ``available_bytes // len(params.devices)``.
+        """
         leaves = params.leaves()
-        bytes_per_page = {
-            leaf_id: leaf.bytes_per_page for leaf_id, leaf in leaves.items()
-        }
+        # Leaf page sizes include a TP multiplier (replica-wide). Each Jenga
+        # slab lives on one device, so ratios must use the per-device stride.
+        tp_degree = params.tensor_parallel_degree
+        bytes_per_page: dict[str, int] = {}
+        for leaf_id, leaf in leaves.items():
+            if leaf.bytes_per_page % tp_degree != 0:
+                raise ValueError(
+                    "Jenga leaf page size must be divisible by tensor "
+                    f"parallel degree {tp_degree}, found {leaf.bytes_per_page} "
+                    f"for {leaf_id}"
+                )
+            bytes_per_page[leaf_id] = leaf.bytes_per_page // tp_degree
+        n_devices = len(params.devices)
+        if n_devices < 1:
+            raise ValueError("Jenga KV cache requires at least one device")
+        per_device_available_bytes = available_bytes // n_devices
         num_huge_blocks, huge_page_bytes, ratios = compute_jenga_ratios(
-            available_bytes, bytes_per_page
+            per_device_available_bytes, bytes_per_page
         )
-        leaf_infos = {
-            leaf_id: KVLeafInfo(
-                ratio=ratios[leaf_id],
-                group_id=leaf.group_id,
+        if params.kv_connector_config.type.value == "dkv":
+            raise ValueError(
+                "DKV KVConnector is not supported with Jenga KV cache. "
+                "Set MODULAR_USE_LEGACY_KV_CACHE=1 if DKV KVConnector is required."
             )
+        leaf_infos = {
+            leaf_id: KVLeafInfo(ratio=ratios[leaf_id], group_id=leaf.group_id)
             for leaf_id, leaf in leaves.items()
         }
+
+        logger.info(
+            f"Jenga KV manager: {num_huge_blocks} huge pages x {to_human_readable_bytes(huge_page_bytes)} = {to_human_readable_bytes(num_huge_blocks * huge_page_bytes)} (per device), page_size {params.page_size} tokens"
+        )
+        max_leaf_id_len = max(len(leaf_id) for leaf_id in leaf_infos)
+        for leaf_id, leaf_info in leaf_infos.items():
+            logger.info(
+                f"\t{leaf_id:<{max_leaf_id_len}}: {leaf_info.ratio * num_huge_blocks} pages of {to_human_readable_bytes(bytes_per_page[leaf_id])}  ({leaf_info.ratio} per huge page)"
+            )
 
         devices = [d.to_device() for d in params.devices]
         slabs = [
@@ -181,25 +216,50 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             for bs in split_into_groups(slabs, params.data_parallel_degree)
         ]
 
-        logger.info(
-            f"Jenga KV manager: {num_huge_blocks} huge pages x {to_human_readable_bytes(huge_page_bytes)} = {to_human_readable_bytes(num_huge_blocks * huge_page_bytes)} (per device), page_size {params.page_size} tokens"
+        # A single connector serves every replica; each load/offload passes the
+        # replica_idx that selects the device endpoint. `to_memory()` emits one
+        # unit per leaf in `params.leaves()` order.
+        replica_kv_memory = [
+            dict(zip(leaves, buf.to_memory(), strict=True))
+            for buf in kv_buffers
+        ]
+        connector = create_connector(
+            leaves={leaf_id: leaf.group_id for leaf_id, leaf in leaves.items()},
+            devices=devices,
+            replica_kv_memory=replica_kv_memory,
+            params=params,
+            device_memory_bytes=num_huge_blocks * huge_page_bytes,
         )
-        max_leaf_id_len = max(len(leaf_id) for leaf_id in leaf_infos)
-        for leaf_id, leaf_info, leaf in zip(
-            leaf_infos.keys(), leaf_infos.values(), leaves.values(), strict=True
-        ):
-            logger.info(
-                f"\t{leaf_id:<{max_leaf_id_len}}: {leaf_info.ratio * num_huge_blocks} pages of {to_human_readable_bytes(leaf.bytes_per_page)}  ({leaf_info.ratio} per huge page)"
-            )
 
-        return cls(
+        manager = cls(
             params=params,
             leaf_infos=leaf_infos,
             kv_buffers=kv_buffers,
             num_huge_blocks=num_huge_blocks,
             max_batch_size=max_batch_size,
             max_num_input_tokens=max_num_input_tokens,
+            connector=connector,
         )
+        if max_seq_len is not None:
+            slack = spec_decode_cache_slack(params)
+            seq_len_with_slack = max_seq_len + slack
+            if not manager._fits_in_cache(seq_len_with_slack):
+                effective = manager.effective_max_seq_length
+                max_tokens = effective if effective is not None else 0
+                slack_str = (
+                    f" (plus {slack} speculative-decode slack tokens)"
+                    if slack > 0
+                    else ""
+                )
+                raise RuntimeError(
+                    "Insufficient cache memory to support a batch containing one"
+                    f" request at the max sequence length of {max_seq_len} tokens"
+                    f"{slack_str}. A request approaching the max sequence length would"
+                    " exhaust the KV cache and crash the model worker. Reduce"
+                    f" --max-length to at most {max_tokens} or increase the available"
+                    " KV cache memory (e.g. raise --device-memory-utilization)."
+                )
+        return manager
 
     def __init__(
         self,
@@ -210,14 +270,27 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         kv_buffers: Sequence[KVCacheBufferInterface],
         max_batch_size: int,
         max_num_input_tokens: int | None = None,
+        connector: KVConnector | None = None,
     ) -> None:
         # Publicly accessible alias for the params object since it is accessed
         # by callers (e.g. scheduler).
         self.params = params
 
-        if params.kv_connector_config.type != KVConnectorType.null:
-            raise ValueError(
-                "JengaKVCacheManager does not support KVConnectors."
+        # `create_connector` hands back a NullConnector when none is
+        # configured; treat that as "no connector" so the guard and the
+        # transfer paths below stay inert for the common case.
+        if params.kv_connector_config.type == KVConnectorType.null:
+            connector = None
+        self._connector = connector
+
+        if (
+            params.enable_dp_cross_replica_prefix_copy
+            and params.data_parallel_degree > 1
+        ):
+            # TODO(SERVOPT-1591)
+            logger.info(
+                "Ignoring enable_dp_cross_replica_prefix_copy=True as Jenga KV cache is incompatible with this feature. "
+                "Set MODULAR_USE_LEGACY_KV_CACHE=1 if cross-replica prefix cache hits via device-to-device copies is required."
             )
 
         self._leaf_infos = leaf_infos
@@ -255,6 +328,7 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             max_num_input_tokens=self._max_num_input_tokens,
             num_draft_tokens=self.params.num_draft_tokens,
             num_draft_tokens_per_step=self.params.num_draft_tokens_per_step,
+            connector=connector,
         )
 
     # ============================================================================
@@ -273,6 +347,16 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             raise ValueError(
                 f"Number of batches must match number of replicas. Expected {self.params.data_parallel_degree}, got {len(batches)}"
             )
+
+        if self._connector is not None:
+            # Pre-forward load barrier (dKV-only): dKV posts its READs in
+            # `load` and orders them here. Asynchronous connectors instead hold
+            # a request out of the batch until its onload polls complete, so
+            # this is a no-op for them.
+            self._connector.wait_for_loads()
+            for replica_idx in range(len(batches)):
+                # Initiate saves of everything committed since the last forward.
+                self.offload(replica_idx)
 
         assignments = [
             self._compute_kv_cache_assignments(
@@ -352,7 +436,7 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         # ``PagedKVCache`` can safely over-read past any valid
         # ``first_lut_idx``. [0, total_num_pages) are the valid block ids
         # and total_num_pages denotes an unassigned block.
-        padded_lut_num_pages = _padded_lut_cols(lut_num_pages)
+        padded_lut_num_pages = padded_lut_cols(lut_num_pages)
         shape = (batch_size, padded_lut_num_pages)
         dtype = DType.uint32
         device = self._staging_devices[replica_idx]
@@ -485,42 +569,35 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         return self.huge_block_count(replica_idx)
 
     # ============================================================================
-    # KVConnector APIs: Unimplemented as Jenga does not support KVConnector yet
+    # KVConnector APIs (full-attention groups only -- see __init__)
     # ============================================================================
-
-    def pending_transfers_exist(self, replica_idx: int = 0) -> bool:
-        """Returns whether there are pending transfers for the replica."""
-        return False
-
-    def poll_transfers(self) -> None:
-        """Polls for transfers to complete."""
-        return
 
     def host_byte_count(self, replica_idx: int = 0) -> ByteCount:
         """Returns the host KV tier occupancy in bytes for the given replica."""
-        return ByteCount(free=0, total=0)
+        if self._connector is None:
+            return ByteCount(free=0, total=0)
+        return self._connector.host_byte_count
 
     def disk_byte_count(self, replica_idx: int = 0) -> ByteCount:
         """Returns the disk KV tier occupancy in bytes for the given replica."""
-        return ByteCount(free=0, total=0)
+        if self._connector is None:
+            return ByteCount(free=0, total=0)
+        return self._connector.disk_byte_count
 
     def shutdown(self) -> None:
-        """Shuts down the connector."""
-        return
+        """Releases the connector's external resources.
+
+        Drains in-flight host/disk transfers and frees the shared pinned host
+        buffer; for the tiered connector this also removes its offload
+        directory. One connector backs every replica, so this shuts it down
+        once. A no-op for the ``null`` connector.
+        """
+        if self._connector is not None:
+            self._connector.shutdown()
 
     # ============================================================================
     # Misc
     # ============================================================================
-
-    def get_prefix_cache_hit_counts(
-        self, ctx: TextContext
-    ) -> list[PrefixCacheHits]:
-        """Counts each replica's contiguous cached prefix for a request.
-
-        Unimplemented: this only feeds prefix-aware replica selection, which
-        fails open to weighting every replica by the full prompt.
-        """
-        raise NotImplementedError
 
     def runtime_inputs_for_leaf(
         self,
@@ -541,13 +618,3 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
     def get_device_buffer(self, replica_idx: int) -> KVCacheBufferInterface:
         """Returns the device buffer for the given replica."""
         return self._kv_buffers[replica_idx]
-
-    def get_req_blocks(self, ctx: TextContext) -> list[int]:
-        """Returns block IDs the request holds on the replica it was claimed on.
-
-        Unimplemented: this interface method assumes one leaf (it backs the
-        KVConnector / disaggregated-serving transfer path, which Jenga does
-        not support -- see the ``kv_connector`` guard in ``__init__``).
-        Jenga's own per-leaf equivalent is :meth:`get_req_blocks_per_leaf`.
-        """
-        raise NotImplementedError

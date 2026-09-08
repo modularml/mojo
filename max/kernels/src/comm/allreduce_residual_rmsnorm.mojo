@@ -67,7 +67,7 @@ from std.sys import (
     size_of,
 )
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -218,7 +218,9 @@ def _allreduce_rmsnorm_fp8_kernel_warp_tiling[
     # Round-robin access pattern for NVLink load-balancing.
     comptime PtrType = ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]
     var ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: src_ptrs[(_my_rank + i) % ngpus]
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: src_ptrs[
+            (_my_rank + i) % ngpus
+        ]
     )
 
     # Row loop: each block processes _rows with stride = grid_dim.
@@ -468,14 +470,14 @@ def _allreduce_rmsnorm_fp8_kernel_2stage[
     # +1 advances by sizeof(Signal) bytes (see local scratch note above).
     comptime Fp8PtrType = MutPointer[Scalar[out_dtype], MutAnyOrigin]
     var fp8_ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> Fp8PtrType: (
+        fill_with_unrolled=lambda [i: Int]() -> Fp8PtrType: (
             rank_sigs[i].address_space_cast[.GENERIC]() + 1
         ).bitcast[Scalar[out_dtype]]()
     )
 
     comptime ScalePtrType = MutPointer[Scalar[scales_dtype], MutAnyOrigin]
     var scale_ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> ScalePtrType: (
+        fill_with_unrolled=lambda [i: Int]() -> ScalePtrType: (
             (rank_sigs[i].address_space_cast[.GENERIC]() + 1).bitcast[
                 Scalar[out_dtype]
             ]()
@@ -495,7 +497,9 @@ def _allreduce_rmsnorm_fp8_kernel_2stage[
     # Round-robin P2P input pointers for NVLink load-balancing.
     comptime PtrType = ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]
     var ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: src_ptrs[(_my_rank + i) % ngpus]
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: src_ptrs[
+            (_my_rank + i) % ngpus
+        ]
     )
 
     # Preload gamma weights into registers BEFORE start barrier.
@@ -956,12 +960,14 @@ def _launch_split_allreduce_rmsnorm_fp8[
     it avoids carrying bf16 residual data through scratch buffers.
     """
     # Construct TileTensor inputs for allreduce.
-    var _tt0 = TileTensor(src_ptrs[0], row_major(Coord(rows, cols)))
-    comptime _TT = type_of(_tt0)
-    var input_buffers = Array[_TT, ngpus](fill=_tt0)
-
-    comptime for i in range(1, ngpus):
-        input_buffers[i] = TileTensor(src_ptrs[i], row_major(Coord(rows, cols)))
+    comptime _TT = type_of(
+        TileTensor(src_ptrs[0], row_major(Coord(rows, cols)))
+    )
+    var input_buffers = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> _TT: TileTensor(
+            src_ptrs[i], row_major(Coord(rows, cols))
+        )
+    )
 
     var _cols = cols
 

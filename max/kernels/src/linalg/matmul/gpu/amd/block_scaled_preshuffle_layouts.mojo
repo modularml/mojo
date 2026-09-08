@@ -41,7 +41,7 @@ Layout reference (canonical):
         : `preShuffleWeight` (B 5D) and `preShuffleScale` (scale 4D).
 """
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     block_dim,
     block_idx,
@@ -55,7 +55,7 @@ from std.math import align_up, ceildiv
 from std.math.uutils import udivmod, uceildiv
 from std.memory import bitcast
 
-from layout import Coord, Idx, TensorStorage, TileTensor, row_major
+from layout import Coord, Idx, TensorEngine, TileTensor, row_major
 
 from layout.tile_layout import Layout, TensorLayout, col_major
 from layout.tile_tensor import stack_allocation
@@ -377,11 +377,11 @@ struct Shuffler[E: Int]:
         K_BYTES: Int,
         RawLayout: TensorLayout,
         DstLayout: TensorLayout,
-        RawStore: TensorStorage,
-        DstStore: TensorStorage,
+        RawEngine: TensorEngine,
+        DstEngine: TensorEngine,
     ](
-        raw: TileTensor[.uint8, RawLayout, ImmutAnyOrigin, Storage=RawStore],
-        dst: TileTensor[.uint8, DstLayout, MutAnyOrigin, Storage=DstStore],
+        raw: TileTensor[.uint8, RawLayout, ImmutAnyOrigin, Engine=RawEngine],
+        dst: TileTensor[.uint8, DstLayout, MutAnyOrigin, Engine=DstEngine],
     ):
         """LDS-staged per-tile B 5D preshuffle on AMD GPU.
 
@@ -604,8 +604,8 @@ struct Shuffler[E: Int]:
             K_BYTES,
             type_of(raw_any).LayoutType,
             type_of(dst_any).LayoutType,
-            type_of(raw_any).Storage,
-            type_of(dst_any).Storage,
+            type_of(raw_any).Engine,
+            type_of(dst_any).Engine,
         ]
         ctx.enqueue_function[kernel](
             raw_any,
@@ -625,8 +625,9 @@ struct Shuffler[E: Int]:
         MN: Int,
         K_SCALES: Int,
         SrcLayout: TensorLayout,
+        SrcEngine: TensorEngine,
     ](
-        src: TileTensor[.uint8, SrcLayout, MutAnyOrigin],
+        src: TileTensor[.uint8, SrcLayout, MutAnyOrigin, Engine=SrcEngine],
         mut dst: HostBuffer[.uint8],
     ):
         # shuffles the scale layout on CPU, and pads the layout
@@ -635,6 +636,11 @@ struct Shuffler[E: Int]:
         comptime assert (
             K_SCALES % Self.S_K_BLOCK == 0
         ), "preshuffle_scale_4d: K_SCALES must be a multiple of 8"
+        comptime assert SrcEngine.element_size == 1, (
+            "preshuffle_scale_4d: requires a scalar engine"
+            " (DefaultEngine / PointerStorage); vectorized engines are not"
+            " supported."
+        )
 
         comptime MN_padded = Self.scale_padded_mn(MN)
         comptime group_bytes = MN_padded * K_SCALES
@@ -646,7 +652,12 @@ struct Shuffler[E: Int]:
                     var byte_off = e_off + Self.scale_4d_byte_off[
                         K_SCALES=K_SCALES
                     ](mn, k_scale)
-                    dst[byte_off] = src[Coord(e, mn, k_scale)]
+                    # ElementType is `SIMD[.uint8, SrcEngine.element_size]`,
+                    # but only scalar engines are accepted (asserted above),
+                    # so a width-1 load yields a `UInt8` scalar.
+                    dst[byte_off] = UInt8(
+                        src.load[width=1](Coord(e, mn, k_scale))
+                    )
 
             for mn in range(MN, MN_padded):
                 for k_scale in range(K_SCALES):
@@ -679,21 +690,21 @@ struct Shuffler[E: Int]:
         SrcLayout: TensorLayout,
         DstLayout: TensorLayout,
         AOffsetsLayout: TensorLayout,
-        SrcStore: TensorStorage,
-        DstStore: TensorStorage,
-        AOffsetsStore: TensorStorage,
+        SrcEngine: TensorEngine,
+        DstEngine: TensorEngine,
+        AOffsetsEngine: TensorEngine,
     ](
         sfa_raw: TileTensor[
-            .uint8, SrcLayout, ImmutAnyOrigin, Storage=SrcStore
+            .uint8, SrcLayout, ImmutAnyOrigin, Engine=SrcEngine
         ],
         sfa_pre: TileTensor[
-            mut=True, .uint8, DstLayout, MutAnyOrigin, Storage=DstStore
+            mut=True, .uint8, DstLayout, MutAnyOrigin, Engine=DstEngine
         ],
         a_offsets: TileTensor[
             .uint32,
             AOffsetsLayout,
             ImmutAnyOrigin,
-            Storage=AOffsetsStore,
+            Engine=AOffsetsEngine,
         ],
         num_active_experts: Int32,
         max_padded_M: Int32,
@@ -832,9 +843,9 @@ struct Shuffler[E: Int]:
             type_of(raw_any).LayoutType,
             type_of(pre_any).LayoutType,
             type_of(a_off_any).LayoutType,
-            type_of(raw_any).Storage,
-            type_of(pre_any).Storage,
-            type_of(a_off_any).Storage,
+            type_of(raw_any).Engine,
+            type_of(pre_any).Engine,
+            type_of(a_off_any).Engine,
         ]
         ctx.enqueue_function[kernel](
             raw_any,

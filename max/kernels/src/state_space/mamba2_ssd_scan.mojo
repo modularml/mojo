@@ -50,20 +50,20 @@ boundary -- no cross-sequence bleed. `final_states (batch, nheads, head_dim,
 dstate)` is written at each sequence end.
 """
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     block_dim,
     block_idx,
     thread_idx,
 )
 from max.gpu.host import DeviceContext
-from std.gpu.primitives.warp import lane_group_sum
+from max.gpu.primitives.warp import lane_group_sum
 from max.algorithm import sync_parallelize
 from std.math import exp2
 from std.sys.info import align_of
 from std.utils.index import IndexList
 from std.utils.static_tuple import StaticTuple
-from layout import PointerStorage, TensorLayout, TensorStorage, TileTensor
+from layout import DefaultEngine, TensorLayout, TensorEngine, TileTensor
 from state_space.selective_scan import softplus
 
 # LOG2E: convert exp(x) -> exp2(x * LOG2E) (faster on GPU), matching the
@@ -94,8 +94,8 @@ def mamba2_ssd_chunk_scan_varlen_fwd_gpu[
     has_initial_state_LT: TensorLayout,
     # All operands are built from the same source (graph input tensors in
     # production, device buffers in the coverage test) so they share one
-    # storage policy; a single param binds it for every tile argument.
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    # engine; a single param binds it for every tile argument.
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     nheads_dev: Int32,
     head_dim_dev: Int32,
@@ -105,40 +105,40 @@ def mamba2_ssd_chunk_scan_varlen_fwd_gpu[
     dt_softplus: Int8,
     # Tensors (varlen / ragged: time dim is the packed total_len)
     x: TileTensor[
-        kernel_dtype, x_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (total_len, nheads, head_dim)
     dt: TileTensor[
-        kernel_dtype, dt_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, dt_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (total_len, nheads)
     A: TileTensor[
-        kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (nheads,)
     B: TileTensor[
-        kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (total_len, ngroups, dstate)
     C: TileTensor[
-        kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (total_len, ngroups, dstate)
     D: TileTensor[
-        kernel_dtype, D_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (nheads,) optional
     dt_bias: TileTensor[
-        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (nheads,) optional
     initial_states: TileTensor[
-        .float32, initial_states_LT, MutUntrackedOrigin, Storage=Storage
+        .float32, initial_states_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch, nheads, head_dim, dstate) optional
     y: TileTensor[
-        kernel_dtype, y_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, y_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (total_len, nheads, head_dim)
     final_states: TileTensor[
-        .float32, final_states_LT, MutUntrackedOrigin, Storage=Storage
+        .float32, final_states_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch, nheads, head_dim, dstate)
     query_start_loc: TileTensor[
-        .int32, query_start_loc_LT, MutUntrackedOrigin, Storage=Storage
+        .int32, query_start_loc_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch + 1,)
     has_initial_state: TileTensor[
-        .bool, has_initial_state_LT, MutUntrackedOrigin, Storage=Storage
+        .bool, has_initial_state_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch,) optional
     x_strides: Strides3D,  # (total_len, nheads, head_dim)
     dt_strides: Strides2D,  # (total_len, nheads)
@@ -304,9 +304,9 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu[
     query_start_loc_LT: TensorLayout,
     has_initial_state_LT: TensorLayout,
     cache_indices_LT: TensorLayout,
-    # All operands share one storage policy (see the non-inplace variant); a
+    # All operands share one engine (see the non-inplace variant); a
     # single param binds it for every tile argument.
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     nheads_dev: Int32,
     head_dim_dev: Int32,
@@ -314,30 +314,30 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu[
     nheads_ngroups_ratio_dev: Int32,
     batch_dev: Int32,
     dt_softplus: Int8,
-    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Storage=Storage],
-    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Storage=Storage],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage],
-    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage],
-    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage],
-    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Storage=Storage],
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
     dt_bias: TileTensor[
-        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    y: TileTensor[kernel_dtype, y_LT, MutUntrackedOrigin, Storage=Storage],
+    y: TileTensor[kernel_dtype, y_LT, MutUntrackedOrigin, Engine=Engine],
     # ssm_pool: [max_slots, nheads, head_dim, dstate] fp32 — read for initial
     # state (when has_initial_state[b]) and written in-place at slot
     # cache_indices[b] (instead of a separate final_states output).
     ssm_pool: TileTensor[
-        .float32, ssm_pool_LT, MutUntrackedOrigin, Storage=Storage
+        .float32, ssm_pool_LT, MutUntrackedOrigin, Engine=Engine
     ],
     query_start_loc: TileTensor[
-        .int32, query_start_loc_LT, MutUntrackedOrigin, Storage=Storage
+        .int32, query_start_loc_LT, MutUntrackedOrigin, Engine=Engine
     ],
     has_initial_state: TileTensor[
-        .bool, has_initial_state_LT, MutUntrackedOrigin, Storage=Storage
+        .bool, has_initial_state_LT, MutUntrackedOrigin, Engine=Engine
     ],
     cache_indices: TileTensor[
-        .uint32, cache_indices_LT, MutUntrackedOrigin, Storage=Storage
+        .uint32, cache_indices_LT, MutUntrackedOrigin, Engine=Engine
     ],
     x_strides: Strides3D,
     dt_strides: Strides2D,
@@ -377,8 +377,8 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu[
         query_start_loc_LT: Tensor layout of `query_start_loc`.
         has_initial_state_LT: Tensor layout of `has_initial_state`.
         cache_indices_LT: Tensor layout of `cache_indices`.
-        Storage: Storage policy shared by all tile operands (defaults to
-            `PointerStorage[element_width=1]`).
+        Engine: Engine shared by all tile operands (defaults to
+            `DefaultEngine[element_width=1]`).
 
     Args:
         nheads_dev: Number of attention heads.
@@ -592,6 +592,7 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu_dstate_split[
     query_start_loc_LT: TensorLayout,
     has_initial_state_LT: TensorLayout,
     cache_indices_LT: TensorLayout,
+    Engine: TensorEngine,
     DSTATE_SPLIT: Int = 1,
 ](
     nheads_dev: Int32,
@@ -600,20 +601,28 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu_dstate_split[
     nheads_ngroups_ratio_dev: Int32,
     batch_dev: Int32,
     dt_softplus: Int8,
-    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin],
-    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin],
-    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin],
-    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin],
-    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin],
-    dt_bias: TileTensor[kernel_dtype, dt_bias_LT, MutUntrackedOrigin],
-    y: TileTensor[kernel_dtype, y_LT, MutUntrackedOrigin],
-    ssm_pool: TileTensor[.float32, ssm_pool_LT, MutUntrackedOrigin],
-    query_start_loc: TileTensor[.int32, query_start_loc_LT, MutUntrackedOrigin],
-    has_initial_state: TileTensor[
-        .bool, has_initial_state_LT, MutUntrackedOrigin
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
+    dt_bias: TileTensor[
+        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    cache_indices: TileTensor[.uint32, cache_indices_LT, MutUntrackedOrigin],
+    y: TileTensor[kernel_dtype, y_LT, MutUntrackedOrigin, Engine=Engine],
+    ssm_pool: TileTensor[
+        .float32, ssm_pool_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    query_start_loc: TileTensor[
+        .int32, query_start_loc_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    has_initial_state: TileTensor[
+        .bool, has_initial_state_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    cache_indices: TileTensor[
+        .uint32, cache_indices_LT, MutUntrackedOrigin, Engine=Engine
+    ],
     x_strides: Strides3D,
     dt_strides: Strides2D,
     A_strides: Strides1D,
@@ -884,7 +893,7 @@ struct DStateVecLoader[
     ssm_pool_LT: TensorLayout,
     B_LT: TensorLayout,
     C_LT: TensorLayout,
-    Storage: TensorStorage,
+    Engine: TensorEngine,
     VEC: Int,
     NCHUNK: Int,
 ](ImplicitlyCopyable, Movable):
@@ -894,7 +903,7 @@ struct DStateVecLoader[
     ``..._dstate_split`` sibling performs the identical widen-on-load /
     round-on-store / vectorized-vs-scalar-fallback logic inline; it COULD reuse
     this owner later (it is parameterized on the storage dtypes / layouts /
-    ``Storage``), but is not wired to it here (Apple-scoped change).
+    ``Engine``), but is not wired to it here (Apple-scoped change).
 
     Every DRAM <-> register transition on the innermost (dstate) axis has an
     owner here instead of a ``raw_load`` / ``raw_store`` scattered across the
@@ -926,7 +935,7 @@ struct DStateVecLoader[
         ssm_pool_LT: Layout type of the ``ssm_pool`` view.
         B_LT: Layout type of the ``B`` view.
         C_LT: Layout type of the ``C`` view.
-        Storage: Shared tensor-storage policy of the views.
+        Engine: Shared engine of the views.
         VEC: SIMD load/store width over the contiguous dstate axis.
         NCHUNK: Number of ``VEC``-wide chunks spanning ``DSTATE``.
     """
@@ -935,13 +944,13 @@ struct DStateVecLoader[
         Self.state_dtype,
         Self.ssm_pool_LT,
         MutUntrackedOrigin,
-        Storage=Self.Storage,
+        Engine=Self.Engine,
     ]
     var B: TileTensor[
-        Self.kernel_dtype, Self.B_LT, MutUntrackedOrigin, Storage=Self.Storage
+        Self.kernel_dtype, Self.B_LT, MutUntrackedOrigin, Engine=Self.Engine
     ]
     var C: TileTensor[
-        Self.kernel_dtype, Self.C_LT, MutUntrackedOrigin, Storage=Self.Storage
+        Self.kernel_dtype, Self.C_LT, MutUntrackedOrigin, Engine=Self.Engine
     ]
     # Innermost (dstate) strides for the scalar fallback gather/scatter.
     var pool_dstate_stride: Int
@@ -958,19 +967,19 @@ struct DStateVecLoader[
             Self.state_dtype,
             Self.ssm_pool_LT,
             MutUntrackedOrigin,
-            Storage=Self.Storage,
+            Engine=Self.Engine,
         ],
         B: TileTensor[
             Self.kernel_dtype,
             Self.B_LT,
             MutUntrackedOrigin,
-            Storage=Self.Storage,
+            Engine=Self.Engine,
         ],
         C: TileTensor[
             Self.kernel_dtype,
             Self.C_LT,
             MutUntrackedOrigin,
-            Storage=Self.Storage,
+            Engine=Self.Engine,
         ],
         pool_dstate_stride: Int,
         b_dstate_stride: Int,
@@ -1104,9 +1113,9 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu_apple[
     # backend (`<8 x half>`/`<8 x bfloat>` under-alignment cliff), so the
     # shipping default VEC=4 is the safe choice across state dtypes.
     VEC: Int = 4,
-    # All operands share one storage policy (see the v1 variant); a single
+    # All operands share one engine (see the v1 variant); a single
     # param binds it for every tile argument.
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     nheads_dev: Int32,
     head_dim_dev: Int32,
@@ -1114,27 +1123,27 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu_apple[
     nheads_ngroups_ratio_dev: Int32,
     batch_dev: Int32,
     dt_softplus: Int8,
-    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Storage=Storage],
-    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Storage=Storage],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage],
-    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage],
-    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage],
-    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Storage=Storage],
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
     dt_bias: TileTensor[
-        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    y: TileTensor[kernel_dtype, y_LT, MutUntrackedOrigin, Storage=Storage],
+    y: TileTensor[kernel_dtype, y_LT, MutUntrackedOrigin, Engine=Engine],
     ssm_pool: TileTensor[
-        state_dtype, ssm_pool_LT, MutUntrackedOrigin, Storage=Storage
+        state_dtype, ssm_pool_LT, MutUntrackedOrigin, Engine=Engine
     ],
     query_start_loc: TileTensor[
-        .int32, query_start_loc_LT, MutUntrackedOrigin, Storage=Storage
+        .int32, query_start_loc_LT, MutUntrackedOrigin, Engine=Engine
     ],
     has_initial_state: TileTensor[
-        .bool, has_initial_state_LT, MutUntrackedOrigin, Storage=Storage
+        .bool, has_initial_state_LT, MutUntrackedOrigin, Engine=Engine
     ],
     cache_indices: TileTensor[
-        .uint32, cache_indices_LT, MutUntrackedOrigin, Storage=Storage
+        .uint32, cache_indices_LT, MutUntrackedOrigin, Engine=Engine
     ],
     x_strides: Strides3D,
     dt_strides: Strides2D,
@@ -1271,7 +1280,7 @@ def mamba2_ssd_chunk_scan_varlen_fwd_inplace_gpu_apple[
         ssm_pool_LT,
         B_LT,
         C_LT,
-        Storage,
+        Engine,
         VEC,
         NCHUNK,
     ](ssm_pool, B, C, ssm_pool_strides[3], B_strides[2], C_strides[2])

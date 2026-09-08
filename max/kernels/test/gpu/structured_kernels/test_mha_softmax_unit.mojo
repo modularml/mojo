@@ -48,7 +48,7 @@ After all tiles:
   10. normalize_output(o_reg)
 """
 
-from std.gpu import lane_id
+from max.gpu import lane_id
 from max.gpu.host import DeviceContext
 from std.math import exp2 as math_exp2
 from std.testing import assert_almost_equal, assert_equal

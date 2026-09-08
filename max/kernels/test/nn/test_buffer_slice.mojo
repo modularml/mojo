@@ -49,9 +49,11 @@ def test_slice[
     use_copy: Bool,
 ) raises:
     # Isn't always used but is used for the output buffer if we copy.
-    var output_mem = Array[Scalar[dtype], numelems](uninitialized=True)
+    var output_mem = Array[Scalar[dtype], numelems](fill={})
 
-    var memory1 = Array[Scalar[dtype], numelems](uninitialized=True)
+    var memory1 = Array[Scalar[dtype], numelems](
+        fill_with=lambda (i: Int) -> Scalar[dtype]: Scalar[dtype](i)
+    )
     var in_tensor = TileTensor(
         memory1,
         row_major(Coord(dims)),
@@ -62,31 +64,29 @@ def test_slice[
     print("In shape:", shape)
     print("In strides:", stride)
 
-    var start_tensor_mem = Array[Int, outer_rank](uninitialized=True)
+    var start_tensor_mem = Array[Int, outer_rank](
+        fill_with=lambda (dim: Int) -> Int: Int(starts[dim])
+    )
     var start_tensor = TileTensor(
         start_tensor_mem,
         row_major(Coord(IndexList[1](outer_rank))),
     )
 
-    var end_tensor_mem = Array[Int, outer_rank](uninitialized=True)
+    var end_tensor_mem = Array[Int, outer_rank](
+        fill_with=lambda (dim: Int) -> Int: Int(stops[dim])
+    )
     var end_tensor = TileTensor(
         end_tensor_mem,
         row_major(Coord(IndexList[1](outer_rank))),
     )
 
-    var step_tensor_mem = Array[Int, outer_rank](uninitialized=True)
+    var step_tensor_mem = Array[Int, outer_rank](
+        fill_with=lambda (dim: Int) -> Int: Int(steps[dim])
+    )
     var step_tensor = TileTensor(
         step_tensor_mem,
         row_major(Coord(IndexList[1](outer_rank))),
     )
-
-    for dim in range(outer_rank):
-        start_tensor[dim] = Int(starts[dim])
-        end_tensor[dim] = Int(stops[dim])
-        step_tensor[dim] = Int(steps[dim])
-
-    for i in range(numelems):
-        in_tensor.raw_store(i, Scalar[dtype](i))
 
     # Perform the slice even if we are testing the copy so we get the target size.
     var sliced = slice_as_view(

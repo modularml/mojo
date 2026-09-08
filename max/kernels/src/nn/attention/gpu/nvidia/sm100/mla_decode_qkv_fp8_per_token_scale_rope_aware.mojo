@@ -67,12 +67,12 @@ from std.collections import OptionalReg
 from std.math import ceildiv
 from std.math.constants import log2e
 from std.sys import size_of
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, warp_id
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, warp_id
 from max.gpu.sync import barrier
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.primitives.grid_controls import launch_dependent_grids
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.memory import external_memory
 from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
@@ -88,6 +88,7 @@ from layout import (
     CoordLike,
     Layout,
     RowMajorLayout,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -142,6 +143,7 @@ struct MLA_SM100_Decode_QKV_FP8_PerTokenScale_RopeAware[
     MaskType: MHAMask,
     config: MLA_SM100_Decode_Config,
     ValidLengthType: OptionalPointer,
+    Engine: TensorEngine,
     _is_cache_length_accurate: Bool = False,
     ragged: Bool = False,
     has_per_token_scales: Bool = False,
@@ -173,6 +175,7 @@ struct MLA_SM100_Decode_QKV_FP8_PerTokenScale_RopeAware[
             counts, head counts, and TMEM layout for the kernel.
         ValidLengthType: The optional pointer type for the
             per-request valid sequence length buffer.
+        Engine: Engine policy of the `scalar_args` tile operand.
         _is_cache_length_accurate: Whether the cache length used for
             offset computation is accurate (defaults to `False`).
         ragged: Whether ragged (variable-length) sequences are used,
@@ -352,7 +355,10 @@ struct MLA_SM100_Decode_QKV_FP8_PerTokenScale_RopeAware[
         # Null pointer means no Q scale (sigma_Q = 1.0).
         q_scale_ptr: OptionalReg[UnsafePointer[Float32, MutAnyOrigin]],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # SlidingWindowCausalMask is supported ONLY by the native FP8 backend

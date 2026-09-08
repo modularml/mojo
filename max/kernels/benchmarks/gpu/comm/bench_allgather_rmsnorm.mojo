@@ -145,14 +145,14 @@ def _verify_results[
     comptime GammaType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0)))), ImmutAnyOrigin
     ]
-    var in_shards = Array[ShardType, ngpus](uninitialized=True)
-    comptime for i in range(ngpus):
-        in_shards[i] = ShardType(
+    var in_shards = Array[ShardType, ngpus](
+        fill_with=lambda (i: Int) -> ShardType: ShardType(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
                 cb_shards[i].offset_ptr(0)
             ),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
+    )
     var gamma_view = GammaType(
         rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
             gamma_dev.unsafe_ptr()
@@ -206,12 +206,12 @@ def _verify_results[
         var out_base = rebind[MutPointer[Scalar[in_dtype], MutAnyOrigin]](
             ag_r[i].unsafe_ptr()
         )
-        var out_views = Array[FullType, ngpus](uninitialized=True)
-        comptime for src in range(ngpus):
-            out_views[src] = FullType(
+        var out_views = Array[FullType, ngpus](
+            fill_with=lambda (src: Int) -> FullType: FullType(
                 out_base + config.rank_unit_start(src) * num_cols,
                 row_major(Coord(Index(config.rank_units(src), num_cols))),
             )
+        )
         allgather(in_shards, out_views, rank_sigs, list_of_ctx[i], i)
     group_end()
     for i in range(ngpus):
@@ -400,51 +400,60 @@ def bench_allgather_rmsnorm[
     comptime GammaType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0)))), ImmutAnyOrigin
     ]
-    var in_shards = Array[ShardType, ngpus](uninitialized=True)
-    var normed_views = Array[FullType, ngpus](uninitialized=True)
-    var sum_views = Array[FullType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_shards[i] = ShardType(
+    var in_shards = Array[ShardType, ngpus](
+        fill_with=lambda (i: Int) -> ShardType: ShardType(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
                 cb_shards[i].unsafe_ptr()
             ),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
-        normed_views[i] = FullType(
+    )
+    var normed_views = Array[FullType, ngpus](
+        fill_with=lambda (i: Int) {
+            mut normed, imm num_rows
+        } -> FullType: FullType(
             normed[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(num_rows, num_cols))),
         )
-        sum_views[i] = FullType(
+    )
+    var sum_views = Array[FullType, ngpus](
+        fill_with=lambda (i: Int) {
+            mut sum_full, imm num_rows
+        } -> FullType: FullType(
             sum_full[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(num_rows, num_cols))),
         )
+    )
     var gamma_shard = GammaType(
         rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
             gamma_dev.unsafe_ptr()
         ),
         row_major(Coord(Index(num_cols))),
     )
-    var rank_counts = Array[Int, ngpus](uninitialized=True)
-    comptime for i in range(ngpus):
-        rank_counts[i] = config.rank_units(i)
+    var rank_counts = Array[Int, ngpus](
+        fill_with=lambda (i: Int) -> Int: config.rank_units(i)
+    )
 
     # Per-GPU ptrs captured once for the timed closures.
-    var cold_ptrs = Array[MutPointer[Scalar[in_dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+    comptime PtrType = MutPointer[Scalar[in_dtype], MutAnyOrigin]
+    var cold_ptrs = Array[PtrType, ngpus](
+        fill_with=lambda (i: Int) {mut cold_full} -> PtrType: cold_full[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
-    var ag_ptrs = Array[MutPointer[Scalar[in_dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+    var ag_ptrs = Array[PtrType, ngpus](
+        fill_with=lambda (i: Int) {mut ag_full} -> PtrType: ag_full[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
-    var normed_ptrs = Array[MutPointer[Scalar[in_dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+    var normed_ptrs = Array[PtrType, ngpus](
+        fill_with=lambda (i: Int) {mut normed} -> PtrType: normed[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
     var gamma_ptr = rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
         gamma_dev.unsafe_ptr().as_unsafe_any_origin()
     )
-    for i in range(ngpus):
-        cold_ptrs[i] = cold_full[i].unsafe_ptr().as_unsafe_any_origin()
-        ag_ptrs[i] = ag_full[i].unsafe_ptr().as_unsafe_any_origin()
-        normed_ptrs[i] = normed[i].unsafe_ptr().as_unsafe_any_origin()
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -487,12 +496,12 @@ def bench_allgather_rmsnorm[
             var out_base = rebind[MutPointer[Scalar[in_dtype], MutAnyOrigin]](
                 ag_full[ctx_idx].unsafe_ptr()
             )
-            var out_views = Array[FullType, ngpus](uninitialized=True)
-            comptime for src in range(ngpus):
-                out_views[src] = FullType(
+            var out_views = Array[FullType, ngpus](
+                fill_with=lambda (src: Int) -> FullType: FullType(
                     out_base + config.rank_unit_start(src) * num_cols,
                     row_major(Coord(Index(config.rank_units(src), num_cols))),
                 )
+            )
             allgather(in_shards, out_views, rank_sigs, ctx_inner, ctx_idx)
 
         bencher_iter_custom(bench, call_fn, ctx)
@@ -547,12 +556,12 @@ def bench_allgather_rmsnorm[
             var out_base = rebind[MutPointer[Scalar[in_dtype], MutAnyOrigin]](
                 ag_full[ctx_idx].unsafe_ptr()
             )
-            var out_views = Array[FullType, ngpus](uninitialized=True)
-            comptime for src in range(ngpus):
-                out_views[src] = FullType(
+            var out_views = Array[FullType, ngpus](
+                fill_with=lambda (src: Int) -> FullType: FullType(
                     out_base + config.rank_unit_start(src) * num_cols,
                     row_major(Coord(Index(config.rank_units(src), num_cols))),
                 )
+            )
             allgather(in_shards, out_views, rank_sigs, ctx_inner, ctx_idx)
             if num_rows > 0:
                 _launch_norm_full[in_dtype, num_cols](

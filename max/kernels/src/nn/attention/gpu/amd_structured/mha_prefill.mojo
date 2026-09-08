@@ -33,7 +33,7 @@ pre-filled from sink_weights); the kernel body needs no sink-specific code.
 from std.math import align_up, ceildiv
 from std.sys import llvm_intrinsic, get_defined_bool
 from std.sys.intrinsics import readfirstlane
-from std.gpu import warp_id as get_warp_id
+from max.gpu import warp_id as get_warp_id
 from max.gpu.sync import s_waitcnt
 from layout.swizzle import Swizzle
 from nn.attention.mha_mask import CausalMask, TileMaskStatus

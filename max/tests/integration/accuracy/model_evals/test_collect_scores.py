@@ -197,6 +197,43 @@ def test_compare_joins_both_sides() -> None:
     assert "| aime25 | 0.9062 | 0.9000 | +0.0062 |" in table
 
 
+VERIFIER_SUMMARY = {
+    "accuracy": 0.98,
+    "total": 100,
+    "errors": 2,
+    "unexpected_failures": ["m3_text_tests.py/TestFoo/test_bar"],
+    "pass_at_10": {
+        "Query-Success-Rate": {
+            "score": 1.0,
+            "reference": 1.0,
+            "delta": 0.0,
+            "ok": True,
+        },
+        "ToolCalls-Match-Rate": {
+            "score": 0.95,
+            "reference": 0.988,
+            "delta": -0.038,
+            "ok": False,
+        },
+    },
+}
+
+
+def test_extra_sections_render_unexpected_failures_and_pass_at_10() -> None:
+    rows = [{"benchmark": "verifier", "summary": VERIFIER_SUMMARY}]
+    out = collect_scores.extra_sections(rows)
+    assert "### verifier: unexpected test failures" in out
+    assert "| `m3_text_tests.py/TestFoo/test_bar` |" in out
+    assert "### verifier: pass@10 metrics" in out
+    assert "| Query-Success-Rate | 1.0000 | 1.0000 | 0.0000 | ✅ |" in out
+    assert "| ToolCalls-Match-Rate | 0.9500 | 0.9880 | -0.0380 | ❌ |" in out
+
+
+def test_extra_sections_empty_for_ordinary_benchmarks() -> None:
+    rows = [{"benchmark": "aime25", "summary": AIME_SUMMARY}]
+    assert collect_scores.extra_sections(rows) == ""
+
+
 def test_root_level_score_named_by_prefix(tmp_path: Path) -> None:
     """A per-dataset call uploads one directory, so v4 flattens it: the
     score.json sits at the artifact root and only the call's prefix names it.

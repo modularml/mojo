@@ -27,7 +27,7 @@ from std.memory import AddressSpace, unsafe_stack_allocation
 from std.random import random_si64
 from std.sys.info import _accelerator_arch
 
-from std.gpu import WARP_SIZE, lane_id
+from max.gpu import WARP_SIZE, lane_id
 from max.gpu.sync import barrier
 from max.gpu.compute.arch.mma_apple import _apple_frag_layout
 from max.gpu.host import DeviceContext

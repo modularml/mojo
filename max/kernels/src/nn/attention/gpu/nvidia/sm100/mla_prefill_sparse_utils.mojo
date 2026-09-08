@@ -24,7 +24,7 @@ BF16-KV kernel (`mla_prefill_sparse.mojo`) and the FP8-KV kernel
 from std.sys import size_of
 from std.utils.index import Index, IndexList
 from std.utils.static_tuple import StaticTuple
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     block_idx,
     warp_id,
@@ -36,7 +36,7 @@ from std.math import ceildiv, exp2
 from std.math.constants import log2e
 from max.gpu.primitives.cluster import elect_one_sync
 from max.gpu.primitives.cluster import cluster_sync
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.memory import (
     cp_async_bulk_tensor_shared_cluster_global,
     external_memory,
@@ -48,10 +48,10 @@ from max.gpu.sync import (
     cp_async_bulk_commit_group,
     cp_async_bulk_wait_group,
 )
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host import DeviceContext, FuncAttribute
 from std.ffi import UnsafeUnion
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
     tcgen05_dealloc,

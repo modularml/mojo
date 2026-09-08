@@ -1420,8 +1420,12 @@ def _ring_after[
     for t in range(next_n):
         pos_h[t] = Int32(t) if t < n_valid else Int32(-1)
     slot_h[0] = UInt32(0)
-    ctx.enqueue_copy(k_d, k_host)
-    ctx.enqueue_copy(g_d, gate_host)
+    # The callers' host buffers cover `next_n` slots; the HostBuffer-based
+    # enqueue_copy is source-sized, so a shorter helper call over a wider
+    # caller's buffer would write past `k_d`/`g_d`. Copy through the
+    # destination-sized pointer overload instead.
+    ctx.enqueue_copy(k_d, k_host.unsafe_ptr())
+    ctx.enqueue_copy(g_d, gate_host.unsafe_ptr())
     ctx.enqueue_copy(pos_d, pos_h)
     ctx.enqueue_copy(slot_d, slot_h)
 

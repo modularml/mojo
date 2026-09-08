@@ -47,7 +47,7 @@ exercised transitively by the kernel-level tests once FP8 is wired
 end-to-end.
 """
 
-from std.gpu import lane_id, thread_idx
+from max.gpu import lane_id, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.memory import AddressSpace

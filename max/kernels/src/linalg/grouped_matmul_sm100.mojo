@@ -19,7 +19,7 @@ from std.math.uutils import umod, ufloordiv
 from std.memory import bitcast
 from std.sys import align_of, simd_width_of, size_of
 from std.bit import next_power_of_two
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
@@ -30,7 +30,7 @@ from max.gpu.primitives.cluster import (
 from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host.info import B200
-from std.gpu import (
+from max.gpu import (
     block_id_in_cluster,
     thread_idx,
     lane_id,

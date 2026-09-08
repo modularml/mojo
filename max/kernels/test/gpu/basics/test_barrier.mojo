@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import std.gpu.primitives.warp as warp
-from std.gpu import global_idx
+import max.gpu.primitives.warp as warp
+from max.gpu import global_idx
 from max.gpu.sync import barrier
-from std.gpu.globals import WARP_SIZE
+from max.gpu.globals import WARP_SIZE
 from max.gpu.host import DeviceContext
 from std.testing import assert_equal
 

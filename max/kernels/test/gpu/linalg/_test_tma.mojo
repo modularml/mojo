@@ -14,7 +14,7 @@
 from std.math import ceildiv
 from std.sys import size_of
 
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import (
@@ -40,7 +40,7 @@ from linalg.arch.sm100._tma import (
     to_swizzle,
 )
 from max.gpu.host._tensormap import SwizzleMode
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from std.testing import assert_equal
 from linalg.arch.sm100.mma import max_contiguous_tile_shape, Major
 

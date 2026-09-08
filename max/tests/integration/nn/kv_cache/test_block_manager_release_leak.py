@@ -37,7 +37,6 @@ def _make_ctx(tokens: np.ndarray, request_id: RequestID) -> TextContext:
             request_id=request_id,
             tokens=tokens,
             cache_salt=None,
-            pending_future_count=0,
         ),
     )
 

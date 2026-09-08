@@ -37,7 +37,7 @@ Ring Buffer Configuration:
 - The trait-based design allows easy experimentation with different sync strategies
 """
 from std.sys import simd_width_of
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     MAX_THREADS_PER_BLOCK_METADATA,
     block_idx,
@@ -46,7 +46,7 @@ from std.gpu import (
 )
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu.intrinsics import inlined_assembly
+from max.gpu.intrinsics import inlined_assembly
 from layout import Layout, LayoutTensor, TileTensor
 from layout.layout import blocked_product
 from layout.layout_tensor import ThreadScope, copy_local_to_shared

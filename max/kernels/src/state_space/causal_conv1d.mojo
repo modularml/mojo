@@ -57,12 +57,12 @@ Activation Support:
 
 from max.algorithm import sync_parallelize
 from max.gpu.host import DeviceContext
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     thread_idx,
 )
-from layout import TensorLayout, TensorStorage, TileTensor
+from layout import TensorLayout, TensorEngine, TileTensor
 from nn.activations import silu
 
 
@@ -690,26 +690,26 @@ def causal_conv1d_channel_first_fwd_gpu[
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
     bias_LT: TensorLayout,
-    x_store: TensorStorage,
-    weight_store: TensorStorage,
-    output_store: TensorStorage,
-    bias_store: TensorStorage,
+    x_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
+    bias_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
     x: TileTensor[
-        x_dtype, x_LT, MutUntrackedOrigin, Storage=x_store
+        x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine
     ],  # Shape (B, C, L)
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin, Storage=weight_store
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],  # Shape (C, W)
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin, Storage=output_store
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],  # Shape (B, C, L)
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin, Storage=bias_store
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],  # Shape (C,), stride = 1
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -749,10 +749,10 @@ def causal_conv1d_channel_first_fwd_gpu[
         weight_LT: TensorLayout of the weight tensor `weight`.
         output_LT: TensorLayout of the output tensor `output`.
         bias_LT: TensorLayout of the bias tensor `bias`.
-        x_store: TensorStorage policy of the input tensor `x`.
-        weight_store: TensorStorage policy of the weight tensor `weight`.
-        output_store: TensorStorage policy of the output tensor `output`.
-        bias_store: TensorStorage policy of the bias tensor `bias`.
+        x_engine: Engine of the input tensor `x`.
+        weight_engine: Engine of the weight tensor `weight`.
+        output_engine: Engine of the output tensor `output`.
+        bias_engine: Engine of the bias tensor `bias`.
 
     Args:
         batch: Batch size.
@@ -3616,32 +3616,32 @@ def causal_conv1d_update_gpu[
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
     bias_LT: TensorLayout,
-    x_store: TensorStorage,
-    conv_state_store: TensorStorage,
-    weight_store: TensorStorage,
-    output_store: TensorStorage,
-    bias_store: TensorStorage,
+    x_engine: TensorEngine,
+    conv_state_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
+    bias_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
     state_len: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Storage=x_store],
+    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine],
     conv_state: TileTensor[
         conv_state_dtype,
         conv_state_LT,
         MutUntrackedOrigin,
-        Storage=conv_state_store,
+        Engine=conv_state_engine,
     ],
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin, Storage=weight_store
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin, Storage=output_store
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],
     bias: TileTensor[
-        bias_dtype, bias_LT, MutUntrackedOrigin, Storage=bias_store
+        bias_dtype, bias_LT, MutUntrackedOrigin, Engine=bias_engine
     ],
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -3680,12 +3680,12 @@ def causal_conv1d_update_gpu[
         weight_LT: TensorLayout of the weight tensor `weight`.
         output_LT: TensorLayout of the output tensor `output`.
         bias_LT: TensorLayout of the bias tensor `bias`.
-        x_store: TensorStorage policy of the input tensor `x`.
-        conv_state_store: TensorStorage policy of the convolution state tensor
+        x_engine: Engine of the input tensor `x`.
+        conv_state_engine: Engine of the convolution state tensor
             `conv_state`.
-        weight_store: TensorStorage policy of the weight tensor `weight`.
-        output_store: TensorStorage policy of the output tensor `output`.
-        bias_store: TensorStorage policy of the bias tensor `bias`.
+        weight_engine: Engine of the weight tensor `weight`.
+        output_engine: Engine of the output tensor `output`.
+        bias_engine: Engine of the bias tensor `bias`.
 
     Args:
         batch: Batch size.
@@ -3834,28 +3834,28 @@ def causal_conv1d_update_gpu_no_bias[
     conv_state_LT: TensorLayout,
     weight_LT: TensorLayout,
     output_LT: TensorLayout,
-    x_store: TensorStorage,
-    conv_state_store: TensorStorage,
-    weight_store: TensorStorage,
-    output_store: TensorStorage,
+    x_engine: TensorEngine,
+    conv_state_engine: TensorEngine,
+    weight_engine: TensorEngine,
+    output_engine: TensorEngine,
 ](
     batch: Int32,
     dim: Int32,
     seqlen: Int32,
     width: Int32,
     state_len: Int32,
-    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Storage=x_store],
+    x: TileTensor[x_dtype, x_LT, MutUntrackedOrigin, Engine=x_engine],
     conv_state: TileTensor[
         conv_state_dtype,
         conv_state_LT,
         MutUntrackedOrigin,
-        Storage=conv_state_store,
+        Engine=conv_state_engine,
     ],
     weight: TileTensor[
-        weight_dtype, weight_LT, MutUntrackedOrigin, Storage=weight_store
+        weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],
     output: TileTensor[
-        output_dtype, output_LT, MutUntrackedOrigin, Storage=output_store
+        output_dtype, output_LT, MutUntrackedOrigin, Engine=output_engine
     ],
     x_batch_stride: UInt32,
     x_c_stride: UInt32,
@@ -3892,11 +3892,11 @@ def causal_conv1d_update_gpu_no_bias[
             `conv_state`.
         weight_LT: TensorLayout of the weight tensor `weight`.
         output_LT: TensorLayout of the output tensor `output`.
-        x_store: TensorStorage policy of the input tensor `x`.
-        conv_state_store: TensorStorage policy of the convolution state tensor
+        x_engine: Engine of the input tensor `x`.
+        conv_state_engine: Engine of the convolution state tensor
             `conv_state`.
-        weight_store: TensorStorage policy of the weight tensor `weight`.
-        output_store: TensorStorage policy of the output tensor `output`.
+        weight_engine: Engine of the weight tensor `weight`.
+        output_engine: Engine of the output tensor `output`.
 
     Args:
         batch: Batch size.

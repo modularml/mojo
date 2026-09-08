@@ -59,11 +59,11 @@ from layout.tile_layout import row_major as tt_row_major
 from layout.swizzle import make_swizzle
 from linalg.arch.sm100.mma import smem_descriptor
 
-from std.gpu.globals import WARP_SIZE
+from max.gpu.globals import WARP_SIZE
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, thread_idx, warp_id
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, thread_idx, warp_id
 from max.gpu.sync import barrier
 from nn.attention.mha_utils import (
     MHAConfig,

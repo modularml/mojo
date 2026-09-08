@@ -22,7 +22,7 @@ as Mojo's atomic API differs. The level array stores if visited; races
 on unvisited vertices are harmless as they all write the same level.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
 from max.gpu.host import DeviceContext
 from std.atomic import Atomic
 from std.collections import List

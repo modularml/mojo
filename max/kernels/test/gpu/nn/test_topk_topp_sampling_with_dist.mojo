@@ -499,6 +499,9 @@ def main() raises:
         # budget: the launcher falls back to the single-block kernel and its
         # emit_dist tail, which are otherwise unexercised on cluster devices.
         test_tokens_match_without_dist(ctx, rows=2, d=249856, k=40, top_p=0.95)
+        # Exercise two- and four-block row groups.
+        test_tokens_match_without_dist(ctx, rows=100, d=16384, k=40, top_p=0.95)
+        test_tokens_match_without_dist(ctx, rows=50, d=32768, k=40, top_p=0.95)
         # Vocabularies narrower than one block: under a cluster most CTAs own
         # no elements and contribute only reduction identities -- the shape
         # the rejection sampler reaches with its unit-test vocabularies.

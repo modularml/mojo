@@ -109,7 +109,7 @@ def launch_dependent_grids():
     """
 
     comptime if _SUPPORT_PDL_LAUNCH:
-        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action launch_dependents`
+        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action<launch_dependents>`
         __mlir_op.`nvvm.griddepcontrol`[kind=kind_attr, _type=None]()
 
 
@@ -129,11 +129,12 @@ def wait_on_dependent_grids():
     """
 
     comptime if _SUPPORT_PDL_LAUNCH:
-        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action wait`
+        comptime kind_attr = __mlir_attr.`#nvvm.grid_dep_action<wait>`
         __mlir_op.`nvvm.griddepcontrol`[kind=kind_attr, _type=None]()
 
 
-struct PDLLevel(Defaultable, TrivialRegisterPassable):
+@fieldwise_init
+struct PDLLevel(Defaultable, Equatable, TrivialRegisterPassable):
     """Programmatic Dependency Launch (PDL) level."""
 
     var _level: Int
@@ -159,27 +160,6 @@ struct PDLLevel(Defaultable, TrivialRegisterPassable):
         self = PDLLevel.OFF
 
     @always_inline
-    def __init__(out self, level: Int):
-        """Initialize the PDL level.
-
-        Args:
-            level: The PDL level to initialize.
-        """
-        self._level = level
-
-    @always_inline
-    def __eq__(self, other: PDLLevel) -> Bool:
-        """Check if the PDL level is equal to another PDL level.
-
-        Args:
-            other: The other PDL level to compare against.
-
-        Returns:
-            True if the PDL level is equal to the other PDL level, False otherwise.
-        """
-        return self._level == other._level
-
-    @always_inline
     def __eq__(self, other: Int) -> Bool:
         """Check if the PDL level is equal to another PDL level.
 
@@ -190,18 +170,6 @@ struct PDLLevel(Defaultable, TrivialRegisterPassable):
             True if the PDL level is equal to the other PDL level, False otherwise.
         """
         return self._level == other
-
-    @always_inline
-    def __ne__(self, other: PDLLevel) -> Bool:
-        """Check if the PDL level is not equal to another PDL level.
-
-        Args:
-            other: The other PDL level to compare against.
-
-        Returns:
-            True if the PDL level is not equal to the other PDL level, False otherwise.
-        """
-        return self._level != other._level
 
     @always_inline
     def __gt__(self, other: PDLLevel) -> Bool:

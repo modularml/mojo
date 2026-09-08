@@ -14,7 +14,7 @@
 from std.sys.info import align_of
 
 from max.gpu.host import DeviceContext, FuncAttribute
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.memory import external_memory
 from max.gpu.sync import barrier
 from std.memory import unsafe_stack_allocation

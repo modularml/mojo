@@ -23,6 +23,8 @@ from kv_cache.types import (
     KVCacheT,
     PagedRowIndices,
     _populate_via_row_idx,
+    create_flat_scale_tma_tile,
+    flat_scale_window,
     kv_num_sub_tiles,
     kv_sub_tile_rows,
     kv_tma_fold_chunks,
@@ -32,8 +34,8 @@ from kv_cache.types import (
 from layout import (
     Layout,
     LayoutTensor,
-    PointerStorage,
-    TensorStorage,
+    DefaultEngine,
+    TensorEngine,
     UNKNOWN_VALUE,
 )
 from layout.tile_layout import (
@@ -254,6 +256,29 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         This is useful for `m-major` MMA operations where we don't
         need to mask any extra rows."""
         ...
+
+    @always_inline
+    def create_index_scale_tma_tile[
+        TILE: Int
+    ](self, ctx: DeviceContext) raises -> TMATensorTile[
+        Self.dtype,
+        2,
+        Index(1, flat_scale_window[Self.dtype, TILE]()),
+        Index(1, flat_scale_window[Self.dtype, TILE]()),
+    ]:
+        """Creates a flat TMA tile over the scale pool this operand addresses.
+
+        Only meaningful for an operand that IS a scale pool, so the default
+        rejects; `block_paged_ptr` must already address scales. The box is
+        `TILE` scales plus one alignment unit of slack -- a TMA's global start
+        must be 16-byte aligned and a key index is the innermost coordinate
+        here, so an unaligned caller rounds its base down and skips the
+        residual.
+        """
+        comptime assert False, (
+            "create_index_scale_tma_tile is only meaningful for an operand"
+            " that ADDRESSES scales"
+        )
 
     @always_inline
     def create_rope_tma_tile[
@@ -836,8 +861,14 @@ struct KVCacheScalesMHAOperand[
 
     @always_inline
     def row_idx(self, batch_idx: UInt32, start_tok_idx: UInt32) -> UInt32:
-        """Returns the row idx when viewing the memory as a matrix."""
-        return self.cache.row_idx(batch_idx, start_tok_idx)
+        """Returns the row idx in the SCALE pool -- what this operand addresses.
+
+        The scale pool has its own lookup table and its own block stride, which
+        coincide with the value pool's only when the caller leaves the scales
+        LUT unset. `block_paged_ptr` already forwards to the scales, so this
+        must too.
+        """
+        return self.cache.scale_row_idx(batch_idx, start_tok_idx)
 
     @always_inline
     def get_tma_row(self, encoded_index: Int32) -> Int32:
@@ -879,6 +910,27 @@ struct KVCacheScalesMHAOperand[
         ],
     ) raises:
         comptime assert False, "create_scale_tma_tile is not implemented"
+
+    @always_inline
+    def create_index_scale_tma_tile[
+        TILE: Int
+    ](
+        self,
+        ctx: DeviceContext,
+        out tma: TMATensorTile[
+            Self.dtype,
+            2,
+            Index(1, flat_scale_window[Self.dtype, TILE]()),
+            Index(1, flat_scale_window[Self.dtype, TILE]()),
+        ],
+    ) raises:
+        """A flat window on the cache's scale pool.
+
+        This operand IS the scales, so unlike `create_scale_tma_tile` -- which
+        describes a companion buffer and stays unimplemented here -- this one
+        is the operand's whole point.
+        """
+        return self.cache.create_index_scale_tma_tile[TILE](ctx)
 
     @always_inline
     def create_rope_tma_tile[
@@ -1026,8 +1078,8 @@ struct LayoutTensorMHAOperand[
         shape_types=Coord[].element_types,
         stride_types=Coord[].element_types,
     ],
-    buffer_storage: TensorStorage = PointerStorage[element_width=1],
-    scale_buffer_storage: TensorStorage = PointerStorage[element_width=1],
+    buffer_engine: TensorEngine = DefaultEngine[element_width=1],
+    scale_buffer_engine: TensorEngine = DefaultEngine[element_width=1],
 ](MHAOperand, TrivialRegisterPassable):
     """An implementation for contiguous tensor arguments to MHA kernels.
 
@@ -1042,10 +1094,10 @@ struct LayoutTensorMHAOperand[
         scale_buffer_layout: `TensorLayout` of the `scale_buffer`. A
             rank-0 layout disables quantization (defaults to a rank-0
             `MixedLayout`).
-        buffer_storage: `TensorStorage` of the K/V `buffer` (defaults to
-            `PointerStorage`).
-        scale_buffer_storage: `TensorStorage` of the `scale_buffer`
-            (defaults to `PointerStorage`).
+        buffer_engine: `TensorEngine` of the K/V `buffer` (defaults to
+            `DefaultEngine`).
+        scale_buffer_engine: `TensorEngine` of the `scale_buffer`
+            (defaults to `DefaultEngine`).
     """
 
     comptime dtype = Self.dtype_
@@ -1068,20 +1120,20 @@ struct LayoutTensorMHAOperand[
     comptime quantization_enabled: Bool = Self.scale_buffer_layout.rank != 0
 
     var buffer: TileTensor[
-        Self.dtype, Self.buffer_layout, Self.origin, Storage=Self.buffer_storage
+        Self.dtype, Self.buffer_layout, Self.origin, Engine=Self.buffer_engine
     ]
     var scale_buffer: TileTensor[
         Self.scale_dtype,
         Self.scale_buffer_layout,
         Self.scale_origin,
-        Storage=Self.scale_buffer_storage,
+        Engine=Self.scale_buffer_engine,
     ]
     comptime device_type: AnyType = Self
 
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -1093,13 +1145,13 @@ struct LayoutTensorMHAOperand[
             Self.dtype,
             Self.buffer_layout,
             Self.origin,
-            Storage=Self.buffer_storage,
+            Engine=Self.buffer_engine,
         ],
         scale_buffer: TileTensor[
             Self.scale_dtype,
             Self.scale_buffer_layout,
             Self.scale_origin,
-            Storage=Self.scale_buffer_storage,
+            Engine=Self.scale_buffer_engine,
         ] = _null_scale_tile_tensor[
             Self.scale_dtype, Self.scale_buffer_layout
         ](),
@@ -1676,6 +1728,42 @@ struct RaggedMHAOperand[
                 "scale_layout must be 2D(per token) or 3D(per token per head)"
                 " tensor."
             )
+
+    @always_inline
+    def create_index_scale_tma_tile[
+        TILE: Int
+    ](
+        self,
+        ctx: DeviceContext,
+        out tma: TMATensorTile[
+            Self.dtype,
+            2,
+            Index(1, flat_scale_window[Self.dtype, TILE]()),
+            Index(1, flat_scale_window[Self.dtype, TILE]()),
+        ],
+    ) raises:
+        """A flat window on the buffer this operand addresses.
+
+        Over `buffer`, not `scale_buffer`: the FP8 indexer constructs this
+        operand directly over the k-scale tensor, so the scales ARE the primary
+        buffer and `create_scale_tma_tile` above would describe the (unset)
+        companion one.
+        """
+        comptime assert Self.layout.rank <= 3, (
+            "the flat scale window needs one scalar per token, so the buffer"
+            " may carry only degenerate trailing dims"
+        )
+        var total_elements = self.buffer.num_elements()
+        debug_assert[assert_mode="safe"](
+            total_elements == Int(self.buffer.dim[0]()),
+            (
+                "the flat scale window assumes one element per token; this"
+                " buffer has more than one"
+            ),
+        )
+        return create_flat_scale_tma_tile[
+            Self.dtype, flat_scale_window[Self.dtype, TILE]()
+        ](ctx, self.buffer.ptr, total_elements)
 
     @always_inline
     def create_rope_tma_tile[

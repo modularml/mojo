@@ -37,7 +37,7 @@ def reshape[
     ],
     input.origin,
     address_space=input.address_space,
-    Storage=input.Storage,
+    Engine=input.Engine,
 ]:
     """Returns a view of the contiguous `input` tensor reinterpreted under `new_shape` with matching element count.
 
@@ -68,8 +68,8 @@ def reshape[
         stride_tuple[i] = stride
         stride *= new_shape[i]
 
-    # Return a view with the new shape, preserving the input's storage policy
-    # (for example a device tile stays `DevicePointerStorage`) by rebinding the
+    # Return a view with the new shape, preserving the input's engine
+    # (for example a device tile stays `DevicePointerEngine`) by rebinding the
     # storage handle rather than erasing it through a raw pointer.
     return {
         input._storage,

@@ -22,7 +22,7 @@ enables coalesced shared-memory reads and direct MFMA consumption.
 
 from std.math import align_up, ceildiv
 from std.sys import get_defined_bool, get_defined_int
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     block_idx,
 )
@@ -30,7 +30,7 @@ from max.gpu.host import DeviceContext
 from max.gpu.host.info import MI355X
 from max.gpu.memory import CacheOperation
 
-from layout import Coord, Idx, TensorLayout, TensorStorage, TileTensor
+from layout import Coord, Idx, TensorLayout, TensorEngine, TileTensor
 from layout.tile_layout import row_major
 
 from std.utils import StaticTuple
@@ -196,13 +196,13 @@ struct PreShuffledBGroupedGEMM[
         LayoutSFB: TensorLayout,
         AOffsetsLayout: TensorLayout,
         ExpertIdsLayout: TensorLayout,
-        StoreC: TensorStorage,
-        StoreA: TensorStorage,
-        StoreBPre: TensorStorage,
-        StoreSFA: TensorStorage,
-        StoreSFB: TensorStorage,
-        StoreAOffsets: TensorStorage,
-        StoreExpertIds: TensorStorage,
+        CEngine: TensorEngine,
+        AEngine: TensorEngine,
+        BPreEngine: TensorEngine,
+        SFAEngine: TensorEngine,
+        SFBEngine: TensorEngine,
+        AOffsetsEngine: TensorEngine,
+        ExpertIdsEngine: TensorEngine,
         N: Int,
         K_BYTES: Int,
         b_cache_policy: CacheOperation = CacheOperation.ALWAYS,
@@ -215,31 +215,31 @@ struct PreShuffledBGroupedGEMM[
         waves_per_eu: Int = 0,
     ](
         c_tensor: TileTensor[
-            mut=True, out_dtype, LayoutC, MutAnyOrigin, Storage=StoreC
+            mut=True, out_dtype, LayoutC, MutAnyOrigin, Engine=CEngine
         ],
-        a_tensor: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Storage=StoreA],
+        a_tensor: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Engine=AEngine],
         b_pre_tensor: TileTensor[
-            .uint8, LayoutBPre, ImmutAnyOrigin, Storage=StoreBPre
+            .uint8, LayoutBPre, ImmutAnyOrigin, Engine=BPreEngine
         ],
         sfa_tensor: TileTensor[
-            .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Storage=StoreSFA
+            .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Engine=SFAEngine
         ],
         sfb_tensor: TileTensor[
-            .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Storage=StoreSFB
+            .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Engine=SFBEngine
         ],
         a_offsets: TileTensor[
             mut=False,
             .uint32,
             AOffsetsLayout,
             ImmutAnyOrigin,
-            Storage=StoreAOffsets,
+            Engine=AOffsetsEngine,
         ],
         expert_ids: TileTensor[
             mut=False,
             .int32,
             ExpertIdsLayout,
             ImmutAnyOrigin,
-            Storage=StoreExpertIds,
+            Engine=ExpertIdsEngine,
         ],
         num_active_experts: Int32,
         max_padded_M: Int32,
@@ -383,11 +383,11 @@ struct PreShuffledBGroupedGEMM[
                     type_of(b_pre_tile).LayoutType,
                     type_of(sfa_tile).LayoutType,
                     type_of(sfb_tile).LayoutType,
-                    type_of(c_tile).Storage,
-                    type_of(a_tile).Storage,
-                    type_of(b_pre_tile).Storage,
-                    type_of(sfa_tile).Storage,
-                    type_of(sfb_tile).Storage,
+                    type_of(c_tile).Engine,
+                    type_of(a_tile).Engine,
+                    type_of(b_pre_tile).Engine,
+                    type_of(sfa_tile).Engine,
+                    type_of(sfb_tile).Engine,
                     N,
                     K_BYTES,
                 ](
@@ -439,13 +439,13 @@ struct PreShuffledBGroupedGEMM[
         LayoutSFB: TensorLayout,
         AOffsetsLayout: TensorLayout,
         ExpertIdsLayout: TensorLayout,
-        StoreC: TensorStorage,
-        StoreA: TensorStorage,
-        StoreBPre: TensorStorage,
-        StoreSFA: TensorStorage,
-        StoreSFB: TensorStorage,
-        StoreAOffsets: TensorStorage,
-        StoreExpertIds: TensorStorage,
+        CEngine: TensorEngine,
+        AEngine: TensorEngine,
+        BPreEngine: TensorEngine,
+        SFAEngine: TensorEngine,
+        SFBEngine: TensorEngine,
+        AOffsetsEngine: TensorEngine,
+        ExpertIdsEngine: TensorEngine,
         N: Int,
         K_BYTES: Int,
         b_cache_policy: CacheOperation = CacheOperation.ALWAYS,
@@ -458,31 +458,31 @@ struct PreShuffledBGroupedGEMM[
         waves_per_eu: Int = 0,
     ](
         c_tensor: TileTensor[
-            mut=True, out_dtype, LayoutC, MutAnyOrigin, Storage=StoreC
+            mut=True, out_dtype, LayoutC, MutAnyOrigin, Engine=CEngine
         ],
-        a_tensor: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Storage=StoreA],
+        a_tensor: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Engine=AEngine],
         b_pre_tensor: TileTensor[
-            .uint8, LayoutBPre, ImmutAnyOrigin, Storage=StoreBPre
+            .uint8, LayoutBPre, ImmutAnyOrigin, Engine=BPreEngine
         ],
         sfa_tensor: TileTensor[
-            .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Storage=StoreSFA
+            .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Engine=SFAEngine
         ],
         sfb_tensor: TileTensor[
-            .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Storage=StoreSFB
+            .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Engine=SFBEngine
         ],
         a_offsets: TileTensor[
             mut=False,
             .uint32,
             AOffsetsLayout,
             ImmutAnyOrigin,
-            Storage=StoreAOffsets,
+            Engine=AOffsetsEngine,
         ],
         expert_ids: TileTensor[
             mut=False,
             .int32,
             ExpertIdsLayout,
             ImmutAnyOrigin,
-            Storage=StoreExpertIds,
+            Engine=ExpertIdsEngine,
         ],
         num_active_experts: Int32,
         max_padded_M: Int32,
@@ -554,11 +554,11 @@ struct PreShuffledBGroupedGEMM[
             type_of(b_pre_tile).LayoutType,
             type_of(sfa_tile).LayoutType,
             type_of(sfb_tile).LayoutType,
-            type_of(c_tile).Storage,
-            type_of(a_tile).Storage,
-            type_of(b_pre_tile).Storage,
-            type_of(sfa_tile).Storage,
-            type_of(sfb_tile).Storage,
+            type_of(c_tile).Engine,
+            type_of(a_tile).Engine,
+            type_of(b_pre_tile).Engine,
+            type_of(sfa_tile).Engine,
+            type_of(sfb_tile).Engine,
             N,
             K_BYTES,
         ](
@@ -676,13 +676,13 @@ struct PreShuffledBGroupedGEMM[
                 type_of(b_scales_i).LayoutType,
                 type_of(a_off_i).LayoutType,
                 type_of(expert_ids_i).LayoutType,
-                type_of(c).Storage,
-                type_of(a_i).Storage,
-                type_of(b_pre_i).Storage,
-                type_of(a_scales_i).Storage,
-                type_of(b_scales_i).Storage,
-                type_of(a_off_i).Storage,
-                type_of(expert_ids_i).Storage,
+                type_of(c).Engine,
+                type_of(a_i).Engine,
+                type_of(b_pre_i).Engine,
+                type_of(a_scales_i).Engine,
+                type_of(b_scales_i).Engine,
+                type_of(a_off_i).Engine,
+                type_of(expert_ids_i).Engine,
                 N,
                 K_BYTES,
                 b_cache_policy,
@@ -721,13 +721,13 @@ struct PreShuffledBGroupedGEMM[
                 type_of(b_scales_i).LayoutType,
                 type_of(a_off_i).LayoutType,
                 type_of(expert_ids_i).LayoutType,
-                type_of(c).Storage,
-                type_of(a_i).Storage,
-                type_of(b_pre_i).Storage,
-                type_of(a_scales_i).Storage,
-                type_of(b_scales_i).Storage,
-                type_of(a_off_i).Storage,
-                type_of(expert_ids_i).Storage,
+                type_of(c).Engine,
+                type_of(a_i).Engine,
+                type_of(b_pre_i).Engine,
+                type_of(a_scales_i).Engine,
+                type_of(b_scales_i).Engine,
+                type_of(a_off_i).Engine,
+                type_of(expert_ids_i).Engine,
                 N,
                 K_BYTES,
                 b_cache_policy,
@@ -798,38 +798,38 @@ def block_scaled_grouped_matmul_amd_kernel[
     LayoutSFB: TensorLayout,
     AOffsetsLayout: TensorLayout,
     ExpertIdsLayout: TensorLayout,
-    StoreC: TensorStorage,
-    StoreA: TensorStorage,
-    StoreB: TensorStorage,
-    StoreSFA: TensorStorage,
-    StoreSFB: TensorStorage,
-    StoreAOffsets: TensorStorage,
-    StoreExpertIds: TensorStorage,
+    CEngine: TensorEngine,
+    AEngine: TensorEngine,
+    BEngine: TensorEngine,
+    SFAEngine: TensorEngine,
+    SFBEngine: TensorEngine,
+    AOffsetsEngine: TensorEngine,
+    ExpertIdsEngine: TensorEngine,
 ](
     c_tensor: TileTensor[
-        mut=True, out_dtype, LayoutC, MutAnyOrigin, Storage=StoreC
+        mut=True, out_dtype, LayoutC, MutAnyOrigin, Engine=CEngine
     ],
-    a_tensor: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Storage=StoreA],
-    b_tensor: TileTensor[.uint8, LayoutB, ImmutAnyOrigin, Storage=StoreB],
+    a_tensor: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Engine=AEngine],
+    b_tensor: TileTensor[.uint8, LayoutB, ImmutAnyOrigin, Engine=BEngine],
     sfa_tensor: TileTensor[
-        .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Storage=StoreSFA
+        .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Engine=SFAEngine
     ],
     sfb_tensor: TileTensor[
-        .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Storage=StoreSFB
+        .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Engine=SFBEngine
     ],
     a_offsets: TileTensor[
         mut=False,
         .uint32,
         AOffsetsLayout,
         ImmutAnyOrigin,
-        Storage=StoreAOffsets,
+        Engine=AOffsetsEngine,
     ],
     expert_ids: TileTensor[
         mut=False,
         .int32,
         ExpertIdsLayout,
         ImmutAnyOrigin,
-        Storage=StoreExpertIds,
+        Engine=ExpertIdsEngine,
     ],
     num_active_experts: Int32,
 ):
@@ -856,13 +856,13 @@ def block_scaled_grouped_matmul_amd_kernel[
             `a_offsets`.
         ExpertIdsLayout: Compile-time layout of the expert indices tensor
             `expert_ids`.
-        StoreC: Storage policy of the output tensor `c_tensor`.
-        StoreA: Storage policy of the A operand `a_tensor`.
-        StoreB: Storage policy of the B operand `b_tensor`.
-        StoreSFA: Storage policy of the A scales tensor `sfa_tensor`.
-        StoreSFB: Storage policy of the B scales tensor `sfb_tensor`.
-        StoreAOffsets: Storage policy of the token offsets tensor `a_offsets`.
-        StoreExpertIds: Storage policy of the expert indices tensor
+        CEngine: Engine of the output tensor `c_tensor`.
+        AEngine: Engine of the A operand `a_tensor`.
+        BEngine: Engine of the B operand `b_tensor`.
+        SFAEngine: Engine of the A scales tensor `sfa_tensor`.
+        SFBEngine: Engine of the B scales tensor `sfb_tensor`.
+        AOffsetsEngine: Engine of the token offsets tensor `a_offsets`.
+        ExpertIdsEngine: Engine of the expert indices tensor
             `expert_ids`.
 
     Args:
@@ -934,11 +934,11 @@ def block_scaled_grouped_matmul_amd_kernel[
         type_of(b_tile).LayoutType,
         type_of(sfa_tile).LayoutType,
         type_of(sfb_tile).LayoutType,
-        type_of(c_tile).Storage,
-        type_of(a_tile).Storage,
-        type_of(b_tile).Storage,
-        type_of(sfa_tile).Storage,
-        type_of(sfb_tile).Storage,
+        type_of(c_tile).Engine,
+        type_of(a_tile).Engine,
+        type_of(b_tile).Engine,
+        type_of(sfa_tile).Engine,
+        type_of(sfb_tile).Engine,
     ](c_tile, a_tile, b_tile, sfa_tile, sfb_tile)
 
 
@@ -1121,13 +1121,13 @@ def _launch_block_scaled_grouped[
         type_of(sfb_2d).LayoutType,
         type_of(a_off_i).LayoutType,
         type_of(expert_ids_i).LayoutType,
-        type_of(c).Storage,
-        type_of(a_i).Storage,
-        type_of(b_2d).Storage,
-        type_of(a_scales_i).Storage,
-        type_of(sfb_2d).Storage,
-        type_of(a_off_i).Storage,
-        type_of(expert_ids_i).Storage,
+        type_of(c).Engine,
+        type_of(a_i).Engine,
+        type_of(b_2d).Engine,
+        type_of(a_scales_i).Engine,
+        type_of(sfb_2d).Engine,
+        type_of(a_off_i).Engine,
+        type_of(expert_ids_i).Engine,
     ]
 
     ctx.enqueue_function[kernel](
@@ -1516,7 +1516,7 @@ def block_scaled_grouped_matmul_amd_preb[
                 128,
                 256,
                 64,
-                False,
+                True,
                 cluster_drain_sched=True,
                 scale_group=4,
                 b_addr_split=True,
@@ -1546,52 +1546,170 @@ def block_scaled_grouped_matmul_amd_preb[
             # 6.9%-23.3% win over the prior tile here.
             return run_kernel[64, 64, 256, 16, False]()
         else:
-            # Direct dispatch beats the prior persistent-grid tile here.
-            return run_kernel[128, 128, 256, 64, False, waves_per_eu=2]()
+            return run_kernel[128, 128, 256, 64, True, waves_per_eu=2]()
+
+    comptime if LB == 24 and N == 4096 and K_LOGICAL == 7168:  # gate+up
+        if etm <= 20:
+            return run_kernel[16, 64, 512, 16, False]()
+        elif etm <= 127:
+            return run_kernel[16, 128, 512, 32, False]()
+        elif etm <= 255:
+            return run_kernel[32, 128, 512, 64, False]()
+        else:
+            return run_kernel[32, 64, 256, 64, False]()
 
     comptime if LB == 24 and N == 6144 and K_LOGICAL == 6144:  # M3 gate+up
-        if etm <= 256:
-            if decode_grid_m_cap > 0 and etm <= decode_grid_m_cap:
-                return run_kernel[
-                    16,
-                    64,
-                    512,
-                    16,
-                    False,
-                    STREAM,
-                    use_decode_cap=True,
-                    pipeline_depth=3,
-                ]()
-            return run_kernel[16, 128, 512, 32, True, STREAM]()
-        elif etm <= 512:
-            return run_kernel[32, 128, 512, 32, True, STREAM]()
-        elif etm <= 2100:
-            return run_kernel[64, 128, 512, 32, True]()
-        elif etm <= 4095:
-            return run_kernel[128, 128, 512, 64, True]()
+        if decode_grid_m_cap > 0 and etm <= decode_grid_m_cap:
+            return run_kernel[
+                16,
+                64,
+                512,
+                16,
+                False,
+                STREAM,
+                use_decode_cap=True,
+                pipeline_depth=3,
+            ]()
+        if etm <= 3:
+            return run_kernel[
+                16, 64, 512, 16, False, cluster_drain_sched=True, mfma_cluster=2
+            ]()
+        elif etm <= 7:
+            return run_kernel[
+                16,
+                128,
+                512,
+                32,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
+        elif etm <= 31:
+            return run_kernel[
+                16, 64, 256, 16, False, cluster_drain_sched=True, mfma_cluster=2
+            ]()
+        elif etm <= 255:
+            return run_kernel[
+                16,
+                128,
+                256,
+                32,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
         else:
-            return run_kernel[64, 128, 512, 64, False]()
+            return run_kernel[
+                32,
+                128,
+                256,
+                64,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
 
     comptime if LB == 24 and N == 6144 and K_LOGICAL == 3072:  # M3 down
-        if etm <= 256:
-            if decode_grid_m_cap > 0 and etm <= decode_grid_m_cap:
-                return run_kernel[
-                    16,
-                    64,
-                    512,
-                    16,
-                    False,
-                    STREAM,
-                    use_decode_cap=True,
-                    pipeline_depth=3,
-                ]()
-            return run_kernel[16, 128, 512, 32, True, STREAM]()
-        elif etm <= 512:
-            return run_kernel[32, 128, 512, 32, True, STREAM]()
-        elif etm <= 2100:
-            return run_kernel[64, 128, 512, 32, True]()
+        if decode_grid_m_cap > 0 and etm <= decode_grid_m_cap:
+            return run_kernel[
+                16,
+                64,
+                512,
+                16,
+                False,
+                STREAM,
+                use_decode_cap=True,
+                pipeline_depth=3,
+            ]()
+        if etm <= 3:
+            return run_kernel[
+                16, 64, 512, 16, False, cluster_drain_sched=True, mfma_cluster=2
+            ]()
+        elif etm <= 7:
+            return run_kernel[
+                16,
+                128,
+                512,
+                32,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
+        elif etm <= 31:
+            return run_kernel[
+                16, 64, 256, 16, False, cluster_drain_sched=True, mfma_cluster=2
+            ]()
+        elif etm <= 255:
+            return run_kernel[
+                16,
+                128,
+                256,
+                32,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
         else:
-            return run_kernel[128, 128, 512, 64, True]()
+            return run_kernel[
+                32,
+                128,
+                256,
+                64,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
+
+    comptime if LB == 24:
+        if decode_grid_m_cap > 0 and etm <= decode_grid_m_cap:
+            return run_kernel[
+                16,
+                64,
+                512,
+                16,
+                False,
+                STREAM,
+                use_decode_cap=True,
+                pipeline_depth=3,
+            ]()
+        if etm <= 3:
+            return run_kernel[
+                16, 64, 512, 16, False, cluster_drain_sched=True, mfma_cluster=2
+            ]()
+        elif etm <= 7:
+            return run_kernel[
+                16,
+                128,
+                512,
+                32,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
+        elif etm <= 31:
+            return run_kernel[
+                16, 64, 256, 16, False, cluster_drain_sched=True, mfma_cluster=2
+            ]()
+        elif etm <= 255:
+            return run_kernel[
+                16,
+                128,
+                256,
+                32,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
+        else:
+            return run_kernel[
+                32,
+                128,
+                256,
+                64,
+                False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+            ]()
 
     # Other shapes: persistent below the threshold, direct at/above it.
     # Not a typo: BK counts ELEMENTS, so 256 at MXFP8 is the same LDS/register

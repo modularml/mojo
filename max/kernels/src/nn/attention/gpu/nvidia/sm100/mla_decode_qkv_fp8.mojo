@@ -32,11 +32,11 @@ SMEM Layout (native FP8):
 
 from std.math import ceildiv
 from std.sys import size_of
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, warp_id
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, warp_id
 from max.gpu.sync import barrier
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.primitives.grid_controls import launch_dependent_grids
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.memory import external_memory
 from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
@@ -47,7 +47,14 @@ from max.gpu.compute.arch.tcgen05 import (
 from layout.tma_async import (
     SharedMemBarrier,
 )
-from layout import ComptimeInt, CoordLike, Layout, RowMajorLayout, TileTensor
+from layout import (
+    ComptimeInt,
+    CoordLike,
+    Layout,
+    RowMajorLayout,
+    TensorEngine,
+    TileTensor,
+)
 from layout.tile_layout import row_major as tt_row_major
 from nn.attention.gpu.nvidia.common import (
     OptionalPointer,
@@ -98,6 +105,7 @@ struct MLA_SM100_Decode_QKV_FP8[
     MaskType: MHAMask,
     config: MLA_SM100_Decode_Config,
     ValidLengthType: OptionalPointer,
+    Engine: TensorEngine,
     _is_cache_length_accurate: Bool = False,
     ragged: Bool = False,
     # This is used when speculative decoding is enabled.
@@ -133,6 +141,7 @@ struct MLA_SM100_Decode_QKV_FP8[
             kernel.
         ValidLengthType: The optional pointer type for the
             per-request valid sequence length buffer.
+        Engine: Engine policy of the `scalar_args` tile operand.
         _is_cache_length_accurate: Whether the cache length used
             for offset computation is accurate (defaults to
             `False`).
@@ -282,7 +291,10 @@ struct MLA_SM100_Decode_QKV_FP8[
         ],
         scales_ptr: UnsafePointer[Float32, origin=MutAnyOrigin],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # MaskType assertion: native FP8 backend supports NullMask, CausalMask,

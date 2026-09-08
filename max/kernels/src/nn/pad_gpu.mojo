@@ -13,9 +13,9 @@
 """Implements GPU-specific tensor padding kernels with constant or edge-fill strategies."""
 
 from std.algorithm.functional import vectorize
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.host import DeviceContext, DeviceBuffer, DeviceAttribute
-from layout import Coord, TensorLayout, TileTensor
+from layout import Coord, TensorEngine, TensorLayout, TileTensor
 from layout.tile_layout import Layout
 from std.math import align_down, ceildiv
 from std.sys.info import align_of
@@ -113,9 +113,15 @@ def padded_copy_kernel[
     output_origin: MutOrigin,
     dtype: DType,
     simd_width: Int,
+    InputEngine: TensorEngine,
+    OutputEngine: TensorEngine,
 ](
-    input_tensor: TileTensor[dtype, InputLayoutType, input_origin],
-    output_tensor: TileTensor[dtype, OutputLayoutType, output_origin],
+    input_tensor: TileTensor[
+        dtype, InputLayoutType, input_origin, Engine=InputEngine
+    ],
+    output_tensor: TileTensor[
+        dtype, OutputLayoutType, output_origin, Engine=OutputEngine
+    ],
     rows_per_sm: Int32,
     total_rows: Int32,
     row_length: Int32,
@@ -195,6 +201,8 @@ def _pad_constant_impl[
         OutputLayoutType=output_tensor.LayoutType,
         dtype=dtype,
         simd_width=simd_width,
+        InputEngine=type_of(input_tensor.as_immut()).Engine,
+        OutputEngine=output_tensor.Engine,
     ]
 
     ctx.enqueue_function[kernel](

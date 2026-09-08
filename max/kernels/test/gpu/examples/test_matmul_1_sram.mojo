@@ -14,7 +14,7 @@
 from std.math import align_down, ceildiv
 
 from std.algorithm.functional import tile_and_unswitch
-from std.gpu import global_idx, thread_idx
+from max.gpu import global_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from layout import TileTensor, Coord, Idx, row_major

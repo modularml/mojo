@@ -1,0 +1,25 @@
+load("//bazel:api.bzl", "lit_tests", "modular_cc_library")
+
+package(default_visibility = ["//visibility:private"])
+
+# C reference implementations for extern_c effect testing.
+# Used by tests that exercise indirect calls through extern_c function pointers.
+modular_cc_library(
+    name = "c_effect_reference",
+    testonly = True,
+    srcs = ["c_reference.c"],
+    copts = [
+        "-Werror",
+        "-O0",  # No optimization to keep assembly predictable
+        "-g",
+    ],
+    alwayslink = True,
+)
+
+lit_tests(
+    name = "test",
+    srcs = glob(["*.mojo"]),
+    data = [":c_effect_reference"],
+    mojo_deps = ["@mojo//:std"],
+    tools = ["//Mojo/tools/mojo"],
+)

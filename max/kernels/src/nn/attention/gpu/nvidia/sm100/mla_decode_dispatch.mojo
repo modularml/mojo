@@ -59,19 +59,19 @@ comptime logger = Logger()
 comptime MIN_FOLD_Q = 2
 comptime MAX_FOLD_Q = 8
 
+
 # TODO: Remove once stdlib's SwitchedFunction2 supports `raises`.
-# The stdlib unswitch 2-predicate overload uses SwitchedFunction2 which
-# is `def[sw0: Bool, sw1: Bool]() capturing[_] -> None` (no raises).
-# Our sparse dispatch needs raises, so we define a local raises variant.
-comptime _SwitchedFunction2Raises = def[
-    sw0: Bool, sw1: Bool
-]() raises capturing[_] -> None
-
-
+# The stdlib 2-predicate unswitch uses SwitchedFunction2 which is
+# `def[sw0: Bool, sw1: Bool]() -> None` (no raises). Sparse dispatch needs
+# raises, so this local helper takes a raising unified closure value.
 @always_inline
 def _unswitch_raises[
-    switched_func: _SwitchedFunction2Raises
-](dynamic_switch_a: Bool, dynamic_switch_b: Bool) raises:
+    FuncType: def[sw0: Bool, sw1: Bool]() raises -> None
+](
+    dynamic_switch_a: Bool,
+    dynamic_switch_b: Bool,
+    switched_func: FuncType,
+) raises:
     if dynamic_switch_a:
 
         @always_inline
@@ -1682,9 +1682,9 @@ def mla_decode_sm100_sink_split_k[
         q_type
     ]()
     # Comptime-local aliases so the nested `_launch_sparse_kv_fp8_fold_sel`
-    # @__parameter closure can read these in its `comptime if` (nested closures
-    # capture comptime locals, not the enclosing function's comptime params by
-    # bare name).
+    # closure can read these in its `comptime if` (nested closures capture
+    # comptime locals, not the enclosing function's comptime params by bare
+    # name).
     comptime _fold_shared_index = fold_shared_index
     comptime _has_attn_sink = has_attn_sink
     # Scoped to the sparse native-FP8 kernel ONLY: this same mla_config
@@ -1783,11 +1783,10 @@ def mla_decode_sm100_sink_split_k[
                     depth=mla_config.input_q_depth,
                 ](ctx, q_ptr, num_rows_q)
 
-                @__parameter
                 @always_inline
                 def _launch_sparse_kv_bf16[
                     _has_extra_kv: Bool, _has_variable_topk: Bool
-                ]() raises:
+                ]() raises {imm}:
                     if ragged:
                         comptime ValidLengthType = NonNullPointer[.uint32]
                         var valid_len: ValidLengthType = {
@@ -1873,8 +1872,10 @@ def mla_decode_sm100_sink_split_k[
                             ctx,
                         )
 
-                _unswitch_raises[_launch_sparse_kv_bf16](
-                    extra_k is not None, Bool(topk_lengths)
+                _unswitch_raises(
+                    extra_k is not None,
+                    Bool(topk_lengths),
+                    _launch_sparse_kv_bf16,
                 )
                 return
 
@@ -2020,11 +2021,10 @@ def mla_decode_sm100_sink_split_k[
                             logical_indices=logical_indices,
                         )
 
-                @__parameter
                 @always_inline
                 def _launch_sparse_qkv_fp8_fold_sel[
                     _has_extra_kv: Bool, _has_variable_topk: Bool
-                ]() raises:
+                ]() raises {imm}:
                     comptime _fold_ok = (
                         _fold_shared_index
                         and not _has_extra_kv
@@ -2044,8 +2044,10 @@ def mla_decode_sm100_sink_split_k[
                                     return
                     _launch_sparse_qkv_fp8[_has_extra_kv, _has_variable_topk]()
 
-                _unswitch_raises[_launch_sparse_qkv_fp8_fold_sel](
-                    extra_k is not None, Bool(topk_lengths)
+                _unswitch_raises(
+                    extra_k is not None,
+                    Bool(topk_lengths),
+                    _launch_sparse_qkv_fp8_fold_sel,
                 )
                 return
 
@@ -2163,11 +2165,10 @@ def mla_decode_sm100_sink_split_k[
                             ctx,
                         )
 
-                @__parameter
                 @always_inline
                 def _launch_sparse_kv_fp8_fold_sel[
                     _has_extra_kv: Bool, _has_variable_topk: Bool
-                ]() raises:
+                ]() raises {imm}:
                     comptime _fold_ok = (
                         _fold_shared_index
                         and not _has_extra_kv
@@ -2187,8 +2188,10 @@ def mla_decode_sm100_sink_split_k[
                                     return
                     _launch_sparse_kv_fp8[_has_extra_kv, _has_variable_topk]()
 
-                _unswitch_raises[_launch_sparse_kv_fp8_fold_sel](
-                    extra_k is not None, Bool(topk_lengths)
+                _unswitch_raises(
+                    extra_k is not None,
+                    Bool(topk_lengths),
+                    _launch_sparse_kv_fp8_fold_sel,
                 )
                 return
 
@@ -2251,11 +2254,10 @@ def mla_decode_sm100_sink_split_k[
                 depth=mla_config.input_q_depth,
             ](ctx, q_ptr, num_rows_q)
 
-            @__parameter
             @always_inline
             def _launch_sparse[
                 _has_extra_kv: Bool, _has_variable_topk: Bool
-            ]() raises:
+            ]() raises {imm}:
                 if ragged:
                     comptime ValidLengthType = NonNullPointer[.uint32]
                     var valid_len: ValidLengthType = {
@@ -2349,8 +2351,8 @@ def mla_decode_sm100_sink_split_k[
                         ctx,
                     )
 
-            _unswitch_raises[_launch_sparse](
-                extra_k is not None, Bool(topk_lengths)
+            _unswitch_raises(
+                extra_k is not None, Bool(topk_lengths), _launch_sparse
             )
             return
 
@@ -2944,6 +2946,7 @@ def launch_mla_sm100_decode_enqueue_kernel[
         ValidLengthType=ValidLengthType,
         _is_cache_length_accurate=_is_cache_length_accurate,
         ragged=ragged,
+        Engine=scalar_args_buf.Engine,
     ].kernel if _is_old_fp8 else MLA_SM100_Decode_KV_BF16[
         q_type=q_type,
         KVLUTType=KVLUTType,
@@ -2954,6 +2957,7 @@ def launch_mla_sm100_decode_enqueue_kernel[
         ValidLengthType=ValidLengthType,
         _is_cache_length_accurate=_is_cache_length_accurate,
         ragged=ragged,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     # Enable PDL (Programmatic Dependent Launch) for split-K mode to chain
     # the MLA decode kernel with the combine kernel, reducing host synchronization.
@@ -3062,6 +3066,7 @@ def launch_mla_sm100_decode_native_fp8[
         ragged=ragged,
         fold_q=fold_q,
         q_len_fold=q_len_fold,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     comptime pdl_level = PDLLevel.OVERLAP_AT_END if config.decoding_warp_split_k else PDLLevel.OFF
     ctx.enqueue_function[kernel](
@@ -3176,6 +3181,7 @@ def launch_mla_sm100_decode_native_fp8_layout_g[
         ragged=ragged,
         fold_q=fold_q,
         q_len_fold=q_len_fold,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     comptime pdl_level = PDLLevel.OVERLAP_AT_END if config_g.decoding_warp_split_k else PDLLevel.OFF
     ctx.enqueue_function[kernel](
@@ -3285,6 +3291,7 @@ def launch_mla_sm100_decode_fp8_per_token_scale_rope_aware[
         _is_cache_length_accurate=_is_cache_length_accurate,
         ragged=ragged,
         has_per_token_scales=has_per_token_scales,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     comptime pdl_level = PDLLevel.OVERLAP_AT_END if config.decoding_warp_split_k else PDLLevel.OFF
     ctx.enqueue_function[kernel](

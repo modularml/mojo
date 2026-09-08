@@ -7,13 +7,13 @@ package(default_visibility = ["//max:consumers"])
 filegroup(
     name = "srcs",
     srcs = glob(["*.mojo"]),
-    visibility = ["//KGEN/test/mojo-lsp-server/parse-tree:__pkg__"],
+    visibility = ["//Mojo/test/mojo-lsp-server/parse-tree:__pkg__"],
 )
 
 # Mojo-importable `Range` context manager (MXTOOLS-190). Consumers do
 # `from profiling_range import Range, is_enabled` after taking a dep on
 # `//max:profiling_range`. Bridges to KGEN_CompilerRT_Range* in
-# KGEN/lib/CompilerRT/RangeBridge.cpp through `external_call` (no build-time
+# Mojo/lib/CompilerRT/RangeBridge.cpp through `external_call` (no build-time
 # dep on KGEN). Lives under //max so KGEN stays buildable and testable without
 # the MAX/Kernels trees. The package is named `profiling_range` to avoid
 # shadowing Mojo's built-in `range()` iterator.

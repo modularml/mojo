@@ -24,7 +24,7 @@ import extensibility
 from extensibility import InputTensor, OutputTensor
 from max.gpu.host import DeviceContext
 from max.gpu.primitives.grid_controls import PDLLevel, pdl_launch_attributes
-from std.gpu.host.info import is_gpu
+from max.gpu.host.info import is_gpu
 
 from attn_res.mix import attn_res_mix_gpu
 
@@ -102,13 +102,13 @@ struct AttnResMix:
                     attn_res_mix_gpu[
                         dtype,
                         output_tt.LayoutType,
-                        output_tt.Storage,
+                        output_tt.Engine,
                         candidates_tt.LayoutType,
-                        candidates_tt.Storage,
+                        candidates_tt.Engine,
                         proj_tt.LayoutType,
-                        proj_tt.Storage,
+                        proj_tt.Engine,
                         norm_tt.LayoutType,
-                        norm_tt.Storage,
+                        norm_tt.Engine,
                         c,
                         BLOCK_SIZE,
                     ]

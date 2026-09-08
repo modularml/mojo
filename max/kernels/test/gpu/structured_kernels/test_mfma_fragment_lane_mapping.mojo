@@ -33,7 +33,7 @@ If it fails, the lane-mapping doc is wrong, and all FP8-cast logic
 downstream is built on bad assumptions.
 """
 
-from std.gpu import lane_id, thread_idx
+from max.gpu import lane_id, thread_idx
 from max.gpu.host import DeviceContext
 from max.gpu.compute.mma import mma as gpu_mma
 from std.memory import AddressSpace

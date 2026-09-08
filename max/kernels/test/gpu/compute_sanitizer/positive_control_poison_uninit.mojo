@@ -28,7 +28,7 @@
 # Expected with poison ON: assertion fires (dst is NaN). With poison OFF: the
 # read returns pool garbage and the test may silently "pass". Tagged `manual`.
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.host import DeviceContext
 from std.math import isnan
 

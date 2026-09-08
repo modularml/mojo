@@ -22,7 +22,7 @@ Usage:
   br test_mxfp4_matmul_amd_preb.mojo.test
 """
 
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, global_idx
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, global_idx
 from max.gpu.host import DeviceContext, HostBuffer
 from max.gpu.memory import CacheOperation
 from max.gpu.host.info import MI355X
@@ -37,7 +37,7 @@ from layout import (
     Coord,
     Idx,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -143,22 +143,22 @@ def _preb_grid_kernel[
     LayoutBPre: TensorLayout,
     LayoutSFA: TensorLayout,
     LayoutSFB: TensorLayout,
-    StoreC: TensorStorage,
-    StoreA: TensorStorage,
-    StoreBPre: TensorStorage,
-    StoreSFA: TensorStorage,
-    StoreSFB: TensorStorage,
+    CEngine: TensorEngine,
+    AEngine: TensorEngine,
+    BPreEngine: TensorEngine,
+    SFAEngine: TensorEngine,
+    SFBEngine: TensorEngine,
     N: Int,
     K_BYTES: Int,
 ](
-    c: TileTensor[mut=True, out_dtype, LayoutC, MutAnyOrigin, Storage=StoreC],
-    a: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Storage=StoreA],
-    b_pre: TileTensor[.uint8, LayoutBPre, ImmutAnyOrigin, Storage=StoreBPre],
+    c: TileTensor[mut=True, out_dtype, LayoutC, MutAnyOrigin, Engine=CEngine],
+    a: TileTensor[.uint8, LayoutA, ImmutAnyOrigin, Engine=AEngine],
+    b_pre: TileTensor[.uint8, LayoutBPre, ImmutAnyOrigin, Engine=BPreEngine],
     sfa: TileTensor[
-        .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Storage=StoreSFA
+        .float8_e8m0fnu, LayoutSFA, ImmutAnyOrigin, Engine=SFAEngine
     ],
     sfb: TileTensor[
-        .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Storage=StoreSFB
+        .float8_e8m0fnu, LayoutSFB, ImmutAnyOrigin, Engine=SFBEngine
     ],
 ):
     BlockScaledMatmulAMD_PreB[
@@ -178,11 +178,11 @@ def _preb_grid_kernel[
         LayoutBPre,
         LayoutSFA,
         LayoutSFB,
-        StoreC,
-        StoreA,
-        StoreBPre,
-        StoreSFA,
-        StoreSFB,
+        CEngine,
+        AEngine,
+        BPreEngine,
+        SFAEngine,
+        SFBEngine,
         N,
         K_BYTES,
     ](
@@ -365,11 +365,11 @@ def _test_case[
         type_of(b_pre_tt).LayoutType,
         type_of(sfa_tt).LayoutType,
         type_of(sfb_tt).LayoutType,
-        type_of(c_tt).Storage,
-        type_of(a_tt).Storage,
-        type_of(b_pre_tt).Storage,
-        type_of(sfa_tt).Storage,
-        type_of(sfb_tt).Storage,
+        type_of(c_tt).Engine,
+        type_of(a_tt).Engine,
+        type_of(b_pre_tt).Engine,
+        type_of(sfa_tt).Engine,
+        type_of(sfb_tt).Engine,
         N_static,
         packed_K,
     ]

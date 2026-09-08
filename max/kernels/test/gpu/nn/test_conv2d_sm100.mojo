@@ -2152,7 +2152,7 @@ def main() raises:
         )
 
         # NOTE: FP16 tests require additional stdlib changes beyond TMA:
-        # - std/gpu/compute/mma.mojo st_matrix() also only supports BF16/F32
+        # - max/gpu/compute/mma.mojo st_matrix() also only supports BF16/F32
         # - Full FP16 support would require updates across multiple files
         # For now, CUTLASS comparison requires modifying CUTLASS to use BF16
 

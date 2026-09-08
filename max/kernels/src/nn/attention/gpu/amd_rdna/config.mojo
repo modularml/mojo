@@ -17,7 +17,7 @@ Single fixed config for both prefill and decode: MMA shape 16x16x16
 single-buffered, depth-padded V SMEM.
 """
 
-from std.gpu import block_idx, lane_id
+from max.gpu import block_idx, lane_id
 from std.math.uutils import umod, ufloordiv
 from std.utils import IndexList
 

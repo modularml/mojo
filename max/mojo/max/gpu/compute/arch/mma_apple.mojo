@@ -28,7 +28,7 @@ Supported operations:
 
 from std.sys import llvm_intrinsic
 
-from std.gpu import lane_id
+from std._gpu import lane_id
 
 # Import helper functions from parent module
 from ..mma import _has_shape, _unsupported_mma_op

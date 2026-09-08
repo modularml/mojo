@@ -18,7 +18,7 @@ from std.sys import (
     get_defined_string,
     align_of,
 )
-from std.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
+from max.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
 import linalg.matmul.vendor.blas as vendor_blas
 from max.benchmark import bencher_iter_custom
 from std.benchmark import (

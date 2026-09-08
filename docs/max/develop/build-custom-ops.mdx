@@ -248,8 +248,8 @@ That's basically it. We created a custom op and added it to a graph!
 
 Now we can run an inference, using
 [`InferenceSession`](/api/python/generated/max.engine.InferenceSession). We
-start by loading the graph onto the selected `device` (see above; either a CPU
-or GPU "accelerator"):
+start by compiling the graph for the selected `device` (see above; either a CPU
+or GPU "accelerator"), then initializing it for execution:
 
 ```python title="addition.py"
 session = InferenceSession(

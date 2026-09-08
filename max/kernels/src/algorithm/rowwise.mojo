@@ -97,7 +97,7 @@ from algorithm.rowwise_types import (
 )
 from algorithm.reduce_op import ReduceOp, Reducer
 from std.collections import Optional
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     lane_id,
     thread_idx,
@@ -106,7 +106,7 @@ from std.gpu import (
 from max.gpu import barrier, syncwarp
 from max.gpu.host import DeviceContext, get_gpu_target
 from max.gpu.memory import external_memory
-from std.gpu.host.info import is_cpu, is_gpu
+from max.gpu.host.info import is_cpu, is_gpu
 from std.math import ceildiv, iota
 from std.memory import bitcast, stack_allocation
 from std.memory.unsafe_pointer import UnsafePointer

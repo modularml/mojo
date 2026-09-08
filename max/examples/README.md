@@ -6,7 +6,7 @@ READMEs for usage instructions.
 
 ## Mojo code examples
 
-We moved the Mojo examples to [/mojo/examples](../../mojo/examples/)
+We moved the Mojo examples to [/Mojo/examples](../../Mojo/examples/)
 
 ## [Modules](modules/)
 

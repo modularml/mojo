@@ -66,7 +66,7 @@ Tolerances (max element-wise abs-diff over the whole accumulator):
   scaled small so the sum of 64 products stays representable).
 """
 
-from std.gpu import lane_id, thread_idx
+from max.gpu import lane_id, thread_idx
 from max.gpu.host import DeviceContext
 from std.memory import AddressSpace
 from std.testing import assert_true

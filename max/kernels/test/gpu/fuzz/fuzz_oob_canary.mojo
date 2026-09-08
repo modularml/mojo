@@ -25,7 +25,7 @@
 # overflow==0 (clean) and overflow>0 (OOB) cases, so the fuzzer "finds" the
 # planted bug from generated specs.
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.random import random_ui64, seed

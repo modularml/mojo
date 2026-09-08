@@ -533,7 +533,7 @@ struct InputPipelineStorage[
     # separate in SMEM. This is the extensibility point for future.
     #
     # TODO: When Payload types define Storage, add:
-    # var payload: Payload.Storage[num_stages]
+    # var payload: Payload.Engine[num_stages]
 
     @always_inline
     def create_pipeline(

@@ -61,18 +61,18 @@ static constexpr llvm::StringLiteral kNVPTXWorkspace = "nvptxcompiler_x86_64";
 static constexpr RunfileMapping kRunfileMappings[] = {
     {"crash_reporting.handler_path", "crashpad", "modular-crashpad-handler",
      false, ""},
-    {"mojo-max.driver_path", "", "KGEN/tools/mojo/mojo", false, ""},
+    {"mojo-max.driver_path", "", "Mojo/tools/mojo/mojo", false, ""},
     {"mojo-max.lld_path", "llvm-project", "lld/lld", false, ""},
     {"mojo-max.lldb_path", "llvm-project", "lldb/lldb", false, ""},
     {"mojo-max.lsp_server_path", "",
-     "KGEN/tools/mojo-lsp-server/mojo-lsp-server", false, ""},
+     "Mojo/tools/mojo-lsp-server/mojo-lsp-server", false, ""},
     {"mojo-max.repl_entry_point", "",
-     "KGEN/tools/mojo-repl-entry-point/mojo-repl-entry-point", false, ""},
+     "Mojo/tools/mojo-repl-entry-point/mojo-repl-entry-point", false, ""},
 
     // Shared libraries
     {"mojo-max.mgprt_path", "", "GraphCompiler", true, "MGPRT"},
-    {"mojo-max.compilerrt_path", "", "KGEN", true, "KGENCompilerRTShared"},
-    {"mojo-max.lldb_plugin_path", "", "KGEN", true, "MojoLLDB"},
+    {"mojo-max.compilerrt_path", "", "Mojo", true, "KGENCompilerRTShared"},
+    {"mojo-max.lldb_plugin_path", "", "Mojo", true, "MojoLLDB"},
 
     {"max.lib_path", "", "max/internal", true, "max"},
 

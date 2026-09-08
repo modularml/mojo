@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from std.random import randn
 from layout.tile_tensor import TileTensor

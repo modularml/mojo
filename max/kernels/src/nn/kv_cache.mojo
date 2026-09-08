@@ -17,7 +17,7 @@ from std.math.uutils import udivmod
 from std.memory import ThinAllocation, dealloc
 from std.memory.alloc import Layout as AllocLayout
 from std.sys.info import align_of, simd_width_of
-from std.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
+from max.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext, DeviceBuffer, get_gpu_target
 from max.gpu.host.info import is_cpu, is_gpu
@@ -34,7 +34,7 @@ from layout import (
     LayoutTensor,
     RuntimeLayout,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     UNKNOWN_VALUE,
     coord_to_index_list,
@@ -610,19 +610,19 @@ def _fused_qk_rms_norm_ragged_paged_gpu[
     cache_t: KVCacheT,
     q_out_layout: TensorLayout,
     q_out_origin: Origin[mut=True],
-    q_out_storage: TensorStorage,
+    q_out_engine: TensorEngine,
     q_layout: TensorLayout,
     q_origin: ImmOrigin,
-    q_storage: TensorStorage,
+    q_engine: TensorEngine,
     q_gamma_layout: TensorLayout,
     q_gamma_origin: ImmOrigin,
-    q_gamma_storage: TensorStorage,
+    q_gamma_engine: TensorEngine,
     k_gamma_layout: TensorLayout,
     k_gamma_origin: ImmOrigin,
-    k_gamma_storage: TensorStorage,
+    k_gamma_engine: TensorEngine,
     offsets_layout: TensorLayout,
     offsets_origin: ImmOrigin,
-    offsets_storage: TensorStorage,
+    offsets_engine: TensorEngine,
     dtype: DType,
     //,
     simd_width: Int,
@@ -630,21 +630,21 @@ def _fused_qk_rms_norm_ragged_paged_gpu[
     multiply_before_cast: Bool,
 ](
     q_output: TileTensor[
-        dtype, q_out_layout, q_out_origin, Storage=q_out_storage
+        dtype, q_out_layout, q_out_origin, Engine=q_out_engine
     ],
-    q_proj: TileTensor[dtype, q_layout, q_origin, Storage=q_storage],
+    q_proj: TileTensor[dtype, q_layout, q_origin, Engine=q_engine],
     k_cache: cache_t,
     q_gamma: TileTensor[
-        dtype, q_gamma_layout, q_gamma_origin, Storage=q_gamma_storage
+        dtype, q_gamma_layout, q_gamma_origin, Engine=q_gamma_engine
     ],
     k_gamma: TileTensor[
-        dtype, k_gamma_layout, k_gamma_origin, Storage=k_gamma_storage
+        dtype, k_gamma_layout, k_gamma_origin, Engine=k_gamma_engine
     ],
     epsilon: Float32,
     weight_offset: Float32,
     total_seq_len: UInt32,
     input_row_offsets: TileTensor[
-        .uint32, offsets_layout, offsets_origin, Storage=offsets_storage
+        .uint32, offsets_layout, offsets_origin, Engine=offsets_engine
     ],
     q_num_heads: Int32,
     num_cols: Int32,
@@ -840,19 +840,19 @@ def fused_qk_rms_norm_ragged_paged[
             cache_t=type_of(k_cache),
             q_out_layout=q_output.LayoutType,
             q_out_origin=q_output.origin,
-            q_out_storage=q_output.Storage,
+            q_out_engine=q_output.Engine,
             q_layout=q_proj.LayoutType,
             q_origin=q_proj.origin,
-            q_storage=q_proj.Storage,
+            q_engine=q_proj.Engine,
             q_gamma_layout=q_gamma.LayoutType,
             q_gamma_origin=q_gamma.origin,
-            q_gamma_storage=q_gamma.Storage,
+            q_gamma_engine=q_gamma.Engine,
             k_gamma_layout=k_gamma.LayoutType,
             k_gamma_origin=k_gamma.origin,
-            k_gamma_storage=k_gamma.Storage,
+            k_gamma_engine=k_gamma.Engine,
             offsets_layout=input_row_offsets.LayoutType,
             offsets_origin=input_row_offsets.origin,
-            offsets_storage=input_row_offsets.Storage,
+            offsets_engine=input_row_offsets.Engine,
             dtype=dtype,
             simd_width,
             warps_per_block,
@@ -885,19 +885,19 @@ def _fused_qk_rms_norm_rope_process_row[
     cache_t: KVCacheT,
     q_out_layout: TensorLayout,
     q_out_origin: Origin[mut=True],
-    q_out_storage: TensorStorage,
+    q_out_engine: TensorEngine,
     q_gamma_layout: TensorLayout,
     q_gamma_origin: ImmOrigin,
-    q_gamma_storage: TensorStorage,
+    q_gamma_engine: TensorEngine,
     k_gamma_layout: TensorLayout,
     k_gamma_origin: ImmOrigin,
-    k_gamma_storage: TensorStorage,
+    k_gamma_engine: TensorEngine,
     freqs_layout: TensorLayout,
     freqs_origin: ImmOrigin,
-    freqs_storage: TensorStorage,
+    freqs_engine: TensorEngine,
     offsets_layout: TensorLayout,
     offsets_origin: ImmOrigin,
-    offsets_storage: TensorStorage,
+    offsets_engine: TensorEngine,
     dtype: DType,
     q_out_dtype: DType,
     freq_dtype: DType,
@@ -916,22 +916,22 @@ def _fused_qk_rms_norm_rope_process_row[
     global_token_idx: Int,
     head_idx: Int,
     q_output: TileTensor[
-        q_out_dtype, q_out_layout, q_out_origin, Storage=q_out_storage
+        q_out_dtype, q_out_layout, q_out_origin, Engine=q_out_engine
     ],
     k_cache: cache_t,
     q_gamma: TileTensor[
-        dtype, q_gamma_layout, q_gamma_origin, Storage=q_gamma_storage
+        dtype, q_gamma_layout, q_gamma_origin, Engine=q_gamma_engine
     ],
     k_gamma: TileTensor[
-        dtype, k_gamma_layout, k_gamma_origin, Storage=k_gamma_storage
+        dtype, k_gamma_layout, k_gamma_origin, Engine=k_gamma_engine
     ],
     freqs_cis: TileTensor[
-        freq_dtype, freqs_layout, freqs_origin, Storage=freqs_storage
+        freq_dtype, freqs_layout, freqs_origin, Engine=freqs_engine
     ],
     epsilon: Float32,
     weight_offset: Scalar[dtype],
     input_row_offsets: TileTensor[
-        .uint32, offsets_layout, offsets_origin, Storage=offsets_storage
+        .uint32, offsets_layout, offsets_origin, Engine=offsets_engine
     ],
     num_cols: Int,
 ):
@@ -1113,19 +1113,19 @@ def _fused_qk_rms_norm_rope_ragged_paged_gpu[
     cache_t: KVCacheT,
     q_out_layout: TensorLayout,
     q_out_origin: Origin[mut=True],
-    q_out_storage: TensorStorage,
+    q_out_engine: TensorEngine,
     q_gamma_layout: TensorLayout,
     q_gamma_origin: ImmOrigin,
-    q_gamma_storage: TensorStorage,
+    q_gamma_engine: TensorEngine,
     k_gamma_layout: TensorLayout,
     k_gamma_origin: ImmOrigin,
-    k_gamma_storage: TensorStorage,
+    k_gamma_engine: TensorEngine,
     freqs_layout: TensorLayout,
     freqs_origin: ImmOrigin,
-    freqs_storage: TensorStorage,
+    freqs_engine: TensorEngine,
     offsets_layout: TensorLayout,
     offsets_origin: ImmOrigin,
-    offsets_storage: TensorStorage,
+    offsets_engine: TensorEngine,
     dtype: DType,
     q_out_dtype: DType,
     freq_dtype: DType,
@@ -1141,23 +1141,23 @@ def _fused_qk_rms_norm_rope_ragged_paged_gpu[
     rope_dim: Int,
 ](
     q_output: TileTensor[
-        q_out_dtype, q_out_layout, q_out_origin, Storage=q_out_storage
+        q_out_dtype, q_out_layout, q_out_origin, Engine=q_out_engine
     ],
     k_cache: cache_t,
     q_gamma: TileTensor[
-        dtype, q_gamma_layout, q_gamma_origin, Storage=q_gamma_storage
+        dtype, q_gamma_layout, q_gamma_origin, Engine=q_gamma_engine
     ],
     k_gamma: TileTensor[
-        dtype, k_gamma_layout, k_gamma_origin, Storage=k_gamma_storage
+        dtype, k_gamma_layout, k_gamma_origin, Engine=k_gamma_engine
     ],
     freqs_cis: TileTensor[
-        freq_dtype, freqs_layout, freqs_origin, Storage=freqs_storage
+        freq_dtype, freqs_layout, freqs_origin, Engine=freqs_engine
     ],
     epsilon: Float32,
     weight_offset: Float32,
     total_seq_len: UInt32,
     input_row_offsets: TileTensor[
-        .uint32, offsets_layout, offsets_origin, Storage=offsets_storage
+        .uint32, offsets_layout, offsets_origin, Engine=offsets_engine
     ],
     q_num_heads: Int32,
     num_cols: Int32,
@@ -1359,19 +1359,19 @@ def fused_qk_rms_norm_rope_ragged_paged[
             cache_t=type_of(k_cache),
             q_out_layout=q_output.LayoutType,
             q_out_origin=q_output.origin,
-            q_out_storage=q_output.Storage,
+            q_out_engine=q_output.Engine,
             q_gamma_layout=q_gamma.LayoutType,
             q_gamma_origin=q_gamma.origin,
-            q_gamma_storage=q_gamma.Storage,
+            q_gamma_engine=q_gamma.Engine,
             k_gamma_layout=k_gamma.LayoutType,
             k_gamma_origin=k_gamma.origin,
-            k_gamma_storage=k_gamma.Storage,
+            k_gamma_engine=k_gamma.Engine,
             freqs_layout=freqs_cis.LayoutType,
             freqs_origin=freqs_cis.origin,
-            freqs_storage=freqs_cis.Storage,
+            freqs_engine=freqs_cis.Engine,
             offsets_layout=input_row_offsets.LayoutType,
             offsets_origin=input_row_offsets.origin,
-            offsets_storage=input_row_offsets.Storage,
+            offsets_engine=input_row_offsets.Engine,
             dtype=dtype,
             q_out_dtype=q_out_dtype,
             freq_dtype=freq_dtype,
@@ -1408,28 +1408,28 @@ def _fused_dual_qk_rms_norm_rope_ragged_paged_gpu[
     index_cache_t: KVCacheT,
     q_main_out_layout: TensorLayout,
     q_main_out_origin: Origin[mut=True],
-    q_main_out_storage: TensorStorage,
+    q_main_out_engine: TensorEngine,
     q_index_out_layout: TensorLayout,
     q_index_out_origin: Origin[mut=True],
-    q_index_out_storage: TensorStorage,
+    q_index_out_engine: TensorEngine,
     q_main_gamma_layout: TensorLayout,
     q_main_gamma_origin: ImmOrigin,
-    q_main_gamma_storage: TensorStorage,
+    q_main_gamma_engine: TensorEngine,
     k_main_gamma_layout: TensorLayout,
     k_main_gamma_origin: ImmOrigin,
-    k_main_gamma_storage: TensorStorage,
+    k_main_gamma_engine: TensorEngine,
     q_index_gamma_layout: TensorLayout,
     q_index_gamma_origin: ImmOrigin,
-    q_index_gamma_storage: TensorStorage,
+    q_index_gamma_engine: TensorEngine,
     k_index_gamma_layout: TensorLayout,
     k_index_gamma_origin: ImmOrigin,
-    k_index_gamma_storage: TensorStorage,
+    k_index_gamma_engine: TensorEngine,
     freqs_layout: TensorLayout,
     freqs_origin: ImmOrigin,
-    freqs_storage: TensorStorage,
+    freqs_engine: TensorEngine,
     offsets_layout: TensorLayout,
     offsets_origin: ImmOrigin,
-    offsets_storage: TensorStorage,
+    offsets_engine: TensorEngine,
     dtype: DType,
     q_main_out_dtype: DType,
     q_index_out_dtype: DType,
@@ -1452,13 +1452,13 @@ def _fused_dual_qk_rms_norm_rope_ragged_paged_gpu[
         q_main_out_dtype,
         q_main_out_layout,
         q_main_out_origin,
-        Storage=q_main_out_storage,
+        Engine=q_main_out_engine,
     ],
     q_index_output: TileTensor[
         q_index_out_dtype,
         q_index_out_layout,
         q_index_out_origin,
-        Storage=q_index_out_storage,
+        Engine=q_index_out_engine,
     ],
     main_k_cache: main_cache_t,
     index_k_cache: index_cache_t,
@@ -1466,35 +1466,35 @@ def _fused_dual_qk_rms_norm_rope_ragged_paged_gpu[
         dtype,
         q_main_gamma_layout,
         q_main_gamma_origin,
-        Storage=q_main_gamma_storage,
+        Engine=q_main_gamma_engine,
     ],
     k_main_gamma: TileTensor[
         dtype,
         k_main_gamma_layout,
         k_main_gamma_origin,
-        Storage=k_main_gamma_storage,
+        Engine=k_main_gamma_engine,
     ],
     q_index_gamma: TileTensor[
         dtype,
         q_index_gamma_layout,
         q_index_gamma_origin,
-        Storage=q_index_gamma_storage,
+        Engine=q_index_gamma_engine,
     ],
     k_index_gamma: TileTensor[
         dtype,
         k_index_gamma_layout,
         k_index_gamma_origin,
-        Storage=k_index_gamma_storage,
+        Engine=k_index_gamma_engine,
     ],
     freqs_cis: TileTensor[
-        freq_dtype, freqs_layout, freqs_origin, Storage=freqs_storage
+        freq_dtype, freqs_layout, freqs_origin, Engine=freqs_engine
     ],
     main_epsilon: Float32,
     index_epsilon: Float32,
     weight_offset: Float32,
     total_seq_len: UInt32,
     input_row_offsets: TileTensor[
-        .uint32, offsets_layout, offsets_origin, Storage=offsets_storage
+        .uint32, offsets_layout, offsets_origin, Engine=offsets_engine
     ],
     q_main_num_heads_dev: Int32,
     q_index_num_heads_dev: Int32,
@@ -1791,28 +1791,28 @@ def fused_dual_qk_rms_norm_rope_ragged_paged[
             index_cache_t=type_of(index_k_cache),
             q_main_out_layout=q_main_output.LayoutType,
             q_main_out_origin=q_main_output.origin,
-            q_main_out_storage=q_main_output.Storage,
+            q_main_out_engine=q_main_output.Engine,
             q_index_out_layout=q_index_output.LayoutType,
             q_index_out_origin=q_index_output.origin,
-            q_index_out_storage=q_index_output.Storage,
+            q_index_out_engine=q_index_output.Engine,
             q_main_gamma_layout=q_main_gamma.LayoutType,
             q_main_gamma_origin=q_main_gamma.origin,
-            q_main_gamma_storage=q_main_gamma.Storage,
+            q_main_gamma_engine=q_main_gamma.Engine,
             k_main_gamma_layout=k_main_gamma.LayoutType,
             k_main_gamma_origin=k_main_gamma.origin,
-            k_main_gamma_storage=k_main_gamma.Storage,
+            k_main_gamma_engine=k_main_gamma.Engine,
             q_index_gamma_layout=q_index_gamma.LayoutType,
             q_index_gamma_origin=q_index_gamma.origin,
-            q_index_gamma_storage=q_index_gamma.Storage,
+            q_index_gamma_engine=q_index_gamma.Engine,
             k_index_gamma_layout=k_index_gamma.LayoutType,
             k_index_gamma_origin=k_index_gamma.origin,
-            k_index_gamma_storage=k_index_gamma.Storage,
+            k_index_gamma_engine=k_index_gamma.Engine,
             freqs_layout=freqs_cis.LayoutType,
             freqs_origin=freqs_cis.origin,
-            freqs_storage=freqs_cis.Storage,
+            freqs_engine=freqs_cis.Engine,
             offsets_layout=input_row_offsets.LayoutType,
             offsets_origin=input_row_offsets.origin,
-            offsets_storage=input_row_offsets.Storage,
+            offsets_engine=input_row_offsets.Engine,
             dtype=dtype,
             q_main_out_dtype=q_main_out_dtype,
             q_index_out_dtype=q_index_out_dtype,

@@ -280,11 +280,12 @@ def _build_session(args: _SessionArgs) -> _SessionResult:
     truncated_at_turn: int | None = None
 
     for turn_i, turn in enumerate(args.turns):
+        sys_prompt_ratio = args.sys_prompt_ratio if turn_i == 0 else 0.0
         msg = build_scaled_user_message(
             tokenizer,
             turn.prompt_text,
             turn.target_in,
-            args.sys_prompt_ratio,
+            sys_prompt_ratio,
             turn.sys_variant,
             args.min_input_len,
             unique_marker=turn.unique_marker,
@@ -436,7 +437,7 @@ def build_chat_samples_from_user_text_pool(
     max_variant = max(1, max_num_unique_sys_prompt)
     session_args_list: list[_SessionArgs] = []
     cursor = 0
-    pass_count = 0
+    draw_index = 0
     for session_id in range(num_sessions):
         n_planned = num_turns_per_session[session_id]
 
@@ -444,7 +445,6 @@ def build_chat_samples_from_user_text_pool(
         for turn_i in range(n_planned):
             if cursor >= len(filtered):
                 cursor = 0
-                pass_count += 1
             in_dist = in_first_dist if turn_i == 0 else in_rest_dist
             out_dist = out_first_dist if turn_i == 0 else out_rest_dist
             target_in = max(round(in_dist.sample_value()), min_input_len)
@@ -455,7 +455,8 @@ def build_chat_samples_from_user_text_pool(
                 if delay_dist
                 else None
             )
-            marker = f"[{pass_count}] " if pass_count > 0 else ""
+            # Marked unconditionally: avoids unintended shared prefixes.
+            marker = f"[{draw_index}] "
             turns.append(
                 _TurnSpec(
                     prompt_text=filtered[cursor],
@@ -467,6 +468,7 @@ def build_chat_samples_from_user_text_pool(
                 )
             )
             cursor += 1
+            draw_index += 1
 
         session_args_list.append(
             _SessionArgs(

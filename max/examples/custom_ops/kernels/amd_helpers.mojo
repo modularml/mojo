@@ -17,7 +17,7 @@ from std.sys import align_of, size_of
 # AMD Helper functions and structs for Tensor Core MMA operations
 from std.sys.info import simd_width_of
 
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     global_idx,
@@ -29,7 +29,7 @@ from max.gpu.host import DeviceBuffer, DeviceContext
 from max.gpu.sync import AMDScheduleBarrierMask, schedule_group_barrier
 from layout import (
     Layout,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
     TileTensor,
     row_major,
@@ -142,9 +142,9 @@ def copy_local_to_dram_32_32_8[
     dst_thread_layout: Layout,
     thread_scope: ThreadScope = ThreadScope.BLOCK,
 ](
-    dst: TileTensor[Storage=PointerStorage[], ...],
-    src: TileTensor[Storage=PointerStorage[], ...],
-    dst_base: TileTensor[Storage=PointerStorage[], ...],
+    dst: TileTensor[Engine=DefaultEngine[], ...],
+    src: TileTensor[Engine=DefaultEngine[], ...],
+    dst_base: TileTensor[Engine=DefaultEngine[], ...],
 ):
     # TODO: use copy_local_to_dram instead once fixed. This is a workaround for now.
 

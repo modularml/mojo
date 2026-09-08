@@ -18,7 +18,7 @@ It checks if the source vertex of the edge was visited in the previous level
 and if so, marks the destination vertex as visited at the current level.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
 from max.gpu.host import DeviceContext
 from std.atomic import Atomic
 from std.collections import List

@@ -62,15 +62,6 @@ class MoEQuantized(MoE):
         if self._uses_nvidia_block_scaled_ep_layout:
             return NvMxf4f8Strategy(self.quant_config, self.dtype)
         elif self.quant_config.is_mxfp6:
-            # Deliberately not a subclass of Mxfp4Strategy: the
-            # `isinstance(strategy, Mxfp4Strategy)` branches below select the
-            # A-scale slot folds, which have no FP6 producer -- writing scales
-            # in the grouped matmul's slot layout is unimplemented in
-            # `fused_silu_mxfp6_kernel` (it asserts on
-            # `fuse_a_scale_preshuffle`). The fused *activation* kernel does
-            # exist for FP6 (`ep.fused_silu.mxfp6`), so MXFP6 is admitted to
-            # that branch explicitly with the fold inputs at 0; it is the
-            # isinstance checks for the folds it must stay out of.
             if not self.quant_config.block_scaled_preshuffled_b:
                 raise ValueError(
                     "MXFP6 MoE requires preshuffled B weights: the 24-byte FP6 "
@@ -396,7 +387,7 @@ class MoEQuantized(MoE):
             if (
                 self._ep_batch_manager
                 and self.use_swigluoai
-                and isinstance(strategy, BlockScaledStrategy)
+                and isinstance(strategy, (BlockScaledStrategy, Mxfp6Strategy))
                 and self.quant_config is not None
                 and self.quant_config.block_scaled_preshuffled_b
             )
@@ -480,7 +471,7 @@ class MoEQuantized(MoE):
                     )
 
         down_inputs = (down_in, silu_scales) + expert_inputs[2:]
-        if isinstance(strategy, BlockScaledStrategy):
+        if isinstance(strategy, (BlockScaledStrategy, Mxfp6Strategy)):
             # Whichever producer wrote the down A-scale in slot layout (up-fold or
             # local SwiGLU down-fold; the other is 0), the reader stride MUST match
             # that constant, not the runtime per-expert max, or it reads wrong scales.

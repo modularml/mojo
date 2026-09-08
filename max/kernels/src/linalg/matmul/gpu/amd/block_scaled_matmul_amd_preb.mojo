@@ -36,7 +36,7 @@ from std.math import ceildiv
 from std.math.uutils import udivmod
 from std.memory.unsafe import bitcast
 from std.sys import simd_width_of
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -51,7 +51,7 @@ from max.gpu.memory import CacheOperation
 from max.gpu.sync import s_waitcnt
 from std.sys.intrinsics import llvm_intrinsic
 
-from layout import Coord, TensorLayout, TensorStorage, TileTensor
+from layout import Coord, TensorLayout, TensorEngine, TileTensor
 from layout.tile_layout import row_major, col_major
 from layout.tile_tensor import stack_allocation
 from layout.swizzle import Swizzle
@@ -998,24 +998,24 @@ struct BlockScaledMatmulAMD_PreB[
         b_pre_layout: TensorLayout,
         sfa_layout: TensorLayout,
         sfb_layout: TensorLayout,
-        c_store: TensorStorage,
-        a_store: TensorStorage,
-        b_pre_store: TensorStorage,
-        sfa_store: TensorStorage,
-        sfb_store: TensorStorage,
+        c_engine: TensorEngine,
+        a_engine: TensorEngine,
+        b_pre_engine: TensorEngine,
+        sfa_engine: TensorEngine,
+        sfb_engine: TensorEngine,
         N: Int,
         K_BYTES: Int,
     ](
-        c: TileTensor[out_dtype, c_layout, MutAnyOrigin, Storage=c_store],
-        a: TileTensor[.uint8, a_layout, ImmutAnyOrigin, Storage=a_store],
+        c: TileTensor[out_dtype, c_layout, MutAnyOrigin, Engine=c_engine],
+        a: TileTensor[.uint8, a_layout, ImmutAnyOrigin, Engine=a_engine],
         b_pre: TileTensor[
-            .uint8, b_pre_layout, ImmutAnyOrigin, Storage=b_pre_store
+            .uint8, b_pre_layout, ImmutAnyOrigin, Engine=b_pre_engine
         ],
         sfa: TileTensor[
-            .float8_e8m0fnu, sfa_layout, ImmutAnyOrigin, Storage=sfa_store
+            .float8_e8m0fnu, sfa_layout, ImmutAnyOrigin, Engine=sfa_engine
         ],
         sfb: TileTensor[
-            .float8_e8m0fnu, sfb_layout, ImmutAnyOrigin, Storage=sfb_store
+            .float8_e8m0fnu, sfb_layout, ImmutAnyOrigin, Engine=sfb_engine
         ],
         n_tile_idx: Int,
         m_tile_idx: Int,

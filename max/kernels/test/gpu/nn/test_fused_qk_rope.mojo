@@ -104,7 +104,10 @@ def test_fused_qk_rope[dtype: DType](ctx: DeviceContext) raises -> None:
     var cache_lengths_shape = Index(batch_size)
     var lookup_table_shape = IndexList[2](batch_size, pages_per_seq)
     var q_shape = IndexList[4](batch_size, seq_len, num_heads, head_dim)
-    var freqs_shape = IndexList[2](max_seq_len, head_dim)
+    # The golden freqs table holds 2*max_seq_len rows of head_dim values
+    # (positions 0..2*max_seq_len-1); the kernel only reads rows below
+    # max_seq_len.
+    var freqs_shape = IndexList[2](2 * max_seq_len, head_dim)
 
     # Create runtime layouts for LayoutTensor
     var kv_block_runtime_layout = RuntimeLayout[kv_block_layout].row_major(

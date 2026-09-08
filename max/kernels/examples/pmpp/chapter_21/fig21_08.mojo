@@ -20,7 +20,7 @@ multiple grid point calculations.
 """
 
 from std.math import sqrt
-from std.gpu import block_idx, thread_idx, block_dim
+from max.gpu import block_idx, thread_idx, block_dim
 from max.gpu.host import DeviceContext
 from std.itertools import product
 

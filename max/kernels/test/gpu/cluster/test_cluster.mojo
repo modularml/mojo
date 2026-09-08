@@ -14,7 +14,7 @@
 from std.sys import size_of
 from std.math.uutils import ufloordiv
 
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import (
     cluster_sync,
@@ -27,8 +27,8 @@ from max.gpu.primitives.cluster import (
     elect_one_sync_with_mask,
 )
 from max.gpu.host import DeviceContext
-from std.gpu import block_id_in_cluster, lane_id
-from std.gpu.intrinsics import Scope
+from max.gpu import block_id_in_cluster, lane_id
+from max.gpu.intrinsics import Scope
 from max.gpu.memory import fence_mbarrier_init
 from layout.tma_async import PipelineState, SharedMemBarrier
 from std.memory import unsafe_stack_allocation

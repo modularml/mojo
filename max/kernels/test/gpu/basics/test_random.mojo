@@ -14,7 +14,7 @@
 from std.sys import simd_width_of
 
 from max.algorithm.functional import elementwise
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext, get_gpu_target
 from std.random import NormalRandom, Random
 from std.testing import *
@@ -33,7 +33,7 @@ def run_elementwise[
 
     comptime pack_size = simd_width_of[dtype, target=get_gpu_target()]()
 
-    var out_stack = Array[Scalar[dtype], length](uninitialized=True)
+    var out_stack = Array[Scalar[dtype], length](fill={})
     var out_host = TileTensor(out_stack, row_major[length]())
 
     var out_device = ctx.enqueue_create_buffer[dtype](length)

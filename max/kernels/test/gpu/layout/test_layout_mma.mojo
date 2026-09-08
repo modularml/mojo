@@ -16,7 +16,7 @@ from std.os import abort
 from std.random import random_float64
 from std.sys import has_amd_gpu_accelerator, has_nvidia_gpu_accelerator
 
-from std.gpu import WARP_SIZE, global_idx
+from max.gpu import WARP_SIZE, global_idx
 from max.gpu.host import DeviceContext
 from layout import *
 from layout._utils import ManagedLayoutTensor

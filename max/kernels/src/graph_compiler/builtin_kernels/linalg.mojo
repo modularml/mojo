@@ -39,7 +39,7 @@ from layout import (
     Coord,
     Idx,
     IntTuple,
-    PointerStorage,
+    DefaultEngine,
     TileTensor,
     UNKNOWN_VALUE,
     coord_to_index_list,
@@ -1226,7 +1226,9 @@ struct Struct_matmul_dynamic_block_scaled_amd[lane_bytes: Int = 16]:
 
 
 @extensibility.register("mo.matmul.dynamic.block.scaled.mxfp6")
-struct Struct_matmul_dynamic_block_scaled_mxfp6[FP6_FORMAT: Int = 0]:
+struct Struct_matmul_dynamic_block_scaled_mxfp6[
+    FP6_FORMAT: Int = 0, preshuffled_b: Bool = False
+]:
     """Registers the `mo.matmul.dynamic.block.scaled.mxfp6` graph op.
 
     Separate from the MXFP4/MXFP8 op rather than another `lane_bytes` value:
@@ -1235,6 +1237,13 @@ struct Struct_matmul_dynamic_block_scaled_mxfp6[FP6_FORMAT: Int = 0]:
 
     Parameters:
         FP6_FORMAT: 0 selects E2M3, 1 selects E3M2, matching `FP6Format`.
+        preshuffled_b: When True, `b` and `b_scales` must already be in the
+            plane-split / packed-scale layouts from
+            `Shuffler.preshuffle_b_planes` / `preshuffle_scale_4d` (a
+            one-time, load-time cost for the static weight; see
+            `preshuffle_block_scaled_b_dense`). Ignored (falls back to the
+            row-major dispatch) when `M` is within the decode range -- see
+            `mxfp6_block_scaled_matmul_amd`.
     """
 
     @always_inline
@@ -1269,7 +1278,7 @@ struct Struct_matmul_dynamic_block_scaled_mxfp6[FP6_FORMAT: Int = 0]:
             == 0 else CDNA4F8F6F4MatrixFormat.FLOAT6_E3M2
         )
 
-        mxfp6_block_scaled_matmul_amd[fmt](
+        mxfp6_block_scaled_matmul_amd[fmt, preshuffled_b=Self.preshuffled_b](
             c.to_tile_tensor[.int64](),
             a.to_tile_tensor[.int64]().bitcast[.uint8](),
             b.to_tile_tensor[.int64]().bitcast[.uint8](),
@@ -1420,7 +1429,7 @@ def _apple_int8_w8a8_dispatch[
 ](
     c_tt: TileTensor[mut=True, c_type, ...],
     a_tt: TileTensor[.bfloat16, ...],
-    b_tt: TileTensor[.int8, Storage=PointerStorage[], ...],
+    b_tt: TileTensor[.int8, Engine=DefaultEngine[], ...],
     bs_tt: TileTensor[.float32, ...],
     bias_tt: TileTensor[c_type, ...],
     context: DeviceContext,

@@ -35,7 +35,7 @@ from std.math import ceildiv
 from std.sys import align_of
 from std.utils import Index, IndexList
 
-from std.gpu import block_dim, global_idx, grid_dim
+from max.gpu import block_dim, global_idx, grid_dim
 from max.gpu.host import DeviceBuffer, DeviceContext
 
 from layout import Coord, Idx, TileTensor
@@ -290,9 +290,9 @@ def amd_4wave_split_k_matmul[
             type_of(a).LayoutType,
             type_of(b).LayoutType,
             type_of(ws_tile).LayoutType,
-            type_of(a).Storage,
-            type_of(b).Storage,
-            type_of(ws_tile).Storage,
+            type_of(a).Engine,
+            type_of(b).Engine,
+            type_of(ws_tile).Engine,
             num_splits=num_splits,
         ]
 

@@ -51,7 +51,7 @@ both `W` and `R`). `V_LAYOUT = row_major[2, 4, 32]`: 2 K-strips x 4
 depth-tiles x 32 FP8 elts/fragment per lane.
 """
 
-from std.gpu import WARP_SIZE, lane_id, thread_idx, warp_id
+from max.gpu import WARP_SIZE, lane_id, thread_idx, warp_id
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from max.gpu.sync import s_waitcnt

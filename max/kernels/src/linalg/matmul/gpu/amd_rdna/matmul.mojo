@@ -28,7 +28,7 @@ from std.math import ceildiv
 from std.sys import size_of
 from std.sys.info import _is_amd_rdna2_or_earlier
 
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     block_idx,
     lane_id,

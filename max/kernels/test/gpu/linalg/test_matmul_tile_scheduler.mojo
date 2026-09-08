@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx
+from max.gpu import block_idx
 from linalg.matmul.gpu.tile_scheduler import TileScheduler
 
 from std.utils.index import Index

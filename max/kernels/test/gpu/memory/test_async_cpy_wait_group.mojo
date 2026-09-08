@@ -13,7 +13,7 @@
 
 from std.sys import size_of
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.host import DeviceContext
 from max.gpu.memory import (
     async_copy,

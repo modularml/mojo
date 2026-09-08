@@ -82,8 +82,8 @@ from std.utils import Variant
 from std.utils._serialize import _serialize_elements
 from std.utils.static_tuple import StaticTuple
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.info import GPUInfo
+from std._gpu.host import get_gpu_target
+from std._gpu.host.info import GPUInfo
 
 from .compile import (
     _compile_code,
@@ -3342,40 +3342,21 @@ struct DeviceFunction[
                 else:
                     return reflect[declared_arg_type].name()
 
-            # Now we'll check if the given argument's device_type is
-            # what the kernel expects.
-
-            # First, check if they're handing in a device dtype, in other
-            # words, a dtype that can be passed directly and doesn't need to
-            # be mapped. For example, Int, IndexList, etc.
-            comptime is_convertible: Bool = actual_arg_type._is_convertible_to_device_type[
+            # Check that the given argument can occupy the kernel's declared
+            # argument slot after device encoding.
+            comptime is_convertible: Bool = actual_arg_type._is_implicitly_encodable_to[
                 declared_arg_type
             ]()
 
-            comptime if actual_arg_type == actual_arg_type.device_type:
-                # Now check if they handed in the *correct* device dtype.
-                comptime assert is_convertible, String(
-                    "argument #",
-                    i,
-                    " of type '",
-                    actual_arg_type.get_type_name(),
-                    "' does not match the declared function argument type '",
-                    declared_arg_type_name(),
-                    "'",
-                )
-            else:
-                # They handed in a host dtype, in other words, a dtype that
-                # needs to be mapped before handing it to the device. In
-                # this case, we use a more informative error message.
-                comptime assert is_convertible, String(
-                    "argument #",
-                    i,
-                    " of type '",
-                    actual_arg_type.get_type_name(),
-                    "' (which became device of type '",
-                    declared_arg_type_name(),
-                    "') does not match the declared function argument type",
-                )
+            comptime assert is_convertible, String(
+                "argument #",
+                i,
+                " of type '",
+                actual_arg_type.get_type_name(),
+                "' is not encodable as the declared function argument type '",
+                declared_arg_type_name(),
+                "'",
+            )
             var aligned_type_size = align_up(
                 size_of[actual_arg_type.device_type, target=Self.target](),
                 8,
@@ -3899,7 +3880,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
 
     ```mojo
     from max.gpu.host import DeviceContext
-    from std.gpu import thread_idx
+    from max.gpu import thread_idx
 
     def kernel():
         print("hello from thread:", thread_idx.x, thread_idx.y, thread_idx.z)
@@ -4739,7 +4720,8 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         your kernel captures variables from its surrounding scope:
 
         ```text
-        from std.gpu import DeviceContext, global_idx
+        from max.gpu import global_idx
+        from max.gpu.host import DeviceContext
         from layout import TileTensor, row_major
 
 
@@ -6912,12 +6894,15 @@ struct DeviceContextArray[length: Int](Copyable, Sized):
             __list_literal__: Marker that lets this constructor accept
                 list-literal syntax (`var l: DeviceContextArray[N] = [c0, c1]`).
         """
-        assert (
-            len(device_contexts) == Self.length
-        ), "mismatch in the number of elements"
-        self.device_contexts = Array[
-            DeviceContext, __literal_size__
-        ]._from_variadic(*device_contexts^)
+        self.device_contexts = {uninitialized = True}
+        var ptr = self.device_contexts.unsafe_ptr()
+        comptime for i in range(__literal_size__):
+            ptr.unsafe_offset(i).unsafe_write_move_from(
+                Pointer(to=device_contexts[i])
+            )
+
+        # Do not destroy the elements when their backing storage goes away.
+        device_contexts^._annihilate()
 
     def __getitem_param__[index: Int](self) -> DeviceContext:
         """Access a `DeviceContext` at a compile-time known index.

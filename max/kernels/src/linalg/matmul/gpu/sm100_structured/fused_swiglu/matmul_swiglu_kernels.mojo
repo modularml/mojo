@@ -31,9 +31,9 @@ from std.math import ceildiv, exp, recip
 from std.sys import size_of
 from std.math.uutils import umod, ufloordiv
 
-from std.gpu import WARP_SIZE, warp_id as get_warp_id
+from max.gpu import WARP_SIZE, warp_id as get_warp_id
 from max.gpu.sync import barrier
-from std.gpu import block_id_in_cluster, lane_id
+from max.gpu import block_id_in_cluster, lane_id
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
     elect_one_sync,
@@ -63,7 +63,7 @@ from max.gpu.primitives.grid_controls import (
     PDLLevel,
     wait_on_dependent_grids,
 )
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 
 from layout import Layout, RowMajorLayout, TileTensor, row_major

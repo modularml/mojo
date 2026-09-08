@@ -25,12 +25,12 @@ Two gates per case, because neither alone is sufficient:
    an off-by-one: gate 1 stayed green, gate 2 caught it.
 
 Usage (plain `mojo` is shadowed by the installed shmem package — use bazel):
-  ./bazelw run //KGEN/tools/mojo -- \
+  ./bazelw run //Mojo/tools/mojo -- \
       max/kernels/test/gpu/shmem/test_mxfp8_fused_silu_scale_fusion.mojo
 """
 
 from max.gpu.host import DeviceContext, HostBuffer
-from std.gpu.host.info import MI355X
+from max.gpu.host.info import MI355X
 from std.math import align_up, exp, isfinite
 from std.random import random_float64, seed
 from std.testing import assert_equal, assert_true

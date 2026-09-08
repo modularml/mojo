@@ -17,7 +17,7 @@ packed 32x3 bf16 input loaded 4-wide per row yields `[3l, 3l+1, 3l+2, 0]`, with
 col 3 masked to zero rather than leaking the next row. Apple M5 only.
 """
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.host import DeviceContext, HostBuffer
 from max.gpu.memory import (
     build_edge_mask,

@@ -18,7 +18,7 @@ from std.pathlib import Path
 from std.sys.info import CompilationTarget, _accelerator_arch, _TargetType
 
 from std.compile import CompiledFunctionInfo, compile_info
-from std.gpu.host import get_gpu_target
+from std._gpu.host import get_gpu_target
 
 from .info import A100, GPUInfo
 

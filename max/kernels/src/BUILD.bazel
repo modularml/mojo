@@ -7,7 +7,7 @@ package(default_visibility = ["//max:consumers"])
 # land their files here in runfiles.
 exports_files(
     ["index.md"],
-    visibility = ["//KGEN/test/mojo-lsp-server/parse-tree:__pkg__"],
+    visibility = ["//Mojo/test/mojo-lsp-server/parse-tree:__pkg__"],
 )
 
 # Auto-discover all kernel library sub-packages, excluding private (underscore-

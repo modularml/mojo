@@ -15,7 +15,7 @@
 from std.sys import has_accelerator
 
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 
 
 def print_threads():

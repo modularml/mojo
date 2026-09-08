@@ -523,7 +523,7 @@ LayoutTensor](https://mojolang.org/docs/manual/layout/tensors/) in the Mojo
 Manual
 
 ```mojo
-fn matmul_kernel[
+def matmul_kernel[
     M: Int, N: Int, K: Int
 ](
     c: LayoutTensor[DType.bfloat16, Layout.row_major(M, N)],

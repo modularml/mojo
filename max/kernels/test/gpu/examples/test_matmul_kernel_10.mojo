@@ -28,12 +28,12 @@ from layout import (
     Coord,
     TileTensor,
     TensorLayout,
-    PointerStorage,
+    DefaultEngine,
     Idx,
     row_major,
     stack_allocation,
 )
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -43,7 +43,7 @@ from std.gpu import (
 )
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu.intrinsics import ldg
+from max.gpu.intrinsics import ldg
 from linalg.utils import elementwise_epilogue_type
 
 from std.utils import StaticTuple
@@ -88,19 +88,19 @@ def sgemm_warp_tiling_kernel[
         c_type,
         CLayoutType,
         MutAnyOrigin,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     mat_a: TileTensor[
         a_type,
         ALayoutType,
         MutAnyOrigin,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     mat_b: TileTensor[
         b_type,
         BLayoutType,
         MutAnyOrigin,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     alpha: Scalar[c_type],
     beta: Scalar[c_type],

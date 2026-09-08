@@ -26,7 +26,7 @@ from std.sys.info import (
     is_apple_m5,
 )
 
-from std.gpu._utils import (
+from std._gpu._utils import (
     _get_llvm_struct_fields,
     array_to_llvm_struct,
     llvm_struct_to_array,

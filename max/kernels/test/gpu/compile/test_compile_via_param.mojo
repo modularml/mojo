@@ -18,7 +18,7 @@
 # RUN: cat %t/test_compile_via_param/test_compile_via_param.ptx | FileCheck %s
 # RUN: rm -fr %t/test_compile_via_param/
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.host import DeviceContext
 
 

@@ -25,7 +25,7 @@ Related: KERN-2861 (NaN at page_size=128 in Gemma-3/4). Complements
 memory via a poisoned-padding stress test.
 """
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.memory import unsafe_memset_zero
 from std.sys.defines import get_defined_int

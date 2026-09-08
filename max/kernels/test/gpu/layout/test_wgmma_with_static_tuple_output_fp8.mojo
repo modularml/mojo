@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import warp_id, lane_id
+from max.gpu import warp_id, lane_id
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.compute.mma import (
     wgmma_async,
     wgmma_commit_group_sync,

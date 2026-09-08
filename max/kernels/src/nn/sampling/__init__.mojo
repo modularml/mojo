@@ -24,9 +24,9 @@ from std.sys.info import _has_sm_9x_or_newer
 from layout import (
     ComptimeInt,
     Coord,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
 )
 from layout.tile_layout import Layout
@@ -69,6 +69,9 @@ def topk_topp_masked_probs[
         shape_types=Coord[Int64, Int64].element_types,
         stride_types=Coord[Int64, ComptimeInt[1]].element_types,
     ],
+    TopKArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     ctx: DeviceContext,
     logits: TileTensor[mut=False, dtype, ...],
@@ -76,13 +79,22 @@ def topk_topp_masked_probs[
     top_k_val: Int,
     top_p_val: Float32 = 1.0,
     top_k_arr: Optional[
-        TileTensor[.int64, TopKArrLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .int64, TopKArrLayoutType, ImmutAnyOrigin, Engine=TopKArrEngine
+        ]
     ] = None,
     top_p_arr: Optional[
-        TileTensor[.float32, TopPArrLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32, TopPArrLayoutType, ImmutAnyOrigin, Engine=TopPArrEngine
+        ]
     ] = None,
     temperature: Optional[
-        TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TemperatureLayoutType,
+            ImmutAnyOrigin,
+            Engine=TemperatureEngine,
+        ]
     ] = None,
 ) raises:
     """Computes per-row top-k/top-p masked softmax.
@@ -96,7 +108,17 @@ def topk_topp_masked_probs[
     output contract; both sides share them.
     """
     comptime if _has_sm_9x_or_newer():
-        topk_topp_masked_probs_cluster[dtype, block_size](
+        topk_topp_masked_probs_cluster[
+            dtype,
+            block_size,
+            TopKArrLayoutType,
+            TopPArrLayoutType,
+            TemperatureLayoutType,
+            ProbsLayoutType,
+            TopKArrEngine,
+            TopPArrEngine,
+            TemperatureEngine,
+        ](
             ctx,
             logits,
             probs,
@@ -107,7 +129,17 @@ def topk_topp_masked_probs[
             temperature,
         )
     else:
-        _topk_topp_masked_probs_single[dtype, block_size](
+        _topk_topp_masked_probs_single[
+            dtype,
+            block_size,
+            TopKArrLayoutType,
+            TopPArrLayoutType,
+            TemperatureLayoutType,
+            ProbsLayoutType,
+            TopKArrEngine,
+            TopPArrEngine,
+            TemperatureEngine,
+        ](
             ctx,
             logits,
             probs,
@@ -154,12 +186,12 @@ def topk_topp_sampling_from_prob[
         shape_types=Coord[Int64].element_types,
         stride_types=Coord[ComptimeInt[1]].element_types,
     ],
-    TopKArrStorageType: TensorStorage = PointerStorage[element_width=1],
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    TopPArrStorageType: TensorStorage = PointerStorage[element_width=1],
-    SeedStorageType: TensorStorage = PointerStorage[element_width=1],
-    TemperatureStorageType: TensorStorage = PointerStorage[element_width=1],
-    MinPStorageType: TensorStorage = PointerStorage[element_width=1],
+    TopKArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    SeedEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
+    MinPEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     ctx: DeviceContext,
     probs: TileTensor[mut=False, dtype, ...],
@@ -168,9 +200,7 @@ def topk_topp_sampling_from_prob[
     top_p_val: Float32 = 1.0,
     deterministic: Bool = False,
     rng_seed: Optional[
-        TileTensor[
-            .uint64, SeedLayoutType, ImmutAnyOrigin, Storage=SeedStorageType
-        ]
+        TileTensor[.uint64, SeedLayoutType, ImmutAnyOrigin, Engine=SeedEngine]
     ] = None,
     rng_offset: UInt64 = 0,
     indices: Optional[
@@ -178,7 +208,7 @@ def topk_topp_sampling_from_prob[
             out_idx_type,
             IndicesLayoutType,
             ImmutAnyOrigin,
-            Storage=IndicesStorageType,
+            Engine=IndicesEngine,
         ]
     ] = None,
     top_k_arr: Optional[
@@ -186,7 +216,7 @@ def topk_topp_sampling_from_prob[
             out_idx_type,
             TopKArrLayoutType,
             ImmutAnyOrigin,
-            Storage=TopKArrStorageType,
+            Engine=TopKArrEngine,
         ]
     ] = None,
     top_p_arr: Optional[
@@ -194,7 +224,7 @@ def topk_topp_sampling_from_prob[
             .float32,
             TopPArrLayoutType,
             ImmutAnyOrigin,
-            Storage=TopPArrStorageType,
+            Engine=TopPArrEngine,
         ]
     ] = None,
     temperature: Optional[
@@ -202,13 +232,11 @@ def topk_topp_sampling_from_prob[
             .float32,
             TemperatureLayoutType,
             ImmutAnyOrigin,
-            Storage=TemperatureStorageType,
+            Engine=TemperatureEngine,
         ]
     ] = None,
     min_p: Optional[
-        TileTensor[
-            .float32, MinPLayoutType, ImmutAnyOrigin, Storage=MinPStorageType
-        ]
+        TileTensor[.float32, MinPLayoutType, ImmutAnyOrigin, Engine=MinPEngine]
     ] = None,
     out_dist: Optional[
         TileTensor[dist_dtype, DistLayoutType, MutAnyOrigin]

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 from max.pipelines.kv_cache.config import KVConnectorConfig
-from max.pipelines.kv_cache.connectors import (
+from max.pipelines.kv_cache.connectors.rust_tier_connector import (
     KV_OFFLOAD_DIR_PREFIX,
     _resolve_disk_offload_dir,
     warn_stale_offload_dirs,

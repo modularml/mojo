@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.host import get_gpu_target
 from max.gpu.host.compile import _compile_code
 from max.gpu.memory import external_memory

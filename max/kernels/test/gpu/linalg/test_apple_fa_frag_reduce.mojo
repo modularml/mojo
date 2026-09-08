@@ -36,9 +36,9 @@ barriers (the Apple idiom). fp32 is shuffled at width 1 -- the only width the
 Apple shuffle intrinsic supports for non-half dtypes.
 """
 
-from std.gpu import WARP_SIZE, lane_id
+from max.gpu import WARP_SIZE, lane_id
 from max.gpu.host import DeviceContext
-from std.gpu.primitives.warp import shuffle_xor
+from max.gpu.primitives.warp import shuffle_xor
 from std.sys.info import _accelerator_arch
 
 comptime MMA_DIM = 16  # one 16x16 score sub-tile

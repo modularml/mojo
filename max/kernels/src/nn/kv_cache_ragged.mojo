@@ -25,7 +25,7 @@ from std.memory.alloc import Layout as AllocLayout
 from std.algorithm.functional import unswitch
 
 from max.algorithm.functional import elementwise
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext, get_gpu_target
 from max.gpu.host.info import is_cpu, is_gpu
 from max.gpu.primitives.grid_controls import PDLLevel

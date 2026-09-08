@@ -25,7 +25,7 @@ _transitioned_mojo_library = rule(
         # Must stay in sync with the toolchain's `mojo`; this is the same
         # compiler, only reconfigured.
         "_mojo_override": attr.label(
-            default = Label("//KGEN/tools/mojo"),
+            default = Label("//Mojo/tools/mojo"),
             executable = True,
             cfg = cc_transition,
         ),

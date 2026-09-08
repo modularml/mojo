@@ -23,7 +23,7 @@ from max.experimental.nn.linear import Linear
 from max.experimental.nn.norm import RMSNorm
 from max.experimental.tensor import Tensor
 from max.graph import TensorValue, ops
-from max.nn.kv_cache import KVCacheInputs, KVCacheParamInterface
+from max.nn.kv_cache import KVCacheInputs, KVCacheParamInterface, KVCacheParams
 from max.pipelines.lib.vlm_utils import merge_multimodal_embeddings
 
 from ..llama3_modulev3.layers.transformer_block import LlamaTransformerBlock
@@ -215,6 +215,9 @@ class PixtralLanguage(Module[..., tuple[Tensor, ...]]):
             interleaved=False,
         )
 
+        kv_params = config.kv_params
+        assert isinstance(kv_params, KVCacheParams)
+
         layers = [
             LlamaTransformerBlock(
                 attention=AttentionWithRope(
@@ -222,7 +225,7 @@ class PixtralLanguage(Module[..., tuple[Tensor, ...]]):
                     num_attention_heads=config.num_attention_heads,
                     num_key_value_heads=config.num_key_value_heads,
                     hidden_size=config.hidden_size,
-                    kv_params=config.kv_params,
+                    kv_params=kv_params,
                     layer_idx=i,
                     scale=config.attention_multiplier,
                     stacked_qkv=False,
@@ -264,6 +267,6 @@ class PixtralLanguage(Module[..., tuple[Tensor, ...]]):
             ),
             output=output,
             embedding=embedding_layer,
-            kv_params=config.kv_params,
+            kv_params=kv_params,
             return_logits=config.return_logits,
         )

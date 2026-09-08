@@ -20,9 +20,9 @@ This module contains common components used by all SM100 matmul kernel variants:
 - _Batched3DLayout / _to_batched_3d: Reshape 2D TileTensor to 3D (batch=1)
 """
 
-from std.gpu import WARP_SIZE, lane_id, thread_idx
-from std.gpu import warp_id as get_warp_id
-from std.gpu import block_id_in_cluster
+from max.gpu import WARP_SIZE, lane_id, thread_idx
+from max.gpu import warp_id as get_warp_id
+from max.gpu import block_id_in_cluster
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
     elect_one_sync_with_mask,
@@ -226,7 +226,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         """Returns True if current thread is in the SFB TMA load warp (warp 6).
 
         Only meaningful when `has_sfb` (i.e. MMA_N < 64). Callers gate this
-        behind `@parameter if Self.MMA_N < 64` so the check is unreachable on
+        behind `comptime if Self.MMA_N < 64` so the check is unreachable on
         the no-SFB path, where the same threads host the scheduler warp.
         """
         return (
@@ -240,7 +240,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         """Returns True if current thread is in an SFB TMEM load warp (warps 7-10).
 
         Only meaningful when `has_sfb` (i.e. MMA_N < 64); callers gate the
-        check with `@parameter if Self.MMA_N < 64`.
+        check with `comptime if Self.MMA_N < 64`.
         """
         return (
             thread_idx.x >= Self.SFB_LOAD_WARP_START

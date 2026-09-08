@@ -39,15 +39,15 @@ class GroupNorm(Module[[Tensor], Tensor]):
 
     .. code-block:: python
 
-        from max.driver import Accelerator
+        from max.driver import CPU
         from max.dtype import DType
         from max.experimental.nn.norm import GroupNorm
-        from max.experimental.tensor import Tensor
+        from max.experimental.tensor import Tensor, default_device
 
-        device = Accelerator()
-        norm = GroupNorm(num_groups=32, num_channels=128).to(device)
-        x = Tensor.ones([2, 128, 8, 8], dtype=DType.float32, device=device)
-        y = norm(x)
+        with default_device(CPU()):
+            norm = GroupNorm(num_groups=32, num_channels=128)
+            x = Tensor.ones([2, 128, 8, 8], dtype=DType.float32)
+            y = norm(x)
 
     .. invisible-code-block: python
 

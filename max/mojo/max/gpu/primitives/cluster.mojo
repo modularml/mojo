@@ -22,8 +22,8 @@ with careful consideration of the underlying hardware synchronization mechanisms
 """
 
 from std.bit import next_power_of_two
-from std.gpu import thread_idx
-from std.gpu.primitives.warp import _ReduceFn
+from std._gpu import thread_idx
+from std._gpu.primitives.warp import _ReduceFn
 from std.memory import bitcast
 from std.sys import _RegisterPackType, llvm_intrinsic, size_of
 from max.gpu.sync import barrier

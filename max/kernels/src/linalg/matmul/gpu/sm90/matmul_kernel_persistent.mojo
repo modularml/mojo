@@ -24,10 +24,10 @@ groups that iterate over a persistent tile schedule assigned by a
 from std.math import ceildiv
 from std.sys import size_of
 
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA
-from std.gpu.globals import WARPGROUP_SIZE
-from std.gpu import thread_idx
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA
+from max.gpu.globals import WARPGROUP_SIZE
+from max.gpu import thread_idx
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from layout import TensorLayout, TileTensor
 from layout.tma_async import TMATensorTile
 from max.gpu.memory import external_memory
@@ -69,7 +69,7 @@ __extension HopperMatmulSM90Kernel:
         b_tma_op: TMATensorTile[b_type, b_tma_rank, b_tile_shape, b_desc_shape],
         c_tma_op: TMATensorTile[c_type, c_tma_rank, c_tile_shape, c_desc_shape],
         c: TileTensor[
-            c_type, c_tensor_layout, MutAnyOrigin, Storage=Self.c_storage
+            c_type, c_tensor_layout, MutAnyOrigin, Engine=Self.c_engine
         ],
         problem_shape: IndexList[3],
     ):
@@ -190,9 +190,9 @@ __extension HopperMatmulSM90Kernel:
         c_desc_shape: IndexList[c_tma_rank],
     ](
         c_tma_op: TMATensorTile[c_type, c_tma_rank, c_tile_shape, c_desc_shape],
-        a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Storage=Self.a_storage],
-        b: TileTensor[b_type, b_layout, ImmutAnyOrigin, Storage=Self.b_storage],
-        c: TileTensor[c_type, c_layout, MutAnyOrigin, Storage=Self.c_storage],
+        a: TileTensor[a_type, a_layout, ImmutAnyOrigin, Engine=Self.a_engine],
+        b: TileTensor[b_type, b_layout, ImmutAnyOrigin, Engine=Self.b_engine],
+        c: TileTensor[c_type, c_layout, MutAnyOrigin, Engine=Self.c_engine],
     ):
         """Kernel using cp.async for A/B loading when K alignment doesn't meet TMA requirements.
         """

@@ -59,7 +59,7 @@ Thread mapping (GPU)
   current sequence.
 """
 
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     thread_idx,

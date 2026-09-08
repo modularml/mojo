@@ -18,9 +18,9 @@ fp32 elements stored as a row vector. `full()` runs one online-softmax
 iteration end-to-end (max → exp → sum → correction → output update).
 """
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.math.uutils import umod
-from std.gpu import lane_id, warp_id as get_warp_id
+from max.gpu import lane_id, warp_id as get_warp_id
 from max.gpu.sync import barrier
 from layout import TileTensor
 from layout.tile_layout import col_major, row_major

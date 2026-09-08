@@ -56,12 +56,13 @@ from std.random import random_ui64, seed
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import MI355X
 from std.testing import assert_true
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, global_idx
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, global_idx
 from std.utils import StaticTuple
-from layout import Idx, TileTensor
+from layout import Coord, Idx, TileTensor
 from layout.tile_layout import row_major
 
 from linalg.arch.amd.block_scaled_mma import CDNA4F8F6F4MatrixFormat
+from linalg.matmul.gpu.amd import Shuffler
 from linalg.fp6_utils import (
     FP6Format,
     decode_fp6_to_f32,
@@ -420,6 +421,195 @@ def run_case[
     return True
 
 
+def run_case_preb[
+    fmt: FP6Format,
+    N: Int,
+    K: Int,
+    out_dtype: DType = DType.float32,
+](
+    ctx: DeviceContext, M: Int, data_pattern: Int, scale_pattern: Int
+) raises -> Bool:
+    """Same shapes and reference as `run_case`, but drives
+    `mxfp6_block_scaled_matmul_amd[preshuffled_b=True]`: B and its scales are
+    preshuffled once (untimed, mirroring the load-time cost
+    `preshuffle_block_scaled_b_dense` pays in production) before the call.
+
+    Only valid for `M > DECODE_M_MAX` (64): the dispatcher silently takes the
+    row-major decode path for smaller M regardless of `preshuffled_b`, so
+    preshuffled bytes there would be read as row-major and corrupt the
+    result -- not exercised here.
+    """
+    comptime assert (
+        K % 128 == 0
+    ), "K must be a multiple of 128 so the BK tile divides K"
+    comptime assert N % 64 == 0, "N must be a multiple of BN = 64"
+    comptime K_BYTES = (K * 6) // 8
+    comptime K_SCALES = K // 32
+    comptime mfma_format = (
+        CDNA4F8F6F4MatrixFormat.FLOAT6_E2M3 if fmt
+        == FP6Format.E2M3 else CDNA4F8F6F4MatrixFormat.FLOAT6_E3M2
+    )
+
+    var a_packed = ctx.enqueue_create_host_buffer[DType.uint8](M * K_BYTES)
+    var b_packed = ctx.enqueue_create_host_buffer[DType.uint8](N * K_BYTES)
+
+    if data_pattern == DATA_RANDOM:
+        _fill_packed_random(a_packed.unsafe_ptr(), M * K_BYTES, 1)
+        _fill_packed_random(b_packed.unsafe_ptr(), N * K_BYTES, 2)
+    else:
+        var a_codes = ctx.enqueue_create_host_buffer[DType.uint8](M * K)
+        var b_codes = ctx.enqueue_create_host_buffer[DType.uint8](N * K)
+        _fill_codes(a_codes.unsafe_ptr(), M * K, data_pattern, 0)
+        _fill_codes(b_codes.unsafe_ptr(), N * K, data_pattern, 1)
+        _pack_fp6(a_codes.unsafe_ptr(), a_packed.unsafe_ptr(), M, K)
+        _pack_fp6(b_codes.unsafe_ptr(), b_packed.unsafe_ptr(), N, K)
+
+    var a_sf = ctx.enqueue_create_host_buffer[DType.uint8](M * K_SCALES)
+    var b_sf = ctx.enqueue_create_host_buffer[DType.uint8](N * K_SCALES)
+    _fill_scales(a_sf.unsafe_ptr(), M, K_SCALES, scale_pattern, 0)
+    _fill_scales(b_sf.unsafe_ptr(), N, K_SCALES, scale_pattern, 3)
+
+    # Preshuffle B's scales on the host into the packed-cell layout
+    # `PreshuffledScaleLoader` reads -- a one-time, load-time cost for the
+    # static weight.
+    var b_sf_pre = ctx.enqueue_create_host_buffer[DType.uint8](N * K_SCALES)
+    ctx.synchronize()
+    var b_sf_tt = TileTensor(
+        b_sf, row_major(Coord(Idx[1], Idx[N], Idx[K_SCALES]))
+    )
+    _ = Shuffler[1].preshuffle_scale_4d[MN=N, K_SCALES=K_SCALES](
+        b_sf_tt, b_sf_pre
+    )
+
+    var a_sf_typed = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
+        M * K_SCALES
+    )
+    # The reference reads B's scales *un*-shuffled, in the original layout;
+    # only the kernel under test sees the preshuffled version.
+    var b_sf_typed = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
+        N * K_SCALES
+    )
+    var b_sf_pre_typed = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
+        N * K_SCALES
+    )
+    for i in range(M * K_SCALES):
+        a_sf_typed[i] = bitcast[DType.float8_e8m0fnu](a_sf[i])
+    for i in range(N * K_SCALES):
+        b_sf_typed[i] = bitcast[DType.float8_e8m0fnu](b_sf[i])
+        b_sf_pre_typed[i] = bitcast[DType.float8_e8m0fnu](b_sf_pre[i])
+
+    var a_dev = ctx.enqueue_create_buffer[DType.uint8](M * K_BYTES)
+    var b_dev = ctx.enqueue_create_buffer[DType.uint8](N * K_BYTES)
+    var b_pre_dev = ctx.enqueue_create_buffer[DType.uint8](N * K_BYTES)
+    var a_sf_dev = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](M * K_SCALES)
+    var b_sf_dev = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](N * K_SCALES)
+    var b_sf_pre_dev = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](
+        N * K_SCALES
+    )
+    var c_dev = ctx.enqueue_create_buffer[out_dtype](M * N)
+    var ref_dev = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var mag_dev = ctx.enqueue_create_buffer[DType.float32](M * N)
+
+    var poison = ctx.enqueue_create_host_buffer[out_dtype](M * N)
+    for i in range(M * N):
+        poison[i] = SENTINEL.cast[out_dtype]()
+
+    ctx.enqueue_copy(a_dev, a_packed)
+    ctx.enqueue_copy(b_dev, b_packed)
+    ctx.enqueue_copy(a_sf_dev, a_sf_typed)
+    ctx.enqueue_copy(b_sf_dev, b_sf_typed)
+    ctx.enqueue_copy(b_sf_pre_dev, b_sf_pre_typed)
+    ctx.enqueue_copy(c_dev, poison)
+    ctx.synchronize()
+
+    # Preshuffle B's weight bytes on the GPU into the plane-split layout
+    # `PreshuffledBLoader` reads. Also a one-time, load-time cost.
+    var b_raw_tt = TileTensor[mut=False](b_dev, row_major[1, N, K_BYTES]())
+    var b_pre_tt = TileTensor[mut=True](b_pre_dev, row_major[1, N, K_BYTES]())
+    Shuffler[1].preshuffle_b_planes[N=N, K_BYTES=K_BYTES, lane_bytes=24](
+        b_raw_tt, b_pre_tt, ctx
+    )
+
+    comptime REF_BLOCK = 16
+    ctx.enqueue_function[_mxfp6_matmul_ref[fmt]](
+        a_dev.unsafe_ptr(),
+        b_dev.unsafe_ptr(),
+        a_sf_dev.unsafe_ptr(),
+        b_sf_dev.unsafe_ptr(),
+        ref_dev.unsafe_ptr(),
+        mag_dev.unsafe_ptr(),
+        Int32(M),
+        Int32(N),
+        Int32(K),
+        grid_dim=(ceildiv(M, REF_BLOCK), ceildiv(N, REF_BLOCK)),
+        block_dim=(REF_BLOCK, REF_BLOCK),
+    )
+
+    mxfp6_block_scaled_matmul_amd[mfma_format, preshuffled_b=True](
+        TileTensor(c_dev, row_major((Int(M), Idx[N]))),
+        TileTensor(a_dev, row_major((Int(M), Idx[K_BYTES]))),
+        TileTensor(b_pre_dev, row_major[N, K_BYTES]()),
+        TileTensor(a_sf_dev, row_major((Int(M), Idx[K_SCALES]))),
+        TileTensor(b_sf_pre_dev, row_major[N, K_SCALES]()),
+        ctx,
+    )
+    ctx.synchronize()
+
+    var c_host = ctx.enqueue_create_host_buffer[out_dtype](M * N)
+    var ref_host = ctx.enqueue_create_host_buffer[DType.float32](M * N)
+    var mag_host = ctx.enqueue_create_host_buffer[DType.float32](M * N)
+    ctx.enqueue_copy(c_host, c_dev)
+    ctx.enqueue_copy(ref_host, ref_dev)
+    ctx.enqueue_copy(mag_host, mag_dev)
+    ctx.synchronize()
+
+    comptime ULP_F32 = 5.9604644775390625e-8
+    var rel_tol = Float64(0.02) if out_dtype == DType.bfloat16 else (
+        Float64(16 * K) * ULP_F32
+    )
+
+    var mismatches = 0
+    var unwritten = 0
+    var saw_nonzero = False
+    for i in range(M * N):
+        var want = Float64(ref_host[i])
+        if want != Float64(0.0):
+            saw_nonzero = True
+        var got = Float64(c_host[i].cast[DType.float32]())
+        if got == Float64(SENTINEL):
+            unwritten += 1
+        elif abs(got - want) > rel_tol * Float64(mag_host[i]):
+            if mismatches < 3:
+                print(
+                    "      [",
+                    i // N,
+                    ",",
+                    i % N,
+                    "] got=",
+                    got,
+                    " want=",
+                    want,
+                    " mag=",
+                    Float64(mag_host[i]),
+                )
+            mismatches += 1
+
+    if unwritten > 0 or mismatches > 0:
+        print(
+            "    FAIL ",
+            mismatches,
+            " wrong, ",
+            unwritten,
+            " unwritten, of ",
+            M * N,
+        )
+        return False
+    if data_pattern != DATA_ZERO and not saw_nonzero:
+        print("    BAD TEST: reference is all zero")
+        return False
+    return True
+
+
 def _report[
     fmt: FP6Format,
     N: Int,
@@ -451,6 +641,64 @@ def _report[
         ctx, M, data_pattern, scale_pattern
     )
     return 0 if ok else 1
+
+
+def _report_preb[
+    fmt: FP6Format,
+    N: Int,
+    K: Int,
+    out_dtype: DType = DType.float32,
+](
+    ctx: DeviceContext, M: Int, data_pattern: Int, scale_pattern: Int
+) raises -> Int:
+    """Runs one `preshuffled_b=True` case and returns 1 if it failed."""
+    print(
+        "  ",
+        "E2M3" if fmt == FP6Format.E2M3 else "E3M2",
+        M,
+        "x",
+        N,
+        "x",
+        K,
+        " preshuffled_b out=",
+        out_dtype,
+        " data=",
+        data_pattern,
+        " scale=",
+        scale_pattern,
+    )
+    var ok = run_case_preb[fmt, N, K, out_dtype](
+        ctx, M, data_pattern, scale_pattern
+    )
+    return 0 if ok else 1
+
+
+def test_preshuffled_b_dispatch(ctx: DeviceContext) raises -> Int:
+    """Bucket R: `preshuffled_b=True` through the production dispatch path.
+
+    Covers all 5 of a production model's tp=4 dense shapes at M=128 (the
+    shape this path was built for -- see `mxfp6_block_scaled_matmul_amd`'s
+    docstring), plus M just above `DECODE_M_MAX`, both sides of the
+    internal BM=16/BM=32 crossover at `P_LARGE_M_THRESHOLD=1536`, and a
+    large prefill M. All M values here are > 64 by construction: smaller M
+    is documented to ignore `preshuffled_b` and is covered by the row-major
+    buckets above instead.
+    """
+    comptime fmt = FP6Format.E2M3
+    var bad = 0
+    for m in [65, 96, 128, 256, 1535, 1536, 8192]:
+        bad += _report_preb[fmt, 2048, 6144](ctx, m, DATA_RANDOM, SCALE_VARY)
+        bad += _report_preb[fmt, 128, 6144](ctx, m, DATA_RANDOM, SCALE_VARY)
+        bad += _report_preb[fmt, 6144, 2048](ctx, m, DATA_RANDOM, SCALE_VARY)
+        bad += _report_preb[fmt, 3072, 6144](ctx, m, DATA_RANDOM, SCALE_VARY)
+        bad += _report_preb[fmt, 6144, 3072](ctx, m, DATA_RANDOM, SCALE_VARY)
+    bad += _report_preb[fmt, 128, 6144, DType.bfloat16](
+        ctx, 128, DATA_RANDOM, SCALE_VARY
+    )
+    bad += _report_preb[FP6Format.E3M2, 2048, 6144](
+        ctx, 128, DATA_RANDOM, SCALE_VARY
+    )
+    return bad
 
 
 def test_baseline_aligned(ctx: DeviceContext) raises -> Int:
@@ -807,6 +1055,9 @@ def main() raises:
 
     print("\n--- D: output dtypes ---")
     bad += test_output_dtypes(ctx)
+
+    print("\n--- R: preshuffled_b dispatch (M=128 fix) ---")
+    bad += test_preshuffled_b_dispatch(ctx)
 
     if bad > 0:
         print("\nFAILED cases: ", bad)

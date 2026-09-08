@@ -25,11 +25,11 @@ Example with DP=4, TP=2, 8 GPUs:
 Uses a pull-based approach: each GPU reads its chunk from root via P2P.
 """
 
-from layout import TensorStorage, TileTensor
+from layout import TensorEngine, TileTensor
 from layout.tile_layout import TensorLayout
 from std.collections import Array
 from max.gpu.host import DeviceContext, get_gpu_target
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     global_idx,
     grid_dim,
@@ -123,11 +123,11 @@ def scatter[
     dp_size: Int,
     in_layout: TensorLayout,
     in_origin: Origin,
-    in_store: TensorStorage,
+    in_engine: TensorEngine,
     pdl_level: PDLLevel = PDLLevel(),
 ](
     input_buffers: Array[
-        TileTensor[dtype, in_layout, in_origin, Storage=in_store], dp_size
+        TileTensor[dtype, in_layout, in_origin, Engine=in_engine], dp_size
     ],
     output_buffer: TileTensor[mut=True, dtype, ...],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
@@ -144,7 +144,7 @@ def scatter[
         dp_size: Number of data-parallel replicas.
         in_layout: Layout of the input TileTensors.
         in_origin: Origin of the input TileTensors.
-        in_store: `TensorStorage` policy of the input TileTensors.
+        in_engine: Engine of the input TileTensors.
         pdl_level: Controls PDL behavior for P2P kernels.
 
     Args:

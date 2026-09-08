@@ -14,10 +14,10 @@
 from std.math import ceildiv
 from std.math.uutils import umod
 
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.sync import Semaphore
 from max.gpu.host import DeviceBuffer, DeviceContext
-from layout import PointerStorage, TileTensor, row_major
+from layout import DefaultEngine, TileTensor, row_major
 from linalg.matmul.gpu import matmul_kernel_naive
 from std.memory import alloc
 from std.testing import assert_almost_equal
@@ -322,19 +322,19 @@ def matmul_stream_k[
         c_type,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     a: TileTensor[
         a_type,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     b: TileTensor[
         b_type,
         address_space=.GENERIC,
         ...,
-        Storage=PointerStorage[element_width=1],
+        Engine=DefaultEngine[element_width=1],
     ],
     M: Int,
     N: Int,

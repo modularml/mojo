@@ -100,7 +100,7 @@ def bench_concat[
             type,
             input0_device.LayoutType,
             ImmutAnyOrigin,
-            Storage=input0_device.Storage,
+            Engine=input0_device.Engine,
         ],
         num_inputs,
     ](
@@ -222,7 +222,7 @@ def bench_concat_inner_most_single_dim[
                 var output = TileTensor(
                     out_dev, row_major[d0, d1, d2, d3, num_inputs]()
                 )
-                # Name the input tile type so the kernel's `InputStorage` param
+                # Name the input tile type so the kernel's `InputEngine` param
                 # matches the `DeviceBuffer` constructor's storage exactly.
                 comptime InTile = type_of(
                     TileTensor(in_dev[0], input_layout)
@@ -241,10 +241,10 @@ def bench_concat_inner_most_single_dim[
                 comptime kernel = _concat_inner_most_single_dim[
                     OutputLayoutType=output.LayoutType,
                     output_origin=MutAnyOrigin,
-                    OutputStorage=output.Storage,
+                    OutputEngine=output.Engine,
                     InputLayoutType=InLayout,
                     input_origin=ImmutAnyOrigin,
-                    InputStorage=InTile.Storage,
+                    InputEngine=InTile.Engine,
                     dtype=dtype,
                     num_inputs=num_inputs,
                     block_size=B_SIZE,
@@ -262,7 +262,7 @@ def bench_concat_inner_most_single_dim[
                 var out_shape = IndexList[rank](d0, d1, d2, d3, num_inputs)
                 comptime InLayout = type_of(row_major(Coord(in_shape)))
                 var output = TileTensor(out_dev, row_major(Coord(out_shape)))
-                # Name the input tile type so the kernel's `InputStorage` param
+                # Name the input tile type so the kernel's `InputEngine` param
                 # matches the `DeviceBuffer` constructor's storage exactly.
                 comptime InTile = type_of(
                     TileTensor(in_dev[0], row_major(Coord(in_shape)))
@@ -281,10 +281,10 @@ def bench_concat_inner_most_single_dim[
                 comptime kernel = _concat_inner_most_single_dim[
                     OutputLayoutType=output.LayoutType,
                     output_origin=MutAnyOrigin,
-                    OutputStorage=output.Storage,
+                    OutputEngine=output.Engine,
                     InputLayoutType=InLayout,
                     input_origin=ImmutAnyOrigin,
-                    InputStorage=InTile.Storage,
+                    InputEngine=InTile.Engine,
                     dtype=dtype,
                     num_inputs=num_inputs,
                     block_size=B_SIZE,

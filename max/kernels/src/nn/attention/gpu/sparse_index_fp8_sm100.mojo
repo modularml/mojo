@@ -68,7 +68,7 @@ NVIDIA SM100 only (SS-UMMA / TMA / tcgen05). Verified against
 match via `test_mla_index_fp8`.
 """
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -94,9 +94,9 @@ from std.utils.index import Index
 from std.utils.static_tuple import StaticTuple
 
 from layout import (
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     UNKNOWN_VALUE,
 )
@@ -121,7 +121,6 @@ from nn.attention.gpu.sparse_index_fp8_sm100_prefill import (
     _PREFILL_MIN_TOKEN_TILES,
     _ctas_per_sm,
     _is_keysplit_shape,
-    _prefill_cons_wgs,
     fp8_index_score_sm100_prefill,
 )
 
@@ -182,15 +181,6 @@ comptime _ALT_NTOK_FORCE = get_defined_int["FP8_INDEX_ALT_NTOK", 0]()
 comptime _ALT_FORCE_ANY = get_defined_int["FP8_INDEX_ALT_FORCE", 0]()
 comptime _ALT_OFF = get_defined_int["FP8_INDEX_ALT_OFF", 0]()
 
-# The WIDE speculative-decode tile: one 192-column block covering a whole 6-token
-# GLM 5.x MTP step at nh=32, against the alternate tile's two 96-column blocks.
-# Unlike the alternate tile this deliberately CROSSES the TMEM step function and
-# takes 1 CTA/SM, which only pays because such a tile now runs two consumer
-# warpgroups (`_prefill_cons_wgs`) and so keeps its consumer warp count. Not a
-# caller hint: 6 tokens is a property of the step, but 192 columns being the right
-# trade is a property of nh=32, and the gate below enforces that.
-comptime SPEC_DECODE_N_TOKENS_WIDE = 6
-
 
 # Q buffer 1 sits at the END of the SMEM layout so a decode launch (every
 # batch entry a single token tile, so buffer 1 is never touched) can allocate
@@ -232,19 +222,17 @@ def _fp8_index_body[
     kpool: Int = 1,
     epilogue_chunk: Int = _EPILOGUE_CHUNK,
     *,
-    VLStorageType: TensorStorage = PointerStorage[element_width=1],
-    QSStorageType: TensorStorage = PointerStorage[element_width=1],
-    OutStorageType: TensorStorage = PointerStorage[element_width=1],
+    VLEngine: TensorEngine = DefaultEngine[element_width=1],
+    QSEngine: TensorEngine = DefaultEngine[element_width=1],
+    OutEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     q_tma: QTMATileT[dtype, N_TOKENS * num_heads, depth],
     k_tma: KTMATileT[dtype, BM_key, depth],
     k_operand: KOperand,
     ks_operand: KSOperand,
-    valid_length: TileTensor[
-        .uint32, VLLT, ImmutAnyOrigin, Storage=VLStorageType
-    ],
-    q_s: TileTensor[.float32, QSLT, ImmutAnyOrigin, Storage=QSStorageType],
-    output: TileTensor[.float32, OutLT, MutAnyOrigin, Storage=OutStorageType],
+    valid_length: TileTensor[.uint32, VLLT, ImmutAnyOrigin, Engine=VLEngine],
+    q_s: TileTensor[.float32, QSLT, ImmutAnyOrigin, Engine=QSEngine],
+    output: TileTensor[.float32, OutLT, MutAnyOrigin, Engine=OutEngine],
     max_num_keys: Int,
     causal: Int,
     nt_start: Int,
@@ -630,19 +618,17 @@ def _fp8_index_score_kernel_sm100[
     _is_cache_length_accurate: Bool,
     kpool: Int = 1,
     *,
-    VLStorageType: TensorStorage = PointerStorage[element_width=1],
-    QSStorageType: TensorStorage = PointerStorage[element_width=1],
-    OutStorageType: TensorStorage = PointerStorage[element_width=1],
+    VLEngine: TensorEngine = DefaultEngine[element_width=1],
+    QSEngine: TensorEngine = DefaultEngine[element_width=1],
+    OutEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     q_tma: QTMATileT[dtype, N_TOKENS * num_heads, depth],
     k_tma: KTMATileT[dtype, BM_key, depth],
     k_operand: KOperand,
     ks_operand: KSOperand,
-    valid_length: TileTensor[
-        .uint32, VLLT, ImmutAnyOrigin, Storage=VLStorageType
-    ],
-    q_s: TileTensor[.float32, QSLT, ImmutAnyOrigin, Storage=QSStorageType],
-    output: TileTensor[.float32, OutLT, MutAnyOrigin, Storage=OutStorageType],
+    valid_length: TileTensor[.uint32, VLLT, ImmutAnyOrigin, Engine=VLEngine],
+    q_s: TileTensor[.float32, QSLT, ImmutAnyOrigin, Engine=QSEngine],
+    output: TileTensor[.float32, OutLT, MutAnyOrigin, Engine=OutEngine],
     max_num_keys_dev: Int32,
     causal_dev: Int32,
     out_row_begin_dev: Int32,
@@ -686,9 +672,9 @@ def _fp8_index_score_kernel_sm100[
         N_TOKENS,
         _is_cache_length_accurate,
         kpool,
-        VLStorageType=VLStorageType,
-        QSStorageType=QSStorageType,
-        OutStorageType=OutStorageType,
+        VLEngine=VLEngine,
+        QSEngine=QSEngine,
+        OutEngine=OutEngine,
     ](
         q_tma,
         k_tma,
@@ -726,19 +712,17 @@ def _fp8_index_score_kernel_sm100_split[
     _is_cache_length_accurate: Bool,
     kpool: Int = 1,
     *,
-    VLStorageType: TensorStorage = PointerStorage[element_width=1],
-    QSStorageType: TensorStorage = PointerStorage[element_width=1],
-    OutStorageType: TensorStorage = PointerStorage[element_width=1],
+    VLEngine: TensorEngine = DefaultEngine[element_width=1],
+    QSEngine: TensorEngine = DefaultEngine[element_width=1],
+    OutEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     q_tma: QTMATileT[dtype, N_TOKENS * num_heads, depth],
     k_tma: KTMATileT[dtype, BM_key, depth],
     k_operand: KOperand,
     ks_operand: KSOperand,
-    valid_length: TileTensor[
-        .uint32, VLLT, ImmutAnyOrigin, Storage=VLStorageType
-    ],
-    q_s: TileTensor[.float32, QSLT, ImmutAnyOrigin, Storage=QSStorageType],
-    output: TileTensor[.float32, OutLT, MutAnyOrigin, Storage=OutStorageType],
+    valid_length: TileTensor[.uint32, VLLT, ImmutAnyOrigin, Engine=VLEngine],
+    q_s: TileTensor[.float32, QSLT, ImmutAnyOrigin, Engine=QSEngine],
+    output: TileTensor[.float32, OutLT, MutAnyOrigin, Engine=OutEngine],
     max_num_keys_dev: Int32,
     causal_dev: Int32,
     out_row_begin_dev: Int32,
@@ -788,9 +772,9 @@ def _fp8_index_score_kernel_sm100_split[
         N_TOKENS,
         _is_cache_length_accurate,
         kpool,
-        VLStorageType=VLStorageType,
-        QSStorageType=QSStorageType,
-        OutStorageType=OutStorageType,
+        VLEngine=VLEngine,
+        QSEngine=QSEngine,
+        OutEngine=OutEngine,
     ](
         q_tma,
         k_tma,
@@ -987,82 +971,6 @@ def fp8_index_score_sm100[
             max_seq_len, max_num_keys
         )
         if to_prefill:
-            # The WIDE tile first: one block covering a whole speculative step, taken
-            # only when the step is EXACTLY that wide. What it recovers is not the
-            # fold (the FMNMX / FFMA2 / LDS counts measure identical across tile
-            # widths) but the MMA and the TMEM reads, which are issued for dead
-            # columns too -- an MTP step of 6 tokens at nh=32 otherwise runs two
-            # 4-token blocks, 256 MMA columns for 192 live ones.
-            #
-            # This tile crosses the TMEM step function on purpose and drops to
-            # 1 CTA/SM. That trade was previously recorded as a WASH, halving the
-            # consumer warps per SM for what the work cut saved -- but that was
-            # measured against a kernel whose consumer was always ONE warpgroup. An
-            # SM-owning tile now runs two, so the warps come back and the work cut is
-            # kept. `_prefill_cons_wgs[MMA_N_WIDE] == 2` below is what ties this arm
-            # to that property rather than to the tile width.
-            #
-            # `num_heads == 32` is a measurement boundary, not a physical one: at
-            # nh=64 the same 192 columns cover 3 tokens rather than 6, which is a
-            # different trade and was never swept.
-            # TODO(cme): sweep nh=64 and nh in {4, 8}; if the trade holds there, fold
-            # this into the divisor search below rather than enumerating head counts.
-            comptime N_WIDE = (
-                SPEC_DECODE_N_TOKENS_WIDE if num_heads == 32 else 0
-            )
-            comptime MMA_N_WIDE = N_WIDE * num_heads
-            comptime if (
-                N_WIDE > N_TOKENS
-                and MMA_N_WIDE % 16 == 0
-                and MMA_N_WIDE <= 256
-                # Strictly FEWER CTAs/SM: this is the arm that buys tile exactness
-                # with residency, the opposite of the alternate tile's clause below,
-                # and it is only admissible because of the warpgroup clause next.
-                and _ctas_per_sm[MMA_N_WIDE]() < _ctas_per_sm[MMA_N]()
-                and _prefill_cons_wgs[MMA_N_WIDE]() == 2
-            ):
-                # One block for the whole run, or nothing: what was measured is the
-                # token-block count collapsing 2 -> 1. A wider tile that still needs
-                # several blocks pays the residency without collapsing the step, and
-                # a SHORTER run (a 3-token tail) would spend half its columns on dead
-                # tokens -- that shape keeps the alternate tile below.
-                if max_seq_len == N_WIDE:
-                    var q_tma_wide = create_split_tma[
-                        Index(MMA_N_WIDE, 1, depth),
-                        Index(UNKNOWN_VALUE, 1, depth),
-                        _INDEX_SWIZZLE,
-                    ](
-                        ctx,
-                        rebind[UnsafePointer[Scalar[dtype], ImmutAnyOrigin]](
-                            q.ptr
-                        ),
-                        total_q_rows,
-                    )
-                    fp8_index_score_sm100_prefill[
-                        dtype,
-                        KOperand,
-                        KSOperand,
-                        num_heads,
-                        depth,
-                        BM_key,
-                        N_WIDE,
-                        _is_cache_length_accurate,
-                        kpool,
-                    ](
-                        rebind[QTMATileT[dtype, MMA_N_WIDE, depth]](q_tma_wide),
-                        rebind[KTMATileT[dtype, BM_key, depth]](k_tma_tile),
-                        k_operand,
-                        ks_operand,
-                        valid_length,
-                        q_s,
-                        output,
-                        batch_size,
-                        max_seq_len,
-                        max_num_keys,
-                        Int(causal),
-                        ctx,
-                    )
-                    return
             # Optional alternate N-tile, taken when it divides the run and the default
             # does not. The default packs `128 // num_heads` whole tokens, so an MTP
             # step of seq_len 6 at nh=32 runs two 4-token blocks: 256 MMA columns for
@@ -1074,10 +982,22 @@ def fp8_index_score_sm100[
             # `_S_TMEM_STAGES * align_up(MMA_N, 32)` rounded up to a power of two is
             # what buys or loses the second co-resident CTA: 6 tokens at nh=32 needs
             # 384 -> 512 columns and drops to 1 CTA/SM, while 3 tokens needs 192 -> 256
-            # and keeps 2. This arm therefore stays on the 2-CTA/SM side; the wide arm
-            # above is the one that pays residency for exactness, and it can only do
-            # so because it recovers the consumer warps. See `_ctas_per_sm` and
-            # `_prefill_cons_wgs` in the prefill file.
+            # and keeps 2. This arm therefore stays on the 2-CTA/SM side. See
+            # `_ctas_per_sm` in the prefill file.
+            #
+            # A 192-column WIDE tile covering the whole 6-token step used to claim
+            # this width ahead of here, buying tile exactness with residency and
+            # handing the consumer warps back through a second warpgroup. Measured
+            # against it on B200, min over 5 reps x 3 processes: the 96-column
+            # divisor is faster on every decode cell that moves, 1.07x at (b8, 32K
+            # keys) to 1.28x at (b32, 8K), geomean 1.17x over those five and 1.12x
+            # over all seven. Two things it wins that the wide tile could not: the
+            # second co-resident CTA, and the q-scale hoist, which keys on the
+            # column count and so fits at 96 -- worth 48 `ld.shared` per key tile
+            # per thread, 8.8% of the wide tile's loop body. Streaming the key range
+            # twice, once per 3-token block, costs nothing measurable: `grid_dim` is
+            # (batch, token_block, key_part), so an entry's two blocks land in the
+            # same key-part slab and share L2.
             #
             # The hint is a TOKEN count, so one caller-side constant reaches every head
             # count and is inert where it cannot apply: 3 is 24 columns at nh=8, not a
@@ -1139,9 +1059,9 @@ def fp8_index_score_sm100[
                         N_ALT,
                         _is_cache_length_accurate,
                         kpool,
-                        VLStorageType=type_of(valid_length.as_immut()).Storage,
-                        QSStorageType=q_s.Storage,
-                        OutStorageType=output.Storage,
+                        VLEngine=type_of(valid_length.as_immut()).Engine,
+                        QSEngine=q_s.Engine,
+                        OutEngine=output.Engine,
                     ](
                         rebind[QTMATileT[dtype, MMA_N_ALT, depth]](q_tma_alt),
                         rebind[KTMATileT[dtype, BM_key, depth]](k_tma_tile),
@@ -1168,9 +1088,9 @@ def fp8_index_score_sm100[
                 N_TOKENS,
                 _is_cache_length_accurate,
                 kpool,
-                VLStorageType=type_of(valid_length.as_immut()).Storage,
-                QSStorageType=q_s.Storage,
-                OutStorageType=output.Storage,
+                VLEngine=type_of(valid_length.as_immut()).Engine,
+                QSEngine=q_s.Engine,
+                OutEngine=output.Engine,
             ](
                 rebind[QTMATileT[dtype, N_TOKENS * num_heads, depth]](
                     q_tma_tile
@@ -1209,9 +1129,9 @@ def fp8_index_score_sm100[
             N_TOKENS,
             _is_cache_length_accurate,
             kpool,
-            VLStorageType=type_of(valid_length.as_immut()).Storage,
-            QSStorageType=q_s.Storage,
-            OutStorageType=output.Storage,
+            VLEngine=type_of(valid_length.as_immut()).Engine,
+            QSEngine=q_s.Engine,
+            OutEngine=output.Engine,
         ]
         comptime kernel_split = _fp8_index_score_kernel_sm100_split[
             dtype,
@@ -1226,9 +1146,9 @@ def fp8_index_score_sm100[
             N_TOKENS,
             _is_cache_length_accurate,
             kpool,
-            VLStorageType=type_of(valid_length.as_immut()).Storage,
-            QSStorageType=q_s.Storage,
-            OutStorageType=output.Storage,
+            VLEngine=type_of(valid_length.as_immut()).Engine,
+            QSEngine=q_s.Engine,
+            OutEngine=output.Engine,
         ]
 
         comptime q1_offset = _Q1SmemOffset[dtype, BM_key, MMA_N, depth]

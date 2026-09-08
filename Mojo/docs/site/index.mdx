@@ -1,0 +1,120 @@
+---
+title: Documentation
+sidebar_label: Docs
+hide_title: true
+hide_table_of_contents: true
+description: All the documentation for the Mojo programming language.
+---
+
+import DocsLanding from '@site/src/components/DocsLanding';
+
+import PowerIcon from '@site/static/img/power.svg';
+import MultipleStarsIcon from '@site/static/img/multiple-stars.svg';
+import StarIcon from '@site/static/img/star.svg';
+import WrenchIcon from '@site/static/img/wrench.svg';
+import InfoIcon from '@site/static/img/info.svg';
+import LightBulbIcon from '@site/static/img/lightbulb.svg';
+
+export const getStartedCards = [
+  {
+    icon: <PowerIcon />,
+    title: 'Quickstart',
+    url: '/docs/manual/quickstart/',
+    description:
+      'Install and tour Mojo syntax basics in 20 minutes',
+  },
+  {
+    icon: <MultipleStarsIcon />,
+    title: '\'Get Started\' Tutorial',
+    url: '/docs/manual/get-started/',
+    description: 'Build Conway\'s Game of Life from scratch',
+  },
+  {
+    icon: <LightBulbIcon />,
+    title: 'Cheat Sheets',
+    url: '/docs/reference/cheat-sheets/',
+    description:
+      'Quick syntax and feature reference guides',
+  },
+];
+
+export const guidesReferencesCards = [
+  {
+    title: 'Mojo Manual',
+    url: '/docs/manual/',
+    description:
+      'Syntax, concepts, programming patterns, and more',
+  },
+  {
+    title: 'Standard Library APIs',
+    url: '/docs/std/',
+    description:
+      'Data types, structs, traits, functions, and packages',
+  },
+  {
+    title: 'Mojo Language Reference',
+    url: '/docs/reference/',
+    description:
+      'Detailed guides and deep dives into Mojo syntax',
+  },
+  {
+    title: 'Agent Skills',
+    url: '/docs/tools/skills/',
+    description:
+      'Keep your AI coding assistant current with the latest Mojo',
+  },
+  {
+    title: 'Mojo Quest',
+    url: 'https://quest.mojolang.org/',
+    description:
+      'Learn Mojo using this interactive coding game',
+  },
+  {
+    title: 'Compiler Reference',
+    url: '/docs/cli/',
+    description:
+      'Commands and options for the `mojo` CLI compiler',
+  },
+];
+
+export const shortcutColumns = [
+  {
+    icon: <StarIcon />,
+    title: 'Popular topics',
+    links: [
+      { to: '/docs/manual/basics/', label: 'Language basics' },
+      { to: '/docs/manual/python/', label: 'Python interop' },
+      { to: '/docs/manual/values/ownership/', label: 'Ownership' },
+      { to: '/docs/manual/values/lifetimes/', label: 'Origins and references' },
+      { to: '/docs/manual/metaprogramming/', label: 'Metaprogramming' },
+    ],
+  },
+  {
+    icon: <WrenchIcon />,
+    title: 'Tools & workflow',
+    links: [
+      { to: '/docs/tools/skills/', label: 'Agent skills' },
+      { to: '/docs/tools/debugging/', label: 'Debugging' },
+      { to: '/docs/tools/compilation/', label: 'Compilation targets' },
+      { to: '/docs/tools/testing/', label: 'Testing' },
+      { to: '/docs/tools/notebooks/', label: 'Jupyter notebooks' },
+    ],
+  },
+  {
+    icon: <InfoIcon />,
+    title: 'Project info',
+    links: [
+      { to: '/docs/vision/', label: 'Mojo vision' },
+      { to: '/docs/roadmap/', label: 'Mojo roadmap' },
+      { to: '/docs/faq/', label: 'FAQ' },
+      { to: '/docs/api-docs/stability/', label: 'Stability policy' },
+      { to: 'https://github.com/modular/modular', label: 'Open source' },
+    ],
+  },
+];
+
+<DocsLanding
+  getStartedCards={getStartedCards}
+  guidesReferencesCards={guidesReferencesCards}
+  shortcutColumns={shortcutColumns}
+/>

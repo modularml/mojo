@@ -33,7 +33,7 @@ from std.math import ceildiv
 from std.sys import align_of, size_of
 
 from std.memory import UnsafePointer
-from std.gpu import WARP_SIZE, warp_id as get_warp_id
+from max.gpu import WARP_SIZE, warp_id as get_warp_id
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
@@ -41,7 +41,7 @@ from max.gpu.primitives.cluster import (
     elect_one_sync,
 )
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, lane_id
+from max.gpu import block_idx, lane_id
 from max.gpu.memory import (
     async_copy,
     async_copy_commit_group,

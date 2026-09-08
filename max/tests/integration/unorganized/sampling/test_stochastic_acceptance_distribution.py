@@ -94,6 +94,59 @@ def acceptance_sampler(session: InferenceSession) -> Model:
     return session.load(graph)
 
 
+@pytest.fixture(scope="module")
+def sampled_acceptance_sampler(session: InferenceSession) -> Model:
+    """Compile the sampled-draft-proposal acceptance sampler for the module."""
+    device_ref = DeviceRef.from_device(session.devices[0])
+    graph_inputs = [
+        TensorType(DType.int64, ["batch_size", "num_steps"], device=device_ref),
+        TensorType(
+            DType.float32, ["total_output_len", "vocab_size"], device=device_ref
+        ),
+        TensorType(DType.float32, ["batch_size"], device=device_ref),
+        TensorType(DType.int64, ["batch_size"], device=device_ref),
+        TensorType(DType.int64, [], device=DeviceRef.CPU()),
+        TensorType(DType.float32, ["batch_size"], device=device_ref),
+        TensorType(DType.float32, [], device=DeviceRef.CPU()),
+        ops.random.SeedType(device_ref),
+        TensorType(
+            DType.float32,
+            ["batch_size", "num_steps", VOCAB_SIZE],
+            device=device_ref,
+        ),
+    ]
+    with Graph(
+        "stochastic_acceptance_distribution_sampled", input_types=graph_inputs
+    ) as graph:
+        (
+            draft_tokens,
+            target_logits,
+            temperature,
+            top_k,
+            max_k,
+            top_p,
+            min_top_p,
+            seed,
+            draft_probs_full,
+        ) = graph.inputs
+        graph.output(
+            *stochastic_acceptance_sampler(
+                draft_tokens=draft_tokens.tensor,
+                target_logits=target_logits.tensor,
+                temperature=temperature.tensor,
+                top_k=top_k.tensor,
+                max_k=max_k.tensor,
+                top_p=top_p.tensor,
+                min_top_p=min_top_p.tensor,
+                seed=seed.tensor,
+                draft_proposal="sampled",
+                draft_probs_full=draft_probs_full.tensor,
+                vocab_size=VOCAB_SIZE,
+            )
+        )
+    return session.load(graph)
+
+
 def _make_target_probs(
     rng: np.random.Generator,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
@@ -113,6 +166,25 @@ def _make_target_probs(
     probs = tail
     probs[top_idx] = head_probs
     return probs, top_idx.astype(np.int64)
+
+
+def _noisy_draft_distribution(
+    rng: np.random.Generator,
+    logits_row: npt.NDArray[np.float32],
+    low: float = -0.3,
+    high: float = 0.3,
+) -> npt.NDArray[np.float64]:
+    """A full-support draft distribution perturbing the target's logits.
+
+    Softmaxed with full support everywhere, so ``q`` is positive everywhere
+    and the rejection-sampling exactness identity applies regardless of the
+    draft's own distribution.
+    """
+    draft_logits_row = logits_row * (
+        1.0 + rng.uniform(low, high, logits_row.shape[0])
+    )
+    draft_e = np.exp(draft_logits_row - draft_logits_row.max())
+    return draft_e / draft_e.sum()
 
 
 def test_recovered_tokens_respect_top_p(
@@ -271,4 +343,169 @@ def test_stochastic_acceptance_output_distribution(
     assert chi2 < 30.0, (
         f"chi-square {chi2:.1f} over top-5 + tail buckets exceeds 30: "
         f"observed freq {observed / total}, expected {expected / total}"
+    )
+
+
+def test_argmax_vs_sampled_committed_distribution_match(
+    session: InferenceSession,
+    acceptance_sampler: Model,
+    sampled_acceptance_sampler: Model,
+) -> None:
+    """``draft_proposal="argmax"`` and ``"sampled"`` must commit the same
+    distribution.
+
+    For any full-support draft distribution, rejection sampling commits the
+    target distribution regardless of the draft's own distribution -- so the
+    two modes can only differ in accept/reject rate, never in what ends up
+    committed. Each mode is also checked against the analytic target
+    directly, so a bug shared by both verdict functions can't hide behind
+    the two modes merely agreeing with each other.
+
+    Both modes' ``recovered`` output is already the committed token at
+    every position, independent of what happened at earlier positions in
+    the same row (each position samples from a fused kernel with a distinct
+    per-row/per-position seed) -- so the whole ``[batch, num_steps]`` array
+    is used directly, unlike the reconstruction above that stops at the
+    first rejection to mirror an actual decode step.
+    """
+    device = session.devices[0]
+    rng = np.random.default_rng(2)
+
+    target_probs, top_idx = _make_target_probs(rng)
+    logits_row = np.log(target_probs).astype(np.float32)
+    logits_np = np.tile(logits_row, (BATCH_SIZE * (NUM_STEPS + 1), 1))
+    logits_tensor = Buffer.from_dlpack(logits_np).to(device)
+    draft_probs_row = _noisy_draft_distribution(rng, logits_row)
+
+    temperature = Buffer.from_numpy(np.ones(BATCH_SIZE, dtype=np.float32)).to(
+        device
+    )
+    top_k = Buffer.from_numpy(np.full(BATCH_SIZE, -1, dtype=np.int64)).to(
+        device
+    )
+    max_k = Buffer.from_numpy(np.array(-1, dtype=np.int64))
+    top_p = Buffer.from_numpy(np.ones(BATCH_SIZE, dtype=np.float32)).to(device)
+    min_top_p = Buffer.from_numpy(np.array(1.0, dtype=np.float32))
+
+    committed_argmax: list[npt.NDArray[np.int64]] = []
+    committed_sampled: list[npt.NDArray[np.int64]] = []
+    for _ in range(NUM_TRIALS):
+        # Both modes are driven from the same draft draws: sharing the draw
+        # removes an unnecessary asymmetry between the two setups rather
+        # than corrupting either one.
+        draft_np = rng.choice(
+            VOCAB_SIZE, size=(BATCH_SIZE, NUM_STEPS), p=draft_probs_row
+        ).astype(np.int64)
+        draft_tokens = Buffer.from_dlpack(draft_np).to(device)
+
+        argmax_seed = rng.integers(np.iinfo(np.int64).max, dtype=np.uint64)
+        _, recovered_argmax, _ = acceptance_sampler(
+            draft_tokens,
+            logits_tensor,
+            temperature,
+            top_k,
+            max_k,
+            top_p,
+            min_top_p,
+            Buffer.from_numpy(np.array([argmax_seed], dtype=np.uint64)).to(
+                device
+            ),
+        )
+        assert isinstance(recovered_argmax, Buffer)
+        committed_argmax.append(recovered_argmax.to_numpy().reshape(-1))
+
+        draft_probs_full_np = np.tile(
+            draft_probs_row.astype(np.float32), (BATCH_SIZE, NUM_STEPS, 1)
+        )
+        sampled_seed = rng.integers(np.iinfo(np.int64).max, dtype=np.uint64)
+        _, recovered_sampled, _ = sampled_acceptance_sampler(
+            draft_tokens,
+            logits_tensor,
+            temperature,
+            top_k,
+            max_k,
+            top_p,
+            min_top_p,
+            Buffer.from_numpy(np.array([sampled_seed], dtype=np.uint64)).to(
+                device
+            ),
+            Buffer.from_dlpack(draft_probs_full_np).to(device),
+        )
+        assert isinstance(recovered_sampled, Buffer)
+        committed_sampled.append(recovered_sampled.to_numpy().reshape(-1))
+
+    all_argmax = np.concatenate(committed_argmax)
+    all_sampled = np.concatenate(committed_sampled)
+    counts_argmax = np.bincount(all_argmax, minlength=VOCAB_SIZE).astype(
+        np.float64
+    )
+    counts_sampled = np.bincount(all_sampled, minlength=VOCAB_SIZE).astype(
+        np.float64
+    )
+    total_argmax = counts_argmax.sum()
+    total_sampled = counts_sampled.sum()
+
+    tail_mass = 1.0 - target_probs[top_idx].sum()
+    tail_freq_argmax = 1.0 - counts_argmax[top_idx].sum() / total_argmax
+    tail_freq_sampled = 1.0 - counts_sampled[top_idx].sum() / total_sampled
+    assert abs(tail_freq_argmax - tail_mass) < 0.015, (
+        f"argmax committed-token tail mass {tail_freq_argmax:.4f} deviates "
+        f"from target {tail_mass:.4f}"
+    )
+    assert abs(tail_freq_sampled - tail_mass) < 0.015, (
+        f"sampled committed-token tail mass {tail_freq_sampled:.4f} "
+        f"deviates from target {tail_mass:.4f}"
+    )
+
+    # Each mode vs. the analytic target independently, before diffing them
+    # against each other: a bug shared by both verdict functions would make
+    # the two modes agree while both are wrong, which a pure cross-mode diff
+    # can't see.
+    observed_argmax = np.append(
+        counts_argmax[top_idx], total_argmax - counts_argmax[top_idx].sum()
+    )
+    expected_argmax = np.append(target_probs[top_idx], tail_mass) * total_argmax
+    chi2_argmax = float(
+        np.sum((observed_argmax - expected_argmax) ** 2 / expected_argmax)
+    )
+    assert chi2_argmax < 30.0, (
+        f"argmax chi-square {chi2_argmax:.1f} over top-5 + tail buckets "
+        f"exceeds 30: observed freq {observed_argmax / total_argmax}, "
+        f"expected {expected_argmax / total_argmax}"
+    )
+
+    observed_sampled = np.append(
+        counts_sampled[top_idx], total_sampled - counts_sampled[top_idx].sum()
+    )
+    expected_sampled = (
+        np.append(target_probs[top_idx], tail_mass) * total_sampled
+    )
+    chi2_sampled = float(
+        np.sum((observed_sampled - expected_sampled) ** 2 / expected_sampled)
+    )
+    assert chi2_sampled < 30.0, (
+        f"sampled chi-square {chi2_sampled:.1f} over top-5 + tail buckets "
+        f"exceeds 30: observed freq {observed_sampled / total_sampled}, "
+        f"expected {expected_sampled / total_sampled}"
+    )
+
+    # The actual ask: diff the two modes' committed marginals directly via a
+    # two-sample chi-square-of-homogeneity over the same buckets.
+    pooled = observed_argmax + observed_sampled
+    grand_total = total_argmax + total_sampled
+    expected_a = pooled * total_argmax / grand_total
+    expected_b = pooled * total_sampled / grand_total
+    chi2_cross = float(
+        np.sum((observed_argmax - expected_a) ** 2 / expected_a)
+        + np.sum((observed_sampled - expected_b) ** 2 / expected_b)
+    )
+    assert chi2_cross < 30.0, (
+        f"argmax vs sampled cross-mode chi-square {chi2_cross:.1f} over "
+        f"top-5 + tail buckets exceeds 30: argmax freq "
+        f"{observed_argmax / total_argmax}, sampled freq "
+        f"{observed_sampled / total_sampled}"
+    )
+    assert abs(tail_freq_argmax - tail_freq_sampled) < 0.02, (
+        f"argmax tail freq {tail_freq_argmax:.4f} vs sampled tail freq "
+        f"{tail_freq_sampled:.4f} diverge by more than 0.02"
     )

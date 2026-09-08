@@ -13,7 +13,7 @@
 
 from max.gpu.sync import NamedBarrierSemaphore
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx, grid_dim, thread_idx
+from max.gpu import block_idx, grid_dim, thread_idx
 from layout import Layout, RuntimeLayout, UNKNOWN_VALUE
 from layout._utils import ManagedLayoutTensor
 from std.testing import assert_equal

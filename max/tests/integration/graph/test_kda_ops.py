@@ -41,6 +41,7 @@ from max.driver import accelerator_architecture_name, accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import BufferType, DeviceRef, Graph, TensorType, ops
+from max.nn.state_space import kda_decode
 
 # The chunk pipeline reassociates the fp32 arithmetic, so it is graded on
 # relative RMSE at the tolerance its kernel suite documents rather than on
@@ -461,3 +462,194 @@ def test_kda_chunk_output_and_slot_isolation(
             pool_initial_np[s],
             err_msg=f"state_pool slot {s} must be untouched",
         )
+
+
+def test_kda_decode_wrapper_rejects_split_dtype_groups() -> None:
+    """The wrapper's dtype check, which exists to beat the compiler to it.
+
+    ``q/k/v`` bind one compile-time ``qkv_dtype`` and the gate tensors another,
+    so a mixed group resolves no kernel; the graph-compiler diagnostic names a
+    Mojo parameter instead of the tensor at fault.
+    """
+    gpu = DeviceRef.GPU()
+    t, h, d, slots = 4, 2, 32, 2
+    packed = TensorType(DType.float32, [t, h, d], device=gpu)
+    with Graph(
+        "kda_decode_wrapper_dtypes",
+        input_types=[
+            packed,
+            packed,
+            packed,
+            TensorType(DType.float32, [t, h], device=gpu),
+            TensorType(DType.float32, [h], device=gpu),
+            TensorType(DType.float32, [h, d], device=gpu),
+            TensorType(DType.int32, [2], device=gpu),
+            BufferType(DType.float32, [slots, h, d, d], device=gpu),
+            TensorType(DType.int32, [1], device=gpu),
+        ],
+    ) as graph:
+        q = graph.inputs[0].tensor
+        v = graph.inputs[1].tensor
+        raw_gate = graph.inputs[2].tensor
+        beta_logits = graph.inputs[3].tensor
+        a_log = graph.inputs[4].tensor
+        dt_bias = graph.inputs[5].tensor
+        cu_seqlens = graph.inputs[6].tensor
+        pool = graph.inputs[7].buffer
+        indices = graph.inputs[8].tensor
+
+        with pytest.raises(ValueError, match="q and k to have the same dtype"):
+            kda_decode(
+                q,
+                q.cast(DType.bfloat16),
+                v,
+                raw_gate,
+                beta_logits,
+                a_log,
+                dt_bias,
+                cu_seqlens,
+                pool,
+                indices,
+                output_dtype=DType.float32,
+            )
+
+        with pytest.raises(ValueError, match="beta_logits"):
+            kda_decode(
+                q,
+                q,
+                v,
+                raw_gate,
+                beta_logits.cast(DType.bfloat16),
+                a_log,
+                dt_bias,
+                cu_seqlens,
+                pool,
+                indices,
+                output_dtype=DType.float32,
+            )
+
+        with pytest.raises(ValueError, match="cu_seqlens to have dtype int32"):
+            kda_decode(
+                q,
+                q,
+                v,
+                raw_gate,
+                beta_logits,
+                a_log,
+                dt_bias,
+                cu_seqlens.cast(DType.uint32),
+                pool,
+                indices,
+                output_dtype=DType.float32,
+            )
+
+        graph.output()
+
+
+def test_kda_decode_wrapper_rejects_mismatched_shapes() -> None:
+    """The wrapper's shape checks, which the kernel only has in debug builds.
+
+    The kernel derives every ``k`` offset from ``q``'s head extents and scales
+    it by ``k``'s own strides, so a narrower ``k`` reads across row boundaries
+    instead of failing -- and its ``debug_assert`` guards compile out at the
+    default assert level. These are build-time errors for that reason.
+    """
+    gpu = DeviceRef.GPU()
+    t, h, kd, vd, slots = 4, 2, 32, 32, 2
+
+    with Graph(
+        "kda_decode_wrapper_shapes",
+        input_types=[
+            TensorType(DType.float32, [t, h, kd], device=gpu),
+            TensorType(DType.float32, [t, h, kd - 1], device=gpu),
+            TensorType(DType.float32, [t, h, vd], device=gpu),
+            TensorType(DType.float32, [t, h, kd], device=gpu),
+            TensorType(DType.float32, [t, h], device=gpu),
+            TensorType(DType.float32, [h], device=gpu),
+            TensorType(DType.float32, [h, kd], device=gpu),
+            TensorType(DType.int32, [2], device=gpu),
+            BufferType(DType.float32, [slots, h, kd, vd], device=gpu),
+            TensorType(DType.int32, [1], device=gpu),
+            TensorType(DType.float32, [t, h, kd, vd], device=gpu),
+            BufferType(DType.float32, [slots, h, kd, vd + 1], device=gpu),
+        ],
+    ) as graph:
+        q = graph.inputs[0].tensor
+        narrow_k = graph.inputs[1].tensor
+        v = graph.inputs[2].tensor
+        raw_gate = graph.inputs[3].tensor
+        beta_logits = graph.inputs[4].tensor
+        a_log = graph.inputs[5].tensor
+        dt_bias = graph.inputs[6].tensor
+        cu_seqlens = graph.inputs[7].tensor
+        pool = graph.inputs[8].buffer
+        indices = graph.inputs[9].tensor
+        rank4_q = graph.inputs[10].tensor
+        wrong_pool = graph.inputs[11].buffer
+
+        # The out-of-bounds read the kernel's debug_assert would have caught.
+        with pytest.raises(ValueError, match="key-head width"):
+            kda_decode(
+                q,
+                narrow_k,
+                v,
+                raw_gate,
+                beta_logits,
+                a_log,
+                dt_bias,
+                cu_seqlens,
+                pool,
+                indices,
+                output_dtype=DType.float32,
+            )
+
+        with pytest.raises(ValueError, match="rank 3"):
+            kda_decode(
+                rank4_q,
+                q,
+                v,
+                raw_gate,
+                beta_logits,
+                a_log,
+                dt_bias,
+                cu_seqlens,
+                pool,
+                indices,
+                output_dtype=DType.float32,
+            )
+
+        # `cu_seqlens` is indexed as `batch_size + 1`, off `state_indices`.
+        with pytest.raises(ValueError, match="one more entry"):
+            kda_decode(
+                q,
+                q,
+                v,
+                raw_gate,
+                beta_logits,
+                a_log,
+                dt_bias,
+                indices,
+                pool,
+                indices,
+                output_dtype=DType.float32,
+            )
+
+        # The pool's trailing axes are ordered by `state_layout`; a pool
+        # whose extents disagree with (key_head_dim, value_head_dim) would
+        # have the kernel index state it does not own.
+        with pytest.raises(ValueError, match="trailing axes"):
+            kda_decode(
+                q,
+                q,
+                v,
+                raw_gate,
+                beta_logits,
+                a_log,
+                dt_bias,
+                cu_seqlens,
+                wrong_pool,
+                indices,
+                output_dtype=DType.float32,
+            )
+
+        graph.output()

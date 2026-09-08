@@ -629,3 +629,206 @@ def test_transfer_to_subgraph_with_allreduce(num_gpus: int) -> None:
     for tensor in outputs:
         assert isinstance(tensor, Buffer)
         assert np.allclose(expected, tensor.to(host).to_numpy(), atol=1e-6)
+
+
+def _grouped_allreduce_graph(
+    signals: Signals, group_ms: list[int], group_size: int
+) -> Graph:
+    """Allreduce over independent contiguous device groups.
+
+    Each group carries its own row count so cross-group mixing cannot pass by
+    accident: a value that leaks between groups changes both the sum and, for
+    most bugs, the shape.
+    """
+    devices = signals.devices
+    num_devices = len(devices)
+    input_types = [
+        TensorType(
+            dtype=DType.float32,
+            shape=[group_ms[i // group_size], N],
+            device=devices[i],
+        )
+        for i in range(num_devices)
+    ]
+    all_input_types = input_types + list(signals.input_types())
+
+    with Graph("grouped_allreduce", input_types=all_input_types) as graph:
+        tensor_inputs = [
+            graph.inputs[i].tensor * (i + 1) for i in range(num_devices)
+        ]
+        outputs = ops.allreduce.sum(
+            tensor_inputs,
+            [inp.buffer for inp in graph.inputs[num_devices:]],
+            group_size=group_size,
+        )
+        graph.output(*outputs)
+        return graph
+
+
+@pytest.mark.parametrize(
+    "group_ms",
+    [
+        pytest.param([5, 9], id="small-1stage"),
+        pytest.param([384, 512], id="large-2stage"),
+    ],
+)
+def test_grouped_allreduce_execution(group_ms: list[int]) -> None:
+    """Grouped allreduce reduces within each device group independently.
+
+    Devices {0,1} and {2,3} form separate groups: the second group's ranks
+    are 2 and 3 globally but 0 and 1 within the op, which is exactly the
+    resolution a rank-from-device-id kernel gets wrong.
+    """
+    if accelerator_count() < 4:
+        pytest.skip("Test requires at least 4 GPUs")
+
+    num_gpus, group_size = 4, 2
+    signals = Signals(devices=[DeviceRef.GPU(id=id) for id in range(num_gpus)])
+    graph = _grouped_allreduce_graph(signals, group_ms, group_size)
+    host = CPU()
+    devices: list[Device] = [Accelerator(i) for i in range(num_gpus)]
+
+    session = InferenceSession(devices=[host] + devices)
+    compiled = session.load(graph)
+
+    input_tensors = [
+        Buffer.from_numpy(
+            np.ones((group_ms[i // group_size], N), np.float32)
+        ).to(devices[i])
+        for i in range(num_gpus)
+    ]
+    output = compiled.execute(*input_tensors, *signals.buffers())
+
+    # Group {0,1} sums scales 1+2; group {2,3} sums scales 3+4.
+    group_sums = [1.0 + 2.0, 3.0 + 4.0]
+    for i, (out_tensor, device) in enumerate(zip(output, devices, strict=True)):
+        assert isinstance(out_tensor, Buffer)
+        assert out_tensor.device == device
+        expected = np.full(
+            (group_ms[i // group_size], N),
+            group_sums[i // group_size],
+            dtype=np.float32,
+        )
+        assert np.allclose(expected, out_tensor.to(host).to_numpy())
+
+
+def test_grouped_allreduce_interleaved_with_world() -> None:
+    """Grouped and full-world allreduces alternate on the same signal buffers.
+
+    The grouped collective uses a nonzero barrier domain precisely so its
+    counters cannot poison the full-world bank; interleaving the two families
+    in one graph is the sequence that hangs or corrupts if that isolation is
+    wrong.
+    """
+    if accelerator_count() < 4:
+        pytest.skip("Test requires at least 4 GPUs")
+
+    num_gpus, group_size, m = 4, 2, 64
+    signals = Signals(devices=[DeviceRef.GPU(id=id) for id in range(num_gpus)])
+    input_types = [
+        TensorType(dtype=DType.float32, shape=[m, N], device=d)
+        for d in signals.devices
+    ] + list(signals.input_types())
+
+    with Graph("grouped_world_interleave", input_types=input_types) as graph:
+        xs = [graph.inputs[i].tensor for i in range(num_gpus)]
+        sigs = [inp.buffer for inp in graph.inputs[num_gpus:]]
+        # Grouped: {0,1} and {2,3} each sum to 2x within the group.
+        h = ops.allreduce.sum(xs, sigs, group_size=group_size)
+        # Full world: sums the two groups' results, 4x groupwise value.
+        h = ops.allreduce.sum(h, sigs)
+        # Grouped again on the world result.
+        h = ops.allreduce.sum(h, sigs, group_size=group_size)
+        graph.output(*h)
+
+    host = CPU()
+    devices: list[Device] = [Accelerator(i) for i in range(num_gpus)]
+    session = InferenceSession(devices=[host] + devices)
+    compiled = session.load(graph)
+
+    input_tensors = [
+        Buffer.from_numpy(np.ones((m, N), np.float32)).to(d) for d in devices
+    ]
+    output = compiled.execute(*input_tensors, *signals.buffers())
+
+    # ones -> grouped sum: 2 -> world sum: 8 -> grouped sum: 16.
+    expected = np.full((m, N), 16.0, dtype=np.float32)
+    for out_tensor in output:
+        assert isinstance(out_tensor, Buffer)
+        assert np.allclose(expected, out_tensor.to(host).to_numpy())
+
+
+def test_grouped_allreduce_validation() -> None:
+    """group_size must divide the device count; shapes must match per group."""
+    num_gpus = 4
+    signals = Signals(devices=[DeviceRef.GPU(id=id) for id in range(num_gpus)])
+    input_types = [
+        TensorType(dtype=DType.float32, shape=[8, N], device=d)
+        for d in signals.devices
+    ] + list(signals.input_types())
+
+    with Graph("grouped_allreduce_validation", input_types=input_types):
+        graph = Graph.current
+        xs = [graph.inputs[i].tensor for i in range(num_gpus)]
+        sigs = [inp.buffer for inp in graph.inputs[num_gpus:]]
+
+        with pytest.raises(ValueError, match="evenly divide"):
+            ops.allreduce.sum(xs, sigs, group_size=3)
+
+        # Shape mismatch WITHIN a group must be rejected...
+        mixed = [xs[0], xs[1][:4, :], xs[2], xs[3]]
+        with pytest.raises(ValueError, match="same shape"):
+            ops.allreduce.sum(mixed, sigs, group_size=2)
+
+        # ...while a shape difference ACROSS groups is the DP use case.
+        cross = [xs[0][:4, :], xs[1][:4, :], xs[2], xs[3]]
+        outs = ops.allreduce.sum(cross, sigs, group_size=2)
+        assert [tuple(o.shape) for o in outs[:2]] == [(4, N), (4, N)]
+
+
+def test_group_size_world_is_bitwise_identical_to_ungrouped() -> None:
+    """group_size == world must be byte-equivalent to omitting group_size.
+
+    Every existing allreduce user is on the ungrouped form; the grouped
+    plumbing must be provably inert for them. With group_size == num_devices
+    the MOGG handler derives barrier domain 0 and local_rank == device id --
+    the exact instantiation the ungrouped op launches -- so the two forms in
+    one graph, fed the same inputs, must produce bitwise-identical outputs
+    (the reduction order per rank is fixed; see test_allreduce_determinism).
+    """
+    available_gpus = accelerator_count()
+    if available_gpus < 2:
+        pytest.skip("Test requires at least 2 GPUs")
+
+    num_gpus, m = min(available_gpus, 4), 512
+    signals = Signals(devices=[DeviceRef.GPU(id=id) for id in range(num_gpus)])
+    input_types = [
+        TensorType(dtype=DType.float32, shape=[m, N], device=d)
+        for d in signals.devices
+    ] + list(signals.input_types())
+
+    with Graph("group_world_equivalence", input_types=input_types) as graph:
+        xs = [graph.inputs[i].tensor for i in range(num_gpus)]
+        sigs = [inp.buffer for inp in graph.inputs[num_gpus:]]
+        ungrouped = ops.allreduce.sum(xs, sigs)
+        grouped = ops.allreduce.sum(xs, sigs, group_size=num_gpus)
+        graph.output(*ungrouped, *grouped)
+
+    host = CPU()
+    devices: list[Device] = [Accelerator(i) for i in range(num_gpus)]
+    session = InferenceSession(devices=[host] + devices)
+    compiled = session.load(graph)
+
+    rng = np.random.default_rng(11)
+    inputs = [
+        Buffer.from_numpy(rng.standard_normal((m, N)).astype(np.float32)).to(d)
+        for d in devices
+    ]
+    out = compiled.execute(*inputs, *signals.buffers())
+
+    for i in range(num_gpus):
+        a, b = out[i], out[num_gpus + i]
+        assert isinstance(a, Buffer) and isinstance(b, Buffer)
+        assert np.array_equal(a.to(host).to_numpy(), b.to(host).to_numpy()), (
+            f"group_size=world diverged from ungrouped on device {i}"
+        )

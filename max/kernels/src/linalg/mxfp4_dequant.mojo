@@ -20,7 +20,7 @@ SF_VECTOR_SIZE (32) consecutive elements.
 """
 
 from std.math import ceildiv
-from std.gpu import block_idx, thread_idx, grid_dim, block_dim
+from max.gpu import block_idx, thread_idx, grid_dim, block_dim
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import GPUInfo
 from std.sys.info import _accelerator_arch
@@ -30,8 +30,8 @@ from max.gpu.primitives.grid_controls import (
     pdl_launch_attributes,
 )
 from std.utils import StaticTuple
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA
-from layout import TensorStorage, TileTensor
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA
+from layout import TensorEngine, TileTensor
 from layout.coord import Coord, Idx
 from layout.tile_layout import TensorLayout
 from .fp4_utils import cast_uint_to_fp4e2m1, MXFP4_SF_VECTOR_SIZE
@@ -52,16 +52,22 @@ def _dequant_mxfp4_to_fp8_kernel[
     output_layout: TensorLayout,
     scales_layout: TensorLayout,
     input_layout: TensorLayout,
-    output_storage: TensorStorage,
-    scales_storage: TensorStorage,
-    input_storage: TensorStorage,
+    output_engine: TensorEngine,
+    scales_engine: TensorEngine,
+    input_engine: TensorEngine,
     *,
     SF_VECTOR_SIZE: Int = 32,
     ELEMENTS_PER_THREAD: Int = 8,
 ](
-    output: TileTensor[out_dtype, output_layout, MutAnyOrigin],
-    input: TileTensor[in_dtype, input_layout, MutAnyOrigin],
-    scales: TileTensor[scales_dtype, scales_layout, MutAnyOrigin],
+    output: TileTensor[
+        out_dtype, output_layout, MutAnyOrigin, Engine=output_engine
+    ],
+    input: TileTensor[
+        in_dtype, input_layout, MutAnyOrigin, Engine=input_engine
+    ],
+    scales: TileTensor[
+        scales_dtype, scales_layout, MutAnyOrigin, Engine=scales_engine
+    ],
     num_rows: Int32,
     num_cols: Int32,
 ):
@@ -201,7 +207,7 @@ def dequant_mxfp4[
             in_dtype,
             type_of(input).LayoutType,
             MutAnyOrigin,
-            Storage=type_of(input).Storage,
+            Engine=type_of(input).Engine,
         ]
     ](input)
     var scales_tt = rebind[
@@ -209,7 +215,7 @@ def dequant_mxfp4[
             scales_dtype,
             type_of(scales).LayoutType,
             MutAnyOrigin,
-            Storage=type_of(scales).Storage,
+            Engine=type_of(scales).Engine,
         ]
     ](scales)
 
@@ -220,9 +226,9 @@ def dequant_mxfp4[
         type_of(output).LayoutType,
         type_of(scales_tt).LayoutType,
         type_of(input_tt).LayoutType,
-        type_of(output).Storage,
-        type_of(scales_tt).Storage,
-        type_of(input_tt).Storage,
+        type_of(output).Engine,
+        type_of(scales_tt).Engine,
+        type_of(input_tt).Engine,
         SF_VECTOR_SIZE=SF_VECTOR_SIZE,
         ELEMENTS_PER_THREAD=ELEMENTS_PER_THREAD,
     ]

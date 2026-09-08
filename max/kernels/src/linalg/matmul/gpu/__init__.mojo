@@ -29,7 +29,7 @@ from std.sys.info import _accelerator_arch, _has_blackwell_tcgen05
 from std.algorithm.functional import tile_and_unswitch
 
 from max.algorithm.functional import elementwise
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     global_idx,
     thread_idx,
@@ -42,10 +42,10 @@ from layout import (
     Coord,
     Idx,
     LayoutTensor,
-    PointerStorage,
+    DefaultEngine,
     RuntimeLayout,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     coord_to_index_list,
     row_major,
@@ -275,13 +275,13 @@ def matmul_kernel_naive[
     transpose_b: Bool = False,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
     s_type: DType = get_accum_type[c_type](),
-    c_storage: TensorStorage = PointerStorage[element_width=1],
-    a_storage: TensorStorage = PointerStorage[element_width=1],
-    b_storage: TensorStorage = PointerStorage[element_width=1],
+    c_engine: TensorEngine = DefaultEngine[element_width=1],
+    a_engine: TensorEngine = DefaultEngine[element_width=1],
+    b_engine: TensorEngine = DefaultEngine[element_width=1],
 ](
-    c: TileTensor[c_type, c_layout_type, MutAnyOrigin, Storage=c_storage],
-    a: TileTensor[a_type, a_layout_type, ImmutAnyOrigin, Storage=a_storage],
-    b: TileTensor[b_type, b_layout_type, ImmutAnyOrigin, Storage=b_storage],
+    c: TileTensor[c_type, c_layout_type, MutAnyOrigin, Engine=c_engine],
+    a: TileTensor[a_type, a_layout_type, ImmutAnyOrigin, Engine=a_engine],
+    b: TileTensor[b_type, b_layout_type, ImmutAnyOrigin, Engine=b_engine],
     m: Int32,
     n: Int32,
     k: Int32,
@@ -654,7 +654,7 @@ def _matmul_gpu[
                 type_of(b).origin,
                 address_space=type_of(b).address_space,
                 linear_idx_type=type_of(b).linear_idx_type,
-                Storage=type_of(b).Storage,
+                Engine=type_of(b).Engine,
             ]
             enqueue_apple_matmul[
                 a_type,
@@ -684,9 +684,9 @@ def _matmul_gpu[
                     type_of(c).LayoutType,
                     type_of(a).LayoutType,
                     type_of(b).LayoutType,
-                    type_of(c).Storage,
-                    type_of(a).Storage,
-                    type_of(b).Storage,
+                    type_of(c).Engine,
+                    type_of(a).Engine,
+                    type_of(b).Engine,
                     transpose_b,
                     elementwise_lambda_fn=elementwise_lambda_wrapper,
                     BLOCK_M=64,
@@ -1517,9 +1517,9 @@ def _matmul_gpu[
         BLOCK_DIM,
         transpose_b,
         elementwise_lambda_fn=elementwise_lambda_wrapper,
-        c_storage=type_of(c).Storage,
-        a_storage=type_of(a).Storage,
-        b_storage=type_of(b).Storage,
+        c_engine=type_of(c).Engine,
+        a_engine=type_of(a).Engine,
+        b_engine=type_of(b).Engine,
     ]
 
     ctx.enqueue_function[kernel](
@@ -1678,9 +1678,9 @@ def multistage_gemm[
                     type_of(a).LayoutType,
                     type_of(b).LayoutType,
                     type_of(c).LayoutType,
-                    type_of(a).Storage,
-                    type_of(b).Storage,
-                    type_of(c).Storage,
+                    type_of(a).Engine,
+                    type_of(b).Engine,
+                    type_of(c).Engine,
                 ]
                 ctx.enqueue_function[k](
                     a,
@@ -1709,9 +1709,9 @@ def multistage_gemm[
                     type_of(a).LayoutType,
                     type_of(b).LayoutType,
                     type_of(c).LayoutType,
-                    type_of(a).Storage,
-                    type_of(b).Storage,
-                    type_of(c).Storage,
+                    type_of(a).Engine,
+                    type_of(b).Engine,
+                    type_of(c).Engine,
                 ]
                 ctx.enqueue_function[k](
                     a,
@@ -1739,7 +1739,14 @@ def multistage_gemm[
                     True,
                     std_config,
                     elementwise_lambda_fn,
-                ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+                ].run[
+                    c.LayoutType,
+                    a.LayoutType,
+                    b.LayoutType,
+                    c.Engine,
+                    a.Engine,
+                    b.Engine,
+                ]
                 ctx.enqueue_function[k](
                     c,
                     a,
@@ -1777,7 +1784,14 @@ def multistage_gemm[
                 True,
                 bf16_config,
                 elementwise_lambda_fn,
-            ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+            ].run[
+                c.LayoutType,
+                a.LayoutType,
+                b.LayoutType,
+                c.Engine,
+                a.Engine,
+                b.Engine,
+            ]
             ctx.enqueue_function[k](
                 c,
                 a,
@@ -1984,9 +1998,9 @@ def multistage_gemm[
                     type_of(a).LayoutType,
                     type_of(b).LayoutType,
                     type_of(c).LayoutType,
-                    type_of(a).Storage,
-                    type_of(b).Storage,
-                    type_of(c).Storage,
+                    type_of(a).Engine,
+                    type_of(b).Engine,
+                    type_of(c).Engine,
                 ]
                 ctx.enqueue_function[k](
                     a,
@@ -2015,9 +2029,9 @@ def multistage_gemm[
                     type_of(a).LayoutType,
                     type_of(b).LayoutType,
                     type_of(c).LayoutType,
-                    type_of(a).Storage,
-                    type_of(b).Storage,
-                    type_of(c).Storage,
+                    type_of(a).Engine,
+                    type_of(b).Engine,
+                    type_of(c).Engine,
                 ]
                 ctx.enqueue_function[k](
                     a,
@@ -2045,7 +2059,14 @@ def multistage_gemm[
                     True,
                     std_config,
                     elementwise_lambda_fn,
-                ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+                ].run[
+                    c.LayoutType,
+                    a.LayoutType,
+                    b.LayoutType,
+                    c.Engine,
+                    a.Engine,
+                    b.Engine,
+                ]
                 ctx.enqueue_function[k](
                     c,
                     a,
@@ -2083,7 +2104,14 @@ def multistage_gemm[
                 True,
                 bf16_config,
                 elementwise_lambda_fn,
-            ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+            ].run[
+                c.LayoutType,
+                a.LayoutType,
+                b.LayoutType,
+                c.Engine,
+                a.Engine,
+                b.Engine,
+            ]
             ctx.enqueue_function[k](
                 c,
                 a,

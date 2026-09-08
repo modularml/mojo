@@ -23,5 +23,5 @@ def main():
     var src = TileTensor(src_data, row_major[2, 2]())
     var dst = TileTensor(dst_data, row_major[2, 3]())
 
-    # CHECK: TensorStorage.copy_from requires matching total element count
+    # CHECK: TensorEngine.copy_from requires matching total element count
     dst.copy_from(src)

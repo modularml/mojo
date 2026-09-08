@@ -27,7 +27,7 @@ which keeps it usable inside a CUDA-graph capture region. A register-heap fast
 path is a possible future optimization.
 """
 
-from std.gpu import block_dim, thread_idx
+from max.gpu import block_dim, thread_idx
 from max.gpu.sync import barrier
 from std.math import min
 from std.memory import unsafe_stack_allocation

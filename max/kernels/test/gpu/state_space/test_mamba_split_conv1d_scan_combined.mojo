@@ -374,6 +374,7 @@ def run_mamba_split_conv1d_scan_combined_gpu[
             rmsnorm_weight_gpu_lt.LayoutType,
             outproj_weight_gpu_lt.LayoutType,
             outproj_bias_gpu_lt.LayoutType,
+            zxbcdt_gpu_lt.Engine,
         ]
     ]()
 

@@ -1,0 +1,92 @@
+[
+  {
+    "source": "/docs/manual/install/",
+    "dest": "/install/",
+    "status": 301
+  },
+  {
+    "source": "/docs/changelog",
+    "dest": "/releases",
+    "status": 301
+  },
+  {
+    "source": "/docs/changelog/",
+    "dest": "/releases/",
+    "status": 301
+  },
+  {
+    "source": "/docs/manual/pointers/unsafe-pointers/",
+    "dest": "/docs/manual/pointers/using-pointers/",
+    "status": 301
+  },
+  {
+    "source": "/docs/manual/values/closures/",
+    "dest": "/docs/manual/functions/closures/",
+    "status": 301
+  },
+  {
+    "source": "/docs/layout",
+    "dest": "https://max.modular.com/api/mojo/layout/",
+    "status": 302
+  },
+  {
+    "source": "/docs/layout/(.*)",
+    "dest": "https://max.modular.com/api/mojo/layout/{0}",
+    "status": 302
+  },
+  {
+    "source": "/docs/manual/gpu/(.*)",
+    "dest": "https://max.modular.com/gpu/{0}",
+    "status": 302
+  },
+  {
+    "source": "/docs/tools/gpu-debugging/",
+    "dest": "https://max.modular.com/gpu/debugging/",
+    "status": 302
+  },
+  {
+    "source": "/docs/manual/layout/(.*)",
+    "dest": "https://max.modular.com/layout/{0}",
+    "status": 302
+  },
+  {
+    "source": "/docs/manual/tile-tensor/(.*)",
+    "dest": "https://max.modular.com/tile-tensor/{0}",
+    "status": 302
+  },
+  {
+    "source": "/docs/reference/decorators/extensibility-register/",
+    "dest": "https://max.modular.com/api/mojo/extensibility/decorators/register/",
+    "status": 302
+  },
+  {
+    "source": "/docs/std/gpu/(.*)",
+    "dest": "https://max.modular.com/api/mojo/max/gpu/{0}",
+    "status": 302
+  },
+  {
+    "source": "/nightly/releases/(.*)",
+    "dest": "/releases/{0}",
+    "status": 301
+  },
+  {
+    "source": "/nightly/community/",
+    "dest": "/community/",
+    "status": 301
+  },
+  {
+    "source": "https://www\\.mojolang\\.org/(.*)",
+    "dest": "https://mojolang.org/{0}",
+    "status": 301
+  },
+  {
+    "source": "https://www\\.mojolang\\.com/(.*)",
+    "dest": "https://mojolang.org/{0}",
+    "status": 301
+  },
+  {
+    "source": "https://mojolang\\.com/(.*)",
+    "dest": "https://mojolang.org/{0}",
+    "status": 301
+  }
+]

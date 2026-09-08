@@ -36,7 +36,7 @@ from std.sys import align_of, size_of
 from std.atomic import Atomic
 from std.collections import Array
 
-from std.gpu import WARP_SIZE, block_idx, grid_dim, thread_idx
+from max.gpu import WARP_SIZE, block_idx, grid_dim, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext, get_gpu_target
 from max.gpu.primitives import block
@@ -109,7 +109,7 @@ def _allreduce_lamport_rmsnorm_kernel[
     var my_region = rank_sigs[my_rank][].lamport_region_ptr[dtype]()
     comptime PtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
     var peer_regions = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: rank_sigs[
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: rank_sigs[
             circular_add[ngpus](my_rank, i)
         ][].lamport_region_ptr[dtype]()
     )

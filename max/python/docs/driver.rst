@@ -26,7 +26,6 @@ Devices
    DeviceEvent
    DeviceQueue
    DeviceSpec
-   NPU
 
 Buffers
 -------

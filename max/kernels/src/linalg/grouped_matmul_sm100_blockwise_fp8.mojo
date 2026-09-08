@@ -20,7 +20,7 @@ from std.sys import align_of, size_of, simd_width_of
 from max.gpu.host.info import B200, H100, _is_sm10x_gpu
 from max.runtime.tracing import Trace, TraceLevel, get_safe_task_id
 from std.collections.string.string_span import get_static_string
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
@@ -30,7 +30,7 @@ from max.gpu.primitives.cluster import (
 )
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import (
+from max.gpu import (
     block_id_in_cluster,
     thread_idx,
     block_idx,

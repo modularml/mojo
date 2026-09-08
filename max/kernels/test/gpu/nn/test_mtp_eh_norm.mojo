@@ -17,7 +17,7 @@ from std.random import rand, seed
 from std.testing import assert_equal, assert_true
 
 from layout import TileTensor, row_major
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.host import DeviceContext, HostBuffer
 
 from nn.mtp_eh_norm import mtp_eh_norm_kernel
@@ -148,6 +148,11 @@ def test_mtp_eh_norm[
         ImmOrigin(hw_t.origin),
         hidden_size,
         max_warps,
+        out_t.Engine,
+        type_of(embed_t.as_immut()).Engine,
+        type_of(prev_t.as_immut()).Engine,
+        type_of(ew_t.as_immut()).Engine,
+        type_of(hw_t.as_immut()).Engine,
     ]
     ctx.enqueue_function[kernel](
         out_t,

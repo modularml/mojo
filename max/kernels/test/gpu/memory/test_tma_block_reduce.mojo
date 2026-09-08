@@ -16,10 +16,10 @@ from std.random import rand
 from std.sys import argv
 from std.sys.info import simd_width_of, size_of
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.host import DeviceContext, get_gpu_target
 from max.gpu.host.nvidia.tma import TMADescriptor, create_tma_descriptor
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     thread_idx,

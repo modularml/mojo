@@ -57,6 +57,7 @@ _NUM_Q_HEADS = 16
 _N_KV_HEADS = 1
 _HEAD_DIM = 128
 _PAGE_SIZE = 128
+_SPARSE_BLOCK_SIZE = 128
 _TOPK = 16
 _SF_VECTOR_SIZE = 32
 _NUM_LAYERS = 1
@@ -162,6 +163,7 @@ def _run_case(
             block_indices=d_indices_in.tensor,
             group=_NUM_Q_HEADS // _N_KV_HEADS,
             topk=_TOPK,
+            sparse_block_size=_SPARSE_BLOCK_SIZE,
             scale=scale,
         )
         ref_fp8, ref_scales = quantize_dynamic_block_scaled(
@@ -181,6 +183,7 @@ def _run_case(
             block_indices=d_indices_in.tensor,
             group=_NUM_Q_HEADS // _N_KV_HEADS,
             topk=_TOPK,
+            sparse_block_size=_SPARSE_BLOCK_SIZE,
             scale=scale,
         )
 

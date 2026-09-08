@@ -16,7 +16,7 @@ from std.sys import simd_width_of
 
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.memory import (
     async_copy_commit_group,
     async_copy_wait_all,

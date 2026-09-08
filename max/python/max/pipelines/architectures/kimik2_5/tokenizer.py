@@ -39,6 +39,7 @@ from max.pipelines.lib import (
     max_tokens_to_generate,
 )
 from max.pipelines.lib.tokenizer import (
+    encode_dkv_cache_hint,
     resolve_single_special_token,
     run_with_default_executor,
 )
@@ -63,8 +64,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("max.pipelines")
 
-# Kimi K2.5 special token for image placeholder padding.
-_MEDIA_PAD_TOKEN = "<|media_pad|>"
+MEDIA_PAD = "<|media_pad|>"
+IM_END = "<|im_end|>"
+THINK_START = "<think>"
+THINK_END = "</think>"
+TOOL_CALLS_SECTION_BEGIN = "<|tool_calls_section_begin|>"
+TOOL_CALLS_SECTION_END = "<|tool_calls_section_end|>"
+TOOL_CALL_BEGIN = "<|tool_call_begin|>"
+TOOL_CALL_END = "<|tool_call_end|>"
+TOOL_CALL_ARGUMENT_BEGIN = "<|tool_call_argument_begin|>"
 
 # One image's patchified pixels and its (t, h, w) grid, as cached.
 _PreprocessedImage = tuple[npt.NDArray[Any], npt.NDArray[np.int64]]
@@ -139,18 +147,6 @@ def _sanitize_kimi_schema_node(node: Any) -> Any:
     return node
 
 
-# Chat turn terminator. The HF tokenizer lists [EOS] as eos_token, but the
-# chat format ends assistant turns with <|im_end|>.  We need both in the
-# EOS set so generation stops.
-_IM_END_TOKEN = "<|im_end|>"
-
-# Reasoning span delimiters. Both are special tokens in the Kimi K2.5
-# tokenizer vocab; resolving them at init lets us implement the
-# ``ReasoningPipelineTokenizer`` protocol.
-_THINK_START_TOKEN = "<think>"
-_THINK_END_TOKEN = "</think>"
-
-
 class KimiK2_5VLTokenizer(TextAndVisionTokenizer):
     """Kimi K2.5 tokenizer for multimodal (text + vision) inputs.
 
@@ -191,7 +187,7 @@ class KimiK2_5VLTokenizer(TextAndVisionTokenizer):
             elif isinstance(eos_token_id, list):
                 self._eos_token_ids.update(eos_token_id)
 
-        im_end_id = self.delegate.convert_tokens_to_ids(_IM_END_TOKEN)
+        im_end_id = self.delegate.convert_tokens_to_ids(IM_END)
         if isinstance(im_end_id, int):
             self._eos_token_ids.add(im_end_id)
 
@@ -203,21 +199,21 @@ class KimiK2_5VLTokenizer(TextAndVisionTokenizer):
         )
 
         # Resolve the media pad token ID used as the vision placeholder.
-        media_pad_id = self.delegate.convert_tokens_to_ids(_MEDIA_PAD_TOKEN)
+        media_pad_id = self.delegate.convert_tokens_to_ids(MEDIA_PAD)
         if isinstance(media_pad_id, list):
             media_pad_id = media_pad_id[0]
         if media_pad_id == self.delegate.unk_token_id:
             raise ValueError(
-                f"Token {_MEDIA_PAD_TOKEN!r} not found in tokenizer vocabulary"
+                f"Token {MEDIA_PAD!r} not found in tokenizer vocabulary"
             )
         self.media_pad_token_id: int = media_pad_id
         self.vision_token_ids = [self.media_pad_token_id]
 
         self._reasoning_start_token_id: int = resolve_single_special_token(
-            self.delegate, _THINK_START_TOKEN
+            self.delegate, THINK_START
         )
         self._reasoning_end_token_id: int = resolve_single_special_token(
-            self.delegate, _THINK_END_TOKEN
+            self.delegate, THINK_END
         )
 
         # Build the custom vision processor from HF config.
@@ -567,6 +563,7 @@ class KimiK2_5VLTokenizer(TextAndVisionTokenizer):
             log_probabilities_echo=request.echo,
             sampling_params=request.sampling_params,
             target_endpoint=request.target_endpoint,
+            dkv_cache_hint=encode_dkv_cache_hint(request.dkv_cache_hint),
             grid_thws=grid_thws,
             position_ids=position_ids,
             image_token_indices=image_token_indices,

@@ -24,28 +24,28 @@ from std.math import ceildiv
 from std.math.uutils import udivmod
 from std.sys import size_of
 
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA
 from max.gpu.sync import barrier
 from max.gpu.primitives.cluster import (
     cluster_sync,
     cluster_sync_relaxed,
     elect_one_sync,
 )
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.primitives.grid_controls import (
     PDLLevel,
     launch_dependent_grids,
     wait_on_dependent_grids,
 )
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import (
+from max.gpu import (
     block_id_in_cluster,
     block_idx,
     grid_dim,
     thread_idx,
     warp_id,
 )
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.memory import (
     external_memory,
     fence_mbarrier_init,
@@ -55,9 +55,9 @@ from layout import (
     Idx,
     Layout,
     MixedLayout,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -261,11 +261,11 @@ struct HopperMatmulSM90Kernel[
     hilbert_swizzle: Bool = False,
     k_group_size: Int = 1,
     swapAB: Bool = False,
-    a_storage: TensorStorage = PointerStorage[element_width=1],
-    b_storage: TensorStorage = PointerStorage[element_width=1],
-    c_storage: TensorStorage = PointerStorage[element_width=1],
-    a_offsets_storage: TensorStorage = PointerStorage[element_width=1],
-    expert_ids_storage: TensorStorage = PointerStorage[element_width=1],
+    a_engine: TensorEngine = DefaultEngine[element_width=1],
+    b_engine: TensorEngine = DefaultEngine[element_width=1],
+    c_engine: TensorEngine = DefaultEngine[element_width=1],
+    a_offsets_engine: TensorEngine = DefaultEngine[element_width=1],
+    expert_ids_engine: TensorEngine = DefaultEngine[element_width=1],
 ]:
     """Hopper SM90 GEMM for NVIDIA H100 GPUs.
 
@@ -311,16 +311,16 @@ struct HopperMatmulSM90Kernel[
         swapAB: Whether to swap the A and B operand roles in the output
             writer for the small-M strategy, transposing the tile and
             block coordinate mapping (defaults to `False`).
-        a_storage: Storage policy of the A operand (defaults to
-            `PointerStorage`).
-        b_storage: Storage policy of the B operand (defaults to
-            `PointerStorage`).
-        c_storage: Storage policy of the C output (defaults to
-            `PointerStorage`).
-        a_offsets_storage: Storage policy of the `a_offsets` tensor
-            (defaults to `PointerStorage`).
-        expert_ids_storage: Storage policy of the `expert_ids` tensor
-            (defaults to `PointerStorage`).
+        a_engine: Engine of the A operand (defaults to
+            `DefaultEngine`).
+        b_engine: Engine of the B operand (defaults to
+            `DefaultEngine`).
+        c_engine: Engine of the C output (defaults to
+            `DefaultEngine`).
+        a_offsets_engine: Engine of the `a_offsets` tensor
+            (defaults to `DefaultEngine`).
+        expert_ids_engine: Engine of the `expert_ids` tensor
+            (defaults to `DefaultEngine`).
     """
 
     comptime BM = Self.block_tile_shape[0]
@@ -743,10 +743,10 @@ struct HopperMatmulSM90Kernel[
         ](),
     ](
         a: TileTensor[
-            Self.a_type, Self.a_layout, ImmutAnyOrigin, Storage=Self.a_storage
+            Self.a_type, Self.a_layout, ImmutAnyOrigin, Engine=Self.a_engine
         ],
         b: TileTensor[
-            Self.b_type, Self.b_layout, ImmutAnyOrigin, Storage=Self.b_storage
+            Self.b_type, Self.b_layout, ImmutAnyOrigin, Engine=Self.b_engine
         ],
     ) -> Tuple[
         TileLoaderCPAsync[
@@ -755,7 +755,7 @@ struct HopperMatmulSM90Kernel[
             thread_layout,
             Self.a_swizzle,
             vector_size,
-            Self.a_storage,
+            Self.a_engine,
         ],
         TileLoaderCPAsync[
             Self.b_type,
@@ -763,7 +763,7 @@ struct HopperMatmulSM90Kernel[
             thread_layout,
             Self.b_swizzle,
             vector_size,
-            Self.b_storage,
+            Self.b_engine,
         ],
     ]:
         var a_loader = TileLoaderCPAsync[
@@ -772,7 +772,7 @@ struct HopperMatmulSM90Kernel[
             thread_layout,
             Self.a_swizzle,
             vector_size,
-            Self.a_storage,
+            Self.a_engine,
         ](a)
         var b_loader = TileLoaderCPAsync[
             Self.b_type,
@@ -780,7 +780,7 @@ struct HopperMatmulSM90Kernel[
             thread_layout,
             Self.b_swizzle,
             vector_size,
-            Self.b_storage,
+            Self.b_engine,
         ](b)
         return (a_loader, b_loader)
 
@@ -902,13 +902,13 @@ struct HopperMatmulSM90Kernel[
             Self.c_type, c_tma_rank, c_tile_shape, c_desc_shape
         ],
         a: TileTensor[
-            Self.a_type, a_tensor_layout, ImmutAnyOrigin, Storage=Self.a_storage
+            Self.a_type, a_tensor_layout, ImmutAnyOrigin, Engine=Self.a_engine
         ],
         b: TileTensor[
-            Self.b_type, b_tensor_layout, ImmutAnyOrigin, Storage=Self.b_storage
+            Self.b_type, b_tensor_layout, ImmutAnyOrigin, Engine=Self.b_engine
         ],
         c: TileTensor[
-            Self.c_type, c_tensor_layout, MutAnyOrigin, Storage=Self.c_storage
+            Self.c_type, c_tensor_layout, MutAnyOrigin, Engine=Self.c_engine
         ],
         lut_ptr: UnsafePointer[UInt32, MutAnyOrigin],
     ):
@@ -1089,7 +1089,7 @@ struct HopperMatmulSM90Kernel[
             Self.c_type, c_tma_rank, c_tile_shape, c_desc_shape
         ],
         c: TileTensor[
-            Self.c_type, c_tensor_layout, MutAnyOrigin, Storage=Self.c_storage
+            Self.c_type, c_tensor_layout, MutAnyOrigin, Engine=Self.c_engine
         ],
         workspace_ptr: UnsafePointer[Scalar[Self.accum_type], MutAnyOrigin],
         locks_ptr: UnsafePointer[UInt8, MutAnyOrigin],
@@ -1322,17 +1322,17 @@ struct HopperMatmulSM90Kernel[
             .uint32,
             AOffsetsLayout,
             MutAnyOrigin,
-            Storage=Self.a_offsets_storage,
+            Engine=Self.a_offsets_engine,
         ],
         expert_ids: TileTensor[
             mut=False,
             .int32,
             ExpertIdsLayout,
             MutAnyOrigin,
-            Storage=Self.expert_ids_storage,
+            Engine=Self.expert_ids_engine,
         ],
         c: TileTensor[
-            Self.c_type, c_tensor_layout, MutAnyOrigin, Storage=Self.c_storage
+            Self.c_type, c_tensor_layout, MutAnyOrigin, Engine=Self.c_engine
         ],
     ):
         """Grouped matmul variant for MoE (Mixture of Experts) models.

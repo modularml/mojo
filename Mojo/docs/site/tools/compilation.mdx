@@ -1,0 +1,559 @@
+---
+title: Compilation targets
+sidebar_position: 1
+description: >
+  Build Mojo code for a different architecture, CPU, or GPU
+  than your development machine.
+---
+
+<!-- This page must be hand-tested; it cannot be verified in CI.
+     Test plan: Mojo/docs/code/tools/README-Compilation-Targets.md
+     Test script: Mojo/docs/code/tools/test_compilation_targets.sh -->
+
+Mojo compiles code for a range of targets, from your local machine to
+other CPUs, operating systems, and GPUs. You can inspect what the
+compiler supports, choose a target configuration, and generate code for
+that target.
+
+_Compilation targets_ describe where and how your program runs. They define
+the platform, CPU, features, and optional accelerators used during code
+generation, for both native and cross-compilation workflows, including
+GPU-enabled (_heterogeneous builds_).
+
+The Mojo command line compiler lets you inspect your current platform,
+select a target configuration, and generate code for that target. Use it
+to build for your own system or target other CPUs, operating systems, and
+accelerators.
+
+:::caution Work in progress
+Cross-compilation support is still in development. You can query
+targets, cross-compile to object files and assembly, and target GPU
+architectures. Producing a fully linked cross-compiled executable
+requires an external linker for the target platform. See
+[Emit options](#emit-options) for details on what works today.
+:::
+
+## Query your system and available targets
+
+Before setting compilation or cross-compilation flags, check which
+targets the compiler supports and what it detects on your system. These
+commands list available targets and show how the compiler configures
+your current machine.
+
+Use these commands to understand and choose the components of a target,
+including the target triple (architecture, vendor, OS), CPU, features,
+and accelerators.
+
+:::note
+A target triple is a string that identifies the target platform. It lists
+an architecture, vendor, and operating system.
+:::
+
+### Effective target
+
+The effective target is the configuration the compiler uses for your
+current system when you don't set target flags.
+
+Print the full target configuration for your system:
+
+```sh
+mojo build --print-effective-target
+```
+
+Sample output on an Apple M4 MacBook Pro. The features are truncated
+in this example to save space:
+
+```output
+Effective target configuration:
+  --target-triple arm64-apple-darwin25.3.0
+  --target-cpu apple-m4
+  --target-features +aes,+bf16,+complxnum,+crc,+dotprod,+fp-armv8,...
+  --target-accelerator metal:4
+```
+
+This output shows the flags that reproduce your host configuration.
+Use it to see what the compiler assumes when you don't set target flags.
+
+### Supported targets
+
+List the target architectures the compiler can generate code for. Use
+this command to see which architectures are available before selecting a
+target or composing a target triple.
+
+```sh
+mojo build --print-supported-targets
+```
+
+For example:
+
+```output
+Registered Targets:
+  arm64 - ARM64 (little endian)
+  arm64_32 - ARM64 (little endian ILP32)
+  aarch64 - AArch64 (little endian)
+  aarch64_32 - AArch64 (little endian ILP32)
+  aarch64_be - AArch64 (big endian)
+  r600 - AMD GPUs HD2XXX-HD6XXX
+  amdgcn - AMD GCN GPUs
+  hexagon - Hexagon
+  ...
+```
+
+### Supported target CPUs
+
+List valid CPU names for a given target triple. Set `--target-triple`
+to select the target triple and narrow the results.
+
+```sh
+mojo build --print-supported-cpus \
+           --target-triple=aarch64-apple-macosx
+```
+
+For example:
+
+```output
+Available CPUs for target aarch64-apple-macosx:
+  a64fx
+  ampere1
+  apple-a10
+  apple-a11
+  apple-m1
+  apple-m4
+  ...
+```
+
+### Supported accelerators
+
+List the accelerator architectures the compiler can target.
+
+```sh
+mojo build --print-supported-accelerators
+```
+
+```output
+Supported Accelerator Architectures:
+
+NVIDIA (CUDA):
+  sm_52       - Maxwell (GTX 970)
+  sm_60       - Pascal (Tesla P100)
+  sm_90       - Hopper (H100)
+  ...
+
+AMD (ROCm/HIP):
+  gfx942      - CDNA3 (MI300X)
+  mi300x      - (alias) -> gfx942
+  ...
+
+Apple Silicon GPU:
+  apple-m1    - Apple M1
+  apple-m2    - Apple M2
+  ...
+
+Other:
+  cuda        - Generic CUDA
+```
+
+## How Mojo describes a build target
+
+When the compiler generates machine code, it needs a few key details
+about the hardware it targets:
+
+- The **architecture** defines the base instruction set, such as x86-64
+  or AArch64.
+- The **CPU model** adds processor-specific behavior and may enable
+  instructions beyond the base.
+- The **feature set** controls individual hardware capabilities that
+  can be enabled or disabled, such as AVX-512 or Neon.
+
+For accelerator targets, one more detail applies:
+
+- The **accelerator architecture** identifies the GPU or other
+  accelerator to generate device code for.
+
+If you don't set these explicitly, the compiler uses your host system.
+
+### Target triples
+
+A target triple identifies the platform you're compiling for. It lists the
+architecture, vendor, and operating system in a single value:
+
+```text
+x86_64-unknown-linux-gnu
+aarch64-apple-macosx
+```
+
+The triple sets the overall execution environment and binary
+conventions. It's the starting point for cross-compilation and works
+with both flag sets described in the next section.
+
+## Two ways to set your target
+
+Mojo provides two sets of flags to specify target hardware. They reach
+the same result through different interfaces, and you can't mix them in
+one command. These are Mojo target flags and GCC/Clang-compatible flags.
+
+### Mojo target flags
+
+These flags let you set the triple, CPU, and features directly.
+
+| Flag                   | Purpose                         |
+|------------------------|---------------------------------|
+| `--target-triple`      | Platform (arch + vendor + OS)   |
+| `--target-cpu`         | Specific processor model        |
+| `--target-features`    | Individual feature toggles      |
+| `--target-accelerator` | GPU or accelerator architecture |
+
+:::note
+When cross-compiling with Mojo target flags, set `--target-cpu` with
+`--target-triple`. The CPU defaults to your host processor, which may not
+be valid for the target architecture. Omitting `--target-cpu` when
+cross-compiling to a different architecture produces an error such as
+`failed to create target info: unknown target CPU 'apple-m4'`.
+:::
+
+For example:
+
+```sh
+mojo build --target-triple aarch64-unknown-linux-gnu \
+           --target-cpu cortex-a72 \
+           --emit object -o myapp.o myapp.mojo
+```
+
+Use `--target-features` to enable or disable individual hardware
+extensions.
+
+```sh
+mojo build --target-triple x86_64-unknown-linux-gnu \
+           --target-cpu x86-64-v3 \
+           --target-features "+avx512f" \
+           --emit object -o myapp.o myapp.mojo
+```
+
+### GCC/Clang-compatible flags
+
+Mojo supports the same `--march`, `--mcpu`, and `--mtune` flags used
+in GCC and Clang. These flags follow the behavior documented in the
+GCC manual and work as they do in `clang`.
+
+| Flag      | Purpose                                          |
+|-----------|--------------------------------------------------|
+| `--march` | Architecture or CPU subtype to generate code for |
+| `--mcpu`  | CPU model (sets architecture and tuning)         |
+| `--mtune` | Optimization hint for a specific processor       |
+
+For example:
+
+```sh
+mojo build --target-triple x86_64-unknown-linux-gnu \
+           --mcpu=haswell \
+           --emit object -o myapp.o myapp.mojo
+```
+
+**`--march`** controls which instructions the compiler can use. Code
+compiled with `--march=skylake-avx512` can use AVX-512 instructions,
+but it won't run on hardware that lacks them.
+
+**`--mcpu`** sets both the architecture and tuning from a single CPU
+name.
+
+**`--mtune`** guides optimization without changing which instructions
+the compiler uses. It tells the compiler to prefer instruction
+sequences that run faster on the given processor. The code still runs
+correctly on other processors with the same instruction support.
+
+<!-- Ticket: MOCO-3686 -->
+:::note Known issue
+When using `--mcpu` or `--march` to cross-compile from a host with a
+different architecture, the compiler may print warnings about unrecognized
+features. These warnings are harmless — the compiler ignores the unsupported
+features and the output is correct. This will be fixed in a future release.
+:::
+
+The `--march` flag supports extension syntax for adding features
+inline:
+
+```sh
+mojo build --target-triple x86_64-unknown-linux-gnu \
+           --march=x86-64-v3+avx512f \
+           --emit asm -o myapp.s myapp.mojo
+```
+
+:::caution Architecture-specific behavior
+The exact relationship between `--march` and `--mcpu` varies by target
+architecture, matching GCC/Clang conventions:
+
+- **x86**: `--march` or `--mcpu` specifies a CPU subtype like
+  `skylake-avx512`. With `--mcpu=generic`, `--march` is treated as an
+  architecture baseline.
+- **AArch64**: `--march` sets the base architecture (like `armv8.2-a`),
+  `--mcpu` sets the specific CPU (like `neoverse-n1`). If you only set
+  the architecture, the CPU defaults to `generic`.
+- **ARM**: `--march` sets the base architecture, `--mcpu` sets the
+  specific CPU. If you only set the architecture, the default CPU for
+  that architecture is used.
+:::
+
+### ⚠️ Don't mix the two families {#dont-mix-the-two-families}
+
+The Mojo compiler enforces a clear separation between these flag
+families. Using `--target-cpu` or `--target-features` with `--march`
+or `--mcpu` in the same command produces an error:
+
+```sh
+# This fails:
+mojo build --target-cpu=haswell --mcpu=skylake myapp.mojo
+```
+
+Error:
+
+```output
+error: --target-cpu cannot be used with --march or --mcpu;
+use either --target-cpu/--target-features or --march/--mcpu/--mtune
+```
+
+Pick one family and use it consistently. Both produce the same result
+for the same hardware.
+
+### Shared flags
+
+Two flags work with both families:
+
+- `--target-triple` is always valid and is typically required for
+  cross-compilation, regardless of which family you use.
+- `--target-accelerator` is always valid and is used to target GPUs
+  with either family.
+
+## Accelerator targets
+
+Mojo supports _heterogeneous builds_ that generate host code for the
+CPU and device code for a GPU in a single build. Use
+`--target-accelerator` to specify the GPU architecture:
+
+```sh
+mojo build --target-accelerator=sm_90 myapp.mojo
+```
+
+For NVIDIA and AMD targets, use a prefix to select the platform:
+
+```sh
+mojo build --target-accelerator=nvidia:sm_90 myapp.mojo   # NVIDIA H100
+mojo build --target-accelerator=amdgpu:gfx942 myapp.mojo  # AMD MI300X
+```
+
+When you use `--emit asm` with a GPU target, the compiler produces a
+separate file for each kernel alongside the host assembly: `.ptx` for
+NVIDIA, `.amdgcn` for AMD, and `.ll` for Metal.
+
+## Cross-compilation in practice
+
+### Generate an object file for another platform
+
+```sh
+mojo build --target-triple aarch64-unknown-linux-gnu \
+           --target-cpu cortex-a72 \
+           --emit object -o myapp.o myapp.mojo
+```
+
+This produces an object file for the target platform. Link it with a
+toolchain for that platform.
+
+### Generate assembly for inspection or external toolchains
+
+```sh
+mojo build --target-triple x86_64-unknown-linux-gnu \
+           --emit asm -o myapp.s myapp.mojo
+```
+
+This produces assembly for the target platform. Use it for inspection
+or pass it to an external toolchain for further processing.
+
+### Target a specific CPU with tuning
+
+```sh
+mojo build --target-triple x86_64-unknown-linux-gnu \
+           --march=x86-64 --mcpu=haswell --mtune=skylake \
+           --emit object -o myapp.o myapp.mojo
+```
+
+This generates code for the Haswell instruction set and optimizes it
+for Skylake.
+
+### GPU kernel compilation
+
+```sh
+mojo build --target-accelerator=nvidia:sm_90 myapp.mojo
+```
+
+This compiles GPU kernels for the specified accelerator and includes
+them with the host build.
+
+:::caution Runtime dependencies
+Cross-compiled binaries don't include external libraries. This includes
+Python libraries, C libraries, and Modular runtime libraries. The target
+environment must provide all runtime dependencies your program needs.
+:::
+
+## Emit options
+
+The `--emit` flag controls the output `mojo build` produces. These
+options are essential for cross-compilation because you can't yet
+produce linked executables with the Mojo compiler.
+
+| Value           | Output                      | Status |
+|-----------------|-----------------------------|--------|
+| `exe` (default) | Executable binary           | Native |
+| `shared-lib`    | Shared (dynamic) library    | Native |
+| `object`        | Object file (experimental)  | Both   |
+| `llvm`          | Unoptimized LLVM IR         | Both   |
+| `llvm-bitcode`  | Unoptimized LLVM IR bitcode | Both   |
+| `asm`           | Assembly (+ GPU sidecars)   | Both   |
+
+### What's working
+
+Outputs that don't require linking work with any supported target:
+
+- `--emit object` — produces a relocatable object file for the target
+- `--emit asm` — produces assembly for the target
+- `--emit llvm` — produces LLVM IR configured for the target
+- `--emit llvm-bitcode` — produces LLVM bitcode for the target
+
+Outputs that require linking need a linker for the target platform,
+which Mojo doesn't provide and aren't working:
+
+- `--emit exe` — fails at the link step when cross-compiling
+- `--emit shared-lib` — fails at the link step when cross-compiling
+
+To produce a cross-compiled executable or shared library, generate an
+object file and link it with a toolchain for your target platform.
+
+## Call a Mojo shared library from C or C++
+
+You can compile Mojo code into a shared library and call it from a
+program written in another language, such as C or C++, through the C
+ABI.
+
+### Build and export
+
+Build the shared library with `--emit shared-lib`:
+
+```sh
+mojo build mylib.mojo --emit shared-lib -o libmylib.so
+```
+
+(Use a `.dylib` extension on macOS.)
+
+Mark each function you want to call from the host with the
+[`@export`](/docs/reference/decorators/export/) decorator, giving it a
+name that's a valid C identifier and the `abi("C")` effect so it
+follows the C calling convention.
+
+### Initialize the Mojo runtime
+
+When a Mojo program starts from its own `main()` function, compiler-generated
+startup code initializes the Mojo runtime — the thread pool that parallel APIs
+such as
+[`parallelize()`](https://max.modular.com/api/mojo/max/algorithm/backend/cpu/parallelize/parallelize/)
+depend on. When the process `main()` belongs to a C or C++ host instead, that
+startup code never runs, so the runtime is never initialized. An exported
+function that then uses a runtime-dependent API crashes with a segmentation
+fault.
+
+To fix this, call
+[`initialize_runtime()`](/docs/std/runtime/initialize_runtime/)
+before any runtime-dependent Mojo code executes. The call is idempotent
+and inexpensive when the runtime is already initialized, and one
+initialization covers all threads in the process. There are two common
+patterns:
+
+- Call `initialize_runtime()` at the start of every exported function.
+  This is the simplest approach and imposes no calling contract on the
+  host program.
+
+- Export a dedicated initialization function and require the host to
+  call it once before anything else:
+
+  ```mojo
+  from std.runtime import initialize_runtime
+
+  @export("mylib_init")
+  def mylib_init() abi("C"):
+      initialize_runtime()
+  ```
+
+### Complete example
+
+The following Mojo library exports one function that fills a list in
+parallel and returns a checksum:
+
+```mojo title="mylib.mojo"
+from max.algorithm import parallelize
+from std.runtime import initialize_runtime
+
+
+@export("parallel_sum")
+def parallel_sum(n: Int64) abi("C") -> Int64:
+    initialize_runtime()
+
+    var count = Int(n)
+    var results = List[Int64](length=count, fill=0)
+
+    def fill(i: Int) {mut results}:
+        results[i] = Int64(i)
+
+    parallelize(fill, count)
+
+    var total = Int64(0)
+    for r in results:
+        total += r
+    return total
+```
+
+A C host program that calls it:
+
+```c title="main.c"
+#include <stdio.h>
+
+extern long long parallel_sum(long long n);
+
+int main(void) {
+  printf("sum=%lld\n", parallel_sum(1000));
+  return 0;
+}
+```
+
+Build and run on Linux:
+
+```sh
+mojo build mylib.mojo --emit shared-lib -o libmylib.so
+cc main.c -o main -L. -lmylib -Wl,-rpath,'$ORIGIN'
+./main
+```
+
+On macOS:
+
+```sh
+mojo build mylib.mojo --emit shared-lib -o libmylib.dylib
+install_name_tool -id @rpath/libmylib.dylib libmylib.dylib
+cc main.c -o main -L. -lmylib -Wl,-rpath,@loader_path
+./main
+```
+
+Both print:
+
+```output
+sum=499500
+```
+
+:::note Differences from a Mojo executable
+Without a Mojo `main()` function, some process-level setup that Mojo
+executables perform doesn't happen:
+
+- `sys.argv()` isn't populated with the host program's arguments.
+- The signal handler that prints a stack trace on a crash isn't
+  installed.
+- The runtime, once initialized, remains alive until the process
+  exits; there is no API to shut it down.
+- The host program's dynamic loader must be able to locate the Modular
+  runtime libraries that the shared library depends on (for example,
+  through the rpath entries embedded in the shared library).
+:::

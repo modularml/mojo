@@ -31,7 +31,8 @@ from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 # ===-----------------------------------------------------------------------===#
 
 
-struct MaskName(Writable):
+@fieldwise_init
+struct MaskName(Equatable, Writable):
     """A canonical string name identifying a mask type."""
 
     var name: String
@@ -45,9 +46,6 @@ struct MaskName(Writable):
     comptime CHUNKED_CAUSAL = Self("chunked_causal")
     comptime CAUSAL_PADDING = Self("causal_padding")
 
-    def __init__(out self, name: String):
-        self.name = name
-
     def write_to(self, mut writer: Some[Writer]):
         """Writes the mask name.
 
@@ -56,14 +54,8 @@ struct MaskName(Writable):
         """
         writer.write_string(self.name)
 
-    def __eq__(self, rhs: Self) -> Bool:
-        return self.name == rhs.name
-
     def __eq__(self, rhs: String) -> Bool:
         return self.name == rhs
-
-    def __ne__(self, rhs: Self) -> Bool:
-        return self.name != rhs.name
 
 
 # ===-----------------------------------------------------------------------===#
@@ -121,7 +113,8 @@ struct TileMaskStatus(
         writer.write("unknown mask")
 
 
-struct MaskStrategy(TrivialRegisterPassable):
+@fieldwise_init
+struct MaskStrategy(Equatable, TrivialRegisterPassable):
     """Bit-flag enum that selects the masking strategy for a tile iteration set.
 
     Strategies are combined with bitwise OR. `NO_MASK` skips masking
@@ -155,18 +148,6 @@ struct MaskStrategy(TrivialRegisterPassable):
     `UPPER_TRIANGULAR` (and `OUT_OF_BOUNDS` for masks that fold it into
     `mask_bits`).
     """
-
-    @always_inline
-    def __init__(out self, value: Int32):
-        self._value = value
-
-    @always_inline
-    def __eq__(self, other: Self) -> Bool:
-        return self._value == other._value
-
-    @always_inline
-    def __ne__(self, other: Self) -> Bool:
-        return self._value != other._value
 
     @always_inline
     def __and__(self, other: Self) -> Self:

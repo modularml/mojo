@@ -17,9 +17,9 @@ from std.math import ceildiv
 from std.sys import bit_width_of
 
 from std.builtin.dtype import _uint_type_of_width
-from std.gpu import WARP_SIZE, block_idx, thread_idx
+from max.gpu import WARP_SIZE, block_idx, thread_idx
 from max.gpu.sync import barrier
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.host import DeviceContext, DeviceBuffer
 from max.gpu.host import Dim
 from std.sys.info import has_apple_gpu_accelerator
@@ -351,8 +351,8 @@ def radix_sort_pairs_kernel[
     ]()
 
     # Initialize counts[NUM_BUCKETS]
-    var counts_stack = Array[Int32, NUM_BUCKETS](uninitialized=True)
-    var counts_buf = TileTensor(counts_stack, row_major[NUM_BUCKETS]()).fill(0)
+    var counts_stack = Array[Int32, NUM_BUCKETS](fill=0)
+    var counts_buf = TileTensor(counts_stack, row_major[NUM_BUCKETS]())
     var counts = counts_buf.ptr
 
     # Process elements and compute counts for each thread
@@ -437,10 +437,10 @@ def radix_sort_pairs_kernel[
         barrier()
 
     # Each thread initializes local_offsets[NUM_BUCKETS] = 0
-    var local_offsets_stack = Array[Int32, NUM_BUCKETS](uninitialized=True)
+    var local_offsets_stack = Array[Int32, NUM_BUCKETS](fill=0)
     var local_offsets_buf = TileTensor(
         local_offsets_stack, row_major[NUM_BUCKETS]()
-    ).fill(0)
+    )
     var local_offsets = local_offsets_buf.ptr
 
     # Now, each thread processes its elements, computes destination index, write to output

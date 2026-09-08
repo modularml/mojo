@@ -105,19 +105,22 @@ def _verify_results[
     comptime OutTensorType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0, num_cols)))), MutAnyOrigin
     ]
-    var in_tensors = Array[InTensorType, ngpus](uninitialized=True)
-    var out_tensors = Array[OutTensorType, ngpus](uninitialized=True)
-    comptime for _i in range(ngpus):
-        in_tensors[_i] = TileTensor(
+    var in_tensors = Array[InTensorType, ngpus](
+        fill_with=lambda (i: Int) -> InTensorType: TileTensor(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
-                cb_inputs[_i].offset_ptr(0)
+                cb_inputs[i].offset_ptr(0)
             ),
             row_major(Coord(Index(num_rows, num_cols))),
         )
-        out_tensors[_i] = TileTensor(
-            ar_out_dev[_i],
+    )
+    var out_tensors = Array[OutTensorType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref ar_out_dev, imm num_rows
+        } -> OutTensorType: TileTensor(
+            ar_out_dev[i],
             row_major(Coord(Index(num_rows, num_cols))),
         ).as_unsafe_any_origin()
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -339,19 +342,24 @@ def _verify_add_results[
     comptime OutTensorType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0, num_cols)))), MutAnyOrigin
     ]
-    var in_tensors = Array[InTensorType, ngpus](uninitialized=True)
-    var out_tensors = Array[OutTensorType, ngpus](uninitialized=True)
-    comptime for _i in range(ngpus):
-        in_tensors[_i] = TileTensor(
+    var in_tensors = Array[InTensorType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref cb_inputs, imm num_rows
+        } -> InTensorType: TileTensor(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
-                cb_inputs[_i].offset_ptr(0)
+                cb_inputs[i].offset_ptr(0)
             ),
             row_major(Coord(Index(num_rows, num_cols))),
         )
-        out_tensors[_i] = TileTensor(
-            ar_out_dev[_i],
+    )
+    var out_tensors = Array[OutTensorType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref ar_out_dev, imm num_rows
+        } -> OutTensorType: TileTensor(
+            ar_out_dev[i],
             row_major(Coord(Index(num_rows, num_cols))),
         )
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -625,19 +633,22 @@ def bench_allreduce_rmsnorm_fp8[
     comptime OutTensorType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0, num_cols)))), MutAnyOrigin
     ]
-    var in_tensors = Array[InTensorType, ngpus](uninitialized=True)
-    var ar_out_tensors = Array[OutTensorType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_tensors[i] = TileTensor(
+    var in_tensors = Array[InTensorType, ngpus](
+        fill_with=lambda (i: Int) -> InTensorType: TileTensor(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
                 cb_inputs[i].unsafe_ptr()
             ),
             row_major(Coord(Index(num_rows, num_cols))),
         )
-        ar_out_tensors[i] = TileTensor(
+    )
+    var ar_out_tensors = Array[OutTensorType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref ar_out_dev, imm num_rows
+        } -> OutTensorType: TileTensor(
             ar_out_dev[i],
             row_major(Coord(Index(num_rows, num_cols))),
         )
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -722,49 +733,50 @@ def bench_allreduce_rmsnorm_fp8[
 
     # Capture per-GPU pointers for closures.
     var residual_ptr_base = cb_residual.unsafe_ptr()
-    var fused_fp8_out_ptrs = Array[
-        MutPointer[Scalar[out_dtype], MutAnyOrigin], ngpus
-    ](uninitialized=True)
-    var fused_scales_ptrs = Array[MutPointer[Float32, MutAnyOrigin], ngpus](
-        uninitialized=True
+    comptime Fp8PtrType = MutPointer[Scalar[out_dtype], MutAnyOrigin]
+    comptime ScalePtrType = MutPointer[Float32, MutAnyOrigin]
+    comptime ResPtrType = MutPointer[Scalar[in_dtype], MutAnyOrigin]
+
+    def dbuffer_ptr(
+        mut buffer: DeviceBuffer[_],
+    ) -> Pointer[Scalar[buffer.dtype], MutUnsafeAnyOrigin]:
+        return buffer.unsafe_ptr().as_unsafe_any_origin()
+
+    var fused_fp8_out_ptrs = Array[Fp8PtrType, ngpus](
+        fill_with=lambda (i: Int) {ref} -> Fp8PtrType: dbuffer_ptr(
+            fused_fp8_out_dev[i]
+        )
     )
-    var fully_fused_fp8_out_ptrs = Array[
-        MutPointer[Scalar[out_dtype], MutAnyOrigin], ngpus
-    ](uninitialized=True)
-    var fully_fused_scales_ptrs = Array[
-        MutPointer[Float32, MutAnyOrigin], ngpus
-    ](uninitialized=True)
-    var fused_add_fp8_out_ptrs = Array[
-        MutPointer[Scalar[out_dtype], MutAnyOrigin], ngpus
-    ](uninitialized=True)
-    var fused_add_scales_ptrs = Array[MutPointer[Float32, MutAnyOrigin], ngpus](
-        uninitialized=True
+    var fused_scales_ptrs = Array[ScalePtrType, ngpus](
+        fill_with=lambda (i: Int) {ref} -> ScalePtrType: dbuffer_ptr(
+            fused_scales_dev[i]
+        )
     )
-    var residual_output_ptrs = Array[
-        MutPointer[Scalar[in_dtype], MutAnyOrigin], ngpus
-    ](uninitialized=True)
-    for i in range(ngpus):
-        fused_fp8_out_ptrs[i] = (
-            fused_fp8_out_dev[i].unsafe_ptr().as_unsafe_any_origin()
+    var fully_fused_fp8_out_ptrs = Array[Fp8PtrType, ngpus](
+        fill_with=lambda (i: Int) {ref} -> Fp8PtrType: dbuffer_ptr(
+            fully_fused_fp8_out_dev[i]
         )
-        fused_scales_ptrs[i] = (
-            fused_scales_dev[i].unsafe_ptr().as_unsafe_any_origin()
+    )
+    var fully_fused_scales_ptrs = Array[ScalePtrType, ngpus](
+        fill_with=lambda (i: Int) {ref} -> ScalePtrType: dbuffer_ptr(
+            fully_fused_scales_dev[i]
         )
-        fully_fused_fp8_out_ptrs[i] = (
-            fully_fused_fp8_out_dev[i].unsafe_ptr().as_unsafe_any_origin()
+    )
+    var fused_add_fp8_out_ptrs = Array[Fp8PtrType, ngpus](
+        fill_with=lambda (i: Int) {ref} -> Fp8PtrType: dbuffer_ptr(
+            fused_add_fp8_out_dev[i]
         )
-        fully_fused_scales_ptrs[i] = (
-            fully_fused_scales_dev[i].unsafe_ptr().as_unsafe_any_origin()
+    )
+    var fused_add_scales_ptrs = Array[ScalePtrType, ngpus](
+        fill_with=lambda (i: Int) {ref} -> ScalePtrType: dbuffer_ptr(
+            fused_add_scales_dev[i]
         )
-        fused_add_fp8_out_ptrs[i] = (
-            fused_add_fp8_out_dev[i].unsafe_ptr().as_unsafe_any_origin()
+    )
+    var residual_output_ptrs = Array[ResPtrType, ngpus](
+        fill_with=lambda (i: Int) {ref} -> ResPtrType: dbuffer_ptr(
+            residual_out_dev[i]
         )
-        fused_add_scales_ptrs[i] = (
-            fused_add_scales_dev[i].unsafe_ptr().as_unsafe_any_origin()
-        )
-        residual_output_ptrs[i] = (
-            residual_out_dev[i].unsafe_ptr().as_unsafe_any_origin()
-        )
+    )
 
     # ===== Benchmark 1: allreduce only =====
 

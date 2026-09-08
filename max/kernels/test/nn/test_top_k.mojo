@@ -18,7 +18,7 @@ from std.random import rand, seed
 from layout import (
     Coord,
     Idx,
-    PointerStorage,
+    DefaultEngine,
     TileTensor,
     coord_to_index_list,
     row_major,
@@ -31,7 +31,7 @@ from nn.topk import _top_k_cpu, _top_k_sampling
 from std.utils.index import IndexList, product
 
 comptime FillFnType = def[rank: Int, dtype: DType](
-    TileTensor[mut=True, dtype, ..., Storage=PointerStorage[element_width=1]]
+    TileTensor[mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]]
 ) -> None
 
 
@@ -206,7 +206,7 @@ def main() raises:
         rank: Int, dtype: DType
     ](
         buf: TileTensor[
-            mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+            mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
         ]
     ):
         iota(
@@ -218,7 +218,7 @@ def main() raises:
         rank: Int, dtype: DType
     ](
         buf: TileTensor[
-            mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+            mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
         ]
     ):
         rand(
@@ -288,7 +288,7 @@ def main() raises:
         rank: Int, dtype: DType
     ](
         buf: TileTensor[
-            mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+            mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
         ]
     ):
         _ = buf.fill(1)
@@ -324,7 +324,7 @@ def main() raises:
         rank: Int, dtype: DType
     ](
         buf: TileTensor[
-            mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+            mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
         ]
     ):
         var flat_buf = TileTensor(
@@ -395,7 +395,7 @@ def main() raises:
         rank: Int, dtype: DType
     ](
         buf: TileTensor[
-            mut=True, dtype, ..., Storage=PointerStorage[element_width=1]
+            mut=True, dtype, ..., Engine=DefaultEngine[element_width=1]
         ]
     ):
         for i in range(

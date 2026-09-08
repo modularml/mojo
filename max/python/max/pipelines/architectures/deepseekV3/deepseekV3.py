@@ -115,6 +115,25 @@ def _validate_parallelism_config(config: DeepseekV3Config) -> None:
         )
 
 
+def mask_padded_tail(
+    logits: TensorValue, vocab_size: int, unpadded_vocab_size: int | None
+) -> TensorValue:
+    """Sends the dummy/padding rows of the vocabulary to negative infinity."""
+    if unpadded_vocab_size is None or unpadded_vocab_size >= vocab_size:
+        return logits
+    device = logits.device
+    # Two broadcast scalars rather than a materialized row: keeps a
+    # vocab-sized fp32 constant out of the graph.
+    keep = ops.broadcast_to(
+        ops.constant(0.0, DType.float32, device=device), [unpadded_vocab_size]
+    )
+    drop = ops.broadcast_to(
+        ops.constant(float("-inf"), DType.float32, device=device),
+        [vocab_size - unpadded_vocab_size],
+    )
+    return logits + ops.cast(ops.concat([keep, drop]), logits.dtype)
+
+
 def deepseek_logits_postprocess(
     h: list[TensorValue],
     input_row_offsets: list[TensorValue],
@@ -132,6 +151,8 @@ def deepseek_logits_postprocess(
     logits_scaling: float = 1.0,
     capture_hidden_states: list[list[TensorValue]] | None = None,
     emit_last_token_logits: bool = True,
+    unpadded_vocab_size: int | None = None,
+    vocab_size: int | None = None,
 ) -> tuple[TensorValue, ...]:
     """Logits postprocessing for DeepseekV3 and DeepseekV3NextN.
 
@@ -246,6 +267,17 @@ def deepseek_logits_postprocess(
             if all_logits_input_row_offsets is not None
             else input_row_offsets[0]
         )
+
+    if unpadded_vocab_size is not None:
+        assert vocab_size is not None, (
+            "vocab_size must accompany unpadded_vocab_size"
+        )
+        if last_logits is not None:
+            last_logits = mask_padded_tail(
+                last_logits, vocab_size, unpadded_vocab_size
+            )
+        if logits is not None:
+            logits = mask_padded_tail(logits, vocab_size, unpadded_vocab_size)
 
     if logits_scaling != 1.0:
         if last_logits is not None:

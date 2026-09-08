@@ -16,7 +16,7 @@ from std.random import rand
 from std.sys import argv, size_of
 from std.sys.defines import get_defined_int
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceBuffer, DeviceContext
 from max.gpu.host.info import A100, H100, _is_sm10x_gpu
 from layout import (

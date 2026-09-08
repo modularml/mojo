@@ -23,7 +23,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     block_dim,
     block_idx,

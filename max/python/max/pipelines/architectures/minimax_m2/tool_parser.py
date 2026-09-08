@@ -23,8 +23,6 @@ MiniMax M2 uses an XML-style format for tool calls:
     <parameter name="param2">value2</parameter>
     </invoke>
     </minimax:tool_call>
-
-Reference: vllm/tool_parsers/minimax_m2_tool_parser.py
 """
 
 from __future__ import annotations
@@ -33,12 +31,13 @@ import json
 import re
 from typing import Any
 
-from llguidance import LLMatcher
+from max.pipelines.context.exceptions import InputError
+from max.pipelines.lib.pipeline_variants.structured_output_backend import (
+    build_xgrammar_tool_grammar,
+)
 from max.pipelines.lib.tool_parsing import (
     StructuralTagToolParser,
-    escape_for_lark_string,
     generate_call_id,
-    names_from_tools,
     register,
 )
 from max.pipelines.modeling.types import ParsedToolCall
@@ -158,106 +157,47 @@ class MinimaxM2ToolParser(StructuralTagToolParser):
         inner = ", ".join(parts)
         return "{" + inner + ("}" if is_complete else "")
 
-    # ----- Constrained decoding grammar (MiniMax-specific) ------------------
+    # ----- Constrained decoding grammar ------------
 
-    @staticmethod
-    def _build_invoke_name_terminal(tool_names: list[str] | None) -> str:
-        """Builds the Lark INVOKE_NAME terminal declaration.
-
-        When ``tool_names`` is provided, returns an alternation of Lark
-        string literals restricting the model to those exact names.
-        Otherwise returns a permissive regex terminal.
-
-        Args:
-            tool_names: Optional allow-list of function names. ``None``
-                accepts any double-quote-free name.
-        """
-        if tool_names is not None:
-            quoted = [f'"{escape_for_lark_string(n)}"' for n in tool_names]
-            return "INVOKE_NAME: " + " | ".join(quoted)
-        return r'INVOKE_NAME: /[^"]+/'
+    XGRAMMAR_FORMAT = "minimax"
 
     @staticmethod
     def generate_tool_call_grammar(
         response_format_schema: dict[str, Any] | None = None,
         tools: list[dict[str, Any]] | None = None,
+        backend: str = "xgrammar",
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> str:
-        """Generates a Lark grammar for MiniMax M2 constrained decoding.
+        """Generates a constrained-decoding grammar for MiniMax M2 tool calls.
 
-        Uses Lark rules for the envelope structure and regex terminals only
-        at leaves. Special tokens ``<minimax:tool_call>`` and
-        ``</minimax:tool_call>`` (IDs 200052/200053) are referenced as
-        single-token symbols to avoid llguidance ParserTooComplex on
-        multi-byte literal matches.
-
-        Parameter values are captured via a ``param_value`` rule with
-        ``suffix="</parameter>"`` so that the ``</parameter>`` boundary is
-        handled atomically at the grammar level.  This allows values to
-        contain literal ``<`` characters (HTML, JSON, comparison operators,
-        etc.) without restriction.
-
-        No trailing free-form text is allowed after the closing
-        ``</minimax:tool_call>`` tag: under constrained decoding the model
-        is expected to emit EOS immediately after the envelope.
-
-        When ``response_format_schema`` is provided, adds an alternative
-        branch that accepts JSON content matching the schema.
+        Returns a serialized xgrammar ``StructuralTag`` that frames the
+        ``<minimax:tool_call>`` / ``<invoke name="...">`` envelope and
+        constrains each call's arguments to that tool's JSON schema (emitted
+        as ``<parameter name=...>`` values). When ``response_format_schema``
+        is provided, the grammar also accepts a schema-conforming JSON
+        response as an alternative to a tool call.
 
         Args:
             response_format_schema: Optional JSON schema dict. When provided,
                 the grammar also accepts a JSON response matching the schema.
-            tools: Optional list of OpenAI-style tool dicts. ``None`` accepts
-                any tool name.
+            tools: OpenAI-style tool dicts.
+            backend: Structured-output backend; must be ``"xgrammar"``.
+            tool_choice: ``"auto"``, ``"required"``, or a named choice.
             **kwargs: Ignored; accepts ``tokenizer`` and other future kwargs.
 
         Returns:
-            A grammar string compatible with ``LLMatcher``.
+            The StructuralTag serialized as a JSON string.
         """
-        tool_names = names_from_tools(tools)
-        invoke_name_terminal = MinimaxM2ToolParser._build_invoke_name_terminal(
-            tool_names
-        )
-
-        # Shared rules and terminals — same for both branches.
-        rules = [
-            "invokes: invoke_block+ NL",
-            'invoke_block: NL "<invoke name=\\"" INVOKE_NAME "\\">" param_line* NL "</invoke>"',
-            'param_line: NL "<parameter name=\\"" PARAM_NAME "\\">" param_value',
-            'param_value[suffix="</parameter>"]: /[\\s\\S]*/',
-        ]
-        terminals = [
-            invoke_name_terminal,
-            r'PARAM_NAME: /[^"]+/',
-            r"NL: /\n/",
-        ]
-
-        if response_format_schema is None:
-            start_rule = (
-                "start: <minimax:tool_call> invokes </minimax:tool_call>"
+        if backend != "xgrammar":
+            raise InputError(
+                "MiniMax M2 constrained tool calling requires the xgrammar "
+                "backend; run with --structured-output-backend=xgrammar."
             )
-            extra_rules: list[str] = []
-        else:
-            schema_str = json.dumps(response_format_schema)
-            start_rule = "start: tool_calls_branch | json_response"
-            extra_rules = [
-                (
-                    "tool_calls_branch: <minimax:tool_call> invokes "
-                    "</minimax:tool_call>"
-                ),
-                f"json_response: %json {schema_str}",
-            ]
-
-        lark = (
-            "\n".join(
-                [
-                    "%llguidance {}",
-                    start_rule,
-                    *rules,
-                    *extra_rules,
-                    *terminals,
-                ]
-            )
-            + "\n"
+        normalized_choice = tool_choice if tool_choice is not None else "auto"
+        return build_xgrammar_tool_grammar(
+            MinimaxM2ToolParser.XGRAMMAR_FORMAT,
+            tools or [],
+            normalized_choice,
+            response_format_schema=response_format_schema,
         )
-        return LLMatcher.grammar_from_lark(lark)

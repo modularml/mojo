@@ -15,7 +15,7 @@ from std.testing import *
 from std.testing import TestSuite
 
 from std.compile import compile_info
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from std.memory import unsafe_stack_allocation
 from std.sys.info import _cdna_4_or_newer, _is_amd_cdna, CompilationTarget
 from std.sys.compile import SanitizeAddress

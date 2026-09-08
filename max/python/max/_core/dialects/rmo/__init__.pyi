@@ -13,8 +13,8 @@
 # GENERATED FILE, DO NOT EDIT MANUALLY!
 # ===----------------------------------------------------------------------=== #
 
-from collections.abc import Callable, Sequence
-from typing import Protocol, overload
+from collections.abc import Sequence
+from typing import overload
 
 import max._core
 import max._core.dialects.builtin
@@ -28,104 +28,6 @@ from . import passes as passes
 
 # C++ overloads on different int types look the same in Python, ignore these
 # mypy: disable-error-code="overload-cannot-match"
-
-class MOAnalogue(Protocol):
-    """
-    An RMO operation which maps 1-1 in semantics to an existing MO operation.
-
-    Such RMO operations should have the same semantics as the MO operation
-    including the number and type of operands and results.
-
-    The MO operation however will have stricter verifiers (since they must
-    guaranteed to be statically compatible). Therefore, each analogue must find
-    a way to reconcile the types given in the RMO graph to something that
-    type-checks MO.
-
-    To provide this, we declare an `inferMOTypes` method which given the
-    current input types, figures out the types to both the MO operands and
-    results.
-    """
-
-    @property
-    def m_o_analogue_output_param_decls(
-        self,
-    ) -> Sequence[max._core.dialects.kgen.ParamDeclAttr]: ...
-    @property
-    def m_o_analogue_output_param_decls_attr_name(
-        self,
-    ) -> max._core.dialects.builtin.StringAttr: ...
-    def infer_mo_types(
-        self,
-        arg0: max._core.dialects.mo.GraphOp,
-        arg1: Sequence[max._core.Type],
-        arg2: Sequence[max._core.Type],
-        arg3: Sequence[Sequence[max._core.dialects.kgen.ParamDeclAttr]],
-        arg4: Sequence[Sequence[max._core.dialects.kgen.ParamDeclAttr]],
-        /,
-    ) -> None: ...
-
-class RMOOp(Protocol):
-    """
-    Interface for easy pattern matching on all RMO Ops.
-
-    Each RMO op needs to have a parent `mo.graph_op`. This is needed to
-    maintain unique shape parameters.
-    """
-
-    @property
-    def implicitly_parametric(self) -> bool: ...
-    @property
-    def output_param_decls(
-        self,
-    ) -> Sequence[max._core.dialects.kgen.ParamDeclAttr]: ...
-    @output_param_decls.setter
-    def output_param_decls(
-        self, arg: Sequence[max._core.dialects.kgen.ParamDeclAttr], /
-    ) -> None: ...
-    def get_input_tensor(
-        self, arg: int, /
-    ) -> max._core.Value[max._core.dialects.mo.TensorType]: ...
-    def get_output_tensor(
-        self, arg: int, /
-    ) -> max._core.Value[max._core.dialects.mo.TensorType]: ...
-    def get_effects(
-        self, arg: Sequence[max._core._MemoryEffect], /
-    ) -> None: ...
-    def walk_declarations(
-        self, arg: Callable[[max._core.dialects.kgen.ParamDeclAttr], None], /
-    ) -> None: ...
-    def walk_definitions(
-        self,
-        arg: Callable[
-            [
-                max._core.dialects.kgen.ParamDeclAttr,
-                max._core.dialects.kgen.ParamDefValue,
-            ],
-            None,
-        ],
-        /,
-    ) -> None: ...
-    def rename_declarations(
-        self, arg: Sequence[max._core.dialects.kgen.ParamDeclAttr], /
-    ) -> None: ...
-    def collect_parameter_uses(
-        self,
-        arg0: Callable[[max._core.Attribute], None],
-        arg1: Callable[[max._core.Type], None],
-        /,
-    ) -> None: ...
-    def collect_parameter_uses_below(
-        self,
-        arg0: Callable[[max._core.Attribute], None],
-        arg1: Callable[[max._core.Type], None],
-        /,
-    ) -> None: ...
-
-class TensorSameDTypeOperandsAndResults(Protocol):
-    """
-    Interface for RMO ops where all tensor types in the operands and results
-    have the same dtype. Also checks at least one tensor type operand/result.
-    """
 
 class MoReduceArgMaxOp(max._core.Operation):
     """

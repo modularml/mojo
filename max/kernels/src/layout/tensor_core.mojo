@@ -65,12 +65,12 @@ from std.sys.info import (
 )
 
 
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
     lane_id,
     thread_idx,
 )
-from std.gpu.intrinsics import lop, ds_read_tr16_b64
+from max.gpu.intrinsics import lop, ds_read_tr16_b64
 from max.gpu.compute.mma import (
     get_amd_bf8_dtype,
     get_amd_fp8_dtype,

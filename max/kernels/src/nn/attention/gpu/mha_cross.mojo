@@ -21,7 +21,7 @@ from std.math.uutils import ufloordiv, udivmod
 from std.sys import align_of, simd_width_of
 
 from std.algorithm.functional import vectorize
-from std.gpu import block_idx, global_idx
+from max.gpu import block_idx, global_idx
 from max.gpu.host import DeviceContext, DeviceBuffer
 from kv_cache.types import KVCacheT
 from layout import Coord, Idx, TensorLayout, TileTensor, row_major
@@ -337,7 +337,7 @@ def mha_cross_gpu_naive[
 
     # FIXME: RUNP-356 Direct access to CUDA within DeviceContext
     var p_buffer = TileTensor(
-        # FIXME: GEX-4123 Force use of PointerStorage until the
+        # FIXME: GEX-4123 Force use of DefaultEngine until the
         # `input_fn_device` legacy closure is replaced.
         p_device.unsafe_ptr(),
         row_major((batch_size * num_heads, q_max_seq_len, num_keys)),

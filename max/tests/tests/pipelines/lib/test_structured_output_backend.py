@@ -142,6 +142,93 @@ def test_xgrammar_stop_tokens_cover_runtime_eos_set(
     )
 
 
+def test_fill_slot_after_stop_token_accepted_forces_eos_without_crashing() -> (
+    None
+):
+    """Once the matcher actually consumes its stop token (not merely reaching
+    the "ready to stop" accepting state exercised above), xgrammar's native
+    fill raises a fatal C++ check rather than returning a mask. This drives a
+    real matcher through that exact transition and confirms
+    ``fill_next_token_bitmask`` still forces the same stop-token-only mask
+    instead of crashing -- built by hand from ``stop_token_ids`` rather than
+    delegated to xgrammar's own (crashing) fill.
+    """
+    delegate = _FakeTikTokenTokenizer()
+    pipeline_tokenizer = MagicMock()
+    pipeline_tokenizer.delegate = delegate
+    pipeline_tokenizer.eos_token_ids = {delegate.eos_token_id}
+
+    helper = StructuredOutputHelper.from_tokenizer(
+        cast("PipelineTokenizer[Any, Any, Any]", pipeline_tokenizer),
+        enable_structured_output=True,
+        backend_name="xgrammar",
+    )
+    assert helper.backend is not None
+
+    schema = {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    }
+    matcher = helper.backend.create_matcher(
+        helper.backend.compile_json_schema(json.dumps(schema))
+    )
+    for char in "{}":
+        assert matcher.try_consume_tokens([ord(char)]) == 1
+    assert matcher.is_accepting()
+    assert not matcher.is_stopped()
+
+    assert matcher.try_consume_tokens([delegate.eos_token_id]) == 1
+    assert matcher.is_stopped()
+    assert matcher.is_accepting()
+
+    allowed = set(np.flatnonzero(_allowed_tokens(helper.backend, matcher)))
+    assert allowed == {delegate.eos_token_id}, (
+        "a stopped-and-accepted xgrammar matcher must force exactly its "
+        f"stop token set, not {allowed} -- xgrammar's own fill crashes here, "
+        "so the mask is built by hand from stop_token_ids"
+    )
+
+
+def test_llguidance_completed_matcher_still_gets_eos_mask() -> None:
+    """llguidance's ``is_stopped()`` becomes true the moment the grammar is
+    satisfied -- before the stop token is even consumed -- so a completed
+    grammar is llguidance's normal, frequent end-of-request state, not a
+    rare corner case. It computes a real EOS-only mask here without
+    crashing, matching xgrammar's hand-built one above.
+    """
+    delegate = _FakeTikTokenTokenizer()
+    pipeline_tokenizer = MagicMock()
+    pipeline_tokenizer.delegate = delegate
+    pipeline_tokenizer.eos_token_ids = {delegate.eos_token_id}
+
+    helper = StructuredOutputHelper.from_tokenizer(
+        cast("PipelineTokenizer[Any, Any, Any]", pipeline_tokenizer),
+        enable_structured_output=True,
+        backend_name="llguidance",
+    )
+    assert helper.backend is not None
+
+    schema = {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    }
+    matcher = helper.backend.create_matcher(
+        helper.backend.compile_json_schema(json.dumps(schema))
+    )
+    for char in "{}":
+        assert matcher.try_consume_tokens([ord(char)]) == 1
+    assert matcher.is_accepting()
+    assert matcher.is_stopped()
+
+    allowed = set(np.flatnonzero(_allowed_tokens(helper.backend, matcher)))
+    assert allowed == {delegate.eos_token_id}, (
+        f"a completed llguidance matcher must force exactly its stop token "
+        f"set, not {allowed}"
+    )
+
+
 # Minimal schema for the whitespace-mode tests: one required string property.
 _WS_SCHEMA = json.dumps(
     {

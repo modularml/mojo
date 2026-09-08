@@ -44,7 +44,7 @@ Currently MI355X-only.
 
 Usage (after editing ep_comm.mojo, plain `mojo` is shadowed by the installed
 shmem package — use bmojo / bazel):
-  ./bazelw run //KGEN/tools/mojo -- \\
+  ./bazelw run //Mojo/tools/mojo -- \\
       max/kernels/test/gpu/shmem/test_mxfp4_fused_silu_scale_fusion.mojo
 """
 

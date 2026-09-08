@@ -11,8 +11,8 @@
 # limitations under the License.
 ##===----------------------------------------------------------------------===##
 
-# AMD MXFP4/MXFP8 dense GEMM benchmark: MAX (vs aiter for MXFP4; aiter has no
-# native MX-format FP8 kernel, so MXFP8 runs MAX-only).
+# AMD MXFP4/MXFP6/MXFP8 dense GEMM benchmark: MAX (vs aiter for MXFP4; aiter
+# has no native MX-format FP6 or FP8 kernel, so those run MAX-only).
 # Computes Y = A @ B^T with both operands MX block-scaled (one E8M0 scale per
 # 32-element K block), where B is the weight [N=out_features, K=in_features]
 # and A is [M, K]. Each params block fixes a (N, K) weight shape and sweeps M
@@ -22,7 +22,8 @@
 #   Kimi-K2.5 (hidden=7168, moe_inter=2048, dense intermediate=18432): shared
 #     expert (moe_inter) + dense layer-0 MLP (intermediate) at tp=8/ep=8
 #     (per-GPU shapes). Routed experts use a separate grouped-matmul kernel.
-#   MiniMax M3 (hidden=6144), MXFP8, at tp=4 (per-GPU shapes).
+#   A dense-MoE model (hidden=6144), MXFP8/MXFP4/MXFP6, at tp=4 (per-GPU
+#     shapes).
 
 name: bench_amd_mx_gemm
 file: $BUILD_WORKSPACE_DIRECTORY/max/kernels/benchmarks/misc/comparison/bench_amd_mx_gemm.py
@@ -35,6 +36,14 @@ commons: &commons
 # aiter has no MX-format FP8 kernel, so MXFP8 entries skip the aiter engine.
 commons_mxfp8: &commons_mxfp8
   $dtype: ["mxfp8"]
+  $engine: ["modular_max"]
+  $M: [1, 4, 8, 16, 32, 64, 128, 256, 512]
+
+# Same for MXFP6. E2M3 is the only encoding benchmarked: it is what the M3
+# MXFP6 checkpoints ship, and the tile config does not depend on the encoding
+# (both are 24 bytes per lane), so E3M2 would re-measure the same kernel.
+commons_mxfp6: &commons_mxfp6
+  $dtype: ["mxfp6"]
   $engine: ["modular_max"]
   $M: [1, 4, 8, 16, 32, 64, 128, 256, 512]
 
@@ -175,5 +184,39 @@ params:
 
 # Dense/shared-expert MLP down proj
 - <<: *commons
+  $N: [6144]
+  $K: [3072]
+
+# ---------------------------------------------------------------------------
+# The same dense-MoE model, tp=4, MXFP6 E2M3 (the format its MXFP6
+# checkpoints ship; see max/docs/internal/MXFP6Checkpoints.md). Unlike
+# MXFP8, MXFP6 has no fused-QKV path -- the 5-way sparse fusion needs MXFP8
+# and `quantized_fused_qkv_matmul` has no MXFP6 case -- so q/k/v/o AND the
+# MLP all land on this dense kernel.
+# That makes every shape below a real production shape for MXFP6, including
+# the tiny-N K/V projection.
+# ---------------------------------------------------------------------------
+# Attn Q proj
+- <<: *commons_mxfp6
+  $N: [2048]
+  $K: [6144]
+
+# Attn K/V proj
+- <<: *commons_mxfp6
+  $N: [128]
+  $K: [6144]
+
+# Attn O proj
+- <<: *commons_mxfp6
+  $N: [6144]
+  $K: [2048]
+
+# Dense/shared-expert MLP gate/up proj
+- <<: *commons_mxfp6
+  $N: [3072]
+  $K: [6144]
+
+# Dense/shared-expert MLP down proj
+- <<: *commons_mxfp6
   $N: [6144]
   $K: [3072]

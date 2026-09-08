@@ -237,9 +237,33 @@ class ProcessCompilePool:
 
     .. code-block:: python
 
-        with ProcessCompilePool() as pool:
+        import numpy as np
+
+        from max.driver import CPU, DeviceSpec
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.experimental.compile_pool import ProcessCompilePool
+        from max.graph import DeviceRef, Graph, TensorType
+
+        with Graph(
+            "scale_2",
+            input_types=[TensorType(DType.float32, [4], device=DeviceRef.CPU())],
+        ) as graph:
+            (x,) = graph.inputs
+            graph.output(x.tensor * 2.0)
+
+        session = InferenceSession(devices=[CPU()])
+        with ProcessCompilePool(device_specs=[DeviceSpec.cpu()]) as pool:
             future = pool.compile(graph)
             model = session.init(future.result())
+
+        (result,) = model(np.ones(4, dtype=np.float32))
+
+    .. invisible-code-block: python
+
+        np.testing.assert_array_equal(
+            result.to_numpy(), np.full(4, 2.0, dtype=np.float32)
+        )
     """
 
     def __init__(

@@ -26,7 +26,7 @@ from linalg.utils import (
 
 
 from layout import TileTensor, Coord, Idx, row_major
-from layout.tensor_storage import PointerStorage
+from layout.tensor_engine import DefaultEngine
 
 comptime dtype = DType.float32
 comptime simd_size = simd_width_of[dtype]()
@@ -52,11 +52,9 @@ def print_mat(a_ptr: ImmPointer[Scalar[dtype], _], m: Int, n: Int):
 
 
 def gemm_naive(
-    a: TileTensor[dtype, Storage=PointerStorage[element_width=1], ...],
-    b: TileTensor[dtype, Storage=PointerStorage[element_width=1], ...],
-    c: TileTensor[
-        mut=True, dtype, Storage=PointerStorage[element_width=1], ...
-    ],
+    a: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
+    b: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
+    c: TileTensor[mut=True, dtype, Engine=DefaultEngine[element_width=1], ...],
     m: Int,
     n: Int,
     k: Int,

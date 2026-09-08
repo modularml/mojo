@@ -15,7 +15,7 @@ from std.math import align_up
 from std.math.uutils import umod, ufloordiv
 from std.sys import size_of
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import (
+from max.gpu import (
     warp_id as get_warp_id,
     block_id_in_cluster,
     block_idx,

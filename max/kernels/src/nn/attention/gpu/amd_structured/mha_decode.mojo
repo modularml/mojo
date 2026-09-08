@@ -36,8 +36,8 @@ from std.sys import get_defined_bool
 from std.sys.intrinsics import readfirstlane
 from std.math import ceildiv
 from std.math.uutils import umod, ufloordiv
-from std.gpu import block_idx
-from std.gpu import warp_id as get_warp_id
+from max.gpu import block_idx
+from max.gpu import warp_id as get_warp_id
 from max.gpu.sync import s_waitcnt
 from std.memory import bitcast
 from std.utils.numerics import get_accum_type, min_or_neg_inf

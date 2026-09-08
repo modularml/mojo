@@ -42,8 +42,8 @@ here as well would blank a correct row.
 """
 
 from std.math import rsqrt
-from std.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
-from layout import TensorLayout, TileTensor
+from max.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
+from layout import TensorEngine, TensorLayout, TileTensor
 
 from nn.normalization import block_reduce_dual_sum
 
@@ -63,12 +63,25 @@ def mtp_eh_norm_kernel[
     hw_origin: ImmOrigin,
     hidden_size: Int,
     max_warps_per_block: Int,
+    OutEngine: TensorEngine,
+    EmbedEngine: TensorEngine,
+    PrevEngine: TensorEngine,
+    EWEngine: TensorEngine,
+    HWEngine: TensorEngine,
 ](
-    out_buf: TileTensor[dtype, OutLayoutType, out_origin],
-    embed: TileTensor[mut=False, dtype, EmbedLayoutType, embed_origin],
-    prev: TileTensor[mut=False, dtype, PrevLayoutType, prev_origin],
-    enorm_weight: TileTensor[mut=False, dtype, EWLayoutType, ew_origin],
-    hnorm_weight: TileTensor[mut=False, dtype, HWLayoutType, hw_origin],
+    out_buf: TileTensor[dtype, OutLayoutType, out_origin, Engine=OutEngine],
+    embed: TileTensor[
+        mut=False, dtype, EmbedLayoutType, embed_origin, Engine=EmbedEngine
+    ],
+    prev: TileTensor[
+        mut=False, dtype, PrevLayoutType, prev_origin, Engine=PrevEngine
+    ],
+    enorm_weight: TileTensor[
+        mut=False, dtype, EWLayoutType, ew_origin, Engine=EWEngine
+    ],
+    hnorm_weight: TileTensor[
+        mut=False, dtype, HWLayoutType, hw_origin, Engine=HWEngine
+    ],
     epsilon: Float32,
     num_tokens: Int32,
 ):
@@ -91,6 +104,11 @@ def mtp_eh_norm_kernel[
             not the launch's actual warp count. `block_reduce_dual_sum` reduces
             over a power-of-two lane group; slots past the real warp count hold
             zero.
+        OutEngine: Engine policy of `out_buf`.
+        EmbedEngine: Engine policy of `embed`.
+        PrevEngine: Engine policy of `prev`.
+        EWEngine: Engine policy of `enorm_weight`.
+        HWEngine: Engine policy of `hnorm_weight`.
 
     Args:
         out_buf: Output `[num_tokens, 2 * hidden_size]`. Columns

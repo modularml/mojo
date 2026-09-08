@@ -15,7 +15,7 @@
 # This is the complete implementation combining all the concepts from Chapter 2
 
 from std.math import ceildiv
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 
 # ========================== KERNEL CODE ==========================

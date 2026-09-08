@@ -18,7 +18,7 @@ If the vertex was visited in the previous level, it pushes updates to all
 its unvisited neighbors.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
 from max.gpu.host import DeviceContext
 from std.atomic import Atomic
 from std.collections import List

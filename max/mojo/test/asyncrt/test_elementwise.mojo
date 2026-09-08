@@ -15,7 +15,7 @@ from std.sys import simd_width_of
 
 from max.algorithm.functional import elementwise
 from asyncrt_test_utils import create_test_device_context
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext, get_gpu_target
 from std.testing import TestSuite, assert_equal
 

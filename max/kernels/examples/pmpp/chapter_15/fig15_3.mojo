@@ -14,7 +14,7 @@
 """Figure 15.3: Tiled matrix multiplication kernel combining all optimizations."""
 
 from std.math import ceildiv
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
 from std.itertools import product

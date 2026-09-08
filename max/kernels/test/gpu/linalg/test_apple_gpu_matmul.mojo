@@ -24,7 +24,7 @@ Covers two paths:
 
 from std.collections import Optional
 from std.random import random_si64
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from max.gpu.host import DeviceBuffer, DeviceContext
 from std.sys.info import _accelerator_arch
 from std.utils import IndexList
@@ -157,9 +157,9 @@ def _run_8x8_case[
         type_of(d_tt).LayoutType,
         type_of(a_tt).LayoutType,
         type_of(b_tt).LayoutType,
-        type_of(d_tt).Storage,
-        type_of(a_tt).Storage,
-        type_of(b_tt).Storage,
+        type_of(d_tt).Engine,
+        type_of(a_tt).Engine,
+        type_of(b_tt).Engine,
         transpose_b,
         BLOCK_M=BM,
         BLOCK_N=BN,
@@ -270,9 +270,9 @@ def _run_8x8_bias_case[
         type_of(d_tt).LayoutType,
         type_of(a_tt).LayoutType,
         type_of(b_tt).LayoutType,
-        type_of(d_tt).Storage,
-        type_of(a_tt).Storage,
-        type_of(b_tt).Storage,
+        type_of(d_tt).Engine,
+        type_of(a_tt).Engine,
+        type_of(b_tt).Engine,
         transpose_b,
         elementwise_lambda_fn=Optional[elementwise_epilogue_type](
             bias_epilogue

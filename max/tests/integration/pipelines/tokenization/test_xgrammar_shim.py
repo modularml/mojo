@@ -220,6 +220,33 @@ def test_property_name_escapes_cannot_forge_a_cache_key() -> None:
     )
 
 
+def test_property_key_with_embedded_quote_enforces_value_type() -> None:
+    key = 'foo"bar'
+    compiled = _compiler().compile_json_schema(
+        json.dumps(
+            {
+                "properties": {key: {"$ref": "#/definitions/foo%22bar"}},
+                "definitions": {key: {"type": "number"}},
+            }
+        )
+    )
+    assert _accepts(compiled, json.dumps({key: 1}))
+    assert not _accepts(compiled, json.dumps({key: "1"}))
+
+
+def test_property_key_with_embedded_backslash_enforces_value_type() -> None:
+    key = "a\\b"
+    compiled = _compiler().compile_json_schema(
+        json.dumps(
+            {
+                "properties": {key: {"type": "number"}},
+            }
+        )
+    )
+    assert _accepts(compiled, json.dumps({key: 1}))
+    assert not _accepts(compiled, json.dumps({key: "1"}))
+
+
 # Rejection of unenforceable keywords is opt-in: it happens only when the caller
 # passes reject_unsupported=True. The default (exercised by the guard tests below)
 # falls back to best-effort decoding instead.
@@ -906,6 +933,28 @@ def test_oneof_const_disjoint_compiles_and_enforces() -> None:
     assert not _accepts(compiled, '"ab"')
 
 
+def test_const_enum_control_char_string_is_escaped() -> None:
+    # A const/enum string value with a control char must render as its escaped
+    # JSON form; the grammar must reject the raw control byte (invalid JSON).
+    nl = _compiler().compile_json_schema(
+        json.dumps({"const": "a\nb"}), reject_unsupported=True
+    )
+    assert _accepts(nl, '"a\\nb"')  # escaped newline -> valid JSON, accepted
+    assert not _accepts(nl, '"a\nb"')  # raw newline -> invalid JSON, rejected
+
+    en = _compiler().compile_json_schema(
+        json.dumps({"enum": ["a\nb"]}), reject_unsupported=True
+    )
+    assert _accepts(en, '"a\\nb"')
+    assert not _accepts(en, '"a\nb"')
+
+    nul = _compiler().compile_json_schema(
+        json.dumps({"const": "x\x00y"}), reject_unsupported=True
+    )
+    assert _accepts(nul, '"x\\u0000y"')  # escaped NUL -> valid, accepted
+    assert not _accepts(nul, '"x\x00y"')  # raw NUL -> invalid, rejected
+
+
 def test_oneof_enum_disjoint_compiles_and_enforces() -> None:
     compiled = _compiler().compile_json_schema(
         '{"oneOf": [{"enum": ["a", "b"]}, {"enum": [1]}]}',
@@ -1186,8 +1235,6 @@ def test_anyof_compiles() -> None:
 
 
 def test_unsupported_keyword_in_tag_compiles_by_default() -> None:
-    # Same permissive default on the structural-tag path: JSONSchemaFormat
-    # defaults reject_unsupported to False.
     tag = xgr.StructuralTag(
         format=JSONSchemaFormat(
             json_schema={
@@ -3173,6 +3220,81 @@ def test_cache_key_distinguishes_property_names_default_type() -> None:
     assert not _accepts(compiled, '{"b": 1, "a": {1: 1}}')
 
 
+def test_property_names_non_string_shape_rejected() -> None:
+    for property_names in (
+        {"type": ["integer", "string"]},
+        {"type": ["string"]},
+        {"anyOf": [{"type": "string"}, {"type": ["integer"]}]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": property_names,
+        }
+        with pytest.raises(Exception, match="non-string"):
+            _gemma_compile(schema)
+        with pytest.raises(Exception, match="non-string"):
+            _compiler().compile_json_schema(json.dumps(schema))
+
+
+def test_property_names_non_string_const_enum_rejected() -> None:
+    for property_names in (
+        {"const": 42},
+        {"const": True},
+        {"const": None},
+        {"enum": [1, 2]},
+        {"enum": ["a", 2]},
+        {"enum": [None]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": property_names,
+        }
+        with pytest.raises(Exception, match="non-string"):
+            _gemma_compile(schema)
+        with pytest.raises(Exception, match="non-string"):
+            _compiler().compile_json_schema(json.dumps(schema))
+
+
+def test_property_names_string_const_enum_accepted() -> None:
+    for property_names in ({"const": "foo"}, {"enum": ["a", "b"]}):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": property_names,
+        }
+        _gemma_compile(schema)
+        _compiler().compile_json_schema(json.dumps(schema))
+
+
+def test_property_names_allof_folds_to_string_shape() -> None:
+    for accepted in (
+        {"allOf": [{"type": "string"}]},
+        {"allOf": [{"type": "string"}, {"minLength": 1}]},
+        {"allOf": [{"const": "foo"}]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": accepted,
+        }
+        _compiler().compile_json_schema(json.dumps(schema))
+    for rejected in (
+        {"allOf": [{"type": "number"}]},
+        {"allOf": [{"type": "string"}, {"type": "number"}]},
+    ):
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": rejected,
+        }
+        with pytest.raises(
+            Exception, match="must be an object that validates string"
+        ):
+            _compiler().compile_json_schema(json.dumps(schema))
+
+
 def test_cache_key_not_forgeable_via_property_name() -> None:
     # A property name may contain quotes and colons that make one
     # subschema's text resemble a structurally different sibling's. Such
@@ -3250,6 +3372,113 @@ def test_gemma_4_property_names_with_pattern_properties_rejected() -> None:
                 "patternProperties": {"^a+$": {"type": "integer"}},
             }
         )
+
+
+def test_pattern_properties_with_additional_properties_rejected() -> None:
+    # patternProperties + additionalProperties (non-false) needs per-key
+    # priority: a matching key takes the pattern's subschema, a non-matching
+    # key falls back to additionalProperties. The fallback arm needs the
+    # complement of a regex as a key pattern, which xgrammar cannot express.
+    # Reject the combination under reject_unsupported rather than emit an
+    # unsound un-excluded fallback (which would accept a matching key with
+    # the additionalProperties value) or silently drop the fallback.
+    #
+    # All open forms are rejected: a schema value, an empty schema (which
+    # accepts any value, same as true), and boolean true.
+    schema_base = (
+        '{"type":"object",'
+        '"patternProperties":{"^[a-z]+$":{"type":"string"}},'
+        '"additionalProperties":'
+    )
+    for addl in ('{"type":"integer"}', "{}", "true"):
+        with pytest.raises(Exception, match="patternProperties"):
+            _compiler().compile_json_schema(
+                schema_base + addl + "}",
+                reject_unsupported=True,
+            )
+
+
+def test_pattern_properties_with_additional_properties_false_compiles() -> None:
+    # additionalProperties:false closes the object: no fallback arm exists,
+    # so the reject guard does not fire and the schema compiles under
+    # reject_unsupported. The pattern is still enforced -- a matching key
+    # must conform to the pattern's subschema, and a non-matching key is
+    # not admitted at all.
+    compiled = _compiler().compile_json_schema(
+        '{"type":"object",'
+        '"patternProperties":{"^[a-z]+$":{"type":"string"}},'
+        '"additionalProperties":false}',
+        reject_unsupported=True,
+    )
+    assert _accepts(compiled, '{"a":"a"}')
+    assert not _accepts(compiled, '{"a":1}')
+    assert not _accepts(compiled, '{"1":1}')
+
+
+def test_gemma_4_property_names_ref_max_length_zero_rejected() -> None:
+    # The propertyNames bare-key guards must inspect the COMPLETE schema, not
+    # only the literal propertyNames object: a $ref to a maxLength:0 subschema
+    # admits only the empty key and must be rejected the same as a literal
+    # maxLength:0.
+    with pytest.raises(Exception, match="propertyNames"):
+        _gemma_compile(
+            {
+                "type": "object",
+                "propertyNames": {"$ref": "#/$defs/k"},
+                "$defs": {"k": {"maxLength": 0}},
+            }
+        )
+
+
+def test_gemma_4_property_names_ref_explicit_min_length_zero_rejected() -> None:
+    # min-length guard through a $ref: an explicit minLength:0 behind a ref
+    # affirmatively permits the empty key and must be rejected.
+    with pytest.raises(Exception, match="minLength"):
+        _gemma_compile(
+            {
+                "type": "object",
+                "propertyNames": {"$ref": "#/$defs/k"},
+                "$defs": {"k": {"type": "string", "minLength": 0}},
+            }
+        )
+
+
+def test_gemma_4_property_names_anyof_empty_pattern_rejected() -> None:
+    # empty-match guard through a combinator: an anyOf branch whose pattern
+    # matches the empty string can emit a zero-length bare key through the
+    # union, so the guard must see into the combinator and reject.
+    with pytest.raises(Exception):
+        _gemma_compile(
+            {
+                "type": "object",
+                "propertyNames": {"anyOf": [{"pattern": "^a*$"}]},
+            }
+        )
+
+
+def test_gemma_4_property_names_allof_forbidden_char_rejected() -> None:
+    # forbidden-char guard through a combinator: an allOf member pattern that
+    # needs a structural byte (`:`) not allowed in a bare key must be rejected.
+    with pytest.raises(Exception):
+        _gemma_compile(
+            {
+                "type": "object",
+                "propertyNames": {"allOf": [{"pattern": "^a:b$"}]},
+            }
+        )
+
+
+def test_gemma_4_property_names_ref_bare_safe_compiles() -> None:
+    # The complete-schema resolution must not over-reject: a $ref to a
+    # bare-safe key schema still compiles.
+    compiled = _gemma_compile(
+        {
+            "type": "object",
+            "propertyNames": {"$ref": "#/$defs/k"},
+            "$defs": {"k": {"type": "string", "pattern": "^[a-z_]+$"}},
+        }
+    )
+    assert isinstance(compiled, xgr.CompiledGrammar)
 
 
 def test_xml_root_forbidden_key_excluded_from_additional_branch() -> None:
@@ -3892,10 +4121,6 @@ def _gemma_tool_with_params(params: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _gemma_compile(params: dict[str, Any]) -> xgr.CompiledGrammar:
-    # No test-level flag walker: the gemma_4 builtin tag already sets
-    # require_object_root and reject_unsupported on every arg-schema
-    # JSONSchemaFormat (model-scoped enable in JSON_CONFIG), so the flags are
-    # real on the gemma path without a stand-in.
     tag = xgr.get_builtin_structural_tag(
         "gemma_4",
         tools=_gemma_tool_with_params(params),
@@ -3906,9 +4131,6 @@ def _gemma_compile(params: dict[str, Any]) -> xgr.CompiledGrammar:
 
 
 def test_gemma_4_tool_call_rejects_unsupported_keyword_without_walker() -> None:
-    # The JSON_CONFIG enable makes reject_unsupported real on the gemma path:
-    # an unenforceable keyword (multipleOf) in an arg schema is rejected
-    # fail-closed, with NO test-level flag walker.
     with pytest.raises(Exception):
         _gemma_compile(
             {
@@ -3927,9 +4149,6 @@ def test_gemma_4_tool_call_non_object_root_rejected_without_walker() -> None:
 
 
 def test_qwen_tool_call_permits_unsupported_keyword_by_default() -> None:
-    # Scoping: the enable is gemma-only. A non-gemma model's builtin tag leaves
-    # reject_unsupported at its False default, so an unenforceable keyword
-    # (multipleOf) falls back to unconstrained decoding and still compiles.
     tag = xgr.get_builtin_structural_tag(
         "qwen_3_5",
         tools=_qwen_tool(

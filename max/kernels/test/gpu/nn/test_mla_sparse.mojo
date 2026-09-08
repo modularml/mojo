@@ -35,7 +35,7 @@ from std.memory import alloc, bitcast
 from std.random import randn, seed
 from std.sys import argv, has_nvidia_gpu_accelerator, size_of
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
 from max.gpu.host.info import _is_sm10x_gpu
 from max.gpu.host.nvidia.tma import TensorMapSwizzle

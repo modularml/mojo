@@ -16,7 +16,7 @@ from std.sys import size_of
 
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceContext
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.memory import ReduceOp, fence_async_view_proxy
 from max.gpu.sync import cp_async_bulk_commit_group, cp_async_bulk_wait_group
 from layout import Layout, LayoutTensor

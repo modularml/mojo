@@ -27,7 +27,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
+from max.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
 from max.gpu.host import DeviceContext
 from max.gpu.primitives import block
 from std.memory import dealloc

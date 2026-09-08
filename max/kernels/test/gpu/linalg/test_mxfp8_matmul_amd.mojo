@@ -25,7 +25,7 @@ fragment-layout error cannot cancel out. `data-only` and `scales-only` phases
 split a data-layout bug from a scale-index bug, which uniform fills cannot.
 """
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.memory import bitcast
@@ -210,11 +210,11 @@ def _test_case[
         type_of(b_tt).LayoutType,
         type_of(sfa_tt).LayoutType,
         type_of(sfb_tt).LayoutType,
-        type_of(c_tt).Storage,
-        type_of(a_tt).Storage,
-        type_of(b_tt).Storage,
-        type_of(sfa_tt).Storage,
-        type_of(sfb_tt).Storage,
+        type_of(c_tt).Engine,
+        type_of(a_tt).Engine,
+        type_of(b_tt).Engine,
+        type_of(sfa_tt).Engine,
+        type_of(sfb_tt).Engine,
     ]
     ctx.enqueue_function[kernel](
         c_tt,

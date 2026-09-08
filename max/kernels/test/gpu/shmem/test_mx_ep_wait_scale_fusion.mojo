@@ -65,10 +65,10 @@ plain run can pass green against a stale artifact that never saw the edit.
   ./bazel-bin/max/kernels/test/gpu/shmem/test_mx_ep_wait_scale_fusion.mojo.test
 """
 
-from std.gpu import block_idx
+from max.gpu import block_idx
 from max.gpu.host import DeviceContext, HostBuffer
-from std.gpu.host.info import MI355X
-from std.gpu.primitives import warp_id
+from max.gpu.host.info import MI355X
+from max.gpu.primitives import warp_id
 from std.math import align_up
 
 from layout import Coord, Idx, TileTensor, row_major

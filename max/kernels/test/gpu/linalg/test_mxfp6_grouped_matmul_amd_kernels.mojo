@@ -40,7 +40,7 @@ Usage:
 """
 
 from max.gpu.host import DeviceBuffer, DeviceContext, HostBuffer
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, global_idx
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, global_idx
 from max.gpu.memory import CacheOperation
 from std.math import align_up, ceildiv
 from std.memory import bitcast
@@ -768,6 +768,261 @@ def main() raises:
     # Crosses into the prefill band (etm > 2100).
     ok &= test_launcher[FP6Format.E3M2, 2, 512, 2048](
         "prefill", [1200, 1200], [0, 1], ctx
+    )
+
+    # Production kimi up-proj shape (N=4096, K=7168): the launcher's own
+    # etm bands for this (N, K) at lane_bytes=24 -- straddle each edge
+    # (<=20, <=127, <=255, above) so both the boundary and the tile picked
+    # just past it get a real dispatch-table run, not just the raw kernel
+    # coverage below (which bypasses the launcher).
+    ok &= test_launcher[FP6Format.E2M3, 2, 4096, 7168](
+        "up etm==20", [10, 10], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 4096, 7168](
+        "up etm==21", [11, 10], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 4096, 7168](
+        "up etm==127", [64, 63], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 4096, 7168](
+        "up etm==128", [64, 64], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 4096, 7168](
+        "up etm==255", [128, 127], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 4096, 7168](
+        "up etm==256", [128, 128], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 4096, 7168](
+        "up etm large", [2500, 2500], [0, 1], ctx
+    )
+
+    ok &= test_launcher[FP6Format.E3M2, 2, 4096, 7168](
+        "up etm==20", [10, 10], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 4096, 7168](
+        "up etm==21", [11, 10], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 4096, 7168](
+        "up etm==127", [64, 63], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 4096, 7168](
+        "up etm==128", [64, 64], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 4096, 7168](
+        "up etm==255", [128, 127], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 4096, 7168](
+        "up etm==256", [128, 128], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 4096, 7168](
+        "up etm large", [2500, 2500], [0, 1], ctx
+    )
+
+    # Real production grouped-expert shapes (EP=8 on MI355X: hidden=6144,
+    # expert_intermediate=3072, fused gate+up output=2*3072=6144). Deep-tuning
+    # pass band edges: <=3, <=7, <=31, <=255, above (see
+    # mxfp6-grouped-deep-tuning-bands.md) -- straddle each of the three NEW
+    # edges (<=3/4, <=7/8, <=31/32) in addition to the unchanged <=255/256
+    # edge already covered below.
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==3", [2, 1], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==4", [2, 2], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==7", [4, 3], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==8", [4, 4], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==31", [16, 15], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==32", [16, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==33", [17, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==127", [64, 63], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==128", [64, 64], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==255", [128, 127], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm==256", [128, 128], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 6144](
+        "m3 gate_up etm large", [2500, 2500], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==3", [2, 1], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==4", [2, 2], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==7", [4, 3], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==8", [4, 4], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==31", [16, 15], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==32", [16, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==33", [17, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==127", [64, 63], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==128", [64, 64], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==255", [128, 127], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm==256", [128, 128], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 3072](
+        "m3 down etm large", [2500, 2500], [0, 1], ctx
+    )
+
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==3", [2, 1], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==4", [2, 2], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==7", [4, 3], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==8", [4, 4], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==31", [16, 15], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==32", [16, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==33", [17, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==127", [64, 63], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==128", [64, 64], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==255", [128, 127], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm==256", [128, 128], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 6144](
+        "m3 gate_up etm large", [2500, 2500], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==3", [2, 1], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==4", [2, 2], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==7", [4, 3], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==8", [4, 4], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==31", [16, 15], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==32", [16, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==33", [17, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==127", [64, 63], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==128", [64, 64], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==255", [128, 127], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm==256", [128, 128], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 3072](
+        "m3 down etm large", [2500, 2500], [0, 1], ctx
+    )
+
+    # Generic (N, K) fallback band -- covers any MXFP6 shape that doesn't
+    # match one of the shape-specific bands above (narrow N or short K, e.g.
+    # per-rank expert widths outside the two measured production models).
+    # These used to fall through to the untuned BM=64 fallback and hit the
+    # same register-spill cliff the shape-specific bands exist to avoid; see
+    # Reuses the M3 bands' etm edges (<=3, <=7, <=31, <=255, above) at a
+    # narrow-N shape (N=2048) and a short-K shape (K=512) neither of which
+    # matches N==4096/N==6144 above.
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==3", [2, 1], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==4", [2, 2], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==7", [4, 3], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==8", [4, 4], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==31", [16, 15], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==32", [16, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==255", [128, 127], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm==256", [128, 128], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 2048, 3072](
+        "generic narrow-N etm large", [2500, 2500], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 2048, 3072](
+        "generic narrow-N etm==32", [16, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 2048, 3072](
+        "generic narrow-N etm large", [2500, 2500], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 512](
+        "generic short-K etm==3", [2, 1], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 512](
+        "generic short-K etm==32", [16, 16], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E2M3, 2, 6144, 512](
+        "generic short-K etm large", [2500, 2500], [0, 1], ctx
+    )
+    ok &= test_launcher[FP6Format.E3M2, 2, 6144, 512](
+        "generic short-K etm==32", [16, 16], [0, 1], ctx
     )
 
     # ----------------------------------------------------------------- #

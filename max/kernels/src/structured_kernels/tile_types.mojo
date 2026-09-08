@@ -34,8 +34,10 @@ from layout import (
     ComptimeInt,
     Coord,
     CoordLike,
+    DefaultEngine,
     Idx,
     LayoutTensor,
+    TensorEngine,
     TensorLayout,
     TileTensor,
     row_major,
@@ -558,7 +560,8 @@ def create_tma_tile[
 comptime GMEMTile[
     dtype: DType,
     tt_layout: TensorLayout,
-] = TileTensor[dtype, tt_layout, MutAnyOrigin]
+    Engine: TensorEngine = DefaultEngine[element_width=1],
+] = TileTensor[dtype, tt_layout, MutAnyOrigin, Engine=Engine]
 """Global memory TileTensor for global memory kernel parameters.
 
 Used for kernel parameter types, replacing LayoutTensor parameters.

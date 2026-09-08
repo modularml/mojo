@@ -14,7 +14,7 @@
 
 from std.bit import log2_floor
 from std.collections import Optional, OptionalReg
-from std.gpu import block_dim, lane_id, thread_idx
+from max.gpu import block_dim, lane_id, thread_idx
 from max.gpu.memory import CacheEviction, async_copy
 from std.math.uutils import umod
 from std.os import abort
@@ -665,7 +665,7 @@ struct GenericToSharedAsyncTileCopier[
         # `Scalar[src.dtype]` so `async_copy`'s `dtype` parameter infers
         # cleanly; without it the inferred dtype is a comptime expression
         # that fails to unify across the two pointer arguments.
-        # `TensorStorage.unsafe_ptr` is a raising trait method (it aborts for
+        # `TensorEngine.unsafe_ptr` is a raising trait method (it aborts for
         # storage that cannot expose a raw pointer); this copier runs in a
         # non-raising context, so mirror the old `TileTensor.ptr` accessor by
         # trapping any failure here.
@@ -679,7 +679,7 @@ struct GenericToSharedAsyncTileCopier[
         try:
             src_global_ptr = (
                 type_of(src_fragments)
-                .Storage.unsafe_ptr(src_fragments._storage)
+                .Engine.unsafe_ptr(src_fragments._storage)
                 .address_space_cast[.GLOBAL]()
                 .unsafe_mut_cast[False]()
                 .unsafe_origin_cast[ImmutAnyOrigin]()
@@ -687,7 +687,7 @@ struct GenericToSharedAsyncTileCopier[
             )
             dst_shared_ptr = (
                 type_of(dst_fragments)
-                .Storage.unsafe_ptr(dst_fragments._storage)
+                .Engine.unsafe_ptr(dst_fragments._storage)
                 .unsafe_mut_cast[True]()
                 .address_space_cast[.SHARED]()
                 .unsafe_origin_cast[MutAnyOrigin]()

@@ -24,11 +24,11 @@ methods invoked by the individual warps.
 
 from std.math import ceildiv
 from std.sys import size_of
-from std.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, warp_id
+from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, block_idx, warp_id
 from max.gpu.sync import barrier
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.primitives.grid_controls import launch_dependent_grids
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.memory import external_memory
 from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
@@ -39,7 +39,13 @@ from max.gpu.compute.arch.tcgen05 import (
 from layout.tma_async import (
     SharedMemBarrier,
 )
-from layout import ComptimeInt, CoordLike, RowMajorLayout, TileTensor
+from layout import (
+    ComptimeInt,
+    CoordLike,
+    RowMajorLayout,
+    TensorEngine,
+    TileTensor,
+)
 from nn.attention.gpu.nvidia.common import (
     OptionalPointer,
 )
@@ -88,6 +94,7 @@ struct MLA_SM100_Decode_KV_BF16[
     MaskType: MHAMask,
     config: MLA_SM100_Decode_Config,
     ValidLengthType: OptionalPointer,
+    Engine: TensorEngine,
     _is_cache_length_accurate: Bool = False,
     ragged: Bool = False,
 ](TrivialRegisterPassable):
@@ -106,6 +113,7 @@ struct MLA_SM100_Decode_KV_BF16[
             TMEM/SMEM layout.
         ValidLengthType: `OptionalPointer` type wrapping the per-batch
             valid-sequence-length tensor.
+        Engine: Engine policy of the `scalar_args` tile operand.
         _is_cache_length_accurate: When `False`, the kernel adds the local
             sequence length to the cache length to compute the total key
             count (defaults to `False`).
@@ -237,7 +245,10 @@ struct MLA_SM100_Decode_KV_BF16[
         ],
         scales_ptr: UnsafePointer[Float32, origin=MutAnyOrigin],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # SlidingWindowCausalMask is supported ONLY by the native FP8 backend

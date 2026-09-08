@@ -15,7 +15,7 @@
 from std.collections import Array
 from std.math import align_down, ceildiv
 from max.gpu.host import DeviceContext, get_gpu_target
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     global_idx,
     grid_dim,
@@ -28,8 +28,8 @@ from max.gpu.primitives.grid_controls import (
 
 from std.sys import align_of, is_amd_gpu, simd_width_of, size_of
 from max.gpu.memory import Consistency, multimem_st
-from std.gpu.intrinsics import Scope
-from layout import TensorLayout, TensorStorage, TileTensor
+from max.gpu.intrinsics import Scope
+from layout import TensorLayout, TensorEngine, TileTensor
 
 from .sync import (
     MAX_GPUS,
@@ -56,12 +56,12 @@ def broadcast_multimem_kernel[
     Layout: TensorLayout,
     BLOCK_SIZE: Int,
     ngpus: Int,
-    out_store: TensorStorage,
-    in_store: TensorStorage,
+    out_engine: TensorEngine,
+    in_engine: TensorEngine,
     simd_width: Int = simd_width_of[dtype, target=get_gpu_target()](),
 ](
-    output: TileTensor[dtype, Layout, MutAnyOrigin, Storage=out_store],
-    input: TileTensor[dtype, Layout, ImmutAnyOrigin, Storage=in_store],
+    output: TileTensor[dtype, Layout, MutAnyOrigin, Engine=out_engine],
+    input: TileTensor[dtype, Layout, ImmutAnyOrigin, Engine=in_engine],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     my_rank: Int32,
     root: Int32,
@@ -76,8 +76,8 @@ def broadcast_multimem_kernel[
         Layout: `TensorLayout` shared by both tensors.
         BLOCK_SIZE: Number of threads per thread block.
         ngpus: Number of GPUs participating in the broadcast.
-        out_store: `TensorStorage` policy of the output tensor.
-        in_store: `TensorStorage` policy of the input tensor.
+        out_engine: Engine of the output tensor.
+        in_engine: Engine of the input tensor.
         simd_width: Vector width used for memory access (defaults to the
             device-native SIMD width for `dtype`).
 
@@ -175,12 +175,12 @@ def broadcast_pull_1stage_kernel[
     layout: TensorLayout,
     BLOCK_SIZE: Int,
     ngpus: Int,
-    out_store: TensorStorage,
-    in_store: TensorStorage,
+    out_engine: TensorEngine,
+    in_engine: TensorEngine,
     simd_width: Int = simd_width_of[dtype, target=get_gpu_target()](),
 ](
-    output: TileTensor[dtype, layout, MutAnyOrigin, Storage=out_store],
-    input: TileTensor[dtype, layout, ImmutAnyOrigin, Storage=in_store],
+    output: TileTensor[dtype, layout, MutAnyOrigin, Engine=out_engine],
+    input: TileTensor[dtype, layout, ImmutAnyOrigin, Engine=in_engine],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     my_rank: Int32,
 ):
@@ -197,8 +197,8 @@ def broadcast_pull_1stage_kernel[
         layout: `TensorLayout` shared by both tensors.
         BLOCK_SIZE: Number of threads per thread block.
         ngpus: Number of GPUs participating in the broadcast.
-        out_store: `TensorStorage` policy of the output tensor.
-        in_store: `TensorStorage` policy of the input tensor.
+        out_engine: Engine of the output tensor.
+        in_engine: Engine of the input tensor.
         simd_width: Vector width used for memory access (defaults to the
             device-native SIMD width for `dtype`).
 
@@ -253,11 +253,11 @@ def broadcast_pull_2stage_kernel[
     dtype: DType,
     OutputLayout: TensorLayout,
     ngpus: Int,
-    result_store: TensorStorage,
+    result_engine: TensorEngine,
     *,
     BLOCK_SIZE: Int,
 ](
-    result: TileTensor[dtype, OutputLayout, MutAnyOrigin, Storage=result_store],
+    result: TileTensor[dtype, OutputLayout, MutAnyOrigin, Engine=result_engine],
     root_input_ptr: ImmPointer[Scalar[dtype], ImmutAnyOrigin],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     num_elements: Int32,
@@ -279,7 +279,7 @@ def broadcast_pull_2stage_kernel[
         dtype: Data dtype of tensor elements.
         OutputLayout: Layout of the output TileTensor.
         ngpus: Number of GPUs participating.
-        result_store: `TensorStorage` policy of the output tensor.
+        result_engine: Engine of the output tensor.
         BLOCK_SIZE: Number of threads per block.
 
     Args:
@@ -312,7 +312,7 @@ def broadcast_pull_2stage_kernel[
     # These are used as scratch space for the scatter-gather pattern
     comptime PtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
     var payloads = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: (
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: (
             rank_sigs[i].address_space_cast[.GENERIC]() + 1
         ).bitcast[Scalar[dtype]]()
     )
@@ -473,15 +473,15 @@ def broadcast[
     dtype: DType,
     in_layout: TensorLayout,
     in_origin: Origin,
-    in_store: TensorStorage,
-    out_store: TensorStorage,
+    in_engine: TensorEngine,
+    out_engine: TensorEngine,
     //,
     ngpus: Int,
     pdl_level: PDLLevel = PDLLevel(),
     use_multimem: Bool = False,
 ](
-    input_tensor: TileTensor[dtype, in_layout, in_origin, Storage=in_store],
-    output_tensor: TileTensor[mut=True, dtype, in_layout, _, Storage=out_store],
+    input_tensor: TileTensor[dtype, in_layout, in_origin, Engine=in_engine],
+    output_tensor: TileTensor[mut=True, dtype, in_layout, _, Engine=out_engine],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
     root: Int,
@@ -495,8 +495,8 @@ def broadcast[
         dtype: Data type of the tensor elements.
         in_layout: Layout of the input TileTensor.
         in_origin: Origin of the input TileTensor.
-        in_store: `TensorStorage` policy of the input tensor.
-        out_store: `TensorStorage` policy of the output tensor.
+        in_engine: Engine of the input tensor.
+        out_engine: Engine of the output tensor.
         ngpus: Number of GPUs participating in the broadcast.
         pdl_level: Controls PDL behavior for P2P kernels.
         use_multimem: Whether to use multimem mode for improved performance.
@@ -551,8 +551,8 @@ def broadcast[
             in_layout,
             BLOCK_SIZE,
             ngpus,
-            out_store,
-            in_store,
+            out_engine,
+            in_engine,
         ]
 
         ctx.enqueue_function[bcast_kernel](
@@ -583,8 +583,8 @@ def broadcast[
                 in_layout,
                 BLOCK_SIZE,
                 ngpus,
-                out_store,
-                in_store,
+                out_engine,
+                in_engine,
             ]
 
             ctx.enqueue_function[bcast_kernel](
@@ -602,14 +602,14 @@ def broadcast_2stage[
     dtype: DType,
     in_layout: TensorLayout,
     in_origin: Origin,
-    in_store: TensorStorage,
-    out_store: TensorStorage,
+    in_engine: TensorEngine,
+    out_engine: TensorEngine,
     //,
     ngpus: Int,
     pdl_level: PDLLevel,
 ](
-    input_tensor: TileTensor[dtype, in_layout, in_origin, Storage=in_store],
-    output_tensor: TileTensor[mut=True, dtype, in_layout, _, Storage=out_store],
+    input_tensor: TileTensor[dtype, in_layout, in_origin, Engine=in_engine],
+    output_tensor: TileTensor[mut=True, dtype, in_layout, _, Engine=out_engine],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
     root: Int,
@@ -639,8 +639,8 @@ def broadcast_2stage[
         dtype: Data dtype of tensor elements.
         in_layout: Layout of the input TileTensor.
         in_origin: Origin of the input TileTensor.
-        in_store: `TensorStorage` policy of the input tensor.
-        out_store: `TensorStorage` policy of the output tensor.
+        in_engine: Engine of the input tensor.
+        out_engine: Engine of the output tensor.
         ngpus: Number of GPUs participating.
         pdl_level: Control PDL behavior for the kernel.
 
@@ -683,7 +683,7 @@ def broadcast_2stage[
         dtype,
         in_layout,
         ngpus,
-        out_store,
+        out_engine,
         BLOCK_SIZE=BLOCK_SIZE,
     ]
 

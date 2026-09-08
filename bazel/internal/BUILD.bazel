@@ -183,7 +183,7 @@ mojo_toolchain(
     name = "mojo_toolchain_target",
     implicit_deps = [],
     lld = "@llvm-project//lld:lld",
-    mojo = "//KGEN/tools/mojo",
+    mojo = "//Mojo/tools/mojo",
     tags = [
         # Manual so that even in --config=prebuilt-mojo this
         # doesn't build, since we build this folder in the OSS CI.

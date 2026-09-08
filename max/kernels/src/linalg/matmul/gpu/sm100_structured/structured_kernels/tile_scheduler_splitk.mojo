@@ -29,9 +29,9 @@ from structured_kernels.tile_types import (
     _StridedLayout,
     _strided_layout,
 )
-from std.gpu import WARP_SIZE, grid_dim, lane_id
+from max.gpu import WARP_SIZE, grid_dim, lane_id
 from max.gpu.sync import NamedBarrierSemaphore
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.compute.arch.tcgen05 import *
 from std.bit import prev_power_of_two
 from std.math.uutils import ufloordiv, umod

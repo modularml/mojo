@@ -879,6 +879,8 @@ class DeepseekV3_2(Module):
             return_hidden_states=self.return_hidden_states,
             logits_scaling=self.logits_scaling,
             emit_last_token_logits=self.emit_last_token_logits,
+            unpadded_vocab_size=self.config.unpadded_vocab_size,
+            vocab_size=self.config.vocab_size,
         )
 
     def input_types(

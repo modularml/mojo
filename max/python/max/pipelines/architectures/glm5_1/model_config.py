@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -26,12 +27,36 @@ from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import MAXModelConfig, PipelineConfig
 from max.pipelines.lib.config.model_config import _select_quantization_encoding
 from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
+from max.pipelines.lib.registry import PIPELINE_REGISTRY
 from max.pipelines.modeling.config_enums import (
     SupportedEncoding,
     supported_encoding_dtype,
 )
 from transformers import AutoConfig
 from typing_extensions import Self, override
+
+logger = logging.getLogger("max.pipelines")
+
+
+def _glm_unpadded_vocab_size(
+    pipeline_config: PipelineConfig,
+) -> int | None:
+    """Returns the tokenizer's token count, or ``None`` to skip tail masking."""
+    try:
+        tokenizer = PIPELINE_REGISTRY.get_active_tokenizer(
+            pipeline_config.model.huggingface_model_repo
+        )
+    except Exception as e:
+        # Skipping the mask leaves the untrained tail sampleable, so say so
+        # rather than degrading silently.
+        logger.warning(
+            "GLM-5.x: could not read the tokenizer vocab size (%s); the "
+            "padded vocab tail will not be masked.",
+            e,
+        )
+        return None
+
+    return len(tokenizer)
 
 
 def _glm_rope_scaling(huggingface_config: AutoConfig) -> dict[str, Any] | None:
@@ -160,4 +185,5 @@ class Glm5_1Config(DeepseekV3_2Config):
                 config, "indexer_rope_interleave", False
             ),
             quantization_encoding=quantization_encoding,
+            unpadded_vocab_size=_glm_unpadded_vocab_size(pipeline_config),
         )

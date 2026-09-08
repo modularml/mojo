@@ -199,7 +199,7 @@ def test_stencil_avg_pool_padded() raises:
     comptime output_shape_dims = IndexList[4](1, output_height, output_width, 1)
 
     var input_stack = Array[Scalar[dtype], input_shape_dims.flattened_length()](
-        uninitialized=True
+        fill={}
     )
     var input = Span(input_stack)
     var input_shape = IndexList[rank](1, input_height, input_width, 1)

@@ -18,22 +18,22 @@ from std.sys.info import simd_width_of
 
 from max.algorithm import elementwise
 from std.bit import next_power_of_two
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     block_idx,
     global_idx,
     thread_idx,
 )
 from max.gpu.sync import barrier
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.host import DeviceContext, get_gpu_target
 from max.gpu.host.info import is_cpu
 from std.memory import unsafe_stack_allocation
 from layout import (
     Idx,
-    PointerStorage,
+    DefaultEngine,
     TensorLayout,
-    TensorStorage,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -46,21 +46,21 @@ from std.utils.index import IndexList, StaticTuple
 def _argsort_cpu[
     *,
     ascending: Bool = True,
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     indices: TileTensor[
-        mut=True, address_space=.GENERIC, Storage=IndicesStorageType, ...
+        mut=True, address_space=.GENERIC, Engine=IndicesEngine, ...
     ],
-    input: TileTensor[mut=False, Storage=InputStorageType, ...],
+    input: TileTensor[mut=False, Engine=InputEngine, ...],
 ) raises:
     """
     Performs argsort on CPU.
 
     Parameters:
         ascending: Sort direction (True for ascending, False for descending).
-        IndicesStorageType: Storage policy of the indices tile.
-        InputStorageType: Storage policy of the input tile.
+        IndicesEngine: Engine of the indices tile.
+        InputEngine: Engine of the input tile.
 
     Args:
         indices: Output buffer to store sorted indices.
@@ -128,22 +128,22 @@ def _bitonic_local_sort_kernel[
     ascending: Bool,
     IndicesLayoutType: TensorLayout,
     InputLayoutType: TensorLayout,
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     indices_arg: TileTensor[
         mut=True,
         indices_dtype,
         IndicesLayoutType,
         MutAnyOrigin,
-        Storage=IndicesStorageType,
+        Engine=IndicesEngine,
     ],
     input_arg: TileTensor[
         mut=True,
         input_dtype,
         InputLayoutType,
         MutAnyOrigin,
-        Storage=InputStorageType,
+        Engine=InputEngine,
     ],
     n_arg: Int32,
 ):
@@ -221,22 +221,22 @@ def _bitonic_merge_local_kernel[
     ascending: Bool,
     IndicesLayoutType: TensorLayout,
     InputLayoutType: TensorLayout,
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     indices_arg: TileTensor[
         mut=True,
         indices_dtype,
         IndicesLayoutType,
         MutAnyOrigin,
-        Storage=IndicesStorageType,
+        Engine=IndicesEngine,
     ],
     input_arg: TileTensor[
         mut=True,
         input_dtype,
         InputLayoutType,
         MutAnyOrigin,
-        Storage=InputStorageType,
+        Engine=InputEngine,
     ],
     n_arg: Int32,
     stage: Int32,
@@ -299,11 +299,11 @@ def _bitonic_merge_local_kernel[
 def _argsort_gpu_impl[
     *,
     ascending: Bool = True,
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
-    indices: TileTensor[mut=True, Storage=IndicesStorageType, ...],
-    input: TileTensor[mut=True, Storage=InputStorageType, ...],
+    indices: TileTensor[mut=True, Engine=IndicesEngine, ...],
+    input: TileTensor[mut=True, Engine=InputEngine, ...],
     ctx: DeviceContext,
 ) raises:
     """
@@ -320,8 +320,8 @@ def _argsort_gpu_impl[
 
     Parameters:
         ascending: Sort direction (True for ascending, False for descending).
-        IndicesStorageType: Storage policy of the indices tile.
-        InputStorageType: Storage policy of the input tile.
+        IndicesEngine: Engine of the indices tile.
+        InputEngine: Engine of the input tile.
 
     Args:
         indices: Output buffer to store sorted indices.
@@ -347,13 +347,13 @@ def _argsort_gpu_impl[
             indices.dtype,
             indices.LayoutType,
             indices.origin,
-            Storage=indices.Storage,
+            Engine=indices.Engine,
         ],
         input_arg: TileTensor[
             input.dtype,
             input.LayoutType,
             input.origin,
-            Storage=input.Storage,
+            Engine=input.Engine,
         ],
         n_arg: Int32,
         step: Int32,
@@ -389,8 +389,8 @@ def _argsort_gpu_impl[
         ascending=ascending,
         IndicesLayoutType=indices.LayoutType,
         InputLayoutType=input.LayoutType,
-        IndicesStorageType=IndicesStorageType,
-        InputStorageType=InputStorageType,
+        IndicesEngine=IndicesEngine,
+        InputEngine=InputEngine,
     ]
     ctx.enqueue_function[local_sort_kernel](
         indices,
@@ -425,8 +425,8 @@ def _argsort_gpu_impl[
             ascending=ascending,
             IndicesLayoutType=indices.LayoutType,
             InputLayoutType=input.LayoutType,
-            IndicesStorageType=IndicesStorageType,
-            InputStorageType=InputStorageType,
+            IndicesEngine=IndicesEngine,
+            InputEngine=InputEngine,
         ]
         ctx.enqueue_function[merge_local_kernel](
             indices,
@@ -442,11 +442,11 @@ def _argsort_gpu_impl[
 def _argsort_gpu[
     *,
     ascending: Bool = True,
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
-    indices: TileTensor[mut=True, Storage=IndicesStorageType, ...],
-    input: TileTensor[mut=False, Storage=InputStorageType, ...],
+    indices: TileTensor[mut=True, Engine=IndicesEngine, ...],
+    input: TileTensor[mut=False, Engine=InputEngine, ...],
     ctx: DeviceContext,
 ) raises:
     """
@@ -454,8 +454,8 @@ def _argsort_gpu[
 
     Parameters:
         ascending: Sort direction (True for ascending, False for descending).
-        IndicesStorageType: Storage policy of the indices tile.
-        InputStorageType: Storage policy of the input tile.
+        IndicesEngine: Engine of the indices tile.
+        InputEngine: Engine of the input tile.
 
     Args:
         indices: Output buffer to store sorted indices.
@@ -567,11 +567,11 @@ def _argsort_gpu[
 
 
 def _validate_argsort[
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
-    input: TileTensor[mut=False, Storage=InputStorageType, ...],
-    output: TileTensor[mut=False, Storage=IndicesStorageType, ...],
+    input: TileTensor[mut=False, Engine=InputEngine, ...],
+    output: TileTensor[mut=False, Engine=IndicesEngine, ...],
 ) raises:
     """
     Validates input and output buffers for argsort operation.
@@ -592,13 +592,13 @@ def argsort[
     *,
     ascending: Bool = True,
     target: StaticString = "cpu",
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     output: TileTensor[
-        mut=True, address_space=.GENERIC, Storage=IndicesStorageType, ...
+        mut=True, address_space=.GENERIC, Engine=IndicesEngine, ...
     ],
-    input: TileTensor[mut=False, Storage=InputStorageType, ...],
+    input: TileTensor[mut=False, Engine=InputEngine, ...],
     ctx: DeviceContext,
 ) raises:
     """
@@ -607,8 +607,8 @@ def argsort[
     Parameters:
         ascending: Sort direction (True for ascending, False for descending).
         target: Target device ("cpu" or "gpu").
-        IndicesStorageType: Storage policy of the output (indices) tile.
-        InputStorageType: Storage policy of the input tile.
+        IndicesEngine: Engine of the output (indices) tile.
+        InputEngine: Engine of the input tile.
 
     Args:
         output: Buffer to store sorted indices.
@@ -621,7 +621,7 @@ def argsort[
         "argsort",
         task_id=get_safe_task_id(ctx),
     ):
-        _validate_argsort[IndicesStorageType, InputStorageType](input, output)
+        _validate_argsort[IndicesEngine, InputEngine](input, output)
 
         comptime if is_cpu[target]():
             return _argsort_cpu[ascending=ascending](output, input)
@@ -631,21 +631,21 @@ def argsort[
 
 def argsort[
     ascending: Bool = True,
-    IndicesStorageType: TensorStorage = PointerStorage[element_width=1],
-    InputStorageType: TensorStorage = PointerStorage[element_width=1],
+    IndicesEngine: TensorEngine = DefaultEngine[element_width=1],
+    InputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     output: TileTensor[
-        mut=True, address_space=.GENERIC, Storage=IndicesStorageType, ...
+        mut=True, address_space=.GENERIC, Engine=IndicesEngine, ...
     ],
-    input: TileTensor[mut=False, Storage=InputStorageType, ...],
+    input: TileTensor[mut=False, Engine=InputEngine, ...],
 ) raises:
     """
     CPU-only version of argsort.
 
     Parameters:
         ascending: Sort direction (True for ascending, False for descending).
-        IndicesStorageType: Storage policy of the output (indices) tile.
-        InputStorageType: Storage policy of the input tile.
+        IndicesEngine: Engine of the output (indices) tile.
+        InputEngine: Engine of the input tile.
 
     Args:
         output: Buffer to store sorted indices.
@@ -655,5 +655,5 @@ def argsort[
     comptime assert output.flat_rank == 1
     comptime assert output.dtype.is_integral()
     with Trace[TraceLevel.OP]("argsort"):
-        _validate_argsort[IndicesStorageType, InputStorageType](input, output)
+        _validate_argsort[IndicesEngine, InputEngine](input, output)
         _argsort_cpu[ascending=ascending](output, input)

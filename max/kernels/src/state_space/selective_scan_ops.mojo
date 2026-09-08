@@ -122,7 +122,7 @@ struct SelectiveScanFwd[delta_softplus: Bool = False]:
                 "Unsupported dstate: " + String(dstate) + ". Expected 8 or 16."
             )
 
-        # Dispatch runtime dstate to compile-time DSTATE for @parameter for
+        # Dispatch runtime dstate to compile-time DSTATE for comptime for
         # loop unrolling and guaranteed register allocation on GPU.
         comptime if is_cpu[target]():
             if dstate == 16:
@@ -216,7 +216,7 @@ struct SelectiveScanFwd[delta_softplus: Bool = False]:
                         D_tt.LayoutType,
                         z_tt.LayoutType,
                         delta_bias_tt.LayoutType,
-                        output_tt.Storage,
+                        output_tt.Engine,
                     ]
                 ]()
                 gpu_ctx.enqueue_function(
@@ -269,7 +269,7 @@ struct SelectiveScanFwd[delta_softplus: Bool = False]:
                         D_tt.LayoutType,
                         z_tt.LayoutType,
                         delta_bias_tt.LayoutType,
-                        output_tt.Storage,
+                        output_tt.Engine,
                     ]
                 ]()
                 gpu_ctx.enqueue_function(
@@ -487,7 +487,7 @@ struct SelectiveScanFwdMinimal[delta_softplus: Bool = False]:
                         A_tt.LayoutType,
                         B_tt.LayoutType,
                         C_tt.LayoutType,
-                        output_tt.Storage,
+                        output_tt.Engine,
                     ]
                 ]()
                 gpu_ctx.enqueue_function(
@@ -528,7 +528,7 @@ struct SelectiveScanFwdMinimal[delta_softplus: Bool = False]:
                         A_tt.LayoutType,
                         B_tt.LayoutType,
                         C_tt.LayoutType,
-                        output_tt.Storage,
+                        output_tt.Engine,
                     ]
                 ]()
                 gpu_ctx.enqueue_function(
@@ -758,7 +758,7 @@ struct SelectiveScanUpdate[delta_softplus: Bool = False]:
                         D_tt.LayoutType,
                         z_tt.LayoutType,
                         dt_bias_tt.LayoutType,
-                        state_out_tt.Storage,
+                        state_out_tt.Engine,
                     ]
                 ]()
                 gpu_ctx.enqueue_function(
@@ -810,7 +810,7 @@ struct SelectiveScanUpdate[delta_softplus: Bool = False]:
                         D_tt.LayoutType,
                         z_tt.LayoutType,
                         dt_bias_tt.LayoutType,
-                        state_out_tt.Storage,
+                        state_out_tt.Engine,
                     ]
                 ]()
                 gpu_ctx.enqueue_function(

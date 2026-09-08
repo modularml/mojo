@@ -37,7 +37,7 @@ from layout import (
     IntTuple,
     Layout,
     MixedLayout,
-    PointerStorage,
+    DefaultEngine,
     RuntimeLayout,
     RuntimeTuple,
     TensorLayout,
@@ -45,15 +45,15 @@ from layout import (
     UNKNOWN_VALUE,
     row_major,
 )
-from layout.tensor_storage import TensorStorage
+from layout.tensor_engine import TensorEngine
 from layout.tile_io import copy_sram_to_dram
 from max.gpu.memory import fence_async_view_proxy
 from std.collections import OptionalReg
 from ....structuring import RegTile
 from structured_kernels.smem_types import reg_tile_to_tile_tensor
 from layout.swizzle import Swizzle
-from std.gpu import lane_id
-from std.gpu.globals import WARP_SIZE, WARPGROUP_SIZE
+from max.gpu import lane_id
+from max.gpu.globals import WARP_SIZE, WARPGROUP_SIZE
 
 from max.gpu.compute.mma import st_matrix
 from std.memory import bitcast
@@ -243,7 +243,7 @@ struct TileWriterThreadwise[
     dtype: DType,
     dst_layout: TensorLayout,
     dst_origin: MutOrigin,
-    dst_storage: TensorStorage,
+    dst_engine: TensorEngine,
     dst_linear_idx_type: DType,
     //,
     thread_layout: MixedLayout,
@@ -262,7 +262,7 @@ struct TileWriterThreadwise[
         dtype: Data type of the source and destination tiles (inferred).
         dst_layout: Layout of the destination global tensor (inferred).
         dst_origin: Origin type of the destination global tensor (inferred).
-        dst_storage: Storage type of the destination global tensor (inferred).
+        dst_engine: Engine of the destination global tensor (inferred).
         dst_linear_idx_type: Linear index type for the destination tensor
             (inferred).
         thread_layout: Layout mapping threads across the tile for vectorized
@@ -281,7 +281,7 @@ struct TileWriterThreadwise[
         Self.dtype,
         LayoutType=Self.dst_layout,
         origin=Self.dst_origin,
-        Storage=Self.dst_storage,
+        Engine=Self.dst_engine,
         address_space=.GENERIC,
         linear_idx_type=Self.dst_linear_idx_type,
     ]
@@ -555,7 +555,7 @@ struct FragmentToSMemWriter[
             Self.c_type,
             origin=MutAnyOrigin,
             address_space=.SHARED,
-            Storage=PointerStorage[element_width=1],
+            Engine=DefaultEngine[element_width=1],
             ...,
         ],
         data: SIMD[Self.c_type, elements_per_op],
@@ -682,7 +682,7 @@ struct RegisterToGMemWriter[
     c_type: DType,
     dst_layout: TensorLayout,
     dst_origin: MutOrigin,
-    dst_storage: TensorStorage,
+    dst_engine: TensorEngine,
     dst_linear_idx_type: DType,
     //,
     wgmma_shape: IndexList[3],
@@ -703,7 +703,7 @@ struct RegisterToGMemWriter[
         c_type: Output data type.
         dst_layout: Layout of the destination tensor.
         dst_origin: Origin type of the destination tensor.
-        dst_storage: Storage type of the destination tensor.
+        dst_engine: Engine of the destination tensor.
         dst_linear_idx_type: Linear index type for destination tensor.
         wgmma_shape: Shape of the WGMMA operation [M, N, K].
         num_consumer: Number of consumer warp groups.
@@ -730,7 +730,7 @@ struct RegisterToGMemWriter[
         Self.c_type,
         LayoutType=Self.dst_layout,
         origin=Self.dst_origin,
-        Storage=Self.dst_storage,
+        Engine=Self.dst_engine,
         address_space=.GENERIC,
         linear_idx_type=Self.dst_linear_idx_type,
     ]

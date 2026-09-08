@@ -40,7 +40,7 @@ from std.collections import Optional
 from std.random import randn, seed
 from std.sys import argv, has_nvidia_gpu_accelerator
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import _is_sm10x_gpu
 from std.utils.index import Index

@@ -13,7 +13,7 @@
 
 from max.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
 from max.gpu.host import DeviceContext, Dim
-from std.gpu import cluster_dim
+from max.gpu import cluster_dim
 
 
 def test_cluster_sync_kernel():

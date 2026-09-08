@@ -13,7 +13,7 @@
 
 """Figure 13.9: Basic merge kernel implementation in Mojo."""
 
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.host import DeviceContext
 from std.math import min, max
 

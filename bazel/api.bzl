@@ -126,7 +126,7 @@ def _process_mojo_deps(deps):
             imports_max = True
         elif dep == "//MLRT:Driver/DeviceContext":
             new_deps.append("@modular_wheel//:AsyncRTMojoBindings_lib")
-        elif dep == "//KGEN:CompilerRT":
+        elif dep == "//Mojo:CompilerRT":
             needs_compiler_rt = True
         else:
             new_deps.append(dep)
@@ -136,7 +136,7 @@ def _process_mojo_deps(deps):
 
     if needs_compiler_rt:
         new_deps += select({
-            "//:use_prebuilt_mojo_toolchain_disabled": ["//KGEN:CompilerRT"],
+            "//:use_prebuilt_mojo_toolchain_disabled": ["//Mojo:CompilerRT"],
             "//conditions:default": ["@modular_wheel//:CompilerRT_lib"],
         })
 

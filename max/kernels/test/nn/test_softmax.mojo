@@ -33,26 +33,26 @@ def test_logsoftmax() raises:
 
     def logsoftmax_test_nd[rank: Int, shape: IndexList[rank]]() raises:
         comptime if rank == 1:
-            var in_stack = Array[Scalar[type], shape[0]](uninitialized=True)
+            var in_stack = Array[Scalar[type], shape[0]](fill={})
             var in_tt = TileTensor(in_stack, row_major[shape[0]]())
-            var out_stack = Array[Scalar[type], shape[0]](uninitialized=True)
+            var out_stack = Array[Scalar[type], shape[0]](fill=0)
             arange(in_tt)
-            var out_tt = TileTensor(out_stack, row_major[shape[0]]()).fill(0)
+            var out_tt = TileTensor(out_stack, row_major[shape[0]]())
             logsoftmax_inline[type, simd_width, rank](in_tt, out_tt, rank - 1)
             for i in range(out_tt.num_elements()):
                 print(out_tt[i])
         else:
             comptime if rank == 2:
                 comptime sz = shape[0] * shape[1]
-                var in_stack = Array[Scalar[type], sz](uninitialized=True)
+                var in_stack = Array[Scalar[type], sz](fill={})
                 var in_tt = TileTensor(
                     in_stack, row_major[shape[0], shape[1]]()
                 )
-                var out_stack = Array[Scalar[type], sz](uninitialized=True)
+                var out_stack = Array[Scalar[type], sz](fill=0)
                 arange(in_tt)
                 var out_tt = TileTensor(
                     out_stack, row_major[shape[0], shape[1]]()
-                ).fill(0)
+                )
                 logsoftmax_inline[type, simd_width, rank](
                     in_tt, out_tt, rank - 1
                 )
@@ -92,12 +92,12 @@ def test_softmax_2pass():
     comptime simd_width = simd_width_of[type]()
     comptime sz = 5
 
-    var in_stack = Array[Scalar[type], sz](uninitialized=True)
+    var in_stack = Array[Scalar[type], sz](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var in_tt = TileTensor(in_stack, row_major[sz]())
-    for i in range(sz):
-        in_tt[i] = Float32(i)
-    var out_stack = Array[Scalar[type], sz](uninitialized=True)
-    var out_tt = TileTensor(out_stack, row_major[sz]()).fill(0)
+    var out_stack = Array[Scalar[type], sz](fill=0)
+    var out_tt = TileTensor(out_stack, row_major[sz]())
 
     softmax_2_pass[simd_width, type](out_tt, in_tt)
 

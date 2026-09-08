@@ -32,10 +32,10 @@ from std.collections import Array
 from std.math import ceildiv
 from std.sys import simd_width_of, align_of, size_of
 
-from layout import TensorStorage, TileTensor
+from layout import TensorEngine, TileTensor
 from layout.tile_layout import TensorLayout
 from layout.tma_async import SharedMemBarrier
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -117,14 +117,14 @@ def _allgather_naive[
     in_origin: Origin,
     out_layout: TensorLayout,
     out_origin: MutOrigin,
-    in_store: TensorStorage,
-    out_store: TensorStorage,
+    in_engine: TensorEngine,
+    out_engine: TensorEngine,
 ](
     input_buffers: Array[
-        TileTensor[dtype, in_layout, in_origin, Storage=in_store], ngpus
+        TileTensor[dtype, in_layout, in_origin, Engine=in_engine], ngpus
     ],
     output_buffers: Array[
-        TileTensor[mut=True, dtype, out_layout, out_origin, Storage=out_store],
+        TileTensor[mut=True, dtype, out_layout, out_origin, Engine=out_engine],
         ngpus,
     ],
     ctx: DeviceContext,
@@ -199,19 +199,19 @@ def _allgather_p2p_kernel[
 
     comptime SrcPtrType = ImmPointer[Scalar[dtype], ImmutAnyOrigin]
     var src_ptrs_rr = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> SrcPtrType: src_ptrs[
+        fill_with_unrolled=lambda [i: Int]() -> SrcPtrType: src_ptrs[
             circular_add[ngpus](_my_rank, i)
         ]
     )
 
     comptime OutPtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
     var out_ptrs_rr = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> OutPtrType: outputs[
+        fill_with_unrolled=lambda [i: Int]() -> OutPtrType: outputs[
             circular_add[ngpus](_my_rank, i)
         ]
     )
     var lengths_rr = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> Int: Int(
+        fill_with_unrolled=lambda [i: Int]() -> Int: Int(
             lengths[circular_add[ngpus](_my_rank, i)]
         )
     )
@@ -444,15 +444,15 @@ def _allgather_p2p[
     in_origin: Origin,
     out_layout: TensorLayout,
     out_origin: MutOrigin,
-    in_store: TensorStorage,
-    out_store: TensorStorage,
+    in_engine: TensorEngine,
+    out_engine: TensorEngine,
     domain_id: Int = 0,
 ](
     input_buffers: Array[
-        TileTensor[dtype, in_layout, in_origin, Storage=in_store], ngpus
+        TileTensor[dtype, in_layout, in_origin, Engine=in_engine], ngpus
     ],
     output_buffers: Array[
-        TileTensor[mut=True, dtype, out_layout, out_origin, Storage=out_store],
+        TileTensor[mut=True, dtype, out_layout, out_origin, Engine=out_engine],
         ngpus,
     ],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
@@ -557,15 +557,15 @@ def allgather[
     in_origin: Origin,
     out_layout: TensorLayout,
     out_origin: MutOrigin,
-    in_store: TensorStorage,
-    out_store: TensorStorage,
+    in_engine: TensorEngine,
+    out_engine: TensorEngine,
     domain_id: Int = 0,
 ](
     input_buffers: Array[
-        TileTensor[dtype, in_layout, in_origin, Storage=in_store], ngpus
+        TileTensor[dtype, in_layout, in_origin, Engine=in_engine], ngpus
     ],
     output_buffers: Array[
-        TileTensor[mut=True, dtype, out_layout, out_origin, Storage=out_store],
+        TileTensor[mut=True, dtype, out_layout, out_origin, Engine=out_engine],
         ngpus,
     ],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
@@ -589,8 +589,8 @@ def allgather[
         in_origin: Origin of the input TileTensors.
         out_layout: Layout of the output TileTensors.
         out_origin: Origin of the output TileTensors.
-        in_store: `TensorStorage` policy of the input TileTensors.
-        out_store: `TensorStorage` policy of the output TileTensors.
+        in_engine: Engine of the input TileTensors.
+        out_engine: Engine of the output TileTensors.
         domain_id: Barrier counter bank to use (0 for full-world; a distinct
             nonzero value for grouped collectives sharing the same Signal
             buffers). See `_multi_gpu_barrier`.

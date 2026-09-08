@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.gpu.host import DeviceContext
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.memory import external_memory
 from max.gpu.sync import barrier
 from std.testing import assert_equal

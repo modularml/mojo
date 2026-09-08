@@ -22,8 +22,8 @@ GEMMs (P = Q @ K^T and O += P @ V).
 """
 
 from max.gpu.compute.mma import mma as gpu_mma
-from std.gpu import lane_id, WARP_SIZE
-from std.gpu.intrinsics import ds_read_tr16_b64
+from max.gpu import lane_id, WARP_SIZE
+from max.gpu.intrinsics import ds_read_tr16_b64
 from std.math.uutils import ufloordiv, umod
 from std.memory import AddressSpace
 from std.sys import simd_width_of

@@ -32,11 +32,11 @@ The global / tensor scalar scale (`alpha`) folds in once at the matmul epilogue,
 not here -- this routine produces the per-element dequantized weight only.
 """
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from std.math import ceildiv
 from max.gpu.host import DeviceContext
 
-from layout import Idx, TensorStorage, TileTensor
+from layout import Idx, TensorEngine, TileTensor
 from layout.tile_layout import TensorLayout, row_major
 
 from linalg.fp4_utils import E2M1_TO_FLOAT32, NVFP4_SF_VECTOR_SIZE
@@ -76,14 +76,14 @@ def fp4_materialize_kernel[
     w_layout: TensorLayout,
     s_layout: TensorLayout,
     out_layout: TensorLayout,
-    w_storage: TensorStorage,
-    s_storage: TensorStorage,
-    out_storage: TensorStorage,
+    w_engine: TensorEngine,
+    s_engine: TensorEngine,
+    out_engine: TensorEngine,
 ](
-    out_w: TileTensor[out_type, out_layout, MutAnyOrigin, Storage=out_storage],
-    packed: TileTensor[.uint8, w_layout, ImmutAnyOrigin, Storage=w_storage],
+    out_w: TileTensor[out_type, out_layout, MutAnyOrigin, Engine=out_engine],
+    packed: TileTensor[.uint8, w_layout, ImmutAnyOrigin, Engine=w_engine],
     scales: TileTensor[
-        .float8_e4m3fn, s_layout, ImmutAnyOrigin, Storage=s_storage
+        .float8_e4m3fn, s_layout, ImmutAnyOrigin, Engine=s_engine
     ],
 ):
     """Materializes the packed-FP4 weight into a dense `[N, K]` `out_type` buffer.
@@ -101,9 +101,9 @@ def fp4_materialize_kernel[
             `[N, K//16]` `float8_e4m3fn` buffer.
         out_layout: `TileTensor` layout of `out_w`, a plain rank-2 `[N, K]`
             buffer of `out_type`.
-        w_storage: `TensorStorage` of `packed`.
-        s_storage: `TensorStorage` of `scales`.
-        out_storage: `TensorStorage` of `out_w`.
+        w_engine: `TensorEngine` of `packed`.
+        s_engine: `TensorEngine` of `scales`.
+        out_engine: `TensorEngine` of `out_w`.
 
     Args:
         out_w: Output weight buffer of shape `[N, K]` and dtype `out_type`,
@@ -169,9 +169,9 @@ def enqueue_fp4_materialize[
         type_of(packed).LayoutType,
         type_of(scales).LayoutType,
         type_of(out_w).LayoutType,
-        type_of(packed).Storage,
-        type_of(scales).Storage,
-        type_of(out_w).Storage,
+        type_of(packed).Engine,
+        type_of(scales).Engine,
+        type_of(out_w).Engine,
     ]
     ctx.enqueue_function[kernel](
         out_w,

@@ -14,7 +14,7 @@
 
 
 from std.bit import next_power_of_two
-from std.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
+from max.gpu import WARP_SIZE, block_dim, block_idx, thread_idx
 from max.gpu.primitives.grid_controls import (
     PDL,
     PDLLevel,
@@ -26,7 +26,7 @@ from std.sys.info import has_apple_gpu_accelerator
 
 from max.gpu.host import DeviceContext, get_gpu_target
 from max.runtime.tracing import Trace, TraceLevel, trace_arg
-from layout import TensorLayout, TensorStorage, TileTensor, coord_to_index_list
+from layout import TensorLayout, TensorEngine, TileTensor, coord_to_index_list
 from nn.topk import TopK_2, _block_reduce_topk, _topk_dead_val
 from std.utils.index import IndexList
 
@@ -183,10 +183,10 @@ def _argmaxmin_scan_kernel[
     simd_width: Int,
     unroll: Int,
     InputLayoutType: TensorLayout,
-    InputStorage: TensorStorage,
+    InputEngine: TensorEngine,
 ](
     input: TileTensor[
-        dtype, InputLayoutType, ImmutAnyOrigin, Storage=InputStorage
+        dtype, InputLayoutType, ImmutAnyOrigin, Engine=InputEngine
     ],
     part_vals: MutPointer[Scalar[dtype], MutAnyOrigin],
     part_idxs: MutPointer[Int32, MutAnyOrigin],
@@ -208,7 +208,7 @@ def _argmaxmin_scan_kernel[
         simd_width: Elements per vector load.
         unroll: Vector loads issued back to back per loop trip.
         InputLayoutType: Layout of the input.
-        InputStorage: Storage policy of the input.
+        InputEngine: Engine of the input.
 
     Args:
         input: Input rows, contiguous with `num_elements` per row.
@@ -254,14 +254,14 @@ def _argmaxmin_combine_kernel[
     out_idx_type: DType,
     largest: Bool,
     OutIdxLayoutType: TensorLayout,
-    OutIdxStorage: TensorStorage,
+    OutIdxEngine: TensorEngine,
 ](
     out_idxs: TileTensor[
         mut=True,
         out_idx_type,
         OutIdxLayoutType,
         MutAnyOrigin,
-        Storage=OutIdxStorage,
+        Engine=OutIdxEngine,
     ],
     part_vals: ImmPointer[Scalar[dtype], ImmutAnyOrigin],
     part_idxs: ImmPointer[Int32, ImmutAnyOrigin],
@@ -274,7 +274,7 @@ def _argmaxmin_combine_kernel[
         out_idx_type: Output index dtype.
         largest: Select the maximum (argmax) or the minimum (argmin).
         OutIdxLayoutType: Layout of the output indices.
-        OutIdxStorage: Storage policy of the output indices.
+        OutIdxEngine: Engine of the output indices.
 
     Args:
         out_idxs: One index per row.
@@ -412,7 +412,7 @@ def argmaxmin_gpu[
             simd_width,
             _ARGMAXMIN_UNROLL,
             input.LayoutType,
-            type_of(input).Storage,
+            type_of(input).Engine,
         ]
         ctx.enqueue_function[scan_kernel](
             input.as_immut(),
@@ -431,7 +431,7 @@ def argmaxmin_gpu[
             output_type,
             largest,
             output.LayoutType,
-            type_of(output).Storage,
+            type_of(output).Engine,
         ]
         ctx.enqueue_function[combine_kernel](
             output,

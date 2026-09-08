@@ -61,7 +61,7 @@ in TMEM throughout the combine.
 """
 
 from std.sys import size_of, get_defined_bool
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.memory import external_memory
 from layout.tma_async import SharedMemBarrier
 from nn.attention.gpu.nvidia.sm100.attention import (

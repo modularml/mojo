@@ -455,13 +455,9 @@ def _run_stage4_dispatch_paths(
     ctx.enqueue_copy(packed_dev, packed_host)
     ctx.enqueue_copy(scale_dev, scale_host)
 
-    var act_tt = TileTensor(act_dev.unsafe_ptr(), row_major(M, K)).as_immut()
-    var packed_tt = TileTensor(
-        packed_dev.unsafe_ptr(), row_major(N, packed_k)
-    ).as_immut()
-    var scale_tt = TileTensor(
-        scale_dev.unsafe_ptr(), row_major(N, scale_k)
-    ).as_immut()
+    var act_tt = TileTensor(act_dev, row_major(M, K)).as_immut()
+    var packed_tt = TileTensor(packed_dev, row_major(N, packed_k)).as_immut()
+    var scale_tt = TileTensor(scale_dev, row_major(N, scale_k)).as_immut()
 
     # (1) Production dispatch (materialize->dense for this M).
     var out_disp_tt = TileTensor(out_disp_dev.unsafe_ptr(), row_major(M, N))
@@ -473,7 +469,7 @@ def _run_stage4_dispatch_paths(
     # the large-M fused kernel stays covered even though the launcher routes
     # M>=256 to materialize. BM=128/BK=64/coalesce_scales=True matches the mid-M
     # dispatch geometry (the BK=64 deep-K-strip win).
-    var out_fused_tt = TileTensor(out_fused_dev.unsafe_ptr(), row_major(M, N))
+    var out_fused_tt = TileTensor(out_fused_dev, row_major(M, N))
     _launch_apple_fp4_matmul[
         c_type=.float32,
         elementwise_lambda_fn=None,
@@ -572,7 +568,7 @@ def _parity_and_hostref[
     var wdense_tt = TileTensor(wdense.unsafe_ptr(), row_major(N, K))
 
     # --- the matmul2d FP4 path ---
-    # `DevicePointerStorage`-backed views, constructed straight from the
+    # `DevicePointerEngine`-backed views, constructed straight from the
     # DeviceBuffers: the fused path runs on device-pointer tiles (exercising
     # the entry points' Storage threading) while the oracle keeps the
     # pointer-backed views above.

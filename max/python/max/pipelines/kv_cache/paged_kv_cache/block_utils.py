@@ -422,6 +422,28 @@ class _FreeKVCacheBlockQueue(Generic[BlockT]):
         self.num_free_blocks += 1
         self.free_blocks.add(block.bid)
 
+    def appendleft(self, block: BlockT) -> None:
+        """Puts a block back at the head, so it is popped before older entries.
+
+        Args:
+            block: The block to append.
+        """
+        if self.free_list_head is not None:
+            self.free_list_head.prev_free_block = block
+            block.next_free_block = self.free_list_head
+            self.free_list_head = block
+        else:
+            assert self.free_list_tail is None
+            self.free_list_head = self.free_list_tail = block
+
+        block.prev_free_block = None
+        self.num_free_blocks += 1
+        self.free_blocks.add(block.bid)
+
+    def peek_front(self) -> BlockT | None:
+        """Returns the least-recently-used free block without removing it."""
+        return self.free_list_head
+
 
 FreeKVCacheBlockQueue = _FreeKVCacheBlockQueue[KVCacheBlock]
 FreeHugeKVCacheBlockQueue = _FreeKVCacheBlockQueue[HugeKVCacheBlock]

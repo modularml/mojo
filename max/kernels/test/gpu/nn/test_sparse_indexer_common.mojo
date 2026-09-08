@@ -34,7 +34,7 @@ the same way; `_run_block_dim_invariance` turns that argument into evidence.
 """
 
 from std.collections import Set
-from std.gpu import WARP_SIZE, block_idx
+from max.gpu import WARP_SIZE, block_idx
 from max.gpu.host import DeviceBuffer, DeviceContext
 from std.math import min
 from std.random import rand

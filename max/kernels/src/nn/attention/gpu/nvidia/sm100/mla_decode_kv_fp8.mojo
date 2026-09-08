@@ -15,16 +15,16 @@
 
 from std.math import ceildiv
 from std.sys import size_of
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     thread_idx,
     block_idx,
     warp_id,
 )
 from max.gpu.sync import barrier
-from std.gpu.globals import WARPGROUP_SIZE
+from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.primitives.grid_controls import launch_dependent_grids
-from std.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
+from max.gpu.intrinsics import warpgroup_reg_alloc, warpgroup_reg_dealloc
 from max.gpu.memory import external_memory, fence_async_view_proxy
 from max.gpu.sync import named_barrier
 from max.gpu.compute.arch.tcgen05 import (
@@ -42,6 +42,7 @@ from layout import (
     ComptimeInt,
     CoordLike,
     RowMajorLayout,
+    TensorEngine,
     TileTensor,
     row_major,
     stack_allocation as tt_stack_allocation,
@@ -102,6 +103,7 @@ struct MLA_SM100_Decode_KV_FP8[
     MaskType: MHAMask,
     config: MLA_SM100_Decode_Config,
     ValidLengthType: OptionalPointer,
+    Engine: TensorEngine,
     _is_cache_length_accurate: Bool = False,
     ragged: Bool = False,
 ](TrivialRegisterPassable):
@@ -128,6 +130,7 @@ struct MLA_SM100_Decode_KV_FP8[
             and tuning parameters for the decode kernel.
         ValidLengthType: `OptionalPointer` type for the per-batch valid key
             length tensor, or `NullPointer` when not provided.
+        Engine: Engine policy of the `scalar_args` tile operand.
         _is_cache_length_accurate: Whether the reported cache length is
             exact (defaults to `False`).
         ragged: Whether variable-length sequences are enabled, allowing
@@ -303,7 +306,10 @@ struct MLA_SM100_Decode_KV_FP8[
         ],
         scales_ptr: UnsafePointer[Float32, origin=MutAnyOrigin],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # SlidingWindowCausalMask is supported ONLY by the native FP8 backend
@@ -929,7 +935,7 @@ struct MLA_SM100_Decode_KV_FP8[
 
             # Compute the scale SMEM stage pointer for blockwise scaling.
             # When scale_block_size == 0, scale_smem_per_stage is 0 so
-            # this pointer is never dereferenced (guarded by @parameter if).
+            # this pointer is never dereferenced (guarded by comptime if).
             # Scale visibility is guaranteed by the kv_load2cvt_pipe mbar:
             # warp 8's per-thread mbar.arrive() (release) after scale stores
             # ensures this mbar.wait() (acquire) sees all scale data.

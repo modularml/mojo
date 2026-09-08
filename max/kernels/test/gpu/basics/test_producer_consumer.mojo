@@ -14,9 +14,9 @@
 from std.sys import size_of
 from std.math.uutils import umod, udivmod
 
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from max.gpu.sync import barrier
-from std.gpu import warp_id as get_warp_id
+from max.gpu import warp_id as get_warp_id
 from max.gpu.host import DeviceContext
 from max.gpu.memory import async_copy
 from max.gpu.sync import async_copy_arrive

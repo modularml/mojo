@@ -13,8 +13,8 @@
 
 from std.math import ceildiv
 
-import std.gpu.primitives.warp as warp
-from std.gpu import WARP_SIZE
+import max.gpu.primitives.warp as warp
+from max.gpu import WARP_SIZE
 from max.gpu.host import DeviceContext
 from layout import Coord, Idx, TileTensor, row_major
 from linalg.gemv import gemv_kernel

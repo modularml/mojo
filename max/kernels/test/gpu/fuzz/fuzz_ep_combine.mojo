@@ -41,7 +41,7 @@
 # that carried the bug) and the wild write lands in this device's own combine
 # receive buffer where the redzone/memcheck oracle guards it.
 
-from std.gpu import global_idx
+from max.gpu import global_idx
 from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.random import randint, randn, seed

@@ -131,7 +131,7 @@ elif [[ "${{MODULAR_RR:-}}" == "1" ]]; then
 else
   env {pairs} \
       "$lldb_bin" \
-      --one-line-before-file 'plugin load bazel-bin/KGEN/libMojoLLDB.{extension}' \
+      --one-line-before-file 'plugin load bazel-bin/Mojo/libMojoLLDB.{extension}' \
       --one-line-before-file 'settings set target.launch-working-dir {pwd}' \
       -- {args}
 fi

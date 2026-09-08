@@ -15,7 +15,7 @@ from std.math import isclose
 from std.random import rand
 
 from layout import TileTensor, row_major
-from layout.tensor_storage import PointerStorage
+from layout.tensor_engine import DefaultEngine
 from nn.conv.conv import Naive2dConvolution
 
 from std.utils.index import Index
@@ -25,11 +25,9 @@ from std.utils.index import Index
 def matmul[
     dtype: DType, //, N: Int, K: Int, M: Int, transpose_b: Bool
 ](
-    C: TileTensor[
-        mut=True, dtype, Storage=PointerStorage[element_width=1], ...
-    ],
-    A: TileTensor[dtype, Storage=PointerStorage[element_width=1], ...],
-    B: TileTensor[dtype, Storage=PointerStorage[element_width=1], ...],
+    C: TileTensor[mut=True, dtype, Engine=DefaultEngine[element_width=1], ...],
+    A: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
+    B: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
 ):
     comptime assert C.flat_rank == 2
     comptime assert A.flat_rank == 2
@@ -60,12 +58,12 @@ def matmul[
 def winograd_2d_convolution_3x3[
     dtype: DType
 ](
-    signal: TileTensor[dtype, Storage=PointerStorage[element_width=1], ...],
+    signal: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
     kernel: TileTensor[
-        dtype, Storage=PointerStorage[element_width=1], ...
+        dtype, Engine=DefaultEngine[element_width=1], ...
     ],  # must be 3x3, let's comptime assert  somehow. Or parameter
     output: TileTensor[
-        mut=True, dtype, Storage=PointerStorage[element_width=1], ...
+        mut=True, dtype, Engine=DefaultEngine[element_width=1], ...
     ],
 ):
     comptime assert signal.flat_rank == 2
@@ -74,30 +72,30 @@ def winograd_2d_convolution_3x3[
 
     # Winograd transformation matrices as stack-allocated TileTensors
     # fmt: off
-    var b_stack = Array[Scalar[dtype], 16](uninitialized=True)
+    var b_stack = Array[Scalar[dtype], 16](fill={})
     var B = TileTensor(b_stack, row_major[4, 4]())
     B[0,0] = 1.0; B[0,1] =  0.0; B[0,2] = -1.0; B[0,3] =  0.0
     B[1,0] = 0.0; B[1,1] =  1.0; B[1,2] =  1.0; B[1,3] =  0.0
     B[2,0] = 0.0; B[2,1] = -1.0; B[2,2] =  1.0; B[2,3] =  0.0
     B[3,0] = 0.0; B[3,1] =  1.0; B[3,2] =  0.0; B[3,3] = -1.0
 
-    var g_stack = Array[Scalar[dtype], 12](uninitialized=True)
+    var g_stack = Array[Scalar[dtype], 12](fill={})
     var G = TileTensor(g_stack, row_major[4, 3]())
     G[0,0] = 1.0; G[0,1] =  0.0; G[0,2] = 0.0
     G[1,0] = 0.5; G[1,1] =  0.5; G[1,2] = 0.5
     G[2,0] = 0.5; G[2,1] = -0.5; G[2,2] = 0.5
     G[3,0] = 0.0; G[3,1] =  0.0; G[3,2] = 1.0
 
-    var a_stack = Array[Scalar[dtype], 8](uninitialized=True)
+    var a_stack = Array[Scalar[dtype], 8](fill={})
     var A = TileTensor(a_stack, row_major[2, 4]())
     A[0,0] = 1.0; A[0,1] = 1.0; A[0,2] =  1.0; A[0,3] =  0.0
     A[1,0] = 0.0; A[1,1] = 1.0; A[1,2] = -1.0; A[1,3] = -1.0
     # fmt: on
 
     # Temporary buffers for intermediate results
-    var scratch_stack = Array[Scalar[dtype], 16](uninitialized=True)
+    var scratch_stack = Array[Scalar[dtype], 16](fill={})
     var scratch = TileTensor(scratch_stack, row_major[4, 4]())
-    var g_t_stack = Array[Scalar[dtype], 16](uninitialized=True)
+    var g_t_stack = Array[Scalar[dtype], 16](fill={})
     var g_transformed = TileTensor(g_t_stack, row_major[4, 4]())
 
     # Transform kernel: G @ kernel @ G^T
@@ -111,11 +109,11 @@ def winograd_2d_convolution_3x3[
     var Ow = W - 2
 
     # Additional temporary buffers
-    var d_stack = Array[Scalar[dtype], 16](uninitialized=True)
+    var d_stack = Array[Scalar[dtype], 16](fill={})
     var d = TileTensor(d_stack, row_major[4, 4]())
-    var m_stack = Array[Scalar[dtype], 16](uninitialized=True)
+    var m_stack = Array[Scalar[dtype], 16](fill={})
     var m = TileTensor(m_stack, row_major[4, 4]())
-    var y_stack = Array[Scalar[dtype], 4](uninitialized=True)
+    var y_stack = Array[Scalar[dtype], 4](fill={})
     var y = TileTensor(y_stack, row_major[2, 2]())
 
     for i in range(0, Oh, 2):
@@ -151,11 +149,9 @@ def winograd_2d_convolution_3x3[
 def outputs_are_close[
     dtype: DType
 ](
-    output_naive: TileTensor[
-        dtype, Storage=PointerStorage[element_width=1], ...
-    ],
+    output_naive: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
     output_winograd: TileTensor[
-        dtype, Storage=PointerStorage[element_width=1], ...
+        dtype, Engine=DefaultEngine[element_width=1], ...
     ],
     Oh: Int,
     Ow: Int,

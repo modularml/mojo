@@ -51,13 +51,13 @@ source utils/start-modular.sh
 mojo /path/to/file.mojo
 
 # Alternative ways include
-./bazelw run //KGEN/tools/mojo -- /path/to/file.mojo
+./bazelw run //Mojo/tools/mojo -- /path/to/file.mojo
 
 # Or use the bmojo alias (after sourcing start-modular.sh)
 bmojo /path/to/file.mojo
 
 # Debug a Mojo file
-bd //KGEN/tools/mojo -- /path/to/file.mojo
+bd //Mojo/tools/mojo -- /path/to/file.mojo
 ```
 
 For kernel development (editing `max/kernels/src`), run

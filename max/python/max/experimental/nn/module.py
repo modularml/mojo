@@ -284,12 +284,13 @@ class Module(Generic[_P, _R]):
 
         from max.dtype import DType
         from max.experimental.nn import Linear
-        from max.experimental.tensor import Tensor
+        from max.experimental.tensor import Tensor, defaults
         from max.graph import TensorType
 
         model = Linear(5, 10)
+        _, device = defaults()
+        model.to(device)
 
-        # Build the input type from model.device so computation matches weights.
         input_type = TensorType(DType.float32, ["batch", 5], device=model.device)
         compiled = model.compile(input_type)
         result = compiled(Tensor.ones([3, 5], dtype=DType.float32))
@@ -303,21 +304,16 @@ class Module(Generic[_P, _R]):
 
     .. code-block:: python
 
-        from max.dtype import DType
+        from max.driver import CPU
         from max.experimental.nn import Linear
-        from max.experimental.tensor import Tensor
-        from max.graph import TensorType
 
         model = Linear(5, 10)
-        input_type = TensorType(DType.float32, ["batch", 5], device=model.device)
-        compiled = model.compile(input_type)        # runs on CPU
-        result = compiled(Tensor.ones([3, 5], dtype=DType.float32))
+        print(model.device)
 
     .. invisible-code-block: python
 
         from max.driver import CPU
 
-        assert list(result.shape) == [3, 10]
         assert isinstance(model.device, CPU)
 
     Because :attr:`device` is tracked per-module instance, sub-modules can be
@@ -465,7 +461,6 @@ class Module(Generic[_P, _R]):
                 fc2=Linear(20, 5)
             )
 
-            # Count parameters
             total_params = sum(
                 param.num_elements()
                 for name, param in model.parameters
@@ -545,11 +540,12 @@ class Module(Generic[_P, _R]):
 
         .. code-block:: python
 
-            from max.driver import Accelerator
             from max.experimental.nn import Linear
+            from max.experimental.tensor import defaults
 
+            _, device = defaults()
             model = Linear(2, 3)
-            model.apply_to_parameters(lambda _, t: t.to(Accelerator()))
+            model.apply_to_local_parameters(lambda _, t: t.to(device))
 
         Args:
             f: The transformation to apply to each local parameter.
@@ -572,12 +568,11 @@ class Module(Generic[_P, _R]):
         and all nested sub-module parameters. The transformation receives the
         parameter's qualified name (dot-separated path) and current tensor value.
 
-        Transfer all parameters to accelerator:
+        Transfer all parameters to the best available device:
 
         .. code-block:: python
 
-            from max.driver import Accelerator
-            from max.experimental.tensor import Tensor
+            from max.experimental.tensor import Tensor, defaults
             from max.experimental.nn import Module, module_dataclass, Linear
 
             @module_dataclass
@@ -593,8 +588,8 @@ class Module(Generic[_P, _R]):
                 fc2=Linear(20, 5)
             )
 
-            # Move all parameters to accelerator
-            model.apply_to_parameters(lambda name, t: t.to(Accelerator()))
+            _, device = defaults()
+            model.apply_to_parameters(lambda name, t: t.to(device))
 
         Args:
             f: Transformation function taking ``(name, tensor)`` and returning
@@ -704,7 +699,6 @@ class Module(Generic[_P, _R]):
                 bias=Tensor.zeros([10])
             )
 
-            # Load weights from dictionary
             weights = {
                 "weight": Tensor.zeros([10, 5]),
                 "bias": Tensor.zeros([10]),
@@ -783,11 +777,12 @@ class Module(Generic[_P, _R]):
 
         .. code-block:: python
 
-            from max.driver import Accelerator
             from max.experimental.nn import Linear
+            from max.experimental.tensor import defaults
 
+            _, device = defaults()
             model = Linear(2, 3)
-            model_on_gpu = model.map_parameters(lambda _, t: t.to(Accelerator()))
+            model_on_device = model.map_parameters(lambda _, t: t.to(device))
 
         Args:
             f: The transformation to apply to each parameter.
@@ -828,9 +823,9 @@ class Module(Generic[_P, _R]):
             from max.experimental.nn import Linear
 
             model = Linear(2, 3)
-            print(model.device)     # CPU()  - CPU default
-            model.to(CPU())         # use Accelerator() to move weights to a GPU
-            print(model.device)     # CPU()
+            print(model.device)
+            model.to(CPU())
+            print(model.device)
 
         .. invisible-code-block: python
 
@@ -871,17 +866,15 @@ class Module(Generic[_P, _R]):
 
         .. code-block:: python
 
-            from max.driver import Accelerator, CPU, accelerator_count
             from max.dtype import DType
             from max.experimental.nn import Linear
-            from max.experimental.tensor import Tensor
+            from max.experimental.tensor import Tensor, defaults
             from max.graph import TensorType
 
             model = Linear(2, 3)
-            device = CPU() if accelerator_count() == 0 else Accelerator()
+            _, device = defaults()
             model.to(device)
 
-            # Build the input type from model.device so computation matches:
             input_type = TensorType(DType.float32, ["batch", 2], device=model.device)
             compiled = model.compile(input_type)
             result = compiled(Tensor.ones([4, 2], dtype=DType.float32))
@@ -1122,16 +1115,14 @@ class Module(Generic[_P, _R]):
         .. code-block:: python
 
             from max.dtype import DType
-            from max.driver import Accelerator, CPU, accelerator_count
             from max.experimental.nn import Linear
-            from max.experimental.tensor import Tensor
+            from max.experimental.tensor import Tensor, defaults
             from max.graph import TensorType
 
             model = Linear(5, 10)
-            device = CPU() if accelerator_count() == 0 else Accelerator()
+            _, device = defaults()
             model.to(device)
 
-            # Build the input type from model.device — computation matches:
             input_type = TensorType(DType.float32, ["batch", 5], device=model.device)
             compiled = model.compile(input_type)
             result = compiled(Tensor.ones([3, 5], dtype=DType.float32))
@@ -1161,12 +1152,10 @@ class Module(Generic[_P, _R]):
                 bias=Tensor.zeros([10])
             )
 
-            # Compile with fixed input shape
             _, device = defaults()
             input_type = TensorType(DType.float32, [3, 5], device=device)
             model = linear.compile(input_type)
 
-            # Execute compiled model
             input_data = Tensor.ones([3, 5], dtype=DType.float32)
             result = model(input_data)
             print(result)
@@ -1175,7 +1164,7 @@ class Module(Generic[_P, _R]):
 
             import numpy as np
 
-            assert np.allclose(result.to_numpy(), 0.0)  # zero weights/bias
+            assert np.allclose(result.to_numpy(), 0.0)
             assert list(result.shape) == [3, 10]
 
         Compilation with custom Mojo kernel extensions follows the same
@@ -1200,7 +1189,7 @@ class Module(Generic[_P, _R]):
             module = CustomModule()
             compiled = module.compile(
                 input_type,
-                custom_extensions=[Path("my_kernels")],  # Mojo source dir or package
+                custom_extensions=[Path("my_kernels")],
             )
 
         Args:
@@ -1361,7 +1350,7 @@ def subgraphable(module: _T, *, name: str | None = None) -> _T:
     is used to determine whether an existing subgraph can be used (this process
     is slow, but guarantees correctness).
 
-    .. warning::
+    .. caution::
 
         Kernel fusion cannot cross a subgraph boundary, so prefer marking larger
         modules, like encoder/decoder blocks.
@@ -1439,11 +1428,12 @@ def module_dataclass(  # noqa: ANN201
 
     .. code-block:: python
 
+        from max.driver import CPU
         from max.dtype import DType
         from max.experimental import functional as F
         from max.experimental import random
         from max.experimental.nn import Module, Linear, module_dataclass
-        from max.experimental.tensor import Tensor
+        from max.experimental.tensor import Tensor, default_device
         from max.graph import TensorType
 
         @module_dataclass
@@ -1457,26 +1447,21 @@ def module_dataclass(  # noqa: ANN201
                 x = self.fc2(x)
                 return x
 
-        # Create module with automatic parameter tracking
-        mlp = MLP(
-            fc1=Linear(128, 256),
-            fc2=Linear(256, 128)
-        )
+        with default_device(CPU()):
+            mlp = MLP(
+                fc1=Linear(128, 256),
+                fc2=Linear(256, 128)
+            )
 
-        # All parameters are automatically tracked
-        print(dict(mlp.parameters).keys())
-        # {'fc1.weight', 'fc1.bias', 'fc2.weight', 'fc2.bias'}
+            print(dict(mlp.parameters).keys())
 
-        # Run eagerly with a random input.
-        random.set_seed(0)
-        x = random.normal([4, 128], dtype=DType.float32)
-        output = mlp(x)
-        print(output.shape)  # [4, 128]
+            random.set_seed(0)
+            x = random.normal([4, 128], dtype=DType.float32)
+            output = mlp(x)
 
-        # Or compile for optimized execution.
-        input_type = TensorType(DType.float32, ["batch", 128], device=mlp.device)
-        compiled = mlp.compile(input_type)
-        compiled_output = compiled(x)
+            input_type = TensorType(DType.float32, ["batch", 128], device=mlp.device)
+            compiled = mlp.compile(input_type)
+            compiled_output = compiled(x)
 
     .. invisible-code-block: python
 

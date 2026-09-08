@@ -166,9 +166,9 @@ def small_MN_gemms[
             c_layout,
             a_layout,
             b_layout,
-            type_of(c).Storage,
-            type_of(a).Storage,
-            type_of(b).Storage,
+            type_of(c).Engine,
+            type_of(a).Engine,
+            type_of(b).Engine,
             simd_width=simd_width,
             tile_m=config.tile_m,
             tile_n=config.tile_n,
@@ -339,6 +339,9 @@ def matmul_dispatch_sm100[
     comptime static_N = c.static_shape[1]
     comptime static_K = a.static_shape[1]
 
+    # When N is dynamic, static_N will be set to -1.
+    comptime has_static_N = static_N > -1
+
     comptime if get_defined_bool["AUTOTUNING_MODE", False]():
         comptime BM = get_defined_int["TUNE_BM", 128]()
         comptime BN = get_defined_int["TUNE_BN", 64]()
@@ -414,7 +417,7 @@ def matmul_dispatch_sm100[
         a_type == .float32
         and c_type == .float32
         and transpose_b
-        and static_N > -1
+        and has_static_N
         and static_N <= 256
         and static_K >= 2048
         and static_K % simd_width_of[a_type, target=get_gpu_target()]() == 0
@@ -455,6 +458,58 @@ def matmul_dispatch_sm100[
         elif m <= 64 or not use_tf32:
             _dispatch_split_k[4]()
             return
+
+    # C's row stride is not 16-byte aligned, so no TMA descriptor can
+    # describe C.
+    comptime has_unaligned_n_alt_dispatch = (
+        a_type in (DType.bfloat16, DType.float8_e4m3fn)
+        and c_type == .bfloat16
+        and transpose_b
+        and has_static_N
+        and static_N * size_of[c_type]() % 16 != 0
+    )
+
+    comptime if has_unaligned_n_alt_dispatch:
+        comptime has_split_k_band = (
+            static_N <= 642
+            and static_K >= 128
+            and static_K % simd_width_of[a_type, target=get_gpu_target()]() == 0
+        )
+
+        comptime if has_split_k_band:
+
+            @__parameter
+            def _dispatch_unaligned_n_split_k[tile_m: Int]() raises:
+                logger.info(
+                    (
+                        "------ Dispatching to SM100 unaligned-N split-K GEMV"
+                        " (tile_m="
+                    ),
+                    tile_m,
+                    ") ------ Problem Shape: MNK=[",
+                    m,
+                    ", ",
+                    static_N,
+                    ", ",
+                    static_K,
+                    "]",
+                )
+                gemv_gpu_dispatch[
+                    transpose_b=transpose_b,
+                    elementwise_lambda_fn=elementwise_lambda_wrapper,
+                    pdl_level=pdl_level,
+                    tile_m=tile_m,
+                ](GEMVAlgorithm.GEMV_SPLIT_K, c, a, b, ctx)
+
+            if m <= 6:
+                _dispatch_unaligned_n_split_k[1]()
+                return
+            elif m <= 12:
+                _dispatch_unaligned_n_split_k[2]()
+                return
+            elif m <= 64:
+                _dispatch_unaligned_n_split_k[4]()
+                return
 
     comptime if _vendor_blas_fallback_disabled():
         comptime if (

@@ -19,11 +19,11 @@ per-lane MMA fragment shape. All lane decomposition / stride queries go
 through `Layout` methods rather than hand-rolled integer arithmetic.
 """
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.math import fma
 from std.math.uutils import umod
 from std.bit import log2_floor
-from std.gpu import lane_id, warp_id as get_warp_id
+from max.gpu import lane_id, warp_id as get_warp_id
 from max.gpu.sync import barrier
 from layout import TileTensor, row_major, stack_allocation
 from layout.tile_layout import TensorLayout, col_major

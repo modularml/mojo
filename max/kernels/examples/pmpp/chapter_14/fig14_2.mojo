@@ -13,7 +13,7 @@
 
 """Figure 14.2: Parallel odd-even sort kernel implementation in Mojo."""
 
-from std.gpu import block_idx, thread_idx
+from max.gpu import block_idx, thread_idx
 from max.gpu.host import DeviceContext
 from std.random import random_ui64
 

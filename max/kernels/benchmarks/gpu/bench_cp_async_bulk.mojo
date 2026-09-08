@@ -41,7 +41,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import (
+from max.gpu import (
     block_idx,
     grid_dim as gpu_grid_dim,
     thread_idx,

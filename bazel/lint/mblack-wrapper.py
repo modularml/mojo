@@ -28,7 +28,7 @@ def _filter(fname: str) -> bool:
 
 
 def _config_file_changed(changed_files: set[str]) -> bool:
-    return any(f.startswith("KGEN/tools/mblack/src") for f in changed_files)
+    return any(f.startswith("Mojo/tools/mblack/src") for f in changed_files)
 
 
 def main() -> None:

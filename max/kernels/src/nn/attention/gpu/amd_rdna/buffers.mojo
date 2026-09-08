@@ -23,7 +23,7 @@ from std.math import ceildiv
 from std.math.uutils import umod
 from std.sys import simd_width_of
 
-from std.gpu import lane_id, warp_id as get_warp_id
+from max.gpu import lane_id, warp_id as get_warp_id
 from layout import TensorLayout, TileTensor
 from layout.tensor_core import TiledTensorCore
 from layout.tile_layout import row_major

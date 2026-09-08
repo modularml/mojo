@@ -35,7 +35,7 @@ NaN first, making the failure deterministic.
 from max.gpu.host import DeviceContext, FuncAttribute
 from max.gpu.memory import external_memory
 from max.gpu.sync import barrier
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from std.math import ceildiv, isnan, rsqrt
 from std.random import seed
 from std.sys import size_of

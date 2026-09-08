@@ -26,7 +26,7 @@ For new code, use sm100_structured directly:
 from std.sys import align_of, simd_width_of, size_of
 from std.math.uutils import umod, ufloordiv, udivmod
 
-from std.gpu import WARP_SIZE, lane_id, warp_id
+from max.gpu import WARP_SIZE, lane_id, warp_id
 from max.gpu.primitives.cluster import elect_one_sync
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from max.gpu.compute.mma import st_matrix

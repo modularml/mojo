@@ -16,7 +16,7 @@ from std.sys import get_defined_int
 from max.benchmark import bencher_iter_custom
 from std.benchmark import Bench, Bencher, BenchId
 from std.builtin._closure import __ownership_keepalive
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     grid_dim,

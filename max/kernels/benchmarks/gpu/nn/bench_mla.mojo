@@ -24,7 +24,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import _is_sm10x_gpu
 from internal_utils import arg_parse, CacheBustingBuffer

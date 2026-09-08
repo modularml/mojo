@@ -123,6 +123,33 @@ class MultiAttnKey(AttnKeyInterface):
         return cls(children=tuple(children.items()))
 
 
+#: Padding added to every LUT inner dim (columns per batch row). The SIMD
+#: ``populate`` in ``PagedKVCache`` reads up to 16 consecutive ``uint32``
+#: entries past ``base_kv_row / page_size``; this buffer keeps those reads
+#: in-bounds of the allocation for partial-tile tails. The value is also
+#: a multiple of 8 so the inner-dim stride stays 32-byte aligned for the
+#: ``ld.global.v{N}.u32`` vector loads.
+_LUT_TAIL_PAD = 16
+
+
+def padded_lut_cols(cols: int) -> int:
+    """Rounds a page lookup-table inner dim up to a kernel-safe width.
+
+    Kept in lockstep with the invariant asserted in
+    ``max/kernels/src/kv_cache/types.mojo`` (``PagedKVCache.populate``):
+    ``lookup_table.dim[1]`` is a multiple of 8 and is at least
+    ``logical_cols + 15`` so a 16-wide SIMD lookup load from any valid
+    ``first_lut_idx`` stays in-bounds.
+
+    Args:
+        cols: The number of logical page columns per batch row.
+
+    Returns:
+        The allocated inner dim to use for the lookup table.
+    """
+    return ((cols + 7) // 8) * 8 + _LUT_TAIL_PAD
+
+
 def build_max_lengths_tensors(
     max_prompt_length: int, max_cache_length: int
 ) -> tuple[Buffer, Buffer]:

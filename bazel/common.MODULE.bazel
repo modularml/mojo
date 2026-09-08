@@ -75,6 +75,9 @@ archive_override(
         "//bazel/public-patches:rules_mypy_pyi_files.patch",
         # https://github.com/bazel-contrib/rules_mypy/pull/141
         "//bazel/public-patches:rules_mypy_transitives.patch",
+        # The aspect applies to every top-level target, so target-configured
+        # type stubs make any cross-compile fail during loading. TODO: upstream.
+        "//bazel/public-patches:rules_mypy_exec_types.patch",
     ],
     strip_prefix = "rules_mypy-0.41.0",
     urls = [
@@ -741,15 +744,15 @@ node.toolchain(node_version = "22.15.1")
 
 npm.npm_translate_lock(
     name = "mojo-lsp-server-node-tests",
-    data = ["//KGEN/test/mojo-lsp-server-node:package.json"],
+    data = ["//Mojo/test/mojo-lsp-server-node:package.json"],
     dev = True,
-    pnpm_lock = "//KGEN/test/mojo-lsp-server-node:pnpm-lock.yaml",
+    pnpm_lock = "//Mojo/test/mojo-lsp-server-node:pnpm-lock.yaml",
 )
 use_repo(npm, "mojo-lsp-server-node-tests")
 
 rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext", dev_dependency = True)
 rules_ts_ext.deps(
-    ts_version_from = "//KGEN/test/mojo-lsp-server-node:package.json",
+    ts_version_from = "//Mojo/test/mojo-lsp-server-node:package.json",
 )
 use_repo(rules_ts_ext, "npm_typescript")
 

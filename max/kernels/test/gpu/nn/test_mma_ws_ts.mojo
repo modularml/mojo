@@ -35,7 +35,7 @@ from std.memory import alloc
 from std.random import rand, randn, seed
 from std.sys import size_of
 
-from std.gpu import thread_idx, warp_id as get_warp_id
+from max.gpu import thread_idx, warp_id as get_warp_id
 from max.gpu.sync import barrier
 from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
 from max.gpu.host.nvidia.tma import (

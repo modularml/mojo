@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 """Tests alias-scoped raw-buffer DMA into LDS."""
 
-from std.gpu import lane_id, WARP_SIZE
+from max.gpu import lane_id, WARP_SIZE
 from max.gpu.host import DeviceContext
 from max.gpu.memory import CacheOperation
 from max.gpu.sync import s_waitcnt
-from std.gpu.intrinsics import AMDBufferResource
+from max.gpu.intrinsics import AMDBufferResource
 from std.memory import AddressSpace, unsafe_stack_allocation
 from std.testing import assert_equal
 

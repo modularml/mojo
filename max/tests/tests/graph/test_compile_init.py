@@ -29,6 +29,7 @@ import torch
 from max.driver import (
     CPU,
     Accelerator,
+    Buffer,
     accelerator_count,
     get_virtual_cpu_target,
     set_virtual_cpu_target,
@@ -41,6 +42,7 @@ from max.engine import CompiledModel, InferenceSession, Model
 from max.engine._compilation_stats import collect_compilation_stats
 from max.experimental.nn._compilation_timer import CompilationTimer
 from max.graph import DeviceRef, Graph, Module, TensorType, TensorValue, ops
+from max.graph.weights import WeightData
 from max.nn import Signals
 
 
@@ -277,6 +279,23 @@ def test_signal_buffers_skip_allocation_in_virtual_device_mode(
     signals = Signals([DeviceRef.GPU(0), DeviceRef.GPU(1)])
 
     assert signals.buffers() == []
+
+
+def test_weight_cast_keeps_dtype_and_payload_in_step_in_virtual_device_mode(
+    virtual_device_mode: None,
+) -> None:
+    """A virtual-device cast converts no values, but the dtype it reports
+    still describes its payload: loaders validate a weight against the dtype
+    of its DLPack buffer, not against this metadata.
+    """
+    weight = WeightData.from_numpy(
+        np.ones((3, 4), dtype=np.float32), "norm.weight"
+    )
+
+    converted = weight.astype(DType.bfloat16)
+
+    assert converted.dtype == DType.bfloat16
+    assert Buffer.from_dlpack(converted).dtype == DType.bfloat16
 
 
 def test_nested_collectors_both_observe_phases() -> None:

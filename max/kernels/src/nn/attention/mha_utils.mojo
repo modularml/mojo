@@ -35,7 +35,7 @@ from std.sys import (
 from std.sys.info import _accelerator_arch
 
 from std.bit import prev_power_of_two
-from std.gpu import WARP_SIZE, lane_id
+from max.gpu import WARP_SIZE, lane_id
 from max.gpu.host import DeviceBuffer
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE

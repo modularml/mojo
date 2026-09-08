@@ -472,13 +472,13 @@ def test_copy_from():
         RuntimeTuple[layout.shape, element_type=.int32](8, 8),
         RuntimeTuple[layout.stride, element_type=.int32](8, 1),
     )
-    var src_storage = List(length=dynamic_layout.size(), fill=Float32(0))
+    var src_engine = List(length=dynamic_layout.size(), fill=Float32(0))
     var src_tensor = LayoutTensor[
         .float32,
         layout,
         layout_int_type=.int32,
         linear_idx_type=.int32,
-    ](src_storage, dynamic_layout)
+    ](src_engine, dynamic_layout)
     arange(src_tensor)
 
     var dst_storage = List(length=dynamic_layout.size(), fill=Float32(0))
@@ -506,13 +506,13 @@ def test_linspace_fill():
         RuntimeTuple[layout.shape, element_type=.int32](8, 8),
         RuntimeTuple[layout.stride, element_type=.int32](8, 1),
     )
-    var src_storage = List(length=dynamic_layout.size(), fill=Float32(0))
+    var src_engine = List(length=dynamic_layout.size(), fill=Float32(0))
     var src_tensor = LayoutTensor[
         .float32,
         layout,
         layout_int_type=.int32,
         linear_idx_type=.int32,
-    ](src_storage, dynamic_layout)
+    ](src_engine, dynamic_layout)
     arange(src_tensor)
 
     # CHECK: ----source-tensor----
@@ -570,13 +570,13 @@ def test_random_fill():
         RuntimeLayoutType.ShapeType(comptime (layout.size())),
         RuntimeLayoutType.StrideType(1),
     )
-    var src_storage = List(length=dynamic_layout.size(), fill=Float32(0))
+    var src_engine = List(length=dynamic_layout.size(), fill=Float32(0))
     var src_tensor = LayoutTensor[
         .float32,
         layout,
         layout_int_type=.int32,
         linear_idx_type=.int32,
-    ](src_storage, dynamic_layout)
+    ](src_engine, dynamic_layout)
     random(src_tensor)
     var sum: Float32 = 0.0
     for i in range(src_tensor.runtime_layout.size()):

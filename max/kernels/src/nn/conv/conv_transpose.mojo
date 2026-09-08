@@ -56,7 +56,7 @@ from layout import (
     row_major,
 )
 from layout.coord import DynamicCoord
-from layout.tensor_storage import TensorStorage
+from layout.tensor_engine import TensorEngine
 from linalg.accumulate import _Accumulator
 from linalg.utils import partition_work
 from nn.conv.conv import _get_cudnn_meta, check_cudnn_error
@@ -412,11 +412,11 @@ def get_partition(
 @fieldwise_init
 struct ConvTransposedPacked[
     input_linear_idx_type: DType,
-    input_storage: TensorStorage,
+    input_engine: TensorEngine,
     filter_linear_idx_type: DType,
-    filter_storage: TensorStorage,
+    filter_engine: TensorEngine,
     output_linear_idx_type: DType,
-    output_storage: TensorStorage,
+    output_engine: TensorEngine,
     InputLayoutType: TensorLayout,
     FilterLayoutType: TensorLayout,
     OutputLayoutType: TensorLayout,
@@ -439,11 +439,11 @@ struct ConvTransposedPacked[
 
     Parameters:
         input_linear_idx_type: Linear index dtype of the input tensor (inferred).
-        input_storage: Storage backing the input tile tensor (inferred).
+        input_engine: Engine backing the input tile tensor (inferred).
         filter_linear_idx_type: Linear index dtype of the filter tensor (inferred).
-        filter_storage: Storage backing the filter tile tensor (inferred).
+        filter_engine: Engine backing the filter tile tensor (inferred).
         output_linear_idx_type: Linear index dtype of the output tensor (inferred).
-        output_storage: Storage backing the output tile tensor (inferred).
+        output_engine: Engine backing the output tile tensor (inferred).
         InputLayoutType: Compile-time layout of the input tensor (inferred).
         FilterLayoutType: Compile-time layout of the filter tensor (inferred).
         OutputLayoutType: Compile-time layout of the output tensor (inferred).
@@ -464,21 +464,21 @@ struct ConvTransposedPacked[
         Self.output_type,
         Self.OutputLayoutType,
         Self.output_origin,
-        Storage=Self.output_storage,
+        Engine=Self.output_engine,
         linear_idx_type=Self.output_linear_idx_type,
     ]
     var input: TileTensor[
         Self.input_type,
         Self.InputLayoutType,
         Self.input_origin,
-        Storage=Self.input_storage,
+        Engine=Self.input_engine,
         linear_idx_type=Self.input_linear_idx_type,
     ]
     var filter: TileTensor[
         Self.filter_type,
         Self.FilterLayoutType,
         Self.filter_origin,
-        Storage=Self.filter_storage,
+        Engine=Self.filter_engine,
         linear_idx_type=Self.filter_linear_idx_type,
     ]
 
@@ -498,7 +498,7 @@ struct ConvTransposedPacked[
             Self.output_type,
             Self.OutputLayoutType,
             Self.output_origin,
-            Storage=Self.output_storage,
+            Engine=Self.output_engine,
             linear_idx_type=Self.output_linear_idx_type,
             address_space=.GENERIC,
             ...,
@@ -507,7 +507,7 @@ struct ConvTransposedPacked[
             Self.input_type,
             Self.InputLayoutType,
             Self.input_origin,
-            Storage=Self.input_storage,
+            Engine=Self.input_engine,
             linear_idx_type=Self.input_linear_idx_type,
             address_space=.GENERIC,
             ...,
@@ -516,7 +516,7 @@ struct ConvTransposedPacked[
             Self.filter_type,
             Self.FilterLayoutType,
             Self.filter_origin,
-            Storage=Self.filter_storage,
+            Engine=Self.filter_engine,
             linear_idx_type=Self.filter_linear_idx_type,
             address_space=.GENERIC,
             ...,

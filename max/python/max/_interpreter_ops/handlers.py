@@ -25,6 +25,7 @@ from math import prod
 from typing import Any, Protocol, cast
 
 import numpy as np
+import numpy.typing as npt
 from max import _core, graph
 from max._core.dialects import builtin, kgen, mo, mosh
 from max._interpreter_ops import (
@@ -593,11 +594,11 @@ def _handle_broadcast_to(
     # shape from the second input if the shape is parametric.
     target_shape = None
     result_mlir_type: mo.TensorType = list(op.results)[0].type  # type: ignore[assignment]
-    shape_attr = result_mlir_type.shape_attr
-    if isinstance(shape_attr, mosh.ShapeAttr):
-        shape = graph.Shape.from_mlir(shape_attr)
-        if graph.Shape.is_static(shape):
-            target_shape = graph.Shape(shape).static_dims
+    shape_attr = result_mlir_type.shape
+
+    shape = graph.Shape.from_mlir(shape_attr)
+    if graph.Shape.is_static(shape):
+        target_shape = graph.Shape(shape).static_dims
 
     if target_shape is None and len(inputs) > 1:
         # For dynamic/parametric shapes, get from the shape operand
@@ -2449,18 +2450,23 @@ def _handle_distributed_allreduce_sum(
         assert isinstance(b, Buffer), f"allreduce input {i} is not a Buffer"
         bufs.append(b)
 
-    # Sum all inputs on the CPU via NumPy.
-    total = bufs[0].to(CPU()).to_numpy().copy()
-    for buf in bufs[1:]:
-        total += buf.to(CPU()).to_numpy()
+    # Sum inputs on the CPU via NumPy, one independent sum per group.
+    # group_size == 0 (the attribute default) means one full-world group.
+    group_size = op.group_size or num_inputs
+    totals: list[npt.NDArray[Any]] = []
+    for group_start in range(0, num_inputs, group_size):
+        total = bufs[group_start].to(CPU()).to_numpy().copy()
+        for buf in bufs[group_start + 1 : group_start + group_size]:
+            total += buf.to(CPU()).to_numpy()
+        totals.extend([total] * group_size)
 
-    # Place the sum on each output device.
+    # Place each group's sum on its output devices.
     results = list(op.results)
     output_buffers: list[Buffer | None] = []
-    for result in results[:-1]:
+    for i, result in enumerate(results[:-1]):
         result_type: mo.TensorType = result.type  # type: ignore[assignment]
         device = graph.DeviceRef.from_mlir(result_type.device_ref).to_device()
-        output_buffers.append(Buffer.from_numpy(total).to(device))
+        output_buffers.append(Buffer.from_numpy(totals[i]).to(device))
 
     # Trailing None for the output chain.
     output_buffers.append(None)

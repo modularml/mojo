@@ -149,10 +149,10 @@ struct CausalConv1D[activation: StaticString]:
                         W.LayoutType,
                         O.LayoutType,
                         B.LayoutType,
-                        X.Storage,
-                        W.Storage,
-                        O.Storage,
-                        B.Storage,
+                        X.Engine,
+                        W.Engine,
+                        O.Engine,
+                        B.Engine,
                     ]
                 ]()
                 var silu_activation_int8 = Int8(silu_activation)
@@ -198,10 +198,10 @@ struct CausalConv1D[activation: StaticString]:
                         W.LayoutType,
                         O.LayoutType,
                         B.LayoutType,
-                        X.Storage,
-                        W.Storage,
-                        O.Storage,
-                        B.Storage,
+                        X.Engine,
+                        W.Engine,
+                        O.Engine,
+                        B.Engine,
                     ]
                 ]()
                 var silu_activation_int8 = Int8(silu_activation)
@@ -247,10 +247,10 @@ struct CausalConv1D[activation: StaticString]:
                         W.LayoutType,
                         O.LayoutType,
                         B.LayoutType,
-                        X.Storage,
-                        W.Storage,
-                        O.Storage,
-                        B.Storage,
+                        X.Engine,
+                        W.Engine,
+                        O.Engine,
+                        B.Engine,
                     ]
                 ]()
                 var silu_activation_int8 = Int8(silu_activation)
@@ -296,10 +296,10 @@ struct CausalConv1D[activation: StaticString]:
                         W.LayoutType,
                         O.LayoutType,
                         B.LayoutType,
-                        X.Storage,
-                        W.Storage,
-                        O.Storage,
-                        B.Storage,
+                        X.Engine,
+                        W.Engine,
+                        O.Engine,
+                        B.Engine,
                     ]
                 ]()
                 var silu_activation_int8 = Int8(silu_activation)
@@ -505,11 +505,11 @@ struct CausalConv1DUpdate[activation: StaticString]:
                     W.LayoutType,
                     O.LayoutType,
                     B.LayoutType,
-                    X.Storage,
-                    CS.Storage,
-                    W.Storage,
-                    O.Storage,
-                    B.Storage,
+                    X.Engine,
+                    CS.Engine,
+                    W.Engine,
+                    O.Engine,
+                    B.Engine,
                 ]
             ]()
             var silu_activation_int8 = Int8(silu_activation)

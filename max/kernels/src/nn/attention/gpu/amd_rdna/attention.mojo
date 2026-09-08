@@ -23,7 +23,7 @@ from std.math import ceildiv, recip
 from std.math.uutils import umod, ufloordiv
 from std.math.constants import log2e
 from std.algorithm.functional import unswitch
-from std.gpu import block_idx, lane_id, thread_idx
+from max.gpu import block_idx, lane_id, thread_idx
 from std.memory import unsafe_stack_allocation
 from std.sys import align_of, simd_width_of
 from std.utils import IndexList

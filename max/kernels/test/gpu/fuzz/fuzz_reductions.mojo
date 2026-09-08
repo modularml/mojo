@@ -38,7 +38,7 @@
 # to zero, which is a tolerance argument rather than a bug, and the identity it
 # would exercise (`1`) is already covered by the hand-written regressions.
 
-from std.gpu.globals import WARP_SIZE
+from max.gpu.globals import WARP_SIZE
 from std.math import isfinite
 from std.random import random_ui64, seed
 from std.sys import align_of

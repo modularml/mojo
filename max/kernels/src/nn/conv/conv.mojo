@@ -102,7 +102,7 @@ from linalg.utils import (
     partial_simd_load,
     partial_simd_store,
 )
-from std.gpu import block_dim, block_idx, thread_idx
+from max.gpu import block_dim, block_idx, thread_idx
 from max.gpu.host import get_gpu_target, DeviceBuffer, DeviceContext
 from max.gpu.host._amdgpu_hip import HIP
 from max.gpu.host._nvidia_cuda import CUDA

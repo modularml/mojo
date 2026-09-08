@@ -27,7 +27,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
+from max.gpu import global_idx, grid_dim, block_dim, thread_idx, block_idx
 from max.gpu.host import DeviceContext
 from max.gpu.primitives import block
 from internal_utils import (
@@ -116,6 +116,7 @@ def verify_matmul[
     *,
     transpose_b: Bool = False,
     init_on_gpu: Bool = True,
+    enable_normal_epilogue: Bool = False,
 ](
     ctx: DeviceContext,
     c_shape: Coord,
@@ -178,10 +179,26 @@ def verify_matmul[
         transpose_b=transpose_b,
     )
 
-    _matmul_gpu[
-        use_tensor_core=True,
-        transpose_b=transpose_b,
-    ](c_device_nd, a_device_nd, b_device_nd, ctx)
+    # Dummy epilogue that just stores the result.
+    @always_inline
+    @__parameter
+    @__copy_capture(c_device_nd)
+    def normal_elementwise_epilogue[
+        dtype: DType, width: SIMDLength, *, alignment: Int = 1
+    ](idx: IndexList[2], val: SIMD[dtype, width]) capturing -> None:
+        c_device_nd.store[width=width](Coord(idx), val.cast[c_type]())
+
+    comptime if enable_normal_epilogue:
+        _matmul_gpu[
+            use_tensor_core=True,
+            transpose_b=transpose_b,
+            elementwise_lambda_fn=normal_elementwise_epilogue,
+        ](c_device_nd, a_device_nd, b_device_nd, ctx)
+    else:
+        _matmul_gpu[
+            use_tensor_core=True,
+            transpose_b=transpose_b,
+        ](c_device_nd, a_device_nd, b_device_nd, ctx)
 
     # Launch GPU verification kernel
     comptime NUM_BLOCKS = 32
@@ -335,17 +352,9 @@ def bench_matmul[
     verify: Bool,
     run_benchmark: Bool = True,
 ) raises:
-    # Choose a size larger than the two times the L2 cache
-    # 128 MiB is larger that twice the L2 cache on the A100, A10, and L4.
-    # update: using 512 to be 2x the infinity cache on MI300x
-    @always_inline
-    def get_size(shape: Coord) -> Int:
-        return Int(shape[0].value()) * Int(shape[1].value())
-
-    comptime simd_size = 4
-    var cb_a = CacheBustingBuffer[a_type](get_size(shape_a), simd_size, ctx)
-    var cb_b = CacheBustingBuffer[a_type](get_size(shape_b), simd_size, ctx)
-    var cb_c = CacheBustingBuffer[c_type](get_size(shape_c), simd_size, ctx)
+    var cb_a = CacheBustingBuffer[a_type](shape_a.product(), ctx, cache_busting)
+    var cb_b = CacheBustingBuffer[a_type](shape_b.product(), ctx, cache_busting)
+    var cb_c = CacheBustingBuffer[c_type](shape_c.product(), ctx, cache_busting)
     # TODO: remove init_on_gpu flag and the loading on CPU
     comptime init_on_gpu = True
 
@@ -438,20 +447,13 @@ def bench_matmul[
             elementwise_compute_lambda_type
         ](test_lambda_add_coords_prod) if enable_compute_epilogue else None
 
-        # create a dummy buffer to force using the mojo the matmul kernel to output values
-        # in the correct c_type
-        var c_dummy = TileTensor(
-            MutPointer[BFloat16, MutUntrackedOrigin].unsafe_dangling(),
-            row_major(shape_c),
-        )
-
         @always_inline
         @__parameter
         @__copy_capture(tensor_c)
         def normal_elementwise_epilogue[
             dtype: DType, width: SIMDLength, *, alignment: Int = 1
         ](idx: IndexList[2], val: SIMD[dtype, width]) capturing -> None:
-            tensor_c.store[width=width]((idx[0], idx[1]), val.cast[c_type]())
+            tensor_c.store[width=width](Coord(idx), val.cast[c_type]())
 
         comptime optional_normal_lambda_fn = Optional[
             elementwise_epilogue_type
@@ -465,7 +467,7 @@ def bench_matmul[
                     use_tensor_core=True,
                     transpose_b=transpose_b,
                     elementwise_lambda_fn=optional_normal_lambda_fn,
-                ](c_dummy, tensor_a, tensor_b, ctx)
+                ](tensor_c, tensor_a, tensor_b, ctx)
             else:
                 _matmul_gpu[
                     use_tensor_core=True,
@@ -506,13 +508,14 @@ def bench_matmul[
     # Verification: compare our kernel output against vendor BLAS as reference.
     # The benchmark already wrote our kernel's output to buffer_c at offset 0
     # (iteration 0 uses offset 0), so we just need to run vendor BLAS once.
-    comptime if not use_vendor_blas and not enable_compute_epilogue and not enable_normal_epilogue:
+    comptime if not use_vendor_blas and not enable_compute_epilogue:
         if verify:
             verify_matmul[
                 c_type,
                 a_type,
                 transpose_b=transpose_b,
                 init_on_gpu=init_on_gpu,
+                enable_normal_epilogue=enable_normal_epilogue,
             ](ctx, shape_c, shape_a, shape_b, init_type)
 
 
@@ -575,7 +578,7 @@ def main() raises:
         arg_parse("init_type", "uniform_distribution")
     )
     var verify = arg_parse("verify", True) if not c_type.is_float8() else False
-    comptime cache_busting = True
+    comptime cache_busting = get_defined_bool["cache_busting", True]()
     comptime transpose_b = True
     comptime use_vendor_blas = get_defined_bool["use_vendor_blas", False]()
     comptime enable_compute_epilogue = get_defined_bool[

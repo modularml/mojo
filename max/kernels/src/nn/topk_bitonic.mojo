@@ -25,7 +25,7 @@ from std.bit import count_leading_zeros, log2_floor
 
 from std.atomic import Atomic, Ordering
 from shmem.ep_comm import BLOCK_SCOPE
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -36,7 +36,7 @@ from std.gpu import (
 from max.gpu.memory import external_memory
 from max.gpu.sync import barrier
 import max.gpu.primitives.block as block
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from max.gpu.host import DeviceAttribute, DeviceContext, FuncAttribute
 from std.memory import bitcast, unsafe_stack_allocation
 from std.math import ceildiv

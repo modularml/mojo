@@ -128,12 +128,12 @@ kgen_kernel = rule(
         "data": attr.label_list(allow_files = True),
         "deps": attr.label_list(providers = [MojoInfo]),
         "_compiler_rt": attr.label(
-            default = Label("//KGEN:CompilerRT"),
+            default = Label("//Mojo:CompilerRT"),
             cfg = "target",
             providers = [CcInfo],
         ),
         "_kgen": attr.label(
-            default = Label("//KGEN/tools/kgen"),
+            default = Label("//Mojo/tools/kgen"),
             cfg = CFG_WORKAROUND,
             executable = True,
         ),

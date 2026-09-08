@@ -18,12 +18,12 @@ scan (SSM) recurrence used by Mamba and Mamba-2, including the SSD
 (state-space duality) combined scan for variable-length batched prefill.
 """
 
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     thread_idx,
 )
-from layout import PointerStorage, TensorLayout, TensorStorage, TileTensor
+from layout import DefaultEngine, TensorLayout, TensorEngine, TileTensor
 from std.utils.index import IndexList
 from max.algorithm import sync_parallelize
 from max.gpu.host import DeviceContext
@@ -85,7 +85,7 @@ def selective_scan_fwd_gpu[
     D_LT: TensorLayout,
     z_LT: TensorLayout,
     delta_bias_LT: TensorLayout,
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     total_batch_dim: Int32,
     batch: Int32,
@@ -94,23 +94,23 @@ def selective_scan_fwd_gpu[
     group_size: Int32,
     delta_softplus: Int8,
     output: TileTensor[
-        kernel_dtype, output_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, output_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Storage=Storage],
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
     out_z: TileTensor[
-        kernel_dtype, out_z_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, out_z_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    u: TileTensor[kernel_dtype, u_LT, MutUntrackedOrigin, Storage=Storage],
+    u: TileTensor[kernel_dtype, u_LT, MutUntrackedOrigin, Engine=Engine],
     delta: TileTensor[
-        kernel_dtype, delta_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, delta_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage],
-    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage],
-    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage],
-    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Storage=Storage],
-    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Storage=Storage],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Engine=Engine],
     delta_bias: TileTensor[
-        kernel_dtype, delta_bias_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, delta_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],
     output_strides: Strides3D,
     x_strides: Strides4D,
@@ -143,8 +143,8 @@ def selective_scan_fwd_gpu[
         D_LT: Memory layout of the `D` skip connection tensor.
         z_LT: Memory layout of the `z` gating tensor.
         delta_bias_LT: Memory layout of the `delta_bias` tensor.
-        Storage: Storage policy shared by all tile operands (defaults to
-            `PointerStorage[element_width=1]`).
+        Engine: Engine shared by all tile operands (defaults to
+            `DefaultEngine[element_width=1]`).
 
     Args:
         total_batch_dim: Total `(batch, dim)` pairs launched.
@@ -514,7 +514,7 @@ def selective_scan_fwd_gpu_minimal[
     A_LT: TensorLayout,
     B_LT: TensorLayout,
     C_LT: TensorLayout,
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     total_batch_dim: Int32,
     batch: Int32,
@@ -523,16 +523,16 @@ def selective_scan_fwd_gpu_minimal[
     group_size: Int32,
     delta_softplus: Int8,
     output: TileTensor[
-        kernel_dtype, output_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, output_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Storage=Storage],
-    u: TileTensor[kernel_dtype, u_LT, MutUntrackedOrigin, Storage=Storage],
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
+    u: TileTensor[kernel_dtype, u_LT, MutUntrackedOrigin, Engine=Engine],
     delta: TileTensor[
-        kernel_dtype, delta_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, delta_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage],
-    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage],
-    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
     output_strides: Strides3D,
     x_strides: Strides4D,
     u_strides: Strides3D,
@@ -557,8 +557,8 @@ def selective_scan_fwd_gpu_minimal[
         A_LT: Memory layout of the `A` recurrence matrix.
         B_LT: Memory layout of the `B` input projection tensor.
         C_LT: Memory layout of the `C` output projection tensor.
-        Storage: Storage policy shared by all tile operands (defaults to
-            `PointerStorage[element_width=1]`).
+        Engine: Engine shared by all tile operands (defaults to
+            `DefaultEngine[element_width=1]`).
 
     Args:
         total_batch_dim: Total number of (batch, dim) pairs launched,
@@ -747,7 +747,7 @@ def selective_scan_update_gpu[
     D_LT: TensorLayout,
     z_LT: TensorLayout,
     dt_bias_LT: TensorLayout,
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     total_batch_dim: Int32,
     batch: Int32,
@@ -755,23 +755,23 @@ def selective_scan_update_gpu[
     group_size: Int32,
     delta_softplus: Int8,
     state_out: TileTensor[
-        kernel_dtype, state_out_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, state_out_LT, MutUntrackedOrigin, Engine=Engine
     ],
     output: TileTensor[
-        kernel_dtype, output_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, output_LT, MutUntrackedOrigin, Engine=Engine
     ],
     state_in: TileTensor[
-        kernel_dtype, state_in_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, state_in_LT, MutUntrackedOrigin, Engine=Engine
     ],
-    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Storage=Storage],
-    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Storage=Storage],
-    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Storage=Storage],
-    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Storage=Storage],
-    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Storage=Storage],
-    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Storage=Storage],
-    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Storage=Storage],
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Engine=Engine],
     dt_bias: TileTensor[
-        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Storage=Storage
+        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Engine=Engine
     ],
     state_out_strides: Strides3D,
     output_strides: Strides2D,
@@ -804,8 +804,8 @@ def selective_scan_update_gpu[
         D_LT: Memory layout of the `D` skip connection tensor.
         z_LT: Memory layout of the `z` gating tensor.
         dt_bias_LT: Memory layout of the `dt_bias` tensor.
-        Storage: Storage policy shared by all tile operands (defaults to
-            `PointerStorage[element_width=1]`).
+        Engine: Engine shared by all tile operands (defaults to
+            `DefaultEngine[element_width=1]`).
 
     Args:
         total_batch_dim: Total number of (batch, dim) pairs launched,
@@ -1737,7 +1737,7 @@ def ssd_combined_gpu[
     z_LT: TensorLayout,
     delta_bias_LT: TensorLayout,
     gamma_LT: TensorLayout,
-    Storage: TensorStorage = PointerStorage[element_width=1],
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     total_batch_dim: Int32,
     batch: Int32,
@@ -1745,23 +1745,23 @@ def ssd_combined_gpu[
     seqlen: Int32,
     group_size: Int32,
     delta_softplus: Int8,
-    output: TileTensor[kernel_dtype, output_LT, MutAnyOrigin, Storage=Storage],
-    x: TileTensor[kernel_dtype, x_LT, MutAnyOrigin, Storage=Storage],
-    out_z: TileTensor[kernel_dtype, out_z_LT, MutAnyOrigin, Storage=Storage],
+    output: TileTensor[kernel_dtype, output_LT, MutAnyOrigin, Engine=Engine],
+    x: TileTensor[kernel_dtype, x_LT, MutAnyOrigin, Engine=Engine],
+    out_z: TileTensor[kernel_dtype, out_z_LT, MutAnyOrigin, Engine=Engine],
     residual: TileTensor[
-        kernel_dtype, residual_LT, MutAnyOrigin, Storage=Storage
+        kernel_dtype, residual_LT, MutAnyOrigin, Engine=Engine
     ],
-    u: TileTensor[kernel_dtype, u_LT, MutAnyOrigin, Storage=Storage],
-    delta: TileTensor[kernel_dtype, delta_LT, MutAnyOrigin, Storage=Storage],
-    A: TileTensor[kernel_dtype, A_LT, MutAnyOrigin, Storage=Storage],
-    B: TileTensor[kernel_dtype, B_LT, MutAnyOrigin, Storage=Storage],
-    C: TileTensor[kernel_dtype, C_LT, MutAnyOrigin, Storage=Storage],
-    D: TileTensor[kernel_dtype, D_LT, MutAnyOrigin, Storage=Storage],
-    z: TileTensor[kernel_dtype, z_LT, MutAnyOrigin, Storage=Storage],
+    u: TileTensor[kernel_dtype, u_LT, MutAnyOrigin, Engine=Engine],
+    delta: TileTensor[kernel_dtype, delta_LT, MutAnyOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutAnyOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutAnyOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutAnyOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutAnyOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutAnyOrigin, Engine=Engine],
     delta_bias: TileTensor[
-        kernel_dtype, delta_bias_LT, MutAnyOrigin, Storage=Storage
+        kernel_dtype, delta_bias_LT, MutAnyOrigin, Engine=Engine
     ],
-    gamma: TileTensor[kernel_dtype, gamma_LT, MutAnyOrigin, Storage=Storage],
+    gamma: TileTensor[kernel_dtype, gamma_LT, MutAnyOrigin, Engine=Engine],
     epsilon: Scalar[kernel_dtype],
     weight_offset: Scalar[kernel_dtype],
 ):
@@ -1787,8 +1787,8 @@ def ssd_combined_gpu[
         delta_bias_LT: Memory layout of the `delta_bias` tensor.
         gamma_LT: Memory layout of the `gamma` normalization scale
             tensor.
-        Storage: Storage policy shared by all tile operands (defaults to
-            `PointerStorage[element_width=1]`).
+        Engine: Engine shared by all tile operands (defaults to
+            `DefaultEngine[element_width=1]`).
 
     Args:
         total_batch_dim: Total number of (batch, dim) pairs launched,
@@ -3252,6 +3252,7 @@ def mamba_split_conv1d_scan_combined_gpu[
     rmsnorm_weight_layout: TensorLayout,
     outproj_weight_layout: TensorLayout,
     outproj_bias_layout: TensorLayout,
+    Engine: TensorEngine,
 ](
     total_batch_dim: Int32,
     batch: Int32,
@@ -3266,26 +3267,38 @@ def mamba_split_conv1d_scan_combined_gpu[
     norm_before_gate: Int8,
     has_rmsnorm: Int8,
     has_outproj: Int8,
-    zxbcdt: TileTensor[kernel_dtype, zxbcdt_layout, MutAnyOrigin],
-    conv_weight: TileTensor[kernel_dtype, conv_weight_layout, MutAnyOrigin],
-    conv_bias: TileTensor[kernel_dtype, conv_bias_layout, MutAnyOrigin],
-    dt_bias: TileTensor[kernel_dtype, delta_bias_layout, MutAnyOrigin],
-    A: TileTensor[kernel_dtype, A_layout, MutAnyOrigin],
-    D: TileTensor[kernel_dtype, D_layout, MutAnyOrigin],
-    x: TileTensor[kernel_dtype, x_layout, MutAnyOrigin],
-    out_z: TileTensor[kernel_dtype, out_z_layout, MutAnyOrigin],
-    dt: TileTensor[kernel_dtype, dt_layout, MutAnyOrigin],
-    B: TileTensor[kernel_dtype, B_layout, MutAnyOrigin],
-    C: TileTensor[kernel_dtype, C_layout, MutAnyOrigin],
-    z: TileTensor[kernel_dtype, z_layout, MutAnyOrigin],
+    zxbcdt: TileTensor[
+        kernel_dtype, zxbcdt_layout, MutAnyOrigin, Engine=Engine
+    ],
+    conv_weight: TileTensor[
+        kernel_dtype, conv_weight_layout, MutAnyOrigin, Engine=Engine
+    ],
+    conv_bias: TileTensor[
+        kernel_dtype, conv_bias_layout, MutAnyOrigin, Engine=Engine
+    ],
+    dt_bias: TileTensor[
+        kernel_dtype, delta_bias_layout, MutAnyOrigin, Engine=Engine
+    ],
+    A: TileTensor[kernel_dtype, A_layout, MutAnyOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_layout, MutAnyOrigin, Engine=Engine],
+    x: TileTensor[kernel_dtype, x_layout, MutAnyOrigin, Engine=Engine],
+    out_z: TileTensor[kernel_dtype, out_z_layout, MutAnyOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_layout, MutAnyOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_layout, MutAnyOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_layout, MutAnyOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_layout, MutAnyOrigin, Engine=Engine],
     rmsnorm_weight: TileTensor[
-        kernel_dtype, rmsnorm_weight_layout, MutAnyOrigin
+        kernel_dtype, rmsnorm_weight_layout, MutAnyOrigin, Engine=Engine
     ],
     outproj_weight: TileTensor[
-        kernel_dtype, outproj_weight_layout, MutAnyOrigin
+        kernel_dtype, outproj_weight_layout, MutAnyOrigin, Engine=Engine
     ],
-    outproj_bias: TileTensor[kernel_dtype, outproj_bias_layout, MutAnyOrigin],
-    output: TileTensor[kernel_dtype, output_layout, MutAnyOrigin],
+    outproj_bias: TileTensor[
+        kernel_dtype, outproj_bias_layout, MutAnyOrigin, Engine=Engine
+    ],
+    output: TileTensor[
+        kernel_dtype, output_layout, MutAnyOrigin, Engine=Engine
+    ],
     epsilon: Scalar[kernel_dtype],
 ):
     """GPU kernel for mamba_split_conv1d_scan_combined operation."""

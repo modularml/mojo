@@ -22,7 +22,7 @@ head_dim=64.
 from std.math import isclose
 from std.random import rand
 
-from std.gpu import *
+from max.gpu import *
 from max.gpu.host import DeviceContext
 from layout import (
     Idx,

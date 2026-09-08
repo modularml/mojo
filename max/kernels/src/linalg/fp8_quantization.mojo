@@ -21,7 +21,7 @@ from std.sys import simd_width_of, has_nvidia_gpu_accelerator
 from std.sys import align_of, size_of, get_defined_bool
 import max.gpu.primitives.block as block
 from max.algorithm.functional import _elementwise_impl_gpu
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -41,7 +41,7 @@ from layout import (
     row_major,
 )
 from layout.tile_layout import TensorLayout
-from layout.tensor_storage import TensorStorage
+from layout.tensor_engine import TensorEngine
 from std.logger import Logger
 from std.memory import bitcast
 from max.runtime.tracing import Trace, TraceLevel, trace_arg
@@ -467,11 +467,11 @@ struct _QuantizeFp8Kernel[
     scales_type: DType,
     output_layout: TensorLayout,
     output_origin: MutOrigin,
-    output_storage: TensorStorage,
+    output_engine: TensorEngine,
     output_idx_type: DType,
     scales_layout: TensorLayout,
     scales_origin: MutOrigin,
-    scales_storage: TensorStorage,
+    scales_engine: TensorEngine,
     scales_idx_type: DType,
     //,
     in_type: DType,
@@ -486,7 +486,7 @@ struct _QuantizeFp8Kernel[
         Self.out_type,
         Self.output_layout,
         Self.output_origin,
-        Storage=Self.output_storage,
+        Engine=Self.output_engine,
         linear_idx_type=Self.output_idx_type,
     ]
     var scales: TileTensor[
@@ -494,7 +494,7 @@ struct _QuantizeFp8Kernel[
         Self.scales_type,
         Self.scales_layout,
         Self.scales_origin,
-        Storage=Self.scales_storage,
+        Engine=Self.scales_engine,
         linear_idx_type=Self.scales_idx_type,
     ]
     var scale_ub: Scalar[Self.scales_type]
@@ -587,7 +587,7 @@ struct _ComputeScalesFp8Kernel[
     scales_type: DType,
     scales_layout: TensorLayout,
     scales_origin: MutOrigin,
-    scales_storage: TensorStorage,
+    scales_engine: TensorEngine,
     scales_idx_type: DType,
     //,
     in_type: DType,
@@ -602,7 +602,7 @@ struct _ComputeScalesFp8Kernel[
         Self.scales_type,
         Self.scales_layout,
         Self.scales_origin,
-        Storage=Self.scales_storage,
+        Engine=Self.scales_engine,
         linear_idx_type=Self.scales_idx_type,
     ]
     var scale_ub: Scalar[Self.scales_type]
@@ -670,11 +670,11 @@ struct _QuantizeFp8KernelPerTensor[
     scales_type: DType,
     output_layout: TensorLayout,
     output_origin: MutOrigin,
-    output_storage: TensorStorage,
+    output_engine: TensorEngine,
     output_idx_type: DType,
     scales_layout: TensorLayout,
     scales_origin: MutOrigin,
-    scales_storage: TensorStorage,
+    scales_engine: TensorEngine,
     scales_idx_type: DType,
     //,
     in_type: DType,
@@ -690,7 +690,7 @@ struct _QuantizeFp8KernelPerTensor[
         Self.out_type,
         Self.output_layout,
         Self.output_origin,
-        Storage=Self.output_storage,
+        Engine=Self.output_engine,
         linear_idx_type=Self.output_idx_type,
     ]
     var scales: TileTensor[
@@ -698,7 +698,7 @@ struct _QuantizeFp8KernelPerTensor[
         Self.scales_type,
         Self.scales_layout,
         Self.scales_origin,
-        Storage=Self.scales_storage,
+        Engine=Self.scales_engine,
         linear_idx_type=Self.scales_idx_type,
     ]
     var scale_ub: Scalar[Self.scales_type]
@@ -856,11 +856,11 @@ struct _BatchedQuantizeFp8Kernel[
     scales_type: DType,
     output_layout: TensorLayout,
     output_origin: MutOrigin,
-    output_storage: TensorStorage,
+    output_engine: TensorEngine,
     output_idx_type: DType,
     scales_layout: TensorLayout,
     scales_origin: MutOrigin,
-    scales_storage: TensorStorage,
+    scales_engine: TensorEngine,
     scales_idx_type: DType,
     //,
     in_type: DType,
@@ -875,7 +875,7 @@ struct _BatchedQuantizeFp8Kernel[
         Self.out_type,
         Self.output_layout,
         Self.output_origin,
-        Storage=Self.output_storage,
+        Engine=Self.output_engine,
         linear_idx_type=Self.output_idx_type,
     ]
     var scales: TileTensor[
@@ -883,7 +883,7 @@ struct _BatchedQuantizeFp8Kernel[
         Self.scales_type,
         Self.scales_layout,
         Self.scales_origin,
-        Storage=Self.scales_storage,
+        Engine=Self.scales_engine,
         linear_idx_type=Self.scales_idx_type,
     ]
     var scale_ub: Scalar[Self.scales_type]

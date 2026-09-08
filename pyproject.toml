@@ -16,9 +16,9 @@ force-exclude = '''
       third-party/llvm-project
     | \.derived
     | venv
-    | KGEN/test/mojo-parser
-    | KGEN/test/mojo-tool/format
-    | KGEN/tools/mblack
+    | Mojo/test/mojo-parser
+    | Mojo/test/mojo-tool/format
+    | Mojo/tools/mblack
     | max/python/max/serve/schemas
     | utils/packaging/tests
     | Faux/mojo_llm_from_scratch
@@ -49,7 +49,7 @@ extend-exclude = [
   "*max/python/max/_xgrammar/builtin_structural_tag.py",
   "*max/python/max/_xgrammar/openai_tool_call_schema.py",
   "bazel/internal/llvm-lit/lit.common.cfg.py", # Globals that aren't imported
-  "KGEN/tools/mblack/tests",
+  "Mojo/tools/mblack/tests",
   "Faux/mojo_llm_from_scratch/**", # Experimental from-scratch LLM project
 ]
 
