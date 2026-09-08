@@ -93,6 +93,28 @@ def test_process_inherits_env() raises:
     assert_equal(status.exit_code.value(), 0)
 
 
+def test_process_run_with_env() raises:
+    from std.os.env import getenv
+
+    _ = setenv("_MOJO_TEST_SHOULD_NOT_INHERIT", "oops")
+
+    var child_env = List[String]()
+    child_env.append("PATH=" + getenv("PATH"))
+    child_env.append("_MOJO_TEST_CUSTOM_VAR=hello_from_env")
+
+    # The custom var should be visible to the child.
+    var p = Process.run("printenv", ["_MOJO_TEST_CUSTOM_VAR"], env=child_env)
+    var status = p.wait()
+    assert_equal(status.exit_code.value(), 0)
+
+    # A parent var NOT in the explicit env should be absent in the child.
+    var p2 = Process.run(
+        "printenv", ["_MOJO_TEST_SHOULD_NOT_INHERIT"], env=child_env
+    )
+    var status2 = p2.wait()
+    assert_equal(status2.exit_code.value(), 1)
+
+
 def main() raises:
     test_process_run()
     test_process_run_missing()
@@ -100,3 +122,4 @@ def main() raises:
     test_process_kill()
     test_pipe()
     test_process_inherits_env()
+    test_process_run_with_env()

@@ -17,21 +17,20 @@ can't be caught with `try`/`except`. This runs the code under test in a
 re-exec'd child and checks that the child crashed with the expected message.
 """
 
-from std.os import abort, remove
-from std.os.env import getenv, setenv, unsetenv
-from std.os.path import exists
-from std.os.process import Process, ProcessStatus
+from std.ffi import CStringSlice
+from std.os import abort
+from std.os.env import getenv
+from std.os.process import Pipe, Process, ProcessStatus
 from std.reflection import call_location, SourceLocation
 from std.sys import argv
 from std.sys._io import stderr, stdout
-from std.sys._libc import dup2
+from std.sys._libc import _get_environ, close, dup2
 from std.sys.compile import SanitizeAddress
-from std.tempfile import NamedTemporaryFile
 from std.time import perf_counter, sleep
 
 # Which call site (file:line:col) the re-exec'd child should run.
 comptime _LOCATION_ENV = "__MOJO_TEST_EXPECT_ABORT_LOCATION_TARGET"
-# Path the child's stdout/stderr get redirected to before running.
+# File descriptor number (as a string) the child should dup2 onto stdout/stderr.
 comptime _OUTPUT_ENV = "__MOJO_TEST_EXPECT_ABORT_OUTPUT"
 # How long to wait for the child to abort before killing it.
 comptime _DEFAULT_TIMEOUT = 30.0
@@ -119,13 +118,53 @@ def _assert_aborts_impl(
 
 
 def _run(f: Some[def() raises]) raises:
-    """Redirects stdout/stderr to the parent-provided file, then calls `f`."""
-    with open(getenv(_OUTPUT_ENV), "w") as out_file:
-        var fd = Int32(out_file._get_raw_fd())
-        # redirect stdout/stderr to the output file
-        _ = dup2(fd, Int32(stdout.value))
-        _ = dup2(fd, Int32(stderr.value))
+    """Redirects stdout/stderr to the parent-provided fd, then calls `f`."""
+    var fd = Int32(Int(getenv(_OUTPUT_ENV)))
+    _ = dup2(fd, Int32(stdout.value))
+    _ = dup2(fd, Int32(stderr.value))
+    _ = close(fd)
     f()
+
+
+def _build_child_env(location: SourceLocation, write_fd: Int) -> List[String]:
+    """Copies the current environment, adds the assert_aborts control vars."""
+    var env = List[String]()
+    var envp = _get_environ()
+    if not envp:
+        env.append(String(t"{_LOCATION_ENV}={location}"))
+        env.append(String(t"{_OUTPUT_ENV}={write_fd}"))
+        return env^
+
+    var ptr = envp.value()
+    var i = 0
+    while True:
+        var entry = ptr[unsafe_offset=i]
+        if not entry:
+            break
+        var s = String(unsafe_from_utf8=entry.value().as_bytes())
+        if not s.startswith(_LOCATION_ENV + "=") and not s.startswith(
+            _OUTPUT_ENV + "="
+        ):
+            env.append(s)
+        i += 1
+
+    env.append(String(t"{_LOCATION_ENV}={location}"))
+    env.append(String(t"{_OUTPUT_ENV}={write_fd}"))
+    return env^
+
+
+def _read_all(mut p: Pipe) raises -> String:
+    """Reads all bytes from the read end of a pipe."""
+    var result = List[UInt8]()
+    var buf = Array[UInt8, 4096](fill=0)
+    while True:
+        var n = p.read_bytes(Span(buf))
+        if n == 0:
+            break
+        for i in range(n):
+            result.append(buf[i])
+    result.append(0)
+    return String(unsafe_from_utf8=result^)
 
 
 def _spawn_and_check(
@@ -143,54 +182,35 @@ def _spawn_and_check(
             t" bazel target."
         )
 
-    var tmp = NamedTemporaryFile(mode="w", delete=False)
-    var out_path = tmp.name
-    tmp.close()
+    # The write end must NOT be close-on-exec so the child inherits it.
+    var output_pipe = Pipe(in_close_on_exec=True, out_close_on_exec=False)
+    var write_fd = rebind[Int](output_pipe.fd_out.value())
+
+    var child_env = _build_child_env(location, write_fd)
 
     var rest = List[String]()
     for arg in self_argv[1:]:
         rest.append(String(arg))
 
-    # `setenv` mutates our own environment, which `Process.run` inherits
-    # into the child.
-    _ = setenv(_LOCATION_ENV, String(location))
-    _ = setenv(_OUTPUT_ENV, out_path)
-
-    def unsetenvs():
-        _ = unsetenv(_LOCATION_ENV)
-        _ = unsetenv(_OUTPUT_ENV)
+    var child = Process.run(String(self_argv[0]), rest, env=child_env)
+    # Close the parent's copy of the write end so we get EOF when
+    # the child exits (or aborts).
+    output_pipe.set_input_only()
 
     var status: ProcessStatus
     var timed_out = False
-    try:
-        var child = Process.run(String(self_argv[0]), rest)
-        var deadline = perf_counter() + timeout
+    var deadline = perf_counter() + timeout
+    status = child.poll()
+    while not status.has_exited():
+        if perf_counter() >= deadline:
+            _ = child.kill()
+            status = child.wait()
+            timed_out = True
+            break
+        sleep(_POLL_INTERVAL)
         status = child.poll()
-        while not status.has_exited():
-            if perf_counter() >= deadline:
-                _ = child.kill()
-                status = child.wait()
-                timed_out = True
-                break
-            sleep(_POLL_INTERVAL)
-            status = child.poll()
-    except e:
-        # process.run/wait failed!
-        # Restore the environment before propagating.
-        unsetenvs()
-        raise e^
 
-    unsetenvs()
-
-    var captured: String
-    try:
-        captured = open(out_path, "r").read()
-        remove(out_path)
-    except e:
-        abort(
-            t"The test framework failed to open/remove temp file '{out_path}'"
-            t" used for assert_aborts.\nError: {e}"
-        )
+    var captured = _read_all(output_pipe)
 
     if timed_out:
         raise Error(

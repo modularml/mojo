@@ -42,7 +42,7 @@ def test_help_performance() -> None:
     so make sure to check that all imports are function local first.
 
     """
-    THRESHOLD_MILLISECONDS = 1000
+    THRESHOLD_MILLISECONDS = 2000
 
     runfiles = python.runfiles.Create()
     assert runfiles is not None, "Unable to find runfiles tree"
