@@ -42,6 +42,7 @@ from max.nn.kv_cache.data_parallelism_utils import split_into_groups
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.kv_cache._nixl_backend import (
     NIXL_BACKEND_ENV_VAR,
+    SUPPORTED_NIXL_BACKENDS,
     NixlBackendType,
     validate_nixl_backend,
 )
@@ -299,23 +300,85 @@ def _heartbeat_overrides() -> dict[str, int]:
     return overrides
 
 
-def _nixl_backend_override() -> NixlBackendType | None:
-    """The validated NIXL transfer backend override, or ``None`` when unset.
+def _required_nixl_backend() -> NixlBackendType:
+    """The validated NIXL transfer backend this connector must use.
 
-    Reads ``MODULAR_NIXL_TRANSFER_BACKEND`` with the same three-way shape as
-    the Rust ``BackendSelection`` parse: unset, empty, and case-insensitive
-    ``auto`` mean auto-select (``None`` here) — the dKV server's own
-    ``DKV_MEMXFER_BACKEND`` accepts and defaults to ``auto``, so that spelling
-    must not crash the MAX pod — and anything else goes through the same
-    validator as the KV transfer engine, so a typo fails model load with the
-    accepted set rather than surfacing as a handshake mismatch. The default
-    differs from the transfer engine on purpose: it assumes ``"ucx"``, while
-    the connector auto-selects.
+    Reads ``MODULAR_NIXL_TRANSFER_BACKEND``, which is mandatory: dKV has no
+    auto-select mode, so there is nothing for an unset variable to mean. An
+    unset, empty, or unknown value fails model load naming the variable and
+    the accepted set, rather than surfacing later as a handshake mismatch or a
+    transfer against a transport that cannot do the job. ``auto`` reaches the
+    validator like any other unknown name — it was the dKV server's own
+    spelling for the mode that was removed, so an operator mirroring
+    ``DKV_MEMXFER_BACKEND`` gets a clear error instead of a silent fallback.
+
+    This deliberately differs from the KV transfer engine, which assumes
+    ``"ucx"`` when the variable is unset. The two consumers share the
+    validator, not the default.
+
+    Returns:
+        The transport to hand the Rust client, normalized to lowercase.
+
+    Raises:
+        ValueError: If the variable is unset, empty, or not a supported
+            backend.
     """
     raw = os.getenv(NIXL_BACKEND_ENV_VAR, "").strip()
-    if not raw or raw.lower() == "auto":
-        return None
+    if not raw:
+        raise ValueError(
+            f"{NIXL_BACKEND_ENV_VAR} must be set to the NIXL transport this "
+            "host's fabric needs (libfabric on EFA, ucx on InfiniBand). The "
+            "dKV connector has no auto-select mode, so there is no default. "
+            f"Supported backends: {sorted(SUPPORTED_NIXL_BACKENDS)}"
+        )
     return validate_nixl_backend(raw)
+
+
+def _required_operator_env() -> tuple[NixlBackendType, str]:
+    """The operator-injected settings dKV refuses to start without.
+
+    Both the NIXL transport and the tenant identity are the deployment
+    operator's to set, and a pod missing one is usually missing both, so they
+    are validated in one pass: an operator learns every missing variable from
+    a single model load instead of discovering the next one after fixing the
+    first. A lone problem is reported on its own, so the common
+    one-variable-missing message stays as direct as it was.
+
+    Returns:
+        The transport to hand the Rust client and the tenant identity.
+
+    Raises:
+        ValueError: If either variable is unset or empty, or the transport is
+            not a supported backend, naming every problem found.
+    """
+    problems: list[str] = []
+
+    backend: NixlBackendType | None = None
+    try:
+        backend = _required_nixl_backend()
+    except ValueError as exc:
+        problems.append(str(exc))
+
+    # MODULAR_DKV_TENANT_ID is injected by the operator (the trust boundary —
+    # not a user-facing override flag, which would be forgeable). It is
+    # REQUIRED: dKV has no default/legacy single-tenant path, so an unset or
+    # empty value fails model load rather than silently keying an unfenced
+    # shared store. Every DP replica handshakes the same per-tenant identity
+    # (kv_shard_id/replica_id zeroed), so the server keys ONE region-sharded
+    # store per tenant_id (backend dedup).
+    tenant_id = os.getenv("MODULAR_DKV_TENANT_ID", "")
+    if not tenant_id:
+        problems.append(
+            "dKV requires MODULAR_DKV_TENANT_ID to be set to a non-empty "
+            "tenant identity (the operator injects it); the legacy "
+            "empty-tenant default path has been removed."
+        )
+
+    if problems:
+        raise ValueError(" ".join(problems))
+
+    assert backend is not None  # no problems recorded means it parsed
+    return backend, tenant_id
 
 
 def _dtype_tag(dtype: object) -> str:
@@ -687,9 +750,12 @@ class DKVConnector(KVConnector):
                 ``kv_config_hash``.
 
         Raises:
-            ValueError: If ``MODULAR_DKV_TENANT_ID`` is unset or empty — dKV has
-                no default/legacy single-tenant path, so it fails model load
-                rather than silently keying an unfenced shared store.
+            ValueError: If either operator-injected variable is missing —
+                ``MODULAR_NIXL_TRANSFER_BACKEND`` (dKV auto-selects no
+                transport) or ``MODULAR_DKV_TENANT_ID`` (dKV has no
+                default/legacy single-tenant path, so it fails model load
+                rather than silently keying an unfenced shared store). Both are
+                checked in one pass, so a pod missing both is told about both.
         """
         # Deferred so importing this module (e.g. by a non-dKV pipeline) does
         # not require the optional, runtime-provided dkv_connector extension to
@@ -711,7 +777,10 @@ class DKVConnector(KVConnector):
             )
 
         listen_port = int(os.getenv("MODULAR_DKV_NIXL_LISTEN_PORT", "0"))
-        backend = _nixl_backend_override()
+        # Both operator-injected variables at once, so a pod missing both is
+        # told about both (CLIN-1730 made the transport required alongside the
+        # tenant identity, and reading them separately reported only the first).
+        backend, tenant_id = _required_operator_env()
 
         # Kill-switch (CLIN-1534): a G0 prefix-cache hit refreshes dKV recency
         # via touch(). Set MODULAR_DKV_DISABLE_G0_TOUCH to make touch() a no-op
@@ -728,21 +797,6 @@ class DKVConnector(KVConnector):
             "y",
         )
 
-        # Tenant deployment identity (CLIN-1477). MODULAR_DKV_TENANT_ID is
-        # injected by the operator (the trust boundary — not a user-facing
-        # override flag, which would be forgeable). It is REQUIRED: dKV has no
-        # default/legacy single-tenant path, so an unset or empty value fails
-        # model load rather than silently keying an unfenced shared store. Every
-        # DP replica handshakes the same per-tenant identity (kv_shard_id/
-        # replica_id zeroed), so the server keys ONE region-sharded store per
-        # tenant_id (backend dedup).
-        tenant_id = os.getenv("MODULAR_DKV_TENANT_ID", "")
-        if not tenant_id:
-            raise ValueError(
-                "dKV requires MODULAR_DKV_TENANT_ID to be set to a non-empty "
-                "tenant identity (the operator injects it); the legacy "
-                "empty-tenant default path has been removed."
-            )
         num_replicas = len(replica_kv_memory)
         # one shard's per-unit page strides in canonical order, from replica 0
         # because every DP replica runs the same model and config and so the

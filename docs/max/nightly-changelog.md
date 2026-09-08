@@ -464,6 +464,22 @@ the [container](/container) page now links to the new page.
   now resolve on this path, folded into the handshake's `kv_config_hash`. A
   single-tenant node spanning more than one GPU must set the dKV server's
   `--fair-share-partitions` to its GPU count.
+- The dKV external KV-cache connector now requires a NIXL transport
+  (`MODULAR_NIXL_TRANSFER_BACKEND`, one of `ucx`, `libfabric`, or `uccl`) and
+  fails model load when it is unset, empty, or `auto`. dKV's auto-selection
+  mode is removed: it activated the first discovered transport plugin, which
+  is plugin-name order, so it resolved to libfabric on every host — including
+  InfiniBand hosts, where UCX is the correct transport and the resulting
+  configuration silently underperformed or failed at transfer time. Inferring
+  the transport from what a host happens to have staged is not fixable by
+  reordering, so the mode is gone rather than corrected. Every deployment that
+  runs the dKV connector already sets the variable and is unaffected; a local
+  or test run that relied on the default must now name a transport. The dKV
+  server's `--memxfer-backend` / `DKV_MEMXFER_BACKEND` became required for the
+  same reason, and it too rejects `auto`. The failure mode differs by engine:
+  MAX refuses to load the model, while mach logs the failure and serves on
+  without the external KV tier, because a failed dKV bring-up is non-fatal
+  there.
 - The dKV external KV-cache connector now waits out a busy node instead of
   failing model load on it. dKV refuses a handshake when it has no room for
   another share, which is a transient condition that clears once a departing

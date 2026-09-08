@@ -60,9 +60,9 @@ def test_unknown_backend_fails_naming_the_variable_and_accepted_set() -> None:
 def test_auto_is_not_a_backend() -> None:
     """``auto`` stays rejected here: the validator names backends only.
 
-    The auto-select *sentinel* is each reader's concern — the dKV connector
-    maps it to ``None`` before validating, and the transfer engine has no
-    auto mode at all, so for it ``auto`` is as wrong as any typo.
+    Neither consumer has an auto-select mode — dKV's was removed because it
+    resolved by plugin name and so never picked UCX — so ``auto`` is as wrong
+    as any typo for both of them.
     """
     with pytest.raises(ValueError, match="auto"):
         validate_nixl_backend("auto")
@@ -74,8 +74,8 @@ def test_transfer_engine_defaults_to_ucx_when_unset(
     """The engine's read-with-default keeps its own semantics.
 
     Only validation is shared: the transfer engine assumes ``"ucx"`` when the
-    variable is unset, while the dKV connector maps unset to ``None``
-    (auto-select) — see ``_nixl_backend_override`` in its connector module.
+    variable is unset, while the dKV connector rejects an unset variable —
+    see ``_required_nixl_backend`` in its connector module.
     """
     monkeypatch.delenv(NIXL_BACKEND_ENV_VAR, raising=False)
 
