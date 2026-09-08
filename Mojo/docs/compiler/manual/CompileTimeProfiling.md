@@ -12,15 +12,19 @@ act on.
 | `--mlir-timing`              | Times every MLIR pass and analysis.                                                            |
 | `--llvm-timing`              | Times every LLVM pass and analysis.                                                            |
 | `--mlir-timing-display MODE` | `tree` (default) nests by pipeline structure; `list` aggregates per pass name, sorted by time. |
+| `--timing-json`              | Writes the reports as one JSON object instead of as text.                                      |
+| `--timing-file FILE`         | Writes the reports to `FILE` instead of to stderr.                                             |
 
 See them and their full help text with `mojo build --help-hidden` or
 `mojo run --help-hidden`. Their definitions live in
-`KGEN/tools/mojo/Common/CompilationOptions.td`.
+`Mojo/tools/mojo/Common/CompilationOptions.td`.
 
 Four things to know before reading any report they produce:
 
 1. Both reports go to **stderr** when compilation finishes, so capture with
-   `2>`. For `mojo run` they print before the program starts.
+   `2>`. For `mojo run` they print before the program starts. `--timing-file`
+   redirects them to a file instead, in either format; see
+   [JSON output](#json-output).
 2. `--llvm-timing` forces single threaded compilation. LLVM's timers are
    process global and not thread safe, so the flag sets `numThreads = 1` and
    overrides `--num-threads`. The report therefore measures total CPU work, not
@@ -86,6 +90,60 @@ The three sections are not siblings and their totals must not be added: the
 MLIR root spans the whole compile including code generation. See
 [Reading the numbers by hand](#reading-the-numbers-by-hand) for the
 consequences.
+
+## JSON output
+
+`--timing-json` writes the reports as one JSON object rather than as text, and
+`--timing-file FILE` sends them to a file rather than to stderr. The two are
+independent, so JSON on stderr and text in a file both work. Neither changes
+the measurement: `--llvm-timing` still forces single threaded compilation, and
+a warm cache still reports nothing.
+
+The object holds one member per report, and only the members the command asked
+for — `--timing-json` with no timing flag gets `{}`.
+
+```json
+{
+  "mlir": [
+    {
+      "name": "ElaborateGenerators",
+      "wall": {"duration": 119.7262, "percentage": 45.1},
+      "passes": [
+        {
+          "name": "offload nvptx64-nvidia-cuda sm_100a (also in host)",
+          "wall": {"duration": 101.8517, "percentage": 38.4},
+          "passes": []
+        }
+      ]
+    }
+  ],
+  "llvm": [
+    {
+      "pipeline": "offload nvptx64-nvidia-cuda sm_100a",
+      "times": {"time.pass.SROAPass.wall": 0.000464}
+    }
+  ]
+}
+```
+
+`mlir` follows `--mlir-timing-display`. `tree` nests each entry's children
+under `passes`; `list` is flat and opens with a `root` entry. `llvm` is one
+entry per pipeline in the order they ran — each accelerator target, then the
+host — each with a flat `times` map.
+
+Those `times` keys are `time.<group>.<name>.<metric>`, with `<metric>` one of
+`wall`, `user`, `sys` or `instr`. The four groups are the same four the text
+report prints and they overlap the same way, so the arithmetic in
+[The LLVM groups overlap](#the-llvm-groups-overlap) applies unchanged.
+
+One difference from the text report: accelerator scope names in `mlir` carry no
+`===---` rule. The rule exists to set the scope apart from the host passes it
+sits beside when a human reads a tree, and it only gets in a matcher's way.
+Match the `(also in host)` suffix instead.
+
+The digest script reads the text report, not the JSON. Use `--timing-json`
+when feeding another consumer, and `2> log.txt` or `--timing-file` when feeding
+[the digest](#digesting-the-report).
 
 ## Timing a model
 
@@ -194,7 +252,7 @@ them; they matter when checking its output or writing another consumer.
 ### The MLIR root is the whole compile
 
 It spans parsing, the passes, and code generation, because the `MLIRPassTiming`
-object lives for all of `build()` in `KGEN/tools/mojo/Build/mojo-build.cpp`. On
+object lives for all of `build()` in `Mojo/tools/mojo/Build/mojo-build.cpp`. On
 one gemma-4 compile the root read 272.34s against 272.56s of wall clock. Take
 the compile total from the root; never add sections to it.
 
@@ -209,7 +267,8 @@ computes `Rest` as the root minus the sum of the children, so double counted
 time lands there with its sign flipped: the row reads `-59.0020` in place of the
 42.85s that is genuinely unattributed. Adding the scope back recovers it:
 `-59.00 + 101.85 = 42.85` seconds. A consumer of the report has to either skip
-rows whose name starts with `===---` or subtract them.
+those scope rows or subtract them — by the `===---` prefix in the text report,
+or by the `(also in host)` suffix, which both formats carry.
 
 ### `Rest` is host code generation, not noise
 
@@ -222,12 +281,12 @@ and 8.4s of translation to LLVM IR plus object emission.
 
 Each LLVM section prints up to four groups, and only two are disjoint:
 
-| Group                                  | Relationship                       |
-|----------------------------------------|------------------------------------|
-| `Pass execution timing report`         | the passes                         |
-| `Analysis execution timing report`     | the analyses, separate from passes |
-| `Instruction Selection and Scheduling` | sub-timers inside the ISel pass    |
-| `Register Allocation`                  | sub-timers inside the RA pass      |
+| Group                                  | JSON key prefix    | Relationship                       |
+|----------------------------------------|--------------------|------------------------------------|
+| `Pass execution timing report`         | `time.pass.`       | the passes                         |
+| `Analysis execution timing report`     | `time.analysis.`   | the analyses, separate from passes |
+| `Instruction Selection and Scheduling` | `time.sdag.`       | sub-timers inside the ISel pass    |
+| `Register Allocation`                  | `time.regalloc.`   | sub-timers inside the RA pass      |
 
 The last two come from `NamedRegionTimer` objects inside
 `SelectionDAGISel::CodeGenAndEmitDAG` and the greedy allocator, so their time is

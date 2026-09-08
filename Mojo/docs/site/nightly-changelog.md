@@ -357,6 +357,32 @@ This version is still a work in progress.
   from ._impl import Widget, make_widget
   ```
 
+- `mojo build` and `mojo run` can now report where a compile spends its time.
+  `--mlir-timing` times every MLIR pass and analysis, and `--llvm-timing` does
+  the same for LLVM, each printing a report to stderr when the compilation
+  finishes, which for `mojo run` is before the program starts.
+  `--mlir-timing-display` groups the MLIR report as a `tree` (the default),
+  which nests by pipeline structure, or as a `list`, which aggregates by pass
+  name and sorts by total time. These options are hidden, use `--help-hidden`
+  to list them.
+
+  Two things shape what the numbers mean. `--llvm-timing` pins the compile to
+  one thread and overrides `--num-threads`, because LLVM's timers are global to
+  the process and are not thread safe, so its report measures the work LLVM
+  does rather than the cost of a parallel build. And passes served from the
+  compilation cache never run, so a warm cache reports little and an object
+  cache hit leaves the LLVM report empty; point `MODULAR_CACHE_DIR` at an empty
+  directory to time a whole pipeline.
+
+- Both timing reports can be written as JSON, with `--timing-json`, and to a
+  file, with `--timing-file`. The two are independent, so the text reports can
+  go to a file and the JSON can go to stderr.
+
+  The JSON is one object per command, holding a `mlir` member and an `llvm`
+  member, and only the members the command asked for. A command that asks for
+  JSON but for no timing writes `{}`, so a consumer can parse the output
+  without first checking which timing options ran.
+
 ## Removed
 
 - Legacy constructs replaced in 1.0 were removed in this release, including
