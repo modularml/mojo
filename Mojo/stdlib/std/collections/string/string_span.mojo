@@ -2617,7 +2617,11 @@ def _unsafe_strlen(ptr: ImmPointer[Byte, _], max: Int = Int.MAX) -> Int:
 
     Args:
         ptr: The null-terminated pointer to the string.
-        max: The maximum size of the string.
+        max: The maximum number of bytes to scan. Defaults to `UInt.MAX`,
+             which means the scan is unbounded and relies on the string
+             being null-terminated. Pass an explicit value to cap the scan
+             (e.g. when reading from a fixed-size buffer such as a dirent
+             name field).
 
     Returns:
         The length of the null terminated string without the null terminator.
@@ -2625,7 +2629,65 @@ def _unsafe_strlen(ptr: ImmPointer[Byte, _], max: Int = Int.MAX) -> Int:
     Notes:
         The length does NOT include the null terminator.
     """
-    var offset = 0
+    if __is_run_in_comptime_interpreter:
+        var offset = 0
+        while offset < max and ptr[unsafe_offset=offset]:
+            offset += 1
+        return offset
+    return _unsafe_strlen_impl(ptr, max)
+
+
+def _unsafe_strlen_impl(ptr: ImmPointer[Byte, _], max: Int) -> Int:
+    """SIMD-accelerated helper for `_unsafe_strlen`.
+
+    Scans for a null byte using SIMD-width blocks, then a scalar tail for any
+    remaining bytes within `max`. When `max == Int.MAX` the scan is
+    unbounded; all other values cap the scan to at most `max` bytes.
+
+    The SIMD width matches `_memchr_impl` (`simd_width_of[DType.bool]()`),
+    keeping SIMD behaviour consistent across stdlib string search helpers.
+    """
+    comptime bool_mask_width = simd_width_of[DType.bool]()
+    var zero = SIMD[DType.uint8, bool_mask_width](0)
+
+    # Int.MAX is the sentinel for "no bound" (see _unsafe_strlen docstring).
+    if max == Int.MAX:
+        # Unbounded scan: the string is guaranteed to be null-terminated, so
+        # a null byte will always be found.
+        #
+        # Scalar prelude: advance byte-by-byte until the pointer is
+        # SIMD-width-aligned. An unaligned SIMD load can straddle a memory
+        # page boundary and fault if the adjacent page is unmapped.
+        var offset_in_first_block = Int(ptr) & (bool_mask_width - 1)
+        var scalar_end = (bool_mask_width - offset_in_first_block) & (
+            bool_mask_width - 1
+        )
+        for j in range(scalar_end):
+            if not ptr[unsafe_offset=j]:
+                return j
+
+        # ptr + scalar_end is now SIMD-width-aligned; loads are page-safe
+        # because page size is always >= SIMD width.
+        var i = scalar_end
+        while True:
+            var block = ptr.unsafe_load[width=bool_mask_width](i)
+            var bool_mask = block.eq(zero)
+            var mask = pack_bits(bool_mask)
+            if mask:
+                return i + Int(count_trailing_zeros(mask))
+            i += bool_mask_width
+
+    # Bounded case: process only complete SIMD blocks that fit within max.
+    var vectorized_end = align_down(max, bool_mask_width)
+    for i in range(0, vectorized_end, bool_mask_width):
+        var block = ptr.unsafe_load[width=bool_mask_width](i)
+        var bool_mask = block.eq(zero)
+        var mask = pack_bits(bool_mask)
+        if mask:
+            return i + Int(count_trailing_zeros(mask))
+
+    # Scalar tail for the remaining bytes that don't fill a full SIMD block.
+    var offset = vectorized_end
     while offset < max and ptr[unsafe_offset=offset]:
         offset += 1
     return offset
