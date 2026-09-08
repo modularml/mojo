@@ -25,6 +25,8 @@ from std.collections.string._unicode_lookups import (
 from std.builtin.globals import global_constant
 from std.collections import Span
 
+comptime BIGGEST_UNICODE_CODEPOINT = UInt32(0x10FFFF)
+
 
 def _uppercase_mapping_index(rune: Codepoint) -> Int:
     """Return index for upper case mapping or -1 if no mapping is given."""
