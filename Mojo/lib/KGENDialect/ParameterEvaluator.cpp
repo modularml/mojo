@@ -164,7 +164,12 @@ bool ParameterEvaluationContext::isMaterializationContext() const {
 
 Operation *ParameterEvaluationContext::resolveConformanceForStruct(
     ResolvedStructHandle resolved, TraitSymbolAttr traitSymbol) {
-  return resolved.decl.lookupConformance(traitSymbol);
+  Operation *ret = nullptr;
+  withEvaluator(resolved.decl.getInputParams(), resolved.paramValues,
+                [&](ParameterEvaluator &evaluator) {
+                  ret = resolved.decl.lookupConformance(evaluator, traitSymbol);
+                });
+  return ret;
 }
 
 FailureOr<TypedAttr> ParameterEvaluationContext::evaluateExpression(

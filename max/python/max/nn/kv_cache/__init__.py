@@ -34,7 +34,6 @@ from .cache_params import (
     compute_max_seq_len_fitting_in_cache,
     compute_num_device_blocks,
     estimated_memory_size,
-    host_bytes_per_block,
     spec_decode_cache_slack,
 )
 from .input_types import (
@@ -52,6 +51,7 @@ from .utils import (
     MLAAttnKey,
     MSAAttnKey,
     build_max_lengths_tensors,
+    padded_lut_cols,
 )
 
 __all__ = [
@@ -89,6 +89,6 @@ __all__ = [
     "compute_max_seq_len_fitting_in_cache",
     "compute_num_device_blocks",
     "estimated_memory_size",
-    "host_bytes_per_block",
+    "padded_lut_cols",
     "spec_decode_cache_slack",
 ]

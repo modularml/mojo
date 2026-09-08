@@ -109,12 +109,33 @@ class Eagle3MHADraftConfig:
     return_logits: ReturnLogits = ReturnLogits.LAST_TOKEN
     return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE
 
+    sampling_logits_dtype: DType = DType.float32
+    """Dtype exposed to the sampling consumer."""
+
     fc_norm: bool = False
     """Apply a separate RMSNorm to each captured target hidden-state chunk
     before the ``fc`` fusion (EAGLE3 ``fc_norm: true``). The chunks come from
     target layers at different depths with very different magnitudes, and ``fc``
     is trained on per-chunk-normalized inputs, so skipping this collapses the
     draft."""
+
+
+def _sampling_logits_output(
+    logits: TensorValue, output_dtype: DType
+) -> TensorValue:
+    """Returns LM-head logits in the dtype their sampling consumer requires."""
+    if output_dtype in (DType.bfloat16, DType.float16):
+        assert logits.dtype == output_dtype, (
+            f"native {output_dtype} sampling logits require an LM-head output "
+            f"of the same dtype, got {logits.dtype}"
+        )
+        return logits
+    if output_dtype != DType.float32:
+        raise ValueError(
+            "Eagle3 MHA draft sampling logits must be float32, bfloat16 or "
+            f"float16, got {output_dtype}"
+        )
+    return ops.cast(logits, DType.float32)
 
 
 def project_captured_hidden_states(
@@ -497,6 +518,7 @@ class Eagle3MHADraft(Module):
 
         self.return_logits = config.return_logits
         self.return_hidden_states = config.return_hidden_states
+        self.sampling_logits_dtype = config.sampling_logits_dtype
         self.logits_scaling = 1.0
 
     def __call__(
@@ -834,9 +856,9 @@ class Eagle3MHADraft(Module):
         norm_last_token = forward_sharded_layers(
             self.norm_shards, last_token_distributed
         )
-        last_logits = ops.cast(
+        last_logits = _sampling_logits_output(
             self.lm_head(norm_last_token, signal_buffers)[0],
-            DType.float32,
+            self.sampling_logits_dtype,
         )
 
         ret_val: tuple[TensorValue, ...] = (last_logits,)
@@ -883,12 +905,12 @@ class Eagle3MHADraft(Module):
                     variable_per_dev, signal_buffers
                 )
 
-            variable_logits = ops.cast(
+            variable_logits = _sampling_logits_output(
                 self.lm_head(
                     forward_sharded_layers(self.norm_shards, variable_per_dev),
                     signal_buffers,
                 )[0],
-                DType.float32,
+                self.sampling_logits_dtype,
             )
             logit_offsets = ops.range(
                 0,

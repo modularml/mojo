@@ -26,7 +26,7 @@ from max.graph import (
     ops,
 )
 from max.nn.embedding import Embedding
-from max.nn.kv_cache import PagedCacheValues
+from max.nn.kv_cache import KVCacheParams, MultiKVCacheParams, PagedCacheValues
 from max.nn.layer import LayerList, Module
 from max.nn.linear import ColumnParallelLinear
 from max.nn.norm.rms_norm import RMSNorm
@@ -117,28 +117,48 @@ class GptOssTextModel(DistributedLogitsPostprocessMixin, Module):
             multiply_before_cast=True,
         )
 
-        layers = [
-            GptOssTransformerBlock(
-                attention=GptOssAttention(
-                    rope=rope,
-                    num_attention_heads=config.num_attention_heads,
-                    num_key_value_heads=config.num_key_value_heads,
-                    hidden_size=config.hidden_size,
-                    kv_params=config.kv_params,
-                    layer_idx=i,
-                    dtype=config.dtype,
-                    devices=config.devices,
-                    local_window_size=config.sliding_window,
-                    has_bias=config.attention_bias,
-                    layer_type=config.layer_types[i]
-                    if i < len(config.layer_types)
-                    else "full_attention",
-                ),
-                mlp=GptOssMoE(config),
-                input_layernorm=create_norm(),
-                post_attention_layernorm=create_norm(),
-                devices=config.devices,
+        assert isinstance(config.kv_params, MultiKVCacheParams)
+        kv_params_by_layer_type: dict[str, KVCacheParams] = {}
+        for layer_type_key, kv_params_leaf in config.kv_params.children.items():
+            assert isinstance(kv_params_leaf, KVCacheParams)
+            kv_params_by_layer_type[layer_type_key] = kv_params_leaf
+
+        layer_type_counts = {"sliding_attention": 0, "full_attention": 0}
+        layers = []
+        for i in range(config.num_hidden_layers):
+            layer_type = (
+                config.layer_types[i]
+                if i < len(config.layer_types)
+                else "full_attention"
             )
+            layer_idx_in_cache = layer_type_counts[layer_type]
+            layer_type_counts[layer_type] += 1
+            layers.append(
+                GptOssTransformerBlock(
+                    attention=GptOssAttention(
+                        rope=rope,
+                        num_attention_heads=config.num_attention_heads,
+                        num_key_value_heads=config.num_key_value_heads,
+                        hidden_size=config.hidden_size,
+                        kv_params=kv_params_by_layer_type[layer_type],
+                        layer_idx=layer_idx_in_cache,
+                        dtype=config.dtype,
+                        devices=config.devices,
+                        local_window_size=config.sliding_window,
+                        has_bias=config.attention_bias,
+                        layer_type=layer_type,
+                    ),
+                    mlp=GptOssMoE(config),
+                    input_layernorm=create_norm(),
+                    post_attention_layernorm=create_norm(),
+                    devices=config.devices,
+                )
+            )
+
+        self._layer_kv_key = [
+            config.layer_types[i]
+            if i < len(config.layer_types)
+            else "full_attention"
             for i in range(config.num_hidden_layers)
         ]
 
@@ -152,7 +172,8 @@ class GptOssTextModel(DistributedLogitsPostprocessMixin, Module):
         self,
         tokens: TensorValue,
         signal_buffers: Sequence[BufferValue],
-        kv_collections: Sequence[PagedCacheValues],
+        sliding_kv_collections: Sequence[PagedCacheValues],
+        global_kv_collections: Sequence[PagedCacheValues],
         return_n_logits: TensorValue,
         input_row_offsets: Sequence[TensorValue],
         **kwargs,
@@ -163,6 +184,11 @@ class GptOssTextModel(DistributedLogitsPostprocessMixin, Module):
         # Replicate embedding output to all devices
         h = [h_embed.to(device) for device in self.devices]
 
+        kv_collections_by_type = {
+            "sliding_attention": sliding_kv_collections,
+            "full_attention": global_kv_collections,
+        }
+
         # Run through transformer layers
         for idx, layer in enumerate(self.layers):
             layer_idx_tensor = ops.constant(
@@ -172,7 +198,7 @@ class GptOssTextModel(DistributedLogitsPostprocessMixin, Module):
                 layer_idx_tensor,
                 h,
                 signal_buffers,
-                kv_collections,
+                kv_collections_by_type[self._layer_kv_key[idx]],
                 input_row_offsets=input_row_offsets,
                 **kwargs,
             )
@@ -193,14 +219,16 @@ class GptOss(Module):
         self,
         tokens: TensorValue,
         signal_buffers: Sequence[BufferValue],
-        kv_cache_inputs_per_dev: Sequence[PagedCacheValues],
+        sliding_kv_collections: Sequence[PagedCacheValues],
+        global_kv_collections: Sequence[PagedCacheValues],
         return_n_logits: TensorValue,
         input_row_offsets: Sequence[TensorValue],
     ) -> tuple[TensorValue, ...]:
         return self.language_model(
             tokens,
             signal_buffers,
-            kv_cache_inputs_per_dev,
+            sliding_kv_collections,
+            global_kv_collections,
             return_n_logits,
             input_row_offsets,
         )

@@ -59,11 +59,12 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-#include <string_view>
 
 #include "Support/Configuration.h"
 #include "Support/Profiling/PluginABI.h"
 #include "Support/Profiling/Ranges.h"
+
+#include "llvm/ADT/StringRef.h"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -285,11 +286,11 @@ std::string sinkLastTraceError() {
   return big;
 }
 
-void sinkRangeBegin(std::string_view name, uint32_t color) {
+void sinkRangeBegin(StringRef name, uint32_t color) {
   api()->rangeBegin(name.data(), name.size(), color);
 }
 
-void sinkRangeBeginWithId(uint64_t correlationId, std::string_view name,
+void sinkRangeBeginWithId(uint64_t correlationId, StringRef name,
                           uint32_t color) {
   api()->rangeBeginWithId(correlationId, name.data(), name.size(), color);
 }

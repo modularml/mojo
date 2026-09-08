@@ -55,6 +55,17 @@ class EOSTracker(BaseModel):
             (len(s) for s in self.eos_sequences), default=1
         )
 
+    @property
+    def eos_sequence_lookback(self) -> int:
+        """How many pre-span tokens first_eos_offset can read.
+
+        A stop sequence straddling the span boundary contributes at most
+        len(seq) - 1 tokens from before it, so callers capturing history
+        for that method need only this many. Zero when no multi-token stop
+        sequence is configured, where prior_generated is ignored outright.
+        """
+        return self._max_eos_seq_len - 1
+
     # --- EOS Single ID + Sequence ID Check---
     def is_eos_from_tokens(
         self,
@@ -115,7 +126,7 @@ class EOSTracker(BaseModel):
             The offset into ``new_tokens`` of the first terminating token, or
             ``None`` if the span does not end generation.
         """
-        keep = self._max_eos_seq_len - 1
+        keep = self.eos_sequence_lookback
         tail = (
             prior_generated[max(0, len(prior_generated) - keep) :]
             if keep

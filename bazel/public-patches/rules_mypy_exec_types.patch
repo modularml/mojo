@@ -1,0 +1,70 @@
+Resolve the aspect's type-stub deps in the exec configuration.
+
+`_types_keys` / `_types_values` carry the Python type-stub wheels that mypy
+itself consumes, so they belong in the exec configuration alongside `_mypy_cli`
+(which already sets `cfg = "exec"`), not in the target configuration.
+
+Left in the target configuration they are resolved for whatever platform is
+being built, which breaks cross-compilation outright: the aspect is applied to
+every top-level target, so building for a target platform that the Python lock
+file has no environment for fails during loading, before the aspect's own
+suppression tags get a chance to apply. Building any C++ target for a Windows
+target platform hits this.
+
+Moving them exposes a second defect that has to be fixed with it. A dependency
+listed in `types` takes the `continue` branch below, so it never reaches the
+loop that records the output roots its files live under; the only root the
+aspect saw for that repository came from the *stub* target instead. Those roots
+are joined with the target's own import paths to build `MYPYPATH`, so once the
+stub target resolves in the exec configuration the resulting entry points at an
+exec-configuration path while the dependency's files are staged in the target
+configuration, and mypy stops finding the package. Collect each dependency's
+roots from that dependency, before the type-mapping check.
+
+diff --git a/mypy/private/mypy.bzl b/mypy/private/mypy.bzl
+--- a/mypy/private/mypy.bzl
++++ b/mypy/private/mypy.bzl
+@@ -135,6 +135,17 @@
+             depsets.append(dep[RulesPythonPyInfo].transitive_sources)
+             depsets.append(dep[RulesPythonPyInfo].transitive_pyi_files)
+
++        # Collect generated roots before the type-mapping check below can skip
++        # this dep: these roots are joined with the target's own import paths,
++        # so each dep has to contribute the root its own files live under.
++        for file in dep.default_runfiles.files.to_list():
++            root = file.root.path
++            if root:
++                if dep.label.workspace_root.startswith("external/"):
++                    generated_dirs[root + "/" + dep.label.workspace_root] = 1
++                else:
++                    generated_dirs[root] = 1
++
+         if PyTypeLibraryInfo in dep:
+             types.append(dep[PyTypeLibraryInfo].directory.path + "/site-packages")
+         elif dep.label in type_mapping:
+@@ -153,14 +164,6 @@
+         if MypyCacheInfo in dep:
+             upstream_caches.append(dep[MypyCacheInfo].directory)
+
+-        for file in dep.default_runfiles.files.to_list():
+-            root = file.root.path
+-            if root:
+-                if dep.label.workspace_root.startswith("external/"):
+-                    generated_dirs[root + "/" + dep.label.workspace_root] = 1
+-                else:
+-                    generated_dirs[root] = 1
+-
+         # TODO: can we use `ctx.bin_dir.path` here to cover generated files
+         # and as a way to skip iterating over depset contents to find generated
+         # file roots?
+@@ -293,8 +296,8 @@
+             ),
+             # pass the dict[Label, Label] in parts because Bazel doesn't have
+             # this kind of attr to pass naturally
+-            "_types_keys": attr.label_list(default = types.keys()),
+-            "_types_values": attr.label_list(default = types.values()),
++            "_types_keys": attr.label_list(default = types.keys(), cfg = "exec"),
++            "_types_values": attr.label_list(default = types.values(), cfg = "exec"),
+             "_suppression_tags": attr.string_list(default = suppression_tags or ["no-mypy"]),
+             "_opt_in_tags": attr.string_list(default = opt_in_tags or []),
+             "cache": attr.bool(default = cache),

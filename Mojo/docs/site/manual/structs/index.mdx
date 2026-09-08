@@ -1,0 +1,493 @@
+---
+title: Mojo structs
+sidebar_position: 1
+description: Introduction to Mojo structures (structs).
+---
+
+A struct is Mojo's primary way to define your own type. When you want to model
+both data and behavior—whether that's a small value type, a numeric
+abstraction, or the foundation of a larger system—use a struct.
+
+At a high level, a Mojo struct lets you bundle data together with the
+operations that act on that data. This makes structs a natural way to represent
+concepts in your program, rather than passing loosely related values through
+functions.
+
+Each Mojo `struct` is a data structure that lets you encapsulate _fields_ and
+_methods_ to store and operate on data. Structs can define the following
+members:
+
+- **Fields** are variables that store data relevant to the struct.
+- **Methods** are functions defined in a struct that normally act upon the field
+  data.
+- **Static methods** are functions provided by the type to perform behaviors,
+  provide constants, or create specialized instances.
+- **Dunder methods** are named for their _d_ouble _under_-scored form, with
+  `__` on both sides. Also called "special methods," [they help define
+  behaviors](/docs/manual/structs/#special-methods) such as initialization
+  and allow structs to conform to [traits](/docs/manual/traits/).
+- **`comptime` members** enable compile-time references that can be used for
+  optimization.
+
+For example, if you're building a graphics program, you can use a struct to
+define an `Image` that has fields to store information about each image (such
+as its component pixels) and methods that perform actions on it (such as
+rotating the image).
+
+Mojo's struct format is designed to provide a static, memory-safe data
+structure that's both powerful and performant. Unlike dynamic objects
+(such as Python classes) that can be modified freely at runtime,
+structs are defined at compile time, which allows Mojo to generate
+highly optimized code.
+
+All struct fields must be declared using `var` and include a type
+annotation. This requirement is part of Mojo's compile-time guarantees,
+helping ensure both performance and memory safety.
+
+## Struct definition
+
+You can define a simple struct called `MyPair` with two fields like this:
+
+```mojo
+struct MyPair:
+    var first: Int
+    var second: Int
+```
+
+However, you can't instantiate this struct because it has no initializer
+method. So here it is with an initializer to initialize the two fields:
+
+```mojo
+struct MyPair:
+    var first: Int
+    var second: Int
+
+    def __init__(out self, first: Int, second: Int):
+        self.first = first
+        self.second = second
+```
+
+Notice that the first argument in the `__init__()` method is `out self`.
+You'll have a `self` argument as the first argument on all struct methods.
+It references the current struct instance (it allows code in the method to
+refer to "itself"). _When you call the initializer, you never pass a value
+for `self`—Mojo passes it in automatically._
+
+The `out` portion of `out self` is an [argument
+convention](/docs/manual/values/ownership#argument-conventions) that declares
+`self` as a mutable reference that starts out as uninitialized and must be
+initialized before the function returns.
+
+Many types use a field-wise initializer like the one shown for `MyPair` above:
+it takes an argument for each field, and initializes the fields directly from
+the arguments. To save typing, Mojo provides a
+[`@fieldwise_init`](/docs/reference/decorators/fieldwise-init/) decorator, which
+generates a field-wise initializer for the struct. So you can rewrite the
+`MyPair` example above like this:
+
+```mojo
+@fieldwise_init
+struct MyPair:
+    var first: Int
+    var second: Int
+```
+
+The `__init__()` method is one of many [special methods](#special-methods)
+(also known as "dunder methods" because they have *d*ouble *under*scores) with
+pre-determined names.
+
+:::note
+
+You can't assign values when you declare fields. You must initialize
+all of the struct's fields in the initializer. (If you try to leave a field
+uninitialized, the code won't compile.)
+
+:::
+
+## Constructing a struct type
+
+Once you have an initializer, with `__init__()` or using `@fieldwise_init`,
+you can create an instance of `MyPair` and set the fields:
+
+```mojo title="Construct an instance"
+var mine = MyPair(2, 4)
+print(mine.first)
+```
+
+```output
+2
+```
+
+:::note Initializer lists
+Mojo initializer lists let you construct instances without spelling
+out the full type name and parameters. If the full type can be inferred
+from context, pass the initializer arguments directly between braces,
+with or without keywords. For example `{0.5, fish="salmon"}` calls
+`__init__(0.5, fish="salmon")` on the appropriate struct type. This
+is equivalent to `MyStruct(0.5, fish="salmon")` if the type is inferred
+to be `MyStruct`.
+:::
+
+## Making a struct Copyable {#making-a-struct-copyable-and-movable}
+
+By default, Mojo structs can be _moved_, but not _copied_.
+
+For example, the following code produces errors:
+
+```mojo
+var a = MyPair(1, 2)
+
+# Implicit copy
+var b = a  # value of type 'MyPair' cannot be implicitly copied,
+           # it does not conform to 'ImplicitlyCopyable'
+
+# Explicit copy
+var c = a.copy()  # 'MyPair' has no attribute 'copy'
+                    # it does not conform to 'Copyable'
+# Move
+var d = a^  # OK
+```
+
+In most cases, you can make a struct copyable just by adding the
+`Copyable` [trait](/docs/manual/traits/).
+
+### Copyability
+
+To make a struct copyable, add the `Copyable` trait:
+
+  ```mojo
+  struct MyPair(Copyable):
+    ...
+  ```
+
+In most cases, that's all you need to do. Mojo generates a copy
+initializer (`__init__(out self, *, copy: Self)` method) for you. You don't
+need to write your own unless you need custom logic in the copy
+initializer; for example, if your struct dynamically allocates memory. For
+more information, see the section on [copy
+initializers](/docs/manual/lifecycle/life/#copy-constructor).
+
+The [`Copyable`](/docs/std/traits/copyable/Copyable/) trait provides two ways
+to copy a value: the `copy()`
+instance method and the copy initializer. Prefer the `copy()` method.
+
+### Implicit copyability
+
+To make a struct implicitly copyable, add the
+[`ImplicitlyCopyable`](/docs/std/traits/copyable/ImplicitlyCopyable/) trait:
+
+```mojo
+struct MyPair(ImplicitlyCopyable):
+    ...
+```
+
+`ImplicitlyCopyable` automatically implies `Copyable` and `Movable`, so all
+the notes related to copyability apply here. A type should only be implicitly
+copyable if copying the type is inexpensive and has no side effects. Unnecessary
+copies can be a big drain on memory and performance, so use this trait with
+caution.
+
+## Fields
+
+Fields store a struct's data. When you declare a field, it becomes part of the
+struct's memory layout. Because the compiler knows every field's type at
+compile time, it can:
+
+- Calculate the struct's exact memory footprint
+- Ensure all fields are initialized before use
+- Generate fast, direct access to field data
+- Prevent changes to the struct's layout at runtime
+
+Fields share the lifetime of their struct instance. They are created when the
+struct is created and destroyed when the struct is destroyed. This model avoids
+dangling references and partially constructed objects.
+
+Outside of your struct implementation, you access fields with dot notation
+(`my_struct.field_name`). Within the struct, your methods access fields using
+`self` (`self.field_name`). Mojo knows each field's location at compile time,
+making field access direct and efficient.
+
+### Field requirements
+
+**You must** declare field members with `var` in structs:
+
+```mojo
+struct MyStruct:
+    value: Int # Error. Missing `var` keyword
+    var count: Int # Yes
+```
+
+Unlike local variables in functions, this requirement lets Mojo reason about a
+struct's layout and guarantees that its memory is safe and predictable.
+
+**You must** use unique symbols for fields, methods, or `comptime` members.
+These all exist in the same namespace:
+
+```mojo
+struct MyStruct:
+    var count: Int
+    var count: String # Error. Invalid redeclaration of `count`
+```
+
+**You can** re-use a struct member's name for an argument or method variable.
+
+```mojo
+struct MyStruct:
+    var foo: Int
+
+    def use_argument(self, foo: Int):  # Argument shadows field
+        print(foo)  # Prints argument value
+
+    def use_local(self, value: Int):
+        var foo = value  # Local variable shadows field
+        print(foo, self.foo)  # Prints local, then field
+```
+
+**You must** mark `self` as mutable if updating a field value.
+
+```mojo
+struct MyStruct:
+    var foo: Int
+
+    def update_foo(mut self, new_value: Int):
+        self.foo = new_value
+```
+
+**You must** initialize fields within initializers, and not
+at the point of declaration.
+
+```mojo
+struct MyStruct:
+    var foo: Int = 10 # Error: Unknown tokens
+    comptime bar = 10 # Yes
+```
+
+[`comptime` members](/docs/manual/parameters/#comptime-members)
+are compile-time constants (not fields) and don't occupy instance
+storage, so they can be initialized at the point of declaration.
+
+### Field conventions
+
+Like other Mojo elements, fields normally adhere to
+[certain conventions](https://github.com/modular/modular/blob/main/Mojo/docs/contributing/stdlib/stdlib-code-style.md#code-conventions):
+
+You should use conventional naming for field members:
+
+- Prefer lowercase snake_case for field names (for example, `user_count`,
+  `max_capacity`).
+- Use descriptive names that indicate purpose, and not their type (for example,
+  `error_msg` not `msg_string`).
+- For members meant for internal use or to maintain invariants, add an
+  underscore prefix (for example, `_private_field`).
+- For boolean fields, use `is_` or `has_` prefixes (for example, `is_valid`,
+  `has_data`).
+- Avoid single-letter names except for common mathematical conventions (such as
+  `x`, `y`, `z` for coordinates).
+
+## Methods
+
+In addition to special methods like `__init__()`, you can add any other method
+you want to your struct. For example:
+
+```mojo
+@fieldwise_init
+struct MyPair:
+    var first: Int
+    var second: Int
+
+    def get_sum(self) -> Int:
+        return self.first + self.second
+```
+
+```mojo
+var mine = MyPair(6, 8)
+print(mine.get_sum())
+```
+
+```output
+14
+```
+
+Notice that `get_sum()` also uses the `self` argument, because this is
+the only way you can access the struct's fields in a method. The name `self` is
+just a convention, and you can use any name you want to refer to the struct
+instance that is always passed as the first argument.
+
+Methods that take the implicit `self` argument are called _instance methods_
+because they act on an instance of the struct.
+
+:::note
+
+The `self` argument in a struct method is the only argument in a `def`
+function that doesn't require a type. You can include the type if you
+want, but you can elide it because Mojo already knows its type
+(`MyPair` in this case).
+
+:::
+
+## Mutating methods {#mutating-a-struct}
+
+By default, a struct's methods receive an immutable `self`,
+so they can't modify the struct's fields. For example:
+
+```mojo
+struct MyStruct:
+    var value: Int
+
+    def increment(self):
+        self.value += 1 # ERROR: expression must be mutable in assignment
+
+    # ...
+```
+
+To allow a method to mutate the instance, declare its receiver as `mut self`.
+This makes `self` mutable inside the method and allows changes to its fields
+that persist after the method returns:
+
+```mojo
+struct MyStruct:
+    var value: Int
+
+    def increment(mut self):
+        self.value += 1 # Works: Mutable `self` allows assignment
+
+    #...
+```
+
+:::note
+Read more about mutable arguments and the `mut` keyword:
+[Mutable arguments (`mut`)](/docs/manual/values/ownership/#mutable-arguments-mut)
+:::
+
+### Static methods
+
+A struct can have _static methods_. A static method can be called without
+creating an instance of the struct. Unlike instance methods, a static method
+doesn't receive the implicit `self` argument, so it can't access any fields on
+the struct.
+
+To declare a static method, use the
+[`@staticmethod`](/docs/reference/decorators/staticmethod/) decorator and don't
+include
+a `self` argument:
+
+```mojo
+struct Logger:
+
+    def __init__(out self):
+        pass
+
+    @staticmethod
+    def log_info(message: String):
+        print("Info: ", message)
+```
+
+You can invoke a static method by calling it on the type (in this case,
+`Logger`). You can also call it on an instance of the type. Both forms are
+shown below:
+
+```mojo
+Logger.log_info("Static method called.")
+var l = Logger()
+l.log_info("Static method called from instance.")
+```
+
+```output
+Info:  Static method called.
+Info:  Static method called from instance.
+```
+
+## Structs compared to classes
+
+If you're familiar with other object-oriented languages, then structs might
+sound a lot like classes, and there are some similarities, but also some
+important differences. Eventually, Mojo will also support classes to match the
+behavior of Python classes.
+
+So, let's compare Mojo structs to Python classes. They both support methods,
+fields, operator overloading, decorators for metaprogramming, and more, but
+their key differences are as follows:
+
+- Python classes are dynamic: they allow for dynamic dispatch, monkey-patching
+  (or "swizzling"), and dynamically binding instance fields at runtime.
+
+- Mojo structs are static: they are bound at compile-time (you cannot add
+  methods at runtime). Structs allow you to trade flexibility for performance
+  while being safe and easy to use.
+
+- Mojo structs don't support inheritance ("sub-classing"), but a struct can
+  implement [traits](/docs/manual/traits/).
+
+- Python classes support class attributes—values that are shared by all
+  instances of the class, equivalent to class variables or static data members
+  in other languages.
+
+- Mojo structs don't support static data members.
+
+Syntactically, the biggest difference compared to a Python class is that all
+fields in a struct must be explicitly declared with `var`.
+
+In Mojo, the structure and contents of a struct are set at compile time and
+can't be changed while the program is running. Unlike in Python, where you can
+add, remove, or change attributes of an object on the fly, Mojo doesn't allow
+that for structs.
+
+However, the static nature of structs helps Mojo run your code faster. The
+program knows exactly where to find the struct's information and how to use it
+without any extra steps or delays at runtime.
+
+Mojo's structs also work really well with features you might already know from
+Python, like operator overloading (which lets you change how math symbols like
+`+` and `-` work with your own data, using [special
+methods](#special-methods)).
+
+As mentioned above, Mojo builds all its standard types
+([`Int`](/docs/std/builtin/simd/#int),
+[`String`](/docs/std/collections/string/string/String/), etc.) from structs,
+rather than hardwiring them into the language itself. This gives you more
+flexibility and control when writing your code, and it means you can define your
+own types with all the same capabilities (there's no special treatment for the
+standard library types).
+
+## Special methods
+
+Special methods (or "dunder methods") such as `__init__()` are pre-determined
+method names that you can define in a struct to perform a special task.
+
+Although it's possible to call special methods with their method names, the
+point is that you never should, because Mojo automatically invokes them in
+circumstances where they're needed (which is why they're also called "magic
+methods"). For example, Mojo calls the `__init__()` method when you create
+an instance of the struct; and when Mojo destroys the instance, it calls the
+`__deinit__()` method (if it exists).
+
+Even operator behaviors that appear built-in (`+`, `<`, `==`, `|`, and so on)
+are implemented as special methods that Mojo implicitly calls upon to perform
+operations or comparisons on the type that the operator is applied to.
+
+Mojo supports a long list of special methods; far too many to discuss here, but
+they generally match all of [Python's special
+methods](https://docs.python.org/3/reference/datamodel#special-method-names)
+and they usually accomplish one of two types of tasks:
+
+- Operator overloading: A lot of special methods are designed to overload
+  operators such as `<` (less-than), `+` (add), and `|` (or) so they work
+  appropriately with each type. For more information, see
+  [Implement operators for custom
+  types](/docs/manual/structs/operator-support/).
+
+- Lifecycle event handling: These special methods deal with the lifecycle
+  and value ownership of an instance. For example, `__init__()` and
+  `__deinit__()` demarcate the beginning and end of an instance lifetime,
+  and other special methods define the behavior for other lifecycle events
+  such as how to copy or move a value.
+
+You can learn all about the lifecycle special methods in the [Value
+lifecycle](/docs/manual/lifecycle/) section. However, most structs are simple
+aggregations of other types, so unless your type requires custom behaviors when
+an instance is created, copied, moved, or destroyed, you can synthesize the
+essential lifecycle methods you need (and save yourself some time) using the
+`@fieldwise_init` decorator (described in
+[Struct definition](#struct-definition)), and the `Copyable` and `Movable`
+traits (described in
+[Making a struct copyable](#making-a-struct-copyable-and-movable)).

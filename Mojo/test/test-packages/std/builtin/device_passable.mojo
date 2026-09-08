@@ -70,6 +70,10 @@ trait DevicePassable:
         else:
             return SrcT == Self.device_type
 
+    @staticmethod
+    def _is_implicitly_encodable_to[SrcT: AnyType]() -> Bool:
+        return Self._is_convertible_to_device_type[SrcT]()
+
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):

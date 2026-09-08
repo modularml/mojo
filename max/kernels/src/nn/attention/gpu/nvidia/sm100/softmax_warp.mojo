@@ -4108,7 +4108,11 @@ def fa4_softmax[
                     comptime if rescale_threshold < 0:
                         # old_max - new_row_max < -8
                         # 8 < new_row_max - old_max
-                        if _vote_nvidia_helper(diff < rescale_threshold) != 0:
+                        #
+                        # Per-lane predicate, not a warp vote: thread_tile_row
+                        # = tid % BM packs unrelated Q rows into one warp, so
+                        # an OR here would leak a sibling row's rescale.
+                        if diff < rescale_threshold:
                             row_max = new_row_max
                             comptime if use_fma:
                                 neg_max_scaled = nms_new
@@ -4212,7 +4216,8 @@ def fa4_softmax[
                 comptime if rescale_threshold < 0:
                     # old_max - new_row_max < -8
                     # 8 < new_row_max - old_max
-                    if _vote_nvidia_helper(diff < rescale_threshold) != 0:
+                    # Per-lane predicate, not a warp vote -- see the gate above.
+                    if diff < rescale_threshold:
                         row_max = new_row_max
                         comptime if use_fma:
                             neg_max_scaled = nms_new

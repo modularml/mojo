@@ -103,7 +103,13 @@ from layout.tma_async import (
     _gather4_box_width,
 )
 from max.gpu.host.nvidia.tma import TensorMapSwizzle
-from layout import ComptimeInt, RowMajorLayout, TileTensor
+from layout import (
+    ComptimeInt,
+    DefaultEngine,
+    RowMajorLayout,
+    TensorEngine,
+    TileTensor,
+)
 from layout.tile_layout import row_major as tt_row_major
 from nn.attention.gpu.nvidia.common import OptionalPointer
 from nn.attention.mha_mask import MHAMask
@@ -159,6 +165,7 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
     has_variable_topk: Bool = False,
     fold_shared_index: Bool = False,
     q_len_fold: Int = 1,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](TrivialRegisterPassable):
     """Sparse MLA decode with native FP8 WGMMA for SM100 (B200), unified gather.
 
@@ -315,7 +322,10 @@ struct MLA_SM100_Decode_Sparse_QKV_FP8[
         extra_indices_stride_dev: Int32,
         extra_scales_ptr: OptionalReg[UnsafePointer[Float32, MutAnyOrigin]],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         comptime _mask_type_name: String = Self.MaskType.get_type_name()

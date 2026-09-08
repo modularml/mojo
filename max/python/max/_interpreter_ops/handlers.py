@@ -594,11 +594,11 @@ def _handle_broadcast_to(
     # shape from the second input if the shape is parametric.
     target_shape = None
     result_mlir_type: mo.TensorType = list(op.results)[0].type  # type: ignore[assignment]
-    shape_attr = result_mlir_type.shape_attr
-    if isinstance(shape_attr, mosh.ShapeAttr):
-        shape = graph.Shape.from_mlir(shape_attr)
-        if graph.Shape.is_static(shape):
-            target_shape = graph.Shape(shape).static_dims
+    shape_attr = result_mlir_type.shape
+
+    shape = graph.Shape.from_mlir(shape_attr)
+    if graph.Shape.is_static(shape):
+        target_shape = graph.Shape(shape).static_dims
 
     if target_shape is None and len(inputs) > 1:
         # For dynamic/parametric shapes, get from the shape operand

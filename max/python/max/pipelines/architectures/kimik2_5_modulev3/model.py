@@ -71,6 +71,9 @@ from max.pipelines.lib.vision_encoder_cache import VisionEncodeResult
 from max.pipelines.weights.quant import parse_quant_config
 from transformers import AutoConfig
 
+from ..deepseekV3_modulev3.layers.quant_ops import (
+    routed_weight_dtype,
+)
 from .batch_processor import KimiK2_5BatchProcessor
 from .context import KimiK2_5TextAndVisionContext
 from .kimi_nvfp4_policy import infer_kimi_nvfp4_weight_flags
@@ -281,10 +284,12 @@ class KimiK2_5Model(
             quant_config = parse_quant_config(
                 self.huggingface_config.text_config, state_dict, self.dtype
             )
-            shared_experts_weight_dtype, _ = infer_kimi_nvfp4_weight_flags(
-                state_dict,
-                first_k_dense_replace=llm.first_k_dense_replace,
-                quant_config=quant_config,
+            shared_experts_weight_dtype, dense_mlp_layers_without_quant = (
+                infer_kimi_nvfp4_weight_flags(
+                    state_dict,
+                    first_k_dense_replace=llm.first_k_dense_replace,
+                    quant_config=quant_config,
+                )
             )
             if (
                 quant_config is not None
@@ -294,6 +299,7 @@ class KimiK2_5Model(
                     quant_config,
                     shared_experts_weight_dtype=shared_experts_weight_dtype,
                 )
+            llm.dense_mlp_layers_without_quant = dense_mlp_layers_without_quant
         llm.quant_config = quant_config
         # Kimi K2.5 keeps the entire attention block (including o_proj) in bf16
         # (the checkpoint's modelopt ``ignore`` list covers all ``self_attn``),
@@ -353,6 +359,13 @@ class KimiK2_5Model(
         quantized_dispatch = quant_config is not None and (
             self.dtype.is_float8() or quant_config.is_nvfp4
         )
+        fused_shared_expert = llm.n_shared_experts == 1
+        if quant_config is not None:
+            fused_shared_expert = fused_shared_expert and (
+                quant_config.shared_experts_use_quant(
+                    routed_weight_dtype(quant_config)
+                )
+            )
         ep_config = EPConfig(
             dispatch_dtype=(
                 self.dtype if quantized_dispatch else DType.bfloat16
@@ -372,7 +385,7 @@ class KimiK2_5Model(
             ),
             n_gpus_per_node=n_devices,
             n_nodes=ep_size // n_devices,
-            fused_shared_expert=llm.n_shared_experts == 1,
+            fused_shared_expert=fused_shared_expert,
             use_allreduce=self.pipeline_config.runtime.ep_use_allreduce,
         )
         llm.ep_config = ep_config

@@ -133,13 +133,33 @@ ErrorOr<std::vector<std::string>> M::getFeatures(StringRef triple,
   return getFeaturesFromClang(opts, cpu);
 }
 
+ErrorOr<M::ResolvedCpu> M::resolveCpu(StringRef triple, StringRef cpu) {
+  ErrorOr<std::vector<std::string>> featuresOr = getFeatures(triple, cpu);
+  if (!featuresOr.isError())
+    return ResolvedCpu{cpu.str(), featuresOr.takeValue()};
+  if (cpu.empty())
+    return featuresOr.takeError();
+
+  // LLVM answers "generic" for a CPU it cannot identify, and that name is not
+  // universally valid: Clang checks it against a per-architecture TargetParser
+  // CPU table, and x86_64's omits "generic" while AArch64's carries it. So an
+  // unidentified host CPU takes target creation down on x86_64, and would on
+  // any architecture whose table omits the name. Asking for no CPU name gives
+  // the triple's baseline, which is what "unidentified" means.
+  featuresOr = getFeatures(triple, "");
+  if (featuresOr.isError())
+    return featuresOr.takeError();
+  return ResolvedCpu{"", featuresOr.takeValue()};
+}
+
 ErrorOr<TargetInfo> M::getHostTargetInfo() {
   std::string hostTriple = llvm::sys::getDefaultTargetTriple();
-  std::string hostCpu(llvm::sys::getHostCPUName());
-  ErrorOr<std::vector<std::string>> featuresOr =
-      getFeatures(hostTriple, hostCpu);
-  if (featuresOr)
-    return featuresOr.takeError();
+  ErrorOr<ResolvedCpu> hostCpuOr =
+      resolveCpu(hostTriple, llvm::sys::getHostCPUName());
+  if (hostCpuOr)
+    return hostCpuOr.takeError();
+  ResolvedCpu hostCpu = hostCpuOr.takeValue();
+  std::vector<std::string> features = std::move(hostCpu.features);
 
   // A Docker container or hypervisor may only enable a subset of CPU features
   // (e.g. no AVX-512). Use LLVM's runtime
@@ -152,13 +172,13 @@ ErrorOr<TargetInfo> M::getHostTargetInfo() {
       auto it = runtimeFeatures.find(f);
       return it != runtimeFeatures.end() && !it->second;
     };
-    for (StringRef f : *featuresOr)
+    for (StringRef f : features)
       if (featureIsAbsent(f))
         disabledFeatures.push_back(f.str());
-    llvm::erase_if(*featuresOr, featureIsAbsent);
+    llvm::erase_if(features, featureIsAbsent);
   }
 
-  return TargetInfo(llvm::Triple(hostTriple), hostCpu, std::move(*featuresOr),
+  return TargetInfo(llvm::Triple(hostTriple), hostCpu.name, std::move(features),
                     std::move(disabledFeatures));
 }
 

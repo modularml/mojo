@@ -25,7 +25,7 @@
 
 #if MODULAR_KGEN_PROFILING_ENABLED
 #include "Support/Profiling/Ranges.h"
-#include <string_view>
+#include "llvm/ADT/StringRef.h"
 #endif
 
 #include <cstddef>
@@ -39,16 +39,16 @@ extern "C" {
 // kernel-launch paths.
 //
 // Precondition: `namePtr` must be non-null even when `nameLen == 0`.
-// Constructing a `std::string_view` from a null pointer is undefined behavior
-// under C++17 and only well-defined under C++20 when the length is zero.
-// The Mojo callers pass String/StaticString buffer pointers, which are
-// non-null even for empty strings and so satisfy this contract; any new
-// C-ABI caller must uphold it itself.
+// Constructing an `llvm::StringRef` from a null pointer asserts in debug
+// builds and is UB for non-zero lengths. The Mojo callers pass
+// String/StaticString buffer pointers, which are non-null even for empty
+// strings and so satisfy this contract; any new C-ABI caller must uphold
+// it itself.
 COMPILERRT_EXPORT COMPILERRT_VISIBILITY_EXPORT void
 KGEN_CompilerRT_RangeBegin(const char *namePtr, size_t nameLen,
                            uint32_t color) {
 #if MODULAR_KGEN_PROFILING_ENABLED
-  M::Profiling::rangeBegin(std::string_view(namePtr, nameLen), color);
+  M::Profiling::rangeBegin(llvm::StringRef(namePtr, nameLen), color);
 #endif
 }
 

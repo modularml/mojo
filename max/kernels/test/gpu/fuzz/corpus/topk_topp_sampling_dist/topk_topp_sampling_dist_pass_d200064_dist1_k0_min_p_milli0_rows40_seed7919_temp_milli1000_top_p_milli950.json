@@ -1,0 +1,17 @@
+{
+  "target": "topk_topp_sampling_dist",
+  "spec": {
+    "rows": 40,
+    "d": 200064,
+    "k": 0,
+    "top_p_milli": 950,
+    "temp_milli": 1000,
+    "min_p_milli": 0,
+    "dist": 1,
+    "seed": 7919
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "MiniMax-M3 serving shape: 200064-token vocabulary, top_p=0.95, temperature=1.0, one row per request at max_batch_size 40. Anchors the two contracts speculative decoding depends on at the vocabulary the generator otherwise reaches only by chance -- the sampled token carries positive mass in the emitted distribution, and the single-block path samples inside that same nucleus.",
+  "findings": []
+}

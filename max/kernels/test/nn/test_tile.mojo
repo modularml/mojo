@@ -25,26 +25,18 @@ def test_tile_eg1() raises:
     print("== test_tile_eg1")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 4](uninitialized=True)
+    var input_stack: Array[Scalar[type], _] = [0, 1, 2, 3]
     var input = TileTensor(input_stack, row_major[2, 2]())
-
-    input[0, 0] = 0
-    input[0, 1] = 1
-    input[1, 0] = 2
-    input[1, 1] = 3
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 2](uninitialized=True)
+    var repeats_stack = Array[Scalar[type_repeats], 2](fill=2)
     var repeats = TileTensor(repeats_stack, row_major[2]())
-
-    repeats[0] = 2
-    repeats[1] = 2
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 16](uninitialized=True)
+    var output_stack = Array[Scalar[type], 16](fill={})
     var output = TileTensor(output_stack, row_major[4, 4]())
 
     tile[type, type_repeats](
@@ -72,26 +64,18 @@ def test_tile_eg2() raises:
     print("== test_tile_eg2")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 4](uninitialized=True)
+    var input_stack: Array[Scalar[type], _] = [0, 1, 2, 3]
     var input = TileTensor(input_stack, row_major[2, 2]())
-
-    input[0, 0] = 0
-    input[0, 1] = 1
-    input[1, 0] = 2
-    input[1, 1] = 3
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 2](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [3, 2]
     var repeats = TileTensor(repeats_stack, row_major[2]())
-
-    repeats[0] = 3
-    repeats[1] = 2
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 6 * 4](uninitialized=True)
+    var output_stack = Array[Scalar[type], 6 * 4](fill={})
     var output = TileTensor(output_stack, row_major[6, 4]())
 
     tile[type, type_repeats](
@@ -117,26 +101,18 @@ def test_tile_eg3() raises:
     print("== test_tile_eg3")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 4](uninitialized=True)
+    var input_stack: Array[Scalar[type], _] = [0, 1, 2, 3]
     var input = TileTensor(input_stack, row_major[2, 2]())
-
-    input[0, 0] = 0
-    input[0, 1] = 1
-    input[1, 0] = 2
-    input[1, 1] = 3
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 2](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [2, 3]
     var repeats = TileTensor(repeats_stack, row_major[2]())
-
-    repeats[0] = 2
-    repeats[1] = 3
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 6](uninitialized=True)
+    var output_stack = Array[Scalar[type], 4 * 6](fill={})
     var output = TileTensor(output_stack, row_major[4, 6]())
 
     tile[type, type_repeats](
@@ -166,32 +142,20 @@ def test_tile_eg4() raises:
     print("== test_tile_eg4")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[2, 2, 2]())
-
-    input[0, 0, 0] = 0
-    input[0, 0, 1] = 1
-    input[0, 1, 0] = 2
-    input[0, 1, 1] = 3
-
-    input[1, 0, 0] = 4
-    input[1, 0, 1] = 5
-    input[1, 1, 0] = 6
-    input[1, 1, 1] = 7
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 3](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [2, 1, 1]
     var repeats = TileTensor(repeats_stack, row_major[3]())
-
-    repeats[0,] = 2
-    repeats[1,] = 1
-    repeats[2,] = 1
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 2 * 2](uninitialized=True)
+    var output_stack = Array[Scalar[type], 4 * 2 * 2](fill={})
     var output = TileTensor(output_stack, row_major[4, 2, 2]())
 
     tile[type, type_repeats](
@@ -223,32 +187,20 @@ def test_tile_eg5() raises:
     print("== test_tile_eg5")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[2, 2, 2]())
-
-    input[0, 0, 0] = 0
-    input[0, 0, 1] = 1
-    input[0, 1, 0] = 2
-    input[0, 1, 1] = 3
-
-    input[1, 0, 0] = 4
-    input[1, 0, 1] = 5
-    input[1, 1, 0] = 6
-    input[1, 1, 1] = 7
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 3](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [2, 1, 2]
     var repeats = TileTensor(repeats_stack, row_major[3]())
-
-    repeats[0] = 2
-    repeats[1] = 1
-    repeats[2] = 2
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 2 * 4](uninitialized=True)
+    var output_stack = Array[Scalar[type], 4 * 2 * 4](fill={})
     var output = TileTensor(output_stack, row_major[4, 2, 4]())
 
     tile[type, type_repeats](
@@ -274,26 +226,20 @@ def test_tile_eg6() raises:
     print("== test_tile_eg6")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i + 1)
+    )
     var input = TileTensor(input_stack, row_major[2, 2]())
-
-    input[0, 0] = 1
-    input[0, 1] = 2
-    input[1, 0] = 3
-    input[1, 1] = 4
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 2](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [1, 2]
     var repeats = TileTensor(repeats_stack, row_major[2]())
-
-    repeats[0] = 1
-    repeats[1] = 2
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 2 * 4](uninitialized=True)
+    var output_stack = Array[Scalar[type], 2 * 4](fill={})
     var output = TileTensor(output_stack, row_major[2, 4]())
 
     tile[type, type_repeats](
@@ -319,26 +265,20 @@ def test_tile_eg7() raises:
     print("== test_tile_eg7")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i + 1)
+    )
     var input = TileTensor(input_stack, row_major[2, 2]())
-
-    input[0, 0] = 1
-    input[0, 1] = 2
-    input[1, 0] = 3
-    input[1, 1] = 4
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 2](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [2, 1]
     var repeats = TileTensor(repeats_stack, row_major[2]())
-
-    repeats[0] = 2
-    repeats[1] = 1
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 2](uninitialized=True)
+    var output_stack = Array[Scalar[type], 4 * 2](fill={})
     var output = TileTensor(output_stack, row_major[4, 2]())
 
     tile[type, type_repeats](
@@ -364,27 +304,19 @@ def test_tile_eg8() raises:
     print("== test_tile_eg8")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 4](uninitialized=True)
+    var input_stack: Array[Scalar[type], _] = [1, 2, 3, 4]
     var input = TileTensor(input_stack, row_major[1, 4]())
-
-    input[0, 0] = 1
-    input[0, 1] = 2
-    input[0, 2] = 3
-    input[0, 3] = 4
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 2](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [4, 1]
     var repeats = TileTensor(repeats_stack, row_major[2]())
-
-    repeats[0] = 4
-    repeats[1] = 1
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 4](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[4, 4]()).fill(0)
+    var output_stack = Array[Scalar[type], 4 * 4](fill=0)
+    var output = TileTensor(output_stack, row_major[4, 4]())
 
     tile[type, type_repeats](
         input.make_dynamic[.int64](),
@@ -421,33 +353,21 @@ def test_tile_eg9() raises:
     print("== test_tile_eg9")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[2, 2, 2]())
-
-    input[0, 0, 0] = 0
-    input[0, 0, 1] = 1
-    input[0, 1, 0] = 2
-    input[0, 1, 1] = 3
-
-    input[1, 0, 0] = 4
-    input[1, 0, 1] = 5
-    input[1, 1, 0] = 6
-    input[1, 1, 1] = 7
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 3](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [2, 2, 1]
     var repeats = TileTensor(repeats_stack, row_major[3]())
-
-    repeats[0] = 2
-    repeats[1] = 2
-    repeats[2] = 1
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 4 * 2](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[4, 4, 2]()).fill(0)
+    var output_stack = Array[Scalar[type], 4 * 4 * 2](fill=0)
+    var output = TileTensor(output_stack, row_major[4, 4, 2]())
 
     tile[type, type_repeats](
         input.make_dynamic[.int64](),
@@ -494,32 +414,20 @@ def test_tile_eg10() raises:
     print("== test_tile_eg10")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[2, 2, 2]())
-
-    input[0, 0, 0] = 0
-    input[0, 0, 1] = 1
-    input[0, 1, 0] = 2
-    input[0, 1, 1] = 3
-
-    input[1, 0, 0] = 4
-    input[1, 0, 1] = 5
-    input[1, 1, 0] = 6
-    input[1, 1, 1] = 7
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 3](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [3, 2, 3]
     var repeats = TileTensor(repeats_stack, row_major[3]())
-
-    repeats[0] = 3
-    repeats[1] = 2
-    repeats[2] = 3
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 6 * 4 * 6](uninitialized=True)
+    var output_stack = Array[Scalar[type], 6 * 4 * 6](fill={})
     var output = TileTensor(output_stack, row_major[6, 4, 6]())
 
     tile[type, type_repeats](
@@ -579,28 +487,15 @@ def test_tile_eg11() raises:
     print("== test_tile_eg11")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 3 * 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 3 * 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[3, 2, 2]())
-
-    input[0, 0, 0] = 0
-    input[0, 0, 1] = 1
-    input[0, 1, 0] = 2
-    input[0, 1, 1] = 3
-
-    input[1, 0, 0] = 4
-    input[1, 0, 1] = 5
-    input[1, 1, 0] = 6
-    input[1, 1, 1] = 7
-
-    input[2, 0, 0] = 8
-    input[2, 0, 1] = 9
-    input[2, 1, 0] = 10
-    input[2, 1, 1] = 11
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 3](uninitialized=True)
+    var repeats_stack = Array[Scalar[type_repeats], 3](fill={})
     var repeats = TileTensor(repeats_stack, row_major[3]())
 
     repeats[0] = 2
@@ -609,8 +504,8 @@ def test_tile_eg11() raises:
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 6 * 6 * 2](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[6, 6, 2]()).fill(0)
+    var output_stack = Array[Scalar[type], 6 * 6 * 2](fill=0)
+    var output = TileTensor(output_stack, row_major[6, 6, 2]())
 
     tile[type, type_repeats](
         input.make_dynamic[.int64](),
@@ -637,18 +532,15 @@ def test_tile_eg12() raises:
     print("== test_tile_eg12")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
-
-    input[0, 0, 0, 0] = 0
-    input[0, 0, 0, 1] = 1
-    input[0, 0, 1, 0] = 2
-    input[0, 0, 1, 1] = 3
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 4](uninitialized=True)
+    var repeats_stack = Array[Scalar[type_repeats], 4](fill={})
     var repeats = TileTensor(repeats_stack, row_major[4]())
 
     repeats[0] = 1
@@ -658,8 +550,8 @@ def test_tile_eg12() raises:
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 6](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[1, 1, 4, 6]()).fill(0)
+    var output_stack = Array[Scalar[type], 4 * 6](fill=0)
+    var output = TileTensor(output_stack, row_major[1, 1, 4, 6]())
 
     tile[type, type_repeats](
         input.make_dynamic[.int64](),
@@ -700,33 +592,15 @@ def test_tile_eg13() raises:
     print("== test_tile_eg13")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2 * 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2 * 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[2, 2, 2, 2]())
-
-    input[0, 0, 0, 0] = 0
-    input[0, 0, 0, 1] = 1
-    input[0, 0, 1, 0] = 2
-    input[0, 0, 1, 1] = 3
-
-    input[0, 1, 0, 0] = 4
-    input[0, 1, 0, 1] = 5
-    input[0, 1, 1, 0] = 6
-    input[0, 1, 1, 1] = 7
-
-    input[1, 0, 0, 0] = 8
-    input[1, 0, 0, 1] = 9
-    input[1, 0, 1, 0] = 10
-    input[1, 0, 1, 1] = 11
-
-    input[1, 1, 0, 0] = 12
-    input[1, 1, 0, 1] = 13
-    input[1, 1, 1, 0] = 14
-    input[1, 1, 1, 1] = 15
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 4](uninitialized=True)
+    var repeats_stack = Array[Scalar[type_repeats], 4](fill={})
     var repeats = TileTensor(repeats_stack, row_major[4]())
 
     repeats[0] = 1
@@ -736,8 +610,8 @@ def test_tile_eg13() raises:
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 2 * 4 * 4 * 6](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[2, 4, 4, 6]()).fill(0)
+    var output_stack = Array[Scalar[type], 2 * 4 * 4 * 6](fill=0)
+    var output = TileTensor(output_stack, row_major[2, 4, 4, 6]())
 
     tile[type, type_repeats](
         input.make_dynamic[.int64](),
@@ -794,44 +668,21 @@ def test_tile_eg14() raises:
     print("== test_tile_eg14")
     comptime type = DType.float32
 
-    var input_stack = Array[Scalar[type], 2 * 2 * 2 * 2](uninitialized=True)
+    var input_stack = Array[Scalar[type], 2 * 2 * 2 * 2](
+        fill_with=lambda (i: Int) -> Scalar[type]: Scalar[type](i)
+    )
     var input = TileTensor(input_stack, row_major[2, 2, 2, 2]())
-
-    input[0, 0, 0, 0] = 0
-    input[0, 0, 0, 1] = 1
-    input[0, 0, 1, 0] = 2
-    input[0, 0, 1, 1] = 3
-
-    input[0, 1, 0, 0] = 4
-    input[0, 1, 0, 1] = 5
-    input[0, 1, 1, 0] = 6
-    input[0, 1, 1, 1] = 7
-
-    input[1, 0, 0, 0] = 8
-    input[1, 0, 0, 1] = 9
-    input[1, 0, 1, 0] = 10
-    input[1, 0, 1, 1] = 11
-
-    input[1, 1, 0, 0] = 12
-    input[1, 1, 0, 1] = 13
-    input[1, 1, 1, 0] = 14
-    input[1, 1, 1, 1] = 15
 
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 4](uninitialized=True)
+    var repeats_stack: Array[Scalar[type_repeats], _] = [2, 2, 2, 3]
     var repeats = TileTensor(repeats_stack, row_major[4]())
-
-    repeats[0] = 2
-    repeats[1] = 2
-    repeats[2] = 2
-    repeats[3] = 3
 
     # Output rank = input rank
     # output_dim[i] = input_dim[i] * repeats[i]
-    var output_stack = Array[Scalar[type], 4 * 4 * 4 * 6](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[4, 4, 4, 6]()).fill(0)
+    var output_stack = Array[Scalar[type], 4 * 4 * 4 * 6](fill=0)
+    var output = TileTensor(output_stack, row_major[4, 4, 4, 6]())
 
     tile[type, type_repeats](
         input.make_dynamic[.int64](),
@@ -860,20 +711,15 @@ def test_tile_1d() raises:
     comptime type = DType.float32
     comptime type_repeats = DType.int64
 
-    var input_stack = Array[Scalar[type], 3](uninitialized=True)
+    var input_stack: Array[Scalar[type], _] = [1, 2, 3]
     var input = TileTensor(input_stack, row_major[3]())
 
-    input[0] = 1
-    input[1] = 2
-    input[2] = 3
-
-    var repeats_stack = Array[Scalar[type_repeats], 1](uninitialized=True)
+    # Tile 3 times along the single dimension
+    var repeats_stack: Array[Scalar[type_repeats], _] = [3]
     var repeats = TileTensor(repeats_stack, row_major[1]())
 
-    repeats[0] = 3  # Tile 3 times along the single dimension
-
     # Output: 3 * 3 = 9 elements
-    var output_stack = Array[Scalar[type], 9](uninitialized=True)
+    var output_stack = Array[Scalar[type], 9](fill={})
     var output = TileTensor(output_stack, row_major[9]())
 
     tile[type, type_repeats](

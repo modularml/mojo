@@ -43,6 +43,7 @@ Cache manager
    :toctree: generated
    :template: autosummary/class.rst
 
+   ByteCount
    DummyKVCache
    InsufficientBlocksError
    PagedKVCacheManager

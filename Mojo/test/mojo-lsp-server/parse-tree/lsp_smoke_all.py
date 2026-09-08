@@ -53,15 +53,15 @@ No test currently covers docstring code-block checking.
 
 Usage (manual):
   python3 lsp_smoke_all.py PATH [PATH ...]          # dirs walked for *.mojo
-  python3 lsp_smoke_all.py --import-path "$PWD/oss/modular/mojo/stdlib/std" \\
-      --log-dir /tmp/logs oss/modular/mojo/stdlib/std
+  python3 lsp_smoke_all.py --import-path "$PWD/Mojo/stdlib/std" \\
+      --log-dir /tmp/logs Mojo/stdlib/std
 
 Usage (bazel, sharded): driven by --scan-root-file from the BUILD target.
 
 Usage (bazel, single file, for debugging a failure -- sets up
 MODULAR_MOJO_MAX_IMPORT_PATH automatically via mojo_deps):
   bazel run //Mojo/test/mojo-lsp-server/parse-tree:lsp-smoke-one -- \\
-      oss/modular/mojo/stdlib/std/sys/info.mojo
+      Mojo/stdlib/std/sys/info.mojo
 """
 
 import argparse

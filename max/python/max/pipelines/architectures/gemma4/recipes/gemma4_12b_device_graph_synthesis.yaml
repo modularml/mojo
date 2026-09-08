@@ -1,0 +1,25 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+model:
+  model_path: google/gemma-4-12B-it
+  device_specs: [0]
+  max_length: 8192
+  kv_cache:
+    device_memory_utilization: 0.75
+
+# Compiles the language graph through device-graph synthesis: the compiled
+# model records its kernels into a device graph and replays it on execute.
+# Mutually exclusive with device_graph_capture (this arch's default), which
+# the config resolution disables when synthesis is set.
+runtime:
+  experimental_device_graph_synthesis: true

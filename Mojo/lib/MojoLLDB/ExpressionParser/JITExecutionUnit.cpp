@@ -451,7 +451,8 @@ public:
 
       // First try the symbol.
       if (candidate.symbol) {
-        loadAddr = candidate.symbol->ResolveCallableAddress(*target);
+        loadAddr = candidate.symbol->ResolveCallableAddress(
+            *target, candidate.module_sp);
         if (loadAddr == LLDB_INVALID_ADDRESS) {
           Address addr = candidate.symbol->GetAddress();
           loadAddr = target->GetProcessSP() ? addr.GetLoadAddress(target)

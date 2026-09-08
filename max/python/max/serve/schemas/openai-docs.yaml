@@ -13,8 +13,8 @@ paths:
       summary: Create response
       description: |
         Creates a response for the given input. Supports image generation
-        (text-to-image, image-to-image) and video generation (text-to-video,
-        image-to-video). This endpoint follows the
+        (text-to-image, image-to-image), video generation (text-to-video,
+        image-to-video), and audio generation. This endpoint follows the
         [Open Responses](https://huggingface.co/blog/open-responses)
         specification.
 
@@ -26,8 +26,9 @@ paths:
         ```
 
         For detailed usage examples, see the
-        [image generation guide](/serve/image-generation) and the
-        [video generation guide](/serve/video-generation).
+        [image generation guide](/serve/image-generation), the
+        [video generation guide](/serve/video-generation), and the
+        [audio generation guide](/serve/audio-generation).
       requestBody:
         required: true
         content:
@@ -91,7 +92,8 @@ paths:
                   type: object
                   description: |
                     Provider-specific generation options. Use the `image` key
-                    for image generation models and the `video` key for video
+                    for image generation models, the `video` key for video
+                    generation models, and the `audio` key for audio
                     generation models. The `max` key applies to all models.
                   properties:
                     image:
@@ -298,6 +300,46 @@ paths:
                             inline in `output[0].content[0].video_data`.
                           default: url
                           enum: [url, b64_json]
+                    audio:
+                      type: object
+                      description: |
+                        Configuration options for audio generation models.
+                      properties:
+                        lyrics:
+                          type: string
+                          description: |
+                            The lyrics to sing. Applies to music generation
+                            models.
+                        audio_duration:
+                          type: number
+                          description: |
+                            The maximum length of the generated audio, in
+                            seconds. If you omit
+                            this field, the model uses its default duration.
+                          exclusiveMinimum: 0.0
+                        steps:
+                          type: integer
+                          description: |
+                            The number of denoising steps to run. Applies to
+                            models that generate audio with a diffusion or
+                            flow-matching stage. If you omit this field, the
+                            model uses its default number of steps.
+                          minimum: 1
+                        guidance_scale:
+                          type: number
+                          description: |
+                            The classifier-free guidance scale. If you omit
+                            this field, the model uses its own scales. Audio
+                            models often guide their autoregressive and
+                            denoising stages at different strengths.
+                          exclusiveMinimum: 0.0
+                        audio_format:
+                          type: string
+                          description: |
+                            The format for the returned audio. Only
+                            `wav` is supported.
+                          default: wav
+                          enum: [wav]
             examples:
               textToImage:
                 summary: Text-to-image generation
@@ -357,6 +399,16 @@ paths:
                       num_frames: 81
                       frames_per_second: 16
                       response_format: b64_json
+              audioGeneration:
+                summary: Music generation from a caption and lyrics
+                value:
+                  model: "MiniMaxAI/MiniMax-Music3"
+                  input: "Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums."
+                  seed: 1235
+                  provider_options:
+                    audio:
+                      lyrics: "[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer"
+                      audio_duration: 30
       responses:
         '200':
           description: OK
@@ -416,6 +468,30 @@ paths:
                                   is `url` (the default for video models).
                                   Download from
                                   `GET /v1/videos/{video_id}/content`.
+                              type:
+                                type: string
+                                description: |
+                                  Content-part discriminator. For audio
+                                  output this is `output_audio`.
+                              audio_url:
+                                type: string
+                                description: |
+                                  URL to download the generated audio.
+                              format:
+                                type: string
+                                description: |
+                                  Format of the generated audio. Only
+                                  `wav` is supported.
+                              sample_rate:
+                                type: integer
+                                description: |
+                                  Sample rate of the generated audio, in
+                                  hertz.
+                              num_samples:
+                                type: integer
+                                description: |
+                                  Number of samples per channel in the
+                                  generated audio.
                   usage:
                     type: object
                     description: |
@@ -465,6 +541,35 @@ paths:
                           image_count:
                             type: integer
                             description: The number of images generated for the request.
+                      audio_generation_details:
+                        type: object
+                        description: |
+                          Audio generation metadata. Only present when the
+                          response contains generated audio.
+                        required:
+                          - duration_seconds
+                          - sample_rate
+                          - channels
+                          - num_samples
+                          - steps
+                        properties:
+                          duration_seconds:
+                            type: number
+                            description: Duration of the generated audio, in seconds.
+                          sample_rate:
+                            type: integer
+                            description: Sample rate of the generated audio, in hertz.
+                          channels:
+                            type: integer
+                            description: Number of channels in the generated audio.
+                          num_samples:
+                            type: integer
+                            description: Number of samples per channel.
+                          steps:
+                            type: integer
+                            description: |
+                              Number of denoising steps used to generate
+                              the audio.
         '400':
           description: Bad request
           content:
@@ -871,6 +976,141 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/audio/speech:
+    post:
+      operationId: createSpeech
+      summary: Create speech
+      description: |
+        Generates audio from a text prompt. Only compatible with
+        audio or music generation models.
+
+        For a full walkthrough, see the
+        [audio generation guide](/serve/audio-generation).
+      x-codeSamples:
+        - lang: Python
+          source: |
+            from openai import OpenAI
+
+            client = OpenAI(
+                base_url="http://0.0.0.0:8000/v1",
+                api_key="EMPTY",
+            )
+
+            response = client.audio.speech.create(
+                model="MiniMaxAI/MiniMax-Music3",
+                input="[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer",
+                instructions="Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums.",
+                voice="",
+                response_format="wav",
+                extra_body={"audio_duration": 30, "seed": 1235},
+            )
+
+            response.write_to_file("song.wav")
+        - lang: curl
+          source: |
+            curl -X POST http://0.0.0.0:8000/v1/audio/speech \
+              -H "Content-Type: application/json" \
+              -o song.wav \
+              -d '{
+                "model": "MiniMaxAI/MiniMax-Music3",
+                "instructions": "Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums.",
+                "input": "[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer",
+                "audio_duration": 30,
+                "seed": 1235
+              }'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model
+                - input
+                - instructions
+              properties:
+                model:
+                  type: string
+                  description: The ID of the audio generation model to use.
+                input:
+                  type: string
+                  description: |
+                    The text the model renders as audio. For a model
+                    that sings, this field holds the lyrics.
+                instructions:
+                  type: string
+                  description: |
+                    A description of how the audio sounds,
+                    such as the genre, tempo, key, mood, vocal, and
+                    arrangement. Music models require this field.
+                voice:
+                  type: string
+                  description: |
+                    The voice to use. Exists for OpenAI compatibility only;
+                    MAX accepts the field and ignores its value.
+                response_format:
+                  type: string
+                  description: |
+                    The container format for the returned audio. MAX
+                    supports only `wav`. Any other value, such as `mp3`,
+                    returns a `400` error.
+                  default: wav
+                  enum: [wav]
+                audio_duration:
+                  type: number
+                  description: |
+                    The maximum length of the generated audio, in seconds.
+                    If you omit this field, the
+                    model uses its own default duration.
+                  default: 60
+                  exclusiveMinimum: 0.0
+                steps:
+                  type: integer
+                  description: |
+                    The number of denoising steps in the flow-matching
+                    stage. Higher values improve the audio quality and
+                    increase the latency. If you omit this field, the model
+                    uses its own default.
+                  default: 30
+                  minimum: 1
+                guidance_scale:
+                  type: number
+                  description: |
+                    The classifier-free guidance scale.
+                  default: 1.7
+                  exclusiveMinimum: 0.0
+                seed:
+                  type: integer
+                  description: |
+                    The seed for the sampling and noise draws. The same seed
+                    and the same prompt reproduce the same audio.
+                  default: 0
+            examples:
+              musicGeneration:
+                summary: Music generation from a caption and lyrics
+                value:
+                  model: "MiniMaxAI/MiniMax-Music3"
+                  input: "[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer"
+                  instructions: "Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums."
+                  audio_duration: 30
+                  seed: 1235
+      responses:
+        '200':
+          description: OK
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+                description: |
+                  The generated audio as 16-bit PCM WAV at the model's own
+                  sample rate.
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/models:
     get:
       operationId: listModels
@@ -1004,9 +1244,8 @@ components:
           required:
             - type
           description: |
-            Controls model reasoning, translated to the chat template's thinking
-            flags. The effect is model-dependent: only models whose chat
-            template reads these flags honor it.
+            Controls model reasoning. Useful if the model expects `thinking`
+            rather than `reasoning` parameters.
           properties:
             type:
               type: string
@@ -1015,10 +1254,11 @@ components:
         reasoning:
           type: object
           description: |
-            Reasoning controls. MAX honors `enabled` (mapped to the chat
-            template's thinking flags); when `enabled` is unset, providing
-            `effort` with any value enables thinking. `max_tokens` and
-            `exclude` are accepted but ignored.
+            Sets the reasoning configuration. See the
+            [Reasoning](/serve/reasoning/) guide for more information.
+
+            Note that some fields are non-functional and only exist
+            to maintain compatibility with different providers.
           properties:
             enabled:
               type: boolean

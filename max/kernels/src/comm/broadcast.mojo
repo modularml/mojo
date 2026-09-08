@@ -312,7 +312,7 @@ def broadcast_pull_2stage_kernel[
     # These are used as scratch space for the scatter-gather pattern
     comptime PtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
     var payloads = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: (
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: (
             rank_sigs[i].address_space_cast[.GENERIC]() + 1
         ).bitcast[Scalar[dtype]]()
     )

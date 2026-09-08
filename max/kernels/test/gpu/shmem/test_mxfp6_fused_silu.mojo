@@ -135,6 +135,7 @@ def _run_case[
         scales_tt,
         input_tt,
         off_tt,
+        Int32(0),  # max_padded_M unused when the fold is off
         alpha,
         limit,
         grid_dim=hw.sm_count,

@@ -108,7 +108,7 @@ struct PagedKVCache[
     var lookup_table: NDBuffer[DType.uint32, 2]
 
     @always_inline
-    fn _get_idx(
+    def _get_idx(
         self, bs: Int, head_idx: Int, tok_idx: Int, head_dim_idx: Int
     ) -> IndexList[6]:
 
@@ -123,7 +123,7 @@ struct PagedKVCache[
             head_dim_idx,
         )
 
-    fn load[
+    def load[
         width: Int
     ](self, bs: Int, head_idx: Int, tok_idx: Int, head_dim_idx: Int) -> SIMD[
         Self.type, width
@@ -131,7 +131,7 @@ struct PagedKVCache[
         var idx = self._get_idx(bs, head_idx, tok_idx, head_dim_idx)
         return self.blocks.load[width=width](idx)
 
-    fn store(
+    def store(
         self,
         bs: Int,
         head_idx: Int,
@@ -152,7 +152,7 @@ generic fashion
 
 ```mojo
 @always_inline
-fn _fused_qkv_matmul_kv_cache_impl[
+def _fused_qkv_matmul_kv_cache_impl[
     ...
     collection_t: KVCollectionT,
     ...
@@ -181,7 +181,7 @@ fn _fused_qkv_matmul_kv_cache_impl[
 
     @__parameter
     @__copy_capture(q_dim, qk_offset, SEQ_LEN, k_cache, v_cache)
-    fn write_to_cache[
+    def write_to_cache[
         type_: DType, width: Int, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[type_, width],):
         b_idx, t_idx = divmod(UInt(idx[0]), SEQ_LEN)

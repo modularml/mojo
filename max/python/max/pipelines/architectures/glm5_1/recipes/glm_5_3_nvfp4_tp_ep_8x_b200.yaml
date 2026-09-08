@@ -1,0 +1,37 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# 8x B200 recipe for GLM-5.3 NVFP4 with MTP.
+#
+# quantization_encoding is left unset so it resolves from the checkpoint's own
+# quantization_config, and max_length unset so the checkpoint's 1048576
+# applies. data_parallel_degree is 1 because DP corrupts output on this
+# checkpoint; TP is the safe choice until that is root-caused.
+model:
+  model_path: RadixArk/GLM-5.3-NVFP4
+  device_specs: [0, 1, 2, 3, 4, 5, 6, 7]
+  data_parallel_degree: 1
+  kv_cache:
+    kv_cache_format: float8_e4m3fn
+    device_memory_utilization: 0.78
+
+speculative:
+  speculative_method: mtp
+  num_speculative_tokens: 5
+
+runtime:
+  ep_size: 8
+  max_batch_input_tokens: 2048
+  max_batch_size: 32
+
+sampling:
+  enable_structured_output: true

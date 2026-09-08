@@ -1251,7 +1251,7 @@ void TypeCheckedParamList::emitBodyConstraints() {
       violationDiag = shared.emitError(loc ? *loc : deferral.deferralLoc);
       return *violationDiag;
     };
-    TriState result = LIT::canDischargeConstraintsInScope(
+    TriBool result = LIT::canDischargeConstraintsInScope(
         declScope, /*paramListAttr=*/PogListAttr(), {deferral.constraint},
         /*origConstraints=*/{}, getDiag, &stillUnprovable,
         /*evaluator=*/nullptr);
@@ -1603,7 +1603,8 @@ ParseResult ParsedArgumentList::parseArgumentListAndEffects(ParserBase &p,
       }
       isThin = true;
     } else if (spelling == "__param_trait__") {
-      assert(kind == ArgListKind::kFnTypeArgList &&
+      assert((kind == ArgListKind::kFnTypeArgList ||
+              kind == ArgListKind::kArgList) &&
              "__param_trait__ must only be used on function types");
       isExperimentalParamTrait = true;
     } else if (spelling == "register_passable") {

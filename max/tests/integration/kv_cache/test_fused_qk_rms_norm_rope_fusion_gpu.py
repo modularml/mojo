@@ -38,8 +38,7 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.kernels import fused_qk_rms_norm_rope_ragged
 from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 pytestmark = pytest.mark.skipif(
     accelerator_count() == 0,
@@ -232,19 +231,9 @@ def _run(
 
     # Allocate the paged cache for the batch. Its contents are irrelevant to Q,
     # which is computed purely from the projection.
-    kv_manager = PagedKVCacheManager(
-        _kv_params(dtype),
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
+    kv_rt = paged_kv_cache_inputs(
+        _kv_params(dtype), PROMPT_LENS, total_num_pages=8
     )
-    batch = [
-        create_text_context(np.empty(n, dtype=np.int64)) for n in PROMPT_LENS
-    ]
-    for ctx in batch:
-        kv_manager.claim(ctx)
-        kv_manager.alloc(ctx)
-    kv_rt = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
     assert kv_rt.attention_dispatch_metadata is not None
 
     if combined_width is None:

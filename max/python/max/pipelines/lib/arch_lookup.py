@@ -267,6 +267,39 @@ class SupportedArchitecture:
     registration time via :attr:`~max.pipelines.lib.interfaces.pipeline_model.PipelineModel.batch_processor_cls`.
     Ragged text models should subclass
     :class:`~max.pipelines.lib.interfaces.batch_processor.RaggedBatchProcessor`.
+
+    Every token-generation model needs a batch processor. It's easiest to
+    use or subclass an existing one (for example,
+    ``batching=Llama3BatchProcessor``).
+
+    .. code-block:: python
+
+        from max.pipelines.lib.interfaces.batch_processor import (
+            SingleReplicaRaggedBatchProcessor,
+        )
+
+        class MyBatchProcessor(SingleReplicaRaggedBatchProcessor):
+            def _make_inputs(
+                self,
+                *,
+                tokens,
+                input_row_offsets,
+                return_n_logits,
+                kv_cache_inputs,
+                signal_buffers,
+            ):
+                ...  # Build the ModelInputs.
+
+        # Pass ``batching=MyBatchProcessor`` to ``SupportedArchitecture``
+        # when registering the architecture.
+
+    .. invisible-code-block: python
+
+        from max.pipelines.lib.interfaces.batch_processor import (
+            BatchProcessor,
+        )
+
+        assert issubclass(MyBatchProcessor, BatchProcessor)
     """
 
     reasoning_parser: str | None = None
@@ -345,8 +378,34 @@ class SupportedArchitecture:
     :class:`~max.pipelines.kv_cache.PagedMemoryPlanner` (or a subclass with
     architecture-specific overrides).
 
-    ``None`` means the architecture manages its own memory estimation (e.g.
-    diffusion pipelines that skip KV cache estimation entirely).
+    ``None`` means the architecture manages its own memory estimation (for
+    example, diffusion pipelines that skip KV cache estimation entirely).
+    Without a planner, memory estimation budgets no activation memory and
+    does not infer ``max_batch_size``, so architectures that use a KV cache
+    should always set this field.
+
+    To reserve a fixed chunk of activation memory (vision headroom, for
+    example) without writing a planner subclass, register the class returned
+    by
+    :meth:`~max.pipelines.kv_cache.PagedMemoryPlanner.with_activation_reservation`.
+
+    .. code-block:: python
+
+        from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
+
+        # Most architectures register the planner class directly:
+        #     SupportedArchitecture(..., memory_planner=PagedMemoryPlanner)
+        # A configured subclass reserves activation memory:
+        planner = PagedMemoryPlanner.with_activation_reservation(
+            15 * 1024**3  # 15 GiB
+        )
+
+    .. invisible-code-block: python
+
+        from max.pipelines.kv_cache.memory_planner import MemoryPlanner
+
+        assert issubclass(PagedMemoryPlanner, MemoryPlanner)
+        assert issubclass(planner, PagedMemoryPlanner)
     """
 
     cascade_pipeline_factory: Callable[[PipelineConfig], object] | None = None

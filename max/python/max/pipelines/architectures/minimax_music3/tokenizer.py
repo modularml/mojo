@@ -124,7 +124,7 @@ def assemble_prompt(description: str, lyrics: str) -> str:
 
 
 class MiniMaxMusic3Tokenizer(AudioGenerationTokenizer):
-    """Builds the conditional and unconditional prompts MiniMax Music 3 wants.
+    """Builds the conditional and unconditional prompts for MiniMax Music 3.
 
     Args:
         args: Forwarded to :class:`AudioGenerationTokenizer`.
@@ -170,8 +170,8 @@ class MiniMaxMusic3Tokenizer(AudioGenerationTokenizer):
 
         Everything between the opening ``<|im_start|>`` and the closing
         ``<|im_end|><|audio_start|>`` becomes one repeated token, so the
-        unconditional row keeps the conditional row's length -- the two are
-        batched together and share a position grid.
+        unconditional prompt is the same length as the conditional prompt.
+        The two prompts are batched together.
 
         Args:
             token_ids: The conditional prompt's token ids.

@@ -107,9 +107,10 @@ session.set_debug_print_options(
     output_directory="max_tensors",
 )
 
-# Compile the model with its weights, then run it on your input.
-compiled_model = session.load(graph, weights_registry=model.state_dict())
-compiled_model.execute(input_ids)
+# Compile the model, bind its weights, then run it on your input.
+compiled = session.compile(graph)
+runnable_model = session.init(compiled, weights_registry=model.state_dict())
+runnable_model.execute(input_ids)
 ```
 
 :::note

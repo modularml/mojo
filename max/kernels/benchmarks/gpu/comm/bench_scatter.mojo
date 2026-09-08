@@ -158,11 +158,11 @@ def bench_scatter[
     comptime InputTileType = TileTensor[
         dtype, type_of(row_major(num_elems)), ImmutAnyOrigin
     ]
-    var tt_in_bufs = Array[InputTileType, dp_size](uninitialized=True)
-    for dp_idx in range(dp_size):
-        tt_in_bufs[dp_idx] = TileTensor(
+    var tt_in_bufs = Array[InputTileType, dp_size](
+        fill_with=lambda (dp_idx: Int) -> InputTileType: TileTensor(
             cb_inputs[dp_idx].device_buffer(), row_major(num_elems)
         ).as_immut()
+    )
 
     comptime OutputTileType = TileTensor[
         dtype, type_of(row_major(num_elems)), MutAnyOrigin

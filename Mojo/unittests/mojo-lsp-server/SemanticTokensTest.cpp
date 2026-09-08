@@ -20,18 +20,18 @@ using namespace M::Mojo::LSP;
 TEST(SemanticTokensTest, testSemanticTokens) {
   Document doc("test:///foo.mojo", R"(
 import std.builtin
-alias builtin_alias = std.builtin
+comptime builtin_alias = std.builtin
 
 struct Struct:
   var field: Int
 
-alias struct_alias = Struct
+comptime struct_alias = Struct
 
 # `raises` is load-bearing; see MOTO-903.
 def foo() raises:
   return
 
-alias int_alias = 10
+comptime int_alias = 10
 
 trait ATrait:
   def foo(var self, i: Self):

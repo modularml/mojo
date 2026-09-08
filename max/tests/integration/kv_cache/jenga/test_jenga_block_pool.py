@@ -484,6 +484,20 @@ def test_can_satisfy_demand_credits_pages_already_carved() -> None:
     check_invariants(pool)
 
 
+def test_can_satisfy_demand_retypes_surplus_parked_pages() -> None:
+    pool = JengaBlockPool(
+        num_huge_blocks=5, cache_ratios={GLOBAL: 2, SCALES: 4}
+    )
+    scales_blocks = [pool.alloc_block(SCALES) for _ in range(8)]
+    for block in scales_blocks:
+        pool.free_block(block)
+
+    # One parked SCALES huge block satisfies its demand. The other can be
+    # retyped with the two pristine blocks to satisfy GLOBAL's demand.
+    assert pool.can_satisfy_demand({GLOBAL: 6, SCALES: 4})
+    check_invariants(pool)
+
+
 def test_can_satisfy_demand_at_capacity_ignores_what_is_out() -> None:
     pool = JengaBlockPool(
         num_huge_blocks=5, cache_ratios={GLOBAL: 2, SCALES: 4}

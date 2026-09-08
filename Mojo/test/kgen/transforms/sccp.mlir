@@ -396,6 +396,203 @@ kgen.func @loop_generates_constant_but_hits_limit() -> (index, index) {
    kgen.return %2, %6 : index, index
  }
 
+// COM: A break under an unknown condition is only one of the loop's exits, so
+// COM: the loop result cannot take its value.
+// CHECK-LABEL: @partial_early_exit
+kgen.func @partial_early_exit(%cond: !kgen.scalar<bool>) -> index {
+  %idx0 = index.constant 0
+  %idx1 = index.constant 1
+  %idx3 = index.constant 3
+
+  // CHECK: [[R:%.*]] = hlcf.loop
+  %0 = hlcf.loop(%arg0 = %idx0: index) -> index {
+    %1 = index.cmp slt(%arg0, %idx3)
+    %b1 = pop.cast_from_builtin %1 : i1 to !kgen.scalar<bool>
+    hlcf.if %b1 {
+      hlcf.yield
+    } else {
+      // COM: the loop leaves here with 3.
+      hlcf.break %arg0: index
+    }
+    hlcf.if %cond {
+      %2 = index.cmp eq(%arg0, %idx0)
+      %b2 = pop.cast_from_builtin %2 : i1 to !kgen.scalar<bool>
+      // COM: this break executes on the first iteration only, and only if
+      // COM: %cond holds.
+      hlcf.if %b2 {
+        hlcf.break %arg0: index
+      } else {
+        hlcf.yield
+      }
+      hlcf.yield
+    } else {
+      hlcf.yield
+    }
+    %3 = index.add %arg0, %idx1
+    hlcf.continue %3 : index
+  }
+
+  // COM: the result stays the loop's, not the guarded break's value.
+  // CHECK: kgen.return [[R]] : index
+  kgen.return %0: index
+}
+
+// COM: A break under a condition that folds to false cannot execute, so it does
+// COM: not stand in the way of knowing where the loop exits.
+// CHECK-LABEL: @break_in_untaken_branch
+kgen.func @break_in_untaken_branch() -> index {
+  %idx0 = index.constant 0
+  %idx1 = index.constant 1
+  %idx3 = index.constant 3
+  %idx5 = index.constant 5
+  %false = kgen.param.constant: scalar<bool> = <false>
+
+  %0 = hlcf.loop(%arg0 = %idx0: index) -> index {
+    hlcf.if %false {
+      hlcf.break %idx1: index
+    } else {
+      hlcf.yield
+    }
+    %1 = index.cmp eq(%arg0, %idx3)
+    %b1 = pop.cast_from_builtin %1 : i1 to !kgen.scalar<bool>
+    hlcf.if %b1 {
+      hlcf.break %idx5: index
+    } else {
+      hlcf.yield
+    }
+    %2 = index.add %arg0, %idx1
+    hlcf.continue %2 : index
+  }
+
+  // CHECK: kgen.return %idx5
+  kgen.return %0: index
+}
+
+// COM: A break in a switch case the index does not select cannot execute.
+// CHECK-LABEL: @break_in_untaken_switch_case
+kgen.func @break_in_untaken_switch_case() -> index {
+  %idx0 = index.constant 0
+  %idx1 = index.constant 1
+  %idx3 = index.constant 3
+  %idx5 = index.constant 5
+
+  %0 = hlcf.loop(%arg0 = %idx0: index) -> index {
+    hlcf.switch %idx0
+    default {
+      hlcf.yield
+    }
+    case 1 {
+      hlcf.break %idx1: index
+    }
+    %1 = index.cmp eq(%arg0, %idx3)
+    %b1 = pop.cast_from_builtin %1 : i1 to !kgen.scalar<bool>
+    hlcf.if %b1 {
+      hlcf.break %idx5: index
+    } else {
+      hlcf.yield
+    }
+    %2 = index.add %arg0, %idx1
+    hlcf.continue %2 : index
+  }
+
+  // CHECK: kgen.return %idx5
+  kgen.return %0: index
+}
+
+// COM: A break leaving the outer loop from inside an inner one that stops at
+// COM: the unroll threshold may supply results the analysis never saw.
+// CHECK-LABEL: @outer_break_from_unconverged_inner
+kgen.func @outer_break_from_unconverged_inner() -> index {
+  %idx0 = index.constant 0
+  %idx1 = index.constant 1
+  %idx9 = index.constant 9
+
+  // CHECK: [[R:%.*]] = hlcf.loop "outer"
+  %0 = hlcf.loop "outer"(%arg0 = %idx0: index) -> index {
+    %i = hlcf.loop "inner"(%arg1 = %idx0: index) -> index {
+      %1 = index.cmp eq(%arg1, %idx9)
+      %b1 = pop.cast_from_builtin %1 : i1 to !kgen.scalar<bool>
+      hlcf.if %b1 {
+        hlcf.break "outer" %idx9 : index
+      } else {
+        hlcf.yield
+      }
+      %2 = index.add %arg1, %idx1
+      hlcf.continue "inner" %2 : index
+    }
+    hlcf.break "outer" %arg0 : index
+  }
+
+  // CHECK: kgen.return [[R]] : index
+  kgen.return %0: index
+}
+
+// COM: A continue that re-enters an outer loop is one of its entry edges.
+// COM: The inner loop stops at the unroll threshold before reaching it, so the
+// COM: outer loop's iterations are not all known and its result is not either.
+// CHECK-LABEL: @outer_continue_from_unconverged_inner
+kgen.func @outer_continue_from_unconverged_inner() -> index {
+  %idx0 = index.constant 0
+  %idx1 = index.constant 1
+  %idx9 = index.constant 9
+
+  // CHECK: [[R:%.*]] = hlcf.loop "outer"
+  %0 = hlcf.loop "outer"(%arg0 = %idx0: index) -> index {
+    %i = hlcf.loop "inner"(%arg1 = %idx0: index) -> index {
+      %1 = index.cmp eq(%arg0, %idx1)
+      %b1 = pop.cast_from_builtin %1 : i1 to !kgen.scalar<bool>
+      hlcf.if %b1 {
+        hlcf.break "inner" %arg1 : index
+      } else {
+        hlcf.yield
+      }
+      %2 = index.cmp eq(%arg1, %idx9)
+      %b2 = pop.cast_from_builtin %2 : i1 to !kgen.scalar<bool>
+      // COM: reached only past the threshold, on outer iteration 0.
+      hlcf.if %b2 {
+        %3 = index.add %arg0, %idx1
+        hlcf.continue "outer" %3 : index
+      } else {
+        hlcf.yield
+      }
+      %4 = index.add %arg1, %idx1
+      hlcf.continue "inner" %4 : index
+    }
+    hlcf.break "outer" %arg0 : index
+  }
+
+  // CHECK: kgen.return [[R]] : index
+  kgen.return %0: index
+}
+
+// COM: The second break cannot execute: the first one always leaves the loop.
+// COM: The result is still known even though the analysis never reaches it.
+// CHECK-LABEL: @break_dominated_by_break
+kgen.func @break_dominated_by_break(%cond: !kgen.scalar<bool>) -> index {
+  %idx0 = index.constant 0
+  %idx1 = index.constant 1
+  %idx5 = index.constant 5
+  %true = kgen.param.constant: scalar<bool> = <true>
+
+  %0 = hlcf.loop(%arg0 = %idx0: index) -> index {
+    hlcf.if %true {
+      hlcf.break %idx5: index
+    } else {
+      hlcf.yield
+    }
+    hlcf.if %cond {
+      hlcf.break %idx1: index
+    } else {
+      hlcf.yield
+    }
+    %1 = index.add %arg0, %idx1
+    hlcf.continue %1 : index
+  }
+
+  // CHECK: kgen.return %idx5
+  kgen.return %0: index
+}
+
 // CHECK-LABEL: @none_hlcf_controlflownode_donot_crash
 kgen.generator @none_hlcf_controlflownode_donot_crash() -> index {
   // COM: Conservatively mark all results as Unknown, but process the subregions.

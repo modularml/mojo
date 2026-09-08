@@ -124,6 +124,9 @@ class DeepseekV3Config(ArchConfigWithKVCache):
     mla_o_proj_quantized: bool = True
     """Whether the MLA output projection is quantized."""
 
+    dense_mlp_layers_without_quant: frozenset[int] = frozenset()
+    """Dense prefix layers (indices ``< first_k_dense_replace``) that skip MLP quant."""
+
     def __post_init__(self) -> None:
         if self.hidden_act != "silu":
             raise ValueError(

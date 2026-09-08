@@ -108,6 +108,7 @@ from ._nvshmem import (
 comptime shmem_team_t = c_int
 
 
+@fieldwise_init
 struct SHMEMScope(Equatable, ImplicitlyCopyable):
     """Enables following the OpenSHMEM spec by default for put/get/iput/iget
     etc. While allowing NVIDIA extensions for block and warp scopes by passing a
@@ -121,12 +122,6 @@ struct SHMEMScope(Equatable, ImplicitlyCopyable):
     """Execute RMA operation at thread block scope (NVIDIA extension)."""
     comptime warp = Self("_warp")
     """Execute RMA operation at warp scope (NVIDIA extension)."""
-
-    def __init__(out self, value: StaticString):
-        self.value = value
-
-    def __eq__(self, other: Self) -> Bool:
-        return self.value == other.value
 
 
 # ===----------------------------------------------------------------------=== #

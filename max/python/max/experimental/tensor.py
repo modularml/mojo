@@ -1908,17 +1908,16 @@ class Tensor(DLPackArray, HasTensorValue):
         .. code-block:: python
 
             from max.experimental import tensor
-            from max.driver import CPU, Accelerator
+            from max.experimental.tensor import defaults
+            from max.driver import CPU
 
-            # Create a tensor on CPU
             x = tensor.Tensor.ones((2, 3), device=CPU())
-            print(x.device)  # CPU
+            print(x.device)
 
-            # Transfer to accelerator
-            y = x.to(Accelerator())
-            print(y.device)  # Accelerator(0)
+            _, device = defaults()
+            y = x.to(device)
+            print(y.device)
 
-            # Same-device transfer is a no-op
             z = y.to(y.device)
             assert z is y
 

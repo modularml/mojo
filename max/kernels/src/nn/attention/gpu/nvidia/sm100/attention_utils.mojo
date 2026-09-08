@@ -719,8 +719,8 @@ struct TMemTile[
                     ]()
                     var tmem = self.tmem_addr + UInt32(offsets.tmem_offset)
                     var frag = Array[_, offsets.local_frag_size_b32](
-                        fill_with=lambda (_i: Int) -> UInt32: ptr.load(
-                            offsets.ptr_offset + _i
+                        fill_with_unrolled=lambda [i: Int]() -> UInt32: (
+                            ptr.load(offsets.ptr_offset + i)
                         )
                     )
                     # 16 x 256b results in repeated 8x4 matrix of <1,2> vector pattern

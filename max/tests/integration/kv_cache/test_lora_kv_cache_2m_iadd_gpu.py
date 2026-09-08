@@ -22,14 +22,14 @@ from max.experimental.torch import max_dtype_to_torch
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.kernels import kv_cache_ragged_2m_iadd
 from max.nn.kv_cache import (
-    KVCacheBuffer,
     KVCacheParams,
     MHAKVCacheParams,
     PagedCacheValues,
 )
-from max.pipelines.context import TextContext
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import (
+    block_ids_for_batch,
+    paged_kv_cache_inputs,
+)
 from torch.utils.dlpack import from_dlpack
 
 DTYPE = DType.bfloat16
@@ -71,27 +71,20 @@ class KeyOrValue:
 
 
 def dump_kv_cache_to_torch(
-    cache: PagedKVCacheManager,
-    batch: list[TextContext],
+    kv_params: KVCacheParams,
+    kv_blocks: Buffer,
+    seq_lens: list[int],
     key_or_value: int,
-    device_id: int = 0,
 ) -> list[torch.Tensor]:
     """Extract K or V cache contents for each sequence in batch."""
-    kv_params = cache.params
-    assert isinstance(kv_params, KVCacheParams)
     torch_dtype = max_dtype_to_torch(kv_params.dtype)
-    kv_buffer = cache.get_device_buffer(replica_idx=0)
-    assert isinstance(kv_buffer, KVCacheBuffer)
-    device_buffer = kv_buffer.values[device_id]
-    device_buffer_torch = from_dlpack(device_buffer).to(torch_dtype).cpu()
+    device_buffer_torch = from_dlpack(kv_blocks).to(torch_dtype).cpu()
     device_buffer_torch = device_buffer_torch[:, key_or_value, :, :, :, :]
     page_size = kv_params.page_size
 
     results = []
-    for ctx in batch:
-        req_blocks = cache.get_req_blocks(ctx)
-        seq_len = ctx.tokens.processed_length
-
+    blocks = block_ids_for_batch(seq_lens, page_size)
+    for req_blocks, seq_len in zip(blocks, seq_lens, strict=True):
         result = torch.empty(
             seq_len,
             kv_params.n_kv_heads_per_device,
@@ -151,26 +144,10 @@ def run_kv_cache_2m_iadd(
         devices=[device_ref],
     )
 
-    kv_manager = PagedKVCacheManager(
-        params=kv_params,
-        session=session,
-        total_num_pages=16,
-        max_batch_size=128,
-    )
-
-    batch = []
-    for prompt_len in prompt_lens:
-        context = create_text_context(np.empty(prompt_len))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
-    # Zero the KV cache before iadd test (since iadd adds to existing values)
-    kv_buffer = kv_manager.get_device_buffer(replica_idx=0)
-    assert isinstance(kv_buffer, KVCacheBuffer)
-    cache_tensor = kv_buffer.values[0]
-    cache_tensor.inplace_copy_from(
-        Buffer.zeros(cache_tensor.shape, dtype=DTYPE, device=device)
+    # The cache starts zeroed, which iadd needs since it adds to what is
+    # already there.
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=16
     )
 
     kv_symbolic_inputs = kv_params.flattened_kv_inputs()
@@ -220,8 +197,6 @@ def run_kv_cache_2m_iadd(
 
     batch_seq_len_arr = np.array([total_seq_len], dtype=np.int64)
 
-    kv_runtime_inputs = kv_manager.runtime_inputs([batch])
-
     compiled.execute(
         to_max_tensor(kv_lora_output, device),
         Buffer.from_numpy(input_row_offsets).to(device),
@@ -230,11 +205,12 @@ def run_kv_cache_2m_iadd(
         *kv_runtime_inputs.flatten(),
     )
 
-    for ctx in batch:
-        ctx.update(999)
-
-    k_caches = dump_kv_cache_to_torch(kv_manager, batch, KeyOrValue.KEY)
-    v_caches = dump_kv_cache_to_torch(kv_manager, batch, KeyOrValue.VALUE)
+    k_caches = dump_kv_cache_to_torch(
+        kv_params, kv_runtime_inputs.kv_blocks, prompt_lens, KeyOrValue.KEY
+    )
+    v_caches = dump_kv_cache_to_torch(
+        kv_params, kv_runtime_inputs.kv_blocks, prompt_lens, KeyOrValue.VALUE
+    )
 
     return k_caches, v_caches
 

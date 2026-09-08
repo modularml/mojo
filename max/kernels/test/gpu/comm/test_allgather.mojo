@@ -101,36 +101,34 @@ def all_gather_test[
         out_bufs_list.append(device_outputs^)
 
     # Build TileTensor arrays directly.
-    # TODO(MOCO-4346): `.as_unsafe_any_origin()` casts the tensors off the
-    # `List` interior origin; storing an interior-origin type into an
-    # uninitialized `Array` trips a CheckLifetimes over-rejection.
-    # Drop these casts once the compiler bug is fixed.
     comptime InTileType = type_of(
         TileTensor(in_bufs_list[0], row_major(lengths[0]))
         .as_immut()
         .as_unsafe_any_origin()
     )
-    var tt_in_bufs = Array[InTileType, ngpus](uninitialized=True)
-    comptime for i in range(ngpus):
-        tt_in_bufs[i] = (
+    var tt_in_bufs = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InTileType: (
             TileTensor(in_bufs_list[i], row_major(lengths[i]))
             .as_immut()
             .as_unsafe_any_origin()
         )
+    )
 
     comptime OutTileType = type_of(
         TileTensor(
             out_bufs_list[0][0], row_major(lengths[0])
         ).as_unsafe_any_origin()
     )
-    var tt_out_bufs = Array[OutTileType, ngpus * ngpus](uninitialized=True)
-    comptime for i in range(ngpus * ngpus):
-        comptime device_idx = i // ngpus
-        comptime input_idx = i % ngpus
-        tt_out_bufs[i] = TileTensor(
+
+    def tt_out_bufs_at(i: Int) {mut out_bufs_list, imm} -> OutTileType:
+        var device_idx = i // ngpus
+        var input_idx = i % ngpus
+        return TileTensor(
             out_bufs_list[device_idx][input_idx],
             row_major(lengths[input_idx]),
         ).as_unsafe_any_origin()
+
+    var tt_out_bufs = Array[_, ngpus * ngpus](fill_with=tt_out_bufs_at)
 
     # Optional: vendor CCL (only if all lengths are equal; NCCL/RCCL requires uniform count).
     var uniform = True
@@ -163,9 +161,11 @@ def all_gather_test[
     print("  Testing implementation with rank_sigs (P2P-capable)")
 
     for gpu_idx in range(ngpus):
-        var device_out = Array[OutTileType, ngpus](uninitialized=True)
-        comptime for src_idx in range(ngpus):
-            device_out[src_idx] = tt_out_bufs[gpu_idx * ngpus + src_idx]
+        var device_out = Array[_, ngpus](
+            fill_with=lambda (src_idx: Int) -> OutTileType: tt_out_bufs[
+                gpu_idx * ngpus + src_idx
+            ]
+        )
         allgather(
             tt_in_bufs, device_out, rank_sigs, list_of_ctx[gpu_idx], gpu_idx
         )
@@ -276,57 +276,58 @@ def grouped_all_gather_test[
             )
         out_bufs_list.append(device_outputs^)
 
-    # TODO(MOCO-4346): `.as_unsafe_any_origin()` casts the tensors off the
-    # `List` interior origin; storing an interior-origin type into an
-    # uninitialized `Array` trips a CheckLifetimes over-rejection.
-    # Drop these casts once the compiler bug is fixed.
     comptime InTileType = type_of(
         TileTensor(in_bufs_list[0], row_major(lengths[0]))
         .as_immut()
         .as_unsafe_any_origin()
     )
-    var tt_in_bufs = Array[InTileType, ngpus](uninitialized=True)
-    comptime for i in range(ngpus):
-        tt_in_bufs[i] = (
+    var tt_in_bufs = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InTileType: (
             TileTensor(in_bufs_list[i], row_major(lengths[i]))
             .as_immut()
             .as_unsafe_any_origin()
         )
+    )
 
     comptime OutTileType = type_of(
         TileTensor(
             out_bufs_list[0][0], row_major(lengths[0])
         ).as_unsafe_any_origin()
     )
-    var tt_out_bufs = Array[OutTileType, ngpus * group_size](uninitialized=True)
-    comptime for i in range(ngpus * group_size):
-        comptime device_idx = i // group_size
-        comptime local_idx = i % group_size
-        comptime group_start = (device_idx // group_size) * group_size
-        comptime input_idx = group_start + local_idx
-        tt_out_bufs[i] = TileTensor(
+
+    def tt_out_bufs_at(i: Int) {mut out_bufs_list, imm} -> OutTileType:
+        var device_idx = i // group_size
+        var local_idx = i % group_size
+        var group_start = (device_idx // group_size) * group_size
+        var input_idx = group_start + local_idx
+        return TileTensor(
             out_bufs_list[device_idx][local_idx],
             row_major(lengths[input_idx]),
         ).as_unsafe_any_origin()
 
+    var tt_out_bufs = Array[_, ngpus * group_size](fill_with=tt_out_bufs_at)
+
     comptime for group_idx in range(ngpus // group_size):
         comptime group_start = group_idx * group_size
-        var group_in_bufs = Array[InTileType, group_size](uninitialized=True)
+        var group_in_bufs = Array[_, group_size](
+            fill_with=lambda (local_idx: Int) -> InTileType: tt_in_bufs[
+                group_start + local_idx
+            ]
+        )
         var group_rank_sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
             uninitialized=True
         )
 
         comptime for local_idx in range(group_size):
-            group_in_bufs[local_idx] = tt_in_bufs[group_start + local_idx]
             group_rank_sigs[local_idx] = rank_sigs[group_start + local_idx]
 
         comptime for local_idx in range(group_size):
             comptime device_idx = group_start + local_idx
-            var device_out = Array[OutTileType, group_size](uninitialized=True)
-            comptime for src_idx in range(group_size):
-                device_out[src_idx] = tt_out_bufs[
+            var device_out = Array[_, group_size](
+                fill_with=lambda (src_idx: Int) -> OutTileType: tt_out_bufs[
                     device_idx * group_size + src_idx
                 ]
+            )
 
             allgather[domain_id=group_size](
                 group_in_bufs,

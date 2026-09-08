@@ -24,6 +24,21 @@ with a chat template (typically `-instruct`, `-it`, `-chat`) are supported.
 The first local run compiles the model graph, which can take several minutes for
 a large model (subsequent runs reuse the compile cache).
 
+## What CI runs: nightly vs manual
+
+`smoke_test_github_matrix.py` holds two model sets:
+
+- `MODELS` is every model CI knows how to smoke test, with its per-framework
+  and per-GPU exclusions.
+- `NIGHTLY_MODELS` is the subset the nightly suite runs (`--tier nightly`).
+
+To run anything outside `NIGHTLY_MODELS`, dispatch the Serve Smoke Tests
+workflow (`.github/workflows/serveSmokeTest.yaml`) with `model_tier: all`, the
+default for a manual run, or name the models in `models_override`.
+
+Membership in `NIGHTLY_MODELS` is opt-in: adding a model to `MODELS` does not
+add it to the nightly.
+
 ## Task overrides
 
 By default the harness runs `gsm8k_cot_llama` (plus `chartqa` for vision

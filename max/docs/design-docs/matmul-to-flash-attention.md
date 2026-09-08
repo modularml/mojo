@@ -52,8 +52,7 @@ for k in range(0, K, tile_size):
   # Guard writing to shared memory.
   barrier()
 
-  @parameter
-  for kk in range(tile_size):
+  comptime for kk in range(tile_size):
     accum += a_smem_tile[i, kk] * b_smem_tile[kk, j]
 
   # Guard read of shared memory.
@@ -306,7 +305,7 @@ for kv_offset in range(0, num_keys, kv_tile_size):
     # To avoid overflow
     #   y[i] = exp(x[i] - max(x)) / sum(exp(x[i] - max(x))
 
-    # fn softmax(x):
+    # def softmax(x):
     #   var x_max       = rowmax(x)            # Need the entire row !!!!
     #   var numerator   = exp(x - x_max)
     #   var denominator = rowsum(numerator)    # Need the entire row !!!!

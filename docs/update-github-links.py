@@ -16,7 +16,7 @@
 Example:
 cd oss/modular/docs
 python3 update-github-links.py . max/v26.3
-python3 update-github-links.py ../mojo/docs mojo/v1.0.0b1
+python3 update-github-links.py ../Mojo/docs mojo/v1.0.0b1
 """
 
 import sys

@@ -704,7 +704,7 @@ def naive_fa_decode_apple[
     # Flat 1D TileTensor views over the q/output/partial buffers. The kernels
     # bake the per-(batch, head, split, depth) offset into a linear index
     # (`_o_idx`/`_ml_idx`) and the BSHD/ragged q/out offset, so the flat views
-    # just carry the device pointers with TileTensor typing (no raw pointers /
+    # just carry the storage handles with TileTensor typing (no raw pointers /
     # DeviceBuffer-as-pointer inside the kernels).
     var q_flat = TileTensor(
         q.ptr.as_imm().as_unsafe_any_origin(),
@@ -718,27 +718,12 @@ def naive_fa_decode_apple[
         valid_length.ptr.as_imm().as_unsafe_any_origin(),
         row_major(Coord(Int(valid_length.size()))),
     )
-    var o_partial_t = TileTensor(
-        o_partial_dev.unsafe_ptr(), row_major(Coord(o_partial_n))
-    )
-    var m_partial_t = TileTensor(
-        m_partial_dev.unsafe_ptr(), row_major(Coord(ml_partial_n))
-    )
-    var l_partial_t = TileTensor(
-        l_partial_dev.unsafe_ptr(), row_major(Coord(ml_partial_n))
-    )
-    var o_partial_imm = TileTensor(
-        o_partial_dev.unsafe_ptr().as_imm().as_unsafe_any_origin(),
-        row_major(Coord(o_partial_n)),
-    )
-    var m_partial_imm = TileTensor(
-        m_partial_dev.unsafe_ptr().as_imm().as_unsafe_any_origin(),
-        row_major(Coord(ml_partial_n)),
-    )
-    var l_partial_imm = TileTensor(
-        l_partial_dev.unsafe_ptr().as_imm().as_unsafe_any_origin(),
-        row_major(Coord(ml_partial_n)),
-    )
+    var o_partial_t = TileTensor(o_partial_dev, row_major(Coord(o_partial_n)))
+    var m_partial_t = TileTensor(m_partial_dev, row_major(Coord(ml_partial_n)))
+    var l_partial_t = TileTensor(l_partial_dev, row_major(Coord(ml_partial_n)))
+    var o_partial_imm = o_partial_t.as_immut()
+    var m_partial_imm = m_partial_t.as_immut()
+    var l_partial_imm = l_partial_t.as_immut()
 
     # Sink weights: a nullable `OptionalReg[TileTensor]` passed by value (NOT a
     # dangling `UnsafePointer` -- KB `unsafepointer-is-non-nullable`). When

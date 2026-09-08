@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Rejection Sampler custom ops."""
 
+import logging
 from typing import Literal
 
 import numpy as np
@@ -24,6 +25,8 @@ from max.nn.kernels import (
     topk_topp_masked_probs,
 )
 from max.nn.layer import Module
+
+logger = logging.getLogger("max.pipelines")
 
 # Constant for masking invalid tokens in logits.
 # Using -10000 to match the existing sampling code pattern.
@@ -40,6 +43,20 @@ _SEED_GOLDEN_GAMMA = 0x9E3779B97F4A7C15
 # the residual-recovery stream so a recovery draw can never share a key with a
 # draft-proposal draw that happens to sit at the same index.
 _SEED_DOMAIN_RECOVERY = 0xBF58476D1CE4E5B9
+
+# SplitMix64's second mixing constant, the same kind of domain tag for the
+# sampled verdict's implicit RNG stream: without it, the stream is keyed on
+# the bare per-execute seed, which is also the key a sampled draft proposal
+# draws its own token with -- so row 0's accept coin is the very draw the
+# proposal inverted. See the commit message for the derivation and impact.
+_SEED_DOMAIN_VERDICT = 0x94D049BB133111EB
+
+# MurmurHash3 fmix64's first constant, tagging the synthetic sampler's
+# implicit RNG stream. Synthetic acceptance never reads the drafted token, so
+# nothing here can invert against it the way the sampled verdict's coin did --
+# but keeping every batch-level stream on its own domain tag is cheap
+# insurance against a future caller adding one.
+_SEED_DOMAIN_SYNTHETIC = 0xFF51AFD7ED558CCD
 
 
 def _seed_offset(index: int, domain: int = 0) -> int:
@@ -74,6 +91,18 @@ def _draft_step_seed(seed: TensorValue, step: int) -> TensorValue:
 def _recovery_row_offset(row: int) -> int:
     """Returns the seed offset the residual-recovery stream uses for ``row``."""
     return _seed_offset(row, _SEED_DOMAIN_RECOVERY)
+
+
+def _set_domain_seed(seed: TensorValue, domain: int) -> None:
+    """Seeds the implicit-RNG ops of a batch-level draw under ``domain``.
+
+    ``ops.random.set_seed`` keys one stream for the whole graph, so a rank-1
+    per-row seed contributes only its row-0 value.
+    """
+    scalar = seed[0] if seed.rank == 1 else seed
+    ops.random.set_seed(
+        scalar + ops.constant(domain, DType.uint64, scalar.device)
+    )
 
 
 def _multinomial(
@@ -411,7 +440,7 @@ def synthetic_acceptance_sampler(
         draft_tokens, target_logits
     )
 
-    ops.random.set_seed(seed[0] if seed.rank == 1 else seed)
+    _set_domain_seed(seed, _SEED_DOMAIN_SYNTHETIC)
 
     float_type = TensorType(
         DType.float32, draft_tokens.type.shape, device=device
@@ -524,6 +553,26 @@ class AcceptanceSampler:
                 synthetic_acceptance_rate,
                 num_draft_steps,
             )
+
+        logger.info(
+            "Speculative acceptance rule: %s (draft_proposal=%s, relaxed=%s)",
+            self.acceptance_rule,
+            self._draft_proposal,
+            self._relaxed_topk is not None or self._relaxed_delta is not None,
+        )
+
+    @property
+    def acceptance_rule(self) -> Literal["synthetic", "stochastic", "greedy"]:
+        """The rule :meth:`__call__` dispatches to, in its precedence order.
+
+        This is the only place the acceptance rule in effect is decided:
+        ``SpeculativeConfig.rejection_sampling_strategy`` is read by nothing.
+        """
+        if self._base_rate is not None:
+            return "synthetic"
+        if self._use_stochastic:
+            return "stochastic"
+        return "greedy"
 
     def __call__(
         self,
@@ -1025,9 +1074,9 @@ def stochastic_acceptance_sampler(
             "per-row seeds require draft_proposal='argmax'; the sampled "
             "verdict consumes a single batch-level random stream"
         )
-    # Seeds the implicit-RNG ops of the sampled verdict; the argmax verdict is
-    # explicitly keyed per flat row and never reads this stream.
-    ops.random.set_seed(seed[0] if seed.rank == 1 else seed)
+    # The argmax verdict is explicitly keyed per flat row and never reads this
+    # stream.
+    _set_domain_seed(seed, _SEED_DOMAIN_VERDICT)
 
     device = draft_tokens.device
 

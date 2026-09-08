@@ -314,12 +314,13 @@ def pv_ts_batched_kernel[
     # All 4 warps store to the SAME address a_tmem (datapaths=32); the hardware
     # subpartition routes warp g's store to quarter g (no per-warp offset). This
     # single packed P feeds ALL depth-tile MMAs (P is depth-independent).
-    var frag = Array[UInt32, P_FRAG_U32](uninitialized=True)
-    for j in range(P_FRAG_U32):
+    def frag_at(j: Int) {imm} -> UInt32:
         var pair = SIMD[OP_TYPE, 2]()
         pair[0] = p_input[row, g * PART_KEYS + 2 * j][0]
         pair[1] = p_input[row, g * PART_KEYS + 2 * j + 1][0]
-        frag[j] = bitcast[.uint32, 1](pair)
+        return bitcast[.uint32, 1](pair)
+
+    var frag = Array[_, P_FRAG_U32](fill_with=frag_at)
 
     tcgen05_st[datapaths=32, bits=32, repeat=P_FRAG_U32, pack=False](
         a_tmem, frag

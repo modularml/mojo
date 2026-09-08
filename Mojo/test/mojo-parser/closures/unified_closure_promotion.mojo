@@ -179,7 +179,7 @@ def s6_trigger[xx: Int, func: def(Int) capturing -> Int]() -> Int:
 # S7-DAG: lit.struct.decl @"def[dtype: DType, //, simd_width: Int]() thin -> SIMD[dtype, simd_width]_PtrWrapper"
 # S7-DAG: lit.alias.decl dtype: !DType = <__capture_dtype>
 # S7-DAG: lit.fn @"__call__[::DType,::SIMD[DType.int, 1]](unified_closure_promotion::def[dtype: DType, //, simd_width: Int]() thin -> SIMD[dtype, simd_width]_PtrWrapper[$0, $1])"
-# S7-DAG: {{.*}} = lit.call tail[!lit.generator<() -> !lit.struct<#SIMD {{.*}}: bind_params{{.*}}Impl, :!DType _dtype, :!Int simd_width)]()
+# S7-DAG: {{.*}} = lit.call tail[!lit.generator<() -> !lit.struct<#SIMD {{.*}}: bind_params{{.*}}Impl, :!DType *"Closure_Syn#0", :!Int *"Closure_Syn#1")]()
 # S7-DAG: kgen.witness "dtype" : !DType = __capture_dtype
 # S7-LABEL: lit.fn @"s7_trigger[::SIMD[DType.int, 1],::DType]()"
 # S7: %[[S7_WRAP:.*]] = lit.var.decl "__call_result_tmp__" synth : !lit.ref<!lit.struct

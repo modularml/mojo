@@ -3342,40 +3342,21 @@ struct DeviceFunction[
                 else:
                     return reflect[declared_arg_type].name()
 
-            # Now we'll check if the given argument's device_type is
-            # what the kernel expects.
-
-            # First, check if they're handing in a device dtype, in other
-            # words, a dtype that can be passed directly and doesn't need to
-            # be mapped. For example, Int, IndexList, etc.
-            comptime is_convertible: Bool = actual_arg_type._is_convertible_to_device_type[
+            # Check that the given argument can occupy the kernel's declared
+            # argument slot after device encoding.
+            comptime is_convertible: Bool = actual_arg_type._is_implicitly_encodable_to[
                 declared_arg_type
             ]()
 
-            comptime if actual_arg_type == actual_arg_type.device_type:
-                # Now check if they handed in the *correct* device dtype.
-                comptime assert is_convertible, String(
-                    "argument #",
-                    i,
-                    " of type '",
-                    actual_arg_type.get_type_name(),
-                    "' does not match the declared function argument type '",
-                    declared_arg_type_name(),
-                    "'",
-                )
-            else:
-                # They handed in a host dtype, in other words, a dtype that
-                # needs to be mapped before handing it to the device. In
-                # this case, we use a more informative error message.
-                comptime assert is_convertible, String(
-                    "argument #",
-                    i,
-                    " of type '",
-                    actual_arg_type.get_type_name(),
-                    "' (which became device of type '",
-                    declared_arg_type_name(),
-                    "') does not match the declared function argument type",
-                )
+            comptime assert is_convertible, String(
+                "argument #",
+                i,
+                " of type '",
+                actual_arg_type.get_type_name(),
+                "' is not encodable as the declared function argument type '",
+                declared_arg_type_name(),
+                "'",
+            )
             var aligned_type_size = align_up(
                 size_of[actual_arg_type.device_type, target=Self.target](),
                 8,

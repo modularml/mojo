@@ -25,8 +25,9 @@
 #include "Mojo/MojoParser/Constraints.h"
 #include "Mojo/MojoParser/IRValues.h"
 #include "Mojo/MojoParser/SharedState.h"
-#include "Mojo/Support/TriState.h"
+#include "Mojo/Support/TriBool.h"
 #include "mlir/IR/Builders.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/SMLoc.h"
 
@@ -43,20 +44,24 @@ class TraitType;
 // ConversionFailure
 //===----------------------------------------------------------------------===//
 
-/// Why an implicit conversion was rejected. `canImplicitlyConvertToType` tries
+/// Why an implicit conversion was rejected. `classifyImplicitConversion` tries
 /// a sequence of unrelated conversion strategies, and each one fails for its
 /// own kind of reason, so each gets its own alternative here.
+///
+/// This is only used when an answer is definitively `no`. For inconclusive
+/// answers, the `ImplicitConversionResult` returned by
+/// `classifyImplicitConversionWithDetails` carries the undecided constraints.
 class ConversionFailure {
 public:
   /// Rejected without recording a reason.
   struct None {};
 
-  /// A constraint was refuted or could not be proven.
-  struct UnsatisfiedConstraints {
-    ConstraintFailure constraints;
+  /// A constraint was refuted.
+  struct RefutedConstraints {
+    SmallVector<ConstraintAttr, 2> constraints;
   };
 
-  using Reason = std::variant<None, UnsatisfiedConstraints>;
+  using Reason = std::variant<None, RefutedConstraints>;
 
   ConversionFailure() = default;
   ConversionFailure(ConversionFailure &&) = default;
@@ -168,23 +173,19 @@ public:
   ///   - `yes`     the conversion is free (including shedding generator body
   ///               constraints that `declScope` proves).
   ///   - `no`      the representations differ, or a generator body constraint
-  ///               is unprovable or refuted in `declScope`.
+  ///               is refuted in `declScope`.
+  ///   - `unknown` a generator body constraint is unprovable in `declScope`.
   ///
   /// `declScope` supplies the `where` assumptions used to discharge generator
   /// body constraints; `additionalAssumptions` are extra facts to consider
   /// alongside it.
-  ///
-  /// When `failure` is non-null and the verdict is `unknown`, it receives the
-  /// body constraints that lacked evidence, so a caller needing to name them
-  /// does not have to repeat the discharge.
-  static TriState
+  static TriBool
   canZeroCostConvert(ASTType fromType, ASTType toType, SharedState &shared,
                      ASTDecl &declScope,
-                     ArrayRef<ConstraintAttr> additionalAssumptions = {},
-                     ConversionFailure *failure = nullptr);
+                     ArrayRef<ConstraintAttr> additionalAssumptions = {});
 
   /// Same as the above, using this emitter's shared state and scope.
-  TriState
+  TriBool
   canZeroCostConvert(ASTType fromType, ASTType toType,
                      ArrayRef<ConstraintAttr> additionalAssumptions = {}) {
     return canZeroCostConvert(fromType, toType, shared, declScope,
@@ -205,14 +206,20 @@ public:
   // scope-dependent: the same type pair can yield a different verdict in a
   // scope with a different assumption set, so callers that memoize keyed on the
   // type pair must not cache a scope-dependent verdict.
-  //
-  // When `failure` is non-null, it receives the verdict plus any
-  // failed/unproven provider `where` constraints.
-  static FailureOr<TriState>
-  canMetaTypeUpCastTo(SharedState &shared, SMLoc loc, ASTType fromType,
-                      ASTType toType, ASTDecl *declScope,
-                      bool *scopeDependent = nullptr,
-                      ConstraintFailure *failure = nullptr);
+
+  static FailureOr<TriBool> canMetaTypeUpCastTo(SharedState &shared, SMLoc loc,
+                                                ASTType fromType,
+                                                ASTType toType,
+                                                ASTDecl *declScope,
+                                                bool *scopeDependent = nullptr);
+
+  /// Same, additionally collecting the problematic constraints so a diagnosing
+  /// caller can name them. An upcast to a trait is decided by a conformance
+  /// query, so a rejection reports exactly what that query would have.
+  static FailureOr<ConstraintResult>
+  canMetaTypeUpCastToWithDetails(SharedState &shared, SMLoc loc,
+                                 ASTType fromType, ASTType toType,
+                                 ASTDecl *declScope, bool *scopeDependent);
 
   /// Given a value of a type that can be zero cost converted to another type,
   /// emit a rebind or other operation to get it in the right type.
@@ -365,8 +372,7 @@ public:
 
   /// Bind the universal parametric closure trait's parameters to match the
   /// given function signature, returning the resulting concrete `TraitType`.
-  TraitType bindParamsToClosureTraitFromSig(const ExprNode *expr,
-                                            FnTypeGeneratorType sig);
+  TraitSymbolAttr bindParamsToClosureTraitFromSig(FnTypeGeneratorType sig);
   //===--------------------------------------------------------------------===//
   // Emission helpers for various value classifications.
 
@@ -387,29 +393,37 @@ public:
   /// Return true if 'value' may be implicitly converted to 'requiredType'
   /// by invoking (one level of) conversion operations.  This does not generate
   /// any IR.
-  // When `deferralCtx` is non-null and the only obstacle to the conversion is
-  // an unprovable (`unknown`) trait conformance, the conversion is
-  // reported as convertible (and not cached since it's context-dependent).
-  //
-  // When `failure` is non-null it receives why the conversion was rejected.
-  // Only the strategies that know a reason record one, so it can come back
-  // empty even for a rejection.
-  static TriState classifyImplicitConversion(
+  /// When `deferralCtx` is non-null and the only obstacle to the conversion is
+  /// an unprovable (`unknown`) trait conformance, the conversion is
+  /// reported as convertible (and not cached since it's context-dependent).
+  static TriBool classifyImplicitConversion(
       ASTExprAnd<CValue> value, ASTType requiredType, ASTDecl &declScope,
       ArrayRef<ConstraintAttr> additionalAssumptions = {},
-      DeferredTypingContext *deferralCtx = nullptr,
-      ConversionFailure *failure = nullptr);
+      DeferredTypingContext *deferralCtx = nullptr);
+
+  /// The answer from `classifyImplicitConversionWithDetails`:
+  /// - A `no`/`unknown` carries why the conversion was rejected. Only the
+  ///   strategies that know a reason record one, so it can come back empty even
+  ///   for a rejection.
+  /// - An `unknown` carries the undecided constraints.
+  using ImplicitConversionResult =
+      TriResult<void, ConversionFailure, SmallVector<ConstraintAttr, 2>>;
+
+  /// Same as `classifyImplicitConversion`, additionally collecting non-yes
+  /// reasons.
+  static ImplicitConversionResult classifyImplicitConversionWithDetails(
+      ASTExprAnd<CValue> value, ASTType requiredType, ASTDecl &declScope,
+      ArrayRef<ConstraintAttr> additionalAssumptions,
+      DeferredTypingContext *deferralCtx);
 
   /// Boolean form of `classifyImplicitConversion`, collapsing an undecided
-  /// verdict the way callers that cannot represent one have always seen it.
+  /// answer the way callers that cannot represent one have always seen it.
   static bool canImplicitlyConvertToType(
       ASTExprAnd<CValue> value, ASTType requiredType, ASTDecl &declScope,
       ArrayRef<ConstraintAttr> additionalAssumptions = {},
-      DeferredTypingContext *deferralCtx = nullptr,
-      ConversionFailure *failure = nullptr) {
-    TriState verdict =
-        classifyImplicitConversion(value, requiredType, declScope,
-                                   additionalAssumptions, deferralCtx, failure);
+      DeferredTypingContext *deferralCtx = nullptr) {
+    TriBool verdict = classifyImplicitConversion(
+        value, requiredType, declScope, additionalAssumptions, deferralCtx);
     if (verdict.isUnknown())
       return deferralCtx != nullptr;
     return verdict.isTrue();
@@ -508,6 +522,36 @@ public:
   /// scalar<bool> value that we can test directly.  This reports and error and
   /// returns null on error.
   RValue emitExprScalarBool(const ExprNode *condExpr, ExprContext context);
+
+  /// Emit a 2-arm `hlcf.elif` that produces `resultTypes`. `cond` is an
+  /// already-computed i1 used as the elif operand. `emitThen` / `emitElse`
+  /// run at the start of their blocks and should terminate them (typically
+  /// with `hlcf.yield`). On success the insertion point is after the elif and
+  /// the op is returned; on failure, returns null.
+  Operation *emitIfThen(Location loc, Value cond, TypeRange resultTypes,
+                        llvm::function_ref<LogicalResult()> emitThen,
+                        llvm::function_ref<LogicalResult()> emitElse);
+
+  /// Short-circuiting conjunction of match predicates (`lhs && emitRhs()`).
+  ///
+  /// When `lhs` is a known-true constant the rhs is emitted directly; when it
+  /// is known-false the rhs is skipped unless `evaluateRhsEvenIfLhsFalse` is
+  /// set (used by `case` guards so a never-matching pattern still typechecks
+  /// its guard). Otherwise this lowers to a nested `hlcf.elif` that yields the
+  /// rhs only if `lhs` is true.
+  CValue
+  emitAndMatchPredicates(ASTExprAnd<CValue> lhs,
+                         llvm::function_ref<ASTExprAnd<CValue>()> emitRhs,
+                         bool evaluateRhsEvenIfLhsFalse = false);
+
+  /// Short-circuiting disjunction of match predicates (`lhs || emitRhs()`).
+  ///
+  /// When `lhs` is a known-true constant the rhs is skipped; when it is
+  /// known-false the rhs is emitted directly. Otherwise this lowers to a
+  /// nested `hlcf.elif` that yields true if `lhs` matches, else the rhs.
+  CValue
+  emitOrMatchPredicates(ASTExprAnd<CValue> lhs,
+                        llvm::function_ref<ASTExprAnd<CValue>()> emitRhs);
 
   /// Given a value, emit it into an MLIR value by invoking its `__mlir_index__`
   /// method.

@@ -11,20 +11,16 @@
 # limitations under the License.
 ##===----------------------------------------------------------------------===##
 # 2x B200 recipe for Inkling Small NVFP4 with MTP (K=2).
-# 8-shot GSM8K prompts are ~1k tokens, so max_length stays at 4096.
 model:
   model_path: thinkingmachines/Inkling-Small-NVFP4
   device_specs: [0, 1]
   quantization_encoding: float4_e2m1fnx2
   trust_remote_code: true
-  max_length: 4096
+  max_length: 8192
   kv_cache:
     device_memory_utilization: 0.95
     enable_prefix_caching: false
 
-# Matches the smoke test's 64 concurrent requests so the eval finishes
-# inside its 600s budget; also keeps the device-graph-capture ladder
-# (one graph per decode batch size) well under the 128 cap.
 runtime:
   max_batch_size: 64
 

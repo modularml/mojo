@@ -103,9 +103,10 @@ if __name__ == "__main__":
     # --- Run the model locally ---
 
     session = InferenceSession(devices=[CPU()])
-    compiled_model = session.load(graph, weights_registry=model.state_dict())
+    compiled = session.compile(graph)
+    runnable_model = session.init(compiled, weights_registry=model.state_dict())
 
     input_data = rng.standard_normal((1, dim)).astype(np.float32)
-    result = compiled_model(input_data)
+    result = runnable_model(input_data)
 
     print("result:", result[0].to_numpy())

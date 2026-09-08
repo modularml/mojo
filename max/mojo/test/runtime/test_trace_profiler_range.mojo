@@ -11,14 +11,17 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Tests for `Trace`'s MAX profiler range branch.
+"""Tests for `Trace`'s MAX profiler range branch and the external profiler
+annotation bridge.
 
 Exercises the runtime-gated `__enter__`/`__exit__` path that records spans
-through the `KGEN_CompilerRT_Range*` FFI bridge. No profiler backend is
-available in this test environment, so the recording gate never rises and
-these tests pin the safety properties of the branch: the disabled fast path,
-clean unwind across raises, and profiler state staying undisturbed. Span
-content is asserted end-to-end in `max/tests/internal/profiler/`.
+through the `KGEN_CompilerRT_Range*` FFI bridge, plus the suppressed path of
+the `KGEN_CompilerRT_ExternalProfilerAnnotation*` external profiler annotation
+bridge. No profiler backend is available in this test environment and
+external profiler annotation is never requested, so the gates never rise
+and these tests pin the safety properties: the disabled fast path, clean
+unwind across raises, and profiler state staying undisturbed. Span content
+is asserted end-to-end in `max/tests/internal/profiler/`.
 """
 
 from std.ffi import external_call
@@ -105,8 +108,32 @@ def test_trace_exits_when_body_raises() raises:
     assert_false(_is_recording())
 
 
+def test_external_profiler_annotation_suppressed_without_shim() raises:
+    """With annotation never requested the bridge suppresses pushes.
+
+    MODULAR_ENABLE_PROFILING is unset in this test's environment and no shim
+    is available, so a push must report that nothing was emitted and a bare
+    pop must be a safe no-op.
+    """
+    assert_equal(
+        0,
+        external_call[
+            "KGEN_CompilerRT_ExternalProfilerAnnotationIsEnabled", Int
+        ](),
+    )
+    var name = StaticString("tool-span")
+    assert_equal(
+        0,
+        external_call["KGEN_CompilerRT_ExternalProfilerAnnotationPush", Int](
+            name.as_bytes().unsafe_ptr(), name.byte_length(), UInt32(0)
+        ),
+    )
+    external_call["KGEN_CompilerRT_ExternalProfilerAnnotationPop", NoneType]()
+
+
 def main() raises:
     test_not_recording_at_startup()
     test_trace_scopes_while_not_recording()
     test_trace_scopes_with_profiler_enabled()
     test_trace_exits_when_body_raises()
+    test_external_profiler_annotation_suppressed_without_shim()

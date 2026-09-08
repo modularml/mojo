@@ -2900,13 +2900,12 @@ struct Struct_ep_fused_silu_mxfp6:
         it from the bytes -- it must match what the checkpoint declares.
         """
         comptime assert is_gpu[target](), "EP is only supported on GPU."
-        comptime assert not fuse_a_scale_preshuffle, (
-            "MXFP6 has no A-scale slot-layout producer; run the standalone"
-            " preshuffle instead"
-        )
-        comptime assert max_padded_M == 0, (
-            "max_padded_M belongs to the A-scale fold, which MXFP6 does not"
-            " support"
+        comptime assert not fuse_a_scale_preshuffle or (
+            max_padded_M > 0 and max_padded_M % 32 == 0
+        ), (
+            "the A-scale fold needs the graph-build-time slot stride:"
+            " max_padded_M must be a positive multiple of 32, since the"
+            " matmul reads with align_up(max_num_tokens_per_expert, 32)"
         )
 
         var output_tensor = output.to_tile_tensor[.int64]()
@@ -2929,6 +2928,7 @@ struct Struct_ep_fused_silu_mxfp6:
             hw_info.max_thread_block_size,
             hw_info.sm_count,
             fp6_format=FP6Format(FP6_FORMAT),
+            fuse_a_scale_preshuffle=fuse_a_scale_preshuffle,
             clamp_activation=clamp_activation,
         ]
 
@@ -2939,6 +2939,7 @@ struct Struct_ep_fused_silu_mxfp6:
                 "scales_dtype=", scales_dtype,
                 ";input_dtype=", input_dtype,
                 ";FP6_FORMAT=", FP6_FORMAT,
+                ";fuse_a_scale_preshuffle=", fuse_a_scale_preshuffle,
                 ";clamp_activation=", clamp_activation,
             )
             # fmt: on
@@ -2953,6 +2954,7 @@ struct Struct_ep_fused_silu_mxfp6:
                 scales_tensor,
                 input_tensor,
                 row_offsets_tensor,
+                Int32(max_padded_M),
                 alpha,
                 limit,
                 grid_dim=hw_info.sm_count,

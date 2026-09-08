@@ -310,7 +310,7 @@ def _reducescatter_kernel[
         # Round-robin access pattern to balance NVLink traffic across GPUs.
         comptime TileType = TileTensor[dtype, in_layout, ImmutAnyOrigin]
         var reordered = Array[_, num_buffers](
-            fill_with=lambda (i: Int) -> TileType: in_bufs[
+            fill_with_unrolled=lambda [i: Int]() -> TileType: in_bufs[
                 circular_add[num_buffers](_my_rank, i)
             ]
         )
@@ -325,7 +325,7 @@ def _reducescatter_kernel[
             comptime FlatTile = TileTensor[dtype, FlatLayout, ImmutAnyOrigin]
             var elem_start = u_start * config.unit_numel
             var flat_tiles = Array[_, num_buffers](
-                fill_with=lambda (i: Int) -> FlatTile: FlatTile(
+                fill_with_unrolled=lambda [i: Int]() -> FlatTile: FlatTile(
                     reordered[i]._storage + elem_start,
                     row_major(n_elements),
                 )
@@ -348,7 +348,7 @@ def _reducescatter_kernel[
                 dtype, RevLayout, ImmutAnyOrigin
             ]
 
-            def sliced_tiles_at(i: Int) {imm} -> SlicedRevTile:
+            def sliced_tiles_at[i: Int]() {imm} -> SlicedRevTile:
                 comptime if axis == 0:
                     # Scatter along rows.
                     var sliced = reordered[i].slice(
@@ -369,7 +369,9 @@ def _reducescatter_kernel[
                         sliced._storage, sliced.layout.reverse()
                     )
 
-            var sliced_tiles = Array[_, num_buffers](fill_with=sliced_tiles_at)
+            var sliced_tiles = Array[_, num_buffers](
+                fill_with_unrolled=sliced_tiles_at
+            )
 
             _reduce_scatter_impl[
                 ngpus, output_lambda=output_lambda, use_multimem=use_multimem

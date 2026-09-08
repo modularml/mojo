@@ -155,3 +155,5 @@ void POPDialect::initialize() {
 
   addInterface<POPDialectBytecodeInterface>();
 }
+
+#include "Mojo/POPDialect/POPInterfaces.cpp.inc"

@@ -10,9 +10,9 @@
 //   KGEN/test/mojo-integration/extern-c-abi/
 //
 // TRANSFORM UNDER TEST:
-//   KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp  — ConvertPOPExternalCall
-//   KGEN/lib/KGENToLLVM/CABIAAPCS.cpp        — AAPCSABIInfo classifier
-//   KGEN/lib/KGENToLLVM/CABILowering.cpp     — shared utilities
+//   Mojo/lib/KGENToLLVM/LowerPOPToLLVM.cpp  — ConvertPOPExternalCall
+//   Mojo/lib/KGENToLLVM/CABIAAPCS.cpp        — AAPCSABIInfo classifier
+//   Mojo/lib/KGENToLLVM/CABILowering.cpp     — shared utilities
 //
 // RELATED TEST FILES:
 //   extern-c-abi.mlir          — platform-independent tests (DefaultCABIInfo,

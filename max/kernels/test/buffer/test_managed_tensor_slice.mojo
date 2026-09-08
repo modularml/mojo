@@ -29,7 +29,7 @@ from std.utils import IndexList
 
 def test_basic_construction() raises:
     """Test basic ManagedTensorSlice construction from pointer and shape."""
-    var storage = Array[Float32, 3 * 4](uninitialized=True)
+    var storage = Array[Float32, 3 * 4](fill={})
     # Shape-only constructor computes row-major strides automatically
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 3, 4]()
     var tensor = ManagedTensorSlice[io_spec=IOSpec.Unknown, static_spec=spec](
@@ -42,7 +42,7 @@ def test_basic_construction() raises:
 
 def test_shape_and_strides() raises:
     """Test shape() and strides() methods."""
-    var storage = Array[Float32, 2 * 3 * 4](uninitialized=True)
+    var storage = Array[Float32, 2 * 3 * 4](fill={})
     comptime spec = get_row_major_tensor_spec_static[
         DType.float32, 3, 2, 3, 4
     ]()
@@ -63,7 +63,7 @@ def test_shape_and_strides() raises:
 
 def test_dim_size() raises:
     """Test dim_size methods (compile-time and runtime)."""
-    var storage = Array[Float32, 5 * 7](uninitialized=True)
+    var storage = Array[Float32, 5 * 7](fill={})
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 5, 7]()
     var tensor = ManagedTensorSlice[io_spec=IOSpec.Unknown, static_spec=spec](
         storage.unsafe_ptr(), IndexList[2](5, 7)
@@ -80,7 +80,7 @@ def test_dim_size() raises:
 
 def test_getitem_setitem() raises:
     """Test __getitem__ and __setitem__ operations."""
-    var storage = Array[Float32, 2 * 3](uninitialized=True)
+    var storage = Array[Float32, 2 * 3](fill={})
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 2, 3]()
     var tensor = ManagedTensorSlice[
         mut=True, io_spec=IOSpec.Unknown, static_spec=spec
@@ -109,7 +109,7 @@ def test_getitem_setitem() raises:
 
 def test_simd_load_store() raises:
     """Test SIMD load and store operations."""
-    var storage = Array[Float32, 8](uninitialized=True)
+    var storage = Array[Float32, 8](fill={})
     comptime spec = get_row_major_tensor_spec_static[.float32, 1, 8]()
     var tensor = ManagedTensorSlice[
         mut=True, io_spec=IOSpec.Unknown, static_spec=spec
@@ -132,16 +132,13 @@ def test_simd_load_store() raises:
 
 def test_to_layout_tensor() raises:
     """Test to_layout_tensor() conversion."""
-    var storage = Array[Float32, 3 * 4](uninitialized=True)
+    var storage = Array[Float32, 3 * 4](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 3, 4]()
     var tensor = ManagedTensorSlice[
         mut=True, io_spec=IOSpec.Unknown, static_spec=spec
     ](storage.unsafe_ptr(), IndexList[2](3, 4))
-
-    # Initialize data
-    for i in range(3):
-        for j in range(4):
-            tensor[i, j] = Float32(i * 4 + j)
 
     # Convert to LayoutTensor
     var layout_tensor = tensor.to_layout_tensor()
@@ -155,10 +152,15 @@ def test_to_layout_tensor() raises:
     assert_equal(Int(layout_tensor.runtime_layout.shape[0]), 3)
     assert_equal(Int(layout_tensor.runtime_layout.shape[1]), 4)
 
+    # TODO(GEX-4147): ManagedTensorSlice needs to carry the Array's origin
+    # `tensor` holds an untracked pointer into `storage`; keep `storage` alive
+    # until the last read through it.
+    _ = storage^
+
 
 def test_stride_length() raises:
     """Test stride_length methods."""
-    var storage = Array[Float32, 3 * 5](uninitialized=True)
+    var storage = Array[Float32, 3 * 5](fill={})
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 3, 5]()
     var tensor = ManagedTensorSlice[io_spec=IOSpec.Unknown, static_spec=spec](
         storage.unsafe_ptr(), IndexList[2](3, 5)
@@ -175,7 +177,7 @@ def test_stride_length() raises:
 
 def test_simd_load_store_2d() raises:
     """Test SIMD load and store operations on 2D tensor."""
-    var storage = Array[Float32, 4 * 8](uninitialized=True)
+    var storage = Array[Float32, 4 * 8](fill={})
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 4, 8]()
     var tensor = ManagedTensorSlice[
         mut=True, io_spec=IOSpec.Unknown, static_spec=spec
@@ -212,16 +214,13 @@ def test_simd_load_store_2d() raises:
 
 def test_to_tile_tensor() raises:
     """Test to_tile_tensor() conversion."""
-    var storage = Array[Float32, 3 * 4](uninitialized=True)
+    var storage = Array[Float32, 3 * 4](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 3, 4]()
     var tensor = ManagedTensorSlice[
         mut=True, io_spec=IOSpec.Unknown, static_spec=spec
     ](storage.unsafe_ptr(), IndexList[2](3, 4))
-
-    # Initialize data
-    for i in range(3):
-        for j in range(4):
-            tensor[i, j] = Float32(i * 4 + j)
 
     # Convert to TileTensor
     var tile_tensor = tensor.to_tile_tensor[.int64]()
@@ -236,10 +235,15 @@ def test_to_tile_tensor() raises:
     assert_equal(tile_tensor.layout.shape[0]().value(), 3)
     assert_equal(tile_tensor.layout.shape[1]().value(), 4)
 
+    # TODO(GEX-4147): ManagedTensorSlice needs to carry the Array's origin
+    # `tensor` holds an untracked pointer into `storage`; keep `storage` alive
+    # until the last read through it.
+    _ = storage^
+
 
 def test_shape_coord_static() raises:
     """Test shape_coord() preserves fully-static shape information."""
-    var storage = Array[Float32, 3 * 4](uninitialized=True)
+    var storage = Array[Float32, 3 * 4](fill={})
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 3, 4]()
     var tensor = ManagedTensorSlice[io_spec=IOSpec.Unknown, static_spec=spec](
         storage.unsafe_ptr(), IndexList[2](3, 4)
@@ -260,7 +264,7 @@ def test_shape_coord_static() raises:
 
 def test_shape_coord_mixed() raises:
     """Test shape_coord() encodes static dims while filling dynamic ones."""
-    var storage = Array[Float32, 2 * 4](uninitialized=True)
+    var storage = Array[Float32, 2 * 4](fill={})
     # dim 0 is dynamic (-1), dim 1 is static (4); strides are row-major.
     comptime mixed_layout = _IndexListToTileLayout[
         IndexList[2](-1, 4), IndexList[2](4, 1)
@@ -288,7 +292,7 @@ def test_shape_coord_mixed() raises:
 
 def test_strides_coord_static() raises:
     """Test strides_coord() preserves fully-static stride information."""
-    var storage = Array[Float32, 3 * 4](uninitialized=True)
+    var storage = Array[Float32, 3 * 4](fill={})
     comptime spec = get_row_major_tensor_spec_static[.float32, 2, 3, 4]()
     var tensor = ManagedTensorSlice[io_spec=IOSpec.Unknown, static_spec=spec](
         storage.unsafe_ptr(), IndexList[2](3, 4)
@@ -310,7 +314,7 @@ def test_strides_coord_static() raises:
 def test_strides_coord_mixed() raises:
     """Test strides_coord() encodes static strides while filling dynamic ones.
     """
-    var storage = Array[Float32, 2 * 4](uninitialized=True)
+    var storage = Array[Float32, 2 * 4](fill={})
     # Shape is static (2, 4); stride 0 is dynamic (-1) and stride 1 is static.
     comptime mixed_layout = _IndexListToTileLayout[
         IndexList[2](2, 4), IndexList[2](-1, 1)

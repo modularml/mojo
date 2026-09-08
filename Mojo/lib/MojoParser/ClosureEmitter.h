@@ -145,7 +145,7 @@ public:
                  ASTDecl *targetParent = nullptr);
 
   Value emitClosure(ASTDecl &moduleDecl, ASTDecl &nestedFnDecl,
-                    ArrayRef<Capture> captures, TraitDeclOp trait,
+                    ArrayRef<Capture> captures, ASTDecl &traitDecl,
                     Location location, bool isCopyable,
                     FnTypeGeneratorType closureSig,
                     ArrayRef<ParamDeclRefAttr> paramCaptures);
@@ -222,34 +222,44 @@ public:
                                       TraitDeclOp targetTrait,
                                       ASTDecl *declScope = nullptr);
 
+  /// One parent trait that a synthesized closure conforms to, named by symbol.
   struct ClosureParent {
-    ClosureParent(StringRef name, StringRef fnName, ClosureMethod closureMethod)
-        : traitName(name), traitFnName(fnName), closureMethod(closureMethod) {}
-    ClosureParent(TraitDeclOp trait, FnOp definingOp,
-                  ClosureMethod closureMethod)
-        : traitFnName(definingOp ? *definingOp.getSourceName() : ""),
-          trait(trait), definingFn(definingOp), closureMethod(closureMethod) {}
-    TraitDeclOp getTrait(ASTDecl &moduleDecl);
-    FnOp getDefiningOp(ASTDecl &moduleDecl);
-    SymbolRefAttr getSymbolRef(ASTDecl &moduleDecl);
-    StringRef getDefiningOpName() const { return traitFnName; }
-    StringAttr getFullSymbolName(ASTDecl &moduleDecl);
+    /// Resolves \p symbol's requirement up front; \p traitFnName is
+    /// empty for marker traits, which have none.
+    ClosureParent(SharedState &shared, TraitSymbolAttr symbol,
+                  StringRef traitFnName, ClosureMethod closureMethod);
+
+    ClosureParent(TraitSymbolAttr symbol, FnTypeGeneratorType traitFnSig,
+                  StringAttr witnessName, ClosureMethod closureMethod)
+        : symbol(symbol), closureMethod(closureMethod),
+          witnessName(witnessName), signature(traitFnSig) {}
+
+    TraitSymbolAttr getSymbol() const { return symbol; }
+    StringAttr getWitnessName() const { return witnessName; }
+
+    SymbolRefAttr getSymbolRef() const { return symbol.getSymbol(); }
+    StringAttr getFlattenedName() const { return symbol.getFlattenedName(); }
+
     bool isEmpty() const { return closureMethod == ClosureMethod::NONE; }
     ClosureMethod getClosureMethod() const { return closureMethod; }
 
+    TraitDeclOp getTrait(SharedState &shared) const;
+
+    FnTypeGeneratorType getSignature() const { return signature; }
+
+    InlineLevel getInlineLevel() const { return inlineLevel; }
+
   private:
-    StringRef traitName;
-    StringRef traitFnName;
-    /// The parent definition
-    TraitDeclOp trait;
-    /// all closure parents have a single defining function.
-    FnOp definingFn;
-    /// symbol of the trait.
-    SymbolRefAttr sym;
-    /// full symbol name as string
-    StringAttr fullSymbolName;
+    /// Symbol of the parent trait; its declaration is looked up from this.
+    TraitSymbolAttr symbol;
     /// closure method tag corresponding to the method this parent represents.
     ClosureMethod closureMethod;
+    /// The name used for building conformance table.
+    StringAttr witnessName;
+    /// The requirement function signature, null for marker trait.
+    FnTypeGeneratorType signature;
+    /// The requirement's inline level, which the synthesized witness inherits.
+    InlineLevel inlineLevel = InlineLevel::Automatic;
   };
 
   /// This is `isEqualCanon` with one relaxation: parameters
@@ -271,13 +281,13 @@ private:
   /// example), a location, and a populate method, return a trait declaration
   /// that inherits from the parent and contains the methods added to the
   /// function list populated by the populate method.
-  std::pair<TraitDeclOp, ASTDecl *> createTraitOp(
-      ASTDecl &moduleDecl, StringAttr name, SmallVector<ClosureParent> &parents,
-      SMLoc nestedFunctionOrTypeLocation,
-      llvm::function_ref<
-          void(ASTDecl &traitDecl,
-               DenseSet<std::pair<StringAttr, StringAttr>> &functions)>
-          populateTrait);
+  std::pair<TraitDeclOp, ASTDecl *>
+  createTraitOp(StringAttr name, SmallVector<ClosureParent> &parents,
+                SMLoc nestedFunctionOrTypeLocation,
+                llvm::function_ref<void(
+                    ASTDecl &traitDecl,
+                    DenseSet<std::pair<StringAttr, StringAttr>> &functions)>
+                    populateTrait);
   /// Construct the closure struct, lift the nested function into a method, and
   /// emit witness tables for all closure parents.
   Closure liftClosure(ASTDecl &moduleDecl, SMLoc smLoc,
@@ -293,7 +303,8 @@ private:
                       SmallVector<Type> &&deviceCaptureFieldTypes,
                       bool capturesEncodable, ASTDecl &nestedFnDecl);
 
-  /// Given a trait function, specialize it and add it to the struct.
+  /// Given the signature of a trait function, specialize it and add it to the
+  /// struct as \p fnName.
   /// Returns
   /// (a) the new FnOp,
   /// (b) the parameters of the function minus the origins and remapped to
@@ -303,13 +314,14 @@ private:
   /// \p selfTypeOverride replaces the struct's own `Self` in the specialized
   /// signature; an extension's methods are written on the anchor it extends,
   /// not on the (stateless) extension struct.
-  std::tuple<FnOp, ArrayRef<ParamDeclAttr>, Type>
-  pushBackTraitFunctionImpl(FnOp traitFnOp, ASTDecl &structDecl,
-                            bool synthetic = true, StringAttr customName = {},
-                            bool redirectWitnessToImplParam = true,
-                            ASTType selfTypeOverride = {});
+  std::tuple<FnOp, ArrayRef<ParamDeclAttr>, Type> pushBackTraitFunctionImpl(
+      FnTypeGeneratorType traitFnSignature, ASTDecl &structDecl, bool synthetic,
+      StringAttr fnName, SpecialFunctionKind specialFnID,
+      InlineLevel inlineLevel, bool redirectWitnessToImplParam = true,
+      ASTType selfTypeOverride = {});
   struct DevicePassablePopulators {
     llvm::function_ref<FailureOr<SymbolConstantAttr>(FnOp)> isConvertible;
+    llvm::function_ref<FailureOr<SymbolConstantAttr>(FnOp)> isEncodable;
     llvm::function_ref<FailureOr<SymbolConstantAttr>(FnOp)> toDeviceType;
     llvm::function_ref<FailureOr<SymbolConstantAttr>(FnOp)> typeName;
     llvm::function_ref<TypedAttr()> deviceType;
@@ -326,22 +338,63 @@ private:
                                         ArrayRef<Type> deviceCaptureFieldTypes,
                                         StringRef name);
 
+  /// Look up a prelude trait used as a closure parent.
+  ClosureParent getBuiltinParent(StringRef traitName, StringRef traitFnName,
+                                 ClosureMethod closureMethod);
+
+  /// We need to lazily resolve this builtin traits, since at the time closure
+  /// emitter is constructed, they are not registered.
+  ClosureParent getAnyParent() {
+    if (anyParent.has_value())
+      return *anyParent;
+    return getBuiltinParent("AnyType", "", ClosureMethod::NONE);
+  }
+  ClosureParent getMoveParent() {
+    if (moveParent.has_value())
+      return *moveParent;
+    return getBuiltinParent("Movable", "__init__", ClosureMethod::MOVE);
+  }
+  ClosureParent getDeinitableParent() {
+    if (deinitableParent.has_value())
+      return *deinitableParent;
+    return getBuiltinParent("Deinitable", "__deinit__", ClosureMethod::DEL);
+  }
+  ClosureParent getRegisterPassableParent() {
+    if (registerPassableParent.has_value())
+      return *registerPassableParent;
+    return getBuiltinParent("RegisterPassable", "", ClosureMethod::NONE);
+  }
+  ClosureParent getTrivialRegisterTypeParent() {
+    if (trivialRegisterTypeParent.has_value())
+      return *trivialRegisterTypeParent;
+    return getBuiltinParent("TrivialRegisterPassable", "", ClosureMethod::NONE);
+  }
+  ClosureParent getCopyParent() {
+    if (copyParent.has_value())
+      return *copyParent;
+    return getBuiltinParent("Copyable", "__init__", ClosureMethod::COPY);
+  }
+  ClosureParent getImplicitlyCopyableParent() {
+    if (implicitlyCopyableParent.has_value())
+      return *implicitlyCopyableParent;
+    return getBuiltinParent("ImplicitlyCopyable", "", ClosureMethod::NONE);
+  }
+
   /// AnyType is the base metatype for all types.
-  ClosureParent anyParent;
-  /// Movable trait is a parent of all closures. Cache its defining op.
-  ClosureParent moveParent;
-  /// Deinitable trait is a parent of all closures. Cache its
-  /// defining op.
-  ClosureParent deinitableParent;
+  std::optional<ClosureParent> anyParent;
+  /// Movable trait is a parent of all closures.
+  std::optional<ClosureParent> moveParent;
+  /// Deinitable trait is a parent of all closures.
+  std::optional<ClosureParent> deinitableParent;
   /// RegisterPassable marks the type as register passable.
-  ClosureParent registerPassableParent;
+  std::optional<ClosureParent> registerPassableParent;
   /// TrivialRegisterPassable marks the state as trivially register passable.
-  ClosureParent trivialRegisterTypeParent;
-  /// Copy trait is a parent of some closures. Cache its defining op.
-  ClosureParent copyParent;
+  std::optional<ClosureParent> trivialRegisterTypeParent;
+  /// Copy trait is a parent of some closures.
+  std::optional<ClosureParent> copyParent;
   /// ImplicitlyCopyable trait is a parent of some closures. It has no defining
   /// methods.
-  ClosureParent implicitlyCopyableParent;
+  std::optional<ClosureParent> implicitlyCopyableParent;
   /// Closure traits live in the top level module. This cache guards against
   /// emitting duplicates.
   DenseMap<Type, ASTDecl *> closureTraitCache;

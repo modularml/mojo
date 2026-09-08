@@ -255,6 +255,8 @@ public:
 
     kUnpack,     // prefix: * or **
     kAssignExpr, // infix: := (walrus)
+    kAsPat,      // infix: as (match patterns; looser than if so `with x as y`
+                 // still parses the `as` as a statement suffix)
     kIfElse,     // infix: if - else
     kBoolOr,     // infix: or
     kBoolAnd,    // infix: and

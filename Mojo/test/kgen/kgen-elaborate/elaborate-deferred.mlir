@@ -3,10 +3,10 @@
 
 kgen.generator @select_pred<*"cmp`2x": scalar<bool>>() -> !kgen.deferred {
   kgen.param.if <*"cmp`2x"> {
-    %0 = kgen.param.constant: !kgen.deferred = <#kgen<deferred #index<cmp_predicate sle>>>
+    %0 = kgen.param.constant: !kgen.deferred = <#kgen<deferred #index.cmp_predicate<sle>>>
     kgen.return %0 : !kgen.deferred
   } else {
-    %0 = kgen.param.constant: !kgen.deferred = <#kgen<deferred #index<cmp_predicate sgt>>>
+    %0 = kgen.param.constant: !kgen.deferred = <#kgen<deferred #index.cmp_predicate<sgt>>>
     kgen.return %0 : !kgen.deferred
   } {elseIsolated, thenIsolated}
   kgen.unreachable
@@ -32,7 +32,7 @@ kgen.generator @test_select_pred<cmp: scalar<bool>>(%arg0: index, %arg1: index, 
 kgen.generator @test_elaborate_deferred_op(%arg0: index, %arg1: index, %arg2: !kgen.pointer<i1> byref_result) throws -> i1 {
   %0 = kgen.param.constant: i1 = <0>
   // CHECK: %[[CMP_RESULT:.*]] = index.cmp sle(%arg0, %arg1)
-  %1 = kgen.deferred "index.cmp"(%arg0, %arg1 : index, index) {pred = #kgen<deferred #index<cmp_predicate sle>> : !kgen.deferred} : i1
+  %1 = kgen.deferred "index.cmp"(%arg0, %arg1 : index, index) {pred = #kgen<deferred #index.cmp_predicate<sle>> : !kgen.deferred} : i1
   // CHECK-NEXT: pop.store %[[CMP_RESULT]], %arg2 : !kgen.pointer<i1>
   pop.store %1, %arg2 : !kgen.pointer<i1>
   kgen.return %0 : i1
@@ -42,7 +42,7 @@ kgen.generator @test_elaborate_deferred_op(%arg0: index, %arg1: index, %arg2: !k
 kgen.generator @test_elaborate_deferred_op_props_only(%arg0: index, %arg1: index, %arg2: !kgen.pointer<i1> byref_result) throws -> i1 {
   %0 = kgen.param.constant: i1 = <0>
   // CHECK: %[[CMP_RESULT:.*]] = index.cmp eq(%arg0, %arg1)
-  %1 = kgen.deferred "index.cmp"(%arg0, %arg1 : index, index) {} : i1 properties {pred = #index<cmp_predicate eq>}
+  %1 = kgen.deferred "index.cmp"(%arg0, %arg1 : index, index) {} : i1 properties {pred = #index.cmp_predicate<eq>}
   // CHECK-NEXT: pop.store %[[CMP_RESULT]], %arg2 : !kgen.pointer<i1>
   pop.store %1, %arg2 : !kgen.pointer<i1>
   kgen.return %0 : i1
@@ -53,14 +53,14 @@ kgen.generator @test_elaborate_deferred_op_props_deferred(%arg0: index, %arg1: i
   %0 = kgen.param.constant: i1 = <0>
   // CHECK: %[[CMP_RESULT:.*]] = index.cmp ne(%arg0, %arg1)
   %1 = kgen.deferred "index.cmp"(%arg0, %arg1 : index, index) {} : i1
-       properties {pred = #kgen<deferred #index<cmp_predicate ne>> : !kgen.deferred}
+       properties {pred = #kgen<deferred #index.cmp_predicate<ne>> : !kgen.deferred}
   // CHECK-NEXT: pop.store %[[CMP_RESULT]], %arg2 : !kgen.pointer<i1>
   pop.store %1, %arg2 : !kgen.pointer<i1>
   kgen.return %0 : i1
 }
 
 kgen.generator @select_pred_concat<*"pred`2x": struct<(pointer<none>, index)>>() -> !kgen.deferred {
-  %0 = kgen.param.constant: !kgen.deferred = <#kgen<attr_ctor_deferred("#index<cmp_predicate ", #kgen<to_string_deferred(#kgen.param.expr<data_to_str, #kgen.param.decl.ref<"pred`2x"> : !kgen.struct<(pointer<none>, index)>, #kgen.param_list<> : !kgen.param_list<struct<(pointer<none>, index)>>> : !kgen.string) elide_type unit>, ">")>>
+  %0 = kgen.param.constant: !kgen.deferred = <#kgen<attr_ctor_deferred("#index.cmp_predicate<", #kgen<to_string_deferred(#kgen.param.expr<data_to_str, #kgen.param.decl.ref<"pred`2x"> : !kgen.struct<(pointer<none>, index)>, #kgen.param_list<> : !kgen.param_list<struct<(pointer<none>, index)>>> : !kgen.string) elide_type unit>, ">")>>
   kgen.return %0 : !kgen.deferred
 }
 

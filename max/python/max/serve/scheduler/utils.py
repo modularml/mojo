@@ -1065,6 +1065,8 @@ def publish_completed_batch_metrics(
     METRICS.batch_prompt_throughput(prompt_throughput, batch_type=bt)
     METRICS.batch_generation_throughput(generation_throughput, batch_type=bt)
     METRICS.batch_execution_time(stats.execution_time_s * 1000, batch_type=bt)
+    if stats.early_sync_duration_s is not None:
+        METRICS.di_early_sync_time(stats.early_sync_duration_s * 1000)
 
 
 class SchedulerLogger:

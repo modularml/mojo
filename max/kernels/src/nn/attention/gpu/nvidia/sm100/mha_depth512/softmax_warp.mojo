@@ -51,7 +51,6 @@ from max.gpu.compute.arch.tcgen05 import (
     tcgen05_release_allocation_lock,
     tcgen05_store_wait,
 )
-from max.gpu.primitives.warp import _vote_nvidia_helper
 from max.gpu.primitives.cluster import block_rank_in_cluster
 from linalg.matmul.gpu.sm100_structured.structured_kernels.tmem import (
     TmemAddress,
@@ -807,7 +806,12 @@ def depth512_softmax[
 
         var correction: Float32
         comptime if rescale_threshold < 0:
-            if _vote_nvidia_helper(diff < rescale_threshold) != 0:
+            # Per-lane predicate, not a warp vote: under `fuse_gqa`,
+            # `per_thread_score_row` packs multiple distinct query rows
+            # (heads and/or seq positions) into one warp's 32 `m_row`
+            # values, so an OR here would leak a sibling row's rescale
+            # trajectory into this one's.
+            if diff < rescale_threshold:
                 row_max = new_row_max
                 correction = exp2(diff)
             else:

@@ -38,7 +38,8 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
-#include <string_view>
+
+#include "llvm/ADT/StringRef.h"
 
 namespace M::Profiling {
 
@@ -106,7 +107,7 @@ void registerCurrentThreadSlow() {
 
 } // namespace Detail
 
-void rangeBegin(std::string_view name, uint32_t color) {
+void rangeBegin(StringRef name, uint32_t color) {
   // Gate first (contract in Ranges.h): outside a live trace this is one
   // predicted branch. enable()-driven traces raise the gate only after
   // acquire() stored the process-global sink, so the cache read below
@@ -120,8 +121,7 @@ void rangeBegin(std::string_view name, uint32_t color) {
     sink->rangeBegin(name, color);
 }
 
-void rangeBeginWithId(uint64_t correlationId, std::string_view name,
-                      uint32_t color) {
+void rangeBeginWithId(uint64_t correlationId, StringRef name, uint32_t color) {
   if (!isRangeRecordingActive())
     return;
   if (const Detail::RangeSink *sink =
@@ -210,7 +210,7 @@ ProfilerState state() {
   return isEnabled() ? ProfilerState::Active : ProfilerState::Idle;
 }
 
-std::string_view stateName(ProfilerState s) {
+StringRef stateName(ProfilerState s) {
   switch (s) {
   case ProfilerState::Idle:
     return "idle";
@@ -222,6 +222,17 @@ std::string_view stateName(ProfilerState s) {
     return "flushing";
   }
   return "idle";
+}
+
+RangeScope::RangeScope(StringRef name, uint32_t color)
+    : enabled_(isRangeRecordingActive()) {
+  if (enabled_)
+    rangeBegin(name, color);
+}
+
+RangeScope::~RangeScope() {
+  if (enabled_)
+    rangeEnd();
 }
 
 } // namespace M::Profiling

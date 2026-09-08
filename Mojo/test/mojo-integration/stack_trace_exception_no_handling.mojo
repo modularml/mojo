@@ -52,5 +52,5 @@ def main() raises:
 # O3-FULL-NEXT: #{{.*}} std::builtin::error::StackTrace::collect_if_enabled(::SIMD[DType.int, 1])
 # O3-FULL-NEXT: #{{.*}} stack_trace_exception_no_handling::foo2()_REMOVED_ARG {{.*}}/stack_trace_exception_no_handling.mojo:{{.*}}:{{.*}}
 # O3-FULL-NEXT: #{{.*}} std::builtin::_startup::__wrap_and_execute_raising_main
-# O3-FULL-NEXT: #{{.*}} main {{.*}}mojo/stdlib/std/builtin/_startup.mojo:{{.*}}:{{.*}}
+# O3-FULL-NEXT: #{{.*}} main Mojo/stdlib/std/builtin/_startup.mojo:{{.*}}:{{.*}}
 # O3-FULL: Unhandled exception caught during execution: nested gotcha!

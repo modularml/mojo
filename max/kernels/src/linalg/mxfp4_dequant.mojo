@@ -59,9 +59,15 @@ def _dequant_mxfp4_to_fp8_kernel[
     SF_VECTOR_SIZE: Int = 32,
     ELEMENTS_PER_THREAD: Int = 8,
 ](
-    output: TileTensor[out_dtype, output_layout, MutAnyOrigin],
-    input: TileTensor[in_dtype, input_layout, MutAnyOrigin],
-    scales: TileTensor[scales_dtype, scales_layout, MutAnyOrigin],
+    output: TileTensor[
+        out_dtype, output_layout, MutAnyOrigin, Engine=output_engine
+    ],
+    input: TileTensor[
+        in_dtype, input_layout, MutAnyOrigin, Engine=input_engine
+    ],
+    scales: TileTensor[
+        scales_dtype, scales_layout, MutAnyOrigin, Engine=scales_engine
+    ],
     num_rows: Int32,
     num_cols: Int32,
 ):

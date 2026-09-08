@@ -21,7 +21,7 @@ from typing import ClassVar, Literal
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.graph.weights import WeightData
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParamInterface
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
 from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
@@ -121,7 +121,7 @@ class Olmo2Config(
     return_logits: ReturnLogits
     """Whether to return the last token, all logits, or a variable number of logits."""
 
-    kv_params: KVCacheParams
+    kv_params: KVCacheParamInterface
     """KV cache parameters."""
 
     @classmethod
@@ -134,7 +134,7 @@ class Olmo2Config(
         cache_dtype: DType,
         *,
         allow_kv_head_replication: bool = False,
-    ) -> KVCacheParams:
+    ) -> KVCacheParamInterface:
         """Olmo2 does not support data parallelism; use default grouped KV (no EAGLE)."""
         if pipeline_config.model.data_parallel_degree > 1:
             raise ValueError(

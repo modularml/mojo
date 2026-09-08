@@ -505,15 +505,22 @@ static LogicalResult runToolPipeline(MLIRContext *ctx, llvm::SourceMgr &mgr,
           !clOptions.parser.targetFeaturesWasSet())
         clOptions.targetFeatures = "";
 
-      ErrorOr<std::vector<std::string>> featuresOr =
-          M::getFeatures(clOptions.targetTriple, clOptions.targetCpu);
-      if (featuresOr)
-        return failure(clOptions.reportError(featuresOr.takeError().get()));
+      // `targetCpu` defaults to the host CPU name, which LLVM reports as
+      // "generic" for a part it cannot identify -- a name that fails
+      // validation. Fall back to the triple's baseline instead of refusing to
+      // compile on such a host, and take the resolved name with it so
+      // getTargetInfoFor below is not handed one the target already rejected.
+      ErrorOr<M::ResolvedCpu> cpuOr =
+          M::resolveCpu(clOptions.targetTriple, clOptions.targetCpu);
+      if (cpuOr)
+        return failure(clOptions.reportError(cpuOr.takeError().get()));
+      M::ResolvedCpu resolvedCpu = cpuOr.takeValue();
+      clOptions.targetCpu = resolvedCpu.name;
 
       // TODO: This always overwrites any user-specified features
       if (clOptions.targetFeatures.empty())
         clOptions.targetFeatures =
-            encodeFeatures(TargetInfo({}, {}, std::move(*featuresOr)));
+            encodeFeatures(TargetInfo({}, {}, std::move(resolvedCpu.features)));
 
       // Use the full triple, specific CPU, and manually specified features to
       // get the target info.

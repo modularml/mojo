@@ -96,7 +96,8 @@ void MatchFailure::addExplanation(MojoInflightDiag &diag) const {
       ASTType argType(anyStruct.getType());
       diag << ", argument type " << argType << " does not conform to trait "
            << failure.paramType;
-      failure.constraintFailure.attachNotes(diag);
+      if (failure.upCastFailure)
+        attachConstraintNotes(diag, *failure.upCastFailure);
       return;
     }
     if (sugarIsa<TraitType>(failure.argParamType)) {
@@ -698,7 +699,7 @@ LogicalResult ParamMatcher::matchTypes(Type actualType, Type expectedType) {
   // Handle meta type upcasting.
   // Assumptions needed: overload resolution for e.g.
   // repr[T: Writable](Tuple[*Ts]) inside a fn with `where AllWritable[*Ts]`.
-  FailureOr<TriState> typeUpCastable = IREmitter::canMetaTypeUpCastTo(
+  FailureOr<TriBool> typeUpCastable = IREmitter::canMetaTypeUpCastTo(
       shared, state.declScope.getLoc(), actualType, expectedType,
       &state.declScope);
   if (succeeded(typeUpCastable) && typeUpCastable->isTrue())
@@ -817,7 +818,7 @@ LogicalResult ParamMatcher::matchParams(TypedAttr actualAttr,
       // #param.ref<....> : !lit.trait<!Copyable>
       bool fixableByUpCast = false;
       // Why the rejecting upcast failed; carried into TypeConflict below.
-      ConstraintFailure upCastDetails;
+      std::optional<ConstraintResult> upCastFailure;
       if (LIT::isTypeExpr(actualAttr) ||
           LIT::isVariadicOfTypeExpr(actualAttr)) {
         auto targetMT = getTargetMetaTypeForTypeValue(expectedAttr.getType());
@@ -838,11 +839,14 @@ LogicalResult ParamMatcher::matchParams(TypedAttr actualAttr,
             // `struct __MLIRType` is the corner case here :(.
             tightestBound = typeExpr.getType();
           }
-          FailureOr<TriState> upCastable = IREmitter::canMetaTypeUpCastTo(
-              shared, state.declScope.getLoc(), tightestBound, targetMT,
-              &state.declScope, /*scopeDependent=*/nullptr, &upCastDetails);
-          if (succeeded(upCastable) && upCastable->isTrue())
+          FailureOr<ConstraintResult> upCastable =
+              IREmitter::canMetaTypeUpCastToWithDetails(
+                  shared, state.declScope.getLoc(), tightestBound, targetMT,
+                  &state.declScope, /*scopeDependent=*/nullptr);
+          if (succeeded(upCastable) && upCastable->isYes())
             return true;
+          if (succeeded(upCastable))
+            upCastFailure = std::move(*upCastable);
 
           if (!assumptions.empty()) {
             if (auto targetTrait = dyn_cast<TraitType>(targetMT)) {
@@ -881,7 +885,7 @@ LogicalResult ParamMatcher::matchParams(TypedAttr actualAttr,
         if (auto ire = dyn_cast<ParamIndexRefAttr>(expectedAttr)) {
           return error(MatchFailure::TypeConflict{
               ire.getIndex(), expectedAttr.getType(), actualAttr.getType(),
-              /*constraintFailure=*/std::move(upCastDetails)});
+              /*upCastFailure=*/std::move(upCastFailure)});
         }
         return error(MatchFailure::Unclassified{});
       }
@@ -1234,14 +1238,14 @@ LogicalResult ParamMatcher::matchSingleEltStruct(TypedAttr actualOrig,
           ASTType(expDRT).getWithUnknownParametersReplaced(shared);
       CallOperands ctorOperands(CallSyntax::kImplicitConvert, expr,
                                 EC_TypeParamValue, {{actual, expr}});
-      FailureOr<PValue> pValue = OverloadSet::canConstructType(
+      FailureOr<CalleeResult> pValue = OverloadSet::canConstructType(
           nonParamDRT, ctorOperands, state.declScope);
-      if (failed(pValue) || !pValue.value())
+      if (failed(pValue) || !pValue->isYes())
         return error(MatchFailure::Unclassified{});
 
       // If we succeeded, figure out what the concrete type being inferred would
       // be with any parameters bound.
-      auto initSig = sugarCast<FnTypeGeneratorType>(pValue.value().getType());
+      auto initSig = sugarCast<FnTypeGeneratorType>(pValue->getYes().getType());
       // The constructed type is the result of the initializer.
       assert(initSig.getNumArguments() != 0);
       expDRT = sugarCast<LIT::StructType>(initSig.getUserResultType());

@@ -1540,14 +1540,14 @@ struct TileWriter[
             var casted = frags.cast[Self.epilogue_dtype]()
 
             var upper_frag_casted = Array[_, Self.rep_frag_size](
-                fill_with=lambda (_i: Int) -> Scalar[
+                fill_with_unrolled=lambda [i: Int]() -> Scalar[
                     Self.epilogue_dtype
-                ]: casted.upper[_i]
+                ]: casted.upper[i]
             )
             var lower_frag_casted = Array[_, Self.rep_frag_size](
-                fill_with=lambda (_i: Int) -> Scalar[
+                fill_with_unrolled=lambda [i: Int]() -> Scalar[
                     Self.epilogue_dtype
-                ]: casted.lower[_i]
+                ]: casted.lower[i]
             )
 
             comptime if stage == Self.num_stages - 1:

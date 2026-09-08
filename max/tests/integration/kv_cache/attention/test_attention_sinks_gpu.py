@@ -25,8 +25,7 @@ from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.attention import MHAMaskVariant
 from max.nn.kernels import flash_attention_ragged
 from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
 def max_flash_attention_with_sinks(
@@ -73,24 +72,13 @@ def max_flash_attention_with_sinks(
         devices=[DeviceRef.GPU()],
     )
 
-    # Create KV manager
-    kv_manager = PagedKVCacheManager(
-        params=kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
+    prompt_lens = [
+        int(input_row_offsets[i + 1] - input_row_offsets[i])
+        for i in range(batch_size)
+    ]
+    kv_cache_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
     )
-
-    # Create contexts for KV cache
-    batch = []
-    for i in range(batch_size):
-        seq_len = input_row_offsets[i + 1] - input_row_offsets[i]
-        context = create_text_context(np.empty(seq_len))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
-    kv_cache_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
 
     # Define graph input types
     input_type = TensorType(

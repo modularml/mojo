@@ -2107,10 +2107,17 @@ async def openai_create_chat_completion(
         stream_options = None
         if completion_request.stream:
             stream_options = completion_request.stream_options
-        # Parse tool calls when tools are provided. With combined grammar support,
-        # the model can output either tool calls or structured content. The parser
-        # will detect which format was used and handle accordingly.
-        parse_tool_calls = tools is not None
+        # Parse tool calls when tools are provided. With combined grammar
+        # support, the model can output either tool calls or structured
+        # content, and the parser detects which format was used. MiniMax M3
+        # (identified by its tool parser) also parses a request that declares
+        # no ``tools``, because its inventory can be established by the
+        # conversation history alone; other models are unaffected.
+        # ``tool_choice="none"`` (which clears ``tools``) opts out.
+        parse_tool_calls = (
+            tools is not None
+            or pipeline_config.runtime.tool_parser == "minimax_m3"
+        ) and completion_request.tool_choice != "none"
         # MiniMax ``reasoning_split=False`` folds reasoning back into the
         # ``content`` field wrapped in ``<think>...</think>``. Gated to MiniMax
         # M3 (identified by its reasoning parser) so other models are unaffected.

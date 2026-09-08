@@ -210,7 +210,7 @@ literals — one can use `Int` and `42`.
 
 It is not recommended to use the real standard library in Mojo language or
 compiler tests. Standard library itself is tested separately in
-`oss/modular/mojo/stdlib/test`.
+`Mojo/stdlib/test`.
 
 Tests should be self-contained and only depend on themselves and the
 test-packages stubs.

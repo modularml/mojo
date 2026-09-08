@@ -56,7 +56,9 @@ from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.memory import bitcast
 from layout import (
     ComptimeInt,
+    DefaultEngine,
     RowMajorLayout,
+    TensorEngine,
     TileTensor,
     row_major,
     stack_allocation as tt_stack_allocation,
@@ -124,6 +126,7 @@ struct MLA_SM100_Decode_Sparse[
     has_attn_sink: Bool = False,
     has_extra_kv: Bool = False,
     has_variable_topk: Bool = False,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](TrivialRegisterPassable):
     """Sparse MLA decoding kernel for SM100 with FP8 KV cache and gather4 TMA.
 
@@ -157,6 +160,8 @@ struct MLA_SM100_Decode_Sparse[
             always-attend tokens (defaults to `False`).
         has_variable_topk: Whether the sparse top-k length varies per
             batch, read from `topk_lengths` (defaults to `False`).
+        Engine: Engine policy of the `scalar_args` tile operand
+            (defaults to `DefaultEngine[element_width=1]`).
     """
 
     comptime kv_type = Self.KVLUTType.dtype
@@ -426,7 +431,10 @@ struct MLA_SM100_Decode_Sparse[
             UnsafePointer[Float32, origin=MutAnyOrigin]
         ],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # SlidingWindowCausalMask is supported ONLY by the native FP8 backend

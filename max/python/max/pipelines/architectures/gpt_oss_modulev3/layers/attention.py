@@ -25,15 +25,13 @@ from max.experimental.nn.common_layers.functional_kernels import (
     flash_attention_ragged,
     rope_split_store_ragged,
 )
+from max.experimental.nn.common_layers.kv_cache import PagedCacheValues
 from max.experimental.nn.common_layers.rotary_embedding import (
     YarnRotaryEmbedding,
 )
 from max.experimental.tensor import Tensor
 from max.nn.attention import MHAMaskVariant
-from max.nn.kv_cache import (
-    KVCacheParams,
-    PagedCacheValues,
-)
+from max.nn.kv_cache import KVCacheParams
 
 
 class GptOssAttention(Module[..., Tensor]):
@@ -71,7 +69,8 @@ class GptOssAttention(Module[..., Tensor]):
             hidden_size: The dimension of the hidden states.
             kv_params: KV Cache Params, including the number of kv heads, the
                 head dim, and data type.
-            layer_idx: The layer number associated with this Attention block.
+            layer_idx: Index of this layer within its KV group (not the
+                global decoder index).
             linear_cls: Linear class to use for the outputs dense layer.
             scale: Value used to scale the results of the attention output.
             has_bias: Whether to use an attention bias. Defaults to False.

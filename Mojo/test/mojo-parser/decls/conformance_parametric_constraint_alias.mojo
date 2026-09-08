@@ -11,8 +11,9 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# Witness selection against a parametric trait-alias bound, and against a
-# same-named method that stays partially bound.
+# Discharging parametric `where` clauses: witness selection against a
+# trait-alias bound and against a same-named method that stays partially bound,
+# and a clause that can be neither proven nor refuted at a conversion site.
 
 # RUN: %parse-mojo-isolated -verify-diagnostics %s
 
@@ -88,3 +89,30 @@ struct ConditionalGreeter[T: Movable](
 ):
     def greet(self) -> Int where conforms_to(Self.T, Copyable):
         return 1
+
+
+# An `@implicit` constructor whose `where` clause is unprovable in the calling
+# scope leaves the conversion undecided rather than impossible. Recording that
+# as a definitive "not convertible" for the `(Int, Constrained[m])` pair
+# poisons the query below, which asks about the same pair from a scope that can
+# prove the clause.
+struct Constrained[n: Int]:
+    var v: Int
+
+    @implicit
+    def __init__(out self, x: Int) where Self.n > 0:
+        self.v = x
+
+
+# expected-note @below {{function declared here}}
+def takes_constrained[n: Int](imm s: Constrained[n]):
+    pass
+
+
+def unprovable_at_call[m: Int]():
+    # expected-error @below {{invalid call to 'takes_constrained': value passed to 's' cannot be converted from 'Int' to 'Constrained[m]'}}
+    takes_constrained[m](Int(1))
+
+
+def provable_at_call[m: Int]() where m > 0:
+    takes_constrained[m](Int(1))

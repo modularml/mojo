@@ -280,6 +280,16 @@ bool ASTDecl::hasRecursivelyStableName(StringAttr name) const {
   return false;
 }
 
+void ASTDecl::addDocInlineName(StringAttr name) {
+  if (!docInlineNames)
+    docInlineNames = std::make_unique<llvm::DenseSet<StringAttr>>();
+  docInlineNames->insert(name);
+}
+
+bool ASTDecl::isDocInlineName(StringAttr name) const {
+  return docInlineNames && docInlineNames->contains(name);
+}
+
 bool ASTDecl::hasRecursivelyStableType(const ASTDecl *typeDecl) const {
   if (!typeDecl)
     return false;

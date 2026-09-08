@@ -288,7 +288,9 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
     # ... plus rope scaling params, multipliers, devices, quantization ...
 
     @classmethod
-    def initialize_from_config(cls, pipeline_config, huggingface_config, model_config=None):
+    def initialize_from_config(
+        cls, pipeline_config, huggingface_config, model_config=None, *, max_seq_len
+    ):
         return cls(
             hidden_size=huggingface_config.hidden_size,
             num_attention_heads=huggingface_config.num_attention_heads,
@@ -297,8 +299,9 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             intermediate_size=huggingface_config.intermediate_size,
             vocab_size=huggingface_config.vocab_size,
             rope_theta=get_rope_theta(huggingface_config),
-            # max_seq_len is clamped, not copied; dtype comes from the encoding.
-            max_seq_len=Llama3Config.calculate_max_seq_len(pipeline_config, huggingface_config),
+            # max_seq_len is received, not derived here: the caller already
+            # resolved and clamped it before construction.
+            max_seq_len=max_seq_len,
             dtype=supported_encoding_dtype(pipeline_config.model.quantization_encoding),
             # ... remaining fields ...
         )

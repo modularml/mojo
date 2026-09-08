@@ -57,6 +57,7 @@ class _CountingConnector:
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
         return CompletedTransfer.load()
 

@@ -125,7 +125,6 @@ CUSTOM_MODELS: Mapping[str, set[str]] = {
     "microsoft/Phi-3.5-mini-instruct__modulev3": MULTI,
     "microsoft/phi-4__modulev3": MULTI,
     "deepseek-ai/DeepSeek-V2-Lite-Chat__modulev3": MULTI,
-    "deepseek-ai/DeepSeek-V3.1-Terminus__modulev3": NON_XL | AMD_XL,
     "nvidia/DeepSeek-V3.1-NVFP4__fp8kv": NON_XL | AMD_XL,
     "nvidia/DeepSeek-V3.1-NVFP4__tpep": NON_XL | AMD_XL,
     "nvidia/DeepSeek-V3.1-NVFP4__tpep_ar": NON_XL | AMD_XL,
@@ -135,6 +134,9 @@ CUSTOM_MODELS: Mapping[str, set[str]] = {
     "meta-llama/Llama-3.1-8B-Instruct__dflash": MULTI,
     "nvidia/DeepSeek-V3.1-NVFP4__mtp": NON_XL | AMD_XL,
     "nvidia/DeepSeek-V3.1-NVFP4__mtp_tpep": NON_XL | AMD_XL,
+    # The experimental_device_graph_synthesis flag is not in a released MAX yet, so
+    # max-ci only. Synthesis is single-device (first cut), hence MULTI.
+    "google/gemma-4-12B-it__device_graph_synthesis": MULTI | {"max"},
     # DSpark arch is not in a released MAX yet, so max-ci only.
     "google/gemma-4-12B-it__dspark": MULTI | {"max"},
     # Tuned recipes use an FP8 KV cache that does not support MI355.
@@ -142,11 +144,10 @@ CUSTOM_MODELS: Mapping[str, set[str]] = {
     "google/gemma-4-31B-it__tuned": MULTI | {"MI355"},
     "nvidia/Gemma-4-26B-A4B-NVFP4__tuned": MULTI | {"MI355"},
     "nvidia/Gemma-4-31B-IT-NVFP4__tuned": MULTI | {"MI355"},
+    "nvidia/Kimi-K2.7-Code-NVFP4__modulev3": NON_XL | AMD_XL,
     "meta-llama/Llama-3.1-8B-Instruct__rust_tiered_kvconnector": MULTI | {"MI355"},
     "nvidia/GLM-5.2-NVFP4__mtp_tpep": NON_XL | AMD_XL,
-    # Jenga requires data_parallel_degree=1 and doesn't support KVConnector /
-    # disaggregated serving yet, so it can't run on multi-GPU runners.
-    "google/gemma-4-31B-it__jenga": MULTI,
+    "RadixArk/GLM-5.3-NVFP4__mtp_tpep": NON_XL | AMD_XL,
     "thinkingmachines/Inkling-Small-NVFP4__mtp": B200_2X_ONLY,
     "MiniMaxAI/MiniMax-M3-MXFP8__mtp": B200_8X_ONLY | {"max"},
 }
@@ -158,6 +159,46 @@ PRIVATE_RECIPE_MODELS = frozenset({"MiniMaxAI/MiniMax-M3-MXFP8__mtp"})
 
 MODELS: Mapping[str, set[str]] = {**HF_MODELS, **CUSTOM_MODELS}
 # fmt: on
+
+NIGHTLY_MODELS = frozenset(
+    {
+        "google/diffusiongemma-26B-A4B-it",
+        "google/gemma-4-12B-it__dspark",
+        "google/gemma-4-26B-A4B-it",
+        "google/gemma-4-26B-A4B-it__tuned",
+        "google/gemma-4-31B-it",
+        "google/gemma-4-31B-it__tuned",
+        "nvidia/Gemma-4-26B-A4B-NVFP4",
+        "nvidia/Gemma-4-26B-A4B-NVFP4__tuned",
+        "nvidia/Gemma-4-31B-IT-NVFP4",
+        "nvidia/Gemma-4-31B-IT-NVFP4__tuned",
+        "nvidia/diffusiongemma-26B-A4B-it-NVFP4",
+        "MiniMaxAI/MiniMax-M3-MXFP8",
+        "MiniMaxAI/MiniMax-M3-MXFP8__mtp",
+        "amd/MiniMax-M3-MXFP4",
+        "modularai/MiniMax-M3-MXFP6",
+        "nvidia/GLM-5.2-NVFP4__mtp_tpep",
+        "amd/Kimi-K2.7-Code-MXFP4",
+        "nvidia/Kimi-K2.7-Code-NVFP4",
+    }
+)
+
+TIERS = ("nightly", "all")
+
+
+def tier_models(tier: str) -> list[str]:
+    """Lists the models a tier schedules, before framework/GPU exclusions.
+
+    Args:
+        tier: Either ``"nightly"`` for the deployed families or ``"all"`` for
+            every entry in ``MODELS``.
+
+    Returns:
+        The model keys the tier covers.
+    """
+    if tier == "all":
+        return list(MODELS)
+    return [model for model in MODELS if model in NIGHTLY_MODELS]
 
 
 def excluded(framework: str, gpu: str, model: str) -> bool:
@@ -190,6 +231,13 @@ def parse_override(raw: str | None) -> list[str]:
     default=None,
     help="Comma list of models; skips exclusions.",
 )
+@click.option(
+    "--tier",
+    type=click.Choice(TIERS),
+    default="all",
+    show_default=True,
+    help="Model set: 'nightly' for the deployed families, 'all' for every model.",
+)
 @click.option("--run-on-b200", is_flag=True)
 @click.option("--run-on-mi355", is_flag=True)
 @click.option("--run-on-2xb200", is_flag=True)
@@ -200,6 +248,7 @@ def parse_override(raw: str | None) -> list[str]:
 def main(
     framework: str,
     models_override: str | None,
+    tier: str,
     run_on_b200: bool,
     run_on_mi355: bool,
     run_on_2xb200: bool,
@@ -218,7 +267,7 @@ def main(
         "8xMI355": run_on_8xmi355,
     }
     gpus = [gpu for gpu, ok in flags.items() if ok]
-    models = parse_override(models_override) or list(MODELS)
+    models = parse_override(models_override) or tier_models(tier)
     ignore_exclusions = models_override is not None
 
     job = []

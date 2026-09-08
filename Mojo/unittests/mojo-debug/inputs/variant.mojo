@@ -16,7 +16,7 @@ from std.utils import Variant
 
 
 # Compile-time guard: the LLDB Variant formatter
-# (KGEN/lib/MojoLLDB/Language/Formatters/MojoVariantTypeFormatter.cpp) reads
+# (Mojo/lib/MojoLLDB/Language/Formatters/MojoVariantTypeFormatter.cpp) reads
 # `String`'s three header words positionally when `String` is the active
 # arm, because the lowered `!kgen.struct<(pointer, index, index) memoryOnly>`
 # shape loses LIT field names. If the stdlib `String` layout changes in a

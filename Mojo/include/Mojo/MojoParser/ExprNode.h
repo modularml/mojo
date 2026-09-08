@@ -136,6 +136,7 @@ public:
     kPow,
     kWalrus,      // x := y aka walrus
     kTypePattern, // x: Int   (Used in assignment statements).
+    kAsPat,       // x as y   (match patterns)
 
     // Assignment and Inplace operators.
     kAssign, // x = y aka assignment_expression
@@ -204,6 +205,20 @@ public:
   /// of __next__ into the pattern (a, b).
   virtual llvm::LogicalResult emitDestructuringPValue(PValue value,
                                                       IREmitter &emitter) const;
+
+  /// Emit this expression as a match pattern against `subject`.
+  ///
+  /// On success, returns a boolean CValue that is true when the subject
+  /// matches this pattern (and any bindings introduced by the pattern have
+  /// been declared in the current scope). The default implementation rejects
+  /// the expression as an invalid pattern.
+  ///
+  /// `patternKind` is the enclosing `var`/`ref` binding mode for this pattern
+  /// (or `kNone` when none applies). Unary `var`/`ref` patterns update it and
+  /// pass it down to their subpattern; binding sites such as identifiers
+  /// consume it to decide how to declare.
+  virtual CValue emitMatch(IREmitter &emitter, CValue subject,
+                           PatternDeclKind patternKind) const;
 
   /// Emit this expression to MLIR, returning a (possibly null!) AnyValue.  The
   /// ExprDest indicates information about where to emit the expression result

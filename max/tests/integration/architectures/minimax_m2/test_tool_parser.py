@@ -1015,3 +1015,23 @@ def test_generate_tool_call_grammar_rejects_non_xgrammar_backend() -> None:
             tools=_tools("get_weather"),
             backend="some_other_backend",
         )
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string"},
+        {"type": "number"},
+        {"type": "boolean"},
+        {"const": 2},
+        {"enum": [0]},
+    ],
+)
+def test_non_object_root_raises(schema: dict[str, Any]) -> None:
+    """A bare non-object ``parameters`` root raises at grammar compile time."""
+    grammar = MinimaxM2ToolParser.generate_tool_call_grammar(
+        tools=_tools_with_schemas({"f": schema}),
+        tool_choice="required",
+    )
+    with pytest.raises(Exception):
+        _compile_structural_tag(grammar)

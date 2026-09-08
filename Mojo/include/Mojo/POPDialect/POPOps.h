@@ -23,6 +23,7 @@
 #include "Mojo/KGENDialect/UnifiedFolding.h"
 #include "Mojo/POPDialect/POPAttrs.h"
 #include "Mojo/POPDialect/POPEnums.h"
+#include "Mojo/POPDialect/POPInterfaces.h"
 #include "Support/LLVMCompilerForwardDecls.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/OpImplementation.h"

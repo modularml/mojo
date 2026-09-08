@@ -1,0 +1,297 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# SM100 FP8 indexer prefill scorer at GLM-5.2 shapes. `num_heads`/`depth`/
+# `page_size` are the only compile-time parameters and are identical in every
+# group, so the whole file builds once and every shape below is argv.
+#
+# Usage:
+#   kbench bench_fp8_index_prefill.yaml
+#   kbench bench_fp8_index_prefill.yaml --filter label=decode
+#   kbench bench_fp8_index_prefill.yaml --filter label=decode \
+#       --profile ncu-single --set full --param run_benchmark:False
+#
+# A `--profile` run drops shared-library mode, so runtime params reach the
+# binary on argv and `run_benchmark:False` leaves ncu a single launch to replay.
+#
+# `$label` names the group a row came from; it reaches the benchmark name and
+# nothing branches on it.
+
+name: bench_fp8_index_prefill
+file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_fp8_index_prefill.mojo
+
+params:
+
+# label=prefill -- every cell lands on the default 4-token MMA_N=128 tile (no
+# seq_len here is divisible by the alternate tile's 3), so a change meant to
+# touch only the speculative width must read 1.000 across this group. That
+# makes it the negative control for every `decode` result. The shapes are
+# irregular, so each is its own entry.
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: prefill
+  $spread: 0
+  $batch_size: 1
+  $seq_len: 2048
+  $cache_len: 0
+  $max_num_keys: 2048
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: prefill
+  $spread: 0
+  $batch_size: 1
+  $seq_len: 2048
+  $cache_len: 8192
+  $max_num_keys: 10240
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: prefill
+  $spread: 0
+  $batch_size: 1
+  $seq_len: 8192
+  $cache_len: 0
+  $max_num_keys: 8192
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: prefill
+  $spread: 0
+  $batch_size: 4
+  $seq_len: 512
+  $cache_len: 0
+  $max_num_keys: 512
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: prefill
+  $spread: 0
+  $batch_size: 4
+  $seq_len: 1024
+  $cache_len: 4096
+  $max_num_keys: 5120
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: prefill
+  $spread: 0
+  $batch_size: 8
+  $seq_len: 512
+  $cache_len: 2048
+  $max_num_keys: 2560
+
+# label=decode -- a 6-token speculative step over a deep cache, which routes to
+# the 3-token / 96-column alternate tile. `max_num_keys` clears
+# `_KEYSPLIT_MIN_KEY_TILES` (64 tiles = 8192) in every cell, without which the
+# route never opens. The two 8192-key cells at batch 1 and 8 sit on the ~6.2 us
+# launch floor and cannot move; quote a geomean over the other five, or over all
+# seven as the conservative figure.
+#
+# `max_num_keys == cache_len + seq_len` throughout, so batch is the only free
+# axis and each cache depth is one entry.
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: decode
+  $spread: 0
+  $seq_len: 6
+  $cache_len: 8192
+  $max_num_keys: 8198
+  $batch_size: [1, 8, 32, 148]
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: decode
+  $spread: 0
+  $seq_len: 6
+  $cache_len: 32768
+  $max_num_keys: 32774
+  $batch_size: [8, 32]
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: decode
+  $spread: 0
+  $seq_len: 6
+  $cache_len: 131072
+  $max_num_keys: 131078
+  $batch_size: [8]
+
+# label=ragged_decode -- each mean depth is run at three spreads with spread 0
+# the uniform twin, so every triple is its own control: equal total key work,
+# only the distribution differs. `max_num_keys` is sized for the DEEPEST entry,
+# which is what makes the launcher's key-part grid a batch-maximum quantity.
+#
+# `max_num_keys` and `spread` co-vary, so they pair one per entry; batch is the
+# free axis within a cache depth.
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_decode
+  $seq_len: 6
+  $cache_len: 32768
+  $spread: 0
+  $max_num_keys: 32774
+  $batch_size: [8, 32]
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_decode
+  $seq_len: 6
+  $cache_len: 32768
+  $spread: 50
+  $max_num_keys: 49158
+  $batch_size: [8, 32]
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_decode
+  $seq_len: 6
+  $cache_len: 32768
+  $spread: 90
+  $max_num_keys: 62265
+  $batch_size: [8, 32]
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_decode
+  $seq_len: 6
+  $cache_len: 8192
+  $spread: 0
+  $max_num_keys: 8198
+  $batch_size: [148]
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_decode
+  $seq_len: 6
+  $cache_len: 8192
+  $spread: 50
+  $max_num_keys: 12294
+  $batch_size: [148]
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_decode
+  $seq_len: 6
+  $cache_len: 8192
+  $spread: 90
+  $max_num_keys: 15570
+  $batch_size: [148]
+
+# label=ragged_prefill -- the same three-spread control structure at prefill
+# widths. Every field co-varies across the triples, so each cell is its own
+# entry.
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 8
+  $seq_len: 512
+  $cache_len: 2048
+  $spread: 0
+  $max_num_keys: 2560
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 8
+  $seq_len: 512
+  $cache_len: 2048
+  $spread: 50
+  $max_num_keys: 3584
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 8
+  $seq_len: 512
+  $cache_len: 2048
+  $spread: 90
+  $max_num_keys: 4403
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 4
+  $seq_len: 1024
+  $cache_len: 4096
+  $spread: 0
+  $max_num_keys: 5120
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 4
+  $seq_len: 1024
+  $cache_len: 4096
+  $spread: 50
+  $max_num_keys: 7168
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 4
+  $seq_len: 1024
+  $cache_len: 4096
+  $spread: 90
+  $max_num_keys: 8806
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 4
+  $seq_len: 2048
+  $cache_len: 8192
+  $spread: 0
+  $max_num_keys: 10240
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 4
+  $seq_len: 2048
+  $cache_len: 8192
+  $spread: 50
+  $max_num_keys: 14336
+
+- num_heads: 32
+  depth: 128
+  page_size: 128
+  $label: ragged_prefill
+  $batch_size: 4
+  $seq_len: 2048
+  $cache_len: 8192
+  $spread: 90
+  $max_num_keys: 17612

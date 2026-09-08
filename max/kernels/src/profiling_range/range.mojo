@@ -13,7 +13,7 @@
 """Mojo `Range` context manager for libkineto activity spans.
 
 `Range` wraps the `KGEN_CompilerRT_Range{Begin,End,IsEnabled}` FFI bridge from
-`KGEN/lib/CompilerRT/RangeBridge.cpp`. Use it as a context manager to emit a
+`Mojo/lib/CompilerRT/RangeBridge.cpp`. Use it as a context manager to emit a
 libkineto activity span: `__enter__` opens the span and `__exit__` closes it.
 
 `Range` mirrors `max.runtime.tracing.Trace`: the span is opened in `__enter__`

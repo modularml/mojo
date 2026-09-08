@@ -71,9 +71,9 @@ def test_from_numpy_non_contiguous_raises() raises:
 
 
 def test_to_numpy_contiguous() raises:
-    var storage = Array[Float32, 6](uninitialized=True)
-    for i in range(6):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, 6](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     var tensor = TileTensor(Span(storage), row_major(Coord(Idx[2], Idx[3])))
     var array = to_numpy(tensor)
 
@@ -87,9 +87,9 @@ def test_to_numpy_contiguous() raises:
 
 
 def test_to_numpy_is_independent() raises:
-    var storage = Array[Float32, 4](uninitialized=True)
-    for i in range(4):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, 4](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     var tensor = TileTensor(Span(storage), row_major(Coord(Idx[2], Idx[2])))
     var array = to_numpy(tensor)
     storage[0] = 99.0
@@ -99,9 +99,9 @@ def test_to_numpy_is_independent() raises:
 def test_to_numpy_gathers_non_contiguous() raises:
     # A tile has the parent's strides, so it is not row-major contiguous and
     # must be gathered element by element.
-    var storage = Array[Float32, 24](uninitialized=True)
-    for i in range(24):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, 24](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     var tensor = TileTensor(
         Span(storage), row_major(Coord(Idx[2], Idx[3], Idx[4]))
     )

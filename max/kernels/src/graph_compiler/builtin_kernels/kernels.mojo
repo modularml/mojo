@@ -4345,6 +4345,7 @@ struct Mamba2SSDChunkScanVarlenFwdInplace[dt_softplus: Bool = True]:
                     query_start_loc_tt.LayoutType,
                     has_initial_state_tt.LayoutType,
                     cache_indices_tt.LayoutType,
+                    x_tt.Engine,
                     DSTATE_SPLIT,
                 ]
                 var compiled = ctx.compile_function[kernel]()
@@ -4799,10 +4800,12 @@ struct CausalConv1DVarlenFwd[
                     ]()
                     # Host-side safe upper bound on the per-sequence tile
                     # count, avoiding a host max-reduction over ragged
-                    # seqlens: `ceildiv(total_seqlen, TILE_SEQ)` covers the
-                    # tile count if all tokens were in one sequence, plus one
-                    # extra tile per sequence (`batch`) covers the remainder
-                    # from splitting total_seqlen across `batch` sequences.
+                    # seqlens: grid-z indexes each sequence's LOCAL tile, and
+                    # no sequence is longer than total_seqlen, so
+                    # `ceildiv(total_seqlen, TILE_SEQ)` bounds every
+                    # sequence's tile count (tile 0 stays alive for every
+                    # sequence, including empty ones, since the dispatcher
+                    # only reaches this kernel when total_seqlen > batch > 0).
                     # Blocks whose z-index exceeds a given sequence's actual
                     # tile count early-return inside the kernel.
                     gpu_ctx.enqueue_function(
@@ -4836,7 +4839,7 @@ struct CausalConv1DVarlenFwd[
                         grid_dim=(
                             batch,
                             ceildiv(dim, BLOCK_DIM),
-                            ceildiv(total_seqlen, TILE_SEQ) + batch,
+                            ceildiv(total_seqlen, TILE_SEQ),
                         ),
                         block_dim=(BLOCK_DIM, 1),
                     )
@@ -5250,12 +5253,13 @@ struct WaitHostValue:
     - `payload[1]`: the 64-bit value to wait for (the int64 element is
       reinterpreted as a u64).
 
-    Captures cleanly into a CUDA graph as a wait-value / batch-mem-op
+    Records into a captured device graph as a wait-value / batch-mem-op
     node, so this op can sit inside a captured forward graph just before
     the sampling kernel to gate the sampler on the bitmask compute
-    finishing while the rest of the forward body runs concurrently.
-    Currently only CUDA streams support stream memory ops; non-CUDA
-    backends raise at runtime.
+    finishing while the rest of the forward body runs concurrently. On
+    HIP that node is recorded explicitly by the driver layer, because
+    ROCm's stream capture does not record `hipStreamWaitValue64` itself.
+    Supported on CUDA and HIP streams; other backends raise at runtime.
     """
 
     @staticmethod

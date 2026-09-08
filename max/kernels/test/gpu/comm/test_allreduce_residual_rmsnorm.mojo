@@ -253,9 +253,11 @@ def test_fused_allreduce_rmsnorm_fp8[
     comptime InputTileType = TileTensor[
         in_dtype, type_of(in_layout), ImmutAnyOrigin
     ]
-    var in_tiles = Array[InputTileType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_tiles[i] = TileTensor(in_dev[i], in_layout).as_immut()
+    var in_tiles = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InputTileType: TileTensor(
+            in_dev[i], in_layout
+        ).as_immut()
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -459,9 +461,11 @@ def test_fused_allreduce_rmsnorm_noquant[
     comptime InputTileType = TileTensor[
         dtype, type_of(in_layout), ImmutAnyOrigin
     ]
-    var in_tiles = Array[InputTileType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_tiles[i] = TileTensor(in_dev[i], in_layout).as_immut()
+    var in_tiles = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InputTileType: TileTensor(
+            in_dev[i], in_layout
+        ).as_immut()
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -617,9 +621,11 @@ def test_fused_allreduce_residual_rmsnorm_fp8[
     comptime InputTileType = TileTensor[
         in_dtype, type_of(in_layout), ImmutAnyOrigin
     ]
-    var in_tiles = Array[InputTileType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_tiles[i] = TileTensor(in_dev[i], in_layout).as_immut()
+    var in_tiles = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InputTileType: TileTensor(
+            in_dev[i], in_layout
+        ).as_immut()
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
@@ -886,9 +892,11 @@ def test_fused_allreduce_residual_rmsnorm_noquant[
     comptime InputTileType = TileTensor[
         dtype, type_of(in_layout), ImmutAnyOrigin
     ]
-    var in_tiles = Array[InputTileType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_tiles[i] = TileTensor(in_dev[i], in_layout).as_immut()
+    var in_tiles = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InputTileType: TileTensor(
+            in_dev[i], in_layout
+        ).as_immut()
+    )
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 

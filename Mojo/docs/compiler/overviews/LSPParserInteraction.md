@@ -62,7 +62,7 @@ Key source files:
 ## The seam: `MojoParserContext`
 
 The boundary between the LSP and the parser is one class, `MojoParserContext`
-(`KGEN/lib/MojoTooling/`), the tooling-facing driver that owns parser state. The
+(`Mojo/lib/MojoTooling/`), the tooling-facing driver that owns parser state. The
 LSP holds one per open document and drives it.
 
 It is constructed inside `MojoDocument::Context`, which also wires the LSP's
@@ -220,7 +220,7 @@ over `resolve(decl, body|signature, loc)`.
 #### The regular path: `importMojoFile` -> `importMojoImpl`
 
 Goal: produce a complete, canonical, verified IR module for the compiler. Steps
-(`KGEN/lib/MojoParser/EntryPoint.cpp`, `importMojoImpl`):
+(`Mojo/lib/MojoParser/EntryPoint.cpp`, `importMojoImpl`):
 
 1. `resolveAllReferencedFrom(moduleDecl)` — two stages, both **full body**:
    - Stage 1: BFS `resolveBody` on all decls within the main module.
@@ -237,9 +237,9 @@ Goal: produce a complete, canonical, verified IR module for the compiler. Steps
 #### The LSP path: `parseFileForLSP`
 
 Goal: just enough resolved AST to answer editor queries, cheaply, tolerating
-broken code. Entire body (`KGEN/lib/MojoTooling/ParserDriver.cpp`):
+broken code. Entire body (`Mojo/lib/MojoTooling/ParserDriver.cpp`):
 
-```257:269:KGEN/lib/MojoTooling/ParserDriver.cpp
+```257:269:Mojo/lib/MojoTooling/ParserDriver.cpp
 MojoASTDeclRef MojoParserContext::parseFileForLSP(unsigned fileId) {
   ...
   ASTDecl *moduleDecl = buildModuleDecl(filepath, sourceBuf, impl->sharedState);
@@ -299,7 +299,7 @@ Because imported `FnOp` bodies are left as empty stubs, when the LSP later
 clones the module to run the "check" pipeline (`checkModuleSemantics`), it must
 mark those stubs `external` — a case the compiler path never hits, since it
 erases stubs before the pipeline (`cloneDeclModuleForCompilation` in
-`KGEN/lib/MojoParser/EntryPoint.cpp`, ~590–600).
+`Mojo/lib/MojoParser/EntryPoint.cpp`, ~590–600).
 
 ### Sink 1: the `SymbolIndex` (write side)
 
@@ -315,7 +315,7 @@ This is the structural-facts sink of the generalized parse: the
 > are the specialized parses below.
 
 Files: `KGEN/tools/mojo-lsp-server/MojoServer.cpp` (`LSPParserListener`,
-`SymbolIndex`, `Symbol`, `SymbolRef`), `KGEN/lib/MojoParser/SharedState.cpp`
+`SymbolIndex`, `Symbol`, `SymbolRef`), `Mojo/lib/MojoParser/SharedState.cpp`
 (the `notifyListenerOnXxx` methods).
 
 Key facts up front:
@@ -331,7 +331,7 @@ The parser never calls the LSP listener directly. It calls
 `SharedState::notifyListenerOnXxx(...)` at each resolution point, each gated by
 an interest check:
 
-```2280:2299:KGEN/lib/MojoParser/SharedState.cpp
+```2280:2299:Mojo/lib/MojoParser/SharedState.cpp
 static bool isListenerInterestedInLoc(ParserListener *listener, SMLoc loc) {
   return listener && listener->isInterestedInLoc(loc);
 }
@@ -401,7 +401,7 @@ reference is cheap:
 - **Detailed info** (signature snippet, argument list, docstring, markdown) is
   the "correct but slow path": built lazily via `declRef.getDecl()` (a full
   `PublicDecl` view) only when a feature needs it (e.g. hover). Both share
-  `getDeclImpl<ResultType>()` in `KGEN/lib/MojoTooling/MojoASTDeclRef.cpp`.
+  `getDeclImpl<ResultType>()` in `Mojo/lib/MojoTooling/MojoASTDeclRef.cpp`.
 - **Required at creation:** only a non-empty name (`registerSymbol` bails on an
   empty identifier). The kind is computed but cheap; the detailed view is never
   computed at creation.
@@ -591,7 +591,7 @@ void MojoDocument::checkModuleSemantics(MojoASTDeclRef decl) {
 
 #### The passes (`buildCheckLITPipeline`)
 
-```20:33:KGEN/lib/Compiler/Pipeline/Pipeline.cpp
+```20:33:Mojo/lib/Compiler/Pipeline/Pipeline.cpp
 void KGEN::buildCheckLITPipeline(mlir::PassManager &pm,
                                  const CompilationOptions &options) {
   // Lower semantic control flow operations like lit.return to terminators and
@@ -674,7 +674,7 @@ the listener, the location filter, the sink, and the context lifetime.
 ### Common shape
 
 All specialized parses (`codeComplete`, `signatureHelp`) share this shape, set
-up by `parseCompletionImpl` in `KGEN/lib/MojoTooling/CodeComplete.cpp`:
+up by `parseCompletionImpl` in `Mojo/lib/MojoTooling/CodeComplete.cpp`:
 
 1. **Throwaway context.** A fresh `SourceMgr` + `MLIRContext` +
    `MojoParserContext`, independent of the document's persistent `Context`,
@@ -692,7 +692,7 @@ up by `parseCompletionImpl` in `KGEN/lib/MojoTooling/CodeComplete.cpp`:
 
 ### `codeComplete`
 
-Files: `KGEN/lib/MojoTooling/CodeComplete.cpp`,
+Files: `Mojo/lib/MojoTooling/CodeComplete.cpp`,
 `MojoTextDocument::onCodeCompletionSyncImpl` in
 `KGEN/tools/mojo-lsp-server/MojoServer.cpp`.
 
@@ -743,7 +743,7 @@ The parser fires listener callbacks through `SharedState`, each gated by
 `isInterestedInLoc`. `CodeCompletionListener` returns true **only inside the
 completion range**:
 
-```96:98:KGEN/lib/MojoTooling/CodeComplete.cpp
+```96:98:Mojo/lib/MojoTooling/CodeComplete.cpp
   bool isInterestedInLoc(SMLoc parserLoc) override {
     return containsLoc(completionRange, parserLoc);
   }
@@ -802,7 +802,7 @@ pull each candidate module's doc string.
 
 ### `signatureHelp`
 
-Files: `KGEN/lib/MojoTooling/CodeComplete.cpp`,
+Files: `Mojo/lib/MojoTooling/CodeComplete.cpp`,
 `MojoTextDocument::onSignatureHelpSyncImpl` /
 `MojoDocument::onSignatureHelpSync` in
 `KGEN/tools/mojo-lsp-server/MojoServer.cpp`.
@@ -824,7 +824,7 @@ lists:
 The location filter is coarser than completion's: it filters to the whole
 completion **buffer**, then refines per-operand inside the hook.
 
-```249:253:KGEN/lib/MojoTooling/CodeComplete.cpp
+```249:253:Mojo/lib/MojoTooling/CodeComplete.cpp
   bool isInterestedInLoc(SMLoc loc) override {
     // Filter at a high level for locations in the completion buffer, we'll
     // filter further when examining calls.
@@ -896,7 +896,7 @@ per request, cursor-as-`isInterestedInLoc`-filter) is shared with
 
 ### Docstring code blocks: `parseREPLExpression` (the exception)
 
-Files: `KGEN/lib/MojoTooling/ParserDriverREPL.cpp`,
+Files: `Mojo/lib/MojoTooling/ParserDriverREPL.cpp`,
 `MojoDocStrings::addDocString` / `processDocStrings` in
 `KGEN/tools/mojo-lsp-server/MojoServer.cpp`.
 
@@ -929,7 +929,7 @@ and why `translateParserLoc` must map such locs back into the main file's
 docstring region (Divergence 3). These buffers accumulate for the document
 version's lifetime and are discarded when an edit builds a fresh `MojoDocument`.
 
-```456:471:KGEN/lib/MojoTooling/ParserDriverREPL.cpp
+```456:471:Mojo/lib/MojoTooling/ParserDriverREPL.cpp
   // Splat out the main body code inside of a nested def. This will allow for us
   // to redefine previous variables transparently.
   exprOS << "  var __mojo_repl_expr_failed = True\n"
@@ -980,7 +980,7 @@ as the main parse (`resolveForLSP` + `resolveSignaturesForLSP`). The non-LSP
 path (real REPL/notebook/LLDB) instead does full `resolveAllReferencedFrom`
 because it compiles and runs the wrapped code.
 
-```797:805:KGEN/lib/MojoTooling/ParserDriverREPL.cpp
+```797:805:Mojo/lib/MojoTooling/ParserDriverREPL.cpp
   if (parseForLSP) {
     resolveForLSP(*sharedState.declResolver, moduleDecl);
     if (!sharedState.diags.isErrorEmitted())
@@ -1052,7 +1052,7 @@ which persona overrides each. "Generalized" = the document parse's
 | `onCall`                               | a call is being resolved with operands          | SigHelp (no-op in Generalized)             |
 | `onParameterBinding`                   | parameters are being bound                      | SigHelp (no-op in Generalized)             |
 
-The base-class defaults are all no-ops (`KGEN/lib/MojoParser/EntryPoint.cpp`,
+The base-class defaults are all no-ops (`Mojo/lib/MojoParser/EntryPoint.cpp`,
 ~609–633), so any hook a given listener does not override simply does nothing
 for that parse. This is what makes the persona hook sets disjoint.
 
@@ -1103,7 +1103,7 @@ one-at-a-time, lock-free:
     previous.andThenAsync([doc = RCRef<MojoDocument>::copy(this),
                            fn = std::forward<FnT>(fn),
                            current = std::move(current)]() mutable {
-      fn(*doc);
+      def(*doc);
       std::move(current).emplace();
     });
   }

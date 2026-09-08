@@ -98,6 +98,10 @@ struct ParamRefRemapper : public IndexParameterReplacer<ParamRefRemapper> {
       parameters.push_back(p.getName());
   }
 
+  void appendParamDecl(ParamDeclAttr newDecl) {
+    parameters.push_back(newDecl.getName());
+  }
+
   Attribute tryReplace(Attribute attr, size_t depth) {
     auto indexRef = dyn_cast<ParamIndexRefAttr>(attr);
     if (!indexRef || indexRef.getDepth() != depth)

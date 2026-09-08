@@ -601,6 +601,33 @@ static void populateReplacer(StructDecls &decls, LowerLITReplacer &replacer,
       },
       TypeDomain::AsValue);
 
+  replacer.addInferredDomainNonRecursiveReplacement(
+      [&](TraitSymbolAttr attr) -> FailureOr<Attribute> {
+        if (attr.getSymbol().getLeafReference().strref().ends_with(
+                UNI_CLOSURE_TRAIT_NAME)) {
+          assert(attr.getParamValues().size() == 6);
+          SmallVector<TypedAttr> params;
+          for (auto param : attr.getParamValues()) {
+            if (isa<PogListAttr>(param)) // irrelevant after lower-lit
+              continue;
+            auto replaced = replacer.replaceParameter(param);
+            if (failed(replaced))
+              return failure();
+
+            // strip the origin metadata too.
+            if (auto meta = dyn_cast<FnMetadataAttr>(*replaced))
+              params.push_back(meta.getWithMetadata(nullptr));
+            else
+              params.push_back(*replaced);
+          }
+          return TraitSymbolAttr::get(attr.getSymbol(), params);
+        }
+
+        // It has to be a non-parametric trait for non-closures.
+        assert(attr.getParamValues().empty());
+        return attr;
+      });
+
   // Since lowerings have been generated for all struct types, we just need to
   // lookup the lowered type and substitute the parameters.
   // - For the AsType type domain, convert into a StructType.

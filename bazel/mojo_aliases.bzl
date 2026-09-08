@@ -1,14 +1,14 @@
-"""Aliases for mojo packages."""
+"""Aliases for Mojo packages."""
 
 _PACKAGES = {
-    "std": "mojo/stdlib/std",
-    "python": "mojo/python/mojo",
-    "test_utils": "mojo/stdlib/test/test_utils",
+    "std": "Mojo/stdlib/std",
+    "python": "Mojo/python/mojo",
+    "test_utils": "Mojo/stdlib/test/test_utils",
 }
 
 _EXTRA_ALIASES = {
-    "__init__.mojo": "mojo/stdlib/std:__init__.mojo",
-    "std_srcs": "mojo/stdlib/std:std_srcs",
+    "__init__.mojo": "Mojo/stdlib/std:__init__.mojo",
+    "std_srcs": "Mojo/stdlib/std:std_srcs",
 }
 
 _MAX_PACKAGES = {
@@ -58,7 +58,7 @@ def _mojo_aliases_impl(rctx):
         if override:
             actual = override
         else:
-            actual = "\"@//" + rctx.attr.prefix + target + "\""
+            actual = "\"@//" + target + "\""
         alias_rules.append("""
 alias(
     name = "{name}",
@@ -131,10 +131,6 @@ def max_aliases():
 mojo_aliases = repository_rule(
     implementation = _mojo_aliases_impl,
     attrs = {
-        "prefix": attr.string(
-            doc = "The prefix of the modular/modular repo root",
-            default = "",
-        ),
         "overrides": attr.string_dict(
             doc = "Override certain aliases to other targets.",
             default = {},

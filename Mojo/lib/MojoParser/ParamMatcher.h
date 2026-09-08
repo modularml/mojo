@@ -41,8 +41,9 @@ struct MatchFailure {
   struct TypeConflict {
     size_t paramIdx; // TODO: Render this name.
     ASTType paramType, argParamType;
-    /// From the upcast check that rejected this match, if any.
-    ConstraintFailure constraintFailure;
+    /// From the upcast check that rejected this match, absent when no upcast
+    /// was tried or it had nothing to report.
+    std::optional<ConstraintResult> upCastFailure;
   };
 
   /// This failure happens when a parameter is inferred to two different values.

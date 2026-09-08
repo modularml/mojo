@@ -301,8 +301,10 @@ extractChildDecls(const ASTDecl &decl,
       if (!childOp || shouldHideDeclInDocGen(*child, name))
         continue;
 
-      // Skip declarations that were imported from other scopes.
-      if (child->getParentDecl() != &decl || !seenOps.insert(childOp).second)
+      // Skip declarations that were imported from other scopes, unless the
+      // import asked for the target's documentation to appear here.
+      if ((child->getParentDecl() != &decl && !decl.isDocInlineName(name)) ||
+          !seenOps.insert(childOp).second)
         continue;
       // Skip synthetic declarations that don't have accompanying documentation
       // generated with them.
@@ -1069,6 +1071,24 @@ PublicFunctionDecl::PublicFunctionDecl(MojoASTDeclRef declRef,
                     signature.getUserResultType());
 }
 
+/// Return the decl for the trait default that `decl` inherits, or `decl` itself
+/// if it is not an inherited default.
+static ASTDecl *findDefaultImplDecl(SharedState &shared, ASTDecl *decl) {
+  auto fnOp = dyn_cast_or_null<FnOp>(decl->getIfOperation());
+  if (!fnOp)
+    return decl;
+
+  std::optional<SymbolRefAttr> defaultFn = fnOp.getDefaultFnRef();
+  if (!defaultFn)
+    return decl;
+
+  // Trait defaults reached through a bytecode package are resolved on demand,
+  // so this can be the reference that first loads one.
+  ASTDecl *defaultImpl =
+      shared.resolveAndGetFuncDecl(*defaultFn, decl->getLoc());
+  return defaultImpl ? defaultImpl : decl;
+}
+
 void PublicFunctionDecl::initFromSignature(MojoASTDeclRef declRef,
                                            FnTypeGeneratorType signature,
                                            ArrayRef<Type> userArgTypes,
@@ -1126,7 +1146,10 @@ void PublicFunctionDecl::initFromSignature(MojoASTDeclRef declRef,
     returnType = str;
   }
 
-  if (auto docStr = declRef->getParsedDocString()) {
+  // An inherited default is a copy that cannot carry a doc string of its own,
+  // so its documentation comes from the trait method that declares it.
+  if (auto docStr =
+          findDefaultImplDecl(shared, &*declRef)->getParsedDocString()) {
     summary = docStr->getSummary();
     augmentWithDocumentation(docStr->getDescription());
   }

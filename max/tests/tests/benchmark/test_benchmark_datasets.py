@@ -1082,10 +1082,8 @@ def test_chat_judge_gen_chat_sessions_no_delay_by_default(
     assert all(m.delay_until_next_message is None for m in session.messages)
 
 
-def test_pool_wraps_with_pass_marker_when_exhausted() -> None:
-    """When planned turns exceed the pool, the iterator wraps and each new
-    pass prepends a ``[N] `` marker to the user body so cycled prompts stay
-    cache-distinct while still satisfying ``num_sessions``."""
+def test_every_user_body_is_marked_distinct() -> None:
+    """Every body carries its own ``[N] `` marker, wrap or no wrap."""
     tok = _FakeTokenizer(model_max_length=50_000)
     pool_texts = ["alpha body text", "beta body text", "gamma body text"]
     num_sessions = 5
@@ -1115,19 +1113,10 @@ def test_pool_wraps_with_pass_marker_when_exhausted() -> None:
 
     assert len(user_contents) == num_sessions * turns_per_session
 
-    # First pass through the pool: no marker.
-    for content in user_contents[: len(pool_texts)]:
-        assert not content.startswith("["), (
-            f"first-pass content should have no marker, got: {content!r}"
-        )
-
-    # Subsequent turns are stamped with their pass number.
-    expected_prefixes = ["[1] ", "[1] ", "[1] ", "[2] ", "[2] ", "[2] ", "[3] "]
-    for content, prefix in zip(
-        user_contents[len(pool_texts) :], expected_prefixes, strict=False
-    ):
-        assert content.startswith(prefix), (
-            f"expected {prefix!r} prefix, got: {content!r}"
+    # Numbered from the first body, monotonically, across the whole run.
+    for index, content in enumerate(user_contents):
+        assert content.startswith(f"[{index}] "), (
+            f"expected '[{index}] ' prefix, got: {content!r}"
         )
 
     # Marker token budget reservation keeps on-the-wire length close to target.
@@ -1666,3 +1655,40 @@ def test_hf_hub_download_does_not_retry_offline_miss() -> None:
         with pytest.raises(hf_hub_errors.LocalEntryNotFoundError):
             hf_hub_download_with_retry(repo_id="org/d")
     assert mock_download.call_count == 1
+
+
+def _has_system_block(content: str) -> bool:
+    # build_scaled_user_message joins [system, body] with a blank line, and
+    # emits a single part when there is no system block.
+    return "\n\n" in content
+
+
+def test_system_prefix_lands_on_the_first_turn_only() -> None:
+    """A session resends its history, so a later system block is a duplicate."""
+    tok = _FakeTokenizer(model_max_length=50_000)
+
+    with TokenizerPool(tok, loader=_fake_loader) as pool:
+        samples = build_chat_samples_from_user_text_pool(
+            pool=pool,
+            user_text_pool=[f"body-{i} " * 40 for i in range(20)],
+            num_sessions=3,
+            num_turns="4",
+            input_len="400",
+            output_len="20",
+            delay_between_turns_dist=None,
+            sys_prompt_ratio=0.5,
+            max_num_unique_sys_prompt=1,
+            shuffle_pool=False,
+            log_prefix="test-sys",
+        )
+
+    assert samples.chat_sessions
+    for session in samples.chat_sessions:
+        users = [m for m in session.messages if m.source == "user"]
+        assert len(users) == 4
+        assert _has_system_block(users[0].content)
+        for later in users[1:]:
+            assert not _has_system_block(later.content)
+
+    # The prefix must still reach warmup now that only turn 0 carries one.
+    assert samples.shared_contexts

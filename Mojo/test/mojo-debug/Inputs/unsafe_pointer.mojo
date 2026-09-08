@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # NOTE: A parallel copy of this file lives at
-#   KGEN/unittests/mojo-debug/inputs/unsafe_pointer.mojo
+#   Mojo/unittests/mojo-debug/inputs/unsafe_pointer.mojo
 # The two files must be kept in sync. Any change here (adding variables,
 # reordering lines) requires updating the sibling file AND updating the
 # hardcoded line numbers in StdlibTypesTest.cpp / unsafe-pointer-formatter.lldb.

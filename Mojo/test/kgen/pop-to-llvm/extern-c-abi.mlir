@@ -9,8 +9,8 @@
 //   KGEN/test/mojo-integration/extern-c-abi/
 //
 // TRANSFORM UNDER TEST:
-//   KGEN/lib/KGENToLLVM/LowerPOPToLLVM.cpp  — ConvertPOPExternalCall
-//   KGEN/lib/KGENToLLVM/CABILowering.cpp     — DefaultCABIInfo (empty triple)
+//   Mojo/lib/KGENToLLVM/LowerPOPToLLVM.cpp  — ConvertPOPExternalCall
+//   Mojo/lib/KGENToLLVM/CABILowering.cpp     — DefaultCABIInfo (empty triple)
 //
 // RELATED TEST FILES:
 //   extern-c-abi-x86-64.mlir  — x86-64 System V AMD64 ABI tests (integer/SSE

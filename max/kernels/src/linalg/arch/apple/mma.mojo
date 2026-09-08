@@ -421,13 +421,16 @@ struct MmaOpApple[
         var b_hi_off = rb_plus_8 * b_row_stride + self.cb
 
         comptime for ki in range(num_k_steps):
-
-            def b_frag_at[ni: Int]() {imm} -> SIMD[Self.b_type, Self.FRAG_SIZE]:
+            # Pre-load B fragments for this K-step.
+            var b_frags = Array[
+                SIMD[Self.b_type, Self.FRAG_SIZE], Self.num_n_mmas
+            ](uninitialized=True)
+            comptime for ni in range(Self.num_n_mmas):
                 var b_sub = b_tile.tile[16, 16](
                     ni if Self.transpose_b else ki,
                     ki if Self.transpose_b else ni,
                 )
-                return self._do_load[Self.b_type, bounded](
+                b_frags[ni] = self._do_load[Self.b_type, bounded](
                     b_sub,
                     (b_valid_cols - ni * 16) if Self.transpose_b else (
                         k_valid - ki * 16
@@ -438,11 +441,6 @@ struct MmaOpApple[
                     b_lo_off,
                     b_hi_off,
                 )
-
-            # Pre-load B fragments for this K-step.
-            var b_frags = Array[_, Self.num_n_mmas](
-                fill_with_unrolled=b_frag_at
-            )
 
             comptime for mi in range(Self.num_m_mmas):
                 var a_sub = a_tile.tile[16, 16](

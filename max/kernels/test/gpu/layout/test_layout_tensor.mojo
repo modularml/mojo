@@ -218,13 +218,11 @@ def test_aligned_load() raises:
     """Tests aligned_load with both index types."""
     # Use a 4x7 tensor so we can load 4 elements starting at columns 0,1,2,3
     # without going out of bounds (column 3 + width 4 = 7)
-    var storage = Array[Float32, 4 * 7](uninitialized=True)
+    var storage = Array[Float32, 4 * 7](fill=0.0)
     var tensor = LayoutTensor[
         .float32,
         Layout([4, 7]),
-    ](
-        storage
-    ).fill(0.0)
+    ](storage)
 
     tensor.store[4](0, 0, 1.0)  # Store 4 elements starting at column 0
     tensor.store[4](0, 1, 2.0)  # Store 4 elements starting at column 1

@@ -598,6 +598,32 @@ modular_py_test(
     ],
 )
 
+# Does the sampled verdict's implicit RNG stream collide with a draft
+# proposal's explicit-seed stream, and does it leak across batch rows?
+modular_py_test(
+    name = "test-verdict-draft-seed-collision",
+    size = "medium",
+    srcs = [
+        "conftest.py",
+        "sampling/test_verdict_draft_seed_collision.py",
+    ],
+    env = {
+        "MODULAR_PATH": ".",
+    },
+    exec_properties = {
+        "test.resources:gpu-memory": "8",
+    },
+    gpu_constraints = _SAMPLING_GPU_CONSTRAINTS,
+    tags = [
+        "gpu",
+        "no-sandbox",
+    ],
+    deps = _SAMPLING_BASE_DEPS + [
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/lib",
+    ],
+)
+
 # Test for rejection_sampler (speculative decoding)
 modular_py_test(
     name = "test-rejection-sampler",

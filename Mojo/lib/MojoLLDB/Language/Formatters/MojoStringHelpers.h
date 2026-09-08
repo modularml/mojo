@@ -26,7 +26,7 @@ class ValueObject;
 namespace M::KGEN::Mojo {
 
 /// The three raw header words of a Mojo `String`, pre-decoded by the
-/// caller. Field names mirror the stdlib (`oss/modular/mojo/stdlib/std/
+/// caller. Field names mirror the stdlib (`Mojo/stdlib/std/
 /// collections/string/string.mojo`): the `_ptr_or_data`/`_len_or_data`/
 /// `_capacity_or_data` union repurposes these words for either the
 /// inline (small-string) form or the heap (large-string) form.

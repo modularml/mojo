@@ -6,10 +6,10 @@ configuration is in [/max/python/docs/](/max/python/docs).
 
 ## Other docs
 
-- [`/mojo/docs`](/mojo/docs): Source docs for mojolang.org.
+- [`/Mojo/docs`](/Mojo/docs): Source docs for mojolang.org.
 - [`/max/docs`](/max/docs): Docs for developers working in the MAX framework
   codebase.
-- [`/mojo/stdlib/docs`](/mojo/stdlib/docs): Docs for developers working in the
+- [`/Mojo/docs/stdlib`](/Mojo/docs/stdlib): Docs for developers working in the
   Mojo standard library.
 - [`/max/docs/design-docs`](/max/docs/design-docs): Engineering docs that
   describe how core Modular technologies work.

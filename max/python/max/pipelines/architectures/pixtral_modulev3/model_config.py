@@ -20,7 +20,7 @@ from typing import ClassVar
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParamInterface
 from max.nn.transformer import ReturnLogits
 from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import MAXModelConfig, PipelineConfig
@@ -67,7 +67,7 @@ class PixtralConfig(
     num_key_value_heads: int
     feed_forward_length: int
     vocab_size: int
-    kv_params: KVCacheParams
+    kv_params: KVCacheParamInterface
     attention_multiplier: float
 
     # Vision encoder fields
@@ -158,7 +158,7 @@ class PixtralConfig(
             feed_forward_length=text_config.intermediate_size,
             vocab_size=text_config.vocab_size,
             kv_params=kv_params,
-            attention_multiplier=math.sqrt(1 / kv_params.head_dim),
+            attention_multiplier=math.sqrt(1 / text_config.head_dim),
             patch_size=vision_config.patch_size,
             image_size=vision_config.image_size,
             num_channels=vision_config.num_channels,

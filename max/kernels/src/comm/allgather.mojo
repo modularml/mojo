@@ -199,19 +199,19 @@ def _allgather_p2p_kernel[
 
     comptime SrcPtrType = ImmPointer[Scalar[dtype], ImmutAnyOrigin]
     var src_ptrs_rr = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> SrcPtrType: src_ptrs[
+        fill_with_unrolled=lambda [i: Int]() -> SrcPtrType: src_ptrs[
             circular_add[ngpus](_my_rank, i)
         ]
     )
 
     comptime OutPtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
     var out_ptrs_rr = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> OutPtrType: outputs[
+        fill_with_unrolled=lambda [i: Int]() -> OutPtrType: outputs[
             circular_add[ngpus](_my_rank, i)
         ]
     )
     var lengths_rr = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> Int: Int(
+        fill_with_unrolled=lambda [i: Int]() -> Int: Int(
             lengths[circular_add[ngpus](_my_rank, i)]
         )
     )

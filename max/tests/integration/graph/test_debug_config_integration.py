@@ -438,13 +438,14 @@ class TestReaderMigration:
     """The migrated reader sites see values set via the new Config keys."""
 
     def test_graph_source_tracebacks_via_modular_debug(self) -> None:
-        # graph.py's _SOURCE_TRACEBACKS_ENABLED reads from
-        # InferenceSession.debug.source_tracebacks, which goes through
-        # Config and picks up MODULAR_DEBUG=source-tracebacks.
+        # graph.py's _location() reads the live
+        # InferenceSession.debug.source_tracebacks value, which goes through
+        # Config and picks up MODULAR_DEBUG=source-tracebacks. This covers the
+        # public debug API rather than graph.py internals.
         result = _run_script(
             """\
-            from max.graph import graph
-            assert graph._SOURCE_TRACEBACKS_ENABLED is True
+            from max.engine import InferenceSession
+            assert InferenceSession.debug.source_tracebacks is True
             print("PASS")
             """,
             env_overrides={"MODULAR_DEBUG": "source-tracebacks"},

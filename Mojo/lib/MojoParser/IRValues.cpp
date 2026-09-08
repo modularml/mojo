@@ -574,9 +574,9 @@ InitializerUValue::getOperandsForInferredType(ASTType type, ExprDest &&dest,
       dictOperands.add({getEmptyList(), operands.callExpr});
       dictOperands.add({getEmptyList(), operands.callExpr});
       addNoneLiteralMarker(dictOperands, "__dict_literal__", emitter);
-      FailureOr<PValue> pValue =
+      FailureOr<CalleeResult> pValue =
           OverloadSet::canConstructType(type, dictOperands, emitter.declScope);
-      if (succeeded(pValue) && pValue.value())
+      if (succeeded(pValue) && pValue->isYes())
         return dictOperands;
       operands.dest = std::move(dictOperands.dest);
     }
@@ -586,9 +586,9 @@ InitializerUValue::getOperandsForInferredType(ASTType type, ExprDest &&dest,
     // PythonObject's set literal ctor takes a required keyword argument.
     CallOperands setOperands(operands, std::move(operands.dest));
     addNoneLiteralMarker(setOperands, "__set_literal__", emitter);
-    FailureOr<PValue> pValue =
+    FailureOr<CalleeResult> pValue =
         OverloadSet::canConstructType(type, setOperands, emitter.declScope);
-    if (succeeded(pValue) && pValue.value())
+    if (succeeded(pValue) && pValue->isYes())
       return setOperands;
 
     // Otherwise, leave it alone as an initializer list.

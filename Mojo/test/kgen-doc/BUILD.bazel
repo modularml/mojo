@@ -11,6 +11,7 @@ lit_tests(
             "test_std_mock/**/*.mojo",
             "test_package/**/*.mojo",
             "test_dir_package/**/*.mojo",
+            "test_doc_inline/**/*.mojo",
         ],
     ),
     data = glob([
@@ -18,6 +19,7 @@ lit_tests(
         "test_std_mock/**/*.mojo",
         "test_package/**/*.mojo",
         "test_dir_package/**/*.mojo",
+        "test_doc_inline/**/*.mojo",
     ]),
     mojo_deps = [
         "//max:layout",  # required by mojo_doc.mojo (layout.int_tuple)

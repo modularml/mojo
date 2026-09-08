@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -73,7 +74,11 @@ def test_speculative_config_model_copy_update() -> None:
 
 
 def test_rejection_sampling_strategy_default() -> None:
-    """Verify rejection_sampling_strategy defaults to None (resolved later based on method)."""
+    """Verify rejection_sampling_strategy defaults to None.
+
+    Nothing resolves it afterwards either: the acceptance rule in effect is
+    AcceptanceSampler.acceptance_rule.
+    """
     config = SpeculativeConfig()
     assert config.rejection_sampling_strategy is None
 
@@ -218,3 +223,39 @@ def test_eagle_width_is_already_final() -> None:
     """Eagle takes its default at construction; no architecture supplies it."""
     spec = SpeculativeConfig(speculative_method="eagle")
     assert spec.num_speculative_tokens == 2
+
+
+def test_acceptance_sampler_reports_the_rule_it_dispatches_to(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The sampler must name the acceptance rule it will actually run.
+
+    ``rejection_sampling_strategy`` is not read by any speculative path, so
+    the rule in effect is only knowable from the sampler's own dispatch:
+    synthetic beats stochastic beats greedy.
+    """
+    with caplog.at_level(logging.INFO, logger="max.pipelines"):
+        assert AcceptanceSampler().acceptance_rule == "greedy"
+        assert (
+            AcceptanceSampler(use_stochastic=True).acceptance_rule
+            == "stochastic"
+        )
+        # Synthetic wins even with stochastic asked for, matching __call__.
+        assert (
+            AcceptanceSampler(
+                synthetic_acceptance_rate=0.8,
+                num_draft_steps=3,
+                use_stochastic=True,
+            ).acceptance_rule
+            == "synthetic"
+        )
+
+    logged = [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "max.pipelines" and "acceptance rule" in r.getMessage()
+    ]
+    assert len(logged) == 3, logged
+    assert "greedy" in logged[0]
+    assert "stochastic" in logged[1]
+    assert "synthetic" in logged[2]

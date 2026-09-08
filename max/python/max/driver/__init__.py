@@ -47,7 +47,6 @@ from .buffer import (
 )
 from .driver import (
     CPU,
-    NPU,
     Accelerator,
     Device,
     DeviceQueue,
@@ -97,7 +96,6 @@ def launch_trace() -> Iterator[list[LaunchTraceEntry]]:
 
 __all__ = [
     "CPU",
-    "NPU",
     "Accelerator",
     "Buffer",
     "CompletionFlag",

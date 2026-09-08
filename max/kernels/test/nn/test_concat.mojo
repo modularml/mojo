@@ -47,18 +47,16 @@ def test_concat() raises:
     comptime l1 = row_major[2, 2, 1, 2]()
     comptime l2 = row_major[2, 2, 2, 2]()
     comptime l3 = row_major[2, 2, 3, 2]()
-    var x1_stack = Array[Scalar[dtype], l1.product()](uninitialized=True)
-    var x2_stack = Array[Scalar[dtype], l2.product()](uninitialized=True)
-    var x3_stack = Array[Scalar[dtype], l3.product()](uninitialized=True)
-    var x1 = TileTensor(x1_stack, l1).fill(0)
-    var x2 = TileTensor(x2_stack, l2).fill(1)
-    var x3 = TileTensor(x3_stack, l3).fill(2)
+    var x1_stack = Array[Scalar[dtype], l1.product()](fill=0)
+    var x2_stack = Array[Scalar[dtype], l2.product()](fill=1)
+    var x3_stack = Array[Scalar[dtype], l3.product()](fill=2)
+    var x1 = TileTensor(x1_stack, l1)
+    var x2 = TileTensor(x2_stack, l2)
+    var x3 = TileTensor(x3_stack, l3)
 
     comptime out_layout = row_major[2, 2, 6, 2]()
-    var out_stack = Array[Scalar[dtype], out_layout.product()](
-        uninitialized=True
-    )
-    var output = TileTensor(out_stack, out_layout).fill(-1)
+    var out_stack = Array[Scalar[dtype], out_layout.product()](fill=-1)
+    var output = TileTensor(out_stack, out_layout)
     var x1_dyn = x1.make_dynamic[.int64]()
 
     var input_tuple = StaticTuple[
@@ -117,22 +115,20 @@ def test_concat_parallel() raises:
     comptime l1 = row_major[2, 2, 1, 2]()
     comptime l2 = row_major[2, 2, 2, 2]()
     comptime l3 = row_major[2, 2, 3, 2]()
-    var x1_stack = Array[Scalar[dtype], l1.product()](uninitialized=True)
-    var x2_stack = Array[Scalar[dtype], l2.product()](uninitialized=True)
-    var x3_stack = Array[Scalar[dtype], l3.product()](uninitialized=True)
-    var x1 = TileTensor(x1_stack, l1).fill(0)
-    var x2 = TileTensor(x2_stack, l2).fill(1)
-    var x3 = TileTensor(x3_stack, l3).fill(2)
+    var x1_stack = Array[Scalar[dtype], l1.product()](fill=0)
+    var x2_stack = Array[Scalar[dtype], l2.product()](fill=1)
+    var x3_stack = Array[Scalar[dtype], l3.product()](fill=2)
+    var x1 = TileTensor(x1_stack, l1)
+    var x2 = TileTensor(x2_stack, l2)
+    var x3 = TileTensor(x3_stack, l3)
 
     var x1_dyn = x1.make_dynamic[.int64]()
     var x2_dyn = x2.make_dynamic[.int64]()
     var x3_dyn = x3.make_dynamic[.int64]()
 
     comptime out_layout = row_major[2, 2, 6, 2]()
-    var out_stack = Array[Scalar[dtype], out_layout.product()](
-        uninitialized=True
-    )
-    var output = TileTensor(out_stack, out_layout).fill(-1)
+    var out_stack = Array[Scalar[dtype], out_layout.product()](fill=-1)
+    var output = TileTensor(out_stack, out_layout)
 
     var input_tuple = StaticTuple[
         TileTensor[dtype, x1_dyn.LayoutType, ImmutAnyOrigin],
@@ -189,22 +185,20 @@ def test_concat_inner() raises:
     comptime l1 = row_major[1, 1, 1, 2, 2]()
     comptime l2 = row_major[1, 1, 2, 2, 2]()
     comptime l3 = row_major[1, 1, 3, 2, 2]()
-    var x1_stack = Array[Scalar[dtype], l1.product()](uninitialized=True)
-    var x2_stack = Array[Scalar[dtype], l2.product()](uninitialized=True)
-    var x3_stack = Array[Scalar[dtype], l3.product()](uninitialized=True)
-    var x1 = TileTensor(x1_stack, l1).fill(0)
-    var x2 = TileTensor(x2_stack, l2).fill(1)
-    var x3 = TileTensor(x3_stack, l3).fill(2)
+    var x1_stack = Array[Scalar[dtype], l1.product()](fill=0)
+    var x2_stack = Array[Scalar[dtype], l2.product()](fill=1)
+    var x3_stack = Array[Scalar[dtype], l3.product()](fill=2)
+    var x1 = TileTensor(x1_stack, l1)
+    var x2 = TileTensor(x2_stack, l2)
+    var x3 = TileTensor(x3_stack, l3)
 
     var x1_dyn = x1.make_dynamic[.int64]()
     var x2_dyn = x2.make_dynamic[.int64]()
     var x3_dyn = x3.make_dynamic[.int64]()
 
     comptime out_layout = row_major[1, 1, 6, 2, 2]()
-    var out_stack = Array[Scalar[dtype], out_layout.product()](
-        uninitialized=True
-    )
-    var output = TileTensor(out_stack, out_layout).fill(-1)
+    var out_stack = Array[Scalar[dtype], out_layout.product()](fill=-1)
+    var output = TileTensor(out_stack, out_layout)
 
     var input_tuple = StaticTuple[
         TileTensor[dtype, x1_dyn.LayoutType, ImmutAnyOrigin],

@@ -30,25 +30,15 @@ struct SetFastMathFlagsPass
   using SetFastMathFlagsBase::SetFastMathFlagsBase;
 
   void runOnOperation() override {
-    using M::KGEN::POP::AddOp;
     using M::KGEN::POP::FastmathFlags;
-    using M::KGEN::POP::MulOp;
-    using M::KGEN::POP::SubOp;
+    using M::KGEN::POP::FastmathFlagsInterface;
 
     // Only clearing `contract` changes anything.
     if (contract)
       return;
 
-    auto strip = [](auto op) {
+    getOperation()->walk([](FastmathFlagsInterface op) {
       op.setFastmathFlags(op.getFastmathFlags() & ~FastmathFlags::contract);
-    };
-    getOperation()->walk([&](Operation *op) {
-      if (auto add = dyn_cast<AddOp>(op))
-        strip(add);
-      else if (auto sub = dyn_cast<SubOp>(op))
-        strip(sub);
-      else if (auto mul = dyn_cast<MulOp>(op))
-        strip(mul);
     });
   }
 };

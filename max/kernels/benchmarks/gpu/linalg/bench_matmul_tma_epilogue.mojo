@@ -237,19 +237,12 @@ def bench_matmul_tma_epilogue[
         run_benchmark: If False, run a single iteration (for verify-only mode).
     """
 
-    @always_inline
-    def get_size(shape: Coord) -> Int:
-        return Int(shape[0].value()) * Int(shape[1].value())
-
-    comptime simd_size = 4
     comptime transpose_b = True
 
-    var cb_a = CacheBustingBuffer[dtype](get_size(shape_a), simd_size, ctx)
-    var cb_b = CacheBustingBuffer[dtype](get_size(shape_b), simd_size, ctx)
-    var cb_c = CacheBustingBuffer[dtype](get_size(shape_c), simd_size, ctx)
-    var cb_epilogue = CacheBustingBuffer[dtype](
-        get_size(epilogue_shape), simd_size, ctx
-    )
+    var cb_a = CacheBustingBuffer[dtype](shape_a.product(), ctx)
+    var cb_b = CacheBustingBuffer[dtype](shape_b.product(), ctx)
+    var cb_c = CacheBustingBuffer[dtype](shape_c.product(), ctx)
+    var cb_epilogue = CacheBustingBuffer[dtype](epilogue_shape.product(), ctx)
 
     cb_a.init_on_device(init_type, ctx)
     cb_b.init_on_device(init_type, ctx)

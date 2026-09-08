@@ -42,8 +42,8 @@ analysis.
 
 - [`/max/docs/design-docs`](/max/docs/design-docs): Engineering docs that
   describe how core Modular technologies work.
-- [`/oss/modular/mojo/stdlib/docs`](/oss/modular/mojo/stdlib/docs): Docs for
+- [`/Mojo/docs/stdlib`](/Mojo/docs/stdlib): Docs for
   developers working in the Mojo standard library.
-- [`/oss/modular/mojo/docs`](/oss/modular/mojo/docs): Source docs for
+- [`/Mojo/docs`](/Mojo/docs): Source docs for
   mojolang.org/docs.
 - [max.modular.com](https://max.modular.com): All other developer docs.

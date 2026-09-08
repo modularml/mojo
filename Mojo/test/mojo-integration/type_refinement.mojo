@@ -1325,7 +1325,7 @@ def downcast_preserves_refinement_var[
 # attribute alone.
 #
 # Regression guard for the canonicalization fix in
-# `mergeOriginalAndRefinedBounds` (KGEN/lib/MojoParser/ExprNodes.cpp). When
+# `mergeOriginalAndRefinedBounds` (Mojo/lib/MojoParser/ExprNodes.cpp). When
 # the `var`'s declared type embeds `DowncastAttr(T, trait<@Greetable>)`, the
 # original trait set must be canonicalized (to pick up implicit ancestors
 # like `@AnyType`) before checking whether the scope's assumptions add any

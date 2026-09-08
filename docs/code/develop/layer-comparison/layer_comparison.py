@@ -162,8 +162,11 @@ def capture_max_tensors(
         style=PrintStyle.BINARY_MAX_CHECKPOINT,
         output_directory=output_dir,
     )
-    compiled = session.load(graph, weights_registry=model.state_dict())
-    compiled.execute(Buffer.from_numpy(np.asarray(INPUT_IDS, dtype=np.int64)))
+    compiled = session.compile(graph)
+    runnable_model = session.init(compiled, weights_registry=model.state_dict())
+    runnable_model.execute(
+        Buffer.from_numpy(np.asarray(INPUT_IDS, dtype=np.int64))
+    )
     hook.remove()
 
 

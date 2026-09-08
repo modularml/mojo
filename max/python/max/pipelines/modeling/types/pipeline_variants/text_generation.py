@@ -421,9 +421,10 @@ class TextGenerationRequest:
     dkv_cache_hint: dict[str, Any] | None = None
     """Cache hint from the Orchestrator for distributed KV cache.
 
-    When present, the serving layer converts this into
-    ``TextContext.external_block_metadata`` so the DKVConnector can
-    fetch cached blocks before the forward pass.
+    The serving layer never reads it: it re-serializes the object onto
+    ``TextContext.dkv_cache_hint`` and hands those bytes to the dKV connector,
+    which parses them in Rust to route each block to the instance that holds
+    it. See ``dkv/docs/cache-hint.md``.
     """
     cache_salt: str | None = None
     """Optional per-request salt that isolates this prompt's prefix-cache
@@ -567,6 +568,12 @@ class CompletedBatchStats:
     acceptance_rate_per_position: list[float] = field(default_factory=list)
     """Per-position draft acceptance rates for the completed batch
     (speculative decoding)."""
+
+    early_sync_duration_s: float | None = None
+    """Wall-clock time spent in the early-sync guard's blocking
+    ``sync_and_process_outputs()`` call (see
+    ``_should_early_sync_prev_batch``), when it fired for this batch.
+    ``None`` when the guard did not fire."""
 
     @property
     def prompt_throughput(self) -> float:

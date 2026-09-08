@@ -39,7 +39,13 @@ from max.gpu.compute.arch.tcgen05 import (
 from layout.tma_async import (
     SharedMemBarrier,
 )
-from layout import ComptimeInt, CoordLike, RowMajorLayout, TileTensor
+from layout import (
+    ComptimeInt,
+    CoordLike,
+    RowMajorLayout,
+    TensorEngine,
+    TileTensor,
+)
 from nn.attention.gpu.nvidia.common import (
     OptionalPointer,
 )
@@ -88,6 +94,7 @@ struct MLA_SM100_Decode_KV_BF16[
     MaskType: MHAMask,
     config: MLA_SM100_Decode_Config,
     ValidLengthType: OptionalPointer,
+    Engine: TensorEngine,
     _is_cache_length_accurate: Bool = False,
     ragged: Bool = False,
 ](TrivialRegisterPassable):
@@ -106,6 +113,7 @@ struct MLA_SM100_Decode_KV_BF16[
             TMEM/SMEM layout.
         ValidLengthType: `OptionalPointer` type wrapping the per-batch
             valid-sequence-length tensor.
+        Engine: Engine policy of the `scalar_args` tile operand.
         _is_cache_length_accurate: When `False`, the kernel adds the local
             sequence length to the cache length to compute the total key
             count (defaults to `False`).
@@ -237,7 +245,10 @@ struct MLA_SM100_Decode_KV_BF16[
         ],
         scales_ptr: UnsafePointer[Float32, origin=MutAnyOrigin],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # SlidingWindowCausalMask is supported ONLY by the native FP8 backend

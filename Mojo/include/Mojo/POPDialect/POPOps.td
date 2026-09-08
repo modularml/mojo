@@ -23,6 +23,7 @@ include "Mojo/KGENDialect/KGENInterfaces.td"
 include "Mojo/KGENDialect/KGENTypes.td"
 include "Mojo/POPDialect/POPAttrs.td"
 include "Mojo/POPDialect/POPDialect.td"
+include "Mojo/POPDialect/POPInterfaces.td"
 include "Mojo/POPDialect/POPTypes.td"
 include "Mojo/Interpreter/InterpreterInterface.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
@@ -208,7 +209,8 @@ class POP_ArithmeticBinaryOp<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def POP_AddOp : POP_ArithmeticBinaryOp<"add", [Commutative, Pure,
-                DeclareOpInterfaceMethods<ComputeOpInterface>]>, Addition {
+                DeclareOpInterfaceMethods<ComputeOpInterface>,
+                POP_FastmathFlagsInterface]>, Addition {
   let summary = "addition";
   let description = [{
     The `pop.add` operation takes two `!kgen.simd` values and returns their sum.
@@ -235,7 +237,8 @@ def POP_AddOp : POP_ArithmeticBinaryOp<"add", [Commutative, Pure,
 //===----------------------------------------------------------------------===//
 
 def POP_SubOp : POP_ArithmeticBinaryOp<"sub", [Pure,
-                DeclareOpInterfaceMethods<ComputeOpInterface>]>, Addition {
+                DeclareOpInterfaceMethods<ComputeOpInterface>,
+                POP_FastmathFlagsInterface]>, Addition {
   let summary = "subtraction";
   let description = [{
     The `pop.sub` operation takes two `!kgen.simd` values and returns their
@@ -262,7 +265,8 @@ def POP_SubOp : POP_ArithmeticBinaryOp<"sub", [Pure,
 //===----------------------------------------------------------------------===//
 
 def POP_MulOp : POP_ArithmeticBinaryOp<"mul", [Commutative, Pure,
-                DeclareOpInterfaceMethods<ComputeOpInterface>]>,
+                DeclareOpInterfaceMethods<ComputeOpInterface>,
+                POP_FastmathFlagsInterface]>,
                 Multiplication {
   let summary = "multiplication";
   let description = [{
@@ -495,7 +499,8 @@ def POP_ShrOp : POP_ArithmeticBinaryOp<"shr", [Pure,
 
 // Base class for ternary arithmetic pop operations.
 class POP_ArithmeticTernaryOp<string mnemonic, list<Trait> traits = []> :
-    POPOp<mnemonic, traits # [Pure, SameOperandsAndResultType]> {
+    POPOp<mnemonic, traits # [Pure, SameOperandsAndResultType,
+                              POP_FastmathFlagsInterface]> {
   let arguments = (ins UnboundOrIndexOrArithmeticSIMD:$a,
                        UnboundOrIndexOrArithmeticSIMD:$b,
                        UnboundOrIndexOrArithmeticSIMD:$c,
@@ -560,7 +565,7 @@ def POP_CmpOp : POPOp<"cmp", [Pure, SameTypeOperands, InferTypeOpAdaptor,
   let results = (outs BoolSIMD:$result);
 
   let assemblyFormat = [{
-    $pred `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+    enum($pred) `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
   }];
 }
 
@@ -733,16 +738,18 @@ def POP_PointerBitcastOp : POPOp<"pointer.bitcast", [Pure,
 
 def POP_CastOp : POPOp<"cast", [Pure,
     DeclareOpInterfaceMethods<CastOpInterface>,
-    DeclareOpInterfaceMethods<InterpreterOpInterface>]> {
+    DeclareOpInterfaceMethods<InterpreterOpInterface>,
+    POP_FastmathFlagsInterface]> {
   let summary = "element wise cast";
   let description = [{
     Perform an element-wise cast between SIMD vectors types or between scalar
     types. SIMD vectors must have the same size. The cast semantics are the same
     as C casts. Only bool, integer, and floating point dtypes are supported.
 
-    `fast` attribute indicates that lowering of the operation may generate
-    efficient sequence of instructions/assembly, but result may differ from
-    using LLVM's conversion instructions.
+    The `fast` fastmath flag indicates that lowering may generate an efficient
+    sequence of instructions/assembly, but result may differ from using LLVM's
+    conversion instructions. It also permits collapsing a chain of casts
+    `A -> B -> C` into a direct `A -> C`, which may round differently.
 
     Example:
 
@@ -750,16 +757,18 @@ def POP_CastOp : POPOp<"cast", [Pure,
     %0 = pop.cast %a : !kgen.scalar<si32> to !kgen.scalar<f32>
     %1 = pop.cast %b : !kgen.scalar<ui64> to !kgen.scalar<si32>
     %2 = pop.cast %c : !kgen.simd<4, f64> to !kgen.simd<4, ui32>
-    %3 = pop.cast fast %c : !kgen.scalar<f32> to !kgen.scalar<bf16>
+    %3 = pop.cast %c {fastmathFlags = #pop<fmf fast>} :
+        !kgen.scalar<f32> to !kgen.scalar<bf16>
     ```
   }];
 
   let arguments = (ins
     UnboundOrBoolOrIndexOrArithmeticSIMD:$input,
-    OptionalAttr<UnitAttr>:$fast);
+    DefaultValuedAttr<POP_FastmathFlagsAttr,
+      "FastmathFlags::none">:$fastmathFlags);
   let results = (outs UnboundOrBoolOrIndexOrArithmeticSIMD:$output);
   let assemblyFormat = [{
-    (`fast` $fast^)? $input attr-dict `:`
+    $input attr-dict `:`
     qualified(type($input)) `to`  qualified(type($output))
   }];
   let hasFolder = 1;
@@ -977,7 +986,7 @@ def POP_LoadOp : POPOp<"load", [
     custom<I1Flag>($isVolatile, "\"volatile\"")
     custom<I1Flag>($isInvariant, "\"invariant\"")
     custom<I1Flag>($isNonTemporal, "\"nontemporal\"")
-    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $ordering^)?
+    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($ordering)^)?
     $ptr
     (`align` `<` custom<IndexParamValue>($alignment)^ `>`)? attr-dict `:`
     qualified(type($ptr))
@@ -1057,7 +1066,7 @@ def POP_StoreOp : POPOp<"store", [PointerElementType<"ptr", "arg">,
   let assemblyFormat = [{
     custom<I1Flag>($isVolatile, "\"volatile\"")
     custom<I1Flag>($isNonTemporal, "\"nontemporal\"")
-    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $ordering^)?
+    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($ordering)^)?
     $arg `,` $ptr
     (`align` `<` custom<IndexParamValue>($alignment)^ `>`)?
     attr-dict `:` qualified(type($ptr))
@@ -2065,6 +2074,7 @@ def POP_CastFromBuiltinOp : POPOp<"cast_from_builtin", [Pure,
 def POP_CallLLVMIntrinsicOp : POPOp<"call_llvm_intrinsic",[
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    POP_FastmathFlagsInterface,
     DeclareOpInterfaceMethods<InterpreterOpInterface>]> {
   let summary = "Call to an LLVM intrinsic function.";
   let description = [{
@@ -2206,8 +2216,8 @@ def POP_AtomicCmpXchgOp : POPOp<"atomic.cmpxchg", [
   let assemblyFormat = [{
     (`weak` $weak^)?
     $ptr `,` $cmp `,` $val
-    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $success_ordering
-    $failure_ordering (`align` custom<IndexParamValue>($alignment)^ )?
+    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($success_ordering)
+    enum($failure_ordering) (`align` custom<IndexParamValue>($alignment)^ )?
     attr-dict `:` qualified(type($ptr))
   }];
 }
@@ -2259,8 +2269,8 @@ def POP_AtomicRMWOp : POPOp<"atomic.rmw", [
   let results = (outs UnboundOrArithmeticScalar:$result);
 
   let assemblyFormat = [{
-    $bin_op `(` $ptr `,` $val `)`
-    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $ordering
+    enum($bin_op) `(` $ptr `,` $val `)`
+    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($ordering)
     attr-dict `:` qualified(type($ptr))
   }];
 }
@@ -2291,7 +2301,7 @@ def POP_FenceOp : POPOp<"fence"> {
                        OptionalAttr<StrAttr>:$syncscope);
 
   let assemblyFormat = [{
-    (`syncscope` `(` $syncscope^ `)`)? $ordering attr-dict
+    (`syncscope` `(` $syncscope^ `)`)? enum($ordering) attr-dict
   }];
   let hasVerifier = 1;
 }

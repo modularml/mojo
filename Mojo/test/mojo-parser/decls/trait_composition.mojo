@@ -332,10 +332,13 @@ trait SubHandle(Handle):
     pass
 
 
-# CHECK-LABEL: lit.trait.decl @SubHandle
-# CHECK: lit.fn @"transfer
-# CHECK-SAME: %self: !lit.ref<:!AnyType_Handle_SubHandle *"_Self`"
-# CHECK-SAME: :!AnyType_Handle upcast(:!AnyType_Handle_SubHandle *"_Self`")
-# CHECK-SAME: inheritedFrom = #kgen.trait_symbol<@{{.*}}Handle>
+def sub_handle_transfer_type[S: SubHandle]():
+    # CHECK-LABEL: lit.fn @"sub_handle_transfer_type
+    # CHECK:      lit.alias.decl *"f`{{[0-9]*}}"
+    # CHECK-SAME:   "self": !lit.ref<:!AnyType_Handle_SubHandle S
+    # CHECK-SAME:   :!AnyType_Handle upcast(:!AnyType_Handle_SubHandle S)
+    comptime f = S.transfer
+
+
 def main():
     pass

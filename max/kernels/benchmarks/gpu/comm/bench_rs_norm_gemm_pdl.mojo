@@ -264,24 +264,30 @@ def bench_rs_norm_gemm_pdl[
         ImmutAnyOrigin,
     ]
     var in_bufs = Array[InTensorType, ngpus](uninitialized=True)
-    var normed_shards = Array[OutShardType, ngpus](uninitialized=True)
-    var sum_shards = Array[OutShardType, ngpus](uninitialized=True)
-    var gamma_shards = Array[GammaShardType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        normed_shards[i] = OutShardType(
+    var normed_shards = Array[OutShardType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref normed, imm config
+        } -> OutShardType: OutShardType(
             normed[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
-        sum_shards[i] = OutShardType(
+    )
+    var sum_shards = Array[OutShardType, ngpus](
+        fill_with=lambda (i: Int) {
+            ref fused_sum, imm config
+        } -> OutShardType: OutShardType(
             fused_sum[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
-        gamma_shards[i] = GammaShardType(
+    )
+    var gamma_shards = Array[GammaShardType, ngpus](
+        fill_with=lambda (i: Int) -> GammaShardType: GammaShardType(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
                 gamma_dev[i].unsafe_ptr()
             ),
             row_major(Coord(Index(num_cols))),
         )
+    )
 
     var bench_name_prefix = String(
         "M=",

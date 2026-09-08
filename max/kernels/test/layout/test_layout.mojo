@@ -947,9 +947,9 @@ def test_layout_tensor_iterator_print() raises:
     """Test case for MSTDL-1984: Tensors generated from LayoutTensorIter won't print.
     """
     comptime buf_size = 16
-    var storage = Array[Int16, buf_size](uninitialized=True)
-    for i in range(buf_size):
-        storage[i] = Int16(i)
+    var storage = Array[Int16, buf_size](
+        fill_with=lambda (i: Int) -> Int16: Int16(i)
+    )
     comptime tile_layout = Layout.row_major(2, 2)
     var iter = LayoutTensorIter[
         DType.int16,

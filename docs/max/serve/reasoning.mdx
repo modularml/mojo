@@ -1,0 +1,254 @@
+---
+title: Reasoning
+description: Serve reasoning models that separate chain-of-thought from the final answer.
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import InstallMAX from '../_includes/install-modular.mdx';
+
+Some models can reason through a problem before returning a final answer. This
+page explains how to send reasoning requests to models served with MAX.
+
+For the reasoning parameters supported by the API, see the [chat
+completions](/rest-api/create-chat-completion/#POST/v1/chat/completions) API
+reference.
+
+:::note
+
+Whether MAX supports reasoning for a model depends on the model architecture.
+Review any model architecture source by clicking on its link in the [supported
+models](/models/) table.
+
+:::
+
+## Quickstart
+
+Use the [`max serve`](/cli/serve) command to serve a reasoning model.
+
+### Install MAX
+
+Install the `max` CLI:
+
+<InstallMAX folder="reasoning" />
+
+### Serve the model
+
+Start a model that supports reasoning:
+
+```bash
+max serve --model google/gemma-4-31B-it
+```
+
+The server is ready when you see this message:
+
+```output
+Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+### Send a reasoning request
+
+When the server is ready, send a chat request with reasoning enabled:
+
+<Tabs groupId="client">
+<TabItem value="python" label="Python">
+
+```python title="reasoning.py"
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://0.0.0.0:8000/v1",
+    api_key="EMPTY",
+)
+
+response = client.chat.completions.create(
+    model="google/gemma-4-31B-it",
+    messages=[
+        {"role": "user", "content": "Where was the 2020 World Series played?"}
+    ],
+    extra_body={"reasoning": {"enabled": True}},
+)
+print("Reasoning:", response.choices[0].message.reasoning)
+print("Answer:", response.choices[0].message.content)
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+```bash
+curl http://0.0.0.0:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "google/gemma-4-31B-it",
+        "messages": [
+            {
+            "role": "user",
+            "content": "Where was the 2020 World Series played?"
+            }
+        ],
+        "reasoning": { "enabled": true }
+    }'
+```
+
+</TabItem>
+</Tabs>
+
+The response includes the model's reasoning in the `reasoning` field:
+
+```json
+{
+  "id": "18b0abd2d2fd463ea43efe2c147bcac0",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "reasoning": "The user asks where the 2020 World Series was played.",
+        "content": "The 2020 World Series was played at Globe Life Field."
+      }
+    }
+  ],
+  "created": 1743543698,
+  "model": "google/gemma-4-31B-it",
+  "object": "chat.completion",
+  "usage": {
+    "completion_tokens": 64,
+    "prompt_tokens": 24,
+    "total_tokens": 88,
+    "completion_tokens_details": {
+      "reasoning_tokens": 42
+    }
+  }
+}
+```
+
+The `usage.completion_tokens_details.reasoning_tokens` field reports the number
+of completion tokens the model used for reasoning.
+
+## Configuration
+
+The following sections describe request-level and server-level options for
+configuring reasoning behavior.
+
+### Enable reasoning
+
+Whether a model reasons by default depends on its chat template. Some models
+reason on every request, while others reason only when asked. To turn reasoning
+on or off for a request, use the `reasoning` object:
+
+```json
+"reasoning": {
+  "enabled": true
+}
+```
+
+Set `enabled` to `false` to turn reasoning off.
+
+MAX also accepts the `thinking` object used by some other providers:
+
+```json
+"thinking": {
+  "type": "enabled"
+}
+```
+
+The type field accepts the following values:
+
+- `enabled`: Enable reasoning.
+- `disabled`: Disable reasoning.
+- `adaptive`: Let the model's chat template determine whether to reason.
+  Using `"adaptive"` is equivalent to omitting the parameter entirely.
+
+### Control reasoning effort
+
+Use the `reasoning_effort` parameter to control how much effort a model spends
+on reasoning:
+
+```json
+{
+  "model": "google/gemma-4-31B-it",
+  "messages": [
+    {"role": "user", "content": "What is 2+2?"}
+  ],
+  "reasoning_effort": "low"
+}
+```
+
+You can also specify the effort inside the `reasoning` object:
+
+```json
+"reasoning": {
+  "enabled": true,
+  "effort": "low"
+}
+```
+
+Setting `reasoning_effort` to `"none"` disables reasoning entirely.
+
+### Set the thinking temperature
+
+By default, the model uses the same sampling temperature for both reasoning
+tokens and answer tokens. To use a different temperature for tokens inside
+`<think>...</think>` blocks, set `thinking_temperature` in the request:
+
+```json
+{
+  "model": "google/gemma-4-31B-it",
+  "messages": [
+    {"role": "user", "content": "Explain quantum entanglement."}
+  ],
+  "reasoning": { "enabled": true },
+  "thinking_temperature": 0.2
+}
+```
+
+You can also set a server-level default with `--thinking-temperature`:
+
+```bash
+max serve --model google/gemma-4-31B-it --thinking-temperature 0.2
+```
+
+The request-level setting takes precedence over the server-level setting.
+
+### Override the reasoning parser
+
+Each model architecture declares a default reasoning parser that extracts
+thinking blocks from the model's output. You can override this with the
+`--reasoning-parser` flag:
+
+```bash
+max serve --model google/gemma-4-31B-it --reasoning-parser gemma4
+```
+
+To disable reasoning parsing entirely, even when the architecture declares a
+default parser, pass `"none"`:
+
+```bash
+max serve --model google/gemma-4-31B-it --reasoning-parser none
+```
+
+When you disable reasoning parsing, any thinking markup the model produces
+stays inline in the `content` field.
+
+### Rename the reasoning field
+
+MAX returns reasoning in a field named `reasoning`. Clients built for other
+serving APIs may look for a field named `reasoning_content` instead. To use
+that name in responses, start the server with `--emit-reasoning-content`:
+
+```bash
+max serve --model google/gemma-4-31B-it --emit-reasoning-content
+```
+
+Requests also accept the `reasoning_content` name, so you can send a previous
+turn's reasoning back to the model.
+
+## Next steps
+
+- [Text to text](/serve/text-to-text): Learn about the text completion
+  endpoints and general text generation.
+- [Function calling](/serve/function-calling): Connect reasoning models to
+  external tools and functions.
+- [Structured output](/serve/structured-output): Enforce specific output formats
+  on model responses.

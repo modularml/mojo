@@ -37,7 +37,8 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
-#include <string_view>
+
+#include "Support/LLVMForwardDecls.h"
 
 namespace M::Profiling {
 
@@ -95,8 +96,8 @@ void registerCurrentThreadSlow();
 
 // The optional profiler integration, as a function table. All entries have
 // the exact semantics of the same-named public functions below; strings
-// cross as std::string/std::string_view because sink and caller always
-// compile into the same link unit with one toolchain.
+// cross as std::string/StringRef because sink and caller always compile
+// into the same link unit with one toolchain.
 struct RangeSink {
   void (*enable)();
   void (*disable)();
@@ -107,8 +108,8 @@ struct RangeSink {
   int (*state)();
   bool (*canRecord)();
   std::string (*lastTraceError)();
-  void (*rangeBegin)(std::string_view name, uint32_t color);
-  void (*rangeBeginWithId)(uint64_t correlationId, std::string_view name,
+  void (*rangeBegin)(StringRef name, uint32_t color);
+  void (*rangeBeginWithId)(uint64_t correlationId, StringRef name,
                            uint32_t color);
   void (*rangeEnd)();
   void (*registerCurrentThread)();
@@ -168,7 +169,7 @@ inline void registerCurrentThreadIfEnabled() noexcept {
 // annotation span correlated to the GPU kernels launched inside it; pairs
 // still open when the trace stops are dropped. Outside a live trace both
 // calls reduce to one predicted branch.
-void rangeBegin(std::string_view name, uint32_t color);
+void rangeBegin(StringRef name, uint32_t color);
 void rangeEnd();
 
 // As rangeBegin, but with a CALLER-SUPPLIED user correlation id instead of an
@@ -179,8 +180,7 @@ void rangeEnd();
 // name or a time-window heuristic. The id is truncated to 32 bits by the
 // trace format, so keep it under 2^31 to avoid aliasing. The matching
 // rangeEnd() is shared with rangeBegin (per-thread LIFO).
-void rangeBeginWithId(uint64_t correlationId, std::string_view name,
-                      uint32_t color);
+void rangeBeginWithId(uint64_t correlationId, StringRef name, uint32_t color);
 
 // Advance the step counter. Drives the warmup/active state machine for
 // fixed-window profiling. MAX calls this internally at the end of
@@ -248,7 +248,7 @@ ProfilerState state();
 //   "warmup"   — enabled, skipping the configured warmup steps
 //   "active"   — enabled, recording
 //   "flushing" — disabled, trace still being serialized
-std::string_view stateName(ProfilerState s);
+StringRef stateName(ProfilerState s);
 
 // RAII helper. Disabled scopes pay one predicted branch in the constructor
 // (and zero in the destructor when no begin happened).
@@ -260,15 +260,8 @@ std::string_view stateName(ProfilerState s);
 // after ``disable()`` raced in, and keeps raw FFI callers balanced without
 // their own latch.
 struct RangeScope {
-  explicit RangeScope(std::string_view name, uint32_t color = 0)
-      : enabled_(isRangeRecordingActive()) {
-    if (enabled_)
-      rangeBegin(name, color);
-  }
-  ~RangeScope() {
-    if (enabled_)
-      rangeEnd();
-  }
+  explicit RangeScope(StringRef name, uint32_t color = 0);
+  ~RangeScope();
 
   RangeScope(const RangeScope &) = delete;
   RangeScope &operator=(const RangeScope &) = delete;

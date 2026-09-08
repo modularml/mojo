@@ -408,6 +408,9 @@ class JengaBlockPool:
 
     def touch(self, block: LittleKVCacheBlock) -> None:
         """Takes a reference on a block, reviving it if it was out of use."""
+        if block.is_null:
+            return
+
         # Reviving a block whose bytes changed hands would hand back another
         # cache's tensor, so only its own cache's commits are touchable.
         assert block.huge_block.little_block_type == block.cache_id
@@ -425,6 +428,8 @@ class JengaBlockPool:
     def block(self, cache_id: str, bid: int) -> LittleKVCacheBlock:
         """Returns the little block ``bid`` of ``cache_id``."""
         # Bid 0 is the null block, so a cache's own blocks start at its ratio.
+        if bid == 0:
+            return self.null_little_blocks[cache_id]
         return self.little_blocks[cache_id][bid - self.cache_ratios[cache_id]]
 
     def num_free_blocks(self, cache_id: str) -> int:
@@ -455,13 +460,25 @@ class JengaBlockPool:
             claimable = len(self.huge_blocks)
             carved: dict[str, int] = dict.fromkeys(demand, 0)
         else:
-            claimable = len(self.free_huge_blocks) - sum(
-                self._parked_and_typed[cache_id] for cache_id in demand
-            )
             carved = {
                 cache_id: len(self.free_little_blocks[cache_id])
                 for cache_id in demand
             }
+            # A parked huge block stays typed only while its cache needs it to
+            # satisfy demand. The remaining idle pages may be retyped.
+            claimable = len(self.free_huge_blocks)
+            for cache_id, num_blocks in demand.items():
+                ratio = self.cache_ratios[cache_id]
+                parked = self._parked_and_typed[cache_id]
+                fixed_free_blocks = carved[cache_id] - parked * ratio
+                parked_to_keep = min(
+                    parked,
+                    ceildiv(
+                        max(0, num_blocks - fixed_free_blocks),
+                        ratio,
+                    ),
+                )
+                claimable -= parked_to_keep
         # A huge block is carved for exactly one cache, so the demands compete
         # for the same claimable huge blocks: each cache's shortfall is
         # converted at its own ratio and charged against a shared budget.

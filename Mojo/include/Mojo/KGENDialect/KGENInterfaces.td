@@ -128,9 +128,12 @@ def StructDeclInterface : OpInterface<"StructDeclInterface"> {
       Lookup a conformance by trait symbol, when returning non-null, the type
       of the returned Operation must be a ConformanceOp, we declare it as
       `Operation *` here due to build dependencies issues.
-    }], "Operation *", "lookupConformance", (ins "TraitSymbolAttr":$traitSymbol),
+
+      The evaluator provides parameter values of the struct that conforms to
+      the querying trait.
+    }], "Operation *", "lookupConformance", (ins "ParameterEvaluator&":$evaluator, "TraitSymbolAttr":$traitSymbol),
     [{}], [{
-      return impl::lookupConformance($_op, traitSymbol);
+      return impl::lookupConformance($_op, evaluator, traitSymbol);
     }]
     >,
   ];

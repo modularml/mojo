@@ -40,6 +40,7 @@ logger = logging.getLogger("max.pipelines")
 
 
 def create_connector(
+    leaves: Mapping[str, KVCacheGroupId],
     devices: Sequence[Device],
     replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]],
     params: KVCacheParamInterface,
@@ -79,10 +80,14 @@ def create_connector(
     cfg = params.kv_connector_config
     connector = cfg.type
 
-    leaves = {leaf_id: KVCacheGroupId.full() for leaf_id in params.leaves()}
-
     if connector == KVConnectorType.dkv:
         from .dkv import DKVConnector
+
+        if not all(group_id.is_full() for group_id in leaves.values()):
+            raise ValueError(
+                "DKV KVConnector requires all leaves to be full attention groups. "
+                f"Found: {leaves}"
+            )
 
         if not cfg.block_store_endpoint:
             raise ValueError(

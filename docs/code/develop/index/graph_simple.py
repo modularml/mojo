@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# DOC: max/develop/index.mdx
+# DOC: max/develop/graph.mdx
 
 import numpy as np
 from max.driver import CPU
@@ -29,7 +29,8 @@ with Graph("relu_graph", input_types=[input_type]) as graph:
 
 # Step 2: Compile the graph
 session = InferenceSession(devices=[cpu])
-model = session.load(graph)
+compiled = session.compile(graph)
+model = session.init(compiled)
 
 # Step 3: Execute with data
 input_data = np.array([1.0, -2.0, 3.0, -4.0, 5.0], dtype=np.float32)

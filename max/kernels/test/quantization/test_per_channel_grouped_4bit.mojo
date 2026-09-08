@@ -143,36 +143,30 @@ def _read_write_to_tensors[
 
     # Allocate and populate tensor to encode
     # Buffer with the original data
-    var data_matrix_backing = Array[Float32, num_elements](uninitialized=True)
+    var data_matrix_backing = Array[Float32, num_elements](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     var data_matrix_ptr: MutPointer[
         Float32, origin_of(data_matrix_backing)
     ] = data_matrix_backing.unsafe_ptr()
     var data_matrix = TileTensor(
         ptr=data_matrix_ptr, layout=row_major[num_elements]()
     )
-    for i in range(num_elements):
-        data_matrix[i] = Float32(i)
 
     # Tensor to store the packed data
     comptime assert num_elements % group_size == 0
     comptime num_blocks = ceildiv(num_elements, group_size)
     comptime block_size = size_of[Q4sym[group_size]]()
-    var packed_blob_backing = Array[UInt8, num_blocks * block_size](
-        uninitialized=True
-    )
+    var packed_blob_backing = Array[UInt8, num_blocks * block_size](fill={})
     var packed_blob = TileTensor(
         packed_blob_backing, row_major[num_blocks * block_size]()
     )
 
     # Tensor to store the dequantized data
-    var out_data_matrix_backing = Array[Float32, num_elements](
-        uninitialized=True
-    )
+    var out_data_matrix_backing = Array[Float32, num_elements](fill=Float32(0))
     var out_data_matrix = TileTensor(
         out_data_matrix_backing, row_major[num_elements]()
     )
-    for i in range(num_elements):
-        out_data_matrix[i] = Float32(0)
 
     Q4sym[group_size, DType.float32].quantize_and_write_to_tensor(
         data_matrix.make_dynamic[.int64]().to_layout_tensor(),

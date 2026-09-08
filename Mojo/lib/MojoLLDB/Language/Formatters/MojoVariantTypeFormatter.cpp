@@ -50,9 +50,9 @@ struct VariantInfo {
 ///                                    raw u8)
 /// The active payload is `union->GetChildAtIndex(discriminant)`.
 ///
-/// See `KGEN/lib/Transforms/LowerCallingConventions.cpp::lowerVariantType`
+/// See `Mojo/lib/Transforms/LowerCallingConventions.cpp::lowerVariantType`
 /// for the `kgen.variant` → `kgen.struct<(union, scalar<ui8>)>` lowering
-/// and `KGEN/lib/KGENToLLVM/DebugInfoTypeConverter.cpp::buildDebugType(
+/// and `Mojo/lib/KGENToLLVM/DebugInfoTypeConverter.cpp::buildDebugType(
 /// POP::UnionType)` for the DWARF `DW_TAG_variant_part` emission whose
 /// `v0`/`v1`/... member names this formatter relies on.
 ///

@@ -149,7 +149,14 @@ def _launch_default[
         c_dtype,
         True,
         config,
-    ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+    ].run[
+        c.LayoutType,
+        a.LayoutType,
+        b.LayoutType,
+        c.Engine,
+        a.Engine,
+        b.Engine,
+    ]
     ctx.enqueue_function[k](
         c,
         a,

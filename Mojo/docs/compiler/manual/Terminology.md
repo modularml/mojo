@@ -24,7 +24,7 @@ Here are involved concepts in those lines (not in order).
   - `42` is the "runtime value". Try not to call it just a "value" because also
     have compile-time values.
   - `Int` is the "type"
-- In `fn foo[T: Stringable](x: T):`
+- In `def foo[T: Stringable](x: T):`
   - `x` is an “argument”. `x` is **not** a “parameter”. ⚠️ Because...
   - `T` is a "parameter". ⚠️ Outsiders call them "generic arguments" or "generic
     parameters", but here they're just "parameters".
@@ -45,7 +45,7 @@ Here are involved concepts in those lines (not in order).
     made up of parameter values.
   - A “parameter value” is **not** always a “type”. ⚠️ For example, `N` is a
     value that’s not a type.
-- Revisiting `fn foo[T: Stringable](x: T):`:
+- Revisiting `def foo[T: Stringable](x: T):`:
   - In this case, the second mention of `T` is also a “type”, but more often
     you'll hear it referred to as a "trait" or a "metatype".
     - "Metatype" = "trait" is a good rule of thumb, though sometimes people say
@@ -143,13 +143,13 @@ A trait (like `Launchable`) is a collection of metatypes with a set of shared
 requirements. Here are some example metatypes for that trait:
 
 - This metatype / these requirements:
-  - `fn launch(mut self)`
+  - `def launch(mut self)`
 - This metatype / these requirements:
-  - `fn launch(mut self)`
-  - `fn land(mut self)`
+  - `def launch(mut self)`
+  - `def land(mut self)`
 - This metatype / these requirements:
-  - `fn launch(mut self)`
-  - `fn fire(mut self, num_missiles: Int)`
+  - `def launch(mut self)`
+  - `def fire(mut self, num_missiles: Int)`
 
 Any type conforming to any of these metatypes can satisfy that trait.
 

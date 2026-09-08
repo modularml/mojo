@@ -122,7 +122,7 @@ struct SelectiveScanFwd[delta_softplus: Bool = False]:
                 "Unsupported dstate: " + String(dstate) + ". Expected 8 or 16."
             )
 
-        # Dispatch runtime dstate to compile-time DSTATE for @parameter for
+        # Dispatch runtime dstate to compile-time DSTATE for comptime for
         # loop unrolling and guaranteed register allocation on GPU.
         comptime if is_cpu[target]():
             if dstate == 16:

@@ -38,6 +38,12 @@ struct CacheBustingBuffer[dtype: DType](ImplicitlyCopyable):
     var buffer_size: Int
 
     def __init__(
+        out self, tensor_size: Int, ctx: DeviceContext, enabled: Bool = True
+    ) raises:
+        # A TMA descriptor's globalAddress must be 16-byte aligned.
+        self = Self(tensor_size, 16 // size_of[Self.dtype](), ctx, enabled)
+
+    def __init__(
         out self,
         tensor_size: Int,
         alignment: Int,

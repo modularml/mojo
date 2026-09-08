@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Dependency-light per-target metadata, dispatched by triple via
-// `TargetTraitsRegistry`. It lives in the low `KGEN/lib/Target` layer so any
+// `TargetTraitsRegistry`. It lives in the low `Mojo/lib/Target` layer so any
 // KGEN component can query a target's metadata without linking the codegen
 // layer (`TargetBackend`). A supported target registers a full implementation
 // from its own source file; a triple with no registered traits is an error at

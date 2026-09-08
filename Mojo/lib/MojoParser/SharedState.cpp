@@ -2775,20 +2775,37 @@ FailureOr<TypedAttr> BuiltinFunctionFolder::fold(Operation &op) {
     return failure();
   };
 
-  // We can fold hlcf.if operations in limited form that end with a yield of
-  // a single value for which both sides are foldable.
-  if (auto ifOp = dyn_cast<HLCF::IfOp>(op)) {
-    if (auto condVal = findValue(ifOp.getCond())) {
-      auto isYield = [](Operation &op) { return isa<HLCF::YieldOp>(op); };
-      auto trueVal = foldBlock(ifOp.getThenBlock(), isYield);
-      if (failed(trueVal))
-        return trueVal;
-      auto falseVal = foldBlock(ifOp.getElseBlock(), isYield);
-      if (failed(falseVal))
-        return falseVal;
+  // We can fold hlcf.if / single-arm hlcf.elif operations in limited form that
+  // end with a yield of a single value for which both sides are foldable.
+  auto foldIfLike = [&](Value cond, Block &thenBlock,
+                        Block &elseBlock) -> FailureOr<TypedAttr> {
+    auto condVal = findValue(cond);
+    if (!condVal)
+      return TypedAttr();
+    auto isYield = [](Operation &op) { return isa<HLCF::YieldOp>(op); };
+    auto trueVal = foldBlock(thenBlock, isYield);
+    if (failed(trueVal))
+      return trueVal;
+    auto falseVal = foldBlock(elseBlock, isYield);
+    if (failed(falseVal))
+      return falseVal;
 
-      return ParamOperatorAttr::get(POC::Cond, {condVal, *trueVal, *falseVal},
-                                    trueVal->getType());
+    return ParamOperatorAttr::get(POC::Cond, {condVal, *trueVal, *falseVal},
+                                  trueVal->getType());
+  };
+  if (auto ifOp = dyn_cast<HLCF::IfOp>(op)) {
+    auto folded =
+        foldIfLike(ifOp.getCond(), ifOp.getThenBlock(), ifOp.getElseBlock());
+    if (failed(folded) || *folded)
+      return folded;
+  }
+  if (auto elifOp = dyn_cast<HLCF::ElifOp>(op)) {
+    // Only fold the simple if/else shape (no additional elif arms).
+    if (elifOp.getElifRegions().empty()) {
+      auto folded = foldIfLike(elifOp.getCond(), elifOp.getThenBlock(),
+                               elifOp.getElseBlock());
+      if (failed(folded) || *folded)
+        return folded;
     }
   }
 
