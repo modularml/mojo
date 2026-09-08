@@ -137,9 +137,6 @@ This version is still a work in progress.
 ## Library changes
 
 - [`OwnedDLHandle`](/docs/std/ffi/OwnedDLHandle/) now conforms to `Boolable`.
-  It already had a `__bool__()` reporting whether the handle is valid, but the
-  missing conformance kept it out of anything generic over `Boolable`,
-  including `assert_false()`.
 
 - `Coord` has a new `replace[at](value)` method that returns a `Coord` with
   the element at `at` swapped for `value`, keeping the other elements' types. A
