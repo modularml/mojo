@@ -46,7 +46,7 @@ from std.sys import simd_width_of
 from std.ffi import c_char, CStringSlice
 from std.sys.intrinsics import likely, unlikely
 
-from std.bit import count_trailing_zeros
+from std.bit import count_leading_zeros, count_trailing_zeros
 from std.bit.mask import is_negative, splat
 from std.memory import (
     unsafe_memcmp,
@@ -1198,17 +1198,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         print("mojo  ".strip()) # "mojo"
         ```
         """
-        var r_idx = self.byte_length()
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self.__reversed__():
-        #     if not s.isspace():
-        #         break
-        #     r_idx -= 1
-        while (
-            r_idx > 0 and Codepoint(self.as_bytes()[r_idx - 1]).is_posix_space()
-        ):
-            r_idx -= 1
-        return Self(unsafe_from_utf8=self.as_bytes()[:r_idx])
+        return Self(unsafe_from_utf8=self.as_bytes()[:_rstrip_whitespace(self)])
 
     @always_inline
     def lstrip(self, chars: ImmStringSpan) -> Self:
@@ -1244,18 +1234,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         print("  mojo".strip()) # "mojo"
         ```
         """
-        var l_idx = 0
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self:
-        #     if not s.isspace():
-        #         break
-        #     l_idx += 1
-        while (
-            l_idx < self.byte_length()
-            and Codepoint(self.as_bytes()[l_idx]).is_posix_space()
-        ):
-            l_idx += 1
-        return Self(unsafe_from_utf8=self.as_bytes()[l_idx:])
+        return Self(unsafe_from_utf8=self.as_bytes()[_lstrip_whitespace(self):])
 
     def bytes(self) -> BytesIter[Self.origin]:
         """Returns an iterator over the raw bytes of this string span.
@@ -2609,6 +2588,129 @@ def _to_string_list[
         lambda (v: Span[Byte, O]) -> Int: len(v),
         lambda (v: Span[Byte, O]) -> Pointer[Byte, O]: v.unsafe_ptr(),
     ](items)
+
+
+@always_inline
+def _is_posix_space_vec[W: Int](
+    block: SIMD[DType.uint8, W]
+) -> SIMD[DType.bool, W]:
+    """Returns a boolean SIMD vector indicating which bytes are POSIX whitespace.
+
+    The POSIX whitespace bytes are: `\\t\\n\\v\\f\\r` (0x09-0x0d),
+    `\\x1c\\x1d\\x1e` (0x1c-0x1e), and ` ` (0x20).
+
+    Uses the unsigned-subtraction range trick to cover each contiguous group
+    with a single comparison, then ORs the results together.
+
+    Parameters:
+        W: The SIMD vector width.
+
+    Args:
+        block: A vector of bytes to classify.
+
+    Returns:
+        A boolean vector where `True` means the byte is a POSIX space.
+    """
+    comptime lo_ht = SIMD[DType.uint8, W](UInt8(ord("\t")))  # 0x09
+    comptime range_ht = SIMD[DType.uint8, W](UInt8(4))  # \t...\r (0x09-0x0d)
+    comptime lo_fs = SIMD[DType.uint8, W](UInt8(ord("\x1c")))  # 0x1c
+    comptime range_fs = SIMD[DType.uint8, W](UInt8(2))  # \x1c...\x1e
+    comptime sp = SIMD[DType.uint8, W](UInt8(ord(" ")))  # 0x20
+    return (
+        (block - lo_ht).le(range_ht)
+        | (block - lo_fs).le(range_fs)
+        | block.eq(sp)
+    )
+
+
+@always_inline
+def _lstrip_whitespace[origin: Origin](s: StringSlice[origin=origin]) -> Int:
+    """Returns the byte index of the first non-whitespace byte in `s`.
+
+    Scans from the left, skipping POSIX whitespace bytes. Uses SIMD to process
+    `simd_width_of[DType.bool]()` bytes at a time when the string is long
+    enough.
+
+    Args:
+        s: The string slice to scan.
+
+    Returns:
+        The byte index of the first non-whitespace byte, or `len(s)` if all
+        bytes are whitespace.
+    """
+    var ptr = s.unsafe_ptr()
+    var length = s.byte_length()
+    if (
+        __is_run_in_comptime_interpreter
+        or length < simd_width_of[DType.bool]()
+    ):
+        for i in range(length):
+            if not Codepoint(ptr[unsafe_offset=i]).is_posix_space():
+                return i
+        return length
+    comptime bool_mask_width = simd_width_of[DType.bool]()
+    var vectorized_end = align_down(length, bool_mask_width)
+    var i = 0
+    while i < vectorized_end:
+        var block = ptr.unsafe_load[width=bool_mask_width](i)
+        var non_ws_mask = pack_bits(~_is_posix_space_vec(block))
+        if non_ws_mask:
+            return i + Int(count_trailing_zeros(non_ws_mask))
+        i += bool_mask_width
+    while i < length:
+        if not Codepoint(ptr[unsafe_offset=i]).is_posix_space():
+            return i
+        i += 1
+    return length
+
+
+@always_inline
+def _rstrip_whitespace[origin: Origin](s: StringSlice[origin=origin]) -> Int:
+    """Returns the exclusive end byte index after stripping trailing whitespace.
+
+    Scans from the right, skipping POSIX whitespace bytes. Uses SIMD to
+    process `simd_width_of[DType.bool]()` bytes at a time when the string is
+    long enough.
+
+    Args:
+        s: The string slice to scan.
+
+    Returns:
+        The exclusive upper bound of the non-whitespace content, i.e.
+        `s.as_bytes()[:result]` is the rstripped slice.
+    """
+    var ptr = s.unsafe_ptr()
+    var r_idx = s.byte_length()
+    if (
+        __is_run_in_comptime_interpreter
+        or r_idx < simd_width_of[DType.bool]()
+    ):
+        while (
+            r_idx > 0
+            and Codepoint(ptr[unsafe_offset=r_idx - 1]).is_posix_space()
+        ):
+            r_idx -= 1
+        return r_idx
+    comptime bool_mask_width = simd_width_of[DType.bool]()
+    var vectorized_end = align_down(r_idx, bool_mask_width)
+    # Scalar tail: bytes from vectorized_end to r_idx-1
+    while r_idx > vectorized_end:
+        r_idx -= 1
+        if not Codepoint(ptr[unsafe_offset=r_idx]).is_posix_space():
+            return r_idx + 1
+    # SIMD blocks right to left
+    var i = vectorized_end - bool_mask_width
+    while i >= 0:
+        var block = ptr.unsafe_load[width=bool_mask_width](i)
+        var non_ws_mask = pack_bits(~_is_posix_space_vec(block))
+        if non_ws_mask:
+            var last_pos = Int(
+                type_of(non_ws_mask)(bool_mask_width - 1)
+                - count_leading_zeros(non_ws_mask)
+            )
+            return i + last_pos + 1
+        i -= bool_mask_width
+    return 0
 
 
 @always_inline

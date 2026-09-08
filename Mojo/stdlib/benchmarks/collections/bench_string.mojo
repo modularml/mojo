@@ -161,6 +161,42 @@ def bench_string_splitlines[
 
 
 # ===-----------------------------------------------------------------------===#
+# Benchmark string lstrip
+# ===-----------------------------------------------------------------------===#
+@parameter
+def bench_string_lstrip[
+    length: Int = 0, filename: StaticString = "UN_charter_EN"
+](mut b: Bencher) raises:
+    var items = StringSlice(make_string[length](filename + ".txt"))
+
+    @always_inline
+    def call_fn() {imm}:
+        for _ in range(10**6 // length):
+            var res = black_box(items).lstrip()
+            keep(res)
+
+    b.iter(call_fn)
+
+
+# ===-----------------------------------------------------------------------===#
+# Benchmark string rstrip
+# ===-----------------------------------------------------------------------===#
+@parameter
+def bench_string_rstrip[
+    length: Int = 0, filename: StaticString = "UN_charter_EN"
+](mut b: Bencher) raises:
+    var items = StringSlice(make_string[length](filename + ".txt"))
+
+    @always_inline
+    def call_fn() {imm}:
+        for _ in range(10**6 // length):
+            var res = black_box(items).rstrip()
+            keep(res)
+
+    b.iter(call_fn)
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark string lower
 # ===-----------------------------------------------------------------------===#
 def bench_string_lower[
@@ -447,6 +483,14 @@ def main() raises:
             m.bench_function(
                 bench_string_splitlines[length, fname],
                 BenchId(String("bench_string_splitlines", suffix)),
+            )
+            m.bench_function(
+                bench_string_lstrip[length, fname],
+                BenchId(String("bench_string_lstrip", suffix)),
+            )
+            m.bench_function(
+                bench_string_rstrip[length, fname],
+                BenchId(String("bench_string_rstrip", suffix)),
             )
             m.bench_function(
                 bench_string_lower[length, fname],
