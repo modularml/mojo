@@ -21,34 +21,10 @@ The constants are resolved at compile time based on the target GPU architecture 
 are used to optimize code generation and ensure hardware compatibility.
 """
 
-import std._gpu.globals
 
-comptime MAX_THREADS_PER_BLOCK_METADATA = std._gpu.globals.MAX_THREADS_PER_BLOCK_METADATA
-"""This is metadata tag that is used in conjunction with __llvm_metadata to
-give a hint to the compiler about the max threads per block that's used."""
-
-comptime WARP_SIZE = std._gpu.globals.WARP_SIZE
-"""The number of threads that execute in lockstep within a warp on the GPU.
-
-This constant represents the hardware warp size, which is the number of threads that execute
-instructions synchronously as a unit. The value is architecture-dependent:
-- 32 threads per warp on NVIDIA GPUs
-- 32 threads per warp on AMD RDNA GPUs
-- 64 threads per warp on AMD CDNA GPUs
-- 0 if no GPU is detected
-
-The warp size is a fundamental parameter that affects:
-- Thread scheduling and execution
-- Memory access coalescing
-- Synchronization primitives
-- Overall performance optimization
-"""
-
-comptime WARPGROUP_SIZE = std._gpu.globals.WARPGROUP_SIZE
-"""The number of threads in a warpgroup on Nvidia GPUs.
-
-On Nvidia GPUs after hopper, a warpgroup consists of 4 subsequent arps
-i.e. 128 threads. The first warp id must be multiple of 4.
-
-Warpgroup is used for wgmma instructions on Hopper and tcgen05.ld on Blackwell.
-"""
+@__doc_inline
+from std._gpu.globals import (
+    MAX_THREADS_PER_BLOCK_METADATA,
+    WARP_SIZE,
+    WARPGROUP_SIZE,
+)

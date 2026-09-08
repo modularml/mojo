@@ -486,7 +486,7 @@ def shuffle_idx[
     Example:
 
         ```mojo
-            from std._gpu.primitives.warp import shuffle_idx
+            from max.gpu.primitives.warp import shuffle_idx
 
             val = SIMD[.float32, 16](1.0)
 
@@ -545,7 +545,7 @@ def shuffle_idx[
     Example:
 
         ```mojo
-            from std._gpu.primitives.warp import shuffle_idx
+            from max.gpu.primitives.warp import shuffle_idx
 
             # Only broadcast to first 16 lanes
             var mask: UInt = 0xFFFF  # 16 ones
@@ -842,7 +842,7 @@ def shuffle_xor[
     Example:
 
         ```mojo
-            from std._gpu.primitives.warp import shuffle_xor
+            from max.gpu.primitives.warp import shuffle_xor
 
             # Exchange values between even-numbered threads 4 lanes apart
             var mask: UInt = 0xAAAAAAAA  # Even threads only
@@ -909,7 +909,7 @@ def lane_group_reduce[
     Example:
 
         ```mojo
-            from std._gpu.primitives.warp import lane_group_reduce, shuffle_down
+            from max.gpu.primitives.warp import lane_group_reduce, shuffle_down
 
             # Compute sum across 16 threads using shuffle down
             @__parameter
@@ -962,7 +962,7 @@ def reduce[
     Example:
 
     ```mojo
-        from std._gpu.primitives.warp import reduce, shuffle_down
+        from max.gpu.primitives.warp import reduce, shuffle_down
 
         # Compute warp-wide sum using shuffle down
         @__parameter
@@ -1427,7 +1427,7 @@ def match_any[
     Example:
 
         ```mojo
-        from std._gpu.primitives.warp import match_any
+        from max.gpu.primitives.warp import match_any
 
         # If lanes 0, 3, 7 hold the same value, each of them gets a mask with
         # bits 0, 3, and 7 set; the remaining lanes get their own groups.
@@ -1545,7 +1545,7 @@ def match_all[
     Example:
 
         ```mojo
-        from std._gpu.primitives.warp import match_all
+        from max.gpu.primitives.warp import match_all
 
         # `agreed` is non-zero (the active-lane mask) iff every lane passed the
         # same `key`.
