@@ -397,7 +397,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         Args:
             hasher: The hasher instance.
         """
-        hasher._update_with_bytes(
+        hasher.update(
             Span(unsafe_ptr=self.unsafe_ptr(), length=self.byte_length())
         )
 

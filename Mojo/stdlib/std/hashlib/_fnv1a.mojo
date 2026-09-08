@@ -34,7 +34,7 @@ struct Fnv1a(Defaultable, Hasher):
         """Initialize the hasher."""
         self._value = 0xCBF29CE484222325
 
-    def _update_with_bytes(mut self, data: Span[Byte, _]):
+    def update(mut self, data: ImmSpan[Byte, _]):
         """Consume provided data to update the internal buffer.
 
         Args:
@@ -64,14 +64,6 @@ struct Fnv1a(Defaultable, Hasher):
             comptime for r in range(rounds):
                 self._value ^= (v >> type_of(v)(r * 64)).cast[.uint64]()
                 self._value *= 0x100000001B3
-
-    def update(mut self, value: ImmSpan[Byte, _]):
-        """Update the buffer value with new hashable value.
-
-        Args:
-            value: Value used for update.
-        """
-        self._update_with_bytes(value)
 
     def finish(var self) -> UInt64:
         """Computes the hash value based on all the previously provided data.

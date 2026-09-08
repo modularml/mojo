@@ -44,9 +44,6 @@ trait Hasher:
         """Initialize a new hasher instance."""
         ...
 
-    def _update_with_bytes(mut self, data: Span[Byte, _]):
-        ...
-
     def _update_with_simd(mut self, value: SIMD[_, _]):
         ...
 
