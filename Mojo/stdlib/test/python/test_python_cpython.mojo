@@ -579,5 +579,18 @@ def test_pymoduledef_write_repr_to() raises:
     assert_true("size=" in s)
 
 
+def test_is_free_threaded_detection() raises:
+    # Is the CPython instance free-threaded
+    var python = Python()
+    ref cpython = python.cpython()
+    var is_free_threaded = cpython.is_free_threaded
+
+    # Was the interpreter compiled with free-threading support
+    var sys = Python.import_module("sys")
+    var expected_free_threaded = "t" in String(sys.abiflags)
+
+    assert_equal(cpython.is_free_threaded, expected_free_threaded)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

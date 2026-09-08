@@ -552,8 +552,10 @@ struct PyObject(
     """All object types are extensions of this type. This is a type which
     contains the information Python needs to treat a pointer to an object as an
     object. In a normal “release” build, it contains only the object's reference
-    count and a pointer to the corresponding type object. Nothing is actually
-    declared to be a PyObject, but every pointer to a Python object can be cast
+    count and a pointer to the corresponding type object. In the free-threaded
+    build (i.e. Py_GIL_DISABLED), it contains additional fields, see
+    _PyObject_FreeThreaded for more details. Nothing is actually declared to be a
+    PyObject, but every pointer to a Python object can be cast
     to a PyObject.
 
     References:
@@ -592,6 +594,86 @@ struct PyObject(
         """
         fmt.FormatStruct(writer, "PyObject").fields(
             fmt.Named("object_ref_count", self.object_ref_count),
+            fmt.Named("object_type", self.object_type),
+        )
+
+
+@fieldwise_init
+struct _PyMutex(Defaultable, ImplicitlyCopyable):
+    """CPython `PyMutex` from `Include/cpython/lock.h`."""
+
+    # https://github.com/python/cpython/blob/629da5c914b4407e01c1dc06cbcbd8dce825fef3/Include/cpython/pylock.h#L33
+
+    var bits: UInt8
+
+    def __init__(out self):
+        self.bits = 0
+
+
+@fieldwise_init
+struct _PyObject_FreeThreaded(
+    Defaultable,
+    ImplicitlyCopyable,
+    Writable,
+):
+    """CPython free-threaded `_object` layout (`Py_GIL_DISABLED`). Same docs for `PyObject` apply,
+    but with additional fields used by the free-threaded interpreter.
+    """
+
+    # https://github.com/python/cpython/blob/629da5c914b4407e01c1dc06cbcbd8dce825fef3/Include/object.h#L156
+
+    var object_tid: c_size_t
+    var object_flags: UInt16
+    var object_mutex: _PyMutex
+    var object_gc_bits: UInt8
+    var object_ref_local: UInt32
+    var object_ref_shared: Py_ssize_t
+    var object_type: PyTypeObjectPtr
+
+    def __init__(out self):
+        self.object_tid = 0
+        self.object_flags = 0
+        self.object_mutex = {}
+        self.object_gc_bits = 0
+        self.object_ref_local = 0
+        self.object_ref_shared = 0
+        self.object_type = {}
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    def write_to(self, mut writer: Some[Writer]):
+        """Formats to the provided Writer.
+
+        Args:
+            writer: The object to write to.
+        """
+
+        writer.write("_PyObject_FreeThreaded(")
+        writer.write("object_tid=", self.object_tid, ",")
+        writer.write("object_flags=", self.object_flags, ",")
+        writer.write("object_mutex=", self.object_mutex.bits, ",")
+        writer.write("object_gc_bits=", self.object_gc_bits, ",")
+        writer.write("object_ref_local=", self.object_ref_local, ",")
+        writer.write("object_ref_shared=", self.object_ref_shared, ",")
+        writer.write("object_type=", self.object_type)
+        writer.write(")")
+
+    @no_inline
+    def write_repr_to(self, mut writer: Some[Writer]):
+        """Writes the repr of this `_PyObject_FreeThreaded` to a writer.
+
+        Args:
+            writer: The object to write to.
+        """
+        fmt.FormatStruct(writer, "_PyObject_FreeThreaded").fields(
+            fmt.Named("object_tid", self.object_tid),
+            fmt.Named("object_flags", self.object_flags),
+            fmt.Named("object_mutex", self.object_mutex.bits),
+            fmt.Named("object_gc_bits", self.object_gc_bits),
+            fmt.Named("object_ref_local", self.object_ref_local),
+            fmt.Named("object_ref_shared", self.object_ref_shared),
             fmt.Named("object_type", self.object_type),
         )
 
@@ -677,15 +759,13 @@ struct PyModuleDef_Slot:
     var value: OpaquePointer[MutUntrackedOrigin]
 
 
-struct PyModuleDef(Movable, Writable):
-    """The Python module definition structs that holds all of the information
-    needed to create a module.
+struct _PyModuleDef_Body(Movable):
+    """The trailing CPython `PyModuleDef` fields after `m_base`.
 
-    References:
-    - https://docs.python.org/3/c-api/module.html#c.PyModuleDef
+    Shared between the GIL-build `PyModuleDef` and the free-threaded
+    `_PyModuleDef_FreeThreaded` so the two layouts share this functionality after
+    their (differently sized) `PyModuleDef_Base`.
     """
-
-    var base: PyModuleDef_Base
 
     var name: Optional[CStringSlice[ImmStaticOrigin]]
     """Name for the new module."""
@@ -727,7 +807,6 @@ struct PyModuleDef(Movable, Writable):
     or `NULL` if not needed."""
 
     def __init__(out self, name: StaticString):
-        self.base = {}
         self.name = name.as_c_string_slice()
         self.docstring = {}
         # setting `size` to -1 means that the module does not support sub-interpreters
@@ -737,6 +816,25 @@ struct PyModuleDef(Movable, Writable):
         self.traverse_fn = _null_fn_ptr[Self._traverse_fn_type]()
         self.clear_fn = _null_fn_ptr[Self._clear_fn_type]()
         self.free_fn = _null_fn_ptr[Self._free_fn_type]()
+
+
+struct PyModuleDef(Movable, Writable):
+    """The Python module definition structs that holds all of the information
+    needed to create a module.
+
+    References:
+    - https://docs.python.org/3/c-api/module.html#c.PyModuleDef
+    """
+
+    var base: PyModuleDef_Base
+    """The initial `PyModuleDef_Base` segment (GIL-enabled build `PyObject` head)."""
+
+    var body: _PyModuleDef_Body
+    """The trailing CPython `PyModuleDef` fields after `m_base`."""
+
+    def __init__(out self, name: StaticString):
+        self.base = {}
+        self.body = _PyModuleDef_Body(name)
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -755,11 +853,11 @@ struct PyModuleDef(Movable, Writable):
 
         writer.write("PyModuleDef(")
         writer.write("base=", self.base, ",")
-        writer.write("name=", self.name, ",")
-        writer.write("docstring=", self.docstring, ",")
-        writer.write("size=", self.size, ",")
-        writer.write("methods=", self.methods, ",")
-        writer.write("slots=", self.slots, ",")
+        writer.write("name=", self.body.name, ",")
+        writer.write("docstring=", self.body.docstring, ",")
+        writer.write("size=", self.body.size, ",")
+        writer.write("methods=", self.body.methods, ",")
+        writer.write("slots=", self.body.slots, ",")
         writer.write("traverse_fn=<unprintable>", ",")
         writer.write("clear_fn=<unprintable>", ",")
         writer.write("free_fn=<unprintable>")
@@ -773,11 +871,57 @@ struct PyModuleDef(Movable, Writable):
             writer: The object to write to.
         """
         fmt.FormatStruct(writer, "PyModuleDef").fields(
-            fmt.Named("name", self.name),
-            fmt.Named("size", self.size),
-            fmt.Named("methods", self.methods),
-            fmt.Named("slots", self.slots),
+            fmt.Named("name", self.body.name),
+            fmt.Named("size", self.body.size),
+            fmt.Named("methods", self.body.methods),
+            fmt.Named("slots", self.body.slots),
         )
+
+
+struct _PyModuleDef_Base_FreeThreaded(Defaultable, Movable):
+    """`PyModuleDef_Base` for a free-threaded CPython build (`Py_GIL_DISABLED`).
+
+    Identical to `PyModuleDef_Base` except the embedded `PyObject` head uses the
+    larger free-threaded `_PyObject_FreeThreaded` layout.
+    """
+
+    var object_base: _PyObject_FreeThreaded
+    """The initial segment of every `PyObject` in a free-threaded CPython."""
+
+    comptime _init_fn_type = def() thin abi("C") -> PyObjectPtr
+    var init_fn: Self._init_fn_type
+    """The function used to re-initialize the module."""
+
+    var index: Py_ssize_t
+    """The module's index into its interpreter's `modules_by_index` cache."""
+
+    var dict_copy: PyObjectPtr
+    """A copy of the module's `__dict__` after the first time it was loaded."""
+
+    def __init__(out self):
+        self.object_base = {}
+        self.init_fn = _null_fn_ptr[Self._init_fn_type]()
+        self.index = 0
+        self.dict_copy = {}
+
+
+struct _PyModuleDef_FreeThreaded(Movable):
+    """Free-threaded (`Py_GIL_DISABLED`) layout of CPython `PyModuleDef`.
+
+    Mirrors `PyModuleDef`, but with the free-threaded `PyModuleDef_Base`. Used
+    when creating an extension module against a free-threaded interpreter, where
+    the GIL-build `PyModuleDef` layout would misalign and segfault.
+    """
+
+    var base: _PyModuleDef_Base_FreeThreaded
+    """The free-threaded `PyModuleDef_Base` segment."""
+
+    var body: _PyModuleDef_Body
+    """The trailing CPython `PyModuleDef` fields after `m_base`."""
+
+    def __init__(out self, name: StaticString):
+        self.base = {}
+        self.body = _PyModuleDef_Body(name)
 
 
 # ===-------------------------------------------------------------------===#
@@ -920,6 +1064,15 @@ comptime PyGILState_Check = ExternalFunction[
     "PyGILState_Check",
     # int PyGILState_Check()
     def() thin abi("C") -> c_int,
+]
+
+# `PyUnstable_Module_SetGIL` is only compiled into free-threaded
+# (`Py_GIL_DISABLED`) builds.
+# https://github.com/python/cpython/blob/main/Include/moduleobject.h
+comptime PyUnstable_Module_SetGIL = ExternalFunction[
+    "PyUnstable_Module_SetGIL",
+    # int PyUnstable_Module_SetGIL(PyObject *module, void *gil)
+    def(PyObjectPtr, OpaquePointer[MutUntrackedOrigin]) thin abi("C") -> c_int,
 ]
 
 # Importing Modules
@@ -1346,6 +1499,17 @@ comptime PyModule_Create2 = ExternalFunction[
         OptionalPointer[PyModuleDef, MutUntrackedOrigin], c_int
     ) thin abi("C") -> PyObjectPtr,
 ]
+# This binds the *same* C symbol (`PyModule_Create2`) as the binding
+# above. CPython has a single `PyModule_Create2`; we expose a second Mojo
+# signature that takes the free-threaded `PyModuleDef` layout, so the correctly
+# sized struct is passed when running against a free-threaded interpreter.
+comptime PyModule_Create2_FreeThreaded = ExternalFunction[
+    "PyModule_Create2",
+    # PyObject *PyModule_Create2(PyModuleDef *def, int module_api_version)
+    def(
+        OptionalPointer[_PyModuleDef_FreeThreaded, MutUntrackedOrigin], c_int
+    ) thin abi("C") -> PyObjectPtr,
+]
 comptime PyModule_AddFunctions = ExternalFunction[
     "PyModule_AddFunctions",
     # int PyModule_AddFunctions(PyObject *module, PyMethodDef *functions)
@@ -1421,6 +1585,12 @@ def _PyErr_GetRaisedException_dummy() abi("C") -> PyObjectPtr:
 
 def _PyType_GetName_dummy(type: PyTypeObjectPtr) abi("C") -> PyObjectPtr:
     abort("PyType_GetName is not available in this Python version")
+
+
+def _PyUnstable_Module_SetGIL_dummy(
+    module: PyObjectPtr, gil: OpaquePointer[MutUntrackedOrigin]
+) abi("C") -> c_int:
+    abort("PyUnstable_Module_SetGIL is not available in this Python version")
 
 
 # ===-------------------------------------------------------------------===#
@@ -1567,6 +1737,8 @@ struct CPython(Defaultable, Movable):
     """The version of the Python runtime."""
     var init_error: StaticString
     """An error message if initialization failed."""
+    var is_free_threaded: Bool
+    """Whether CPython was built free-threaded (`Py_GIL_DISABLED`)."""
 
     # fields holding function pointers to CPython C API functions
     # ordered based on https://docs.python.org/3/c-api/index.html
@@ -1594,6 +1766,7 @@ struct CPython(Defaultable, Movable):
     var _PyGILState_Ensure: PyGILState_Ensure.type
     var _PyGILState_Release: PyGILState_Release.type
     var _PyGILState_Check: PyGILState_Check.type
+    var _PyUnstable_Module_SetGIL: PyUnstable_Module_SetGIL.type
     # Importing Modules
     var _PyImport_ImportModule: PyImport_ImportModule.type
     var _PyImport_AddModule: PyImport_AddModule.type
@@ -1695,6 +1868,7 @@ struct CPython(Defaultable, Movable):
     # Module Objects
     var _PyModule_GetDict: PyModule_GetDict.type
     var _PyModule_Create2: PyModule_Create2.type
+    var _PyModule_Create2_FreeThreaded: PyModule_Create2_FreeThreaded.type
     var _PyModule_AddFunctions: PyModule_AddFunctions.type
     var _PyModule_AddObjectRef: PyModule_AddObjectRef.type
     # Slice Objects
@@ -1796,6 +1970,16 @@ struct CPython(Defaultable, Movable):
         self._PyGILState_Ensure = PyGILState_Ensure.load(self.lib.borrow())
         self._PyGILState_Release = PyGILState_Release.load(self.lib.borrow())
         self._PyGILState_Check = PyGILState_Check.load(self.lib.borrow())
+        # `PyUnstable_Module_SetGIL` only exists in free-threaded builds; load
+        # the real symbol when present, otherwise an aborting stub.
+        if self.lib.check_symbol("PyUnstable_Module_SetGIL"):
+            self.is_free_threaded = True
+            self._PyUnstable_Module_SetGIL = PyUnstable_Module_SetGIL.load(
+                self.lib.borrow()
+            )
+        else:
+            self.is_free_threaded = False
+            self._PyUnstable_Module_SetGIL = _PyUnstable_Module_SetGIL_dummy
         # Importing Modules
         self._PyImport_ImportModule = PyImport_ImportModule.load(
             self.lib.borrow()
@@ -1962,6 +2146,9 @@ struct CPython(Defaultable, Movable):
         # Module Objects
         self._PyModule_GetDict = PyModule_GetDict.load(self.lib.borrow())
         self._PyModule_Create2 = PyModule_Create2.load(self.lib.borrow())
+        self._PyModule_Create2_FreeThreaded = (
+            PyModule_Create2_FreeThreaded.load(self.lib.borrow())
+        )
         self._PyModule_AddFunctions = PyModule_AddFunctions.load(
             self.lib.borrow()
         )
@@ -3623,10 +3810,6 @@ struct CPython(Defaultable, Movable):
 
         # NOTE: See https://github.com/pybind/pybind11/blob/a1d00916b26b187e583f3bce39cd59c3b0652c32/include/pybind11/pybind11.h#L1326
         # for what we want to do here.
-        var module_def_ptr = alloc(Layout[PyModuleDef].single()).unsafe_leak()
-        module_def_ptr.unsafe_write(PyModuleDef(name))
-
-        # TODO: set gil stuff
         # Note: Python automatically calls https://docs.python.org/3/c-api/module.html#c.PyState_AddModule
         # after the caller imports said module.
 
@@ -3635,6 +3818,34 @@ struct CPython(Defaultable, Movable):
         # if this mismatches with the user's Python, then a `RuntimeWarning` is emitted according to the
         # docs.
         comptime module_api_version: c_int = 1013
+
+        # On a free-threaded build (`Py_GIL_DISABLED`) the embedded `PyObject`
+        # head is larger, so `PyModuleDef` has a different layout. Allocate the
+        # matching struct and declare that the module supports running without
+        # the GIL.
+        if self.is_free_threaded:
+            var module_def_ptr = alloc(
+                Layout[_PyModuleDef_FreeThreaded].single()
+            ).unsafe_leak()
+            module_def_ptr.unsafe_write(_PyModuleDef_FreeThreaded(name))
+
+            var module = self._PyModule_Create2_FreeThreaded(
+                module_def_ptr, module_api_version
+            )
+            if module:
+                # `Py_MOD_GIL_NOT_USED` is `(void *)1` in CPython.
+                var gil_not_used = OpaquePointer[MutUntrackedOrigin](
+                    unsafe_from_address=1
+                )
+                if self._PyUnstable_Module_SetGIL(module, gil_not_used) == -1:
+                    # Don't leak the new reference from `PyModule_Create2` on
+                    # failure.
+                    self.Py_DecRef(module)
+                    return {}
+            return module
+
+        var module_def_ptr = alloc(Layout[PyModuleDef].single()).unsafe_leak()
+        module_def_ptr.unsafe_write(PyModuleDef(name))
         return self._PyModule_Create2(module_def_ptr, module_api_version)
 
     def PyModule_AddFunctions(
