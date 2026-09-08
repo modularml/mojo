@@ -155,8 +155,12 @@ metric with no samples avoids this: the field serializes to a single `null`, and
 consumers whose schemas mark the metric optional accept it and render an empty
 value.
 
-For the same reason, an unbounded `request_rate` is serialized as `None` at the
-results-publication boundary rather than as `inf`.
+An unbounded `request_rate` is serialized as the JSON string `"inf"` at the
+results-publication boundary rather than as a Python `inf`. Both
+`model_dump_json()` and BigQuery rewrite a non-finite float to `null`, which
+would collapse unbounded into the same token as a missing field. Legacy rows
+that already stored `null` stay `null`; treat both `"inf"` and `null` as
+unbounded when reading.
 
 ## Adding or changing a metric
 
