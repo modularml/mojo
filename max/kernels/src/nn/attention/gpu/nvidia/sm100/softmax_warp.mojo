@@ -817,18 +817,18 @@ def fa4_ws_intracta_combine[
         )
         m = max_ftz(m, maxsum_smem[(3 * rows + r) * 2])
 
-    var scale = Array[Scalar[accum_dtype], m_pack](uninitialized=True)
-    var lps = Array[Scalar[accum_dtype], m_pack](uninitialized=True)
-    comptime for p in range(m_pack):
+    def scale_at[p: Int]() {imm} -> Scalar[accum_dtype]:
         var mp = maxsum_smem[(p * rows + r) * 2]
-        var lp = maxsum_smem[(p * rows + r) * 2 + 1]
         var d = mp - m
         comptime if use_fma:
             d = mul_ftz(d, scale_log2e)
-        var s = exp2(d)
-        scale[p] = s
-        lps[p] = lp
-        # l_acc = s.fma(lp, l_acc)
+        return exp2(d)
+
+    def lps_at[p: Int]() {imm} -> Scalar[accum_dtype]:
+        return maxsum_smem[(p * rows + r) * 2 + 1]
+
+    var scale = Array[Scalar[accum_dtype], m_pack](fill_with_unrolled=scale_at)
+    var lps = Array[Scalar[accum_dtype], m_pack](fill_with_unrolled=lps_at)
     var l_acc: Float32
     comptime if m_pack == 2:
         l_acc = scale[1].fma(lps[1], scale[0] * lps[0])
@@ -1009,16 +1009,18 @@ def fa4_ws_level1_combine[
         )
         m = max_ftz(m, maxsum_smem[(3 * rows + r) * 2])
 
-    var scale = Array[Scalar[accum_dtype], m_pack](uninitialized=True)
-    var lps = Array[Scalar[accum_dtype], m_pack](uninitialized=True)
-    comptime for p in range(m_pack):
+    def scale_at[p: Int]() {imm} -> Scalar[accum_dtype]:
         var mp = maxsum_smem[(p * rows + r) * 2]
-        var lp = maxsum_smem[(p * rows + r) * 2 + 1]
         var d = mp - m
         comptime if use_fma:
             d = mul_ftz(d, scale_log2e)
-        scale[p] = exp2(d)
-        lps[p] = lp
+        return exp2(d)
+
+    def lps_at[p: Int]() {imm} -> Scalar[accum_dtype]:
+        return maxsum_smem[(p * rows + r) * 2 + 1]
+
+    var scale = Array[Scalar[accum_dtype], m_pack](fill_with_unrolled=scale_at)
+    var lps = Array[Scalar[accum_dtype], m_pack](fill_with_unrolled=lps_at)
     var l_acc: Float32
     comptime if m_pack == 2:
         l_acc = scale[1].fma(lps[1], scale[0] * lps[0])

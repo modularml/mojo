@@ -345,12 +345,11 @@ struct AppleM5Int8MatMul[
         comptime align = 16
         var lo16 = strip.raw_load[width=16, alignment=align](Int(lo_off))
         var hi16 = strip.raw_load[width=16, alignment=align](Int(hi_off))
-        var out = Array[SIMD[.int8, 8], 4](uninitialized=True)
-        comptime for j in range(4):
-            out[j] = lo16.slice[4, offset=4 * j]().join(
-                hi16.slice[4, offset=4 * j]()
-            )
-        return out^
+        return {
+            fill_with_unrolled = lambda [j: Int]() -> SIMD[
+                .int8, 8
+            ]: lo16.slice[4, offset=4 * j]().join(hi16.slice[4, offset=4 * j]())
+        }
 
     @staticmethod
     @always_inline
@@ -424,11 +423,11 @@ struct AppleM5Int8MatMul[
         var hi16 = t32.load_linear[width=16, alignment=align](
             IndexList[2](abs_row + 8, abs_k)
         )
-        var out = Array[SIMD[.int8, 8], 4](uninitialized=True)
-        comptime for j in range(4):
-            out[j] = lo16.slice[4, offset=4 * j]().join(
-                hi16.slice[4, offset=4 * j]()
-            )
+        var out = Array[SIMD[.int8, 8], 4](
+            fill_with_unrolled=lambda [j: Int]() -> SIMD[.int8, 8]: lo16.slice[
+                4, offset=4 * j
+            ]().join(hi16.slice[4, offset=4 * j]())
+        )
         return out^
 
     @staticmethod

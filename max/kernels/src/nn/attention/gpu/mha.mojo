@@ -7131,28 +7131,16 @@ def _naive_attention_with_transpose[
     )
 
     # BSHD -> BHSD
-    var q_perm_stack = Array[Int, 4](uninitialized=True)
+    var q_perm_stack: Array[Int, 4] = [0, 2, 1, 3]
     var q_perm = TileTensor(q_perm_stack, row_major[4]())
-    q_perm[0] = 0
-    q_perm[1] = 2
-    q_perm[2] = 1
-    q_perm[3] = 3
 
     # BSHD -> BHDS
-    var k_perm_stack = Array[Int, 4](uninitialized=True)
+    var k_perm_stack: Array[Int, 4] = [0, 2, 3, 1]
     var k_perm = TileTensor(k_perm_stack, row_major[4]())
-    k_perm[0] = 0
-    k_perm[1] = 2
-    k_perm[2] = 3
-    k_perm[3] = 1
 
     # BHSD -> BSHD
-    var o_perm_stack = Array[Int, 4](uninitialized=True)
+    var o_perm_stack: Array[Int, 4] = [0, 2, 1, 3]
     var o_perm = TileTensor(o_perm_stack, row_major[4]())
-    o_perm[0] = 0
-    o_perm[1] = 2
-    o_perm[2] = 1
-    o_perm[3] = 3
 
     var q_tt = TileTensor(
         q.ptr,
