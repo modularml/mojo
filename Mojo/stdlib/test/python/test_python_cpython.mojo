@@ -580,10 +580,7 @@ def test_pymoduledef_write_repr_to() raises:
 
 
 def test_cpython_init_populates_version() raises:
-    # A successful CPython initialization must record a real interpreter
-    # version. The init path only calls Py_Initialize and reads the version
-    # when the compatible library symbol is present; a regression there would
-    # leave the version at 0.0.0 even though the interpreter loaded.
+    # Successful CPython initialization records a real interpreter version.
     var python = Python()
     ref cpython = python.cpython()
     assert_true(cpython.version.major >= 3)
