@@ -359,11 +359,9 @@ def test_owned_dlhandle_automatic_cleanup() raises:
 
 
 def test_owned_dlhandle_destroy_null_handle() raises:
-    # `_find_dylib` hands back an uninitialized handle when a library is
-    # missing; destroying it must not reach `dlclose(NULL)`.
-    var lib = OwnedDLHandle(unsafe_uninitialized=True)
-    assert_false(lib, "uninitialized handle should be null")
-    lib^.__deinit__()
+    var null_handle = OwnedDLHandle(unsafe_uninitialized=True)
+    assert_false(null_handle, "uninitialized handle should be null")
+    null_handle^.__deinit__()  # must not `dlclose(NULL)`
 
 
 def main() raises:
