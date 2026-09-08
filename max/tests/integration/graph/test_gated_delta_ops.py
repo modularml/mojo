@@ -31,7 +31,6 @@ import max.driver as md
 import numpy as np
 import pytest
 import torch
-from fusion_utils import xfail_under_adv_fusion
 from max.driver import accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -46,7 +45,6 @@ _VALUE_HEAD_DIM = 128
 
 
 @pytest.mark.skipif(accelerator_count() == 0, reason="Requires GPU")
-@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_gated_delta_conv1d_fwd_shapes_and_in_place(
     session: InferenceSession,
 ) -> None:
@@ -135,7 +133,6 @@ def test_gated_delta_conv1d_fwd_shapes_and_in_place(
 
 
 @pytest.mark.skipif(accelerator_count() == 0, reason="Requires GPU")
-@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_gated_delta_recurrence_fwd_shapes_and_in_place(
     session: InferenceSession,
 ) -> None:
