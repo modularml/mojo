@@ -19,6 +19,7 @@ from std.collections.string.string_span import _to_string_list
 from std.math import isinf, isnan
 
 from std.memory import unsafe_memcpy
+from std.sys import simd_width_of
 from std.python import Python, PythonObject
 from std.testing import (
     assert_equal,
@@ -704,6 +705,58 @@ def test_rfind() raises:
     # TODO(#26444): Support unicode strings.
     # assert_equal(String("こんにちは").rfind("にち"), 2)
     # assert_equal(String("🔥🔥").rfind("🔥"), 1)
+
+
+def test_rfind_large_strings() raises:
+    # Tests targeting the SIMD path in _memrchr_impl (strings >= simd_width).
+    # Use sizes well above the maximum possible SIMD width (64 bytes on AVX-512)
+    # to ensure the SIMD code path is always exercised.
+    #
+    # For each size we test char positions that stress all branches:
+    #   - position 0:       last match found; scans all SIMD blocks
+    #   - position len-1:   first match found; in the scalar tail or first block
+    #   - middle:           match in an interior SIMD block
+    #   - no match:         returns -1
+    #   - last occurrence:  multiple matches, last one returned
+    comptime sizes = (65, 128, 129, 256, 257)
+    comptime for k in range(len(sizes)):
+        comptime n = rebind[Int](sizes[k])
+        # Build "xxx...xZxxx...x" strings with 'Z' at known positions.
+        var base = String("x") * n
+
+        # Match at position 0 only.
+        var s_first = String("Z") + String("x") * (n - 1)
+        assert_equal(s_first.rfind("Z"), 0)
+
+        # Match at last position only.
+        var s_last = String("x") * (n - 1) + String("Z")
+        assert_equal(s_last.rfind("Z"), n - 1)
+
+        # Match in the middle.
+        comptime mid = n // 2
+        var s_mid = String("x") * mid + String("Z") + String("x") * (n - mid - 1)
+        assert_equal(s_mid.rfind("Z"), mid)
+
+        # No match.
+        assert_equal(base.rfind("Z"), -1)
+
+        # Multiple matches — rfind must return the last occurrence.
+        var s_multi = (
+            String("Z") + String("x") * (mid - 1) + String("Z") + String("x") * (n - mid - 1)
+        )
+        assert_equal(s_multi.rfind("Z"), mid)
+
+        # Match at the SIMD block boundary (position simd_width - 1 and simd_width).
+        comptime w = simd_width_of[DType.uint8]()
+        comptime if n > w:
+            var s_boundary_before = (
+                String("x") * (w - 1) + String("Z") + String("x") * (n - w)
+            )
+            assert_equal(s_boundary_before.rfind("Z"), w - 1)
+            var s_boundary_after = (
+                String("x") * w + String("Z") + String("x") * (n - w - 1)
+            )
+            assert_equal(s_boundary_after.rfind("Z"), w)
 
 
 def test_split() raises:
