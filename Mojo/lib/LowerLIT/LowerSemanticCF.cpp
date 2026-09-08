@@ -87,8 +87,9 @@ private:
                     bool &enclosingBlockDoesBreak);
   void lowerParamFor(ParamForOp paramFor, bool &enclosingBlockDoesRaise,
                      bool &enclosingBlockDoesBreak);
-  void lowerElif(HLCF::ElifOp elifOp, bool &doesRaise, bool &doesBreak,
-                 bool &doesFallThrough);
+  /// Lower an `HLCF::ElifOp`, including constant-condition dead-arm cleanup.
+  /// Returns true when the elif does not fall through (caller should stop).
+  bool lowerElIfOp(HLCF::ElifOp elifOp, bool &doesRaise, bool &doesBreak);
   bool checkSelfRecursion(Block &block, bool isConditional);
 };
 } // end anonymous namespace
@@ -236,8 +237,8 @@ static ImplicitLocOpBuilder handleSemanticTerminatorOp(Operation &op,
                                                        StringRef stmtKind) {
   // Warn about dead code after the semantic terminator.
   Operation *nextOp = op.getNextNode();
-  // We do report an error on `parameter if` since `parameter if` serves as a
-  // if preprocessor in Mojo.
+  // We do not report an error on `parameter if` since `parameter if` serves as
+  // a "preprocessor" in Mojo.
   if (!isa<ParamIfOp>(op) && !nextOp->hasTrait<OpTrait::IsTerminator>()) {
     // Don't complain if the location is the same as the enclosing function,
     // it is automatically synthesized.
@@ -253,33 +254,125 @@ static ImplicitLocOpBuilder handleSemanticTerminatorOp(Operation &op,
                               std::next(Block::iterator(&op)));
 }
 
-void LowerSemanticCF::lowerElif(HLCF::ElifOp elifOp, bool &doesRaise,
-                                bool &doesBreak, bool &doesFallThrough) {
-  bool elifFallsThrough = false;
-  for (auto &region : elifOp->getRegions()) {
-    if (region.empty())
-      continue;
-    // Additional condition regions (elifRegions even indices) always transfer
-    // into a sibling then/else; they don't contribute to fallthrough of the
-    // elif itself. Region layout: 0=then, 1=else, 2+=elifRegions.
-    unsigned regionNumber = region.getRegionNumber();
-    bool isAdditionalCond = regionNumber >= 2 && ((regionNumber - 2) % 2 == 0);
+/// Mark a constant-condition arm as unreachable. Warn about interesting
+/// dead code when `warn` is set (used for runtime `if` / `elif`, not
+/// `comptime if`).
+static void markRegionDeadDueToConstantCond(Region &region,
+                                            const char *warningMessage,
+                                            Location loc) {
+  if (region.empty())
+    return;
+  Block &deadBlock = region.front();
+  Operation *firstDeadOp = &deadBlock.front();
+  if (isa<UnreachableOp>(firstDeadOp))
+    return; // Already marked as dead.
 
-    bool blockRaises = false, blockBreaks = false, blockFallThroughs = false;
-    lowerBlock(region.front(), blockRaises, blockBreaks, blockFallThroughs);
+  // Warn about unreachable code in an 'if', but not in a 'comptime if'.
+  // It serves the function of ifdef's, and conditions are often
+  // known-statically true/false.
+  if (warningMessage && !firstDeadOp->hasTrait<OpTrait::IsTerminator>())
+    emitWarning(firstDeadOp->getLoc(), "unreachable code after ")
+        << warningMessage;
+  eraseOpToEndOfBlock(firstDeadOp);
+  auto b = OpBuilder::atBlockBegin(&deadBlock);
+  UnreachableOp::create(b, loc);
+}
+
+/// Lower an `HLCF::ElifOp`: prune constant-dead arms, then rewrite regions.
+/// Returns true when the elif does not fall through so the enclosing block
+/// should stop.
+bool LowerSemanticCF::lowerElIfOp(HLCF::ElifOp elifOp, bool &doesRaise,
+                                  bool &doesBreak) {
+  // Determine whether the elif as a whole can fall through.
+  bool doesFallThrough = false;
+
+  // This keeps track of whether the next "else" is reachable.
+  bool nextElseLive = true;
+
+  // Process the first condition and the 'then' block.
+  SIMDAttr elifCond;
+  if (mlir::matchPattern(elifOp.getCond(), m_Constant(&elifCond))) {
+    if (elifCond.getAsBool()) {
+      // The 'then' region is live and is the only thing going on here.
+      bool blockRaises = false, blockBreaks = false;
+      lowerBlock(elifOp.getThenRegion().front(), blockRaises, blockBreaks,
+                 doesFallThrough);
+      doesRaise |= blockRaises;
+      doesBreak |= blockBreaks;
+
+      // Nothing else is reachable.
+      nextElseLive = false;
+    } else {
+      // First 'then' is dead; later arms / else remain live.
+      markRegionDeadDueToConstantCond(elifOp.getThenRegion(), "'if False'",
+                                      elifOp.getLoc());
+    }
+  } else {
+    // The 'then' region is live.
+    bool blockRaises = false, blockBreaks = false;
+    lowerBlock(elifOp.getThenRegion().front(), blockRaises, blockBreaks,
+               doesFallThrough);
     doesRaise |= blockRaises;
     doesBreak |= blockBreaks;
-    if (isAdditionalCond)
+  }
+
+  // Okay, charge through any "elif" blocks if they're live.
+  for (size_t i = 0; i < elifOp.getElifRegions().size(); i += 2) {
+    // If this condition is unreachable mark it and the 'then' as dead.
+    if (!nextElseLive) {
+      markRegionDeadDueToConstantCond(elifOp.getElifRegions()[i], "'if True'",
+                                      elifOp.getLoc());
+      markRegionDeadDueToConstantCond(elifOp.getElifRegions()[i + 1],
+                                      /*message=*/nullptr, elifOp.getLoc());
       continue;
-    elifFallsThrough |= blockFallThroughs;
+    }
+    // This condition is reachable, so process the block.
+    bool blockRaises = false, blockBreaks = false, condFallsThrough = false;
+    lowerBlock(elifOp.getElifRegions()[i].front(), blockRaises, blockBreaks,
+               condFallsThrough);
+    doesRaise |= blockRaises;
+    doesBreak |= blockBreaks;
+
+    // Check to see if the cond ended in a true/false constant.
+    auto yieldOp =
+        dyn_cast<HLCF::ElifYieldOp>(elifOp.getElifRegions()[i].front().back());
+    if (yieldOp &&
+        mlir::matchPattern(yieldOp.getCond(), m_Constant(&elifCond))) {
+      // A false condition would mean the corresponding 'then' block isn't
+      // reachable but the next cond/else still is.
+      if (!elifCond.getAsBool()) {
+        markRegionDeadDueToConstantCond(elifOp.getElifRegions()[i + 1],
+                                        "'if False'", elifOp.getLoc());
+        continue;
+      }
+      // A true condition would mean the corresponding 'then' block is
+      // reachable but the next cond/else isn't.
+      nextElseLive = false;
+    }
+
+    // Okay, the 'then' block is reachable, so lower it.
+    blockRaises = blockBreaks = false;
+    lowerBlock(elifOp.getElifRegions()[i + 1].front(), blockRaises, blockBreaks,
+               condFallsThrough);
+    doesRaise |= blockRaises;
+    doesBreak |= blockBreaks;
+    doesFallThrough |= condFallsThrough;
   }
-  doesFallThrough = elifFallsThrough;
-  if (!doesFallThrough) {
-    auto b = handleSemanticTerminatorOp(
-        *elifOp.getOperation(),
-        "if statement with then/else that do not fall through");
-    UnreachableOp::create(b, elifOp.getLoc());
+
+  // Handle the 'else' block if reachable.
+  if (nextElseLive) {
+    bool blockRaises = false, blockBreaks = false, elseFallThroughs = false;
+    lowerBlock(elifOp.getElseRegion().front(), blockRaises, blockBreaks,
+               elseFallThroughs);
+    doesRaise |= blockRaises;
+    doesBreak |= blockBreaks;
+    doesFallThrough |= elseFallThroughs;
+  } else {
+    markRegionDeadDueToConstantCond(elifOp.getElseRegion(), "'if True'",
+                                    elifOp.getLoc());
   }
+
+  return !doesFallThrough;
 }
 
 /// Lower a LIT::LoopOp to HLCF::LoopOp.  Return true if the lowering should
@@ -746,92 +839,39 @@ void LowerSemanticCF::lowerBlock(Block &block, bool &doesRaise, bool &doesBreak,
       continue;
     }
 
-    // Process a HLCF::ElifOp
+    // Process a HLCF::ElifOp / HLCF::IfOp / ParamIfOp with a known-constant
+    // condition: mark the unreachable arm(s) so we don't consider them live.
     if (auto elifOp = dyn_cast<HLCF::ElifOp>(op)) {
-      // If the first condition is a known constant, mark unreachable regions
-      // so we don't consider them live.
-      SIMDAttr elifCond;
-      if (mlir::matchPattern(elifOp.getCond(), m_Constant(&elifCond))) {
-        bool constantCondValue = elifCond.getAsBool();
-        auto markDead = [&](Region &region) {
-          if (region.empty())
-            return;
-          Block &deadBlock = region.front();
-          Operation *firstDeadOp = &deadBlock.front();
-          if (!firstDeadOp->hasTrait<OpTrait::IsTerminator>())
-            emitWarning(firstDeadOp->getLoc(), "unreachable code after 'if ")
-                << (constantCondValue ? "True'" : "False'");
-          eraseOpToEndOfBlock(firstDeadOp);
-          auto b = OpBuilder::atBlockBegin(&deadBlock);
-          UnreachableOp::create(b, op.getLoc());
-        };
-        if (constantCondValue) {
-          // First then is taken; else and additional arms are dead.
-          markDead(elifOp.getElseRegion());
-          for (Region &region : elifOp.getElifRegions())
-            markDead(region);
-        } else {
-          // First then is dead; later arms / else remain live.
-          markDead(elifOp.getThenRegion());
-        }
-      }
-
-      bool elifFallsThrough = false;
-      lowerElif(elifOp, doesRaise, doesBreak, elifFallsThrough);
-      if (elifFallsThrough) {
-        // Continue on and process the rest of the current containing `block`.
-        // We don't assign doesFallThrough = true because this scope's
-        // doesFallThrough is talking about what happens at the end of this
-        // current containing `block`, and is only known when this
-        // `LowerSemanticCF::lowerBlock` call returns.
-        continue;
-      } else {
-        // The elif doesn't fall through, which means everything after here is
-        // dead code, so return.
-        doesFallThrough = false;
+      if (lowerElIfOp(elifOp, doesRaise, doesBreak)) {
+        // If the elif does not fall through, cut off the code after it.
+        auto b = handleSemanticTerminatorOp(
+            op, "if statement with then/else that do not fall through");
+        UnreachableOp::create(b, op.getLoc());
         return;
       }
+      continue;
     }
 
-    // Otherwise we must have an if operation.
+    // Otherwise we must have an if / comptime if.
     assert((isa<HLCF::IfOp, ParamIfOp>(op)) &&
            "Unknown operation with regions");
 
-    // If this is a dynamic `if False:` or comptime if on known condition,
-    // mark the unreachable block as unreachable so we don't consider it live.
-    Region *deadRegion = nullptr;
-    bool constantCondValue = false;
     if (auto ifOp = dyn_cast<HLCF::IfOp>(op)) {
       SIMDAttr cond;
       if (mlir::matchPattern(ifOp.getCond(), m_Constant(&cond))) {
-        constantCondValue = cond.getAsBool();
-        deadRegion =
-            &(constantCondValue ? ifOp.getElseRegion() : ifOp.getThenRegion());
+        Region *deadRegion =
+            &(cond.getAsBool() ? ifOp.getElseRegion() : ifOp.getThenRegion());
+        const char *message = cond.getAsBool() ? "'if True'" : "'if False'";
+        markRegionDeadDueToConstantCond(*deadRegion, message, op.getLoc());
       }
     } else if (auto ifOp = dyn_cast<ParamIfOp>(op)) {
       if (auto cond = sugarDynCast<SIMDAttr>(ifOp.getCond())) {
-        constantCondValue = cond.getAsBool();
-        deadRegion =
-            &(constantCondValue ? ifOp.getElseRegion() : ifOp.getThenRegion());
+        Region *deadRegion =
+            &(cond.getAsBool() ? ifOp.getElseRegion() : ifOp.getThenRegion());
+        // Don't warn about "comptime if".
+        markRegionDeadDueToConstantCond(*deadRegion, /*message=*/nullptr,
+                                        op.getLoc());
       }
-    }
-
-    // If either branch of the if is unreachable, diagnose any live code there
-    // as unreachable and replace it with a kgen.unreachable so we don't think
-    // about it for liveness' sake.
-    if (deadRegion) {
-      Block &deadBlock = deadRegion->front();
-      Operation *firstDeadOp = &deadBlock.front();
-      // Warn about unreachable code in an 'if', but not in a 'comptime if'.
-      // It serves the function of ifdef's, and conditions are often
-      // known-statically true/false.
-      if (!isa<ParamIfOp>(op) &&
-          !firstDeadOp->hasTrait<OpTrait::IsTerminator>())
-        emitWarning(firstDeadOp->getLoc(), "unreachable code after 'if ")
-            << (constantCondValue ? "True'" : "False'");
-      eraseOpToEndOfBlock(&deadBlock.front());
-      auto builder = OpBuilder::atBlockBegin(&deadBlock);
-      UnreachableOp::create(builder, op.getLoc());
     }
 
     bool ifOpFallsThrough = false;
