@@ -280,7 +280,12 @@ modular_py_binary(
     ],
     target_compatible_with = ["//:b200_gpu"],
     deps = [
-        ":bench_baseline_lib",
+        "//max/kernels/benchmarks/misc/utils:bench_utils",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
         requirement("torch"),
     ],
 )
@@ -295,7 +300,12 @@ modular_py_binary(
     ],
     target_compatible_with = ["//:b200_gpu"],
     deps = [
-        ":bench_baseline_lib",
+        "//max/kernels/benchmarks/misc/utils:bench_utils",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
         requirement("torch"),
     ],
 )
