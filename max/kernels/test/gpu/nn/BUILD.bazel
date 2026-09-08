@@ -20,6 +20,12 @@ _EXTRA_CONSTRAINTS = {
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    # Exercises both `topk_topp_masked_probs` and the `emit_dist` search path,
+    # neither of which builds on Apple.
+    "test_topk_topp_p_one_vacuous.mojo": select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     # `from_probs` refuses to build on Apple (`_block_reduce_topk` caps its
     # storage at WARP_SIZE there while the kernel launches full-sized blocks),
     # so the test cannot run on that target either.

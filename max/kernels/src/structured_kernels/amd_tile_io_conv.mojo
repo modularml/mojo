@@ -80,7 +80,7 @@ from std.memory import AddressSpace
 from std.sys.intrinsics import readfirstlane
 from std.collections import Optional
 
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from layout.swizzle import Swizzle
 
 from structured_kernels.amd_tile_io import GMemTile, SMemTile, TileLoader
@@ -397,9 +397,12 @@ struct TileLoaderLDSIm2col[
     @always_inline
     def __init__[
         InLayout: TensorLayout,
+        InEngine: TensorEngine,
     ](
         out self,
-        src_nhwc: TileTensor[mut=False, Self.dtype, InLayout, _],
+        src_nhwc: TileTensor[
+            mut=False, Self.dtype, InLayout, _, Engine=InEngine
+        ],
         warp_id: Int,
         lane_id: Int,
         *,
@@ -422,6 +425,7 @@ struct TileLoaderLDSIm2col[
                 Must be rank-4 NHWC (or rank-5 NDHWC when `Q > 1`) with
                 static spatial dims matching the struct's `H`, `W`, and
                 `C` params.
+            InEngine: `TensorEngine` of the input `src_nhwc` `TileTensor`.
 
         Args:
             src_nhwc: 4D NHWC input tensor of shape `(N, H, W, C)`.
@@ -590,9 +594,12 @@ struct TileLoaderLDSIm2col[
     @always_inline
     def __init__[
         InLayout: TensorLayout,
+        InEngine: TensorEngine,
     ](
         out self,
-        src_nhwc: TileTensor[mut=False, Self.dtype, InLayout, _],
+        src_nhwc: TileTensor[
+            mut=False, Self.dtype, InLayout, _, Engine=InEngine
+        ],
         warp_id: Int,
         lane_id: Int,
         *,
@@ -609,6 +616,10 @@ struct TileLoaderLDSIm2col[
         / output spatial dims are runtime values (typically read from
         `input.dim()` / `output.dim()` by the launcher). Use when the
         graph compiler can't pin the resolution.
+
+        Parameters:
+            InLayout: `TensorLayout` of the input `src_nhwc` `TileTensor`.
+            InEngine: `TensorEngine` of the input `src_nhwc` `TileTensor`.
 
         Args:
             src_nhwc: 4D NHWC input tensor of shape `(N, H, W, C)`.
@@ -703,9 +714,12 @@ struct TileLoaderLDSIm2col[
     @always_inline
     def __init__[
         InLayout: TensorLayout,
+        InEngine: TensorEngine,
     ](
         out self,
-        src_ndhwc: TileTensor[mut=False, Self.dtype, InLayout, _],
+        src_ndhwc: TileTensor[
+            mut=False, Self.dtype, InLayout, _, Engine=InEngine
+        ],
         warp_id: Int,
         lane_id: Int,
         *,
@@ -725,6 +739,10 @@ struct TileLoaderLDSIm2col[
         in addition to the spatial H/W ones. The K-decomposition and
         conv params (Q, R, S, stride_d, stride_h, stride_w, dilation_*,
         pad_*, C) stay comptime.
+
+        Parameters:
+            InLayout: `TensorLayout` of the input `src_ndhwc` `TileTensor`.
+            InEngine: `TensorEngine` of the input `src_ndhwc` `TileTensor`.
 
         Args:
             src_ndhwc: 5D NDHWC input tensor of shape `(N, D, H, W, C)`.

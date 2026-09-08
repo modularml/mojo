@@ -48,17 +48,19 @@ following argument conventions:
 5. `owned`: This argument convention provides a mutable reference to value that
    the callee may need to destroy. I'd like to ignore this convention for the
    purposes of this document to keep it focused.
-6. `fn __init__(inout self)`: Mojo has a special hack that allows (and requires)
-   one to write the `self` argument on init functions as `inout`. This doesn't
-   make sense because the value isn't live-in, and indeed you will see poor
-   error messages with code like `var x: fn (inout Foo) -> None = Foo.__init__`.
+6. `def __init__(inout self)`: Mojo has a special hack that allows (and
+   requires) one to write the `self` argument on init functions as `inout`. This
+   doesn't make sense because the value isn't live-in, and indeed you will see
+   poor error messages with code like
+   `var x: def (inout Foo) -> None = Foo.__init__`.
 
 In addition, Mojo functions have the following return syntax:
 
-1. `fn f():` means either `-> None` or `-> object` for a `fn` or `def`.
-2. `fn f() -> T:` returns an owned instance of T.
-3. `fn f() -> ref [life] T:` is a returned reference of some specified lifetime.
-4. `fn f() -> T as name:` allows a named return value. The intention of this
+1. `def f():` means either `-> None` or `-> object` for a `fn` or `def`.
+2. `def f() -> T:` returns an owned instance of T.
+3. `def f() -> ref [life] T:` is a returned reference of some specified
+   lifetime.
+4. `def f() -> T as name:` allows a named return value. The intention of this
    syntax was to follow Python pattern syntax, but it is weird and we can't
    allow other pattern syntax here.
 
@@ -84,10 +86,10 @@ give us:
    donated by the argument to the function call (e.g. because it's an RValue or
    the transfer operation is used) or by Mojo making an implicit copy of the
    value.
-6. ✅ `fn __init__(out self)`: The `__init__` function takes `self` as
+6. ✅ `def __init__(out self)`: The `__init__` function takes `self` as
    uninitialized memory and returns it initialized (when an error isn't thrown)
    which means it's a named output. Let's call it `out`, which will allow one to
-   write `var x: fn (out Foo) -> None = Foo.__init__` as you'd expect.
+   write `var x: def (out Foo) -> None = Foo.__init__` as you'd expect.
 
 I don't see a reason to allow explicit lifetime specifications on `read` and
 `mut`, e.g. `mut [origin]`. The only use-case would be if
@@ -97,11 +99,11 @@ compelling reason to over time.
 
 Finally, let's align the result syntax:
 
-1. `fn f():` **No change**.
-2. `fn f() -> T:` **No change**.
-3. `fn f() -> ref [origin] T:`: **No change**.
-4. `fn f(out name: T):`: This aligns with `__init__` and provides a logical path
-   to multiple results if we desired to go there.
+1. `def f():` **No change**.
+2. `def f() -> T:` **No change**.
+3. `def f() -> ref [origin] T:`: **No change**.
+4. `def f(out name: T):`: This aligns with `__init__` and provides a logical
+   path to multiple results if we desired to go there.
 
 As a benefit of these changes, we'd get rid of the `borrowed` terminology, which
 is loaded with Rust semantics that we don't carry, and get rid of the `inout`
@@ -294,7 +296,7 @@ level as well, an advanced example:
 struct Aggregate:
     var field: String
 
-fn complicated(ref [_] agg: Aggregate) -> ref [agg.field] String:
+def complicated(ref [_] agg: Aggregate) -> ref [agg.field] String:
     ref field = agg.field  # automatically propagates mutability
     print(field)
     return field
@@ -320,7 +322,7 @@ enable things like:
 ```mojo
 struct Dict[K: KeyElement, V: Copyable & Movable]:
     ...
-    fn __getitem__(self, key: K) -> Optional[ref [...] Self.V]:
+    def __getitem__(self, key: K) -> Optional[ref [...] Self.V]:
         ...
 ```
 
@@ -350,7 +352,7 @@ practice, e.g. consider the API docs for `List.append`:
 ```mojo
 struct List[...]:
    ...
-   fn append(out self, var value: T): # doesn't send a "consuming" signal.
+   def append(out self, var value: T): # doesn't send a "consuming" signal.
       ...
 ```
 
@@ -359,9 +361,9 @@ Furthermore, I don't think it would convey the right intention in `__del__` or
 
 ```mojo
 struct YourType:
-   fn __del__(var self):
+   def __del__(var self):
       ...
-   fn __moveinit__(out self, var existing: Self):
+   def __moveinit__(out self, var existing: Self):
       ...
 ```
 

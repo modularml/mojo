@@ -78,7 +78,8 @@ def matrix_multiplication(
 
     # Compile the graph.
     print("Compiling...")
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     # Perform the calculation on the target device.
     print("Executing...")

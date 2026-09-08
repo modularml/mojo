@@ -22,7 +22,7 @@
 #include "Mojo/LITDialect/LITUtils.h"
 #include "Mojo/LITDialect/SpecialFunctions.h"
 #include "Mojo/MojoParser/Constraints.h"
-#include "Mojo/Support/TriState.h"
+#include "Mojo/Support/TriBool.h"
 #include "Support/LLVMCompilerForwardDecls.h"
 #include "mlir/IR/Types.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
@@ -138,8 +138,8 @@ public:
   /// trait: 'Deinitable', 'Copyable', or 'Movable'. Returns `yes` when
   /// provably trivial, `no` when provably non-trivial, and `unknown` when it
   /// can't be proven (e.g. an unfolded member).
-  TriState isSpecialFunctionTrivial(llvm::SMLoc loc, SpecialFunctionKind kind,
-                                    SharedState &shared) const;
+  TriBool isSpecialFunctionTrivial(llvm::SMLoc loc, SpecialFunctionKind kind,
+                                   SharedState &shared) const;
 
   /// Return true if this type is provably implicitly 'trivially' copyable, as
   /// defined by its '__copy_ctor_is_trivial' member and whether or not it
@@ -201,8 +201,8 @@ public:
   /// - `no` if the type definitely does not conform
   /// - `unknown` if conformance depends on constraints that cannot be
   ///   evaluated statically
-  TriState doesConformTo(TraitType trait, SharedState &shared,
-                         ArrayRef<ConstraintAttr> callerAssumptions) const;
+  TriBool doesConformTo(TraitType trait, SharedState &shared,
+                        ArrayRef<ConstraintAttr> callerAssumptions) const;
 
   /// Same, additionally collecting the problematic constraints so a diagnosing
   /// caller can name them.
@@ -213,7 +213,7 @@ public:
   /// Given a standard trait like Copyable, look up the conformance.  On
   /// success, the ASTDecl of the trait itself is returned, it is otherwise
   /// null.
-  std::pair<TriState, ASTDecl *>
+  std::pair<TriBool, ASTDecl *>
   conformsToBuiltinTrait(StringRef traitName, llvm::SMLoc loc,
                          SharedState &shared,
                          ArrayRef<ConstraintAttr> callerAssumptions) const;

@@ -156,15 +156,6 @@ class ModelOutputs:
     For data parallel models, the hs will be on the first gpu since it is replicated.
     """
 
-    sampled_tokens: Buffer | None = None
-    """Greedy token ids selected inside the forward graph, shape ``[B, 1]``.
-
-    Present only when ``fold_sampler_into_graph`` is enabled and the
-    architecture emits a folded argmax output. Consumed by the overlap
-    pipeline for all-greedy decode batches in place of a separate sampler
-    submission; ``None`` otherwise.
-    """
-
 
 @dataclass(kw_only=True)
 class ModelInputs:
@@ -608,19 +599,6 @@ class PipelineModel(ABC, Generic[BaseContextType]):
     def sampler_custom_extensions(self) -> Sequence[Path]:
         """Custom-op extension paths to compile the sampler graph with."""
         return ()
-
-    @property
-    def emits_folded_sampled_tokens(self) -> bool:
-        """Whether the forward graph appends a folded greedy-token output.
-
-        Architectures that fold the sampler (argmax) into the forward graph
-        emit the sampled-token buffer as a trailing graph output and override
-        this to return ``True``. Callers must peel that trailing output into
-        :attr:`ModelOutputs.sampled_tokens` only when this is ``True``;
-        otherwise the ``fold_sampler_into_graph`` runtime flag is a no-op for
-        the architecture.
-        """
-        return False
 
     @abstractmethod
     def execute(

@@ -62,20 +62,14 @@ class Gemma4MoEGate(MoEGate):
             device=devices[0],
         )
 
-    @property
-    def sharding_strategy(self) -> ShardingStrategy | None:
-        return self._sharding_strategy
-
-    @sharding_strategy.setter
-    def sharding_strategy(self, strategy: ShardingStrategy) -> None:
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
         if not strategy.is_replicate:
             raise ValueError(
                 "Only replicate sharding strategy is supported for"
                 " Gemma4MoEGate."
             )
-        self._sharding_strategy = strategy
+        super()._set_sharding_strategy(strategy)
         replicate = ShardingStrategy.replicate(strategy.num_devices)
-        self.gate_score.sharding_strategy = replicate
         self.scale.sharding_strategy = replicate
         self.per_expert_scale.sharding_strategy = replicate
 

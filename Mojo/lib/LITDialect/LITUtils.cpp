@@ -1122,9 +1122,8 @@ public:
 };
 } // namespace
 
-static TriState isPropositionImplied(TypedAttr proposition,
-                                     TypedAttr assumption,
-                                     AssumptionEqualities &assumptionEqs) {
+static TriBool isPropositionImplied(TypedAttr proposition, TypedAttr assumption,
+                                    AssumptionEqualities &assumptionEqs) {
   // Canonicalize and decompose multi-trait conforms_to into AND of single-trait
   // ones so the general conjunction rules handle subsumption uniformly.
   proposition = getCanonicalAttr(proposition);
@@ -1136,19 +1135,19 @@ static TriState isPropositionImplied(TypedAttr proposition,
 
   // Direct equality: A implies A.
   if (assumption == proposition)
-    return TriState::yes();
+    return TriBool::yes();
 
   // A trivially false assumption implies anything.
   if (isTriviallyFalseProposition(assumption))
-    return TriState::yes();
+    return TriBool::yes();
 
   // Trivially true is implied by anything.
   if (isTriviallyTrueProposition(proposition))
-    return TriState::yes();
+    return TriBool::yes();
   // Trivially false constraints are violated under any assumption. This is
   // sound because we know the assumption is not also trivially false here.
   if (isTriviallyFalseProposition(proposition))
-    return TriState::no();
+    return TriBool::no();
 
   if (auto assumptionConformance =
           dyn_cast<TypeConformsToTraitAttr>(assumption)) {
@@ -1170,7 +1169,7 @@ static TriState isPropositionImplied(TypedAttr proposition,
                            assumptionConformance.getTypeValue())),
                        stripIdentityWrappers(getCanonicalAttr(
                            propositionConformance.getTypeValue()))))
-        return TriState::yes();
+        return TriBool::yes();
     }
   }
 
@@ -1178,7 +1177,7 @@ static TriState isPropositionImplied(TypedAttr proposition,
           getIdentityProposition(proposition)) {
     if (assumptionEqs.provesEqual(identity->first, identity->second,
                                   assumption))
-      return TriState::yes();
+      return TriBool::yes();
   }
 
   // Conjunction elimination: (A AND B) implies B if any conjunct implies B.
@@ -1190,15 +1189,15 @@ static TriState isPropositionImplied(TypedAttr proposition,
     if (assumptionOp.getOpcode() == POC::And) {
       bool anyDisproves = false;
       for (Attribute operand : assumptionOp.getOperands()) {
-        TriState result =
+        TriBool result =
             LIT::isPropositionImplied(proposition, cast<TypedAttr>(operand));
         if (result.isFalse())
           anyDisproves = true;
         else if (result.isTrue())
-          return TriState::yes();
+          return TriBool::yes();
       }
       if (anyDisproves)
-        return TriState::no();
+        return TriBool::no();
     }
   }
 
@@ -1207,11 +1206,11 @@ static TriState isPropositionImplied(TypedAttr proposition,
   if (TypedAttr innerProposition = getNotOperand(proposition))
     if (isPropositionImplied(innerProposition, assumption, assumptionEqs)
             .isTrue())
-      return TriState::no();
+      return TriBool::no();
   // Symmetric: if A = NOT(inner) and B implies inner, then A contradicts B.
   if (TypedAttr innerAssumption = getNotOperand(assumption))
     if (isImplicationProven(innerAssumption, proposition))
-      return TriState::no();
+      return TriBool::no();
 
   if (auto propositionOp = dyn_cast<ParamOperatorAttr>(proposition)) {
     // Weakening: A implies (A OR B) for any B.
@@ -1220,19 +1219,19 @@ static TriState isPropositionImplied(TypedAttr proposition,
         if (isPropositionImplied(cast<TypedAttr>(operand), assumption,
                                  assumptionEqs)
                 .isTrue())
-          return TriState::yes();
+          return TriBool::yes();
     }
     // Conjunction introduction: A implies (B AND C) iff A implies every
     // conjunct. A contradicts (B AND C) if A contradicts any conjunct.
     if (propositionOp.getOpcode() == POC::And) {
-      TriState result = TriState::yes();
+      TriBool result = TriBool::yes();
       for (Attribute operand : propositionOp.getOperands()) {
-        TriState operandResult = isPropositionImplied(
-            cast<TypedAttr>(operand), assumption, assumptionEqs);
+        TriBool operandResult = isPropositionImplied(cast<TypedAttr>(operand),
+                                                     assumption, assumptionEqs);
         if (operandResult.isFalse())
-          return TriState::no();
+          return TriBool::no();
         if (operandResult.isUnknown())
-          result = TriState::unknown();
+          result = TriBool::unknown();
       }
       return result;
     }
@@ -1242,13 +1241,13 @@ static TriState isPropositionImplied(TypedAttr proposition,
   TypedAttr combined =
       ParamOperatorAttr::get(POC::And, {assumption, proposition});
   if (combined == assumption)
-    return TriState::yes();
+    return TriBool::yes();
 
-  return TriState::unknown();
+  return TriBool::unknown();
 }
 
-TriState LIT::isPropositionImplied(TypedAttr proposition,
-                                   ArrayRef<TypedAttr> assumptions) {
+TriBool LIT::isPropositionImplied(TypedAttr proposition,
+                                  ArrayRef<TypedAttr> assumptions) {
   TypedAttr combinedAssumption;
   if (assumptions.empty())
     combinedAssumption =
@@ -1261,14 +1260,14 @@ TriState LIT::isPropositionImplied(TypedAttr proposition,
   return isPropositionImplied(proposition, combinedAssumption);
 }
 
-TriState LIT::isPropositionImplied(ConstraintAttr proposition,
-                                   ArrayRef<ConstraintAttr> assumptions,
-                                   ParameterEvaluator &evaluator) {
+TriBool LIT::isPropositionImplied(ConstraintAttr proposition,
+                                  ArrayRef<ConstraintAttr> assumptions,
+                                  ParameterEvaluator &evaluator) {
   TypedAttr propositionAttr = getCanonicalAttr(proposition.getProposition());
   TypedAttr reboundProposition =
       getCanonicalAttr(evaluator.getReboundAttribute(propositionAttr));
   if (isTriviallyTrueProposition(reboundProposition))
-    return TriState::yes();
+    return TriBool::yes();
 
   SmallVector<TypedAttr> canonAssumptions;
   canonAssumptions.reserve(assumptions.size());
@@ -1278,8 +1277,7 @@ TriState LIT::isPropositionImplied(ConstraintAttr proposition,
   return isPropositionImplied(reboundProposition, canonAssumptions);
 }
 
-TriState LIT::isPropositionImplied(TypedAttr proposition,
-                                   TypedAttr assumption) {
+TriBool LIT::isPropositionImplied(TypedAttr proposition, TypedAttr assumption) {
   AssumptionEqualities assumptionEqs;
   return ::isPropositionImplied(proposition, assumption, assumptionEqs);
 }

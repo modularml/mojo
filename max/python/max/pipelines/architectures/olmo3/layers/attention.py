@@ -25,10 +25,11 @@ from max.experimental.nn.common_layers.functional_kernels import (
     flash_attention_ragged,
     rope_split_store_ragged,
 )
+from max.experimental.nn.common_layers.kv_cache import PagedCacheValues
 from max.experimental.nn.common_layers.rotary_embedding import RotaryEmbedding
 from max.experimental.tensor import Tensor
 from max.nn.attention import MHAMaskVariant
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
+from max.nn.kv_cache import KVCacheParams
 from max.pipelines.architectures.olmo2_modulev3.layers.rms_norm import (
     Olmo2RMSNorm,
 )
@@ -68,7 +69,8 @@ class Olmo3Attention(Module[[Tensor, PagedCacheValues, Tensor], Tensor]):
             num_key_value_heads: The number of key/value heads.
             hidden_size: The dimension of the hidden states.
             kv_params: KV Cache Params.
-            layer_idx: The layer number associated with this Attention block.
+            layer_idx: Index of this layer within its KV group (not the
+                global decoder index).
             mask_variant: The mask variant for attention (causal or sliding window).
             scale: Value used to scale the results of the attention output.
             has_bias: Whether to use an attention bias.

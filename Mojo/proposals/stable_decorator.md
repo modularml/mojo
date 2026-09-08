@@ -74,10 +74,10 @@ struct List[T: Copyable & Movable](
     var capacity: Int
 
     @stable
-    fn __init__(out self):
+    def __init__(out self):
 
     # unstable by default
-    fn steal_data(mut self) -> UnsafePointer[Self.T, MutOrigin.external]:
+    def steal_data(mut self) -> UnsafePointer[Self.T, MutOrigin.external]:
 
 ## User code example:
 # Even if FileDescriptor is not marked as stable, this annotation
@@ -203,10 +203,10 @@ and `recursive=True`
 
 ```mojo
 @stable
-fn foo(): ...
+def foo(): ...
 
 @stable(since="1.2")
-fn bar(): ...
+def bar(): ...
 
 @stable(recursive=True)
 from std import FileDescriptor
@@ -233,11 +233,11 @@ Example:
 
 ```mojo
 @stable(since="1.0")
-fn foo(): ...
+def foo(): ...
 
 # later extended
 @stable(since="1.3")
-fn foo(b: Int = 7): ...
+def foo(b: Int = 7): ...
 ```
 
 This proposal does not dictate a specific process for choosing version strings
@@ -386,7 +386,7 @@ unstable APIs with `@unstable`:
 
 ```mojo
 @unstable
-fn experimental():
+def experimental():
     pass
 ```
 

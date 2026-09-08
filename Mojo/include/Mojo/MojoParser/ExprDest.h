@@ -64,6 +64,7 @@ enum ExprContext {
   EC_ForIterator,          // for x internal details
   EC_WithContextMgr,       // with x:
   EC_WithExitResult,       // with (result of __exit__ call)
+  EC_MatchSubject,         // match x:
   EC_ComptimeAssert,       // comptime assert expression
   EC_RaiseValue,           // raise x
   EC_ReturnValue,          // return x;

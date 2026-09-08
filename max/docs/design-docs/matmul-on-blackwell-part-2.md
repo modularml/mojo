@@ -352,8 +352,7 @@ This is how we make use of `tcgen05.mma` and tensor memory in our code:
 for i in range(num_iters):
   load_tiles_ab()  #section 1
   if elect_one_thread:
-      @parameter
-      for j in range(num_k_mmas):
+      comptime for j in range(num_k_mmas):
           alias idx = IntTuple(0, MMA_K * j)
           alias a_offset = a_smem_layout(idx) * sizeof[a_type]()
           alias b_offset = b_smem_layout(idx) * sizeof[b_type]()
@@ -599,10 +598,8 @@ loop:
 alias num_vecs_m = c_gmem_frag.shape[0]()
 alias num_vecs_n = c_gmem_frag.shape[1]()
 
-@parameter
-for n_vec in range(num_vecs_n):
-    @parameter
-    for m_vec in range(num_vecs_m):
+comptime for n_vec in range(num_vecs_n):
+    comptime for m_vec in range(num_vecs_m):
         alias i_vec = n_vec * num_vecs_m + m_vec
         c_gmem_frag[m_vec, n_vec] = [c_frag[2 * i_vec], c_frag[2 * i_vec + 1]]
 ```

@@ -699,7 +699,7 @@ LogicalResult ParamMatcher::matchTypes(Type actualType, Type expectedType) {
   // Handle meta type upcasting.
   // Assumptions needed: overload resolution for e.g.
   // repr[T: Writable](Tuple[*Ts]) inside a fn with `where AllWritable[*Ts]`.
-  FailureOr<TriState> typeUpCastable = IREmitter::canMetaTypeUpCastTo(
+  FailureOr<TriBool> typeUpCastable = IREmitter::canMetaTypeUpCastTo(
       shared, state.declScope.getLoc(), actualType, expectedType,
       &state.declScope);
   if (succeeded(typeUpCastable) && typeUpCastable->isTrue())

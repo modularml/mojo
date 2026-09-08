@@ -310,8 +310,8 @@ def test_concat_shape() raises:
     comptime l1 = row_major[2, 3, 4]()
     comptime l2 = row_major[2, 5, 4]()
 
-    var x1_stack = Array[Scalar[dtype], l1.product()](uninitialized=True)
-    var x2_stack = Array[Scalar[dtype], l2.product()](uninitialized=True)
+    var x1_stack = Array[Scalar[dtype], l1.product()](fill={})
+    var x2_stack = Array[Scalar[dtype], l2.product()](fill={})
 
     var x1 = TileTensor(x1_stack, l1)
     var x2 = TileTensor(x2_stack, l2)

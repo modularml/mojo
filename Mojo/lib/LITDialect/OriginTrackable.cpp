@@ -647,9 +647,9 @@ static Value findSingleStoreToVarDecl(VarDeclOp varDecl) {
 }
 
 /// Given an argument to a function that takes a VariadicList/VariadicPack
-/// argument, dig out the RefPackCreateOp (or ParamConstantOp) that formed it.
-/// This is guaranteed to succeed immediately during/after the parser, not
-/// later.
+/// argument, look through the local constructor to the value that formed it.
+/// Returns null when the argument is a forward of an already-constructed
+/// container.
 static Value findArgPassedToVariadicConstructor(Value val) {
   // Strip off sugar casts, mutability casts etc.
   val = RefImmutOp::stripRebinds(val);
@@ -681,19 +681,44 @@ static Value findArgPassedToVariadicConstructor(Value val) {
   }
   loadOperand = RefImmutOp::stripRebinds(loadOperand);
 
-  // This is a forwarded variadic pack argument.
-  if (isa<BlockArgument>(loadOperand))
-    return loadOperand;
-
   auto varDecl = loadOperand.getDefiningOp<VarDeclOp>();
-  assert(varDecl && "unknown variadic processing logic");
+  if (!varDecl)
+    return {};
+
   auto storedValue = findSingleStoreToVarDecl(varDecl);
 
+  // Look through VariadicList/VariadicPack::__init__ so we can check the
+  // individual arguments for exclusivity. Without this, `mutate_pack(x, x)`
+  // would not be diagnosed as an aliasing violation.
   auto call = storedValue.getDefiningOp<LIT::CallOp>();
+  if (!call)
+    return {};
+  auto callee = call.getDirectCallee();
+  if (!callee || !callee.getLeafReference().strref().starts_with("__init__"))
+    return {};
+
   // Make sure any change to the API forces this code to get updated.
-  assert(call && call.getNumOperands() == 1 &&
+  assert(call.getNumOperands() == 1 &&
          "VariadicList/VariadicPack ctor take a single argument");
   return RefImmutOp::stripRebinds(call.getOperand(0));
+}
+
+/// Return the immutable origin parameter of a VariadicPack or VariadicList.
+static TypedAttr getVariadicContainerOrigin(Value value) {
+  Type type = getCanonicalType(value.getType());
+  if (auto refType = dyn_cast<RefType>(type))
+    type = getCanonicalType(refType.getElementType());
+
+  auto structType = sugarDynCast<LIT::StructType>(type);
+  if (!structType)
+    return {};
+  StringRef name = structType.getName().getValue();
+  if (name != "VariadicPack" && name != "VariadicList")
+    return {};
+  assert(structType.getParamValues().size() > 1 &&
+         isa<OriginType>(structType.getParamValues()[1].getType()) &&
+         "expected a VariadicPack/VariadicList origin parameter");
+  return OriginMutCastAttr::get(structType.getParamValues()[1], false);
 }
 
 /// Given the argument passed to a variadic argument, dig out the trackable
@@ -706,61 +731,49 @@ static Value findArgPassedToVariadicConstructor(Value val) {
 SmallVector<Value>
 OriginTrackable::decodeIndividualVariadicArguments(Value callArgVal,
                                                    TypedAttr &extraOrigin) {
-  auto ctorArg = findArgPassedToVariadicConstructor(callArgVal);
-  assert(ctorArg && "couldn't decode variadic information!");
+  Value ctorArg = findArgPassedToVariadicConstructor(callArgVal);
 
   SmallVector<Value> result;
-  if (isa<BlockArgument>(ctorArg)) {
-    // This is a forwarded variadic, no individual values to track.
-  } else if (ctorArg.getDefiningOp<ParamConstantOp>()) {
-    // Zero argument lists/packs are kgen.param.constant. They have no elements.
-  } else if (auto pack = ctorArg.getDefiningOp<RefPackCreateOp>()) {
-    // Handle variadic packs. They are made by rebinding each reference into a
-    // common origin union type.  Strip the rebind off so each operand reference
-    // has its original origin, not the union.
+  if (auto pack =
+          ctorArg ? ctorArg.getDefiningOp<RefPackCreateOp>() : nullptr) {
+    // Locally constructed VariadicPack. Each operand is an argument reference
+    // rebound onto a common origin union. Strip the rebind so each keeps its
+    // original origin.
     for (auto elt : pack.getOperands())
       result.push_back(RefImmutOp::stripRebinds(elt));
-  } else if (auto fromPointerPackOp =
-                 ctorArg.getDefiningOp<RefPackFromPointerPackOp>()) {
-    // This is either a RefPackFromPointerPackOp directly...
-    extraOrigin = OriginMutCastAttr::get(
-        cast<RefPackType>(fromPointerPackOp.getResult().getType()).getOrigin(),
-        false);
-  } else if (auto refLoad = ctorArg.getDefiningOp<RefLoadOp>()) {
-    // ...or a load of a RefPackFromPointerPackOp result
-    auto fromPointerPackOp =
-        findSingleStoreToVarDecl(
-            refLoad.getOperand().getDefiningOp<VarDeclOp>())
-            .getDefiningOp<RefPackFromPointerPackOp>();
-    assert(fromPointerPackOp &&
-           "expected to find a ref pack from pointer pack");
-    extraOrigin = OriginMutCastAttr::get(
-        cast<RefPackType>(fromPointerPackOp.getResult().getType()).getOrigin(),
-        false);
-  } else {
-    auto varDecl = ctorArg.getDefiningOp<VarDeclOp>();
-    assert(varDecl && "expected to find a var decl");
-    // Handle positional/homogenous variadics. This gets emitted as:
-    // %__passed_varargs__ = lit.var.decl: !lit.ref<array<4, eltref>>
-    // %arr = pop.array.create [%1, %2, %3]
-    // lit.ref.store %arr, %__passed_varargs__
-    // lit.call VariadicList::@"__init__(%__passed_varargs__)
-
-    // We act as though this is an access to the list itself so the list is kept
-    // alive across the call that uses the variadic list.  This is a hack:
-    // VariadicList should capture the origin of the VarDecl as a separate
-    // origin parameter. Unfortunately this VarDecl doesn't exist at ParamInf
-    // time: we need to do something like emitOperandsNeedingOriginsToMemory to
-    // materialize it.
-    // The callee reads the VarDecl but doesn't mutate it.
-    extraOrigin = OriginMutCastAttr::get(varDecl.getType().getOrigin(), false);
-
-    auto arrayCreate =
-        findSingleStoreToVarDecl(varDecl).getDefiningOp<POP::ArrayCreateOp>();
-    assert(arrayCreate && "expected to find an array create");
-    for (auto value : arrayCreate.getOperands())
-      result.push_back(value);
+    return result;
   }
+
+  Value listStorage = ctorArg;
+  if (auto refLoad = ctorArg ? ctorArg.getDefiningOp<RefLoadOp>() : nullptr)
+    listStorage = RefImmutOp::stripRebinds(refLoad.getOperand());
+
+  if (auto varDecl =
+          listStorage ? listStorage.getDefiningOp<VarDeclOp>() : nullptr) {
+    if (auto arrayCreate = findSingleStoreToVarDecl(varDecl)
+                               .getDefiningOp<POP::ArrayCreateOp>()) {
+      // Locally constructed VariadicList. The parser emits:
+      //   %__passed_varargs__ = lit.var.decl: !lit.ref<array<4, eltref>>
+      //   %arr = pop.array.create [%1, %2, %3]
+      //   lit.ref.store %arr, %__passed_varargs__
+      //   lit.call VariadicList::@"__init__"(%__passed_varargs__)
+      // Keep the VarDecl alive across the call. VariadicList should capture
+      // this origin itself; this is a workaround because the VarDecl does not
+      // exist at ParamInf time. The callee reads the VarDecl but doesn't
+      // mutate it.
+      extraOrigin =
+          OriginMutCastAttr::get(varDecl.getType().getOrigin(), false);
+      for (auto value : arrayCreate.getOperands())
+        result.push_back(value);
+      return result;
+    }
+  }
+
+  // Forwarded list/pack: constructed elsewhere (a function argument, a
+  // returned pack, from_pointer_pack, an empty list, etc.). There are no
+  // individual values to track; take the origin from the container type.
+  extraOrigin = getVariadicContainerOrigin(callArgVal);
+  assert(extraOrigin && "unknown variadic value source");
   return result;
 }
 

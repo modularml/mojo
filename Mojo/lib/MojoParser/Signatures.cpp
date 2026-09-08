@@ -1251,7 +1251,7 @@ void TypeCheckedParamList::emitBodyConstraints() {
       violationDiag = shared.emitError(loc ? *loc : deferral.deferralLoc);
       return *violationDiag;
     };
-    TriState result = LIT::canDischargeConstraintsInScope(
+    TriBool result = LIT::canDischargeConstraintsInScope(
         declScope, /*paramListAttr=*/PogListAttr(), {deferral.constraint},
         /*origConstraints=*/{}, getDiag, &stillUnprovable,
         /*evaluator=*/nullptr);

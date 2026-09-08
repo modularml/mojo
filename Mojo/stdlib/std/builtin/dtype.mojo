@@ -547,7 +547,7 @@ struct DType(
     def _match(self, mask: __mlir_type.`!kgen.scalar<ui8>`) -> Bool:
         return Bool(
             mlir_value=__mlir_op.`pop.cmp`[
-                pred=__mlir_attr.`#kgen<cmp_pred ne>`
+                pred=__mlir_attr.`#kgen.cmp_pred<ne>`
             ](
                 __mlir_op.`pop.simd.and`(self._as_ui8(), mask),
                 __mlir_attr.`#kgen.simd<0> : !kgen.scalar<ui8>`,
@@ -566,7 +566,7 @@ struct DType(
         """
         return Bool(
             mlir_value=__mlir_op.`pop.cmp`[
-                pred=__mlir_attr.`#kgen<cmp_pred eq>`
+                pred=__mlir_attr.`#kgen.cmp_pred<eq>`
             ](self._as_ui8(), rhs._as_ui8())
         )
 
@@ -582,7 +582,7 @@ struct DType(
         """
         return Bool(
             mlir_value=__mlir_op.`pop.cmp`[
-                pred=__mlir_attr.`#kgen<cmp_pred ne>`
+                pred=__mlir_attr.`#kgen.cmp_pred<ne>`
             ](self._as_ui8(), rhs._as_ui8())
         )
 

@@ -34,7 +34,7 @@ def main() raises:
 
 def test_cast_from_mutable_tile_tensor() raises:
     """Cast from a mutable TileTensor gives a non-null ptr."""
-    var data = Array[Float32, 6](uninitialized=True)
+    var data = Array[Float32, 6](fill={})
     var tile = TileTensor(data, row_major[2, 3]())
     var nullable = NullableTileTensor(tile)
     assert_true(Bool(nullable.ptr))
@@ -42,7 +42,7 @@ def test_cast_from_mutable_tile_tensor() raises:
 
 def test_ptr_none_after_clear() raises:
     """Ptr is None when cleared manually."""
-    var data = Array[Float32, 6](uninitialized=True)
+    var data = Array[Float32, 6](fill={})
     var tile = TileTensor(data, row_major[2, 3]())
     var nullable = NullableTileTensor(tile)
     assert_true(Bool(nullable.ptr))
@@ -52,7 +52,7 @@ def test_ptr_none_after_clear() raises:
 
 def test_dim_comptime() raises:
     """Dim[i]() returns the correct shape for each dimension."""
-    var data = Array[Int32, 12](uninitialized=True)
+    var data = Array[Int32, 12](fill={})
     var nullable = NullableTileTensor(TileTensor(data, row_major[3, 4]()))
     assert_equal(nullable.dim[0](), 3)
     assert_equal(nullable.dim[1](), 4)
@@ -60,7 +60,7 @@ def test_dim_comptime() raises:
 
 def test_dim_runtime() raises:
     """Dim(i) with a runtime index returns the same values as dim[i]()."""
-    var data = Array[Int32, 20](uninitialized=True)
+    var data = Array[Int32, 20](fill={})
     var nullable = NullableTileTensor(TileTensor(data, row_major[4, 5]()))
     assert_equal(nullable.dim(0), nullable.dim[0]())
     assert_equal(nullable.dim(1), nullable.dim[1]())
@@ -68,7 +68,7 @@ def test_dim_runtime() raises:
 
 def test_dim_3d() raises:
     """Dim queries work on a 3D tensor."""
-    var data = Array[Float32, 24](uninitialized=True)
+    var data = Array[Float32, 24](fill={})
     var nullable = NullableTileTensor(TileTensor(data, row_major[2, 3, 4]()))
     assert_equal(nullable.dim[0](), 2)
     assert_equal(nullable.dim[1](), 3)
@@ -102,7 +102,7 @@ def test_value_shares_memory_with_original() raises:
 
 def test_layout_field_accessible() raises:
     """Layout field is accessible and holds the correct shape/stride info."""
-    var data = Array[Float32, 6](uninitialized=True)
+    var data = Array[Float32, 6](fill={})
     var tile = TileTensor(data, row_major[2, 3]())
     var nullable = NullableTileTensor(tile)
 

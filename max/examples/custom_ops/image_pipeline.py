@@ -80,7 +80,8 @@ def main() -> None:
         graph.output(blurred)
 
     session = InferenceSession(devices=[device])
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     img_dev = Buffer.from_numpy(img).to(device)
 

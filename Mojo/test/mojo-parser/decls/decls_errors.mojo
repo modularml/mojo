@@ -338,7 +338,7 @@ def always_inline_builtin_3() raises: pass
 
 @always_inline("builtin")
 def always_inline_builtin_4(a: Bool):
-  # expected-error @+1 {{'@always_inline("builtin")' does not support MLIR operation hlcf.elif}}
+  # expected-error @+1 {{'@always_inline("builtin")' can only handle single-result if}}
   if a:
      pass
 
@@ -808,7 +808,7 @@ struct BadInit[size: __mlir_type.index](Movable where False):
 
 struct MLIRAttrWithinStruct(Movable where False):
   # expected-error @below {{bare expressions must not appear within structs; use 'var' for a field or move this into a method body}}
-  __mlir_attr.`#index<cmp_predicate eq>`
+  __mlir_attr.`#index.cmp_predicate<eq>`
 
 trait BareExprInTrait:
   # expected-error @below {{bare expressions must not appear within traits; use 'comptime' for an associated type or move this into a method body}}

@@ -1,8 +1,8 @@
 """Define the Mojo toolchain"""
 
-MAX_PACKAGE_VERSION = "26.6.0.dev2026090305"
+MAX_PACKAGE_VERSION = "26.6.0.dev2026090705"
 
-MOJO_PACKAGE_VERSION = "1.1.0.dev2026090305"
+MOJO_PACKAGE_VERSION = "1.1.0.dev2026090705"
 
 BASE_URL = "https://whl.modular.com/nightly"
 

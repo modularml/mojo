@@ -1103,7 +1103,7 @@ one-at-a-time, lock-free:
     previous.andThenAsync([doc = RCRef<MojoDocument>::copy(this),
                            fn = std::forward<FnT>(fn),
                            current = std::move(current)]() mutable {
-      fn(*doc);
+      def(*doc);
       std::move(current).emplace();
     });
   }

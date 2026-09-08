@@ -11,12 +11,12 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+# RUN: %parse-mojo-isolated %s -verify-diagnostics | FileCheck %s
+
 
 def marker():
     pass
 
-
-# RUN: %parse-mojo-isolated %s -verify-diagnostics | FileCheck %s
 struct Unmovable(Movable where False):
     def __init__(out self):
         pass
@@ -83,8 +83,7 @@ def test_var_decl_patterns(c: Bool) raises:
     # CHECK: lit.call {{.*}}marker
     marker()
 
-    # CHECK: hlcf.elif {
-    # CHECK: } then {
+    # CHECK: hlcf.elif %{{.*}} {
     # CHECK-NEXT: [[X2:%.*]] = lit.var.decl "x"
     # CHECK-NEXT: [[VAL:%.*]] = kgen.param.constant: !alias_Int1 = <rebind(:!Int {:scalar<index> 42})>
     # CHECK-NEXT: lit.ref.store [[VAL]], [[X2]]
@@ -110,7 +109,7 @@ def test_var_decl_patterns(c: Bool) raises:
     # CHECK that the var pattern covers both tup1 and tup2
     # CHECK: lit.var.decl "tup1" var
     # CHECK-NEXT: lit.var.decl "tup2" var
-    (var tup1, tup2) = 1, 2
+    (var tup1, var tup2) = 1, 2
 
     # Check that trailing commas work.
     # https://github.com/modular/modular/issues/1649
@@ -366,7 +365,7 @@ def test_mergewith(
 ):
     # One merges to the other.
     _ = a if cond else b
-    # CHECK: hlcf.if %cond
+    # CHECK: hlcf.elif %cond
     # CHECK-NEXT:   [[ARES:%.*]] = lit.call {{.*}}TypeA::@"__merge_with__
     # CHECK-NEXT:   hlcf.yield [[ARES]]
     # CHECK-NEXT: } else {
@@ -375,7 +374,7 @@ def test_mergewith(
 
     # This merge with two merge_with
     _ = a if cond else c
-    # CHECK: hlcf.if %cond
+    # CHECK: hlcf.elif %cond
     # CHECK:   [[ARES:%.*]] = lit.call {{.*}}TypeA::@"__merge_with__
     # CHECK:   hlcf.yield [[ARES]]
     # CHECK: } else {
@@ -385,7 +384,7 @@ def test_mergewith(
 
     # One merge and one implicit conversion.
     _ = c if cond else d
-    # CHECK: hlcf.if %cond
+    # CHECK: hlcf.elif %cond
     # CHECK:   [[CRES:%.*]] = lit.call {{.*}}TypeC::@"__merge_with__
     # CHECK:   hlcf.yield [[CRES]]
     # CHECK: } else {
@@ -399,14 +398,14 @@ def test_mergewith(
     _ = {} if cond else Int()
 
     # https://github.com/modular/modular/issues/5380
-    # CHECK: hlcf.elif {
-    # CHECK-NEXT: [[FALSE:%.*]] = kgen.param.constant: scalar<bool> = <false>
-    # CHECK-NEXT: [[COND:%.*]] = hlcf.if [[FALSE]]
+    # CHECK: [[FALSE:%.*]] = kgen.param.constant: scalar<bool> = <false>
+    # CHECK-NEXT: [[COND:%.*]] = hlcf.elif [[FALSE]]
     # CHECK-NEXT:   kgen.unreachable
     # CHECK-NEXT: } else {
     # CHECK-NEXT:   = kgen.param.constant: !Bool = <{:scalar<bool> false}>
     # CHECK-NEXT:   hlcf.yield
     # CHECK-NEXT: }
+    # CHECK: hlcf.elif %{{.*}} {
     # expected-warning @+1 {{unreachable code on right side of 'False and ...'}}
     if False and cond:
         pass
@@ -421,9 +420,9 @@ def test_mergewith(
 def chained_cmp(a: Int, b: Int, c: Int, d: Int, e: Int):
     # CHECK:      [[CMP_A_B:%.*]] = lit.call tail @{{.*}}__lt__{{.*}}(%a, %b)
     # CHECK-NEXT: %[[CMP_A_B_SB:.*]] = lit.call tail @{{.*}}__mlir_bool__{{.*}}([[CMP_A_B]])
-    # CHECK-NEXT: %[[IF_A_B:.*]] = hlcf.if %[[CMP_A_B_SB]]
+    # CHECK-NEXT: %[[IF_A_B:.*]] = hlcf.elif %[[CMP_A_B_SB]]
     # CHECK-NEXT:   %[[CMP_B_C:.*]] = lit.call tail @{{.*}}__lt__{{.*}}(%b, %c)
-    # CHECK:        %[[IF_B_C:.*]] = hlcf.if
+    # CHECK:        %[[IF_B_C:.*]] = hlcf.elif
     # CHECK-NEXT:     %[[CMP_C_D:.*]] = lit.call tail @{{.*}}__lt__{{.*}}(%c, %d)
     # CHECK-NEXT:     hlcf.yield %[[CMP_C_D]]
     # CHECK-NEXT:   } else {
@@ -440,14 +439,14 @@ def chained_cmp(a: Int, b: Int, c: Int, d: Int, e: Int):
     # COM: This checks the parsing precedence between `<` and `and`.
     # CHECK:      %[[CMP_A_B:.*]] = lit.call {{.*}}__lt__{{.*}}(%a, %b)
     # CHECK:       %[[CMP_A_B_SB:.*]] = lit.call {{.*}}__mlir_bool__{{.*}}(%[[CMP_A_B]])
-    # CHECK-NEXT: %[[IF_A_B:.*]] = hlcf.if %[[CMP_A_B_SB]]
+    # CHECK-NEXT: %[[IF_A_B:.*]] = hlcf.elif %[[CMP_A_B_SB]]
     # CHECK:   %[[CMP_B_C:.*]] = lit.call {{.*}}__lt__{{.*}}(
     # CHECK-NEXT:   hlcf.yield %[[CMP_B_C]]
     # CHECK-NEXT: } else {
     # CHECK-NEXT:   hlcf.yield %[[CMP_A_B]]
     # CHECK-NEXT: }
     # CHECK-NEXT: %[[CMP_SB:.*]] = lit.call {{.*}}__mlir_bool__{{.*}}(%[[IF_A_B]])
-    # CHECK-NEXT: %[[IF:.*]] = hlcf.if %[[CMP_SB]]
+    # CHECK-NEXT: %[[IF:.*]] = hlcf.elif %[[CMP_SB]]
     # CHECK-NEXT:   %[[CMP_D_E:.*]] = lit.call {{.*}}__lt__{{.*}}(%d, %e)
     # CHECK-NEXT:   hlcf.yield %[[CMP_D_E]]
     # CHECK-NEXT: } else {
@@ -470,15 +469,15 @@ comptime chainedCmpAlias3 = 1 <= 2 <= 9 <= 4 <= 5
 # CHECK-LABEL: lit.fn @"chainedCmpSemiDyn
 def chainedCmpSemiDyn(x: Int, a: Int, b: Int, c: Int):
     # CHECK-NEXT: [[IFCOND:%.*]] = kgen.param.constant: scalar<bool> = <true>
-    # CHECK-NEXT: [[FINALRESULT:%.*]] = hlcf.if [[IFCOND]] -> !Bool {
+    # CHECK-NEXT: [[FINALRESULT:%.*]] = hlcf.elif [[IFCOND]] -> !Bool {
     # CHECK-NEXT:   [[PV:%.*]] = {{.*}}constant{{.*}}77
     # CHECK-NEXT:   [[CMPRESULT1:%.*]] = {{.*}}__lt__{{.*}}([[PV]], %x)
     # CHECK-NEXT:   [[IFCONDSB:%.*]] = {{.*}}__mlir_bool__{{.*}}([[CMPRESULT1]])
-    # CHECK-NEXT:   [[INNERRESULT:%.*]] = hlcf.if [[IFCONDSB]] -> !Bool {
+    # CHECK-NEXT:   [[INNERRESULT:%.*]] = hlcf.elif [[IFCONDSB]] -> !Bool {
     # CHECK-NEXT:     [[PV:%.*]] = {{.*}}constant{{.*}}105
     # CHECK-NEXT:     [[CMPRESULT2:%.*]] = {{.*}}__lt__{{.*}}(%x, [[PV]])
     # CHECK-NEXT:     [[IFCONDSB:%.*]] = {{.*}}__mlir_bool__{{.*}}([[CMPRESULT2]])
-    # CHECK-NEXT:     [[MOSTINNERRESULT:%.*]] = hlcf.if [[IFCONDSB]] -> !Bool {
+    # CHECK-NEXT:     [[MOSTINNERRESULT:%.*]] = hlcf.elif [[IFCONDSB]] -> !Bool {
     # CHECK-NEXT:       [[TRUEPARAM:%.*]] = kgen.param.constant: !Bool = {{.*}}{:scalar<bool> true}
     # CHECK-NEXT:       hlcf.yield [[TRUEPARAM]]
     # CHECK-NEXT:     } else {
@@ -514,7 +513,7 @@ struct NonCopyableContainer(Movable where False):
 def chained_cmp_in_non_copyable(a: Int, b: Int, c: NonCopyableContainer):
     # CHECK:      [[CMP_A_B:%.*]] = lit.call {{.*}}__lt__{{.*}}(%a, %b)
     # CHECK:      [[CMP_A_B_SB:%.*]] = lit.call {{.*}}__mlir_bool__{{.*}}([[CMP_A_B]])
-    # CHECK-NEXT: {{%.*}} = hlcf.if [[CMP_A_B_SB]]
+    # CHECK-NEXT: {{%.*}} = hlcf.elif [[CMP_A_B_SB]]
     # CHECK-NEXT:   {{%.*}} = lit.call {{.*}}__contains__{{.*}}(%c,
     # CHECK:        hlcf.yield
     # CHECK-NEXT: } else {
@@ -547,7 +546,7 @@ def test_rp_and_or():
 
     # CHECK-NEXT: [[IMMTMP:%.*]] = lit.ref.immut [[TMPMEM]]
     # CHECK-NEXT: lit.call {{.*}}RPType::@"__bool__{{.*}}([[IMMTMP]])
-    # CHECK:      hlcf.if
+    # CHECK:      hlcf.elif
     # CHECK-NEXT:     [[LHS:%.*]] = lit.load.consume [[TMPMEM]]
     # CHECK-NEXT:     hlcf.yield [[LHS]] : !RPType
 
@@ -582,7 +581,7 @@ def test_if_else_move(r: Bool, var a: MoveOnly, var b: MoveOnly):
     # This should move a/b into t.
     var t = b^ if r else a^
 
-    # CHECK: hlcf.if
+    # CHECK: hlcf.elif
     # CHECK-NEXT: lit.ownership.use %b
     # CHECK-NEXT: lit.call {{.*}}__init__{{.*}}(%b, %t){{.*}}*, "move"
     # CHECK-NEXT: hlcf.yield

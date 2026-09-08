@@ -159,3 +159,25 @@ def test_preshuffle_b_scales_rejects_unshuffleable_group() -> None:
 
     with pytest.raises(ValueError, match="preshuffle skipped"):
         preshuffle_block_scaled_b_scales(state_dict)
+
+
+def test_preshuffle_b_experts_counts_matches_under_virtual_devices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Virtual devices skip the byte copy, so identity cannot report a match.
+
+    The graph-dump tools compile against virtual devices only. Reporting 0
+    there would make a clean dump indistinguishable from a naming regression.
+    """
+    monkeypatch.setattr(
+        "max.pipelines.weights.block_scaled_preshuffle.is_virtual_device_mode",
+        lambda: True,
+    )
+    name = "layers.0.mlp.experts.0.gate_proj.weight"
+    state_dict = {
+        name: WeightData.from_numpy(_weight_bytes(3, (_N, _K_BYTES)), name)
+    }
+    before = state_dict[name]
+
+    assert preshuffle_block_scaled_b_experts(state_dict) == 1
+    assert state_dict[name] is before, "virtual mode must not permute bytes"

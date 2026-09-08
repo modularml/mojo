@@ -807,13 +807,13 @@ kgen.generator @partialBindSignature3<T: type>(%arg : !kgen.param<T>) {
 kgen.generator @mlirOperationExpr() {
   // CHECK: (index, index) -> index = <"index.add">
   kgen.param.declare indexAdd: (index, index) -> index = <"index.add">
-  // CHECK: (index, index) -> i1 = <"index.cmp"{pred = #index<cmp_predicate slt>}>
-  kgen.param.declare indexCmp: (index, index) -> i1 = <"index.cmp"{pred = #index<cmp_predicate slt>}>
+  // CHECK: (index, index) -> i1 = <"index.cmp"{pred = #index.cmp_predicate<slt>}>
+  kgen.param.declare indexCmp: (index, index) -> i1 = <"index.cmp"{pred = #index.cmp_predicate<slt>}>
   // CHECK: (!pop.array<2, si32>) -> si32 = <"pop.array.get"{index = 0 : index}>
   kgen.param.declare arrayGet: (!pop.array<2, si32>) -> si32 = <"pop.array.get"{index = 0 : index}>
 
   // CHECK: cmpResult: i1 = <1>
-  kgen.param.declare cmpResult: i1 = <apply(:(index, index) -> i1 "index.cmp"{pred = #index<cmp_predicate eq>}, 3, 3)>
+  kgen.param.declare cmpResult: i1 = <apply(:(index, index) -> i1 "index.cmp"{pred = #index.cmp_predicate<eq>}, 3, 3)>
   kgen.return
 }
 

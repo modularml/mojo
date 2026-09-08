@@ -1048,7 +1048,7 @@ def LIT_VarDeclOp : LITOp<"var.decl", [
   let results = (outs LIT_RefType:$result);
 
   let assemblyFormat = [{
-    $name $kind `:`
+    $name enum($kind) `:`
     custom<VarDeclType>(type($result), $paramDecl) attr-dict
   }];
 

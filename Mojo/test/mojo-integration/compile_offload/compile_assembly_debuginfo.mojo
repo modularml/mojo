@@ -32,9 +32,10 @@ def main():
 
 # CHECK: define {{.*}} @"compile_assembly_debuginfo::compiled_fn{{.*}} !dbg ![[SP:[0-9]+]]
 # CHECK-NOT @"compile_assembly_debuginfo::compiled_fn
-# CHECK: ![[SP]] = distinct !DISubprogram({{.*}}type: ![[SUBROUTINE:[0-9]+]]
-# CHECK: ![[SUBROUTINE]] = !DISubroutineType({{.*}}types: ![[FUNCTION_TYPE:[0-9]+]]
-# CHECK: ![[FUNCTION_TYPE]] = !{!{{[0-9]+}}, ![[ARG_TYPE:[0-9]+]]}
-
+# The metadata nodes now print dependencies-first (llvm/llvm-project#216838), so
+# the arg/function/subroutine types appear before the subprogram that uses them.
 # The function arg type should have been concretized into the actual dtype.
-# CHECK: ![[ARG_TYPE]] = !DICompositeType(tag: DW_TAG_array_type, name: "!kgen.simd<4, ui32>"
+# CHECK: ![[ARG_TYPE:[0-9]+]] = !DICompositeType(tag: DW_TAG_array_type, name: "!kgen.simd<4, ui32>"
+# CHECK: ![[FUNCTION_TYPE:[0-9]+]] = !{!{{[0-9]+}}, ![[ARG_TYPE]]}
+# CHECK: ![[SUBROUTINE:[0-9]+]] = !DISubroutineType({{.*}}types: ![[FUNCTION_TYPE]]
+# CHECK: ![[SP]] = distinct !DISubprogram({{.*}}type: ![[SUBROUTINE]]

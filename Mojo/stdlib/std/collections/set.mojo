@@ -405,7 +405,7 @@ struct Set[
         # doesn't impact the hash value.
         for e in self:
             hash_value ^= hash(e)
-        hasher.update(hash_value)
+        hash_value.__hash__(hasher)
 
     def _write_self_to[
         *, is_repr: Bool

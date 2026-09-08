@@ -54,11 +54,11 @@ def test_mlir2():
   var c42 = __mlir_op.`index.constant`[value=index42]() # Good
 
   # expected-error @below {{invalid MLIR attribute:}}
-  # expected-note @below {{attempting to parse: '#index<cmp_predicate xeq>'}}
-  __mlir_attr.`#index<cmp_predicate xeq>`
+  # expected-note @below {{attempting to parse: '#index.cmp_predicate<xeq>'}}
+  __mlir_attr.`#index.cmp_predicate<xeq>`
 
   # expected-warning @below {{'__mlir_type.`!kgen.deferred`' value is unused; assign to '_' to discard the result}}
-  __mlir_attr.`#index<cmp_predicate eq>`
+  __mlir_attr.`#index.cmp_predicate<eq>`
 
   # expected-error @below {{invalid MLIR attribute: expected attribute value}}
   # expected-note @below {{attempting to parse: '_'}}

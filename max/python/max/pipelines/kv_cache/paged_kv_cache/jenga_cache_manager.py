@@ -156,13 +156,31 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         max_num_input_tokens: int | None = None,
         max_seq_len: int | None = None,
     ) -> JengaKVCacheManager:
-        """Creates a JengaKVCacheManager."""
+        """Creates a JengaKVCacheManager.
+
+        ``available_bytes`` is the KV budget across all devices from memory
+        estimation (same contract as ``compute_num_device_blocks``). Each
+        device slab is sized from ``available_bytes // len(params.devices)``.
+        """
         leaves = params.leaves()
-        bytes_per_page = {
-            leaf_id: leaf.bytes_per_page for leaf_id, leaf in leaves.items()
-        }
+        # Leaf page sizes include a TP multiplier (replica-wide). Each Jenga
+        # slab lives on one device, so ratios must use the per-device stride.
+        tp_degree = params.tensor_parallel_degree
+        bytes_per_page: dict[str, int] = {}
+        for leaf_id, leaf in leaves.items():
+            if leaf.bytes_per_page % tp_degree != 0:
+                raise ValueError(
+                    "Jenga leaf page size must be divisible by tensor "
+                    f"parallel degree {tp_degree}, found {leaf.bytes_per_page} "
+                    f"for {leaf_id}"
+                )
+            bytes_per_page[leaf_id] = leaf.bytes_per_page // tp_degree
+        n_devices = len(params.devices)
+        if n_devices < 1:
+            raise ValueError("Jenga KV cache requires at least one device")
+        per_device_available_bytes = available_bytes // n_devices
         num_huge_blocks, huge_page_bytes, ratios = compute_jenga_ratios(
-            available_bytes, bytes_per_page
+            per_device_available_bytes, bytes_per_page
         )
         if params.kv_connector_config.type.value == "dkv":
             raise ValueError(
@@ -173,6 +191,15 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             leaf_id: KVLeafInfo(ratio=ratios[leaf_id], group_id=leaf.group_id)
             for leaf_id, leaf in leaves.items()
         }
+
+        logger.info(
+            f"Jenga KV manager: {num_huge_blocks} huge pages x {to_human_readable_bytes(huge_page_bytes)} = {to_human_readable_bytes(num_huge_blocks * huge_page_bytes)} (per device), page_size {params.page_size} tokens"
+        )
+        max_leaf_id_len = max(len(leaf_id) for leaf_id in leaf_infos)
+        for leaf_id, leaf_info in leaf_infos.items():
+            logger.info(
+                f"\t{leaf_id:<{max_leaf_id_len}}: {leaf_info.ratio * num_huge_blocks} pages of {to_human_readable_bytes(bytes_per_page[leaf_id])}  ({leaf_info.ratio} per huge page)"
+            )
 
         devices = [d.to_device() for d in params.devices]
         slabs = [
@@ -188,17 +215,6 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             params.slab_to_buffer_views(bs)
             for bs in split_into_groups(slabs, params.data_parallel_degree)
         ]
-
-        logger.info(
-            f"Jenga KV manager: {num_huge_blocks} huge pages x {to_human_readable_bytes(huge_page_bytes)} = {to_human_readable_bytes(num_huge_blocks * huge_page_bytes)} (per device), page_size {params.page_size} tokens"
-        )
-        max_leaf_id_len = max(len(leaf_id) for leaf_id in leaf_infos)
-        for leaf_id, leaf_info, leaf in zip(
-            leaf_infos.keys(), leaf_infos.values(), leaves.values(), strict=True
-        ):
-            logger.info(
-                f"\t{leaf_id:<{max_leaf_id_len}}: {leaf_info.ratio * num_huge_blocks} pages of {to_human_readable_bytes(leaf.bytes_per_page)}  ({leaf_info.ratio} per huge page)"
-            )
 
         # A single connector serves every replica; each load/offload passes the
         # replica_idx that selects the device endpoint. `to_memory()` emits one

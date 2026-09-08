@@ -89,7 +89,7 @@ struct SIMDLength(
         """
         return Bool(
             value=__mlir_op.`index.cmp`[
-                pred=__mlir_attr.`#index<cmp_predicate eq>`
+                pred=__mlir_attr.`#index.cmp_predicate<eq>`
             ](self._mlir_value, rhs._mlir_value)
         )
 
@@ -104,7 +104,7 @@ struct SIMDLength(
             True if this Int is non-equal to the RHS Int and False otherwise.
         """
         return __mlir_op.`index.cmp`[
-            pred=__mlir_attr.`#index<cmp_predicate ne>`
+            pred=__mlir_attr.`#index.cmp_predicate<ne>`
         ](self._mlir_value, rhs._mlir_value)
 
     @always_inline("builtin")
@@ -148,7 +148,7 @@ struct SIMDLength(
         """
         return Bool(
             value=__mlir_op.`index.cmp`[
-                pred=__mlir_attr.`#index<cmp_predicate sle>`
+                pred=__mlir_attr.`#index.cmp_predicate<sle>`
             ](self._mlir_value, rhs._mlir_value)
         )
 
@@ -163,7 +163,7 @@ struct SIMDLength(
             True if this SIMDLength is greater than the RHS SIMDLength and False otherwise.
         """
         return __mlir_op.`index.cmp`[
-            pred=__mlir_attr.`#index<cmp_predicate sgt>`
+            pred=__mlir_attr.`#index.cmp_predicate<sgt>`
         ](self._mlir_value, rhs._mlir_value)
 
     @always_inline("builtin")
@@ -177,7 +177,7 @@ struct SIMDLength(
             True if this SIMDLength is less-than the RHS SIMDLength and False otherwise.
         """
         return __mlir_op.`index.cmp`[
-            pred=__mlir_attr.`#index<cmp_predicate slt>`
+            pred=__mlir_attr.`#index.cmp_predicate<slt>`
         ](self._mlir_value, rhs._mlir_value)
 
     @always_inline("builtin")
@@ -192,7 +192,7 @@ struct SIMDLength(
             otherwise.
         """
         return __mlir_op.`index.cmp`[
-            pred=__mlir_attr.`#index<cmp_predicate sge>`
+            pred=__mlir_attr.`#index.cmp_predicate<sge>`
         ](self._mlir_value, rhs._mlir_value)
 
     @always_inline("builtin")

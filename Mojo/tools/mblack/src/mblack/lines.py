@@ -611,7 +611,15 @@ class EmptyLineTracker:
                     and current_line.leaves[-1].type == token.COLON
                     and (
                         current_line.leaves[0].value
-                        not in ("with", "try", "for", "while", "if", "match")
+                        not in (
+                            "with",
+                            "try",
+                            "for",
+                            "while",
+                            "if",
+                            "match",
+                            "__match",
+                        )
                     )
                 ):
                     # We shouldn't add two newlines between an indented function and

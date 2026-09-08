@@ -21,7 +21,7 @@ def test_scatter_set_constant() raises:
     var data_stack = Array[Float32, 9](fill=0.0)
     var data = TileTensor(data_stack, row_major[3, 3]())
 
-    var array = Array[Int32, 4 * 2](uninitialized=True)
+    var array = Array[Int32, 4 * 2](fill={})
     var indices = TileTensor(array, row_major[4, 2]())
 
     indices[0, 0] = 0

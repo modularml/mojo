@@ -25,6 +25,7 @@ import random
 import re
 import struct
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
 from pathlib import Path
@@ -632,7 +633,13 @@ class HuggingFaceRepo:
 
     def _get_safetensors_encoding(
         self, file: BinaryIO
-    ) -> set[SupportedEncoding]:
+    ) -> tuple[set[SupportedEncoding], list[tuple[str, str]]]:
+        """Maps a shard header's dtypes onto encodings.
+
+        Returns:
+            The encodings this shard's dtypes map to, and the
+            ``(dtype, tensor name)`` pairs whose dtype maps to none.
+        """
         # Read the first 8 bytes of the file
         length_bytes = file.read(8)
         # Interpret the bytes as a little-endian unsigned 64-bit integer
@@ -643,7 +650,10 @@ class HuggingFaceRepo:
         header = json.loads(header_bytes)
 
         supported_encodings: set[SupportedEncoding] = set()
-        for weight_value in header.values():
+        unknown: list[tuple[str, str]] = []
+        for weight_name, weight_value in header.items():
+            if weight_name == "__metadata__":
+                continue
             if weight_dtype := weight_value.get("dtype", None):
                 if weight_dtype == "F32":
                     supported_encodings.add("float32")
@@ -656,16 +666,16 @@ class HuggingFaceRepo:
                 elif weight_dtype == "U8":
                     supported_encodings.add("float4_e2m1fnx2")
                 else:
-                    _logger.warning(
-                        f"unknown dtype found in safetensors file: {weight_dtype}"
-                    )
-        return supported_encodings
+                    unknown.append((weight_dtype, weight_name))
+        return supported_encodings, unknown
 
     def _detect_safetensors_encodings_from_files(
         self,
     ) -> set[SupportedEncoding]:
         """Detect encodings by reading headers of all safetensors weight files."""
         encodings: set[SupportedEncoding] = set()
+        unknown_counts: Counter[str] = Counter()
+        unknown_examples: dict[str, str] = {}
         fs = (
             huggingface_hub.HfFileSystem()
             if self.repo_type == "online"
@@ -677,15 +687,34 @@ class HuggingFaceRepo:
                     with open(
                         os.path.join(self.local_path, weight_file), "rb"
                     ) as f:
-                        encodings.update(self._get_safetensors_encoding(f))
+                        shard_encodings, unknown = (
+                            self._get_safetensors_encoding(f)
+                        )
                 elif fs is not None:
                     with fs.open(f"{self.repo_id}/{weight_file}", "rb") as f:
-                        encodings.update(self._get_safetensors_encoding(f))
+                        shard_encodings, unknown = (
+                            self._get_safetensors_encoding(f)
+                        )
+                else:
+                    continue
+                encodings.update(shard_encodings)
+                for dtype, tensor_name in unknown:
+                    unknown_counts[dtype] += 1
+                    unknown_examples.setdefault(dtype, tensor_name)
             except Exception:
                 _logger.debug(
                     "Failed to read safetensors header from %s",
                     weight_file,
                 )
+        for dtype, count in sorted(unknown_counts.items()):
+            _logger.warning(
+                "unknown dtype found in safetensors file: %s (%d tensor%s,"
+                " e.g. %r); ignored for encoding detection",
+                dtype,
+                count,
+                "" if count == 1 else "s",
+                unknown_examples[dtype],
+            )
         return encodings
 
     def _get_quantization_config(self) -> dict[str, object] | None:

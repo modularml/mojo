@@ -216,7 +216,7 @@ def combine_kernel[
     # ---- (B) Level 1: per-WG 4-way unnormalized partial (into o_band regs) ----
     var stage_wg = stage0 if wg == 0 else stage1
     var maxsum_wg = maxsum0 if wg == 0 else maxsum1
-    var o_band = Array[Scalar[ACC_TYPE], own_cols](uninitialized=True)
+    var o_band = Array[Scalar[ACC_TYPE], own_cols](fill={})
     var m_wg, l_wg = fa4_ws_level1_combine[M_PACK, ROWS, depth, use_fma=True](
         UInt32(row),
         UInt32(g),

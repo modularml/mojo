@@ -624,7 +624,7 @@ struct HashableOnly(Deinitable, Hashable, Movable):
     var value: Int
 
     def __hash__(self, mut hasher: Some[Hasher]):
-        hasher.update(self.value)
+        self.value.__hash__(hasher)
 
 
 def test_span_hashable_non_copyable() raises:

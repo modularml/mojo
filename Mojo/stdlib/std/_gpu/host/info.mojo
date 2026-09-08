@@ -2295,40 +2295,16 @@ def is_cpu(target: StringSlice) -> Bool:
     return target == "cpu"
 
 
-def is_npu[target: StringSlice]() -> Bool:
-    """Checks if the target is an NPU (compile-time version).
-
-    Parameters:
-        target: Target string to check.
-
-    Returns:
-        True if the target is an NPU, False otherwise.
-    """
-    return is_npu(target)
-
-
-def is_npu(target: StringSlice) -> Bool:
-    """Checks if the target is an NPU (runtime version).
-
-    Args:
-        target: Target string to check.
-
-    Returns:
-        True if the target is an NPU, False otherwise.
-    """
-    return target == "npu"
-
-
 def is_accelerator[target: StringSlice]() -> Bool:
     """Checks if the target is an accelerator (compile-time version).
 
-    True for any non-CPU compute target -- GPUs and NPUs alike.
+    True for any non-CPU compute target.
 
     Parameters:
         target: Target string to check.
 
     Returns:
-        True if the target is a GPU or NPU, False otherwise.
+        True if the target is an accelerator, False otherwise.
     """
     return is_accelerator(target)
 
@@ -2336,15 +2312,15 @@ def is_accelerator[target: StringSlice]() -> Bool:
 def is_accelerator(target: StringSlice) -> Bool:
     """Checks if the target is an accelerator (runtime version).
 
-    True for any non-CPU compute target -- GPUs and NPUs alike.
+    True for any non-CPU compute target.
 
     Args:
         target: Target string to check.
 
     Returns:
-        True if the target is a GPU or NPU, False otherwise.
+        True if the target is an accelerator, False otherwise.
     """
-    return is_gpu(target) or is_npu(target)
+    return is_gpu(target)
 
 
 def is_valid_target[target: StringSlice]() -> Bool:
@@ -2354,7 +2330,7 @@ def is_valid_target[target: StringSlice]() -> Bool:
         target: Target string to check.
 
     Returns:
-        True if the target is valid (CPU, GPU, or NPU), False otherwise.
+        True if the target is valid (CPU or GPU), False otherwise.
     """
     return is_valid_target(target)
 
@@ -2366,6 +2342,6 @@ def is_valid_target(target: StringSlice) -> Bool:
         target: Target string to check.
 
     Returns:
-        True if the target is valid (CPU, GPU, or NPU), False otherwise.
+        True if the target is valid (CPU or GPU), False otherwise.
     """
     return is_cpu(target) or is_accelerator(target)

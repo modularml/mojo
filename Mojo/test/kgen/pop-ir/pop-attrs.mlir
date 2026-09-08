@@ -61,15 +61,15 @@ kgen.func @union_constants() {
 // CHECK: f0 = #pop.union<:i32 42> : !pop.union<i32, i64>
 "union.attr"() { f0 = #pop.union<:i32 42> : !pop.union<i32, i64> } : () -> ()
 
-// CHECK: f0 = #pop<fmf none>
-// CHECK: f1 = #pop<fmf reassoc>
-// CHECK: f2 = #pop<fmf nnan|ninf|reassoc>
-// CHECK: f3 = #pop<fmf fast>
+// CHECK: f0 = #pop.fmf<none>
+// CHECK: f1 = #pop.fmf<reassoc>
+// CHECK: f2 = #pop.fmf<nnan|ninf|reassoc>
+// CHECK: f3 = #pop.fmf<fast>
 "enums.op"() {
-  f0 = #pop<fmf none>,
-  f1 = #pop<fmf reassoc>,
-  f2 = #pop<fmf reassoc|ninf|nnan>,
-  f3 = #pop<fmf fast>
+  f0 = #pop.fmf<none>,
+  f1 = #pop.fmf<reassoc>,
+  f2 = #pop.fmf<reassoc|ninf|nnan>,
+  f3 = #pop.fmf<fast>
 } : () -> ()
 
 // CHECK: f0 = #kgen.param.expr<and, #kgen<simd -1> : !kgen.simd<4, si32>, #kgen.unknown : !kgen.simd<4, si32>> : !kgen.simd<4, si32>

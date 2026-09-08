@@ -64,7 +64,8 @@ public:
                                    SMLoc *firstCommaLoc = nullptr);
   ParseResult parseStarredExprListAsTuple(ExprNode *&result,
                                           ArrayRef<Token::Kind> terminators,
-                                          bool allowAssign);
+                                          bool allowAssign,
+                                          bool allowVarRef = false);
 
   ParseResult parseExpression(ExprNode *&result,
                               Precedence minPrec = Precedence::kExpression);
@@ -149,8 +150,26 @@ ExprParser::parseStarredItemList(SmallVectorImpl<ExprNode *> &results,
 /// Parse a starred_list, forming a single TupleExpr if a comma is present.
 /// Note that starred_item includes assignments, starred_expressions do not.
 ///     starred_expression  ::=  ["*"] or_expr
-ParseResult ExprParser::parseStarredExprListAsTuple(
-    ExprNode *&result, ArrayRef<Token::Kind> terminators, bool allowAssign) {
+/// When `allowVarRef` is true, a leading `var`/`ref` takes this whole list
+/// (`var x, y` → `var (x, y)`). Expression clients leave it false so prefix
+/// `var`/`ref` bind a single subexpression instead.
+ParseResult
+ExprParser::parseStarredExprListAsTuple(ExprNode *&result,
+                                        ArrayRef<Token::Kind> terminators,
+                                        bool allowAssign, bool allowVarRef) {
+  // Statement-level `var x, y` / `ref x, y` take a starred list. Prefix
+  // `var`/`ref` in expressions bind a single subexpression instead.
+  if (allowVarRef && getToken().isAny(Token::kw_var, Token::kw_ref)) {
+    auto kind =
+        getToken().is(Token::kw_var) ? ExprNode::kVarPat : ExprNode::kRefPat;
+    SMLoc opLoc = consumeToken().getLoc();
+    ExprNode *inner = nullptr;
+    if (parseStarredExprListAsTuple(inner, terminators, /*allowAssign=*/false))
+      return failure();
+    result = alloc<UnaryOpNode>(kind, opLoc, inner);
+    return success();
+  }
+
   SmallVector<ExprNode *> exprs;
   SMLoc firstCommaLoc;
   if (parseStarredItemList(exprs, terminators, allowAssign, &firstCommaLoc))
@@ -261,6 +280,8 @@ struct InfixInfo {
                  /*isRightAssociative=*/true);
     case Token::colon_equal:
       return get(Precedence::kAssignExpr, ExprNode::kWalrus);
+    case Token::kw_as:
+      return get(Precedence::kAsPat, ExprNode::kAsPat);
     }
   }
 };
@@ -510,16 +531,8 @@ ParseResult ExprParser::parsePrimaryExpr(ExprNode *&result) {
     }
 
     ExprNode *expr = nullptr;
-    // "var" and "ref" take a star list after them to handle "var x, y" as
-    // "var (x, y)".
-    if (unaryKind == ExprNode::kVarPat || unaryKind == ExprNode::kRefPat) {
-      if (parseStarredExprListAsTuple(expr, /*terminators*/ {},
-                                      /*allowAssign=*/false))
-        return failure();
-    } else {
-      if (parseExpression(expr, subExprPrec))
-        return failure();
-    }
+    if (parseExpression(expr, subExprPrec))
+      return failure();
     result = alloc<UnaryOpNode>(unaryKind, startTok.getLoc(), expr);
     break;
   }
@@ -1662,7 +1675,7 @@ ParseResult ParserBase::parseTargetListExpr(ExprNode *&result,
                                             std::optional<size_t> stmtIndent) {
   return ExprParser(shared, getLexer(), stmtIndent)
       .parseStarredExprListAsTuple(result, /*terminators=*/{},
-                                   /*allowAssign=*/false);
+                                   /*allowAssign=*/false, /*allowVarRef=*/true);
 }
 
 ParseResult ParserBase::parseVarInitExpression(ExprNode *&result,
@@ -1734,7 +1747,7 @@ ParseResult ParserBase::parseSimpleStmtExprs(ExprNode *&result,
   // TODO: Handle yield_expression.
   if (p.parseStarredExprListAsTuple(
           expr, /*terminators=*/{Token::colon, Token::equal},
-          /*allowAssign=*/true))
+          /*allowAssign=*/true, /*allowVarRef=*/true))
     return failure();
 
   // Check for type pattern. In Python this is the:

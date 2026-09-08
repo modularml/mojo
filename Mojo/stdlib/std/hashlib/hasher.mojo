@@ -50,7 +50,7 @@ trait Hasher:
     def _update_with_simd(mut self, value: SIMD[_, _]):
         ...
 
-    def update(mut self, value: Some[Hashable]):
+    def update(mut self, value: ImmSpan[Byte, _]):
         """Update the hash with a value.
 
         Args:

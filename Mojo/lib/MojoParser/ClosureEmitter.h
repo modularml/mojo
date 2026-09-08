@@ -145,7 +145,7 @@ public:
                  ASTDecl *targetParent = nullptr);
 
   Value emitClosure(ASTDecl &moduleDecl, ASTDecl &nestedFnDecl,
-                    ArrayRef<Capture> captures, TraitDeclOp trait,
+                    ArrayRef<Capture> captures, ASTDecl &traitDecl,
                     Location location, bool isCopyable,
                     FnTypeGeneratorType closureSig,
                     ArrayRef<ParamDeclRefAttr> paramCaptures);
@@ -228,6 +228,11 @@ public:
     /// empty for marker traits, which have none.
     ClosureParent(SharedState &shared, TraitSymbolAttr symbol,
                   StringRef traitFnName, ClosureMethod closureMethod);
+
+    ClosureParent(TraitSymbolAttr symbol, FnTypeGeneratorType traitFnSig,
+                  StringAttr witnessName, ClosureMethod closureMethod)
+        : symbol(symbol), closureMethod(closureMethod),
+          witnessName(witnessName), signature(traitFnSig) {}
 
     TraitSymbolAttr getSymbol() const { return symbol; }
     StringAttr getWitnessName() const { return witnessName; }

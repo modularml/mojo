@@ -638,6 +638,10 @@ mod.__doc__ = """Computes the element-wise modulus of two tensors.
 Either operand may be a Python ``int`` or ``float`` scalar, which is
 automatically promoted to a tensor.
 
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``mod``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 mod on Metal (MOCO-4826)")
+
 .. code-block:: python
 
     from max.experimental import Tensor
@@ -993,6 +997,10 @@ Returns:
 ceil = functional(ops.ceil, rule=unary_rule)
 ceil.__doc__ = """Computes the ceiling of a tensor element-wise.
 
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``ceil``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 ceil on Metal (MOCO-4826)")
+
 .. code-block:: python
 
     from max.experimental import Tensor
@@ -1012,6 +1020,10 @@ Returns:
 
 floor = functional(ops.floor, rule=unary_rule)
 floor.__doc__ = """Computes the floor of a tensor element-wise.
+
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``floor``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 floor on Metal (MOCO-4826)")
 
 .. code-block:: python
 
@@ -1037,6 +1049,10 @@ Values exactly halfway between two integers round to the nearest even integer
 (for example, ``2.5`` rounds to ``2.0`` and ``3.5`` rounds to ``4.0``). All
 other values follow normal rounding to the nearest integer.
 
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``round``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 round on Metal (MOCO-4826)")
+
 .. code-block:: python
 
     from max.experimental import Tensor
@@ -1057,6 +1073,10 @@ Returns:
 
 trunc = functional(ops.trunc, rule=unary_rule)
 trunc.__doc__ = """Truncates a tensor toward zero element-wise.
+
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``trunc``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 trunc on Metal (MOCO-4826)")
 
 .. code-block:: python
 

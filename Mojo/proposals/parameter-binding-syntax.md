@@ -37,11 +37,11 @@ var _ : SomeStruct
 
 ```mojo
 struct SomeStruct[a: Int, b: Int, c: Int = 2]:
-    fn __init__(out self, b: ParamType[Self.b]):
+    def __init__(out self, b: ParamType[Self.b]):
         pass
 
     @staticmethod
-    fn foo(b: ParamType[Self.b]) -> Int:
+    def foo(b: ParamType[Self.b]) -> Int:
         pass
 
 # Error: cannot infer `b`, since `[]` must produce a concrete type without `_`/`...`.

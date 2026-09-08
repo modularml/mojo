@@ -342,6 +342,10 @@ struct List[T: AnyType, /](
 
     comptime _PointerType = Pointer[Self.T, MutUntrackedOrigin]
 
+    comptime _InteriorOrigin[origin: Origin] = origin._get_owned_interior[
+        "element"
+    ]
+
     # Fields
     var _data: Self._PointerType
     """The underlying storage for the list."""
@@ -919,7 +923,10 @@ struct List[T: AnyType, /](
     # FIXME: This annotation is needed to support List[Span[x, o]] types with
     # mutable origins.
     @__unsafe_nested_origins_read_only
-    def append(mut self, var value: Self.T) where conforms_to(Self.T, Movable):
+    @stable(since="1.1")
+    def append(
+        mut self, var value: Self.T, /
+    ) where conforms_to(Self.T, Movable):
         """Appends a value to this list.
 
         Args:
@@ -1488,45 +1495,32 @@ struct List[T: AnyType, /](
     @__unsafe_nested_origins_read_only
     @stable(since="1.0")
     @always_inline
-    def __getitem__[
-        origin: Origin, //
-    ](ref[origin] self, slice: ContiguousSlice) -> Span[
-        Self.T, origin_of(self)._get_owned_interior["element"]
-    ]:
+    def __getitem__(
+        ref self, slice: ContiguousSlice
+    ) -> Span[Self.T, Self._InteriorOrigin[origin_of(self)]]:
         """Gets the sequence of elements at the specified positions.
 
         Aborts if `slice`'s start or end index is out of bounds (valid range
         is `0` to `len(self)`, inclusive), or if start is greater than end.
         Negative indices are not supported and always abort.
 
-        Parameters:
-            origin: The origin of `List`.
-
         Args:
             slice: A slice the specifies the positions of the new list.
 
         Returns:
-            A span over the specified slice. The span carries an interior origin
-            derived from `self`, so any subsequent mutation of the list
-            (`append`, `pop`, and similar) invalidates it at compile time.
+            A span over the specified slice.
         """
         var start, end = check_slice_bounds(slice, len(self))
-        return Span[Self.T, origin_of(self)._get_owned_interior["element"]](
-            unsafe_ptr=Pointer(
-                to=self.unsafe_ptr()
-                .unsafe_offset(start)
-                ._get_ref_with_unsafe_interior_origin[
-                    "element", origin_of(self)
-                ]()
-            ),
-            length=end - start,
-        )
+        return {
+            unsafe_ptr = self._unsafe_interior_ptr().unsafe_offset(start),
+            length = end - start,
+        }
 
     @__unsafe_nested_origins_read_only
     @always_inline
     def __getitem__(
         ref self, idx: IntLiteral, /
-    ) -> ref[self.unsafe_get(index(idx))] Self.T:
+    ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
         """Gets the list element at the given index.
 
         Args:
@@ -1546,7 +1540,7 @@ struct List[T: AnyType, /](
     @always_inline
     def __getitem__(
         ref self, idx: Int, /
-    ) -> ref[self.unsafe_get(index(idx))] Self.T:
+    ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
         """Gets the list element at the given index.
 
         Unlike when subscripting using slices negative indices are
@@ -1566,7 +1560,7 @@ struct List[T: AnyType, /](
     @always_inline
     def __getitem__(
         ref self, idx: Some[Indexer]
-    ) -> ref[self.unsafe_get(index(idx))] Self.T:
+    ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
         """Gets the list element at the given index.
 
         Unlike when subscripting using slices negative indices are
@@ -1586,7 +1580,7 @@ struct List[T: AnyType, /](
     @always_inline
     def unsafe_get(
         ref self, idx: Int
-    ) -> ref[origin_of(self)._get_owned_interior["element"]] Self.T:
+    ) -> ref[Self._InteriorOrigin[origin_of(self)]] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Args:
@@ -1606,11 +1600,7 @@ struct List[T: AnyType, /](
             list. Instead, do `my_list.unsafe_get(len(my_list) - 1)`.
         """
         check_bounds[cpu_default=False](idx, len(self))
-        return (
-            self.unsafe_ptr()
-            .unsafe_offset(idx)
-            ._get_ref_with_unsafe_interior_origin["element", origin_of(self)]()
-        )
+        return self._unsafe_interior_ptr().unsafe_offset(idx)[]
 
     @always_inline
     def unsafe_set(
@@ -1686,6 +1676,18 @@ struct List[T: AnyType, /](
         )
         var ptr = self._data
         ptr.unsafe_offset(elt_idx_1).swap_pointees(ptr.unsafe_offset(elt_idx_2))
+
+    @always_inline
+    def _unsafe_interior_ptr[
+        origin: Origin, address_space: AddressSpace, //
+    ](ref[origin, address_space] self) -> Pointer[
+        Self.T, Self._InteriorOrigin[origin], address_space=address_space
+    ]:
+        return Pointer(
+            to=self.unsafe_ptr()._get_ref_with_unsafe_interior_origin[
+                "element", origin
+            ]()
+        )
 
     def unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //

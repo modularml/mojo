@@ -262,6 +262,7 @@ def _top_k_cpu[
     out_idx_type: DType,
     largest: Bool,
     KLayoutType: TensorLayout = RowMajorLayout[Int64],
+    KEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     input: TileTensor[mut=False, dtype, ...],
     max_k: Int,
@@ -271,7 +272,9 @@ def _top_k_cpu[
     parallelism_grain_size: Int,  # impl detail, exposed for testing
     sorted: Bool,
     ctx: Optional[DeviceContext] = None,
-    k: Optional[TileTensor[.int64, KLayoutType, ImmutAnyOrigin]] = None,
+    k: Optional[
+        TileTensor[.int64, KLayoutType, ImmutAnyOrigin, Engine=KEngine]
+    ] = None,
 ):
     comptime assert (
         input.rank == out_vals.rank
@@ -389,18 +392,46 @@ def fused_token_sampling_cpu[
     TemperatureLayoutType: TensorLayout = RowMajorLayout[Int64],
     TopPLayoutType: TensorLayout = RowMajorLayout[Int64],
     SeedLayoutType: TensorLayout = RowMajorLayout[Int64],
+    KEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPEngine: TensorEngine = DefaultEngine[element_width=1],
+    SeedEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     max_k: Int,
     input: TileTensor[mut=False, dtype, ...],
     out_idxs: TileTensor[mut=True, out_idx_type, ...],
-    k: Optional[TileTensor[.int64, KLayoutType, ImmutAnyOrigin]] = None,
+    k: Optional[
+        TileTensor[
+            .int64,
+            KLayoutType,
+            ImmutAnyOrigin,
+            Engine=KEngine,
+        ]
+    ] = None,
     temperature: Optional[
-        TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TemperatureLayoutType,
+            ImmutAnyOrigin,
+            Engine=TemperatureEngine,
+        ]
     ] = None,
     top_p: Optional[
-        TileTensor[.float32, TopPLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TopPLayoutType,
+            ImmutAnyOrigin,
+            Engine=TopPEngine,
+        ]
     ] = None,
-    seed: Optional[TileTensor[.uint64, SeedLayoutType, ImmutAnyOrigin]] = None,
+    seed: Optional[
+        TileTensor[
+            .uint64,
+            SeedLayoutType,
+            ImmutAnyOrigin,
+            Engine=SeedEngine,
+        ]
+    ] = None,
 ) raises:
     """
     Generalized implementation of the Top K algorithm with sampling.
@@ -414,6 +445,10 @@ def fused_token_sampling_cpu[
         TemperatureLayoutType: Layout type of the temperature buffer.
         TopPLayoutType: Layout type of the top_p buffer.
         SeedLayoutType: Layout type of the seed buffer.
+        KEngine: Engine policy of the k buffer.
+        TemperatureEngine: Engine policy of the temperature buffer.
+        TopPEngine: Engine policy of the top_p buffer.
+        SeedEngine: Engine policy of the seed buffer.
 
     Args:
         max_k: Largest number of top elements.
@@ -483,19 +518,47 @@ def _top_k_sampling[
     TemperatureLayoutType: TensorLayout = RowMajorLayout[Int64],
     TopPLayoutType: TensorLayout = RowMajorLayout[Int64],
     SeedLayoutType: TensorLayout = RowMajorLayout[Int64],
+    KEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPEngine: TensorEngine = DefaultEngine[element_width=1],
+    SeedEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     max_k: Int,
     input: TileTensor[mut=False, dtype, ...],
     out_vals: TileTensor[mut=True, dtype, ...],
     out_idxs: TileTensor[mut=True, .int64, ...],
-    k: Optional[TileTensor[.int64, KLayoutType, ImmutAnyOrigin]] = None,
+    k: Optional[
+        TileTensor[
+            .int64,
+            KLayoutType,
+            ImmutAnyOrigin,
+            Engine=KEngine,
+        ]
+    ] = None,
     temperature: Optional[
-        TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TemperatureLayoutType,
+            ImmutAnyOrigin,
+            Engine=TemperatureEngine,
+        ]
     ] = None,
     top_p: Optional[
-        TileTensor[.float32, TopPLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TopPLayoutType,
+            ImmutAnyOrigin,
+            Engine=TopPEngine,
+        ]
     ] = None,
-    seed: Optional[TileTensor[.uint64, SeedLayoutType, ImmutAnyOrigin]] = None,
+    seed: Optional[
+        TileTensor[
+            .uint64,
+            SeedLayoutType,
+            ImmutAnyOrigin,
+            Engine=SeedEngine,
+        ]
+    ] = None,
 ) raises:
     """
     Generalized implementation of the Top K algorithm with sampling.
@@ -508,6 +571,10 @@ def _top_k_sampling[
         TemperatureLayoutType: Layout type of the temperature buffer.
         TopPLayoutType: Layout type of the top_p buffer.
         SeedLayoutType: Layout type of the seed buffer.
+        KEngine: Engine policy of the k buffer.
+        TemperatureEngine: Engine policy of the temperature buffer.
+        TopPEngine: Engine policy of the top_p buffer.
+        SeedEngine: Engine policy of the seed buffer.
 
     Args:
         max_k: Largest number of top elements.

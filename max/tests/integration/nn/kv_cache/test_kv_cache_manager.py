@@ -485,6 +485,41 @@ async def test_runtime_inputs_with_num_speculative_steps() -> None:
     assert len(inputs.inputs) == 1
 
 
+@pytest.mark.asyncio
+async def test_runtime_inputs_cache_length_bounded_by_accepted_not_speculative_length() -> (
+    None
+):
+    """``cache_lengths`` reflects accepted tokens, never the larger
+    speculative verify-width -- this is the read boundary that keeps a
+    rejected draft token's cache row from ever being read by a later step.
+    """
+    page_size = 4
+    kv_manager = _make_kv_manager(
+        page_size=page_size, total_num_pages=64, num_draft_tokens=8
+    )
+
+    ctx = create_text_context(np.arange(7, dtype=np.int64))
+    kv_manager.claim(ctx)
+    kv_manager.alloc(ctx)
+    kv_manager.runtime_inputs_for_leaf([[ctx]])
+    ctx.update(42)
+    kv_manager.step(ctx)
+    assert ctx.tokens.processed_length == 7
+
+    ctx.spec_decoding_state.maybe_accepted_draft_tokens = [1, 2, 3]
+    # A verify width (6) larger than the accepted count (3) must be
+    # irrelevant to cache_lengths -- it only affects block allocation.
+    ctx.spec_decoding_state.draft_tokens_to_verify = [9, 9, 9, 9, 9, 9]
+    kv_manager.alloc(ctx)
+
+    inputs = kv_manager.runtime_inputs_for_leaf([[ctx]]).inputs[0]
+    cache_length = int(inputs.cache_lengths.to_numpy()[0])
+    assert cache_length == 7 + 3, (
+        f"cache_lengths={cache_length}, expected processed_length(7) + "
+        "accepted(3), independent of the larger verify width(6)"
+    )
+
+
 def _make_multi_kv_manager(
     *,
     page_size: int = 128,

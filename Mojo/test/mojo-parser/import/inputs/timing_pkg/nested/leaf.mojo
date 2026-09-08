@@ -11,4 +11,4 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-alias DEEP = 7
+comptime DEEP = 7

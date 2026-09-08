@@ -65,13 +65,13 @@ struct Fnv1a(Defaultable, Hasher):
                 self._value ^= (v >> type_of(v)(r * 64)).cast[.uint64]()
                 self._value *= 0x100000001B3
 
-    def update(mut self, value: Some[Hashable]):
+    def update(mut self, value: ImmSpan[Byte, _]):
         """Update the buffer value with new hashable value.
 
         Args:
             value: Value used for update.
         """
-        value.__hash__(self)
+        self._update_with_bytes(value)
 
     def finish(var self) -> UInt64:
         """Computes the hash value based on all the previously provided data.

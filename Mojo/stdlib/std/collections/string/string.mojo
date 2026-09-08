@@ -1904,7 +1904,7 @@ struct String(
         Args:
             hasher: The hasher instance.
         """
-        hasher.update(StringSlice(self))
+        StringSlice(self).__hash__(hasher)
 
     def lower(self) -> String:
         """Returns a copy of the string with all cased characters

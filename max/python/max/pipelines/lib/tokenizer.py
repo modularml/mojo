@@ -514,12 +514,12 @@ class TextTokenizer(
                 add_special_tokens,
             )
 
-            if self.max_length and len(encoded_prompt) > self.max_length:
-                raise PromptTooLongError(len(encoded_prompt), self.max_length)
-
             encoded_prompt = np.array(encoded_prompt)
         else:
             encoded_prompt = np.array(list(prompt))
+
+        if self.max_length and len(encoded_prompt) > self.max_length:
+            raise PromptTooLongError(len(encoded_prompt), self.max_length)
 
         return encoded_prompt
 

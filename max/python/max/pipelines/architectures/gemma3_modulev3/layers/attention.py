@@ -51,6 +51,7 @@ class Gemma3Attention(Module[..., Tensor]):
         hidden_size: int,
         kv_params: KVCacheParams,
         layer_idx: int,
+        is_sliding: bool,
         sliding_window_pattern: int = 6,
         scale: float | None = None,
         has_bias: bool = False,
@@ -62,6 +63,7 @@ class Gemma3Attention(Module[..., Tensor]):
         self.rope_local = rope_local
         self.n_heads = num_attention_heads
         self.layer_idx = layer_idx
+        self.is_sliding = is_sliding
         self.has_bias = has_bias
         self.scale = (
             scale if scale is not None else math.sqrt(1.0 / kv_params.head_dim)
@@ -156,8 +158,7 @@ class Gemma3Attention(Module[..., Tensor]):
         # Re-concat and apply RoPE + KV cache store.
         qkv = F.concat([x_q, x_k, x_v], axis=-1)
 
-        use_local = bool((self.layer_idx + 1) % self.sliding_window_pattern)
-        rope = self.rope_local if use_local else self.rope_global
+        rope = self.rope_local if self.is_sliding else self.rope_global
 
         xq = rope_split_store_ragged(
             kv_params=self.kv_params,
@@ -173,7 +174,7 @@ class Gemma3Attention(Module[..., Tensor]):
 
         mask_variant = (
             MHAMaskVariant.SLIDING_WINDOW_CAUSAL_MASK
-            if use_local
+            if self.is_sliding
             else MHAMaskVariant.CAUSAL_MASK
         )
         attn_out = flash_attention_ragged(

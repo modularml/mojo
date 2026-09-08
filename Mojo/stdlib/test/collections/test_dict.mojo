@@ -641,7 +641,7 @@ struct DummyKey(KeyElement):
     var value: Int
 
     def __hash__[H: Hasher](self, mut hasher: H):
-        return hasher.update(self.value)
+        return self.value.__hash__(hasher)
 
     def __eq__(self, other: DummyKey) -> Bool:
         return self.value == other.value

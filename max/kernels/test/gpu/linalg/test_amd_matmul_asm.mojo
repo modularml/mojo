@@ -149,6 +149,9 @@ def compile_kernel_to_asm[
         c_tt_layout,
         a_tt_layout,
         b_tt_layout,
+        DefaultEngine[element_width=1],
+        DefaultEngine[element_width=1],
+        DefaultEngine[element_width=1],
     ]
 
     # Compile for AMD GPU

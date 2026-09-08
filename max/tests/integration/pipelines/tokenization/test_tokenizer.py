@@ -206,7 +206,7 @@ def test_tokenizer__truncates_to_max_length(
         model_name=llama_3_1_8b_instruct_local_path,
         prompt="Longer message with lots of text with more words than max length for sure.",
     )
-    with pytest.raises(ValueError, match="max length"):
+    with pytest.raises(ValueError, match="maximum context length"):
         _ = asyncio.run(tokenizer.new_context(long_request))
 
 

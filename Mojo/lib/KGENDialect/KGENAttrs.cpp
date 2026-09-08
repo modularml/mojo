@@ -5172,22 +5172,22 @@ TypedAttr SugarAttr::get(MLIRContext *context, SugarKind kind,
          (kind != SugarKind::MemberAlias && !memberName) &&
              "memberName should be specified for MemberAlias only");
 
-  // If we shouldn't maintain type sugar for this, then just return the
-  // expanded. We strip sugar for always_inline builtin calls that simplify down
-  // to something simple like "42". We don't want to maintain the call sugar
-  // for things like 4+5 because it just gets in the way.
-  //
-  // This is also important for reducing the size of the IR, making it more
-  // readable and the compiler faster for primitive things like origins.
-  if (auto shouldElide = canElideSugarFor(expanded))
-    if ((int)*shouldElide >= (int)kind)
-      return expanded;
-
   // This method gets called by client doing general structural replacements,
   // e.g. a parameter with an arbitrary attribute.  This can turn canonical
   // forms to non-canonical and visa-versa, so always recompute the canonical
   // pointer.
   canonical = getCanonicalAttr(expanded);
+
+  // If we shouldn't maintain type sugar for this, then just return the
+  // canonicalized form. We strip sugar for always_inline builtin calls that
+  // simplify down to something simple like "42". We don't want to maintain the
+  // call sugar for things like 4+5 because it just gets in the way.
+  //
+  // This is also important for reducing the size of the IR, making it more
+  // readable and the compiler faster for primitive things like origins.
+  if (auto shouldElide = canElideSugarFor(expanded))
+    if ((int)*shouldElide >= (int)kind)
+      return canonical;
 
   // We will /never/ use the type sugar in the expanded form of opaque
   // sugar kinds, so we can strip it all away to simplify things.

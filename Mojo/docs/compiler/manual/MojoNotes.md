@@ -99,7 +99,7 @@ cool kids on the block these days.
 
 ### Main
 
-In Mojo the main function has signature `fn main()`.
+In Mojo the main function has signature `def main()`.
 That function is exported automatically with the unique symbol "main" in the
 final object file. This is subject to change as we close the gap with Python's
 functionality.

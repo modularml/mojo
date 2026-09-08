@@ -12,11 +12,11 @@ Today we have:
 
 ```mojo
 trait Movable:
-    fn __moveinit__(out self, deinit existing: Self, /): ...
+    def __moveinit__(out self, deinit existing: Self, /): ...
     ...
 
 trait Copyable:
-    fn __copyinit__(out self, existing: Self, /): ...
+    def __copyinit__(out self, existing: Self, /): ...
     ...
 
 trait ImplicitlyCopyable(Copyable):
@@ -85,7 +85,7 @@ not `Movable`. All non-linear types (those with an implicit destructor) can
 validly (but probably not optimally) implement `__moveinit__` like this:
 
 ```mojo
-fn __moveinit__(out self, var existing: Self, /):
+def __moveinit__(out self, var existing: Self, /):
    # Move by performing a copy and deleting the original value.
    self = Self(existing)
 ```

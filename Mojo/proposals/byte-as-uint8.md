@@ -5,7 +5,7 @@
 At this point in time, a sequence of bytes is often represented as a sequence of
 signed 8 bit integers in Mojo standard library. Most noticeable example is the
 underlying data of string types `String`, `StringLiteral`, `StringRef` and
-`InlinedString`, but also APIs like for example the hash function `fn
+`InlinedString`, but also APIs like for example the hash function `def
 hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:`.
 
 ## Motivation

@@ -60,7 +60,7 @@ from C ABI on structs, causing silent value corruption at the call site.
 bitcasts a "pointer to C function" to a "pointer to Mojo function". Since the
 two calling conventions diverge on struct arguments and return values, this
 assumption is wrong and will silently corrupt values. There is no type-level
-mechanism to distinguish a `fn(Int32) -> Int32` using Mojo CC from one using
+mechanism to distinguish a `def(Int32) -> Int32` using Mojo CC from one using
 C CC, so the compiler cannot catch the mismatch.
 
 ---
@@ -123,7 +123,7 @@ def make_handler() -> def(Int32, Int32) abi("C") -> Int32:
 
 This is the key reason `abi` must be a syntactic effect rather than a
 decorator argument: decorators cannot appear inside type expressions. Rust
-solves this identically with `extern "C" fn(i32) -> i32`; Swift uses
+solves this identically with `extern "C" def(i32) -> i32`; Swift uses
 `@convention(c) (Int32) -> Int32`. Mojo's `abi("C")` in the effect slot
 follows the same pattern while staying consistent with the language's existing
 effect syntax.
@@ -376,7 +376,7 @@ indirect call, or variadic syntax in the function type — for example
 | Location                     | Before                          | After                                   |
 |------------------------------|---------------------------------|-----------------------------------------|
 | Function declaration         | *(no ABI annotation)*           | `def f() abi("C") -> T`                 |
-| Function pointer type        | `fn() -> T`                     | `def() abi("C") -> T`                   |
+| Function pointer type        | `def() -> T`                    | `def() abi("C") -> T`                   |
 | Export with C ABI            | `@export("f", abi="C") def f()` | `@export("f") def f() abi("C") -> T`    |
 | Export without explicit ABI  | *(silently uses Mojo CC)*       | **compiler error**                      |
 | Extern C library function    | *(broken — wrong CC)*           | `@extern("f") def f() abi("C") -> T`    |
@@ -427,7 +427,7 @@ var multiplier: Int32 = 3
 var f: def(Int32) abi("C") -> Int32 = lambda x: x * multiplier
 
 # OK: non-capturing closure (or a bare function reference)
-var g: fn(Int32) abi("C") -> Int32 = lambda x: x * 3
+var g: def(Int32) abi("C") -> Int32 = lambda x: x * 3
 ```
 
 This is the same constraint imposed by Rust (`extern "C" fn` pointers cannot

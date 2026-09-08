@@ -555,12 +555,10 @@ kgen.func @tryraise(%arg1: index, %arg2 : index) async -> index {
   // CHECK: [[NIF:%.*]] = kgen.call @foo1
   %result3 = kgen.call @foo1(%arg1) : (index) -> index
   lit.try "try0" {
-    hlcf.elif {
-      %result = kgen.call @bar(%arg2) : (index) -> i1
-      %result_sb = pop.cast_from_builtin %result : i1 to !kgen.scalar<bool>
-      hlcf.elif.yield %result_sb
-    } then {
-      // CHECK: } then {
+    %result = kgen.call @bar(%arg2) : (index) -> i1
+    %result_sb = pop.cast_from_builtin %result : i1 to !kgen.scalar<bool>
+    hlcf.elif %result_sb {
+      // CHECK: hlcf.elif {{%.*}} {
       // CHECK-NEXT: [[V7:%.*]] = kgen.struct.gep %arg0[[[#FRAME10:]]]
       // CHECK-NEXT: [[V8:%.*]] = pop.load [[V7]] : !kgen.pointer<index>
       // CHECK-NEXT: [[V9:%.*]] = kgen.call @foo([[V8]]) : (index) -> index
@@ -993,29 +991,25 @@ module attributes {M.target_info = #M.target<triple="", arch="", features="", da
 
 // CHECK-LABEL: kgen.func @in_frame_cf_resume
 kgen.func @in_frame_cf(%arg1: index, %arg2: index, %arg3: i1) async -> index {
-  // CHECK-NEXT: hlcf.elif {
-  // CHECK-NEXT:  [[ARG3_SLOT:%.*]] = kgen.struct.gep %arg0[[[#FRAME9:]]]
-  // CHECK-NEXT:  [[ARG3:%.*]] = pop.load [[ARG3_SLOT]] : !kgen.pointer<i1>
-  // CHECK-NEXT:  [[ARG3SB:%.*]] = pop.cast_from_builtin [[ARG3]] : i1 to !kgen.scalar<bool>
-  // CHECK-NEXT:  hlcf.elif.yield [[ARG3SB]]
-  // CHECK-NEXT: } then {
+  // CHECK-NEXT: [[ARG3_SLOT:%.*]] = kgen.struct.gep %arg0[[[#FRAME9:]]]
+  // CHECK-NEXT: [[ARG3:%.*]] = pop.load [[ARG3_SLOT]] : !kgen.pointer<i1>
+  // CHECK-NEXT: [[ARG3SB:%.*]] = pop.cast_from_builtin [[ARG3]] : i1 to !kgen.scalar<bool>
+  // CHECK-NEXT: hlcf.elif [[ARG3SB]] {
   // CHECK-NEXT: [[ARG2_SLOT:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 + 1]]]
   // CHECK-NEXT: [[ARG2:%.*]] = pop.load [[ARG2_SLOT]] : !kgen.pointer<index>
-  // CHECK-NEXT: [[SA:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 - 2]]]
+  // CHECK-NEXT: [[SA:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 - 1]]]
   // CHECK-NEXT: pop.store [[ARG2]], [[SA]] : !kgen.pointer<index>
   // CHECK-NEXT: hlcf.yield
   // CHECK-NEXT: } else {
-  // CHECK-NEXT: [[ARG1_SLOT:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 - 1]]]
+  // CHECK-NEXT: [[ARG1_SLOT:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 + 2]]]
   // CHECK-NEXT: [[ARG1:%.*]] = pop.load [[ARG1_SLOT]] : !kgen.pointer<index>
-  // CHECK-NEXT: [[SA2:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 - 2]]]
+  // CHECK-NEXT: [[SA2:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 - 1]]]
   // CHECK-NEXT: pop.store [[ARG1]], [[SA2]] : !kgen.pointer<index>
   // CHECK-NEXT: hlcf.yield
   // CHECK-NEXT: }
   %0 = pop.stack_allocation 1 x index marked
-  hlcf.elif {
-    %arg3_sb = pop.cast_from_builtin %arg3 : i1 to !kgen.scalar<bool>
-    hlcf.elif.yield %arg3_sb
-  } then {
+  %arg3_sb = pop.cast_from_builtin %arg3 : i1 to !kgen.scalar<bool>
+  hlcf.elif %arg3_sb {
     pop.stack_alloc.lifetime.start(%0) : !kgen.pointer<index>
     pop.store %arg2, %0 : !kgen.pointer<index>
     hlcf.yield
@@ -1034,22 +1028,18 @@ kgen.func @in_frame_cf(%arg1: index, %arg2: index, %arg3: i1) async -> index {
     co.suspend.end
   }
   %2 = kgen.call @use(%0) : (!kgen.pointer<index>) -> index
-  // CHECK-NEXT: [[SA3:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 - 2]]]
+  // CHECK-NEXT: [[SA3:%.*]] = kgen.struct.gep %arg0[[[#FRAME9 - 1]]]
   // CHECK-NEXT: kgen.call @use([[SA3]]) : (!kgen.pointer<index>) -> index
-  // CHECK-NEXT: hlcf.elif {
-  // CHECK-NEXT:   [[ARG3_SLOT:%.*]] = kgen.struct.gep %arg0[[[#FRAME9]]]
-  // CHECK-NEXT:   [[ARG3:%.*]] = pop.load [[ARG3_SLOT]] : !kgen.pointer<i1>
-  // CHECK-NEXT:   [[ARG3SB:%.*]] = pop.cast_from_builtin [[ARG3]] : i1 to !kgen.scalar<bool>
-  // CHECK-NEXT:   hlcf.elif.yield [[ARG3SB]]
-  // CHECK-NEXT: } then {
+  // CHECK-NEXT: [[ARG3_SLOT:%.*]] = kgen.struct.gep %arg0[[[#FRAME9]]]
+  // CHECK-NEXT: [[ARG3:%.*]] = pop.load [[ARG3_SLOT]] : !kgen.pointer<i1>
+  // CHECK-NEXT: [[ARG3SB:%.*]] = pop.cast_from_builtin [[ARG3]] : i1 to !kgen.scalar<bool>
+  // CHECK-NEXT: hlcf.elif [[ARG3SB]] {
   // CHECK-NEXT:   hlcf.yield
   // CHECK-NEXT: } else {
   // CHECK-NEXT:   hlcf.yield
   // CHECK-NEXT: }
-  hlcf.elif {
-    %arg3_sb = pop.cast_from_builtin %arg3 : i1 to !kgen.scalar<bool>
-    hlcf.elif.yield %arg3_sb
-  } then {
+  %arg3_sb2 = pop.cast_from_builtin %arg3 : i1 to !kgen.scalar<bool>
+  hlcf.elif %arg3_sb2 {
     pop.stack_alloc.lifetime.end(%0) : !kgen.pointer<index>
     hlcf.yield
   } else {
@@ -1090,6 +1080,9 @@ kgen.func @not_in_frame_cf(%arg1: index, %arg2: index, %arg3: i1) async -> index
   // CHECK-NEXT: co.suspend {
   // CHECK-NEXT:  co.suspend.end
   // CHECK-NEXT: }
+  // CHECK-NEXT: [[ARG3_SLOT2:%.*]] = kgen.struct.gep %arg0[[[#FRAME8]]]
+  // CHECK-NEXT: [[ARG3_2:%.*]] = pop.load [[ARG3_SLOT2]] : !kgen.pointer<i1>
+  // CHECK-NEXT: [[ARG3SB2:%.*]] = pop.cast_from_builtin [[ARG3_2]] : i1 to !kgen.scalar<bool>
   // CHECK-NEXT: [[SA:%.*]] = pop.stack_allocation 1 x index
 
   // CHECK: pop.stack_alloc.lifetime.start([[SA]])
@@ -1105,10 +1098,8 @@ kgen.func @not_in_frame_cf(%arg1: index, %arg2: index, %arg3: i1) async -> index
     co.suspend (%hdl) {
       co.suspend.end
     }
-    hlcf.elif {
-      %arg3_sb2 = pop.cast_from_builtin %arg3 : i1 to !kgen.scalar<bool>
-      hlcf.elif.yield %arg3_sb2
-    } then {
+    %arg3_sb2 = pop.cast_from_builtin %arg3 : i1 to !kgen.scalar<bool>
+    hlcf.elif %arg3_sb2 {
       %arg3_sb3 = pop.cast_from_builtin %arg3 : i1 to !kgen.scalar<bool>
       hlcf.if %arg3_sb3 {
         pop.stack_alloc.lifetime.start(%0) : !kgen.pointer<index>
@@ -2074,13 +2065,10 @@ kgen.func @conditional_suspoint_elif(%arg0: i1,
                      %arg1: index,
                      %arg2: index,
                      %__result__: !kgen.pointer<index> byref_result) async -> index {
-  // CHECK-NEXT: hlcf.elif {
   // CHECK-NEXT: [[V9:%.*]] = kgen.param.constant: scalar<bool> = <#interp.uninitmem>
-  // CHECK-NEXT: hlcf.elif.yield [[V9]]
-  hlcf.elif {
-    %arg0_sb = pop.cast_from_builtin %arg0 : i1 to !kgen.scalar<bool>
-    hlcf.elif.yield %arg0_sb
-  } then {
+  // CHECK-NEXT: hlcf.elif [[V9]] {
+  %arg0_sb = pop.cast_from_builtin %arg0 : i1 to !kgen.scalar<bool>
+  hlcf.elif %arg0_sb {
     pop.store %arg1, %__result__ : !kgen.pointer<index>
     hlcf.yield
   } else {

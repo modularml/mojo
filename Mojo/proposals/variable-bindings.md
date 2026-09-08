@@ -187,7 +187,7 @@ We've shown simple example with the `=` assignment operator above, but target
 patterns are supported in a few other places, compositionally:
 
 ```mojo
-fn more_target_examples():
+def more_target_examples():
     tuple_list = [(1, 2), (3, 4)]
     # For statement
     for i, j in tuple_list: pass
@@ -279,7 +279,7 @@ I'm aware of the following controversial behavior:
    conflict:
 
    ```mojo
-   fn test(cond: Bool):
+   def test(cond: Bool):
      if cond:
         a = 42
         use(a)
@@ -293,7 +293,7 @@ I'm aware of the following controversial behavior:
    the copy, not the original collection:
 
    ```mojo
-   fn test(mut int_list: List[Int]):
+   def test(mut int_list: List[Int]):
        # Error cannot copy element into `a`.
        for a in collection_of_noncopyable_values(): ...
 

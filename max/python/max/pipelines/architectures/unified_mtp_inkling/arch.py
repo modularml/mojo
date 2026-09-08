@@ -37,6 +37,9 @@ unified_mtp_inkling_arch = SupportedArchitecture(
     tokenizer=InklingTokenizer,
     context_type=TextAndVisionContext,
     config=InklingConfig,
+    tool_parser="inkling",
+    default_structured_output_backend="xgrammar",
+    reasoning_parser="inkling",
     weight_adapters={
         WeightsFormat.safetensors: convert_with_mtp_state_dict,
     },

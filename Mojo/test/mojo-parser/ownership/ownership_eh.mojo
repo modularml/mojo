@@ -113,9 +113,7 @@ def thing_that_raises(c: __mlir_type.`!kgen.scalar<bool>`) raises -> MemExample:
     # CHECK-NEXT: }
     somethingThatRaises()
 
-    # CHECK-NEXT:   hlcf.elif {
-    # CHECK-NEXT:     hlcf.elif.yield %c
-    # CHECK-NEXT:   } then {
+    # CHECK-NEXT:   hlcf.elif %c {
     # CHECK-NEXT:      = lit.call {{.*}}__init__
     # CHECK-NOT:       __deinit__
     # CHECK: kgen.return
@@ -191,7 +189,7 @@ def context_mgr_exit_raises() raises:
     # CHECK-NEXT: lit.try
     # CHECK-NEXT:   [[DID_ERR:%.*]] = lit.ref.load %__with_exc__
     # CHECK-NEXT:   lifetime.end %__with_exc__
-    # CHECK-NEXT:   hlcf.if [[DID_ERR]]
+    # CHECK-NEXT:   hlcf.elif [[DID_ERR]]
     # CHECK-NEXT:     [[IMM:%.*]] = lit.ref.immut %$CONTEXTMGR
     # CHECK-NEXT:     [[BOOL:%.*]] = lit.var.decl
     # CHECK-NEXT:     lit.var.lifetime.start %__finally_error__
@@ -432,9 +430,7 @@ struct InitFieldsDestroyedInThrowingConstructor(Movable where False):
     # CHECK-LABEL: lit.fn @"__init__(!kgen.scalar<bool>)"
     def __init__(out self, cond: __mlir_type.`!kgen.scalar<bool>`) raises:
         self = InitFieldsDestroyedInThrowingConstructor()
-        # CHECK:      hlcf.elif {
-        # CHECK-NEXT:   hlcf.elif.yield %cond
-        # CHECK-NEXT: } then {
+        # CHECK:      hlcf.elif %cond {
         # CHECK-NEXT:   lit.call {{.*}}__deinit__{{.*}}(%self)
         # CHECK-NEXT:   lit.call {{.*}}::@Error::@"__init__
         # CHECK-NEXT:   kgen.param.constant
