@@ -579,5 +579,12 @@ def test_pymoduledef_write_repr_to() raises:
     assert_true("size=" in s)
 
 
+def test_cpython_init_populates_version() raises:
+    # Successful CPython initialization records a real interpreter version.
+    var python = Python()
+    ref cpython = python.cpython()
+    assert_true(cpython.version.major >= 3)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

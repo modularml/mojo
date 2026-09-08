@@ -1761,8 +1761,10 @@ struct CPython(Defaultable, Movable):
         if not self.init_error:
             if not self.lib.check_symbol("Py_Initialize"):
                 self.init_error = "compatible Python library not found"
-            self.lib.call["Py_Initialize"]()
-            self.version = PythonVersion(_py_get_version(self.lib.borrow()))
+                self.version = PythonVersion(0, 0, 0)
+            else:
+                self.lib.call["Py_Initialize"]()
+                self.version = PythonVersion(_py_get_version(self.lib.borrow()))
         else:
             self.version = PythonVersion(0, 0, 0)
 
