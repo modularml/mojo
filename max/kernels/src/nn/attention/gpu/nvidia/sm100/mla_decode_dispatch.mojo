@@ -865,10 +865,11 @@ struct MLADispatchScalarArgs[
 
         # Note: scalars[3] (effective_split_len) is only consumed by the
         # capturable-graph dispatcher path, not by the legacy GPU buffer.
-        var host_args = Array[Int64, 3](uninitialized=True)
-        host_args[0] = Int64(scalars[0])
-        host_args[1] = Int64(scalars[1])
-        host_args[2] = Int64(scalars[2])
+        var host_args: Array[Int64, 3] = [
+            Int64(scalars[0]),
+            Int64(scalars[1]),
+            Int64(scalars[2]),
+        ]
         var output_buf = DeviceBuffer[.int64](
             ctx, self.gpu_buf.unsafe_ptr(), 3, owning=False
         )
