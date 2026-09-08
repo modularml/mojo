@@ -378,6 +378,84 @@ def test_metric_to_string_continuation_only_ce_batch() -> None:
     assert "miss)" not in formatted
 
 
+def test_dkv_clause_reports_the_size_and_the_peak_of_the_read() -> None:
+    """The dKV clause has to carry how much was read, not only how fast.
+
+    The console line that opened CLIN-1844 printed a read latency and a
+    GiB/s and no block count at all, so a 1-block read and a 100-block one
+    looked identical. The byte count was not recoverable from it either:
+    the GiB/s divides by the transfer-time total, the line reports the
+    average, and nothing publishes the count that bridges them. The peak
+    matters for the same reason: the average hides a single slow read
+    inside a batch of fast ones.
+    """
+    metrics = _make_metrics(
+        dkv_read_blocks=100,
+        dkv_read_bytes=512 * 1024 * 1024,
+        nixl_read_latency_avg_ms=0.2,
+        nixl_read_latency_max_ms=16.4,
+        nixl_read_gib_per_s=97.0,
+    )
+
+    assert (
+        "dKV: read 100 blocks (512.00 MiB) in 0.2ms avg / 16.4ms max "
+        "(97.00 GiB/s)"
+    ) in metrics.pretty_format()
+
+    extra = metrics.to_log_extra()
+    assert extra["dkv_read_blocks"] == 100
+    assert extra["dkv_read_bytes"] == 512 * 1024 * 1024
+    assert extra["nixl_read_latency_max_ms"] == 16.4
+
+
+def test_dkv_clause_shows_a_read_whose_latency_sample_was_dropped() -> None:
+    """A batch that landed blocks shows the dKV clause regardless.
+
+    The clause used to be gated on the latency averages alone, so a read
+    whose timing sample never landed printed no dKV clause at all and its
+    block count vanished from the line entirely. What replaces it is the
+    counts without the timings, not the counts beside a row of zeros:
+    ``0.0ms avg / 0.0ms max (0.00 GiB/s)`` reads as an instant read where
+    the truth is an unmeasured one.
+    """
+    metrics = _make_metrics(dkv_read_blocks=7, dkv_read_bytes=14336)
+
+    formatted = metrics.pretty_format()
+    assert "dKV: read 7 blocks (14.00 KiB), write 0.0ms" in formatted
+    assert "ms avg" not in formatted
+    assert "ms max" not in formatted
+
+    # The structured log keeps its zeros: a consumer reads the value beside
+    # the block count, and a dropped key breaks a dashboard series where a
+    # zero does not.
+    extra = metrics.to_log_extra()
+    assert extra["dkv_read_blocks"] == 7
+    assert extra["nixl_read_latency_max_ms"] == 0.0
+
+
+def test_dkv_read_counts_follow_the_console_clause_on_a_write_only_batch() -> (
+    None
+):
+    """A batch that only offloaded reports its zero reads in both places.
+
+    The console clause and the structured log share one predicate, so the
+    line cannot print a read count the log then omits. Zero is the honest
+    answer for a write-only batch, and a zero is a state an operator can
+    read where a missing key is not.
+    """
+    metrics = _make_metrics(
+        dkv_read_blocks=0,
+        dkv_read_bytes=0,
+        nixl_read_latency_avg_ms=0.0,
+        nixl_write_latency_avg_ms=3.0,
+    )
+
+    assert "dKV: read 0 blocks (0.00 KiB)" in metrics.pretty_format()
+    extra = metrics.to_log_extra()
+    assert extra["dkv_read_blocks"] == 0
+    assert extra["dkv_read_bytes"] == 0
+
+
 def test_to_log_extra_required_fields() -> None:
     extra = _make_metrics().to_log_extra()
 
@@ -619,6 +697,7 @@ def test_publish_metrics_default_path() -> None:
     mock_metrics.spec_decode_avg_acceptance_length.assert_not_called()
     mock_metrics.spec_decode_acceptance_rate_per_position.assert_not_called()
     mock_metrics.dkv_nixl_read_latency.assert_not_called()
+    mock_metrics.dkv_nixl_read_latency_max.assert_not_called()
     mock_metrics.dkv_nixl_read_gib_per_s.assert_not_called()
     mock_metrics.dkv_nixl_write_latency.assert_not_called()
     mock_metrics.dkv_nixl_write_gib_per_s.assert_not_called()
@@ -652,6 +731,7 @@ def test_publish_metrics_subsystem_gating() -> None:
         max_acceptance_length=3,
         acceptance_rate_per_position=[0.9, 0.5],
         nixl_read_latency_avg_ms=4.0,
+        nixl_read_latency_max_ms=16.4,
         nixl_write_latency_avg_ms=5.0,
         nixl_read_gib_per_s=1.5,
         nixl_write_gib_per_s=2.5,
@@ -679,6 +759,9 @@ def test_publish_metrics_subsystem_gating() -> None:
     assert mock_metrics.spec_decode_acceptance_rate_per_position.call_count == 2
     # dKV NIXL active (latency + GiB/s emitted as paired values under one guard).
     mock_metrics.dkv_nixl_read_latency.assert_called_once_with(4.0)
+    # The peak publishes beside the average, not instead of it: a dashboard
+    # that only had the average could not see the 16.4ms read at all.
+    mock_metrics.dkv_nixl_read_latency_max.assert_called_once_with(16.4)
     mock_metrics.dkv_nixl_read_gib_per_s.assert_called_once_with(1.5)
     mock_metrics.dkv_nixl_write_latency.assert_called_once_with(5.0)
     mock_metrics.dkv_nixl_write_gib_per_s.assert_called_once_with(2.5)

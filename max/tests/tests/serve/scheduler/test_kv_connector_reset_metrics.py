@@ -229,6 +229,36 @@ def test_kv_cache_metrics_add_sums_tier_attribution_fields() -> None:
     assert KVCacheMetrics().cross_replica_bytes_copied == 0
 
 
+def test_kv_cache_metrics_add_maxes_the_read_latency_peak() -> None:
+    """The READ latency peak takes the max across replicas, never the sum.
+
+    The slowest read two replicas saw is still one read. Adding their peaks
+    would report a latency neither replica measured, and the pooled figure
+    would grow with the replica count rather than with the tail.
+    """
+    replica_0 = KVCacheMetrics(
+        nixl_read_latency_total_ms=2.0,
+        nixl_read_latency_count=10,
+        nixl_read_latency_max_ms=16.4,
+    )
+    replica_1 = KVCacheMetrics(
+        nixl_read_latency_total_ms=1.0,
+        nixl_read_latency_count=5,
+        nixl_read_latency_max_ms=0.3,
+    )
+
+    total = replica_0 + replica_1
+
+    # The pair beside it still sums, so the average is over both replicas.
+    assert total.nixl_read_latency_total_ms == 3.0
+    assert total.nixl_read_latency_count == 15
+    assert total.nixl_read_latency_max_ms == 16.4
+    # Order must not matter, which a sum would also satisfy but an assign
+    # would not.
+    assert (replica_1 + replica_0).nixl_read_latency_max_ms == 16.4
+    assert KVCacheMetrics().nixl_read_latency_max_ms == 0.0
+
+
 def test_kv_cache_metrics_dkv_degraded_predicate() -> None:
     """dkv_degraded is true only with a dKV tier and a client not connected."""
     # no dKV tier attached

@@ -729,6 +729,32 @@ the [container](/container) page now links to the new page.
   On a dKV deployment the two track each other for every load that lands, and
   comparing them needs the server's `--kv-cache-page-size`, since one is in
   blocks and the other in tokens.
+- `maxserve_dkv_rpc_read_latency` and `maxserve_dkv_rpc_acquire_latency` now
+  report. Both were declared and published on a positive value, but nothing
+  ever measured the underlying RPCs, so neither series ever appeared and the
+  per-batch server log printed `acquire 0.0ms, pin 0.0ms` on every line, which
+  reads as an instant lookup rather than an unmeasured one. The connector now
+  times both round trips. They bracket the RPC rather than the transfer, so
+  they include work the transfer latencies cannot see, most importantly the
+  disk-tier restage the server awaits inside its read handler.
+- Added `maxserve_dkv_nixl_read_latency_max`, the slowest single dKV read in
+  the window a batch samples, next to the existing
+  `maxserve_dkv_nixl_read_latency` average. An average cannot separate one
+  slow read from a uniformly slow batch, and it is the slow read that costs a
+  request its time to first token. The peak also appears on the per-batch
+  server log line and in the structured log, and it combines across
+  data-parallel replicas by taking the maximum rather than by summing.
+- The per-batch dKV log clause now reports the blocks that landed and the
+  bytes read, alongside the read average and the new peak. The block count was
+  already in the structured log but missing from the human-readable line, and
+  the byte count was not recoverable from either: the reported throughput
+  divides by the transfer-time total, both surfaces carry only the average,
+  and the sample count that bridges them is published nowhere. The clause is
+  also emitted whenever a batch transferred blocks, where it was previously
+  emitted only when a latency sample survived, so a read whose timing sample
+  was dropped no longer drops the whole clause, and its block count with it.
+  Such a batch reports its counts without the read timings rather than beside
+  a row of zeros, which would read as an instant read.
 - Fixed the speculative-decoding per-position acceptance-rate histogram
   (`maxserve_spec_decode_acceptance_rate_per_position`) understating
   acceptance: decode batches that performed zero verifications published a

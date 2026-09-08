@@ -1171,6 +1171,16 @@ class DKVConnector(KVConnector):
                 nixl_write_bytes=m["write_bytes"],
                 nixl_read_latency_total_ms=m["read_transfer_latency_total_ms"],
                 nixl_read_latency_count=m["read_transfer_latency_count"],
+                nixl_read_latency_max_ms=m["read_transfer_latency_max_ms"],
+                # The lookup RPCs, which the transfer pairs above exclude by
+                # construction: they bracket the copies, these bracket the
+                # round trip that finds and pins the blocks. Unfed until
+                # CLIN-1844, which is why the scheduler log used to print
+                # "acquire 0.0ms, pin 0.0ms" on every line.
+                rpc_read_latency_total_ms=m["rpc_read_latency_total_ms"],
+                rpc_read_latency_count=m["rpc_read_latency_count"],
+                rpc_acquire_latency_total_ms=m["rpc_acquire_latency_total_ms"],
+                rpc_acquire_latency_count=m["rpc_acquire_latency_count"],
                 nixl_write_latency_total_ms=m[
                     "write_transfer_latency_total_ms"
                 ],

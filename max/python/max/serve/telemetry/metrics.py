@@ -408,6 +408,11 @@ SERVE_METRICS: dict[str, SupportedInstruments] = {
         unit="ms",
         description="NIXL READ transfer latency",
     ),  # type: ignore
+    "maxserve.dkv.nixl_read_latency_max": _meter.create_histogram(
+        "maxserve.dkv.nixl_read_latency_max",
+        unit="ms",
+        description="Slowest single NIXL READ transfer in a batch's window",
+    ),  # type: ignore
     "maxserve.dkv.nixl_write_latency": _meter.create_histogram(
         "maxserve.dkv.nixl_write_latency",
         unit="ms",
@@ -1419,6 +1424,15 @@ class _AsyncMetrics:
         self.client.send_measurement(
             MaxMeasurement(
                 "maxserve.dkv.nixl_read_latency",
+                latency_ms,
+                self.extra_attributes,
+            ),
+        )
+
+    def dkv_nixl_read_latency_max(self, latency_ms: float) -> None:
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.dkv.nixl_read_latency_max",
                 latency_ms,
                 self.extra_attributes,
             ),
