@@ -25,6 +25,9 @@
 #include "Support/ErrorOr.h"
 #include "mlir/Support/Timing.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include <memory>
 
 namespace llvm {
 class SourceMgr;
@@ -203,6 +206,54 @@ ErrorOrSuccess parseTargetOptions(
     llvm::opt::OptSpecifier relocationModelId = {},
     llvm::opt::OptSpecifier abiId = {});
 
+/// Where the timing reports of one compiler command go, and in which format.
+/// `--timing-json` asks for JSON rather than text, and `--timing-file` names a
+/// file rather than stderr; the two compose, so any of the four combinations
+/// is reachable.
+///
+/// A JSON command produces one object for the whole command, with one member
+/// per report, so this class owns the braces and the commas between members. A
+/// text command leaves each report to write its own titled section.
+///
+/// The file opens during `configure`, so an unwritable path fails before the
+/// compilation runs rather than after it.
+class TimingReportSink {
+public:
+  // The destructor closes the JSON object; a copy would close it twice.
+  TimingReportSink() = default;
+  TimingReportSink(const TimingReportSink &) = delete;
+  TimingReportSink &operator=(const TimingReportSink &) = delete;
+  TimingReportSink(TimingReportSink &&) = delete;
+  TimingReportSink &operator=(TimingReportSink &&) = delete;
+
+  /// Reads `--timing-json` and opens the file named by `--timing-file`, if the
+  /// command gave one.
+  ErrorOrSuccess configure(const llvm::opt::InputArgList &args,
+                           llvm::opt::OptSpecifier jsonId,
+                           llvm::opt::OptSpecifier fileId);
+
+  bool isJSON() const { return json; }
+
+  /// The destination, which is stderr unless `--timing-file` named a file.
+  llvm::raw_ostream &stream();
+
+  /// Opens member `name` and returns the stream for its value. JSON only.
+  /// Call once per member: it also emits the punctuation around it.
+  llvm::raw_ostream &beginMember(StringRef name);
+
+  /// Closes the JSON object and the file. Idempotent.
+  void finish();
+
+  ~TimingReportSink() { finish(); }
+
+private:
+  /// Null when the reports go to stderr.
+  std::unique_ptr<llvm::raw_fd_ostream> file;
+  bool json = false;
+  bool wroteMember = false;
+  bool finished = false;
+};
+
 /// This class holds the MLIR timing manager for one compiler command, and
 /// gives the root scope that the steps of the compilation nest under. The
 /// timing is off unless the `--mlir-timing` option is present. A command
@@ -223,9 +274,11 @@ public:
   /// Makes the timing active if the `--mlir-timing` option is present. Sets
   /// the display mode from the `--mlir-timing-display` option. Gives an error
   /// if the display mode is not correct.
+  /// `sink` takes the report and must outlive this object.
   ErrorOrSuccess configure(const llvm::opt::InputArgList &args,
                            llvm::opt::OptSpecifier timingId,
-                           llvm::opt::OptSpecifier displayModeId);
+                           llvm::opt::OptSpecifier displayModeId,
+                           TimingReportSink &sink);
 
   /// The root scope for the steps of the compilation. The scope is empty if
   /// the timing is off.
@@ -246,6 +299,7 @@ public:
   ~MLIRPassTiming() { finish(); }
 
 private:
+  TimingReportSink *sink = nullptr;
   mlir::DefaultTimingManager manager;
   // `root` comes after the manager in this declaration. Thus the program
   // destroys `root` first, and the manager sees a scope that is not active if
@@ -272,9 +326,10 @@ public:
   /// sets the compilation to one thread, because the timers of LLVM are
   /// global to the process and are not safe for more than one thread. Call
   /// this before the program makes the CPU device from `options`.
+  /// `sink` takes the report and must outlive this object.
   void configure(const llvm::opt::InputArgList &args,
                  llvm::opt::OptSpecifier timingId,
-                 KGEN::CompilationOptions &options);
+                 KGEN::CompilationOptions &options, TimingReportSink &sink);
 
   /// Prints the report to stderr and clears the timers. Does nothing if the
   /// timing is off. Does nothing on a second call. The destructor calls this
@@ -284,6 +339,7 @@ public:
   ~LLVMPassTiming() { finish(); }
 
 private:
+  TimingReportSink *sink = nullptr;
   bool enabled = false;
 };
 

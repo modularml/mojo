@@ -36,7 +36,8 @@ class CompilationOptions;
 /// the other report.
 std::string pipelineTimingLabel(const CompilationOptions &options);
 
-/// One part of the LLVM pass timing report.
+/// One part of the LLVM pass timing report, in whichever format
+/// `enableLLVMTimingRegions` selected.
 struct LLVMTimingReportPart {
   /// Names the pipeline that made this part, such as `host x86_64-linux-gnu`.
   std::string label;
@@ -54,7 +55,9 @@ struct LLVMTimingReportPart {
 /// the pipelines do not overlap: the option also sets the compilation to one
 /// thread, and the compiler runs each offload pipeline inside elaboration,
 /// which is before the host pipeline reaches LLVM.
-void enableLLVMTimingRegions();
+/// With `asJSON`, a part holds bare `"name": value` pairs and no enclosing
+/// braces, leaving the caller free to nest them in an object of its own.
+void enableLLVMTimingRegions(bool asJSON = false);
 
 /// Reads the parts and forgets them. The parts come in the order in which the
 /// pipelines ran. A pipeline whose timers hold nothing, such as one that the
@@ -93,7 +96,10 @@ private:
 /// manager of an offload target is deep inside the elaboration of the host.
 /// The function that makes this pass manager gets no scope. Thus the root
 /// moves through this function.
-void setMLIRTimingRoot(mlir::TimingScope *root);
+/// `decorateNames` wraps each offload scope name in a rule, which a text
+/// report needs to set the scope apart from the host passes it sits beside.
+/// JSON consumers match on the name, so there the rule only gets in the way.
+void setMLIRTimingRoot(mlir::TimingScope *root, bool decorateNames = true);
 
 /// Gives a scope for the offload pipeline that `options` describes. The scope
 /// is under the root that `setMLIRTimingRoot` holds. The scope is empty if the

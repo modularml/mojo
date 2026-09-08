@@ -170,6 +170,23 @@ defm mlir_timing_display: CommandOptionHidden<["--", "-"],
     "by total time. The `list` mode merges the passes of all pipelines, so it "
     "cannot show the time of one offload target on its own.">>;
 
+def timing_json: Flag<["--", "-"], "timing-json">,
+  Group<CompilationOptionGroup>, Index<21>, Flags<[HelpHidden]>,
+  HelpText<
+    "Writes the timing that `--mlir-timing` and `--llvm-timing` collect as "
+    "one JSON object rather than as text. The object holds a `mlir` member "
+    "and an `llvm` member, and only the members the command asks for, so it "
+    "is empty if the command asks for no timing. The `mlir` member keeps the "
+    "tree or the list that `--mlir-timing-display` selects. The `llvm` member "
+    "holds one entry for each pipeline, with the name of the pipeline and the "
+    "times of its passes.">;
+
+defm timing_file: CommandOptionHidden<["--", "-"], "timing-file",
+  CompilationOptionGroup, Index<22>, MetaVarName<"FILE">,
+  HelpText<
+    "Writes the timing reports to FILE rather than to stderr. The reports are "
+    "text, or JSON with `--timing-json`.">>;
+
 //===----------------------------------------------------------------------===//
 // Linker Options
 //===----------------------------------------------------------------------===//
