@@ -2085,7 +2085,7 @@ struct EPLocalSyncCounters[n_experts: Int](
 
     Memory Layout (all sizes in Int32 elements):
     - dispatch_async: 2 * n_experts + MAX_GPUS_PER_NODE
-    - dispatch_wait/combine_async: 4 * n_experts + 4
+    - dispatch_wait/combine_async: 6 * n_experts + 7
     - combine_wait: 2 * n_experts
     """
 
@@ -2141,12 +2141,20 @@ struct EPLocalSyncCounters[n_experts: Int](
           Region E [4*n_experts + 1]: global ready flag
           Region F [4*n_experts + 2]: send_buf_ready counter
           Region G [4*n_experts + 3]: shared_expert_started counter
+          Region H: the L1 virtual-slot ticket and the L2 pool cursors,
+            2*n_local_experts + 3 words placed by
+            `l1_vslot_ticket_offset`; inside Region C's unused tail where
+            the expert-parallel degree leaves room, otherwise past Region G
 
         Region A will be used by combine_async kernel to track the number of
         tokens of each expert-rank pair. Region D, E, F and G needs to be reset
         to 0 once the dispatch_wait kernel is done.
+
+        The returned size is the worst case over the expert-parallel degree,
+        at which Region H sits past Region G with n_local_experts ==
+        n_experts, because the host allocates from n_experts alone.
         """
-        return 4 * Self.n_experts + 4
+        return 6 * Self.n_experts + 7
 
     @always_inline
     @staticmethod
@@ -2156,7 +2164,7 @@ struct EPLocalSyncCounters[n_experts: Int](
         Must match dispatch_wait_size() since combine_async reuses the same
         memory region.
         """
-        return 4 * Self.n_experts + 4
+        return 6 * Self.n_experts + 7
 
     @always_inline
     @staticmethod
@@ -2231,6 +2239,13 @@ struct EPDispatchKernel[
     skip_a2a: Bool = False,
     has_rank_flag: Bool = False,
     ep_ord_r: Bool = False,
+    # Final contiguous per-expert receive layout: a source writes its rows
+    # directly into the destination expert's live row range instead of the
+    # rank-major [expert, source_rank, max_tpr] segment.
+    ep_final_layout: Bool = False,
+    # Production final-row allocation: one system-scope reservation RMW per
+    # nonzero (source, destination, expert) block; zero per-row atomics.
+    ep_prod_reserve: Bool = False,
     ep_copy_role_split: Bool = False,
     ep_send_join_named: Bool = False,
 ]:
@@ -2272,6 +2287,14 @@ struct EPDispatchKernel[
             system-scope release per source rank) instead of the legacy
             per-expert scheme. A fused consumer that acquires once per source
             rank needs this; see `ep_signal_completion`.
+        ep_final_layout: Whether source ranks write each routed row directly
+            into its final contiguous per-expert row, so a destination reads
+            one expert as a single dense range. Off by default, which keeps
+            the rank-major staging layout and its per-source-rank gather.
+        ep_prod_reserve: Whether a destination hands each source a reserved
+            contiguous row range per non-empty expert block, published through
+            a generation-tagged source-local mailbox. Off by default. Only
+            meaningful with `ep_final_layout`.
         ep_copy_role_split: Opt in to the split's publisher fan-out (the token
             format carries the matching parameter for the copy body). Off by
             default, which keeps the stock warp-strided fan-out.
@@ -2315,6 +2338,27 @@ struct EPDispatchKernel[
     # Atomic counter layout offsets for dispatch_wait kernel.
     comptime rank_prefix_offset = 2 * Self.n_experts
     comptime work_counter_offset = 3 * Self.n_experts
+
+    # S1 (A2_EP8_L1_VSLOT_STEAL) scheduler ticket, in the certified
+    # non-overlapping Region-C window above the live per-expert work
+    # counters and below the cleanup/ready flags.
+    # Region C's free window above the live work counters is
+    # `n_experts - n_local_experts` words. At EP8 that is ample; at low EP
+    # degree `n_experts` shrinks toward `n_local_experts` and the window
+    # closes, so the tail moves past Region G instead of silently running
+    # through the cleanup counter and the ready flag. The in-window
+    # placement is unchanged wherever it already fit, so no layout that
+    # fits today moves.
+    comptime l2_pool_cursor_slots = 2 * Self.n_local_experts + 2
+    comptime _s1s2_fits_region_c = (
+        1 + Self.l2_pool_cursor_slots <= Self.n_experts - Self.n_local_experts
+    )
+    comptime l1_vslot_ticket_offset = (
+        3 * Self.n_experts + Self.n_local_experts
+    ) if Self._s1s2_fits_region_c else (4 * Self.n_experts + 4)
+    # S2 (readiness-driven L2 pool scheduling) per-pool cursors, directly
+    # after the ticket, same owner / lifetime / reset discipline.
+    comptime l2_pool_cursor_offset = Self.l1_vslot_ticket_offset + 1
     comptime cleanup_counter_offset = 4 * Self.n_experts
     comptime ready_flag_offset = 4 * Self.n_experts + 1
     # These two offsets are only used when fused_shared_expert is True.
@@ -2329,6 +2373,52 @@ struct EPDispatchKernel[
     # on. The region exists only when `has_rank_flag` is set, so the legacy
     # buffer size is unchanged.
     comptime rank_flag_base = Self.n_local_experts * Self.n_ranks
+
+    # Per-(destination, local expert) final-row allocation cursors, placed
+    # directly after the ORD-R rank-flag tail inside the destination's
+    # already peer-mapped recv-count buffer, so they inherit its parity
+    # double-buffering and its generation reset.
+    comptime rc_cursor_base = Self.rank_flag_base + Self.n_ranks
+
+    @always_inline
+    @staticmethod
+    def assert_l1_vslot_ticket_layout():
+        """Static layout guarantees for the S1/S2 scheduler words."""
+        comptime assert (
+            Self.l1_vslot_ticket_offset
+            >= Self.work_counter_offset + Self.n_local_experts
+        ), (
+            "the S1 ticket must not overlap Region A/B, the live Region-C"
+            " work counters, or the frontend lane<n_local reset range"
+        )
+        # The tail sits either wholly inside Region C's free window or
+        # wholly past Region G. Straddling would run it through the
+        # cleanup counter and the ready flag.
+        comptime assert (
+            Self.l2_pool_cursor_offset + Self.l2_pool_cursor_slots
+            <= Self.cleanup_counter_offset
+        ) or (
+            Self.l1_vslot_ticket_offset > Self.shared_expert_started_offset
+        ), (
+            "the S1/S2 scheduler words must not straddle the cleanup"
+            " counter, the ready flag or the shared-expert flags"
+        )
+        comptime assert (
+            Self.l2_pool_cursor_offset + Self.l2_pool_cursor_slots
+            <= 6 * Self.n_experts + 7
+        ), "the S1/S2 scheduler words must fit the allocated counter buffer"
+        comptime assert (
+            Self.l2_pool_cursor_offset == Self.l1_vslot_ticket_offset + 1
+        ), "the S2 cursors must follow the single S1 ticket word exactly"
+        # The reservation cursors live in the DESTINATION's receive-count
+        # buffer, a different allocation from the wait counters above, so
+        # they can only collide with the ORD-R rank flags.
+        comptime assert (
+            Self.rc_cursor_base >= Self.rank_flag_base + Self.n_ranks
+        ), "the reservation cursors must not overlap the ORD-R rank flags"
+        comptime assert (
+            Self.rc_cursor_base + Self.n_local_experts <= Self.recv_count_size()
+        ), "the reservation cursors must fit the receive-count buffer"
 
     @staticmethod
     @always_inline
@@ -2350,9 +2440,16 @@ struct EPDispatchKernel[
     @staticmethod
     @always_inline
     def recv_count_size() -> Int:
-        """Receive-count buffer element count, including the ORD-R tail."""
+        """Receive-count buffer element count, including both tails.
+
+        The per-(destination, local expert) reservation cursors sit
+        directly after the ORD-R rank flags and are always reserved: the
+        struct cannot see whether a given launch enables the production
+        reservation, and under-allocating would put the cursors past the
+        end of the buffer.
+        """
         comptime if Self.has_rank_flag:
-            return Self.rank_flag_base + Self.n_ranks
+            return Self.rc_cursor_base + Self.n_local_experts
         return Self.rank_flag_base
 
     comptime _recv_layout = row_major[
@@ -2517,6 +2614,12 @@ struct EPDispatchKernel[
         expert_reserved_counter: UnsafePointer[Int32, MutUntrackedOrigin],
         expert_finished_counter: UnsafePointer[Int32, MutUntrackedOrigin],
         my_rank: Int32,
+        # Source-local block-base mailbox: [0, n_experts) bases,
+        # [n_experts, 2*n_experts) generation tags. Inert when defaulted.
+        prod_gen_p: UnsafePointer[Int32, MutUntrackedOrigin] = UnsafePointer[
+            Int32, MutUntrackedOrigin
+        ](unsafe_from_address=16),
+        prod_gen: Int32 = 0,
     ) -> None:
         """Communication SM logic for dispatch_kernel.
 
@@ -2532,6 +2635,12 @@ struct EPDispatchKernel[
             expert_reserved_counter: Counter for reserved slots per expert.
             expert_finished_counter: Counter for finished sends per expert.
             my_rank: The rank of the current device.
+            prod_gen_p: Source-local block-base mailbox. Entries
+                `[0, n_experts)` hold the reserved base for each expert and
+                `[n_experts, 2 * n_experts)` hold the matching generation
+                tags. Inert when defaulted.
+            prod_gen: Generation tag this launch waits for before reading a
+                base from `prod_gen_p`. Inert when defaulted.
         """
         comptime assert (
             input_tokens.flat_rank == 2
@@ -2653,13 +2762,32 @@ struct EPDispatchKernel[
                         ](expert_reserved_counter + counter_offset, 1)
                     slot_idx = warp.broadcast(slot_idx)
 
+                    # Final row inside the destination expert's contiguous
+                    # live range. Under the production allocation the base
+                    # comes from this block's one reservation, ACQUIREd at
+                    # the last legal point before the address is used; the
+                    # source-local ordinal is unchanged.
+                    var _fl_row = slot_idx
+                    comptime if Self.ep_prod_reserve:
+                        var _pg = (
+                            prod_gen_p + Self.n_experts + Int(target_expert)
+                        )
+                        var _pv = _counter_atomic.load[
+                            ordering=Ordering.ACQUIRE
+                        ](_pg)
+                        while _pv != prod_gen:
+                            _pv = _counter_atomic.load[
+                                ordering=Ordering.ACQUIRE
+                            ](_pg)
+                        _fl_row = prod_gen_p[Int(target_expert)] + slot_idx
+
                     var dst_recv_buf_ptr = recv_buf_ptrs[
                         dst_p2p_rank
                     ] + Self.recv_buf_layout(
                         (
                             dst_expert_local_idx,
-                            my_rank,
-                            slot_idx,
+                            Int32(0) if Self.ep_final_layout else my_rank,
+                            _fl_row,
                             Idx[0],
                         )
                     )
