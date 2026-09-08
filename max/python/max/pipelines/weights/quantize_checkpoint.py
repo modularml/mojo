@@ -111,6 +111,19 @@ def _should_quantize(
     return any(p.search(name) for p in targets)
 
 
+_ALREADY_QUANTIZED_FLOATS = frozenset(
+    dt
+    for name in (
+        "float8_e4m3fn",
+        "float8_e5m2",
+        "float8_e4m3fnuz",
+        "float8_e5m2fnuz",
+    )
+    if (dt := getattr(torch, name, None)) is not None
+)
+"""Narrow float dtypes that only ever appear as an already-quantized payload."""
+
+
 def _quantize_tensor(
     tensor: torch.Tensor, fmt: FP6Format
 ) -> tuple[NDArray[np.uint8], NDArray[np.uint8]] | None:
@@ -121,6 +134,8 @@ def _quantize_tensor(
     like.
     """
     if not tensor.dtype.is_floating_point:
+        return None
+    if tensor.dtype in _ALREADY_QUANTIZED_FLOATS:
         return None
     if tensor.ndim != 2 or tensor.shape[-1] % MX_BLOCK_SIZE:
         return None
