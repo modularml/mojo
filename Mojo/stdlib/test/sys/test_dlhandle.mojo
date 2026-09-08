@@ -363,7 +363,7 @@ def test_owned_dlhandle_destroy_null_handle() raises:
     # missing; destroying it must not reach `dlclose(NULL)`.
     var lib = OwnedDLHandle(unsafe_uninitialized=True)
     assert_false(lib, "uninitialized handle should be null")
-    _ = lib^
+    lib^.__deinit__()
 
 
 def main() raises:
