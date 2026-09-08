@@ -18,7 +18,8 @@ from os import PathLike
 
 # This is only imported internally if gguf is available
 import gguf  # type: ignore
-from max.driver import DLPackArray
+import numpy as np
+from max.driver import Buffer, DLPackArray
 from max.dtype import DType
 from max.graph import DeviceRef
 
@@ -200,8 +201,18 @@ class GGUFWeights(Weights):
         quantization_encoding = _FROM_QUANTIZED_GGML_DTYPES.get(
             tensor.tensor_type
         )
+        weight_array: DLPackArray = tensor.data
+        # The `gguf` package returns BF16 tensors as raw `uint8` bytes (numpy
+        # has no native bfloat16), shaped [..., 2 * cols]. Reinterpret the bytes
+        # as bfloat16 through a `Buffer` (numpy/DLPack cannot represent bfloat16)
+        # so the data matches the declared dtype and shape; otherwise the weight
+        # is loaded with a mismatched shape and produces garbage values.
+        if dtype == DType.bfloat16 and tensor.data.dtype == np.uint8:
+            weight_array = Buffer.from_dlpack(tensor.data).view(
+                DType.bfloat16, shape_list
+            )
         return WeightData(
-            tensor.data, self.name, dtype, shape, quantization_encoding
+            weight_array, self.name, dtype, shape, quantization_encoding
         )
 
     def _raw_tensor(self) -> gguf.ReaderTensor:
