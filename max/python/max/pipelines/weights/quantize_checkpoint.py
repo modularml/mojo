@@ -46,6 +46,7 @@ from max.pipelines.weights.fp6_quantization import (
     mxfp6_quantization_config,
     quantize_mxfp6,
 )
+from max.support.human_readable_formatter import to_human_readable_bytes
 
 # The torch backend, not the numpy one: numpy has no bfloat16, and safetensors
 # refuses a BF16 tensor on both read and write through it. Source checkpoints
@@ -390,11 +391,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     label = "NVFP4" if isinstance(fmt, FP4Format) else f"MXFP6 ({fmt.value})"
     logger.info(
-        "%s: %d tensors quantized, %d copied, %.1f GiB saved",
+        "%s: %d tensors quantized, %d copied, %s saved",
         label,
         stats["quantized"],
         stats["copied"],
-        stats["bytes_saved"] / 2**30,
+        to_human_readable_bytes(stats["bytes_saved"]),
     )
     return 0
 

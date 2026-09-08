@@ -32,6 +32,7 @@ modular_py_library(
         "//max/python/max/graph",
         "//max/python/max/nn",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/support",
         requirement("huggingface-hub"),
         requirement("numpy"),
         requirement("pydantic"),

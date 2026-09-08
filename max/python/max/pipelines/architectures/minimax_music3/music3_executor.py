@@ -48,6 +48,7 @@ from max.pipelines.lib.pipeline_executor import PipelineExecutor
 from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
 from max.pipelines.modeling.base import TensorStruct
 from max.profiler import traced
+from max.support.human_readable_formatter import to_human_readable_bytes
 
 from . import denoise
 from .autoregressive import (
@@ -163,10 +164,9 @@ class MiniMaxMusic3Executor(
         )
         staged = weights + ACTIVATION_HEADROOM > free
         logger.info(
-            "MiniMax Music 3: %.1f GiB of weights against %.1f GiB free, "
-            "%s residency.",
-            weights / 2**30,
-            free / 2**30,
+            "MiniMax Music 3: %s of weights against %s free, %s residency.",
+            to_human_readable_bytes(weights),
+            to_human_readable_bytes(free),
             "staged" if staged else "whole-model",
         )
         if staged:

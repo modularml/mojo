@@ -35,6 +35,7 @@ modular_py_library(
         "//max/python/max/serve/pipelines",
         "//max/python/max/serve/telemetry",
         "//max/python/max/serve/worker_interface",
+        "//max/python/max/support",
         requirement("click"),
         requirement("gguf"),
         requirement("psutil"),

@@ -22,5 +22,6 @@ modular_py_library(
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/profiler",
+        "//max/python/max/support",
     ],
 )
