@@ -963,6 +963,120 @@ def _fused_qkv_ragged_matmul_scaled_mxfp8(
     )[0].tensor
 
 
+def _fused_qkv_ragged_matmul_scaled_mxfp6(
+    kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    wqkv: TensorValue,
+    kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    n_heads: int,
+    input_scale: TensorValue,
+    weight_scale: TensorValue,
+    fp6_format: str = "e2m3",
+    _output_dim: int | None = None,
+) -> TensorValue:
+    """Computes fused QKV projections with MXFP6 block-scaled input and weights.
+
+    The MXFP6 sibling of :func:`_fused_qkv_ragged_matmul_scaled_mxfp8`:
+    ``input`` and ``wqkv`` carry packed FP6 data as ``uint8`` (four codes per
+    three bytes) with E8M0 (``float8_e8m0fnu``) block scales over 32-element K
+    blocks. The Q
+    projection is returned, while K and V are written in place into
+    ``kv_collection``.
+
+    Args:
+        kv_params: KVCacheParams object containing key-value cache parameters.
+        input: Packed FP6 activations, ``uint8`` with shape
+            [M=total_seq_len, K=hidden_dim * 3 // 4].
+        input_row_offsets: TensorValue indicating the start and end of each
+            batch in the input tensor with shape [batch_size + 1].
+        wqkv: Weight tensor, ``uint8`` with shape
+            [N=(num_heads + 2 * num_kv_heads) * head_dim,
+            K=hidden_dim * 3 // 4].
+        kv_collection: PagedCacheValues object for managing key-value cache.
+        layer_idx: Layer index, expected to have dtype uint32 and live on CPU.
+        n_heads: Number of attention heads.
+        input_scale: E8M0 input block scales, rank-2 ``[M, K // 32]``. CDNA4
+            reads the plain layout; this path has no SM100 variant.
+        weight_scale: E8M0 weight block scales, rank-2 ``[N, K // 32]``.
+        _output_dim: Optional output dimension. Defaults to
+            ``n_heads * head_dim``.
+
+    Raises:
+        ValueError: on input shapes/dtypes that are invalid for the kernel.
+    """
+    _check_same_dtype(input=input, wqkv=wqkv)
+
+    input_rank_expected = 2
+    _check_rank(input_rank_expected, input=input)
+
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+
+    tensors_to_check = [wqkv, input_row_offsets, input_scale, weight_scale]
+    if not all(t.device == input.device for t in tensors_to_check):
+        raise ValueError(
+            "expected all tensors to be on the same device as input"
+            f" ({input.device}), but got:\n  wqkv={wqkv.device}\n "
+            f" input_row_offsets={input_row_offsets.device}\n "
+            f" input_scale={input_scale.device}\n "
+            f" weight_scale={weight_scale.device}"
+        )
+
+    if layer_idx.device != DeviceRef.CPU():
+        raise ValueError(
+            "expected layer_idx to be on CPU device, but got"
+            f" {layer_idx.device}"
+        )
+
+    tensor_sf = ops.constant(1.0, DType.float32, device=DeviceRef.CPU())
+
+    assert kv_params.page_size is not None
+    parameters: dict[str, int | str | DType] = {
+        "dtype": DType.uint8,
+        "scale_type": DType.float8_e8m0fnu,
+        "kv_type": kv_params.dtype,
+        "SF_VECTOR_SIZE": 32,
+        "FP6_FORMAT": _fp6_format_code(fp6_format),
+    }
+
+    if not _is_amd_gpu():
+        raise ValueError(
+            "the fused MXFP6 QKV matmul is CDNA4-only; there is no SM100 path"
+        )
+    op_name = "mo.fused_qkv_matmul.ragged.paged.scale.mxfp6.amd"
+    values = [
+        input,
+        input_row_offsets,
+        wqkv,
+        input_scale,
+        weight_scale,
+        tensor_sf,
+        *kv_collection.flatten_without_attention_dispatch_metadata(),
+        layer_idx,
+    ]
+
+    output_dim = (
+        _output_dim if _output_dim is not None else n_heads * kv_params.head_dim
+    )
+
+    return ops.inplace_custom(
+        op_name,
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=input.shape[:-1] + [output_dim],
+                device=input.device,
+            )
+        ],
+        parameters=parameters,
+    )[0].tensor
+
+
 def _fused_qkv_index_ragged_matmul_scaled_mxfp8(
     kv_params: KVCacheParams,
     index_kv_params: KVCacheParams,
@@ -1086,6 +1200,150 @@ def _fused_qkv_index_ragged_matmul_scaled_mxfp8(
     # store-redirect epilogue routes the Q band to the first output and the
     # IndexQ band to the second, so the downstream reshapes stay contiguous
     # views (no split/copy).
+    q_dim = n_heads * kv_params.head_dim
+
+    results = ops.inplace_custom(
+        op_name,
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=input.shape[:-1] + [q_dim],
+                device=input.device,
+            ),
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=input.shape[:-1] + [iq_dim],
+                device=input.device,
+            ),
+        ],
+        parameters=parameters,
+    )
+    return (results[0].tensor, results[1].tensor)
+
+
+def _fused_qkv_index_ragged_matmul_scaled_mxfp6(
+    kv_params: KVCacheParams,
+    index_kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    wqkv: TensorValue,
+    kv_collection: PagedCacheValues,
+    index_kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    n_heads: int,
+    num_index_heads: int,
+    idx_head_dim: int,
+    input_scale: TensorValue,
+    weight_scale: TensorValue,
+    fp6_format: str = "e2m3",
+) -> tuple[TensorValue, TensorValue]:
+    """Computes MiniMax-M3's fused QKV + index-QK projections in one MXFP6 GEMM.
+
+    A 5-way fusion: ``input`` and ``wqkv`` carry packed FP6 data as ``uint8``
+    (four codes per three bytes) with E8M0 (``float8_e8m0fnu``) block scales
+    over 32-element K blocks. ``wqkv`` is the concatenation
+    ``[Wq | Wk | Wv | Wiq | Wik]`` along the output dimension.
+    The single matmul output columns route as:
+
+    - ``Q``       -> returned as the first output, shape ``[M, q_dim]``.
+    - ``K`` / ``V`` -> scattered in place into the MAIN ``kv_collection``.
+    - ``IndexQ``  -> returned as the second output, shape ``[M, iq_dim]``.
+    - ``IndexK``  -> scattered in place into the INDEX ``index_kv_collection``
+      (MLA cache: single latent head, head 0, K only).
+
+    Band boundaries land on M3's 128-element scale blocks, so the per-column
+    scale lookup matches the split matmuls. The CDNA4 tile picks its split-K
+    factor from N, so the concatenated and split GEMMs may still reduce K in a
+    different order and differ by a bf16 ULP; see
+    `test_fused_qkv_index_matmul_scale_mxfp6.mojo`.
+
+    Args:
+        kv_params: KVCacheParams for the MAIN (K, V) cache (GQA/MHA, non-MLA).
+        index_kv_params: KVCacheParams for the INDEX (IndexK) cache; MLA with a
+            single latent head (``is_mla=True``, ``n_kv_heads=1`` for M3).
+        input: Packed FP6 activations, ``uint8`` with shape
+            [M=total_seq_len, K=hidden_dim * 3 // 4].
+        input_row_offsets: Ragged offsets ``[batch_size + 1]``, uint32.
+        wqkv: Concatenated weight ``[Wq | Wk | Wv | Wiq | Wik]``,
+            ``uint8``, shape [N_total, K=hidden_dim * 3 // 4] where
+            ``N_total = q_dim + 2 * kv_dim + iq_dim + ik_dim``.
+        kv_collection: PagedCacheValues for the MAIN cache.
+        index_kv_collection: PagedCacheValues for the INDEX cache.
+        layer_idx: Layer index, uint32 on CPU.
+        n_heads: Number of (main) attention heads. ``q_dim = n_heads *
+            head_dim``.
+        num_index_heads: Number of index Q heads. ``iq_dim = num_index_heads *
+            idx_head_dim``.
+        idx_head_dim: Index head dimension; also the single-head IndexK width.
+        input_scale: E8M0 input block scales, rank-2 ``[M, K // 32]``.
+            CDNA4 reads the plain layout, not SM100's SF-atom interleave.
+        weight_scale: E8M0 weight block scales, rank-2 ``[N_total, K // 32]``.
+        fp6_format: FP6 encoding of both operands, ``e2m3`` or ``e3m2``.
+
+    Returns:
+        A tuple ``(q, index_q)`` of bf16 tensors: ``q`` is ``[M, q_dim]`` and
+        ``index_q`` is ``[M, iq_dim]``.
+
+    Raises:
+        ValueError: on input shapes/dtypes that are invalid for the kernel.
+    """
+    _check_same_dtype(input=input, wqkv=wqkv)
+
+    input_rank_expected = 2
+    _check_rank(input_rank_expected, input=input)
+
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+
+    tensors_to_check = [wqkv, input_row_offsets, input_scale, weight_scale]
+    if not all(t.device == input.device for t in tensors_to_check):
+        raise ValueError(
+            "expected all tensors to be on the same device as input"
+            f" ({input.device}), but got:\n  wqkv={wqkv.device}\n "
+            f" input_row_offsets={input_row_offsets.device}\n "
+            f" input_scale={input_scale.device}\n "
+            f" weight_scale={weight_scale.device}"
+        )
+
+    if layer_idx.device != DeviceRef.CPU():
+        raise ValueError(
+            "expected layer_idx to be on CPU device, but got"
+            f" {layer_idx.device}"
+        )
+
+    tensor_sf = ops.constant(1.0, DType.float32, device=DeviceRef.CPU())
+
+    assert kv_params.page_size is not None
+    assert index_kv_params.page_size is not None
+    iq_dim = num_index_heads * idx_head_dim
+    parameters: dict[str, int | str | DType] = {
+        "dtype": DType.uint8,
+        "scale_type": DType.float8_e8m0fnu,
+        "kv_type": kv_params.dtype,
+        "index_kv_type": index_kv_params.dtype,
+        "SF_VECTOR_SIZE": 32,
+        "FP6_FORMAT": _fp6_format_code(fp6_format),
+        "IQ_DIM": iq_dim,
+    }
+
+    if not _is_amd_gpu():
+        raise ValueError("the fused MXFP6 QKV+IndexQK matmul is CDNA4-only")
+    op_name = "mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp6.amd"
+    values = [
+        input,
+        input_row_offsets,
+        wqkv,
+        input_scale,
+        weight_scale,
+        tensor_sf,
+        *kv_collection.flatten_without_attention_dispatch_metadata(),
+        *index_kv_collection.flatten_without_attention_dispatch_metadata(),
+        layer_idx,
+    ]
+
     q_dim = n_heads * kv_params.head_dim
 
     results = ops.inplace_custom(

@@ -27,6 +27,10 @@ _EXTRA_CONSTRAINTS = {
     "test_kv_cache_matmul.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: PRDT-506
     "test_batch_kv_cache_flash_attention_causal_mask.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: PRDT-506
     "test_kv_cache_ragged_matmul_scale.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: KERN-2318
+    "test_fused_qkv_index_matmul_scale_mxfp6.mojo": select({
+        "//:mi355_gpu": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     "test_fused_qkv_index_matmul_scale_mxfp8.mojo": select({
         # MXFP8 block-scaled matmul (block_scaled_matmul_with_epilogue) asserts
         # on SM100; dual-cache fused QKV+index is M3-on-B200 only.

@@ -63,10 +63,13 @@ from linalg.arch.amd.block_scaled_mma import (
     cdna4_block_scaled_mfma,
 )
 from structured_kernels.amd_tile_io import (
+    RegTileEpilogue,
     RegTileLoader,
     RegTileWriter,
     TileLoaderLDS,
 )
+
+from ....utils import elementwise_epilogue_type
 
 from .block_scaled_matmul_amd import MX_BLOCK_SIZE
 from .block_scaled_preshuffle_layouts import Shuffler
@@ -858,6 +861,7 @@ struct BlockScaledMatmulAMD_PreB[
     scale_group: Int = 1,
     b_addr_split: Bool = False,
     matrix_format: CDNA4F8F6F4MatrixFormat = CDNA4F8F6F4MatrixFormat.FLOAT4_E2M1,
+    elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ]:
     """Preshuffled-B variant of `BlockScaledMatmulAMD`.
 
@@ -939,6 +943,9 @@ struct BlockScaledMatmulAMD_PreB[
         matrix_format: `f8f6f4` operand encoding for A and B. A lane covers
             32 K-elements in every format; the bytes that occupies -- 16
             (FP4), 24 (FP6), 32 (FP8) -- is derived from it.
+        elementwise_lambda_fn: Optional epilogue applied to each output
+            element in registers instead of storing it. The fused QKV ops
+            use it to scatter K/V into the paged cache.
     """
 
     # WM is locked to BM — single warp along M for the preb (no-LDS-B) path.
@@ -1512,14 +1519,42 @@ struct BlockScaledMatmulAMD_PreB[
                 barrier()
 
         var c_reg = mma_op.accum_tile()
-        var c_block = c.tile[Self.BM, Self.BN](m_tile_idx, n_tile_idx)
-        var c_warp = c_block.tile[Self.WM, Self.WN](warp_m, warp_n)
 
-        comptime for m_mma in range(Self.num_m_mmas):
-            comptime for n_mma in range(Self.num_n_mmas):
-                c_writer.store(
-                    c_warp.tile[Self.MMA_M, Self.MMA_N](m_mma, n_mma).vectorize[
-                        1, Self.c_frag_size
-                    ](),
-                    c_reg.tile[1, Self.c_frag_size](m_mma, n_mma),
-                )
+        comptime if Bool(Self.elementwise_lambda_fn):
+            var c_epilogue = RegTileEpilogue[
+                out_dtype,
+                Self.c_frag_size,
+                elementwise_lambda_fn=Self.elementwise_lambda_fn,
+            ](c)
+            var lane_group, thread_m = divmod(Int(lane_id()), Self.MMA_M)
+            var m_warp_base = m_tile_idx * Self.BM
+            var n_warp_base = n_tile_idx * Self.BN + Int(warp_n) * Self.WN
+
+            comptime for m_mma in range(Self.num_m_mmas):
+                var m_global = m_warp_base + m_mma * Self.MMA_M + Int(thread_m)
+                if m_global < M:
+                    comptime for n_mma in range(Self.num_n_mmas):
+                        var v = (
+                            c_reg.tile[1, Self.c_frag_size](m_mma, n_mma)
+                            .raw_load[width=Self.c_frag_size](0)
+                            .cast[out_dtype]()
+                        )
+                        c_epilogue.store(
+                            v,
+                            m=m_global,
+                            n=n_warp_base
+                            + n_mma * Self.MMA_N
+                            + Int(lane_group) * Self.c_frag_size,
+                        )
+        else:
+            var c_block = c.tile[Self.BM, Self.BN](m_tile_idx, n_tile_idx)
+            var c_warp = c_block.tile[Self.WM, Self.WN](warp_m, warp_n)
+
+            comptime for m_mma in range(Self.num_m_mmas):
+                comptime for n_mma in range(Self.num_n_mmas):
+                    c_writer.store(
+                        c_warp.tile[Self.MMA_M, Self.MMA_N](
+                            m_mma, n_mma
+                        ).vectorize[1, Self.c_frag_size](),
+                        c_reg.tile[1, Self.c_frag_size](m_mma, n_mma),
+                    )

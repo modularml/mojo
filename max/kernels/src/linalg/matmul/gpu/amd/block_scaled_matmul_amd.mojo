@@ -2348,6 +2348,7 @@ def _preb_grid_kernel[
     StoreSFB: TensorEngine,
     N: Int,
     K_BYTES: Int,
+    elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
     c: TileTensor[mut=True, out_dtype, LayoutC, MutAnyOrigin, Engine=StoreC],
     a: TileTensor[DType.uint8, LayoutA, ImmutAnyOrigin, Engine=StoreA],
@@ -2369,6 +2370,7 @@ def _preb_grid_kernel[
         BK_ELEMS=BK_ELEMS,
         WN=WN,
         matrix_format=matrix_format,
+        elementwise_lambda_fn=elementwise_lambda_fn,
     ].run[
         out_dtype,
         LayoutC,
@@ -2437,6 +2439,7 @@ def _launch_block_scaled_preb[
     BK_ELEMS: Int,
     WN: Int,
     matrix_format: CDNA4F8F6F4MatrixFormat,
+    elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
     c: TileTensor[mut=True, ...],
     a: TileTensor[mut=False, DType.uint8, ...],
@@ -2464,6 +2467,9 @@ def _launch_block_scaled_preb[
         BK_ELEMS: K tile size in FP6 elements per outer-K iteration.
         WN: Per-warp tile size along N.
         matrix_format: FP6 encoding of both operands.
+        elementwise_lambda_fn: Optional epilogue applied to each output
+            element in registers instead of storing it. The fused QKV ops
+            use it to scatter K/V into the paged cache.
     """
     comptime N = type_of(c).static_shape[1]
     comptime K_BYTES = type_of(a).static_shape[1]
@@ -2526,6 +2532,7 @@ def _launch_block_scaled_preb[
         type_of(b_scales_pre).Engine,
         N,
         K_BYTES,
+        elementwise_lambda_fn,
     ]
     ctx.enqueue_function[kernel](
         c,
@@ -2545,6 +2552,7 @@ def mxfp6_block_scaled_matmul_amd[
     fp6_format: CDNA4F8F6F4MatrixFormat = CDNA4F8F6F4MatrixFormat.FLOAT6_E2M3,
     num_splits: Int = 1,
     preshuffled_b: Bool = False,
+    elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
     c: TileTensor[mut=True, ...],
     a: TileTensor[mut=False, .uint8, ...],
@@ -2588,6 +2596,9 @@ def mxfp6_block_scaled_matmul_amd[
             to the row-major dispatch) when `M <= DECODE_M_MAX`, where the
             existing split-K tile already performs well and preshuffling has
             not been validated. Incompatible with `num_splits > 1`.
+        elementwise_lambda_fn: Optional epilogue applied to each output
+            element in registers instead of storing it. The fused QKV ops
+            use it to scatter K/V into the paged cache.
 
     Args:
         c: Output `[M, N]` (any float dtype).
@@ -2640,6 +2651,7 @@ def mxfp6_block_scaled_matmul_amd[
                 WN=T_WN,
                 num_splits=T_NUM_SPLITS,
                 matrix_format=fp6_format,
+                elementwise_lambda_fn=elementwise_lambda_fn,
             ](c, a, b, a_scales, b_scales, M, ctx)
         else:
             _launch_block_scaled[
@@ -2649,6 +2661,7 @@ def mxfp6_block_scaled_matmul_amd[
                 WM=T_WM,
                 WN=T_WN,
                 matrix_format=fp6_format,
+                elementwise_lambda_fn=elementwise_lambda_fn,
             ](c, a, b, a_scales, b_scales, M, ctx)
         return
 
@@ -2710,6 +2723,7 @@ def mxfp6_block_scaled_matmul_amd[
                 WN=D_WN,
                 num_splits=_decode_splits,
                 matrix_format=fp6_format,
+                elementwise_lambda_fn=elementwise_lambda_fn,
             ](c, a, b, a_scales, b_scales, M, ctx)
             return
 
@@ -2761,6 +2775,7 @@ def mxfp6_block_scaled_matmul_amd[
                     BK_ELEMS=P_BK_ELEMS,
                     WN=P_WN,
                     matrix_format=fp6_format,
+                    elementwise_lambda_fn=elementwise_lambda_fn,
                 ](c, a, b, a_scales, b_scales, M, ctx)
                 return
         _launch_block_scaled_preb[
@@ -2769,6 +2784,7 @@ def mxfp6_block_scaled_matmul_amd[
             BK_ELEMS=P_BK_ELEMS,
             WN=P_WN,
             matrix_format=fp6_format,
+            elementwise_lambda_fn=elementwise_lambda_fn,
         ](c, a, b, a_scales, b_scales, M, ctx)
         return
 
@@ -2781,6 +2797,7 @@ def mxfp6_block_scaled_matmul_amd[
             WN=WN,
             num_splits=num_splits,
             matrix_format=fp6_format,
+            elementwise_lambda_fn=elementwise_lambda_fn,
         ](c, a, b, a_scales, b_scales, M, ctx)
         return
 
@@ -2791,4 +2808,5 @@ def mxfp6_block_scaled_matmul_amd[
         WM=WM,
         WN=WN,
         matrix_format=fp6_format,
+        elementwise_lambda_fn=elementwise_lambda_fn,
     ](c, a, b, a_scales, b_scales, M, ctx)
