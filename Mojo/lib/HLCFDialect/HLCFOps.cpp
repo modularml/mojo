@@ -814,6 +814,14 @@ Block &ElifOp::getThenBlock() { return getThenRegion().front(); }
 
 Block &ElifOp::getElseBlock() { return getElseRegion().front(); }
 
+Operation *ElifOp::getThenTerminator() {
+  return getThenBlock().getTerminator();
+}
+
+Operation *ElifOp::getElseTerminator() {
+  return getElseBlock().getTerminator();
+}
+
 //===----------------------------------------------------------------------===//
 // ElifYieldOp
 //===----------------------------------------------------------------------===//
