@@ -1251,6 +1251,19 @@ DeclRefNode::emitUnqualLookup(StringRef spelling, const ExprNode *expr,
     diag << "add 'var' to declare a new name";
     diag << FixIt::insertBeforeToken(loc, "var ");
     diag << expr->getRange();
+
+    // If 'x' is also a struct field, also suggest 'self.x'.
+    if (auto failureDecls = lookup.getIfFailure(); !failureDecls.empty()) {
+      if (auto fieldOp = dyn_cast_or_null<StructFieldOp>(
+              failureDecls[0]->getIfOperation())) {
+        diag.attachNote(loc)
+            << "'" << spelling
+            << "' is also a struct field; did you mean 'self.'?";
+        diag.attachNote(fieldOp.getLoc())
+            << "'" << spelling << "' declared here";
+      }
+    }
+
     // An assignment outside any function is rejected before name resolution.
     if (ASTDecl *fn = lookupScope.getNearestDeclOfType<FnOp>())
       emitter.getDeclResolver().addErroneousDecl(spelling, loc, fn);
