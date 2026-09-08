@@ -61,24 +61,20 @@ def test_index_tensor_DLRM() raises:
     # We have two 1D tensors with index_len elements each.
 
     # index_len-element input tensor.
-    var a_stack = Array[
-        UInt64, align_up(index_len, simd_width_of[DType.uint64]())
-    ](uninitialized=True)
-    var index_a = TileTensor(a_stack, row_major[index_len]())
     # Initialize with random values within [0-dim_1) since it points do dim_1 of
     # input.
-    for i in range(index_len):
-        a_stack[i] = random_ui64(0, dim_1 - 1)
+    var a_stack = Array[
+        UInt64, align_up(index_len, simd_width_of[DType.uint64]())
+    ](fill_with=lambda (_i: Int) -> UInt64: random_ui64(0, dim_1 - 1))
+    var index_a = TileTensor(a_stack, row_major[index_len]())
 
     # index_len-element input tensor.
-    var b_stack = Array[
-        UInt64, align_up(index_len, simd_width_of[DType.uint64]())
-    ](uninitialized=True)
-    var index_b = TileTensor(b_stack, row_major[index_len]())
     # Initialize with random values within [0-dim_2) since it points do dim_2 of
     # input.
-    for i in range(index_len):
-        b_stack[i] = random_ui64(0, dim_2 - 1)
+    var b_stack = Array[
+        UInt64, align_up(index_len, simd_width_of[DType.uint64]())
+    ](fill_with=lambda (_i: Int) -> UInt64: random_ui64(0, dim_2 - 1))
+    var index_b = TileTensor(b_stack, row_major[index_len]())
 
     # The two 1D tensors are used as coordinates to dimensions 1 and 2 in the
     # dim_0 x dim_1 x dim_1 input tensor. Dimension 0 is preserved.
@@ -162,22 +158,18 @@ def test_index_tensor_DLRM_batch() raises:
     # We have two 1D tensors with index_len elements each.
 
     # index_len-element input tensor.
+    # Initialize with random values within [0-dim_3)
     var a_stack = Array[
         UInt64, align_up(index_len, simd_width_of[DType.uint64]())
-    ](uninitialized=True)
+    ](fill_with=lambda (_i: Int) -> UInt64: random_ui64(0, dim_3 - 1))
     var index_a = TileTensor(a_stack, row_major[index_len]())
-    # Initialize with random values within [0-dim_3)
-    for i in range(index_len):
-        a_stack[i] = random_ui64(0, dim_3 - 1)
 
     # index_len-element input tensor.
+    # Initialize with random values within [0-dim_4)
     var b_stack = Array[
         UInt64, align_up(index_len, simd_width_of[DType.uint64]())
-    ](uninitialized=True)
+    ](fill_with=lambda (_i: Int) -> UInt64: random_ui64(0, dim_4 - 1))
     var index_b = TileTensor(b_stack, row_major[index_len]())
-    # Initialize with random values within [0-dim_4)
-    for i in range(index_len):
-        b_stack[i] = random_ui64(0, dim_4 - 1)
 
     # The two 1D tensors are used as coordinates to dimensions 1 and 2 in the
     # dim_0 x dim_1 x dim_1 input tensor. Dimension 0 is preserved.

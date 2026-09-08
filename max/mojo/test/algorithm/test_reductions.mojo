@@ -229,10 +229,9 @@ def test_product() raises:
     comptime size = 10
 
     # Create a mem of size size
-    var vector = Array[Float32, size](uninitialized=True)
-
-    for i in range(size):
-        vector[i] = Float32(i + 1)
+    var vector = Array[Float32, size](
+        fill_with=lambda (i: Int) -> Float32: Float32(i + 1)
+    )
 
     # CHECK: 3628800.0
     print(product(vector))

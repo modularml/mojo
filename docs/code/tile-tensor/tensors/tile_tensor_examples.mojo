@@ -29,9 +29,9 @@ def accessing_tensor_elements_example() raises:
     comptime rows = 4
     comptime columns = 8
     comptime layout = row_major[rows, columns]()
-    var storage = Array[Float32, rows * columns](uninitialized=True)
-    for i in range(rows * columns):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, rows * columns](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     var tensor = TileTensor(storage, layout)
 
     var row, col = 0, 1
@@ -77,9 +77,9 @@ def accessing_nested_tensor_elements_example() raises:
     comptime columns = 6
     comptime tiler = row_major[2, 3]()
     comptime layout = blocked_product(col_major[2, 2](), tiler)
-    var storage = Array[Float32, rows * columns * 2](uninitialized=True)
-    for i in range(rows * columns):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, rows * columns * 2](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     var tensor = TileTensor(storage, layout)
 
     # start-access-nested-tensor-example
@@ -147,9 +147,9 @@ def tile_tensor_tile_example() raises:
 def layout_tensor_iterator_example() raises:
     # start-layout-tensor-iterator-example-1
     comptime buf_size = 128
-    var storage = Array[Int16, buf_size](uninitialized=True)
-    for i in range(buf_size):
-        storage[i] = Int16(i)
+    var storage = Array[Int16, buf_size](
+        fill_with=lambda (i: Int) -> Int16: Int16(i)
+    )
     comptime tile_m = 4
     comptime tile_n = 4
     comptime tile_size = tile_m * tile_n
@@ -171,9 +171,9 @@ def layout_tensor_iterator_example2() raises:
     comptime cols = 8
     comptime size = rows * cols
     comptime tile_size = 2
-    var storage = Array[Int32, size](uninitialized=True)
-    for i in range(size):
-        storage[i] = Int32(i)
+    var storage = Array[Int32, size](
+        fill_with=lambda (i: Int) -> Int32: Int32(i)
+    )
 
     comptime layout = row_major[rows, cols]()
     var tensor = TileTensor(storage, layout)
@@ -205,9 +205,9 @@ def nested_tile_example() raises:
             Coord(Idx[grid_cols], Idx[frag_cols]),
         )
     )
-    var storage = Array[Float32, total](uninitialized=True)
-    for i in range(total):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, total](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
     var tensor = TileTensor(storage, layout)
 
     # On a nested parent, tile() slices one outer index per mode: the
@@ -236,9 +236,7 @@ def copy_from_example() raises:
 
 def split_static_example() raises:
     # start-split-static-example
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
     var tensor = TileTensor(data, row_major[4, 4]())
 
     # Split into 2 equal halves along axis 0. Split views are immutable,
@@ -251,9 +249,7 @@ def split_static_example() raises:
 
 def split_dynamic_example() raises:
     # start-split-dynamic-example
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
     var tensor = TileTensor(data, row_major[8, 2]())
 
     # Return a single runtime-sized partition: split axis 0 into 4 parts
