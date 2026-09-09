@@ -332,33 +332,22 @@ struct Im2colALoader[
                 addrspace reason).
         """
         self.input_ptr = input_ptr
+        self.h_base = Array[Int32, Self.NUM_ROWS](uninitialized=True)
+        self.w_base = Array[Int32, Self.NUM_ROWS](uninitialized=True)
+        self.batch_base = Array[Int32, Self.NUM_ROWS](uninitialized=True)
         var HW_out = conv.H_out * conv.W_out
         var hwc = conv.H * conv.W * conv.C
-
-        def row_m[ri: Int]() {imm} -> Int32:
+        comptime for ri in range(Self.NUM_ROWS):
             comptime mi = ri // 2
             comptime half = ri % 2
-            return row_base + Int32(mi * 16 + half * 8) + rb
-
-        def h_base_at[ri: Int]() {imm} -> Int32:
-            var spatial = row_m[ri]() % HW_out
+            var m = row_base + Int32(mi * 16 + half * 8) + rb
+            var batch = m // HW_out
+            var spatial = m % HW_out
             var h_out = spatial // conv.W_out
-            return h_out * conv.stride_h - conv.pad_h
-
-        def w_base_at[ri: Int]() {imm} -> Int32:
-            var spatial = row_m[ri]() % HW_out
             var w_out = spatial % conv.W_out
-            return w_out * conv.stride_w - conv.pad_w
-
-        def batch_base_at[ri: Int]() {imm} -> Int32:
-            var batch = row_m[ri]() // HW_out
-            return batch * hwc
-
-        self.h_base = Array[Int32, Self.NUM_ROWS](fill_with_unrolled=h_base_at)
-        self.w_base = Array[Int32, Self.NUM_ROWS](fill_with_unrolled=w_base_at)
-        self.batch_base = Array[Int32, Self.NUM_ROWS](
-            fill_with_unrolled=batch_base_at
-        )
+            self.h_base[ri] = h_out * conv.stride_h - conv.pad_h
+            self.w_base[ri] = w_out * conv.stride_w - conv.pad_w
+            self.batch_base[ri] = batch * hwc
 
         # Seed the K-state for k_strip=0: k0base = 2*cb. These are the ONLY
         # divides on the K axis -- later strips advance by add+carry.

@@ -104,21 +104,18 @@ def _simdgroup8x8_matmul_kernel[
 
     for ks in range(k // MMA8_DIM):
         var kk = ks * MMA8_DIM
-
         # A (M,K) row-major: lane's 2 frag elems are consecutive K cols (K is
         # always in-bounds); only the row needs a bound for ragged M.
-        def afrag_at[mi: Int]() {imm} -> SIMD[a_type, FRAG8]:
+        var afrag = Array[SIMD[a_type, FRAG8], NT_M](uninitialized=True)
+        comptime for mi in range(NT_M):
             var grow = row_base + mi * MMA8_DIM + frow
             if interior or grow < m:
-                return (a_ptr + grow * k + kk + fcol).load[width=FRAG8]()
-            return SIMD[a_type, FRAG8](0)
-
-        var afrag = Array[SIMD[a_type, FRAG8], NT_M](
-            fill_with_unrolled=afrag_at
-        )
-
+                afrag[mi] = (a_ptr + grow * k + kk + fcol).load[width=FRAG8]()
+            else:
+                afrag[mi] = SIMD[a_type, FRAG8](0)
         # B holds B[k_idx, j]: row=k_idx (always in-bounds), col=j (bound for n).
-        def bfrag_at[ni: Int]() {imm} -> SIMD[b_type, FRAG8]:
+        var bfrag = Array[SIMD[b_type, FRAG8], NT_N](uninitialized=True)
+        comptime for ni in range(NT_N):
             comptime if transpose_b:
                 # B stored (N,K): B[k,j]=b_ptr[j*k+k_idx]; slots differ in j.
                 # We gather the transposed fragment manually. The hardware
@@ -131,22 +128,18 @@ def _simdgroup8x8_matmul_kernel[
                     var gj = col_base + ni * MMA8_DIM + fcol + s
                     if interior or gj < n:
                         bf[s] = b_ptr[gj * k + kk + frow]
-                return bf
+                bfrag[ni] = bf
             else:
                 # B stored (K,N): B[k,j]=b_ptr[k_idx*n+j]; slots consecutive j.
                 var krow = kk + frow
                 var gj = col_base + ni * MMA8_DIM + fcol
                 if interior or gj + 1 < n:
-                    return (b_ptr + krow * n + gj).load[width=FRAG8]()
+                    bfrag[ni] = (b_ptr + krow * n + gj).load[width=FRAG8]()
                 else:
                     var bf = SIMD[b_type, FRAG8](0)
                     if gj < n:
                         bf[0] = b_ptr[krow * n + gj]
-                    return bf
-
-        var bfrag = Array[SIMD[b_type, FRAG8], NT_N](
-            fill_with_unrolled=bfrag_at
-        )
+                    bfrag[ni] = bf
         comptime for mi in range(NT_M):
             comptime for ni in range(NT_N):
                 var c_frag = accum[mi * NT_N + ni]
