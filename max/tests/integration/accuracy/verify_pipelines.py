@@ -960,7 +960,7 @@ def run_v2_v3_comparison(
     v3_golden_path = Path(
         f"/tmp/goldens_max_v3_{device_type.value}_{fssafe_pipeline}_{encoding}.json"
     )
-    print("\n--- Generating V3 (Eager API) outputs ---", flush=True)
+    print("\n--- Generating V3 (ModuleV3 API) outputs ---", flush=True)
     generate_llm_logits_with_optional_retry(
         framework="max",
         device=devices,
@@ -1300,7 +1300,7 @@ def _is_pixel_generation(config: LogitVerificationPipelineConfig) -> bool:
     is_flag=True,
     default=False,
     help=(
-        "Run both V2 (graph API) and V3 (eager API) and compare their outputs"
+        "Run both V2 (graph API) and V3 (ModuleV3 API) and compare their outputs"
         " against the torch baseline."
     ),
 )

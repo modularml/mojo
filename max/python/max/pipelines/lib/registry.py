@@ -473,10 +473,10 @@ class PipelineRegistry:
         Args:
             architecture_name: The architecture class name to look up
                 (e.g. ``"LlamaForCausalLM"`` or ``"FluxPipeline"``).
-            prefer_module_v3: Whether to use the eager API architecture variant.
+            prefer_module_v3: Whether to use the ModuleV3 architecture variant.
                 When ``False`` (default), uses the standard graph API architecture name.
                 When ``True``, appends the ``_ModuleV3`` suffix to look up the
-                eager API architecture.
+                ModuleV3 architecture.
             task: Optional task to disambiguate when multiple architectures
                 share the same name.
 

@@ -54,8 +54,8 @@ MAX provides two neural network module packages:
 
 - [`max.nn`](/api/python/nn) provides reusable layers that build MAX graphs.
   Most existing pipeline architectures use this package.
-- [`max.experimental.nn`](/api/python/experimental.nn) provides the eager
-  module API used by newer ModuleV3 architectures.
+- [`max.experimental.nn`](/api/python/experimental.nn) provides the module
+  API used by newer ModuleV3 architectures.
 
 The `max.nn` package includes common components like:
 
@@ -80,9 +80,9 @@ from max.nn.attention import AttentionWithRope
 ```
 
 The [`Module`](/api/python/generated/max.experimental.nn.Module) base class in
-`max.experimental.nn` standardizes how eager modules manage weights and
-devices. Here's an example of building a simple multi-layer perceptron with
-the eager API:
+`max.experimental.nn` standardizes how modules manage weights and devices.
+Here's an example of building a simple multi-layer perceptron with the
+ModuleV3 API:
 
 ```python
 from max.driver import Accelerator
@@ -134,7 +134,7 @@ in your architecture config.
 Understanding the relationship between modules and pipelines is key to working
 with MAX. When you build a model for the pipeline system, define your
 architecture as a module, using either the graph API
-([`max.nn.Module`](/api/python/generated/max.nn.Module)) or the eager API
+([`max.nn.Module`](/api/python/generated/max.nn.Module)) or the ModuleV3 API
 ([`max.experimental.nn.Module`](/api/python/generated/max.experimental.nn.Module)).
 MAX then compiles your module into an optimized executable for the target
 device, and the pipeline orchestrates execution.
@@ -147,7 +147,7 @@ Here's the workflow:
    [`__call__()`](/api/python/generated/max.nn.Module#max.nn.Module.__call__)
    for the graph API, or
    [`forward()`](/api/python/generated/max.experimental.nn.Module#max.experimental.nn.Module.forward)
-   for the eager API.
+   for the ModuleV3 API.
 
 2. **MAX compiles your model**: MAX compiles the module into an optimized
    executable for the target device. This compilation happens once, and you can
