@@ -334,7 +334,7 @@ kgen.generator @int1_aliases<p1, p2, int1: i1, type: dtype>()  {
   // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> not(identical(:dtype type, f32)))>
   %0 = kgen.param.constant: i1 = <to_builtin(:scalar<bool> not(identical(:dtype type, f32)))>
 
-  // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> ne(:scalar<index> from_builtin(p1), 42))>
+  // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> not(identical(:scalar<index> from_builtin(p1), 42)))>
   %1 = kgen.param.constant: i1 = <to_builtin(:scalar<bool> ne(p1, 42))>
 
   // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> not(from_builtin(:i1 int1)))>

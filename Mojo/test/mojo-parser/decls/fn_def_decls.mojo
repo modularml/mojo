@@ -237,7 +237,7 @@ def return_def_arg_box(abc: MemoryOnly) raises -> ref [abc] MemoryOnly:
 
 # CHECK-LABEL: lit.fn @"foldable_requires_1
 # CHECK-SAME: {
-# CHECK-SAME:  ne(:scalar<index> #lit.struct.extract<:!Int x, "_mlir_value">, 0))
+# CHECK-SAME:  not(identical(:scalar<index> #lit.struct.extract<:!Int x, "_mlir_value">, 0)))
 def foldable_requires_1[x: Int]()
     where x:
         pass

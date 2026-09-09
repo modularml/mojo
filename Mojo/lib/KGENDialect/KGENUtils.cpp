@@ -1619,27 +1619,6 @@ void KGEN::printParamValue(AsmPrinter &p, TypedAttr value, Type type) {
         }
       }
 
-      // Temporary back-compat: Scalar int-like `eq` canonicalizes to
-      // `param.identical`, so `not(identical)` of those operands is the same
-      // sugar as `ne`.
-      if (auto identical = dyn_cast<ParamIdenticalAttr>(expr.getOperand(0))) {
-        if (identical.getNumOperands() == 2) {
-          if (auto simdType =
-                  sugarDynCast<SIMDType>(identical.getOperand(0).getType())) {
-            std::optional<KGENDType> dtype = simdType.getResolvedDType();
-            if (dtype && dtype->isIntLike()) {
-              p << "ne(";
-              printColonTypeOrIndexPrefix(p, simdType);
-              llvm::interleaveComma(
-                  identical.getOperands(), p,
-                  [&](TypedAttr operand) { printParamValue(p, operand); });
-              p << ')';
-              return;
-            }
-          }
-        }
-      }
-
       // Otherwise, print as a generic "not".
       return printExpr("not", expr.getOperand(0));
     }
