@@ -1189,6 +1189,8 @@ ClosureEmitter::createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
       return {};
   }
 
+  addStorageConformanceToDevicePassable(structDecl, {}, name);
+
   return &structDecl;
 }
 
@@ -4180,6 +4182,14 @@ CValue ClosureEmitter::createExtensionType(ASTDecl &fileModule,
   return PValue(extension);
 }
 
+/// Push `fnOp`'s debug scope for the duration of emitting its body.
+static DebugInfo::DIBuilder::ScopeGuard pushFnDebugScope(SharedState &shared,
+                                                         FnOp fnOp) {
+  if (!shared.diBuilder)
+    return {};
+  return shared.diBuilder->pushScopeGuard(fnOp.getLocScope());
+}
+
 static void populateDevicePassableTypeName(FnOp implementation,
                                            ASTDecl &structDecl,
                                            TypedAttr closureName) {
@@ -4350,6 +4360,8 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
         function.getSourceNameAttr(), function.getSpecialFunctionKind(),
         function.getInlineLevel(),
         /*redirectWitnessToImplParam=*/false);
+    DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
+        pushFnDebugScope(shared, implementation);
     emitIsConvertibleToDeviceTypeBody(implementation, parameters, b,
                                       deviceTypeValue);
     return buildSymbol(implementation, structDeclOp.getInputParams());
@@ -4361,6 +4373,8 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
         /*synthetic=*/true, function.getSymNameAttr(),
         function.getSpecialFunctionKind(), function.getInlineLevel(),
         /*redirectWitnessToImplParam=*/false);
+    DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
+        pushFnDebugScope(shared, implementation);
     cloneTraitDefaultBody(implementation, function, structDecl);
     return buildSymbol(implementation, structDeclOp.getInputParams());
   };
@@ -4371,6 +4385,8 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
         function.getSourceNameAttr(), function.getSpecialFunctionKind(),
         function.getInlineLevel(),
         /*redirectWitnessToImplParam=*/false);
+    DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
+        pushFnDebugScope(shared, toDevice);
     b.setInsertionPointToStart(&toDevice.getBodyRegion().front());
     assert(toDevice.getBodyRegion().getNumArguments() == 3);
 
@@ -4412,6 +4428,8 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
         function.getSourceNameAttr(), function.getSpecialFunctionKind(),
         function.getInlineLevel(),
         /*redirectWitnessToImplParam=*/false);
+    DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
+        pushFnDebugScope(shared, implementation);
     auto closureName = StringAttr::get(name, StringType::get(ctx));
     populateDevicePassableTypeName(implementation, structDecl, closureName);
     return buildSymbol(implementation, structDeclOp.getInputParams());
