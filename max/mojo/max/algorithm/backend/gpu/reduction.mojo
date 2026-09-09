@@ -758,11 +758,10 @@ def saturated_reduce_kernel[
 
             # Declare & initialize registers
             var val = Array[SIMD[accum_type, simd_width], num_reductions](
-                uninitialized=True
+                fill_with_unrolled=lambda [i: Int]() -> SIMD[
+                    accum_type, simd_width
+                ]: init[i].cast[accum_type]()
             )
-
-            comptime for i in range(num_reductions):
-                val[i] = init[i].cast[accum_type]()
 
             # Load data & reduce
             for val_idx in range(row_size):
