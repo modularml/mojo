@@ -468,5 +468,29 @@ def test_nextafter() raises:
     )
 
 
+def test_nextafter_at_comptime() raises:
+    # `nextafter` used to dispatch to libc through an `external_call`, which the
+    # comptime interpreter cannot execute; these evaluate the branches at
+    # compile time to guard the pure-Mojo fallback.
+    comptime up = nextafter(Float64(1), Float64(2))
+    assert_equal(up, 1.0000000000000002)
+    comptime down = nextafter(Float64(1), Float64(0))
+    assert_equal(down, 0.99999999999999988)
+    comptime neg = nextafter(Float64(-1), Float64(0))
+    assert_equal(neg, -0.99999999999999988)
+    comptime equal = nextafter(Float64(1), Float64(1))
+    assert_equal(equal, 1)
+    comptime from_zero = nextafter(Float64(0), Float64(1))
+    assert_equal(from_zero, 5e-324)
+    comptime from_zero_neg = nextafter(Float64(0), Float64(-1))
+    assert_equal(from_zero_neg, -5e-324)
+    comptime vec = nextafter(
+        SIMD[DType.float64, 2](0, 1), SIMD[DType.float64, 2](1, 1)
+    )
+    assert_equal(vec, SIMD[DType.float64, 2](5e-324, 1))
+    comptime is_nan = nextafter(nan[DType.float32](), Float32(1))
+    assert_true(isnan(is_nan))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

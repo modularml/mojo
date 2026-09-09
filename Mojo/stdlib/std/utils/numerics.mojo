@@ -996,6 +996,40 @@ def nextafter[
         dtype.is_floating_point()
     ), "input dtype must be floating point"
 
+    if __is_run_in_comptime_interpreter:
+        # The runtime path dispatches to libc `nextafter(f)` through an
+        # `external_call`, which the comptime interpreter cannot execute. Walk
+        # to the neighbouring value directly from the IEEE-754 bit pattern
+        # instead: for a fixed sign, consecutive representable values map to
+        # consecutive integers when the raw bits are read as an integer, so
+        # stepping the magnitude is a single increment or decrement.
+        comptime int_dtype = _integral_type_of[dtype]()
+        var bits = bitcast[int_dtype, width](arg0)
+        # Moving toward `arg1` grows the magnitude (and the raw-bit integer)
+        # when it heads away from zero, and shrinks it otherwise: a larger
+        # value steps the bits up for a positive `arg0` but down for a negative
+        # one, and vice versa.
+        var toward_larger = arg1.gt(arg0)
+        var negative = arg0.lt(0)
+        var stepped = toward_larger.select(
+            negative.select(bits - 1, bits + 1),
+            negative.select(bits + 1, bits - 1),
+        )
+        var result = bitcast[dtype, width](stepped)
+        # `arg0 == 0` has no neighbour by stepping bits: the answer is the
+        # smallest subnormal carrying `arg1`'s sign (bit pattern `1`).
+        var smallest = bitcast[dtype, width](SIMD[int_dtype, width](1))
+        result = arg0.eq(0).select(
+            arg1.lt(0).select(-smallest, smallest), result
+        )
+        # Equal inputs (including +0 and -0) return `arg1` per the C contract.
+        result = arg0.eq(arg1).select(arg1, result)
+        # A NaN operand yields NaN.
+        result = (isnan(arg0) | isnan(arg1)).select(
+            SIMD[dtype, width](nan[dtype]()), result
+        )
+        return result
+
     comptime if dtype == .float64:
         return _simd_apply[_float64_dispatch, result_dtype=dtype](arg0, arg1)
     return _simd_apply[_float32_dispatch, result_dtype=dtype](arg0, arg1)

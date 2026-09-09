@@ -657,6 +657,16 @@ def test_ulp() raises:
     assert_equal(ulp(Float64(-5)), 8.881784197001252e-16)
 
 
+def test_ulp_at_comptime() raises:
+    # `ulp` reaches `nextafter`, which used to fail in the comptime interpreter.
+    comptime u1 = ulp(Float32(1.0))
+    assert_equal(u1, ulp(Float32(1.0)))
+    comptime u5 = ulp(Float64(5))
+    assert_equal(u5, 8.881784197001252e-16)
+    comptime u_max = ulp(Float64.MAX_FINITE)
+    assert_equal(u_max, 1.99584030953472e292)
+
+
 def test_ceildiv() raises:
     # NOTE: these tests are here mostly to ensure the ceildiv method exists.
     # Types that opt in to CeilDivable, should test their own dunder methods for
