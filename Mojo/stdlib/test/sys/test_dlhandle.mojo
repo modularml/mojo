@@ -15,7 +15,7 @@ from std.pathlib import Path
 from std.ffi import OwnedDLHandle
 
 from std.sys.info import CompilationTarget
-from std.testing import assert_equal, assert_raises, assert_true
+from std.testing import assert_equal, assert_false, assert_raises, assert_true
 from std.testing import TestSuite
 
 
@@ -356,6 +356,12 @@ def test_owned_dlhandle_automatic_cleanup() raises:
     create_and_destroy_handle()
     create_and_destroy_handle()
     create_and_destroy_handle()
+
+
+def test_owned_dlhandle_destroy_null_handle() raises:
+    var null_handle = OwnedDLHandle(unsafe_uninitialized=True)
+    assert_false(null_handle, "uninitialized handle should be null")
+    null_handle^.__deinit__()  # must not `dlclose(NULL)`
 
 
 def main() raises:

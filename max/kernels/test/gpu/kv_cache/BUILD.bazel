@@ -27,6 +27,10 @@ _EXTRA_CONSTRAINTS = {
     "test_kv_cache_matmul.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: PRDT-506
     "test_batch_kv_cache_flash_attention_causal_mask.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: PRDT-506
     "test_kv_cache_ragged_matmul_scale.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: KERN-2318
+    "test_fused_qkv_index_matmul_scale_mxfp6.mojo": select({
+        "//:mi355_gpu": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     "test_fused_qkv_index_matmul_scale_mxfp8.mojo": select({
         # MXFP8 block-scaled matmul (block_scaled_matmul_with_epilogue) asserts
         # on SM100; dual-cache fused QKV+index is M3-on-B200 only.
@@ -92,16 +96,7 @@ _EXTRA_DEPS = {
         copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         # KERN-2339: Several tests disabled due to bounds check failures
         enable_assertions = select({
-            "//:b200_gpu": src not in [
-                # MSTDL-2240: ASSERT=all inflates the dual-cache bf16 matmul
-                # tactics past the compile-action timeout on SM100 — the same
-                # root cause that disables assertions for this test on AMD (see
-                # the default branch below).
-                "test_fused_qkv_index_matmul.mojo",
-            ],
             "//conditions:default": src not in [
-                "test_kv_cache_matmul.mojo",  # MSTDL-2240: stack frame size exceeds limit with assertions
-                "test_fused_qkv_index_matmul.mojo",  # MSTDL-2240: stack frame size exceeds limit with assertions (AMD bf16 matmul tactics)
                 "test_mha_mixed_ce_tg.mojo",  # KERN-2339: accessing idx=4 in dimension of size 4
                 "test_batch_kv_cache_flash_attention_causal_mask_ragged_paged.mojo",  # KERN-2339: bounds check reveals flash attention kernel bug
                 "test_batch_kv_cache_flash_attention.mojo",  # KERN-2339: bounds check reveals flash attention kernel bug

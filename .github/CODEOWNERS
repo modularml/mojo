@@ -1,20 +1,21 @@
 * @modular/public-repo-maintainers
-*.git* @modular/sdlc
 *.shellcheckrc @modular/sdlc
 /*.clang* @modular/sdlc
 /*.git* @modular/sdlc
 /context7.json @modular/mojo-docs
-*.bazel @modular/sdlc
 *.buildifier.json @modular/sdlc
-*.bzl @modular/sdlc
-/tools/* @modular/sdlc
+*MODULE.bazel @modular/sdlc
+*REPO.bazel @modular/sdlc
+/tools/** @modular/sdlc
 /.bazel* @modular/sdlc
 /bazel* @modular/sdlc
+/BUILD.bazel @modular/sdlc
 /AsyncRT/ @modular/runtime
 /docs/ @modular/mojo-docs
 /AI_TOOL_POLICY.md @modular/mojo-docs
 /max/CONTRIBUTING.md @modular/mojo-docs
 /max/docs/development.md @modular/mojo-docs @modular/max-serve
+/Mojo/BUILD.bazel @modular/compiler
 /Mojo/CLAUDE.md @modular/stdlib
 /Mojo/CONTRIBUTING.md @modular/stdlib
 /Mojo/README.md @modular/stdlib
@@ -62,8 +63,10 @@
 /Mojo/**/MojoLLDB @modular/compiler
 /Mojo/**/MojoTooling @modular/compiler
 /Mojo/**/ToolCommon @modular/compiler
+/max/BUILD.bazel @modular/sdlc
 /max/mojo/max/__init__.mojo @modular/stdlib @modular/genai @modular/driver
 /max/mojo/max/_category_.json @modular/mojo-docs
+/max/mojo/max/BUILD.bazel @modular/stdlib
 /max/mojo/max/algorithm/ @modular/stdlib @modular/genai
 /max/mojo/max/benchmark/ @modular/stdlib
 /max/mojo/max/gpu/ @modular/stdlib @modular/genai
@@ -87,6 +90,8 @@
 /max/kernels/test/layout @modular/genai
 /max/python/docs/ @modular/mojo-docs
 /max/python/layer_benchmarks/ @modular/max-sdk @modular/max-serve
+/max/python/max/BUILD.bazel @modular/runtime
+/max/python/max/all_deps.bzl @modular/sdlc
 /max/python/max/_core/ @modular/max-sdk @modular/runtime
 /max/python/max/_core_types/ @modular/runtime
 /max/python/max/_eager_policy.py @modular/max-sdk
@@ -116,6 +121,7 @@
 /max/python/max/serve/ @modular/max-serve
 /max/python/max/serve/recordreplay/ @modular/max-sdk @modular/max-serve
 /max/python/max/support/ @modular/compiler
+/max/tests/BUILD.bazel @modular/sdlc
 /max/tests/docstring_examples/ @modular/mojo-docs
 /max/tests/integration/accuracy/ @modular/max-serve
 /max/tests/integration/architectures/ @modular/max-serve
@@ -133,6 +139,7 @@
 /max/tests/integration/xarch_warm/ @modular/max-sdk
 /max/tests/tests/benchmark/ @modular/max-sdk
 /max/tests/tests/cascade/ @modular/max-serve @modular/max-sdk
+/max/tests/tests/BUILD.bazel @modular/sdlc
 /max/tests/tests/profiler/ @modular/max-sdk
 /max/tests/tests/driver/ @modular/driver
 /max/tests/tests/_entrypoints/ @modular/max-sdk

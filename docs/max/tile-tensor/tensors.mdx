@@ -491,9 +491,9 @@ var layout = row_major_nested(
         Coord(Idx[grid_cols], Idx[frag_cols]),
     )
 )
-var storage = Array[Float32, total](uninitialized=True)
-for i in range(total):
-    storage[i] = Float32(i)
+var storage = Array[Float32, total](
+    fill_with=lambda (i: Int) -> Float32: Float32(i)
+)
 var tensor = TileTensor(storage, layout)
 
 # On a nested parent, tile() slices one outer index per mode: the
@@ -629,9 +629,7 @@ partition count and returns a `StaticTuple` of `count` equal-sized views. The
 split axis must be statically divisible by `count`:
 
 ```mojo
-var data = Array[Int32, 16](uninitialized=True)
-for i in range(16):
-    data[i] = Int32(i)
+var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 var tensor = TileTensor(data, row_major[4, 4]())
 
 # Split into 2 equal halves along axis 0. Split views are immutable,
@@ -643,9 +641,7 @@ The dynamic form, `split(count, idx)`, takes a run-time partition count and
 returns a single partition with a run-time-sized split axis:
 
 ```mojo
-var data = Array[Int32, 16](uninitialized=True)
-for i in range(16):
-    data[i] = Int32(i)
+var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 var tensor = TileTensor(data, row_major[8, 2]())
 
 # Return a single runtime-sized partition: split axis 0 into 4 parts

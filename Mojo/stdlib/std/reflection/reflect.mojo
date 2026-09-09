@@ -314,12 +314,11 @@ struct Reflected[T: AnyType]:
         comptime count = _field_types_of[Self.T]().length
         comptime raw = _field_names_of[Self.T]()
 
-        # Safety: uninitialized=True is safe because the comptime for loop
-        # below initializes every element.
-        var result = Array[StaticString, count](uninitialized=True)
-
-        comptime for i in range(raw.size):
-            result[i] = comptime (StaticString(raw[i]))
+        var result = Array[StaticString, count](
+            fill_with_unrolled=lambda [i: Int]() -> StaticString: comptime (
+                StaticString(raw[i])
+            )
+        )
 
         return result^
 

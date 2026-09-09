@@ -494,8 +494,6 @@ _FILECHECK_TESTS = [
         # KERN-2339: Several tests disabled due to bounds check failures
         enable_assertions = select({
             "//:amd_gpu": src not in [
-                "test_flash_attention.mojo",  # MSTDL-2240: stack frame size exceeds limit with assertions
-                "test_flash_attention_amd.mojo",  # MSTDL-2240: stack frame size exceeds limit with assertions
                 "test_mha_sink_weights.mojo",  # KERN-2751: sink kernel triggers OOB on AMD
             ],
             # KERN-2339: H100 MLA kernel has OOB in LayoutTensor masking
@@ -505,7 +503,6 @@ _FILECHECK_TESTS = [
             # The OOB is functionally benign (masked out by _kernel_mask).
             "//conditions:default": src not in [
                 "test_mla.mojo",
-                "test_mha_chunked_causal_mask.mojo",  # MSTDL-2240: stack frame size exceeds limit with assertions (amdgpu)
             ],
         }),
         exec_properties = {
@@ -1323,14 +1320,6 @@ _MLA_DECODE_PAGED_CONFIGS = [
             "-D",
             "page_size={}".format(page_size),
         ],
-        # The gfx950 backend crashes compiling the warp-local MLA-decode fold
-        # kernel with assertions enabled (machine scheduler emits illegal MIR
-        # -> "Found N machine code errors"); the no-assert / JIT build is fine.
-        # Mirrors test_flash_attention_amd.mojo (MSTDL-2240). NVIDIA keeps asserts.
-        enable_assertions = select({
-            "//:amd_gpu": False,
-            "//conditions:default": True,
-        }),
         exec_properties = {
             "test.resources:gpu-memory": "6",
         },

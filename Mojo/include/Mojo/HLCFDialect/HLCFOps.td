@@ -727,8 +727,13 @@ def HLCF_ElifOp : HLCFParentOp<"elif"> {
     Block& getThenBlock();
     /// Get 'else' block.
     Block& getElseBlock();
+    /// Get the terminator op from 'then' block.
+    Operation* getThenTerminator();
+    /// Get the terminator op from 'else' block.
+    Operation* getElseTerminator();
   }];
 
   let hasVerifier = 1;
+  let hasCanonicalizer = 1;
 }
 #endif // HLCFOPS_TD

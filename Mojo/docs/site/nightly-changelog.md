@@ -124,6 +124,10 @@ This version is still a work in progress.
   - `def __init__(out self):`
   - `def __init__(out self, *, capacity_bytes: Int):`
   - `def reserve_bytes(mut self, new_capacity_bytes: Int, /):`
+- SIMD
+  - `def __init__(out self):`
+  - `def __eq__(self, rhs: Self) -> Bool:`
+  - `def __len__(self) -> Int:`
 - List
   - `def append(mut self, var value: Self.T, /):`
 
@@ -139,6 +143,8 @@ This version is still a work in progress.
 - `Counter` can now be constructed from any iterable of values, not just a
   `List`, e.g. `Counter(["a", "a", "b"])` or `Counter(String("aaab").bytes())`.
   This replaces the previous `Counter(items: List[V])` constructor.
+  
+- [`OwnedDLHandle`](/docs/std/ffi/OwnedDLHandle/) now conforms to `Boolable`.
 
 - `Coord` has a new `replace[at](value)` method that returns a `Coord` with
   the element at `at` swapped for `value`, keeping the other elements' types. A
@@ -361,6 +367,32 @@ This version is still a work in progress.
   from ._impl import Widget, make_widget
   ```
 
+- `mojo build` and `mojo run` can now report where a compile spends its time.
+  `--mlir-timing` times every MLIR pass and analysis, and `--llvm-timing` does
+  the same for LLVM, each printing a report to stderr when the compilation
+  finishes, which for `mojo run` is before the program starts.
+  `--mlir-timing-display` groups the MLIR report as a `tree` (the default),
+  which nests by pipeline structure, or as a `list`, which aggregates by pass
+  name and sorts by total time. These options are hidden, use `--help-hidden`
+  to list them.
+
+  Two things shape what the numbers mean. `--llvm-timing` pins the compile to
+  one thread and overrides `--num-threads`, because LLVM's timers are global to
+  the process and are not thread safe, so its report measures the work LLVM
+  does rather than the cost of a parallel build. And passes served from the
+  compilation cache never run, so a warm cache reports little and an object
+  cache hit leaves the LLVM report empty; point `MODULAR_CACHE_DIR` at an empty
+  directory to time a whole pipeline.
+
+- Both timing reports can be written as JSON, with `--timing-json`, and to a
+  file, with `--timing-file`. The two are independent, so the text reports can
+  go to a file and the JSON can go to stderr.
+
+  The JSON is one object per command, holding a `mlir` member and an `llvm`
+  member, and only the members the command asked for. A command that asks for
+  JSON but for no timing writes `{}`, so a consumer can parse the output
+  without first checking which timing options ran.
+
 ## Removed
 
 - Legacy constructs replaced in 1.0 were removed in this release, including
@@ -500,6 +532,9 @@ This release completes the removal of APIs deprecated during the v1.0 cycle.
   `.mojoc` files instead.
 
 ## Fixed
+
+- Destroying an [`OwnedDLHandle`](/docs/std/ffi/OwnedDLHandle/) that holds a
+  null handle no longer crashes the process.
 
 - `unsafe_uninit_move_n()` and `unsafe_uninit_copy_n()` with `overlapping=True`
   now handle an overlap in either direction when `T` is not trivially movable

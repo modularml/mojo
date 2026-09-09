@@ -140,6 +140,7 @@ class UnifiedMTPInkling(Module):
         return_n_logits: TensorValue,
         host_input_row_offsets: TensorValue,
         slot_idx: list[TensorValue],
+        has_initial_state: list[TensorValue],
         target_conv_pools: list[list[BufferValue]],
         draft_conv_pools: list[list[BufferValue]],
         seed: TensorValue,
@@ -188,6 +189,7 @@ class UnifiedMTPInkling(Module):
             signal_buffers,
             target_kv,
             slot_idx,
+            has_initial_state,
             target_conv_pools,
         )
         logits = target_outputs[1]
@@ -233,6 +235,7 @@ class UnifiedMTPInkling(Module):
             merged_pos,
             draft_conv_pools,
             slot_idx,
+            has_initial_state,
             signal_buffers,
         )
         draft_logits, draft_argmax = self._depth_logits(
@@ -309,6 +312,7 @@ class UnifiedMTPInkling(Module):
                 decode_pos.rebind([step_batch]),
                 draft_conv_pools,
                 slot_idx,
+                has_initial_state,
                 signal_buffers,
             )
             _, step_argmax = self._depth_logits(
@@ -411,6 +415,10 @@ class UnifiedMTPInkling(Module):
             *kv_params.flattened_kv_inputs(),
             *(
                 TensorType(DType.uint32, shape=["batch_size"], device=dev)
+                for dev in devices
+            ),
+            *(
+                TensorType(DType.bool, shape=["batch_size"], device=dev)
                 for dev in devices
             ),
             *self.target.conv_layout.buffer_types(devices),

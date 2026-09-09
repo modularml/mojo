@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 import numpy as np
+from fusion_utils import xfail_under_adv_fusion
 from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -68,6 +69,7 @@ def test_fold(session: InferenceSession) -> None:
     np.testing.assert_equal(actual, expected)
 
 
+@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_fold_dynamic_shape(session: InferenceSession) -> None:
     """Test with dynamic kernel size and output size."""
     input_shape = (1, 6, 15)

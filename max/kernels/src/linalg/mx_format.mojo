@@ -113,6 +113,18 @@ struct MXFormat(Equatable, TrivialRegisterPassable):
             return 4
         abort("invalid MX format")
 
+    def lane_bytes(self) -> Int:
+        """Returns the payload bytes one lane covers per MFMA fragment.
+
+        A lane covers 32 K-elements in every format, so this is 16, 24 or 32
+        bytes for FP4, FP6 and FP8 -- and it is what tells FP4 and FP6 apart,
+        since both arrive as `uint8`.
+
+        Returns:
+            The payload width in bytes.
+        """
+        return self.bits_per_element() * 32 // 8
+
     def is_fp6(self) -> Bool:
         """Returns whether this is one of the two six-bit encodings.
 

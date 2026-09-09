@@ -19,6 +19,7 @@ import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
+from fusion_utils import xfail_under_adv_fusion
 from max.driver import Buffer, accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
@@ -59,6 +60,7 @@ def torch_conv2d(  # noqa: ANN201
         ([1, 16, 16, 4], [16, 16, 4, 5]),
     ],
 )
+@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_conv2d(
     session: InferenceSession,
     input_shape: list[int],
@@ -111,6 +113,7 @@ def test_conv2d(
         ([1, 16, 16, 4], [16, 16, 2, 6], 2),
     ],
 )
+@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_conv2d_grouped(
     session: InferenceSession,
     input_shape: list[int],

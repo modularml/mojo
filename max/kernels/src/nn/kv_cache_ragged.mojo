@@ -57,7 +57,12 @@ from layout import (
 from linalg.matmul import elementwise_epilogue_type, matmul
 from linalg.fp8_quantization import blockwise_scaled_fp8_with_epilogue
 from linalg.block_scaled_quantization import block_scaled_matmul
+from linalg.arch.amd.block_scaled_mma import CDNA4F8F6F4MatrixFormat
+from linalg.mx_format import MXFormat
 from linalg.matmul.gpu.amd import block_scaled_matmul_amd
+from linalg.matmul.gpu.amd.block_scaled_matmul_amd import (
+    mxfp6_block_scaled_matmul_amd,
+)
 from internal_utils.fp8_utils import cast_saturating
 from nn._ragged_utils import get_batch_from_row_offsets
 from nn.attention.cpu.mha import (
@@ -407,6 +412,8 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale_float4[
     sfb_layout: Layout,
     SF_VECTOR_SIZE: Int,
     target: StaticString = "cpu",
+    mx_format: MXFormat = MXFormat.FP8_E4M3,
+    preshuffled_b: Bool = False,
 ](
     hidden_state: LayoutTensor[mut=False, dtype, a_layout, MutAnyOrigin],
     input_row_offsets: LayoutTensor[
@@ -441,6 +448,12 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale_float4[
             vector; `32` for MXFP8 E8M0 scaling and `16` for NVFP4 scaling.
         target: Compilation target string used to dispatch GPU versus CPU
             paths (defaults to "cpu").
+        mx_format: Element encoding of both operands. The lane width follows
+            from it, so the two cannot disagree; FP4 and FP6 both arrive as
+            `uint8` and nothing downstream can recover the encoding from the
+            packed bytes, so it must match the checkpoint.
+        preshuffled_b: Whether `weight` and `weight_scale` already carry the
+            plane-split / packed-scale layouts the preshuffled-B tile reads.
 
     Args:
         hidden_state: Tensor with shape (sum(seq_lens), num_heads * head_size // 2).
@@ -497,6 +510,8 @@ def generic_fused_qkv_matmul_kv_cache_paged_ragged_scale_float4[
             kv_collection.CacheType,
             SF_VECTOR_SIZE=SF_VECTOR_SIZE,
             target=target,
+            mx_format=mx_format,
+            preshuffled_b=preshuffled_b,
         ](
             hidden_state,
             input_row_offsets,
@@ -738,6 +753,8 @@ def _fused_qkv_matmul_kv_cache_ragged_scale_float4[
     SF_VECTOR_SIZE: Int,
     *,
     target: StaticString,
+    mx_format: MXFormat = MXFormat.FP8_E4M3,
+    preshuffled_b: Bool = False,
 ](
     hidden_state: LayoutTensor[mut=False, dtype, a_layout, MutAnyOrigin],
     input_row_offsets: LayoutTensor[
@@ -788,7 +805,10 @@ def _fused_qkv_matmul_kv_cache_ragged_scale_float4[
         cuda_ctx = context
 
     return _fused_qkv_matmul_kv_cache_ragged_impl_scale_float4[
-        SF_VECTOR_SIZE=SF_VECTOR_SIZE, target=target
+        SF_VECTOR_SIZE=SF_VECTOR_SIZE,
+        target=target,
+        mx_format=mx_format,
+        preshuffled_b=preshuffled_b,
     ](
         hidden_state,
         input_row_offsets,
@@ -1253,6 +1273,8 @@ def _fused_qkv_matmul_kv_cache_ragged_impl_scale_float4[
     SF_VECTOR_SIZE: Int,
     *,
     target: StaticString,
+    mx_format: MXFormat = MXFormat.FP8_E4M3,
+    preshuffled_b: Bool = False,
 ](
     hidden_state: LayoutTensor[dtype, a_layout, ImmutAnyOrigin],
     input_row_offsets: LayoutTensor[
@@ -1371,6 +1393,8 @@ def _fused_qkv_matmul_kv_cache_ragged_impl_scale_float4[
         target=target,
         SF_VECTOR_SIZE=SF_VECTOR_SIZE,
         elementwise_lambda_fn=write_to_cache,
+        mx_format=mx_format,
+        preshuffled_b=preshuffled_b,
     ](
         hidden_state,
         weight,
@@ -1432,6 +1456,8 @@ def generic_fused_qkv_index_matmul_kv_cache_paged_ragged_scale_float4[
     sfb_layout: Layout,
     SF_VECTOR_SIZE: Int,
     target: StaticString = "cpu",
+    mx_format: MXFormat = MXFormat.FP8_E4M3,
+    preshuffled_b: Bool = False,
 ](
     hidden_state: LayoutTensor[mut=False, dtype, a_layout, MutAnyOrigin],
     input_row_offsets: LayoutTensor[
@@ -1473,6 +1499,12 @@ def generic_fused_qkv_index_matmul_kv_cache_paged_ragged_scale_float4[
             32 for MXFP8 or 16 for NVFP4.
         target: Compilation target string used to dispatch GPU versus CPU
             paths (defaults to "cpu").
+        mx_format: Element encoding of both operands. The lane width follows
+            from it, so the two cannot disagree; FP4 and FP6 both arrive as
+            `uint8` and nothing downstream can recover the encoding from the
+            packed bytes, so it must match the checkpoint.
+        preshuffled_b: Whether `weight` and `weight_scale` already carry the
+            plane-split / packed-scale layouts the preshuffled-B tile reads.
 
     Args:
         hidden_state: Tensor with shape (sum(seq_lens), hidden).
@@ -1536,6 +1568,8 @@ def generic_fused_qkv_index_matmul_kv_cache_paged_ragged_scale_float4[
         return _fused_qkv_index_matmul_kv_cache_ragged_scale_float4[
             SF_VECTOR_SIZE=SF_VECTOR_SIZE,
             target=target,
+            mx_format=mx_format,
+            preshuffled_b=preshuffled_b,
         ](
             hidden_state,
             input_row_offsets,
@@ -1569,6 +1603,8 @@ def _fused_qkv_index_matmul_kv_cache_ragged_scale_float4[
     SF_VECTOR_SIZE: Int,
     *,
     target: StaticString,
+    mx_format: MXFormat = MXFormat.FP8_E4M3,
+    preshuffled_b: Bool = False,
 ](
     hidden_state: LayoutTensor[mut=False, dtype, a_layout, MutAnyOrigin],
     input_row_offsets: LayoutTensor[
@@ -1610,7 +1646,10 @@ def _fused_qkv_index_matmul_kv_cache_ragged_scale_float4[
     var index_k_cache = index_kv_collection.get_key_cache(layer_idx_cast)
 
     return _fused_qkv_index_matmul_kv_cache_ragged_impl_scale_float4[
-        SF_VECTOR_SIZE=SF_VECTOR_SIZE, target=target
+        SF_VECTOR_SIZE=SF_VECTOR_SIZE,
+        target=target,
+        mx_format=mx_format,
+        preshuffled_b=preshuffled_b,
     ](
         hidden_state,
         input_row_offsets,
@@ -1644,6 +1683,8 @@ def _fused_qkv_index_matmul_kv_cache_ragged_impl_scale_float4[
     SF_VECTOR_SIZE: Int,
     *,
     target: StaticString,
+    mx_format: MXFormat = MXFormat.FP8_E4M3,
+    preshuffled_b: Bool = False,
 ](
     hidden_state: LayoutTensor[dtype, a_layout, ImmutAnyOrigin],
     input_row_offsets: LayoutTensor[
@@ -1810,6 +1851,8 @@ def _fused_qkv_index_matmul_kv_cache_ragged_impl_scale_float4[
         target=target,
         SF_VECTOR_SIZE=SF_VECTOR_SIZE,
         elementwise_lambda_fn=write_to_caches,
+        mx_format=mx_format,
+        preshuffled_b=preshuffled_b,
     ](
         hidden_state,
         weight,
@@ -2346,6 +2389,8 @@ def _matmul_blockwise_scaled_fp4_common[
     target: StaticString,
     SF_VECTOR_SIZE: Int = 16,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
+    mx_format: MXFormat = MXFormat.FP8_E4M3,
+    preshuffled_b: Bool = False,
 ](
     hidden_state: LayoutTensor[a_type, a_layout, ImmutAnyOrigin],
     weight: LayoutTensor[b_type, b_layout, ImmutAnyOrigin],
@@ -2420,8 +2465,23 @@ def _matmul_blockwise_scaled_fp4_common[
         comptime assert (
             scales_dtype == .float8_e8m0fnu
         ), "CDNA4 block-scaled fused QKV+index requires E8M0 scales"
+        comptime lane_bytes = mx_format.lane_bytes()
+        comptime if mx_format.is_fp6():
+            return mxfp6_block_scaled_matmul_amd[
+                fp6_format=CDNA4F8F6F4MatrixFormat(mx_format),
+                preshuffled_b=preshuffled_b,
+                elementwise_lambda_fn=elementwise_lambda_fn,
+            ](
+                c_tt,
+                lt_to_tt(hidden_state).bitcast[.uint8](),
+                lt_to_tt(weight).bitcast[.uint8](),
+                a_scales_tt.bitcast[.float8_e8m0fnu](),
+                b_scales_tt.bitcast[.float8_e8m0fnu](),
+                context,
+            )
         return block_scaled_matmul_amd[
-            lane_bytes=32, elementwise_lambda_fn=elementwise_lambda_fn
+            lane_bytes=lane_bytes,
+            elementwise_lambda_fn=elementwise_lambda_fn,
         ](
             c_tt,
             lt_to_tt(hidden_state).bitcast[.uint8](),

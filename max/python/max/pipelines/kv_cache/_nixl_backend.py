@@ -16,8 +16,9 @@
 Shared by every consumer of the variable — the KV transfer engine and the dKV
 connector — so a typo fails loudly at the first read with the accepted set,
 under one rule, no matter which consumer reads it first. Only validation is
-shared: the default for an *unset* variable belongs to each caller (the
-transfer engine assumes ``"ucx"``, the dKV connector auto-selects).
+shared: what an *unset* variable means belongs to each caller (the transfer
+engine assumes ``"ucx"``; the dKV connector requires the variable, because dKV
+has no auto-select mode for it to fall back to).
 
 A leaf, stdlib-only module for the same reason as ``_nixl_plugin_deps``: the
 dKV connector cannot depend on the full ``kv_cache`` library without forming
@@ -46,11 +47,10 @@ def validate_nixl_backend(raw: str) -> NixlBackendType:
     Case-insensitive: the Modular-facing convention is lowercase, but NIXL's
     own plugin names are uppercase and deployments set both spellings.
 
-    ``auto`` is deliberately not accepted: it is the auto-select *sentinel*,
-    not a backend, and stripping it out is each reader's job. The dKV
-    connector maps it to ``None`` before validating (mirroring the Rust
-    ``BackendSelection`` parse), while the transfer engine has no auto mode,
-    so for it ``auto`` is as unsupported as any typo.
+    ``auto`` is deliberately not accepted: it names backends only. Neither
+    consumer has an auto-select mode any more — dKV's was removed because it
+    resolved by plugin name and so never picked UCX — so ``auto`` is as
+    unsupported as any typo for both of them.
 
     Args:
         raw: The backend name to validate, as read from the environment.

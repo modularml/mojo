@@ -397,7 +397,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         Args:
             hasher: The hasher instance.
         """
-        hasher._update_with_bytes(
+        hasher.update(
             Span(unsafe_ptr=self.unsafe_ptr(), length=self.byte_length())
         )
 
@@ -2672,9 +2672,7 @@ def _memchr_impl[
         )
         var mask = pack_bits(bool_mask)
         if mask:
-            return haystack.unsafe_offset(
-                Int(type_of(mask)(i) + count_trailing_zeros(mask))
-            )
+            return haystack.unsafe_offset(i + Int(count_trailing_zeros(mask)))
 
     for i in range(vectorized_end, length):
         if haystack[unsafe_offset=i] == char:

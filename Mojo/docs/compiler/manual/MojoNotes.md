@@ -226,7 +226,7 @@ understand how to do a comparison, which uses a custom attribute for the
 comparison condition code. I used:
 
 ```sh
-$ kgen-opt  --mlir-print-op-generic KGEN/test/pop-ir/pop-ops.mlir | grep pop.cmp
+$ kgen-opt  --mlir-print-op-generic Mojo/test/kgen/pop-ir/pop-ops.mlir | grep pop.cmp
     %0 = "pop.cmp"(%arg0, %arg1) {pred = #pop<cmp_pred ge>} : (!kgen.scalar<f32>, !kgen.scalar<f32>) -> !kgen.scalar<bool>
 ...
 ```

@@ -23,6 +23,8 @@ from max.graph import (
     BufferType,
     BufferValue,
     DeviceRef,
+    Graph,
+    ProfileScopeColor,
     TensorType,
     TensorValue,
     Value,
@@ -224,182 +226,203 @@ class UnifiedEagleLlama3(Module):
         draft_kv_collection = inputs.draft_kv_collection
 
         device = tokens.device
+        graph = Graph.current
 
-        # merged_tokens : [S+B*K]
-        # merged_offsets: [B+1]
-        merged_tokens, merged_offsets = self.merger(
-            tokens, input_row_offsets, draft_tokens
-        )
-        # Rebind to clean symbolic dims so downstream reshapes in
-        # Llama3's attention layers can simplify element counts.
-        merged_tokens = merged_tokens.rebind(["merged_seq_len"])
-        merged_offsets = merged_offsets.rebind(["input_row_offsets_len"])
-
-        # --- Target step ---
-        target_outputs = self.target(
-            merged_tokens,
-            kv_collection,
-            return_n_logits,
-            merged_offsets,
-        )
-        # logits       : [B*(K+1), V] (K+1 logits per request)
-        # hidden_states: [S+B*K, H]. ``extract_hs`` flattens per-device
-        # hs into positional tuple elements; single-device here so the
-        # hs is at index 3.
-        logits = target_outputs[1]
-        hidden_states = target_outputs[3]
-
-        hidden_dim = hidden_states.shape[1]
-
-        effective_bitmasks = apply_overlap_bitmask(
-            inputs.pinned_bitmask,
-            inputs.wait_payload,
-            inputs.device_bitmask_scratch,
-            num_steps=draft_tokens.shape[1],
-            device=device,
-        )
-
-        # num_accepted_draft_tokens: [B]     (index of first rejected step, 0..K)
-        # recovered                : [B, K]  (target argmax at each draft position)
-        # bonus                    : [B, 1]  (target argmax at the +1 position)
-        seed_scalar = inputs.seed[0]
-        num_accepted_draft_tokens, recovered, bonus, next_tokens = (
-            accept_and_pick_next_tokens(
-                self.acceptance_sampler,
-                draft_tokens,
-                logits,
-                seed=seed_scalar,
-                temperature=inputs.temperature,
-                top_k=inputs.top_k,
-                max_k=inputs.max_k,
-                top_p=inputs.top_p,
-                min_top_p=inputs.min_top_p,
-                token_bitmasks=effective_bitmasks,
+        # --- Target step: verify the draft tokens from the previous round ---
+        with graph.profile_scope(
+            "target_forward", color=ProfileScopeColor.ORANGE
+        ):
+            # merged_tokens : [S+B*K]
+            # merged_offsets: [B+1]
+            merged_tokens, merged_offsets = self.merger(
+                tokens, input_row_offsets, draft_tokens
             )
-        )
+            # Rebind to clean symbolic dims so downstream reshapes in
+            # Llama3's attention layers can simplify element counts.
+            merged_tokens = merged_tokens.rebind(["merged_seq_len"])
+            merged_offsets = merged_offsets.rebind(["input_row_offsets_len"])
 
-        num_draft_sentinel_gpu = _shape_to_scalar(draft_tokens.shape[1], device)
+            target_outputs = self.target(
+                merged_tokens,
+                kv_collection,
+                return_n_logits,
+                merged_offsets,
+            )
+            # logits       : [B*(K+1), V] (K+1 logits per request)
+            # hidden_states: [S+B*K, H]. ``extract_hs`` flattens per-device
+            # hs into positional tuple elements; single-device here so the
+            # hs is at index 3.
+            logits = target_outputs[1]
+            hidden_states = target_outputs[3]
 
-        shifted_corrected = shift_corrected_tokens(
-            self.merger, tokens, input_row_offsets, recovered, bonus
-        )
+            hidden_dim = hidden_states.shape[1]
 
-        # --- Draft step 0 ---
-        # Hack the return_hidden_states, return_logits and reset it to match
-        # the target model.
-        self.draft.return_hidden_states = ReturnHiddenStates.ALL
-        self.draft.return_logits = ReturnLogits.VARIABLE
-        draft_outputs = self.draft(
-            shifted_corrected,  # [S+B*K]
-            draft_kv_collection,
-            return_n_logits,
-            merged_offsets,  # [B+1]
-            hidden_states,  # [S+B*K, H]
-        )
-        self.draft.return_hidden_states = ReturnHiddenStates.LAST
-        self.draft.return_logits = ReturnLogits.LAST_TOKEN
+        # --- Accept/reject the draft tokens and sample the next token ---
+        with graph.profile_scope(
+            "verify_and_sample", color=ProfileScopeColor.ORANGE
+        ):
+            effective_bitmasks = apply_overlap_bitmask(
+                inputs.pinned_bitmask,
+                inputs.wait_payload,
+                inputs.device_bitmask_scratch,
+                num_steps=draft_tokens.shape[1],
+                device=device,
+            )
 
-        # logits       : [B*(K+1), V] (K+1 logits per request)
-        # hidden_states: [S+B*K, H] (single-device, single TensorValue).
-        logits = draft_outputs[1]
-        hs = draft_outputs[3]
+            # num_accepted_draft_tokens: [B] (index of first rejected step, 0..K)
+            # recovered                : [B, K]  (target argmax at each draft position)
+            # bonus                    : [B, 1]  (target argmax at the +1 position)
+            seed_scalar = inputs.seed[0]
+            num_accepted_draft_tokens, recovered, bonus, next_tokens = (
+                accept_and_pick_next_tokens(
+                    self.acceptance_sampler,
+                    draft_tokens,
+                    logits,
+                    seed=seed_scalar,
+                    temperature=inputs.temperature,
+                    top_k=inputs.top_k,
+                    max_k=inputs.max_k,
+                    top_p=inputs.top_p,
+                    min_top_p=inputs.min_top_p,
+                    token_bitmasks=effective_bitmasks,
+                )
+            )
 
-        last_idx = merged_offsets[1:] - 1
-        last_accepted_idx = (
-            ops.rebind(last_idx, ["batch_size"])
-            - num_draft_sentinel_gpu.broadcast_to(["batch_size"])
-            + num_accepted_draft_tokens
-        )
-        draft_hs = ops.gather(hs, last_accepted_idx, axis=0)
+        # --- Draft steps: generate the next round's speculative tokens ---
+        with graph.profile_scope(
+            "draft_forward", color=ProfileScopeColor.ORANGE
+        ):
+            num_draft_sentinel_gpu = _shape_to_scalar(
+                draft_tokens.shape[1], device
+            )
 
-        # Sample the first draft token
-        logits = _reshape_target_logits(logits)
-        # tokens: [B, K+1]
-        tokens = ops.squeeze(ops.argmax(logits, axis=-1), axis=-1)
+            shifted_corrected = shift_corrected_tokens(
+                self.merger, tokens, input_row_offsets, recovered, bonus
+            )
 
-        next_draft_tokens = ops.gather_nd(
-            tokens,
-            ops.unsqueeze(num_accepted_draft_tokens, axis=-1),
-            batch_dims=1,
-        )
+            # --- Draft step 0 ---
+            with graph.profile_scope("draft_step_0"):
+                # Hack the return_hidden_states, return_logits and reset it to
+                # match the target model.
+                self.draft.return_hidden_states = ReturnHiddenStates.ALL
+                self.draft.return_logits = ReturnLogits.VARIABLE
+                draft_outputs = self.draft(
+                    shifted_corrected,  # [S+B*K]
+                    draft_kv_collection,
+                    return_n_logits,
+                    merged_offsets,  # [B+1]
+                    hidden_states,  # [S+B*K, H]
+                )
+                self.draft.return_hidden_states = ReturnHiddenStates.LAST
+                self.draft.return_logits = ReturnLogits.LAST_TOKEN
 
-        # Compute the new kv cache collection
-        prev_cache_lengths = ops.rebind(
-            draft_kv_collection.cache_lengths, ["batch_size"]
-        )
-        input_lengths = input_row_offsets[1:] - input_row_offsets[:-1]
-        cache_lengths = (
-            prev_cache_lengths
-            + ops.rebind(input_lengths, ["batch_size"])
-            + num_accepted_draft_tokens.cast(DType.uint32)
-        )
+                # logits       : [B*(K+1), V] (K+1 logits per request)
+                # hidden_states: [S+B*K, H] (single-device, single TensorValue).
+                logits = draft_outputs[1]
+                hs = draft_outputs[3]
 
-        # Prepare the new input_row_offsets (all reqs have 1 token)
-        input_row_offsets = ops.range(
-            start=0,
-            stop=input_row_offsets.shape[0],
-            out_dim="input_row_offsets_len",
-            device=device,
-            dtype=DType.uint32,
-        )
+                last_idx = merged_offsets[1:] - 1
+                last_accepted_idx = (
+                    ops.rebind(last_idx, ["batch_size"])
+                    - num_draft_sentinel_gpu.broadcast_to(["batch_size"])
+                    + num_accepted_draft_tokens
+                )
+                draft_hs = ops.gather(hs, last_accepted_idx, axis=0)
 
-        one = ops.constant(1, DType.uint32, DeviceRef.CPU()).broadcast_to([1])
+                # Sample the first draft token
+                logits = _reshape_target_logits(logits)
+                # tokens: [B, K+1]
+                tokens = ops.squeeze(ops.argmax(logits, axis=-1), axis=-1)
 
-        # Set up the max cache length for the next step.
-        # Assume that all tokens are accepted in this calculation.
-        # Confusingly max_cache_length != max(cache_lengths). Instead max_cache_length
-        # is more like max_total_seq_len including cached and input tokens.
-        orig_max_cache_length = draft_kv_collection.max_cache_length
-        max_cache_length = orig_max_cache_length + 1
+                next_draft_tokens = ops.gather_nd(
+                    tokens,
+                    ops.unsqueeze(num_accepted_draft_tokens, axis=-1),
+                    batch_dims=1,
+                )
 
-        # draft_return_n_logits: [1] (CPU)
-        draft_return_n_logits = ops.constant(
-            1, DType.int64, DeviceRef.CPU()
-        ).broadcast_to([1])
+            # Compute the new kv cache collection
+            prev_cache_lengths = ops.rebind(
+                draft_kv_collection.cache_lengths, ["batch_size"]
+            )
+            input_lengths = input_row_offsets[1:] - input_row_offsets[:-1]
+            cache_lengths = (
+                prev_cache_lengths
+                + ops.rebind(input_lengths, ["batch_size"])
+                + num_accepted_draft_tokens.cast(DType.uint32)
+            )
 
-        draft_kv_collection = replace(
-            draft_kv_collection,
-            max_prompt_length=one,
-            max_cache_length=orig_max_cache_length,
-            attention_dispatch_metadata=draft_kv_collection.draft_attention_dispatch_metadata,
-        )
+            # Prepare the new input_row_offsets (all reqs have 1 token)
+            input_row_offsets = ops.range(
+                start=0,
+                stop=input_row_offsets.shape[0],
+                out_dim="input_row_offsets_len",
+                device=device,
+                dtype=DType.uint32,
+            )
 
-        # --- Draft steps 1..N-1 ---
-        all_draft_tokens = [next_draft_tokens]
-        for _ in range(1, self.num_draft_steps):
-            next_draft_tokens = next_draft_tokens.rebind(["batch_size"])
-            draft_hs = draft_hs.rebind(["batch_size", hidden_dim])
+            one = ops.constant(1, DType.uint32, DeviceRef.CPU()).broadcast_to(
+                [1]
+            )
+
+            # Set up the max cache length for the next step.
+            # Assume that all tokens are accepted in this calculation.
+            # Confusingly max_cache_length != max(cache_lengths). Instead
+            # max_cache_length is more like max_total_seq_len including
+            # cached and input tokens.
+            orig_max_cache_length = draft_kv_collection.max_cache_length
+            max_cache_length = orig_max_cache_length + 1
+
+            # draft_return_n_logits: [1] (CPU)
+            draft_return_n_logits = ops.constant(
+                1, DType.int64, DeviceRef.CPU()
+            ).broadcast_to([1])
 
             draft_kv_collection = replace(
-                draft_kv_collection, cache_lengths=cache_lengths
-            )
-
-            draft_outputs = self.draft(
-                next_draft_tokens,
                 draft_kv_collection,
-                draft_return_n_logits,
-                input_row_offsets,
-                draft_hs,
-            )
-            logits = draft_outputs[0]
-            draft_hs = draft_outputs[1]
-
-            next_draft_tokens = ops.argmax(logits, axis=-1).reshape([-1])
-
-            # Store the new tokens for this step
-            all_draft_tokens.append(
-                ops.rebind(next_draft_tokens, ["batch_size"])
+                max_prompt_length=one,
+                max_cache_length=orig_max_cache_length,
+                attention_dispatch_metadata=draft_kv_collection.draft_attention_dispatch_metadata,
             )
 
-            # Increment cache length for the next step
-            cache_lengths = cache_lengths + 1
-            max_cache_length = max_cache_length + 1
+            # --- Draft steps 1..N-1 ---
+            all_draft_tokens = [next_draft_tokens]
+            for i in range(1, self.num_draft_steps):
+                with graph.profile_scope(f"draft_step_{i}"):
+                    next_draft_tokens = next_draft_tokens.rebind(["batch_size"])
+                    draft_hs = draft_hs.rebind(["batch_size", hidden_dim])
 
-        # next_draft_tokens: [B, num_draft_steps]
-        if len(all_draft_tokens) > 1:
-            next_draft_tokens = ops.stack(all_draft_tokens, axis=-1)
-        else:
-            next_draft_tokens = ops.unsqueeze(all_draft_tokens[0], -1)
+                    draft_kv_collection = replace(
+                        draft_kv_collection, cache_lengths=cache_lengths
+                    )
+
+                    draft_outputs = self.draft(
+                        next_draft_tokens,
+                        draft_kv_collection,
+                        draft_return_n_logits,
+                        input_row_offsets,
+                        draft_hs,
+                    )
+                    logits = draft_outputs[0]
+                    draft_hs = draft_outputs[1]
+
+                    next_draft_tokens = ops.argmax(logits, axis=-1).reshape(
+                        [-1]
+                    )
+
+                    # Store the new tokens for this step
+                    all_draft_tokens.append(
+                        ops.rebind(next_draft_tokens, ["batch_size"])
+                    )
+
+                    # Increment cache length for the next step
+                    cache_lengths = cache_lengths + 1
+                    max_cache_length = max_cache_length + 1
+
+            # next_draft_tokens: [B, num_draft_steps]
+            if len(all_draft_tokens) > 1:
+                next_draft_tokens = ops.stack(all_draft_tokens, axis=-1)
+            else:
+                next_draft_tokens = ops.unsqueeze(all_draft_tokens[0], -1)
 
         return (
             num_accepted_draft_tokens,  # [B]

@@ -27,7 +27,9 @@
 #include "mlir/Support/Timing.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/PassTimingInfo.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -643,9 +645,54 @@ ErrorOrSuccess M::parseTargetOptions(
 }
 
 ErrorOrSuccess
-M::MLIRPassTiming::configure(const llvm::opt::InputArgList &args,
-                             llvm::opt::OptSpecifier timingId,
-                             llvm::opt::OptSpecifier displayModeId) {
+M::TimingReportSink::configure(const llvm::opt::InputArgList &args,
+                               llvm::opt::OptSpecifier jsonId,
+                               llvm::opt::OptSpecifier fileId) {
+  json = args.hasArg(jsonId);
+
+  StringRef path = args.getLastArgValue(fileId);
+  if (path.empty())
+    return success();
+
+  std::error_code ec;
+  auto stream =
+      std::make_unique<llvm::raw_fd_ostream>(path, ec, llvm::sys::fs::OF_Text);
+  if (ec)
+    return Error(llvm::formatv("unable to open timing file '{0}': {1}", path,
+                               ec.message()));
+  file = std::move(stream);
+  return success();
+}
+
+llvm::raw_ostream &M::TimingReportSink::stream() {
+  return file ? static_cast<llvm::raw_ostream &>(*file) : llvm::errs();
+}
+
+llvm::raw_ostream &M::TimingReportSink::beginMember(StringRef name) {
+  assert(json && "the command asked for no JSON");
+  // The brace waits for the first member, so that a report on stderr does not
+  // open an object ahead of the diagnostics of the compilation.
+  stream() << (wroteMember ? "," : "{");
+  wroteMember = true;
+  stream() << "\n\"" << name << "\": ";
+  return stream();
+}
+
+void M::TimingReportSink::finish() {
+  if (finished)
+    return;
+  finished = true;
+  // JSON asked for without any timing option still gets a well-formed empty
+  // object.
+  if (json)
+    stream() << (wroteMember ? "\n}\n" : "{}\n");
+  stream().flush();
+  file.reset();
+}
+
+ErrorOrSuccess M::MLIRPassTiming::configure(
+    const llvm::opt::InputArgList &args, llvm::opt::OptSpecifier timingId,
+    llvm::opt::OptSpecifier displayModeId, TimingReportSink &reportSink) {
   StringLiteral kTree = "tree";
   StringLiteral kList = "list";
   // The code reads the display mode also when the timing is off. An argument
@@ -662,6 +709,7 @@ M::MLIRPassTiming::configure(const llvm::opt::InputArgList &args,
   if (!args.hasArg(timingId))
     return success();
 
+  sink = &reportSink;
   manager.setEnabled(true);
   if (displayMode == kList)
     manager.setDisplayMode(mlir::DefaultTimingManager::DisplayMode::List);
@@ -670,7 +718,7 @@ M::MLIRPassTiming::configure(const llvm::opt::InputArgList &args,
   // the host. The function that makes this pass manager gets no scope. That
   // function reads the root from here. Then that function puts its own scope
   // under the root.
-  KGEN::setMLIRTimingRoot(&root);
+  KGEN::setMLIRTimingRoot(&root, /*decorateNames=*/!sink->isJSON());
   return success();
 }
 
@@ -689,14 +737,14 @@ static constexpr unsigned kTimingTitleWidth = 79;
 /// Writes a title above a timing report. MLIR and LLVM both write a report
 /// that does not name the tool that made it, and a command can ask for both
 /// reports. The title tells the two reports apart.
-static void printTimingReportTitle(StringRef title) {
+static void printTimingReportTitle(StringRef title, llvm::raw_ostream &os) {
   // The title is one line. A report starts with a box of three lines, and a
   // box above a box looks like one damaged box.
   std::string prefix = ("===--- " + title + " ").str();
   unsigned fill = prefix.size() < kTimingTitleWidth - 3
                       ? kTimingTitleWidth - 3 - prefix.size()
                       : 0;
-  llvm::errs() << "\n" << prefix << std::string(fill, '-') << "===\n\n";
+  os << "\n" << prefix << std::string(fill, '-') << "===\n\n";
 }
 
 void M::MLIRPassTiming::finish() {
@@ -707,7 +755,17 @@ void M::MLIRPassTiming::finish() {
   root.stop();
   // A scope must not go under `root` after `root` stops.
   KGEN::setMLIRTimingRoot(nullptr);
-  printTimingReportTitle("MLIR pass timing (--mlir-timing)");
+  // The strategy captures the stream, so it must not outlive the sink: the
+  // manager prints immediately below, and nothing prints after.
+  if (sink->isJSON()) {
+    manager.setOutput(mlir::createOutputStrategy(
+        mlir::DefaultTimingManager::OutputFormat::Json,
+        sink->beginMember("mlir")));
+  } else {
+    printTimingReportTitle("MLIR pass timing (--mlir-timing)", sink->stream());
+    manager.setOutput(mlir::createOutputStrategy(
+        mlir::DefaultTimingManager::OutputFormat::Text, sink->stream()));
+  }
   manager.print();
   // The destructor of the manager also prints. A manager that is off prints
   // nothing.
@@ -716,7 +774,8 @@ void M::MLIRPassTiming::finish() {
 
 void M::LLVMPassTiming::configure(const llvm::opt::InputArgList &args,
                                   llvm::opt::OptSpecifier timingId,
-                                  KGEN::CompilationOptions &options) {
+                                  KGEN::CompilationOptions &options,
+                                  TimingReportSink &reportSink) {
   if (!args.hasArg(timingId))
     return;
 
@@ -736,7 +795,8 @@ void M::LLVMPassTiming::configure(const llvm::opt::InputArgList &args,
   // well, because it reads the same global timers.
   options.numThreads = 1;
 
-  KGEN::enableLLVMTimingRegions();
+  sink = &reportSink;
+  KGEN::enableLLVMTimingRegions(/*asJSON=*/sink->isJSON());
 }
 
 void M::LLVMPassTiming::finish() {
@@ -750,10 +810,28 @@ void M::LLVMPassTiming::finish() {
   // Each part holds one pipeline: the host, and one for each offload target.
   // A pipeline that the compilation cache answered gives no part, so a run
   // that gets all of its object code from the cache writes nothing at all.
-  for (const KGEN::LLVMTimingReportPart &part : KGEN::takeLLVMTimingReport()) {
-    printTimingReportTitle("LLVM pass timing (--llvm-timing): " + part.label);
-    llvm::errs() << part.report;
+  llvm::SmallVector<KGEN::LLVMTimingReportPart> parts =
+      KGEN::takeLLVMTimingReport();
+  if (!sink->isJSON()) {
+    for (const KGEN::LLVMTimingReportPart &part : parts) {
+      printTimingReportTitle("LLVM pass timing (--llvm-timing): " + part.label,
+                             sink->stream());
+      sink->stream() << part.report;
+    }
+    return;
   }
+
+  // Each `report` is a brace-less run of object pairs, so wrap it here.
+  llvm::raw_ostream &os = sink->beginMember("llvm");
+  os << "[";
+  StringRef separator = "";
+  for (const KGEN::LLVMTimingReportPart &part : parts) {
+    os << separator << "\n{\"pipeline\": ";
+    os << llvm::json::Value(part.label);
+    os << ", \"times\": {\n" << part.report << "\n}}";
+    separator = ",";
+  }
+  os << "\n]";
 }
 
 ErrorOr<OwningOpRef<ModuleOp>> M::invokeMojoParser(

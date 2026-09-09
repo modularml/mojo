@@ -13,10 +13,10 @@ functional changes) should contain tests.
 
 | Directory                     | Purpose                                               | Primary Tool           |
 |-------------------------------|-------------------------------------------------------|------------------------|
-| `KGEN/test/mojo-parser/`      | Front-end unit tests (lexing, parsing, type-checking) | `%parse-mojo-isolated` |
-| `KGEN/test/mojo-integration/` | Full compiler tests (elaboration, codegen, execution) | `%mojo`, `kgen`        |
-| `KGEN/test/kgen/transforms/`  | Individual optimization pass tests                    | `kgen-opt`             |
-| `KGEN/test/test-packages/`    | Standard library stubs for isolated tests             | N/A                    |
+| `Mojo/test/mojo-parser/`      | Front-end unit tests (lexing, parsing, type-checking) | `%parse-mojo-isolated` |
+| `Mojo/test/mojo-integration/` | Full compiler tests (elaboration, codegen, execution) | `%mojo`, `kgen`        |
+| `Mojo/test/kgen/transforms/`  | Individual optimization pass tests                    | `kgen-opt`             |
+| `Mojo/test/test-packages/`    | Standard library stubs for isolated tests             | N/A                    |
 
 ## Running Tests
 
@@ -48,10 +48,10 @@ functional changes) should contain tests.
 ### About %parse-mojo-isolated
 
 `%parse-mojo-isolated` is **not a separate binary** — it's a lit substitution
-defined in `KGEN/test/mojo-parser/lit.cfg.py`. It expands to:
+defined in `Mojo/test/mojo-parser/lit.cfg.py`. It expands to:
 
 ```bash
-kgen-translate -import-mojo -mojo-enable-prebuilt-packages -mojo-search-paths=KGEN/test/test-packages
+kgen-translate -import-mojo -mojo-enable-prebuilt-packages -mojo-search-paths=Mojo/test/test-packages
 ```
 
 This runs the parser with minimal stdlib stubs instead of the full standard
@@ -205,7 +205,7 @@ elaborator, codegen, back-end tests). Requires code owner approval.
 ### Standard library stubs
 
 All parser tests have access to a tiny stub of the standard library located in
-`KGEN/test/test-packages`. Thus, one does not have to use raw MLIR types or
+`Mojo/test/test-packages`. Thus, one does not have to use raw MLIR types or
 literals — one can use `Int` and `42`.
 
 It is not recommended to use the real standard library in Mojo language or

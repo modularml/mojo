@@ -644,7 +644,9 @@ def _blackwell_matmul_tma_umma_warp_specialized_split_k[
     # Reduction TileTensor layout: shape = (UNKNOWN, BM, MMA_N),
     # strides = (BM*MMA_N, MMA_N, 1) -- all strides are static.
     comptime ReductionTTLayout = type_of(reduction_tensor).LayoutType
-    comptime kernel = matmul_kernel.run_splitk[ReductionTTLayout]
+    comptime kernel = matmul_kernel.run_splitk[
+        ReductionTTLayout, type_of(reduction_tensor).Engine
+    ]
 
     var grid_dim = (
         align_up(ceildiv(M_maybe_swapped, BM), cluster_shape[0]),
@@ -942,6 +944,7 @@ def matmul_sm100_fallback[
         b_type,
         c_type,
         type_of(c).LayoutType,
+        type_of(c).Engine,
         block_tile_shape,
         umma_shape,
         transpose_b=True,

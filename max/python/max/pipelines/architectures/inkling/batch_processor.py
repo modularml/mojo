@@ -55,6 +55,8 @@ class InklingInputs(ModelInputs):
 
     signal_buffers: list[Buffer]
     slot_idx: list[Buffer]
+    has_initial_state: list[Buffer]
+    """Per device, whether each request has convolution history to read."""
     conv_pools: list[Buffer]
     """Per device, one pool per convolution site per layer, mutated in place."""
 
@@ -71,6 +73,7 @@ class InklingInputs(ModelInputs):
             *self.signal_buffers,
             *self.kv_cache_inputs.flatten(),
             *self.slot_idx,
+            *self.has_initial_state,
             *self.conv_pools,
         )
 
@@ -125,7 +128,10 @@ class InklingBatchProcessor(
         request_ids = [context.request_id for context in context_batch]
         for request_id in request_ids:
             state_cache.claim(request_id)
-        slot_idx = state_cache.slot_idx_for(request_ids)
+        slot_idx, has_initial_state = state_cache.admission_inputs_for(
+            request_ids,
+            [context.tokens.processed_length == 0 for context in context_batch],
+        )
 
         tokens, input_row_offsets, positions = self._stage_token_inputs(
             context_batch
@@ -155,6 +161,7 @@ class InklingBatchProcessor(
             image_indices=image_indices,
             signal_buffers=self._signal_buffers,
             slot_idx=slot_idx,
+            has_initial_state=has_initial_state,
             conv_pools=self._conv_pools,
             kv_cache_inputs=kv_cache_inputs,
         )

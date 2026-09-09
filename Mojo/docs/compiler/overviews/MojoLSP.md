@@ -22,7 +22,7 @@ file is opened.
 ### Testing mojo-lsp-server
 
 Our tests are currently split across three implementations. We will eventually
-converge on the NodeJS-based test harness in `KGEN/test/mojo-lsp-server-node`.
+converge on the NodeJS-based test harness in `Mojo/test/mojo-lsp-server-node`.
 
 #### NodeJS-based tests
 
@@ -32,7 +32,7 @@ these more closely mimic real-world conditions for the language server and are
 preferred over the alternatives. Each test starts the language server and
 communicates with it as an actual editor client would.
 
-These tests live in `KGEN/test/mojo-lsp-server-node` and can be run using
+These tests live in `Mojo/test/mojo-lsp-server-node` and can be run using
 
 ```sh
 bazel test //Mojo/test/mojo-lsp-server-node
@@ -50,7 +50,7 @@ FORCE_COLOR=1 bazel test //Mojo/test/mojo-lsp-server-node
 #### Lit tests
 
 These tests use llvm-lit to speak JSON-RPC to the language server and inspect
-its output. They live in `KGEN/test/mojo-lsp-server` and can be run using
+its output. They live in `Mojo/test/mojo-lsp-server` and can be run using
 
 ```sh
 bazel test //Mojo/test/mojo-lsp-server

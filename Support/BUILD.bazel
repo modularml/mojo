@@ -541,6 +541,9 @@ modular_cc_library(
     srcs = ["lib/ExternalProfilerAnnotationHostGlue.cpp"],
     visibility = [
         "//Mojo:__pkg__",
+        # The shim-absent test cannot live next to the shim: its fixture is
+        # that nothing places the shim beside the test binary.
+        "//Support/unittests/internal/ExternalProfilerAnnotation:__pkg__",
         "//max/internal/profiler:__pkg__",
     ],
     deps = [

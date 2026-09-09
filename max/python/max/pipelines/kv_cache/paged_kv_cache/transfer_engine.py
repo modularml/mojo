@@ -76,7 +76,8 @@ def _get_nixl_backend_type() -> NixlBackendType:
 
     Reads ``MODULAR_NIXL_TRANSFER_BACKEND`` (default ``"ucx"``). The default
     is this engine's, not the validator's: the dKV connector reads the same
-    variable through the same validator but auto-selects when it is unset.
+    variable through the same validator but requires it, having no
+    auto-selection to fall back on.
     """
     return validate_nixl_backend(os.environ.get(NIXL_BACKEND_ENV_VAR, "ucx"))
 

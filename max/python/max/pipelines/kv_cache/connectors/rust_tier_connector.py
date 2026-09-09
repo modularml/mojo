@@ -269,10 +269,13 @@ def _alloc_pinned_host_buffer(
     host_offload_huge_page_bytes: int,
     device: Device,
 ) -> DevicePinnedBuffer:
-    host_offload_gib = (
-        host_offload_num_huge_blocks * host_offload_huge_page_bytes / (1024**3)
+    host_offload_bytes = (
+        host_offload_num_huge_blocks * host_offload_huge_page_bytes
     )
-    logger.info("Allocating %.1f GiB pinned host KV cache...", host_offload_gib)
+    logger.info(
+        "Allocating %s pinned host KV cache...",
+        to_human_readable_bytes(host_offload_bytes),
+    )
     start = time.perf_counter()
     host_buffer = _unsafe_alloc_fast_pinned_buffer(
         DType.uint8,
@@ -281,10 +284,10 @@ def _alloc_pinned_host_buffer(
     )
     elapsed = time.perf_counter() - start
     logger.info(
-        "Allocated %.1f GiB pinned host KV cache in %.1f s (%.2f GiB/s)",
-        host_offload_gib,
+        "Allocated %s pinned host KV cache in %.1f s (%.2f GiB/s)",
+        to_human_readable_bytes(host_offload_bytes),
         elapsed,
-        host_offload_gib / elapsed,
+        host_offload_bytes / 1024**3 / elapsed,
     )
     return host_buffer
 

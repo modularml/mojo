@@ -14,12 +14,14 @@
 
 import numpy as np
 import pytest
+from fusion_utils import xfail_under_adv_fusion
 from max.driver import Buffer, accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DevicePlacementPolicy, DeviceRef, Graph, TensorType, ops
 
 
+@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_nonzero_1d(session: InferenceSession) -> None:
     """nonzero on a 1D CPU tensor returns correct row-major indices."""
     with Graph(
@@ -37,6 +39,7 @@ def test_nonzero_1d(session: InferenceSession) -> None:
     np.testing.assert_array_equal(output.to_numpy(), np.array([[1], [3]]))
 
 
+@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_nonzero_2d(session: InferenceSession) -> None:
     """nonzero on a 2D CPU tensor returns correct row-major indices."""
     with Graph(

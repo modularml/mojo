@@ -5189,3 +5189,199 @@ def test_oneof_finite_arm_with_redundant_siblings_compiles() -> None:
     assert _accepts(compiled, '"a"')
     assert _accepts(compiled, "1")
     assert not _accepts(compiled, '"b"')
+
+
+_VARKEY_STYLE_NAMES: dict[str, Any] = {
+    "m2": "minimax_xml",
+    "glm": "glm_xml",
+    "qwen": "qwen_xml",
+}
+
+
+def _varkey_frame(style: str, key: str, value: str) -> str:
+    if style == "m2":
+        return f'<parameter name="{key}">{value}</parameter>'
+    if style == "glm":
+        return f"<arg_key>{key}</arg_key><arg_value>{value}</arg_value>"
+    return f"<parameter={key}>{value}</parameter>"
+
+
+# A byte vocab wide enough to spell any key/value plus the JSON structural bytes.
+_VARKEY_VOCAB = (
+    ["{", "}", '"', ":", " ", "\t", "\n"]
+    + [chr(c) for c in range(33, 127)]
+    + ["<eos>"]
+)
+_VARKEY_VOCAB = list(dict.fromkeys(_VARKEY_VOCAB))
+_VARKEY_ID = {tok: i for i, tok in enumerate(_VARKEY_VOCAB)}
+
+
+def _varkey_compiled(
+    style: str, schema: dict[str, Any], reject_unsupported: bool = False
+) -> xgr.CompiledGrammar:
+    info = xgr.TokenizerInfo(
+        _VARKEY_VOCAB,
+        vocab_type=xgr.VocabType.RAW,
+        stop_token_ids=[_VARKEY_ID["<eos>"]],
+    )
+    tag = xgr.StructuralTag(
+        format=JSONSchemaFormat(
+            json_schema=schema,
+            style=_VARKEY_STYLE_NAMES[style],
+            require_object_root=True,
+            reject_unsupported=reject_unsupported,
+        )
+    )
+    return xgr.GrammarCompiler(info).compile_structural_tag(tag)
+
+
+def _varkey_schema(property_names: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": {"const": "V"},
+        "propertyNames": property_names,
+    }
+
+
+_VARKEY_STYLES = ["m2", "glm", "qwen"]
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_property_names_const_pins_key(style: str) -> None:
+    compiled = _varkey_compiled(style, _varkey_schema({"const": "foo"}))
+    m = xgr.GrammarMatcher(compiled)
+    assert (
+        m.accept_string(_varkey_frame(style, "foo", "V")) and m.is_completed()
+    )
+    bad = xgr.GrammarMatcher(compiled)
+    assert not (
+        bad.accept_string(_varkey_frame(style, "bar", "V"))
+        and bad.is_completed()
+    )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_property_names_enum_restricts_key(style: str) -> None:
+    compiled = _varkey_compiled(style, _varkey_schema({"enum": ["foo", "bar"]}))
+    for good in ("foo", "bar"):
+        m = xgr.GrammarMatcher(compiled)
+        assert (
+            m.accept_string(_varkey_frame(style, good, "V"))
+            and m.is_completed()
+        )
+    bad = xgr.GrammarMatcher(compiled)
+    assert not (
+        bad.accept_string(_varkey_frame(style, "baz", "V"))
+        and bad.is_completed()
+    )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_property_names_max_length_bounds_key(style: str) -> None:
+    compiled = _varkey_compiled(style, _varkey_schema({"maxLength": 3}))
+    m = xgr.GrammarMatcher(compiled)
+    assert (
+        m.accept_string(_varkey_frame(style, "abc", "V")) and m.is_completed()
+    )
+    bad = xgr.GrammarMatcher(compiled)
+    assert not (
+        bad.accept_string(_varkey_frame(style, "abcd", "V"))
+        and bad.is_completed()
+    )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_property_names_min_length_bounds_key(style: str) -> None:
+    compiled = _varkey_compiled(style, _varkey_schema({"minLength": 3}))
+    m = xgr.GrammarMatcher(compiled)
+    assert (
+        m.accept_string(_varkey_frame(style, "abc", "V")) and m.is_completed()
+    )
+    bad = xgr.GrammarMatcher(compiled)
+    assert not (
+        bad.accept_string(_varkey_frame(style, "ab", "V"))
+        and bad.is_completed()
+    )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_plain_additional_properties_key_is_free(style: str) -> None:
+    compiled = _varkey_compiled(
+        style, {"type": "object", "additionalProperties": {"const": "V"}}
+    )
+    for key in ("anything", "other_key"):
+        m = xgr.GrammarMatcher(compiled)
+        assert (
+            m.accept_string(_varkey_frame(style, key, "V")) and m.is_completed()
+        )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_property_names_pattern_enforced(style: str) -> None:
+    compiled = _varkey_compiled(style, _varkey_schema({"pattern": "^a+$"}))
+    m = xgr.GrammarMatcher(compiled)
+    assert (
+        m.accept_string(_varkey_frame(style, "aaa", "V")) and m.is_completed()
+    )
+    bad = xgr.GrammarMatcher(compiled)
+    assert not (
+        bad.accept_string(_varkey_frame(style, "bbb", "V"))
+        and bad.is_completed()
+    )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_property_names_format_enforced(style: str) -> None:
+    compiled = _varkey_compiled(style, _varkey_schema({"format": "email"}))
+    bad = xgr.GrammarMatcher(compiled)
+    assert not (
+        bad.accept_string(_varkey_frame(style, "foo", "V"))
+        and bad.is_completed()
+    )
+
+
+# TODO(CENG-1076): support patternProperties without properties in XML formats.
+@pytest.mark.xfail(
+    strict=True,
+    raises=Exception,
+    reason="patternProperties without properties in XML formats is planned",
+)
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_single_pattern_properties_compiles(style: str) -> None:
+    _varkey_compiled(
+        style,
+        {
+            "type": "object",
+            "patternProperties": {"\\wcole": {"const": "V"}},
+        },
+        reject_unsupported=True,
+    )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_multi_pattern_properties_fails_closed(style: str) -> None:
+    with pytest.raises(Exception):
+        _varkey_compiled(
+            style,
+            {
+                "type": "object",
+                "patternProperties": {
+                    "^a+$": {"const": "V"},
+                    "^b+$": {"const": "W"},
+                },
+            },
+            reject_unsupported=True,
+        )
+
+
+@pytest.mark.parametrize("style", _VARKEY_STYLES)
+def test_varkey_pattern_properties_permissive_compiles(style: str) -> None:
+    # Without reject_unsupported, XML variable-key patternProperties is emitted
+    # best-effort rather than rejected; it must at least compile without error.
+    _varkey_compiled(
+        style,
+        {
+            "type": "object",
+            "patternProperties": {"\\wcole": {"const": "V"}},
+        },
+    )

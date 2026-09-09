@@ -21,6 +21,13 @@ To enable in-runtime NVTX markers, set ``MODULAR_ENABLE_PROFILING`` to ``on``
 or ``detailed`` before running your code. Without it, profiling calls are
 no-ops with minimal overhead.
 
+The host-side spans reach NVTX (or roctx) through ``libmax_profiler_shim.so``,
+which is loaded at runtime. A wheel install finds it on its own; a source build
+does not, and needs ``MODULAR_PROFILER_SHIM`` set to the shim's path (the
+``br-nsys``, ``bt-nsys`` and ``*-rocprof`` aliases do this for you). Without it
+the host-side spans are dropped and only kernel-level ranges appear in the
+capture.
+
 The profiler exposes two layers:
 
 1. **In-source spans**: :class:`Tracer` (context manager / manual stack) and

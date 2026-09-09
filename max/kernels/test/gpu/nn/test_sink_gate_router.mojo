@@ -31,7 +31,7 @@ comptime scores_type = DType.float32
 comptime bias_type = DType.float32
 
 
-def _sigmoid_ref(x: Float32) -> Float32:
+def sigmoid_ref(x: Float32) -> Float32:
     return 1.0 / (1.0 + exp(-x))
 
 
@@ -112,9 +112,7 @@ def test_sink_gate_router[
                         taken = True
                 if taken:
                     continue
-                var s = (
-                    _sigmoid_ref(logits_host[t * n_total + e]) + bias_host[e]
-                )
+                var s = sigmoid_ref(logits_host[t * n_total + e]) + bias_host[e]
                 if best == -1 or s > best_score:
                     best = e
                     best_score = s
@@ -128,10 +126,10 @@ def test_sink_gate_router[
         # kernel's own expression.
         var sigmoids = List[Float32]()
         for j in range(topk):
-            sigmoids.append(_sigmoid_ref(logits_host[t * n_total + winners[j]]))
+            sigmoids.append(sigmoid_ref(logits_host[t * n_total + winners[j]]))
         for s in range(n_shared):
             sigmoids.append(
-                _sigmoid_ref(logits_host[t * n_total + n_routed + s])
+                sigmoid_ref(logits_host[t * n_total + n_routed + s])
             )
 
         var total = Float32(0)

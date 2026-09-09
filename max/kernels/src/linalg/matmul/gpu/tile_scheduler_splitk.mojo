@@ -27,7 +27,14 @@ from max.gpu.sync import NamedBarrierSemaphore
 from max.gpu.globals import WARPGROUP_SIZE
 from max.gpu.host.info import H100
 from max.gpu import block_idx, grid_dim, thread_idx
-from layout import Layout, LayoutTensor, RuntimeLayout, TensorLayout, TileTensor
+from layout import (
+    Layout,
+    LayoutTensor,
+    RuntimeLayout,
+    TensorEngine,
+    TensorLayout,
+    TileTensor,
+)
 from std.bit import log2_floor
 
 from std.utils.index import Index, IndexList
@@ -543,10 +550,11 @@ struct SplitKTileScheduler[
         accum_type: DType,
         c_reg_layout: Layout,
         workspace_layout: TensorLayout,
+        workspace_engine: TensorEngine,
     ](
         self,
         reduction_workspace: TileTensor[
-            mut=True, accum_type, workspace_layout, _
+            mut=True, accum_type, workspace_layout, _, Engine=workspace_engine
         ],
         c_reg_tile: RegTile[accum_type, c_reg_layout],
         work_tile_info: WorkInfo,

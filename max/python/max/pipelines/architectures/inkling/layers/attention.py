@@ -157,6 +157,7 @@ class InklingAttention(Module, Shardable):
         k_conv_pool: BufferValue,
         v_conv_pool: BufferValue,
         slot_idx: TensorValue,
+        has_initial_state: TensorValue,
         cache_layer_idx: TensorValue,
     ) -> TensorValue:
         """Runs the block over one ragged batch. ``cache_layer_idx`` is an
@@ -168,8 +169,12 @@ class InklingAttention(Module, Shardable):
         qkvr = self.qkvr_proj(x)
         q, k, v, r = ops.split(qkvr, [q_dim, k_dim, v_dim, r_dim], axis=-1)
 
-        k = self.k_sconv(k, k_conv_pool, slot_idx, input_row_offsets)
-        v = self.v_sconv(v, v_conv_pool, slot_idx, input_row_offsets)
+        k = self.k_sconv(
+            k, k_conv_pool, slot_idx, input_row_offsets, has_initial_state
+        )
+        v = self.v_sconv(
+            v, v_conv_pool, slot_idx, input_row_offsets, has_initial_state
+        )
 
         q = self.q_norm(
             q.reshape([total_tokens, self.num_heads, self.head_dim])

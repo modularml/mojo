@@ -65,9 +65,13 @@ def test_staging_on_host_device_is_readable_and_writable() -> None:
 
 
 def test_staging_zeros_on_host_device_zeroes() -> None:
+    device = CPU()
     buf = Buffer.zeros(
-        shape=[4], dtype=DType.float32, device=CPU(), usage=Usage.STAGING
+        shape=[4], dtype=DType.float32, device=device, usage=Usage.STAGING
     )
     assert buf.usage == Usage.STAGING
     assert not buf.pinned
+    # Reads of a staging buffer do not synchronize, and the zeroing is enqueued
+    # rather than immediate, so the caller has to wait for it.
+    device.synchronize()
     np.testing.assert_array_equal(buf.to_numpy(), np.zeros(4, dtype=np.float32))

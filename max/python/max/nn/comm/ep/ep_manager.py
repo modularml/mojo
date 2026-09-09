@@ -77,8 +77,17 @@ def get_ep_local_sync_counters_size(n_experts: int) -> int:
 
     Memory Layout (all sizes in Int32 elements):
     - dispatch_async: 2 * n_experts + MAX_GPUS_PER_NODE
-    - dispatch_wait/combine_async: 4 * n_experts + 4
+    - dispatch_wait/combine_async: 6 * n_experts + 7
     - combine_wait: 2 * n_experts
+
+    The dispatch_wait region holds the per-expert counters and the cleanup,
+    ready and shared-expert flags in its first 4 * n_experts + 4 words, then
+    the L1 virtual-slot ticket and the L2 pool cursors. Those sit inside the
+    unused part of the per-expert window at high expert-parallel degree, and
+    only past the flags when a low degree closes it, needing
+    2 * n_local_experts + 3 further words. This size is the worst case over
+    the degree (n_local_experts == n_experts), because the caller allocating
+    the buffer knows n_experts but not the degree.
 
     Args:
         n_experts: Number of experts in the model.
@@ -89,7 +98,7 @@ def get_ep_local_sync_counters_size(n_experts: int) -> int:
     MAX_GPUS_PER_NODE = 8
 
     dispatch_async_size = 2 * n_experts + MAX_GPUS_PER_NODE
-    dispatch_wait_size = 4 * n_experts + 4
+    dispatch_wait_size = 6 * n_experts + 7
     combine_wait_size = 2 * n_experts
     return dispatch_async_size + dispatch_wait_size + combine_wait_size
 

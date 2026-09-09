@@ -42,6 +42,7 @@ from httpx import (
 )
 from max.pipelines.context.exceptions import InputError
 from max.serve.config import Settings
+from max.support.human_readable_formatter import to_human_readable_bytes
 from PIL import Image, UnidentifiedImageError
 from pydantic import AnyUrl
 
@@ -308,7 +309,7 @@ def decode_and_validate_images(
         if max_image_bytes is not None and len(image_bytes) > max_image_bytes:
             raise InputError(
                 "image exceeds the maximum allowed size of "
-                f"{max_image_bytes // (1024 * 1024)}MB"
+                f"{to_human_readable_bytes(max_image_bytes)}"
             )
         try:
             image = Image.open(io.BytesIO(image_bytes))
@@ -340,7 +341,7 @@ def _raise_media_too_large(media_kind: str, max_bytes: int) -> None:
     """
     raise InputError(
         f"{media_kind} exceeds the maximum allowed size of "
-        f"{max_bytes // (1024 * 1024)}MB"
+        f"{to_human_readable_bytes(max_bytes)}"
     )
 
 

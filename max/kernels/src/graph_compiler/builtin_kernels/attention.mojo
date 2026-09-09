@@ -30,6 +30,7 @@ from layout.tile_tensor import row_major
 from max.gpu.host.info import is_cpu, is_gpu
 from kv_cache.paged_sparse_kv_index_remap import paged_sparse_kv_index_remap
 from kv_cache.types import KVCacheStaticParams
+from linalg.mx_format import MXFormat
 from layout import (
     Layout,
     LayoutTensor,
@@ -1283,6 +1284,70 @@ struct Struct_fused_qkv_matmul_padded_ragged_scale_mxfp8_amd:
         )
 
 
+@extensibility.register("mo.fused_qkv_matmul.ragged.paged.scale.mxfp6.amd")
+struct Struct_fused_qkv_matmul_padded_ragged_scale_mxfp6_amd:
+    """Registers the `mo.fused_qkv_matmul.ragged.paged.scale.mxfp6.amd` graph op with the graph compiler.
+    """
+
+    @always_inline
+    @staticmethod
+    def execute[
+        dtype: DType,
+        scale_type: DType,
+        output_type: DType,
+        kv_type: DType,
+        //,
+        SF_VECTOR_SIZE: Int,
+        FP6_FORMAT: Int,
+        target: StaticString,
+    ](
+        output: OutputTensor[dtype=output_type, rank=2, ...],
+        hidden_state: InputTensor[dtype=dtype, rank=2, ...],
+        input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
+        weight: InputTensor[dtype=dtype, rank=2, ...],
+        input_scale: InputTensor[dtype=scale_type, rank=2, ...],
+        weight_scale: InputTensor[dtype=scale_type, rank=2, ...],
+        tensor_sf: Float32,
+        kv_blocks: MutableInputTensor[dtype=kv_type, rank=6, ...],
+        cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
+        kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
+        max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
+        max_cache_length: InputTensor[dtype=.uint32, rank=1, ...],
+        layer_idx: UInt32,
+        ctx: DeviceContext,
+    ) raises:
+        comptime assert FP6_FORMAT in (
+            0,
+            1,
+        ), "FP6_FORMAT must be 0 (E2M3) or 1 (E3M2)"
+        comptime fmt = (
+            MXFormat.FP6_E2M3 if FP6_FORMAT == 0 else MXFormat.FP6_E3M2
+        )
+        var kv_collection = generic_get_paged_cache(
+            kv_blocks,
+            cache_lengths,
+            kv_lookup_table,
+            max_prompt_length,
+            max_cache_length,
+        )
+        return generic_fused_qkv_matmul_kv_cache_paged_ragged_scale_float4[
+            SF_VECTOR_SIZE=SF_VECTOR_SIZE,
+            target=target,
+            mx_format=fmt,
+        ](
+            hidden_state.to_layout_tensor(),
+            input_row_offsets.to_layout_tensor(),
+            weight.to_layout_tensor(),
+            input_scale.to_layout_tensor(),
+            weight_scale.to_layout_tensor(),
+            tensor_sf,
+            kv_collection,
+            layer_idx,
+            output.to_layout_tensor(),
+            ctx,
+        )
+
+
 @extensibility.register("mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp8")
 struct Struct_fused_qkv_index_matmul_padded_ragged_scale_mxfp8:
     """Registers the `mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp8` graph op with the graph compiler.
@@ -1445,6 +1510,92 @@ struct Struct_fused_qkv_index_matmul_padded_ragged_scale_mxfp8_amd:
             generic_fused_qkv_index_matmul_kv_cache_paged_ragged_scale_float4[
                 SF_VECTOR_SIZE=SF_VECTOR_SIZE,
                 target=target,
+            ](
+                hidden_state.to_layout_tensor(),
+                input_row_offsets.to_layout_tensor(),
+                weight.to_layout_tensor(),
+                input_scale.to_layout_tensor(),
+                weight_scale.to_layout_tensor(),
+                tensor_sf,
+                kv_collection,
+                index_kv_collection,
+                layer_idx,
+                IQ_DIM,
+                q_output.to_layout_tensor(),
+                iq_output.to_layout_tensor(),
+                ctx,
+            )
+        )
+
+
+@extensibility.register(
+    "mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp6.amd"
+)
+struct Struct_fused_qkv_index_matmul_padded_ragged_scale_mxfp6_amd:
+    """Registers the `mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp6.amd` graph op with the graph compiler.
+    """
+
+    @always_inline
+    @staticmethod
+    def execute[
+        dtype: DType,
+        scale_type: DType,
+        output_type: DType,
+        kv_type: DType,
+        index_kv_type: DType,
+        //,
+        SF_VECTOR_SIZE: Int,
+        IQ_DIM: Int,
+        FP6_FORMAT: Int,
+        target: StaticString,
+    ](
+        q_output: OutputTensor[dtype=output_type, rank=2, ...],
+        iq_output: OutputTensor[dtype=output_type, rank=2, ...],
+        hidden_state: InputTensor[dtype=dtype, rank=2, ...],
+        input_row_offsets: InputTensor[dtype=.uint32, rank=1, ...],
+        weight: InputTensor[dtype=dtype, rank=2, ...],
+        input_scale: InputTensor[dtype=scale_type, rank=2, ...],
+        weight_scale: InputTensor[dtype=scale_type, rank=2, ...],
+        tensor_sf: Float32,
+        kv_blocks: MutableInputTensor[dtype=kv_type, rank=6, ...],
+        cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
+        kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
+        max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
+        max_cache_length: InputTensor[dtype=.uint32, rank=1, ...],
+        index_kv_blocks: MutableInputTensor[dtype=index_kv_type, rank=6, ...],
+        index_cache_lengths: InputTensor[dtype=.uint32, rank=1, ...],
+        index_kv_lookup_table: InputTensor[dtype=.uint32, rank=2, ...],
+        index_max_prompt_length: InputTensor[dtype=.uint32, rank=1, ...],
+        index_max_cache_length: InputTensor[dtype=.uint32, rank=1, ...],
+        layer_idx: UInt32,
+        ctx: DeviceContext,
+    ) raises:
+        var kv_collection = generic_get_paged_cache(
+            kv_blocks,
+            cache_lengths,
+            kv_lookup_table,
+            max_prompt_length,
+            max_cache_length,
+        )
+        var index_kv_collection = generic_get_paged_cache(
+            index_kv_blocks,
+            index_cache_lengths,
+            index_kv_lookup_table,
+            index_max_prompt_length,
+            index_max_cache_length,
+        )
+        comptime assert FP6_FORMAT in (
+            0,
+            1,
+        ), "FP6_FORMAT must be 0 (E2M3) or 1 (E3M2)"
+        comptime fmt = (
+            MXFormat.FP6_E2M3 if FP6_FORMAT == 0 else MXFormat.FP6_E3M2
+        )
+        return (
+            generic_fused_qkv_index_matmul_kv_cache_paged_ragged_scale_float4[
+                SF_VECTOR_SIZE=SF_VECTOR_SIZE,
+                target=target,
+                mx_format=fmt,
             ](
                 hidden_state.to_layout_tensor(),
                 input_row_offsets.to_layout_tensor(),

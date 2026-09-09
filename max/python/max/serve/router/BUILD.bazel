@@ -20,6 +20,7 @@ modular_py_library(
         "//max/python/max/serve/schemas",
         "//max/python/max/serve/telemetry",
         "//max/python/max/serve/worker_interface",
+        "//max/python/max/support",
         requirement("aiofiles"),
         requirement("fastapi"),
         requirement("opentelemetry-api"),

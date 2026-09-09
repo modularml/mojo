@@ -30,6 +30,7 @@ from max.graph import (
     BufferValue,
     DeviceRef,
     Graph,
+    ProfileScopeColor,
     TensorType,
     TensorValue,
     ops,
@@ -100,16 +101,19 @@ class DenoiseComputeStep(Module):
         # rounding on the raw sigma — matching the diffusers precision
         # path.
 
-        # Transformer forward.
-        (noise_pred,) = self.transformer(
-            latents_concat,
-            encoder_hidden_states,
-            timestep,
-            latent_image_ids_concat,
-            txt_ids,
-            guidance,
-            signal_buffers=signal_buffers,
-        )
+        with Graph.current.profile_scope(
+            "flux2_denoiser_forward", color=ProfileScopeColor.ORANGE
+        ):
+            # Transformer forward.
+            (noise_pred,) = self.transformer(
+                latents_concat,
+                encoder_hidden_states,
+                timestep,
+                latent_image_ids_concat,
+                txt_ids,
+                guidance,
+                signal_buffers=signal_buffers,
+            )
 
         # Slice noise_pred to latents.shape[1] tokens (discard image
         # predictions in img2img case).

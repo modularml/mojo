@@ -81,6 +81,22 @@ _DEVICE_INFO_MAPPING_ATTR_NAME = "mo.device_info_mapping"
 T = TypeVar("T")
 
 
+class ProfileScopeColor(str, Enum):
+    """Named color for the optional in-region ``Graph.profile_scope`` range.
+
+    These names mirror the palette accepted by the GPU tracing backend.
+    """
+
+    MODULAR_PURPLE = "modular_purple"
+    BLUE = "blue"
+    GREEN = "green"
+    ORANGE = "orange"
+    PURPLE = "purple"
+    RED = "red"
+    WHITE = "white"
+    YELLOW = "yellow"
+
+
 def _is_chain_value(value: _Value[Any]) -> TypeGuard[_Value[_mo.ChainType]]:
     return isinstance(value.type, _mo.ChainType)
 
@@ -1033,7 +1049,9 @@ class Graph:
 
     @contextlib.contextmanager
     def profile_scope(
-        self, name: str, color: str | None = None
+        self,
+        name: str,
+        color: ProfileScopeColor | None = None,
     ) -> Generator[None]:
         """Labels every op created within this block for profiling.
 
@@ -1050,17 +1068,18 @@ class Graph:
 
         .. code-block:: python
 
-            from max.graph import Graph
+            from max.graph import Graph, ProfileScopeColor
             with Graph("main") as graph:
-                with graph.profile_scope("draft_forward", color="orange"):
+                with graph.profile_scope(
+                    "draft_forward", color=ProfileScopeColor.ORANGE
+                ):
                     ...  # ops here trace as "kernel_name [draft_forward]"
 
         Args:
             name: The scope label to attach to every op created inside this
                 block.
-            color: Optional NVTX color name for the in-region range bracketing
-                mechanism. Has no effect on the per-kernel trace name. Invalid
-                values are silently ignored by the backend.
+            color: Optional NVTX color for the in-region range bracketing
+                mechanism. Has no effect on the per-kernel trace name.
 
         Note:
             Scopes are tracked in a single module-level ContextVar. Do not
@@ -1068,8 +1087,9 @@ class Graph:
             ``profile_scope`` is still active; labels would leak between the
             two graphs.
         """
+        color_str: str | None = color.value if color is not None else None
         current = _CURRENT_PROFILE_SCOPES.get()
-        token = _CURRENT_PROFILE_SCOPES.set((*current, (name, color)))
+        token = _CURRENT_PROFILE_SCOPES.set((*current, (name, color_str)))
         try:
             yield
         finally:

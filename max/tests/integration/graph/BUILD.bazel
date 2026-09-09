@@ -50,6 +50,74 @@ _SEPARATE_TARGET_TESTS = [
     "test_typical_llm_snifftest.py",
 ]
 
+# Files whose failure under MAX_GC_USE_ADV_FUSION=1 can't be expressed as a
+# per-test xfail -- an uncatchable process abort or a compile-time hang takes
+# down the whole pytest process, not just the failing test -- so the whole
+# file is dropped from the `graph-adv-fusion` mirror instead. Every other
+# new-system failure is a per-test `@xfail_under_adv_fusion` in its own file;
+# grep that marker for the full list. Removing an entry should say which fix
+# covers it, not just "now passes".
+_ADV_FUSION_EXCLUDED_TESTS = [
+    "test_kda_ops.py",  # compile-time: hangs (>800s) under the new system
+    "test_mojo_analysis.py",  # crash: SIGABRT, bad cast<BufferType> in emit
+    "test_mtp_eh_norm.py",  # crash: SIGABRT, null dyn_cast to ParamListAttr
+    "test_mutable_load_fusion.py",  # crash: SIGABRT, bad cast<TensorType> on slice
+]
+
+_GRAPH_COMMON_DATA = [
+    "//max/tests/integration/Inputs:inputs",
+    "//max/tests/integration/Inputs:pytest_inputs",
+    "//max/tests/integration/Inputs/kernel_override_ops",
+    "//max/tests/integration/Inputs/kernel_verification_ops",
+    "//max/tests/integration/Inputs/test_user_op",
+    "//max/tests/integration/graph/testdata/compile_config_ops",
+    "//max/tests/integration/graph/testdata/counter_ops",
+    "//max/tests/tests/graph/testdata",
+]
+
+_GRAPH_COMMON_ENV = {
+    "MODULAR_COUNTER_OPS_PATH": "$(rootpath //max/tests/integration/graph/testdata/counter_ops)",
+    "MODULAR_KERNEL_OVERRIDE_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_override_ops)",
+    "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
+    "MODULAR_COMPILE_CONFIG_OPS_PATH": "$(rootpath //max/tests/integration/graph/testdata/compile_config_ops)",
+    "CUSTOM_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/test_user_op)",
+    "MODULAR_PATH": ".",
+    "GRAPH_TESTDATA": "max/tests/tests/graph/testdata",
+}
+
+_GRAPH_COMMON_MOJO_DEPS = [
+    "//max:builtin_kernels",
+    "//max/tests/integration/Inputs/test_user_op",
+    "//max/tests/integration/graph/testdata/compile_config_ops",
+]
+
+_GRAPH_COMMON_DEPS = [
+    ":fusion_utils",
+    "//max/python/max:_core",
+    "//max/python/max/driver",
+    "//max/python/max/dtype",
+    "//max/python/max/engine",
+    "//max/python/max/graph",
+    "//max/python/max/mlir",
+    "//max/python/max/nn",
+    "//max/tests/integration/test_common:graph_utils",
+    "//max/tests/integration/test_common:modular_graph_test",
+    requirement("gguf"),
+    requirement("hypothesis"),
+    requirement("numpy"),
+    requirement("pytest-asyncio"),
+    requirement("torch"),
+    requirement("torchvision"),
+]
+
+# The legacy bulk `graph` target: every graph test under the default (legacy)
+# pipeline, one per-file target each. Kept as a plain glob (identical to the
+# pre-adv-fusion form) so `modular_py_test` fans each file out into its own
+# target running only that file. A filegroup can't be used here -- its members
+# are opaque to the fan-out, so it would be attached as a shared src to every
+# target, making each one collect and run the whole directory. The
+# `graph`/`graph-adv-fusion` overlap this creates is allow-listed in
+# `find_duplicate_srcs.py` (the same way GraphCompiler's adv-fusion mirrors are).
 modular_py_test(
     name = "graph",
     size = "large",
@@ -61,25 +129,8 @@ modular_py_test(
             "test_nan_check.py",
         ],
     ),
-    data = [
-        "//max/tests/integration/Inputs:inputs",
-        "//max/tests/integration/Inputs:pytest_inputs",
-        "//max/tests/integration/Inputs/kernel_override_ops",
-        "//max/tests/integration/Inputs/kernel_verification_ops",
-        "//max/tests/integration/Inputs/test_user_op",
-        "//max/tests/integration/graph/testdata/compile_config_ops",
-        "//max/tests/integration/graph/testdata/counter_ops",
-        "//max/tests/tests/graph/testdata",
-    ],
-    env = {
-        "MODULAR_COUNTER_OPS_PATH": "$(rootpath //max/tests/integration/graph/testdata/counter_ops)",
-        "MODULAR_KERNEL_OVERRIDE_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_override_ops)",
-        "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
-        "MODULAR_COMPILE_CONFIG_OPS_PATH": "$(rootpath //max/tests/integration/graph/testdata/compile_config_ops)",
-        "CUSTOM_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/test_user_op)",
-        "MODULAR_PATH": ".",
-        "GRAPH_TESTDATA": "max/tests/tests/graph/testdata",
-    },
+    data = _GRAPH_COMMON_DATA,
+    env = _GRAPH_COMMON_ENV,
     exec_properties = {
         "test.resources:gpu-memory": "2",
     },
@@ -98,32 +149,11 @@ modular_py_test(
     # ``max._core.mlrt.AsyncValue`` but the dep graph already covers it
     # transitively via //max/python/max/engine.
     ignore_unresolved_imports = ["max._core.mlrt.AsyncValue"],
-    mojo_deps = [
-        "//max:builtin_kernels",
-        "//max/tests/integration/Inputs/test_user_op",
-        "//max/tests/integration/graph/testdata/compile_config_ops",
-    ],
+    mojo_deps = _GRAPH_COMMON_MOJO_DEPS,
     tags = [
         "gpu",
     ],
-    deps = [
-        ":fusion_utils",
-        "//max/python/max:_core",
-        "//max/python/max/driver",
-        "//max/python/max/dtype",
-        "//max/python/max/engine",
-        "//max/python/max/graph",
-        "//max/python/max/mlir",
-        "//max/python/max/nn",
-        "//max/tests/integration/test_common:graph_utils",
-        "//max/tests/integration/test_common:modular_graph_test",
-        requirement("gguf"),
-        requirement("hypothesis"),
-        requirement("numpy"),
-        requirement("pytest-asyncio"),
-        requirement("torch"),
-        requirement("torchvision"),
-    ],
+    deps = _GRAPH_COMMON_DEPS,
 )
 
 # Shared by every `test_*_fusion.py` file in the bulk `graph` target above:
@@ -139,6 +169,7 @@ modular_py_library(
         "//max/python/max/engine",
         "//max/python/max/graph",
         requirement("numpy"),
+        requirement("pytest"),
     ],
 )
 
@@ -227,6 +258,40 @@ modular_py_test(
     # max.experimental.nn.Module.compile() reaches max.engine.InferenceSession
     # transitively through its own lazy internals; optional at runtime, like
     # the experimental package's own ignore_extra_deps for the same target.
+    ignore_unresolved_imports = ["max.engine.InferenceSession"],
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        requirement("hypothesis"),
+    ],
+)
+
+# adv-fusion mirror of the snifftest. It can't join the bulk `graph-adv-fusion`
+# target (its experimental-API deps aren't in `_GRAPH_COMMON_DEPS`), so it gets
+# its own target with `MAX_GC_USE_ADV_FUSION=1`. The test currently aborts under
+# the new system, which can't be xfail'd, so its body is `skipif`'d under the
+# env var -- the target keeps the test tracked in the new-system suite as a skip
+# rather than dropping it wholesale like `_ADV_FUSION_EXCLUDED_TESTS`.
+modular_py_test(
+    name = "adv-fusion-test_typical_llm_snifftest",
+    srcs = [
+        "conftest.py",
+        "test_typical_llm_snifftest.py",
+    ],
+    env = {"MAX_GC_USE_ADV_FUSION": "1"},
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     ignore_unresolved_imports = ["max.engine.InferenceSession"],
     tags = [
         "gpu",
@@ -738,4 +803,54 @@ modular_py_test(
         "//max/tests/integration/test_common:graph_error_messages_scenario",
         requirement("numpy"),
     ],
+)
+
+# ============================================================================
+# New tests: adv-fusion regression targets (GEX-4140)
+#
+# Everything below reruns the graph tests above under MAX_GC_USE_ADV_FUSION=1
+# to track how much of the suite already passes on the new MAP-dialect fusion
+# system. Kept separate from the default targets on purpose.
+#
+# The test sources are a direct glob so `modular_py_test` fans them out into
+# one py_test per file. `test_name_prefix` keeps the per-file target names
+# from colliding with the default per-file targets. Per-test new-system
+# failures are marked `@xfail_under_adv_fusion(...)` in each source file (grep
+# that marker for the running list); files whose failure can't be a per-test
+# xfail -- an uncatchable crash or a compile-time hang -- are dropped wholesale
+# via `_ADV_FUSION_EXCLUDED_TESTS` near the top of this file.
+# ============================================================================
+modular_py_test(
+    name = "graph-adv-fusion",
+    size = "large",
+    srcs = glob(
+        ["*.py"],
+        exclude = _AMD_ONLY_TESTS + _NVIDIA_ONLY_TESTS + _CPU_ONLY_TESTS + _SEPARATE_TARGET_TESTS + _ADV_FUSION_EXCLUDED_TESTS + [
+            "buffer_create_init_shared.py",
+            "fusion_utils.py",
+            "test_nan_check.py",
+        ],
+    ),
+    data = _GRAPH_COMMON_DATA,
+    env = _GRAPH_COMMON_ENV | {"MAX_GC_USE_ADV_FUSION": "1"},
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
+        "//conditions:default": [],
+    }),
+    ignore_extra_deps = [
+        requirement("gguf"),
+        requirement("pytest-asyncio"),
+    ],
+    ignore_unresolved_imports = ["max._core.mlrt.AsyncValue"],
+    mojo_deps = _GRAPH_COMMON_MOJO_DEPS,
+    tags = [
+        "gpu",
+    ],
+    # Fan out one py_test per file (see the banner above); the prefix avoids
+    # colliding with the default per-file target names.
+    test_name_prefix = "adv-fusion-",
+    deps = _GRAPH_COMMON_DEPS,
 )

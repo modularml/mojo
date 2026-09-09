@@ -98,6 +98,7 @@ class UnifiedMTPInklingBatchProcessor(InklingBatchProcessor):
             image_indices=base.image_indices,
             signal_buffers=base.signal_buffers,
             slot_idx=base.slot_idx,
+            has_initial_state=base.has_initial_state,
             conv_pools=base.conv_pools,
             draft_conv_pools=self._draft_conv_pools,
             kv_cache_inputs=base.kv_cache_inputs,

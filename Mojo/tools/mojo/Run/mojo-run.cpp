@@ -373,11 +373,17 @@ static int run(const State &subcommandState) {
 
   warnBuildingForDebugWithDebugBuiltCompiler(state, options.debugLevel);
 
-  // Comes before the CPU device, because the option sets the thread count to
-  // one. Comes before the MLIR timing, so that the program deletes it later
-  // and the MLIR report is the first report.
+  // Declared first so it outlives both timing objects, which write their
+  // reports into it from their destructors.
+  TimingReportSink timingReport;
+  if (ErrorOrSuccess err = timingReport.configure(
+          args, options::OPT_timing_json, options::OPT_timing_file))
+    return state.reportError(err.getError());
+
+  // Before the CPU device, because the option pins the thread count to one;
+  // before the MLIR timing, so the MLIR report comes out first.
   LLVMPassTiming llvmTiming;
-  llvmTiming.configure(args, options::OPT_llvm_timing, options);
+  llvmTiming.configure(args, options::OPT_llvm_timing, options, timingReport);
 
   AsyncRT::CPUDeviceOptions cpuDeviceOptions;
   configureCPUDeviceOptions(cpuDeviceOptions, options);
@@ -398,8 +404,9 @@ static int run(const State &subcommandState) {
 
   // The timing shows the parse, the passes, and the code generation.
   MLIRPassTiming timing;
-  if (ErrorOrSuccess err = timing.configure(args, options::OPT_mlir_timing,
-                                            options::OPT_mlir_timing_display))
+  if (ErrorOrSuccess err =
+          timing.configure(args, options::OPT_mlir_timing,
+                           options::OPT_mlir_timing_display, timingReport))
     return state.reportError(err.getError());
 
   ErrorOr<OwningOpRef<ModuleOp>> moduleOp = invokeMojoParser(

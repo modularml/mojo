@@ -34,6 +34,7 @@ from layout import (
     IntTuple,
     Layout,
     RuntimeTuple,
+    TensorEngine,
     TensorLayout,
     TileTensor,
     UNKNOWN_VALUE,
@@ -318,13 +319,17 @@ struct TileWriter[
     @always_inline
     def write_splitk[
         reduction_layout: TensorLayout,
+        reduction_engine: TensorEngine,
     ](
         self,
         c_tiles: Self.CTileArray,
         stage: Self.Stage,
         scheduler: TileScheduler,
         reduction_tensor: TileTensor[
-            Self.accum_type, reduction_layout, MutAnyOrigin
+            Self.accum_type,
+            reduction_layout,
+            MutAnyOrigin,
+            Engine=reduction_engine,
         ],
         work_info: WorkInfo,
         shape: Tuple[UInt32, UInt32],

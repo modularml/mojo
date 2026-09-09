@@ -17,18 +17,18 @@ some of the commands. For details, see
 
 ## File Overview
 
-- `KGEN/` -- Mojo compiler sources, tests, and documentation
+- `Mojo/` -- Mojo compiler sources, tests, and documentation
   - `docs/` -- You are here 👋. Main documentation for the Mojo compiler; links
     out to the other docs.
-    - `docs/manual/` -- intro docs, written assuming no prior Mojo compiler
+    - `compiler/manual/` -- intro docs, written assuming no prior Mojo compiler
       knowledge; for newcomers to the compiler team, or folks making drive-by
       contributions.
-    - `docs/overviews/` -- subsystem and cross-cutting behavior overviews, for
-      those more familiar with the compiler.
-      `docs/arcana/` -- more detailed docs, diving deep into nuanced behavior;
-      useful for someone trying to debug the compiler, this has the vital hidden
-      clues.
-    - `docs/attic/` -- older compiler docs, that capture prior thinking and
+    - `compiler/overviews/` -- subsystem and cross-cutting behavior overviews,
+      for those more familiar with the compiler.
+    - `compiler/arcana/` -- more detailed docs, diving deep into nuanced
+      behavior; useful for someone trying to debug the compiler, this has
+      the vital hidden clues.
+    - `compiler/attic/` -- older compiler docs, that capture prior thinking and
       behavior. Occasionally useful to consult when doing code archeology.
   - `lib/` -- C++ sources for the Mojo compiler _libraries_, including parser,
     passes, MLIR dialects, and related tooling (e.g. debugger), etc.
