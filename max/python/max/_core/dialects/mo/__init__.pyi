@@ -340,6 +340,71 @@ class CompositeDistributedAllgatherRmsNormOp(max._core.Operation):
         self, arg: max._core.dialects.builtin.IntegerAttr, /
     ) -> None: ...
 
+class CompositeDistributedAllgatherRmsNormQuantMxfp6Op(max._core.Operation):
+    """
+    The MXFP6 sibling of
+    `mo.composite.distributed.allgather_rms_norm_quant_mxfp8`. It is a separate
+    op rather than an encoding attribute on that one because the result shapes
+    differ: MXFP6 packs four six-bit codes into three bytes, so `outQuant` is
+    `ui8` with `[rows, cols * 3 / 4]`, three quarters the normed width, where
+    the MXFP8 op's quantized result is a same-shaped float8.
+
+    `outScale` is unchanged from the MXFP8 op: `float8_e8m0fnu`,
+    `[rows, cols / 32]`, plain rank-2 row-major -- what
+    `block_scaled_matmul_amd` takes as `a_scales`, NOT the SM100 SF-atom
+    interleave and NOT the preshuffled atom order
+    `block_scaled_matmul_amd_preb` requires. Quantized from the bf16 written to
+    `output`, so byte-identical to a standalone quantize. Same `group_size`
+    contract.
+
+    `fp6_format` selects the OCP encoding, 0 for E2M3 and 1 for E3M2. It has to
+    be carried explicitly: both encodings are six bits and arrive packed as
+    `ui8`, so the result type cannot record which one the bytes hold.
+    """
+
+    def __init__(
+        self,
+        builder: max._core.OpBuilder,
+        location: Location,
+        output: Sequence[max._core.Type],
+        out_quant: Sequence[max._core.Type],
+        out_scale: Sequence[max._core.Type],
+        out_residual: Sequence[max._core.Type],
+        out_chain: ChainType,
+        inputs: Sequence[max._core.Value[max._core.Type]],
+        signal_buffers: Sequence[max._core.Value[max._core.Type]],
+        gamma: Sequence[max._core.Value[max._core.Type]],
+        epsilon: Sequence[max._core.Value[max._core.Type]],
+        weight_offset: Sequence[max._core.Value[max._core.Type]],
+        in_chain: max._core.Value[ChainType],
+        group_size: max._core.dialects.builtin.IntegerAttr,
+        fp6_format: max._core.dialects.builtin.IntegerAttr,
+    ) -> None: ...
+    @property
+    def inputs(self) -> Sequence[max._core.Value[max._core.Type]]: ...
+    @property
+    def signal_buffers(self) -> Sequence[max._core.Value[max._core.Type]]: ...
+    @property
+    def gamma(self) -> Sequence[max._core.Value[max._core.Type]]: ...
+    @property
+    def epsilon(self) -> Sequence[max._core.Value[max._core.Type]]: ...
+    @property
+    def weight_offset(self) -> Sequence[max._core.Value[max._core.Type]]: ...
+    @property
+    def in_chain(self) -> max._core.Value[ChainType]: ...
+    @property
+    def group_size(self) -> int: ...
+    @group_size.setter
+    def group_size(
+        self, arg: max._core.dialects.builtin.IntegerAttr, /
+    ) -> None: ...
+    @property
+    def fp6_format(self) -> int: ...
+    @fp6_format.setter
+    def fp6_format(
+        self, arg: max._core.dialects.builtin.IntegerAttr, /
+    ) -> None: ...
+
 class CompositeDistributedAllgatherRmsNormQuantMxfp8Op(max._core.Operation):
     """
     `mo.composite.distributed.allgather_rms_norm` plus an MXFP8 copy of the

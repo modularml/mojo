@@ -36,6 +36,15 @@ from linalg.block_scaled_quantization import (
     quantize_mx_amd,
     quantize_mxfp8_lane_group,
 )
+from linalg.fp6_quantization import (
+    quantize_mxfp6_amd,
+    quantize_mxfp6_lane_group,
+)
+from linalg.fp6_utils import (
+    FP6Format,
+    MXFP6_SF_VECTOR_SIZE,
+    pack_fp6_x4,
+)
 from linalg.fp4_utils import MXFP8_SF_VECTOR_SIZE
 from comm.lamport import Lamport
 from max.gpu import WARP_SIZE
@@ -1685,6 +1694,320 @@ struct DistributedAllGatherRMSNormQuantMXFP8:
 
                 quantize_mx_amd(
                     dev_ctxs[index], quant_buf, scale_buf, normed_buf
+                )
+
+            _dispatch_ag_norm_quant[
+                two_launch_with_quant=two_launch_with_quant,
+                quant_epilogue=mx_epilogue,
+                domain_id=domain_id,
+            ](
+                in_tensors,
+                normed_buf,
+                sum_buf,
+                gamma_tensor,
+                epsilon,
+                weight_offset,
+                rank_sigs,
+                dev_ctxs[index],
+                local_rank=local_rank,
+            )
+
+        _launch_device_collective[num_devices](
+            launch_fused_ag_norm_quant, dev_ctxs.copy()
+        )
+
+
+@extensibility.register(
+    "mo.composite.distributed.allgather_rms_norm_quant_mxfp6"
+)
+struct DistributedAllGatherRMSNormQuantMXFP6:
+    """Registers `mo.composite.distributed.allgather_rms_norm_quant_mxfp6`."""
+
+    @staticmethod
+    def execute[
+        dtype: DType,
+        quant_dtype: DType,
+        scales_dtype: DType,
+        rank: Int,
+        target: StaticString,
+        _trace_name: StaticString,
+        fp6_format: Int,
+        group_size: Int = 0,
+    ](
+        outputs_normed: OutputVariadicTensors[dtype=dtype, rank=rank, ...],
+        outputs_quant: OutputVariadicTensors[dtype=quant_dtype, rank=rank, ...],
+        outputs_scale: OutputVariadicTensors[
+            dtype=scales_dtype, rank=rank, ...
+        ],
+        outputs_residual: OutputVariadicTensors[dtype=dtype, rank=rank, ...],
+        inputs: InputVariadicTensors[dtype=dtype, rank=rank, ...],
+        signal_buffers: MutableInputVariadicTensors[
+            dtype=DType.uint8, rank=1, ...
+        ],
+        gammas: InputVariadicTensors[dtype=dtype, rank=1, ...],
+        epsilons: InputVariadicTensors[dtype=DType.float32, ...],
+        weight_offsets: InputVariadicTensors[dtype=dtype, ...],
+        dev_ctxs_input: DeviceContextArray,
+    ) capturing raises:
+        """Fused all-gather + RMSNorm that also emits a packed MXFP6 copy.
+
+        `DistributedAllGatherRMSNorm` plus `outputs_quant`/`outputs_scale`. The
+        quantize rides the collective's epilogue on the same bf16 that lands in
+        `outputs_normed`, so it is byte-identical to a standalone quantize.
+
+        Parameters:
+            dtype: Element type of the bf16 input/normed/residual tensors.
+            quant_dtype: Packed element type (`uint8`, four FP6 codes per
+                three bytes).
+            scales_dtype: Block-scale element type (`float8_e8m0fnu`).
+            rank: Tensor rank of the inputs and outputs.
+            target: Target device string for tracing.
+            _trace_name: Trace name for profiling.
+            fp6_format: FP6 encoding, 0 for E2M3 and 1 for E3M2.
+            group_size: Devices per independent all-gather group; see
+                `DistributedAllGatherRMSNorm`.
+
+        Args:
+            outputs_normed: Per-device normed output (the group's gathered
+                `[rows, cols]`, replicated within the group).
+            outputs_quant: Per-device packed MXFP6 copy of `outputs_normed`,
+                `[rows, cols * 3 // 4]`.
+            outputs_scale: Per-device E8M0 block scales, `[rows, cols / 32]`.
+            outputs_residual: Per-device gathered residual.
+            inputs: Per-device input row-shards to gather.
+            signal_buffers: Per-device synchronization buffers.
+            gammas: Per-device RMSNorm gamma weights.
+            epsilons: Per-device RMSNorm epsilon scalars (float32).
+            weight_offsets: Per-device gamma offset scalars.
+            dev_ctxs_input: Device contexts for participating GPUs.
+
+        Limitations:
+            - Targets AMD (CDNA4): the fallback calls `quantize_mx_amd` and
+              the scale layout is its rank-2 one -- what
+              `block_scaled_matmul_amd` takes as `a_scales`, not the SM100 SF
+              atom and not the preshuffled order the `_preb` kernel needs.
+            - Maximum of 8 GPUs; requires P2P.
+        """
+        comptime num_devices = inputs.size
+        comptime assert signal_buffers.size == num_devices, (
+            "expected allgather_rms_norm_quant_mxfp8 inputs and signal buffers"
+            " to have the same number of elements"
+        )
+        comptime assert group_size >= 2, "group_size must be at least 2"
+        comptime assert (
+            num_devices % group_size == 0
+        ), "group_size must evenly divide the number of devices"
+        comptime assert quant_dtype == .uint8, (
+            "MXFP6 quant output must be uint8 (four packed codes per three"
+            " bytes)"
+        )
+        comptime assert (
+            scales_dtype == .float8_e8m0fnu
+        ), "MXFP6 block scales must be float8_e8m0fnu"
+
+        _check_signal_buffer_size(signal_buffers[0].size(), 0)
+
+        comptime assert fp6_format in (
+            0,
+            1,
+        ), "fp6_format must be 0 (E2M3) or 1 (E3M2)"
+        comptime fp6_fmt = FP6Format.E2M3 if fp6_format == 0 else FP6Format.E3M2
+        var dev_ctxs = dev_ctxs_input.filter_gpu_contexts[num_devices]()
+
+        @always_inline
+        def launch_fused_ag_norm_quant[
+            index: Int
+        ]() raises {
+            imm inputs,
+            imm signal_buffers,
+            imm dev_ctxs,
+            imm gammas,
+            imm epsilons,
+            imm weight_offsets,
+            imm outputs_normed,
+            imm outputs_quant,
+            imm outputs_scale,
+            imm outputs_residual,
+        }:
+            comptime group_id, local_rank = divmod(index, group_size)
+            comptime group_start = group_id * group_size
+            comptime domain_id = 0 if group_size == num_devices else group_size
+
+            comptime InputTensorType = type_of(
+                inputs[group_start].to_tile_tensor[.int64]().as_immut()
+            )
+            var in_tensors = Array[InputTensorType, group_size](
+                uninitialized=True
+            )
+            var rank_sigs = Array[
+                UnsafePointer[Signal, MutAnyOrigin], MAX_GPUS
+            ](uninitialized=True)
+
+            comptime for i in range(group_size):
+                in_tensors[i] = rebind[InputTensorType](
+                    inputs[group_start + i].to_tile_tensor[.int64]().as_immut()
+                )
+                rank_sigs[i] = (
+                    signal_buffers[group_start + i]
+                    ._ptr.bitcast[Signal]()
+                    .as_unsafe_any_origin()
+                )
+
+            var normed_buf = outputs_normed[index].to_tile_tensor[.int64]()
+            var quant_buf = outputs_quant[index].to_tile_tensor[.int64]()
+            var scale_buf = outputs_scale[index].to_tile_tensor[.int64]()
+            var sum_buf = outputs_residual[index].to_tile_tensor[.int64]()
+            var gamma_tensor = gammas[index].to_tile_tensor[.int64]()
+            var epsilon = epsilons[index].unsafe_ptr()[]
+            var weight_offset = weight_offsets[index].unsafe_ptr()[]
+            var cols_rt = Int(sum_buf.dim[rank - 1]())
+
+            var rows_rt = Int(normed_buf.num_elements()) // cols_rt
+            var quant_cols = Int(quant_buf.dim[rank - 1]())
+            var packed_cols = (cols_rt * 3) // 4
+            if (
+                cols_rt % 4 != 0
+                or quant_cols != packed_cols
+                or Int(quant_buf.num_elements()) != rows_rt * packed_cols
+            ):
+                raise Error(
+                    String(
+                        "allgather_rms_norm_quant_mxfp6: outputs_quant is ",
+                        Int(quant_buf.num_elements()) // quant_cols,
+                        " x ",
+                        quant_cols,
+                        ", expected ",
+                        rows_rt,
+                        " x ",
+                        packed_cols,
+                        " (normed cols * 3 / 4)",
+                    )
+                )
+            var scale_cols = Int(scale_buf.dim[rank - 1]())
+            if (
+                scale_cols * MXFP6_SF_VECTOR_SIZE != cols_rt
+                or Int(scale_buf.num_elements()) != rows_rt * scale_cols
+            ):
+                raise Error(
+                    String(
+                        "allgather_rms_norm_quant_mxfp6: outputs_scale is ",
+                        Int(scale_buf.num_elements()) // scale_cols,
+                        " x ",
+                        scale_cols,
+                        ", expected ",
+                        rows_rt,
+                        " x ",
+                        cols_rt // MXFP6_SF_VECTOR_SIZE,
+                        " (normed cols / ",
+                        MXFP6_SF_VECTOR_SIZE,
+                        ")",
+                    )
+                )
+
+            # `@__copy_capture` REQUIRED: any local this closure reads but does
+            # not list reaches the device as a host-stack pointer and faults.
+            @__copy_capture(quant_buf, scale_buf, cols_rt)
+            @__parameter
+            @always_inline
+            def mx_epilogue[
+                width: Int
+            ](row: Int, col: Int, val: SIMD[dtype, width]):
+                comptime assert width % 4 == 0, (
+                    "packed FP6 addresses groups of four codes, so a thread's"
+                    " slice must be a whole number of groups"
+                )
+                var codes: SIMD[.uint8, width]
+                var e8m0: Scalar[scales_dtype]
+                codes, e8m0 = quantize_mxfp6_lane_group[
+                    scales_dtype,
+                    fp6_fmt,
+                    SF_VECTOR_SIZE=MXFP6_SF_VECTOR_SIZE,
+                ](val)
+                if col < cols_rt:
+                    var byte_col = (col * 3) // 4
+                    comptime for g in range(width // 4):
+                        var word = pack_fp6_x4(codes.slice[4, offset=g * 4]())
+                        comptime for b in range(3):
+                            quant_buf.raw_store[width=1](
+                                quant_buf.layout(
+                                    Coord(row, byte_col + g * 3 + b)
+                                ),
+                                rebind[Scalar[quant_dtype]](
+                                    UInt8(
+                                        (word >> UInt32(8 * b)) & UInt32(0xFF)
+                                    )
+                                ),
+                            )
+                    if col % MXFP6_SF_VECTOR_SIZE == 0:
+                        scale_buf.raw_store(
+                            scale_buf.layout(
+                                Coord(row, col // MXFP6_SF_VECTOR_SIZE)
+                            ),
+                            e8m0,
+                        )
+
+            @__parameter
+            @always_inline
+            def two_launch_with_quant() raises:
+                var base = rebind[UnsafePointer[Scalar[dtype], MutAnyOrigin]](
+                    sum_buf._storage
+                )
+                comptime OutViewType = type_of(
+                    TileTensor(base, row_major(cols_rt, cols_rt))
+                )
+                var out_views = Array[OutViewType, group_size](
+                    uninitialized=True
+                )
+                var row_off = 0
+                comptime for i in range(group_size):
+                    var len_i = Int(in_tensors[i].num_elements()) // cols_rt
+                    out_views[i] = TileTensor(
+                        base + row_off * cols_rt,
+                        row_major(len_i, cols_rt),
+                    )
+                    row_off += len_i
+
+                allgather[dtype=dtype, ngpus=group_size, domain_id=domain_id](
+                    in_tensors,
+                    out_views,
+                    rank_sigs,
+                    dev_ctxs[index],
+                    local_rank,
+                )
+
+                @__copy_capture(sum_buf)
+                @__parameter
+                @always_inline
+                def norm_input_fn[
+                    width: Int
+                ](coords: Coord) -> SIMD[dtype, width]:
+                    return sum_buf.raw_load[width=width](sum_buf.layout(coords))
+
+                @__copy_capture(normed_buf)
+                @__parameter
+                @always_inline
+                def norm_output_fn[
+                    width: SIMDLength, alignment: Int
+                ](coords: Coord, val: SIMD[dtype, width]) -> None:
+                    normed_buf.raw_store[width=width, alignment=alignment](
+                        normed_buf.layout(coords), val
+                    )
+
+                rms_norm_gpu[
+                    rank,
+                    norm_input_fn,
+                    norm_output_fn,
+                    multiply_before_cast=True,
+                ](
+                    sum_buf.layout.shape_coord(),
+                    gamma_tensor,
+                    epsilon,
+                    weight_offset,
+                    dev_ctxs[index],
+                )
+
+                quantize_mxfp6_amd[fp6_fmt](
+                    dev_ctxs[index], quant_buf, scale_buf, normed_buf.as_immut()
                 )
 
             _dispatch_ag_norm_quant[

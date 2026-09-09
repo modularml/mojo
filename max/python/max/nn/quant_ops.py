@@ -240,6 +240,49 @@ def _matmul_float6_mxfp6(
     )
 
 
+def _matmul_float6_mxfp6_prequantized(
+    x_fp6: TensorValue,
+    x_scales: TensorValue,
+    weight: TensorValue,
+    weight_scale: TensorValue,
+    fp6_format: str,
+) -> TensorValue:
+    """Computes the MXFP6 matmul from an already-quantized activation.
+
+    :func:`_matmul_float6_mxfp6` minus the dynamic quantize, and the MXFP6
+    counterpart of :func:`_matmul_float8_mxfp8_prequantized`. Single owner for
+    the operand order, scale layout and output dtype, so callers that produce
+    the ``(data, scales)`` pair themselves -- the MSA attention op that fuses
+    the quantize into its split-K combine -- cannot drift from the
+    self-quantizing path.
+
+    Args:
+        x_fp6: The activation as packed FP6 ``uint8``, shape
+            ``[M, K * 3 // 4]``: four six-bit codes per three bytes.
+        x_scales: The activation's E8M0 block scales, rank-2 ``[M, K // 32]``.
+        weight: The weight as packed FP6 ``uint8``, shape ``[N, K * 3 // 4]``.
+        weight_scale: The E8M0 weight scales, rank-2 ``[N, K // 32]`` as loaded
+            from the checkpoint.
+        fp6_format: The FP6 encoding both operands hold.
+
+    Returns:
+        The output tensor in bf16, shape ``[M, N]``.
+    """
+    if not _is_amd_gpu():
+        raise ValueError(
+            "MXFP6 requires the AMD CDNA4 block-scaled MFMA (gfx950); no other "
+            "target implements a 6-bit block-scaled matmul"
+        )
+    return dynamic_block_scaled_matmul_mxfp6(
+        x_fp6,
+        weight,
+        x_scales,
+        weight_scale.to(x_fp6.device),
+        fp6_format=fp6_format,
+        out_type=DType.bfloat16,
+    )
+
+
 def _matmul_float8_mxfp8(
     x: TensorValue,
     weight: TensorValue,
@@ -860,15 +903,14 @@ def quantized_fused_qkv_index_matmul(
                 "the fused MXFP6 QKV+IndexQK matmul is CDNA4-only"
             )
         if prequantized is not None:
-            raise NotImplementedError(
-                "MXFP6 has no prequantized-activation producer for this path"
+            x_fp6, x_scales = prequantized
+        else:
+            x_fp6, x_scales = quantize_dynamic_block_scaled_mxfp6(
+                x,
+                fp6_format=quant_config.mxfp6_format,
+                scales_type=DType.float8_e8m0fnu,
+                out_type=DType.uint8,
             )
-        x_fp6, x_scales = quantize_dynamic_block_scaled_mxfp6(
-            x,
-            fp6_format=quant_config.mxfp6_format,
-            scales_type=DType.float8_e8m0fnu,
-            out_type=DType.uint8,
-        )
         return _fused_qkv_index_ragged_matmul_scaled_mxfp6(
             kv_params=kv_params,
             index_kv_params=index_kv_params,

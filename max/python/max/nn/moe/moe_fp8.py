@@ -113,7 +113,6 @@ class MoEQuantized(MoE):
             and uses_mx_ep_token_format(
                 self.ep_batch_manager.config, self.quant_config
             )
-            and not self.quant_config.is_mxfp6
             and self.quant_config.block_scaled_preshuffled_b
         )
 
@@ -377,7 +376,8 @@ class MoEQuantized(MoE):
         # The up-proj reads its A-scale from the dispatched tokens, which
         # `ep_wait` wrote in slot layout when the fusion is on.
         up_a_scales_preshuffled = (
-            isinstance(strategy, BlockScaledStrategy) and mxfp4_ep_scale_fusion
+            isinstance(strategy, (BlockScaledStrategy, Mxfp6Strategy))
+            and mxfp4_ep_scale_fusion
         )
         # Local SwiGLU down-proj A-scale fold: fold the down scale into the matmul
         # slot layout, dropping the standalone preshuffle. Independent of the

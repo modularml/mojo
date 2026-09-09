@@ -34,6 +34,9 @@ from .constant import constant
 from .utils import _buffer_values, _tensor_values
 
 # Mirrors the kernels' `MXFP8_SF_VECTOR_SIZE`: elements per MX block scale.
+_FP6_FORMAT_CODE = {"e2m3": 0, "e3m2": 1}
+"""OCP FP6 encodings, in the order the kernel's `fp6_format` parameter takes."""
+
 _MX_SF_VECTOR_SIZE = 32
 
 
@@ -352,6 +355,141 @@ def allgather_rms_norm_quant_mxfp8(
         weight_offsets,
         in_chain,
         IntegerAttr(IntegerType(64), group_size),
+    )
+
+    graph._update_chain(out_chain)
+    for device in devices:
+        graph.device_chains[device] = out_chain
+
+    normed = [res.tensor for res in results[0 * num_devices : 1 * num_devices]]
+    quant = [res.tensor for res in results[1 * num_devices : 2 * num_devices]]
+    scales = [res.tensor for res in results[2 * num_devices : 3 * num_devices]]
+    residual = [res.tensor for res in results[3 * num_devices :]]
+    return normed, quant, scales, residual
+
+
+def allgather_rms_norm_quant_mxfp6(
+    inputs: Iterable[TensorValueLike],
+    signal_buffers: Iterable[BufferValueLike],
+    gammas: Iterable[TensorValueLike],
+    epsilon: float,
+    weight_offset: float = 0.0,
+    group_size: int | None = None,
+    fp6_format: str = "e2m3",
+) -> tuple[
+    list[TensorValue], list[TensorValue], list[TensorValue], list[TensorValue]
+]:
+    """:obj:`allgather_rms_norm` that also emits a packed MXFP6 copy of the norm.
+
+    The quantize rides the collective's epilogue on the same bfloat16 written to
+    the normed output, so the pair is byte-identical to a standalone quantize.
+    Scales are the plain ``[rows, cols / 32]`` row-major layout
+    ``block_scaled_matmul_amd`` takes as ``a_scales`` -- not the SM100 SF-atom
+    interleave, and NOT what ``block_scaled_matmul_amd_preb`` needs: same dtype
+    and element count, permuted bytes, so it dequants wrongly without erroring.
+
+    Args:
+        inputs: The input row shards to gather, one per device.
+        signal_buffers: Device buffer values used for synchronization.
+        gammas: RMSNorm gamma weights, one per device.
+        epsilon: Numerical stability epsilon for RMSNorm.
+        weight_offset: Constant offset added to ``gammas``.
+        group_size: Devices per independent gather group; defaults to all.
+        fp6_format: OCP FP6 encoding to produce, ``e2m3`` or ``e3m2``. Carried
+            explicitly because both are six bits and arrive packed as
+            ``uint8``, so the result type cannot record which one it holds.
+
+    Returns:
+        ``(normed, quantized, scales, residual)``, each a per-device list.
+        ``quantized`` is ``uint8`` holding four packed FP6 codes per three
+        bytes, so its last dim is three quarters the normed one, and ``scales``
+        is ``float8_e8m0fnu`` with its last dim divided by 32.
+
+    Raises:
+        ValueError: If ``fp6_format`` is not a known encoding, if the hidden
+            dim is not a static multiple of 32 (which also makes it a multiple
+            of the four-code packing group), or on any condition
+            :obj:`allgather_rms_norm` rejects.
+    """
+    inputs, signal_buffers, gammas, devices, num_devices, group_size = (
+        _validate_ag_rms_norm(inputs, signal_buffers, gammas, group_size)
+    )
+    input_dtype = inputs[0].dtype
+
+    graph = Graph.current
+
+    normed_types: list[TensorType] = []
+    quant_types: list[TensorType] = []
+    scale_types: list[TensorType] = []
+    residual_types: list[TensorType] = []
+    for dev_idx, device in enumerate(devices):
+        group_start = (dev_idx // group_size) * group_size
+        group_inputs = inputs[group_start : group_start + group_size]
+        gathered_dim = group_inputs[0].shape[0]
+        for t in group_inputs[1:]:
+            gathered_dim = gathered_dim + t.shape[0]
+        full_shape = list(group_inputs[0].shape)
+        full_shape[0] = gathered_dim
+
+        cols = full_shape[-1]
+        if (
+            not isinstance(cols, StaticDim)
+            or int(cols) % _MX_SF_VECTOR_SIZE != 0
+        ):
+            raise ValueError(
+                "allgather_rms_norm_quant_mxfp6 requires a static hidden dim "
+                f"that is a multiple of {_MX_SF_VECTOR_SIZE} (one block "
+                f"scale's worth); got {cols}."
+            )
+        scale_shape = list(full_shape)
+        scale_shape[-1] = Dim(int(cols) // _MX_SF_VECTOR_SIZE)
+
+        normed_types.append(
+            TensorType(dtype=input_dtype, shape=full_shape, device=device)
+        )
+        packed_shape = list(full_shape)
+        packed_shape[-1] = Dim(int(cols) * 3 // 4)
+        quant_types.append(
+            TensorType(dtype=DType.uint8, shape=packed_shape, device=device)
+        )
+        scale_types.append(
+            TensorType(
+                dtype=DType.float8_e8m0fnu, shape=scale_shape, device=device
+            )
+        )
+        residual_types.append(
+            TensorType(dtype=input_dtype, shape=full_shape, device=device)
+        )
+
+    if fp6_format not in _FP6_FORMAT_CODE:
+        raise ValueError(
+            f"unknown FP6 encoding {fp6_format!r}; expected one of "
+            f"{sorted(_FP6_FORMAT_CODE)}"
+        )
+
+    cpu = DeviceRef.CPU()
+    eps_const = constant(epsilon, DType.float32, cpu)
+    weight_offset_const = constant(weight_offset, input_dtype, cpu)
+    epsilons = [eps_const] * num_devices
+    weight_offsets = [weight_offset_const] * num_devices
+
+    in_chain = graph.device_chains.merge_for(devices)
+
+    *results, out_chain = graph._add_op_generated(
+        mo.CompositeDistributedAllgatherRmsNormQuantMxfp6Op,
+        normed_types,
+        quant_types,
+        scale_types,
+        residual_types,
+        _ChainType(),
+        inputs,
+        signal_buffers,
+        gammas,
+        epsilons,
+        weight_offsets,
+        in_chain,
+        IntegerAttr(IntegerType(64), group_size),
+        IntegerAttr(IntegerType(64), _FP6_FORMAT_CODE[fp6_format]),
     )
 
     graph._update_chain(out_chain)
