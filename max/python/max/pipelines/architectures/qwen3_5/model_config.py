@@ -418,6 +418,7 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
         *,
         weights_size: int,
         device_memory_utilization: float,
+        extra_per_request_bytes: int = 0,
     ) -> int:
         """Return a memory-safe default `max_batch_size` for this architecture.
 
@@ -433,8 +434,17 @@ class Qwen3_5Config(Llama3Config, ArchConfigWithVisionCache):
 
         Falls back to 32—safe for the 27B model on H100/A100 (80 GB)—when
         the device query fails.
+
+        Args:
+            devices: Loaded devices the model will run on.
+            weights_size: Estimated model weights size in bytes.
+            device_memory_utilization: Headroom factor.
+            extra_per_request_bytes: Per-request state the architecture holds
+                beyond the pool set this config declares -- a speculative
+                arch's shadow set, for one. Added to the divisor so the
+                inferred batch fits what will really be allocated.
         """
-        per_req = self._per_request_state_bytes()
+        per_req = self._per_request_state_bytes() + extra_per_request_bytes
         try:
             free_bytes = int(
                 sum(d.stats.get("free_memory", 0) for d in devices)

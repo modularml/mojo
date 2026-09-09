@@ -23,6 +23,7 @@ import extensibility
 
 from extensibility import InputTensor, OutputTensor
 from extensibility import _MutableInputTensor as MutableInputTensor
+from max.gpu import WARP_SIZE
 from max.gpu.host import DeviceContext
 
 from nn.attention.mha_operand import KVCacheMHAOperand
@@ -136,7 +137,7 @@ struct QSASparseAttentionRaggedPaged:
         out_dtype: DType,
         target: StaticString,
         group: Int,
-        threads: Int,
+        warps: Int,
         unroll: Int,
     ](
         output: OutputTensor[dtype=out_dtype, rank=3, ...],
@@ -160,7 +161,7 @@ struct QSASparseAttentionRaggedPaged:
             out_dtype: Element dtype of `output` (inferred).
             target: Compilation target.
             group: Query heads per kv head.
-            threads: Threads per CTA; must satisfy the kernel's divisibility
+            warps: Warps per CTA; must satisfy the kernel's divisibility
                 asserts.
             unroll: Gathered keys loaded before any is consumed.
 
@@ -185,6 +186,12 @@ struct QSASparseAttentionRaggedPaged:
         comptime num_kv_heads = Int(kv_blocks.static_spec.shape_tuple[4])
         comptime head_dim = Int(kv_blocks.static_spec.shape_tuple[5])
         comptime num_q_heads = group * num_kv_heads
+
+        # The caller picks a warp count, not a thread count: the kernel tiles
+        # heads over `THREADS // WARP_SIZE` warps, so a width fixed at wave-32
+        # halves the warps on a wave-64 arch and a warp's heads then straddle
+        # a kv head. The wave size is only known here, against the target.
+        comptime threads = warps * WARP_SIZE
 
         if q.dim_size(1) != num_q_heads or q.dim_size(2) != head_dim:
             raise Error(

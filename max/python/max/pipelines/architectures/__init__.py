@@ -395,6 +395,24 @@ def register_all_models() -> None:
     except ModuleNotFoundError:
         pass
 
+    # Optional: import the Qwen4-Exp model if available.
+    try:
+        from qwen4_exp import qwen4_exp_arch  # type: ignore[import-not-found]
+
+        PIPELINE_REGISTRY.register(qwen4_exp_arch)
+    except ModuleNotFoundError:
+        pass
+
+    # Optional: import the unified Qwen4-Exp + MTP model if available.
+    try:
+        from unified_mtp_qwen4_exp import (  # type: ignore[import-not-found]
+            unified_mtp_qwen4_exp_arch,
+        )
+
+        PIPELINE_REGISTRY.register(unified_mtp_qwen4_exp_arch)
+    except ModuleNotFoundError:
+        pass
+
     # Optional: import the MiniMax-M3 model if available.
     try:
         from minimax_m3 import minimax_m3_arch  # type: ignore[import-not-found]
