@@ -18,6 +18,7 @@ from std.math import align_up, ceildiv, clamp
 
 from layout import (
     Idx,
+    TensorEngine,
     TensorLayout,
     TileTensor,
     row_major,
@@ -67,10 +68,17 @@ def apply_mask_kernel[
     VLLayoutType: TensorLayout,
     vl_origin: ImmOrigin,
     CLLayoutType: TensorLayout,
+    ScoresEngine: TensorEngine,
+    VLEngine: TensorEngine,
+    CLEngine: TensorEngine,
 ](
-    output: TileTensor[.float32, ScoresLayoutType, scores_origin],
-    valid_length: TileTensor[.uint32, VLLayoutType, vl_origin],
-    cache_lengths: TileTensor[.uint32, CLLayoutType, ImmutAnyOrigin],
+    output: TileTensor[
+        .float32, ScoresLayoutType, scores_origin, Engine=ScoresEngine
+    ],
+    valid_length: TileTensor[.uint32, VLLayoutType, vl_origin, Engine=VLEngine],
+    cache_lengths: TileTensor[
+        .uint32, CLLayoutType, ImmutAnyOrigin, Engine=CLEngine
+    ],
     mask: mask_t,
     max_num_keys: Int32,
 ):
@@ -83,6 +91,9 @@ def apply_mask_kernel[
         VLLayoutType: Layout of the `valid_length` tensor.
         vl_origin: Origin of the `valid_length` tensor.
         CLLayoutType: Layout of the `cache_lengths` tensor.
+        ScoresEngine: Engine policy of the `output` scores tensor.
+        VLEngine: Engine policy of the `valid_length` tensor.
+        CLEngine: Engine policy of the `cache_lengths` tensor.
 
     Args:
         output: Score matrix with row stride `max_num_keys`, indexed as
@@ -94,6 +105,9 @@ def apply_mask_kernel[
         mask: The mask instance applied to each score coordinate.
         max_num_keys: Row stride of `output` and maximum keys per token.
     """
+    comptime assert output.element_size == 1
+    comptime assert valid_length.element_size == 1
+    comptime assert cache_lengths.element_size == 1
     var batch_idx = block_idx.x
     var seq_idx = block_idx.y * 16 + thread_idx.x
     var key_idx = block_idx.z * 16 + thread_idx.y
@@ -127,13 +141,19 @@ def fill_invalid_topk_kernel[
     IROLayoutType: TensorLayout,
     iro_origin: ImmOrigin,
     cache_lengths_layout: TensorLayout,
+    IROEngine: TensorEngine,
+    CacheLengthsEngine: TensorEngine,
     use_causal_mask: Bool,
     kpool: Int = 1,
 ](
     output_indices: UnsafePointer[Int32, MutAnyOrigin],
     topk_indices: UnsafePointer[Int32, MutAnyOrigin],
-    input_row_offsets: TileTensor[.uint32, IROLayoutType, iro_origin],
-    cache_lengths: TileTensor[.uint32, cache_lengths_layout, ImmutAnyOrigin],
+    input_row_offsets: TileTensor[
+        .uint32, IROLayoutType, iro_origin, Engine=IROEngine
+    ],
+    cache_lengths: TileTensor[
+        .uint32, cache_lengths_layout, ImmutAnyOrigin, Engine=CacheLengthsEngine
+    ],
     total_seq_len: Int32,
     top_k: Int32,
     effective_k: Int32,
@@ -160,6 +180,8 @@ def fill_invalid_topk_kernel[
         IROLayoutType: Layout of the `input_row_offsets` tensor.
         iro_origin: Origin of the `input_row_offsets` tensor.
         cache_lengths_layout: Layout of the `cache_lengths` tensor.
+        IROEngine: Engine policy of the `input_row_offsets` tensor.
+        CacheLengthsEngine: Engine policy of the `cache_lengths` tensor.
         use_causal_mask: Whether each token is restricted to keys up to
             its own position.
         kpool: Tokens per pooled cache row. `1` scores one row per token;
@@ -182,6 +204,8 @@ def fill_invalid_topk_kernel[
         effective_k: Row stride of `topk_indices` and the actual number of
             computed selections, `min(top_k, max_num_keys)`.
     """
+    comptime assert input_row_offsets.element_size == 1
+    comptime assert cache_lengths.element_size == 1
     comptime assert cache_lengths.flat_rank == 1
 
     var _total_seq_len = Int(total_seq_len)
@@ -249,12 +273,18 @@ def topk_row_bounds_kernel[
     IROLayoutType: TensorLayout,
     iro_origin: ImmOrigin,
     cache_lengths_layout: TensorLayout,
+    IROEngine: TensorEngine,
+    CacheLengthsEngine: TensorEngine,
     use_causal_mask: Bool,
     kpool: Int = 1,
 ](
     row_bounds: UnsafePointer[Int32, MutAnyOrigin],
-    input_row_offsets: TileTensor[.uint32, IROLayoutType, iro_origin],
-    cache_lengths: TileTensor[.uint32, cache_lengths_layout, ImmutAnyOrigin],
+    input_row_offsets: TileTensor[
+        .uint32, IROLayoutType, iro_origin, Engine=IROEngine
+    ],
+    cache_lengths: TileTensor[
+        .uint32, cache_lengths_layout, ImmutAnyOrigin, Engine=CacheLengthsEngine
+    ],
     total_seq_len: Int32,
     max_num_keys: Int32,
 ):
@@ -274,6 +304,8 @@ def topk_row_bounds_kernel[
         IROLayoutType: Layout of the `input_row_offsets` tensor.
         iro_origin: Origin of the `input_row_offsets` tensor.
         cache_lengths_layout: Layout of the `cache_lengths` tensor.
+        IROEngine: Engine policy of the `input_row_offsets` tensor.
+        CacheLengthsEngine: Engine policy of the `cache_lengths` tensor.
         use_causal_mask: Whether each token is restricted to keys up to its
             own position.
         kpool: Tokens per pooled cache row. `1` scores one row per token;
@@ -290,6 +322,8 @@ def topk_row_bounds_kernel[
         max_num_keys: Row stride of the scores buffer (upper bound on any
             row's key count).
     """
+    comptime assert input_row_offsets.element_size == 1
+    comptime assert cache_lengths.element_size == 1
     comptime assert cache_lengths.flat_rank == 1
 
     var token_idx = Int(block_idx.x) * Int(block_dim.x) + Int(thread_idx.x)
@@ -493,6 +527,8 @@ def mla_indexer_ragged_float8_paged[
             input_row_offsets.LayoutType,
             ImmOrigin(input_row_offsets.origin),
             type_of(cache_lengths).LayoutType,
+            type_of(input_row_offsets.as_immut()).Engine,
+            type_of(cache_lengths).Engine,
             use_causal_mask,
             kpool,
         ]
@@ -643,6 +679,9 @@ def mla_indexer_ragged_float8_paged[
                         input_row_offsets.LayoutType,
                         ImmOrigin(input_row_offsets.origin),
                         type_of(cache_lengths).LayoutType,
+                        scores_tile.Engine,
+                        type_of(input_row_offsets.as_immut()).Engine,
+                        type_of(cache_lengths).Engine,
                     ]
 
                     ctx.enqueue_function[mask_kernel](
@@ -695,6 +734,8 @@ def mla_indexer_ragged_float8_paged[
         input_row_offsets.LayoutType,
         ImmOrigin(input_row_offsets.origin),
         type_of(cache_lengths).LayoutType,
+        type_of(input_row_offsets.as_immut()).Engine,
+        type_of(cache_lengths).Engine,
         use_causal_mask,
         kpool,
     ]

@@ -446,7 +446,12 @@ struct AttentionRDNA[
         start_tok_idx: UInt32,
         head_idx: UInt32,
         kv_tile_num_rows: UInt32,
-    ) -> TileTensor[operand_t.dtype, Self.KvTileLayout, ImmutAnyOrigin]:
+    ) -> TileTensor[
+        operand_t.dtype,
+        Self.KvTileLayout,
+        ImmutAnyOrigin,
+        Engine=operand_t.Engine,
+    ]:
         return operand.block_paged_tile[Int(Self.BN)](
             batch_idx,
             start_tok_idx,

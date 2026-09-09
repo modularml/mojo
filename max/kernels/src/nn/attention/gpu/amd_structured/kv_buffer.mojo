@@ -102,7 +102,10 @@ struct KVCacheIterator[
         ].element_types,
     ]
     comptime GmemTileType = TileTensor[
-        Self.cache_t.dtype, Self.GmemTileLayout, ImmutAnyOrigin
+        Self.cache_t.dtype,
+        Self.GmemTileLayout,
+        ImmutAnyOrigin,
+        Engine=Self.cache_t.Engine,
     ]
 
     var cache: Self.cache_t
@@ -1005,10 +1008,7 @@ struct DecodeStreamingKVBuffer[
     @always_inline
     def load_from_dram[
         strip_idx: Int
-    ](
-        self,
-        gmem_tile: TileTensor[Self.kv_t.dtype, Engine=DefaultEngine[], ...],
-    ):
+    ](self, gmem_tile: TileTensor[Self.kv_t.dtype, ...],):
         """Load one BK-wide strip from an external DRAM tile to SMEM.
 
         K (transpose=True): columns [strip*BK, (strip+1)*BK] from BN x depth.

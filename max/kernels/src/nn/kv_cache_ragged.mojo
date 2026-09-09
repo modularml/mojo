@@ -3285,6 +3285,7 @@ def _unfused_qkv_matmul_ragged_paged_gguf_quantized_impl[
         kv_collection.kv_params,
         kv_collection.page_size,
         kv_collection.blocks_origin,
+        kv_collection.blocks_tt_type.Engine,
         kv_collection.cache_lengths_origin,
         kv_collection.lookup_table_origin,
         kv_collection.scales_origin,

@@ -1697,7 +1697,7 @@ struct SubTileLoaderLDS[
     @always_inline
     def __init__(
         out self,
-        gmem_tile: TileTensor[Self.dtype, Engine=DefaultEngine[], ...],
+        gmem_tile: TileTensor[Self.dtype, ...],
     ):
         """Create a loader from a DRAM tile.
 
@@ -2001,7 +2001,7 @@ struct SubTileLoaderLDS_st_8x32[
     @always_inline
     def __init__(
         out self,
-        gmem_tile: TileTensor[Self.dtype, Engine=DefaultEngine[], ...],
+        gmem_tile: TileTensor[Self.dtype, ...],
     ):
         """Create a loader from a DRAM tile.
 

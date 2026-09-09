@@ -30,6 +30,8 @@ from max.gpu.memory import (
     cp_async_bulk_tensor_shared_cluster_global_elect,
 )
 from layout import (
+    DefaultEngine,
+    TensorEngine,
     ComptimeInt,
     Coord,
     CoordLike,
@@ -1270,11 +1272,26 @@ trait KVCacheT(DevicePassable, TrivialRegisterPassable):
     """
 
     comptime dtype: DType
+    comptime Engine: TensorEngine
     comptime kv_params: KVCacheStaticParams
     comptime page_size_: Int
     comptime scale_dtype: DType
     comptime quantization_enabled: Bool = False
     comptime quantization_granularity: Int = 1
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int,
+    ](
+        self,
+        batch_idx: Int,
+        start_tok_idx: Int,
+        head_idx: Int,
+        head_dim_idx: Int = 0,
+    ) -> Self.Engine.StorageType[
+        Self.dtype, MutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        ...
 
     def cache_lengths_nd(
         self,
@@ -1705,6 +1722,7 @@ struct ContinuousBatchingKVCache[
     comptime blocks_tt_type = TileTensor[
         Self.dtype, Self.blocks_tt_layout, Self.blocks_origin
     ]
+    comptime Engine: TensorEngine = DefaultEngine[element_width=1]
 
     comptime cache_lengths_tt_layout = _1d_tt_layout
     comptime cache_lengths_tt_type = TileTensor[
@@ -2042,7 +2060,7 @@ struct ContinuousBatchingKVCache[
             swizzle_mode,
             fold_chunks=fold_chunks,
             row_major=row_major,
-        ](ctx, self.blocks._storage, Int(rows))
+        ](ctx, self.blocks.ptr, Int(rows))
 
     @always_inline
     def create_gather4_tma_tile[
@@ -2106,7 +2124,7 @@ struct ContinuousBatchingKVCache[
             l2_promotion=l2_promotion,
         ](
             ctx,
-            self.blocks._storage.bitcast[Scalar[tma_dtype]](),
+            self.blocks.ptr.bitcast[Scalar[tma_dtype]](),
             self.num_kv_rows(),
         )
 
@@ -2181,10 +2199,52 @@ struct ContinuousBatchingKVCache[
         var full_block_idx = self._get_idx_tuple(
             block_idx, head_idx, start_tok_idx, head_dim_idx
         )
-        var offset_ptr = self.blocks._storage + Int(
+        var offset_ptr = self.blocks.ptr + Int(
             self.blocks.layout(full_block_idx)
         )
         return offset_ptr.as_unsafe_any_origin()
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int,
+    ](
+        self,
+        batch_idx: Int,
+        start_tok_idx: Int,
+        head_idx: Int,
+        head_dim_idx: Int = 0,
+    ) -> Self.Engine.StorageType[
+        Self.dtype, MutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        """Offsets the blocks handle to a block through the engine.
+
+        Parameters:
+            tile_size: Tile size in rows (unused; kept for trait parity).
+
+        Args:
+            batch_idx: Batch index of the request.
+            start_tok_idx: Starting token index within the batch.
+            head_idx: KV head index.
+            head_dim_idx: Index along the head dimension (defaults to 0).
+
+        Returns:
+            The blocks storage handle advanced to the block.
+        """
+        var block_idx = Int(self.lookup_table[batch_idx])
+        var full_block_idx = self._get_idx_tuple(
+            block_idx, head_idx, start_tok_idx, head_dim_idx
+        )
+        return rebind[
+            Self.Engine.StorageType[
+                Self.dtype, MutAnyOrigin, AddressSpace.GENERIC
+            ]
+        ](
+            self.blocks._offset_storage(
+                Scalar[Self.blocks_tt_type.linear_idx_type](
+                    Int(self.blocks.layout(full_block_idx))
+                )
+            )
+        )
 
     @always_inline
     def scales_block_paged_ptr(
@@ -2223,6 +2283,7 @@ struct PagedKVCache[
     kv_params_: KVCacheStaticParams,
     page_size: Int,
     blocks_origin: MutOrigin,
+    blocks_engine: TensorEngine,
     cache_lengths_origin: ImmOrigin,
     lookup_table_origin: ImmOrigin,
     scales_origin: MutOrigin,
@@ -2244,6 +2305,7 @@ struct PagedKVCache[
         kv_params_: The kv-cache static parameters.
         page_size: The size of the page.
         blocks_origin: Origin of the KV cache blocks buffer.
+        blocks_engine: Engine policy of the KV cache blocks buffer.
         cache_lengths_origin: Origin of the cache lengths buffer.
         lookup_table_origin: Origin of the lookup table buffer.
         scales_origin: Origin of the quantization scales buffer.
@@ -2296,8 +2358,12 @@ struct PagedKVCache[
         ].element_types,
     ]
     comptime blocks_tt_type = TileTensor[
-        Self.dtype, Self.blocks_tt_layout, Self.blocks_origin
+        Self.dtype,
+        Self.blocks_tt_layout,
+        Self.blocks_origin,
+        Engine=Self.blocks_engine,
     ]
+    comptime Engine: TensorEngine = Self.blocks_engine
 
     comptime cache_lengths_tt_layout = _1d_tt_layout
     comptime cache_lengths_tt_type = TileTensor[
@@ -2759,7 +2825,7 @@ struct PagedKVCache[
             swizzle_mode,
             fold_chunks=fold_chunks,
             row_major=row_major,
-        ](ctx, self.blocks._storage, Int(rows))
+        ](ctx, self.blocks.ptr, Int(rows))
 
     @always_inline
     def create_index_scale_tma_tile[
@@ -2873,7 +2939,7 @@ struct PagedKVCache[
             l2_promotion=l2_promotion,
         ](
             ctx,
-            self.blocks._storage.bitcast[Scalar[tma_dtype]](),
+            self.blocks.ptr.bitcast[Scalar[tma_dtype]](),
             self.num_kv_rows(),
         )
 
@@ -2919,7 +2985,7 @@ struct PagedKVCache[
         )
         # Offset past the FP8 content to reach the BF16 rope data,
         # then reinterpret the pointer as BF16.
-        var rope_ptr = (self.blocks._storage + padded_depth).bitcast[BFloat16]()
+        var rope_ptr = (self.blocks.ptr + padded_depth).bitcast[BFloat16]()
         comptime smem_dim = IndexList[3](BN, 1, BK)
         comptime gmem_dim = IndexList[3](
             UNKNOWN_VALUE,
@@ -2962,7 +3028,7 @@ struct PagedKVCache[
         reinterprets as BF16, and creates a gather4 TMA descriptor whose row
         stride is the full row width in BF16 elements.
         """
-        var rope_ptr = (self.blocks._storage + padded_depth).bitcast[BFloat16]()
+        var rope_ptr = (self.blocks.ptr + padded_depth).bitcast[BFloat16]()
         return create_tma_tile_gather4[
             DType.bfloat16,
             tile_height=tile_height,
@@ -3270,8 +3336,59 @@ struct PagedKVCache[
             batch_idx, head_idx, start_tok_idx, head_dim_idx
         )
 
-        var ptr = self.blocks._storage + Int(self.blocks.layout(full_block_idx))
+        var ptr = self.blocks.ptr + Int(self.blocks.layout(full_block_idx))
         return ptr.as_unsafe_any_origin()
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int
+    ](
+        self,
+        batch_idx: Int,
+        start_tok_idx: Int,
+        head_idx: Int,
+        head_dim_idx: Int = 0,
+    ) -> Self.blocks_engine.StorageType[
+        Self.dtype, MutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        """Offsets the blocks handle to a paged block through the engine.
+
+        The pointer-returning `block_paged_ptr` drops the engine, so callers
+        that need an engine-carrying tile take this instead.
+
+        Parameters:
+            tile_size: Tile size in rows used to compute the paged block.
+
+        Args:
+            batch_idx: Batch index of the request.
+            start_tok_idx: Starting token index within the batch.
+            head_idx: KV head index.
+            head_dim_idx: Index along the head dimension (defaults to 0).
+
+        Returns:
+            The blocks storage handle advanced to the paged block.
+        """
+        comptime assert (
+            tile_size <= Self.page_size and Self.page_size % tile_size == 0
+        ), (
+            "Invalid tile size for PagedKVCache. tile_size must be less"
+            " than or equal to the page size and divisible by the page size"
+        )
+
+        var full_block_idx = self._get_idx(
+            batch_idx, head_idx, start_tok_idx, head_dim_idx
+        )
+        return rebind[
+            Self.blocks_engine.StorageType[
+                Self.dtype, MutAnyOrigin, AddressSpace.GENERIC
+            ]
+        ](
+            self.blocks._offset_storage(
+                Scalar[Self.blocks_tt_type.linear_idx_type](
+                    Int(self.blocks.layout(full_block_idx))
+                )
+            )
+        )
 
     @always_inline
     def scales_block_paged_ptr(
@@ -3485,7 +3602,7 @@ struct ContinuousBatchingKVCacheCollection[
                 Self.CacheType.blocks_tt_layout,
                 4,
             ](
-                self.blocks._storage + offset,
+                self.blocks.ptr + offset,
                 self.kv_cache_dynamic_shape,
                 self.kv_cache_dynamic_strides,
             ),
@@ -3530,6 +3647,7 @@ struct PagedKVCacheCollection[
         Self.kv_params,
         Self.page_size,
         Self.blocks_origin,
+        Self.blocks_tt_type.Engine,
         Self.cache_lengths_origin,
         Self.lookup_table_origin,
         Self.scales_origin,
@@ -3813,7 +3931,7 @@ struct PagedKVCacheCollection[
                 Self.CacheType.blocks_tt_layout,
                 4,
             ](
-                self.blocks._storage + blocks_offset,
+                self.blocks.ptr + blocks_offset,
                 self.kv_cache_dynamic_shape,
                 self.kv_cache_dynamic_strides,
             ),

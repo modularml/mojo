@@ -66,10 +66,25 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
     """This serves as the trait to support arguments to our MHA kernel."""
 
     comptime dtype: DType
+    comptime Engine: TensorEngine
     comptime scale_dtype: DType
     comptime page_size: Int
     comptime quantization_enabled: Bool = False
     comptime quantization_granularity: Int
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int,
+    ](
+        self,
+        batch_idx: UInt32,
+        start_tok_idx: UInt32,
+        head_idx: UInt32,
+        head_dim_idx: UInt32 = 0,
+    ) -> Self.Engine.StorageType[
+        Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        ...
 
     # TODO: change this to return a LayoutTensor once MOCO-1471 is fixed
     @always_inline
@@ -96,7 +111,7 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
         head_idx: UInt32,
         layout_val: layout_t,
         head_dim_idx: UInt32 = 0,
-    ) -> TileTensor[Self.dtype, layout_t, ImmutAnyOrigin]:
+    ) -> TileTensor[Self.dtype, layout_t, ImmutAnyOrigin, Engine=Self.Engine]:
         """Wraps block_paged_ptr in a TileTensor with the caller's layout.
 
         Parameters:
@@ -113,11 +128,13 @@ trait MHAOperand(DevicePassable, TrivialRegisterPassable):
                 layout.
             head_dim_idx: Index along the head dimension (defaults to 0).
         """
-        return TileTensor[Self.dtype, layout_t, ImmutAnyOrigin](
-            ptr=self.block_paged_ptr[tile_size](
+        return TileTensor[
+            Self.dtype, layout_t, ImmutAnyOrigin, Engine=Self.Engine
+        ](
+            self.block_paged_storage[tile_size](
                 batch_idx, start_tok_idx, head_idx, head_dim_idx
             ),
-            layout=layout_val,
+            layout_val,
         )
 
     @always_inline
@@ -424,6 +441,7 @@ struct KVCacheMHAOperand[
     comptime quantization_granularity = Self.cache_t.quantization_granularity
     var cache: Self.cache_t
 
+    comptime Engine: TensorEngine = Self.cache_t.Engine
     comptime device_type: AnyType = Self
 
     def _to_device_type(
@@ -450,6 +468,31 @@ struct KVCacheMHAOperand[
     ) -> UnsafePointer[Scalar[Self.dtype], ImmutAnyOrigin]:
         return self.cache.block_paged_ptr[tile_size](
             Int(batch_idx), Int(start_tok_idx), Int(head_idx), Int(head_dim_idx)
+        )
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int,
+    ](
+        self,
+        batch_idx: UInt32,
+        start_tok_idx: UInt32,
+        head_idx: UInt32,
+        head_dim_idx: UInt32 = 0,
+    ) -> Self.Engine.StorageType[
+        Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        return rebind[
+            Self.Engine.StorageType[
+                Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+            ]
+        ](
+            self.cache.block_paged_storage[tile_size](
+                Int(batch_idx),
+                Int(start_tok_idx),
+                Int(head_idx),
+                Int(head_dim_idx),
+            )
         )
 
     @always_inline
@@ -791,6 +834,7 @@ struct KVCacheScalesMHAOperand[
     comptime quantization_granularity = Self.cache_t.quantization_granularity
     var cache: Self.cache_t
 
+    comptime Engine: TensorEngine = DefaultEngine[element_width=1]
     comptime device_type: AnyType = Self
 
     def _to_device_type(
@@ -818,6 +862,31 @@ struct KVCacheScalesMHAOperand[
         # Forward to scales_block_paged_ptr instead of block_paged_ptr
         return self.cache.scales_block_paged_ptr(
             Int(batch_idx), Int(start_tok_idx), Int(head_idx), Int(head_dim_idx)
+        )
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int,
+    ](
+        self,
+        batch_idx: UInt32,
+        start_tok_idx: UInt32,
+        head_idx: UInt32,
+        head_dim_idx: UInt32 = 0,
+    ) -> Self.Engine.StorageType[
+        Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        return rebind[
+            Self.Engine.StorageType[
+                Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+            ]
+        ](
+            self.cache.scales_block_paged_ptr(
+                Int(batch_idx),
+                Int(start_tok_idx),
+                Int(head_idx),
+                Int(head_dim_idx),
+            )
         )
 
     @always_inline
@@ -1128,6 +1197,7 @@ struct LayoutTensorMHAOperand[
         Self.scale_origin,
         Engine=Self.scale_buffer_engine,
     ]
+    comptime Engine: TensorEngine = Self.buffer_engine
     comptime device_type: AnyType = Self
 
     def _to_device_type(
@@ -1180,6 +1250,41 @@ struct LayoutTensorMHAOperand[
             )
         )
         return ret_ptr.as_imm().as_unsafe_any_origin()
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int,
+    ](
+        self,
+        batch_idx: UInt32,
+        start_tok_idx: UInt32,
+        head_idx: UInt32,
+        head_dim_idx: UInt32 = 0,
+    ) -> Self.Engine.StorageType[
+        Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        return rebind[
+            Self.Engine.StorageType[
+                Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+            ]
+        ](
+            self.buffer._offset_storage(
+                Scalar[type_of(self.buffer).linear_idx_type](
+                    Int(
+                        self.buffer.layout[
+                            linear_idx_type=type_of(self.buffer).linear_idx_type
+                        ](
+                            Coord(
+                                Int(batch_idx),
+                                Int(start_tok_idx),
+                                Int(head_idx),
+                                Int(head_dim_idx),
+                            )
+                        )
+                    )
+                )
+            )
+        )
 
     @always_inline
     def scales_block_paged_ptr(
@@ -1495,6 +1600,7 @@ struct RaggedMHAOperand[
         .uint32, Self.cache_layout, Self.cache_origin
     ]
 
+    comptime Engine: TensorEngine = DefaultEngine[element_width=1]
     comptime device_type: AnyType = Self
 
     def _to_device_type(
@@ -1576,6 +1682,43 @@ struct RaggedMHAOperand[
             )
         )
         return ret_ptr.as_imm().as_unsafe_any_origin()
+
+    @always_inline
+    def block_paged_storage[
+        tile_size: Int,
+    ](
+        self,
+        batch_idx: UInt32,
+        start_tok_idx: UInt32,
+        head_idx: UInt32,
+        head_dim_idx: UInt32 = 0,
+    ) -> Self.Engine.StorageType[
+        Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+    ]:
+        var global_token_idx = Int(
+            self.cache_row_offsets[Int(batch_idx)] + start_tok_idx
+        )
+        return rebind[
+            Self.Engine.StorageType[
+                Self.dtype, ImmutAnyOrigin, AddressSpace.GENERIC
+            ]
+        ](
+            self.buffer._offset_storage(
+                Scalar[type_of(self.buffer).linear_idx_type](
+                    Int(
+                        self.buffer.layout[
+                            linear_idx_type=type_of(self.buffer).linear_idx_type
+                        ](
+                            Coord(
+                                global_token_idx,
+                                Int(head_idx),
+                                Int(head_dim_idx),
+                            )
+                        )
+                    )
+                )
+            )
+        )
 
     @always_inline
     def scales_block_paged_ptr(

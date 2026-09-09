@@ -24,7 +24,7 @@ from std.math.uutils import umod
 from std.sys import simd_width_of
 
 from max.gpu import lane_id, warp_id as get_warp_id
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from layout.tensor_core import TiledTensorCore
 from layout.tile_layout import row_major
 from layout.tile_tensor import stack_allocation as tt_stack_allocation
@@ -48,6 +48,7 @@ comptime RDNA_CD_FRAG_SIZE = 8
 struct KBufferRDNA[
     cache_dtype: DType,
     gmem_layout: TensorLayout,
+    Engine: TensorEngine,
     //,
     tensor_core_mma: TiledTensorCore,
     BN: Int,
@@ -136,7 +137,7 @@ struct KBufferRDNA[
     # DRAM tile + strip iterator state.
     @__allow_legacy_any_origin_fields
     var gmem_tile: TileTensor[
-        Self.cache_dtype, Self.gmem_layout, ImmutAnyOrigin
+        Self.cache_dtype, Self.gmem_layout, ImmutAnyOrigin, Engine=Self.Engine
     ]
     var strip_idx: Int
     var load_tile_id: Int
@@ -145,7 +146,10 @@ struct KBufferRDNA[
     def __init__(
         out self,
         gmem_tile: TileTensor[
-            Self.cache_dtype, Self.gmem_layout, ImmutAnyOrigin
+            Self.cache_dtype,
+            Self.gmem_layout,
+            ImmutAnyOrigin,
+            Engine=Self.Engine,
         ],
         shared_ptr: UnsafePointer[
             Scalar[Self.cache_dtype], MutAnyOrigin, address_space=.SHARED
@@ -252,6 +256,7 @@ struct KBufferRDNA[
 struct VBufferRDNA[
     cache_dtype: DType,
     gmem_layout: TensorLayout,
+    Engine: TensorEngine,
     //,
     tensor_core_mma: TiledTensorCore,
     BN: Int,
@@ -355,7 +360,7 @@ struct VBufferRDNA[
     # `strip_idx` over BK strips internally on each load_from_dram.
     @__allow_legacy_any_origin_fields
     var gmem_tile: TileTensor[
-        Self.cache_dtype, Self.gmem_layout, ImmutAnyOrigin
+        Self.cache_dtype, Self.gmem_layout, ImmutAnyOrigin, Engine=Self.Engine
     ]
     var strip_idx: Int
     var current_stage: Int
@@ -365,7 +370,10 @@ struct VBufferRDNA[
     def __init__(
         out self,
         gmem_tile: TileTensor[
-            Self.cache_dtype, Self.gmem_layout, ImmutAnyOrigin
+            Self.cache_dtype,
+            Self.gmem_layout,
+            ImmutAnyOrigin,
+            Engine=Self.Engine,
         ],
         shared_ptr: UnsafePointer[
             Scalar[Self.cache_dtype], MutAnyOrigin, address_space=.SHARED
@@ -624,10 +632,13 @@ struct QRegisterBufferRDNA[
 
     @always_inline
     def __init__[
-        q_layout: TensorLayout
+        q_layout: TensorLayout,
+        q_engine: TensorEngine,
     ](
         out self,
-        tensor: TileTensor[Self.dtype, q_layout, ImmutAnyOrigin],
+        tensor: TileTensor[
+            Self.dtype, q_layout, ImmutAnyOrigin, Engine=q_engine
+        ],
         valid_rows: Int,
     ):
         """Load each warp's Q sub-tile from DRAM into register MMA
@@ -635,6 +646,7 @@ struct QRegisterBufferRDNA[
 
         Parameters:
             q_layout: `TensorLayout` of the Q tensor in DRAM (inferred).
+            q_engine: `TensorEngine` of the Q tensor in DRAM (inferred).
 
         Args:
             tensor: DRAM Q tile in `q_layout`.

@@ -17,6 +17,7 @@ from kv_cache.types import (
     PagedKVCacheCollection,
 )
 from layout import (
+    DefaultEngine,
     IntTuple,
     Layout,
     LayoutTensor,
@@ -151,6 +152,7 @@ def test_paged_kv_cache_stride_is_unknown() raises:
         kv_params,
         16,
         MutUntrackedOrigin,
+        DefaultEngine[element_width=1],
         ImmUntrackedOrigin,
         ImmUntrackedOrigin,
         MutUntrackedOrigin,
@@ -338,6 +340,7 @@ def test_paged_kv_cache_quantization() raises:
         kv_params,
         16,
         MutUntrackedOrigin,
+        DefaultEngine[element_width=1],
         ImmUntrackedOrigin,
         ImmUntrackedOrigin,
         MutUntrackedOrigin,

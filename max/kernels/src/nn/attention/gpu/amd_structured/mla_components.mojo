@@ -598,10 +598,10 @@ struct MlaPrefillV2Core[config: MlaConfigV2]:
     def load_q[
         layout: TensorLayout
     ](
-        q_warp_2d: TileTensor[
-            Self.config.dtype, layout, Engine=DefaultEngine[], ...
-        ],
-    ) -> RegTile[Self.config.dtype, Self._Q_LAYOUT_MLA_T, MutUntrackedOrigin]:
+        q_warp_2d: TileTensor[Self.config.dtype, layout, ...],
+    ) -> RegTile[
+        Self.config.dtype, Self._Q_LAYOUT_MLA_T, MutUntrackedOrigin
+    ]:
         """Loads the warp's Q sub-tile at d_qk from gmem into the row_l
         register tile. Mirrors `MhaPrefillV2.load_q` but iterates
         `_NUM_Q_K_TILES = D_QK // MMA_K` K-dim base tiles instead of
@@ -676,9 +676,7 @@ struct MlaPrefillV2Core[config: MlaConfigV2]:
     def _load_q_and_scale_mla[
         layout: TensorLayout
     ](
-        q_warp_2d: TileTensor[
-            Self.config.dtype, layout, Engine=DefaultEngine[], ...
-        ],
+        q_warp_2d: TileTensor[Self.config.dtype, layout, ...],
         scale_log2e: Float32,
     ) -> RegTile[Self.config.dtype, Self._Q_LAYOUT_MLA_T, MutUntrackedOrigin]:
         """Loads Q (d_qk wide) and (when `Self.prescale_q` is True)

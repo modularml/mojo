@@ -21,7 +21,7 @@ from std.sys import simd_width_of, size_of
 
 from max.gpu import lane_id, WARP_SIZE
 from max.gpu.intrinsics import cvt_pk_fp8_f32_raw
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from layout.coord import Coord, ComptimeInt, Idx
 from layout.swizzle import Swizzle
 from layout.tile_layout import (
@@ -161,8 +161,14 @@ struct QRegisterBuffer[
 
     @always_inline
     def __init__[
-        q_tile_layout: TensorLayout
-    ](out self, q_tile: TileTensor[Self.dtype, q_tile_layout, ImmutAnyOrigin],):
+        q_tile_layout: TensorLayout,
+        q_tile_engine: TensorEngine,
+    ](
+        out self,
+        q_tile: TileTensor[
+            Self.dtype, q_tile_layout, ImmutAnyOrigin, Engine=q_tile_engine
+        ],
+    ):
         """Load Q tile from DRAM into registers via buffer_load intrinsics.
 
         Each warp loads its [WM, depth] sub-tile using col-major thread
@@ -172,6 +178,7 @@ struct QRegisterBuffer[
         Parameters:
             q_tile_layout: Compile-time `TensorLayout` of the input `q_tile`
                 DRAM tile.
+            q_tile_engine: `TensorEngine` of the input `q_tile` DRAM tile.
 
         Args:
             q_tile: The full Q tile as a DRAM TileTensor.
