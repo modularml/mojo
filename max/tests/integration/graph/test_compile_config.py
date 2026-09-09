@@ -17,7 +17,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from fusion_utils import xfail_under_adv_fusion
 from max.driver import Accelerator, Buffer, accelerator_api
 from max.dtype import DType
 from max.engine import InferenceSession, LogLevel
@@ -63,7 +62,6 @@ def test_compile_config_split_k_reduction_scheme(
     assert result == [2]
 
 
-@xfail_under_adv_fusion("compile error under the new fusion system")
 def test_compile_config_use_logger(
     capfd: pytest.CaptureFixture,  # type: ignore[type-arg]
     session: InferenceSession,
