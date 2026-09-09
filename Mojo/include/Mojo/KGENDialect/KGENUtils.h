@@ -101,8 +101,8 @@ bool isTypeExprType(Type type);
 /// Returns whether the given attribute is a KGEN type expression.
 bool isTypeExpr(TypedAttr attr);
 
-/// If `prop` asserts that its two operands denote the same value -- so that a
-/// consumer may substitute either one for the other -- return the pair.
+/// If `prop` is a binary `#kgen.param.identical` -- so that a consumer may
+/// substitute either operand for the other -- return the pair.
 std::optional<std::pair<TypedAttr, TypedAttr>>
 getIdentityProposition(TypedAttr prop);
 

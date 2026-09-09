@@ -39,7 +39,7 @@ def test_assert_with_message_parameter[x: Int]():
 
 # CHECK-LABEL: lit.fn @"test_assert_with_param_expr
 def test_assert_with_param_expr[x: Int, y: Int]():
-    # CHECK: kgen.param.assert <{{.*}}eq(:scalar<index> #lit.struct.extract<:!Int x, "_mlir_value">, #lit.struct.extract<:!Int y, "_mlir_value">))>, ""
+    # CHECK: kgen.param.assert <{{.*}}identical(:scalar<index> #lit.struct.extract<:!Int x, "_mlir_value">, #lit.struct.extract<:!Int y, "_mlir_value">))>, ""
     comptime assert x == y
 
 

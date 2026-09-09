@@ -32,7 +32,7 @@ kgen.generator @param_expr<p1, p2, int1: scalar<bool>, int2: scalar<bool>, p1_sc
   // CHECK: = kgen.param.constant = <to_builtin(:scalar<index> mul(from_builtin(p1), from_builtin(p2), 84))>
   %2 = kgen.param.constant = <mul(p1, 42, add(p2, p2))>
 
-  // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> eq(:scalar<index> from_builtin(p1), 42))>
+  // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> identical(:scalar<index> from_builtin(p1), 42))>
   %3 = kgen.param.constant: i1 = <to_builtin(:scalar<bool> eq(42, p1))>
 
   // CHECK: = kgen.param.constant: i1 = <0>
@@ -114,7 +114,7 @@ kgen.generator @param_expr<p1, p2, int1: scalar<bool>, int2: scalar<bool>, p1_sc
   // CHECK: = kgen.param.constant: scalar<bool> = <true>
   %36 = kgen.param.constant : scalar<bool> = <eq(:scalar<bool> int1, int1)>
 
-  // CHECK: = kgen.param.constant: scalar<bool> = <eq(:scalar<bool> int1, int2)>
+  // CHECK: = kgen.param.constant: scalar<bool> = <identical(:scalar<bool> int1, int2)>
   %37 = kgen.param.constant : scalar<bool> = <eq(:scalar<bool> int1, int2)>
 
   // CHECK: = kgen.param.constant = <apply(:(index) -> index fn, p1)>
@@ -156,18 +156,18 @@ kgen.generator @param_expr<p1, p2, int1: scalar<bool>, int2: scalar<bool>, p1_sc
   // CHECK: kgen.param.constant: scalar<index> = <p1_scalar>
   kgen.param.constant :scalar<index> = <cond(eq(:scalar<index> p1_scalar, p2_scalar), p2_scalar, p1_scalar)>
 
-  // CHECK: kgen.param.constant: scalar<index> = <cond(eq(:scalar<index> p1_scalar, 1), 4, 5)>
+  // CHECK: kgen.param.constant: scalar<index> = <cond(identical(:scalar<index> p1_scalar, 1), 4, 5)>
   kgen.param.constant :scalar<index> = <cond(eq(:scalar<index> p1_scalar, 1), add(:scalar<index> p1_scalar, 3), 5)>
 
   // COM: Make sure both internal conditionals substitute into add(p1, p2)
-  // CHECK: kgen.param.constant: scalar<index> = <cond(eq(:scalar<index> p1_scalar, 1), 4, 5)>
+  // CHECK: kgen.param.constant: scalar<index> = <cond(identical(:scalar<index> p1_scalar, 1), 4, 5)>
   kgen.param.constant :scalar<index> = <cond(eq(:scalar<index> p1_scalar, 1), cond(eq(:scalar<index> p2_scalar, 3), add(:scalar<index> p1_scalar, p2_scalar), 4), 5)>
 
   // CHECK: kgen.param.constant: scalar<index> = <1>
   kgen.param.constant :scalar<index> = <cond(eq(:scalar<index> p1_scalar, 1), cond(eq(:scalar<index> p2_scalar, 2), cond(int1, p1_scalar, 1), 1), 1)>
 
   // COM: This hits the depth limit of recursion (3 ops deep max) but would be <1> if raised
-  // CHECK: kgen.param.constant: scalar<index> = <cond(eq(:scalar<index> p1_scalar, 1), cond(eq(:scalar<index> p2_scalar, 2), cond(int1, cond(not(int2), 0, 1), 1), 1), 1)>
+  // CHECK: kgen.param.constant: scalar<index> = <cond(identical(:scalar<index> p1_scalar, 1), cond(identical(:scalar<index> p2_scalar, 2), cond(int1, cond(not(int2), 0, 1), 1), 1), 1)>
   kgen.param.constant:scalar<index> = <cond(eq(:scalar<index> p1_scalar, 1), cond(eq(:scalar<index> p2_scalar, 2), cond(int1, cond(not(int2), 0, 1), 1), 1), 1)>
 
   // COM: None of the substitutions above may fire through a float `eq`, which
@@ -318,7 +318,7 @@ kgen.generator @eq_compare_anything() {
 
 // CHECK-LABEL: @eq_compare_sub_elements
 kgen.generator @eq_compare_sub_elements<a: !kgen.param_list<index>, b: !kgen.param_list<index>, x: index, y: index>() {
-  // CHECK-NEXT: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> and(eq(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<index> a>), 2), eq(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<index> b>), 2)))>
+  // CHECK-NEXT: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> and(identical(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<index> a>), 2), identical(:scalar<index> from_builtin(#kgen.param_list.size<:param_list<index> b>), 2)))>
   kgen.param.constant: i1 = <and(
     to_builtin(:scalar<bool> eq(:index #kgen.param_list.size<:!kgen.param_list<index> b>, 2)),
     to_builtin(:scalar<bool> eq(:index #kgen.param_list.size<:!kgen.param_list<index> a>, 2)),
@@ -476,15 +476,15 @@ kgen.generator @param_canonicalize<p1, p2>() {
 
   // Equality involving an unknown value stays symbolic: an unknown carries
   // no value, so neither attribute equality nor inequality decides it.
-  // CHECK: unknown: i1 = <to_builtin(:scalar<bool> eq(:scalar<index> from_builtin(p1), from_builtin(*?)))>
+  // CHECK: unknown: i1 = <to_builtin(:scalar<bool> identical(:scalar<index> from_builtin(p1), from_builtin(*?)))>
   kgen.param.declare unknown: i1 = <to_builtin(:scalar<bool> eq(*?, p1))>
   // CHECK: unknownEq: i1 = <to_builtin(:scalar<bool> identical(:dtype f32, *?))>
   kgen.param.declare unknownEq: i1 = <to_builtin(:scalar<bool> identical(:dtype *?, f32))>
   // CHECK: unknownEqItself: i1 = <to_builtin(:scalar<bool> identical(:dtype *?, *?))>
   kgen.param.declare unknownEqItself: i1 = <to_builtin(:scalar<bool> identical(:dtype *?, *?))>
-  // CHECK: unknownEqIndex: i1 = <to_builtin(:scalar<bool> eq(:scalar<index> from_builtin(*?), 1))>
+  // CHECK: unknownEqIndex: i1 = <to_builtin(:scalar<bool> identical(:scalar<index> from_builtin(*?), 1))>
   kgen.param.declare unknownEqIndex: i1 = <to_builtin(:scalar<bool> eq(*?, 1))>
-  // CHECK: unknownEqItselfIndex: i1 = <to_builtin(:scalar<bool> eq(:scalar<index> from_builtin(*?), from_builtin(*?)))>
+  // CHECK: unknownEqItselfIndex: i1 = <to_builtin(:scalar<bool> identical(:scalar<index> from_builtin(*?), from_builtin(*?)))>
   kgen.param.declare unknownEqItselfIndex: i1 = <to_builtin(:scalar<bool> eq(*?, *?))>
 
   // Make sure operand deduplication happens for nested operands too
@@ -724,7 +724,7 @@ lit.struct.decl @B {}
 
 // CHECK-LABEL: @symbol_exprs
 kgen.generator @symbol_exprs() {
-  // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> eq(:scalar<index> from_builtin(get_sizeof(!lit.struct<@A>, #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128>)), from_builtin(get_sizeof(!lit.struct<@B>, #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128>))))>
+  // CHECK: = kgen.param.constant: i1 = <to_builtin(:scalar<bool> identical(:scalar<index> from_builtin(get_sizeof(!lit.struct<@A>, #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128>)), from_builtin(get_sizeof(!lit.struct<@B>, #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128>))))>
   %0 = kgen.param.constant: i1 = <to_builtin(:scalar<bool> eq(:index get_sizeof(@A, #target),
                                   get_sizeof(@B, #target)))>
   kgen.return
@@ -1213,7 +1213,8 @@ kgen.generator @param_identical_float_reflexivity<f: scalar<f32>, i: scalar<inde
   // CHECK-NEXT: = kgen.param.constant: scalar<bool> = <eq(:scalar<f32> f, f)>
   kgen.param.constant: scalar<bool> = <eq(:scalar<f32> f, f)>
 
-  // COM: Int-like dtypes have no NaN, so `eq` stays reflexive there.
+  // COM: Int-like dtypes have no NaN, so scalar `eq` canonicalizes to
+  // COM: `identical` and is reflexive.
   // CHECK-NEXT: = kgen.param.constant: scalar<bool> = <true>
   kgen.param.constant: scalar<bool> = <eq(:scalar<index> i, i)>
 
@@ -1225,12 +1226,13 @@ kgen.generator @param_identical_float_reflexivity<f: scalar<f32>, i: scalar<inde
 
 // COM: Identity must not decide *distinct* numeric constants whose value depends
 // COM: on the target: 2^32 and 0 are the same value at 32-bit index width and
-// COM: different at 64-bit, so attribute inequality proves nothing. Both
-// COM: spellings defer here and settle during elaboration -- see
-// COM: @test_identical_index_32/_64 in kgen-elaborate/elaborate-pop-attrs.mlir.
+// COM: different at 64-bit, so attribute inequality proves nothing. Scalar
+// COM: int-like `eq` canonicalizes to `identical`, and both defer here until
+// COM: elaboration -- see @test_identical_index_32/_64 in
+// COM: kgen-elaborate/elaborate-pop-attrs.mlir.
 // CHECK-LABEL: @param_identical_index_defers
 kgen.generator @param_identical_index_defers() {
-  // CHECK-NEXT: = kgen.param.constant: scalar<bool> = <eq(:scalar<index> 4294967296, 0)>
+  // CHECK-NEXT: = kgen.param.constant: scalar<bool> = <identical(:scalar<index> 4294967296, 0)>
   kgen.param.constant: scalar<bool> = <eq(:scalar<index> 4294967296, 0)>
   // CHECK-NEXT: = kgen.param.constant: scalar<bool> = <identical(:scalar<index> 4294967296, 0)>
   kgen.param.constant: scalar<bool> = <identical(:scalar<index> 4294967296, 0)>

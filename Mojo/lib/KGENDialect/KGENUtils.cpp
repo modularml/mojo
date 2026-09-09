@@ -1619,6 +1619,27 @@ void KGEN::printParamValue(AsmPrinter &p, TypedAttr value, Type type) {
         }
       }
 
+      // Temporary back-compat: Scalar int-like `eq` canonicalizes to
+      // `param.identical`, so `not(identical)` of those operands is the same
+      // sugar as `ne`.
+      if (auto identical = dyn_cast<ParamIdenticalAttr>(expr.getOperand(0))) {
+        if (identical.getNumOperands() == 2) {
+          if (auto simdType =
+                  sugarDynCast<SIMDType>(identical.getOperand(0).getType())) {
+            std::optional<KGENDType> dtype = simdType.getResolvedDType();
+            if (dtype && dtype->isIntLike()) {
+              p << "ne(";
+              printColonTypeOrIndexPrefix(p, simdType);
+              llvm::interleaveComma(
+                  identical.getOperands(), p,
+                  [&](TypedAttr operand) { printParamValue(p, operand); });
+              p << ')';
+              return;
+            }
+          }
+        }
+      }
+
       // Otherwise, print as a generic "not".
       return printExpr("not", expr.getOperand(0));
     }
@@ -1726,27 +1747,13 @@ std::optional<std::pair<TypedAttr, TypedAttr>>
 KGEN::getIdentityProposition(TypedAttr prop) {
   // FIXME(MOCO-4577): a class of more than two is dropped rather than returning
   // every derived pair. That loses provability but stays sound.
-  if (auto identical = sugarDynCast<ParamIdenticalAttr>(prop))
-    if (identical.getNumOperands() == 2)
-      return std::make_pair(identical.getOperand(0), identical.getOperand(1));
-
-  auto op = sugarDynCast<ParamOperatorAttr>(prop);
-  if (!op || op.getOpcode() != POC::EQ || op.getOperands().size() != 2)
+  //
+  // Scalar int-like `eq` canonicalizes to `param.identical` at construction, so
+  // identity is spelled one way.
+  auto identical = sugarDynCast<ParamIdenticalAttr>(prop);
+  if (!identical || identical.getNumOperands() != 2)
     return std::nullopt;
-
-  // A lane-wise `eq` answers identity only where the two coincide, which rules
-  // out floats: IEEE equality holds between values that are not
-  // interchangeable (`+0.0` and `-0.0`) and fails between a value and itself
-  // (NaN). An unresolved dtype might still turn out to be a float.
-  Type operandType = op.getOperand(0).getType();
-  if (auto simdType = sugarDynCast<SIMDType>(operandType)) {
-    std::optional<KGENDType> dtype = simdType.getResolvedDType();
-    if (!dtype || !dtype->isIntLike())
-      return std::nullopt;
-  } else if (!operandType.isIntOrIndex()) {
-    return std::nullopt;
-  }
-  return std::make_pair(op.getOperand(0), op.getOperand(1));
+  return std::make_pair(identical.getOperand(0), identical.getOperand(1));
 }
 
 KGEN::EnvAttr KGEN::getModularEnvAttr(MLIRContext *ctx,
