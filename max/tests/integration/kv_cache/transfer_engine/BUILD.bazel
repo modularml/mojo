@@ -95,6 +95,16 @@ modular_py_test(
 )
 
 modular_py_test(
+    name = "test_rdma_alignment",
+    srcs = ["test_rdma_alignment.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/pipelines/kv_cache",
+    ],
+)
+
+modular_py_test(
     name = "test_notification_latency",
     srcs = [
         "conftest.py",

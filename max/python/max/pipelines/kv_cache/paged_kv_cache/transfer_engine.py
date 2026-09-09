@@ -300,6 +300,50 @@ class TensorAgentMetadata(
     """Device ID for this tensor."""
 
 
+_AMD_RDMA_START_ALIGNMENT = 2 * 1024 * 1024
+_AMD_RDMA_ALIGNED_SIZE_FACTOR = 32
+
+
+def _check_rdma_start_alignment(
+    base_addr: int,
+    num_bytes: int,
+    device: Device,
+    agent_name: str,
+    group_index: int,
+) -> None:
+    """Rejects a VRAM region amdgpu cannot pin for RDMA.
+
+    ``amdgpu`` pins device memory for RDMA a 2 MiB page at a time, so
+    ``ibv_reg_mr`` refuses any region whose *start* is not 2 MiB aligned --
+    regardless of its length. NIXL surfaces that refusal as a bare
+    ``NIXL_ERR_BACKEND``, arbitrarily far into a serving run and with nothing
+    pointing at the allocator, so check the address up front instead.
+
+    Only regions the allocator was asked to align are checked.
+    ``MemoryManager`` grants the coarse start address to blocks of
+    ``_AMD_RDMA_ALIGNED_SIZE_FACTOR`` times the alignment and up
+    (``kLargeAllocSizeFactor`` in ``MemoryManager.h``). A KV cache group sits
+    far above that bar; the small buffers other callers register sit below it
+    and keep the device's plain 256-byte alignment by design, so there is no
+    missed promise to report for them.
+    """
+    aligned_size = _AMD_RDMA_START_ALIGNMENT * _AMD_RDMA_ALIGNED_SIZE_FACTOR
+    if (
+        device.api != "hip"
+        or num_bytes < aligned_size
+        or base_addr % _AMD_RDMA_START_ALIGNMENT == 0
+    ):
+        return
+    raise ValueError(
+        f"NIXL group {group_index} for agent {agent_name} starts at "
+        f"{base_addr:#x}, which is not aligned to "
+        f"{_AMD_RDMA_START_ALIGNMENT // (1024 * 1024)} MiB. AMD GPUs cannot "
+        "register a device memory region for RDMA unless its start address "
+        "is 2 MiB aligned, so this buffer must be allocated with that "
+        "alignment."
+    )
+
+
 @dataclass
 class TensorAgent:
     """Manages a single tensor and its associated NIXL agent for transfers.
@@ -418,9 +462,12 @@ class TensorAgent:
         # Register one memory region per group, uniformly.
         base_addrs: list[int] = []
         reg_dlists: list[nixl.RegistrationDescriptorList] = []
-        for tensor in tensors:
+        for group_index, tensor in enumerate(tensors):
             base_addr = tensor._data_ptr()
             num_bytes = tensor.num_elements * tensor.dtype.size_in_bytes
+            _check_rdma_start_alignment(
+                base_addr, num_bytes, device, agent_name, group_index
+            )
             reg_dlist = nixl.RegistrationDescriptorList(
                 type=memory_type,
                 descs=[(base_addr, num_bytes, device.id, "")],
