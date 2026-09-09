@@ -23,6 +23,7 @@ Submodules
    pipelines.diffusion
    pipelines.kv_cache
    pipelines.lib
+   pipelines.lib.arch_lookup
    pipelines.lib.interfaces
    pipelines.lib.log_probabilities
    pipelines.lib.registry

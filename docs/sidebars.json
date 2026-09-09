@@ -603,6 +603,17 @@
               "items": [
                 {
                   "type": "category",
+                  "label": "arch_lookup",
+                  "link": {
+                    "type": "doc",
+                    "id": "api/python/pipelines.lib.arch_lookup"
+                  },
+                  "items": [
+                    "__AUTOGEN:max.pipelines.lib.arch_lookup__"
+                  ]
+                },
+                {
+                  "type": "category",
                   "label": "interfaces",
                   "link": {
                     "type": "doc",

@@ -17,6 +17,7 @@ Submodules
 .. toctree::
    :maxdepth: 1
 
+   pipelines.lib.arch_lookup
    pipelines.lib.interfaces
    pipelines.lib.log_probabilities
 
