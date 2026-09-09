@@ -559,10 +559,10 @@ from std.testing import *
 comptime StringOrInt = Variant[String, Int]
 
 var a: StringOrInt = 1 # Initial value, 1
-assert_true(a.unsafe_get[Int]() == 1)
+assert_true(a[Int] == 1)
 
 a = "string" # Not an error, "string"
-assert_true(a.unsafe_get[String]() == "string")
+assert_true(a[String] == "string")
 ```
 
 ## Types and polymorphism: duck typing vs. traits

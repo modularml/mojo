@@ -216,11 +216,9 @@ def test_scoped() raises:
 
     comptime StringOrInt = Variant[String, Int]
     var a: StringOrInt = 1
-    if a.isa[Int]():
-        assert_true(a.unsafe_get[Int]() == 1)
+    assert_true(a[Int] == 1)
     a = "string"  # Not an error
-    if a.isa[String]():
-        assert_true(a.unsafe_get[String]() == "string")
+    assert_true(a[String] == "string")
 
 
 def test_mixed_types() raises:
@@ -236,10 +234,10 @@ def test_mixed_types() raises:
     #     print(item, end=" ")
     # print()  # Output: 42 3.14 hello True
     assert_true(
-        mixed_list[0].unsafe_get[Int]() == 42
-        and isclose(mixed_list[1].unsafe_get[Float64](), 3.14)
-        and mixed_list[2].unsafe_get[String]() == "hello"
-        and mixed_list[3].unsafe_get[Bool]() == True
+        mixed_list[0][Int] == 42
+        and isclose(mixed_list[1][Float64], 3.14)
+        and mixed_list[2][String] == "hello"
+        and mixed_list[3][Bool] == True
     )
 
 
