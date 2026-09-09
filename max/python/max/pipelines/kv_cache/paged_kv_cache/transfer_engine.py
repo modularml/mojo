@@ -261,7 +261,7 @@ def _resolve_remote_bytes_per_group(
 
     Raises unless the remote advertises exactly as many groups as the local
     engine has: connect() already enforces this (a full ``bytes_per_group``
-    equality check), so this is defense-in-depth, not the primary guard --
+    equality check), so this is defense-in-num_blocks, not the primary guard --
     fewer groups means there is no way to infer the remote's stride for a
     group it never advertised, and more groups would silently assume a
     positional-prefix correspondence that was never validated.

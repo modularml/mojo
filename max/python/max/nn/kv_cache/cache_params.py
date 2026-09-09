@@ -1878,7 +1878,7 @@ class MultiKVCacheParams(KVCacheParamInterface):
     :class:`MultiKVCacheParams` subtrees, so arbitrarily deep hierarchies
     are supported (e.g. ``{target: {sliding, mla}, draft: mha}``). The
     whole tree is consumed through the :class:`KVCacheParamInterface` —
-    callers never need to know the depth.
+    callers never need to know the num_blocks.
     """
 
     children: dict[str, KVCacheParamInterface]

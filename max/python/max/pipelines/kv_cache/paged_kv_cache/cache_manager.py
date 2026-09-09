@@ -386,7 +386,7 @@ class PagedKVCacheManager(PagedKVCacheManagerInterface):
         Computes the request's block hashes once and queries every replica's
         block manager read-only, without claiming the request or mutating any
         per-request state. Intended for prefix-aware data-parallel routing:
-        callers can compare replicas' hit depths (across the device, host,
+        callers can compare replicas' hit num_blocks (across the device, host,
         and disk tiers) before deciding which replica should serve the
         request.
 

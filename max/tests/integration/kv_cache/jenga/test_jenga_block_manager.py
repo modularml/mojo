@@ -34,6 +34,9 @@ from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
     KVLeafInfo,
     _PageCopy,
 )
+from max.pipelines.kv_cache.paged_kv_cache.kv_group_coordinator import (
+    KVGroupCoordinatorInterface,
+)
 from max.pipelines.request.base import RequestID
 
 FULL = "full"
@@ -844,7 +847,7 @@ def test_a_dropped_sliding_window_blocks_all_reuse() -> None:
 
     The full cache holds the whole prefix and the sliding one holds
     nothing, so there is no point both can resume from and the request starts
-    over. The full cache's depth cannot carry the sliding one: its blocks
+    over. The full cache's num_blocks cannot carry the sliding one: its blocks
     feed its own caches, and resuming on its strength would leave the sliding
     caches attending null pages where their window should be.
     """
@@ -1044,7 +1047,7 @@ def test_alphabet() -> None:
     assert len(bm.pools[0].prefix_caches[SLIDING]) == 5
 
     # Four blocks reused. The full cache still reaches I, but a resume point
-    # there needs a window the sliding cache no longer holds, and its depth
+    # there needs a window the sliding cache no longer holds, and its num_blocks
     # cannot stand in for one: the blocks below the resume point feed its own
     # caches, so recomputing from I would leave those queries reading nulls.
     ctx = make_ctx(num_tokens=len(alphabet))
@@ -1470,10 +1473,11 @@ def test_a_dummy_points_at_its_own_replica_null_page() -> None:
     dummy = make_ctx(num_tokens=1)
     bm.alloc_dummy(dummy, replica_idx=1)
 
-    assert (
-        bm._leaves[FULL].req_to_blocks[dummy.request_id][0]
-        is bm.pools[1].null_little_blocks[FULL]
-    )
+    # Identity, not the id: every replica's null page has the same id.
+    group = bm.groups[KVCacheGroupId.full()]
+    assert isinstance(group, KVGroupCoordinatorInterface)
+    row = group.blocks_of(dummy.request_id)
+    assert row[FULL][0] is bm.pools[1].null_little_blocks[FULL]
 
 
 def test_releasing_a_dummy_gives_nothing_back() -> None:

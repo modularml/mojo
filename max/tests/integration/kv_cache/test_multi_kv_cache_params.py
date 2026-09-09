@@ -547,7 +547,7 @@ class TestDeepTreeParallelism:
     def test_deep_tree_parallelism_propagated_to_deepest_node(
         self, n_devices: int, dp_degree: int
     ) -> None:
-        """Parallelism metadata must reach the deepest subtree (e, depth 4)."""
+        """Parallelism metadata must reach the deepest subtree (e, num_blocks 4)."""
         tp = n_devices // dp_degree
         root = _build_deep_tree(n_devices=n_devices, dp_degree=dp_degree)
         draft = root.children["draft"]

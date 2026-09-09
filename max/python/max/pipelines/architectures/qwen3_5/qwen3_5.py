@@ -491,14 +491,12 @@ class Qwen3_5(DistributedLogitsPostprocessMixin, Module):
     ) -> tuple[TensorValue, ...]:
         """Forward pass through the hybrid model.
 
-        The conv and recurrent state pools are mutable graph inputs;
-        per-linear-layer the slot-indexed SSM kernels read and write them in
-        place at slot ``slot_idx[batch_item]``. There are no per-layer state
-        graph outputs — the only graph outputs are the logits.
+        The state pools are mutable graph inputs the SSM kernels write in
+        place; the only graph outputs are the logits.
 
         Under tensor parallelism the hidden state is replicated on every
-        device while the heads are split, so each device carries pools sized
-        to its own share of the heads and its own copy of ``slot_idx``.
+        device while the heads are split, so each device's pools hold its own
+        share of the heads.
 
         Args:
             tokens: Input token IDs.
