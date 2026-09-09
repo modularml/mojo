@@ -62,6 +62,28 @@ class BaseDistribution(ABC):
         ...
 
     @classmethod
+    def from_distribution_parameter_or_raise(
+        cls, param: DistributionParameter
+    ) -> BaseDistribution:
+        """Parse a distribution parameter that the caller must supply.
+
+        Args:
+            param: An int or float, or a distribution string.
+
+        Returns:
+            A concrete distribution.
+
+        Raises:
+            ValueError: If ``param`` does not resolve to a distribution.
+        """
+        dist = cls.from_distribution_parameter(param)
+        if dist is None:
+            raise ValueError(
+                f"a resolved distribution is required; got {param!r}."
+            )
+        return dist
+
+    @classmethod
     def from_distribution_parameter(
         cls, param: DistributionParameter | None
     ) -> BaseDistribution | None:

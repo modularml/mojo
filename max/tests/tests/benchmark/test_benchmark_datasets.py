@@ -60,7 +60,7 @@ from max.benchmark.benchmark_shared.datasets.chat_judge import (
 
 # Import the module under test
 from max.benchmark.benchmark_shared.datasets.multiturn_distribution_fit import (
-    build_chat_samples_from_user_text_pool,
+    build_fitted_chat_samples,
     resolve_constant_delay_ms,
 )
 from max.benchmark.benchmark_shared.datasets.nemotron_opencode import (
@@ -1008,7 +1008,13 @@ def test_instruct_coder_multiturn_fit_distributions(
         for assistant in session.messages[1::2]:
             assert assistant.source == "assistant"
             assert assistant.num_tokens == 20
-            assert assistant.delay_until_next_message == 100.0
+        # Each reply carries the delay before the turn that follows it; the
+        # last reply has no such turn.
+        assert [m.delay_until_next_message for m in session.messages[1::2]] == [
+            100.0,
+            100.0,
+            None,
+        ]
         for user in session.messages[0::2]:
             assert user.source == "user"
             assert user.num_tokens == 80
@@ -1090,7 +1096,7 @@ def test_every_user_body_is_marked_distinct() -> None:
     turns_per_session = 2  # 10 total turns, pool only has 3 -> wraps
 
     with TokenizerPool(tok, loader=_fake_loader) as pool:
-        samples = build_chat_samples_from_user_text_pool(
+        samples = build_fitted_chat_samples(
             pool=pool,
             user_text_pool=pool_texts,
             num_sessions=num_sessions,
@@ -1129,6 +1135,33 @@ def test_every_user_body_is_marked_distinct() -> None:
         assert abs(user.num_tokens - target_in) <= 4
 
 
+def test_a_truncated_session_still_ends_without_a_delay() -> None:
+    """A truncated session's last reply carries no delay.
+
+    Truncation cuts the plan short, so the emitted last reply is not the
+    planned last one.
+    """
+    tok = _FakeTokenizer(model_max_length=200)
+    with TokenizerPool(tok, loader=_fake_loader) as pool:
+        samples = build_fitted_chat_samples(
+            pool=pool,
+            user_text_pool=["alpha body text", "beta body text"],
+            num_sessions=2,
+            num_turns="3",  # only turn 0 fits the context budget
+            input_len="80",
+            output_len="20",
+            delay_between_turns_dist="30000",
+            sys_prompt_ratio=0.0,
+            max_num_unique_sys_prompt=1,
+            shuffle_pool=False,
+            log_prefix="test",
+        )
+    assert samples.chat_sessions, "expected truncated-but-usable sessions"
+    for session in samples.chat_sessions:
+        assert session.messages[-1].source == "assistant"
+        assert session.messages[-1].delay_until_next_message is None
+
+
 def test_truncated_sessions_logged_once_in_aggregate(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -1145,7 +1178,7 @@ def test_truncated_sessions_logged_once_in_aggregate(
     )
     with caplog.at_level(logging.INFO, logger=module):
         with TokenizerPool(tok, loader=_fake_loader) as pool:
-            samples = build_chat_samples_from_user_text_pool(
+            samples = build_fitted_chat_samples(
                 pool=pool,
                 user_text_pool=pool_texts,
                 num_sessions=num_sessions,
@@ -1668,7 +1701,7 @@ def test_system_prefix_lands_on_the_first_turn_only() -> None:
     tok = _FakeTokenizer(model_max_length=50_000)
 
     with TokenizerPool(tok, loader=_fake_loader) as pool:
-        samples = build_chat_samples_from_user_text_pool(
+        samples = build_fitted_chat_samples(
             pool=pool,
             user_text_pool=[f"body-{i} " * 40 for i in range(20)],
             num_sessions=3,

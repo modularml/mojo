@@ -24,7 +24,7 @@ from ._hf_download import hf_hub_download_with_retry
 from ._tokenizer_pool import TokenizerPool
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
-from .multiturn_distribution_fit import build_chat_samples_from_user_text_pool
+from .multiturn_distribution_fit import build_fitted_chat_samples
 from .types import (
     ChatSamples,
     ChatSession,
@@ -214,12 +214,19 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
             random.shuffle(pairs)
 
         if fit_length_distributions:
-            assert num_turns is not None, "num_turns is required when fitting"
-            assert input_len is not None, "input_len is required when fitting"
-            assert output_len is not None, "output_len is required when fitting"
-            if pool is None:
+            if (
+                pool is None
+                or num_turns is None
+                or input_len is None
+                or output_len is None
+            ):
                 raise ValueError(
-                    "pool is required for InstructCoder fit-distributions multiturn"
+                    "pool, num_turns, input_len and output_len are required for"
+                    " InstructCoder fit-distributions multiturn; got"
+                    f" pool={pool!r},"
+                    f" num_turns={num_turns!r},"
+                    f" input_len={input_len!r},"
+                    f" output_len={output_len!r}."
                 )
             return self._gen_multiturn_sessions_from_distributions(
                 num_sessions=num_sessions,
@@ -302,7 +309,7 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
         min_output_len: int,
     ) -> ChatSamples:
         """Build multiturn sessions with sampled lengths (see ``gen_multiturn_sessions``)."""
-        return build_chat_samples_from_user_text_pool(
+        return build_fitted_chat_samples(
             pool=pool,
             user_text_pool=[p for p, _ in pairs],
             num_sessions=num_sessions,

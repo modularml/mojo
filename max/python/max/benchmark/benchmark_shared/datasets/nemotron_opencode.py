@@ -25,7 +25,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from ._tokenizer_pool import TokenizerPool
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
-from .multiturn_distribution_fit import build_chat_samples_from_user_text_pool
+from .multiturn_distribution_fit import build_fitted_chat_samples
 from .types import (
     ChatMessage,
     ChatSamples,
@@ -479,13 +479,19 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
         ``num_turns`` / ``input_len`` / ``output_len`` distributions.
         """
         if fit_length_distributions:
-            assert num_turns is not None, "num_turns required when fitting"
-            assert input_len is not None, "input_len required when fitting"
-            assert output_len is not None, "output_len required when fitting"
-            if pool is None:
+            if (
+                pool is None
+                or num_turns is None
+                or input_len is None
+                or output_len is None
+            ):
                 raise ValueError(
-                    "pool is required for nemotron-opencode "
-                    "fit-distributions multiturn"
+                    "pool, num_turns, input_len and output_len are required for"
+                    " nemotron-opencode fit-distributions multiturn; got"
+                    f" pool={pool!r},"
+                    f" num_turns={num_turns!r},"
+                    f" input_len={input_len!r},"
+                    f" output_len={output_len!r}."
                 )
             user_texts = self._collect_user_turn_texts(
                 enable_tool_calls=enable_tool_calls,
@@ -493,7 +499,7 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
             )
             if shuffle:
                 random.shuffle(user_texts)
-            return build_chat_samples_from_user_text_pool(
+            return build_fitted_chat_samples(
                 pool=pool,
                 user_text_pool=user_texts,
                 num_sessions=num_sessions,

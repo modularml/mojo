@@ -37,6 +37,7 @@ from .random import RandomBenchmarkDataset, SyntheticBenchmarkDataset
 from .registry import DATASET_REGISTRY, DatasetRegistryEntry
 from .sharegpt import ShareGPTBenchmarkDataset
 from .sonnet import SonnetBenchmarkDataset
+from .turn_profile import TurnProfile, TurnTargets
 from .types import (
     ChatSamples,
     ChatSession,
@@ -85,5 +86,7 @@ __all__ = [
     "SonnetBenchmarkDataset",
     "SyntheticBenchmarkDataset",
     "SyntheticPixelBenchmarkDataset",
+    "TurnProfile",
+    "TurnTargets",
     "VisionArenaBenchmarkDataset",
 ]

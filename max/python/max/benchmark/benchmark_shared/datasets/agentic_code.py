@@ -25,7 +25,7 @@ from ._hf_download import hf_hub_download_with_retry
 from ._tokenizer_pool import TokenizerPool
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
-from .multiturn_distribution_fit import build_chat_samples_from_user_text_pool
+from .multiturn_distribution_fit import build_fitted_chat_samples
 from .types import (
     ChatMessage,
     ChatSamples,
@@ -292,18 +292,24 @@ class AgenticCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
         )
 
         if fit_length_distributions:
-            if pool is None:
+            if (
+                pool is None
+                or num_turns is None
+                or input_len is None
+                or output_len is None
+            ):
                 raise ValueError(
-                    "pool is required for agentic-code when "
-                    "fit_length_distributions=True"
+                    "pool, num_turns, input_len and output_len are required for"
+                    " agentic-code when fit_length_distributions=True; got"
+                    f" pool={pool!r},"
+                    f" num_turns={num_turns!r},"
+                    f" input_len={input_len!r},"
+                    f" output_len={output_len!r}."
                 )
-            assert num_turns is not None
-            assert input_len is not None
-            assert output_len is not None
             user_texts = self._collect_user_turn_texts(enable_tool_calls)
             if shuffle:
                 random.shuffle(user_texts)
-            return build_chat_samples_from_user_text_pool(
+            return build_fitted_chat_samples(
                 pool=pool,
                 user_text_pool=user_texts,
                 num_sessions=num_sessions,

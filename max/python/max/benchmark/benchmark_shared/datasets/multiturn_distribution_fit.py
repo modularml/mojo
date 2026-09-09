@@ -20,8 +20,10 @@ the same way as :class:`RandomBenchmarkDataset` multiturn mode.
 
 from __future__ import annotations
 
+import itertools
 import logging
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -29,6 +31,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from ._tokenizer_pool import TokenizerPool, worker_tokenizer
 from .distribution import BaseDistribution, DistributionParameter
+from .turn_profile import TurnProfile
 from .types import (
     ChatSamples,
     ChatSession,
@@ -40,13 +43,14 @@ from .types import (
 
 @dataclass(frozen=True)
 class _TurnSpec:
-    """Pre-sampled inputs for one turn in a multiturn session."""
+    """Pre-sampled inputs for one request: a user message and its reply."""
 
     prompt_text: str
     target_in: int
     target_out: int
     sys_variant: int
-    delay_ms: float | None
+    # The delay that precedes this turn: the user's think-time before asking.
+    preceding_delay_ms: float | None
     unique_marker: str = ""
 
 
@@ -305,15 +309,28 @@ def _build_session(args: _SessionArgs) -> _SessionResult:
                 num_tokens=msg.num_tokens,
             )
         )
+        # The driver sleeps after each reply, so this one carries the
+        # think-time that precedes the turn following it.
+        next_turn = (
+            args.turns[turn_i + 1] if turn_i + 1 < len(args.turns) else None
+        )
         messages.append(
             SessionMessage(
                 source="assistant",
                 content="",
                 num_tokens=turn.target_out,
-                delay_until_next_message=turn.delay_ms,
+                delay_until_next_message=(
+                    next_turn.preceding_delay_ms if next_turn else None
+                ),
             )
         )
         context_tokens += msg.num_tokens + turn.target_out
+
+    # Truncation can end a session on a reply that did have a successor, so
+    # clear it here too: the driver sleeps on this before exiting, and a delay
+    # on the last reply is dead wall-clock.
+    if messages:
+        messages[-1].delay_until_next_message = None
 
     session = (
         ChatSession(args.session_id, messages) if len(messages) >= 2 else None
@@ -325,92 +342,33 @@ def _build_session(args: _SessionArgs) -> _SessionResult:
     )
 
 
-def build_chat_samples_from_user_text_pool(
+def _build_sessions(
+    *,
     pool: TokenizerPool,
-    user_text_pool: list[str],
-    num_sessions: int,
-    num_turns: DistributionParameter,
-    input_len: DistributionParameter,
-    output_len: DistributionParameter,
-    delay_between_turns_dist: DistributionParameter | None,
+    user_text_pool: Sequence[str],
+    session_turn_counts: Sequence[int],
+    first_turn_profile: TurnProfile,
+    later_turn_profile: TurnProfile,
+    min_output_len: int,
     sys_prompt_ratio: float,
     max_num_unique_sys_prompt: int,
-    min_input_len: int = 4,
-    min_output_len: int = 1,
-    *,
-    shuffle_pool: bool = False,
-    log_prefix: str = "multiturn-fit",
+    min_input_len: int,
+    shuffle_pool: bool,
+    log_prefix: str,
 ) -> ChatSamples:
-    """Assemble :class:`ChatSamples` by grouping pooled user strings into sessions.
-
-    For each session, samples a turn count and per-turn input/output targets from
-    the given distributions (with optional ``';'`` split for first vs remaining
-    turns). Each user message is produced by token-space repeat/truncation of a
-    pooled string, optionally prefixed with a scaled synthetic system block.
-
-    When the planned turn count exceeds the available pool, the cursor wraps
-    back to the start of the pool and a ``[N] `` marker (where ``N`` is the
-    1-indexed pass number) is prepended to the user body so cycled prompts are
-    cache-distinct. Distribution samples are re-drawn on every turn, so each
-    cycle produces a freshly fit workload rather than a replay.
-
-    Args:
-        pool: Tokenizer process pool used for batched pre-filter encodes
-            and per-session worker dispatch.
-        user_text_pool: Candidate user message bodies (one per underlying turn).
-        num_sessions: Target number of chat sessions.
-        num_turns: Distribution for turns per session (>= 1 after rounding).
-        input_len: Per-turn user-side token target distribution(s).
-        output_len: Per-turn assistant ``max_tokens`` distribution(s).
-        delay_between_turns_dist: Optional per-assistant-message delay (ms).
-        sys_prompt_ratio: Fraction of user message token budget for system prefix.
-        max_num_unique_sys_prompt: Cycle count for system-prefix variants.
-        min_input_len: Floor for sampled input lengths.
-        min_output_len: Floor for sampled output lengths.
-        shuffle_pool: Whether to shuffle ``user_text_pool`` in place before use.
-        log_prefix: Logger prefix for warnings.
-
-    Returns:
-        Generated chat sessions. The pool is cycled with unique per-cycle
-        markers to satisfy ``num_sessions`` even when planned turns exceed the
-        pool size; the result may still contain fewer sessions if any drop
-        due to model max-context overflow.
-    """
-    first_in, rest_in = parse_two_part_distribution(input_len, "input_len")
-    first_out, rest_out = parse_two_part_distribution(output_len, "output_len")
-
-    num_turns_dist = BaseDistribution.from_distribution_parameter(num_turns)
-    in_first_dist = BaseDistribution.from_distribution_parameter(first_in)
-    in_rest_dist = BaseDistribution.from_distribution_parameter(rest_in)
-    out_first_dist = BaseDistribution.from_distribution_parameter(first_out)
-    out_rest_dist = BaseDistribution.from_distribution_parameter(rest_out)
-    delay_dist = BaseDistribution.from_distribution_parameter(
-        delay_between_turns_dist
-    )
-
-    assert num_turns_dist is not None
-    assert in_first_dist is not None
-    assert in_rest_dist is not None
-    assert out_first_dist is not None
-    assert out_rest_dist is not None
-
+    """Draw each session's turns and build them from the pool."""
     model_max_length = min(
         pool.tokenizer.model_max_length, np.iinfo(np.int64).max
     )
     max_context_length = int(model_max_length * MAX_CONTEXT_USAGE_RATIO)
 
-    # Batch the pre-filter encode through the shared spawn pool.
     pool_lens = pool.encode_lens(list(user_text_pool))
-    filtered = [
+    filtered_user_texts = [
         t
         for t, n in zip(user_text_pool, pool_lens, strict=False)
         if n >= min_input_len
     ]
-
-    if shuffle_pool:
-        random.shuffle(filtered)
-
-    if not filtered:
+    if not filtered_user_texts:
         logger.warning(
             "%s: no valid user texts in pool after filtering (min_input_len=%s).",
             log_prefix,
@@ -418,62 +376,64 @@ def build_chat_samples_from_user_text_pool(
         )
         return ChatSamples(chat_sessions=[])
 
-    num_turns_per_session = [
-        max(round(num_turns_dist.sample_value()), 1)
-        for _ in range(num_sessions)
-    ]
-    total_turns_needed = sum(num_turns_per_session)
-    if total_turns_needed > len(filtered):
+    num_sessions = len(session_turn_counts)
+    total_turns_needed = sum(session_turn_counts)
+    if total_turns_needed > len(filtered_user_texts):
         logger.info(
             "%s: pool has %d valid rows but %d turns planned; will cycle "
-            "through the pool with per-cycle unique markers (e.g. '[1] ') "
-            "while re-sampling distributions on each turn.",
+            "through the pool, with a per-draw unique marker (e.g. '[7] ') "
+            "and distributions re-sampled on each turn.",
             log_prefix,
-            len(filtered),
+            len(filtered_user_texts),
             total_turns_needed,
         )
+
+    if shuffle_pool:
+        random.shuffle(filtered_user_texts)
 
     warmup_dict: dict[int, SharedContext] = {}
     max_variant = max(1, max_num_unique_sys_prompt)
     session_args_list: list[_SessionArgs] = []
-    cursor = 0
-    draw_index = 0
-    for session_id in range(num_sessions):
-        n_planned = num_turns_per_session[session_id]
+    user_body_cycle = itertools.cycle(filtered_user_texts)
+    draw_counter = itertools.count()
 
-        turns: list[_TurnSpec] = []
-        for turn_i in range(n_planned):
-            if cursor >= len(filtered):
-                cursor = 0
-            in_dist = in_first_dist if turn_i == 0 else in_rest_dist
-            out_dist = out_first_dist if turn_i == 0 else out_rest_dist
-            target_in = max(round(in_dist.sample_value()), min_input_len)
-            target_out = max(round(out_dist.sample_value()), min_output_len)
-            sys_variant = (session_id + turn_i) % max_variant
-            delay_ms = (
-                max(float(delay_dist.sample_value()), 0.0)
-                if delay_dist
-                else None
+    def add_turn(
+        turns: list[_TurnSpec],
+        profile: TurnProfile,
+        *,
+        session_id: int,
+        turn_i: int,
+    ) -> None:
+        """Draw one turn and append it, taking its body from the pool."""
+        targets = profile.draw(
+            min_input_len=min_input_len, min_output_len=min_output_len
+        )
+        turns.append(
+            _TurnSpec(
+                prompt_text=next(user_body_cycle),
+                target_in=targets.input_len,
+                target_out=targets.output_len,
+                sys_variant=(session_id + turn_i) % max_variant,
+                preceding_delay_ms=targets.delay_ms,
+                # Marked unconditionally: avoids unintended shared prefixes.
+                unique_marker=f"[{next(draw_counter)}] ",
             )
-            # Marked unconditionally: avoids unintended shared prefixes.
-            marker = f"[{draw_index}] "
-            turns.append(
-                _TurnSpec(
-                    prompt_text=filtered[cursor],
-                    target_in=target_in,
-                    target_out=target_out,
-                    sys_variant=sys_variant,
-                    delay_ms=delay_ms,
-                    unique_marker=marker,
-                )
+        )
+
+    for session_id, n_turns in enumerate(session_turn_counts):
+        turn_specs: list[_TurnSpec] = []
+        for turn_i in range(n_turns):
+            add_turn(
+                turn_specs,
+                first_turn_profile if turn_i == 0 else later_turn_profile,
+                session_id=session_id,
+                turn_i=turn_i,
             )
-            cursor += 1
-            draw_index += 1
 
         session_args_list.append(
             _SessionArgs(
                 session_id=session_id,
-                turns=turns,
+                turns=turn_specs,
                 sys_prompt_ratio=sys_prompt_ratio,
                 min_input_len=min_input_len,
                 max_context_length=max_context_length,
@@ -512,7 +472,94 @@ def build_chat_samples_from_user_text_pool(
             len(sessions),
             num_sessions,
         )
-
     return ChatSamples(
         chat_sessions=sessions, shared_contexts=list(warmup_dict.values())
+    )
+
+
+def build_fitted_chat_samples(
+    pool: TokenizerPool,
+    user_text_pool: list[str],
+    num_sessions: int,
+    num_turns: DistributionParameter,
+    input_len: DistributionParameter,
+    output_len: DistributionParameter,
+    delay_between_turns_dist: DistributionParameter | None,
+    sys_prompt_ratio: float,
+    max_num_unique_sys_prompt: int,
+    min_input_len: int = 4,
+    min_output_len: int = 1,
+    *,
+    shuffle_pool: bool = False,
+    log_prefix: str = "multiturn-fit",
+) -> ChatSamples:
+    """Assemble :class:`ChatSamples` by grouping pooled user strings into sessions.
+
+    For each session, samples a turn count and per-turn input/output targets from
+    the given distributions (with optional ``';'`` split for first vs remaining
+    turns). Each user message is produced by token-space repeat/truncation of a
+    pooled string, optionally prefixed with a scaled synthetic system block.
+
+    Every user body is prefixed with a ``[N] `` marker, ``N`` counting draws
+    across the run from zero, so cycled bodies stay cache-distinct. When the
+    planned turn count exceeds the available pool it wraps back to the start;
+    distribution samples are re-drawn on every turn, so a second pass over the
+    pool produces a freshly fit workload rather than a replay.
+
+    Args:
+        pool: Tokenizer process pool used for batched pre-filter encodes
+            and per-session worker dispatch.
+        user_text_pool: Candidate user message bodies (one per underlying turn).
+        num_sessions: Target number of chat sessions.
+        num_turns: Distribution for turns per session (>= 1 after rounding).
+        input_len: Per-turn user-side token target distribution(s).
+        output_len: Per-turn assistant ``max_tokens`` distribution(s).
+        delay_between_turns_dist: Optional per-assistant-message delay (ms).
+        sys_prompt_ratio: Fraction of user message token budget for system prefix.
+        max_num_unique_sys_prompt: Cycle count for system-prefix variants.
+        min_input_len: Floor for sampled input lengths.
+        min_output_len: Floor for sampled output lengths.
+        shuffle_pool: Whether to shuffle ``user_text_pool`` in place before use.
+        log_prefix: Logger prefix for warnings.
+
+    Returns:
+        Generated chat sessions. The pool is cycled with per-draw unique
+        markers to satisfy ``num_sessions`` even when planned turns exceed the
+        pool size; the result may still contain fewer sessions if any drop
+        due to model max-context overflow.
+    """
+    first_in, rest_in = parse_two_part_distribution(input_len, "input_len")
+    first_out, rest_out = parse_two_part_distribution(output_len, "output_len")
+
+    first_turn_profile = TurnProfile.from_parameters(
+        input_len=first_in,
+        output_len=first_out,
+        delay=delay_between_turns_dist,
+    )
+    later_turn_profile = TurnProfile.from_parameters(
+        input_len=rest_in, output_len=rest_out, delay=delay_between_turns_dist
+    )
+
+    # Turn counts are drawn up front, before any per-turn target, matching the
+    # original sampling order so a fixed seed reproduces earlier runs.
+    num_turns_dist = BaseDistribution.from_distribution_parameter_or_raise(
+        num_turns
+    )
+    session_turn_counts = [
+        max(round(num_turns_dist.sample_value()), 1)
+        for _ in range(num_sessions)
+    ]
+
+    return _build_sessions(
+        pool=pool,
+        user_text_pool=user_text_pool,
+        session_turn_counts=session_turn_counts,
+        first_turn_profile=first_turn_profile,
+        later_turn_profile=later_turn_profile,
+        min_input_len=min_input_len,
+        min_output_len=min_output_len,
+        sys_prompt_ratio=sys_prompt_ratio,
+        max_num_unique_sys_prompt=max_num_unique_sys_prompt,
+        shuffle_pool=shuffle_pool,
+        log_prefix=log_prefix,
     )
