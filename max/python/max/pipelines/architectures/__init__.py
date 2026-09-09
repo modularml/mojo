@@ -177,6 +177,7 @@ def register_all_models() -> None:
             ".granite_modulev3",
             "granite_modulev3_arch",
         ),
+        _LazyArch("GritLM", ".gritlm", "gritlm_arch"),
         _LazyArch("HYV3ForCausalLM", ".hy_v3", "hy_v3_arch"),
         _LazyArch(
             "Idefics3ForConditionalGeneration", ".idefics3", "idefics3_arch"
