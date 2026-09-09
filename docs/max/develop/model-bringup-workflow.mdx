@@ -82,6 +82,51 @@ Each file serves a distinct role:
 The following sections go into detail about how each component works and
 whether they require customization.
 
+## Choose an authoring API
+
+Authoring a model architecture in MAX starts with an API choice that
+determines which module package you build with and how MAX compiles your
+model:
+
+- **Graph API**: define modules with [`max.nn`](/api/python/nn) and build
+  an explicit [`Graph`](/api/python/generated/max.graph.Graph) of symbolic
+  [`TensorValue`](/api/python/generated/max.graph.TensorValue) computations,
+  which MAX then compiles.
+- **ModuleV3 API**: define modules with
+  [`max.experimental.nn`](/api/python/experimental.nn), whose
+  [`Module`](/api/python/generated/max.experimental.nn.Module) runs eagerly
+  on real tensors during development and compiles the same
+  [`forward()`](/api/python/generated/max.experimental.nn.Module#max.experimental.nn.Module.forward)
+  for serving.
+
+Both APIs produce a
+[`SupportedArchitecture`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture)
+and follow the directory layout above. A ModuleV3 architecture differs in the
+pieces you implement:
+
+- `{model_name}.py` subclasses
+  [`Module`](/api/python/generated/max.experimental.nn.Module) with a
+  signature such as
+  `Module[[Tensor, PagedCacheValues, Tensor, Tensor], tuple[Tensor, ...]]`
+  and implements `forward()`.
+- `model.py` subclasses `ModuleV3PipelineModelWithKVCache` and implements
+  `_create_model_config()` and `_instantiate_module()`. The base class loads the
+  adapted state dict, instantiates your module, and compiles it with
+  [`Module.compile()`](/api/python/generated/max.experimental.nn.Module#max.experimental.nn.Module.compile).
+  `weight_adapters.py` works the same way as in the graph API.
+- `arch.py` registers the ModuleV3 variant under the architecture's Hugging
+  Face name plus a `_ModuleV3` suffix, for example
+  `name="LlamaForCausalLM_ModuleV3"`.
+
+:::note
+
+At serve time, the `--prefer-module-v3` flag (or
+[`prefer_module_v3`](/api/python/generated/max.pipelines.PipelineRuntimeConfig)
+in a config file) selects the ModuleV3 registration. If only one variant is
+registered, MAX serves it either way.
+
+:::
+
 ## Choose a reference architecture
 
 The reference architectures in MAX's codebase are complete implementations of
