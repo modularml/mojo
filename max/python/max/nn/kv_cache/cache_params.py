@@ -58,7 +58,7 @@ from .utils import (
 # on max.nn (BUILD.bazel), so importing back would create a circular
 # bazel dependency. The two definitions are structurally identical
 # Literals, so mypy treats them as the same type at use sites.
-SpeculativeMethod = Literal["eagle", "mtp", "dflash"]
+SpeculativeMethod = Literal["eagle", "mtp", "dflash", "dflash2"]
 
 KVHashAlgo = Literal["ahash64", "sha256", "sha256_64"]
 """Supported hash algorithms for KV-cache block identity."""
@@ -617,11 +617,11 @@ class KVCacheParamInterface(Protocol):
 
         Zero when speculative decoding is disabled; one for autoregressive
         drafts (``eagle``, ``mtp``); equal to ``num_draft_tokens`` for block
-        drafts (``dflash``).
+        drafts (``dflash``, ``dflash2``).
         """
         if self.speculative_method is None:
             return 0
-        elif self.speculative_method == "dflash":
+        elif self.speculative_method in ("dflash", "dflash2"):
             return self.num_draft_tokens
         elif self.speculative_method in ("mtp", "eagle"):
             return 1

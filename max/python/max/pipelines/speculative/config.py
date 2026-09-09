@@ -52,7 +52,7 @@ draft slots before any real draft exists. Defined here so the graph side
 (``architectures``) and the runtime side (``lib``) agree on a single value.
 """
 
-SpeculativeMethod = Literal["eagle", "mtp", "dflash"]
+SpeculativeMethod = Literal["eagle", "mtp", "dflash", "dflash2"]
 """The supported methods for speculative decoding."""
 
 _ONE_TOKEN_PER_STEP: tuple[SpeculativeMethod, ...] = ("eagle", "mtp")
@@ -140,8 +140,8 @@ class SpeculativeConfig(ConfigFileModel):
     )
     """The speculative decoding method to use.
 
-    One of ``"eagle"``, ``"mtp"``, or ``"dflash"``. When ``None``,
-    speculative decoding is disabled.
+    One of ``"eagle"``, ``"mtp"``, ``"dflash"``, or ``"dflash2"``. When
+    ``None``, speculative decoding is disabled.
     """
 
     num_speculative_tokens: int | None = Field(
@@ -397,8 +397,21 @@ class SpeculativeConfig(ConfigFileModel):
         return self.speculative_method == "mtp"
 
     def is_dflash(self) -> bool:
-        """Returns whether the configured method is DFlash."""
-        return self.speculative_method == "dflash"
+        """Returns whether the configured method is a DFlash block draft.
+
+        True for both ``"dflash"`` and ``"dflash2"``: v2 keeps v1's fused
+        graph shape and block-drafting contract, so consumers that only
+        need "the draft arrives a block at a time" -- pipeline-class
+        selection, KV cache sizing -- want both. Architecture selection is
+        the exception: each fused graph is built for one drafter, so the
+        v1 and Eagle arms in ``lib.config`` exclude v2 and a v2 target
+        gets its own arm. Use :meth:`is_dflash2` where they differ.
+        """
+        return self.speculative_method in ("dflash", "dflash2")
+
+    def is_dflash2(self) -> bool:
+        """Returns whether the configured method is DFlash2 specifically."""
+        return self.speculative_method == "dflash2"
 
     def uses_greedy_rejection(self) -> bool:
         """Returns whether the ``"greedy"`` rejection sampling strategy is selected."""

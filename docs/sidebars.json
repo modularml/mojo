@@ -436,6 +436,7 @@
                 "api/python/pipelines.architectures.deepseekV3",
                 "api/python/pipelines.architectures.deepseekV3_2",
                 "api/python/pipelines.architectures.deepseekV3_nextn",
+                "api/python/pipelines.architectures.dflash2_qwen3_5",
                 "api/python/pipelines.architectures.dflash_llama3",
                 "api/python/pipelines.architectures.diffusion_gemma",
                 "api/python/pipelines.architectures.dspark_draft",

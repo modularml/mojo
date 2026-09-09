@@ -643,12 +643,19 @@ def _apply_speculative_target_architecture(
     if not target_archs:
         # Nothing to rewrite; the lookup below reports the real problem.
         return None
-    if target_archs[0] == "LlamaForCausalLM":
+    # The Llama and Kimi arms below name DFlash v1 and Eagle graphs, and
+    # neither can verify a DFlash2 block draft. ``is_dflash()`` is true for
+    # v2, so without this both would happily rewrite a DFlash2 pairing onto
+    # a graph that silently mismatches the drafter. A v2 target selects its
+    # own fused arch from its own arm; leaving the name alone here lets the
+    # lookup reject a pairing no arm claims.
+    v1_or_eagle = not speculative.is_dflash2()
+    if target_archs[0] == "LlamaForCausalLM" and v1_or_eagle:
         if speculative.is_dflash():
             target_archs[0] = "UnifiedDflashLlama3ForCausalLM"
         else:
             target_archs[0] = "UnifiedEagleLlama3ForCausalLM"
-    if target_archs[0] == "KimiK25ForConditionalGeneration":
+    if target_archs[0] == "KimiK25ForConditionalGeneration" and v1_or_eagle:
         draft_archs = (
             draft_model.huggingface_config.architectures
             if draft_model is not None

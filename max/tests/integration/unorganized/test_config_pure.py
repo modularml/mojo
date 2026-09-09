@@ -405,9 +405,13 @@ class TestSpeculativeArchitectureOverride:
         *,
         speculative: bool = True,
         is_dflash: bool = False,
+        is_dflash2: bool = False,
         draft_arch: str | None = None,
     ) -> SimpleNamespace:
-        """Build a minimal stand-in exposing the attrs the method reads."""
+        """Build a minimal stand-in exposing the attrs the method reads.
+
+        ``is_dflash`` is true for v2 as well, mirroring the real predicate.
+        """
         model = SimpleNamespace(
             huggingface_config=SimpleNamespace(architectures=[target_arch])
         )
@@ -417,7 +421,10 @@ class TestSpeculativeArchitectureOverride:
                 huggingface_config=SimpleNamespace(architectures=[draft_arch])
             )
         spec = (
-            SimpleNamespace(is_dflash=lambda: is_dflash)
+            SimpleNamespace(
+                is_dflash=lambda: is_dflash or is_dflash2,
+                is_dflash2=lambda: is_dflash2,
+            )
             if speculative
             else None
         )
@@ -438,6 +445,20 @@ class TestSpeculativeArchitectureOverride:
     def test_llama_dflash(self) -> None:
         cfg = self._make_config("LlamaForCausalLM", is_dflash=True)
         assert self._resolved_arch(cfg) == "UnifiedDflashLlama3ForCausalLM"
+
+    def test_dflash2_does_not_take_a_v1_or_eagle_rewrite(self) -> None:
+        """DFlash2 shares ``is_dflash()`` but not the graphs it selects.
+
+        The Llama and Kimi arms name v1 and Eagle graphs, neither of which
+        can verify a DFlash2 block draft, so rewriting to one would load a
+        graph that silently mismatches the drafter. The exclusion is
+        deliberately limited to those arms: a target with its own DFlash2
+        arm must still reach it, so this must not become a blanket
+        "return early for v2".
+        """
+        for target in ("LlamaForCausalLM", "KimiK25ForConditionalGeneration"):
+            cfg = self._make_config(target, is_dflash2=True)
+            assert self._resolved_arch(cfg) == target
 
     def test_gemma4_mtp(self) -> None:
         cfg = self._make_config(

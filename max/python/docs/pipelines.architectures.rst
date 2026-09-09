@@ -23,6 +23,7 @@ family.
    pipelines.architectures.deepseekV3
    pipelines.architectures.deepseekV3_2
    pipelines.architectures.deepseekV3_nextn
+   pipelines.architectures.dflash2_qwen3_5
    pipelines.architectures.dflash_llama3
    pipelines.architectures.diffusion_gemma
    pipelines.architectures.dspark_draft
@@ -90,6 +91,7 @@ Text generation
    ~max.pipelines.architectures.deepseekV3
    ~max.pipelines.architectures.deepseekV3_2
    ~max.pipelines.architectures.deepseekV3_nextn
+   ~max.pipelines.architectures.dflash2_qwen3_5
    ~max.pipelines.architectures.dflash_llama3
    ~max.pipelines.architectures.diffusion_gemma
    ~max.pipelines.architectures.dspark_draft

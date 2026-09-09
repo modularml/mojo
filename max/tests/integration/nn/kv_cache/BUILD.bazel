@@ -27,6 +27,7 @@ modular_py_test(
         "//max/python/max/pipelines/kv_cache:kv_connector",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/speculative",
         "//max/tests/integration/test_common:context_utils",
         requirement("hypothesis"),
         requirement("numpy"),

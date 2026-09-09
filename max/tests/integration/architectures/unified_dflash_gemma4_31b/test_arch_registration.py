@@ -101,7 +101,11 @@ class TestSpeculativeArchitectureRewrite:
             draft_model = SimpleNamespace(
                 huggingface_config=SimpleNamespace(architectures=[draft_arch])
             )
-        spec = SimpleNamespace(is_dflash=lambda: True) if speculative else None
+        spec = (
+            SimpleNamespace(is_dflash=lambda: True, is_dflash2=lambda: False)
+            if speculative
+            else None
+        )
         manifest = {"main": model}
         if draft_model is not None:
             manifest["draft"] = draft_model
@@ -135,7 +139,9 @@ class TestSpeculativeArchitectureRewrite:
         cfg = self._make_config(
             "Gemma4ForConditionalGeneration", draft_arch="LlamaForCausalLM"
         )
-        cfg.speculative = SimpleNamespace(is_dflash=lambda: False)
+        cfg.speculative = SimpleNamespace(
+            is_dflash=lambda: False, is_dflash2=lambda: False
+        )
         assert self._resolved_arch(cfg) == "Gemma4ForConditionalGeneration"
 
     def test_llama3_dflash_pair_regression(self) -> None:

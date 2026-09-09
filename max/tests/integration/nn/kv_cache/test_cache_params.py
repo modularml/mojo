@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from typing import get_args
+
 import numpy as np
 import pytest
 from max.driver import CPU
@@ -25,6 +27,23 @@ from max.nn.kv_cache import (
     MLAAttnKey,
     MLAKVCacheParams,
 )
+from max.nn.kv_cache.cache_params import (
+    SpeculativeMethod as CacheSpeculativeMethod,
+)
+from max.pipelines.speculative import SpeculativeMethod
+
+
+def test_speculative_methods_match_the_pipeline_literal() -> None:
+    """``cache_params`` hand-copies the pipeline literal; pin the two together.
+
+    The copy exists because ``max.pipelines.speculative`` depends on
+    ``max.nn``, so importing back would cycle in bazel. Nothing but this
+    assertion stops the copy from going stale, and a method missing here
+    reaches :meth:`num_draft_tokens_per_step` as an unrecognized value.
+    """
+    assert set(get_args(CacheSpeculativeMethod)) == set(
+        get_args(SpeculativeMethod)
+    )
 
 
 def test_single_device_compatible() -> None:

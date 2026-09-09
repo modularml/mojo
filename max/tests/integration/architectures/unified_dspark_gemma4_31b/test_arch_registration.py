@@ -103,7 +103,11 @@ class TestSpeculativeArchitectureRewrite:
             draft_model = SimpleNamespace(
                 huggingface_config=SimpleNamespace(architectures=[draft_arch])
             )
-        spec = SimpleNamespace(is_dflash=lambda: True) if speculative else None
+        spec = (
+            SimpleNamespace(is_dflash=lambda: True, is_dflash2=lambda: False)
+            if speculative
+            else None
+        )
         manifest = {"main": model}
         if draft_model is not None:
             manifest["draft"] = draft_model
