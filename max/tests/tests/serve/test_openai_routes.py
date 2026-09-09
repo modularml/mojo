@@ -52,6 +52,7 @@ from max.pipelines.lib import (
     PipelineConfig,
     PipelineRuntimeConfig,
 )
+from max.pipelines.lib.log_probabilities import _MAX_TOP_LOGPROBS
 from max.pipelines.lib.tokenizer import open_image
 from max.pipelines.modeling.types import (
     ParsedToolCallDelta,
@@ -408,6 +409,51 @@ async def test_openai_chat_completion_prompt_too_long_returns_400(
     assert body["error"]["message"].startswith("Prompt is too long")
     assert "4096 tokens" in body["error"]["message"]
     assert "2048 tokens" in body["error"]["message"]
+    assert body["error"]["type"] == "invalid_request_error"
+
+
+@pytest.mark.parametrize("top_logprobs", [_MAX_TOP_LOGPROBS + 1, 100, -1])
+@pytest.mark.asyncio
+async def test_chat_completion_out_of_range_top_logprobs_returns_400(
+    app: FastAPI,
+    top_logprobs: int,
+) -> None:
+    """A ``top_logprobs`` the logprobs graph cannot answer is rejected as 400.
+
+    Regression: the count used to reach the model worker untouched, where the
+    logprobs graph raised ``ValueError``, killing the worker and taking the
+    whole server down with it -- so every later request in a fuzz run failed
+    against a dead endpoint.
+    """
+    request = simple_openai_request(model_name="echo", content="hi")
+    request["logprobs"] = True
+    request["top_logprobs"] = top_logprobs
+
+    async with AsyncTestClient(app) as client:
+        response = await client.post("/v1/chat/completions", json=request)
+
+    assert response.status_code == 400
+    body = response.json()
+    assert "top_logprobs" in body["error"]["message"]
+    assert body["error"]["type"] == "invalid_request_error"
+
+
+@pytest.mark.parametrize("logprobs", [_MAX_TOP_LOGPROBS + 1, 100, -1])
+@pytest.mark.asyncio
+async def test_completion_out_of_range_logprobs_returns_400(
+    app: FastAPI,
+    logprobs: int,
+) -> None:
+    """The legacy ``/v1/completions`` spelling of the count is bounded too."""
+    async with AsyncTestClient(app) as client:
+        response = await client.post(
+            "/v1/completions",
+            json={"model": "echo", "prompt": "hi", "logprobs": logprobs},
+        )
+
+    assert response.status_code == 400
+    body = response.json()
+    assert "logprobs" in body["error"]["message"]
     assert body["error"]["type"] == "invalid_request_error"
 
 

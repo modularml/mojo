@@ -51,6 +51,7 @@ from max.pipelines.context import (
 from max.pipelines.context.exceptions import InputError
 from max.pipelines.context.outputs import GenerationOutput
 from max.pipelines.lib import PipelineConfig
+from max.pipelines.lib.log_probabilities import _MAX_TOP_LOGPROBS
 from max.pipelines.lib.tool_parsing import create as create_tool_parser
 from max.pipelines.lib.tool_parsing import (
     maybe_name_from_tool,
@@ -2185,6 +2186,7 @@ async def openai_create_chat_completion(
                 if completion_request.top_logprobs is not None
                 else 1
             )
+            _validate_logprobs_count(logprobs_count, "top_logprobs")
 
         runtime_cfg = pipeline_config.runtime
         if logprobs_count != 0 and runtime_cfg.enable_overlap_scheduler:
@@ -2312,6 +2314,27 @@ def _convert_chat_completion_tools_to_token_generator_tools(
         token_generator_tools.append(token_generator_tool)
 
     return token_generator_tools
+
+
+def _validate_logprobs_count(count: int, field_name: str) -> None:
+    """Validate a requested top-k logprobs count against the graph's ceiling.
+
+    The count reaches the model worker untouched and the logprobs graph raises
+    on one it cannot answer, which kills the worker and takes the whole server
+    with it -- so an out-of-range value has to be rejected here.
+
+    Args:
+        count: The requested number of top log probabilities per token.
+        field_name: Request field the count came from, named in the error.
+
+    Raises:
+        InputError: If ``count`` is negative or above
+            ``_MAX_TOP_LOGPROBS``.
+    """
+    if not 0 <= count <= _MAX_TOP_LOGPROBS:
+        raise InputError(
+            f"`{field_name}` must be in [0, {_MAX_TOP_LOGPROBS}], was {count}."
+        )
 
 
 def _validate_tool_function_name(
@@ -3212,6 +3235,9 @@ async def openai_create_completion(
         )
 
         pipeline_config = get_app_pipeline_config(request.app)
+
+        if completion_request.logprobs is not None:
+            _validate_logprobs_count(completion_request.logprobs, "logprobs")
 
         if (
             completion_request.logprobs is not None

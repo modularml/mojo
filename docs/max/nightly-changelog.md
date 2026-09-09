@@ -1247,6 +1247,14 @@ the [container](/container) page now links to the new page.
 
 ## Fixes
 
+- Fixed an out-of-range `top_logprobs` killing the model worker and taking the
+  server down with it. The logprobs graph is built for a fixed top-k width and
+  raises on a wider request, but the requested count reached it unvalidated, so
+  a single `top_logprobs` above that width (or a negative one) exited the whole
+  server process and left every later request without an endpoint. Both the
+  chat `top_logprobs` and the legacy `/v1/completions` `logprobs` count are now
+  bounded at the request boundary and return HTTP 400 with the supported range.
+
 - Fixed a pre-tokenized prompt longer than `--max-length` killing the model
   worker instead of being rejected. Only a string prompt was length-checked,
   so a token-array prompt — an OpenAI `/v1/completions` token array, or the
