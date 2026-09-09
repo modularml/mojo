@@ -275,6 +275,7 @@ platform(
 string_flag(
     name = "modular_config",
     build_setting_default = "default",
+    scope = "exec:--//:host_modular_config",
     values = MODULAR_CONFIGS,
 )
 
