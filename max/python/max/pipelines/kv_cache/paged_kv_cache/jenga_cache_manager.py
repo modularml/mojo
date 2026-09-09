@@ -35,6 +35,7 @@ from max.nn.kv_cache import (
 from max.nn.kv_cache.cache_params import (
     KVCacheAssignments,
     KVCacheBufferInterface,
+    KVCacheMemory,
     KVConnectorType,
     spec_decode_cache_slack,
 )
@@ -235,6 +236,7 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             params=params,
             leaf_infos=leaf_infos,
             kv_buffers=kv_buffers,
+            replica_kv_memory=replica_kv_memory,
             num_huge_blocks=num_huge_blocks,
             max_batch_size=max_batch_size,
             max_num_input_tokens=max_num_input_tokens,
@@ -268,6 +270,7 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         leaf_infos: Mapping[str, KVLeafInfo],
         num_huge_blocks: int,
         kv_buffers: Sequence[KVCacheBufferInterface],
+        replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]],
         max_batch_size: int,
         max_num_input_tokens: int | None = None,
         connector: KVConnector | None = None,
@@ -282,16 +285,6 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
         if params.kv_connector_config.type == KVConnectorType.null:
             connector = None
         self._connector = connector
-
-        if (
-            params.enable_dp_cross_replica_prefix_copy
-            and params.data_parallel_degree > 1
-        ):
-            # TODO(SERVOPT-1591)
-            logger.info(
-                "Ignoring enable_dp_cross_replica_prefix_copy=True as Jenga KV cache is incompatible with this feature. "
-                "Set MODULAR_USE_LEGACY_KV_CACHE=1 if cross-replica prefix cache hits via device-to-device copies is required."
-            )
 
         self._leaf_infos = leaf_infos
         self._kv_buffers = kv_buffers
@@ -329,6 +322,10 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             num_draft_tokens=self.params.num_draft_tokens,
             num_draft_tokens_per_step=self.params.num_draft_tokens_per_step,
             connector=connector,
+            replica_kv_memory=replica_kv_memory,
+            enable_dp_cross_replica_prefix_copy=(
+                self.params.enable_dp_cross_replica_prefix_copy
+            ),
         )
 
     # ============================================================================

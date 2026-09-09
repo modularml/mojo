@@ -889,6 +889,15 @@ the [container](/container) page now links to the new page.
   `"argmax"` applies only temperature. Sampled mode is GPU-only, needs a
   static `vocab_size`, and cannot be combined with relaxed thinking-phase
   acceptance, whose rule assumes the drafted token is the draft's argmax.
+- `enable_dp_cross_replica_prefix_copy` now takes effect on the Jenga KV
+  cache, which previously logged that it was ignoring the flag. Under data
+  parallelism a prefix cached on one replica is copied to the replica serving
+  the request, in one batched device-to-device transfer, instead of being
+  recomputed or fetched back through the host tier. The flag defaults to on,
+  so this changes behaviour for every data-parallel deployment on this cache:
+  on a multi-turn workload it cut time-to-first-token by around a quarter and
+  left the host tier unused, at a cost in decode latency that shrinks as
+  offered load rises. Set it to false to restore the previous behaviour.
 
 ### C API
 

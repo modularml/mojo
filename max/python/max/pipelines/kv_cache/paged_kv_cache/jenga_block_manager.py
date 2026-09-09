@@ -27,7 +27,9 @@ from bisect import bisect_left
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
+from max.driver import Buffer, batch_inplace_copy
 from max.nn.kv_cache import KVCacheGroupId
+from max.nn.kv_cache.cache_params import KVCacheMemory
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext
 from max.pipelines.kv_cache.kv_connector import BlockCount, KVConnector
@@ -66,6 +68,20 @@ class _PendingTransfer:
     event: KVConnectorTransfer
     blocks: dict[str, list[LittleKVCacheBlock]]
     commit_hashes: list[bytes] | None = None
+
+
+@dataclass(frozen=True)
+class _PageCopy:
+    """One leaf's page, fetched from another replica's device memory.
+
+    ``src_replica`` is per page so leaves of the same hit may come from
+    different replicas.
+    """
+
+    leaf_id: str
+    dst_bid: int
+    src_bid: int
+    src_replica: int
 
 
 def create_kv_group_coordinator(
@@ -130,6 +146,8 @@ class JengaBlockManager:
         num_draft_tokens: int = 0,
         num_draft_tokens_per_step: int = 0,
         connector: KVConnector | None = None,
+        replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]] | None = None,
+        enable_dp_cross_replica_prefix_copy: bool = True,
     ) -> None:
         self._block_size = block_size
         self._enable_prefix_caching = enable_prefix_caching
@@ -143,6 +161,15 @@ class JengaBlockManager:
         self._num_draft_tokens_per_step = num_draft_tokens_per_step
         self._metrics = KVCacheMetrics()
         self._num_replicas = num_replicas
+
+        # Per-replica device memory, keyed by leaf, used to copy committed
+        # prefix blocks between replicas. None when the caller has no buffers.
+        self._replica_kv_memory = replica_kv_memory
+        self._cross_replica_copy_enabled = (
+            enable_dp_cross_replica_prefix_copy
+            and num_replicas > 1
+            and replica_kv_memory is not None
+        )
 
         ratios = {leaf_id: leaf.ratio for leaf_id, leaf in leaf_infos.items()}
         self.pools = [
@@ -310,6 +337,9 @@ class JengaBlockManager:
     ) -> list[PrefixCacheHits]:
         """Counts the number of prefix cache hits for a request per replica.
 
+        Read-only. With cross-replica copies on, a block held by any replica
+        counts as a hit, without checking there is room to copy it in.
+
         Returns:
             A list of PrefixCacheHits for each replica.
         """
@@ -317,7 +347,7 @@ class JengaBlockManager:
         hit_counts: list[PrefixCacheHits] = []
         for replica_idx in range(self._num_replicas):
             num_hit_blocks = self._find_longest_device_prefix_cache_hit(
-                desired_hashes, replica_idx
+                desired_hashes, replica_idx, self._cross_replica_copy_enabled
             )
             # Ask the connector to load the hashes that are remaining.
             (num_hit_host_blocks, num_hit_disk_blocks) = (
@@ -739,7 +769,8 @@ class JengaBlockManager:
     def _find_longest_device_prefix_cache_hit(
         self,
         desired_hashes: Sequence[bytes],
-        replica_idx: int = 0,
+        replica_idx: int,
+        allow_cross_replica: bool,
     ) -> int:
         # Global caches first: they read their whole history, so their run from
         # the root is the tightest bound available and it costs the cheapest
@@ -747,7 +778,9 @@ class JengaBlockManager:
         if KVCacheGroupId.full() in self._groups:
             num_hit_blocks = self._groups[
                 KVCacheGroupId.full()
-            ].longest_cache_hit(desired_hashes, replica_idx)
+            ].longest_cache_hit(
+                desired_hashes, replica_idx, allow_cross_replica
+            )
             desired_hashes = desired_hashes[:num_hit_blocks]
 
         windowed = [
@@ -759,7 +792,7 @@ class JengaBlockManager:
             old_num_hit_blocks = len(desired_hashes)
             for window_group in windowed:
                 num_hit_blocks = window_group.longest_cache_hit(
-                    desired_hashes, replica_idx
+                    desired_hashes, replica_idx, allow_cross_replica
                 )
                 desired_hashes = desired_hashes[:num_hit_blocks]
 
@@ -786,10 +819,21 @@ class JengaBlockManager:
             return {leaf_id: [] for leaf_id in self._leaves}, 0
 
         num_hit_blocks = self._find_longest_device_prefix_cache_hit(
-            desired_hashes, replica_idx
+            desired_hashes, replica_idx, self._cross_replica_copy_enabled
         )
-        hit_hashes = desired_hashes[:num_hit_blocks]
 
+        if self._cross_replica_copy_enabled:
+            self._copy_prefix_from_peers(
+                desired_hashes[:num_hit_blocks], replica_idx
+            )
+            # The copy is best effort, so re-read what actually landed. Every
+            # page that fit is local now, and one that did not shortens the
+            # hit instead of breaking it.
+            num_hit_blocks = self._find_longest_device_prefix_cache_hit(
+                desired_hashes, replica_idx, False
+            )
+
+        hit_hashes = desired_hashes[:num_hit_blocks]
         hit_blocks: dict[str, list[LittleKVCacheBlock]] = {}
         for group in self._groups.values():
             hit_blocks.update(
@@ -800,6 +844,103 @@ class JengaBlockManager:
             )
 
         return hit_blocks, num_hit_blocks
+
+    def _copy_prefix_from_peers(
+        self, hit_hashes: Sequence[bytes], replica_idx: int
+    ) -> None:
+        """Copies the pages of ``hit_hashes`` that only peer replicas hold.
+
+        Best effort. The caller re-reads the prefix cache afterwards, so a
+        page that does not fit shortens the hit rather than corrupting it.
+        Every page taken is held until the end, so allocating for a later one
+        cannot evict an earlier one.
+        """
+        pool = self.pools[replica_idx]
+        held: list[LittleKVCacheBlock] = []
+        copies: list[_PageCopy] = []
+        staged: list[tuple[bytes, LittleKVCacheBlock]] = []
+        try:
+            for group in self._groups.values():
+                for block_hash in group.claimable_hashes(hit_hashes):
+                    src = group.find_replica_with_hash(
+                        block_hash, replica_idx, allow_cross_replica=True
+                    )
+                    if src is None:
+                        break
+                    try:
+                        for leaf_id in group.leaf_ids:
+                            local = pool.prefix_caches[leaf_id].get(block_hash)
+                            if local is not None:
+                                pool.touch(local)
+                                held.append(local)
+                                continue
+                            dst = pool.alloc_block(leaf_id)
+                            held.append(dst)
+                            copies.append(
+                                _PageCopy(
+                                    leaf_id=leaf_id,
+                                    dst_bid=dst.bid,
+                                    src_bid=self.pools[src]
+                                    .prefix_caches[leaf_id][block_hash]
+                                    .bid,
+                                    src_replica=src,
+                                )
+                            )
+                            staged.append((block_hash, dst))
+                    except InsufficientBlocksError:
+                        # No room left; this group copies no further. A hash
+                        # left half-committed is harmless: every page that
+                        # landed holds the right bytes for its leaf, and a hit
+                        # needs every leaf, so the re-read just will not count
+                        # it.
+                        break
+
+            num_bytes = self._submit_page_copies(replica_idx, copies)
+
+            # Publish only once the copies are enqueued: a committed hash is
+            # visible to every request, so its page must already be filled.
+            for block_hash, dst in staged:
+                pool.commit_into_prefix_cache(block_hash, dst)
+            self._metrics.cross_replica_bytes_copied += num_bytes
+        finally:
+            for block in held:
+                pool.free_block(block)
+
+    def _submit_page_copies(
+        self, dst_replica: int, copies: Sequence[_PageCopy]
+    ) -> int:
+        """Batch-copies pages from other replicas into ``dst_replica``.
+
+        Every page view is built before the call so host-side getitem work
+        does not sit between the peer copies. Destinations all live on
+        ``dst_replica``, so mixed sources still cost one submission.
+
+        Returns:
+            How many bytes the copy moves. Each leaf is measured at its own
+            page size, which is the only comparable unit here: one block of
+            the prefix is a page in every leaf of its group, and those pages
+            are not the same size.
+        """
+        if not copies:
+            return 0
+        assert self._replica_kv_memory is not None
+
+        num_bytes = 0
+        dst_pages: list[Buffer] = []
+        src_pages: list[Buffer] = []
+        for page in copies:
+            src_unit = self._replica_kv_memory[page.src_replica][page.leaf_id]
+            dst_unit = self._replica_kv_memory[dst_replica][page.leaf_id]
+            # Every TP shard is fanned out with its own point-to-point copy.
+            for src_buf, dst_buf in zip(
+                src_unit.buffers, dst_unit.buffers, strict=True
+            ):
+                dst_pages.append(dst_buf[page.dst_bid, :])
+                src_pages.append(src_buf[page.src_bid, :])
+            num_bytes += src_unit.bytes_per_page * len(src_unit.buffers)
+
+        batch_inplace_copy(dst_pages, src_pages)
+        return num_bytes
 
     def _reuse_blocks_from_prefix_cache(
         self, ctx: TextContext, replica_idx: int = 0

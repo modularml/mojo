@@ -42,17 +42,64 @@ class KVGroupCoordinatorInterface:
     leaf_ids: Sequence[str]
     group_id: KVCacheGroupId
 
-    def is_in_prefix_cache(self, block_hash: bytes, replica_idx: int) -> bool:
-        """Whether every cache of the group has committed ``block_hash``."""
+    def _holds_every_leaf(self, block_hash: bytes, replica_idx: int) -> bool:
+        """Whether every cache of the group has committed ``block_hash``.
+
+        The leaves are written in lockstep, so a hash only some of them hold
+        is unusable.
+        """
         return all(
             block_hash in self.pools[replica_idx].prefix_caches[leaf_id]
             for leaf_id in self.leaf_ids
         )
 
+    def find_replica_with_hash(
+        self,
+        block_hash: bytes,
+        replica_idx: int,
+        allow_cross_replica: bool = False,
+    ) -> int | None:
+        """The replica to serve ``block_hash`` to ``replica_idx`` from.
+
+        ``replica_idx`` is checked first, so a hash it already holds is never
+        copied. ``allow_cross_replica`` then widens the search to the other
+        replicas, whose pages are copied over before use; without it a local
+        miss is simply a miss.
+
+        Returns:
+            The replica to read the block from, or None when no replica the
+            search covered holds it.
+        """
+        if self._holds_every_leaf(block_hash, replica_idx):
+            return replica_idx
+        if not allow_cross_replica:
+            return None
+        holders = [
+            candidate
+            for candidate in range(len(self.pools))
+            if candidate != replica_idx
+            and self._holds_every_leaf(block_hash, candidate)
+        ]
+        if not holders:
+            return None
+        # Taking the first holder would make the lowest-indexed one serve every
+        # copy of a popular prefix. Keying the choice on the hash and the
+        # destination splits the reads across the holders, and across the ranks
+        # reading the same block, while staying stable per block.
+        rotation = int.from_bytes(block_hash, "little") + replica_idx
+        return holders[rotation % len(holders)]
+
+    def claimable_hashes(
+        self, desired_hashes: Sequence[bytes]
+    ) -> Sequence[bytes]:
+        """Which of ``desired_hashes`` this group would claim as a hit."""
+        raise NotImplementedError("Subclasses must implement this method.")
+
     def longest_cache_hit(
         self,
         desired_hashes: Sequence[bytes],
         replica_idx: int,
+        allow_cross_replica: bool = False,
     ) -> int:
         """Returns how many of ``desired_hashes`` this group could resume from.
 
@@ -60,6 +107,8 @@ class KVGroupCoordinatorInterface:
             desired_hashes: The blocks the request wants, from its committed
                 index up.
             replica_idx: Which pool to read.
+            allow_cross_replica: Whether hashes held only by another replica
+                count as hits.
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
@@ -102,12 +151,24 @@ class FullKVGroupCoordinator(KVGroupCoordinatorInterface):
         self,
         desired_hashes: Sequence[bytes],
         replica_idx: int,
+        allow_cross_replica: bool = False,
     ) -> int:
         """Returns the run of committed hashes from the root."""
         for num_hit_blocks, block_hash in enumerate(desired_hashes):
-            if not self.is_in_prefix_cache(block_hash, replica_idx):
+            if (
+                self.find_replica_with_hash(
+                    block_hash, replica_idx, allow_cross_replica
+                )
+                is None
+            ):
                 return num_hit_blocks
         return len(desired_hashes)
+
+    def claimable_hashes(
+        self, desired_hashes: Sequence[bytes]
+    ) -> Sequence[bytes]:
+        """Every hash: this group reads its whole history."""
+        return desired_hashes
 
     def claim_hit_blocks(
         self,
@@ -155,6 +216,7 @@ class SlidingWindowKVGroupCoordinator(KVGroupCoordinatorInterface):
         self,
         desired_hashes: Sequence[bytes],
         replica_idx: int,
+        allow_cross_replica: bool = False,
     ) -> int:
         """Returns the longest windowed cache hit we can serve.
 
@@ -197,7 +259,12 @@ class SlidingWindowKVGroupCoordinator(KVGroupCoordinatorInterface):
 
         run = 0
         for idx in range(len(desired_hashes) - 1, -1, -1):
-            if not self.is_in_prefix_cache(desired_hashes[idx], replica_idx):
+            if (
+                self.find_replica_with_hash(
+                    desired_hashes[idx], replica_idx, allow_cross_replica
+                )
+                is None
+            ):
                 # The run is broken. Reset the run counter.
                 run = 0
                 continue
@@ -209,6 +276,13 @@ class SlidingWindowKVGroupCoordinator(KVGroupCoordinatorInterface):
         # We can skip the blocks_in_window check in this case.
         return run
 
+    def claimable_hashes(
+        self, desired_hashes: Sequence[bytes]
+    ) -> Sequence[bytes]:
+        """Only the window: this group has slid past everything below it."""
+        low = max(0, len(desired_hashes) - self._blocks_in_window)
+        return desired_hashes[low:]
+
     def claim_hit_blocks(
         self,
         desired_hashes: Sequence[bytes],
@@ -218,7 +292,7 @@ class SlidingWindowKVGroupCoordinator(KVGroupCoordinatorInterface):
         pool = self.pools[replica_idx]
         low = max(0, len(desired_hashes) - self._blocks_in_window)
         if not all(
-            self.is_in_prefix_cache(block_hash, replica_idx)
+            self._holds_every_leaf(block_hash, replica_idx)
             for block_hash in desired_hashes[low:]
         ):
             low = len(desired_hashes)

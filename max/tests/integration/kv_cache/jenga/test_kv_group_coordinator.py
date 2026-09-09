@@ -68,11 +68,33 @@ def commit(
             pool.free_block(block)
 
 
+def full_group_across(
+    pools: Sequence[JengaBlockPool], leaf_ids: Sequence[str] = (VALUES,)
+) -> KVGroupCoordinatorInterface:
+    """A full group whose pools are one per data-parallel replica."""
+    return create_kv_group_coordinator(
+        list(pools), list(leaf_ids), KVCacheGroupId.full(), BLOCK_SIZE
+    )
+
+
 def full_group(
     pool: JengaBlockPool, leaf_ids: Sequence[str] = (VALUES,)
 ) -> KVGroupCoordinatorInterface:
+    return full_group_across([pool], leaf_ids)
+
+
+def sliding_group_across(
+    pools: Sequence[JengaBlockPool],
+    window: int = WINDOW,
+    block_size: int = BLOCK_SIZE,
+    leaf_ids: Sequence[str] = (VALUES,),
+) -> KVGroupCoordinatorInterface:
+    """A sliding group whose pools are one per data-parallel replica."""
     return create_kv_group_coordinator(
-        [pool], list(leaf_ids), KVCacheGroupId.full(), BLOCK_SIZE
+        list(pools),
+        list(leaf_ids),
+        KVCacheGroupId("sliding_window", window),
+        block_size,
     )
 
 
@@ -82,12 +104,7 @@ def sliding_group(
     block_size: int = BLOCK_SIZE,
     leaf_ids: Sequence[str] = (VALUES,),
 ) -> KVGroupCoordinatorInterface:
-    return create_kv_group_coordinator(
-        [pool],
-        list(leaf_ids),
-        KVCacheGroupId("sliding_window", window),
-        block_size,
-    )
+    return sliding_group_across([pool], window, block_size, leaf_ids)
 
 
 def bids(blocks: Sequence[LittleKVCacheBlock]) -> list[int]:
@@ -139,10 +156,10 @@ def test_a_hash_is_present_only_when_every_leaf_holds_it() -> None:
     group = full_group(pool, [VALUES, SCALES])
 
     commit(pool, [VALUES], keys)
-    assert not group.is_in_prefix_cache(keys[0], 0)
+    assert group.find_replica_with_hash(keys[0], 0) is None
 
     commit(pool, [SCALES], keys)
-    assert group.is_in_prefix_cache(keys[0], 0)
+    assert group.find_replica_with_hash(keys[0], 0) == 0
 
 
 def test_full_hit_is_the_run_from_the_root() -> None:
@@ -337,3 +354,95 @@ def test_only_the_group_leaves_are_touched() -> None:
 
     assert set(rows) == {VALUES}
     assert all(pool.prefix_caches[SCALES][key].ref_cnt == 0 for key in keys)
+
+
+def test_find_replica_prefers_local_even_when_peers_are_searchable() -> None:
+    """A block the replica already holds must never source a copy."""
+    pools = [make_pool(), make_pool()]
+    keys = block_keys(1)
+    commit(pools[0], [VALUES], keys)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    assert (
+        group.find_replica_with_hash(keys[0], 0, allow_cross_replica=True) == 0
+    )
+    assert (
+        group.find_replica_with_hash(keys[0], 1, allow_cross_replica=True) == 1
+    )
+
+
+def test_find_replica_falls_back_to_a_peer_when_allowed() -> None:
+    pools = [make_pool(), make_pool()]
+    keys = block_keys(1)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    assert (
+        group.find_replica_with_hash(keys[0], 0, allow_cross_replica=True) == 1
+    )
+
+
+def test_find_replica_ignores_a_peer_when_not_allowed() -> None:
+    """Peer search is opt-in, so a local miss stays a miss by default."""
+    pools = [make_pool(), make_pool()]
+    keys = block_keys(1)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    assert group.find_replica_with_hash(keys[0], 0) is None
+
+
+def test_find_replica_spreads_peer_reads_across_holders() -> None:
+    """Two ranks wanting one block read from different holders.
+
+    Taking the first holder would put every copy of a popular prefix on the
+    lowest-indexed replica and leave the others' links idle.
+    """
+    pools = [make_pool() for _ in range(4)]
+    keys = block_keys(4)
+    commit(pools[0], [VALUES], keys)
+    commit(pools[1], [VALUES], keys)
+
+    group = full_group_across(pools)
+    for key in keys:
+        assert (
+            group.find_replica_with_hash(key, 2, allow_cross_replica=True) == 0
+        )
+        assert (
+            group.find_replica_with_hash(key, 3, allow_cross_replica=True) == 1
+        )
+
+
+def test_find_replica_returns_none_when_absent() -> None:
+    group = full_group_across([make_pool(), make_pool()])
+    key = block_keys(1)[0]
+
+    assert group.find_replica_with_hash(key, 0) is None
+    assert (
+        group.find_replica_with_hash(key, 0, allow_cross_replica=True) is None
+    )
+
+
+def test_full_claims_every_hash() -> None:
+    """The whole prefix is claimed, so every hash is worth copying."""
+    keys = block_keys(3)
+    group = full_group(make_pool())
+
+    assert list(group.claimable_hashes(keys)) == keys
+
+
+def test_sliding_claims_only_its_window() -> None:
+    """Blocks below the window are nulled, so copying them would be waste."""
+    keys = block_keys(8)
+    group = sliding_group(make_pool())
+
+    assert list(group.claimable_hashes(keys)) == keys[-WINDOW_BLOCKS:]
+
+
+def test_sliding_claims_a_prefix_shorter_than_its_window() -> None:
+    """A run reaching the root is claimable however short it is."""
+    keys = block_keys(2)
+    group = sliding_group(make_pool())
+
+    assert list(group.claimable_hashes(keys)) == keys

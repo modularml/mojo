@@ -43,8 +43,9 @@ class KVCacheMetrics:
     cache_tokens: int = 0
     """Number of tokens retrieved from cache (cache hits)."""
     device_blocks_served: int = 0
-    """Number of cache blocks served directly from the local device prefix
-    cache, with no host/disk promotion or cross-replica copy needed."""
+    """Number of cache blocks served from the device tier, with no host or disk
+    promotion. Jenga counts a block copied in from a peer replica; the legacy
+    cache counts only blocks the replica already held."""
     h2d_bytes_copied: int = 0
     """Bytes of KV copied from the connector's host tier to device."""
     d2h_bytes_copied: int = 0
