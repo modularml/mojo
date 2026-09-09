@@ -26,7 +26,10 @@ from std.sys.info import size_of
 from std.collections import StringDict
 
 from std.builtin._startup import _ensure_runtime_init
-from std.builtin.variadics import _call_with_dynamic_pack_pointers
+from std.builtin.variadics import (
+    _call_with_dynamic_pack_pointers,
+    _create_dynamic_pack,
+)
 from std.reflection import reflect
 from std.memory import OpaquePointer, unsafe_stack_allocation
 from std.python import Python, PythonObject
@@ -1641,28 +1644,14 @@ def _dispatch_python_object_method[
 ) raises -> PythonObject:
     check_arguments_arity(PyArgs.length, nargs)
 
-    comptime ToPointer[
-        T: type_of(PythonObject)
-    ]: ImplicitlyCopyable & Deinitable = Pointer[T, MutUnsafeAnyOrigin]
-    var pointers: Tuple[*PyArgs.map[ToPointer]()]
-    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(pointers))
-    comptime for i in range(PyArgs.length):
-        var p: Pointer[PyObjectPtr, _] = Pointer(to=args[unsafe_offset=i])
-        pointers[i] = rebind[type_of(pointers[i])](
-            p.unsafe_bitcast[PythonObject]().as_unsafe_any_origin()
-        )
+    def make_elem_ptr[
+        idx: Int
+    ]() {args} -> Pointer[PyArgs[idx], MutUnsafeAnyOrigin]:
+        var p1: Pointer[PyObjectPtr, _] = Pointer(to=args[unsafe_offset=idx])
+        var p2 = p1.unsafe_bitcast[PythonObject]().as_unsafe_any_origin()
+        return rebind_var[Pointer[PyArgs[idx], MutUnsafeAnyOrigin]](p2)
 
-    comptime BorrowedPack = VariadicPack[
-        origin=MutUnsafeAnyOrigin,
-        element_trait=type_of(PythonObject),
-        False,
-        *PyArgs,
-    ]
-    var borrowed = BorrowedPack(
-        __mlir_op.`lit.ref.pack.from_pointer_pack`[
-            _type=BorrowedPack._mlir_type
-        ](pointers._mlir_value)
-    )
+    var borrowed = _create_dynamic_pack[PyArgs](make_elem_ptr)
     var result = method(self_arg, *borrowed)
 
     return _return_python_object(result^)
@@ -1685,28 +1674,17 @@ def _dispatch_python_object_kwargs_function[
     comptime for i in range(PyArgs.length):
         positional_args.unsafe_ptr().unsafe_offset(i).unsafe_write(py_args[i])
 
-    comptime ToPointer[
-        T: type_of(PythonObject)
-    ]: ImplicitlyCopyable & Deinitable = Pointer[T, MutUnsafeAnyOrigin]
-    var pointers: Tuple[*PyArgs.map[ToPointer]()]
-    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(pointers))
-    comptime for i in range(PyArgs.length):
+    def make_elem_ptr[
+        idx: Int
+    ]() {positional_args} -> Pointer[PyArgs[idx], MutUnsafeAnyOrigin]:
         var element = (
-            positional_args.unsafe_ptr().unsafe_offset(i).as_unsafe_any_origin()
+            positional_args.unsafe_ptr()
+            .unsafe_offset(idx)
+            .as_unsafe_any_origin()
         )
-        pointers[i] = rebind[type_of(pointers[i])](element)
+        return rebind_var[Pointer[PyArgs[idx], MutUnsafeAnyOrigin]](element)
 
-    comptime BorrowedPack = VariadicPack[
-        origin=MutUnsafeAnyOrigin,
-        element_trait=type_of(PythonObject),
-        False,
-        *PyArgs,
-    ]
-    var borrowed = BorrowedPack(
-        __mlir_op.`lit.ref.pack.from_pointer_pack`[
-            _type=BorrowedPack._mlir_type
-        ](pointers._mlir_value)
-    )
+    var borrowed = _create_dynamic_pack[PyArgs](make_elem_ptr)
     var kwargs = _convert_kwargs(py_kwargs)
     var result = func(*borrowed, **kwargs^)
 
@@ -1737,28 +1715,17 @@ def _dispatch_python_object_kwargs_method[
     comptime for i in range(PyArgs.length):
         positional_args.unsafe_ptr().unsafe_offset(i).unsafe_write(py_args[i])
 
-    comptime ToPointer[
-        T: type_of(PythonObject)
-    ]: ImplicitlyCopyable & Deinitable = Pointer[T, MutUnsafeAnyOrigin]
-    var pointers: Tuple[*PyArgs.map[ToPointer]()]
-    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(pointers))
-    comptime for i in range(PyArgs.length):
+    def make_elem_ptr[
+        idx: Int
+    ]() {positional_args} -> Pointer[PyArgs[idx], MutUnsafeAnyOrigin]:
         var element = (
-            positional_args.unsafe_ptr().unsafe_offset(i).as_unsafe_any_origin()
+            positional_args.unsafe_ptr()
+            .unsafe_offset(idx)
+            .as_unsafe_any_origin()
         )
-        pointers[i] = rebind[type_of(pointers[i])](element)
+        return rebind_var[Pointer[PyArgs[idx], MutUnsafeAnyOrigin]](element)
 
-    comptime BorrowedPack = VariadicPack[
-        origin=MutUnsafeAnyOrigin,
-        element_trait=type_of(PythonObject),
-        False,
-        *PyArgs,
-    ]
-    var borrowed = BorrowedPack(
-        __mlir_op.`lit.ref.pack.from_pointer_pack`[
-            _type=BorrowedPack._mlir_type
-        ](pointers._mlir_value)
-    )
+    var borrowed = _create_dynamic_pack[PyArgs](make_elem_ptr)
     var kwargs = _convert_kwargs(py_kwargs)
     var result = method(self_arg, *borrowed, **kwargs^)
 

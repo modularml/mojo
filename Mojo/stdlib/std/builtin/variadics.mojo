@@ -1718,6 +1718,41 @@ def _call_with_dynamic_pack_pointers[
             for a given index. The pointer origin must be valid for the duration
             of the call to `user_func`.
     """
+    var borrowed = _create_dynamic_pack[Args](make_elem_ptr)
+    return user_func(*borrowed)
+
+
+# TODO(MSTDL-3177): Take a caller specified origin instead of MutUnsafeAnyOrigin
+@always_inline
+def _create_dynamic_pack[
+    ArgTrait: type_of(AnyType),
+    //,
+    Args: TypeList[Trait=ArgTrait, ...],
+](
+    init_element_func: Some[
+        def[idx: Int]() -> Pointer[Args[idx], MutUnsafeAnyOrigin]
+    ],
+) -> VariadicPack[
+    origin=MutUnsafeAnyOrigin,
+    element_trait=ArgTrait,
+    False,
+    *Args,
+]:
+    """Constructs a borrowed `VariadicPack` from per-element pointers.
+
+    The closure is invoked exactly once for each type in `Args`, in ascending
+    index order.
+
+    Parameters:
+        Args: The pack element types.
+
+    Args:
+        init_element_func: Returns the pointer for a given pack element. Each
+            pointer must remain valid while the returned pack is used.
+
+    Returns:
+        The dynamically constructed borrowed pack.
+    """
     comptime ToPointer[T: ArgTrait]: ImplicitlyCopyable & Deinitable = Pointer[
         T, MutUnsafeAnyOrigin
     ]
@@ -1730,7 +1765,7 @@ def _call_with_dynamic_pack_pointers[
     # Get a pointer to each pack element value. It's up to the caller
     # to ensure that these pointers are valid for the duration of this function.
     comptime for i in range(Args.length):
-        var element = make_elem_ptr[i]()
+        var element = init_element_func[i]()
         # FIXME(MOCO-4635): This rebind is needed to work around a type folding bug
         pointers[i] = rebind[type_of(pointers[i])](element)
 
@@ -1741,11 +1776,10 @@ def _call_with_dynamic_pack_pointers[
         False,
         *Args,
     ]
-    var borrowed = BorrowedPack(
+    var pack = BorrowedPack(
         __mlir_op.`lit.ref.pack.from_pointer_pack`[
             _type=BorrowedPack._mlir_type
         ](pointers._mlir_value)
     )
 
-    # Call the user primary function
-    return user_func(*borrowed)
+    return pack^
