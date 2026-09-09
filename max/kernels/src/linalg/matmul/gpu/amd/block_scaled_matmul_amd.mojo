@@ -1229,8 +1229,13 @@ struct BlockScaledMatmulAMD[
                     the stage base (a multiple of the swizzle's 1024-byte span).
             """
             comptime MmaOpT = type_of(mma_op)
-            comptime a_stage_base = stage * Self.BM * A_BK_BYTES
-            comptime b_stage_base = stage * Self.BN * B_BK_BYTES
+            # Stride by the SMEM row, not the payload: at FP6 the 96-byte BK
+            # row is padded to 128 in the allocation above, so stepping by
+            # `A_BK_BYTES` would put stage 1 short of where it was written.
+            # The two are equal at MXFP4/MXFP8, which is why this only shows up
+            # as wrong results on FP6.
+            comptime a_stage_base = stage * Self.BM * A_SMEM_ROW_BYTES
+            comptime b_stage_base = stage * Self.BN * B_SMEM_ROW_BYTES
             var tid = Int(thread_idx.x)
 
             @always_inline
@@ -1611,12 +1616,24 @@ def _launch_block_scaled[
     ctx: DeviceContext,
 ) raises:
     """Instantiate BlockScaledMatmulAMD with the given tile shape and launch."""
-    # Depth-2 LDS ping-pong: MXFP8 BK=128 is one K-sub-tile, so the single-buffer
-    # body cannot overlap ds_write with MFMA. VGPR-bound, so 2x LDS costs no occupancy.
+    # Depth-2 LDS ping-pong: at BK=128 the K-sub-tile is one deep, so the
+    # single-buffer body cannot overlap ds_write with MFMA. VGPR-bound, so 2x
+    # LDS costs no occupancy (64 KiB of the 160 KiB budget at BM=BN=128).
+    #
+    # FP6 is admitted alongside FP8. Its 96-byte BK row is padded to 128 in
+    # SMEM (`_smem_row_bytes`), so the staged footprint and the swizzle are the
+    # same as FP8's; what differs is the DRAM side, where a 6-byte-per-16
+    # column count leaves some load threads idle. That is a load-side cost the
+    # pipelining is meant to hide, so it is measured, not assumed -- see the
+    # MXFP6 dense dispatch below for which shapes actually take this tile.
     comptime _a_bk_bytes = (BK_ELEMS * matrix_format.bits_per_element()) // 8
     comptime _k_tiles_total = type_of(a).static_shape[1] // _a_bk_bytes
     comptime num_stages = 2 if (
-        matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT8_E4M3
+        (
+            matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT8_E4M3
+            or matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT6_E2M3
+            or matrix_format == CDNA4F8F6F4MatrixFormat.FLOAT6_E3M2
+        )
         and BK_ELEMS == 128
         and BM == 128
         and BN == 128
@@ -2553,6 +2570,7 @@ def mxfp6_block_scaled_matmul_amd[
     num_splits: Int = 1,
     preshuffled_b: Bool = False,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
+    allow_lds_pingpong: Bool = True,
 ](
     c: TileTensor[mut=True, ...],
     a: TileTensor[mut=False, .uint8, ...],
@@ -2599,6 +2617,10 @@ def mxfp6_block_scaled_matmul_amd[
         elementwise_lambda_fn: Optional epilogue applied to each output
             element in registers instead of storing it. The fused QKV ops
             use it to scatter K/V into the paged cache.
+        allow_lds_pingpong: Whether the depth-2 LDS ping-pong tile may be
+            selected. Callers whose `elementwise_lambda_fn` is expensive pass
+            False: the tile was measured with a plain store epilogue, and a
+            heavier one spills past the GPU stack-frame limit at BM=128.
 
     Args:
         c: Output `[M, N]` (any float dtype).
@@ -2675,6 +2697,63 @@ def mxfp6_block_scaled_matmul_amd[
         "N must be a multiple of BN=64 for the MXFP6 block-scaled matmul; a"
         " column overhang wraps into the next row and corrupts it"
     )
+
+    # === Narrow-M decode band (M <= NARROW_M_MAX) ===
+    # The BM=48 tile below was tuned on N=2048/K=6144 and N=6144/K=3072, which
+    # stopped being production shapes when the fused QKV+IndexQK projection
+    # replaced them. It is also the widest BM the tuning sweep could reach: the
+    # sweep prunes on warps-per-CTA % 3 == 0 for full DRAM->SMEM loader
+    # utilization, which admits only BM=48 and BM=96 and so never measured any
+    # 2-warp tile. Those build and compute correctly (checksums agree to 1e-9
+    # against the shipping tile at every M) and they win below M=16.
+    #
+    # Median of 3 reps, us/call, vs the BM=48 tile:
+    #
+    #   N=2560 K=6144   M=1 1.20x  M=8 1.17x  M=16 1.04x  M=20 0.83x
+    #   N=6144 K=2048   M=1 1.27x  M=8 1.22x  M=16 1.18x  M=20 0.96x
+    #
+    # The split factor is the lever, not the tile: the same tile at
+    # `_pick_num_splits`'s value measures 1.05x / 0.93x instead. Both winners
+    # sit at the largest split the K-loop admits, which is well past that
+    # formula's two-wave CTA cap -- so the band is shape-gated (as the MXFP8
+    # path gates its own measured bands) rather than derived, and must not be
+    # widened to shapes it was not measured on.
+    comptime NARROW_M_MAX = 16
+    comptime W_BM = 16
+    comptime W_BN = 32
+    comptime W_BK_ELEMS = 128
+    comptime W_WM = 16
+    comptime W_WN = 16
+    comptime W_BK_BYTES = (W_BK_ELEMS * fp6_format.bits_per_element()) // 8
+    # Largest legal split: `BlockScaledMatmulAMD.run` needs every band to be a
+    # whole number of BK tiles, and at least two so the K-loop stays pipelined.
+    comptime W_SPLITS = (K_BYTES // W_BK_BYTES) // 2
+    comptime _m3_fp6_narrow_m = (N == 2560 and K_BYTES == 4608) or (
+        N == 6144 and K_BYTES == 1536
+    )
+    comptime _narrow_ok = (
+        _m3_fp6_narrow_m
+        and num_splits == 1
+        and W_SPLITS > 1
+        and N % W_BN == 0
+        and K_BYTES % W_BK_BYTES == 0
+        and K_BYTES % W_SPLITS == 0
+        and (K_BYTES // W_SPLITS) % W_BK_BYTES == 0
+    )
+
+    comptime if _narrow_ok:
+        if M <= NARROW_M_MAX:
+            _launch_block_scaled_split_k[
+                BM=W_BM,
+                BN=W_BN,
+                BK_ELEMS=W_BK_ELEMS,
+                WM=W_WM,
+                WN=W_WN,
+                num_splits=W_SPLITS,
+                matrix_format=fp6_format,
+                elementwise_lambda_fn=elementwise_lambda_fn,
+            ](c, a, b, a_scales, b_scales, M, ctx)
+            return
 
     # === Decode tile (M <= DECODE_M_MAX) ===
     # The BM=96 tile below spans the whole decode M range in one M-tile, so
@@ -2796,6 +2875,48 @@ def mxfp6_block_scaled_matmul_amd[
             WM=WM,
             WN=WN,
             num_splits=num_splits,
+            matrix_format=fp6_format,
+            elementwise_lambda_fn=elementwise_lambda_fn,
+        ](c, a, b, a_scales, b_scales, M, ctx)
+        return
+
+    # Depth-2 LDS ping-pong tile. `_launch_block_scaled` turns the pipeline on
+    # for exactly BM=BN=128, WM=WN=64, BK_ELEMS=128 with an even K-tile count,
+    # so those are the conditions here; anything else falls through to the
+    # single-buffer BM=96 tile below.
+    #
+    # `allow_lds_pingpong=False` is how a caller declines it. The tile was
+    # measured with a plain store epilogue; the fused QKV scatter is far
+    # heavier, and at BM=128/WM=64 inlining it puts the frame past the GPU's
+    # 131056-byte limit (136288 at N=1280, 203616 at N=1920), so the kernel
+    # fails to build and the launch returns hipErrorIllegalState. The width
+    # alone is fine -- N=1280 with a plain store epilogue builds.
+    #
+    # This is the shape MXFP8 already runs for the same projections, where it
+    # is the difference between 214 and 618 us per generated token on
+    # N=2560/K=6144 at concurrency 32. FP6 pays a load-side cost FP8 does not
+    # -- its 96-byte BK row is 6 uint8x16 columns, so 192 of 256 threads are
+    # active on the DRAM read -- which is why this is measured against the
+    # BM=96 tile rather than assumed to win.
+    comptime P2_BM = 128
+    comptime P2_BN = 128
+    comptime P2_W = 64
+    comptime P2_BK_BYTES = (128 * fp6_format.bits_per_element()) // 8
+    comptime _p2_k_tiles = K_BYTES // P2_BK_BYTES
+    comptime _pingpong_ok = (
+        allow_lds_pingpong
+        and N % P2_BN == 0
+        and K_BYTES % P2_BK_BYTES == 0
+        and _p2_k_tiles >= 2
+        and _p2_k_tiles % 2 == 0
+    )
+    comptime if _pingpong_ok:
+        _launch_block_scaled[
+            BM=P2_BM,
+            BN=P2_BN,
+            BK_ELEMS=128,
+            WM=P2_W,
+            WN=P2_W,
             matrix_format=fp6_format,
             elementwise_lambda_fn=elementwise_lambda_fn,
         ](c, a, b, a_scales, b_scales, M, ctx)

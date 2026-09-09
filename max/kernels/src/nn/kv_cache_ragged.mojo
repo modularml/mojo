@@ -2471,6 +2471,7 @@ def _matmul_blockwise_scaled_fp4_common[
                 fp6_format=CDNA4F8F6F4MatrixFormat(mx_format),
                 preshuffled_b=preshuffled_b,
                 elementwise_lambda_fn=elementwise_lambda_fn,
+                allow_lds_pingpong=False,
             ](
                 c_tt,
                 lt_to_tt(hidden_state).bitcast[.uint8](),
