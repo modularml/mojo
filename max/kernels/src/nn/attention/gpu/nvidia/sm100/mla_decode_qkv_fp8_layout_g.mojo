@@ -1096,7 +1096,7 @@ struct MLA_SM100_Decode_QKV_FP8_Layout_G[
         # Extract scalar launch args from the stable device buffer.
         var batch_size = Int(scalar_args.raw_load(0))
         var q_max_seq_len = Int(scalar_args.raw_load(1))
-        var num_partitions = mla_decode_pack.num_partitions
+        var num_partitions = Int(mla_decode_pack.num_partitions)
 
         comptime num_reg_softmax = 192
         comptime num_reg_correction = 184

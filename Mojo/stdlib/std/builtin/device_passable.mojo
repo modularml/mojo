@@ -150,6 +150,11 @@ def _contains_device_passable_field[T: AnyType]() -> Bool:
     # reflection is not functional for _RegTuple, assume it is bit copyable.
     comptime if r.base_name() == "_RegTuple":
         return False
+    # `Bool` stores a `!kgen.scalar<bool>`, which `is_struct()` reports as a
+    # struct but `field_types()` rejects, so recursing into it fails to
+    # elaborate. It holds nothing `DevicePassable` either way.
+    comptime if r.base_name() == "Bool":
+        return False
     comptime field_types = r.field_types()
     comptime for i in range(r.field_count()):
         comptime FieldType = field_types[i]
@@ -314,8 +319,8 @@ trait DeviceTypeEncoder:
                 encoded fields.
 
         Constraints:
-            - `StructType` must conform to `RegisterPassable` and be a Mojo
-              struct type.
+            - `StructType` must be a Mojo struct type conforming to
+              `DevicePassable` or `RegisterPassable`.
             - Every field must either conform to `DevicePassable`, be a
               composite transitively containing a `DevicePassable` member,
               conform to `ImplicitlyCopyable & Deinitable`, or
@@ -325,9 +330,11 @@ trait DeviceTypeEncoder:
         # DevicePassable if a RegisterPassable struct field is DevicePassable.
         # Instead we allow non-DevicePassable types to be encoded when they are
         # RegisterPassable.
-        comptime assert conforms_to(StructType, RegisterPassable), String(
+        comptime assert conforms_to(StructType, DevicePassable) or conforms_to(
+            StructType, RegisterPassable
+        ), String(
             t"encode_fields: StructType '{reflect[StructType].base_name()}'"
-            t" must conform to RegisterPassable"
+            t" must conform to DevicePassable or RegisterPassable"
         )
         comptime assert reflect[StructType].is_struct(), String(
             t"encode_fields: StructType '{reflect[StructType].base_name()}'"

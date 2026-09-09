@@ -769,8 +769,8 @@ struct TMATensorTile[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        """Device type mapping is the identity function."""
-        encoder.encode(self, target)
+        """Encodes each field into its device representation."""
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -5189,7 +5189,7 @@ struct TMATensorTileArray[
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
         """Device type mapping is the identity function."""
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -5331,8 +5331,8 @@ struct RaggedTMA3DTile[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        """Device type mapping is the identity function."""
-        encoder.encode(self, target)
+        """Encodes each field into its device representation."""
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -5688,7 +5688,7 @@ struct RaggedTensorMap[
 
     var descriptor: TMADescriptor
     """The TMA descriptor that will be used to store the ragged tensor."""
-    var max_length: Int
+    var max_length: Int64
     """The maximum length present in the sequences of the ragged tensor."""
     var global_shape: DynamicCoord[.int64, Self.global_rank]
     """The shape of the global tensor."""
@@ -5745,7 +5745,7 @@ struct RaggedTensorMap[
             encoder: The device specific type encoder.
             target: Opaque pointer to the target device memory location.
         """
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -5891,7 +5891,7 @@ struct RaggedTensorMap[
             global_tensor,
         )
 
-        self.max_length = max_length
+        self.max_length = Int64(max_length)
         self.global_shape = Coord(global_shape)
         self.global_stride = Coord(global_stride)
 
@@ -6015,7 +6015,7 @@ struct RaggedTensorMap[
 
             var adjusted_coordinates = coordinates
             adjusted_coordinates[Self.global_rank - 1] = cumulative_length
-            adjusted_coordinates[1] = self.max_length - store_length
+            adjusted_coordinates[1] = Int(self.max_length) - store_length
 
             cp_async_bulk_tensor_global_shared_cta(
                 tile_iterator[].ptr,
@@ -6036,7 +6036,7 @@ struct RaggedTensorMap[
 
             for i in range(descriptor_iters):
                 var max_length_offset = (
-                    self.max_length
+                    Int(self.max_length)
                     - store_length
                     + (i * descriptor_load_length)
                 )
@@ -6119,8 +6119,8 @@ struct TMATensorTileIm2col[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        """Device type mapping is the identity function."""
-        encoder.encode(self, target)
+        """Encodes each field into its device representation."""
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:

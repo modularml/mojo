@@ -712,7 +712,7 @@ struct BF16TokenFormat[
             encoder: The device specific type encoder.
             target: The target address to store the device type.
         """
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -853,7 +853,7 @@ struct BlockwiseFP8TokenFormat[
             encoder: The device specific type encoder.
             target: The target address to store the device type.
         """
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -1171,7 +1171,7 @@ struct NVBlockScaledTokenFormat[
             encoder: The device specific type encoder.
             target: The target address to store the device type.
         """
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -1718,7 +1718,7 @@ struct MXTokenFormat[
     var output_scales: Self.ScalesTensorType
     # Per-expert `scale_4d` slot stride in rows (= `align_up(max, 32)`); only
     # used when `fuse_a_scale_preshuffle` (KS224 up-proj fusion).
-    var max_padded_M: Int
+    var max_padded_M: Int64
 
     comptime device_type: AnyType = Self
 
@@ -1732,7 +1732,7 @@ struct MXTokenFormat[
             encoder: The device specific type encoder.
             target: The target address to store the device type.
         """
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -1775,7 +1775,7 @@ struct MXTokenFormat[
             ),
             output_scales.layout,
         }
-        self.max_padded_M = max_padded_M
+        self.max_padded_M = Int64(max_padded_M)
 
     @always_inline
     @staticmethod
@@ -2022,11 +2022,11 @@ struct MXTokenFormat[
             comptime K_SCALES = Self.hid_dim // Self.group_size
             var local_row = token_index - expert_start
             debug_assert(
-                self.max_padded_M > 0,
+                Int(self.max_padded_M) > 0,
                 "KS224 fused scale store requires max_padded_M > 0",
             )
             debug_assert(
-                local_row < self.max_padded_M,
+                local_row < Int(self.max_padded_M),
                 (
                     "KS224 fused scale store: local_row exceeds the per-expert"
                     " slot capacity (max_padded_M)"
@@ -2042,7 +2042,7 @@ struct MXTokenFormat[
                 ](Self.scales_offset() + i * scale_bytes)
                 var dst_off = Shuffler[1].scale_4d_slot_byte_off[
                     K_SCALES=K_SCALES
-                ](expert_slot, local_row, i, self.max_padded_M)
+                ](expert_slot, local_row, i, Int(self.max_padded_M))
                 self.output_scales._storage[dst_off] = bitcast[
                     Self.scales_dtype, 1
                 ](byte)
@@ -2114,7 +2114,7 @@ struct EPLocalSyncCounters[n_experts: Int](
             encoder: The device specific type encoder.
             target: The target address to store the device type.
         """
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:

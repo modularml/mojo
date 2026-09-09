@@ -129,14 +129,14 @@ trait TileConsumer(DevicePassable, TrivialRegisterPassable):
     """AddressSpace of the tile being consumed"""
 
     # Default `DevicePassable` boilerplate so conformers need not restate it:
-    # the device type is the consumer itself, encoding bit-copies it, and the
-    # name comes from reflection.
+    # the device type is the consumer itself, encoding recurses into the
+    # fields, and the name comes from reflection.
     comptime device_type: AnyType = Self
 
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -184,14 +184,14 @@ trait TileOperation(DevicePassable, TrivialRegisterPassable):
     """AddressSpace of the tile being transformed (typically LOCAL)."""
 
     # Default `DevicePassable` boilerplate so conformers need not restate it:
-    # the device type is the op itself, encoding bit-copies it, and the name
-    # comes from reflection.
+    # the device type is the op itself, encoding recurses into the fields, and
+    # the name comes from reflection.
     comptime device_type: AnyType = Self
 
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:

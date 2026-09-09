@@ -11,6 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.sys import size_of
 from std.utils import IndexList, StaticTuple
 
@@ -204,7 +205,7 @@ struct OOBFill(TrivialRegisterPassable):
 # The TMA descriptor is a 128-byte opaque object filled by the driver API.
 # It should be 64-byte aligned both on the host and the device (if passed to constant memory).
 @align(64)
-struct TensorMap(ImplicitlyCopyable):
+struct TensorMap(DevicePassable, ImplicitlyCopyable):
     """A tensor memory access descriptor for optimized GPU tensor operations.
 
     TensorMap encapsulates a 128-byte opaque descriptor that is filled by the
@@ -218,6 +219,29 @@ struct TensorMap(ImplicitlyCopyable):
 
     var data: StaticTuple[UInt8, 128]
     """The underlying 128-byte opaque descriptor data filled by the CUDA driver API."""
+
+    comptime device_type: AnyType = Self
+    """The device-side type for this tensor map."""
+
+    def _to_device_type(
+        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+    ):
+        """Copies the opaque descriptor bytes to the device unchanged.
+
+        Args:
+            encoder: The device specific type encoder.
+            target: Opaque pointer to the target device memory location.
+        """
+        encoder.encode(self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        """Gets the type name for this tensor map.
+
+        Returns:
+            The string "TensorMap".
+        """
+        return "TensorMap"
 
     @always_inline
     def __init__(out self):

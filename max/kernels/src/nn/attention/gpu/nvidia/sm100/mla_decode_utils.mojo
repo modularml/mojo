@@ -319,13 +319,13 @@ struct MLA_Decode_Pack[
     var mask: Self.MaskType
     var valid_length: Self.ValidLengthType
     var lse_accum_split_ptr: Self.SplitAccumType
-    var num_partitions: Int
+    var num_partitions: Int64
     comptime device_type: AnyType = Self
 
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -346,7 +346,7 @@ struct MLA_Decode_Pack[
         self.mask = mask
         self.valid_length = valid_length
         self.lse_accum_split_ptr = lse_accum_split_ptr
-        self.num_partitions = num_partitions
+        self.num_partitions = Int64(num_partitions)
 
 
 # ------------------------------------------------------------------------------

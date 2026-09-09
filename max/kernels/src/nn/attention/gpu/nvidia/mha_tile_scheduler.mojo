@@ -555,7 +555,7 @@ struct TransientScheduler[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -743,7 +743,7 @@ struct TileScheduler[
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
     ):
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -1023,7 +1023,7 @@ struct QueuedTileScheduler[
             encoder: The device specific type encoder.
             target: The target address to store the device type.
         """
-        encoder.encode(self, target)
+        encoder.encode_fields[Self](self, target)
 
     @no_inline
     @staticmethod
