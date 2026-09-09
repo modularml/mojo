@@ -349,6 +349,205 @@ kgen.func @remove_unused_if_results(%arg0: !kgen.scalar<bool>, %arg1: i32, %arg2
   kgen.return %0#1 : i32
 }
 
+//===----------------------------------------------------------------------===//
+// Same canonicalizations for 2-arm `hlcf.elif` (empty elif list).
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @fold_elif_return
+kgen.func @fold_elif_return(%arg0 : index, %arg1: index, %arg2: index) -> index {
+  // CHECK-NOT: hlcf.elif
+  // CHECK-NEXT: kgen.return %arg0
+  // CHECK-NOT: kgen.return
+  %cond = kgen.param.constant: scalar<bool> = <true>
+  hlcf.elif %cond {
+    kgen.return %arg0: index
+  } else {
+    kgen.return %arg1: index
+  }
+  kgen.return %arg2: index
+}
+
+// CHECK-LABEL: @fold_elif_yield
+kgen.func @fold_elif_yield(%arg0 : index, %arg1: index) -> index {
+  // CHECK-NOT: hlcf.elif
+  // CHECK-NEXT: %[[TEN:.*]] = index.constant 10
+  // CHECK-NEXT: %[[RES:.*]] = index.add %arg1, %[[TEN]]
+  // CHECK-NEXT: kgen.return %[[RES]]
+  %cond = kgen.param.constant: scalar<bool> = <false>
+  %z = hlcf.elif %cond -> index {
+    hlcf.yield %arg0: index
+  } else {
+    hlcf.yield %arg1: index
+  }
+  %ten = index.constant 10
+  %r = index.add %z, %ten
+  kgen.return %r: index
+}
+
+// CHECK-LABEL: @hoist_unconditional_return_elif
+kgen.func @hoist_unconditional_return_elif(%arg0: !kgen.scalar<bool>, %arg1: index, %arg2: index, %arg3: index) -> index {
+  // CHECK:      %[[IF_RES:.*]] = hlcf.elif
+  // CHECK-NEXT:   hlcf.yield %arg1
+  // CHECK-NEXT: else
+  // CHECK-NEXT:   hlcf.yield %arg2
+  // CHECK-NOT:  index.add
+  // CHECK:      kgen.return %[[IF_RES]]
+  %a, %b = hlcf.elif %arg0 -> index, index {
+    kgen.return %arg1: index
+  } else {
+    kgen.return %arg2: index
+  }
+  %r = index.add %a, %arg3
+  kgen.return %r: index
+}
+
+// CHECK-LABEL: @hoist_cond_return_then_elif
+kgen.func @hoist_cond_return_then_elif(%cond: !kgen.scalar<bool>, %arg1: index, %arg2: index, %arg3: index) -> index {
+  // CHECK:      %[[IF_RES:.*]] = hlcf.elif
+  // CHECK-NEXT:   hlcf.yield %arg1
+  // CHECK-NEXT: else
+  // CHECK-NEXT:   %[[ELSE_VAL:.*]] = index.add
+  // CHECK-NEXT:   hlcf.yield %[[ELSE_VAL]]
+  // CHECK-NOT:  index.add
+  // CHECK:      return %[[IF_RES]]
+  %a, %b = hlcf.elif %cond -> index, index {
+    kgen.return %arg1: index
+  } else {
+    hlcf.yield %arg2, %arg3: index, index
+  }
+  %r = index.add %a, %b
+  kgen.return %r: index
+}
+
+// CHECK-LABEL: @hoist_cond_return_else_elif
+kgen.func @hoist_cond_return_else_elif(%cond: !kgen.scalar<bool>, %arg1: index, %arg2: index, %arg3: index) -> index {
+  // CHECK:      %[[IF_RES:.*]] = hlcf.elif
+  // CHECK-NEXT:   %[[THEN_VAL:.*]] = index.add
+  // CHECK-NEXT:   hlcf.yield %[[THEN_VAL]]
+  // CHECK-NEXT: else
+  // CHECK-NEXT:   hlcf.yield %arg1
+  // CHECK-NOT:  index.add
+  // CHECK:      return %[[IF_RES]]
+  %a, %b = hlcf.elif %cond -> index, index {
+    hlcf.yield %arg2, %arg3: index, index
+  } else {
+    kgen.return %arg1: index
+  }
+  %r = index.add %a, %b
+  kgen.return %r: index
+}
+
+// CHECK-LABEL: @hoist_cond_break_elif
+kgen.func @hoist_cond_break_elif(%cond: !kgen.scalar<bool>, %arg1: index, %arg2: index, %arg3: index) -> index {
+  // CHECK:      %[[LOOP_RES:.*]] = hlcf.loop
+  // CHECK-NEXT:   %[[IF_RES:.*]] = hlcf.elif
+  // CHECK-NEXT:     hlcf.yield %arg1
+  // CHECK-NEXT:   else
+  // CHECK-NEXT:     %[[ELSE_VAL:.*]] = index.add
+  // CHECK-NEXT:     hlcf.yield %[[ELSE_VAL]]
+  // CHECK-NOT:    index.add
+  // CHECK:        hlcf.break %[[IF_RES]]
+  // CHECK:      kgen.return %[[LOOP_RES]]
+  %t = hlcf.loop () -> index {
+    %a, %b = hlcf.elif %cond -> index, index {
+      hlcf.break %arg1: index
+    } else {
+      hlcf.yield %arg2, %arg3: index, index
+    }
+    %r = index.add %a, %b
+    hlcf.break %r: index
+  }
+  kgen.return %t: index
+}
+
+// CHECK-LABEL: @empty_elif_1
+kgen.func @empty_elif_1(%cond: !kgen.scalar<bool>, %arg1: index, %arg2: index) -> index {
+  // CHECK-NEXT: kgen.return %arg1
+  hlcf.elif %cond {
+    hlcf.yield
+  } else {
+    hlcf.yield
+  }
+  kgen.return %arg1: index
+}
+
+// CHECK-LABEL: @empty_elif_2
+kgen.func @empty_elif_2(%cond: !kgen.scalar<bool>, %arg1: index, %arg2: index) -> index {
+  // CHECK-NOT:  hlcf.elif
+  // CHECK-NOT:  hlcf.yield %arg1, %arg2
+  // CHECK:      %[[RES:.*]] = index.add %arg1, %arg2
+  // CHECK-NEXT: kgen.return %[[RES]]
+  %a, %b = hlcf.elif %cond -> index, index {
+    hlcf.yield %arg1, %arg2: index, index
+  } else {
+    hlcf.yield %arg1, %arg2: index, index
+  }
+  %r = index.add %a, %b
+  kgen.return %r: index
+}
+
+// CHECK-LABEL: @empty_elif_partial
+kgen.func @empty_elif_partial(%cond: !kgen.scalar<bool>, %arg1: index, %arg2: index) -> index {
+  // CHECK:      hlcf.elif
+  // CHECK:      %[[RES:.*]] = index.add %arg1, %{{.*}}
+  // CHECK-NEXT: kgen.return %[[RES]]
+  %a, %b = hlcf.elif %cond -> index, index {
+    hlcf.yield %arg1, %arg1: index, index
+  } else {
+    hlcf.yield %arg1, %arg2: index, index
+  }
+  %r = index.add %a, %b
+  kgen.return %r: index
+}
+
+// CHECK-LABEL: @remove_unused_elif_results
+kgen.func @remove_unused_elif_results(%arg0: !kgen.scalar<bool>, %arg1: i32, %arg2: i32) -> i32 {
+  // CHECK-NEXT: %0 = hlcf.elif %arg0 -> i32 {
+  %0:2 = hlcf.elif %arg0 -> i32, i32 {
+    "some.op"() : () -> ()
+    // CHECK: hlcf.yield %arg2 : i32
+    hlcf.yield %arg1, %arg2 : i32, i32
+  // CHECK-NEXT: else
+  } else {
+    // CHECK-NEXT: hlcf.yield %arg2 : i32
+    hlcf.yield %arg1, %arg2 : i32, i32
+  }
+  kgen.return %0#1 : i32
+}
+
+// CHECK-LABEL: @elif_cond_same
+kgen.func @elif_cond_same(%arg0: !kgen.scalar<bool>) -> !kgen.scalar<bool> {
+  %0 = kgen.param.constant: scalar<bool> = <false>
+  %1 = kgen.param.constant: scalar<bool> = <true>
+  // CHECK-NEXT: return %arg0
+  %2 = hlcf.elif %arg0 -> !kgen.scalar<bool> {
+    hlcf.yield %1 : !kgen.scalar<bool>
+  } else {
+    hlcf.yield %0 : !kgen.scalar<bool>
+  }
+  kgen.return %2 : !kgen.scalar<bool>
+}
+
+// Multi-arm elif must not use the 2-arm static-false fold (would drop elif arms).
+// CHECK-LABEL: @dont_fold_multiarms_elif_false
+kgen.func @dont_fold_multiarms_elif_false(%arg0: index, %arg1: index, %arg2: index) -> index {
+  // CHECK: hlcf.elif
+  // CHECK: hlcf.elif.yield
+  // CHECK: kgen.return
+  %false = kgen.param.constant: scalar<bool> = <false>
+  %true = kgen.param.constant: scalar<bool> = <true>
+  %0 = hlcf.elif %false -> index {
+    hlcf.yield %arg0: index
+  } else {
+    hlcf.elif.yield %true
+  } then {
+    hlcf.yield %arg1: index
+  } else {
+    hlcf.yield %arg2: index
+  }
+  kgen.return %0: index
+}
+
 // CHECK-LABEL: @dead_loop
 kgen.func @dead_loop() {
   // CHECK-NOT:  hlcf.loop

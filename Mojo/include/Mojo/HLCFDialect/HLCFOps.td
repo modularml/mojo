@@ -734,5 +734,6 @@ def HLCF_ElifOp : HLCFParentOp<"elif"> {
   }];
 
   let hasVerifier = 1;
+  let hasCanonicalizer = 1;
 }
 #endif // HLCFOPS_TD
