@@ -944,7 +944,11 @@ struct Counter[
         # output: [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 6, 6, 7]
         ```
         """
-        var elements: List[Self.V] = List[Self.V]()
+        var total = 0
+        for count in self.values():
+            if count > 0:
+                total += count
+        var elements = List[Self.V](capacity=total)
         for item in self.items():
             for _ in range(item.value):
                 elements.append(item.key.copy())
