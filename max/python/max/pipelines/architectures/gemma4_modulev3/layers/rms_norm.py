@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from max.experimental.nn import Module
 from max.experimental.nn.norm.rms_norm import rms_norm
+from max.experimental.sharding import PlacementMapping
 from max.experimental.tensor import Tensor
 
 
@@ -42,7 +43,13 @@ class Gemma4RMSNorm(Module[[Tensor], Tensor]):
         if self.with_weight:
             w = self.weight
         else:
-            w = Tensor.ones([self.dim], dtype=x.dtype, device=x.device)
+            # Build on x's mesh, not the default device: that keeps this
+            # transfer-free and works when x is TP-sharded (x.device raises).
+            w = Tensor.ones(
+                [self.dim],
+                dtype=x.dtype,
+                device=PlacementMapping.replicated(x.mesh),
+            )
         return rms_norm(
             x, w, self.eps, weight_offset=0.0, multiply_before_cast=True
         )

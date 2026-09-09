@@ -91,6 +91,17 @@ class TestDeviceMapping:
     def test_placement_mapping_is_alias(self) -> None:
         assert PlacementMapping is DeviceMapping
 
+    def test_replicated(self) -> None:
+        mesh = mesh_2d(2, 4)
+        m = DeviceMapping.replicated(mesh)
+        assert m.mesh is mesh
+        assert m.placements == (Replicated(), Replicated())
+        assert m.is_fully_replicated
+
+    def test_replicated_single_axis(self) -> None:
+        mesh = mesh_1d(4)
+        assert DeviceMapping.replicated(mesh).placements == (Replicated(),)
+
 
 class TestIsFullyReplicated:
     def test_all_replicated(self) -> None:

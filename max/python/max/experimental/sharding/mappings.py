@@ -49,6 +49,18 @@ class DeviceMapping:
     mesh: DeviceMesh
     placements: tuple[Placement, ...]
 
+    @classmethod
+    def replicated(cls, mesh: DeviceMesh) -> DeviceMapping:
+        """Builds a mapping that replicates a tensor on every axis of ``mesh``.
+
+        Args:
+            mesh: The device mesh to replicate over.
+
+        Returns:
+            A mapping with :class:`Replicated` on each of ``mesh``'s axes.
+        """
+        return cls(mesh, (Replicated(),) * mesh.ndim)
+
     def __post_init__(self) -> None:
         if len(self.placements) != self.mesh.ndim:
             raise ValueError(
