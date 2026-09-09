@@ -18,7 +18,7 @@ compilation. The compiler's own test suite (`cross_compile_options.mojo`,
 and target resolution but not the end-to-end user experience on
 different host hardware.
 
-**Where:** Placed in _/Mojo/docs/code/tools_
+**Where:** Placed in _/Mojo/docs/site/code/tools_
 under _README-Compilation-Targets.md_ and _test\_compilation\_targets.sh_.
 
 **Important note:** On non-Apple hosts, test 18 will fail. `metal:4` is
@@ -366,7 +366,7 @@ object file and link it with a toolchain for your target platform.
 ## Testing
 
 - Ensure `mojo` is available at command line, however you've installed it.
-- Run `test_compilation_targets.sh` from /Mojo/docs/code/tools.
+- Run `test_compilation_targets.sh` from /Mojo/docs/site/code/tools.
 
 ## April 6
 

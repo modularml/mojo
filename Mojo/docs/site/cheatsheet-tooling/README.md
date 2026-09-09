@@ -93,7 +93,7 @@ Override a single knob when a card needs more room:
 ## Update a card
 
 1. Edit `src/body-<topic>.html` and align its tests
-   (`Mojo/docs/code/reference/cheat-sheets/test_<topic>.mojo`).
+   (`Mojo/docs/site/code/reference/cheat-sheets/test_<topic>.mojo`).
    Test names must use underscores, not hyphens.
 1. Keep each card's title, subtitle, and optional `layout` in the comment lines
    at the top of its body file (see Card shape).

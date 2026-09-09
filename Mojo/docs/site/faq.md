@@ -139,7 +139,7 @@ It includes:
 - [`mojo` CLI](/docs/cli/) (includes the Mojo compiler)
 - [Mojo standard library](/docs/std/)
 - [`mojo` Python
-  package](https://github.com/modular/modular/tree/main/mojo/python/mojo)
+  package](https://github.com/modular/modular/tree/main/Mojo/python/mojo)
 - Mojo language server (LSP) for IDE/editor integration
 - [Mojo debugger](/docs/tools/debugging/) (includes LLDB)
 - [Mojo code formatter](/docs/cli/format/)
@@ -155,7 +155,7 @@ the LSP and debugger tools. It includes:
 - [`mojo` CLI](/docs/cli/) (includes the Mojo compiler)
 - [Mojo standard library](/docs/std/)
 - [`mojo` Python
-  package](https://github.com/modular/modular/tree/main/mojo/python/mojo)
+  package](https://github.com/modular/modular/tree/main/Mojo/python/mojo)
 
 If you're interested in GPU programming, install the `max` package, which
 includes the MAX framework and Mojo. For details, see

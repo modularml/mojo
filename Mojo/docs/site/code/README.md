@@ -10,20 +10,20 @@ has a Bazel test that runs it in CI.
 Run a single example's test from the Modular internal repo:
 
 ```sh
-bt //Mojo/docs/code/manual/basics:hello_world_test
+bt //Mojo/docs/site/code/manual/basics:hello_world_test
 ```
 
 Or run every example under a topic (or the whole tree):
 
 ```sh
-bt //Mojo/docs/code/manual/basics/...
-bt //Mojo/docs/code/...
+bt //Mojo/docs/site/code/manual/basics/...
+bt //Mojo/docs/site/code/...
 ```
 
 Use `br` to run an example directly instead of as a test:
 
 ```sh
-br //Mojo/docs/code/manual/basics:hello_world
+br //Mojo/docs/site/code/manual/basics:hello_world
 ```
 
 ## Contributing
