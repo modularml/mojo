@@ -39,6 +39,8 @@ _JENGA_MODEL_NAME_SUBSTRINGS = (
     "step-3",  # Step-3.5: full + SWA
     "step3",  # same as step-3
     "inkling",  # full + SWA
+    "kimi",  # Kimi K2.x / Kimi-VL: MLA full (Eagle3 draft adds an SWA group)
+    "deepseek",  # DeepSeek V2/V3: MLA full; V3.2 adds a sparse-indexer group
 )
 
 
