@@ -408,17 +408,13 @@ modular_py_test(
 
 modular_py_test(
     name = "test_buffer_create_init_gpu",
-    size = "small",
+    size = "medium",
     srcs = ["test_buffer_create_init_gpu.py"],
     exec_properties = {
         "test.resources:gpu-memory": "1",
     },
     gpu_constraints = ["//:has_gpu"],
-    # TODO(QUA-841): re-enable once the CI timeout is root-caused.
-    tags = [
-        "gpu",
-        "manual",
-    ],
+    tags = ["gpu"],
     deps = [
         ":buffer_create_init_shared",
         "//max/python/max/engine",
