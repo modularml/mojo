@@ -40,6 +40,10 @@ the [container](/container) page now links to the new page.
 - Startup no longer prints one `unknown dtype found in safetensors file`
   warning for each tensor with a dtype that is not a weight encoding. Each
   scan of the weight files now prints one warning for each unknown dtype.
+- Fixed DeepSeek V3 losing tool-call parsing when served with Eagle3 or MTP
+  speculative decoding. The fused spec-decode architectures now inherit the
+  base architecture's settings instead of redeclaring them, so `--tool-parser`
+  no longer has to be passed by hand.
 - Fixed unbounded host-memory usage in Gemma 4 video pre-processing: the
   server now decodes only the sampled frames of a video instead of
   materializing every frame before sampling, bounding peak memory at the

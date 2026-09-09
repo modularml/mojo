@@ -318,6 +318,15 @@ def parse_arch_file(arch_path: Path) -> list[dict[str, Any]]:
         ):
             is_supported_arch = True
 
+        is_speculator = (
+            isinstance(func, ast.Name) and func.id == "Speculator"
+        ) or (isinstance(func, ast.Attribute) and func.attr == "Speculator")
+        if is_speculator:
+            speculator = _speculator_row(call, node, tree, arch_path.parent)
+            if speculator is not None:
+                results.append(speculator)
+            continue
+
         if not is_supported_arch:
             continue
 
@@ -387,19 +396,68 @@ def parse_arch_file(arch_path: Path) -> list[dict[str, Any]]:
         if name is None:
             continue
 
-        results.append(
-            {
-                "var_name": var_name,
-                "name": name,
-                "example_repo_ids": example_repo_ids,
-                "modality": modality,
-                "input_modalities": input_modalities,
-                "supported_encodings": supported_encodings,
-                "multi_gpu_supported": multi_gpu,
-            }
-        )
+        base = {
+            "var_name": var_name,
+            "name": name,
+            "example_repo_ids": example_repo_ids,
+            "modality": modality,
+            "input_modalities": input_modalities,
+            "supported_encodings": supported_encodings,
+            "multi_gpu_supported": multi_gpu,
+        }
+        results.append(base)
 
     return results
+
+
+def _base_arch_row(
+    tree: ast.Module, package_dir: Path, base_var: str
+) -> dict[str, Any] | None:
+    """The parsed row of the architecture ``base_var`` refers to.
+
+    A speculator lives in its own package and names its target by relative
+    import, so the target's columns come from a different ``arch.py``.
+    """
+    for module_path in _relative_import_modules(tree, package_dir):
+        if module_path.name != "arch.py" or not module_path.exists():
+            continue
+        for row in parse_arch_file(module_path):
+            if row.get("var_name") == base_var:
+                return row
+    return None
+
+
+def _speculator_row(
+    call: ast.Call, node: ast.Assign, tree: ast.Module, package_dir: Path
+) -> dict[str, Any] | None:
+    """Row for a ``Speculator(...)`` declared in a speculator's ``arch.py``."""
+    name_node = extract_keyword_value(call, "name")
+    base_node = extract_keyword_value(call, "base")
+    if not (
+        isinstance(name_node, ast.Constant)
+        and isinstance(name_node.value, str)
+        and isinstance(base_node, ast.Name)
+    ):
+        return None
+    base_row = _base_arch_row(tree, package_dir, base_node.id)
+    if base_row is None:
+        return None
+
+    row = dict(base_row)
+    row["name"] = name_node.value
+    row["var_name"] = (
+        node.targets[0].id
+        if node.targets and isinstance(node.targets[0], ast.Name)
+        else None
+    )
+    repos = extract_keyword_value(call, "example_repo_ids")
+    if isinstance(repos, (ast.List, ast.Set)):
+        row["example_repo_ids"] = [
+            elt.value
+            for elt in repos.elts
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+        ]
+    return row
 
 
 def collect_architectures() -> list[dict[str, Any]]:

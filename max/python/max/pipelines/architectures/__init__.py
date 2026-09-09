@@ -31,13 +31,19 @@ class _LazyArch:
     name: str
     """The architecture name, which must match the ``name`` of the
     :class:`SupportedArchitecture` that ``module``.``symbol`` resolves to
-    (including any ``_ModuleV3`` suffix)."""
+    (including any ``_ModuleV3`` suffix).
+
+    With ``speculates_on`` set this is not a lookup key."""
 
     module: str
     """``.``-relative module path the architecture is defined in."""
 
     symbol: str
-    """The attribute on ``module`` holding the :class:`SupportedArchitecture`."""
+    """The attribute on ``module`` holding the :class:`SupportedArchitecture`,
+    or the :class:`~max.pipelines.lib.Speculator` that derives it."""
+
+    speculates_on: str | None = None
+    """For a Speculator, the name of the target it speculates on. """
 
 
 def register_all_models() -> None:
@@ -104,12 +110,14 @@ def register_all_models() -> None:
         _LazyArch(
             "Eagle3DeepseekV3ForCausalLM",
             ".eagle3_deepseekV3",
-            "eagle3_deepseekV3_arch",
+            "eagle3_deepseekV3_speculator",
+            speculates_on="DeepseekV3ForCausalLM",
         ),
         _LazyArch(
             "Eagle3MHADeepseekV3ForCausalLM",
             ".eagle3_deepseekV3",
-            "eagle3_mha_deepseekV3_arch",
+            "eagle3_mha_deepseekV3_speculator",
+            speculates_on="DeepseekV3ForCausalLM",
         ),
         _LazyArch(
             "LlamaForCausalLMEagle3", ".eagle_llama3", "eagle3_llama_arch"
@@ -341,7 +349,8 @@ def register_all_models() -> None:
         _LazyArch(
             "UnifiedMTPDeepseekV3ForCausalLM",
             ".unified_mtp_deepseekV3",
-            "unified_mtp_deepseekV3_arch",
+            "unified_mtp_deepseekV3_speculator",
+            speculates_on="DeepseekV3ForCausalLM",
         ),
         _LazyArch(
             "UnifiedMTPGemma4ForCausalLM",
@@ -365,7 +374,11 @@ def register_all_models() -> None:
 
     for entry in lazy_architectures:
         PIPELINE_REGISTRY.register_lazy(
-            entry.name, entry.module, entry.symbol, package=__name__
+            entry.name,
+            entry.module,
+            entry.symbol,
+            package=__name__,
+            speculates_on=entry.speculates_on,
         )
 
     # Optional: pull in private tool parsers.

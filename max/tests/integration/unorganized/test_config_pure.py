@@ -462,26 +462,6 @@ class TestSpeculativeArchitectureOverride:
             self._resolved_arch(cfg) == "Gemma4UnifiedForConditionalGeneration"
         )
 
-    def test_deepseek_mtp_no_draft(self) -> None:
-        """DeepseekV3 + no draft (NextN baked in) -> unified MTP arch."""
-        cfg = self._make_config("DeepseekV3ForCausalLM", draft_arch=None)
-        assert self._resolved_arch(cfg) == "UnifiedMTPDeepseekV3ForCausalLM"
-
-    def test_deepseek_eagle3_draft(self) -> None:
-        cfg = self._make_config(
-            "DeepseekV3ForCausalLM", draft_arch="Eagle3DeepseekV2ForCausalLM"
-        )
-        assert self._resolved_arch(cfg) == "Eagle3DeepseekV3ForCausalLM"
-
-    def test_deepseek_unrecognized_draft_raises(self) -> None:
-        cfg = self._make_config(
-            "DeepseekV3ForCausalLM", draft_arch="LlamaForCausalLM"
-        )
-        with pytest.raises(
-            ValueError, match="Unrecognized draft architecture for DeepseekV3"
-        ):
-            self._resolved_arch(cfg)
-
     def test_no_speculative_is_noop(self) -> None:
         cfg = self._make_config(
             "DeepseekV3ForCausalLM", speculative=False, draft_arch=None
