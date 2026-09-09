@@ -1136,6 +1136,70 @@ def test_merge() raises:
     _ = cond(True, a, b)
 
 
+def test_string_slice_codepoint_slices_reversed() raises:
+    # Test ASCII
+    var s: StaticString = "xyz"
+    var iter = s.codepoint_slices_reversed()
+    assert_equal(iter.__next__(), "z")
+    assert_equal(iter.__next__(), "y")
+    assert_equal(iter.__next__(), "x")
+
+    # Test concatenation
+    s = "abc"
+    var concat = String()
+    for v in s.codepoint_slices_reversed():
+        concat += v
+    assert_equal(concat, "cba")
+
+    # Test Unicode
+    s = "hello🌍"
+    concat = String()
+    for v in s.codepoint_slices_reversed():
+        concat += v
+    assert_equal(concat, "🌍olleh")
+
+    # Test empty string
+    s = ""
+    concat = String()
+    for v in s.codepoint_slices_reversed():
+        concat += v
+    assert_equal(concat, "")
+
+
+def test_capitalize() raises:
+    # Basic
+    assert_equal(StringSlice("hello world").capitalize(), "Hello world")
+    # All upper
+    assert_equal(StringSlice("HELLO").capitalize(), "Hello")
+    # Mixed
+    assert_equal(StringSlice("hELLO").capitalize(), "Hello")
+    # Empty
+    assert_equal(StringSlice("").capitalize(), "")
+    # Non-alpha first char
+    assert_equal(StringSlice("123abc").capitalize(), "123abc")
+    # Single char
+    assert_equal(StringSlice("a").capitalize(), "A")
+
+
+def test_title() raises:
+    # Basic
+    assert_equal(StringSlice("hello world").title(), "Hello World")
+    # Already title case
+    assert_equal(StringSlice("Hello World").title(), "Hello World")
+    # All caps
+    assert_equal(StringSlice("HELLO WORLD").title(), "Hello World")
+    # Empty
+    assert_equal(StringSlice("").title(), "")
+    # Hyphenated
+    assert_equal(StringSlice("hello-world").title(), "Hello-World")
+    # Apostrophe (Python behavior: apostrophe is non-alpha, so char after it is uppercased)
+    assert_equal(StringSlice("it's a test").title(), "It'S A Test")
+    # Digits
+    assert_equal(StringSlice("123abc def").title(), "123Abc Def")
+    # Single word
+    assert_equal(StringSlice("hello").title(), "Hello")
+
+
 def test_codepoint_indexing() raises:
     assert_equal(StringSlice("abc")[codepoint=0], "a")
     assert_equal(StringSlice("abc")[codepoint=2], "c")

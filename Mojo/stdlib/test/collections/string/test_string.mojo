@@ -1838,6 +1838,40 @@ def test_append_codepoint() raises:
     assert_equal(s.byte_length(), 8)
 
 
+def test_capitalize() raises:
+    # Basic
+    assert_equal(String("hello world").capitalize(), "Hello world")
+    # All upper
+    assert_equal(String("HELLO").capitalize(), "Hello")
+    # Mixed
+    assert_equal(String("hELLO").capitalize(), "Hello")
+    # Empty
+    assert_equal(String("").capitalize(), "")
+    # Non-alpha first char
+    assert_equal(String("123abc").capitalize(), "123abc")
+    # Single char
+    assert_equal(String("a").capitalize(), "A")
+
+
+def test_title() raises:
+    # Basic
+    assert_equal(String("hello world").title(), "Hello World")
+    # Already title case
+    assert_equal(String("Hello World").title(), "Hello World")
+    # All caps
+    assert_equal(String("HELLO WORLD").title(), "Hello World")
+    # Empty
+    assert_equal(String("").title(), "")
+    # Hyphenated
+    assert_equal(String("hello-world").title(), "Hello-World")
+    # Apostrophe (Python behavior: apostrophe is non-alpha, so char after it is uppercased)
+    assert_equal(String("it's a test").title(), "It'S A Test")
+    # Digits
+    assert_equal(String("123abc def").title(), "123Abc Def")
+    # Single word
+    assert_equal(String("hello").title(), "Hello")
+
+
 def test_string_zero_init() raises:
     var s = String()
     assert_equal(Int(s._ptr_or_data), 0)

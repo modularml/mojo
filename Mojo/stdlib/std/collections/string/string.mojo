@@ -1926,6 +1926,33 @@ struct String(
 
         return StringSlice(self).upper()
 
+    def capitalize(self) -> String:
+        """Returns a copy of the string with the first character uppercased and the rest lowercased.
+
+        Processes ASCII characters only. Non-ASCII characters are passed through unchanged.
+
+        Returns:
+            A new `String` with the first character uppercased and the remaining characters lowercased.
+        """
+
+        return StringSlice(self).capitalize()
+
+    def title(self) -> String:
+        """Returns a title-cased version of the string.
+
+        Each word begins with an uppercase character, and the remaining characters are lowercase.
+        A word is defined as a sequence of consecutive alphabetic characters. Non-alphabetic
+        characters (spaces, digits, punctuation) act as word boundaries, consistent with Python's
+        `str.title()` behavior.
+
+        Processes ASCII characters only. Non-ASCII characters are passed through unchanged.
+
+        Returns:
+            A new `String` where each word's first character is uppercased and the rest are lowercased.
+        """
+
+        return StringSlice(self).title()
+
     def startswith(
         self, prefix: StringSlice, start: Int = 0, end: Int = -1
     ) -> Bool:

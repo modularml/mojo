@@ -2299,6 +2299,58 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         # TODO: the _unicode module does not support locale sensitive conversions yet.
         return to_uppercase(self)
 
+    def capitalize(self) -> String:
+        """Returns a copy of the string with the first character uppercased and the rest lowercased.
+
+        Processes ASCII characters only. Non-ASCII characters are passed through unchanged.
+
+        Returns:
+            A new `String` with the first character uppercased and the remaining characters lowercased.
+        """
+        if self.byte_length() == 0:
+            return String("")
+        var result = self.lower()
+        var ptr = result.unsafe_ptr_mut()
+        var b = ptr[0]
+        comptime lower_a = UInt8(ord("a"))
+        comptime lower_z = UInt8(ord("z"))
+        if b >= lower_a and b <= lower_z:
+            ptr[0] = b - UInt8(32)
+        return result^
+
+    def title(self) -> String:
+        """Returns a title-cased version of the string.
+
+        Each word begins with an uppercase character, and the remaining characters are lowercase.
+        A word is defined as a sequence of consecutive alphabetic characters. Non-alphabetic
+        characters (spaces, digits, punctuation) act as word boundaries, consistent with Python's
+        `str.title()` behavior.
+
+        Processes ASCII characters only. Non-ASCII characters are passed through unchanged.
+
+        Returns:
+            A new `String` where each word's first character is uppercased and the rest are lowercased.
+        """
+        comptime lower_a = UInt8(ord("a"))
+        comptime lower_z = UInt8(ord("z"))
+        comptime upper_A = UInt8(ord("A"))
+        comptime upper_Z = UInt8(ord("Z"))
+        var result = self.lower()
+        var prev_cased = False
+        var ptr = result.unsafe_ptr_mut()
+        var n = result.byte_length()
+        for i in range(n):
+            var b = ptr[i]
+            if b >= lower_a and b <= lower_z:
+                if not prev_cased:
+                    ptr[i] = b - UInt8(32)
+                prev_cased = True
+            elif b >= upper_A and b <= upper_Z:
+                prev_cased = True
+            else:
+                prev_cased = False
+        return result^
+
     def is_ascii_printable(self) -> Bool:
         """Returns True if all characters in the string are ASCII printable.
 
