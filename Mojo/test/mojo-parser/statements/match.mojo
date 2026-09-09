@@ -383,6 +383,21 @@ def match_as_pattern(value: String):
         _ = p
         case_callee[1]()
 
+    # `as` can be combined with a guard. The guard itself can use the binding.
+    # CHECK:       [[S:%.*]] = lit.var.decl "s" ref
+    # CHECK:       lit.ref.store %value, [[S]]
+    # CHECK:       [[R:%.*]] = lit.ref.load [[S]]
+    # CHECK:       [[L0:%.*]] = lit.call {{.*}}@"byte_length({{.*}}([[R]])
+    # CHECK:       [[L1:%.*]] = kgen.rebind [[L0]]
+    # CHECK:       [[Z0:%.*]] = kgen.param.constant: !Int = <{:scalar<index> 0}>
+    # CHECK:       [[NE0:%.*]] = lit.call {{.*}}@"__ne__({{.*}}([[L1]], [[Z0]])
+    # CHECK:       [[B0:%.*]] = lit.call {{.*}}@"__mlir_bool__(::Bool)"([[NE0]])
+    # CHECK:       hlcf.elif [[B0]] {
+    # CHECK:       lit.call {{.*}}@"byte_length(
+    __match value:
+    case _ as s if s.byte_length() != 0:
+        _ = s.byte_length()
+
 
 # CHECK-LABEL: lit.fn @"match_or_pattern_int
 def match_or_pattern_int(x: Int):
