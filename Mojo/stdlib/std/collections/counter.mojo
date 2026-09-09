@@ -133,25 +133,44 @@ struct Counter[
         for item in values:
             self._data.setdefault(item.copy(), 0) += 1
 
-    def __init__(out self, items: List[Self.V]):
-        """Create a `Counter` from an input iterable.
+    def __init__[
+        IterableType: Iterable,
+    ](
+        out self,
+        ref iterable: IterableType,
+    ) where (
+        IterableType.IteratorType[origin_of(iterable)].Element == Self.V
+    ):
+        """Create a `Counter` from an iterable of values.
+
+        Each value produced by the iterable is tallied, so the resulting
+        `Counter` maps every distinct value to the number of times it appeared.
+
+        Parameters:
+            IterableType: The type of the `iterable` argument.
 
         Args:
-            items: A list of items to count.
+            iterable: The iterable of values to count.
 
         Example:
 
         ```mojo
         from std.collections import Counter
 
-        var counter = Counter[String](["a", "a", "a", "b", "b", "c", "d", "c", "c"])
+        var counter = Counter(["a", "a", "a", "b", "b", "c", "d", "c", "c"])
         print(counter["a"]) # prints 3
         print(counter["b"]) # prints 2
+
+        # Any iterable works, e.g. the bytes of a string:
+        var by_byte = Counter(String("aaabbaacdd").bytes())
+        print(by_byte[Byte(ord("a"))]) # prints 5
         ```
         """
-        self._data = Dict[Self.V, Int, Self.H]()
-        for item in items:
-            self._data.setdefault(item.copy(), 0) += 1
+        self = Self()
+        for var value in iterable:
+            # TODO(MOCO-4355): Drop `rebind_var` once the `where` clause's
+            # `Element == Self.V` equality is applied when checking the body.
+            self._data.setdefault(rebind_var[Self.V](value^), 0) += 1
 
     @staticmethod
     def fromkeys(keys: List[Self.V], value: Int) -> Self:

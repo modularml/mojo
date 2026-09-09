@@ -140,6 +140,10 @@ This version is still a work in progress.
 
 ## Library changes
 
+- `Counter` can now be constructed from any iterable of values, not just a
+  `List`, e.g. `Counter(["a", "a", "b"])` or `Counter(String("aaab").bytes())`.
+  This replaces the previous `Counter(items: List[V])` constructor.
+
 - [`OwnedDLHandle`](/docs/std/ffi/OwnedDLHandle/) now conforms to `Boolable`.
 
 - `Coord` has a new `replace[at](value)` method that returns a `Coord` with

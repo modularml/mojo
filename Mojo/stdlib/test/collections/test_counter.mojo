@@ -18,6 +18,55 @@ from std.testing import assert_equal, assert_false, assert_raises, assert_true
 from std.testing import TestSuite
 
 
+def test_construction_from_iterable() raises:
+    # From a list literal, inferring `Counter[String]`.
+    var c = Counter(["a", "a", "a", "b", "b", "c", "d", "c", "c"])
+    assert_equal(c["a"], 3)
+    assert_equal(c["b"], 2)
+    assert_equal(c["c"], 3)
+    assert_equal(c["d"], 1)
+    assert_equal(c["z"], 0)  # missing key defaults to 0
+    assert_equal(len(c), 4)
+    assert_equal(c.total(), 9)
+
+    # From a `List` bound to a variable.
+    var items = [String("x"), "y", "x"]
+    var c2 = Counter(items)
+    assert_equal(c2["x"], 2)
+    assert_equal(c2["y"], 1)
+
+    # Empty iterable.
+    var empty = Counter(List[String]())
+    assert_equal(len(empty), 0)
+
+
+def test_construction_from_iterable_unicode() raises:
+    # Multi-byte grapheme keys counted via owned `String` values.
+    var c = Counter(["a", "b", "a", "é", "🎉", "é", "a"])
+    assert_equal(c["a"], 3)
+    assert_equal(c["b"], 1)
+    assert_equal(c["é"], 2)
+    assert_equal(c["🎉"], 1)
+    assert_equal(c["z"], 0)
+    assert_equal(len(c), 4)
+
+    # Counting the bytes of a string, inferring `Counter[Byte]`.
+    var by_byte = Counter(String("aaabbaacdd").bytes())
+    assert_equal(by_byte[Byte(ord("a"))], 5)
+    assert_equal(by_byte[Byte(ord("b"))], 2)
+    assert_equal(by_byte[Byte(ord("c"))], 1)
+    assert_equal(by_byte[Byte(ord("d"))], 2)
+
+    # Byte-level tally of a non-ASCII string: "é" is U+00E9 -> UTF-8 0xC3 0xA9.
+    var cafe = Counter(String("café").bytes())
+    assert_equal(cafe[Byte(ord("c"))], 1)
+    assert_equal(cafe[Byte(ord("a"))], 1)
+    assert_equal(cafe[Byte(ord("f"))], 1)
+    assert_equal(cafe[Byte(0xC3)], 1)
+    assert_equal(cafe[Byte(0xA9)], 1)
+    assert_equal(len(cafe), 5)
+
+
 # def test_and() raises:
 #     var c1 = Counter[String]()
 #     c1["a"] = 1
