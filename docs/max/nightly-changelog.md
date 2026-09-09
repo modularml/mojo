@@ -1273,6 +1273,10 @@ the [container](/container) page now links to the new page.
   host tier but was still on disk inflated the count, and with it any
   disk-throughput figure derived from it.
 
+- Fixed a `CUDA_ERROR_MISALIGNED_ADDRESS` crash that could occur when
+  concatenating tensors with byte sizes that do not satisfy the device's
+  preferred alignment, including rank-1 index vectors with odd lengths.
+
 - Fixed `generate_async` raising `KeyError: Request ID not found in replica
   batch` when requests in one batch finish on different steps, which happens
   whenever they are given different `max_new_tokens`.
