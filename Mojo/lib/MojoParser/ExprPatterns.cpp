@@ -11,8 +11,8 @@
 // limitations under the License.
 //===----------------------------------------------------------------------===//
 //
-// This file implements `emitMatch` for expression nodes used as match
-// patterns.
+// This file implements `emitMatch` and `mayContainBindingPatterns` for
+// expression nodes used as match patterns.
 //
 //===----------------------------------------------------------------------===//
 
@@ -178,6 +178,10 @@ CValue ParenNode::emitMatch(IREmitter &emitter, CValue subject,
   return subExpr->emitMatch(emitter, subject, patternKind);
 }
 
+bool ParenNode::mayContainBindingPatterns() const {
+  return subExpr->mayContainBindingPatterns();
+}
+
 CValue BinOpNode::emitMatch(IREmitter &emitter, CValue subject,
                             PatternDeclKind patternKind) const {
   if (kind == kOr)
@@ -185,6 +189,15 @@ CValue BinOpNode::emitMatch(IREmitter &emitter, CValue subject,
   if (kind == kAsPat)
     return emitAsMatch(emitter, subject, patternKind);
   return ExprNode::emitMatch(emitter, subject, patternKind);
+}
+
+bool BinOpNode::mayContainBindingPatterns() const {
+  if (kind == kOr)
+    return lhs->mayContainBindingPatterns() || rhs->mayContainBindingPatterns();
+  // `pattern as name` always binds `name`.
+  if (kind == kAsPat)
+    return true;
+  return false;
 }
 
 /// Collect VarDeclOps registered in `scope`, keyed by binding name.
@@ -368,6 +381,12 @@ CValue UnaryOpNode::emitMatch(IREmitter &emitter, CValue subject,
   return subExpr->emitMatch(emitter, subject, subKind);
 }
 
+bool UnaryOpNode::mayContainBindingPatterns() const {
+  if (kind != kVarPat && kind != kRefPat)
+    return false;
+  return subExpr->mayContainBindingPatterns();
+}
+
 CValue TupleNode::emitMatch(IREmitter &emitter, CValue subject,
                             PatternDeclKind patternKind) const {
   ASTType subjectType = subject.getRValueType();
@@ -449,6 +468,13 @@ CValue TupleNode::emitMatch(IREmitter &emitter, CValue subject,
     combined.expr = exprs[i];
   }
   return combined.ir;
+}
+
+bool TupleNode::mayContainBindingPatterns() const {
+  for (ExprNode *expr : exprs)
+    if (expr->mayContainBindingPatterns())
+      return true;
+  return false;
 }
 
 CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
@@ -592,6 +618,13 @@ CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
     combined.expr = fieldPatterns[i].operand->expr;
   }
   return combined.ir;
+}
+
+bool CallNode::mayContainBindingPatterns() const {
+  for (const Operand &operand : operands)
+    if (operand.expr->mayContainBindingPatterns())
+      return true;
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

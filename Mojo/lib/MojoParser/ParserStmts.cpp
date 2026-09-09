@@ -233,6 +233,14 @@ private:
   ErrorKind error = ErrorKind::none;
 };
 
+/// Parsed `case` arm for `__match`: pattern, optional guard, and suite cursor.
+struct MatchCaseEntry {
+  ExprNode *patternExpr;
+  ExprNode *guardExpr;
+  LexerCursor caseCursor;
+  size_t caseIndent;
+};
+
 /// This class provides the implementation details of the concrete Lightning
 /// grammar.
 namespace {
@@ -291,6 +299,14 @@ struct StmtParser : public ParserBase {
                            size_t curIndent);
   ParseResult parseWhileStmt(size_t curIndent);
   ParseResult parseMatchStmt(size_t curIndent);
+
+  /// Emit a binding-free `match` as one `hlcf.elif`. Matches without
+  /// pattern bindings can use a flat elif chain instead of nested if/then
+  /// trees, which reduces HLCF nesting and lowers more cleanly.
+  static ParseResult emitMatchAsElIf(StmtParser &parser,
+                                     ArrayRef<MatchCaseEntry> caseEntries,
+                                     BValue subjectBVal, Location matchLocation,
+                                     LexerCursor afterCaseCursor);
 
   // This emits the pattern for a 'for' loop, calling the specified 'bodyFn'
   // closure on success when in the scope of the loop, and the specified
@@ -1544,6 +1560,127 @@ ParseResult StmtParser::parseWhileStmt(size_t curIndent) {
   return success();
 }
 
+static SRValue emitMatchCasePredicate(StmtParser &parser,
+                                      const MatchCaseEntry &caseEntry,
+                                      BValue subjectBVal) {
+  IREmitter emitter = parser.getEmitter();
+  CValue condCVal = caseEntry.patternExpr->emitMatch(emitter, subjectBVal,
+                                                     PatternDeclKind::kBind);
+
+  // If a guard predicate is present, AND it with the pattern predicate.
+  // Always evaluate the guard even when the pattern is known-false so
+  // diagnostics still fire for an unreachable guard.
+  if (condCVal && caseEntry.guardExpr)
+    condCVal = emitter.emitAndMatchPredicates(
+        {condCVal, caseEntry.patternExpr},
+        [&]() -> ASTExprAnd<CValue> {
+          return {
+              emitter.emitExprScalarBool(caseEntry.guardExpr, EC_BoolCondition),
+              caseEntry.guardExpr};
+        },
+        /*evaluateRhsEvenIfLhsFalse=*/true);
+  return emitter.emitSRValue({condCVal, caseEntry.patternExpr},
+                             EC_BoolCondition);
+}
+
+static ParseResult emitMatchCaseBody(StmtParser &parser, OpBuilder &builder,
+                                     const MatchCaseEntry &caseEntry,
+                                     Location caseLoc) {
+  // Change the parser cursor to the start of the case body so we can parse
+  // the right text. Use parseSuite (not parseLocalScopeSuite) so the body
+  // shares the case scope above — pattern bindings remain visible.
+  caseEntry.caseCursor.restore(parser.getLexer());
+  if (failed(parser.parseSuite(caseEntry.caseIndent)))
+    return failure();
+  HLCF::YieldOp::create(builder, caseLoc);
+  return success();
+}
+
+/// Emit a binding-free `match` as one `hlcf.elif`. Matches without
+/// pattern bindings can use a flat elif chain instead of nested if/then
+/// trees, which reduces HLCF nesting and lowers more cleanly.
+ParseResult StmtParser::emitMatchAsElIf(StmtParser &parser,
+                                        ArrayRef<MatchCaseEntry> caseEntries,
+                                        BValue subjectBVal,
+                                        Location matchLocation,
+                                        LexerCursor afterCaseCursor) {
+  OpBuilder &builder = parser.getBuilder();
+
+  // First case: the predicate becomes the elif operand; later cases stay
+  // in-region for short-circuit.
+  HLCF::ElifOp elifOp;
+  {
+    DebugInfo::DIBuilder::ScopeGuard scopeGuard;
+    llvm::SaveAndRestore<ASTDecl *> keepDecl(parser.curDeclScope);
+    parser.pushChildScope(scopeGuard, keepDecl);
+
+    auto firstCaseLoc =
+        parser.translateLocation(caseEntries.front().patternExpr->getLoc());
+    SRValue firstCond =
+        emitMatchCasePredicate(parser, caseEntries.front(), subjectBVal);
+
+    // A bad first pattern still needs an operand for the elif, so recover
+    // with a statically-false arm. That keeps the later cases (and the rest
+    // of the enclosing suite) parsed, so their diagnostics still fire.
+    Value condValue = firstCond;
+    if (!firstCond)
+      condValue = ParamConstantOp::create(
+          builder, firstCaseLoc,
+          SIMDAttr::getScalarBool(builder.getContext(), false));
+
+    unsigned numExtraRegions =
+        caseEntries.size() > 1 ? (caseEntries.size() - 1) * 2 : 0;
+    elifOp = HLCF::ElifOp::create(builder, matchLocation, TypeRange(),
+                                  condValue, numExtraRegions);
+    elifOp.getThenRegion().emplaceBlock();
+    elifOp.getElseRegion().emplaceBlock();
+    for (Region &region : elifOp.getElifRegions())
+      region.emplaceBlock();
+
+    if (!firstCond) {
+      builder.setInsertionPointToStart(&elifOp.getThenRegion().front());
+      HLCF::YieldOp::create(builder, firstCaseLoc);
+    } else {
+      builder.setInsertionPointToStart(&elifOp.getThenRegion().front());
+      if (failed(emitMatchCaseBody(parser, builder, caseEntries.front(),
+                                   firstCaseLoc)))
+        return failure();
+    }
+  }
+
+  for (auto [idx, caseEntry] :
+       llvm::enumerate(ArrayRef<MatchCaseEntry>(caseEntries).drop_front())) {
+    unsigned extraIdx = idx; // 0-based into additional (cond, then) pairs
+    auto &condBlock = elifOp.getElifRegions()[extraIdx * 2].front();
+    builder.setInsertionPointToStart(&condBlock);
+
+    DebugInfo::DIBuilder::ScopeGuard scopeGuard;
+    llvm::SaveAndRestore<ASTDecl *> keepDecl(parser.curDeclScope);
+    parser.pushChildScope(scopeGuard, keepDecl);
+
+    auto caseLoc = parser.translateLocation(caseEntry.patternExpr->getLoc());
+    SRValue condRVal = emitMatchCasePredicate(parser, caseEntry, subjectBVal);
+    if (!condRVal)
+      continue;
+    HLCF::ElifYieldOp::create(builder, caseLoc, condRVal,
+                              /*no extra values*/ ValueRange());
+
+    builder.setInsertionPointToStart(
+        &elifOp.getElifRegions()[extraIdx * 2 + 1].front());
+    if (failed(emitMatchCaseBody(parser, builder, caseEntry, caseLoc)))
+      return failure();
+  }
+
+  // The "else" of the elif is a noop.  TODO: We should mark this as
+  // unreachable if there is an irrefutable pattern so we don't get dead code
+  // errors.
+  builder.setInsertionPointToStart(&elifOp.getElseRegion().front());
+  HLCF::YieldOp::create(builder, matchLocation);
+  builder.setInsertionPointAfter(elifOp);
+  afterCaseCursor.restore(parser.getLexer());
+  return success();
+}
+
 /// match_stmt ::=  "match" subject_expr ":" NEWLINE
 ///                 case_block+
 /// case_block  ::= "case" pattern ["if" expression] ":" suite
@@ -1580,13 +1717,8 @@ ParseResult StmtParser::parseMatchStmt(size_t curIndent) {
   // style) or be indented beneath it (Python style).  We parse each of the
   // patterns before emitting the IR so we can optimize the pattern tests and
   // allocate the ElIf statement once.
-  struct CaseEntry {
-    ExprNode *patternExpr;
-    ExprNode *guardExpr;
-    LexerCursor caseCursor;
-    size_t caseIndent;
-  };
-  SmallVector<CaseEntry, 4> caseEntries;
+  SmallVector<MatchCaseEntry, 4> caseEntries;
+  bool anyContainMatchBindings = false;
 
   while (isTokenInCurrentStatement(curIndent, /*allowSameIndent=*/true) &&
          getToken().is(Token::kw_case)) {
@@ -1617,6 +1749,9 @@ ParseResult StmtParser::parseMatchStmt(size_t curIndent) {
       patternExpr = shared.allocPersistent<BinOpNode>(ExprNode::kAsPat,
                                                       patternExpr, asLoc, name);
     }
+
+    // Notice if any of these contain binding patterns.
+    anyContainMatchBindings |= patternExpr->mayContainBindingPatterns();
 
     // Optional match guard: `case <pattern> if <cond>:`.
     ExprNode *guardExpr = nullptr;
@@ -1659,112 +1794,10 @@ ParseResult StmtParser::parseMatchStmt(size_t curIndent) {
   if (!subjectBVal)
     return failure();
 
-  auto emitCasePredicate = [&](const CaseEntry &caseEntry) -> SRValue {
-    auto emitter = getEmitter();
-    CValue condCVal = caseEntry.patternExpr->emitMatch(emitter, subjectBVal,
-                                                       PatternDeclKind::kBind);
-
-    // If a guard predicate is present, AND it with the pattern predicate.
-    // Always evaluate the guard even when the pattern is known-false so
-    // diagnostics still fire for an unreachable guard.
-    if (condCVal && caseEntry.guardExpr)
-      condCVal = emitter.emitAndMatchPredicates(
-          {condCVal, caseEntry.patternExpr},
-          [&]() -> ASTExprAnd<CValue> {
-            return {emitter.emitExprScalarBool(caseEntry.guardExpr,
-                                               EC_BoolCondition),
-                    caseEntry.guardExpr};
-          },
-          /*evaluateRhsEvenIfLhsFalse=*/true);
-    return emitter.emitSRValue({condCVal, caseEntry.patternExpr},
-                               EC_BoolCondition);
-  };
-
-  auto emitCaseBody = [&](Block &bodyBlock, const CaseEntry &caseEntry,
-                          Location caseLoc, size_t caseIndent) -> ParseResult {
-    builder.setInsertionPointToStart(&bodyBlock);
-    // Change the parser cursor to the start of the case body so we can parse
-    // the right text. Use parseSuite (not parseLocalScopeSuite) so the body
-    // shares the case scope above — pattern bindings remain visible.
-    caseEntry.caseCursor.restore(getLexer());
-    if (failed(parseSuite(caseIndent)))
-      return failure();
-    HLCF::YieldOp::create(builder, caseLoc);
-    return success();
-  };
-
-  // First case: pattern bindings are created while emitting the predicate.
-  // Keep them in a case-local scope that also wraps the body. The predicate
-  // itself becomes the elif operand; later cases stay in-region for
-  // short-circuit.
-  HLCF::ElifOp elifOp;
-  {
-    DebugInfo::DIBuilder::ScopeGuard scopeGuard;
-    llvm::SaveAndRestore<ASTDecl *> keepDecl(curDeclScope);
-    pushChildScope(scopeGuard, keepDecl);
-
-    auto firstCaseLoc =
-        translateLocation(caseEntries.front().patternExpr->getLoc());
-    SRValue firstCond = emitCasePredicate(caseEntries.front());
-
-    // A bad first pattern still needs an operand for the elif, so recover
-    // with a statically-false arm. That keeps the later cases (and the rest
-    // of the enclosing suite) parsed, so their diagnostics still fire.
-    Value condValue = firstCond;
-    if (!firstCond)
-      condValue = ParamConstantOp::create(
-          builder, firstCaseLoc,
-          SIMDAttr::getScalarBool(builder.getContext(), false));
-
-    unsigned numExtraRegions =
-        caseEntries.size() > 1 ? (caseEntries.size() - 1) * 2 : 0;
-    elifOp = HLCF::ElifOp::create(builder, matchLocation, TypeRange(),
-                                  condValue, numExtraRegions);
-    elifOp.getThenRegion().emplaceBlock();
-    elifOp.getElseRegion().emplaceBlock();
-    for (Region &region : elifOp.getElifRegions())
-      region.emplaceBlock();
-
-    size_t caseIndent = caseEntries.front().caseIndent;
-    if (!firstCond) {
-      builder.setInsertionPointToStart(&elifOp.getThenRegion().front());
-      HLCF::YieldOp::create(builder, firstCaseLoc);
-    } else if (failed(emitCaseBody(elifOp.getThenRegion().front(),
-                                   caseEntries.front(), firstCaseLoc,
-                                   caseIndent))) {
-      return failure();
-    }
-  }
-
-  for (auto [idx, caseEntry] :
-       llvm::enumerate(ArrayRef<CaseEntry>(caseEntries).drop_front())) {
-    unsigned extraIdx = idx; // 0-based into additional (cond, then) pairs
-    auto &condBlock = elifOp.getElifRegions()[extraIdx * 2].front();
-    builder.setInsertionPointToStart(&condBlock);
-
-    DebugInfo::DIBuilder::ScopeGuard scopeGuard;
-    llvm::SaveAndRestore<ASTDecl *> keepDecl(curDeclScope);
-    pushChildScope(scopeGuard, keepDecl);
-
-    auto caseLoc = translateLocation(caseEntry.patternExpr->getLoc());
-    SRValue condRVal = emitCasePredicate(caseEntry);
-    if (!condRVal)
-      continue;
-    HLCF::ElifYieldOp::create(builder, caseLoc, condRVal,
-                              /*no extra values*/ ValueRange());
-
-    if (failed(emitCaseBody(elifOp.getElifRegions()[extraIdx * 2 + 1].front(),
-                            caseEntry, caseLoc, caseEntry.caseIndent)))
-      return failure();
-  }
-
-  // The "else" of the elif is a noop.  TODO: We should mark this as unreachable
-  // if there is an irrefutable pattern so we don't get dead code errors.
-  builder.setInsertionPointToStart(&elifOp.getElseRegion().front());
-  HLCF::YieldOp::create(builder, matchLocation);
-  builder.setInsertionPointAfter(elifOp);
-  afterCaseCursor.restore(getLexer());
-  return success();
+  // If there are no bindings in any of the cases, we can use hlcf.elif.
+  if (!anyContainMatchBindings || /*todo*/ true)
+    return emitMatchAsElIf(*this, caseEntries, subjectBVal, matchLocation,
+                           afterCaseCursor);
 }
 
 /// for_stmt ::=  "for" target_list "in" starred_list ":" suite

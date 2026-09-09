@@ -220,6 +220,12 @@ public:
   virtual CValue emitMatch(IREmitter &emitter, CValue subject,
                            PatternDeclKind patternKind) const;
 
+  /// Return true if this expression, used as a match pattern, may introduce
+  /// variable bindings (`var`/`ref`/`as` names, or nested subpatterns that do).
+  /// The base returns true conservatively; pattern nodes that cannot bind
+  /// override this to false or recurse into their subpatterns.
+  virtual bool mayContainBindingPatterns() const { return true; }
+
   /// Emit this expression to MLIR, returning a (possibly null!) AnyValue.  The
   /// ExprDest indicates information about where to emit the expression result
   /// into, e.g. the a/b target in `def f(): (a,b) = (1,2)`.  On success, the
