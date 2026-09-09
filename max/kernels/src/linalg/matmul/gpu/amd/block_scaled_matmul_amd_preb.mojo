@@ -71,7 +71,7 @@ from structured_kernels.amd_tile_io import (
 
 from ....utils import elementwise_epilogue_type
 
-from .block_scaled_matmul_amd import MX_BLOCK_SIZE
+from .block_scaled_matmul_amd import MX_BLOCK_SIZE, _smem_row_bytes
 from .block_scaled_preshuffle_layouts import Shuffler
 from .block_scaled_preshuffle_loaders import (
     PreshuffledBLoader,
@@ -200,6 +200,7 @@ struct BlockScaledMmaOp_PreB[
     scale_group: Int = 1,
     b_addr_split: Bool = False,
     matrix_format: CDNA4F8F6F4MatrixFormat = CDNA4F8F6F4MatrixFormat.FLOAT4_E2M1,
+    pad_a_row: Bool = True,
 ]:
     """Per-warp register state + MFMA dispatch for the preb (preshuffled-B,
     preshuffled-scale) kernel.
@@ -232,12 +233,15 @@ struct BlockScaledMmaOp_PreB[
             double-buffers alongside the B fragments.
         scale_group: Outer-K tiles whose scale atoms are fetched by one
             wide VMEM op (1 = off, per-tile `buffer_load_dword`).
-        b_addr_split: Whether to split the non-FP6 B-fragment address into
+        b_addr_split: Whether to split the B-fragment address into
             a loop-invariant per-lane part and a wave-uniform whole-tile
             part (defaults to False, one address per fragment).
         matrix_format: `f8f6f4` operand encoding for A and B. A lane covers
             32 K-elements in every format; the bytes that occupies -- 16
             (FP4), 24 (FP6), 32 (FP8) -- is derived from it.
+        pad_a_row: Whether to round A's LDS row stride up to a power of two
+            (defaults to True). A no-op at MXFP4/MXFP8; the caller sets it
+            False when a loader writes the tile at the payload stride.
     """
 
     comptime MMA_M = Self.mma_shape[0]
@@ -281,8 +285,10 @@ struct BlockScaledMmaOp_PreB[
     comptime A_K_HALF_STRIDE = Self.A_MMA_K_BYTES // Self.a_num_frag_halves
     comptime B_K_HALF_STRIDE = Self.B_MMA_K_BYTES // Self.b_num_frag_halves
     comptime K_HALF_STRIDE = Self.A_K_HALF_STRIDE
-    # Per-slot A LDS tile is [BM, BK_BYTES].
     comptime BK_BYTES = (Self.warp_tile[2] * Self.a_bits) // 8
+    comptime A_SMEM_ROW_BYTES = _smem_row_bytes[
+        Self.BK_BYTES
+    ]() if Self.pad_a_row else Self.BK_BYTES
 
     comptime mx_format = Self.matrix_format
 
@@ -437,8 +443,8 @@ struct BlockScaledMmaOp_PreB[
         XOR-16 swizzled read (matches the write in `copy_a_tile_to_smem`): each
         lane reads the 16B vec at slot-tile (row, col_byte), then swizzles the
         flat in-tile byte offset before the `raw_load`. WM==BM so `a_smem_warp`
-        IS the contiguous [BM, BK_BYTES] slot tile and `raw_load` indexes it
-        directly.
+        IS the contiguous [BM, A_SMEM_ROW_BYTES] slot tile and `raw_load`
+        indexes it directly.
 
         Parameters:
             mma_k_idx: Index of the MFMA step along K within the warp
@@ -446,16 +452,18 @@ struct BlockScaledMmaOp_PreB[
 
         Args:
             a_smem_warp: The shared-memory A tile for this warp, a
-                contiguous `[BM, BK_BYTES]` slot tile indexed directly
-                by `raw_load`.
+                contiguous `[BM, A_SMEM_ROW_BYTES]` slot tile indexed
+                directly by `raw_load`.
         """
         # col_major 16x4 lane layout: decode lane -> (m, k_vec).
         comptime lane_layout = col_major[Self.MMA_M, WARP_SIZE // Self.MMA_M]()
         var crd = lane_layout.idx2crd(Int(lane_id()))
         var m = crd[0]
         var k_vec = crd[1]
-        comptime swizzle = a_lds_swizzle[Self.BK_BYTES]()
-        comptime tile_layout = row_major[Self.warp_tile[0], Self.BK_BYTES]()
+        comptime swizzle = a_lds_swizzle[Self.A_SMEM_ROW_BYTES]()
+        comptime tile_layout = row_major[
+            Self.warp_tile[0], Self.A_SMEM_ROW_BYTES
+        ]()
         comptime if Self.bits_per_element == 6:
             comptime assert (
                 Self.mma_frag_width_bytes % 8 == 0
@@ -467,12 +475,14 @@ struct BlockScaledMmaOp_PreB[
                     mma_k_idx * Self.MMA_K_BYTES
                     + Int(k_vec) * Self.mma_frag_width_bytes
                 )
-                var off = swizzle(Int(tile_layout(Coord(row, col_byte))))
                 var frag = SIMD[.uint8, Self.reg_frag_bytes](0)
                 comptime for chunk in range(Self.mma_frag_width_bytes // 8):
+                    var off = swizzle(
+                        Int(tile_layout(Coord(row, col_byte + chunk * 8)))
+                    )
                     frag = frag.insert[offset=chunk * 8](
                         rebind[SIMD[.uint8, 8]](
-                            a_smem_warp.raw_load[width=8](off + chunk * 8)
+                            a_smem_warp.raw_load[width=8](off)
                         )
                     )
                 a_reg_fp6[mma_k_idx, i, 0] = frag
@@ -538,7 +548,25 @@ struct BlockScaledMmaOp_PreB[
             # processing in that block. Finally we add the lane's klane offset within that K tile,
             # This is usually a multiple of 16
 
-            comptime if Self.b_bits == 6:
+            comptime if Self.b_bits == 6 and Self.b_addr_split:
+                var frag6 = SIMD[.uint8, Self.b_reg_frag_bytes](0)
+                comptime for pl in range(b_loader.num_planes):
+                    comptime pb6 = Shuffler[1].plane_bytes[
+                        Self.b_frag_width_bytes, pl
+                    ]()
+                    var lane_off6 = b_loader.lane_plane_off[pl](
+                        n_log, lane_klane * Self.b_frag_width_bytes
+                    )
+                    var k_uniform6 = (
+                        k_byte_base + mma_k_idx * Self.B_MMA_K_BYTES
+                    )
+                    frag6 = frag6.insert[offset=pl * 16](
+                        b_loader.load_at[pl](lane_off6, k_uniform6)
+                    )
+                self._b_reg.vectorize[1, 1, 1, Self.b_reg_frag_bytes]()[
+                    slot, mma_k_idx, i, 0
+                ] = rebind[SIMD[.uint8, Self.b_reg_frag_bytes]](frag6)
+            elif Self.b_bits == 6:
                 var k_byte_log = (
                     k_byte_base
                     + mma_k_idx * Self.B_MMA_K_BYTES
@@ -884,7 +912,7 @@ struct BlockScaledMatmulAMD_PreB[
     to stage a staircase against -- and keeps the per-cluster `s_setprio`
     bracketing.) Default off: callers bit-identical unless opted in.
 
-    `b_addr_split` splits the non-FP6 B-fragment address into a loop-invariant
+    `b_addr_split` splits the B-fragment address into a loop-invariant
     per-lane part (voffset) and a wave-uniform whole-tile part (soffset),
     hoisting the per-tile `v_add` chain out of the unrolled K loop. Worth
     3-4% on the wide MXFP8 gate+up tiles (BM 32..128) and *costs* 3-4% on the
@@ -974,6 +1002,7 @@ struct BlockScaledMatmulAMD_PreB[
         scale_group=Self.scale_group,
         b_addr_split=Self.b_addr_split,
         matrix_format=Self.matrix_format,
+        pad_a_row=not Self.dram_to_lds,
     ]
 
     comptime num_m_mmas = Self.MmaOpType.num_m_mmas
@@ -984,6 +1013,7 @@ struct BlockScaledMatmulAMD_PreB[
 
     comptime BK_BYTES = (Self.BK_ELEMS * Self.a_bits) // 8
     comptime B_BK_BYTES = (Self.BK_ELEMS * Self.b_bits) // 8
+    comptime A_SMEM_ROW_BYTES = Self.MmaOpType.A_SMEM_ROW_BYTES
 
     comptime num_warps_m = 1
     comptime num_warps_n = Self.BN // Self.WN
@@ -1077,9 +1107,8 @@ struct BlockScaledMatmulAMD_PreB[
 
         # SMEM for A (B comes direct from preshuffled DRAM; so do the
         # scales unless `scale_group > 1` bounces them through LDS).
-        # `num_a_slots` buffers laid out slot-major ([slot, BM, BK_BYTES]).
         var a_smem = stack_allocation[DType.uint8, address_space=.SHARED](
-            row_major[Self.num_a_slots * Self.BM, Self.BK_BYTES]()
+            row_major[Self.num_a_slots * Self.BM, Self.A_SMEM_ROW_BYTES]()
         )
 
         # Per-warp transpose strip for the grouped scale fetch. One atom row
@@ -1092,7 +1121,7 @@ struct BlockScaledMatmulAMD_PreB[
             Self.num_warps * Self.MmaOpType.scale_packs * Self.scale_group
         ) if Self.scale_group > 1 else 0
         comptime assert (
-            Self.num_a_slots * Self.BM * Self.BK_BYTES
+            Self.num_a_slots * Self.BM * Self.A_SMEM_ROW_BYTES
             + scale_stage_rows * Self.MmaOpType.SCALE_ATOM_BYTES
             <= MI355X.shared_memory_per_multiprocessor
         ), (
@@ -1192,8 +1221,8 @@ struct BlockScaledMatmulAMD_PreB[
         @__parameter
         def a_smem_slot(
             slot: Int,
-        ) -> type_of(a_smem.tile[Self.BM, Self.BK_BYTES](0, 0)):
-            return a_smem.tile[Self.BM, Self.BK_BYTES](slot, 0)
+        ) -> type_of(a_smem.tile[Self.BM, Self.A_SMEM_ROW_BYTES](0, 0)):
+            return a_smem.tile[Self.BM, Self.A_SMEM_ROW_BYTES](slot, 0)
 
         @always_inline
         @__parameter
@@ -1217,7 +1246,7 @@ struct BlockScaledMatmulAMD_PreB[
                 # loop strides BM by load_thread_rows. Swizzle the flat in-tile
                 # byte offset before the raw_store.
                 if thread_idx.x < load_active_threads:
-                    comptime swizzle = a_lds_swizzle[Self.BK_BYTES]()
+                    comptime swizzle = a_lds_swizzle[Self.A_SMEM_ROW_BYTES]()
                     var a_smem_dst = a_smem_slot(slot)
                     var t = thread_idx.x
                     var base_row = t // load_thread_cols
@@ -1232,18 +1261,22 @@ struct BlockScaledMatmulAMD_PreB[
                     )
                     comptime for v in range(a_loads_per_tile):
                         comptime row_off = (
-                            v * load_thread_rows * Self.BK_BYTES
+                            v * load_thread_rows * Self.A_SMEM_ROW_BYTES
                         )
                         var off: Int
                         comptime if row_stride_pow2:
                             comptime d_v = swizzle(row_off) ^ row_off
                             off = (
-                                swizzle(base_row * Self.BK_BYTES + col_byte)
+                                swizzle(
+                                    base_row * Self.A_SMEM_ROW_BYTES + col_byte
+                                )
                                 ^ d_v
                             ) + row_off
                         else:
                             off = swizzle(
-                                base_row * Self.BK_BYTES + col_byte + row_off
+                                base_row * Self.A_SMEM_ROW_BYTES
+                                + col_byte
+                                + row_off
                             )
                         a_smem_dst.raw_store[width=Self.simd_width](
                             off,
@@ -1305,9 +1338,9 @@ struct BlockScaledMatmulAMD_PreB[
         ]():
             # a_slot/scale_slot default to b_slot/0 (unchanged callers); the
             # co-deepened path passes distinct ring indices.
-            var a_warp = a_smem_slot(a_slot).tile[Self.WM, Self.BK_BYTES](
-                warp_m, 0
-            )
+            var a_warp = a_smem_slot(a_slot).tile[
+                Self.WM, Self.A_SMEM_ROW_BYTES
+            ](warp_m, 0)
             s_setprio[1]()
             comptime for k in range(Self.num_k_mmas):
                 mma_op.load_a_frag_from_smem[k](a_warp)
@@ -1323,9 +1356,9 @@ struct BlockScaledMatmulAMD_PreB[
                 # needs newer ops behind the consumed slot; the epilogue has
                 # none), then keep per-cluster setprio bracketing.
                 s_waitcnt[vmcnt=0]()
-                var a_warp = a_smem_slot(slot).tile[Self.WM, Self.BK_BYTES](
-                    warp_m, 0
-                )
+                var a_warp = a_smem_slot(slot).tile[
+                    Self.WM, Self.A_SMEM_ROW_BYTES
+                ](warp_m, 0)
                 comptime for c in range(n_clusters):
                     comptime k_lo = c * Self.mfma_cluster
                     comptime k_hi = min(
@@ -1448,7 +1481,7 @@ struct BlockScaledMatmulAMD_PreB[
                     # sched_barrier(0) so the scheduler can't re-block the loads
                     # into one burst (the front-load we want to break apart).
                     var a_warp = a_smem_slot(cur_slot).tile[
-                        Self.WM, Self.BK_BYTES
+                        Self.WM, Self.A_SMEM_ROW_BYTES
                     ](warp_m, 0)
                     comptime for k in range(Self.num_k_mmas):
                         mma_op.load_b_frag_preshuffled[k, slot=nxt_slot](
@@ -1505,9 +1538,9 @@ struct BlockScaledMatmulAMD_PreB[
                 load_scales_for_iter(k_iter * mma_k_pair_per_tile)
                 barrier()
 
-                var a_warp = a_smem_slot(a_slot).tile[Self.WM, Self.BK_BYTES](
-                    warp_m, 0
-                )
+                var a_warp = a_smem_slot(a_slot).tile[
+                    Self.WM, Self.A_SMEM_ROW_BYTES
+                ](warp_m, 0)
                 var k_byte_base = k_iter * Self.B_BK_BYTES
 
                 comptime for k in range(Self.num_k_mmas):
