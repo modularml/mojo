@@ -932,6 +932,56 @@ def test_endswith() raises:
     assert_true(ab.endswith("ab"))
 
 
+def test_removeprefix() raises:
+    # Empty prefix returns original string unchanged.
+    assert_equal(StringSlice("hello world").removeprefix(""), "hello world")
+    # Prefix present at start is removed.
+    assert_equal(StringSlice("hello world").removeprefix("hello"), " world")
+    # Prefix not at start returns original string unchanged.
+    assert_equal(
+        StringSlice("hello world").removeprefix("world"), "hello world"
+    )
+    # String equal to prefix returns empty string.
+    assert_equal(StringSlice("hello world").removeprefix("hello world"), "")
+    # Prefix longer than string returns original unchanged.
+    assert_equal(StringSlice("hi").removeprefix("hello world"), "hi")
+    # Middle substring is not treated as prefix.
+    assert_equal(
+        StringSlice("hello world").removeprefix("llo wor"), "hello world"
+    )
+    # Only removes once, not recursively.
+    assert_equal(StringSlice("aahello").removeprefix("aa"), "hello")
+    assert_equal(StringSlice("aaaahello").removeprefix("aa"), "aahello")
+    # Unicode prefix.
+    assert_equal(StringSlice("héllo").removeprefix("hé"), "llo")
+    assert_equal(StringSlice("héllo").removeprefix("ll"), "héllo")
+
+
+def test_removesuffix() raises:
+    # Empty suffix returns original string unchanged.
+    assert_equal(StringSlice("hello world").removesuffix(""), "hello world")
+    # Suffix present at end is removed.
+    assert_equal(StringSlice("hello world").removesuffix("world"), "hello ")
+    # Suffix not at end returns original string unchanged.
+    assert_equal(
+        StringSlice("hello world").removesuffix("hello"), "hello world"
+    )
+    # String equal to suffix returns empty string.
+    assert_equal(StringSlice("hello world").removesuffix("hello world"), "")
+    # Suffix longer than string returns original unchanged.
+    assert_equal(StringSlice("hi").removesuffix("hello world"), "hi")
+    # Middle substring is not treated as suffix.
+    assert_equal(
+        StringSlice("hello world").removesuffix("llo wor"), "hello world"
+    )
+    # Only removes once, not recursively.
+    assert_equal(StringSlice("helloaa").removesuffix("aa"), "hello")
+    assert_equal(StringSlice("helloaaaa").removesuffix("aa"), "helloaa")
+    # Unicode suffix.
+    assert_equal(StringSlice("hellé").removesuffix("lé"), "hel")
+    assert_equal(StringSlice("hellé").removesuffix("ll"), "hellé")
+
+
 def test_isupper() raises:
     assert_true(StringSlice("ASDG").isupper())
     assert_false(StringSlice("AsDG").isupper())
