@@ -15,10 +15,10 @@
 # Figures 16.8, 16.9, 16.10, 16.11, 16.12 translated from CUDA to Mojo
 
 from std.math import ceildiv
-from std.gpu import barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 
 # Scoring constants
 comptime MATCH = 1
@@ -59,11 +59,11 @@ def max4(a: Int, b: Int, c: Int, d: Int) -> Int:
 
 def sw_kernel_square(
     sw: UnsafePointer[Int32, MutAnyOrigin],
-    rea: UnsafePointer[UInt8, MutAnyOrigin],
-    ref_seq: UnsafePointer[UInt8, MutAnyOrigin],
-    L: Int,
-    d: Int,
-    tile_width: Int,
+    rea: UnsafePointer[UInt8, ImmutAnyOrigin],
+    ref_seq: UnsafePointer[UInt8, ImmutAnyOrigin],
+    L_dev: Int32,
+    d_dev: Int32,
+    tile_width_dev: Int32,
 ):
     """Figure 16.9: Smith-Waterman kernel with thread block-level tiling.
 
@@ -71,15 +71,19 @@ def sw_kernel_square(
         sw: Scoring matrix (L x L, flattened).
         rea: Query sequence (read).
         ref_seq: Reference sequence.
-        L: Length of scoring matrix side (sequence length + 1).
-        d: Current anti-diagonal of tiles.
-        tile_width: Width of each tile.
+        L_dev: Length of scoring matrix side (sequence length + 1).
+        d_dev: Current anti-diagonal of tiles.
+        tile_width_dev: Width of each tile.
     """
+    # `Int` is not device-passable; widen the fixed-width args.
+    var L = Int(L_dev)
+    var d = Int(d_dev)
+    var tile_width = Int(tile_width_dev)
     # Allocate shared memory for tile
-    var swTile = stack_allocation[
+    var swTile = unsafe_stack_allocation[
         MAX_TILE_WIDTH * MAX_TILE_WIDTH,
-        Scalar[DType.int32],
-        address_space=AddressSpace.SHARED,
+        Int32,
+        address_space=.SHARED,
     ]()
 
     var numTiles_x = ceildiv(L - 1, tile_width)
@@ -137,9 +141,7 @@ def sw_kernel_square(
                     Int(w) + DELETION,
                     Int(n) + INSERTION,
                 )
-                swTile[r_tile * tile_width + q_tile] = Scalar[DType.int32](
-                    score
-                )
+                swTile[r_tile * tile_width + q_tile] = Int32(score)
 
             barrier()  # Thread block synchronization
 
@@ -177,7 +179,7 @@ def max4_host(a: Int, b: Int, c: Int, d: Int) -> Int:
 
 
 def cpu_smith_waterman(
-    sw: UnsafePointer[Int32, MutAnyOrigin],
+    sw: UnsafePointer[mut=True, Int32, _],
     rea: UnsafePointer[UInt8, _],
     ref_seq: UnsafePointer[UInt8, _],
     L: Int,
@@ -219,7 +221,7 @@ def cpu_smith_waterman(
 
 
 def generate_random_sequence(
-    seq: UnsafePointer[UInt8, MutAnyOrigin],
+    seq: UnsafePointer[mut=True, UInt8, _],
     length: Int,
     mut seed: UInt32,
 ) -> UInt32:
@@ -345,9 +347,9 @@ def main() raises:
     # GPU computation
     with DeviceContext() as ctx:
         # Allocate device memory
-        var d_rea = ctx.enqueue_create_buffer[DType.uint8](L_seq)
-        var d_ref = ctx.enqueue_create_buffer[DType.uint8](L_seq)
-        var d_sw = ctx.enqueue_create_buffer[DType.int32](L * L)
+        var d_rea = ctx.enqueue_create_buffer[.uint8](L_seq)
+        var d_ref = ctx.enqueue_create_buffer[.uint8](L_seq)
+        var d_sw = ctx.enqueue_create_buffer[.int32](L * L)
 
         # Copy sequences to device
         ctx.enqueue_copy(d_rea, h_rea)
@@ -372,9 +374,9 @@ def main() raises:
                 d_sw,
                 d_rea,
                 d_ref,
-                L,
-                d,
-                tile_width,
+                Int32(L),
+                Int32(d),
+                Int32(tile_width),
                 grid_dim=(numBlocks, 1, 1),
                 block_dim=(tile_width, 1, 1),
             )

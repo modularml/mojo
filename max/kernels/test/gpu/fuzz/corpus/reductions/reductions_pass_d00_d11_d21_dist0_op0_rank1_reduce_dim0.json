@@ -1,0 +1,16 @@
+{
+  "target": "reductions",
+  "spec": {
+    "rank": 1,
+    "reduce_dim": 0,
+    "d0": 0,
+    "d1": 1,
+    "d2": 1,
+    "op": 0,
+    "dist": 0
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "rank 1 over an empty axis: excluding the reduced dim leaves no dims to multiply, so the single output comes entirely from the empty product. This is what ops.sum over a whole empty tensor lowers to, and the old num_rows == 0 guard swallowed it.",
+  "findings": []
+}

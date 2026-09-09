@@ -87,7 +87,7 @@ def _get_gpu_count(target_accelerator: str = "") -> int | None:
     if prefix:
         vis = os.environ.get(prefix, "").strip()
         if vis:
-            return min(hw_count, len(set(v.strip() for v in vis.split(","))))
+            return min(hw_count, len({v.strip() for v in vis.split(",")}))
     return hw_count
 
 
@@ -129,29 +129,54 @@ def get_nvidia_smi():  # noqa: ANN201
 
 
 def check_gpu_clock() -> None:
+    """Warn when the SM clock is free to move during a benchmark.
+
+    Persistence mode used to stand in for this. It cannot: it is the one step
+    of ``setup-gpu-clock.sh`` that succeeds on a modern driver, it survives
+    reboots, and it says nothing about clock state — so it reported "locked"
+    on boards whose clocks were floating by 900 MHz. Read the board instead.
+    """
     nvidia_smi = get_nvidia_smi()
     if not nvidia_smi:
         return
-    output = subprocess.check_output(
-        [
-            nvidia_smi,
-            "--query-gpu",
-            "persistence_mode",
-            "--format",
-            "csv",
-        ],
-    )
+    try:
+        output = subprocess.check_output(
+            [
+                nvidia_smi,
+                "--query-gpu",
+                "clocks_event_reasons.sw_power_cap,persistence_mode",
+                "--format",
+                "csv,noheader",
+            ],
+        ).decode("utf-8")
+    except subprocess.CalledProcessError:
+        return
 
-    # We check for persistence here as a proxy to check if setup-gpu-clock.sh
-    # has been run. This is not exact, but should cover most cases. Checking for
-    # the clock frequency is more complicated since the frequencies changes per
-    # GPU.
-    if "Disabled" in output.decode("utf-8"):
+    # Exact match: the field reads "Not Active" when idle, so a substring
+    # test for "Active" matches every healthy board.
+    capped = [
+        ln for ln in output.splitlines() if ln.split(",")[0].strip() == "Active"
+    ]
+    if capped:
+        # At the power cap the clock is set by the power budget, so no lock
+        # holds at or above the sustainable frequency: `-lgc` is accepted and
+        # then ignored. Pinning below it is the only thing that works.
         raise Exception(
-            "the clock frequency for the GPU is not locked, please run"
-            " `sudo utils/setup-gpu-clock.sh` to ensure the frequencies"
-            " and power of the GPU are locked to get consistent"
-            " benchmarking behavior."
+            "the GPU is at its software power cap, so the SM clock is floating"
+            " and benchmark results will not be reproducible. Pin below the"
+            " power-limited clock (`sudo nvidia-smi -lgc <mhz>,<mhz>`, released"
+            " with `-rgc` afterwards). `utils/setup-gpu-clock.sh` does NOT pin"
+            " clocks on such a board — its `nvidia-smi -ac` step is refused by"
+            " recent drivers and still exits 0. See"
+            " docs/internal/GpuClockPinning.md."
+        )
+    if "Disabled" in output:
+        raise Exception(
+            "persistence mode is disabled, so the driver may reset clock state"
+            " between runs; enable it with"
+            " `sudo nvidia-smi --persistence-mode=1`. Note that persistence"
+            " alone does not pin the SM clock — see"
+            " docs/internal/GpuClockPinning.md."
         )
 
 
@@ -178,6 +203,7 @@ target_accelerator_values = {
         "amdgpu:gfx942",
         "amdgpu:gfx950",
         "amdgpu:gfx1030",
+        "amdgpu:gfx1033",
         "amdgpu:gfx1100",
         "amdgpu:gfx1101",
         "amdgpu:gfx1102",

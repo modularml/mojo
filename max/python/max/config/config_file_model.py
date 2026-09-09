@@ -52,6 +52,27 @@ def _resolve_config_file(config_file: str) -> str:
     return str(resolved)
 
 
+def _deep_merge(
+    base: dict[str, Any], override: dict[str, Any]
+) -> dict[str, Any]:
+    """Recursively merge ``override`` onto ``base``; ``override`` wins at leaves.
+
+    Nested mappings are merged key by key, so a partial override (e.g. a single
+    CLI flag deep in a subtree) keeps the sibling values from ``base`` instead of
+    replacing the whole subtree. A shallow ``base | override`` would drop those
+    siblings — e.g. ``--load.max-concurrency`` would wipe the rest of the config
+    file's ``benchmark`` object.
+    """
+    merged = dict(base)
+    for key, value in override.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
+
 class ConfigFileModel(MAXBaseModel):
     """Base class for models that can load configuration from a file.
 
@@ -153,7 +174,10 @@ class ConfigFileModel(MAXBaseModel):
                     )
                 loaded_data = section_data
 
-            # Merge: config file values are loaded, then overridden by CLI args + env vars.
+            # Merge: config file values are loaded, then overridden by CLI args +
+            # env vars. The merge is recursive so a partial CLI override (e.g. one
+            # flag under a nested subtree) keeps the config file's sibling values
+            # instead of replacing the whole subtree.
             # Note: Due to cyclopts processing order, env vars override config files.
-            data = loaded_data | data
+            data = _deep_merge(loaded_data, data)
         return data

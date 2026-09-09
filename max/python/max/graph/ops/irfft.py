@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
 
 from max.dtype import DType
 
@@ -39,7 +38,7 @@ class Normalization(Enum):
     ORTHO = "ortho"
     FORWARD = "forward"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, str):
             return self.value == other
         elif isinstance(other, Normalization):

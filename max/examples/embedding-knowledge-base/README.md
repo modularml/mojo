@@ -17,4 +17,4 @@ search through documents semantically.
 
 For a complete walkthrough, see the tutorial to [Create a knowledge base with a
 text embedding
-model](https://docs.modular.com/max/develop/run-embeddings-with-max-serve)
+model](https://max.modular.com/develop/run-embeddings-with-max-serve)

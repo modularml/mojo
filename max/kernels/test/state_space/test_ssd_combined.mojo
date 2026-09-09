@@ -11,7 +11,14 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
+from layout import (
+    Layout,
+    LayoutTensor,
+    RuntimeLayout,
+    TileTensor,
+    UNKNOWN_VALUE,
+    row_major,
+)
 from layout._fillers import random
 from std.math import exp, exp2, log
 from state_space.selective_scan import (
@@ -71,91 +78,58 @@ def run_ssd_combined[
 
     # output: (batch, dim, seqlen)
     var output_heap = List(length=batch * dim * seqlen, fill=Scalar[dtype](0))
-    var output_h = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        output_heap,
-        RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen)),
-    )
+    var output_h = TileTensor(output_heap, row_major(batch, dim, seqlen))
 
     # x: (batch, dim, num_chunks, 2*dstate) - checkpoint tensor
     var x_heap = List(
         length=batch * dim * n_chunks * 2 * dstate, fill=Scalar[dtype](0)
     )
-    var x_h = LayoutTensor[dtype, layout_4d, MutAnyOrigin](
-        x_heap,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, dim, n_chunks, 2 * dstate)
-        ),
-    )
+    var x_h = TileTensor(x_heap, row_major(batch, dim, n_chunks, 2 * dstate))
 
     # out_z: (batch, dim, seqlen) - gated output
     var out_z_heap = List(length=batch * dim * seqlen, fill=Scalar[dtype](0))
-    var out_z_h = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        out_z_heap,
-        RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen)),
-    )
+    var out_z_h = TileTensor(out_z_heap, row_major(batch, dim, seqlen))
 
     # residual: (batch, dim, seqlen)
     var residual_heap = List(length=batch * dim * seqlen, fill=Scalar[dtype](0))
-    var residual_h = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        residual_heap,
-        RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen)),
-    )
+    var residual_h = TileTensor(residual_heap, row_major(batch, dim, seqlen))
 
     # u: (batch, dim, seqlen)
     var u_heap = List(length=batch * dim * seqlen, fill=Scalar[dtype](0))
-    var u_h = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        u_heap, RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen))
-    )
+    var u_h = TileTensor(u_heap, row_major(batch, dim, seqlen))
 
     # delta: (batch, dim, seqlen)
     var delta_heap = List(length=batch * dim * seqlen, fill=Scalar[dtype](0))
-    var delta_h = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        delta_heap,
-        RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen)),
-    )
+    var delta_h = TileTensor(delta_heap, row_major(batch, dim, seqlen))
 
     # A: (dim, dstate)
     var A_heap = List(length=dim * dstate, fill=Scalar[dtype](0))
-    var A_h = LayoutTensor[dtype, layout_2d, MutAnyOrigin](
-        A_heap, RuntimeLayout[layout_2d].row_major(Index(dim, dstate))
-    )
+    var A_h = TileTensor(A_heap, row_major(dim, dstate))
 
     # B: (batch, n_groups, dstate, seqlen)
     var B_heap = List(
         length=batch * n_groups * dstate * seqlen, fill=Scalar[dtype](0)
     )
-    var B_h = LayoutTensor[dtype, layout_4d, MutAnyOrigin](
-        B_heap,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, n_groups, dstate, seqlen)
-        ),
-    )
+    var B_h = TileTensor(B_heap, row_major(batch, n_groups, dstate, seqlen))
 
     # C: (batch, n_groups, dstate, seqlen)
     var C_heap = List(
         length=batch * n_groups * dstate * seqlen, fill=Scalar[dtype](0)
     )
-    var C_h = LayoutTensor[dtype, layout_4d, MutAnyOrigin](
-        C_heap,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, n_groups, dstate, seqlen)
-        ),
-    )
+    var C_h = TileTensor(C_heap, row_major(batch, n_groups, dstate, seqlen))
 
     # D: (dim,) - optional
     var D_size = dim if has_D else 0
     var D_heap = List(length=max(D_size, 1), fill=Scalar[dtype](0))
-    var D_h = LayoutTensor[dtype, layout_1d, MutAnyOrigin](
-        D_heap, RuntimeLayout[layout_1d].row_major(Index(D_size))
-    )
+    var D_h = TileTensor(D_heap, row_major(D_size))
 
     # z: (batch, dim, seqlen) - optional
     var z_size = batch * dim * seqlen if has_z else 0
     var z_heap = List(length=max(z_size, 1), fill=Scalar[dtype](0))
-    var z_h = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
+    var z_h = TileTensor(
         z_heap,
-        RuntimeLayout[layout_3d].row_major(
-            Index(
+        row_major(
+            (
                 batch if has_z else 0,
                 dim if has_z else 0,
                 seqlen if has_z else 0,
@@ -168,16 +142,11 @@ def run_ssd_combined[
     var delta_bias_heap = List(
         length=max(delta_bias_size, 1), fill=Scalar[dtype](0)
     )
-    var delta_bias_h = LayoutTensor[dtype, layout_1d, MutAnyOrigin](
-        delta_bias_heap,
-        RuntimeLayout[layout_1d].row_major(Index(delta_bias_size)),
-    )
+    var delta_bias_h = TileTensor(delta_bias_heap, row_major(delta_bias_size))
 
     # gamma: (dim,) - for normalization
     var gamma_heap = List(length=dim, fill=Scalar[dtype](0))
-    var gamma_h = LayoutTensor[dtype, layout_1d, MutAnyOrigin](
-        gamma_heap, RuntimeLayout[layout_1d].row_major(Index(dim))
-    )
+    var gamma_h = TileTensor(gamma_heap, row_major(dim))
 
     # Initialize data
     random(u_h)
@@ -196,28 +165,28 @@ def run_ssd_combined[
 
     # Initialize gamma to positive values
     for i in range(dim):
-        gamma_h.ptr[i] = abs(gamma_h.ptr[i]) + Scalar[dtype](0.1)
+        gamma_h._storage[i] = abs(gamma_h._storage[i]) + Scalar[dtype](0.1)
 
-    var epsilon = Scalar[dtype](0.001)
+    var epsilon = Float32(0.001)
     var weight_offset = Scalar[dtype](0.0)
 
     # Call kernel
     ssd_combined_cpu[
         dtype,
         DSTATE,
-        output_h.layout,
-        x_h.layout,
-        out_z_h.layout,
-        residual_h.layout,
-        u_h.layout,
-        delta_h.layout,
-        A_h.layout,
-        B_h.layout,
-        C_h.layout,
-        D_h.layout,
-        z_h.layout,
-        delta_bias_h.layout,
-        gamma_h.layout,
+        output_h.LayoutType,
+        x_h.LayoutType,
+        out_z_h.LayoutType,
+        residual_h.LayoutType,
+        u_h.LayoutType,
+        delta_h.LayoutType,
+        A_h.LayoutType,
+        B_h.LayoutType,
+        C_h.LayoutType,
+        D_h.LayoutType,
+        z_h.LayoutType,
+        delta_bias_h.LayoutType,
+        gamma_h.LayoutType,
     ](
         batch,
         dim,
@@ -237,7 +206,7 @@ def run_ssd_combined[
         z_h,
         delta_bias_h,
         gamma_h,
-        epsilon,
+        epsilon.cast[dtype](),
         weight_offset,
     )
 
@@ -251,28 +220,28 @@ def run_ssd_combined[
             var group_id = d_idx // group_size
 
             # Pre-load A values with LOG2E scaling (matches kernel)
-            var A_ref = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var A_ref = SIMD[.float32, MAX_DSTATE](0.0)
             for n in range(dstate):
-                A_ref[n] = Float32(A_h.ptr[d_idx * dstate + n]) * LOG2E
+                A_ref[n] = Float32(A_h._storage[d_idx * dstate + n]) * LOG2E
 
             # Load per-dim scalars
-            var gamma_val = Float32(gamma_h.ptr[d_idx])
+            var gamma_val = Float32(gamma_h._storage[d_idx])
             var D_val = Float32(0)
             if has_D:
-                D_val = Float32(D_h.ptr[d_idx])
+                D_val = Float32(D_h._storage[d_idx])
             var delta_bias_val = Float32(0)
             if has_delta_bias:
-                delta_bias_val = Float32(delta_bias_h.ptr[d_idx])
+                delta_bias_val = Float32(delta_bias_h._storage[d_idx])
             var weight_offset_val = Float32(weight_offset)
 
             # Initialize state to zero
-            var state_ref = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var state_ref = SIMD[.float32, MAX_DSTATE](0.0)
 
             for t in range(seqlen):
                 var off_3d = b_idx * dim * seqlen + d_idx * seqlen + t
-                var u_val = Float32(u_h.ptr[off_3d])
-                var delta_val = Float32(delta_h.ptr[off_3d])
-                var residual_val = Float32(residual_h.ptr[off_3d])
+                var u_val = Float32(u_h._storage[off_3d])
+                var delta_val = Float32(delta_h._storage[off_3d])
+                var residual_val = Float32(residual_h._storage[off_3d])
 
                 if has_delta_bias:
                     delta_val += delta_bias_val
@@ -282,8 +251,8 @@ def run_ssd_combined[
                 var delta_u = delta_val * u_val
 
                 # Load B, C values
-                var B_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
-                var C_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+                var B_vals = SIMD[.float32, MAX_DSTATE](0.0)
+                var C_vals = SIMD[.float32, MAX_DSTATE](0.0)
                 for n in range(dstate):
                     var bc_offset = (
                         b_idx * n_groups * dstate * seqlen
@@ -291,8 +260,8 @@ def run_ssd_combined[
                         + n * seqlen
                         + t
                     )
-                    B_vals[n] = Float32(B_h.ptr[bc_offset])
-                    C_vals[n] = Float32(C_h.ptr[bc_offset])
+                    B_vals[n] = Float32(B_h._storage[bc_offset])
+                    C_vals[n] = Float32(C_h._storage[bc_offset])
 
                 # State update: state = state * exp2(A * delta) + B * delta * u
                 var a_t = exp2(A_ref * delta_val)
@@ -310,7 +279,7 @@ def run_ssd_combined[
                 var normalized = combined * (gamma_val + weight_offset_val)
 
                 if has_z:
-                    var z_val = Float32(z_h.ptr[off_3d])
+                    var z_val = Float32(z_h._storage[off_3d])
                     var out_z_val = normalized * silu_ref(z_val)
                     out_z_ref_heap[off_3d] = Scalar[dtype](out_z_val)
                     normalized = out_z_val
@@ -320,7 +289,7 @@ def run_ssd_combined[
     # Compare kernel output vs reference
     for i in range(ref_size):
         assert_almost_equal(
-            output_h.ptr[i],
+            output_h._storage[i],
             output_ref_heap[i],
             rtol=rtol,
         )
@@ -329,7 +298,7 @@ def run_ssd_combined[
     if has_z:
         for i in range(ref_size):
             assert_almost_equal(
-                out_z_h.ptr[i],
+                out_z_h._storage[i],
                 out_z_ref_heap[i],
                 rtol=rtol,
             )

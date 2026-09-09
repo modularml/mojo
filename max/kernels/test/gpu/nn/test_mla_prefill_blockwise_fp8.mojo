@@ -10,8 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from std.random import randn
 from layout import (
     Idx,
@@ -110,10 +110,10 @@ def test_prefill[
     randn(cache_sf_ptr.as_span())
 
     # input row offsets and cache row offsets
-    var input_row_offsets = ctx.enqueue_create_host_buffer[DType.uint32](
+    var input_row_offsets = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
-    var cache_row_offsets = ctx.enqueue_create_host_buffer[DType.uint32](
+    var cache_row_offsets = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
     for i in range(batch_size):
@@ -129,10 +129,10 @@ def test_prefill[
     var cache_device_ptr = ctx.enqueue_create_buffer[k_rope_type](cache_size)
     var cache_sf_device_ptr = ctx.enqueue_create_buffer[sf_dtype](cache_sf_size)
     var output_device_ptr = ctx.enqueue_create_buffer[qkv_type](o_size)
-    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
-    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
 
@@ -385,14 +385,18 @@ def test_prefill[
     ctx.enqueue_copy(v_ref_device_ptr, v_ref_ptr)
 
     var null_valid_length = LayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
+        .uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
     ](
         None,
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(Index(0)),
     )
 
-    var k_ref_operand = LayoutTensorMHAOperand(k_ref_device.to_layout_tensor())
-    var v_ref_operand = LayoutTensorMHAOperand(v_ref_device.to_layout_tensor())
+    var k_ref_operand = LayoutTensorMHAOperand(
+        k_ref_device.as_immut().as_unsafe_any_origin()
+    )
+    var v_ref_operand = LayoutTensorMHAOperand(
+        v_ref_device.as_immut().as_unsafe_any_origin()
+    )
 
     # create reference output
 
@@ -434,8 +438,8 @@ def test_prefill[
         for s in range(seq_len):
             for h in range(num_heads):
                 for d in range(kv_depth):
-                    lhs = output_rank4[b, s, h, d]
-                    rhs = output_ref[b, s, h, d]
+                    var lhs = output_rank4[b, s, h, d]
+                    var rhs = output_ref[b, s, h, d]
                     # if abs((lhs - rhs)) > 2.2e-2:
                     #    print(b, s, h, d, lhs, rhs)
                     # print(b, s, h, d, lhs, rhs)

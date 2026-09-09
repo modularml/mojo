@@ -1,0 +1,215 @@
+---
+title: Variables
+sidebar_position: 3
+description: Introduction to Mojo variables.
+---
+
+A variable is a name that holds a value or object. All variables in Mojo
+are mutable by default. Their value can change. If you want to define a
+constant value that can't change at runtime, see the [`comptime`
+keyword](/docs/manual/metaprogramming/comptime-evaluation/#comptime-values)
+or pass the value as a non-mutable function argument.
+
+When you declare a variable in Mojo, you allocate a logical storage location,
+and bind a name to that storage.
+
+```mojo
+var greeting: String = "Hello World"
+```
+
+A `var` declaration does three things:
+
+- It declares a logical storage location, which is tied to a particular type.
+  In this case, it holds `String` instances.
+- It binds the name `greeting` to this logical storage location.
+- It *initializes* the storage space with a newly created `String` value,
+  using "Hello World". The new value is *owned by* the variable.
+  No other variable can own this value unless you transfer its ownership.
+
+## Variable declarations
+
+To declare a variable, use `var` with a name. You can give it a value, a
+type annotation, or both. The more you annotate, the more explicit your
+code is, and the easier it is to read and maintain:
+
+```mojo
+var a = 5  # Mojo infers that a is type Int
+var b: Float64 = 3.14  # Explicit declaration of Float64 type
+var c: String  # The name is created but uninitialized
+```
+
+A variable's type never changes. Its storage is strongly typed upon creation
+and can only hold values of that type:
+
+```mojo
+var count = 8 # count is type Int
+count = "Nine?" # Error: can't implicitly convert 'StringLiteral' to 'Int'
+```
+
+A variable is scoped to the block in which it is declared. Its value
+is destroyed at last use. You may transfer a value from a variable so it no
+longer lives in that variable or that scope. The name, that is, the variable
+itself, is destroyed when the scope ends.
+
+- Variables are names that hold values.
+- Values are data that live in memory.
+
+## Variable scopes
+
+Variables in Mojo use *lexical scoping*. A variable's definition is
+determined by where it appears in the source code, not when it executes
+at runtime. The specific scope level depends on how the variable is
+declared.
+
+Variables have **block-level** scope. Nested code can read and modify
+variables defined in an outer scope. An outer scope can't read variables
+defined in an inner scope.
+
+For example, the `if` code block shown here creates an inner scope where outer
+variables are accessible to read/write, but any new variables do not live
+beyond the scope of the `if` block:
+
+```mojo
+def lexical_scopes():
+    var num = 1
+    var dig = 1
+    if num == 1:
+        print("num:", num)  # Reads the outer-scope "num"
+        var num = 2         # Creates new inner-scope "num"
+        print("num:", num)  # Reads the inner-scope "num"
+        dig = 2             # Updates the outer-scope "dig"
+    print("num:", num)      # Reads the outer-scope "num"
+    print("dig:", dig)      # Reads the outer-scope "dig"
+```
+
+```output
+num: 1
+num: 2
+num: 1
+dig: 2
+```
+
+Note that the `var` statement inside the `if` creates a **new** variable
+with the same name as the outer variable. This prevents the inner
+if-statement from accessing the outer `num` variable. This is called
+"variable shadowing," where the inner scope variable hides or "shadows" a
+variable from an outer scope.
+
+The lifetime of the inner `num` ends exactly where the `if` code block ends,
+because that's the scope in which the variable was defined.
+
+## Copying and moving values
+
+An assignment statement of a newly created value or a literal establishes
+ownership:
+
+```mojo
+var owning_variable = "Owned value"
+```
+
+An assignment of an existing variable's value transfers ownership of that
+value or a copy of that value to the new variable:
+
+```mojo
+var source = String("Hello")
+var copied = source   # A copy
+var moved = source^   # A transfer
+```
+
+The right-hand side variables must be `Copyable` or `Movable` to be
+assigned in this way. After the assignment the new variable owns a value,
+whether copied or transferred. A transfer leaves `source` uninitialized, and
+you can't use it again until you assign it a new value.
+
+The value on the right-hand side of the assignment statement must be
+transferable to the new variable. Here's an example where that doesn't
+work:
+
+```mojo
+var first: List[Int] = [1, 2, 3]
+var second = first  # error: 'List[Int]' is not implicitly copyable because
+                    # it doesn't conform to 'ImplicitlyCopyable'
+```
+
+The first assignment is no problem: the expression `[1, 2, 3]` creates a
+new `List` value without an owner, so `first` becomes that owner without
+any ambiguity. The second assignment errors because `first` isn't
+implicitly copyable and the value isn't transferred.
+
+Each outcome depends on type features for the values involved in assignment.
+
+- A `Copyable` type can be copied explicitly, by calling its copy
+  initializer or the `copy()` method.
+
+  ```mojo
+  var second = first.copy()
+  ```
+
+  Copying leaves `first` unchanged. `second` is assigned its own, uniquely
+  owned copy of the list.
+
+- `ImplicitlyCopyable` types can be copied without an explicit signal:
+
+  ```mojo
+  var one_value = 15
+  var another_value = one_value  # implicit copy
+  ```
+
+  Implicitly copyable types are generally simple value types like `Int`,
+  `Float64`, and `Bool`, which can be copied trivially.
+
+- The ownership of a value can be explicitly transferred from one variable
+  to another by appending the *transfer sigil* (`^`) after the value to
+  transfer:
+
+  ```mojo
+  var second = first^
+  ```
+
+  This moves the value to `second`, and leaves `first` uninitialized.
+
+  This ownership may move the value from one memory location to another.
+  This requires the value to be `Movable`.
+
+## Reference bindings
+
+Some APIs return
+[_references_](/docs/manual/values/lifetimes/#working-with-references) to
+values owned elsewhere. References avoid copying values. For example, when
+you retrieve a value from a collection, the collection returns a reference,
+instead of a copy:
+
+```mojo
+var animals: List[String] = ["Cats", "Dogs", "Zebras"]
+print(animals[2])  # Prints "Zebras", does not copy the value.
+```
+
+If you assign a reference to a *variable*, it creates a copy (if the value
+is implicitly copyable) or produces an error (if it isn't):
+
+```mojo
+var items: List[Int] = [99, 77, 33, 12]
+var item = items[1]  # item is a copy of items[1]
+item += 1  # increments item
+print(items[1])  # prints 77
+```
+
+To name a reference, use the `ref` keyword to create a reference binding:
+
+```mojo
+ref item_ref = items[1]  # item_ref is a reference to item[1]
+item_ref += 1  # increments items[1]
+print(items[1])  # prints 78
+```
+
+The name `item_ref` is bound to `items[1]`. All reads and writes to
+`item_ref` go to the item it references.
+
+Reference bindings can't be re-assigned:
+
+```mojo
+ref item_ref = items[2]  # error: invalid redefinition of item_ref
+```
+
+For more information on references, see
+[Working with references](/docs/manual/values/lifetimes/#working-with-references).

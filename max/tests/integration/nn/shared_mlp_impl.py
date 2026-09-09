@@ -19,7 +19,6 @@ from typing import Any
 
 import pytest
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from max.driver import CPU, Accelerator, Buffer, Device, accelerator_count
 from max.dtype import DType
@@ -30,12 +29,12 @@ from max.graph import (
     ShardingStrategy,
     TensorType,
     TensorValue,
-    Type,
     Value,
     ops,
 )
 from max.nn import MLP, Allreduce, Module, Signals
 from test_common.graph_utils import are_all_buffer_values_sequence
+from torch import nn
 
 DTYPE = DType.float32
 TORCH_DTYPE = torch.float32
@@ -117,20 +116,9 @@ class WrapModuleForSubgraph(Module):
         self.prefix = module
 
     def __call__(self, *args: Any) -> Value | list[Value] | list[TensorValue]:  # type: ignore[type-arg]
-        subgraph_arg_types: list[Type] = []  # type: ignore[type-arg]
-
-        def flatten(t: Any, result: list[Type]) -> None:  # type: ignore[type-arg]
-            if isinstance(t, list | tuple):
-                for item in t:
-                    flatten(item, result)
-            else:
-                assert isinstance(t, Value)
-                result.append(t.type)
-
-        flatten(args, subgraph_arg_types)
         subgraph = self.prefix.build_subgraph(
             name="subgraph",
-            input_types=subgraph_arg_types,
+            inputs=list(args),
             weight_prefix="prefix.",
         )
         return ops.call(subgraph, *args, prefix="prefix.")

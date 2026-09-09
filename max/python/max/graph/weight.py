@@ -114,8 +114,11 @@ def head_aware_col_sharding_strategy(
     where the number of heads is not evenly divisible by the number of devices.
     It splits columns according to how heads are distributed across devices.
 
-    Supports packed weights (for example, NVFP4 float4-e2m1fnx2) where the stored
-    columns are in_dim // 2; in that case column indices are halved.
+    Supports packed weights, where the stored columns are bytes rather than
+    elements: NVFP4/FP4 stores in_dim // 2 columns and MXFP6 stores
+    in_dim * 3 // 4. The packing ratio is inferred from the tensor's own width,
+    so column indices are converted to packed positions for those formats and
+    left alone otherwise.
 
     Args:
         weight: The :class:`Weight` to shard.
@@ -134,13 +137,22 @@ def head_aware_col_sharding_strategy(
     col_start = head_start * head_dim
     col_end = head_end * head_dim
 
-    # If the weight is packed (e.g. NVFP4: 2 fp4 values per uint8), it has
-    # in_dim/2 columns; use packed column indices so the slice stays in bounds.
+    # If the weight is packed, its columns are bytes rather than elements, so the
+    # logical head boundaries have to be converted to packed columns or the slice
+    # runs past the end (and, worse, lands on the wrong data). The ratio is read
+    # off the tensor itself, so an unpacked weight -- and the derived scale
+    # tensor, whose columns are already blocks -- falls through unchanged.
     logical_in_dim = num_heads * head_dim
     actual_cols = int(weight.shape[1])
     if actual_cols * 2 == logical_in_dim:
+        # FP4: two 4-bit codes per byte.
         col_start = col_start // 2
         col_end = col_end // 2
+    elif actual_cols * 4 == logical_in_dim * 3:
+        # MXFP6: four 6-bit codes per three bytes. `head_dim` is a multiple of 4
+        # for every supported head size, so head boundaries stay byte-aligned.
+        col_start = col_start * 3 // 4
+        col_end = col_end * 3 // 4
 
     return weight[:, col_start:col_end]
 

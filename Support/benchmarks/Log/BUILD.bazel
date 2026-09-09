@@ -1,0 +1,39 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_binary(
+    name = "LogBenchmark",
+    srcs = ["LogBenchmark.cpp"],
+    deps = [
+        "//Support:Log",
+        "//Support:MicroBenchmark",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_binary(
+    name = "LogThroughputBenchmark",
+    srcs = ["LogThroughputBenchmark.cpp"],
+    deps = [
+        "//Support:Log",
+    ],
+)
+
+modular_cc_binary(
+    name = "LogWorkloadBenchmark",
+    srcs = ["LogWorkloadBenchmark.cpp"],
+    deps = [
+        "//Support:Log",
+        "//Support:MicroBenchmark",
+        "@llvm-project//llvm:Support",
+    ],
+)

@@ -52,3 +52,53 @@ params:
 - dtype: float32
   shape: 32x128256
   temperature: 0.6
+
+# Low-batch, large-vocabulary shapes (LLM decode-sampling)
+# Tests split-row optimization from PR #87842
+- dtype: bfloat16
+  shape: 2x128256
+  temperature: 0.6
+- dtype: bfloat16
+  shape: 4x128256
+  temperature: 0.6
+- dtype: bfloat16
+  shape: 8x128256
+  temperature: 0.6
+- dtype: bfloat16
+  shape: 16x128256
+  temperature: 0.6
+
+# Full-occupancy shapes for comparison
+- dtype: bfloat16
+  shape: 512x4096
+  temperature: 0.6
+
+# Varying temperatures
+- dtype: bfloat16
+  shape: 1x128256
+  temperature: 0.1
+- dtype: bfloat16
+  shape: 1x128256
+  temperature: 2.0
+
+# Additional vocabulary sizes
+- dtype: bfloat16
+  shape: 1x32000
+  temperature: 0.6
+- dtype: bfloat16
+  shape: 32x32000
+  temperature: 0.6
+- dtype: bfloat16
+  shape: 1x64000
+  temperature: 0.6
+- dtype: bfloat16
+  shape: 32x64000
+  temperature: 0.6
+
+# float32 variants
+- dtype: float32
+  shape: 1x128256
+  temperature: 0.6
+- dtype: float32
+  shape: 1024x4096
+  temperature: 0.6

@@ -1,0 +1,164 @@
+---
+title: Serve models with recipes
+sidebar_label: Recipes
+description: Learn how to serve models with recipes that capture tuned max serve configurations for a specific model and hardware layout.
+---
+
+A recipe is a YAML file that captures a complete [`max serve`](/cli/serve)
+configuration. Use recipes to reuse performance-optimized serving settings for a
+specific model and hardware layout.
+
+In MAX, many [supported models](/models/) are packaged with recipes you can use
+when serving. You can also write your own recipes. This page describes how to
+use built-in model recipes and how to write your own.
+
+:::experiment
+
+This feature is experimental and in ongoing development.
+
+:::
+
+## How recipes work
+
+### Recipe structure
+
+In a recipe YAML file, sections correspond to different parts of the serving
+pipeline. The majority of keys within sections correspond to `max serve` options
+that you can review in the [CLI reference](/cli/serve). Any configuration that
+you don't define explicitly falls back to default values.
+
+Here's an example recipe that serves Gemma 4 26B A4B on a single GPU:
+
+```yaml
+model:
+  model_path: google/gemma-4-26B-A4B-it
+  device_specs: [0]
+  kv_cache:
+    kv_cache_format: float8_e4m3fn
+    kv_cache_page_size: 128
+    kv_connector_config:
+      type: rust_tiered
+
+draft_model:
+  model_path: google/gemma-4-26B-A4B-it-assistant
+  device_specs: [0]
+
+speculative:
+  speculative_method: mtp
+  num_speculative_tokens: 3
+
+runtime:
+  device_graph_capture: true
+```
+
+In this example, each top-level section configures one part of the pipeline:
+
+- `model`: the model to serve, its device placement, and its KV cache settings.
+- `draft_model`: the draft model that speculative decoding uses.
+- `speculative`: the speculative decoding method and token count.
+- `runtime`: batching and execution tuning.
+
+This recipe optimizes serving performance by storing the KV cache in FP8,
+enabling tiered prefix caching, adding multi-token prediction, and turning on
+device graph capture.
+
+### Configuration precedence
+
+When the same value comes from more than one source, MAX resolves it in this
+order, from highest priority to lowest:
+
+1. Command-line flags
+2. Environment variables
+3. Recipe file values
+4. Built-in defaults
+
+## Run max serve with recipes
+
+### Use a bundled recipe
+
+When a model in MAX already includes a recipe in its
+[architecture package](https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures),
+you can use it when running `max serve` for that model. If a model contains
+multiple recipes, choose which one to use based on:
+
+- The hardware that you serve the model on. Recipes are hardware-specific.
+- The performance strategy that you want to optimize for.
+
+To serve a model with a bundled recipe, pass its package-relative path to
+`--config-file`. MAX resolves paths that start with
+`max/pipelines/architectures/` against the installed `max` package, so they work
+from any directory:
+
+```bash
+max serve --config-file max/pipelines/architectures/gemma4/recipes/gemma4_26b_a4b_tuned.yaml
+```
+
+### Use a custom recipe
+
+You can write your own recipe YAML file for your preferred serving
+configuration. An easy way to get started is to duplicate an existing model's
+recipe and change some of the values.
+
+```yaml
+# updated-gemma-recipe.yaml
+model:
+  model_path: google/gemma-4-26B-A4B-it
+  device_specs: [0]
+  max_length: 8192
+  kv_cache:
+    device_memory_utilization: 0.8
+
+runtime:
+  device_graph_capture: true
+```
+
+Serve a model using your recipe by passing the file path to `--config-file`:
+
+```bash
+max serve --config-file updated-gemma-recipe.yaml
+```
+
+To measure how well your recipe works, use the `benchmark` CLI command to
+compare the performance of different configurations. See [Benchmark
+performance](/serve/benchmark) for more information.
+
+:::note
+
+If you're [bringing a custom model architecture](/develop/) to MAX, write
+recipes from scratch and include them in the `recipes` folder of your
+architecture package.
+
+:::
+
+### Override recipe values
+
+As described in [Configuration precedence](#configuration-precedence), you can
+override any value that a recipe sets on the command line. The following example
+overrides a recipe's KV cache page size, assuming that the recipe doesn't
+already set it to `256`:
+
+```bash
+max serve \
+  --config-file max/pipelines/architectures/gemma4/recipes/gemma4_26b_a4b_tuned.yaml \
+  --kv-cache-page-size 256
+```
+
+You can also override hardware settings. The following example changes the
+amount of GPU memory reserved for the KV cache:
+
+```bash
+max serve \
+  --config-file max/pipelines/architectures/gemma4/recipes/gemma4_26b_a4b_tuned.yaml \
+  --device-memory-utilization 0.6
+```
+
+## Next steps
+
+Now that you can serve a model from a recipe, explore the features that recipes
+configure:
+
+- [Speculative decoding](/serve/speculative-decoding): Understand the
+  `speculative` and `draft_model` sections that enable multi-token prediction,
+  EAGLE, and DFlash drafting.
+- [Prefix caching](/serve/prefix-caching): Learn about the KV cache behavior
+  that the `kv_cache` section controls.

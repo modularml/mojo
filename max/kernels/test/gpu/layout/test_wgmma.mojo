@@ -14,10 +14,10 @@
 import linalg.matmul.vendor.blas as vendor_blas
 
 from std.math.uutils import udivmod
-from std.gpu import barrier
-from std.gpu.host import DeviceContext
-from std.gpu import lane_id, thread_idx, warp_id
-from std.gpu.compute.mma import (
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import lane_id, thread_idx, warp_id
+from max.gpu.compute.mma import (
     wgmma_async,
     wgmma_commit_group_sync,
     wgmma_fence_aligned,
@@ -53,21 +53,21 @@ def wgmma_kernel_rs[
     c_gmem: LayoutTensor[c_type, c_layout, MutAnyOrigin],
 ):
     var a_smem_tile = LayoutTensor[
-        DType.bfloat16,
+        .bfloat16,
         a_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     var b_smem_tile = LayoutTensor[
-        DType.bfloat16,
+        .bfloat16,
         b_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     comptime num_output_regs = WMMA_M * WMMA_N // 128
-    var c_reg = SIMD[DType.float32, num_output_regs](0)
+    var c_reg = SIMD[.float32, num_output_regs](0)
 
     comptime M = a_layout.shape[0].value()
     comptime K = a_layout.shape[1].value()
@@ -93,18 +93,18 @@ def wgmma_kernel_rs[
 
         var mat_b_desc = _rhs_descriptor[transpose_b](b_smem_tile)
 
-        var a_reg = SIMD[DType.bfloat16, 8](0)
+        var a_reg = SIMD[.bfloat16, 8](0)
         var lane_q, lane_r = udivmod(lane_id(), 4)
         var row = warp_id() * 16 + lane_q
         var col = lane_r * 2
-        a_reg[0] = a_gmem_tile.ptr[row * K + col].cast[DType.bfloat16]()
-        a_reg[1] = a_gmem_tile.ptr[row * K + col + 1].cast[DType.bfloat16]()
-        a_reg[2] = a_gmem_tile.ptr[(row + 8) * K + col].cast[DType.bfloat16]()
+        a_reg[0] = a_gmem_tile.ptr[row * K + col].cast[.bfloat16]()
+        a_reg[1] = a_gmem_tile.ptr[row * K + col + 1].cast[.bfloat16]()
+        a_reg[2] = a_gmem_tile.ptr[(row + 8) * K + col].cast[.bfloat16]()
         a_reg[3] = a_gmem_tile.ptr[(row + 8) * K + col + 1].cast[
             DType.bfloat16
         ]()
-        a_reg[4] = a_gmem_tile.ptr[row * K + col + 8].cast[DType.bfloat16]()
-        a_reg[5] = a_gmem_tile.ptr[row * K + col + 9].cast[DType.bfloat16]()
+        a_reg[4] = a_gmem_tile.ptr[row * K + col + 8].cast[.bfloat16]()
+        a_reg[5] = a_gmem_tile.ptr[row * K + col + 9].cast[.bfloat16]()
         a_reg[6] = a_gmem_tile.ptr[(row + 8) * K + col + 8].cast[
             DType.bfloat16
         ]()
@@ -156,21 +156,21 @@ def wgmma_kernel_ss[
     c_gmem: LayoutTensor[c_type, c_layout, MutAnyOrigin],
 ):
     var a_smem_tile = LayoutTensor[
-        DType.bfloat16,
+        .bfloat16,
         a_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     var b_smem_tile = LayoutTensor[
-        DType.bfloat16,
+        .bfloat16,
         b_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     comptime num_output_regs = WMMA_M * WMMA_N // 128
-    var c_reg = SIMD[DType.float32, num_output_regs](0)
+    var c_reg = SIMD[.float32, num_output_regs](0)
 
     comptime M = a_layout.shape[0].value()
     comptime K = a_layout.shape[1].value()
@@ -231,18 +231,18 @@ def wgmma_bf16_bf16_f32[
         sep="",
     )
 
-    var a = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(M, K)](ctx)
+    var a = ManagedLayoutTensor[.bfloat16, Layout.row_major(M, K)](ctx)
     arange(a.tensor[update=False]())
 
-    var b = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(N, K)](ctx)
+    var b = ManagedLayoutTensor[.bfloat16, Layout.row_major(N, K)](ctx)
     arange(b.tensor[update=False]())
 
-    var c = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(M, N)](ctx)
-    var c_ref = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(M, N)](ctx)
+    var c = ManagedLayoutTensor[.bfloat16, Layout.row_major(M, N)](ctx)
+    var c_ref = ManagedLayoutTensor[.bfloat16, Layout.row_major(M, N)](ctx)
 
-    comptime a_smem_layout = tile_layout_k_major[DType.bfloat16, BM=M, BK=16]()
+    comptime a_smem_layout = tile_layout_k_major[.bfloat16, BM=M, BK=16]()
 
-    comptime b_smem_layout = tile_layout_k_major[DType.bfloat16, BM=N, BK=16]()
+    comptime b_smem_layout = tile_layout_k_major[.bfloat16, BM=N, BK=16]()
 
     comptime kernel = (wgmma_kernel_rs if a_reg else wgmma_kernel_ss)[
         DType.bfloat16,

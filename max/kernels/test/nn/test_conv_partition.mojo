@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
+from layout import Coord
 from linalg.utils import partition_work
 from nn.conv.conv_utils import ConvShape, get_conv_num_partitions
 
@@ -29,16 +30,16 @@ def test_partition():
 
     var conv_shape = ConvShape[2](
         n=1,
-        input_dims=Index(56, 56),
-        output_dims=Index(56, 56),
-        filter_dims=Index(3, 3),
+        input_dims=Coord(Index(56, 56)),
+        output_dims=Coord(Index(56, 56)),
+        filter_dims=Coord(Index(3, 3)),
         c=64,
         f=64,
-        stride=Index(1, 1),
-        dilation=Index(1, 1),
-        pad_d=Index(0, 0),
-        pad_h=Index(1, 1),
-        pad_w=Index(1, 1),
+        stride=Coord(Index(1, 1)),
+        dilation=Coord(Index(1, 1)),
+        pad_d=Coord(Index(0, 0)),
+        pad_h=Coord(Index(1, 1)),
+        pad_w=Coord(Index(1, 1)),
         num_groups=1,
     )
 

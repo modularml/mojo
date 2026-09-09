@@ -13,9 +13,9 @@
 
 """Integration tests for ``max.benchmark.sweep_benchmark_serving``.
 
-CSV columns, percentile validation, and ``SweepServingBenchmarkResultWriter``
-behavior are covered by
-``test_sweep_benchmark_serving_result_utils.py``.
+Percentile validation and the uploader protocol are covered by
+``test_sweep_benchmark_serving_result_utils.py``; schema-driven CSV column
+derivation is covered by ``test_model_csv.py``.
 """
 
 from __future__ import annotations
@@ -30,6 +30,10 @@ import pytest
 import pytest_mock
 import yaml
 from max.benchmark import sweep_benchmark_serving
+from max.benchmark.benchmark_shared.metrics import (
+    BenchmarkResult,
+    TextGenAggregates,
+)
 
 pytestmark = pytest.mark.usefixtures("offline_dryrun_mocks")
 
@@ -172,7 +176,7 @@ def test_override_num_prompts_if_set_explicitly(
     workload_config: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """When --num-prompts is set, no defaulting warning and value appears in CSV row."""
+    """When --num-prompts is set, no defaulting warning and the value is used."""
     cmd_missing_args = [
         "--model",
         "HuggingFaceTB/SmolLM2-135M",
@@ -193,7 +197,7 @@ def test_override_num_prompts_if_set_explicitly(
     assert _NUM_PROMPTS_DURATION_WARNING not in stderr, (
         f"Unexpected defaulting warning in stderr:\n{stderr}"
     )
-    assert "\n1,inf,700," in stdout
+    assert "num_prompts=700" in stdout
 
 
 def test_override_benchmark_duration_s(
@@ -297,27 +301,6 @@ def test_upload_results(
     )
 
 
-def test_latency_percentiles_with_spaces(
-    cmd_args: list[str],
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """CLI accepts spaces in ``--latency-percentiles``."""
-    cmd_spaces_args = cmd_args + ["--latency-percentiles", "50, 90, 99"]
-
-    sweep_benchmark_serving.main(cmd_spaces_args)
-    stdout, _stderr = capsys.readouterr()
-
-    expected_percentile_headers = [
-        "time_to_first_token_p50_ms",
-        "time_to_first_token_p90_ms",
-        "time_to_first_token_p99_ms",
-    ]
-    for header in expected_percentile_headers:
-        assert header in stdout, (
-            f"Expected header '{header}' not found in output:\n{stdout}"
-        )
-
-
 def test_latency_percentiles_invalid_format(
     cmd_args: list[str],
     capsys: pytest.CaptureFixture[str],
@@ -345,38 +328,6 @@ def test_latency_percentiles_help_message(
 
     assert "--latency-percentiles" in stdout, (
         f"--latency-percentiles not found in help:\n{stdout}"
-    )
-
-
-def test_latency_percentiles_order_preserved(
-    cmd_args: list[str],
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """CSV header lists percentile groups in CLI order (P99 before P50 before P95)."""
-    cmd_custom_order_args = cmd_args + ["--latency-percentiles", "99,50,95"]
-
-    sweep_benchmark_serving.main(cmd_custom_order_args)
-    stdout, _stderr = capsys.readouterr()
-
-    header_lines = [
-        line for line in stdout.split("\n") if "time_to_first_token_p" in line
-    ]
-    assert len(header_lines) >= 1, (
-        f"Could not find CSV header line in output:\n{stdout}"
-    )
-
-    header_line = header_lines[0]
-
-    p99_pos = header_line.find("time_to_first_token_p99_ms")
-    p50_pos = header_line.find("time_to_first_token_p50_ms")
-    p95_pos = header_line.find("time_to_first_token_p95_ms")
-
-    assert p99_pos != -1, f"p99 header not found in: {header_line}"
-    assert p50_pos != -1, f"p50 header not found in: {header_line}"
-    assert p95_pos != -1, f"p95 header not found in: {header_line}"
-
-    assert p99_pos < p50_pos < p95_pos, (
-        f"Headers not in expected order in: {header_line}"
     )
 
 
@@ -551,6 +502,46 @@ def test_flush_prefix_cache_proxy_wrapped_mixed_statuses_raises() -> None:
             flush_prefix_cache("vllm-chat", "localhost", 8000, dry_run=False)
 
 
+def test_flush_prefix_cache_base_url_uses_url_and_bearer_auth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--base-url targets the remote endpoint and carries bearer auth."""
+    from max.benchmark.benchmark_serving import flush_prefix_cache
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+
+    with patch("requests.post", return_value=mock_response) as post:
+        flush_prefix_cache(
+            "modular",
+            "localhost",
+            8000,
+            dry_run=False,
+            base_url="https://example.com/",
+        )
+
+    post.assert_called_once_with(
+        "https://example.com/reset_prefix_cache",
+        headers={"Authorization": "Bearer test-key"},
+    )
+
+
+def test_flush_prefix_cache_no_base_url_uses_host_port_without_auth() -> None:
+    """Local servers keep the http://host:port URL and send no auth."""
+    from max.benchmark.benchmark_serving import flush_prefix_cache
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+
+    with patch("requests.post", return_value=mock_response) as post:
+        flush_prefix_cache("modular", "localhost", 8000, dry_run=False)
+
+    post.assert_called_once_with(
+        "http://localhost:8000/reset_prefix_cache", headers=None
+    )
+
+
 # ===========================================================================
 # result_filename plumbing tests
 # ===========================================================================
@@ -571,7 +562,7 @@ def test_result_filename_reaches_main_with_parsed_args(
     result_path = str(tmp_path / "result.json")
     received: dict[str, str | None] = {}
 
-    def capture_config(config: object) -> list[object]:
+    def capture_config(config: object, **kwargs: object) -> list[object]:
         received["result_filename"] = getattr(
             config, "result_filename", "NOT_SET"
         )
@@ -612,7 +603,7 @@ def test_result_filename_none_when_not_provided(
     """When --result-filename is not passed, config.result_filename must be None."""
     received: dict[str, str | None] = {}
 
-    def capture_config(config: object) -> list[object]:
+    def capture_config(config: object, **kwargs: object) -> list[object]:
         received["result_filename"] = getattr(
             config, "result_filename", "NOT_SET"
         )
@@ -645,6 +636,30 @@ def test_result_filename_none_when_not_provided(
 # ===========================================================================
 
 
+def _real_text_result(
+    *, completed: int = 5, duration: float = 1.0
+) -> BenchmarkResult:
+    """A minimal real result: ``save_result_json`` reads ``result_groups``
+    from the model field, so a ``MagicMock`` no longer suffices."""
+    return BenchmarkResult(
+        task_type="text",
+        max_concurrency=1,
+        text_data=TextGenAggregates(
+            duration=duration,
+            completed=completed,
+            failures=0,
+            request_throughput=completed / duration,
+            total_input=10,
+            total_output=20,
+            nonempty_response_chunks=20,
+            max_input=10,
+            max_output=20,
+            max_total=30,
+            global_cached_token_rate=0.0,
+        ),
+    )
+
+
 def test_save_result_json_writes_valid_json(
     tmp_path: Path, workload_config: Path
 ) -> None:
@@ -665,18 +680,10 @@ def test_save_result_json_writes_valid_json(
         ]
     )
 
-    mock_result = MagicMock()
-    mock_result.metrics.aggregates.completed = 5
-    mock_result.to_result_dict.return_value = {
-        "duration": 1.0,
-        "completed": 5,
-        "failures": 0,
-    }
-
     save_result_json(
         config.result_filename,
         config,
-        mock_result,
+        _real_text_result(completed=5),
         benchmark_task="text-generation",
         model_id="myorg/mymodel",
         tokenizer_id="myorg/mymodel",
@@ -696,6 +703,7 @@ def test_save_result_json_writes_valid_json(
     assert data["request_rate"] == 10.0
     assert "date" in data
     assert "duration" in data
+    assert data["result_groups"]["summary"]["completed"] == 5
 
 
 def test_result_json_written_at_specified_path(
@@ -710,7 +718,7 @@ def test_result_json_written_at_specified_path(
     """
     result_path = tmp_path / "output" / "result.json"
 
-    def fake_benchmark(config: object) -> list[object]:
+    def fake_benchmark(config: object, **kwargs: object) -> list[object]:
         filename = getattr(config, "result_filename", None)
         if filename:
             Path(filename).parent.mkdir(parents=True, exist_ok=True)
@@ -957,17 +965,7 @@ def test_upload_path_writes_one_json_per_concurrency(
         "max.benchmark.sweep_benchmark_serving.save_result_json",
         side_effect=capture_save,
     )
-    mocker.patch(
-        "max.benchmark.sweep_benchmark_serving._build_sweep_result",
-        return_value=MagicMock(),
-    )
-    mock_writer_cls = mocker.patch(
-        "max.benchmark.sweep_benchmark_serving.LLMBenchmarkResultWriter"
-    )
-    mock_ctx = MagicMock()
-    mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
-    mock_ctx.__exit__ = MagicMock(return_value=False)
-    mock_writer_cls.return_value = mock_ctx
+    mocker.patch("max.benchmark.sweep_benchmark_serving.CsvStreamWriter")
 
     sweep_benchmark_serving.main(
         [
@@ -1021,26 +1019,19 @@ def test_upload_writes_correct_data_to_correct_files(
     )
     from max.benchmark.benchmark_shared.config import ServingBenchmarkConfig
 
-    MC1_SENTINEL = "mc1_data"
-    MC2_SENTINEL = "mc2_data"
-
     def fake_benchmark_serving_main(
         config: ServingBenchmarkConfig,
+        **kwargs: object,
     ) -> Iterator[BenchmarkRunResult]:
         assert config.model is not None
-        for mc, sentinel in [(1, MC1_SENTINEL), (2, MC2_SENTINEL)]:
-            mock_result = MagicMock()
-            mock_result.metrics.aggregates.completed = 5
-            mock_result.to_result_dict.return_value = {
-                "duration": float(mc),
-                "completed": 5,
-                "failures": 0,
-                "test_sentinel": sentinel,
-            }
+        for mc in [1, 2]:
+            # ``duration == float(mc)`` is the per-iteration sentinel: stale
+            # mc1 data in mc2's file (or vice versa) shows as the wrong value.
+            result = _real_text_result(completed=5, duration=float(mc))
             save_result_json(
                 config.result_filename,
                 config,
-                mock_result,
+                result,
                 benchmark_task="text-generation",
                 model_id=config.model,
                 tokenizer_id=config.model,
@@ -1051,23 +1042,14 @@ def test_upload_writes_correct_data_to_correct_files(
                 max_concurrency=mc,
                 request_rate=float(mc),
                 num_prompts=10,
-                result=mock_result,
+                result=result,
             )
 
     mocker.patch(
         "max.benchmark.sweep_benchmark_serving.benchmark_serving_main",
         side_effect=fake_benchmark_serving_main,
     )
-    mocker.patch(
-        "max.benchmark.sweep_benchmark_serving._build_sweep_result",
-    )
-    mock_writer_cls = mocker.patch(
-        "max.benchmark.sweep_benchmark_serving.LLMBenchmarkResultWriter"
-    )
-    mock_ctx = MagicMock()
-    mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
-    mock_ctx.__exit__ = MagicMock(return_value=False)
-    mock_writer_cls.return_value = mock_ctx
+    mocker.patch("max.benchmark.sweep_benchmark_serving.CsvStreamWriter")
 
     sweep_benchmark_serving.main(
         [
@@ -1100,11 +1082,11 @@ def test_upload_writes_correct_data_to_correct_files(
 
     mc1_data = json.loads(mc1_file.read_text())
     mc2_data = json.loads(mc2_file.read_text())
-    assert mc1_data.get("test_sentinel") == MC1_SENTINEL, (
-        f"results-1-median.json contains mc2 data (sentinel={mc1_data.get('test_sentinel')!r})"
+    assert mc1_data.get("duration") == 1.0, (
+        f"results-1-median.json contains mc2 data (duration={mc1_data.get('duration')!r})"
     )
-    assert mc2_data.get("test_sentinel") == MC2_SENTINEL, (
-        f"results-2-median.json contains wrong data (sentinel={mc2_data.get('test_sentinel')!r})"
+    assert mc2_data.get("duration") == 2.0, (
+        f"results-2-median.json contains wrong data (duration={mc2_data.get('duration')!r})"
     )
 
 
@@ -1145,17 +1127,7 @@ def test_upload_path_single_run_no_max_concurrency(
         "max.benchmark.sweep_benchmark_serving.save_result_json",
         side_effect=capture_save,
     )
-    mocker.patch(
-        "max.benchmark.sweep_benchmark_serving._build_sweep_result",
-        return_value=MagicMock(),
-    )
-    mock_writer_cls = mocker.patch(
-        "max.benchmark.sweep_benchmark_serving.LLMBenchmarkResultWriter"
-    )
-    mock_ctx = MagicMock()
-    mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
-    mock_ctx.__exit__ = MagicMock(return_value=False)
-    mock_writer_cls.return_value = mock_ctx
+    mocker.patch("max.benchmark.sweep_benchmark_serving.CsvStreamWriter")
 
     sweep_benchmark_serving.main(
         [

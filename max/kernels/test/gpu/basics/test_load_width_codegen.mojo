@@ -12,15 +12,15 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.gpu.host.compile import _compile_code, get_gpu_target
+from max.gpu.host.compile import _compile_code, get_gpu_target
 from std.testing import assert_true
 
 comptime _TargetType = __mlir_type.`!kgen.target`
 
 
 def kernel(
-    src: UnsafePointer[Float32, ImmutAnyOrigin],
-    dst: UnsafePointer[Float32, MutAnyOrigin],
+    src: ImmPointer[Float32, ImmutAnyOrigin],
+    dst: MutPointer[Float32, MutAnyOrigin],
 ):
     var v = src.load[width=8, alignment=32]()
     dst.store[width=8, alignment=32](v)

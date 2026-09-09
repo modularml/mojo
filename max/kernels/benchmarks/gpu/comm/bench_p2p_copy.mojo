@@ -45,14 +45,19 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
+from max.benchmark import (
+    bench_multicontext,
+    bencher_iter_custom,
+)
 from comm.sync import enable_p2p
-from std.gpu import (
+from max.gpu import (
     global_idx,
     grid_dim,
     MAX_THREADS_PER_BLOCK_METADATA,
 )
-from std.gpu.host import DeviceContext, get_gpu_target
-from internal_utils import arg_parse, human_readable_size, ScalarArray
+from max.gpu.host import DeviceContext, get_gpu_target
+from internal_utils import arg_parse, human_readable_size
+from std.memory import dealloc
 from std.utils import StaticTuple
 
 comptime BLOCK_SIZE = 256
@@ -82,13 +87,13 @@ def p2p_copy_kernel[
     dtype: DType,
     width: Int,
 ](
-    dst: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    src: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    num_elements: Int,
+    dst: MutPointer[Scalar[dtype], MutAnyOrigin],
+    src: ImmPointer[Scalar[dtype], ImmutAnyOrigin],
+    num_elements: Int32,
 ):
     var global_tid = global_idx.x
     var stride = grid_dim.x * BLOCK_SIZE
-    var num_vectors = num_elements // width
+    var num_vectors = Int(num_elements) // width
 
     comptime vec_align = width * size_of[dtype]()
 
@@ -156,14 +161,14 @@ def bench_p2p[
         human_readable_size(num_bytes),
     )
 
-    @parameter
     @always_inline
     def bench_iter(
         mut bencher: Bencher, ctx: DeviceContext, ctx_idx: Int
-    ) raises:
-        @parameter
+    ) raises {mut buf0_write, mut buf1_write, imm}:
         @always_inline
-        def call_fn(ctx_inner: DeviceContext, cache_iter: Int) raises:
+        def call_fn(
+            ctx_inner: DeviceContext, cache_iter: Int
+        ) raises {mut buf0_write, mut buf1_write, imm}:
             # In unidir mode only GPU 0 does work; GPU 1 is idle.
             comptime if not is_bidir:
                 if ctx_idx != 0:
@@ -172,43 +177,45 @@ def bench_p2p[
             # Determine src/dst based on direction and which GPU we are.
             # Push: each GPU reads local, writes remote.
             # Pull: each GPU reads remote, writes local.
-            var dst: UnsafePointer[Scalar[dtype], MutAnyOrigin]
-            var src: UnsafePointer[Scalar[dtype], MutAnyOrigin]
+            var dst: MutPointer[Scalar[dtype], MutAnyOrigin]
+            var src: ImmPointer[Scalar[dtype], ImmutAnyOrigin]
 
             comptime if is_bidir:
                 comptime if is_push:
                     if ctx_idx == 0:
-                        dst = buf1_write.unsafe_ptr()
-                        src = buf0_read.unsafe_ptr()
+                        dst = buf1_write.unsafe_ptr().as_unsafe_any_origin()
+                        src = buf0_read.unsafe_ptr().as_unsafe_any_origin()
                     else:
-                        dst = buf0_write.unsafe_ptr()
-                        src = buf1_read.unsafe_ptr()
+                        dst = buf0_write.unsafe_ptr().as_unsafe_any_origin()
+                        src = buf1_read.unsafe_ptr().as_unsafe_any_origin()
                 else:
                     if ctx_idx == 0:
-                        dst = buf0_write.unsafe_ptr()
-                        src = buf1_read.unsafe_ptr()
+                        dst = buf0_write.unsafe_ptr().as_unsafe_any_origin()
+                        src = buf1_read.unsafe_ptr().as_unsafe_any_origin()
                     else:
-                        dst = buf1_write.unsafe_ptr()
-                        src = buf0_read.unsafe_ptr()
+                        dst = buf1_write.unsafe_ptr().as_unsafe_any_origin()
+                        src = buf0_read.unsafe_ptr().as_unsafe_any_origin()
             else:
                 comptime if is_push:
-                    dst = buf1_write.unsafe_ptr()
-                    src = buf0_write.unsafe_ptr()
+                    dst = buf1_write.unsafe_ptr().as_unsafe_any_origin()
+                    src = buf0_write.unsafe_ptr().as_unsafe_any_origin()
                 else:
-                    dst = buf0_write.unsafe_ptr()
-                    src = buf1_write.unsafe_ptr()
+                    dst = buf0_write.unsafe_ptr().as_unsafe_any_origin()
+                    src = buf1_write.unsafe_ptr().as_unsafe_any_origin()
 
             ctx_inner.enqueue_function[copy_kernel](
                 dst,
                 src,
-                num_elements,
+                Int32(num_elements),
                 grid_dim=grid_size,
                 block_dim=BLOCK_SIZE,
             )
 
-        bencher.iter_custom[call_fn](ctx)
+        bencher_iter_custom(bencher, call_fn, ctx)
 
-    b.bench_multicontext[bench_iter](
+    bench_multicontext(
+        b,
+        bench_iter,
         ctxs,
         BenchId(name),
         [ThroughputMeasure(BenchMetric.bytes, num_bytes)],
@@ -229,14 +236,14 @@ def bench_p2p[
             ctx0.enqueue_function[copy_kernel](
                 buf1_write,
                 buf0_read,
-                num_elements,
+                Int32(num_elements),
                 grid_dim=grid_size,
                 block_dim=BLOCK_SIZE,
             )
             ctx1.enqueue_function[copy_kernel](
                 buf0_write,
                 buf1_read,
-                num_elements,
+                Int32(num_elements),
                 grid_dim=grid_size,
                 block_dim=BLOCK_SIZE,
             )
@@ -245,14 +252,14 @@ def bench_p2p[
             ctx0.enqueue_function[copy_kernel](
                 buf0_write,
                 buf1_read,
-                num_elements,
+                Int32(num_elements),
                 grid_dim=grid_size,
                 block_dim=BLOCK_SIZE,
             )
             ctx1.enqueue_function[copy_kernel](
                 buf1_write,
                 buf0_read,
-                num_elements,
+                Int32(num_elements),
                 grid_dim=grid_size,
                 block_dim=BLOCK_SIZE,
             )
@@ -261,17 +268,24 @@ def bench_p2p[
         ctx1.synchronize()
 
         # Verify: copy back to host and check
-        var host0 = ScalarArray[dtype](count=num_elements)
-        var host1 = ScalarArray[dtype](count=num_elements)
-        ctx0.enqueue_copy(host0.unsafe_ptr(), buf0_write)
-        ctx1.enqueue_copy(host1.unsafe_ptr(), buf1_write)
+        var host0_alloc = alloc[Scalar[dtype]](
+            {count = num_elements}
+        ).into_managed()
+        var host1_alloc = alloc[Scalar[dtype]](
+            {count = num_elements}
+        ).into_managed()
+        ctx0.enqueue_copy(host0_alloc.unsafe_span(), buf0_write)
+        ctx1.enqueue_copy(host1_alloc.unsafe_span(), buf1_write)
         ctx0.synchronize()
         ctx1.synchronize()
 
         # buf0_write should have buf1_read's value (20)
         # buf1_write should have buf0_read's value (10)
-        _verify(host0.as_span(), Scalar[dtype](20), num_elements, 0)
-        _verify(host1.as_span(), Scalar[dtype](10), num_elements, 1)
+        _verify(host0_alloc.unsafe_span(), Scalar[dtype](20), 0)
+        _verify(host1_alloc.unsafe_span(), Scalar[dtype](10), 1)
+
+        dealloc(host0_alloc^)
+        dealloc(host1_alloc^)
     else:
         # Unidir: reset dst, run one copy, verify.
         comptime if is_push:
@@ -281,15 +295,18 @@ def bench_p2p[
             ctx0.enqueue_function[copy_kernel](
                 buf1_write,
                 buf0_write,
-                num_elements,
+                Int32(num_elements),
                 grid_dim=grid_size,
                 block_dim=BLOCK_SIZE,
             )
             ctx0.synchronize()
-            var host = ScalarArray[dtype](count=num_elements)
-            ctx1.enqueue_copy(host.unsafe_ptr(), buf1_write)
+            var host_alloc = alloc[Scalar[dtype]](
+                {count = num_elements}
+            ).into_managed()
+            ctx1.enqueue_copy(host_alloc.unsafe_span(), buf1_write)
             ctx1.synchronize()
-            _verify(host.as_span(), Scalar[dtype](1), num_elements, 1)
+            _verify(host_alloc.unsafe_span(), Scalar[dtype](1), 1)
+            dealloc(host_alloc^)
         else:
             # src=buf1_write(2) -> dst=buf0_write
             ctx0.enqueue_memset(buf0_write, Scalar[dtype](0))
@@ -297,15 +314,18 @@ def bench_p2p[
             ctx0.enqueue_function[copy_kernel](
                 buf0_write,
                 buf1_write,
-                num_elements,
+                Int32(num_elements),
                 grid_dim=grid_size,
                 block_dim=BLOCK_SIZE,
             )
             ctx0.synchronize()
-            var host = ScalarArray[dtype](count=num_elements)
-            ctx0.enqueue_copy(host.unsafe_ptr(), buf0_write)
+            var host_alloc = alloc[Scalar[dtype]](
+                {count = num_elements}
+            ).into_managed()
+            ctx0.enqueue_copy(host_alloc.unsafe_span(), buf0_write)
             ctx0.synchronize()
-            _verify(host.as_span(), Scalar[dtype](2), num_elements, 0)
+            _verify(host_alloc.unsafe_span(), Scalar[dtype](2), 0)
+            dealloc(host_alloc^)
 
     _ = buf0_write^
     _ = buf1_write^
@@ -318,14 +338,9 @@ def bench_p2p[
 
 def _verify[
     dtype: DType
-](
-    host: Span[Scalar[dtype], _],
-    expected: Scalar[dtype],
-    num_elements: Int,
-    gpu: Int,
-) raises:
-    for i in range(num_elements):
-        if host[i] != expected:
+](host: Span[Scalar[dtype], _], expected: Scalar[dtype], gpu: Int,) raises:
+    for i, value in enumerate(host):
+        if value != expected:
             raise Error(
                 String(
                     "Verification failed at GPU ",
@@ -333,7 +348,7 @@ def _verify[
                     " index ",
                     i,
                     ": got ",
-                    host[i],
+                    value,
                     " expected ",
                     expected,
                 )
@@ -343,7 +358,7 @@ def _verify[
 
 def main() raises:
     var num_bytes = arg_parse("num_bytes", 64 * 1024 * 1024)
-    comptime dtype = get_defined_dtype["dtype", DType.bfloat16]()
+    comptime dtype = get_defined_dtype["dtype", .bfloat16]()
     comptime simd_width = (
         simd_width_of[dtype, target=get_gpu_target()]() if store_width
         == 0 else store_width

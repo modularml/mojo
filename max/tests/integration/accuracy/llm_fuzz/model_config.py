@@ -123,6 +123,12 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         tags=["model:gemma4"],
         description="Gemma 4 model-specific tests",
     ),
+    "minimax-m3": ModelProfile(
+        name="minimax-m3",
+        default_port=8400,
+        tags=["model:minimax-m3"],
+        description="MiniMax M3 model-specific tests",
+    ),
 }
 
 

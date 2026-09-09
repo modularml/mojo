@@ -17,8 +17,9 @@ from collections.abc import AsyncGenerator
 from unittest.mock import Mock
 
 import numpy as np
-from max.pipelines.modeling.types import GenerationStatus, RequestID
-from max.pipelines.modeling.types.generation import GenerationOutput
+from max.pipelines.context import GenerationStatus
+from max.pipelines.context.outputs import GenerationOutput
+from max.pipelines.modeling.types import RequestID
 from max.pipelines.request import (
     OpenResponsesRequest,
     OpenResponsesRequestBody,

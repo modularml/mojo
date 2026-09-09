@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -12,6 +11,7 @@ modular_py_test(
     srcs = glob(["*.py"]),
     data = glob(["*.mojo"]),
     mojo_deps = [
+        "//max:max_mojo",
         "@mojo//:std",
     ],
     target_compatible_with = select({

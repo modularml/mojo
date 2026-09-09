@@ -1,0 +1,9 @@
+# gazelle:default_visibility //Cache:__subpackages__
+
+package(
+    default_visibility = ["//Cache:__subpackages__"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)

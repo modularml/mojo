@@ -17,8 +17,8 @@ from io import BytesIO
 
 import numpy as np
 import pytest
-from max.pipelines.modeling.types.generation import GenerationOutput
-from max.pipelines.modeling.types.status import GenerationStatus
+from max.pipelines.context.outputs import GenerationOutput
+from max.pipelines.context.status import GenerationStatus
 from max.pipelines.request import RequestID
 from max.pipelines.request.open_responses import (
     ImageDetail,

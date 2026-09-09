@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
-from std.gpu.compute.arch.mma_nvidia_sm100 import MMASmemDescriptor
-from std.gpu.compute.arch.tcgen05 import (
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
+from max.gpu.compute.arch.mma_nvidia_sm100 import MMASmemDescriptor
+from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
     tcgen05_cp,
     tcgen05_dealloc,
@@ -29,8 +29,8 @@ from std.testing import assert_true
 
 
 def alloc_test_fn[cta_group: Int32]():
-    var ptr_tmem_addr = UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
+    var ptr_tmem_addr = MutPointer[
+        UInt32, MutAnyOrigin, address_space=.SHARED
     ].unsafe_dangling()
     var num_cols: UInt32 = 32
     tcgen05_alloc[cta_group](ptr_tmem_addr, num_cols)
@@ -54,8 +54,8 @@ def test_tcgen05_alloc() raises:
 
 
 def alloc_dealloc_test_fn():
-    var ptr_tmem_addr = UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
+    var ptr_tmem_addr = MutPointer[
+        UInt32, MutAnyOrigin, address_space=.SHARED
     ].unsafe_dangling()
     var tmem_addr: UInt32 = 0
     var num_cols: UInt32 = 32
@@ -76,8 +76,8 @@ def test_tcgen05_dealloc() raises:
 
 
 def ld_test_fn[repeat: Int]():
-    var ptr_tmem_addr = UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
+    var ptr_tmem_addr = MutPointer[
+        UInt32, MutAnyOrigin, address_space=.SHARED
     ].unsafe_dangling()
     var num_cols: UInt32 = 32
     tcgen05_alloc[1](ptr_tmem_addr, num_cols)
@@ -111,13 +111,13 @@ def test_tcgen05_ld() raises:
 
 
 def st_test_fn():
-    var ptr_tmem_addr = UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
+    var ptr_tmem_addr = MutPointer[
+        UInt32, MutAnyOrigin, address_space=.SHARED
     ].unsafe_dangling()
     var num_cols: UInt32 = 32
     tcgen05_alloc[1](ptr_tmem_addr, num_cols)
     var tmem_addr = ptr_tmem_addr[0]
-    var data = InlineArray[Scalar[DType.float32], 64](uninitialized=True)
+    var data = Array[Float32, 64](fill={})
     tcgen05_st[
         datapaths=32,
         bits=32,
@@ -138,18 +138,18 @@ def test_tcgen05_st() raises:
 
 
 def cp_test_fn():
-    var ptr_tmem_addr = UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
+    var ptr_tmem_addr = MutPointer[
+        UInt32, MutAnyOrigin, address_space=.SHARED
     ].unsafe_dangling()
     var num_cols: UInt32 = 32
     tcgen05_alloc[1](ptr_tmem_addr, num_cols)
     var tmem_addr = ptr_tmem_addr[0]
 
     var smem_tile = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(IntTuple(32, 32)),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 

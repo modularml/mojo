@@ -1,0 +1,32 @@
+// Test that, without a `-o` output argument, a package is created in the
+// current working directory:
+// RUN: mojo precompile %S/test_package
+// RUN: kgen-opt -mlir-print-debuginfo test_package.mojoc | FileCheck %s
+// CHECK: lit.package @test_package
+// RUN: rm test_package.mojoc
+
+// Test that, given a `-o` output argument, a package is created with the given
+// name:
+// RUN: mkdir -p %t.dir
+// RUN: mojo precompile %S/test_package -o %t.dir/foo.mojoc
+// RUN: kgen-opt -mlir-print-debuginfo %t.dir/foo.mojoc \
+// RUN:   | FileCheck %s --check-prefix=CHECK-O
+// CHECK-O: lit.package @foo
+// RUN: rm %t.dir/foo.mojoc
+
+// Test that, given an `-o` argument for an existing directory, a package is
+// created within that directory:
+// RUN: mkdir -p %t.dir
+// RUN: mojo precompile %S/test_package -o %t.dir
+// RUN: kgen-opt -mlir-print-debuginfo %t.dir/test_package.mojoc \
+// RUN:   | FileCheck %s --check-prefix=CHECK-O-DIR
+// CHECK-O-DIR: lit.package @test_package
+// RUN: rm -rf %t.dir
+
+// Test that if input path is "." for current directory, we get the package name
+// of `current_directory_name.mojoc` instead of `..mojoc`.
+// RUN: cd %S/test_package && mojo precompile .
+// RUN: kgen-opt -mlir-print-debuginfo %S/test_package/test_package.mojoc \
+// RUN:   | FileCheck %s --check-prefix=CHECK-CUR-DIR
+// CHECK-CUR-DIR: lit.package @test_package
+// RUN: rm %S/test_package/test_package.mojoc

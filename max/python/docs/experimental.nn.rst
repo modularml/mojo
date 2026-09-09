@@ -55,4 +55,5 @@ Functions
    :template: autosummary/function.rst
 
    module_dataclass
+   subgraphable
 

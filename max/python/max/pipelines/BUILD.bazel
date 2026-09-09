@@ -9,8 +9,18 @@ modular_py_library(
     ],
     deps = [
         "//max/python/max/pipelines/architectures",
-        "//max/python/max/pipelines/core",
         "//max/python/max/pipelines/diffusion",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/lora",
+        "//max/python/max/pipelines/sampling",
+        "//max/python/max/pipelines/weights",
+    ],
+)
+
+modular_py_library(
+    name = "logging_utils",
+    srcs = ["logging_utils.py"],
+    deps = [
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
     ],

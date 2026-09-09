@@ -37,4 +37,5 @@ def test_crash_if_cpu(monkeypatch: pytest.MonkeyPatch) -> None:
             devices=[CPU()],
             kv_cache_config=Mock(),
             weights=Mock(),
+            memory_plan=Mock(),
         )

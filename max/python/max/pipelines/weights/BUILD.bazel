@@ -1,0 +1,60 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "weights",
+    srcs = glob(
+        ["**/*.py"],
+        exclude = [
+            "quantize_checkpoint_main.py",
+        ],
+    ),
+    ignore_extra_deps = [
+        # Optional dep of max.graph, used for loading gguf files
+        requirement("gguf"),
+        # Used transitively via pydantic models and huggingface-hub internals
+        requirement("numpy"),
+        requirement("pydantic"),
+        requirement("typing-extensions"),
+        "//max/python/max:_core",
+    ],
+    ignore_unresolved_imports = [
+        # Intentionally excluded so the MAX package depends on neither: only
+        # the offline quantize_checkpoint CLI imports them, and the
+        # :quantize_checkpoint binary declares them for its runfiles.
+        "safetensors",
+        "torch",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/modeling",
+        requirement("huggingface-hub"),
+        requirement("numpy"),
+        requirement("pydantic"),
+        requirement("requests"),
+        requirement("tqdm"),
+        requirement("transformers"),
+        requirement("typing-extensions"),
+    ],
+)
+
+modular_py_binary(
+    name = "quantize_checkpoint",
+    srcs = ["quantize_checkpoint_main.py"],
+    # Imported by quantize_checkpoint.py, which this entry file only calls
+    # into, so pydeps cannot see the use.
+    ignore_extra_deps = [
+        requirement("safetensors"),
+        requirement("torch"),
+    ],
+    main = "quantize_checkpoint_main.py",
+    deps = [
+        ":weights",
+        requirement("safetensors"),
+        requirement("torch"),
+    ],
+)

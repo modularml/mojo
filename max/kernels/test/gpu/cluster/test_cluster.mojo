@@ -14,8 +14,9 @@
 from std.sys import size_of
 from std.math.uutils import ufloordiv
 
-from std.gpu import barrier, block_dim, block_idx, thread_idx
-from std.gpu.primitives.cluster import (
+from max.gpu import block_dim, block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.primitives.cluster import (
     cluster_sync,
     cluster_sync_acquire,
     cluster_sync_release,
@@ -25,12 +26,12 @@ from std.gpu.primitives.cluster import (
     elect_one_sync,
     elect_one_sync_with_mask,
 )
-from std.gpu.host import DeviceContext
-from std.gpu import block_id_in_cluster, lane_id
-from std.gpu.intrinsics import Scope
-from std.gpu.memory import fence_mbarrier_init
+from max.gpu.host import DeviceContext
+from max.gpu import block_id_in_cluster, lane_id
+from max.gpu.intrinsics import Scope
+from max.gpu.memory import fence_mbarrier_init
 from layout.tma_async import PipelineState, SharedMemBarrier
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_almost_equal
 
 from std.utils.static_tuple import StaticTuple
@@ -39,33 +40,37 @@ from layout import TileTensor, row_major
 
 
 # Derived from https://docs.nvidia.com/cuda/cuda-c-programming-guide/#kernel-example-vector-scalar-multiplication
-def cluster_launch_control(data: UnsafePointer[Float32, MutAnyOrigin], n: Int):
-    result = stack_allocation[
+def cluster_launch_control(
+    data: MutPointer[Float32, MutAnyOrigin], n_dev: Int32
+):
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var n = Int(n_dev)
+    var result = unsafe_stack_allocation[
         1,
         UInt128,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=16,
     ]()
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
-    bx = UInt32(block_idx.x)
-    tidx = bx * UInt32(block_dim.x) + UInt32(thread_idx.x)
+    var bx = UInt32(block_idx.x)
+    var tidx = bx * UInt32(block_dim.x) + UInt32(thread_idx.x)
     if tidx < UInt32(n):
         data[tidx] = 1.0
 
-    phase: UInt32 = 0
+    var phase: UInt32 = 0
 
     # Single thread barrier.
     if thread_idx.x == 0:
         mbar[0].init(1)
 
-    alpha = Int64(thread_idx.x)
+    var alpha = Int64(thread_idx.x)
 
     # Work-straling loop.
     while True:
@@ -105,24 +110,24 @@ def cluster_launch_control(data: UnsafePointer[Float32, MutAnyOrigin], n: Int):
 def pipeline_test_kernel[
     num_stages: Int, cluster_shape: StaticTuple[Int32, 3]
 ]():
-    var clc_response = stack_allocation[
+    var clc_response = unsafe_stack_allocation[
         num_stages,
         UInt128,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=16,
     ]()
 
-    var full_mbar = stack_allocation[
+    var full_mbar = unsafe_stack_allocation[
         num_stages,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=16,
     ]()
 
-    var empty_mbar = stack_allocation[
+    var empty_mbar = unsafe_stack_allocation[
         num_stages,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=16,
     ]()
 
@@ -195,12 +200,12 @@ def pipeline_test_kernel[
 def test_cluster_launch_control(ctx: DeviceContext) raises:
     comptime n = 4000
 
-    data = ctx.enqueue_create_buffer[DType.float32](n)
+    var data = ctx.enqueue_create_buffer[.float32](n)
 
     comptime kernel = cluster_launch_control
     ctx.enqueue_function[kernel](
         data,
-        n,
+        Int32(n),
         grid_dim=((n + 1023) // 1024),
         block_dim=(1024),
     )

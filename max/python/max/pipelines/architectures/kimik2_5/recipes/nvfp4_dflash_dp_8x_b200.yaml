@@ -1,0 +1,40 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# Kimi K2.5 NVFP4 with the z-lab DFlash draft on 8x B200, data-parallel.
+
+model:
+  model_path: nvidia/Kimi-K2.5-NVFP4
+  trust_remote_code: true
+  device_specs: [0, 1, 2, 3, 4, 5, 6, 7]
+  data_parallel_degree: 8
+  max_length: 163840
+  kv_cache:
+    kv_cache_format: float8_e4m3fn
+    device_memory_utilization: 0.65
+
+draft_model:
+  model_path: z-lab/Kimi-K2.5-DFlash
+  trust_remote_code: true
+  device_specs: [0, 1, 2, 3, 4, 5, 6, 7]
+  data_parallel_degree: 8
+  quantization_encoding: bfloat16
+  sliding_window: 4096
+
+speculative:
+  speculative_method: dflash
+  num_speculative_tokens: 7
+
+runtime:
+  ep_size: 8
+  max_batch_input_tokens: 4096
+  device_graph_capture: true

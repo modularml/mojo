@@ -104,8 +104,13 @@ def bench_max(
     cache_lengths_torch = torch.tensor(
         [s_kv], dtype=torch.uint32, device="cuda"
     )
-    max_lengths_torch = torch.tensor(
-        [[s_q, s_kv]],
+    max_prompt_length_torch = torch.tensor(
+        [s_q],
+        dtype=torch.uint32,
+        device="cpu",  # must be on CPU
+    )
+    max_cache_length_torch = torch.tensor(
+        [s_kv],
         dtype=torch.uint32,
         device="cpu",  # must be on CPU
     )
@@ -124,7 +129,8 @@ def bench_max(
     kv_blocks_max = Buffer.from_dlpack(kv_blocks_torch)
     lut_max = Buffer.from_dlpack(lut_torch)
     cache_lengths_max = Buffer.from_dlpack(cache_lengths_torch)
-    max_lengths_max = Buffer.from_dlpack(max_lengths_torch)
+    max_prompt_length_max = Buffer.from_dlpack(max_prompt_length_torch)
+    max_cache_length_max = Buffer.from_dlpack(max_cache_length_torch)
     input_row_offsets_max = Buffer.from_dlpack(input_row_offsets_torch)
     sparse_indices_max = Buffer.from_dlpack(sparse_indices_torch)
     topk_lengths_max = Buffer.from_dlpack(topk_lengths_torch)
@@ -144,8 +150,11 @@ def bench_max(
     lookup_table_type = TensorType(
         DType.uint32, shape=[1, num_pages], device=DeviceRef.GPU()
     )
-    max_lengths_type = TensorType(
-        DType.uint32, shape=[1, 2], device=DeviceRef.CPU()
+    max_prompt_length_type = TensorType(
+        DType.uint32, shape=[1], device=DeviceRef.CPU()
+    )
+    max_cache_length_type = TensorType(
+        DType.uint32, shape=[1], device=DeviceRef.CPU()
     )
     input_row_offsets_type = TensorType(
         DType.uint32, shape=[2], device=DeviceRef.GPU()
@@ -167,7 +176,8 @@ def bench_max(
             blocks_type,
             cache_lengths_type,
             lookup_table_type,
-            max_lengths_type,
+            max_prompt_length_type,
+            max_cache_length_type,
             input_row_offsets_type,
             sparse_indices_type,
             topk_lengths_type,
@@ -179,7 +189,8 @@ def bench_max(
             blocks_g,
             cache_lengths_g,
             lookup_table_g,
-            max_lengths_g,
+            max_prompt_length_g,
+            max_cache_length_g,
             input_row_offsets_g,
             sparse_indices_g,
             topk_lengths_g,
@@ -190,7 +201,8 @@ def bench_max(
             blocks_g.buffer,
             cache_lengths_g.tensor,
             lookup_table_g.tensor,
-            max_lengths_g.tensor,
+            max_prompt_length_g.tensor,
+            max_cache_length_g.tensor,
         )
 
         layer_idx = ops.constant(0, DType.uint32, DeviceRef.CPU())
@@ -230,7 +242,8 @@ def bench_max(
             kv_blocks_max,
             cache_lengths_max,
             lut_max,
-            max_lengths_max,
+            max_prompt_length_max,
+            max_cache_length_max,
             input_row_offsets_max,
             sparse_indices_max,
             topk_lengths_max,

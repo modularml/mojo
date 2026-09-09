@@ -19,14 +19,15 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-import torch
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from max.driver import Buffer, DLPackArray
 from max.dtype import DType
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.graph.type import Shape
 from max.graph.weights import WeightData
 from max.nn import AttentionWithRope, RotaryEmbedding
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.quant_config import (
     InputScaleSpec,
     QuantConfig,
@@ -183,7 +184,7 @@ class AttentionWithRopeHarness(
         max_seq_len = p.max_seq_len
         rope_theta = p.rope_theta
 
-        kv_params = KVCacheParams(
+        kv_params = MHAKVCacheParams(
             dtype=DType.bfloat16,
             n_kv_heads=n_kv_heads,
             head_dim=head_dim,
@@ -293,7 +294,7 @@ class AttentionWithRopeHarness(
         input_row_offsets_type = TensorType(
             DType.uint32, shape=["input_row_offsets_len"], device=device_ref
         )
-        flattened_kv_types = kv_params.get_symbolic_inputs().flatten()
+        flattened_kv_types = kv_params.flattened_kv_inputs()
 
         with Graph(
             graph_name,
@@ -304,11 +305,9 @@ class AttentionWithRopeHarness(
             ),
         ) as graph:
             inputs, input_row_offsets, *kv_cache = graph.inputs
-            kv_collection = (
-                kv_params.get_symbolic_inputs()
-                .unflatten(iter(kv_cache))
-                .inputs[0]
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(kv_cache)
+            ).inputs[0]
             layer_idx = ops.constant(0, DType.uint32, device=DeviceRef.CPU())
             graph.output(
                 layer(

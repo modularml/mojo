@@ -30,6 +30,12 @@ anyway, pulling stale data from LUT padding entries. This is the
 partial-page bug described in
 ``docs/plans/sorted-sauteeing-snowglobe.md``.
 
+The shared driver (``run_test_paged_prefill`` in
+``_paged_prefill_test_utils.mojo``) drives the plain bf16
+``flare_mla_prefill`` path used by this test and the CENG-282 vhead test;
+here it runs with the DeepSeek shape (``v_head_dim == qk_nope_head_dim``,
+so ``v_depth`` defaults to ``nope_depth``).
+
 Why output-comparison alone can't detect the bug
 =================================================
 
@@ -70,41 +76,15 @@ therefore pass both pre- and post-fix): ``ps256_nk256``,
 ``ps64_nk100``, ``ps32_nk100``.
 """
 
-from std.math import ceildiv
-from std.random import randn, seed
+from std.random import seed
 from std.sys import get_defined_int
 
-from std.gpu.host import DeviceContext
-from kv_cache.types import KVCacheStaticParams, PagedKVCacheCollection
-from layout import (
-    Idx,
-    Layout,
-    LayoutTensor,
-    RuntimeLayout,
-    TileTensor,
-    UNKNOWN_VALUE,
-    row_major,
-)
-from std.memory import alloc
-from nn.attention.gpu.mha import mha_gpu_naive
-from nn.attention.mha_mask import CausalMask
-from nn.attention.mha_operand import LayoutTensorMHAOperand
-from nn.attention.gpu.mla import flare_mla_prefill
-from std.testing import assert_almost_equal
-from std.gpu.host.info import _is_sm10x_gpu
-from std.utils.index import Index, IndexList
+from max.gpu.host import DeviceContext
+from max.gpu.host.info import _is_sm10x_gpu
 
 from _paged_prefill_test_utils import (
-    CACHE_DEPTH,
-    KV_NUM_HEADS,
-    NUM_LAYERS,
-    ROPE_DEPTH,
-    extract_k_rope_for_batch,
-    fill_paged_blocks_uniform,
-    fill_uniform_lookup_table,
-    lut_max_pages_per_batch,
     num_keys_to_test,
-    paged_block_elems,
+    run_test_paged_prefill,
 )
 
 
@@ -115,420 +95,6 @@ from _paged_prefill_test_utils import (
 # ===-----------------------------------------------------------------------===#
 
 comptime PAGE_SIZE = get_defined_int["page_size", 256]()
-
-
-# ===-----------------------------------------------------------------------===#
-# Test scaffolding
-# ===-----------------------------------------------------------------------===#
-
-
-def run_test_paged_prefill[
-    qkv_type: DType,
-    k_rope_type: DType,
-    output_type: DType,
-    depth: Int,
-    num_heads: Int,
-    kv_depth: Int,
-    page_size: Int,
-    batch_size: Int = 1,
-](seq_len: Int, num_keys: Int, ctx: DeviceContext) raises:
-    print(
-        "test_mla_prefill_paged",
-        " batch_size:",
-        batch_size,
-        " seq_len:",
-        seq_len,
-        " num_keys:",
-        num_keys,
-        " page_size:",
-        page_size,
-        " qkv_type:",
-        qkv_type,
-        " k_rope_type:",
-        k_rope_type,
-    )
-
-    comptime scale = Float32(0.125)
-
-    # ------------------------------------------------------------------
-    # Step 1: Allocate ragged Q, K, V on host (random init).
-    # ------------------------------------------------------------------
-    var q_size = batch_size * seq_len * num_heads * depth
-    var k_size = batch_size * num_keys * num_heads * kv_depth
-    var v_size = k_size
-    var o_size = batch_size * seq_len * num_heads * kv_depth
-
-    var q_ptr = alloc[Scalar[qkv_type]](q_size)
-    var k_ptr = alloc[Scalar[qkv_type]](k_size)
-    var v_ptr = alloc[Scalar[qkv_type]](v_size)
-    var output_ptr = alloc[Scalar[output_type]](o_size)
-
-    randn[qkv_type](q_ptr, q_size)
-    randn[qkv_type](k_ptr, k_size)
-    randn[qkv_type](v_ptr, v_size)
-
-    # ------------------------------------------------------------------
-    # Step 2: Build the row-offset tables.
-    # ------------------------------------------------------------------
-    var input_row_offsets_host = alloc[UInt32](batch_size + 1)
-    var cache_row_offsets_host = alloc[UInt32](batch_size + 1)
-    for i in range(batch_size):
-        input_row_offsets_host[i] = UInt32(i * seq_len)
-        cache_row_offsets_host[i] = UInt32(i * num_keys)
-    input_row_offsets_host[batch_size] = UInt32(batch_size * seq_len)
-    cache_row_offsets_host[batch_size] = UInt32(batch_size * num_keys)
-
-    # ------------------------------------------------------------------
-    # Step 3: Allocate paged K_rope blocks + LUT, fill with random data.
-    # The red signal for the partial-page bug is a `debug_assert`
-    # inside the kernel's K_rope sub-tile loop (see
-    # ``mla_prefill_generic.mojo``); LUT padding values do not
-    # influence whether it fires.
-    # ------------------------------------------------------------------
-    var num_pages_per_batch = ceildiv(num_keys, page_size)
-    var total_pages = batch_size * num_pages_per_batch
-    var max_pages_per_batch = lut_max_pages_per_batch(num_keys, page_size)
-    var lut_size = batch_size * max_pages_per_batch
-    var block_elems = paged_block_elems(total_pages, page_size, CACHE_DEPTH)
-
-    var blocks_host = alloc[Scalar[k_rope_type]](block_elems)
-    var cache_lengths_host = alloc[UInt32](batch_size)
-    var lookup_table_host = alloc[UInt32](lut_size)
-
-    fill_paged_blocks_uniform[k_rope_type](
-        blocks_host, batch_size, num_keys, page_size
-    )
-    # For the SM100 paged path, ``cache_length(b)`` is interpreted as the
-    # PRE-EXISTING cache length (start_pos in the kernel). For fresh
-    # prefill (self-attention with no preceding tokens), this is 0; the
-    # kernel then attends to keys ``[0, seq_len)`` which is where this
-    # test places its K_rope data. See ``MLAPositionSummary
-    # .get_num_keys_and_start_pos`` in ``mla_prefill_utils.mojo``.
-    for i in range(batch_size):
-        cache_lengths_host[i] = UInt32(0)
-    fill_uniform_lookup_table(
-        lookup_table_host,
-        batch_size,
-        num_keys,
-        page_size,
-        max_pages_per_batch,
-    )
-
-    # ------------------------------------------------------------------
-    # Step 4: Allocate device buffers and copy from host.
-    # ------------------------------------------------------------------
-    var q_device_buf = ctx.enqueue_create_buffer[qkv_type](q_size)
-    var k_device_buf = ctx.enqueue_create_buffer[qkv_type](k_size)
-    var v_device_buf = ctx.enqueue_create_buffer[qkv_type](v_size)
-    var output_device_buf = ctx.enqueue_create_buffer[output_type](o_size)
-    var input_ro_buf = ctx.enqueue_create_buffer[DType.uint32](batch_size + 1)
-    var cache_ro_buf = ctx.enqueue_create_buffer[DType.uint32](batch_size + 1)
-    var blocks_device = ctx.enqueue_create_buffer[k_rope_type](block_elems)
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
-
-    ctx.enqueue_copy(q_device_buf, q_ptr)
-    ctx.enqueue_copy(k_device_buf, k_ptr)
-    ctx.enqueue_copy(v_device_buf, v_ptr)
-    ctx.enqueue_copy(input_ro_buf, input_row_offsets_host)
-    ctx.enqueue_copy(cache_ro_buf, cache_row_offsets_host)
-    ctx.enqueue_copy(blocks_device, blocks_host)
-    ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
-    ctx.enqueue_copy(lookup_table_device, lookup_table_host)
-
-    ctx.synchronize()
-
-    # ------------------------------------------------------------------
-    # Step 5: Build TileTensors for the kernel call.
-    # ------------------------------------------------------------------
-    var q_device = TileTensor(
-        q_device_buf,
-        row_major((batch_size * seq_len, Idx[num_heads], Idx[depth])),
-    )
-    var k_device = TileTensor(
-        k_device_buf,
-        row_major((batch_size * num_keys, Idx[num_heads], Idx[kv_depth])),
-    )
-    var v_device = TileTensor(
-        v_device_buf,
-        row_major((batch_size * num_keys, Idx[num_heads], Idx[kv_depth])),
-    )
-    var output_device = TileTensor(
-        output_device_buf,
-        row_major((batch_size * seq_len, Idx[num_heads], Idx[kv_depth])),
-    )
-    var input_ro_tt = TileTensor(input_ro_buf, row_major(batch_size + 1))
-    var cache_ro_tt = TileTensor(cache_ro_buf, row_major(batch_size + 1))
-
-    # ------------------------------------------------------------------
-    # Step 6: Build the PagedKVCacheCollection for K_rope.
-    # ------------------------------------------------------------------
-    comptime kv_params = KVCacheStaticParams(
-        num_heads=KV_NUM_HEADS, head_size=CACHE_DEPTH, is_mla=True
-    )
-    var block_shape = IndexList[6](
-        total_pages,
-        1,  # kv_dim2 = 1 for is_mla
-        NUM_LAYERS,
-        page_size,
-        kv_params.num_heads,
-        kv_params.head_size,
-    )
-
-    var blocks_lt = LayoutTensor[k_rope_type, Layout.row_major[6]()](
-        blocks_device.unsafe_ptr(),
-        RuntimeLayout[Layout.row_major[6]()].row_major(block_shape),
-    )
-
-    comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
-        cache_lengths_device.unsafe_ptr(),
-        RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
-    )
-
-    comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
-        lookup_table_device.unsafe_ptr(),
-        RuntimeLayout[lt_layout_2d].row_major(
-            IndexList[2](batch_size, max_pages_per_batch)
-        ),
-    )
-
-    var kv_collection = PagedKVCacheCollection[
-        k_rope_type, kv_params, page_size
-    ](
-        LayoutTensor[k_rope_type, Layout.row_major[6](), MutAnyOrigin](
-            blocks_lt.ptr,
-            RuntimeLayout[Layout.row_major[6]()](
-                blocks_lt.runtime_layout.shape.value,
-                blocks_lt.runtime_layout.stride.value,
-            ),
-        ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
-            cache_lengths_lt.ptr,
-            RuntimeLayout[cl_layout](
-                cache_lengths_lt.runtime_layout.shape.value,
-                cache_lengths_lt.runtime_layout.stride.value,
-            ),
-        ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
-            lookup_table_lt.ptr,
-            RuntimeLayout[lt_layout_2d](
-                lookup_table_lt.runtime_layout.shape.value,
-                lookup_table_lt.runtime_layout.stride.value,
-            ),
-        ),
-        UInt32(seq_len),  # max_seq_length
-        UInt32(num_keys),  # max_cache_length
-    )
-
-    var kv_cache = kv_collection.get_key_cache(0)
-
-    # k and v need LayoutTensor form (the paged overload signature).
-    var k_lt = k_device.to_layout_tensor()
-    var v_lt = v_device.to_layout_tensor()
-
-    # ------------------------------------------------------------------
-    # Step 7: Launch the kernel.
-    # ------------------------------------------------------------------
-    print("  Launching MLA prefill kernel (paged K_rope)...")
-
-    flare_mla_prefill[rank=3](
-        output_device,
-        q_device,
-        k_lt,
-        v_lt,
-        kv_cache,
-        CausalMask(),
-        input_ro_tt,
-        cache_ro_tt,
-        scale,
-        ctx,
-        q_max_seq_len=seq_len,
-    )
-
-    ctx.synchronize()
-    print("  Kernel completed (no crash).")
-
-    # ------------------------------------------------------------------
-    # Step 8: Copy the kernel output back to host.
-    # ------------------------------------------------------------------
-    ctx.enqueue_copy(output_ptr, output_device_buf)
-    ctx.synchronize()
-
-    # ------------------------------------------------------------------
-    # Step 9: Build the contiguous reference (K_ref, V_ref) by
-    # extracting K_rope from the paged blocks and concatenating with K.
-    # ------------------------------------------------------------------
-    var ref_size = batch_size * num_keys * num_heads * depth
-    var k_ref_host = alloc[Scalar[qkv_type]](ref_size)
-    var v_ref_host = alloc[Scalar[qkv_type]](ref_size)
-    var output_ref_host = alloc[Scalar[output_type]](
-        batch_size * seq_len * num_heads * depth
-    )
-
-    # K_rope contiguous extraction buffer per batch (reused).
-    var k_rope_one_batch = alloc[Scalar[k_rope_type]](num_keys * ROPE_DEPTH)
-
-    for b in range(batch_size):
-        extract_k_rope_for_batch[k_rope_type](
-            blocks_host, k_rope_one_batch, b, num_keys, page_size
-        )
-        for s in range(num_keys):
-            for h in range(num_heads):
-                # First kv_depth elements: copy from K/V.
-                var k_src_off = (
-                    b * num_keys + s
-                ) * num_heads * kv_depth + h * kv_depth
-                var v_src_off = k_src_off
-                var dst_base = (
-                    b * num_keys + s
-                ) * num_heads * depth + h * depth
-                for d in range(kv_depth):
-                    k_ref_host[dst_base + d] = k_ptr[k_src_off + d]
-                    v_ref_host[dst_base + d] = v_ptr[v_src_off + d]
-                # Last ROPE_DEPTH elements of each head: copy from
-                # extracted rope (broadcast across heads). V_ref tail
-                # is zero (V doesn't have a rope component).
-                for d in range(ROPE_DEPTH):
-                    k_ref_host[dst_base + kv_depth + d] = k_rope_one_batch[
-                        s * ROPE_DEPTH + d
-                    ].cast[qkv_type]()
-                    v_ref_host[dst_base + kv_depth + d] = 0
-
-    # ------------------------------------------------------------------
-    # Step 10: Run the naive MHA reference on the contiguous K_ref/V_ref.
-    # ------------------------------------------------------------------
-    var k_ref_device_buf = ctx.enqueue_create_buffer[qkv_type](ref_size)
-    var v_ref_device_buf = ctx.enqueue_create_buffer[qkv_type](ref_size)
-    var output_ref_device_buf = ctx.enqueue_create_buffer[output_type](
-        batch_size * seq_len * num_heads * depth
-    )
-    ctx.enqueue_copy(k_ref_device_buf, k_ref_host)
-    ctx.enqueue_copy(v_ref_device_buf, v_ref_host)
-
-    var q_device_rank4 = TileTensor(
-        q_device_buf,
-        row_major((batch_size, seq_len, Idx[num_heads], Idx[depth])),
-    )
-    var k_ref_device = TileTensor(
-        k_ref_device_buf,
-        row_major((batch_size, num_keys, Idx[num_heads], Idx[depth])),
-    )
-    var v_ref_device = TileTensor(
-        v_ref_device_buf,
-        row_major((batch_size, num_keys, Idx[num_heads], Idx[depth])),
-    )
-    var output_ref_device = TileTensor(
-        output_ref_device_buf,
-        row_major((batch_size, seq_len, Idx[num_heads], Idx[depth])),
-    )
-
-    var null_valid_length = LayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
-    ](
-        None,
-        RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(Index(0)),
-    )
-
-    var k_ref_operand = LayoutTensorMHAOperand(k_ref_device.to_layout_tensor())
-    var v_ref_operand = LayoutTensorMHAOperand(v_ref_device.to_layout_tensor())
-
-    mha_gpu_naive[_is_cache_length_accurate=True](
-        q_device_rank4.to_layout_tensor(),
-        k_ref_operand,
-        v_ref_operand,
-        CausalMask(),
-        output_ref_device.to_layout_tensor(),
-        null_valid_length,
-        scale,
-        batch_size,
-        seq_len,
-        num_keys,
-        num_heads,
-        depth,
-        1,  # group
-        ctx,
-    )
-
-    ctx.synchronize()
-    ctx.enqueue_copy(output_ref_host, output_ref_device_buf)
-    ctx.synchronize()
-
-    # ------------------------------------------------------------------
-    # Step 11: Compare the kernel output with the reference. The
-    # kernel writes [total_seq_tokens, num_heads, kv_depth]; the
-    # reference is rank-4 [batch, seq, num_heads, depth] and we only
-    # compare the first kv_depth dims per head.
-    # ------------------------------------------------------------------
-    comptime atol: Float64 = 2e-2
-    comptime rtol: Float64 = 2e-2
-    var max_abs_err = Float64(0)
-    for b in range(batch_size):
-        for s in range(seq_len):
-            for h in range(num_heads):
-                for d in range(kv_depth):
-                    var actual = output_ptr.load(
-                        (b * seq_len + s) * num_heads * kv_depth
-                        + h * kv_depth
-                        + d
-                    ).cast[DType.float64]()
-                    var expect = output_ref_host.load(
-                        ((b * seq_len + s) * num_heads + h) * depth + d
-                    ).cast[DType.float64]()
-                    var abs_err = abs(actual - expect)
-                    if abs_err > max_abs_err:
-                        max_abs_err = abs_err
-                    if abs_err > atol:
-                        print(
-                            "mismatch at b=",
-                            b,
-                            " s=",
-                            s,
-                            " h=",
-                            h,
-                            " d=",
-                            d,
-                            " actual=",
-                            actual,
-                            " expect=",
-                            expect,
-                        )
-                    assert_almost_equal(actual, expect, atol=atol, rtol=rtol)
-
-    print("  PASS, max_abs_err:", max_abs_err)
-
-    # ------------------------------------------------------------------
-    # Cleanup
-    # ------------------------------------------------------------------
-    q_ptr.free()
-    k_ptr.free()
-    v_ptr.free()
-    output_ptr.free()
-    k_ref_host.free()
-    v_ref_host.free()
-    output_ref_host.free()
-    k_rope_one_batch.free()
-    blocks_host.free()
-    cache_lengths_host.free()
-    lookup_table_host.free()
-    input_row_offsets_host.free()
-    cache_row_offsets_host.free()
-
-    _ = q_device_buf
-    _ = k_device_buf
-    _ = v_device_buf
-    _ = output_device_buf
-    _ = input_ro_buf
-    _ = cache_ro_buf
-    _ = blocks_device
-    _ = cache_lengths_device
-    _ = lookup_table_device
-    _ = k_ref_device_buf
-    _ = v_ref_device_buf
-    _ = output_ref_device_buf
 
 
 def main() raises:
@@ -550,7 +116,7 @@ def main() raises:
                     output_type=DType.bfloat16,
                     depth=192,
                     num_heads=16,
-                    kv_depth=128,
+                    nope_depth=128,
                     page_size=PAGE_SIZE,
                     batch_size=1,
                 ](num_keys, num_keys, ctx)
@@ -565,7 +131,40 @@ def main() raises:
                     output_type=DType.bfloat16,
                     depth=192,
                     num_heads=16,
-                    kv_depth=128,
+                    nope_depth=128,
                     page_size=PAGE_SIZE,
                     batch_size=2,
                 ](num_keys, num_keys, ctx)
+
+            # 1Q multi-tile coverage: 657 keys / 16 heads / batch 1 keeps
+            # the unclamped 2Q grid at 3 * 16 = 48 blocks <= SMs/2, so
+            # the dispatch heuristic picks the 1Q (num_qo=1) kernel.
+            # 657 = 5 * 128 + 17 exercises the 1Q producer main loop,
+            # tail, and partial last page in one shot. (The short shapes
+            # in `num_keys_to_test()` also route to 1Q on B200, but only
+            # cover T <= 2.)
+            seed(0)
+            run_test_paged_prefill[
+                qkv_type=DType.bfloat16,
+                k_rope_type=DType.bfloat16,
+                output_type=DType.bfloat16,
+                depth=192,
+                num_heads=16,
+                nope_depth=128,
+                page_size=PAGE_SIZE,
+                batch_size=1,
+            ](657, 657, ctx)
+            # 2Q coverage retention: 1088 keys -> 5 BM=256 tiles, so the
+            # unclamped 2Q grid is 5 * 16 = 80 blocks > SMs/2 and the
+            # dispatch keeps the 2Q kernel (with a partial 2Q last tile).
+            seed(0)
+            run_test_paged_prefill[
+                qkv_type=DType.bfloat16,
+                k_rope_type=DType.bfloat16,
+                output_type=DType.bfloat16,
+                depth=192,
+                num_heads=16,
+                nope_depth=128,
+                page_size=PAGE_SIZE,
+                batch_size=1,
+            ](1088, 1088, ctx)

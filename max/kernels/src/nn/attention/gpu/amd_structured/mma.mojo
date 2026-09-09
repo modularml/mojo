@@ -10,10 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""
+TileTensor-native matrix-multiply-accumulate (MMA) operations for AMD GPU
+attention kernels.
 
-from std.gpu.compute.mma import mma as gpu_mma
-from std.gpu import lane_id, WARP_SIZE
-from std.gpu.intrinsics import ds_read_tr16_b64
+Defines `TiledMmaOp`, a thin wrapper over the raw GPU MMA intrinsic that
+operates directly on register-resident `TileTensor` fragments, and
+`KVMmaOp`, which owns the K or V operand register tile and its
+shared-memory-to-register load logic for the two sequential attention
+GEMMs (P = Q @ K^T and O += P @ V).
+"""
+
+from max.gpu.compute.mma import mma as gpu_mma
+from max.gpu import lane_id, WARP_SIZE
+from max.gpu.intrinsics import ds_read_tr16_b64
 from std.math.uutils import ufloordiv, umod
 from std.memory import AddressSpace
 from std.sys import simd_width_of
@@ -58,9 +68,9 @@ struct TiledMmaOp[
     def mma[
         swap_a_b: Bool = False
     ](
-        a: TileTensor[_, _, address_space=AddressSpace.LOCAL, ...],
-        b: TileTensor[_, _, address_space=AddressSpace.LOCAL, ...],
-        c: TileTensor[mut=True, _, _, address_space=AddressSpace.LOCAL, ...],
+        a: TileTensor[_, _, address_space=.LOCAL, ...],
+        b: TileTensor[_, _, address_space=.LOCAL, ...],
+        c: TileTensor[mut=True, _, _, address_space=.LOCAL, ...],
     ):
         """Perform MMA on TileTensor operands.
 
@@ -118,11 +128,9 @@ struct TiledMmaOp[
     def load_b[
         swizzle: Optional[Swizzle] = None,
     ](
-        warp_tile: TileTensor[
-            Self.in_type, _, _, address_space=AddressSpace.SHARED, ...
-        ],
+        warp_tile: TileTensor[Self.in_type, _, _, address_space=.SHARED, ...],
         reg_tile: TileTensor[
-            mut=True, Self.in_type, _, _, address_space=AddressSpace.LOCAL, ...
+            mut=True, Self.in_type, _, _, address_space=.LOCAL, ...
         ],
         k_group_idx: Int = 0,
     ):
@@ -172,11 +180,9 @@ struct TiledMmaOp[
     def load_a[
         swizzle: Optional[Swizzle] = None,
     ](
-        warp_tile: TileTensor[
-            Self.in_type, _, _, address_space=AddressSpace.SHARED, ...
-        ],
+        warp_tile: TileTensor[Self.in_type, _, _, address_space=.SHARED, ...],
         reg_tile: TileTensor[
-            mut=True, Self.in_type, _, _, address_space=AddressSpace.LOCAL, ...
+            mut=True, Self.in_type, _, _, address_space=.LOCAL, ...
         ],
         k_group_idx: Int = 0,
     ):
@@ -243,7 +249,7 @@ struct KVMmaOp[
         BN: KV block height (needed by V load methods for SMEM offset math).
         BK: KV block width (needed by V load methods for SMEM offset math).
         transpose_b: True for K (transposed load), False for V.
-        swizzle: Optional SMEM swizzle — vector-space for prefill,
+        swizzle: Optional SMEM swizzle: vector-space for prefill,
             element-space for decode.
         out_type: Accumulator data type (defaults to accum(in_type)).
     """
@@ -260,13 +266,13 @@ struct KVMmaOp[
     var reg_tile: TileTensor[
         Self.in_type,
         type_of(Self._reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
 
     @always_inline
     def __init__(out self):
-        self.reg_tile = stack_allocation[Self.in_type, AddressSpace.LOCAL](
+        self.reg_tile = stack_allocation[Self.in_type, address_space=.LOCAL](
             Self._reg_layout
         )
 
@@ -275,9 +281,7 @@ struct KVMmaOp[
         bk_tile: Int
     ](
         self,
-        warp_smem: TileTensor[
-            Self.in_type, _, _, address_space=AddressSpace.SHARED, ...
-        ],
+        warp_smem: TileTensor[Self.in_type, _, _, address_space=.SHARED, ...],
     ):
         """Load the `bk_tile`-th BK strip of K fragments from SMEM.
 
@@ -285,6 +289,13 @@ struct KVMmaOp[
         vector-space swizzle). Handles both BF16 (single load per MMA
         tile) and FP8 (two-half-K load + join) via the `num_packs`
         branch inside `load_b`.
+
+        Parameters:
+            bk_tile: Index of the BK strip to load into the register tile.
+
+        Args:
+            warp_smem: Source warp tile in shared memory holding the K
+                fragments for this strip.
         """
         comptime assert Self.transpose_b, "load_prefill is K-operand only"
         comptime total_frags = Self.num_mmas * Self.num_k_mmas
@@ -300,15 +311,114 @@ struct KVMmaOp[
             dst[Int(i), 0] = rebind[type_of(dst[Int(i), 0])](frags[Int(i)])
 
     @always_inline
+    def load_prefill_split[
+        bk_tile: Int,
+        has_hi: Bool,
+    ](
+        self,
+        warp_smem_lo: TileTensor[
+            Self.in_type, _, _, address_space=.SHARED, ...
+        ],
+        warp_smem_hi: TileTensor[
+            Self.in_type, _, _, address_space=.SHARED, ...
+        ],
+    ):
+        """Load the `bk_tile`-th MMA K=128 strip composed of two
+        adjacent `WN × (MMA_K/2)` SMEM blocks.
+
+        Used by FP8 16x16x128 MLA decode when the SMEM block width
+        (`bk_smem`) is `MMA_K/2 = 64` instead of `BK = 128`. Each MMA
+        strip's two K-halves live in two separate `BN × 64` SMEM blocks
+        (matching the no-pad K layout at depth=576).
+
+        When `has_hi == False` the hi half is register-zero: this
+        handles the partial K-tile at the rope tail (strip 4 for
+        depth=576: lo holds depth 512..575 from block 8, hi has no
+        backing block, MMA upper-half lane registers get 0).
+
+        Parameters:
+            bk_tile: Index of the BK strip to load into the register tile.
+            has_hi: Whether the high K-half has backing SMEM. When False
+                the high half is register-zero for the partial K-tile at
+                the rope tail.
+
+        Args:
+            warp_smem_lo: SMEM tile holding the low K half (depth
+                `[0, MMA_K/2)` of this strip).
+            warp_smem_hi: SMEM tile holding the high K half (depth
+                `[MMA_K/2, MMA_K)`); ignored when `has_hi` is False.
+        """
+        comptime assert Self.transpose_b, "load_prefill_split is K-operand only"
+        comptime assert (
+            Self.in_type.is_float8() and Self.MMA_K == 128
+        ), "load_prefill_split is FP8 16x16x128 only"
+
+        # Half-K MMA tile shape: 16 × 16 × 64 (matches load_b's
+        # `num_packs == 2` half).
+        comptime half_k_shape = IndexList[3](
+            Self.MMA_M, Self.mma_shape[1], Self.MMA_K // 2
+        )
+        # Half-K per-lane fragment width. Bound symbolically to the
+        # MMA shape so `lo.join(hi)` stays correct if MMA_K ever
+        # changes. For FP8 16x16x128 this equals 16, matching
+        # `simd_width_of[in_type]`; check that invariant so a future
+        # shape mismatch surfaces here.
+        comptime half_frag_w = num_matrix_reg[Self.MMA_M, Self.MMA_K // 2]()
+        comptime assert (
+            half_frag_w == simd_width_of[Self.in_type]()
+        ), "load_prefill_split: half-K frag size must equal SIMD width"
+        comptime total_frags = Self.num_mmas * Self.num_k_mmas
+
+        var dst = self.reg_tile.tile[
+            Self._rows_per_k_tile, Self.input_frag_size
+        ](bk_tile, 0).vectorize[1, Self.input_frag_size]()
+
+        comptime for i in range(total_frags):
+            # Each warp_smem_{lo,hi} is (WN, MMA_K/2). Slice out the
+            # i-th MMA-M strip (rows [i*MMA_M, (i+1)*MMA_M), cols [0, MMA_K/2)).
+            # _load_b_tile reads the full 16×64 sub-tile at k_tile_idx=0.
+            var src_lo = warp_smem_lo.tile[Self.MMA_M, Self.MMA_K // 2](
+                Int(i), 0
+            )
+            var lo = TiledMmaLoader[
+                Self.in_type, Self.mma_shape, Self.swizzle
+            ]._load_b_tile[half_k_shape, 0](src_lo)
+
+            # Bind `hi`'s type to `lo`'s so the two halves stay
+            # type-coherent for `lo.join(hi)`.
+            var hi: type_of(lo)
+            comptime if has_hi:
+                var src_hi = warp_smem_hi.tile[Self.MMA_M, Self.MMA_K // 2](
+                    Int(i), 0
+                )
+                hi = TiledMmaLoader[
+                    Self.in_type, Self.mma_shape, Self.swizzle
+                ]._load_b_tile[half_k_shape, 0](src_hi)
+            else:
+                hi = type_of(lo)(0)
+
+            var joined = lo.join(hi)
+            dst[Int(i), 0] = rebind[type_of(dst[Int(i), 0])](joined)
+
+    @always_inline
     def mma_tile_at[
         bk_tile: Int, kg: Int
     ](self) -> TileTensor[
         Self.in_type,
         type_of(row_major[Self.num_mmas, Self.input_frag_size]()),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]:
-        """Sub-view of the reg tile for a given (bk_tile, k-group) pair."""
+        """Sub-view of the reg tile for a given (bk_tile, k-group) pair.
+
+        Parameters:
+            bk_tile: Index of the BK strip in the register tile.
+            kg: K-group index within the BK strip.
+
+        Returns:
+            Register tile sub-view of shape `[num_mmas, input_frag_size]`
+            covering the fragments for the selected BK strip and K-group.
+        """
         return self.reg_tile.tile[Self._rows_per_k_tile, Self.input_frag_size](
             bk_tile, 0
         ).tile[Self.num_mmas, Self.input_frag_size](kg, 0)
@@ -319,9 +429,7 @@ struct KVMmaOp[
     ](
         self,
         smem_base: UnsafePointer[
-            Scalar[Self.in_type],
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            Scalar[Self.in_type], MutAnyOrigin, address_space=.SHARED
         ],
     ):
         """Load the `bk_tile`-th BK strip of BF16 V fragments from SMEM.
@@ -329,17 +437,22 @@ struct KVMmaOp[
         V SMEM is blocked (num_repeats × BN × BK, row-major within each
         block). For each (k, i) ∈ [num_k_mmas] × [num_mmas], build an
         MMA sub-tile view with the correct `(BK, 1)` row stride (not
-        `(MMA_M, 1)` — see `smem_mma_subtile` header), call
+        `(MMA_M, 1)`, see `smem_mma_subtile` header), call
         `TiledMmaLoader.load_b_tr`, and write the fragment into the
         reg slot `mma_tile_at[bk_tile, k][i]`.
 
         Only valid when `transpose_b == False` and `in_type ==
         bfloat16`.
+
+        Parameters:
+            bk_tile: Index of the BK strip to load.
+
+        Args:
+            smem_base: Base pointer to the V operand SMEM buffer in
+                shared memory.
         """
         comptime assert not Self.transpose_b, "load_v_bf16 is V-operand only"
-        comptime assert (
-            Self.in_type == DType.bfloat16
-        ), "load_v_bf16 is bf16 only"
+        comptime assert Self.in_type == .bfloat16, "load_v_bf16 is bf16 only"
 
         comptime _MmaTileLayout = MixedLayout[
             Coord[
@@ -350,12 +463,12 @@ struct KVMmaOp[
 
         # mla_kv_alias mode: V reads from K's swizzled SMEM, so V's
         # `ds_read_tr16_b64` per-lane addresses must apply the same
-        # swizzle K's writer applies.  `load_b_tr` /
+        # swizzle K's writer applies. `load_b_tr` /
         # `ds_read_tr16_b64_warp` / `ds_read_tr16_b64_row` only know
         # about `tile.ptr` and have no `block_base` to swizzle relative
         # to, so we inline the addressing here and call the bare
         # `ds_read_tr16_b64` intrinsic with a swizzled per-lane address.
-        # Mirrors `load_v_fp8_strip`'s swizzle path.  No-swizzle case
+        # Mirrors `load_v_fp8_strip`'s swizzle path. No-swizzle case
         # keeps the original helper-based load.
         comptime if Self.swizzle:
             # Per-lane element offset within a (4, 16) shared_b_tile
@@ -381,7 +494,7 @@ struct KVMmaOp[
                         Self.MMA_K, Self.MMA_M, Self.BN, Self.BK
                     ](bk_tile, Int(k), Int(i))
 
-                    @parameter
+                    @__parameter
                     def _read_half[half_idx: Int]() -> SIMD[Self.in_type, 4]:
                         comptime half_off = (
                             half_idx * (Self.MMA_K // 2) * Self.BK
@@ -401,9 +514,14 @@ struct KVMmaOp[
                     var part_2 = _read_half[1]()
                     var frag = part_1.join(part_2)
 
-                    var dst = self.mma_tile_at[bk_tile, Int(k)]().vectorize[
-                        1, Self.input_frag_size
-                    ]()
+                    # `bk_tile % num_k_tiles` folds the global strip index into
+                    # the (possibly chunked) reg tile: identity when the reg
+                    # tile is full, slot 0 when the caller streams one strip at
+                    # a time (reg_chunk_keys == BK). Missing it OOB-corrupts a
+                    # chunked V tile.
+                    var dst = self.mma_tile_at[
+                        bk_tile % Self.num_k_tiles, Int(k)
+                    ]().vectorize[1, Self.input_frag_size]()
                     dst[Int(i), 0] = rebind[type_of(dst[Int(i), 0])](frag)
         else:
             comptime for k in range(Self.num_k_mmas):
@@ -415,15 +533,17 @@ struct KVMmaOp[
                         Self.in_type,
                         _MmaTileLayout,
                         MutAnyOrigin,
-                        address_space=AddressSpace.SHARED,
+                        address_space=.SHARED,
                     ](smem_base + offset, _MmaTileLayout())
                     var frag = TiledMmaLoader[
                         Self.in_type, Self.mma_shape
                     ].load_b_tr(mma_smem)
 
-                    var dst = self.mma_tile_at[bk_tile, Int(k)]().vectorize[
-                        1, Self.input_frag_size
-                    ]()
+                    # `bk_tile % num_k_tiles`: identity for a full reg tile,
+                    # slot 0 when streaming one strip at a time (chunked V).
+                    var dst = self.mma_tile_at[
+                        bk_tile % Self.num_k_tiles, Int(k)
+                    ]().vectorize[1, Self.input_frag_size]()
                     dst[Int(i), 0] = rebind[type_of(dst[Int(i), 0])](frag)
 
     @always_inline
@@ -432,9 +552,7 @@ struct KVMmaOp[
     ](
         self,
         smem_base: UnsafePointer[
-            Scalar[Self.in_type],
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            Scalar[Self.in_type], MutAnyOrigin, address_space=.SHARED
         ],
         rel_key: Int,
         hw_key_shift: Int,
@@ -449,8 +567,21 @@ struct KVMmaOp[
 
         Only valid when `transpose_b == False` and `in_type` is FP8.
         Caller precomputes the lane-only coords (`rel_key`,
-        `hw_key_shift`, `depth_base`) once before a multi-bk loop —
+        `hw_key_shift`, `depth_base`) once before a multi-bk loop:
         they don't depend on bk_tile or dt.
+
+        Parameters:
+            bk_tile: Index of the BK strip to load.
+
+        Args:
+            smem_base: Base pointer to the V operand SMEM buffer in
+                shared memory.
+            rel_key: Lane-relative key coordinate, precomputed by the
+                caller (independent of `bk_tile` and depth).
+            hw_key_shift: Hardware key shift for lane addressing,
+                precomputed by the caller.
+            depth_base: Depth base coordinate for lane addressing,
+                precomputed by the caller.
         """
         comptime assert (
             not Self.transpose_b
@@ -460,7 +591,9 @@ struct KVMmaOp[
             Self.num_k_mmas == 1
         ), "FP8 V expects num_k_mmas == 1 (MMA_K >= BK)"
 
-        var dst = self.mma_tile_at[bk_tile, 0]().vectorize[
+        # `bk_tile % num_k_tiles`: identity for a full reg tile, slot 0 when
+        # streaming one strip at a time (chunked V).
+        var dst = self.mma_tile_at[bk_tile % Self.num_k_tiles, 0]().vectorize[
             1, Self.input_frag_size
         ]()
         comptime for dt in range(Self.num_mmas):
@@ -476,12 +609,25 @@ struct KVMmaOp[
         swap_a_b: Bool = False,
     ](
         self,
-        a: TileTensor[_, _, address_space=AddressSpace.LOCAL, ...],
-        c: TileTensor[mut=True, _, _, address_space=AddressSpace.LOCAL, ...],
+        a: TileTensor[_, _, address_space=.LOCAL, ...],
+        c: TileTensor[mut=True, _, _, address_space=.LOCAL, ...],
         bk_tile: Int,
         kg: Int,
     ):
-        """Compute C += A * B using this op's reg tile as B operand."""
+        """Compute C += A * B using this op's reg tile as B operand.
+
+        Parameters:
+            swap_a_b: Whether to swap A and B operands in the underlying
+                `gpu_mma` call (defaults to False).
+
+        Args:
+            a: A operand register tile in local memory.
+            c: Accumulator register tile, updated in place.
+            bk_tile: Index of the BK strip in this op's reg tile to use
+                as the B operand.
+            kg: K-group index within the BK strip selecting the MMA
+                fragment row.
+        """
         TiledMmaOp[
             Self.out_type,
             Self.in_type,

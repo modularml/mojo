@@ -17,13 +17,15 @@ from .moe import (
     MoE,
     MoEGate,
     make_concatenated_gated_activation_fn,
+    make_interleaved_gated_activation_fn,
 )
 from .moe_fp8 import MoEQuantized
 from .quant_strategy import (
+    BlockScaledStrategy,
     Fp8Strategy,
-    Mxfp4Strategy,
+    Mxfp6Strategy,
     Nvfp4Scales,
-    Nvfp4Strategy,
+    NvMxf4f8Strategy,
     QuantStrategy,
 )
 from .stacked_moe import (
@@ -38,11 +40,12 @@ __all__ = [
     "MoE",
     "MoEGate",
     "MoEQuantized",
+    "NvMxf4f8Strategy",
     "Nvfp4Scales",
-    "Nvfp4Strategy",
     "QuantStrategy",
     "StackedMoE",
     "forward_moe_sharded_layers",
     "make_concatenated_gated_activation_fn",
+    "make_interleaved_gated_activation_fn",
     "make_stacked_gated_activation_fn",
 ]

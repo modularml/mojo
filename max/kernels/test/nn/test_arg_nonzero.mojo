@@ -22,9 +22,7 @@ def test_where_size() raises:
     print("== test_where_size")
     comptime rank = 3
     comptime values_shape = row_major[3, 2, 1]()
-    var values_stack = InlineArray[Float32, values_shape.product()](
-        uninitialized=True
-    )
+    var values_stack = Array[Float32, values_shape.product()](fill={})
     var values = TileTensor(values_stack, values_shape)
 
     values[0, 0, 0] = 1.0
@@ -34,8 +32,8 @@ def test_where_size() raises:
     values[2, 0, 0] = 0.0
     values[2, 1, 0] = -3.0
 
-    var output_shape = arg_nonzero_shape[DType.float32](
-        values.make_dynamic[DType.int64]()
+    var output_shape = arg_nonzero_shape[.float32](
+        values.make_dynamic[.int64]()
     )
 
     assert_equal(output_shape[0], 3)
@@ -47,21 +45,17 @@ def test_where_size_bool() raises:
     print("== test_where_size_bool")
     comptime rank = 3
     comptime values_shape = row_major[3, 2, 1]()
-    var values_stack = InlineArray[Scalar[DType.bool], values_shape.product()](
-        uninitialized=True
-    )
+    var values_stack = Array[Scalar[.bool], values_shape.product()](fill={})
     var values = TileTensor(values_stack, values_shape)
 
     values[0, 0, 0] = True
     values[0, 1, 0] = True
     values[1, 0, 0] = False
     values[1, 1, 0] = False
-    values[2, 0, 0] = Scalar[DType.bool](False)
-    values[2, 1, 0] = Scalar[DType.bool](True)
+    values[2, 0, 0] = Scalar[.bool](False)
+    values[2, 1, 0] = Scalar[.bool](True)
 
-    var output_shape = arg_nonzero_shape[DType.bool](
-        values.make_dynamic[DType.int64]()
-    )
+    var output_shape = arg_nonzero_shape[.bool](values.make_dynamic[.int64]())
 
     assert_equal(output_shape[0], 3)
     assert_equal(output_shape[1], 3)
@@ -72,9 +66,7 @@ def test_where() raises:
     print("== test_where")
     comptime rank = 3
     comptime values_shape = row_major[3, 2, 1]()
-    var values_stack = InlineArray[Float32, values_shape.product()](
-        uninitialized=True
-    )
+    var values_stack = Array[Float32, values_shape.product()](fill={})
     var values = TileTensor(values_stack, values_shape)
 
     values[0, 0, 0] = 1.0
@@ -84,14 +76,14 @@ def test_where() raises:
     values[2, 0, 0] = 0.0
     values[2, 1, 0] = -3.0
 
-    var computed_stack = InlineArray[Scalar[DType.int], 9](uninitialized=True)
-    var computed_outputs = TileTensor[DType.int,](
+    var computed_stack = Array[Int, 9](fill={})
+    var computed_outputs = TileTensor[.int](
         computed_stack,
         row_major[3, 3](),
     )
 
-    var golden_stack = InlineArray[Scalar[DType.int], 9](uninitialized=True)
-    var golden_outputs = TileTensor[DType.int,](
+    var golden_stack = Array[Int, 9](fill={})
+    var golden_outputs = TileTensor[.int](
         golden_stack,
         row_major[3, 3](),
     )
@@ -107,8 +99,8 @@ def test_where() raises:
     golden_outputs[2, 2] = 0
 
     arg_nonzero(
-        values.make_dynamic[DType.int64](),
-        computed_outputs.make_dynamic[DType.int64](),
+        values.make_dynamic[.int64](),
+        computed_outputs.make_dynamic[.int64](),
     )
 
     for i, j in product(range(3), range(3)):
@@ -121,44 +113,24 @@ def test_where_1d() raises:
     comptime num_elements = 12
     comptime num_indices = 6
 
-    var values_stack = InlineArray[Float32, num_elements](uninitialized=True)
+    var values_stack = Array[Float32, num_elements](
+        fill_with=lambda (i: Int) -> Float32: Float32(i % 2)
+    )
     var values = TileTensor(values_stack, row_major[num_elements]())
 
-    values[0] = 0.0
-    values[1] = 1.0
-    values[2] = 0.0
-    values[3] = 1.0
-    values[4] = 0.0
-    values[5] = 1.0
-    values[6] = 0.0
-    values[7] = 1.0
-    values[8] = 0.0
-    values[9] = 1.0
-    values[10] = 0.0
-    values[11] = 1.0
-
-    var computed_stack = InlineArray[Scalar[DType.int], num_indices](
-        uninitialized=True
-    )
+    var computed_stack = Array[Int, num_indices](fill={})
     var computed_outputs = TileTensor(
         computed_stack, row_major[num_indices, 1]()
     )
 
-    var golden_stack = InlineArray[Scalar[DType.int], num_indices](
-        uninitialized=True
+    var golden_stack = Array[Int, num_indices](
+        fill_with=lambda (i: Int) -> Int: 2 * i + 1
     )
     var golden_outputs = TileTensor(golden_stack, row_major[num_indices]())
 
-    golden_outputs[0] = 1
-    golden_outputs[1] = 3
-    golden_outputs[2] = 5
-    golden_outputs[3] = 7
-    golden_outputs[4] = 9
-    golden_outputs[5] = 11
-
     arg_nonzero(
-        values.make_dynamic[DType.int64](),
-        computed_outputs.make_dynamic[DType.int64](),
+        values.make_dynamic[.int64](),
+        computed_outputs.make_dynamic[.int64](),
     )
 
     for i in range(num_indices):
@@ -170,9 +142,9 @@ def test_where_bool() raises:
     print("== test_where_bool")
     comptime rank = 3
     comptime values_shape = row_major[3, 2, 1]()
-    var values_stack = InlineArray[
-        Scalar[DType.bool], Int(values_shape.product())
-    ](uninitialized=True)
+    var values_stack = Array[Scalar[.bool], Int(values_shape.product())](
+        fill={}
+    )
     var values = TileTensor(values_stack, values_shape)
 
     values[0, 0, 0] = True
@@ -182,10 +154,10 @@ def test_where_bool() raises:
     values[2, 0, 0] = False
     values[2, 1, 0] = True
 
-    var computed_stack = InlineArray[Scalar[DType.int], 9](uninitialized=True)
+    var computed_stack = Array[Int, 9](fill={})
     var computed_outputs = TileTensor(computed_stack, row_major[3, 3]())
 
-    var golden_stack = InlineArray[Scalar[DType.int], 9](uninitialized=True)
+    var golden_stack = Array[Int, 9](fill={})
     var golden_outputs = TileTensor(golden_stack, row_major[3, 3]())
 
     golden_outputs[0, 0] = 0
@@ -199,8 +171,8 @@ def test_where_bool() raises:
     golden_outputs[2, 2] = 0
 
     arg_nonzero(
-        values.make_dynamic[DType.int64](),
-        computed_outputs.make_dynamic[DType.int64](),
+        values.make_dynamic[.int64](),
+        computed_outputs.make_dynamic[.int64](),
     )
 
     for i, j in product(range(3), range(3)):

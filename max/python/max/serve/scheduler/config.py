@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from max.pipelines.lib import PipelineConfig
+from max.pipelines.lib import MemoryPlan, PipelineConfig
 
 
 @dataclass
@@ -25,7 +25,6 @@ class TokenGenerationSchedulerConfig:
     max_batch_size: int
     """The maximum number of requests that can be in the token generation batch."""
 
-    max_forward_steps_tg: int
     """The number of tokens to generate for each request in the token generation iteration."""
 
     target_tokens_per_batch_ce: int
@@ -42,6 +41,12 @@ class TokenGenerationSchedulerConfig:
     """Enables chunked prefill, where the scheduler splits requests into chunks to ensure
     each batch contains exactly `target_tokens_per_batch_ce` tokens."""
 
+    chunked_prefill_min_chunk_size: int = 0
+    """Floor, in tokens, on any chunk created by chunked prefill: a split
+    never creates a piece (chunk or remainder) smaller than this; contexts
+    with no legal cut point within the remaining budget are left unsplit for
+    a later step. 0 disables the floor."""
+
     enable_in_flight_batching: bool = False
     """When enabled, prioritizes token generation by batching it with context encoding requests."""
 
@@ -55,9 +60,6 @@ class TokenGenerationSchedulerConfig:
     If speculative decoding is disabled, this should be 0.
     """
 
-    kvcache_ce_watermark: float = 0.95
-    """The maximum percentage of total KVCache memory that can be used after allocating a CE request. This parameter was found empirically."""
-
     decode_stall_timeout_s: float | None = None
     """Seconds of no-batch-activity after which the decode worker exits to trigger a pod restart. None disables the watchdog."""
 
@@ -67,6 +69,27 @@ class TokenGenerationSchedulerConfig:
     evicted individually (KV blocks released, failure surfaced to the
     client) so a stuck PD pipeline does not force the stall watchdog to
     kill the whole engine. ``None`` disables eviction."""
+
+    dp_ce_balance_timeout_ms: float = -1.0
+    """Max time (ms) a CE request's work may be deferred, from arrival,
+    while awaiting token-balanced scheduling across DP replicas. -1 disables
+    the balancer entirely (requests bind to a replica on arrival; current
+    behavior). 0 enables post-cache-weighted placement with late binding but
+    never defers work. > 0 additionally defers unbalanced CE work (unbound
+    requests and mid-prefill tails) until ``dp_ce_balance_threshold`` is
+    met, the deadline expires, or there is nothing else to run."""
+
+    dp_ce_balance_threshold: float = 0.8
+    """Per-step CE active-token occupancy across DP replicas (mean/max,
+    0-1) at or above which CE work is scheduled without further deferral.
+    Only consulted when ``dp_ce_balance_timeout_ms`` > 0."""
+
+    dp_ce_balance_enable_dynamic_chunk_size: bool = False
+    """Whether a below-threshold CE step with work on 2+ replicas runs
+    immediately with each replica's chunk size reduced to the balance level
+    (deferring only the excess). When False, such steps are held whole until
+    the threshold is met, a deadline expires, or there is nothing else to
+    run."""
 
     def __post_init__(self) -> None:
         if self.max_batch_size <= 0:
@@ -84,9 +107,10 @@ class TokenGenerationSchedulerConfig:
             raise ValueError(
                 "Need set `target_tokens_per_batch_ce` for the scheduler to enable chunked prefill."
             )
-        if self.max_forward_steps_tg <= 0:
+        if self.chunked_prefill_min_chunk_size < 0:
             raise ValueError(
-                f"`max_forward_steps_tg` must be greater than 0, found {self.max_forward_steps_tg}"
+                "`chunked_prefill_min_chunk_size` must be non-negative, found"
+                f" {self.chunked_prefill_min_chunk_size}"
             )
         if (
             self.max_batch_total_tokens is not None
@@ -100,31 +124,51 @@ class TokenGenerationSchedulerConfig:
             raise ValueError(
                 f"`max_batch_size` must be less than or equal to `target_tokens_per_batch_ce`, found {self.max_batch_size} > {self.target_tokens_per_batch_ce}"
             )
+        if not 0.0 <= self.dp_ce_balance_threshold <= 1.0:
+            raise ValueError(
+                "`dp_ce_balance_threshold` must be in [0, 1], found"
+                f" {self.dp_ce_balance_threshold}"
+            )
 
     @classmethod
     def from_pipeline_config(
-        cls, pipeline_config: PipelineConfig
+        cls,
+        pipeline_config: PipelineConfig,
+        max_batch_size: int,
+        memory_plan: MemoryPlan | None,
     ) -> TokenGenerationSchedulerConfig:
-        # We know that the max_length and max_batch_size is not None since they
-        # are required for memory estimation.
-        assert pipeline_config.runtime.max_batch_size is not None
+        """Builds the scheduler config from the pipeline config and memory plan.
+
+        ``memory_plan`` carries the planned sequence length and batch token
+        budget; ``None`` only for pipelines sized without a plan (test echoes).
+        """
         assert pipeline_config.model is not None
 
         return cls(
-            max_batch_size=pipeline_config.runtime.max_batch_size,
-            max_forward_steps_tg=pipeline_config.runtime.max_num_steps
-            if pipeline_config.runtime.max_num_steps != -1
-            else 1,
+            max_batch_size=max_batch_size,
             target_tokens_per_batch_ce=pipeline_config.runtime.max_batch_input_tokens,
-            max_seq_len=pipeline_config.model.max_length,
-            max_batch_total_tokens=pipeline_config.runtime.max_batch_total_tokens,
+            max_seq_len=(
+                memory_plan.planned_max_length
+                if memory_plan is not None
+                else None
+            ),
+            max_batch_total_tokens=(
+                memory_plan.planned_max_batch_total_tokens
+                if memory_plan is not None
+                else None
+            ),
             enable_chunked_prefill=pipeline_config.runtime.enable_chunked_prefill,
+            chunked_prefill_min_chunk_size=pipeline_config.runtime.chunked_prefill_min_chunk_size,
             enable_in_flight_batching=pipeline_config.runtime.enable_in_flight_batching,
             data_parallel_degree=pipeline_config.model.data_parallel_degree,
-            kvcache_ce_watermark=pipeline_config.runtime.kvcache_ce_watermark,
             decode_stall_timeout_s=pipeline_config.runtime.decode_stall_timeout_s,
             decode_request_ttl_s=pipeline_config.runtime.decode_request_ttl_s,
-            num_speculative_tokens=pipeline_config.speculative.num_speculative_tokens
+            dp_ce_balance_timeout_ms=pipeline_config.runtime.dp_ce_balance_timeout_ms,
+            dp_ce_balance_threshold=pipeline_config.runtime.dp_ce_balance_threshold,
+            dp_ce_balance_enable_dynamic_chunk_size=pipeline_config.runtime.dp_ce_balance_enable_dynamic_chunk_size,
+            num_speculative_tokens=(
+                pipeline_config.speculative.num_speculative_tokens or 0
+            )
             if pipeline_config.speculative is not None
             else 0,
         )

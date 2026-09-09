@@ -18,19 +18,19 @@ definitions while maintaining performance through compile-time specialization.
 
 Key components:
 
-- [`TensorLayout`](/docs/layout/tile_layout/TensorLayout): Trait
+- [`TensorLayout`](/api/mojo/layout/tile_layout/TensorLayout): Trait
   defining the interface for all mixed layouts.
-- [`Layout`](/docs/layout/tile_layout/Layout): Primary struct
+- [`Layout`](/api/mojo/layout/tile_layout/Layout): Primary struct
   implementing a layout with mixed compile-time and runtime dimensions.
-- [`row_major`](/docs/layout/tile_layout/row_major): Create a
+- [`row_major`](/api/mojo/layout/tile_layout/row_major): Create a
   row-major layout from a shape.
-- [`col_major`](/docs/layout/tile_layout/col_major): Create a
+- [`col_major`](/api/mojo/layout/tile_layout/col_major): Create a
   column-major layout from a shape.
-- [`blocked_product`](/docs/layout/tile_layout/blocked_product):
+- [`blocked_product`](/api/mojo/layout/tile_layout/blocked_product):
   Create a hierarchical blocked layout from block and tiler layouts.
-- [`zipped_divide`](/docs/layout/tile_layout/zipped_divide): Divide
+- [`zipped_divide`](/api/mojo/layout/tile_layout/zipped_divide): Divide
   a layout into inner and outer components by a tile shape.
-- [`coalesce`](/docs/layout/tile_layout/coalesce): Simplify a
+- [`coalesce`](/api/mojo/layout/tile_layout/coalesce): Simplify a
   layout by merging dimensions with contiguous strides.
 
 You can import these APIs from the `layout` package:
@@ -180,7 +180,7 @@ trait TensorLayout(TrivialRegisterPassable):
     def __call__[
         index_type: CoordLike,
         *,
-        linear_idx_type: DType = DType.int64,
+        linear_idx_type: DType = .int64,
     ](self, index: index_type) -> Scalar[linear_idx_type]:
         """Maps a logical coordinate to a linear memory index.
 
@@ -198,7 +198,7 @@ trait TensorLayout(TrivialRegisterPassable):
 
     def idx2crd[
         *,
-        out_dtype: DType = DType.int64,
+        out_dtype: DType = .int64,
     ](self, idx: Int) -> Coord[
         *_NestedDynamicCoord[out_dtype, *Self._shape_types]
     ]:
@@ -290,7 +290,7 @@ comptime RowMajorNestedLayout[*shape_types: CoordLike] = Layout[
 ]
 """A `Layout` with row-major strides for a nested shape (CuTe semantics).
 
-For shape `((a, b), (c, d))` the strides are `((b*c*d, c*d), (d, 1))` —
+For shape `((a, b), (c, d))` the strides are `((b*c*d, c*d), (d, 1))`:
 row-major over the flattened shape, re-nested.
 
 Parameters:
@@ -321,9 +321,9 @@ struct Layout[
     var _stride: Coord[*Self.stride_types]
     """The stride of the layout as a Coord."""
 
-    comptime rank = Self.shape_types.size
+    comptime rank = Self.shape_types.length
     """The number of dimensions in the layout."""
-    comptime flat_rank = _Flattened[*Self.shape_types].size
+    comptime flat_rank = _Flattened[*Self.shape_types].length
     """The number of dimensions after flattening nested coordinates."""
     comptime shape_known = Coord[*Self.shape_types].all_dims_known
     """Whether all shape dimensions are known at compile time."""
@@ -400,7 +400,7 @@ struct Layout[
     def __call__[
         index_type: CoordLike,
         *,
-        linear_idx_type: DType = DType.int64,
+        linear_idx_type: DType = .int64,
     ](self, index: index_type) -> Scalar[linear_idx_type]:
         """Maps a logical coordinate to a linear memory index.
 
@@ -455,7 +455,7 @@ struct Layout[
     @always_inline("nodebug")
     def idx2crd[
         *,
-        out_dtype: DType = DType.int64,
+        out_dtype: DType = .int64,
     ](self, idx: Int) -> Coord[
         *_NestedDynamicCoord[out_dtype, *Self.shape_types]
     ]:
@@ -506,12 +506,12 @@ struct Layout[
                     var coord_val = _mod_by_shape[
                         Self.shape_types[i].ParamListType[j]
                     ](divided, Int(sub_shape[j].value()))
-                    UnsafePointer(to=sub_result[j]).init_pointee_copy(
+                    Pointer(to=sub_result[j]).write(
                         rebind[SubResultType.element_types[j]](
                             Scalar[out_dtype](coord_val)
                         )
                     )
-                UnsafePointer(to=result[i]).init_pointee_copy(
+                Pointer(to=result[i]).write(
                     rebind[ResultType.element_types[i]](sub_result)
                 )
             else:
@@ -521,7 +521,7 @@ struct Layout[
                 var coord_val = _mod_by_shape[Self.shape_types[i]](
                     divided, Int(shape_t[i].value())
                 )
-                UnsafePointer(to=result[i]).init_pointee_copy(
+                Pointer(to=result[i]).write(
                     rebind[ResultType.element_types[i]](
                         Scalar[out_dtype](coord_val)
                     )
@@ -553,7 +553,7 @@ struct Layout[
 
     @always_inline("nodebug")
     def cosize[
-        linear_idx_type: DType = DType.int64
+        linear_idx_type: DType = .int64
     ](self) -> Scalar[linear_idx_type]:
         """Returns the size of the memory region spanned by the layout.
 
@@ -656,7 +656,7 @@ struct Layout[
             ```mojo
             from layout.tile_layout import row_major
             var layout = row_major[3, 4]()  # All compile-time
-            var dynamic = layout.make_dynamic[DType.int64]()
+            var dynamic = layout.make_dynamic[.int64]()
             # dynamic has Int64 for all dimensions
             ```
         """
@@ -741,7 +741,7 @@ def _types_to_int_tuple[Types: TypeList[Trait=CoordLike, ...]]() -> IntTuple:
     Uses direct IntTuple construction (no append) for rank 1-2.
     Falls back to append for rank > 2.
     """
-    comptime N = Types.size
+    comptime N = Types.length
     comptime if N == 1:
         return _type_to_int_tuple[Types[0]]()
     elif N == 2:
@@ -769,7 +769,7 @@ comptime _StaticCosize[
     Shapes: TypeList[Trait=CoordLike, ...],
     Strides: TypeList[Trait=CoordLike, ...],
 ] = ParameterList.tabulate[
-    Shapes.size, _StaticCosizeTabulator[Shapes, Strides, _]
+    Shapes.length, _StaticCosizeTabulator[Shapes, Strides, _]
 ]().reduce[
     1, _AddReducer
 ]
@@ -777,7 +777,7 @@ comptime _StaticCosize[
 
 
 comptime _UnwrapSingleTuple[*element_types: CoordLike] = TypeList[
-    element_types[0]._ParamListType if element_types.size == 1
+    element_types[0]._ParamListType if element_types.length == 1
     and element_types[0].is_tuple else element_types.values
 ]()
 
@@ -793,7 +793,7 @@ comptime _UnwrapSingleTuple[*element_types: CoordLike] = TypeList[
 
 
 comptime _ElementFlatRank[T: CoordLike] = (
-    _Flattened[*T.ParamListType].size if T.is_tuple else 1
+    _Flattened[*T.ParamListType].length if T.is_tuple else 1
 )
 """Number of leaf dims contributed by one (possibly nested) `CoordLike`."""
 
@@ -841,7 +841,7 @@ comptime _NestedStrideD1[
 ]: CoordLike = Coord[
     *TypeList.tabulate[
         Trait=CoordLike,
-        SubShape[sub_idx].ParamListType.size,
+        SubShape[sub_idx].ParamListType.length,
         _NestedStrideLeaf[
             SubShape[sub_idx].ParamListType,
             FlatStrides,
@@ -864,7 +864,7 @@ comptime _NestedStrideD2[
 ]: CoordLike = Coord[
     *TypeList.tabulate[
         Trait=CoordLike,
-        SubShape[sub_idx].ParamListType.size,
+        SubShape[sub_idx].ParamListType.length,
         _NestedStrideD1[
             SubShape[sub_idx].ParamListType,
             FlatStrides,
@@ -887,7 +887,7 @@ comptime _NestedStrideTabulator[
 ]: CoordLike = Coord[
     *TypeList.tabulate[
         Trait=CoordLike,
-        SubShape[sub_idx].ParamListType.size,
+        SubShape[sub_idx].ParamListType.length,
         _NestedStrideD2[
             SubShape[sub_idx].ParamListType,
             FlatStrides,
@@ -939,7 +939,7 @@ comptime _RowMajorMapperIdx[
 
 
 comptime _AnyTuple[*element_types: CoordLike] = (
-    not element_types.all_satisfies[_IsNotTuplePredicate]()
+    not element_types.all[_IsNotTuplePredicate]()
 )
 """True iff `element_types` contains at least one tuple element."""
 
@@ -958,7 +958,7 @@ shapes use `_RowMajorNested`."""
 
 comptime _RowMajorNested[*element_types: CoordLike] = TypeList.tabulate[
     Trait=CoordLike,
-    element_types.size,
+    element_types.length,
     _NestedStrideTabulator[
         TypeList[element_types.values](),
         _RowMajor[*_Flattened[*element_types]],
@@ -988,32 +988,30 @@ def row_major(var shape: Coord) -> RowMajorLayout[*shape.element_types]:
         A Layout with row-major strides.
     """
     comptime RowMajorTypes = _RowMajor[*shape.element_types]
-    comptime rank = shape.element_types.size
+    comptime rank = shape.element_types.length
 
     var strides = Tuple[*RowMajorTypes]()
 
     comptime for i in range(rank):
         comptime idx = rank - 1 - i  # Process in reverse order
-        var stride_ptr = UnsafePointer(to=strides[idx])
+        var stride_ptr = Pointer(to=strides[idx])
 
         comptime if i == 0:
             # Rightmost dimension always has stride 1.
             comptime StrideType = RowMajorTypes[idx]
-            stride_ptr.init_pointee_copy(rebind[StrideType](Idx[1]))
+            stride_ptr.write(rebind[StrideType](Idx[1]))
         else:
             # stride[i] = shape[i+1] * stride[i+1]
             comptime StrideType = RowMajorTypes[idx]
 
             comptime if StrideType.is_static_value:
                 comptime stride_val = StrideType.static_value
-                stride_ptr.init_pointee_copy(
-                    rebind[StrideType](Idx[stride_val])
-                )
+                stride_ptr.write(rebind[StrideType](Idx[stride_val]))
             else:
                 var stride_val = Int(shape[idx + 1].value()) * Int(
                     strides[idx + 1].value()
                 )
-                stride_ptr.init_pointee_copy(
+                stride_ptr.write(
                     rebind[StrideType](
                         Scalar[StrideType.DTYPE](
                             Scalar[StrideType.DTYPE](stride_val)
@@ -1044,7 +1042,7 @@ def row_major[
     """
 
     comptime RowMajorTypes = _RowMajor[*element_types]
-    comptime rank = element_types.size
+    comptime rank = element_types.length
 
     var strides = Tuple[*RowMajorTypes]()
 
@@ -1052,26 +1050,24 @@ def row_major[
     # nested case has its own `row_major_nested` constructor).
     comptime for i in range(rank):
         comptime idx = rank - 1 - i  # Process in reverse order
-        var stride_ptr = UnsafePointer(to=strides[idx])
+        var stride_ptr = Pointer(to=strides[idx])
 
         comptime if i == 0:
             # Rightmost dimension always has stride 1.
             comptime StrideType = RowMajorTypes[idx]
-            stride_ptr.init_pointee_copy(rebind[StrideType](Idx[1]))
+            stride_ptr.write(rebind[StrideType](Idx[1]))
         else:
             # stride[i] = shape[i+1] * stride[i+1]
             comptime StrideType = RowMajorTypes[idx]
 
             comptime if StrideType.is_static_value:
                 comptime stride_val = StrideType.static_value
-                stride_ptr.init_pointee_copy(
-                    rebind[StrideType](Idx[stride_val])
-                )
+                stride_ptr.write(rebind[StrideType](Idx[stride_val]))
             else:
                 var stride_val = Int(elements[idx + 1].value()) * Int(
                     strides[idx + 1].value()
                 )
-                stride_ptr.init_pointee_copy(
+                stride_ptr.write(
                     rebind[StrideType](
                         Scalar[StrideType.DTYPE](
                             Scalar[StrideType.DTYPE](stride_val)
@@ -1110,7 +1106,7 @@ def row_major_nested(
     """Creates a row-major layout from a nested shape `Coord`.
 
     For a nested shape `((a, b), (c, d))` the result has nested strides
-    `((b*c*d, c*d), (d, 1))` — row-major over the flattened shape, re-nested.
+    `((b*c*d, c*d), (d, 1))`: row-major over the flattened shape, re-nested.
 
     Currently restricted to all-static (compile-time) leaf dimensions
     and one level of nesting. For flat shapes use `row_major`.
@@ -1123,15 +1119,15 @@ def row_major_nested(
         A `Layout` with the matching nested row-major strides.
     """
     comptime RowMajorTypes = _RowMajorNested[*shape.element_types]
-    comptime rank = shape.element_types.size
+    comptime rank = shape.element_types.length
 
     var strides = Tuple[*RowMajorTypes]()
 
     comptime for i in range(rank):
         comptime idx = rank - 1 - i
-        var stride_ptr = UnsafePointer(to=strides[idx])
+        var stride_ptr = Pointer(to=strides[idx])
         comptime StrideType = RowMajorTypes[idx]
-        stride_ptr.init_pointee_copy(rebind[StrideType](StrideType()))
+        stride_ptr.write(rebind[StrideType](StrideType()))
 
     return {shape, Coord(strides^)}
 
@@ -1157,7 +1153,7 @@ comptime ColMajorNestedLayout[
 ] = Layout[shape_types, _ColMajorNested[*shape_types]]
 """A `Layout` with column-major strides for a nested shape (CuTe semantics).
 
-For shape `((a, b), (c, d))` the strides are `((1, a), (a*b, a*b*c))` —
+For shape `((a, b), (c, d))` the strides are `((1, a), (a*b, a*b*c))`:
 col-major over the flattened shape, re-nested.
 
 Parameters:
@@ -1176,7 +1172,7 @@ nested shapes use `_ColMajorNested`."""
 
 comptime _ColMajorNested[*element_types: CoordLike] = TypeList.tabulate[
     Trait=CoordLike,
-    element_types.size,
+    element_types.length,
     _NestedStrideTabulator[
         TypeList[element_types.values](),
         _ColMajor[*_Flattened[*element_types]],
@@ -1260,33 +1256,31 @@ def col_major(var shape: Coord) -> ColMajorLayout[shape.element_types]:
         A Layout with column-major strides.
     """
     comptime ColMajorTypes = _ColMajor[*shape.element_types]
-    comptime rank = shape.element_types.size
+    comptime rank = shape.element_types.length
 
     var strides = Tuple[*ColMajorTypes]()
 
     # Compute column-major strides (flat-only — the nested case has
     # its own `col_major_nested` constructor).
     comptime for i in range(rank):
-        var stride_ptr = UnsafePointer(to=strides[i])
+        var stride_ptr = Pointer(to=strides[i])
 
         comptime if i == 0:
             # Leftmost dimension always has stride 1.
             comptime StrideType = ColMajorTypes[i]
-            stride_ptr.init_pointee_copy(rebind[StrideType](Idx[1]))
+            stride_ptr.write(rebind[StrideType](Idx[1]))
         else:
             # stride[i] = shape[i-1] * stride[i-1]
             comptime StrideType = ColMajorTypes[i]
 
             comptime if StrideType.is_static_value:
                 comptime stride_val = StrideType.static_value
-                stride_ptr.init_pointee_copy(
-                    rebind[StrideType](Idx[stride_val])
-                )
+                stride_ptr.write(rebind[StrideType](Idx[stride_val]))
             else:
                 var stride_val = Int(shape[i - 1].value()) * Int(
                     strides[i - 1].value()
                 )
-                stride_ptr.init_pointee_copy(
+                stride_ptr.write(
                     rebind[StrideType](
                         Scalar[StrideType.DTYPE](
                             Scalar[StrideType.DTYPE](stride_val)
@@ -1327,7 +1321,7 @@ def col_major_nested(
     """Creates a column-major layout from a nested shape `Coord`.
 
     For a nested shape `((a, b), (c, d))` the result has nested strides
-    `((1, a), (a*b, a*b*c))` — col-major over the flattened shape, re-nested.
+    `((1, a), (a*b, a*b*c))`: col-major over the flattened shape, re-nested.
 
     Currently restricted to all-static (compile-time) leaf dimensions
     and one level of nesting. For flat shapes use `col_major`.
@@ -1340,14 +1334,14 @@ def col_major_nested(
         A `Layout` with the matching nested column-major strides.
     """
     comptime ColMajorTypes = _ColMajorNested[*shape.element_types]
-    comptime rank = shape.element_types.size
+    comptime rank = shape.element_types.length
 
     var strides = Tuple[*ColMajorTypes]()
 
     comptime for i in range(rank):
-        var stride_ptr = UnsafePointer(to=strides[i])
+        var stride_ptr = Pointer(to=strides[i])
         comptime StrideType = ColMajorTypes[i]
-        stride_ptr.init_pointee_copy(rebind[StrideType](StrideType()))
+        stride_ptr.write(rebind[StrideType](StrideType()))
 
     return Layout(shape, Coord[*ColMajorTypes](strides^))
 
@@ -1500,7 +1494,7 @@ comptime _BlockedProductShapeTypes[
     TilerLayoutType: TensorLayout,
 ] = TypeList.tabulate[
     Trait=CoordLike,
-    BlockLayoutType._stride_types.size,
+    BlockLayoutType._stride_types.length,
     _BlockedProductShapeTabulator[
         BlockLayoutType,
         TilerLayoutType,
@@ -1523,7 +1517,7 @@ comptime _BlockedProductStrideTypes[
     TilerLayoutType: TensorLayout,
 ] = TypeList.tabulate[
     Trait=CoordLike,
-    BlockLayoutType._stride_types.size,
+    BlockLayoutType._stride_types.length,
     _BlockedProductStrideTabulator[
         BlockLayoutType,
         TilerLayoutType,
@@ -1556,7 +1550,7 @@ comptime _CoalescedBlockedProductShapeTypes[
     TilerLayoutType: TensorLayout,
 ] = TypeList.tabulate[
     Trait=CoordLike,
-    BlockLayoutType._shape_types.size,
+    BlockLayoutType._shape_types.length,
     _CoalescedBlockedShapeTabulator[
         BlockLayoutType,
         TilerLayoutType,
@@ -1587,7 +1581,7 @@ comptime _CoalescedBlockedProductStrideTypes[
     TilerLayoutType: TensorLayout,
 ] = TypeList.tabulate[
     Trait=CoordLike,
-    BlockLayoutType._stride_types.size,
+    BlockLayoutType._stride_types.length,
     _CoalescedBlockedStrideTabulator[
         BlockLayoutType,
         TilerLayoutType,
@@ -1722,14 +1716,14 @@ def blocked_product[
 
     comptime for i in range(outer_shape.rank):
         comptime if OuterStrideTypes[i].is_static_value:
-            UnsafePointer(to=outer_stride[i]).init_pointee_copy(
+            Pointer(to=outer_stride[i]).write(
                 rebind[OuterStrideTypes[i]](
                     ComptimeInt[OuterStrideTypes[i].static_value]()
                 )
             )
         else:
             var block_cosize = Int(block.shape_coord().product())
-            UnsafePointer(to=outer_stride[i]).init_pointee_copy(
+            Pointer(to=outer_stride[i]).write(
                 rebind[OuterStrideTypes[i]](
                     Scalar[OuterStrideTypes[i].DTYPE](
                         Int(tiler.stride_coord()[i].value()) * block_cosize
@@ -1743,12 +1737,12 @@ def blocked_product[
     var result_stride = Coord[*ResultType._stride_types]()
 
     comptime for i in range(inner_shape.rank):
-        UnsafePointer(to=result_shape[i]).init_pointee_copy(
+        Pointer(to=result_shape[i]).write(
             rebind[ResultType._shape_types[i]](
                 Coord(inner_shape[i], outer_shape[i])
             )
         )
-        UnsafePointer(to=result_stride[i]).init_pointee_copy(
+        Pointer(to=result_stride[i]).write(
             rebind[ResultType._stride_types[i]](
                 Coord(inner_stride[i], outer_stride[i])
             )
@@ -1879,7 +1873,7 @@ comptime _UpcastShapeTypes[
     stride_types: TypeList[Trait=CoordLike, ...],
 ] = TypeList.tabulate[
     Trait=CoordLike,
-    shape_types.size,
+    shape_types.length,
     _UpcastShapeTabulator[factor, shape_types, stride_types, ...],
 ]()
 """The shape types after upcast by ``factor``."""
@@ -1982,11 +1976,9 @@ def upcast[
 
         # Compute new_stride[i] = shape_div(stride[i], factor).
         comptime if ResultStrideTypes[i].is_static_value:
-            UnsafePointer(to=new_stride[i]).init_pointee_copy(
-                ResultStrideTypes[i]()
-            )
+            Pointer(to=new_stride[i]).write(ResultStrideTypes[i]())
         else:
-            UnsafePointer(to=new_stride[i]).init_pointee_copy(
+            Pointer(to=new_stride[i]).write(
                 rebind[ResultStrideTypes[i]](
                     Scalar[ResultStrideTypes[i].DTYPE](
                         _runtime_shape_div(
@@ -1998,11 +1990,9 @@ def upcast[
 
         # Compute new_shape[i] = shape_div(shape[i], shape_div(factor, stride[i])).
         comptime if ResultShapeTypes[i].is_static_value:
-            UnsafePointer(to=new_shape[i]).init_pointee_copy(
-                ResultShapeTypes[i]()
-            )
+            Pointer(to=new_shape[i]).write(ResultShapeTypes[i]())
         else:
-            UnsafePointer(to=new_shape[i]).init_pointee_copy(
+            Pointer(to=new_shape[i]).write(
                 rebind[ResultShapeTypes[i]](
                     Scalar[ResultShapeTypes[i].DTYPE](
                         _runtime_shape_div(
@@ -2028,7 +2018,7 @@ comptime _DropLast2[
     types: TypeList.of[Trait=CoordLike]._mlir_type,
 ] = TypeList[
     types
-]().slice[0, TypeList[types].size - 2]()
+]().slice[0, TypeList[types].length - 2]()
 """Remove the last two elements from a variadic."""
 
 
@@ -2047,7 +2037,7 @@ comptime _CoalesceReducerIdx[
             ComptimeInt[flat_stride_types[list_idx].static_value],
         ]().values,
     ]()
-    .values if TypeList[Prev]()[TypeList[Prev].size - 2]
+    .values if TypeList[Prev]()[TypeList[Prev].length - 2]
     .static_value
     == 1 else (
         # Contiguous: merge into previous (prev_shape * cur_shape, prev_stride)
@@ -2056,15 +2046,15 @@ comptime _CoalesceReducerIdx[
             TypeList.of[
                 Trait=CoordLike,
                 ComptimeInt[
-                    TypeList[Prev]()[TypeList[Prev].size - 2].static_value
+                    TypeList[Prev]()[TypeList[Prev].length - 2].static_value
                     * element.static_value
                 ],
-                TypeList[Prev]()[TypeList[Prev].size - 1],
+                TypeList[Prev]()[TypeList[Prev].length - 1],
             ]().values,
         ]()
-        .values if TypeList[Prev]()[TypeList[Prev].size - 2]
+        .values if TypeList[Prev]()[TypeList[Prev].length - 2]
         .static_value
-        * TypeList[Prev]()[TypeList[Prev].size - 1].static_value
+        * TypeList[Prev]()[TypeList[Prev].length - 1].static_value
         == flat_stride_types[list_idx].static_value else
         # Non-contiguous: append new (shape, stride) pair
         TypeList._concat[
@@ -2131,7 +2121,9 @@ comptime _CoalescedShapeTypes[
     stride_types: TypeList[Trait=CoordLike, ...],
 ] = TypeList.tabulate[
     Trait=CoordLike,
-    _HalfSizeDriver[_CoalescedInterleaved[shape_types, stride_types].size].size,
+    _HalfSizeDriver[
+        _CoalescedInterleaved[shape_types, stride_types].length
+    ].length,
     _ExtractEvenTabulator[_CoalescedInterleaved[shape_types, stride_types], _],
 ]()
 """Coalesced shape types extracted from the interleaved result."""
@@ -2142,7 +2134,9 @@ comptime _CoalescedStrideTypes[
     stride_types: TypeList[Trait=CoordLike, ...],
 ] = TypeList.tabulate[
     Trait=CoordLike,
-    _HalfSizeDriver[_CoalescedInterleaved[shape_types, stride_types].size].size,
+    _HalfSizeDriver[
+        _CoalescedInterleaved[shape_types, stride_types].length
+    ].length,
     _ExtractOddTabulator[_CoalescedInterleaved[shape_types, stride_types], _],
 ]()
 """Coalesced stride types extracted from the interleaved result."""
@@ -2228,7 +2222,7 @@ def coalesce[
 comptime _WCPair3[L: CoordLike, C: CoordLike]: Bool = (
     True if not C.is_tuple else (
         False if not L.is_tuple else (
-            L.ParamListType.size == C.ParamListType.size
+            L.ParamListType.length == C.ParamListType.length
         )
     )
 )
@@ -2255,30 +2249,21 @@ comptime _WCPair1[L: CoordLike, C: CoordLike]: Bool = (
 
 
 comptime _BoolIsTrue[a: Bool]: Bool = a
-comptime _TwoCoordLikePredicate = __mlir_type[
-    `!lit.generator<<"LHS": `,
-    +CoordLike,
-    `, "RHS": `,
-    +CoordLike,
-    `> `,
-    +Bool,
-    `>`,
-]
 
 comptime _tabulatePredicate[
     a: TypeList[Trait=CoordLike, ...],
     b: TypeList[Trait=CoordLike, ...],
-    pred: _TwoCoordLikePredicate,
+    pred: __generator_type[LHS: CoordLike, RHS: CoordLike] Bool,
     idx: Int,
 ]: Bool = pred[a[idx], b[idx]]
 
 comptime _AllEltsSatisfy[
     a: TypeList[Trait=CoordLike, ...],
     b: TypeList[Trait=CoordLike, ...],
-    pred: _TwoCoordLikePredicate,
-]: Bool = a.size == b.size and ParameterList.tabulate[
-    a.size, _tabulatePredicate[a, b, pred, _]
-]().all_satisfies[
+    pred: __generator_type[LHS: CoordLike, RHS: CoordLike] Bool,
+]: Bool = a.length == b.length and ParameterList.tabulate[
+    a.length, _tabulatePredicate[a, b, pred, _]
+]().all[
     _BoolIsTrue,
 ]()
 

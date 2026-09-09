@@ -21,14 +21,14 @@ import pytest
 from max.driver import Accelerator, Buffer
 from max.engine import InferenceSession
 from max.graph import DeviceRef
-from max.pipelines.core import TextContext
-from max.pipelines.core.context import FUTURE_TOKEN
+from max.pipelines.context import TextContext, TokenBuffer
+from max.pipelines.context.context import FUTURE_TOKEN
 from max.pipelines.lib.interfaces import ModelInputs
 from max.pipelines.lib.pipeline_variants.overlap_text_generation import (
     AsyncBatch,
     RealizeFutureTokenProcessor,
 )
-from max.pipelines.modeling.types import TextGenerationInputs, TokenBuffer
+from max.pipelines.modeling.types import TextGenerationInputs
 
 OOB_IDX = np.iinfo(np.int32).min
 
@@ -91,7 +91,7 @@ def _create_async_batch(
             generated_tokens.append(ctx.tokens.active[-1] + 1)
             ctx.update_with_future_token()
     return AsyncBatch(
-        inputs=TextGenerationInputs(batches=batches, num_steps=1),
+        inputs=TextGenerationInputs(batches=batches),
         generated_tokens_device=_to_gpu(generated_tokens),
         generated_tokens_host=_to_cpu(generated_tokens),
         copy_event=MagicMock(),
@@ -115,7 +115,7 @@ def _scatter(
     curr_batch: list[list[TextContext]],
     model_inputs: RaggedModelInputs,
 ) -> tuple[list[int] | None, list[int]]:
-    curr_inputs = TextGenerationInputs(batches=curr_batch, num_steps=1)
+    curr_inputs = TextGenerationInputs(batches=curr_batch)
 
     mappings = realize_future_token_processor._compute_mappings(
         prev_batch=prev_batch,
@@ -262,7 +262,7 @@ def test_no_overlap_returns_none_and_skips_scatter(
     curr_ragged_inputs, curr_input_row_offsets = _to_ragged_inputs([[req_c]])
     assert curr_input_row_offsets == [0, 3]
 
-    curr_inputs = TextGenerationInputs(batches=[[req_c]], num_steps=1)
+    curr_inputs = TextGenerationInputs(batches=[[req_c]])
 
     # _compute_scatter_future_tok_indices returns None — no work to do.
     mappings = realize_future_token_processor._compute_mappings(

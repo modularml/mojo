@@ -46,13 +46,14 @@ import os
 
 import pytest
 from benchmark_utils import print_results_table
+from layer_mefs import create_runner
 from testbed.correctness import print_correctness_report
 from testbed.harnesses.wan_vae_attention import (
     WanVaeAttentionDynamicParams,
-    WanVaeAttentionHarness,
     WanVaeAttentionStaticParams,
 )
-from testbed.runner import LayerTestRunner, create_session
+from testbed.runner import LayerTestRunner
+from testbed.specs import WAN_VAE_ATTENTION
 
 
 def _env_int(name: str, default: int) -> int:
@@ -61,8 +62,10 @@ def _env_int(name: str, default: int) -> int:
 
 
 def _make_static_params() -> WanVaeAttentionStaticParams:
+    # Defaulting to the spec keeps an un-overridden run identical to the graph
+    # the CPU build action precompiled, so it can skip the compile.
     return WanVaeAttentionStaticParams(
-        dim=_env_int("WAN_VAE_DIM", 96),
+        dim=_env_int("WAN_VAE_DIM", WAN_VAE_ATTENTION.static_params.dim),
     )
 
 
@@ -87,8 +90,7 @@ def runner() -> LayerTestRunner[
 ]:
     params = _make_static_params()
     print(f"\nWanVaeAttention config: {params}")
-    session, device = create_session()
-    return LayerTestRunner(WanVaeAttentionHarness(params, session, device))
+    return create_runner(WAN_VAE_ATTENTION, params)
 
 
 @pytest.mark.skipif(

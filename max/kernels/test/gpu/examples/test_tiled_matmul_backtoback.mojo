@@ -18,17 +18,17 @@ from std.os import abort
 from std.sys import size_of
 from std.sys.info import align_of, simd_width_of
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
-    barrier,
     block_idx,
     grid_dim,
     lane_id,
     thread_idx,
 )
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.memory import external_memory
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.memory import external_memory
 from layout import Layout, LayoutTensor, UNKNOWN_VALUE
 from layout._utils import ManagedLayoutTensor
 from layout.layout import size
@@ -62,10 +62,10 @@ struct BackToBackMatmulConfig[
     # D is MxN
     # We block over M and L, yielding BM and BL.
     # BM x BN x BK
-    var block_tile_shape: IndexList[3, element_type=DType.uint64]
+    var block_tile_shape: IndexList[3, element_type=.uint64]
 
     # WM x WN x WK
-    var warp_tile_shape: IndexList[3, element_type=DType.uint64]
+    var warp_tile_shape: IndexList[3, element_type=.uint64]
 
     var num_pipeline_stages: Int
 
@@ -96,8 +96,8 @@ struct BackToBackMatmulConfig[
 
     def __init__(
         out self,
-        block_tile_shape: IndexList[3, element_type=DType.uint64],
-        warp_tile_shape: IndexList[3, element_type=DType.uint64],
+        block_tile_shape: IndexList[3, element_type=.uint64],
+        warp_tile_shape: IndexList[3, element_type=.uint64],
         num_pipeline_stages: Int = 2,
     ):
         self.block_tile_shape = block_tile_shape
@@ -223,14 +223,14 @@ def b2b_gemm[
     ) if swizzle_block else Index(block_idx.x, block_idx.y)
 
     # Coordinates of the current warp.
-    warp_y, warp_x = udivmod(warp_id, num_warps_n)
+    var warp_y, warp_x = udivmod(warp_id, num_warps_n)
 
     # Prepare shared memory buffers for A, B, and C.
     # We load our entire local `A` block into shared
     # memory and reuse it on each iteration.
     var a_smem = external_memory[
         Scalar[in_type],
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=align_of[SIMD[in_type, simd_size]](),
     ]()
     comptime a_smem_size = BM * K  # single block
@@ -253,7 +253,7 @@ def b2b_gemm[
     var b_smem_iter = LayoutTensorIter[
         in_type,
         b_smem_layout,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         circular=True,
     ](b_smem, b_smem_size)
     # C may not have the same layout
@@ -293,7 +293,7 @@ def b2b_gemm[
             accum_type,
             layout,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ]
         .stack_allocation()
         .fill(0)
@@ -303,7 +303,7 @@ def b2b_gemm[
         accum_type,
         layout,
         MutAnyOrigin,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ].stack_allocation()
     for l in range(num_l_iter):
         _ = ab_reg_tile.fill(0)
@@ -447,8 +447,7 @@ def b2b_gemm[
         var accum_smem_warp_tile = LayoutTensor[
             accum_type,
             Layout.row_major(WM, WN),
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
         ](a_smem.bitcast[Scalar[accum_type]]() + warp_id * WM * WN)
 
         copy_local_to_shared[
@@ -498,6 +497,7 @@ def b2b_gemm[
 
                 comptime dst_static_idx = type_of(d_gmem_frag).layout(i)
 
+                var dst_idx: Int
                 comptime if d_layout.all_dims_known():
                     dst_idx = dst_static_idx
                 else:
@@ -548,6 +548,7 @@ def b2b_gemm[
             comptime for i in range(type_of(d_gmem_frag).layout.size()):
                 comptime src_idx = d_reg_frag.layout(i)
 
+                var dst_idx: Int
                 comptime if d_layout.all_dims_known():
                     comptime dst_static_idx = type_of(d_gmem_frag).layout(i)
                     dst_idx = dst_static_idx
@@ -683,16 +684,10 @@ def test_b2b_matmul(ctx: DeviceContext) raises:
     var mat_b = ManagedLayoutTensor[src_type, layout_b](ctx)
     var mat_c = ManagedLayoutTensor[src_type, layout_c](ctx)
     var mat_d = ManagedLayoutTensor[dst_type, layout_d](ctx)
-    var stack_d = InlineArray[Scalar[dst_type], layout_d.size()](
-        uninitialized=True
-    )
+    var stack_d = Array[Scalar[dst_type], layout_d.size()](fill={})
     comptime layout_ab = Layout.row_major(M, L)
-    var stack_ab = InlineArray[Scalar[dst_type], layout_ab.size()](
-        uninitialized=True
-    )
-    var stack_ab_downcast = InlineArray[Scalar[src_type], layout_ab.size()](
-        uninitialized=True
-    )
+    var stack_ab = Array[Scalar[dst_type], layout_ab.size()](fill={})
+    var stack_ab_downcast = Array[Scalar[src_type], layout_ab.size()](fill={})
     var host_d_ref = LayoutTensor[dst_type, layout_d](stack_d)
     var host_ab = LayoutTensor[dst_type, layout_ab](stack_ab)
     var host_ab_downcast = LayoutTensor[src_type, layout_ab](stack_ab_downcast)
@@ -723,8 +718,8 @@ def test_b2b_matmul(ctx: DeviceContext) raises:
     # print("Host Matrix:\n", host_d_ref)
 
     comptime config = BackToBackMatmulConfig[dst_type, src_type](
-        IndexList[3, element_type=DType.uint64](32, 64, 64),
-        IndexList[3, element_type=DType.uint64](16, 64, 16),
+        IndexList[3, element_type=.uint64](32, 64, 64),
+        IndexList[3, element_type=.uint64](16, 64, 16),
         num_pipeline_stages=2,
     )
     multistage_b2b_gemm[config](

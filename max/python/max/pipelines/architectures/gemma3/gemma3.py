@@ -20,7 +20,11 @@ from collections.abc import Sequence
 
 from max.dtype import DType
 from max.graph import BufferValue, ShardingStrategy, TensorValue, ops
-from max.nn.kv_cache import PagedCacheValues
+from max.nn.kv_cache import (
+    KVCacheParams,
+    MultiKVCacheParams,
+    PagedCacheValues,
+)
 from max.nn.layer import LayerList, Module
 from max.nn.linear import MLP, ColumnParallelLinear
 from max.nn.rotary_embedding import (
@@ -116,37 +120,57 @@ class Gemma3TextModel(DistributedLogitsPostprocessMixin, Module):
             eps=config.rms_norm_eps,
         )
 
-        layers = [
-            Gemma3TransformerBlock(
-                attention=Gemma3Attention(
-                    rope_global=rope_global,
-                    rope_local=rope_local,
-                    num_attention_heads=config.num_attention_heads,
-                    num_key_value_heads=config.num_key_value_heads,
-                    hidden_size=config.hidden_size,
-                    kv_params=config.kv_params,
-                    layer_idx=i,
-                    dtype=config.dtype,
+        assert isinstance(config.kv_params, MultiKVCacheParams)
+        kv_params_by_type: dict[str, KVCacheParams] = {}
+        for layer_type_key, kv_params_leaf in config.kv_params.children.items():
+            assert isinstance(kv_params_leaf, KVCacheParams)
+            kv_params_by_type[layer_type_key] = kv_params_leaf
+
+        layer_type_counts = {"sliding_attention": 0, "full_attention": 0}
+        layers = []
+        for i in range(config.num_hidden_layers):
+            is_sliding = bool((i + 1) % config.sliding_window_pattern)
+            layer_type = "sliding_attention" if is_sliding else "full_attention"
+            layer_idx_in_cache = layer_type_counts[layer_type]
+            layer_type_counts[layer_type] += 1
+            layers.append(
+                Gemma3TransformerBlock(
+                    attention=Gemma3Attention(
+                        rope_global=rope_global,
+                        rope_local=rope_local,
+                        num_attention_heads=config.num_attention_heads,
+                        num_key_value_heads=config.num_key_value_heads,
+                        hidden_size=config.hidden_size,
+                        kv_params=kv_params_by_type[layer_type],
+                        layer_idx=layer_idx_in_cache,
+                        is_sliding=is_sliding,
+                        dtype=config.dtype,
+                        devices=config.devices,
+                        qk_norm_eps=config.rms_norm_eps,
+                        local_window_size=config.sliding_window,
+                        quant_config=config.quant_config,
+                    ),
+                    mlp=MLP(
+                        dtype=config.dtype,
+                        quantization_encoding=None,
+                        hidden_dim=config.hidden_size,
+                        feed_forward_length=config.intermediate_size,
+                        devices=config.devices,
+                        activation_function=config.hidden_activation,
+                        quant_config=config.quant_config,
+                    ),
+                    input_layernorm=create_norm(),
+                    post_attention_layernorm=create_norm(),
+                    pre_feedforward_layernorm=create_norm(),
+                    post_feedforward_layernorm=create_norm(),
                     devices=config.devices,
-                    qk_norm_eps=config.rms_norm_eps,
-                    local_window_size=config.sliding_window,
-                    quant_config=config.quant_config,
-                ),
-                mlp=MLP(
-                    dtype=config.dtype,
-                    quantization_encoding=None,
-                    hidden_dim=config.hidden_size,
-                    feed_forward_length=config.intermediate_size,
-                    devices=config.devices,
-                    activation_function=config.hidden_activation,
-                    quant_config=config.quant_config,
-                ),
-                input_layernorm=create_norm(),
-                post_attention_layernorm=create_norm(),
-                pre_feedforward_layernorm=create_norm(),
-                post_feedforward_layernorm=create_norm(),
-                devices=config.devices,
+                )
             )
+
+        self._layer_kv_key = [
+            "sliding_attention"
+            if bool((i + 1) % config.sliding_window_pattern)
+            else "full_attention"
             for i in range(config.num_hidden_layers)
         ]
 
@@ -160,14 +184,18 @@ class Gemma3TextModel(DistributedLogitsPostprocessMixin, Module):
         self,
         tokens: TensorValue,
         signal_buffers: Sequence[BufferValue],
-        kv_collections: Sequence[PagedCacheValues],
+        sliding_kv_collections: Sequence[PagedCacheValues],
+        global_kv_collections: Sequence[PagedCacheValues],
         return_n_logits: TensorValue,
         input_row_offsets: Sequence[TensorValue],
         **kwargs,
     ) -> tuple[TensorValue, ...]:
         h = self.embed_tokens(tokens, signal_buffers)
 
-        # Create KV cache collections per device
+        kv_collections_by_type = {
+            "sliding_attention": sliding_kv_collections,
+            "full_attention": global_kv_collections,
+        }
 
         # Run through transformer layers
         for idx, layer in enumerate(self.layers):
@@ -178,7 +206,7 @@ class Gemma3TextModel(DistributedLogitsPostprocessMixin, Module):
                 layer_idx_tensor,
                 h,
                 signal_buffers,
-                kv_collections,
+                kv_collections_by_type[self._layer_kv_key[idx]],
                 input_row_offsets=input_row_offsets,
                 **kwargs,
             )
@@ -199,14 +227,16 @@ class Gemma3(Module):
         self,
         tokens: TensorValue,
         signal_buffers: Sequence[BufferValue],
-        kv_cache_inputs_per_dev: Sequence[PagedCacheValues],
+        sliding_kv_collections: Sequence[PagedCacheValues],
+        global_kv_collections: Sequence[PagedCacheValues],
         return_n_logits: TensorValue,
         input_row_offsets: Sequence[TensorValue],
     ) -> tuple[TensorValue, ...]:
         return self.language_model(
             tokens,
             signal_buffers,
-            kv_cache_inputs_per_dev,
+            sliding_kv_collections,
+            global_kv_collections,
             return_n_logits,
             input_row_offsets,
         )

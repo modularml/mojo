@@ -1,0 +1,43 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+#
+# MiniMax-M3 MXFP8 grouped preb on MI355; other AMD grouped benches are MXFP4-only.
+# etm = M * topk // n_gpus_per_node (M/2 at topk=4, ep=8); num_experts is the local shard.
+##===----------------------------------------------------------------------===##
+
+name: bench_grouped_matmul_amd_mxfp8_m3
+file: $KERNEL_BENCHMARKS_ROOT/gpu/linalg/bench_grouped_matmul_amd.mojo
+
+common: &common
+  ASSERT: none
+  lane_bytes: 32
+  num_experts: 16
+  topk: 4
+  $n_gpus_per_node: 8
+  $expert_skew: uniform
+  metadata:
+    MODEL: minimax-m3
+
+params:
+
+# gate+up; M values straddle the BM64/BK512 band.
+- <<: *common
+  N: 6144
+  K: 6144
+  $M: [512, 528, 800, 1024, 2048]
+
+# down; sweep covers both BM64/BK512 arms plus a control on each side.
+- <<: *common
+  N: 6144
+  K: 3072
+  $M: [512, 528, 1024, 2048, 4096, 8192]

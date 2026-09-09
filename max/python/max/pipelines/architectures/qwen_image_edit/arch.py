@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import PixelContext
+from max.pipelines.context import PixelContext
+from max.pipelines.diffusion.config import GENERIC_TAYLORSEER_DEFAULTS
 from max.pipelines.lib import SupportedArchitecture
 from max.pipelines.modeling.types import InputModality, PipelineTask
 
@@ -24,7 +25,7 @@ qwen_image_edit_arch = SupportedArchitecture(
     name="QwenImageEditPipeline",
     task=PipelineTask.PIXEL_GENERATION,
     input_modalities={InputModality.TEXT, InputModality.IMAGE},
-    default_encoding="bfloat16",
+    default_encoding=QwenImageArchConfig.DEFAULT_ENCODING,
     supported_encodings={"bfloat16"},
     example_repo_ids=[
         "Qwen/Qwen-Image-Edit-2511",
@@ -34,13 +35,14 @@ qwen_image_edit_arch = SupportedArchitecture(
     default_weights_format=WeightsFormat.safetensors,
     tokenizer=QwenImageEditTokenizer,
     config=QwenImageArchConfig,
+    denoising_cache_defaults=GENERIC_TAYLORSEER_DEFAULTS,
 )
 
 qwen_image_edit_plus_arch = SupportedArchitecture(
     name="QwenImageEditPlusPipeline",
     task=PipelineTask.PIXEL_GENERATION,
     input_modalities={InputModality.TEXT, InputModality.IMAGE},
-    default_encoding="bfloat16",
+    default_encoding=QwenImageArchConfig.DEFAULT_ENCODING,
     supported_encodings={"bfloat16"},
     example_repo_ids=[
         "Qwen/Qwen-Image-Edit-2511",
@@ -50,4 +52,5 @@ qwen_image_edit_plus_arch = SupportedArchitecture(
     default_weights_format=WeightsFormat.safetensors,
     tokenizer=QwenImageEditTokenizer,
     config=QwenImageArchConfig,
+    denoising_cache_defaults=GENERIC_TAYLORSEER_DEFAULTS,
 )

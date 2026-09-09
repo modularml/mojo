@@ -331,10 +331,43 @@ def test_will_reason_after_prompt_multi_turn_with_think() -> None:
 
 
 def test_will_reason_after_prompt_no_think_token_returns_false() -> None:
-    """Without ``<|think|>`` in the prompt, model won't reason."""
+    """Without ``<|think|>`` and with the prior reasoning block already
+    closed, the model won't reason on the next turn."""
     parser = _make_parser()
-    prompt = [10, CHANNEL_START_TOKEN_ID, 20, 30]
+    prompt = [10, CHANNEL_START_TOKEN_ID, 20, CHANNEL_END_TOKEN_ID, 30]
     assert parser.will_reason_after_prompt(prompt) is False
+
+
+def test_will_reason_after_prompt_prefilled_channel_open_returns_true() -> None:
+    """A still-open ``<|channel>`` at the tail of the prompt (the chat
+    template prefills ``<|channel>thought`` on the generation turn) means
+    reasoning is already open -- even without ``<|think|>``. This is what
+    lets Gemma reason on the turn after a ``tool`` result."""
+    parser = _make_parser(think_token_id=None)
+    prompt = [10, 20, CHANNEL_START_TOKEN_ID]
+    assert parser.will_reason_after_prompt(prompt) is True
+
+
+def test_prefilled_open_stream_captures_reasoning_after_tool_turn() -> None:
+    """Regression for OpenRouter ``reasoning-enabled-tool-call-step-5``.
+
+    After a tool result, the chat template prefills ``<|channel>thought`` so
+    the prompt ends with an open ``<|channel>``. ``will_reason_after_prompt``
+    detects that and seeds the parser, so the model's output -- which has no
+    ``<|channel>`` opener (it lives in the prompt) -- is still parsed as
+    reasoning instead of leaking into content (which made OR see zero
+    reasoning and auto-disable tools)."""
+    parser = _make_parser()
+    # Prompt: ...tool result... then the prefilled, still-open opener.
+    prompt = [TOOL_CALL_START_TOKEN_ID, 99, CHANNEL_START_TOKEN_ID]
+    assert parser.will_reason_after_prompt(prompt) is True
+
+    # Model output: reasoning text, the closing delimiter, then the answer.
+    tokens = [10, 20, CHANNEL_END_TOKEN_ID, 30]
+    delta = parser.stream(tokens, is_currently_reasoning=True)
+    assert delta.span.extract_reasoning(tokens) == [10, 20]
+    assert delta.span.extract_content(tokens) == [30]
+    assert delta.is_still_reasoning is False
 
 
 def test_will_reason_after_prompt_no_think_token_id_configured() -> None:

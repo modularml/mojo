@@ -53,7 +53,17 @@ def _make_max_model_config_with_hf_config(
     checkers (guarded by ``if not TYPE_CHECKING``), so we set the private
     attribute directly after construction to keep mypy happy.
     """
-    cfg = MAXModelConfig(model_path=model_path)
+    # ``__init__`` eagerly builds the HuggingFace repo handles; keep that
+    # offline for the placeholder repo (CI runs under HF_HUB_OFFLINE).
+    with (
+        patch("max.pipelines.lib.config.model_config.validate_hf_repo_access"),
+        patch("max.pipelines.weights.hf_utils.validate_hf_repo_access"),
+        patch(
+            "max.pipelines.weights.hf_utils.generate_local_model_path",
+            side_effect=lambda repo_id, revision=None: f"/fake/cache/{repo_id}",
+        ),
+    ):
+        cfg = MAXModelConfig(model_path=model_path)
     cfg._huggingface_config = hf_config
     return cfg
 
@@ -133,14 +143,8 @@ def test_create_layer_overrides_with_standard_key() -> None:
         "n_embd": 768,
     }
 
-    with (
-        patch(
-            "max.tests.integration.tools.hf_config_overrides.hf_repo_lock.revision_for_hf_repo",
-            return_value=None,
-        ),
-        patch(
-            "transformers.AutoConfig.from_pretrained", return_value=mock_config
-        ),
+    with patch(
+        "transformers.AutoConfig.from_pretrained", return_value=mock_config
     ):
         result = hf_overrides.create_layer_overrides("3", "gpt2")
         assert result == {"n_layer": 3}
@@ -156,14 +160,8 @@ def test_create_layer_overrides_with_integer() -> None:
         "n_embd": 768,
     }
 
-    with (
-        patch(
-            "max.tests.integration.tools.hf_config_overrides.hf_repo_lock.revision_for_hf_repo",
-            return_value=None,
-        ),
-        patch(
-            "transformers.AutoConfig.from_pretrained", return_value=mock_config
-        ),
+    with patch(
+        "transformers.AutoConfig.from_pretrained", return_value=mock_config
     ):
         result = hf_overrides.create_layer_overrides(5, "gpt2")
         assert result == {"n_layer": 5}
@@ -175,14 +173,8 @@ def test_create_layer_overrides_no_matching_keys() -> None:
     mock_config = Mock()
     mock_config.to_dict.return_value = {"hidden_size": 768, "vocab_size": 50257}
 
-    with (
-        patch(
-            "max.tests.integration.tools.hf_config_overrides.hf_repo_lock.revision_for_hf_repo",
-            return_value=None,
-        ),
-        patch(
-            "transformers.AutoConfig.from_pretrained", return_value=mock_config
-        ),
+    with patch(
+        "transformers.AutoConfig.from_pretrained", return_value=mock_config
     ):
         with pytest.raises(ValueError, match="No common layer keys found"):
             hf_overrides.create_layer_overrides("1", "fake-model")

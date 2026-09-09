@@ -18,15 +18,15 @@
 # RUN: cat %t/test_compile_via_param/test_compile_via_param.ptx | FileCheck %s
 # RUN: rm -fr %t/test_compile_via_param/
 
-from std.gpu import thread_idx
-from std.gpu.host import DeviceContext
+from max.gpu import thread_idx
+from max.gpu.host import DeviceContext
 
 
 def test_compile_function() raises:
     print("== test_compile_function")
 
-    def kernel(x: UnsafePointer[Int, MutAnyOrigin]):
-        x[0] = thread_idx.x
+    def kernel(x: Pointer[Int, MutAnyOrigin]):
+        x[unsafe_offset=0] = thread_idx.x
 
     # CHECK: tid.x
 

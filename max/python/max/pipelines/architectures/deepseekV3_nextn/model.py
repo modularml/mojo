@@ -15,21 +15,18 @@
 from __future__ import annotations
 
 import logging
-import time
-from collections.abc import Sequence
 from dataclasses import dataclass, field, fields
 from typing import Any, ClassVar, cast
 
-import numpy as np
-from max.driver import Buffer, Device, DLPackArray
+from max.driver import Buffer, Device, DLPackArray, is_virtual_device_mode
 from max.dtype import DType
-from max.engine import InferenceSession, Model
+from max.engine import InferenceSession
 from max.graph import Graph, ops
 from max.graph.weights import WeightData, Weights, WeightsAdapter
 from max.nn.comm.ep import EPCommInitializer
 from max.nn.kv_cache import KVCacheInputs
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import (
     AlwaysSignalBuffersMixin,
     KVCacheConfig,
@@ -38,17 +35,12 @@ from max.pipelines.lib import (
     PipelineConfig,
     PipelineModel,
 )
-from max.pipelines.lib.utils import compute_data_parallel_splits
-from max.pipelines.modeling.config_enums import (
-    is_float4_encoding,
-    supported_encoding_dtype,
-)
-from max.support.algorithm import flatten2d
-from max.support.human_readable_formatter import to_human_readable_bytes
+from max.pipelines.lib.memory_estimation import MemoryPlan
 from typing_extensions import override
 
 from ..deepseekV2.model import DeepseekV2Model
 from ..deepseekV3.model import DeepseekV3Inputs, DeepseekV3Model
+from .batch_processor import DeepseekV3NextNBatchProcessor
 from .deepseekV3_nextn import DeepseekV3NextN
 from .model_config import DeepseekV3NextNConfig
 
@@ -68,6 +60,9 @@ class DeepseekV3NextNInputs(DeepseekV3Inputs):
 
 class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
     model_config_cls: ClassVar[type[Any]] = DeepseekV3NextNConfig
+    batch_processor_cls: ClassVar[type[DeepseekV3NextNBatchProcessor]] = (
+        DeepseekV3NextNBatchProcessor
+    )
 
     def __init__(
         self,
@@ -76,11 +71,14 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
         devices: list[Device],
         kv_cache_config: KVCacheConfig,
         weights: Weights,
+        *,
+        memory_plan: MemoryPlan,
         adapter: WeightsAdapter | None = None,
         return_logits: ReturnLogits = ReturnLogits.ALL,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
         shared_weights: dict[str, DLPackArray] | None = None,
         shared_ep_comm_initializer: EPCommInitializer | None = None,
+        max_batch_size: int = 1,
     ) -> None:
         self._shared_weights = shared_weights
         self._shared_ep_comm_initializer = shared_ep_comm_initializer
@@ -90,9 +88,11 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
             devices,
             kv_cache_config,
             weights,
-            adapter,
-            return_logits,
-            return_hidden_states,
+            adapter=adapter,
+            return_logits=return_logits,
+            return_hidden_states=return_hidden_states,
+            max_batch_size=max_batch_size,
+            memory_plan=memory_plan,
         )
 
     def _apply_shared_weights(self, state_dict: dict[str, WeightData]) -> None:
@@ -103,149 +103,6 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
             # safetensors may omit weights shared with the target model
             # (e.g. embed_tokens, lm_head) so we must be able to add them.
             state_dict[key] = cast(WeightData, value)
-
-    @classmethod
-    def estimate_weights_size(cls, pipeline_config: PipelineConfig) -> int:
-        """Calculates the estimated memory consumption of the DeepseekV3 NextN model.
-
-        The NextN model consists of:
-        - embed_tokens: VocabParallelEmbedding (shared in EAGLE/MTP mode)
-        - lm_head: ColumnParallelLinear (shared in EAGLE/MTP mode)
-        - enorm, hnorm, shared_head_norm: RMSNorm layers
-        - eh_proj: Linear layer (hidden_size * 2 -> hidden_size)
-        - decoder_layer: Single DeepseekV3DecoderLayer (MoE layer)
-
-        Args:
-            pipeline_config: The pipeline configuration containing model settings.
-
-        Returns:
-            Estimated weight memory in bytes.
-        """
-        draft_model_config = pipeline_config.draft_model
-        assert draft_model_config is not None, (
-            "draft_model must be set for NextN"
-        )
-        encoding = draft_model_config.quantization_encoding
-        assert encoding is not None
-        # NextN weights are always BF16 even when the pipeline encoding is FP4,
-        # because the NextN checkpoint is not quantized.
-        if is_float4_encoding(encoding):
-            dtype_bytes = DType.bfloat16.size_in_bytes
-        else:
-            dtype_bytes = supported_encoding_dtype(encoding).size_in_bytes
-        config = draft_model_config.huggingface_config
-        assert config is not None
-        n_gpus_per_node = len(draft_model_config.device_specs)
-        data_parallel_degree = pipeline_config.model.data_parallel_degree
-
-        total_size = 0
-
-        sharing_enabled = pipeline_config.speculative is not None and (
-            pipeline_config.speculative.is_eagle()
-            or pipeline_config.speculative.is_mtp()
-        )
-
-        # 1. Embedding and LM head (always in BF16 unless shared with target)
-        # In EAGLE/MTP, embedding and lm_head are shared with the target model.
-        embedding_size = (
-            config.vocab_size
-            * config.hidden_size
-            * DType.bfloat16.size_in_bytes
-        )
-        lm_head_size = embedding_size
-        if not sharing_enabled:
-            total_size += embedding_size + lm_head_size
-
-        # 2-4. Non-expert weights: norms, eh_proj, attention, router.
-        # In DP mode these are replicated per DP rank; in TP mode they are
-        # sharded across devices. Multiply by data_parallel_degree to account
-        # for this, matching the pattern in DeepseekV3Model.estimate_weights_size.
-        non_expert_size = 0
-
-        # 2. NextN-specific norms (enorm, hnorm, shared_head_norm) - always BF16
-        norm_size = config.hidden_size * DType.bfloat16.size_in_bytes
-        non_expert_size += 2 * norm_size
-        if not sharing_enabled:
-            non_expert_size += norm_size
-
-        # 3. eh_proj: Linear(hidden_size * 2, hidden_size)
-        eh_proj_size = config.hidden_size * 2 * config.hidden_size * dtype_bytes
-        non_expert_size += eh_proj_size
-
-        # 4. Single decoder layer components
-
-        # 4a. Layer norms (input_layernorm, post_attention_layernorm)
-        non_expert_size += 2 * norm_size
-
-        # 4b. MLA attention weights
-        num_heads = config.num_attention_heads
-        # kv_a_proj: hidden_size -> kv_lora_rank + qk_rope_head_dim
-        kv_a_proj_size = (
-            config.hidden_size
-            * (config.kv_lora_rank + config.qk_rope_head_dim)
-            * dtype_bytes
-        )
-        # kv_a_layernorm: kv_lora_rank
-        kv_a_layernorm_size = config.kv_lora_rank * DType.bfloat16.size_in_bytes
-        # kv_b_proj: kv_lora_rank -> num_heads * (qk_nope_head_dim + v_head_dim)
-        kv_b_proj_size = (
-            config.kv_lora_rank
-            * num_heads
-            * (config.qk_nope_head_dim + config.v_head_dim)
-            * dtype_bytes
-        )
-        # q_proj: hidden_size -> num_heads * (qk_nope_head_dim + qk_rope_head_dim)
-        q_proj_size = (
-            config.hidden_size
-            * num_heads
-            * (config.qk_nope_head_dim + config.qk_rope_head_dim)
-            * dtype_bytes
-        )
-        # o_proj: num_heads * v_head_dim -> hidden_size
-        o_proj_size = (
-            num_heads * config.v_head_dim * config.hidden_size * dtype_bytes
-        )
-
-        attn_size = (
-            kv_a_proj_size
-            + kv_a_layernorm_size
-            + kv_b_proj_size
-            + q_proj_size
-            + o_proj_size
-        )
-        non_expert_size += attn_size
-
-        # 4c. MoE weights (single layer)
-        # Expert FFN: gate_proj, up_proj, down_proj
-        expert_size = (
-            config.moe_intermediate_size * config.hidden_size * 3 * dtype_bytes
-        )
-        routing_experts_size = config.n_routed_experts * expert_size
-        shared_experts_size = config.n_shared_experts * expert_size
-
-        # Router gate weights
-        router_size = config.hidden_size * config.n_routed_experts * dtype_bytes
-        non_expert_size += router_size
-
-        total_size += non_expert_size * data_parallel_degree
-
-        # Handle expert parallelism
-        ep_size = max(pipeline_config.runtime.ep_size, 1)
-        if ep_size == 1:
-            total_size += routing_experts_size
-        else:
-            # Routing experts are sharded across nodes
-            n_nodes = ep_size // n_gpus_per_node
-            total_size += routing_experts_size // n_nodes
-
-        # Shared experts are replicated on each device
-        total_size += shared_experts_size * n_gpus_per_node
-
-        logger.info(
-            f"Estimated NextN weights size: {to_human_readable_bytes(total_size)}"
-        )
-
-        return total_size
 
     def _create_model_config(
         self, state_dict: dict[str, WeightData]
@@ -309,69 +166,54 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
         return model_config
 
     @override
-    def load_model(self, session: InferenceSession) -> Model:
-        """Load the NextN model with the given weights."""
-
-        max_batch_size = self.pipeline_config.runtime.max_batch_size
-        assert max_batch_size, "Expected max_batch_size to be set"
-
-        # `_host_input_row_offsets_prealloc` tensor needs to reserve space for
-        # `max_batch_size` of requests on each DP rank.
-        dp_size = self.pipeline_config.model.data_parallel_degree
-        max_batch_size *= dp_size
-
-        self._host_input_row_offsets_prealloc = Buffer.from_numpy(
-            np.arange(max_batch_size + 1, dtype=np.uint32)
-        )
-        self._device_input_row_offsets_prealloc = (
-            self._host_input_row_offsets_prealloc.to(self.devices[0])
-        )
-
-        self._batch_context_lengths_prealloc_cpu = [
-            Buffer.zeros(shape=[1], dtype=DType.int32)
-            for _ in range(len(self.devices))
-        ]
-
-        logger.info("Building DeepseekV3 NextN model...")
-        before = time.perf_counter()
-
-        if self.adapter:
-            state_dict = self.adapter(
-                dict(self.weights.items()),
-                huggingface_config=self.huggingface_config,
-                pipeline_config=self.pipeline_config,
-            )
-        else:
-            state_dict = {
-                key: value.data() for key, value in self.weights.items()
-            }
-
+    def _load_state_dict(self) -> dict[str, WeightData]:
+        state_dict = super()._load_state_dict()
         self._apply_shared_weights(state_dict)
-        config = self._create_model_config(state_dict)
+        return state_dict
 
-        self.ep_comm_initializer: EPCommInitializer | None = None
-        if config.ep_config is not None:
-            if self._shared_ep_comm_initializer is not None:
-                # Reuse target model's EP buffers (NVSHMEM symmetric memory).
-                # Target and draft execute sequentially in the EAGLE pipeline,
-                # so sharing is safe and avoids duplicating ~85 GiB of buffers.
-                self.ep_comm_initializer = self._shared_ep_comm_initializer
-                # Propagate node_id from the shared initializer since NextN
-                # constructs its own EPConfig with node_id=-1.
-                config.ep_config.node_id = (
-                    self._shared_ep_comm_initializer.config.node_id
-                )
-                logger.info("Reusing target model's EP communication buffers.")
-            else:
-                self.ep_comm_initializer = EPCommInitializer(config.ep_config)
-                self.ep_comm_initializer.ep_init(session)
-            if config.ep_config.node_id == -1:
-                raise ValueError(
-                    "EP node ID is not set. Please check if the EP initialization is successful."
-                )
+    @override
+    def _init_distributed_runtime(
+        self,
+        session: InferenceSession,
+        model_config: DeepseekV3NextNConfig,
+    ) -> None:
+        self.ep_comm_initializer = None
+        # Skip EP initialization in virtual device mode (compilation-only)
+        # since NVSHMEM functions cannot be linked without real GPU devices.
+        # We still keep ep_config to generate the correct graph structure.
+        if model_config.ep_config is None or is_virtual_device_mode():
+            return
+        if self._shared_ep_comm_initializer is not None:
+            # Reuse target model's EP buffers (NVSHMEM symmetric memory).
+            # Target and draft execute sequentially in the EAGLE pipeline,
+            # so sharing is safe and avoids duplicating ~85 GiB of buffers.
+            self.ep_comm_initializer = self._shared_ep_comm_initializer
+            # Propagate node_id from the shared initializer since NextN
+            # constructs its own EPConfig with node_id=-1.
+            model_config.ep_config.node_id = (
+                self._shared_ep_comm_initializer.config.node_id
+            )
+            logger.info("Reusing target model's EP communication buffers.")
+        else:
+            self.ep_comm_initializer = EPCommInitializer(model_config.ep_config)
+            self.ep_comm_initializer.ep_init(session)
+        if model_config.ep_config.node_id == -1:
+            raise ValueError(
+                "EP node ID is not set. Please check if the EP initialization is successful."
+            )
 
-        nn_model = DeepseekV3NextN(config)
+    @override
+    def _build_graph_for_compile(
+        self,
+        session: InferenceSession,
+        state_dict: dict[str, WeightData],
+        model_config: DeepseekV3NextNConfig,
+    ) -> tuple[Graph, dict[str, Any]]:
+        del session
+        logger.info("Building DeepseekV3 NextN model...")
+        nn_model = DeepseekV3NextN(model_config)
         nn_model.load_state_dict(state_dict, weight_alignment=1, strict=True)
+        weights_registry = nn_model.state_dict()
 
         num_devices = len(self.devices)
 
@@ -382,9 +224,7 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
             graph_inputs_iter = iter(graph.inputs)
 
             tokens = next(graph_inputs_iter)
-
             hidden_states = next(graph_inputs_iter)
-
             device_input_row_offsets = next(graph_inputs_iter)
             host_input_row_offsets = next(graph_inputs_iter)
             return_n_logits = next(graph_inputs_iter)
@@ -394,13 +234,9 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
                 next(graph_inputs_iter).buffer for _ in range(num_devices)
             ]
 
-            fetch_types = (
-                self.kv_params.get_symbolic_inputs().inputs[0].flatten()
-            )
-            len_of_kv_inputs = len(list(fetch_types)) * num_devices
-            kv_caches_per_dev = self._unflatten_kv_inputs(
-                [next(graph_inputs_iter) for _ in range(len_of_kv_inputs)]
-            )
+            kv_inputs = self.kv_params.unflatten_kv_inputs(graph_inputs_iter)
+            assert isinstance(kv_inputs, KVCacheInputs)
+            kv_caches_per_dev = list(kv_inputs.inputs)
 
             batch_context_lengths = [
                 next(graph_inputs_iter).tensor for _ in range(num_devices)
@@ -430,25 +266,7 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
             )
 
             graph.output(*outputs)
-
-        after_build = time.perf_counter()
-        logger.info(
-            f"Building graph took {after_build - before:.6f} seconds. Compiling..."
-        )
-
-        before_compile = time.perf_counter()
-        model = session.load(graph, weights_registry=nn_model.state_dict())
-        after = time.perf_counter()
-
-        logger.info(
-            f"Compiling model took {after - before_compile:.6f} seconds"
-        )
-
-        load_time = after - before
-        logging.info(
-            f"DeepseekV3 NextN model loaded in {load_time:.6f} seconds"
-        )
-        return model
+            return graph, weights_registry
 
     def execute(
         self,
@@ -496,129 +314,6 @@ class DeepseekV3NextNModel(AlwaysSignalBuffersMixin, DeepseekV2Model):
                 next_token_logits=model_outputs[0],
                 logits=model_outputs[0],
             )
-
-    def prepare_initial_token_inputs(
-        self,
-        replica_batches: Sequence[Sequence[TextContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
-        return_n_logits: int = 1,
-        hidden_states: Buffer | None = None,
-    ) -> DeepseekV3NextNInputs:
-        """Prepare initial inputs for the NextN model.
-
-        Args:
-            replica_batches: Batches of text contexts per replica
-            kv_cache_inputs: KV cache inputs (optional)
-            return_n_logits: Number of logits to return
-            hidden_states: Hidden states from the base or draft model
-
-        Returns:
-            NextN model inputs
-        """
-
-        dp = self.pipeline_config.model.data_parallel_degree
-        if len(replica_batches) != dp:
-            raise ValueError(
-                "Number of replica batches must match data parallel degree"
-            )
-
-        # If we are not in decode only mode, we need to create a list of
-        # tensors containing the context length of each batch. Needed by MLA prefill.
-        if self.pipeline_config.runtime.pipeline_role != "decode_only":
-            for i, batch in enumerate(replica_batches):
-                curr_length = sum([ctx.tokens.active_length for ctx in batch])
-                self._batch_context_lengths_prealloc_cpu[i][0] = curr_length
-
-            if dp != len(self.devices):
-                assert dp == 1
-                # Duplicate the batch context lengths for each device.
-                for dev_idx in range(1, len(self.devices)):
-                    self._batch_context_lengths_prealloc_cpu[dev_idx][0] = (
-                        self._batch_context_lengths_prealloc_cpu[0][0].item()
-                    )
-
-        context_batch = flatten2d(replica_batches)
-        if len(context_batch) == 0:
-            tokens = Buffer(shape=[0], dtype=DType.int64).to(self.devices[0])
-            host_input_row_offsets = Buffer.zeros(shape=[1], dtype=DType.uint32)
-        else:
-            # Create a ragged token vector of length: sum(len(t) for t in tokens).
-            tokens = Buffer.from_numpy(
-                np.concatenate([ctx.tokens.active for ctx in context_batch])
-            ).to(self.devices[0])
-
-            host_input_row_offsets = Buffer.from_numpy(
-                np.cumsum(
-                    [0] + [ctx.tokens.active_length for ctx in context_batch],
-                    dtype=np.uint32,
-                )
-            )
-
-        device_input_row_offsets = host_input_row_offsets.to(self.devices[0])
-
-        data_parallel_splits = compute_data_parallel_splits(replica_batches)
-
-        return DeepseekV3NextNInputs(
-            tokens=tokens,
-            hidden_states=hidden_states,
-            input_row_offsets=device_input_row_offsets,
-            host_input_row_offsets=host_input_row_offsets,
-            signal_buffers=self.signal_buffers,
-            batch_context_lengths=self._batch_context_lengths_prealloc_cpu,
-            kv_cache_inputs=kv_cache_inputs,
-            return_n_logits=Buffer.from_numpy(
-                np.array([return_n_logits], dtype=np.int64)
-            ),
-            data_parallel_splits=Buffer.from_numpy(data_parallel_splits),
-        )
-
-    def prepare_next_token_inputs(
-        self,
-        next_tokens: Buffer,
-        prev_model_inputs: ModelInputs,
-        hidden_states: Buffer | None = None,
-    ) -> DeepseekV3NextNInputs:
-        """Prepare inputs for next token generation.
-
-        Args:
-            next_tokens: Next tokens to process
-            prev_model_inputs: Previous model inputs
-            hidden_states: Hidden states from the base model (optional, will use
-                          hidden_states from prev_model_inputs if not provided)
-
-        Returns:
-            NextN model inputs for next token
-        """
-        assert isinstance(prev_model_inputs, DeepseekV3NextNInputs)
-
-        # Use provided hidden_states, or fall back to previous hidden_states
-        # This allows EAGLE pipeline to set hidden_states after calling this method
-        if hidden_states is None:
-            hidden_states = prev_model_inputs.hidden_states
-
-        # If still None after fallback, that's a real error
-        if hidden_states is None:
-            raise ValueError(
-                "hidden_states must be provided for DeepSeekV3 NextN model"
-            )
-        row_offsets_size = prev_model_inputs.input_row_offsets.shape[0]
-        next_device_row_offsets = self._device_input_row_offsets_prealloc[
-            :row_offsets_size
-        ]
-        next_host_row_offsets = self._host_input_row_offsets_prealloc[
-            :row_offsets_size
-        ]
-        return DeepseekV3NextNInputs(
-            tokens=next_tokens,
-            hidden_states=hidden_states,
-            input_row_offsets=next_device_row_offsets,
-            host_input_row_offsets=next_host_row_offsets,
-            signal_buffers=self.signal_buffers,
-            batch_context_lengths=self._batch_context_lengths_prealloc_cpu,
-            kv_cache_inputs=prev_model_inputs.kv_cache_inputs,
-            return_n_logits=prev_model_inputs.return_n_logits,
-            data_parallel_splits=prev_model_inputs.data_parallel_splits,
-        )
 
 
 def maybe_build_deepseekv3_nextn_kwargs(

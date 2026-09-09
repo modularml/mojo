@@ -13,23 +13,43 @@
 
 from std.math import iota
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceBuffer, DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceBuffer, DeviceContext
+from std.reflection import reflect
 from std.testing import assert_equal
 
 
 # A Simple Kernel performing the sum of two arrays
 def vec_func(
-    in0: UnsafePointer[Float32, ImmutAnyOrigin],
-    in1: UnsafePointer[Float32, ImmutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
-    len: Int,
-    supplement: Int,
+    in0: ImmPointer[Float32, ImmutAnyOrigin],
+    in1: ImmPointer[Float32, ImmutAnyOrigin],
+    output: MutPointer[Float32, MutAnyOrigin],
+    len_dev: Int32,
+    supplement_dev: Int32,
 ):
+    # `Int` is not device-passable; widen the fixed-width args.
+    var len = Int(len_dev)
+    var supplement = Int(supplement_dev)
     var tid = global_idx.x
     if tid >= len:
         return
     output[tid] = in0[tid] + in1[tid] + Float32(supplement)
+
+
+def test_declared_arg_types(ctx: DeviceContext) raises:
+    var compiled = ctx.compile_function[vec_func]()
+    comptime arg_types = type_of(compiled).declared_arg_types
+
+    # The list is always present and reports the kernel's arity.
+    assert_equal(arg_types.length, 5)
+
+    # Indexing yields the declared argument types in order.
+    comptime assert arg_types[0] == ImmPointer[Float32, ImmutAnyOrigin]
+    comptime assert arg_types[2] == MutPointer[Float32, MutAnyOrigin]
+    comptime assert arg_types[3] == Int32
+    comptime assert arg_types[4] == Int32
+
+    assert_equal(reflect[arg_types[0]].base_name(), "Pointer")
 
 
 def test_is_compatible(ctx: DeviceContext) raises:
@@ -40,9 +60,9 @@ def test_basic(ctx: DeviceContext) raises:
     comptime length = 1024
 
     # Host memory buffers for input and output data
-    var in0_host = ctx.enqueue_create_host_buffer[DType.float32](length)
-    var in1_host = ctx.enqueue_create_host_buffer[DType.float32](length)
-    var out_host = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var in0_host = ctx.enqueue_create_host_buffer[.float32](length)
+    var in1_host = ctx.enqueue_create_host_buffer[.float32](length)
+    var out_host = ctx.enqueue_create_host_buffer[.float32](length)
     ctx.synchronize()
 
     # Initialize inputs
@@ -51,9 +71,9 @@ def test_basic(ctx: DeviceContext) raises:
         in1_host[i] = Float32(2)
 
     # Device memory buffers for the kernel input and output
-    var in0_device = ctx.enqueue_create_buffer[DType.float32](length)
-    var in1_device = ctx.enqueue_create_buffer[DType.float32](length)
-    var out_device = ctx.enqueue_create_buffer[DType.float32](length)
+    var in0_device = ctx.enqueue_create_buffer[.float32](length)
+    var in1_device = ctx.enqueue_create_buffer[.float32](length)
+    var out_device = ctx.enqueue_create_buffer[.float32](length)
 
     # Copy the input data from the Host to the Device memory
     ctx.enqueue_copy(in0_device, in0_host)
@@ -68,8 +88,8 @@ def test_basic(ctx: DeviceContext) raises:
         in0_device,
         in1_device,
         out_device,
-        length,
-        supplement,
+        Int32(length),
+        Int32(supplement),
         grid_dim=(length // block_dim),
         block_dim=(block_dim),
     )
@@ -111,7 +131,7 @@ def test_id(ctx: DeviceContext) raises:
 def test_print(ctx: DeviceContext) raises:
     comptime size = 15
 
-    var host_buffer = ctx.enqueue_create_host_buffer[DType.uint16](size)
+    var host_buffer = ctx.enqueue_create_host_buffer[.uint16](size)
     ctx.synchronize()
 
     iota(host_buffer.as_span())
@@ -121,7 +141,7 @@ def test_print(ctx: DeviceContext) raises:
     )
     assert_equal(String(host_buffer), expected_host)
 
-    var dev_buffer = ctx.enqueue_create_buffer[DType.uint16](size)
+    var dev_buffer = ctx.enqueue_create_buffer[.uint16](size)
     host_buffer.enqueue_copy_to(dev_buffer)
     ctx.synchronize()
 
@@ -131,7 +151,7 @@ def test_print(ctx: DeviceContext) raises:
     assert_equal(String(dev_buffer), expected_dev)
 
     comptime large_size = 1001
-    var large_buffer = ctx.enqueue_create_host_buffer[DType.float32](large_size)
+    var large_buffer = ctx.enqueue_create_host_buffer[.float32](large_size)
     ctx.synchronize()
 
     iota(large_buffer.as_span())
@@ -146,9 +166,9 @@ def test_enqueue_unified(ctx: DeviceContext) raises:
     comptime length = 1024
 
     # Host memory buffers for input and output data
-    var in0_host = ctx.enqueue_create_host_buffer[DType.float32](length)
-    var in1_host = ctx.enqueue_create_host_buffer[DType.float32](length)
-    var out_host = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var in0_host = ctx.enqueue_create_host_buffer[.float32](length)
+    var in1_host = ctx.enqueue_create_host_buffer[.float32](length)
+    var out_host = ctx.enqueue_create_host_buffer[.float32](length)
     ctx.synchronize()
 
     # Initialize inputs
@@ -157,26 +177,26 @@ def test_enqueue_unified(ctx: DeviceContext) raises:
         in1_host[i] = Float32(2)
 
     # Device memory buffers for the kernel input and output
-    var in0_device = ctx.enqueue_create_buffer[DType.float32](length)
-    var in1_device = ctx.enqueue_create_buffer[DType.float32](length)
-    var out_device = ctx.enqueue_create_buffer[DType.float32](length)
+    var in0_device = ctx.enqueue_create_buffer[.float32](length)
+    var in1_device = ctx.enqueue_create_buffer[.float32](length)
+    var out_device = ctx.enqueue_create_buffer[.float32](length)
 
     # Copy the input data from the Host to the Device memory
     ctx.enqueue_copy(in0_device, in0_host)
     ctx.enqueue_copy(in1_device, in1_host)
 
     var block_dim = 32
-    var supplement = 5
+    var supplement: Float32 = 5
 
-    var output = Span(ptr=out_device.unsafe_ptr(), length=length)
-    var in0 = Span(ptr=in0_device.unsafe_ptr(), length=length)
-    var in1 = Span(ptr=in1_device.unsafe_ptr(), length=length)
+    var output = Span(unsafe_ptr=out_device.unsafe_ptr(), length=length)
+    var in0 = Span(unsafe_ptr=in0_device.unsafe_ptr(), length=length)
+    var in1 = Span(unsafe_ptr=in1_device.unsafe_ptr(), length=length)
 
     def vec_closure() {var supplement, var in0, var in1, var output}:
         var tid = global_idx.x
         if tid >= length:
             return
-        output[tid] = in0[tid] + in1[tid] + Float32(supplement)
+        output[tid] = in0[tid] + in1[tid] + supplement
 
     # Execute the kernel on the device.
     #  - notice the simple function call like invocation
@@ -214,10 +234,10 @@ def test_enqueue_copy_from_span(ctx: DeviceContext) raises:
 
     # Test with List as source (implicitly converts to Span).
     var src_list: List[Float32] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    var dev_buf = ctx.enqueue_create_buffer[DType.float32](length)
+    var dev_buf = ctx.enqueue_create_buffer[.float32](length)
     ctx.enqueue_copy(dev_buf, Span(src_list))
 
-    var out_host = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var out_host = ctx.enqueue_create_host_buffer[.float32](length)
     ctx.enqueue_copy(out_host, dev_buf)
     ctx.synchronize()
 
@@ -230,7 +250,7 @@ def test_enqueue_copy_to_span(ctx: DeviceContext) raises:
 
     # Set up device buffer with known data.
     var src_list: List[Float32] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    var dev_buf = ctx.enqueue_create_buffer[DType.float32](length)
+    var dev_buf = ctx.enqueue_create_buffer[.float32](length)
     ctx.enqueue_copy(dev_buf, Span(src_list))
 
     # Copy device buffer back into a List via Span.
@@ -246,7 +266,7 @@ def test_enqueue_copy_from_span_host_buffer(ctx: DeviceContext) raises:
     comptime length = 4
 
     var src_list: List[Float32] = [100.0, 200.0, 300.0, 400.0]
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var host_buf = ctx.enqueue_create_host_buffer[.float32](length)
     ctx.enqueue_copy(host_buf, Span(src_list))
     ctx.synchronize()
 
@@ -257,7 +277,7 @@ def test_enqueue_copy_from_span_host_buffer(ctx: DeviceContext) raises:
 def test_enqueue_copy_to_span_host_buffer(ctx: DeviceContext) raises:
     comptime length = 4
 
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var host_buf = ctx.enqueue_create_host_buffer[.float32](length)
     ctx.synchronize()
     for i in range(length):
         host_buf[i] = Float32((i + 1) * 10)
@@ -274,7 +294,7 @@ def test_device_buffer_enqueue_copy_from_span(ctx: DeviceContext) raises:
     comptime length = 4
 
     var src_list: List[Float32] = [10.0, 20.0, 30.0, 40.0]
-    var dev_buf = ctx.enqueue_create_buffer[DType.float32](length)
+    var dev_buf = ctx.enqueue_create_buffer[.float32](length)
     dev_buf.enqueue_copy_from(Span(src_list))
 
     var dst_list: List[Float32] = [0.0, 0.0, 0.0, 0.0]
@@ -289,7 +309,7 @@ def test_device_buffer_enqueue_copy_to_span(ctx: DeviceContext) raises:
     comptime length = 4
 
     var src_list: List[Float32] = [10.0, 20.0, 30.0, 40.0]
-    var dev_buf = ctx.enqueue_create_buffer[DType.float32](length)
+    var dev_buf = ctx.enqueue_create_buffer[.float32](length)
     ctx.enqueue_copy(dev_buf, Span(src_list))
 
     var dst_list: List[Float32] = [0.0, 0.0, 0.0, 0.0]
@@ -304,7 +324,7 @@ def test_host_buffer_enqueue_copy_from_span(ctx: DeviceContext) raises:
     comptime length = 4
 
     var src_list: List[Float32] = [10.0, 20.0, 30.0, 40.0]
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var host_buf = ctx.enqueue_create_host_buffer[.float32](length)
     host_buf.enqueue_copy_from(Span(src_list))
     ctx.synchronize()
 
@@ -315,7 +335,7 @@ def test_host_buffer_enqueue_copy_from_span(ctx: DeviceContext) raises:
 def test_host_buffer_enqueue_copy_to_span(ctx: DeviceContext) raises:
     comptime length = 4
 
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var host_buf = ctx.enqueue_create_host_buffer[.float32](length)
     ctx.synchronize()
     for i in range(length):
         host_buf[i] = Float32((i + 1) * 10)
@@ -334,6 +354,7 @@ def main() raises:
         # Execute our test with the context
         test_is_compatible(ctx)
         test_basic(ctx)
+        test_declared_arg_types(ctx)
         test_move(ctx)
         test_id(ctx)
         test_print(ctx)

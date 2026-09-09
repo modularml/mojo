@@ -16,8 +16,8 @@ from std.random import rand
 from std.sys import argv
 
 
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -26,7 +26,7 @@ from layout import (
     TileTensor,
     row_major,
 )
-from std.memory import memset_zero
+from std.memory import unsafe_memset_zero
 from nn.attention.gpu.mha import (
     _naive_attention_with_transpose,
     flash_attention,
@@ -255,10 +255,10 @@ def test[
         row_major((batch_size, seq_len, Idx[num_heads], Idx[depth])),
     )
 
-    @parameter
     @always_inline
-    @__copy_capture(q_device, k_device, v_device, mask3d, mask4d, output_device)
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {var q_device, var k_device, var v_device, var output_device, imm}:
         comptime if mask_rank == 3:
             flash_attention(
                 output_device,
@@ -288,7 +288,7 @@ def test[
         # Warmup
         kernel_launch(ctx)
 
-        var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+        var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
             nrun
         )
         var sectime = nstime / 1000000
@@ -509,7 +509,7 @@ def test_context_encoding[
 
     # Long-context AMD CDNA prefill gate. seq_len=4096 with BF16-output
     # causal prefill on CDNA fires the gate in `flash_attention_dispatch`,
-    # routing through `hk_mha_prefill`. Validates that (a) the gate builds
+    # routing through `mha_prefill_v2`. Validates that (a) the gate builds
     # + launches the kernel correctly, (b) the `LayoutTensor → TileTensor`
     # adapters in the gate preserve the data, and (c) the output matches
     # the gpu_naive reference within BF16 attention tolerance. Guarded on
@@ -530,7 +530,7 @@ def test_decoding[
     batch_size: Int,
     depth: Int,
     num_partitions: Optional[Int] = None,
-    qkv_type: DType = DType.bfloat16,
+    qkv_type: DType = .bfloat16,
 ](ctx: DeviceContext, use_index_input: Bool) raises:
     # fp32 arbitrary depth and num_heads, baseline impl.
     # BF16 token gen
@@ -642,7 +642,7 @@ def test_decoding[
 
 def main() raises:
     with DeviceContext() as ctx:
-        comptime depths = [64, 128, 256, 512]
+        comptime depths = [64, 80, 128, 256, 512]
 
         comptime for i in range(len(depths)):
             comptime depth = depths[i]

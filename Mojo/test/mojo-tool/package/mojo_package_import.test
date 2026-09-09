@@ -1,0 +1,17 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# Note the bug being regression tested against (MOCO-4232) required us to
+# precompile a package relative to the current working directory, leaving us
+# with an "empty" working directory. We'd then fail to search there for
+# modules, meaning we'd not find the package when it was being renamed at the
+# same time.
+# Thus we copy the package into the test's execution directory, meaning we can
+# use relative pathing for it.
+
+# RUN: mkdir -p %t
+# RUN: cp -r %S/test_package %t
+# RUN: mojo precompile test_package -o rename.mojoc

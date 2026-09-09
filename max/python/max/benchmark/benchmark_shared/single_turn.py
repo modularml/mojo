@@ -49,8 +49,11 @@ from max.benchmark.benchmark_shared.request import (
     PixelGenerationRequestFuncInput,
     RequestDriver,
     RequestFuncInput,
+    mark_cancelled_if_past_deadline,
+    progressbar_request_driver,
 )
 from max.benchmark.benchmark_shared.utils import (
+    deadline_passed,
     deadline_remaining_s,
     exceeds_deadline,
 )
@@ -259,7 +262,7 @@ async def run_single_turn_benchmark(
                 )
             remaining_s = deadline_remaining_s(benchmark_should_end_time)
             try:
-                return await asyncio.wait_for(
+                output = await asyncio.wait_for(
                     request_driver.request(request_func_input),
                     timeout=remaining_s,
                 )
@@ -267,6 +270,9 @@ async def run_single_turn_benchmark(
                 return request_func_input.get_output_type()(
                     cancelled=True, request_submit_time=time.perf_counter()
                 )
+            return mark_cancelled_if_past_deadline(
+                output, benchmark_should_end_time
+            )
 
     tasks: list[asyncio.Task[BaseRequestFuncOutput]] = []
     request_idx = 0
@@ -305,6 +311,15 @@ async def run_single_turn_benchmark(
 
     outputs = await asyncio.gather(*tasks)
 
+    if deadline_passed(benchmark_should_end_time):
+        cancelled = sum(1 for o in outputs if o.cancelled)
+        logger.info(
+            "Benchmark stopped by the duration limit"
+            " (--max-benchmark-duration-s):"
+            f" dispatched {len(outputs)} of {len(input_requests)} requests,"
+            f" {cancelled} cancelled in flight."
+        )
+
     return outputs
 
 
@@ -317,6 +332,7 @@ async def prime_shared_contexts(
     max_concurrency: int,
     run_prefix: str | None = None,
     run_prefix_len: int = 0,
+    disable_tqdm: bool = False,
 ) -> None:
     """Warm up prefix caching by sending each shared context for prefilling."""
     warmup_entries = samples.shared_contexts
@@ -375,14 +391,21 @@ async def prime_shared_contexts(
 
     semaphore = asyncio.Semaphore(max_concurrency)
 
-    async def _run_warmup_index(idx: int, inp: RequestFuncInput) -> None:
-        async with semaphore:
-            warmup_results[idx] = await request_driver.request(inp)
-
     warmup_start = time.perf_counter()
-    async with TaskGroup() as tg:
-        for idx, inp in enumerate(warmup_inputs):
-            tg.create_task(_run_warmup_index(idx, inp))
+    with progressbar_request_driver(
+        request_driver,
+        len(warmup_inputs),
+        disable_tqdm=disable_tqdm,
+        desc="prefix-cache warmup",
+    ) as driver:
+
+        async def _run_warmup_index(idx: int, inp: RequestFuncInput) -> None:
+            async with semaphore:
+                warmup_results[idx] = await driver.request(inp)
+
+        async with TaskGroup() as tg:
+            for idx, inp in enumerate(warmup_inputs):
+                tg.create_task(_run_warmup_index(idx, inp))
     warmup_elapsed_s = time.perf_counter() - warmup_start
     for sys_idx, inp in enumerate(warmup_inputs):
         result = warmup_results[sys_idx]

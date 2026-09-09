@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     Idx,
@@ -31,9 +31,9 @@ def conv2d_ref_cpu[
     output_type: DType,
     conv_rank: Int,
 ](
-    input_ptr: UnsafePointer[Scalar[input_type], ImmutAnyOrigin],
-    filter_ptr: UnsafePointer[Scalar[filter_type], ImmutAnyOrigin],
-    output_ptr: UnsafePointer[Scalar[output_type], MutAnyOrigin],
+    input_ptr: ImmPointer[Scalar[input_type], _],
+    filter_ptr: ImmPointer[Scalar[filter_type], _],
+    output_ptr: MutPointer[Scalar[output_type], _],
     input_dim: IndexList[conv_rank + 2],
     filter_dim: IndexList[conv_rank + 2],
     output_dim: IndexList[conv_rank + 2],
@@ -102,9 +102,9 @@ def conv3d_ref_cpu[
     output_type: DType,
     conv_rank: Int,
 ](
-    input_ptr: UnsafePointer[Scalar[input_type], ImmutAnyOrigin],
-    filter_ptr: UnsafePointer[Scalar[filter_type], ImmutAnyOrigin],
-    output_ptr: UnsafePointer[Scalar[output_type], MutAnyOrigin],
+    input_ptr: ImmPointer[Scalar[input_type], _],
+    filter_ptr: ImmPointer[Scalar[filter_type], _],
+    output_ptr: MutPointer[Scalar[output_type], _],
     input_dim: IndexList[conv_rank + 2],
     filter_dim: IndexList[conv_rank + 2],
     output_dim: IndexList[conv_rank + 2],
@@ -309,7 +309,7 @@ def test_conv_miopen[
         if diff > max_diff:
             max_diff = diff
     # Use absolute tolerance appropriate for reduced precision types
-    comptime if input_type == DType.float32:
+    comptime if input_type == .float32:
         if max_diff > 1e-3:
             print("  FAIL: max_diff=", max_diff)
             raise Error("MIOpen output does not match CPU reference")
@@ -334,7 +334,7 @@ def main() raises:
         comptime dtype_configs = (DType.float32, DType.float16, DType.bfloat16)
 
         comptime for i in range(len(dtype_configs)):
-            comptime dtype = dtype_configs[i]
+            comptime dtype = rebind[DType](dtype_configs[i])
 
             test_conv_miopen[
                 IndexList[4](1, 8, 8, 16),  # input  (NHWC)
@@ -507,7 +507,7 @@ def main() raises:
         ](ctx)
 
         comptime for i in range(len(dtype_configs)):
-            comptime dtype = dtype_configs[i]
+            comptime dtype = rebind[DType](dtype_configs[i])
 
             test_conv_miopen[
                 IndexList[5](1, 4, 10, 8, 16),  # input  (NHWC)

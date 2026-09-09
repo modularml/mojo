@@ -25,7 +25,7 @@ the main loop so the HBM read latency overlaps with the MFMAs. No
 extra HBM round-trip, no separate elementwise launch.
 
 When `has_residual=False` (or `beta == 0.0`), the call routes to
-`amd_4wave_conv` directly — same code path, no residual cost.
+`amd_4wave_conv` directly: same code path, no residual cost.
 
 Epilogue ordering matches SM100: `D = lambda(Conv(A,B)) + beta * C`,
 i.e. `elementwise_compute_lambda_fn` (pre-residual: bias / ReLU /
@@ -34,8 +34,8 @@ residual FMA, and `elementwise_lambda_fn` (post-residual: void
 store-site lambda) fires after with the fused value.
 """
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.sys import align_of
 
@@ -62,25 +62,28 @@ def _kpad_filter_frsc[
 ](
     src_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     dst_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    K_real: Int,
-    K_padded: Int,
-    F: Int,
+    K_real: Int32,
+    K_padded: Int32,
+    F: Int32,
 ):
     """Copy `[F, K_real]` -> `[F, K_padded]` with zero-filled trailing K.
 
     KRSC flattens to `[C_out, R*S*C_in]` row-major. We just need to
     copy each row to a wider stride and zero-pad the tail.
     """
-    var total = F * K_padded
+    var _K_real = Int(K_real)
+    var _K_padded = Int(K_padded)
+    var _F = Int(F)
+    var total = _F * _K_padded
     var tid = global_idx.x
     if tid >= total:
         return
-    var f = tid // K_padded
-    var k = tid - f * K_padded
-    if k >= K_real:
+    var f = tid // _K_padded
+    var k = tid - f * _K_padded
+    if k >= _K_real:
         dst_ptr.store(tid, Scalar[dtype](0))
         return
-    dst_ptr.store(tid, src_ptr.load(f * K_real + k))
+    dst_ptr.store(tid, src_ptr.load(f * _K_real + k))
 
 
 @always_inline
@@ -235,16 +238,16 @@ def amd_4wave_conv_fprop_with_residual[
         ctx.enqueue_function[_kpad_filter_frsc[filter_type]](
             filter.ptr,
             filter_padded_buf,
-            K_real,
-            K_padded,
-            _C_out,
+            Int32(K_real),
+            Int32(K_padded),
+            Int32(_C_out),
             grid_dim=_kpad_grid,
             block_dim=_kpad_block,
         )
         comptime _filter_2d_layout = row_major[_C_out, K_padded]()
         var filter_2d = TileTensor(filter_padded_buf, _filter_2d_layout)
 
-        @parameter
+        @__parameter
         @always_inline
         def _launch_kpad[stride_v: Int, pad_v: Int]() raises:
             amd_4wave_conv[
@@ -293,7 +296,7 @@ def amd_4wave_conv_fprop_with_residual[
         comptime _filter_2d_layout_no_pad = row_major[_C_out, K_real]()
         var filter_2d_no_pad = TileTensor(filter.ptr, _filter_2d_layout_no_pad)
 
-        @parameter
+        @__parameter
         @always_inline
         def _launch_no_pad[stride_v: Int, pad_v: Int]() raises:
             amd_4wave_conv[
@@ -390,12 +393,12 @@ def _launch_plain_conv[
     var W_out = problem.out_width()
     var HW_out = H_out * W_out
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(output, H_out, W_out, HW_out)
     def composed_epilogue[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = align_of[SIMD[_dtype, width]](),
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> None:
@@ -429,16 +432,16 @@ def _launch_plain_conv[
         ctx.enqueue_function[_kpad_filter_frsc[filter_type]](
             filter.ptr,
             filter_padded_buf,
-            K_real,
-            K_padded,
-            _C_out,
+            Int32(K_real),
+            Int32(K_padded),
+            Int32(_C_out),
             grid_dim=_kpad_grid,
             block_dim=_kpad_block,
         )
         comptime _filter_2d_layout = row_major[_C_out, K_padded]()
         var filter_2d = TileTensor(filter_padded_buf, _filter_2d_layout)
 
-        @parameter
+        @__parameter
         @always_inline
         def _launch_kpad[stride_v: Int, pad_v: Int]() raises:
             comptime if Bool(elementwise_lambda_fn):
@@ -489,7 +492,7 @@ def _launch_plain_conv[
         comptime _filter_2d_layout_no_pad = row_major[_C_out, K_real]()
         var filter_2d_no_pad = TileTensor(filter.ptr, _filter_2d_layout_no_pad)
 
-        @parameter
+        @__parameter
         @always_inline
         def _launch_no_pad[stride_v: Int, pad_v: Int]() raises:
             comptime if Bool(elementwise_lambda_fn):

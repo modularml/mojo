@@ -11,8 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
-from std.gpu.compute.mma import mma
+from max.gpu.host import DeviceContext
+from max.gpu.compute.mma import mma
 from layout import Layout, LayoutTensor
 from layout._utils import ManagedLayoutTensor
 from layout.tensor_core import TensorCore
@@ -38,10 +38,12 @@ def load_and_mma_16x8x32[
     mat_b: LayoutTensor[in_type, layout_b, MutAnyOrigin],
 ):
     comptime assert (
-        in_type == DType.float8_e4m3fn or in_type == DType.float8_e5m2
+        in_type == .float8_e4m3fn or in_type == .float8_e5m2
     ), "This kernel only supports E4M3 and E5M2 combinations"
 
-    mma = TensorCore[DType.float32, in_type, IndexList[3](16, 8, 32), False]()
+    var mma = TensorCore[
+        DType.float32, in_type, IndexList[3](16, 8, 32), False
+    ]()
     var a_reg_tile = mma.load_a(mat_a)
     var b_reg_tile = mma.load_b(mat_b)
     var c_reg_tile = mma.load_c(mat_c)

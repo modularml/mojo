@@ -26,7 +26,6 @@ BlockwiseFP8TileCore and shared with BlockwiseFP8_1D2DSmem. Each SMEM struct
 is a thin wrapper that adds the appropriate pipeline bundle.
 """
 
-from std.gpu.memory import AddressSpace
 from std.utils.index import IndexList
 
 from ..structured_kernels.config import MatmulConfig
@@ -56,6 +55,14 @@ struct BlockwiseFP8TileCore[
     Contains derived constants, layouts, tile storage, tile accessors, and
     size utilities. Shared between BlockwiseFP8Smem (CLC) and
     BlockwiseFP8_1D2DSmem (no CLC).
+
+    Parameters:
+        a_type: Element type of the A input matrix.
+        b_type: Element type of the B input matrix.
+        c_type: Element type of the C output matrix.
+        a_scales_type: Element type of the A blockwise scales.
+        transpose_b: Whether B is accessed transposed.
+        config: Matmul tile shapes, MMA shapes, and pipeline stage counts.
     """
 
     # ========== Derived Constants ==========
@@ -183,6 +190,14 @@ struct BlockwiseFP8Smem[
     """SMEM struct for blockwise FP8 matmul with CLC scheduler pipeline.
 
     Thin wrapper over BlockwiseFP8TileCore + SmemPipelineBundle.
+
+    Parameters:
+        a_type: Element type of the A input matrix.
+        b_type: Element type of the B input matrix.
+        c_type: Element type of the C output matrix.
+        a_scales_type: Element type of the A blockwise scales.
+        transpose_b: Whether B is accessed transposed.
+        config: Matmul tile shapes, MMA shapes, and pipeline stage counts.
     """
 
     # ========== Core (tile storage + constants) ==========

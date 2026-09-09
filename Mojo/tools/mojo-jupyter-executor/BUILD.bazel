@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(default_visibility = ["//Mojo:consumers"])
+
+modular_cc_binary(
+    name = "mojo-jupyter-executor",
+    srcs = ["main.cpp"],
+    data = [
+        "//Mojo:gdb-server",
+        "//Mojo/tools/mojo-repl-entry-point",
+    ],
+    deps = [
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+        "//Mojo:ExecutionEngine",
+        "//Mojo:MojoJupyter",
+        "//Mojo:MojoLLDB",
+        "//Mojo:MojoLLDBPublicHeaders",
+        "//Support:Globals",
+        "@llvm-project//lldb:liblldb.wrapper",
+    ],
+)

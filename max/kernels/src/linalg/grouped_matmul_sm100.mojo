@@ -11,43 +11,45 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Provides warp-specialized persistent grouped GEMM kernels for SM100 (B200) GPUs."""
+
 from std.collections import Optional
 from std.math import ceildiv
 from std.math.uutils import umod, ufloordiv
 from std.memory import bitcast
 from std.sys import align_of, simd_width_of, size_of
 from std.bit import next_power_of_two
-from std.gpu import WARP_SIZE, barrier
-from std.gpu.primitives.cluster import (
+from max.gpu import WARP_SIZE
+from max.gpu.sync import barrier
+from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
     cluster_sync,
     elect_one_sync,
     elect_one_sync_with_mask,
 )
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.host.info import B200
-from std.gpu import (
+from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host.info import B200
+from max.gpu import (
     block_id_in_cluster,
     thread_idx,
     lane_id,
     warp_id as get_warp_id,
 )
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.memory import (
     external_memory,
     fence_async_view_proxy,
     fence_mbarrier_init,
 )
-from std.gpu.compute.mma import st_matrix
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.sync import (
+from max.gpu.compute.mma import st_matrix
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.sync import (
     named_barrier,
     named_barrier_arrive,
     syncwarp,
     umma_arrive_leader_cta,
 )
-from std.gpu.compute.arch.tcgen05 import *
+from max.gpu.compute.arch.tcgen05 import *
 from layout import (
     Coord,
     Idx,
@@ -58,6 +60,8 @@ from layout import (
     UNKNOWN_VALUE,
 )
 from layout.tile_tensor import TileTensor
+
+from .utils import partial_simd_load
 from layout.swizzle import Swizzle, make_swizzle
 from layout.tile_layout import col_major as tl_col_major
 from layout.tensor_core_async import tile_layout_k_major_typed
@@ -78,13 +82,19 @@ from std.utils.numerics import get_accum_type
 from std.utils.static_tuple import StaticTuple
 
 from .arch.sm100 import MmaOpSM100_SS
-from .utils import elementwise_epilogue_type
+from .utils import elementwise_epilogue_type, lora_qkv_plane_row_offset
 from .utils_gpu import MatmulConfig
 from .grouped_matmul_tile_scheduler import TileScheduler
 
 
 @fieldwise_init
 struct WarpRole(TrivialRegisterPassable):
+    """Enumerates the role each warp plays in the warp-specialized kernel.
+
+    The main-load, MMA, and epilogue warps select their code path by
+    comparing the runtime warp id against these roles.
+    """
+
     var _role: Int32
 
     comptime Mma = Self(5)
@@ -147,8 +157,9 @@ def load_AB[
     block_tile_shape: IndexList[3],
     mma_shape: IndexList[3],
     cta_group: Int = 1,
+    a_plane_splits: IndexList[2] = Index(0, 0),
 ](
-    expert_ids: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    expert_ids: UnsafePointer[mut=False, Int32, _],
     a_tma_op: TMATensorTile[a_type, a_tile_rank, a_tile_shape, a_desc_shape],
     b_tma_op: TMATensorTile[b_type, b_tile_rank, b_tile_shape, b_desc_shape],
     a_smem_tiles: SMemTileArray2D[
@@ -158,10 +169,10 @@ def load_AB[
         b_type, b_dim0, b_dim1, b_num_tiles, b_swizzle_bytes
     ],
     mma_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     tma_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     producer_phase: PipelineState[num_pipeline_stages],
     peer_cta_coord: Tuple[Int, Int, Int],
@@ -171,7 +182,82 @@ def load_AB[
     iter_idx: UInt32,
     elect_one_cta: Bool,
     scheduler: TileScheduler,
+    qkv_plane_stride: Int = 0,
 ):
+    """Loads A and B tiles from global memory into shared memory via TMA multicast.
+
+    Issues asynchronous multicast TMA loads for the current pipeline stage,
+    addressing the expert-local slice of A and the shared B slice, then
+    signals completion through the TMA mbarrier.
+
+    Parameters:
+        a_type: Element type of the A operand tiles (inferred).
+        b_type: Element type of the B operand tiles (inferred).
+        a_tile_rank: Rank of the A TMA tile descriptor (inferred).
+        a_tile_shape: Element shape of one A TMA tile (inferred).
+        a_desc_shape: Descriptor shape of the A TMA tile, used to compute
+            per-load element counts and row stride (inferred).
+        b_tile_rank: Rank of the B TMA tile descriptor (inferred).
+        b_tile_shape: Element shape of one B TMA tile (inferred).
+        b_desc_shape: Descriptor shape of the B TMA tile, used to compute
+            per-load element counts and row stride (inferred).
+        a_dim0: Number of rows in one A shared-memory tile (inferred).
+        a_dim1: Number of columns in one A shared-memory tile (inferred).
+        a_num_tiles: Number of pipeline stages in the A shared-memory
+            tile array (inferred).
+        a_swizzle_bytes: Swizzle granularity in bytes for A shared-memory
+            tiles (inferred).
+        b_dim0: Number of rows in one B shared-memory tile (inferred).
+        b_dim1: Number of columns in one B shared-memory tile (inferred).
+        b_num_tiles: Number of pipeline stages in the B shared-memory
+            tile array (inferred).
+        b_swizzle_bytes: Swizzle granularity in bytes for B shared-memory
+            tiles (inferred).
+        num_pipeline_stages: Number of double-buffered pipeline stages
+            for A and B shared-memory tiles (inferred).
+        block_tile_shape: Block tile shape `[BM, BN, BK]` partitioning
+            the GEMM into work tiles.
+        mma_shape: MMA instruction shape `[MMA_M, MMA_N, MMA_K]`.
+        cta_group: Number of CTAs cooperating per MMA along the M
+            dimension (defaults to 1).
+        a_plane_splits: Per-plane split sizes for fused LoRA QKV A-plane
+            row offsetting; `(0, 0)` disables it (defaults to `(0, 0)`).
+
+    Args:
+        expert_ids: Pointer to the per-group expert id array; used to
+            offset the A global-memory slice by the expert's local M base.
+        a_tma_op: TMA tile descriptor for loading A tiles from global
+            to shared memory.
+        b_tma_op: TMA tile descriptor for loading B tiles from global
+            to shared memory.
+        a_smem_tiles: Shared-memory tile array of staged A tiles, one
+            per pipeline stage.
+        b_smem_tiles: Shared-memory tile array of staged B tiles, one
+            per pipeline stage.
+        mma_mbar: Pointer to the MMA mbarrier array, one per pipeline
+            stage, waited on to confirm the consumer has freed the prior
+            stage's shared memory.
+        tma_mbar: Pointer to the TMA mbarrier array, one per pipeline
+            stage, signaled when the TMA load for a stage is complete.
+        producer_phase: Producer pipeline state tracking the stage index
+            and phase bit.
+        peer_cta_coord: `(peer_id, mma_coord_m, mma_coord_n)` tuple
+            giving the peer CTA's coordinates within the cluster.
+        work_tile_coord: `(m, n)` element coordinates of the current
+            work tile returned by the scheduler.
+        a_multicast_mask: Bitmask of CTAs participating in the A TMA
+            multicast load.
+        b_multicast_mask: Bitmask of CTAs participating in the B TMA
+            multicast load.
+        iter_idx: Current K-dimension iteration index within the work
+            tile.
+        elect_one_cta: Whether this CTA is the elected leader that sets
+            the expected bytes on the TMA mbarrier.
+        scheduler: Tile scheduler providing the current group index and
+            static M/N bounds.
+        qkv_plane_stride: Row stride between fused QKV planes used to
+            compute the A-plane row offset (defaults to 0).
+    """
     comptime BM = block_tile_shape[0]
     comptime BN = block_tile_shape[1]
     comptime BK = block_tile_shape[2]
@@ -202,6 +288,17 @@ def load_AB[
         peer_cta_coord[1] * b_tma_rows
         + peer_cta_coord[0] * BN
         + work_tile_coord[1]
+    )
+
+    # Activation-operand (post-swapAB `b`) plane select: shift the gmem row by a
+    # function of the output-column tile base (`work_tile_coord[0]`, the kernel's
+    # M dim after swapAB) and the per-plane row stride. Lets one launch read a
+    # different slice of the activations per output-column region (LoRA-B QKV
+    # expand: pick the Q/K/V plane of the planar shrink output). The descriptor
+    # must cover the full activation extent (see `b_desc_rows` in the launcher)
+    # so the shifted rows are in bounds. `a_plane_splits == (0, 0)` disables it.
+    b_gmem_slice_coord += lora_qkv_plane_row_offset[a_plane_splits](
+        work_tile_coord[0], qkv_plane_stride
     )
 
     var a_smem_tile = a_smem_tiles[stage]
@@ -256,10 +353,11 @@ def load_AB_cuda_core[
     b_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_32B,
     a_gmem_layout: Layout = Layout.row_major(1, 1),
     b_gmem_layout: Layout = Layout.row_major(1, 1),
+    a_plane_splits: IndexList[2] = Index(0, 0),
 ](
     a_gmem: LayoutTensor[a_type, a_gmem_layout, ImmutAnyOrigin],
     b_gmem: LayoutTensor[b_type, b_gmem_layout, ImmutAnyOrigin],
-    expert_ids: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    expert_ids: UnsafePointer[mut=False, Int32, _],
     a_smem_tiles: SMemTileArray2D[
         a_type, a_dim0, a_dim1, a_num_tiles, a_swizzle_bytes
     ],
@@ -267,21 +365,83 @@ def load_AB_cuda_core[
         b_type, b_dim0, b_dim1, b_num_tiles, b_swizzle_bytes
     ],
     mma_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     tma_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     producer_phase: PipelineState[num_pipeline_stages],
     peer_cta_coord: Tuple[Int, Int, Int],
     work_tile_coord: Tuple[Int, Int],
     iter_idx: UInt32,
     scheduler: TileScheduler,
+    qkv_plane_stride: Int = 0,
 ):
     """CUDA core fallback for load_AB when K*sizeof < 16 bytes.
 
     Copies [BM, BK] and [BN, BK] tiles from gmem LayoutTensors into
     swizzled smem, zero-filling columns where k >= K_actual.
+
+    Parameters:
+        a_type: Element type of the A operand tiles (inferred).
+        b_type: Element type of the B operand tiles (inferred).
+        a_dim0: Number of rows in one A shared-memory tile (inferred).
+        a_dim1: Number of columns in one A shared-memory tile (inferred).
+        a_num_tiles: Number of pipeline stages in the A shared-memory
+            tile array (inferred).
+        a_swizzle_bytes: Swizzle granularity in bytes for A shared-memory
+            tiles (inferred).
+        b_dim0: Number of rows in one B shared-memory tile (inferred).
+        b_dim1: Number of columns in one B shared-memory tile (inferred).
+        b_num_tiles: Number of pipeline stages in the B shared-memory
+            tile array (inferred).
+        b_swizzle_bytes: Swizzle granularity in bytes for B shared-memory
+            tiles (inferred).
+        num_pipeline_stages: Number of double-buffered pipeline stages
+            for A and B shared-memory tiles (inferred).
+        K_actual: Actual K dimension in elements; columns where
+            `k >= K_actual` are zero-filled.
+        cta_group: Number of CTAs cooperating per MMA along the M
+            dimension (defaults to 1).
+        a_swizzle: TMA swizzle mode applied to A shared-memory tiles
+            (defaults to `SWIZZLE_32B`).
+        b_swizzle: TMA swizzle mode applied to B shared-memory tiles
+            (defaults to `SWIZZLE_32B`).
+        a_gmem_layout: Layout of the A global-memory tensor (defaults to
+            `Layout.row_major(1, 1)`).
+        b_gmem_layout: Layout of the B global-memory tensor (defaults to
+            `Layout.row_major(1, 1)`).
+        a_plane_splits: Per-plane split sizes for fused LoRA QKV A-plane
+            row offsetting; `(0, 0)` disables it (defaults to `(0, 0)`).
+
+    Args:
+        a_gmem: A operand tensor in global memory, source of the
+            `[BM, BK]` A tiles.
+        b_gmem: B operand tensor in global memory, source of the
+            `[BN, BK]` B tiles.
+        expert_ids: Pointer to the per-group expert id array; used to
+            offset the A global-memory slice by the expert's local M base.
+        a_smem_tiles: Shared-memory tile array of staged A tiles, one
+            per pipeline stage.
+        b_smem_tiles: Shared-memory tile array of staged B tiles, one
+            per pipeline stage.
+        mma_mbar: Pointer to the MMA mbarrier array, one per pipeline
+            stage, waited on to confirm the consumer has freed the prior
+            stage's shared memory.
+        tma_mbar: Pointer to the TMA mbarrier array, one per pipeline
+            stage, signaled when the copy for a stage is complete.
+        producer_phase: Producer pipeline state tracking the stage index
+            and phase bit.
+        peer_cta_coord: `(peer_id, mma_coord_m, mma_coord_n)` tuple
+            giving the peer CTA's coordinates within the cluster.
+        work_tile_coord: `(m, n)` element coordinates of the current
+            work tile returned by the scheduler.
+        iter_idx: Current K-dimension iteration index within the work
+            tile.
+        scheduler: Tile scheduler providing the current group index and
+            static M/N bounds.
+        qkv_plane_stride: Row stride between fused QKV planes used to
+            compute the A-plane row offset (defaults to 0).
     """
     comptime BM = a_dim0
     comptime BN = b_dim0
@@ -302,6 +462,12 @@ def load_AB_cuda_core[
         peer_cta_coord[1] * (BN // cta_group)
         + peer_cta_coord[0] * BN
         + work_tile_coord[1]
+    )
+    # Activation-operand plane select (see `load_AB`).
+    b_row0 += Int32(
+        lora_qkv_plane_row_offset[a_plane_splits](
+            work_tile_coord[0], qkv_plane_stride
+        )
     )
     var b_col0 = Int32(iter_idx) * Int32(BK)
 
@@ -327,11 +493,25 @@ def load_AB_cuda_core[
     comptime a_rows_per_thread = BM // WARP_SIZE
     comptime a_tv = tl_col_major(Coord(Idx[WARP_SIZE], Idx[a_rows_per_thread]))
 
+    # SIMD widths must be powers of two: odd K rows are gathered with a
+    # masked load into the next power-of-two width, whose padded lanes are
+    # never read by the scatter below.
+    comptime K_padded = next_power_of_two(K_actual)
+
     comptime for v in range(a_rows_per_thread):
         var m = a_tv[linear_idx_type=DType.int32](Coord(Int32(tid), Idx[v]))
-        var vec = a_gmem.load[K_actual, a_row_align](
-            Int(a_row0 + m), Int(a_col0)
-        )
+        var vec: SIMD[a_type, K_padded]
+        comptime if K_actual == K_padded:
+            vec = a_gmem.load[K_padded, a_row_align](
+                Int(a_row0 + m), Int(a_col0)
+            )
+        else:
+            vec = partial_simd_load[K_padded](
+                a_gmem.ptr_at_offset(Index(Int(a_row0 + m), Int(a_col0))),
+                0,
+                K_actual,
+                0,
+            )
         comptime for k in range(BK):
             var smem_off = a_sw(m * Int32(BK) + Int32(k))
             comptime if k < K_actual:
@@ -347,9 +527,18 @@ def load_AB_cuda_core[
 
     comptime for v in range(b_rows_per_thread):
         var n = b_tv[linear_idx_type=DType.int32](Coord(Int32(tid), Idx[v]))
-        var vec = b_gmem.load[K_actual, b_row_align](
-            Int(b_row0 + n), Int(b_col0)
-        )
+        var vec: SIMD[b_type, K_padded]
+        comptime if K_actual == K_padded:
+            vec = b_gmem.load[K_padded, b_row_align](
+                Int(b_row0 + n), Int(b_col0)
+            )
+        else:
+            vec = partial_simd_load[K_padded](
+                b_gmem.ptr_at_offset(Index(Int(b_row0 + n), Int(b_col0))),
+                0,
+                K_actual,
+                0,
+            )
         comptime for k in range(BK):
             var smem_off = b_sw(n * Int32(BK) + Int32(k))
             comptime if k < K_actual:
@@ -397,10 +586,10 @@ def consumer_main_loop[
         b_type, b_dim0, b_dim1, b_num_tiles, b_swizzle_bytes
     ],
     mma_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     tma_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     consumer_phase: PipelineState[pipeline_stages],
     mma_op: MmaOpSM100_SS[
@@ -419,6 +608,67 @@ def consumer_main_loop[
     elect_one_warp: Bool,
     iter_idx: UInt32,
 ):
+    """Performs the MMA consumer step for one pipeline stage.
+
+    Waits on the TMA mbarrier for the current stage, issues the SM100 SS MMA
+    against the staged shared-memory tiles into tensor memory, and commits
+    the result to the MMA mbarrier.
+
+    Parameters:
+        accum_type: Accumulator dtype used for the MMA result in tensor
+            memory (inferred).
+        c_type: Element type of the C output matrix (inferred).
+        a_type: Element type of the A operand tiles (inferred).
+        b_type: Element type of the B operand tiles (inferred).
+        a_dim0: Number of rows in one A shared-memory tile (inferred).
+        a_dim1: Number of columns in one A shared-memory tile (inferred).
+        a_num_tiles: Number of pipeline stages in the A shared-memory
+            tile array (inferred).
+        a_swizzle_bytes: Swizzle granularity in bytes for A shared-memory
+            tiles (inferred).
+        b_dim0: Number of rows in one B shared-memory tile (inferred).
+        b_dim1: Number of columns in one B shared-memory tile (inferred).
+        b_num_tiles: Number of pipeline stages in the B shared-memory
+            tile array (inferred).
+        b_swizzle_bytes: Swizzle granularity in bytes for B shared-memory
+            tiles (inferred).
+        a_swizzle: TMA swizzle mode applied to A shared-memory tiles
+            (inferred).
+        b_swizzle: TMA swizzle mode applied to B shared-memory tiles
+            (inferred).
+        transpose_b: Whether B is stored transposed in global memory
+            (inferred).
+        pipeline_stages: Number of double-buffered pipeline stages for A
+            and B shared-memory tiles (inferred).
+        block_tile_shape: Block tile shape `[BM, BN, BK]` partitioning the
+            GEMM into work tiles.
+        mma_shape: MMA instruction shape `[MMA_M, MMA_N, MMA_K]`.
+        cta_group: Number of CTAs cooperating per MMA along the M
+            dimension (defaults to 1).
+        cluster_shape: Thread block cluster shape `[CLUSTER_M, CLUSTER_N,
+            CLUSTER_D]` (defaults to `Index(1, 1, 1)`).
+
+    Args:
+        tmem_addr: Tensor-memory base address where the MMA accumulates
+            results for this accumulator stage.
+        a_smem_tiles: Shared-memory tile array of staged A tiles, one
+            per pipeline stage.
+        b_smem_tiles: Shared-memory tile array of staged B tiles, one
+            per pipeline stage.
+        mma_mbar: Pointer to the MMA mbarrier array, one per pipeline
+            stage, signaled when the MMA for a stage completes.
+        tma_mbar: Pointer to the TMA mbarrier array, one per pipeline
+            stage, waited on to confirm the TMA load for a stage is
+            complete.
+        consumer_phase: Consumer pipeline state tracking the stage index
+            and phase bit.
+        mma_op: SM100 SS MMA operation object used to issue and commit the
+            tensor-memory multiply-accumulate.
+        elect_one_warp: Whether this warp is the elected MMA warp for the
+            current work tile.
+        iter_idx: Current K-dimension iteration index; when zero, the MMA
+            initializes the accumulator instead of accumulating.
+    """
     var stage = consumer_phase.index()
     var phase = consumer_phase.phase()
 
@@ -444,9 +694,30 @@ def stsm_helper[
     vec_size: Int,
     transpose_c: Bool = False,
 ](
-    vec: InlineArray[Scalar[vec_dtype], vec_size],
-    dst: LayoutTensor[_, _, address_space=AddressSpace.SHARED, ...],
+    vec: Array[Scalar[vec_dtype], vec_size],
+    dst: LayoutTensor[_, _, address_space=.SHARED, ...],
 ):
+    """Stores a register fragment to shared memory using the stmatrix instruction.
+
+    Casts the loaded fragment to the destination dtype, applies the shared
+    memory swizzle, and emits `st_matrix` stores so the epilogue can drain
+    tensor memory through shared memory before the TMA store.
+
+    Parameters:
+        swizzle: Shared-memory swizzle applied to compute the store offset
+            from the lane offset.
+        vec_dtype: Element type of the input register fragment `vec`.
+        vec_size: Number of scalar elements in the input register fragment
+            `vec`.
+        transpose_c: Whether to transpose the fragment layout when computing
+            the store offset (defaults to False).
+
+    Args:
+        vec: Register fragment loaded from tensor memory to store to shared
+            memory.
+        dst: Destination shared-memory `LayoutTensor` where the fragment is
+            written via `st_matrix`.
+    """
     # Number of elements in one row per stsmx4 tile, a row is 32B.
     comptime stsmx4_row_size = 32 // size_of[dst.dtype]()
     # Number of elements owned by each lane, each lane has 16B
@@ -473,7 +744,7 @@ def stsm_helper[
 
     var lane = lane_id()
     comptime RLayout32Bits[layout: Layout] = RuntimeLayout[
-        layout, element_type=DType.uint32, linear_idx_type=DType.uint32
+        layout, element_type=.uint32, linear_idx_type=.uint32
     ]
     var stsm_lane_offset = UInt32(
         (lane & 15) * stride0 + (lane >> 4)
@@ -488,15 +759,13 @@ def stsm_helper[
         comptime for k in range(stsmx4_lane_size // cast_width):
             var src = SIMD[vec_dtype, cast_width]()
             comptime for _j in range(cast_width):
-                src[_j] = rebind[Scalar[vec_dtype]](
-                    vec[i * stsmx4_lane_size + k * cast_width + _j]
-                )
+                src[_j] = vec[i * stsmx4_lane_size + k * cast_width + _j]
             var casted = src.cast[dst.dtype]()
             comptime for _j in range(cast_width):
                 v[k * cast_width + _j] = casted[_j]
         st_matrix[simd_width=4, transpose=transpose_c](
             dst.ptr.unsafe_mut_cast[True]() + offset,
-            bitcast[DType.float32, 4](v),
+            bitcast[.float32, 4](v),
         )
 
 
@@ -522,16 +791,16 @@ def multi_stage_store_C[
     transpose_c: Bool = False,
 ](
     c_smem_base: UnsafePointer[
-        Scalar[c_type], MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, Scalar[c_type], _, address_space=.SHARED
     ],
     c_tma_op: TMATensorTile[c_type, c_tile_rank, c_tile_shape, c_desc_shape],
-    c_ptr: UnsafePointer[Scalar[c_type], MutAnyOrigin],
+    c_ptr: UnsafePointer[mut=True, Scalar[c_type], _],
     accum_pipeline_consumer_state: PipelineState[num_accum_pipeline_stages],
     accum_full_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     accum_empty_mbar: UnsafePointer[
-        SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
+        mut=True, SharedMemBarrier, _, address_space=.SHARED
     ],
     tmem_addr: UInt32,
     work_tile_coord: Tuple[Int, Int],
@@ -540,6 +809,72 @@ def multi_stage_store_C[
     M: UInt32,
     N: UInt32,
 ):
+    """Drains accumulated results from tensor memory and stores them to global memory.
+
+    Waits on the accumulator-full mbarrier, loads fragments from tensor
+    memory in stages, packs them into swizzled shared memory via
+    `stsm_helper`, and issues TMA async stores (or a scalar fallback for
+    unaligned tails) to write the output tile, optionally applying an
+    elementwise epilogue.
+
+    Parameters:
+        c_type: Element type of the C output matrix.
+        c_tile_rank: Rank of the C TMA tile descriptor.
+        c_tile_shape: Element shape of one C TMA tile.
+        c_desc_shape: Descriptor shape of the C TMA tile, used to compute
+            per-store element counts and row stride.
+        num_accum_pipeline_stages: Number of accumulator pipeline stages
+            used to double-buffer TMEM-to-global-memory C stores.
+        c_smem_layout: Layout of one C shared-memory output tile stage;
+            its shape determines the per-stage column width and tile size.
+        accum_type: Accumulator dtype loaded from tensor memory before
+            packing into shared memory.
+        block_tile_shape: Block tile shape `[BM, BN, BK]` partitioning the
+            GEMM into work tiles.
+        mma_shape: MMA instruction shape `[MMA_M, MMA_N, MMA_K]`.
+        stage_stride_cols: Per-stage column stride in tensor memory
+            between accumulator pipeline stages.
+        c_static_N: Static N dimension of the C output matrix; used as
+            the row stride and M-coordinate bound in the scalar fallback
+            store path.
+        c_swizzle: TMA swizzle mode applied to C shared-memory tiles
+            (defaults to `SWIZZLE_128B`).
+        cta_group: Number of CTAs cooperating per MMA along the M
+            dimension (defaults to 1).
+        num_output_warps: Number of warps participating in the epilogue
+            store (defaults to 4).
+        elementwise_lambda_fn: Optional elementwise epilogue applied to
+            stored C fragments (defaults to None).
+        transpose_c: Whether to transpose the C output tile in shared
+            memory before the TMA store (defaults to False).
+
+    Args:
+        c_smem_base: Base pointer to the C shared-memory buffer used for
+            double-buffered output tile staging.
+        c_tma_op: TMA tile descriptor for storing C tiles from shared to
+            global memory.
+        c_ptr: Base pointer to the row-major C output tensor in global
+            memory, used by the scalar fallback store path.
+        accum_pipeline_consumer_state: Consumer pipeline state tracking
+            the accumulator stage index and phase bit.
+        accum_full_mbar: Pointer to the accumulator-full mbarrier array,
+            one per pipeline stage, waited on to confirm the MMA has
+            filled the accumulator stage.
+        accum_empty_mbar: Pointer to the accumulator-empty mbarrier
+            array, arrived on to signal the consumer has drained an
+            accumulator stage.
+        tmem_addr: Tensor-memory base address where the MMA accumulated
+            results for this work tile reside.
+        work_tile_coord: `(m, n)` element coordinates of the current work
+            tile returned by the scheduler.
+        group_end_idx: Exclusive end of the current group's valid N
+            range, used to mask out-of-bound TMA stores and select the
+            scalar fallback for unaligned tails.
+        elect_one_warp: Whether this warp is the elected epilogue leader
+            for issuing TMA stores.
+        M: M dimension of the GEMM output in elements.
+        N: N dimension of the GEMM output in elements.
+    """
     # WAIT FOR MMA TO FINISH AND STORE RESULT
     # scheduler fetch next work
     comptime BM = block_tile_shape[0]
@@ -623,8 +958,7 @@ def multi_stage_store_C[
         var c_smem_tile = LayoutTensor[
             c_type,
             c_smem_layout,
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
             alignment=128,
         ](c_smem_base + (stage % 2) * c_smem_tile_size)
 
@@ -814,6 +1148,29 @@ def zero_output[
     coord: Tuple[UInt32, UInt32],
     group_end_idx: UInt32,
 ):
+    """Zero-fills an output tile for skipped or invalid expert assignments.
+
+    Each thread stores a SIMD vector of zeros per row across the output
+    tile width, masking out threads and rows that fall outside the valid
+    tile or group boundary.
+
+    Parameters:
+        c_type: Element type of the C output tensor.
+        output_tile_shape: Tile shape `[rows, cols]` of the output region to
+            zero-fill, where index 0 bounds the row count and index 1 bounds
+            the column count.
+        c_stride: Row stride of the C output tensor in elements; the store
+            pointer advances by this amount per row.
+        c_N: Total width of the C output tensor in elements; bounds the
+            column offset `coord[0]` to mask out-of-bound stores.
+
+    Args:
+        c_ptr: Base pointer to the C output tensor in global memory.
+        coord: `(m, n)` element coordinates of the output tile origin, where
+            `coord[0]` is the column offset and `coord[1]` is the row offset.
+        group_end_idx: Exclusive end of the current group's valid row range;
+            bounds the number of rows zeroed.
+    """
     comptime thread_num = 4 * WARP_SIZE
     comptime simd_size = min(2, simd_width_of[c_type]())
 
@@ -840,6 +1197,92 @@ def zero_output[
                 zero_vec
             )
             ptr += c_stride
+
+
+@always_inline
+def zero_output_epilogue[
+    c_type: DType,
+    /,
+    *,
+    c_smem_layout: Layout,
+    block_tile_shape: IndexList[3],
+    mma_shape: IndexList[3],
+    c_static_N: Int,
+    c_swizzle: TensorMapSwizzle,
+    cta_group: Int,
+    num_output_warps: Int,
+    elementwise_lambda_fn: elementwise_epilogue_type,
+    transpose_c: Bool,
+](work_tile_coord: Tuple[Int, Int], group_end_idx: UInt32,):
+    """Zero an inactive group's output THROUGH the elementwise epilogue.
+
+    Mirror of the epilogue (unaligned/`elementwise_lambda_fn`) branch of
+    `multi_stage_store_C`, but with a zero accumulator: for an inactive group
+    (`expert_id < 0`) there is no MMA, so this walks the same output-tile
+    coordinate mapping and calls `elementwise_lambda_fn` with a zero vector at
+    each `(n, m)`. It deliberately does NOT wait on `accum_full_mbar` or read
+    TMEM: the main-load and MMA warps skip inactive groups entirely (they never
+    arrive on that barrier), so waiting would deadlock. Matches the naive
+    grouped matmul, which likewise runs the epilogue with `accum == 0` for
+    `expert == -1` instead of storing zeros directly to C -- so callers whose
+    real output lives behind the epilogue (e.g. the LoRA-B QKV expand's
+    `route_qkv`) get their `-1` tokens zeroed without a separate memset.
+    """
+    comptime MMA_M = mma_shape[0]
+    comptime MMA_N = mma_shape[1]
+    comptime simd_size = simd_width_of[c_type]()
+
+    comptime N_dim = 0 if transpose_c else 1
+    comptime stageN = c_smem_layout.shape[N_dim].value()
+    comptime num_stages = MMA_N // stageN if (
+        MMA_M == 256 or cta_group == 1
+    ) else MMA_N // stageN // 2
+
+    comptime assert (
+        transpose_c
+    ), "zero_output_epilogue only supports transpose_c (epilogue path)"
+    comptime assert (
+        MMA_M == 256 or cta_group == 1
+    ), "zero_output_epilogue only supports MMA_M == 256 or cta_group == 1"
+
+    # `M` here is the tile's contiguous (row) extent, matching
+    # `c_smem_tile.layout.shape[1]` in `multi_stage_store_C`.
+    comptime M = c_smem_layout.shape[1].value()
+    comptime chunkM = c_swizzle.bytes() // size_of[c_type]()
+    comptime vec_chunkM = chunkM // simd_size
+    comptime chunk_num = M // chunkM
+    comptime logical_c_layout = Layout.row_major(chunk_num, stageN, vec_chunkM)
+    comptime thread_num = num_output_warps * WARP_SIZE
+    comptime assert logical_c_layout.size() % thread_num == 0
+    comptime value_shape = logical_c_layout.size() // thread_num
+    comptime cN = c_static_N
+    comptime alignment = align_of[SIMD[c_type, simd_size]]()
+    comptime elementwise_lambda = elementwise_lambda_fn
+    var zero_vec = SIMD[c_type, simd_size](0)
+
+    comptime for stage in range(num_stages):
+        # Only the M==256/cta_group==1 coord form is reachable here (asserted
+        # above); `coord_n` matches `coord_n_mma_m256` in `multi_stage_store_C`.
+        var coord_n = work_tile_coord[1] + stage * stageN
+        var n_inbound_size = group_end_idx - UInt32(coord_n)
+
+        comptime for v in range(value_shape):
+            comptime thread_offset = v * thread_num
+            var thread_index = UInt32(thread_idx.x) + UInt32(thread_offset)
+            var vec_chunkM_idx = thread_index % UInt32(vec_chunkM)
+            var rest = thread_index // UInt32(vec_chunkM)
+            var n_idx = rest % UInt32(stageN)
+            if n_idx >= min(n_inbound_size, UInt32(stageN)):
+                continue
+            var chunk_idx = rest // UInt32(stageN)
+            var n = UInt32(coord_n) + n_idx
+            var m = UInt32(work_tile_coord[0]) + (
+                chunk_idx * UInt32(vec_chunkM) + vec_chunkM_idx
+            ) * UInt32(simd_size)
+            if m < UInt32(cN):
+                elementwise_lambda[c_type, simd_size, alignment=alignment](
+                    Index(n, m), zero_vec
+                )
 
 
 # Important deviation from the normal SM100 matmul: The coordinate returned by
@@ -879,17 +1322,18 @@ def blackwell_tma_umma_warp_specialized_kernel[
     c_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     cta_group: Int = 2,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
+    a_plane_splits: IndexList[2] = Index(0, 0),
     transpose_c: Bool = False,
     use_tma: Bool = True,
     K_actual: Int = 0,
     a_gmem_layout: Layout = Layout.row_major(1, 1),
     b_gmem_layout: Layout = Layout.row_major(1, 1),
 ](
-    num_active_experts: Int,
+    expert_usage_stats: UnsafePointer[UInt32, ImmutAnyOrigin],
     a_tma_op: TMATensorTile[a_type, a_tile_rank, a_tile_shape, a_desc_shape],
-    expert_ids: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    expert_ids: UnsafePointer[Int32, ImmutAnyOrigin],
     b_tma_op: TMATensorTile[b_type, b_tile_rank, b_tile_shape, b_desc_shape],
-    b_offsets: UnsafePointer[Scalar[DType.uint32], ImmutAnyOrigin],
+    b_offsets: UnsafePointer[UInt32, ImmutAnyOrigin],
     c_tma_op: TMATensorTile[
         c_type, c_tile_rank, c_tile_shape_param, c_desc_shape
     ],
@@ -898,7 +1342,91 @@ def blackwell_tma_umma_warp_specialized_kernel[
     a_gmem: LayoutTensor[a_type, a_gmem_layout, ImmutAnyOrigin],
     b_gmem: LayoutTensor[b_type, b_gmem_layout, ImmutAnyOrigin],
 ):
-    comptime assert c_type != DType.float32, "c_type cannot be float32"
+    """Implements the warp-specialized persistent grouped GEMM kernel for SM100.
+
+    Splits the CTA warps into main-load, MMA, and epilogue roles that
+    cooperate through mbarriers and a tile scheduler to iterate over
+    grouped GEMM work tiles, streaming A and B through shared memory via
+    TMA and accumulating into tensor memory before storing C back to
+    global memory.
+
+    Parameters:
+        a_type: Element type of the A operand matrix.
+        b_type: Element type of the B operand matrix.
+        c_type: Element type of the C output matrix.
+        expert_m: Static M dimension of each expert's local slice, used as the
+            C stride and row bound for contiguous row-major C output.
+        a_tile_rank: Rank of the A TMA tile descriptor.
+        a_tile_shape: Element shape of one A TMA tile.
+        a_desc_shape: Descriptor shape of the A TMA tile, used to compute per-
+            load element counts and row stride.
+        b_tile_rank: Rank of the B TMA tile descriptor.
+        b_tile_shape: Element shape of one B TMA tile.
+        b_desc_shape: Descriptor shape of the B TMA tile, used to compute per-
+            load element counts and row stride.
+        c_tile_rank: Rank of the C TMA tile descriptor.
+        c_tile_shape_param: Element shape of one C TMA tile.
+        c_desc_shape: Descriptor shape of the C TMA tile.
+        block_tile_shape: Block tile shape `[BM, BN, BK]` partitioning the GEMM
+            into work tiles.
+        mma_shape: MMA instruction shape `[MMA_M, MMA_N, MMA_K]`.
+        cluster_shape: Thread block cluster shape `[CLUSTER_M, CLUSTER_N,
+            CLUSTER_D]`.
+        num_pipeline_stages: Number of TMA producer and consumer pipeline stages
+            used to double-buffer A and B shared-memory tiles.
+        num_accum_pipeline_stages: Number of accumulator pipeline stages
+            used to double-buffer TMEM-to-global-memory C stores.
+        num_output_stages: Number of output shared-memory buffer stages for C
+            (defaults to 2).
+        output_tile_shape: Output tile shape `[OUT_M, OUT_N]` for one C shared-
+            memory stage (defaults to `Index(128, 32)`).
+        transpose_b: Whether B is stored transposed in global memory (defaults
+            to True).
+        a_swizzle: TMA swizzle mode applied to A shared-memory tiles (defaults
+            to `SWIZZLE_128B`).
+        b_swizzle: TMA swizzle mode applied to B shared-memory tiles (defaults
+            to `SWIZZLE_128B`).
+        c_swizzle: TMA swizzle mode applied to C shared-memory tiles (defaults
+            to `SWIZZLE_128B`).
+        cta_group: Number of CTAs cooperating per MMA along the M dimension
+            (defaults to 2).
+        elementwise_lambda_fn: Optional elementwise epilogue applied to stored
+            C fragments (defaults to None).
+        a_plane_splits: Per-plane split sizes for fused LoRA QKV A-plane row
+            offsetting; `(0, 0)` disables it (defaults to `(0, 0)`).
+        transpose_c: Whether to transpose the C output tile in shared memory
+            before the TMA store (defaults to False).
+        use_tma: Whether to use TMA for A and B loads; when False, use the
+            CUDA-core fallback (defaults to True).
+        K_actual: Actual K dimension in elements for the CUDA-core fallback
+            when `use_tma` is False (defaults to 0).
+        a_gmem_layout: Layout of the A global-memory tensor, used only by the
+            CUDA-core fallback (defaults to `Layout.row_major(1, 1)`).
+        b_gmem_layout: Layout of the B global-memory tensor, used only by the
+            CUDA-core fallback (defaults to `Layout.row_major(1, 1)`).
+
+    Args:
+        expert_usage_stats: Pointer to per-expert usage stats; index 1 holds
+            the active expert count.
+        a_tma_op: TMA tile descriptor for loading A tiles from global to shared
+            memory.
+        expert_ids: Pointer to the per-group expert id array; negative entries
+            skip the tile.
+        b_tma_op: TMA tile descriptor for loading B tiles from global to shared
+            memory.
+        b_offsets: Pointer to the per-expert B offset prefix sum, of length
+            `num_active_experts + 1`.
+        c_tma_op: TMA tile descriptor for storing C tiles from shared to global
+            memory.
+        c_ptr: Base pointer to the row-major C output tensor in global memory.
+        mnk: `[M, N, K]` dimensions of the grouped GEMM as unsigned 32-bit
+            integers.
+        a_gmem: A operand tensor used only by the CUDA-core fallback when
+            `use_tma` is False.
+        b_gmem: B operand tensor used only by the CUDA-core fallback when
+            `use_tma` is False.
+    """
+    comptime assert c_type != .float32, "c_type cannot be float32"
     comptime if not use_tma:
         comptime assert (
             K_actual > 0
@@ -910,7 +1438,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
     comptime TMA_LOAD_THREADS = WARP_SIZE
     comptime MMA_THREADS = WARP_SIZE
     comptime EPILOGUE_THREADS = num_output_warps * WARP_SIZE
-    comptime CLUSTER_SIZE = cluster_shape[0] * cluster_shape[1]
+    comptime CLUSTER_SIZE = Int(cluster_shape[0]) * Int(cluster_shape[1])
     comptime clc_producer_arv_count = 1
     comptime clc_consumer_arv_count = SCHEDULER_THREADS + CLUSTER_SIZE * (
         TMA_LOAD_THREADS + MMA_THREADS + EPILOGUE_THREADS
@@ -945,9 +1473,9 @@ def blackwell_tma_umma_warp_specialized_kernel[
     comptime a_tma_rows = a_desc_shape[0]
     comptime b_tma_rows = b_desc_shape[0]
 
-    base_ptr_smem = external_memory[
+    var base_ptr_smem = external_memory[
         Scalar[a_type],
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ]()
 
@@ -994,11 +1522,11 @@ def blackwell_tma_umma_warp_specialized_kernel[
 
     var ptr_tmem_addr = (tmem_dealloc_mbar_ptr + 1).bitcast[UInt32]()
 
-    tma_mbar = tma_mbar_ptr.bitcast[SharedMemBarrier]()
-    mma_mbar = mma_mbar_ptr.bitcast[SharedMemBarrier]()
-    accum_full_mbar = accum_full_mbar_ptr.bitcast[SharedMemBarrier]()
-    accum_empty_mbar = accum_empty_mbar_ptr.bitcast[SharedMemBarrier]()
-    tmem_dealloc_mbar = tmem_dealloc_mbar_ptr.bitcast[SharedMemBarrier]()
+    var tma_mbar = tma_mbar_ptr.bitcast[SharedMemBarrier]()
+    var mma_mbar = mma_mbar_ptr.bitcast[SharedMemBarrier]()
+    var accum_full_mbar = accum_full_mbar_ptr.bitcast[SharedMemBarrier]()
+    var accum_empty_mbar = accum_empty_mbar_ptr.bitcast[SharedMemBarrier]()
+    var tmem_dealloc_mbar = tmem_dealloc_mbar_ptr.bitcast[SharedMemBarrier]()
 
     comptime accum_type = get_accum_type[a_type]()
 
@@ -1057,9 +1585,14 @@ def blackwell_tma_umma_warp_specialized_kernel[
         transpose_b=transpose_b,
     ]()
 
+    # num_active_experts is a TileScheduler loop bound, and the persistent grid
+    # is fixed at one CTA per SM, so it can be read from the device tensor
+    # rather than taken as a host scalar. (`[0]` = max tokens, unused here.)
+    var num_active_experts = Int(expert_usage_stats[1])
+
     comptime _offsets_layout = Layout.row_major(UNKNOWN_VALUE)
-    b_offsets_tensor = LayoutTensor[
-        DType.uint32,
+    var b_offsets_tensor = LayoutTensor[
+        .uint32,
         _offsets_layout,
         ImmutAnyOrigin,
     ](
@@ -1124,6 +1657,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
                         block_tile_shape=block_tile_shape,
                         mma_shape=mma_shape,
                         cta_group=cta_group,
+                        a_plane_splits=a_plane_splits,
                     ](
                         expert_ids,
                         a_tma_op,
@@ -1140,6 +1674,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
                         i,
                         elect_one_cta,
                         scheduler,
+                        Int(mnk[0]),
                     )
                 else:
                     load_AB_cuda_core[
@@ -1149,6 +1684,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
                         b_swizzle=b_swizzle,
                         a_gmem_layout=a_gmem_layout,
                         b_gmem_layout=b_gmem_layout,
+                        a_plane_splits=a_plane_splits,
                     ](
                         a_gmem,
                         b_gmem,
@@ -1162,6 +1698,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
                         (Int(work_info.m), Int(work_info.n)),
                         i,
                         scheduler,
+                        Int(mnk[0]),
                     )
                 producer_phase.step()
 
@@ -1179,7 +1716,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
         # non blocking, arrives and proceeds
         named_barrier_arrive[Int32(MMA_THREADS + EPILOGUE_THREADS)](1)
 
-        tmem_addr = ptr_tmem_addr[0]
+        var tmem_addr = ptr_tmem_addr[0]
 
         while not work_info.is_done():
             if (
@@ -1189,7 +1726,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
                 work_info = scheduler.fetch_next_work()
                 continue
             # scheduler fetch next work
-            next_work_info = scheduler.fetch_next_work()
+            var next_work_info = scheduler.fetch_next_work()
             # DO MMA
             if elect_one_cta:
                 var accum_index = accum_pipeline_producer_state.index()
@@ -1243,7 +1780,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
 
     if WarpRole.is_epilogue():
         named_barrier[Int32(MMA_THREADS + EPILOGUE_THREADS)](1)
-        tmem_addr = ptr_tmem_addr[0]
+        var tmem_addr = ptr_tmem_addr[0]
 
         # while work_info.is_valid():
         while not work_info.is_done():
@@ -1252,20 +1789,47 @@ def blackwell_tma_umma_warp_specialized_kernel[
                 continue
 
             if expert_ids[Int(scheduler.current_group_idx)] < 0:
-                # c_stride == c_N == expert_m for contiguous row-major C.
-                zero_output[
-                    output_tile_shape=output_tile_shape,
-                    c_stride=expert_m,
-                    c_N=expert_m,
-                ](
-                    c_ptr,
-                    (work_info.m, work_info.n),
-                    rebind[Scalar[DType.uint32]](
-                        scheduler.group_offsets[
-                            Int(scheduler.current_group_idx + 1)
-                        ]
-                    ),
-                )
+                comptime if elementwise_lambda_fn:
+                    # An epilogue owns every store and `c_ptr` may be dangling,
+                    # so zero the inactive group THROUGH the epilogue (accum==0)
+                    # rather than storing zeros straight to C. Matches the naive
+                    # path; see `zero_output_epilogue`.
+                    zero_output_epilogue[
+                        c_type,
+                        c_smem_layout=Layout.row_major(
+                            output_tile_shape[0], output_tile_shape[1]
+                        ),
+                        block_tile_shape=block_tile_shape,
+                        mma_shape=mma_shape,
+                        c_static_N=expert_m,
+                        c_swizzle=c_swizzle,
+                        cta_group=cta_group,
+                        num_output_warps=num_output_warps,
+                        elementwise_lambda_fn=elementwise_lambda_fn.value(),
+                        transpose_c=transpose_c,
+                    ](
+                        work_tile_coord=(Int(work_info.m), Int(work_info.n)),
+                        group_end_idx=rebind[UInt32](
+                            scheduler.group_offsets[
+                                Int(scheduler.current_group_idx + 1)
+                            ]
+                        ),
+                    )
+                else:
+                    # c_stride == c_N == expert_m for contiguous row-major C.
+                    zero_output[
+                        output_tile_shape=output_tile_shape,
+                        c_stride=expert_m,
+                        c_N=expert_m,
+                    ](
+                        c_ptr,
+                        (work_info.m, work_info.n),
+                        rebind[UInt32](
+                            scheduler.group_offsets[
+                                Int(scheduler.current_group_idx + 1)
+                            ]
+                        ),
+                    )
                 work_info = scheduler.fetch_next_work()
                 continue
             # WAIT FOR MMA TO FINISH AND STORE RESULT
@@ -1293,7 +1857,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
                 accum_empty_mbar,
                 tmem_addr,
                 work_tile_coord=(Int(work_info.m), Int(work_info.n)),
-                group_end_idx=rebind[Scalar[DType.uint32]](
+                group_end_idx=rebind[UInt32](
                     scheduler.group_offsets[
                         Int(scheduler.current_group_idx + 1)
                     ]
@@ -1304,7 +1868,7 @@ def blackwell_tma_umma_warp_specialized_kernel[
             )
             accum_pipeline_consumer_state.step()
 
-            next_work_info = scheduler.fetch_next_work()
+            var next_work_info = scheduler.fetch_next_work()
             work_info = next_work_info
 
         comptime if cta_group == 2:
@@ -1325,20 +1889,61 @@ def grouped_matmul_sm100_persistent[
     a_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     b_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
+    a_plane_splits: IndexList[2] = Index(0, 0),
 ](
-    c: TileTensor[mut=True, c_type, address_space=AddressSpace.GENERIC, ...],
-    a: TileTensor[mut=False, a_type, address_space=AddressSpace.GENERIC, ...],
-    a_offsets: TileTensor[
-        mut=False, DType.uint32, address_space=AddressSpace.GENERIC, ...
+    c: TileTensor[mut=True, c_type, address_space=.GENERIC, ...],
+    a: TileTensor[mut=False, a_type, address_space=.GENERIC, ...],
+    a_offsets: TileTensor[mut=False, .uint32, address_space=.GENERIC, ...],
+    b: TileTensor[mut=False, b_type, address_space=.GENERIC, ...],
+    expert_ids: TileTensor[mut=False, .int32, address_space=.GENERIC, ...],
+    expert_usage_stats: TileTensor[
+        mut=False, .uint32, address_space=.GENERIC, ...
     ],
-    max_num_tokens_per_expert: Int,
-    b: TileTensor[mut=False, b_type, address_space=AddressSpace.GENERIC, ...],
-    expert_ids: TileTensor[
-        mut=False, DType.int32, address_space=AddressSpace.GENERIC, ...
-    ],
-    num_active_experts: Int,
     ctx: DeviceContext,
 ) raises:
+    """Launches the persistent grouped GEMM kernel for SM100 from host tensors.
+
+    Swaps A and B to match the kernel's transposed-B convention, delegates
+    to `_grouped_matmul_sm100_persistent` which builds TMA descriptors and
+    shared-memory layouts from the matmul config, selects the pipeline
+    depth from available shared memory, and enqueues the warp-specialized
+    kernel on the device context.
+
+    Parameters:
+        c_type: Element type of the C output matrix (inferred).
+        a_type: Element type of the A operand matrix (inferred).
+        b_type: Element type of the B operand matrix (inferred).
+        transpose_b: Whether B is stored transposed in global memory
+            (inferred).
+        config: Matmul config carrying the block tile shape, MMA shape,
+            and cluster shape.
+        cta_group: Number of CTAs cooperating per MMA along the M
+            dimension (defaults to 1).
+        num_pipeline_stages: Number of TMA producer and consumer
+            pipeline stages; when None, auto-selected from available
+            shared memory (defaults to None).
+        a_swizzle: TMA swizzle mode applied to A shared-memory tiles
+            (defaults to `SWIZZLE_128B`).
+        b_swizzle: TMA swizzle mode applied to B shared-memory tiles
+            (defaults to `SWIZZLE_128B`).
+        elementwise_lambda_fn: Optional elementwise epilogue applied to
+            stored C fragments (defaults to None).
+        a_plane_splits: Per-plane split sizes for fused LoRA QKV A-plane
+            row offsetting; `(0, 0)` disables it (defaults to `(0, 0)`).
+
+    Args:
+        c: Output C tile tensor in generic address space.
+        a: A operand tile tensor (activations); swapped to B by the
+            kernel's transposed-B convention.
+        a_offsets: Per-expert A offset prefix sum tile tensor.
+        b: B operand tile tensor (weights); swapped to A by the
+            kernel's transposed-B convention.
+        expert_ids: Per-group expert id tile tensor; negative entries
+            skip the tile.
+        expert_usage_stats: Per-expert usage stats tile tensor; index 1
+            holds the active expert count.
+        ctx: Device context used to enqueue the kernel.
+    """
     # swapAB by default
     comptime num_experts = b.static_shape[0]
     comptime M = b.static_shape[1]
@@ -1361,14 +1966,21 @@ def grouped_matmul_sm100_persistent[
         a_swizzle=a_swizzle,
         b_swizzle=b_swizzle,
         elementwise_lambda_fn=elementwise_lambda_fn,
+        # Plane-split boundaries (output-column element offsets) for the optional
+        # activation plane select, forwarded unchanged across the swapAB boundary.
+        a_plane_splits=a_plane_splits,
     ](
-        c.ptr.as_any_origin(),
-        b.ptr.as_any_origin(),  # weights (a after swapAB)
-        expert_ids.ptr.as_any_origin(),
-        a.ptr.as_any_origin(),  # activations (b after swapAB)
-        a_offsets.ptr.as_any_origin(),
-        num_active_experts,
+        c.ptr.as_unsafe_any_origin(),
+        b.ptr.as_unsafe_any_origin(),  # weights (a after swapAB)
+        expert_ids.ptr.as_unsafe_any_origin(),
+        a.ptr.as_unsafe_any_origin(),  # activations (b after swapAB)
+        a_offsets.ptr.as_unsafe_any_origin(),
+        expert_usage_stats.ptr.as_unsafe_any_origin(),
         Int(c.dim[0]()),
+        # Activation descriptor row extent (`b_desc_rows`): the activation's own
+        # row count. Equals `c.dim[0]` for a normal grouped matmul; the LoRA-B
+        # QKV expand passes a `[3M, R]` activation so this is `3M`.
+        Int(a.dim[0]()),
         ctx,
     )
 
@@ -1389,14 +2001,16 @@ def _grouped_matmul_sm100_persistent[
     a_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     b_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
+    a_plane_splits: IndexList[2] = Index(0, 0),
 ](
     c_ptr: UnsafePointer[Scalar[c_type], MutAnyOrigin],
     a_ptr: UnsafePointer[Scalar[a_type], ImmutAnyOrigin],
-    expert_ids: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    expert_ids: UnsafePointer[Int32, ImmutAnyOrigin],
     b_ptr: UnsafePointer[Scalar[b_type], ImmutAnyOrigin],
-    b_offsets: UnsafePointer[Scalar[DType.uint32], ImmutAnyOrigin],
-    num_active_experts: Int,
+    b_offsets: UnsafePointer[UInt32, ImmutAnyOrigin],
+    expert_usage_stats: UnsafePointer[UInt32, ImmutAnyOrigin],
     M_runtime: Int,
+    b_desc_rows: Int,
     ctx: DeviceContext,
 ) raises:
     comptime assert transpose_b, "Only support transposed B"
@@ -1419,8 +2033,8 @@ def _grouped_matmul_sm100_persistent[
     comptime assert expert_m != 0 and K != 0, "expert_m and K must be non-zero"
 
     # TMA requires the global stride (K * sizeof) to be a multiple of
-    # 16 bytes.  When it is not, the kernel uses CUDA core copies
-    # instead.  We still create TMA descriptors (to satisfy the type
+    # 16 bytes. When it is not, the kernel uses CUDA core copies
+    # instead. We still create TMA descriptors (to satisfy the type
     # system) but use BK as the fake K so the stride is large enough.
     comptime use_tma = (K * size_of[a_type]()) % 16 == 0
     comptime tma_K = K if use_tma else BK
@@ -1433,7 +2047,7 @@ def _grouped_matmul_sm100_persistent[
     var a_gmem = LayoutTensor[a_type, a_gmem_layout, ImmutAnyOrigin](a_ptr)
     var b_gmem = LayoutTensor[b_type, b_gmem_layout, ImmutAnyOrigin](
         b_ptr,
-        RuntimeLayout[b_gmem_layout](Index(M_runtime, K), Index(K, 1)),
+        RuntimeLayout[b_gmem_layout](Index(b_desc_rows, K), Index(K, 1)),
     )
 
     # TMA layouts with tma_K (may be padded when use_tma=False).
@@ -1449,16 +2063,40 @@ def _grouped_matmul_sm100_persistent[
 
     # TMA descriptor creation uses tma_K layouts.
     var a_device = LayoutTensor[a_type, a_tma_layout, ImmutAnyOrigin](a_ptr)
+    # The activation (post-swapAB `b`) descriptor is sized from the activation's
+    # own row extent `b_desc_rows`, not `M_runtime`. For a normal grouped matmul
+    # the two are equal; the LoRA-B QKV expand passes a `[3M, R]` planar activation
+    # (`b_desc_rows == 3M`) so the `a_plane_splits` plane shifts stay in bounds.
     var b_device = LayoutTensor[b_type, b_tma_layout, ImmutAnyOrigin](
         b_ptr,
-        RuntimeLayout[b_tma_layout](Index(M_runtime, tma_K), Index(tma_K, 1)),
+        RuntimeLayout[b_tma_layout](Index(b_desc_rows, tma_K), Index(tma_K, 1)),
     )
+    # When an elementwise epilogue owns every store, the kernel never writes to
+    # `c_ptr` through the C TMA descriptor (see `multi_stage_store_C` /
+    # `zero_output_epilogue`), so the caller is allowed to pass a dangling
+    # `c_ptr`. But `create_tensor_tile` below still calls `cuTensorMapEncodeTiled`
+    # on the descriptor's base address, which rejects a dangling global pointer
+    # with `CUDA_ERROR_INVALID_VALUE`. Point the descriptor at a valid 1-element
+    # scratch allocation in that case: the descriptor only needs a valid,
+    # aligned base to encode (its extent is never dereferenced). The descriptor
+    # type is identical in both branches (only the runtime base pointer differs),
+    # so this does not create the scoped-reference issue that branching the
+    # descriptor's static type would.
+    # No-epilogue callers (e.g. MoE `grouped_matmul_ragged`) emit NO extra host
+    # op here: `c_desc_scratch` stays `None` and the descriptor uses `c_ptr`
+    # directly, exactly as before this change.
+    comptime has_epilogue = Bool(elementwise_lambda_fn)
+    var c_desc_scratch = Optional[DeviceBuffer[c_type]](None)
+    var c_desc_ptr = c_ptr
+    comptime if has_epilogue:
+        c_desc_scratch = ctx.enqueue_create_buffer[c_type](1)
+        c_desc_ptr = c_desc_scratch.value().unsafe_ptr().as_unsafe_any_origin()
     var c_device = LayoutTensor[
         c_type,
         c_layout,
         MutAnyOrigin,
     ](
-        c_ptr,
+        c_desc_ptr,
         RuntimeLayout[c_layout](Index(M_runtime, expert_m), Index(expert_m, 1)),
     )
 
@@ -1467,11 +2105,11 @@ def _grouped_matmul_sm100_persistent[
     if M == 0:
         return
 
-    a_tma_op = create_tensor_tile[
+    var a_tma_op = create_tensor_tile[
         Index(BM // cluster_shape[1], BK), swizzle_mode=a_swizzle
     ](ctx, a_device)
 
-    b_tma_op = create_tensor_tile[
+    var b_tma_op = create_tensor_tile[
         Index(
             BN // (cluster_shape[0] // cta_group), BK
         ) if transpose_b else Index(BK, BN // (cluster_shape[0] // cta_group)),
@@ -1606,6 +2244,7 @@ def _grouped_matmul_sm100_persistent[
         a_gmem_layout=a_gmem_layout,
         b_gmem_layout=b_gmem_layout,
         elementwise_lambda_fn=elementwise_lambda_fn,
+        a_plane_splits=a_plane_splits,
     ]
 
     comptime assert (
@@ -1621,7 +2260,7 @@ def _grouped_matmul_sm100_persistent[
     var mnk = StaticTuple[UInt32, 3](UInt32(M), UInt32(N), UInt32(K))
 
     ctx.enqueue_function[kernel](
-        num_active_experts,
+        expert_usage_stats,
         a_tma_op,
         expert_ids,
         b_tma_op,
@@ -1639,3 +2278,9 @@ def _grouped_matmul_sm100_persistent[
             UInt32(smem_size)
         ),
     )
+
+    # Keep the C-descriptor scratch buffer alive until the kernel launch above
+    # has been enqueued (`c_device`/`c_tma_op` alias its pointer when an
+    # epilogue owns all stores). Only exists in the epilogue case.
+    comptime if has_epilogue:
+        _ = c_desc_scratch^

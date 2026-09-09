@@ -20,15 +20,17 @@ ingredients for that pattern; callers wire up the comptime loops.
 
 Usage pattern:
 
-    comptime n_krn = len(schedule.kernel)
-    print_phase_header("KERNEL", n_krn)
-    comptime for i in range(n_krn):
-        print_entry[my_op_name_fn]("KRN", i, materialize[schedule.kernel[i]]())
+```mojo
+comptime n_krn = len(schedule.kernel)
+print_phase_header("KERNEL", n_krn)
+comptime for i in range(n_krn):
+    print_entry[my_op_name_fn]("KRN", i, materialize[schedule.kernel[i]]())
 
-    var counts = WaitCounts()
-    comptime for i in range(n_krn):
-        counts.add(materialize[schedule.kernel[i]](), i, n_krn)
-    print_wait_counts("kernel  ", counts)
+var counts = WaitCounts()
+comptime for i in range(n_krn):
+    counts.add(materialize[schedule.kernel[i]](), i, n_krn)
+print_wait_counts("kernel  ", counts)
+```
 """
 
 from std.collections import List
@@ -100,17 +102,22 @@ def print_entry(
     pre-resolved tag name.
 
     Format:
-      <prefix> [<idx>] <name>  s=<stage> sub=<subtile> k=<k_offset>
-                               wait=<wait_value> pf=<is_prefetch>
+
+    ```text
+    <prefix> [<idx>] <name>  s=<stage> sub=<subtile> k=<k_offset>
+                             wait=<wait_value> pf=<is_prefetch>
+    ```
 
     Callers resolve the tag name themselves (kernel tags are
     schedule-specific):
 
-        var name = (
-            my_op_name(e.op.tag) if e.op.tag < 128
-            else default_op_name(e.op.tag)
-        )
-        print_entry("KRN ", i, name, e)
+    ```mojo
+    var name = (
+        my_op_name(e.op.tag) if e.op.tag < 128
+        else default_op_name(e.op.tag)
+    )
+    print_entry("KRN ", i, name, e)
+    ```
 
     Args:
         prefix: Short label printed before the index (e.g. "KRN").

@@ -31,10 +31,9 @@ from max.dtype import DType
 from max.experimental import functional as F
 from max.experimental.tensor import Tensor
 from max.graph import TensorType
-from max.pipelines.core import PixelContext
+from max.pipelines.context import PixelContext, TokenBuffer
 from max.pipelines.diffusion.cache import DenoisingCacheState
 from max.pipelines.diffusion.interface import DiffusionPipeline, max_compile
-from max.pipelines.modeling.types import TokenBuffer
 from max.profiler import Tracer, traced
 
 from ..autoencoders import AutoencoderKLModel
@@ -68,7 +67,7 @@ def _validate_z_image_context(context: PixelContext) -> None:
         if not hasattr(context, name):
             raise TypeError(
                 f"ZImagePipeline requires PixelGenerationContext with attribute "
-                f"{name!r} (e.g. max.pipelines.core.PixelContext); "
+                f"{name!r} (e.g. max.pipelines.context.PixelContext); "
                 f"{type(context).__name__} has no {name!r}."
             )
         arr = getattr(context, name)
@@ -83,7 +82,7 @@ class ZImageModelInputs:
     """Z-Image execution inputs with device tensors and host metadata.
 
     Scalar and NumPy fields are populated from :class:`PixelGenerationContext`
-    (concrete type :class:`~max.pipelines.core.PixelContext`) via
+    (concrete type :class:`~max.pipelines.context.PixelContext`) via
     :meth:`kwargs_from_context`; ``latents_tensor``, ``sigmas_tensor``, and
     shape carriers are required device tensors supplied by
     :meth:`ZImagePipeline.prepare_inputs` in one shot.
@@ -271,7 +270,7 @@ class ZImagePipeline(DiffusionPipeline):
     @traced(message="ZImagePipeline.prepare_inputs")
     def prepare_inputs(
         self,
-        context: PixelContext,  # type: ignore[override]
+        context: PixelContext,
     ) -> ZImageModelInputs:
         """Convert a :class:`PixelGenerationContext` into model inputs with device tensors."""
         _validate_z_image_context(context)

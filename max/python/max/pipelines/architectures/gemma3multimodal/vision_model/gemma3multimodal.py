@@ -26,7 +26,7 @@ from max.graph import (
     Weight,
     ops,
 )
-from max.nn.kv_cache import PagedCacheValues
+from max.nn.kv_cache import KVCacheParams, MultiKVCacheParams, PagedCacheValues
 from max.nn.layer import LayerList, Module
 from max.nn.linear import MLP, ColumnParallelLinear
 from max.nn.norm import LayerNorm
@@ -134,37 +134,57 @@ class Gemma3LanguageModel(DistributedLogitsPostprocessMixin, Module):
             eps=text_config.rms_norm_eps,
         )
 
-        layers = [
-            Gemma3TransformerBlock(
-                attention=Gemma3Attention(
-                    rope_global=rope_global,
-                    rope_local=rope_local,
-                    num_attention_heads=text_config.num_attention_heads,
-                    num_key_value_heads=text_config.num_key_value_heads,
-                    hidden_size=text_config.hidden_size,
-                    kv_params=config.kv_params,
-                    layer_idx=i,
-                    dtype=config.dtype,
+        assert isinstance(config.kv_params, MultiKVCacheParams)
+        kv_params_by_type: dict[str, KVCacheParams] = {}
+        for layer_type_key, kv_params_leaf in config.kv_params.children.items():
+            assert isinstance(kv_params_leaf, KVCacheParams)
+            kv_params_by_type[layer_type_key] = kv_params_leaf
+
+        layer_type_counts = {"sliding_attention": 0, "full_attention": 0}
+        layers = []
+        for i in range(text_config.num_hidden_layers):
+            is_sliding = bool((i + 1) % text_config.sliding_window_pattern)
+            layer_type = "sliding_attention" if is_sliding else "full_attention"
+            layer_idx_in_cache = layer_type_counts[layer_type]
+            layer_type_counts[layer_type] += 1
+            layers.append(
+                Gemma3TransformerBlock(
+                    attention=Gemma3Attention(
+                        rope_global=rope_global,
+                        rope_local=rope_local,
+                        num_attention_heads=text_config.num_attention_heads,
+                        num_key_value_heads=text_config.num_key_value_heads,
+                        hidden_size=text_config.hidden_size,
+                        kv_params=kv_params_by_type[layer_type],
+                        layer_idx=layer_idx_in_cache,
+                        is_sliding=is_sliding,
+                        dtype=config.dtype,
+                        devices=config.devices,
+                        qk_norm_eps=text_config.rms_norm_eps,
+                        local_window_size=text_config.sliding_window,
+                        quant_config=config.quant_config,
+                    ),
+                    mlp=MLP(
+                        dtype=config.dtype,
+                        quantization_encoding=None,
+                        hidden_dim=text_config.hidden_size,
+                        feed_forward_length=text_config.intermediate_size,
+                        devices=config.devices,
+                        activation_function=text_config.hidden_activation,
+                        quant_config=config.quant_config,
+                    ),
+                    input_layernorm=create_norm(),
+                    post_attention_layernorm=create_norm(),
+                    pre_feedforward_layernorm=create_norm(),
+                    post_feedforward_layernorm=create_norm(),
                     devices=config.devices,
-                    qk_norm_eps=text_config.rms_norm_eps,
-                    local_window_size=text_config.sliding_window,
-                    quant_config=config.quant_config,
-                ),
-                mlp=MLP(
-                    dtype=config.dtype,
-                    quantization_encoding=None,
-                    hidden_dim=text_config.hidden_size,
-                    feed_forward_length=text_config.intermediate_size,
-                    devices=config.devices,
-                    activation_function=text_config.hidden_activation,
-                    quant_config=config.quant_config,
-                ),
-                input_layernorm=create_norm(),
-                post_attention_layernorm=create_norm(),
-                pre_feedforward_layernorm=create_norm(),
-                post_feedforward_layernorm=create_norm(),
-                devices=config.devices,
+                )
             )
+
+        self._layer_kv_key = [
+            "sliding_attention"
+            if bool((i + 1) % text_config.sliding_window_pattern)
+            else "full_attention"
             for i in range(text_config.num_hidden_layers)
         ]
 
@@ -182,7 +202,8 @@ class Gemma3LanguageModel(DistributedLogitsPostprocessMixin, Module):
         image_embeddings: Sequence[TensorValue],
         image_token_indices: Sequence[TensorValue],
         signal_buffers: Sequence[BufferValue],
-        kv_collections: Sequence[PagedCacheValues],
+        sliding_kv_collections: Sequence[PagedCacheValues],
+        global_kv_collections: Sequence[PagedCacheValues],
     ) -> tuple[TensorValue, ...]:
         h = self.embed_tokens(tokens, signal_buffers)
 
@@ -198,6 +219,11 @@ class Gemma3LanguageModel(DistributedLogitsPostprocessMixin, Module):
             )
         ]
 
+        kv_collections_by_type = {
+            "sliding_attention": sliding_kv_collections,
+            "full_attention": global_kv_collections,
+        }
+
         # Run through transformer layers, passing image_token_indices so
         # that global attention layers can apply bidirectional masking for
         # image tokens
@@ -209,7 +235,7 @@ class Gemma3LanguageModel(DistributedLogitsPostprocessMixin, Module):
                 layer_idx_tensor,
                 h,
                 signal_buffers,
-                kv_collections,
+                kv_collections_by_type[self._layer_kv_key[idx]],
                 input_row_offsets=input_row_offsets,
                 image_token_indices=image_token_indices[0],
             )
@@ -271,7 +297,7 @@ class Gemma3VisionModel(Module):
         )
 
         self.post_layernorm_list = []
-        for device, weight_shard, bias_shard in zip(
+        for device, weight_shard, bias_shard in zip(  # noqa: PLR1704 (FIXME)
             config.devices,
             post_layernorm_weight_shards,
             post_layernorm_bias_shards,

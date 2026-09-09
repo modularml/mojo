@@ -13,7 +13,7 @@
 
 """Tests for the Kimi K2.5 tokenizer, specifically tool handling."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from max.pipelines.architectures.kimik2_5.tokenizer import (
@@ -21,7 +21,13 @@ from max.pipelines.architectures.kimik2_5.tokenizer import (
     _sanitize_kimi_schema_node,
     _sanitize_kimi_tool_schemas,
 )
+from max.pipelines.context import (
+    SamplingParams,
+    TextGenerationResponseFormat,
+)
 from max.pipelines.modeling.types import (
+    RequestID,
+    TextGenerationRequest,
     TextGenerationRequestMessage,
     TextGenerationRequestTool,
 )
@@ -444,3 +450,107 @@ class TestSanitizeKimiToolSchemas:
         result = _sanitize_kimi_tool_schemas([tool])
         assert result is not None
         assert result[0]["function"]["parameters"] == {}
+
+
+class TestNewContextGrammarState:
+    """``new_context`` must carry grammar enforcement state from the request.
+
+    Regression guard: ``KimiK2_5VLTokenizer.new_context`` overrides
+    ``new_context`` and previously omitted ``grammar_state``, so the context
+    fell back to a default ``GrammarEnforcementState`` with
+    ``grammar_enforced=False``. The context's grammar state must instead reflect the
+    request's ``response_format`` (matching ``TextTokenizer``).
+    """
+
+    @pytest.fixture
+    def tokenizer(self, monkeypatch: pytest.MonkeyPatch) -> KimiK2_5VLTokenizer:
+        """A KimiK2_5VLTokenizer with ``new_context``'s collaborators mocked.
+
+        Drives the text-only path (``prompt`` set, no images), so vision
+        processing is skipped and only the grammar-state wiring is exercised.
+        """
+        with patch.object(
+            KimiK2_5VLTokenizer, "__init__", lambda self, *args, **kwargs: None
+        ):
+            tok = KimiK2_5VLTokenizer.__new__(KimiK2_5VLTokenizer)
+        tok.delegate = MagicMock()
+        tok.max_length = 4096
+        # A media-pad id absent from the encoded prompt -> no-image path.
+        tok.media_pad_token_id = 999_999
+        tok.vision_token_ids = [999_999]
+        tok.enable_prefix_caching = False
+        tok.enable_vision_caching = False
+        tok.vision_processor = MagicMock()
+        tok.vision_processor.cfg.merge_kernel_size = 2
+        # ``monkeypatch.setattr`` avoids mypy's method-assign error.
+        monkeypatch.setattr(
+            tok, "encode", AsyncMock(return_value=[1, 2, 3, 4, 5])
+        )
+        monkeypatch.setattr(
+            tok, "create_eos_tracker", AsyncMock(return_value=MagicMock())
+        )
+        return tok
+
+    @staticmethod
+    def _request(
+        response_format: TextGenerationResponseFormat | None,
+    ) -> TextGenerationRequest:
+        return TextGenerationRequest(
+            request_id=RequestID("test_grammar_state"),
+            model_name="kimi-k2.5",
+            prompt=[1, 2, 3, 4, 5],
+            sampling_params=SamplingParams(max_new_tokens=8),
+            response_format=response_format,
+        )
+
+    @pytest.mark.asyncio
+    async def test_json_schema_response_format_is_enforced(
+        self, tokenizer: KimiK2_5VLTokenizer
+    ) -> None:
+        """A json_schema response_format yields an enforced grammar state."""
+        response_format = TextGenerationResponseFormat(
+            type="json_schema",
+            json_schema={"type": "object"},
+            grammar_enforced=True,
+            has_json_schema=True,
+            requires_structured_output_flag=True,
+        )
+
+        context = await tokenizer.new_context(self._request(response_format))
+
+        assert context.json_schema is not None
+        # The key regression assertion: state carried from response_format,
+        # not the default grammar_enforced=False.
+        assert context.grammar_enforced is True
+        assert context.grammar_state.has_json_schema is True
+        assert context.grammar_state.requires_structured_output_flag is True
+
+    @pytest.mark.asyncio
+    async def test_forced_tool_grammar_is_enforced_from_start(
+        self, tokenizer: KimiK2_5VLTokenizer
+    ) -> None:
+        """A forced tool grammar (tool_choice=required) enforces from token 0."""
+        response_format = TextGenerationResponseFormat(
+            type="grammar",
+            grammar='start: "x"',
+            grammar_enforced=True,
+            tools_forced=True,
+        )
+
+        context = await tokenizer.new_context(self._request(response_format))
+
+        assert context.grammar is not None
+        assert context.grammar_enforced is True
+        assert context.grammar_state.tools_forced is True
+
+    @pytest.mark.asyncio
+    async def test_no_response_format_is_unenforced(
+        self, tokenizer: KimiK2_5VLTokenizer
+    ) -> None:
+        """Without a response_format the state defaults to unenforced."""
+        context = await tokenizer.new_context(self._request(None))
+
+        assert context.json_schema is None
+        assert context.grammar is None
+        assert context.grammar_enforced is False
+        assert context.grammar_state.has_json_schema is False

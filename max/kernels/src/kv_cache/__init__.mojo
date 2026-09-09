@@ -10,12 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""
-Contains implementations for several types of key-value caches.
+"""Contains implementations for several types of key-value caches.
 
-[KV caches](/glossary/ai/kv-cache) are used in transformer models to store
-key-value tensors output from self-attention layers.
+KV caches are used in transformer models to store
+key-value tensors output from self-attention layers, allowing previously
+computed results to be reused across decoding steps.
 
-These APIs are used in the higher-level functions in the
-[`nn`](../nn/) package.
+This package provides the low-level cache types and index-remapping kernels
+used during paged and sparse attention. These APIs are consumed by the
+higher-level functions in the [`nn`](../nn/) package and are not typically
+called directly by model authors.
 """

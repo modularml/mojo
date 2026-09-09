@@ -12,10 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 
 
-import max.nn as nn
 import numpy as np
 import pytest
 import torch
+from max import nn
 from max.driver import Buffer, accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession

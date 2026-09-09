@@ -10,13 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements tensor resize (upsample/downsample) with nearest, bilinear, and other interpolation modes."""
 
 from std.math import ceil, floor
 
 
-from std.algorithm.functional import elementwise
-from std.algorithm.reduction import _get_nd_indices_from_flat_index
-from std.gpu.host import DeviceContext
+from max.algorithm.functional import elementwise
+from max.algorithm.reduction import _get_nd_indices_from_flat_index
+from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     TensorLayout,
@@ -24,12 +25,15 @@ from layout import (
     coord_to_index_list,
     row_major,
 )
-from std.memory import memcpy
+from std.memory import unsafe_memcpy
 
 from std.utils import IndexList, StaticTuple
 
 
 struct CoordinateTransformationMode(ImplicitlyCopyable):
+    """Specifies how output coordinates map to input coordinates during resize.
+    """
+
     var value: Int
     comptime HalfPixel = CoordinateTransformationMode(0)
     comptime AlignCorners = CoordinateTransformationMode(1)
@@ -45,11 +49,25 @@ struct CoordinateTransformationMode(ImplicitlyCopyable):
         return self.value == other.value
 
 
-@parameter
+@__parameter
 @always_inline
 def coord_transform[
     mode: CoordinateTransformationMode
 ](out_coord: Int, in_dim: Int, out_dim: Int, scale: Float32) -> Float32:
+    """Maps an output coordinate to an input coordinate according to the given transformation mode.
+
+    Parameters:
+        mode: The coordinate transformation mode governing the mapping.
+
+    Args:
+        out_coord: The output coordinate to map.
+        in_dim: The size of the input dimension.
+        out_dim: The size of the output dimension.
+        scale: The ratio of output dimension size to input dimension size.
+
+    Returns:
+        The corresponding input coordinate as a floating-point value.
+    """
     var out_coord_f32 = Float32(out_coord)
 
     comptime if mode == CoordinateTransformationMode.HalfPixel:
@@ -71,7 +89,7 @@ def coord_transform[
         # note: resized image will have same corners as original image
         return (
             out_coord_f32
-            * (Float64(in_dim - 1) / Float64(out_dim - 1)).cast[DType.float32]()
+            * (Float64(in_dim - 1) / Float64(out_dim - 1)).cast[.float32]()
         )
     elif mode == CoordinateTransformationMode.Asymmetric:
         return out_coord_f32 / scale
@@ -80,6 +98,9 @@ def coord_transform[
 
 
 struct RoundMode(ImplicitlyCopyable):
+    """Specifies how fractional coordinates are rounded to integer indices during nearest-neighbor resize.
+    """
+
     var value: Int
     comptime HalfDown = RoundMode(0)
     comptime HalfUp = RoundMode(1)
@@ -97,6 +118,8 @@ struct RoundMode(ImplicitlyCopyable):
 
 @fieldwise_init
 struct InterpolationMode(ImplicitlyCopyable):
+    """Specifies the interpolation method used during resize."""
+
     var value: Int
     comptime Linear = InterpolationMode(0)
 
@@ -108,6 +131,9 @@ struct InterpolationMode(ImplicitlyCopyable):
 struct Interpolator[mode: InterpolationMode](
     Defaultable, TrivialRegisterPassable
 ):
+    """Holds interpolation filter state and applies the filter for a given interpolation mode.
+    """
+
     var cubic_coeff: Float32
 
     @always_inline
@@ -139,10 +165,22 @@ def resize_nearest_neighbor[
     round_mode: RoundMode,
     dtype: DType,
 ](
-    input: TileTensor[dtype, ...],
+    input: TileTensor[mut=False, dtype, ...],
     output: TileTensor[mut=True, dtype, ...],
     ctx: DeviceContext,
 ) raises:
+    """Resizes input to output shape using nearest-neighbor interpolation.
+
+    Parameters:
+        coordinate_transformation_mode: How to map a coordinate in output to a coordinate in input.
+        round_mode: How to round fractional input coordinates to integer indices.
+        dtype: Type of input and output.
+
+    Args:
+        input: The input to be resized.
+        output: The output containing the resized input.
+        ctx: The device context used to launch the kernel.
+    """
     comptime assert (
         input.rank == output.rank
     ), "input rank must match output rank"
@@ -152,7 +190,7 @@ def resize_nearest_neighbor[
             DType.float32
         ]()
 
-    @parameter
+    @__parameter
     @always_inline
     def round[dtype: DType](val: Scalar[dtype]) -> Scalar[dtype]:
         comptime if round_mode == RoundMode.HalfDown:
@@ -166,11 +204,9 @@ def resize_nearest_neighbor[
         else:
             comptime assert False, "round_mode not implemented"
 
-    @__copy_capture(scales)
-    @parameter
     def nn_interpolate[
-        simd_width: Int, _rank: Int, alignment: Int = 1
-    ](out_coords: IndexList[_rank]):
+        simd_width: Int, alignment: Int = 1
+    ](out_coords: Coord) {var}:
         var in_coords = IndexList[input.rank](0)
 
         comptime for i in range(input.rank):
@@ -178,7 +214,7 @@ def resize_nearest_neighbor[
                 Int(
                     round(
                         coord_transform[coordinate_transformation_mode](
-                            out_coords[i],
+                            Int(out_coords[i].value()),
                             Int(input.dim(i)),
                             Int(output.dim(i)),
                             scales[i],
@@ -189,14 +225,12 @@ def resize_nearest_neighbor[
             )
 
         var in_idx = input.layout(Coord(in_coords))
-        var out_idx = output.layout(Coord(out_coords))
+        var out_idx = output.layout(out_coords)
 
         output.raw_store(out_idx, input.ptr[in_idx])
 
-    # TODO (#21439): can use memcpy when scale on inner dimension is 1
-    elementwise[nn_interpolate, 1](
-        coord_to_index_list(output.layout.shape_coord()), ctx
-    )
+    # TODO (#21439): can use unsafe_memcpy when scale on inner dimension is 1
+    elementwise[1](nn_interpolate, output.layout.shape_coord(), ctx)
 
 
 @always_inline
@@ -216,7 +250,7 @@ def linear_filter(x: Float32) -> Float32:
     return 0
 
 
-@parameter
+@__parameter
 @always_inline
 def interpolate_point_1d[
     InputLayoutType: TensorLayout,
@@ -231,16 +265,27 @@ def interpolate_point_1d[
     out_coords: IndexList[InputLayoutType.rank],
     scale: Float32,
     input: TileTensor[
-        mut=True,
-        dtype,
-        InputLayoutType,
-        address_space=AddressSpace.GENERIC,
-        ...,
+        mut=False, dtype, InputLayoutType, address_space=.GENERIC, ...
     ],
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
 ):
+    """Computes one-dimensional interpolation for a single output point along a given dimension.
+
+    Parameters:
+        InputLayoutType: The layout type of the input tensor.
+        coordinate_transformation_mode: The coordinate transformation mode to apply.
+        antialias: Whether to stretch the filter to antialias when downsampling.
+        dtype: The element type of the input and output tensors.
+        interpolation_mode: The interpolation mode to use.
+
+    Args:
+        interpolator: The interpolator providing the filter function.
+        dim: The dimension along which to interpolate.
+        out_coords: The multi-dimensional coordinates of the output point.
+        scale: The ratio of output dimension size to input dimension size.
+        input: The input tensor to read from.
+        output: The output tensor to write the interpolated value to.
+    """
     var center = (
         coord_transform[coordinate_transformation_mode](
             out_coords[dim], Int(input.dim(dim)), Int(output.dim(dim)), scale
@@ -276,14 +321,10 @@ def resize_linear[
     antialias: Bool,
     dtype: DType,
 ](
-    input: TileTensor[mut=True, dtype, address_space=AddressSpace.GENERIC, ...],
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
+    input: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
 ):
     """Resizes input to output shape using linear interpolation.
-
-    Does not use anti-aliasing filter for downsampling (coming soon).
 
     Parameters:
         coordinate_transformation_mode: How to map a coordinate in output to a coordinate in input.
@@ -308,10 +349,8 @@ def _resize[
     antialias: Bool,
     dtype: DType,
 ](
-    input: TileTensor[mut=True, dtype, address_space=AddressSpace.GENERIC, ...],
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
+    input: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
 ):
     comptime assert (
         input.rank == output.rank
@@ -322,7 +361,7 @@ def _resize[
     ) == rebind[IndexList[input.rank]](
         coord_to_index_list(output.layout.shape_coord())
     ):
-        return memcpy(
+        return unsafe_memcpy(
             dest=output.ptr, src=input.ptr, count=input.num_elements()
         )
     var scales = StaticTuple[Float32, input.rank]()
@@ -338,7 +377,7 @@ def _resize[
             resize_dims.append(i)
     var interpolator = Interpolator[interpolation_mode]()
 
-    var in_ptr = input.ptr.unsafe_origin_cast[MutExternalOrigin]()
+    var in_ptr = input.ptr.unsafe_origin_cast[MutUntrackedOrigin]()
     # SAFETY: Placeholder; always overwritten below.
     var out_ptr = UnsafePointer[Scalar[dtype], MutAnyOrigin].unsafe_dangling()
 
@@ -349,12 +388,12 @@ def _resize[
     # ping pong between using tmp_buffer1 and tmp_buffer2 to store outputs
     # of 1d interpolation pass across one of the dimensions
     if len(resize_dims) == 1:  # avoid allocating tmp_buffer
-        out_ptr = output.ptr.unsafe_origin_cast[MutExternalOrigin]()
+        out_ptr = output.ptr.unsafe_origin_cast[MutAnyOrigin]()
     if len(resize_dims) > 1:  # avoid allocating second tmp_buffer
         tmp_buffer1 = List[Scalar[dtype]](
             unsafe_uninit_length=tmp_dims.flattened_length()
         )
-        out_ptr = tmp_buffer1.unsafe_ptr()
+        out_ptr = tmp_buffer1.unsafe_ptr().as_unsafe_any_origin()
         using_tmp1 = True
     if len(resize_dims) > 2:  # need a second tmp_buffer
         # TODO: if you are upsampling all dims, you can use the output in place of tmp_buffer2
@@ -369,7 +408,7 @@ def _resize[
     # interpolated dimension
     for dim_idx in range(len(resize_dims)):
         if dim_idx == len(resize_dims) - 1:
-            out_ptr = output.ptr.unsafe_origin_cast[MutExternalOrigin]()
+            out_ptr = output.ptr.unsafe_origin_cast[MutAnyOrigin]()
         var resize_dim = resize_dims[dim_idx]
         out_shape[resize_dim] = Int(output.dim(resize_dim))
 
@@ -397,11 +436,11 @@ def _resize[
                 )
 
         in_shape = out_shape
-        in_ptr = out_ptr.unsafe_origin_cast[MutExternalOrigin]()
+        in_ptr = out_ptr.unsafe_origin_cast[MutUntrackedOrigin]()
 
         out_ptr = (
             tmp_buffer2.unsafe_ptr() if using_tmp1 else tmp_buffer1.unsafe_ptr()
-        )
+        ).as_unsafe_any_origin()
         using_tmp1 = not using_tmp1
 
     _ = tmp_buffer1^

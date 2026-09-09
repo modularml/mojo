@@ -1,0 +1,2 @@
+This file tests that the parser doesn't confuse `test_package.foo` with
+`test_package/__init__.mojo` as a package.

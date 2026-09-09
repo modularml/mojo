@@ -557,21 +557,21 @@ def run_selective_scan_update[
             var x_val = Float32(x_buf.ptr[x_offset])
 
             # Load A values and compute dA
-            var dA_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var dA_vals = SIMD[.float32, MAX_DSTATE](0.0)
             for n in range(dstate):
                 var A_offset = d * dstate + n
                 var A_val = Float32(A_buf.ptr[A_offset]) * LOG2E
                 dA_vals[n] = exp2(A_val * dt_val)
 
             # Load B values and compute dB
-            var dB_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var dB_vals = SIMD[.float32, MAX_DSTATE](0.0)
             for n in range(dstate):
                 var B_offset = b * n_groups * dstate + group_id * dstate + n
                 var B_val = Float32(B_buf.ptr[B_offset])
                 dB_vals[n] = B_val * dt_val
 
             # Load current state
-            var state_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var state_vals = SIMD[.float32, MAX_DSTATE](0.0)
             for n in range(dstate):
                 var state_offset = b * dim * dstate + d * dstate + n
                 state_vals[n] = Float32(state_out_ref_h.ptr[state_offset])
@@ -585,7 +585,7 @@ def run_selective_scan_update[
                 state_out_ref_h.ptr[state_offset] = Scalar[dtype](state_vals[n])
 
             # Load C values
-            var C_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var C_vals = SIMD[.float32, MAX_DSTATE](0.0)
             for n in range(dstate):
                 var C_offset = b * n_groups * dstate + group_id * dstate + n
                 C_vals[n] = Float32(C_buf.ptr[C_offset])

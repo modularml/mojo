@@ -183,7 +183,7 @@ class GlmMoeDsaIndexer(nn.Module):
         self,
         hidden_states: torch.Tensor,  # [B, S, hidden]
         q_resid: torch.Tensor,  # [B, S, q_lora_rank]
-        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        position_embeddings: tuple[torch.Tensor, torch.Tensor] | None,
         attention_mask: torch.Tensor | None,
         use_cache: bool = False,
     ) -> torch.LongTensor:
@@ -201,7 +201,9 @@ class GlmMoeDsaIndexer(nn.Module):
         Args:
             hidden_states: Input hidden states `[B, S, hidden_size]`.
             q_resid: Query residual from `q_a_layernorm(q_a_proj(x))`, shape `[B, S, q_lora_rank]`.
-            position_embeddings: `(cos, sin)` from RotaryEmbedding.
+            position_embeddings: `(cos, sin)` from RotaryEmbedding, or `None`
+                when `qk_rope_head_dim == 0` (a NoPE sibling such as
+                GLM-5.3-Flash, whose indexer has no rotary path at all).
             attention_mask: Causal mask, broadcastable to `[B, S, T]`.
             use_cache: Whether to store/update the indexer's own key cache for autoregressive decode.
 
@@ -209,34 +211,38 @@ class GlmMoeDsaIndexer(nn.Module):
             `torch.LongTensor`: Top-k token indices of shape `[B, S, topk]`.
         """
         batch_size, seq_len, _ = hidden_states.shape
-        cos, sin = position_embeddings
 
         # === Queries ===
         q = self.wq_b(q_resid)  # [B, S, H*D]
         q = q.view(
             batch_size, seq_len, self.n_heads, self.head_dim
         )  # [B, S, H, D]
-        q_pe, q_nope = torch.split(
-            q,
-            [self.qk_rope_head_dim, self.head_dim - self.qk_rope_head_dim],
-            dim=-1,
-        )
-        q_pe = apply_rotary_pos_emb(
-            q_pe, cos, sin, unsqueeze_dim=2
-        )  # [B, S, H, rope_D]
-        q = torch.cat([q_pe, q_nope], dim=-1)  # [B, S, H, D]
 
         # === Keys ===
         k = self.k_norm(self.wk(hidden_states))  # [B, S, D]
-        k_pe, k_nope = torch.split(
-            k,
-            [self.qk_rope_head_dim, self.head_dim - self.qk_rope_head_dim],
-            dim=-1,
-        )
-        k_pe = apply_rotary_pos_emb(
-            k_pe.unsqueeze(2), cos, sin, unsqueeze_dim=2
-        ).squeeze(2)  # [B, S, rope_D]
-        k = torch.cat([k_pe, k_nope], dim=-1)  # [B, S, D]
+
+        if self.qk_rope_head_dim:
+            assert position_embeddings is not None
+            cos, sin = position_embeddings
+            q_pe, q_nope = torch.split(
+                q,
+                [self.qk_rope_head_dim, self.head_dim - self.qk_rope_head_dim],
+                dim=-1,
+            )
+            q_pe = apply_rotary_pos_emb(
+                q_pe, cos, sin, unsqueeze_dim=2
+            )  # [B, S, H, rope_D]
+            q = torch.cat([q_pe, q_nope], dim=-1)  # [B, S, H, D]
+
+            k_pe, k_nope = torch.split(
+                k,
+                [self.qk_rope_head_dim, self.head_dim - self.qk_rope_head_dim],
+                dim=-1,
+            )
+            k_pe = apply_rotary_pos_emb(
+                k_pe.unsqueeze(2), cos, sin, unsqueeze_dim=2
+            ).squeeze(2)  # [B, S, rope_D]
+            k = torch.cat([k_pe, k_nope], dim=-1)  # [B, S, D]
 
         # === Key cache (managed by the indexer, not DynamicCache) ===
         # Reset cache on prefill (new prompt) to avoid stale keys / batch-size mismatch

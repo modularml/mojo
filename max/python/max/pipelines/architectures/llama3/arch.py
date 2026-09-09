@@ -11,12 +11,17 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from max.experimental.cascade.pipelines.common_textgen import (
+    CommonTextGenPipeline,
+)
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
 from max.pipelines.lib import SupportedArchitecture, TextTokenizer
 from max.pipelines.modeling.types import PipelineTask
 
 from . import weight_adapters
+from .batch_processor import Llama3BatchProcessor
 from .model import Llama3Model
 from .model_config import Llama3Config
 
@@ -31,21 +36,11 @@ llama_arch = SupportedArchitecture(
         "deepseek-ai/deepseek-coder-6.7b-instruct",
         "modularai/Llama-3.1-8B-Instruct-GGUF",
     ],
-    default_encoding="q4_k",
-    supported_encodings={
-        "gptq",
-        "q4_k",
-        "q4_0",
-        "q6_k",
-        "float32",
-        "bfloat16",
-        "float8_e4m3fn",
-        "float4_e2m1fnx2",
-    },
+    default_encoding=Llama3Config.DEFAULT_ENCODING,
+    supported_encodings=Llama3Config.SUPPORTED_ENCODINGS,
     pipeline_model=Llama3Model,
     tokenizer=TextTokenizer,
     context_type=TextContext,
-    rope_type="normal",
     default_weights_format=WeightsFormat.safetensors,
     multi_gpu_supported=True,
     weight_adapters={
@@ -54,4 +49,7 @@ llama_arch = SupportedArchitecture(
     },
     task=PipelineTask.TEXT_GENERATION,
     config=Llama3Config,
+    batching=Llama3BatchProcessor,
+    memory_planner=PagedMemoryPlanner,
+    cascade_pipeline_factory=CommonTextGenPipeline,
 )

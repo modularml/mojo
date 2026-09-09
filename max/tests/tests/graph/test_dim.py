@@ -14,9 +14,12 @@
 
 from collections.abc import Callable
 
+import numpy as np
 import pytest
 from max._core.dialects import builtin, kgen
-from max.graph import AlgebraicDim, Dim, Graph, StaticDim, SymbolicDim
+from max.dtype import DType
+from max.graph import AlgebraicDim, Dim, Graph, StaticDim, SymbolicDim, ops
+from max.graph.type import DeviceRef
 
 
 class TestStaticDimAlgebraNoContext:
@@ -460,3 +463,97 @@ class TestDimTypes:
         """Creating dim from invalid attr raises TypeError."""
         with pytest.raises(TypeError, match=match):
             creator(attr)
+
+
+class TestDimTensorValueInterop:
+    """Tests that Dim defers to TensorValue for unsupported operand types.
+
+    When a Dim is on the LHS of an arithmetic op with a TensorValue on the
+    RHS, Dim should return NotImplemented so Python falls through to
+    TensorValue.__radd__ (etc.), which already handles Dim operands.
+    """
+
+    def test_add_dim_lhs(self) -> None:
+        """Dim.__add__: Dim(5) + tv -> TensorValue via TensorValue.__radd__."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(3, dtype=np.int64), DType.int64, device=DeviceRef.CPU()
+            )
+            result = Dim(5) + tv
+            assert isinstance(result, type(tv))
+
+    def test_add_dim_rhs(self) -> None:
+        """TensorValue.__add__: tv + Dim(5) -> TensorValue directly."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(3, dtype=np.int64), DType.int64, device=DeviceRef.CPU()
+            )
+            result = tv + Dim(5)
+            assert isinstance(result, type(tv))
+
+    def test_add_symbolic_dim_lhs(self) -> None:
+        """Dim.__add__: SymbolicDim + tv -> TensorValue."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(3, dtype=np.int64), DType.int64, device=DeviceRef.CPU()
+            )
+            result = Dim("batch") + tv
+            assert isinstance(result, type(tv))
+
+    def test_sub_dim_lhs(self) -> None:
+        """Dim.__sub__: Dim(10) - tv -> TensorValue via TensorValue.__rsub__."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(3, dtype=np.int64), DType.int64, device=DeviceRef.CPU()
+            )
+            result = Dim(10) - tv
+            assert isinstance(result, type(tv))
+
+    def test_sub_dim_rhs(self) -> None:
+        """TensorValue.__sub__: tv - Dim(3) -> TensorValue directly."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(10, dtype=np.int64),
+                DType.int64,
+                device=DeviceRef.CPU(),
+            )
+            result = tv - Dim(3)
+            assert isinstance(result, type(tv))
+
+    def test_mul_dim_lhs(self) -> None:
+        """Dim.__mul__: Dim(5) * tv -> TensorValue via TensorValue.__rmul__."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(3, dtype=np.int64), DType.int64, device=DeviceRef.CPU()
+            )
+            result = Dim(5) * tv
+            assert isinstance(result, type(tv))
+
+    def test_mul_dim_rhs(self) -> None:
+        """TensorValue.__mul__: tv * Dim(5) -> TensorValue directly."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(3, dtype=np.int64), DType.int64, device=DeviceRef.CPU()
+            )
+            result = tv * Dim(5)
+            assert isinstance(result, type(tv))
+
+    def test_floordiv_dim_lhs(self) -> None:
+        """Dim.__floordiv__: Dim(10) // tv -> TensorValue via TensorValue.__rfloordiv__."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(3, dtype=np.int64), DType.int64, device=DeviceRef.CPU()
+            )
+            result = Dim(10) // tv
+            assert isinstance(result, type(tv))
+
+    def test_floordiv_dim_rhs(self) -> None:
+        """TensorValue.__floordiv__: tv // Dim(3) -> TensorValue directly."""
+        with Graph("test"):
+            tv = ops.constant(
+                np.array(10, dtype=np.int64),
+                DType.int64,
+                device=DeviceRef.CPU(),
+            )
+            result = tv // Dim(3)
+            assert isinstance(result, type(tv))

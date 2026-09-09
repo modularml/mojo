@@ -16,8 +16,8 @@
 
 from std.sys.info import _accelerator_arch, _is_sm_9x, _is_sm_9x_or_newer
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
 from std.testing import *
 
 

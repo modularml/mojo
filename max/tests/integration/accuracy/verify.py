@@ -597,10 +597,10 @@ def compute_discrepancy_report(
     return DiscrepancyReport(
         mae_per_prompt=mae_per_prompt,
         rmse_per_prompt=rmse_per_prompt,
-        kl_div_per_prompt=kl_div_per_prompt if kl_div_per_prompt else None,
+        kl_div_per_prompt=kl_div_per_prompt or None,
         max_kl_div=model_max_kl_div,
-        ssim_per_prompt=ssim_per_prompt if ssim_per_prompt else None,
-        lpips_per_prompt=lpips_per_prompt if lpips_per_prompt else None,
+        ssim_per_prompt=ssim_per_prompt or None,
+        lpips_per_prompt=lpips_per_prompt or None,
         model_modality=model_modality,
     )
 

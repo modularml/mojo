@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Provides QR factorization of matrices using Householder reflections."""
+
 from std.math import copysign, sqrt
 from std.os import abort
 
@@ -31,6 +33,17 @@ def qr_factorization[
     Householder reflections. The result is stored directly in the input matrix
     `A`, with scaling factors in `sigma`. The implementation follows the LAPACK
     algorithm for generating Householder reflectors in-place.
+
+    Parameters:
+        dtype: Element type of the matrix `A` and the scaling vector `sigma`.
+        element_layout: Memory layout of the `LayoutTensor` inputs.
+
+    Args:
+        sigma: Vector of length `n` holding the Householder scaling factor
+            `ξ/ν` for each column. Written in-place during factorization.
+        A: `m×n` matrix to factorize. Modified in-place: the strictly-lower
+            triangle stores the Householder vectors and the upper triangle
+            (including the diagonal) stores the `R` factor.
 
     Algorithm:
         The Householder reflector is defined as:
@@ -53,17 +66,17 @@ def qr_factorization[
         There is a typo in reference [lawn72]. The correct result is U^H x =
         -νe₁.
     """
-    m, n = Int(A.runtime_layout.shape[0]), Int(A.runtime_layout.shape[1])
+    var m, n = Int(A.runtime_layout.shape[0]), Int(A.runtime_layout.shape[1])
     for k in range(n):
-        x_0 = A[k, k]
-        x_norm = SIMD[dtype, A.element_layout.size()](0.0)
+        var x_0 = A[k, k]
+        var x_norm = SIMD[dtype, A.element_layout.size()](0.0)
         for i in range(m - k):
             x_norm += A[k + i, k] * A[k + i, k]
         x_norm = sqrt(x_norm)
-        nu = copysign(x_norm, x_0)
+        var nu = copysign(x_norm, x_0)
         A[k, k] = -nu
-        xi = x_0 + nu
-        inv_xi = 1.0 / xi
+        var xi = x_0 + nu
+        var inv_xi = 1.0 / xi
         for i in range(m - k - 1):
             A[k + i + 1, k] *= inv_xi
         sigma[k] = xi / nu
@@ -75,12 +88,12 @@ def qr_factorization[
         # v[0] -= s
         # v[1:] -= s * w
         for j in range(n - k - 1):
-            dot = A[k, k + j + 1]  # v[0]
+            var dot = A[k, k + j + 1]  # v[0]
             for i in range(m - k - 1):
-                wi = A[k + i + 1, k]  # w[i]
-                vi = A[k + i + 1, k + j + 1]  # v[i + 1]
+                var wi = A[k + i + 1, k]  # w[i]
+                var vi = A[k + i + 1, k + j + 1]  # v[i + 1]
                 dot += wi * vi
-            s = sigma[k] * dot
+            var s = sigma[k] * dot
             A[k, k + j + 1] -= s  # v[0] -= s
             for i in range(m - k - 1):
                 A[k + i + 1, k + j + 1] -= (
@@ -101,19 +114,33 @@ def apply_q[
 
     See `qr_factorization` for more details on the construction of the
     Householder reflector.
+
+    Parameters:
+        dtype: Element type of the matrices.
+        element_layout: Memory layout of the `LayoutTensor` inputs.
+
+    Args:
+        sigma: Vector of length `n` holding the Householder scaling factors
+            produced by `qr_factorization`.
+        A: `m×n` matrix containing the implicit `Q` factor as produced by
+            `qr_factorization`.
+        X: `m×q_n` matrix to multiply by `Q`. Must have the same number of
+            rows as `A`. Overwritten with `Q·X` in-place.
     """
-    m, n = Int(A.runtime_layout.shape[0]), Int(A.runtime_layout.shape[1])
-    q_m, q_n = Int(X.runtime_layout.shape[0]), Int(X.runtime_layout.shape[1])
+    var m, n = Int(A.runtime_layout.shape[0]), Int(A.runtime_layout.shape[1])
+    var q_m, q_n = Int(X.runtime_layout.shape[0]), Int(
+        X.runtime_layout.shape[1]
+    )
     if q_m != m:
         abort("apply_q: X must have the same number of rows as A")
     for k in range(n - 1, -1, -1):
         for j in range(q_n):
-            dot = X[k, j]  # v[0]
+            var dot = X[k, j]  # v[0]
             for i in range(m - k - 1):
-                wi = A[k + i + 1, k]  # w[i]
-                vi = X[k + i + 1, j]  # v[i + 1]
+                var wi = A[k + i + 1, k]  # w[i]
+                var vi = X[k + i + 1, j]  # v[i + 1]
                 dot += wi * vi
-            s = sigma[k] * dot
+            var s = sigma[k] * dot
             X[k, j] -= s  # v[0] -= s
             for i in range(m - k - 1):
                 X[k + i + 1, j] -= s * A[k + i + 1, k]  # v[i + 1] -= s * w
@@ -129,9 +156,23 @@ def form_q[
 ):
     """Forms the Q factor from the implicit Q factor stored in `A` and `sigma`
     after calling `qr_factorization` and stores the result in `Q`.
+
+    Parameters:
+        dtype: Element type of the matrices.
+        element_layout: Memory layout of the `LayoutTensor` inputs.
+
+    Args:
+        sigma: Vector of length `n` holding the Householder scaling factors
+            produced by `qr_factorization`.
+        A: `m×n` matrix containing the implicit `Q` factor as produced by
+            `qr_factorization`.
+        Q: `q_m×q_n` output matrix initialized to the identity and
+            overwritten with the explicit `Q` factor.
     """
-    q_m, q_n = Int(Q.runtime_layout.shape[0]), Int(Q.runtime_layout.shape[1])
-    min_mn = min(q_m, q_n)
+    var q_m, q_n = Int(Q.runtime_layout.shape[0]), Int(
+        Q.runtime_layout.shape[1]
+    )
+    var min_mn = min(q_m, q_n)
 
     # Q.fill(0.0) doesn't work
     for i in range(q_m):

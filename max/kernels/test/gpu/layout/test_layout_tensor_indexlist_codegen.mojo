@@ -24,7 +24,7 @@ After the fix, both should produce equivalent code.
 """
 
 from std.compile import compile_info
-from std.gpu.host import get_gpu_target
+from max.gpu.host import get_gpu_target
 from layout import Layout, LayoutTensor
 from std.testing import assert_true
 from std.utils import Index
@@ -37,12 +37,12 @@ def test_store_codegen_equivalence() raises:
     """Test that store(IndexList) produces equivalent code to store(m, n)."""
 
     def variadic_kernel(
-        output: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
+        output: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
     ):
         output.store[1](2, 3, 1234)
 
     def indexlist_kernel(
-        output: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
+        output: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
     ):
         output.store[1](Index(2, 3), 1234)
 
@@ -79,15 +79,15 @@ def test_load_codegen_equivalence() raises:
     """Test that load(IndexList) produces equivalent code to load(m, n)."""
 
     def variadic_kernel(
-        input: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
-        output: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
+        input: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
+        output: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
     ):
         var val = input.load[1](2, 3)
         output.store[1](0, 0, val)
 
     def indexlist_kernel(
-        input: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
-        output: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
+        input: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
+        output: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
     ):
         var val = input.load[1](Index(2, 3))
         output.store[1](0, 0, val)
@@ -124,15 +124,15 @@ def test_aligned_load_codegen_equivalence() raises:
     """
 
     def variadic_kernel(
-        input: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
-        output: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
+        input: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
+        output: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
     ):
         var val = input.aligned_load[1](2, 3)
         output.store[1](0, 0, val)
 
     def indexlist_kernel(
-        input: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
-        output: LayoutTensor[DType.int32, layout_2d, MutAnyOrigin],
+        input: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
+        output: LayoutTensor[.int32, layout_2d, MutAnyOrigin],
     ):
         var val = input.aligned_load[1](Index(2, 3))
         output.store[1](0, 0, val)

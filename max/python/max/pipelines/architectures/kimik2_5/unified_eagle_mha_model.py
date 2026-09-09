@@ -14,11 +14,11 @@
 
 Mirrors :class:`Eagle3KimiK25Unified` but:
 
-- carries an MHA draft (:class:`Eagle3MHAKimiK25`) whose KV cache geometry
+- carries an MHA draft (:class:`Eagle3MHADraft`) whose KV cache geometry
   is independent of the target's MLA cache;
 - declares an independent set of per-device draft KV inputs (kv_blocks,
-  cache_lengths, lookup_table, max_lengths, attention_dispatch_metadata)
-  instead of borrowing the target's slots.
+  cache_lengths, lookup_table, max_prompt_length, max_cache_length,
+  attention_dispatch_metadata) instead of borrowing the target's slots.
 """
 
 from __future__ import annotations
@@ -36,40 +36,38 @@ from max.graph import (
     Value,
     ops,
 )
-from max.nn.comm import Signals
-from max.nn.kernels import (
-    eagle_prefill_shift_tokens,
-    inplace_memcpy,
-    wait_host_value_with_dep,
-)
-from max.nn.kv_cache import (
-    KVCacheInputsPerDevice,
-    KVCacheParamInterface,
-    KVCacheParams,
-    PagedCacheValues,
-)
+from max.nn.kv_cache import MultiKVCacheParams, PagedCacheValues
 from max.nn.layer import Module
 from max.nn.sampling.rejection_sampler import (
     AcceptanceSampler,
     _reshape_target_logits,
 )
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
+from max.nn.transformer.transformer import captures_by_device
 from max.pipelines.kv_cache.paged_kv_cache.increment_cache_lengths import (
     increment_cache_lengths_from_counts,
 )
 from max.pipelines.lib.vlm_utils import merge_multimodal_embeddings
 from max.pipelines.speculative.config import SpeculativeConfig
-from max.pipelines.speculative.ragged_token_merger import (
-    RaggedTokenMerger,
-    _shape_to_scalar,
+from max.pipelines.speculative.ragged_token_merger import RaggedTokenMerger
+from max.pipelines.speculative.spec_input_types import (
+    SpecDecodeInputTypeSpec,
+    build_spec_decode_input_types,
+)
+from max.pipelines.speculative.unified_graph_ops import (
+    accept_and_pick_next_tokens,
+    apply_overlap_bitmask,
+    gather_accepted_hidden_states,
+    merge_tokens_and_host_offsets,
+    shift_corrected_tokens,
 )
 
 from ..deepseekV3.deepseekV3 import DeepseekV3
 from ..deepseekV3.model_config import DeepseekV3Config
-from ..unified_mtp_deepseekV3.unified_mtp_deepseekV3 import (
-    compute_host_merged_offsets,
+from ..eagle_common.eagle_mha_draft import (
+    Eagle3MHADraft,
+    Eagle3MHADraftConfig,
 )
-from .eagle3_mha_kimi_k25 import Eagle3MHAKimiK25, Eagle3MHAKimiK25DraftConfig
 
 
 class Eagle3MHAKimiK25Unified(Module):
@@ -84,7 +82,7 @@ class Eagle3MHAKimiK25Unified(Module):
     def __init__(
         self,
         config: DeepseekV3Config,
-        draft_config: Eagle3MHAKimiK25DraftConfig,
+        draft_config: Eagle3MHADraftConfig,
         speculative_config: SpeculativeConfig | None = None,
         enable_structured_output: bool = False,
         enable_vision: bool = False,
@@ -101,7 +99,8 @@ class Eagle3MHAKimiK25Unified(Module):
         self.enable_vision = enable_vision
         self.num_draft_steps = (
             speculative_config.num_speculative_tokens
-            if speculative_config
+            if speculative_config is not None
+            and speculative_config.num_speculative_tokens is not None
             else 1
         )
         relaxed_topk: int | None = None
@@ -126,9 +125,15 @@ class Eagle3MHAKimiK25Unified(Module):
         self.target = DeepseekV3(config)
         self.merger = RaggedTokenMerger(config.devices[0])
 
-        self.draft: Eagle3MHAKimiK25 | None = None
+        self.draft: Eagle3MHADraft | None = None
         if draft_config is not None:
-            self.draft = Eagle3MHAKimiK25(draft_config)
+            self.draft = Eagle3MHADraft(draft_config)
+            aux_layer_ids = config.eagle_aux_hidden_state_layer_ids
+            assert aux_layer_ids is not None
+            assert len(aux_layer_ids) == draft_config.fc_input_multiplier, (
+                f"the target captures {len(aux_layer_ids)} aux hidden states "
+                f"but the draft's fc fuses {draft_config.fc_input_multiplier}"
+            )
 
     def __call__(
         self,
@@ -156,14 +161,14 @@ class Eagle3MHAKimiK25Unified(Module):
         wait_payload: BufferValue | None = None,
         device_bitmask_scratch: BufferValue | None = None,
     ) -> tuple[TensorValue, ...]:
-        merged_tokens, merged_offsets = self.merger(
-            tokens, input_row_offsets, draft_tokens
-        )
-        merged_tokens = ops.rebind(merged_tokens, ["merged_seq_len"])
-        merged_offsets = ops.rebind(merged_offsets, ["input_row_offsets_len"])
-
-        host_merged_offsets = compute_host_merged_offsets(
-            host_input_row_offsets, draft_tokens
+        merged_tokens, merged_offsets, host_merged_offsets = (
+            merge_tokens_and_host_offsets(
+                self.merger,
+                tokens,
+                input_row_offsets,
+                draft_tokens,
+                host_input_row_offsets,
+            )
         )
 
         assert self.draft is not None
@@ -222,85 +227,35 @@ class Eagle3MHAKimiK25Unified(Module):
                 ep_inputs,
             )
         logits = target_outputs[1]
-        hidden_states = list(target_outputs[3 : 3 + n_devs])
+        hidden_states = captures_by_device(target_outputs[3:], n_devs)
 
-        # Constrained-decoding overlap: gate the model stream on the
-        # async callback's release-store to ``wait_payload``, then
-        # in-graph H2D from pinned host memory to
-        # ``device_bitmask_scratch``. The sampler reads the scratch.
-        # ``device_bitmask_scratch`` is threaded through the wait as
-        # a fake mutable operand so the graph compiler / cuGraph
-        # capture serialises the memcpy after the wait (both ops
-        # mutate the same buffer). The triple is all-or-none.
-        if not (
-            (pinned_bitmask is None)
-            == (wait_payload is None)
-            == (device_bitmask_scratch is None)
-        ):
-            raise ValueError(
-                "pinned_bitmask, wait_payload, and device_bitmask_scratch "
-                "must be either all None or all non-None; got "
-                f"pinned_bitmask={'set' if pinned_bitmask is not None else 'None'}, "
-                f"wait_payload={'set' if wait_payload is not None else 'None'}, "
-                f"device_bitmask_scratch={'set' if device_bitmask_scratch is not None else 'None'}"
-            )
-        effective_bitmasks: TensorValue | None = None
-        if (
-            pinned_bitmask is not None
-            and wait_payload is not None
-            and device_bitmask_scratch is not None
-        ):
-            wait_host_value_with_dep(
-                wait_payload, device_bitmask_scratch, device=devices[0]
-            )
-            inplace_memcpy(device_bitmask_scratch, pinned_bitmask)
-            # Trim the persistent buffer's worst-case
-            # ``num_speculative_tokens + 1`` rows down to
-            # ``num_steps + 1`` so the acceptance sampler's rebind
-            # to ``num_steps + 1`` lines up. Position ``i`` of the
-            # bitmask holds the FSM state with ``i`` drafts
-            # consumed, so positions ``0..num_steps`` cover the
-            # ``num_steps`` draft-verification slots plus the bonus
-            # slot at index ``num_steps``; the target never emits
-            # logits for the trailing rows this iter.
-            num_steps_plus_one = draft_tokens.shape[1] + 1
-            effective_bitmasks = device_bitmask_scratch[
-                :, :num_steps_plus_one, :
-            ]
+        effective_bitmasks = apply_overlap_bitmask(
+            pinned_bitmask,
+            wait_payload,
+            device_bitmask_scratch,
+            num_steps=draft_tokens.shape[1],
+            device=devices[0],
+        )
 
         seed_scalar = seed[0]
-        first_rejected, recovered, bonus = self.acceptance_sampler(
-            draft_tokens,
-            logits,
-            seed=seed_scalar,
-            temperature=temperature,
-            top_k=top_k,
-            max_k=max_k,
-            top_p=top_p,
-            min_top_p=min_top_p,
-            in_thinking_phase=in_thinking_phase,
-            token_bitmasks=effective_bitmasks,
+        first_rejected, recovered, bonus, next_tokens = (
+            accept_and_pick_next_tokens(
+                self.acceptance_sampler,
+                draft_tokens,
+                logits,
+                seed=seed_scalar,
+                temperature=temperature,
+                top_k=top_k,
+                max_k=max_k,
+                top_p=top_p,
+                min_top_p=min_top_p,
+                in_thinking_phase=in_thinking_phase,
+                token_bitmasks=effective_bitmasks,
+            )
         )
 
-        target_tokens = ops.concat([recovered, bonus], axis=1)
-        next_tokens = ops.gather_nd(
-            target_tokens,
-            ops.unsqueeze(first_rejected, axis=-1),
-            batch_dims=1,
-        )
-
-        corrected_merged, corrected_offsets = self.merger(
-            tokens, input_row_offsets, recovered
-        )
-        corrected_merged = ops.rebind(corrected_merged, ["merged_seq_len"])
-        corrected_offsets = ops.rebind(
-            corrected_offsets, ["input_row_offsets_len"]
-        )
-
-        shifted_corrected = eagle_prefill_shift_tokens(
-            corrected_merged,
-            corrected_offsets,
-            bonus.reshape((-1,)),
+        shifted_corrected = shift_corrected_tokens(
+            self.merger, tokens, input_row_offsets, recovered, bonus
         )
 
         assert draft_kv_collections is not None
@@ -344,39 +299,18 @@ class Eagle3MHAKimiK25Unified(Module):
         device0 = devices[0]
         hidden_dim = self.draft.config.hidden_size
 
-        last_idx = merged_offsets[1:] - 1
-        num_draft_sentinel_gpu = _shape_to_scalar(
-            draft_tokens.shape[1], device0
+        draft_hs = gather_accepted_hidden_states(
+            all_hs,
+            merged_offsets=merged_offsets,
+            merged_offsets_per_dev=merged_offsets_per_dev,
+            num_accepted=first_rejected,
+            num_draft_tokens=draft_tokens.shape[1],
+            data_parallel_degree=self.config.data_parallel_degree,
+            data_parallel_splits=data_parallel_splits,
+            signal_buffers=signal_buffers,
+            device=device0,
+            split_prefix="eagle3_mha",
         )
-        last_accepted_idx = (
-            ops.rebind(last_idx, ["batch_size"])
-            - num_draft_sentinel_gpu.broadcast_to(["batch_size"])
-            + first_rejected
-        )
-        last_accepted_idx_i64 = last_accepted_idx.cast(DType.int64)
-        last_accepted_idx_per_dev = ops.distributed_broadcast(
-            last_accepted_idx_i64, signal_buffers
-        )
-
-        draft_hs: list[TensorValue] = []
-        if self.config.data_parallel_degree > 1:
-            for i in range(n_devs):
-                start = data_parallel_splits[i]
-                end = data_parallel_splits[i + 1]
-                global_idx_dev_i = ops.slice_tensor(
-                    last_accepted_idx_per_dev[i],
-                    [(slice(start, end), f"eagle3_mha_batch_split_{i}")],
-                )
-                local_seq_offset_i = merged_offsets_per_dev[i][start].cast(
-                    DType.int64
-                )
-                local_idx_dev_i = global_idx_dev_i - local_seq_offset_i
-                draft_hs.append(ops.gather(all_hs[i], local_idx_dev_i, axis=0))
-        else:
-            for i in range(n_devs):
-                draft_hs.append(
-                    ops.gather(all_hs[i], last_accepted_idx_per_dev[i], axis=0)
-                )
 
         input_lengths = ops.rebind(
             (input_row_offsets[1:] - input_row_offsets[:-1]).cast(DType.int64),
@@ -417,25 +351,18 @@ class Eagle3MHAKimiK25Unified(Module):
         )
 
         one = ops.constant(1, DType.uint32, DeviceRef.CPU()).broadcast_to([1])
-        new_max_lengths = [
-            ops.concat(
-                [one, kv.max_lengths[0, 1].broadcast_to([1])], axis=-1
-            ).reshape([1, 2])
-            for kv in draft_kv_collections
-        ]
 
         # The pipeline_model already swapped attention_dispatch_metadata to
         # the draft slot at graph-init; carry that through to the step-1+
-        # collections along with the updated max_lengths.
+        # collections along with the updated max prompt / cache lengths.
         draft_kv_collections = [
             replace(
                 kv,
-                max_lengths=max_lengths,
+                max_prompt_length=one,
+                max_cache_length=kv.max_cache_length,
                 attention_dispatch_metadata=kv.draft_attention_dispatch_metadata,
             )
-            for kv, max_lengths in zip(
-                draft_kv_collections, new_max_lengths, strict=True
-            )
+            for kv in draft_kv_collections
         ]
 
         next_draft_tokens = next_draft_tokens.rebind(["batch_size"])
@@ -493,190 +420,39 @@ class Eagle3MHAKimiK25Unified(Module):
 
     def input_types(
         self,
-        kv_params: KVCacheParamInterface,
-        draft_kv_params: KVCacheParams,
+        kv_params: MultiKVCacheParams,
     ) -> tuple[TensorType | BufferType, ...]:
         """Input types for the unified MHA-draft graph.
 
-        Order:
-            tokens, device_offsets, host_offsets, return_n_logits,
-            data_parallel_splits, signal_buffers,
-            target_kv_cache (flat), batch_context_lengths, target_ep_inputs,
-            draft_tokens, draft_kv_cache (flat per-device — kv_blocks
-            + cache_lengths + lookup_table + max_lengths +
-            attention_dispatch_metadata + draft_attention_dispatch_metadata),
-            seed, temperature, top_k, max_k, top_p, min_top_p,
-            in_thinking_phase, [pinned_bitmask, wait_payload,
-            device_bitmask_scratch].
-
-        The draft cache contributes its own per-device dispatch metadata
-        (one buffer for the q_max_seq_len = ``1 + num_speculative_tokens``
-        prefill at step 0 and one for the q_max_seq_len = 1 decode at
-        steps 1..K), so the graph-capture branch can populate MHA geometry
-        for the draft independently of the target's MLA geometry.
+        ``kv_params`` is the unified ``{"target", "draft"}`` tree. The target
+        leaf is MLA; the draft leaf is MHA and carries its own per-device
+        blocks, cache lengths, lookup table, and dispatch metadata (the qN
+        verify slot plus the q1 decode slot), so the graph-capture branch can
+        populate MHA geometry for the draft independently of the target's MLA
+        geometry. Optionally prepends per-device vision inputs and carries the
+        per-row ``in_thinking_phase`` flag plus the structured-output bitmask
+        triple. See :func:`build_spec_decode_input_types` for the canonical
+        ordering.
         """
-        devices = self.config.devices
-        device_ref = devices[0]
-
-        tokens_type = TensorType(
-            DType.int64, shape=["total_seq_len"], device=device_ref
+        spec = SpecDecodeInputTypeSpec(
+            distributed=True,
+            data_parallel_degree=self.config.data_parallel_degree,
+            enable_vision=self.enable_vision,
+            vision_hidden_size=self.config.hidden_size,
+            include_in_thinking_phase=True,
+            enable_structured_output=self.enable_structured_output,
         )
-        image_embeddings_types = [
-            TensorType(
-                DType.bfloat16,
-                shape=["vision_merged_seq_len", self.config.hidden_size],
-                device=DeviceRef.from_device(device),
-            )
-            for device in devices
-        ]
-        image_token_indices_types = [
-            TensorType(
-                DType.int32,
-                shape=["total_image_tokens"],
-                device=DeviceRef.from_device(device),
-            )
-            for device in devices
-        ]
-        device_input_row_offsets_type = TensorType(
-            DType.uint32,
-            shape=["input_row_offsets_len"],
-            device=device_ref,
+        ep_input_types = (
+            self.target.ep_manager.input_types()
+            if self.target.ep_manager is not None
+            else ()
         )
-        host_input_row_offsets_type = TensorType(
-            DType.uint32,
-            shape=["input_row_offsets_len"],
-            device=DeviceRef.CPU(),
+        return build_spec_decode_input_types(
+            spec,
+            devices=self.config.devices,
+            kv_params=kv_params,
+            ep_input_types=ep_input_types,
         )
-        draft_tokens_type = TensorType(
-            DType.int64,
-            ["batch_size", "num_steps"],
-            device=device_ref,
-        )
-        return_n_logits_type = TensorType(
-            DType.int64, shape=["return_n_logits"], device=DeviceRef.CPU()
-        )
-        data_parallel_splits_type = TensorType(
-            DType.int64,
-            shape=[self.config.data_parallel_degree + 1],
-            device=DeviceRef.CPU(),
-        )
-
-        signals = Signals(devices=devices)
-        signal_buffer_types: list[BufferType] = signals.input_types()
-
-        all_input_types: list[TensorType | BufferType] = [
-            tokens_type,
-        ]
-        if self.enable_vision:
-            all_input_types.extend(image_embeddings_types)
-            all_input_types.extend(image_token_indices_types)
-        all_input_types.extend(
-            [
-                device_input_row_offsets_type,
-                host_input_row_offsets_type,
-                return_n_logits_type,
-                data_parallel_splits_type,
-            ]
-        )
-        all_input_types.extend(signal_buffer_types)
-        # Size the target's ``draft_attention_dispatch_metadata`` slot by
-        # the draft's ``is_mla`` (shape [4]/CPU for MHA vs [3]/device for
-        # MLA). The colleague's graph-capture branch populates that slot
-        # at runtime with the draft resolver's output. The
-        # ``draft_attention_group`` kwarg lives on ``KVCacheParams`` (the
-        # concrete dataclass), not on the ``KVCacheParamInterface``
-        # Protocol — narrow with ``isinstance`` so mypy can see the
-        # kwarg.
-        assert isinstance(kv_params, KVCacheParams)
-        all_input_types.extend(
-            kv_params.get_symbolic_inputs(
-                draft_attention_group=draft_kv_params
-            ).flatten()
-        )
-
-        batch_context_length_type = TensorType(
-            DType.int32, shape=[1], device=DeviceRef.CPU()
-        )
-        all_input_types.extend(
-            [batch_context_length_type for _ in range(len(devices))]
-        )
-
-        if self.target.ep_manager is not None:
-            all_input_types.extend(self.target.ep_manager.input_types())
-
-        all_input_types.append(draft_tokens_type)
-
-        # Draft KV block storage: one Buffer per device. The rest of the
-        # draft cache fields are reused from the target (same logical
-        # pages, different physical storage). The draft's MHA dispatch
-        # metadata is plumbed via the target KV input's
-        # ``draft_attention_dispatch_metadata`` slot, populated by the
-        # graph-capture branch.
-        for sym in draft_kv_params.get_symbolic_inputs().inputs:
-            assert isinstance(sym, KVCacheInputsPerDevice)
-            all_input_types.append(sym.kv_blocks)
-
-        seed_type = TensorType(
-            DType.uint64, shape=["batch_size"], device=device_ref
-        )
-        all_input_types.append(seed_type)
-
-        temperature_type = TensorType(
-            DType.float32, shape=["batch_size"], device=device_ref
-        )
-        top_k_type = TensorType(
-            DType.int64, shape=["batch_size"], device=device_ref
-        )
-        max_k_type = TensorType(DType.int64, shape=[], device=DeviceRef.CPU())
-        top_p_type = TensorType(
-            DType.float32, shape=["batch_size"], device=device_ref
-        )
-        min_top_p_type = TensorType(
-            DType.float32, shape=[], device=DeviceRef.CPU()
-        )
-        in_thinking_phase_type = TensorType(
-            DType.bool, shape=["batch_size"], device=device_ref
-        )
-        all_input_types.extend(
-            [
-                temperature_type,
-                top_k_type,
-                max_k_type,
-                top_p_type,
-                min_top_p_type,
-                in_thinking_phase_type,
-            ]
-        )
-
-        # Constrained-decoding bitmask triple (pinned host bitmask +
-        # wait_payload + device scratch). The pinned input is declared
-        # on CPU per the engine's input binding rule.
-        # ``num_bitmask_positions = num_speculative_tokens + 1``.
-        if self.enable_structured_output:
-            pinned_bitmask_type = TensorType(
-                DType.bool,
-                shape=["batch_size", "num_bitmask_positions", "vocab_size"],
-                device=DeviceRef.CPU(),
-            )
-            wait_payload_type = BufferType(
-                DType.int64,
-                shape=[2],
-                device=DeviceRef.CPU(),
-            )
-            device_bitmask_scratch_type = BufferType(
-                DType.bool,
-                shape=["batch_size", "num_bitmask_positions", "vocab_size"],
-                device=device_ref,
-            )
-            all_input_types.extend(
-                [
-                    pinned_bitmask_type,
-                    wait_payload_type,
-                    device_bitmask_scratch_type,
-                ]
-            )
-
-        return tuple(all_input_types)
 
 
 # TODO(SERVOPT-1437): This is a temporary patch, until we have a proper way
@@ -696,7 +472,7 @@ def _patch_draft0_kv_cache(kv: PagedCacheValues) -> PagedCacheValues:
     """
     decode_md = kv.draft_attention_dispatch_metadata
     assert decode_md is not None
-    step0_max_prompt = kv.max_lengths[0, 0].cast(DType.int64).reshape([1]) + 1
+    step0_max_prompt = kv.max_prompt_length.cast(DType.int64).reshape([1]) + 1
     step0_md = ops.concat(
         [decode_md[0:1], step0_max_prompt, decode_md[2:4]],
         axis=0,

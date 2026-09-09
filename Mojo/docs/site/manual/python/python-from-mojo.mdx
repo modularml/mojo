@@ -1,0 +1,150 @@
+---
+title: Calling Python from Mojo
+sidebar_position: 2
+description: How to import and use Python modules in Mojo code.
+show_languages: true
+---
+
+The Python ecosystem is full of useful libraries, so you shouldn't have to
+rewrite them in Mojo. Instead, you can simply import Python packages and call
+Python APIs from Mojo. The Python code runs in a standard Python interpreter
+(CPython), so your existing Python code doesn't need to change.
+
+## Specify your Python version
+
+Mojo doesn't include a CPython interpreter—it uses the CPython interpreter
+provided by your environment's default Python version. So be sure you know
+which Python version you're using in each environment where your Mojo code will
+run.
+
+To ensure you get consistent results, we recommend you
+[use Pixi](https://pixi.prefix.dev/latest/installation/) to manage your package
+dependency and virtual environment. In a Pixi project, you can specify the
+Python version like this:
+
+```sh
+pixi add "python==3.11"
+```
+
+Now, even if your operating system's default Python version is something else,
+your Pixi project (and the Mojo code inside) always uses Python 3.11.
+
+```sh
+pixi run python --version
+```
+
+```output
+Python 3.11.0
+```
+
+## Import a Python module in Mojo
+
+To import a Python module in Mojo, just call
+[`Python.import_module()`](/docs/std/python/python/Python/#import_module)
+with the module name. The following shows an example of importing the standard
+Python [NumPy](https://numpy.org/) package:
+
+```mojo
+from std.python import Python
+
+def main() raises:
+    # This is equivalent to Python's `import numpy as np`
+    var np = Python.import_module("numpy")
+
+    # Now use numpy as if writing in Python
+    var array = np.array(Python.list(1, 2, 3))
+    print(array)  # [1 2 3]
+```
+
+Assuming that you have the NumPy package installed in your environment, this
+imports NumPy and you can use any of its features.
+
+If you want to use Python builtin APIs, you just need to import the `builtins`
+module the same way. For example:
+
+```mojo
+from std.python import Python
+
+def main() raises:
+    var np = Python.import_module("numpy")
+    var array = np.array(Python.list(1, 2, 3))
+
+    var builtins = Python.import_module("builtins")
+    print(builtins.type(array))  # <class 'numpy.ndarray'>
+```
+
+A few things to note:
+
+- The `import_module()` method returns a reference to the module in the form of
+  a [`PythonObject`](/docs/std/python/python_object/PythonObject/) wrapper. You
+  must store the reference in a variable and then use it as shown in the example
+  above to access functions, classes, and other objects defined by the module.
+  See [Mojo wrapper objects](/docs/manual/python/types/#mojo-wrapper-objects)
+  for more information about the `PythonObject` type.
+
+- Currently, you cannot import individual members (such as a single Python class
+  or function). You must import the whole Python module and then access members
+  through the module name.
+
+- Mojo doesn't yet support top-level code, so the `import_module()` call must
+  be inside another method. This means you may need to import a module multiple
+  times or pass around a reference to the module. This works the same way as
+  Python: importing the module multiple times won't run the initialization
+  logic more than once, so you don't pay any performance penalty.
+
+- `import_module()` may raise an exception. Raising exceptions is much
+more common in Python code than in the Mojo standard library, which
+[limits their use for performance
+reasons](/docs/roadmap#the-standard-library-has-limited-exceptions-use).
+
+- We recommend using a package manager such as pixi, uv, or conda to manage your
+  environment. For instructions on setting up a Mojo project with pixi, see
+  [Create a Mojo project](/docs/manual/get-started/#1-create-a-mojo-project) in
+  the Get started with Mojo tutorial.
+
+:::caution
+
+[`mojo build`](/docs/cli/build/) doesn't include the Python packages used by
+your Mojo project. Instead, Mojo loads the Python interpreter and Python
+packages at runtime, so they must be provided in the environment where you run
+the Mojo program (such as inside the pixi environment where you built the
+executable).
+
+:::
+
+### Import a local Python module
+
+If you have some local Python code you want to use in Mojo, just add
+the directory to the Python path and then import the module.
+
+For example, suppose you have a Python file named `mypython.py`:
+
+```python title="mypython.py"
+import numpy as np
+
+def gen_random_values(size, base):
+    # generate a size x size array of random numbers between base and base+1
+    random_array = np.random.rand(size, size)
+    return random_array + base
+```
+
+Here's how you can import it and use it in a Mojo file:
+
+```mojo title="main.mojo"
+from std.python import Python
+
+def main() raises:
+    Python.add_to_path("path/to/module")
+    var mypython = Python.import_module("mypython")
+
+    var values = mypython.gen_random_values(2, 3)
+    print(values)
+```
+
+Both absolute and relative paths work with
+[`add_to_path()`](/docs/std/python/python/Python/#add_to_path). For example,
+you can import from the local directory like this:
+
+```mojo
+Python.add_to_path(".")
+```

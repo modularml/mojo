@@ -20,13 +20,13 @@ from std.utils import Index
 def test_tile_masked():
     print("== test_tile_masked")
     comptime layout = Layout.row_major(11, 7)
-    var stack = InlineArray[Float32, layout.size()](uninitialized=True)
-    tensor_11x7 = LayoutTensor[DType.float32, layout](stack)
+    var stack = Array[Float32, layout.size()](fill={})
+    var tensor_11x7 = LayoutTensor[.float32, layout](stack)
     arange(tensor_11x7)
     for tile_i in range(3):
         for tile_j in range(2):
             print("--tile[", tile_i, ", ", tile_j, "]--")
-            tensor_4x4_masked = tensor_11x7.tile[4, 4](tile_i, tile_j)
+            var tensor_4x4_masked = tensor_11x7.tile[4, 4](tile_i, tile_j)
             print(
                 tensor_4x4_masked.runtime_layout,
                 tensor_4x4_masked.masked,
@@ -38,13 +38,13 @@ def test_tile_masked():
 def test_subtile_masked():
     print("== test_subtile_masked")
     comptime layout = Layout.row_major(15, 9)
-    var stack = InlineArray[Float32, layout.size()](uninitialized=True)
-    tensor_15x9 = LayoutTensor[DType.float32, layout](stack)
+    var stack = Array[Float32, layout.size()](fill={})
+    var tensor_15x9 = LayoutTensor[.float32, layout](stack)
     arange(tensor_15x9)
     for tile_i in range(2):
         for tile_j in range(2):
             print("--tile[", tile_i, ", ", tile_j, "]--")
-            tensor_8x8_masked = tensor_15x9.tile[8, 8](tile_i, tile_j)
+            var tensor_8x8_masked = tensor_15x9.tile[8, 8](tile_i, tile_j)
             print(
                 tensor_8x8_masked.runtime_layout,
                 tensor_8x8_masked.masked,
@@ -53,7 +53,7 @@ def test_subtile_masked():
             for tile_ii in range(2):
                 for tile_jj in range(2):
                     print("--subtile[", tile_ii, ", ", tile_jj, "]--")
-                    subtile_4x4_masked = tensor_8x8_masked.tile[4, 4](
+                    var subtile_4x4_masked = tensor_8x8_masked.tile[4, 4](
                         tile_ii, tile_jj
                     )
                     print(
@@ -67,14 +67,14 @@ def test_subtile_masked():
 def test_tile_dynamic_no_bounds():
     print("== test_tile_dynamic_no_bounds")
     comptime layout = Layout.row_major(4, 4)
-    var stack = InlineArray[Float32, layout.size()](uninitialized=True)
-    tensor_UxU = LayoutTensor[DType.float32, Layout.row_major[2]()](
+    var stack = Array[Float32, layout.size()](fill={})
+    var tensor_UxU = LayoutTensor[.float32, Layout.row_major[2]()](
         stack, RuntimeLayout[Layout.row_major[2]()].row_major(Index(4, 4))
     )
     arange(tensor_UxU)
     for tile_i in range(2):
         for tile_j in range(2):
-            tensor_2x2_masked = tensor_UxU.tile[2, 2](tile_i, tile_j)
+            var tensor_2x2_masked = tensor_UxU.tile[2, 2](tile_i, tile_j)
             print("--tile[", tile_i, ", ", tile_j, "]--")
             print(
                 tensor_2x2_masked.runtime_layout,
@@ -87,14 +87,14 @@ def test_tile_dynamic_no_bounds():
 def test_tile_dynamic_with_bounds():
     print("== test_tile_dynamic_with_bounds")
     comptime layout = Layout.row_major(5, 3)
-    var stack = InlineArray[Float32, layout.size()](uninitialized=True)
-    tensor_UxU = LayoutTensor[DType.float32, Layout.row_major[2]()](
+    var stack = Array[Float32, layout.size()](fill={})
+    var tensor_UxU = LayoutTensor[.float32, Layout.row_major[2]()](
         stack, RuntimeLayout[Layout.row_major[2]()].row_major(Index(5, 3))
     )
     arange(tensor_UxU)
     for tile_i in range(3):
         for tile_j in range(2):
-            tensor_2x2_masked = tensor_UxU.tile[2, 2](tile_i, tile_j)
+            var tensor_2x2_masked = tensor_UxU.tile[2, 2](tile_i, tile_j)
             print("--tile[", tile_i, ", ", tile_j, "]--")
             print(
                 tensor_2x2_masked.runtime_layout,
@@ -107,15 +107,15 @@ def test_tile_dynamic_with_bounds():
 def test_tile_and_distribute():
     print("== test_tile_and_distribute")
     comptime layout = Layout.row_major(5, 3)
-    var stack = InlineArray[Float32, layout.size()](uninitialized=True)
-    tensor_UxU = LayoutTensor[DType.float32, Layout.row_major[2]()](
+    var stack = Array[Float32, layout.size()](fill={})
+    var tensor_UxU = LayoutTensor[.float32, Layout.row_major[2]()](
         stack, RuntimeLayout[Layout.row_major[2]()].row_major(Index(5, 3))
     )
     arange(tensor_UxU)
     for tile_i in range(3):
         for tile_j in range(2):
             print("--tile[", tile_i, ", ", tile_j, "]--")
-            tensor_2x2_masked = tensor_UxU.tile[2, 2](tile_i, tile_j)
+            var tensor_2x2_masked = tensor_UxU.tile[2, 2](tile_i, tile_j)
             print(
                 tensor_2x2_masked.runtime_layout,
                 tensor_2x2_masked.masked,
@@ -133,14 +133,14 @@ def test_tile_and_distribute():
 def test_tile_iterator_masked():
     print("== test_tile_iterator_masked")
     comptime layout = Layout.row_major(5, 3)
-    var stack = InlineArray[Float32, layout.size()](uninitialized=True)
-    tensor_UxU = LayoutTensor[DType.float32, Layout.row_major[2]()](
+    var stack = Array[Float32, layout.size()](fill={})
+    var tensor_UxU = LayoutTensor[.float32, Layout.row_major[2]()](
         stack, RuntimeLayout[Layout.row_major[2]()].row_major(Index(5, 3))
     )
     arange(tensor_UxU)
     print(tensor_UxU)
     for tile_j in range(2):
-        tensor_iter_2x2_masked = tensor_UxU.tiled_iterator[2, 2](0, tile_j)
+        var tensor_iter_2x2_masked = tensor_UxU.tiled_iterator[2, 2](0, tile_j)
         for tile_i in range(3):
             print("--tile[", tile_i, ", ", tile_j, "]--")
             print(tensor_iter_2x2_masked.runtime_layout)
@@ -151,8 +151,8 @@ def test_tile_iterator_masked():
 def test_tile_and_vectorize():
     print("== test_tile_and_vectorize")
     comptime layout = Layout.row_major(3, 4)
-    var stack = InlineArray[Float32, layout.size()](uninitialized=True)
-    tensor_UxU = LayoutTensor[DType.float32, Layout.row_major[2]()](
+    var stack = Array[Float32, layout.size()](fill={})
+    var tensor_UxU = LayoutTensor[.float32, Layout.row_major[2]()](
         stack, RuntimeLayout[Layout.row_major[2]()].row_major(Index(3, 4))
     )
     arange(tensor_UxU)

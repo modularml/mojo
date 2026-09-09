@@ -1,0 +1,317 @@
+---
+title: Mojo literals reference
+sidebar_label: Literals
+sidebar_position: 2
+description: >
+  Complete reference for Mojo literal syntax. Covers integer,
+  floating-point, string, t-string, boolean, None, Self,
+  discard, and ellipsis literals with lexical rules and
+  examples.
+---
+
+<!-- VERIFIED: Lexer.cpp lexInteger(), lexFloat(), lexString(), lexTString(),
+     processEscapeSequences(), ExprNode.h, TokenKinds.def -->
+
+A *literal* is a value written directly in source code: `42`, `"hello"`,
+`True`. Literals produce values without reading variables or calling
+functions. Each section below covers one literal type, its syntax, and
+any rules the lexer enforces.
+
+:::note
+Materialization makes a compile-time value available at runtime.
+Integer, floating-point, and string literals are implicitly materialized
+to their respective runtime types (Int, Float and String).
+:::
+
+## Integer literals
+
+*Integer literals* represent whole numbers in four bases:
+
+```mojo
+42        # Decimal
+0xFF      # Hexadecimal (0x or 0X prefix)
+0o52      # Octal (0o or 0O prefix)
+0b101010  # Binary (0b or 0B prefix)
+```
+
+Integer literals follow these lexical rules:
+
+```text
+integer     → decinteger | bininteger | octinteger | hexinteger
+decinteger  → nonzerodigit ("_" | digit)* | "0"+ ("_" | "0")*
+bininteger  → "0" ("b" | "B") ("_" | bindigit)+
+octinteger  → "0" ("o" | "O") ("_" | octdigit)+
+hexinteger  → "0" ("x" | "X") ("_" | hexdigit)+
+```
+
+Integer literals are always non-negative. `-1024` is the unary negation
+operator `-` applied to the literal `1024`.
+
+Underscores can appear between digits for readability. Mojo is more
+permissive than Python here. Consecutive and trailing underscores are
+allowed:
+
+```mojo
+1_000_000  # Readable grouping
+1__000_    # Also valid (consecutive and trailing underscores OK)
+```
+
+Leading zeros in decimal literals are not allowed. Use the `0o` prefix for
+octal:
+
+```mojo
+0123   # Error: leading zeros in decimal integer literals are not permitted
+0o123  # OK: octal
+```
+
+A base prefix must be followed by at least one digit:
+
+```mojo
+0x  # Error: no digits specified for hex literal
+0b  # Error: no digits specified for binary literal
+0o  # Error: no digits specified for octal literal
+```
+
+## Floating-point literals
+
+*Floating-point literals* represent numbers with a fractional or exponent
+part:
+
+```mojo
+1.0
+3.14159
+.5       # Fraction only (no integer part)
+2.       # Integer part with decimal point
+2.5e-3   # With exponent
+1E10     # Capital E works too
+```
+
+Floating-point literals follow these lexical rules:
+
+```text
+floatnumber   → pointfloat | exponentfloat
+pointfloat    → digitpart? fraction | digitpart "."
+exponentfloat → (digitpart | pointfloat) exponent
+fraction      → "." digitpart
+exponent      → ("e" | "E") ("+" | "-")? digitpart
+digitpart     → digit ("_" | digit)*
+```
+
+Floating-point literals are always non-negative. `-3.14` is the unary
+negation operator `-` applied to the literal `3.14`.
+
+When included, an exponent marker (`e` or `E`) must be followed by at least
+one digit:
+
+```mojo
+2.5e    # Error: expecting a digit after the exponent
+2.5e-   # Error: expecting a digit after the exponent
+2.5e-3  # OK
+```
+
+Underscores in floating-point literals work as they do in integers. Place
+them anywhere that enhances readability:
+
+```mojo
+1_000.000_5
+```
+
+## String literals
+
+*String literals* represent text values. Mojo supports single and double
+quotes, and a triple-quote form for multi-line strings:
+
+```mojo
+"Hello"
+'world'
+"""Multi-line
+string
+"""                # Includes final newline
+'''Also
+    multi-line'''  # Includes 4 spaces at the start of the second line
+```
+
+Triple-quoted strings include any newlines literally. A backslash at the end
+of a line suppresses the newline, joining the next line directly:
+
+```mojo
+"""\
+This string has no leading newline."""
+```
+
+String literals on adjacent lines are joined into a single string. This
+works on one line or across lines when the continuation is indented:
+
+```mojo
+var x = "Hello, " "World"  # "Hello, World"
+
+var y = "line one "
+    "line two"             # "line one line two" (indented continuation)
+```
+
+Prefix with `r` or `R` to create a *raw string* that disables escape
+processing:
+
+```mojo
+r"C:\path\to\file"  # Backslashes treated literally
+```
+
+### Escape sequences
+
+Mojo recognizes these escape sequences in non-raw string literals:
+
+<!-- markdownlint-disable MD013 -->
+
+| Sequence | Meaning                           | Sequence     | Meaning                           |
+|----------|-----------------------------------|--------------|-----------------------------------|
+| `\\`     | Backslash                         | `\a`         | Bell                              |
+| `\"`     | Double quote                      | `\b`         | Backspace                         |
+| `\'`     | Single quote                      | `\f`         | Form feed                         |
+| `\n`     | Newline                           | `\v`         | Vertical tab                      |
+| `\r`     | Carriage return                   | `\xHH`       | Hex value (exactly 2 hex digits)  |
+| `\t`     | Tab                               | `\0`–`\377`  | Octal value (1–3 octal digits)    |
+| `\uHHHH` | Unicode code point (4 hex digits) | `\UHHHHHHHH` | Unicode code point (8 hex digits) |
+
+<!-- markdownlint-enable MD013 -->
+
+Mojo source files are UTF-8. String literals may contain non-ASCII
+characters directly.
+
+```mojo
+var wave = "👋"
+```
+
+Non-ASCII characters can also be written as Unicode hex escapes:
+
+```mojo
+var wave = "\U0001F44B"   # 8-digit hex escape, 👋
+var euro = "\u20AC"       # 4-digit hex escape, €
+```
+
+- `\uHHHH` accepts code points from U+0000 to U+FFFF
+- `\UHHHHHHHH` accepts the full Unicode range, U+0000 to U+10FFFF
+
+Both forms reject surrogate code points (U+D800 to U+DFFF), which are
+reserved for UTF-16 encoding. Code points above U+FFFF require `\U`,
+not a UTF-16 surrogate pair.
+
+## T-string literals
+
+*T-string literals* support expression interpolation using `{}`:
+
+```mojo
+var name = "World"
+var greeting_template = t"Hello, {name}!"   # "Hello, World!"
+var result_template = t"1 + 1 = {1 + 1}"    # "1 + 1 = 2"
+```
+
+Expressions inside `{}` are evaluated at runtime. Adjacent t-string literals
+are joined, just like regular string literals. To use them as strings
+except in print statements, cast them to `String`:
+
+```mojo
+var name = "Alice"
+var greeting = t"Hello, {name}!"    # Type is T-string
+print(greeting)                     # Prints "Hello, Alice!"
+var greeting_str = String(greeting) # Convert to regular String
+```
+
+T-strings can be triple-quoted and combined with the raw prefix (any case
+combination of `r`/`R` and `t`/`T`, in either order):
+
+```mojo
+t"""
+Hello, {name}!
+"""
+
+rt"Path: {base}\subdir"  # Raw t-string: backslashes are literal
+```
+
+Use `{{` and `}}` to include literal braces in a t-string:
+
+```mojo
+t"Use {{braces}} in t-strings"  # "Use {braces} in t-strings"
+```
+
+T-strings can be nested. An interpolation expression can itself contain
+t-strings, up to 20 levels deep.
+
+```mojo
+var name = "world"
+var greeting = t"Hello, {t"dear {name}"}!"
+print(greeting) # "Hello, dear world!"
+```
+
+## Boolean literals
+
+`True` and `False` represent boolean truth values.
+
+```mojo
+var x = True
+var y = False
+```
+
+## None literal
+
+`None` represents the absence of a value. It's the only value of type
+`NoneType`.
+
+```mojo
+var x: NoneType = None
+```
+
+A function without an explicit return type returns `None`. These two
+declarations are equivalent:
+
+```mojo
+def greet():
+    print("hello")
+
+def greet() -> None:
+    print("hello")
+```
+
+## Self literal
+
+`Self` refers to the enclosing type inside a struct or trait definition:
+
+```mojo
+from std.math import sqrt
+
+@fieldwise_init
+struct Point:
+    var x: Float64
+    var y: Float64
+
+    @staticmethod
+    def create() -> Self:          # Self refers to Point
+        return Self(0.0, 0.0)
+
+    def distance(self) -> Float64: # self is an argument name, not Self
+        return sqrt(self.x ** 2 + self.y ** 2)
+```
+
+`Self` (capital S) is a keyword that refers to the type. `self` (lowercase)
+is a conventional argument name for the instance.
+
+## Discard pattern
+
+The underscore `_` discards a value in an assignment:
+
+```mojo
+_, var y = get_pair()  # Ignore the first element
+```
+
+## Ellipsis literal
+
+`...` marks a trait method as required. Conforming types must provide their
+own implementation. It's only valid inside trait definitions:
+
+```mojo
+trait Drawable:
+    def draw(self) -> None: ...   # Required: conforming types must implement
+```
+
+`...` and `pass` aren't interchangeable. `pass` is a no-op statement that
+provides an empty body. `...` is a requirement marker that means "you must
+implement this."

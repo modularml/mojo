@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -375,47 +374,6 @@ def compute_metrics_delta(
         histograms=delta_histograms,
         raw_text="",  # Delta doesn't have raw text
     )
-
-
-def collect_server_metrics(
-    backend: Backend,
-    base_url: str,
-    baseline: ParsedMetrics | None = None,
-) -> ParsedMetrics:
-    """Fetch server metrics and optionally compute delta from baseline.
-
-    Convenience function that fetches metrics from the server's Prometheus endpoint
-    and optionally computes the delta from a baseline measurement.
-
-    Args:
-        backend: Backend type (e.g., "modular")
-        base_url: Server base URL (e.g., 'http://localhost:8000')
-        baseline: Optional baseline metrics to compute delta from. If provided,
-            returns the delta between baseline and current metrics. If None,
-            returns the current metrics as-is.
-
-    Returns:
-        ParsedMetrics object (delta if baseline provided, current otherwise).
-
-    Raises:
-        requests.RequestException: If fetching metrics fails.
-
-    Examples:
-        >>> # Capture baseline before benchmark
-        >>> baseline = collect_server_metrics("modular", "http://localhost:8000")
-        >>>
-        >>> # ... run benchmark ...
-        >>>
-        >>> # Capture final metrics and compute delta
-        >>> delta = collect_server_metrics(
-        ...     "modular", "http://localhost:8000", baseline
-        ... )
-    """
-    final = fetch_and_parse_metrics(backend=backend, base_url=base_url)
-
-    if baseline is not None:
-        return compute_metrics_delta(baseline=baseline, final=final)
-    return final
 
 
 def collect_benchmark_metrics(

@@ -13,144 +13,96 @@
 
 """Python bindings for the MO interpreter ops.
 
-This module defines the operation handler registry and the Mojo op bindings
-for the MO graph interpreter.
+This module defines the operation handler registry and the graph-compiler-
+backed op bindings for the MO graph interpreter.
 """
 
-from collections.abc import Callable
+import time
 
-import mojo.importer
-from max import _core
-from max._core.dialects import mo
-from max._core.driver import Buffer
+from max import _eager_policy
 
-# Import op bindings from categorized Mojo modules
-from . import (  # type: ignore[attr-defined]
-    argmax_ops,
-    argnonzero_ops,
-    avg_pool_ops,
-    band_part_ops,
-    bottomk_ops,
-    conv_ops,
-    data_movement_ops,
-    elementwise_binary_ops,
-    elementwise_cast_ops,
-    elementwise_comparison_ops,
-    elementwise_unary_ops,
-    gather_scatter_ops,
-    group_norm_ops,
-    layer_norm_ops,
-    matmul_ops,
-    misc_ops,
-    nms_ops,
-    pad_ops,
-    pooling_ops,
-    reduce_ops,
-    resize_ops,
-    rms_norm_ops,
-    roi_align_ops,
-    softmax_ops,
-    split_ops,
-    tile_ops,
-    topk_ops,
+from . import (
+    band_part_gc,
+    cast_gc,
+    conv_gc,
+    data_movement_gc,
+    elementwise_binary_gc,
+    gather_gc,
+    gc_compile,
+    group_norm_gc,
+    layer_norm_gc,
+    matmul_gc,
+    nms_gc,
+    nonzero_gc,
+    pooling_gc,
+    random_gc,
+    range_gc,
+    reduce_axis_gc,
+    resize_gc,
+    rms_norm_gc,
+    roi_align_gc,
+    scatter_gc,
+    scatter_nd_gc,
+    select_gc,
+    shape_rearrange_gc,
+    topk_gc,
+    unary_elementwise_gc,
 )
 
-# Arithmetic binary ops: output dtype matches input dtype
-# Dtype dispatch is handled in Mojo
-
-
-BINARY_ELEMENTWISE: dict[
-    type[_core.Operation], Callable[[Buffer, Buffer, Buffer, int], None]
-] = {
-    mo.AddOp: elementwise_binary_ops.Add,
-    mo.SubOp: elementwise_binary_ops.Sub,
-    mo.MulOp: elementwise_binary_ops.Mul,
-    mo.DivOp: elementwise_binary_ops.Div,
-    mo.ModOp: elementwise_binary_ops.Mod,
-    mo.MaxOp: elementwise_binary_ops.Max,
-    mo.MinOp: elementwise_binary_ops.Min,
-    mo.AndOp: elementwise_binary_ops.And,
-    mo.OrOp: elementwise_binary_ops.Or,
-    mo.XorOp: elementwise_binary_ops.Xor,
-    mo.PowOp: elementwise_binary_ops.Pow,
-}
-
-# Comparison binary ops: output dtype is always bool
-BINARY_ELEMENTWISE_COMPARISON: dict[
-    type[_core.Operation], Callable[[Buffer, Buffer, Buffer, int], None]
-] = {
-    mo.EqualOp: elementwise_comparison_ops.Equal,
-    mo.GreaterOp: elementwise_comparison_ops.Greater,
-    mo.GreaterEqualOp: elementwise_comparison_ops.GreaterEqual,
-    mo.NotEqualOp: elementwise_comparison_ops.NotEqual,
-}
-
-# Unary elementwise ops: output dtype matches input dtype
-UNARY_ELEMENTWISE: dict[
-    type[_core.Operation], Callable[[Buffer, Buffer, int], None]
-] = {
-    mo.NegativeOp: elementwise_unary_ops.Negative,
-    mo.AbsOp: elementwise_unary_ops.Abs,
-    mo.ReluOp: elementwise_unary_ops.ReLU,
-    mo.CeilOp: elementwise_unary_ops.Ceil,
-    mo.FloorOp: elementwise_unary_ops.Floor,
-    mo.RoundOp: elementwise_unary_ops.Round,
-    mo.ExpOp: elementwise_unary_ops.Exp,
-    mo.LogOp: elementwise_unary_ops.Log,
-    mo.Log1pOp: elementwise_unary_ops.Log1p,
-    mo.SqrtOp: elementwise_unary_ops.Sqrt,
-    mo.RsqrtOp: elementwise_unary_ops.Rsqrt,
-    mo.TanhOp: elementwise_unary_ops.Tanh,
-    mo.AtanhOp: elementwise_unary_ops.ATanh,
-    mo.TruncOp: elementwise_unary_ops.Trunc,
-    mo.SinOp: elementwise_unary_ops.Sin,
-    mo.CosOp: elementwise_unary_ops.Cos,
-    mo.ErfOp: elementwise_unary_ops.Erf,
-    mo.NotOp: elementwise_unary_ops.Not,
-}
-
-# Reduce ops: reduce along an axis, output shape has reduced dim = 1
-REDUCE: dict[
-    type[_core.Operation], Callable[[Buffer, Buffer, int, int], None]
-] = {
-    mo.ReduceMaxOp: reduce_ops.ReduceMax,
-    mo.ReduceMinOp: reduce_ops.ReduceMin,
-    mo.ReduceAddOp: reduce_ops.ReduceAdd,
-    mo.ReduceMeanOp: reduce_ops.Mean,
-    mo.ReduceMulOp: reduce_ops.ReduceMul,
-}
-
-# Unary mixed-dtype ops: output dtype differs from input dtype
-# IsNan, IsInf: float input -> bool output
-# Cast: any dtype input -> any dtype output
-UNARY_MIXED: dict[
-    type[_core.Operation], Callable[[Buffer, Buffer, int], None]
-] = {
-    mo.CastOp: elementwise_cast_ops.Cast,
-    mo.IsNanOp: elementwise_unary_ops.IsNan,
-    mo.IsInfOp: elementwise_unary_ops.IsInf,
-}
-
-# Softmax ops: output shape matches input, applied along an axis
-SOFTMAX: dict[
-    type[_core.Operation], Callable[[Buffer, Buffer, int, int], None]
-] = {
-    mo.ReduceSoftmaxOp: softmax_ops.Softmax,
-    mo.ReduceLogsoftmaxOp: softmax_ops.LogSoftmax,
-}
-
-# Import handlers after defining kernels to avoid circular import issues.
-# handlers.py uses the kernel dictionaries defined above.
+# Import handlers after the op modules to avoid circular import issues:
+# handlers.py imports the op modules above (via the package).
+# Re-export the warm-adoption query (from gc_compile) so a consumer can assert
+# the ops were force-loaded from the manifest rather than cold-compiled.
+from .gc_compile import adopted_from_manifest
 from .handlers import _MO_OP_HANDLERS, lookup_handler, register_op_handler
 
+# Every warm path iterates this; each ``*_gc.py`` self-registers at import
+# (MXF-533), so there's no hand-maintained list to drift.
+GC_FAMILIES: tuple[gc_compile.GCOpFamily, ...] = (
+    gc_compile.registered_families()
+)
+
+
+def compile_all_families() -> None:
+    """Compile every registered GC family's full sweep into the cache.
+
+    Stamps once, after every family; a manifest force-load does not stamp.
+    """
+    swept = [family.compile_sweep() for family in GC_FAMILIES]
+    if swept and all(swept):
+        gc_compile.write_warm_stamp()
+
+
+# Opt-in (MAX_EAGER_OP_PRECOMPILE=1) precompile of the full GC matrix; lazy
+# per-dispatch otherwise (MXF-508).
+def _precompile_gc_models() -> None:
+    if not gc_compile.should_precompile():
+        return
+    provisioned = gc_compile.provisioned()
+    if not _eager_policy.allow_lazy_compile() and not provisioned:
+        # Fail at import rather than mid-request. (MXF-569)
+        raise _eager_policy.EagerLazyCompileDisallowed(
+            "MAX_EAGER_OP_PRECOMPILE=1 asks to compile the eager op matrix,"
+            f" but {_eager_policy.ALLOW_LAZY_COMPILE_ENV_VAR}=0 forbids it and"
+            " this machine has no warm cache to load.\n\n"
+            "Run `max warm-interpreter-cache` on this machine."
+        )
+    will_compile = not provisioned
+    if will_compile:
+        _eager_policy.note_sweep_start()
+    start = time.perf_counter()
+    compile_all_families()
+    if will_compile:
+        _eager_policy.note_sweep_end(time.perf_counter() - start)
+
+
+_precompile_gc_models()
+
 __all__ = [
-    "BINARY_ELEMENTWISE",
-    "BINARY_ELEMENTWISE_COMPARISON",
-    "REDUCE",
-    "SOFTMAX",
-    "UNARY_ELEMENTWISE",
-    "UNARY_MIXED",
+    "GC_FAMILIES",
     "_MO_OP_HANDLERS",
+    "adopted_from_manifest",
+    "compile_all_families",
     "lookup_handler",
     "register_op_handler",
 ]

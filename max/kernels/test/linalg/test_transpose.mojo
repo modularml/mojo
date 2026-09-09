@@ -110,7 +110,7 @@ def test_transpose_8x8_tiletensor():
     for i in range(num_rows):
         for j in range(num_cols):
             var val = i * num_cols + j
-            matrix[i, j] = Scalar[DType.int](val)
+            matrix[i, j] = Int(val)
 
     transpose_inplace[num_rows, num_cols, DType.int](matrix)
 
@@ -137,7 +137,7 @@ def test_transpose_16x16_tiletensor():
     for i in range(num_rows):
         for j in range(num_cols):
             var val = i * num_cols + j
-            matrix[i, j] = Scalar[DType.int](val)
+            matrix[i, j] = Int(val)
 
     transpose_inplace[num_rows, num_cols, DType.int](matrix)
 
@@ -165,7 +165,7 @@ def test_transpose_2d_identity_tiletensor() raises:
     input[2, 1] = 8
     input[2, 2] = 9
 
-    var perm: InlineArray[Scalar[DType.int], 2] = [0, 1]
+    var perm: Array[Int, 2] = [0, 1]
 
     var output = stack_allocation[dtype=DType.int](row_major[3, 3]())
     _ = output.fill(0)
@@ -207,7 +207,7 @@ def test_transpose_2d_tiletensor() raises:
     input[2, 1] = 8
     input[2, 2] = 9
 
-    var perm: InlineArray[Scalar[DType.int], 2] = [1, 0]
+    var perm: Array[Int, 2] = [1, 0]
 
     var output = stack_allocation[dtype=DType.int](row_major[3, 3]())
     _ = output.fill(0)
@@ -252,7 +252,7 @@ def test_transpose_3d_identity_tiletensor() raises:
     input[1, 1, 1] = 11
     input[1, 1, 2] = 12
 
-    var perm: InlineArray[Scalar[DType.int], 3] = [0, 1, 2]
+    var perm: Array[Int, 3] = [0, 1, 2]
 
     var output = stack_allocation[dtype=DType.int](row_major[2, 2, 3]())
     _ = output.fill(0)
@@ -303,7 +303,7 @@ def test_transpose_3d_tiletensor() raises:
     input[1, 1, 1] = 11
     input[1, 1, 2] = 12
 
-    var perm: InlineArray[Scalar[DType.int], 3] = [2, 0, 1]
+    var perm: Array[Int, 3] = [2, 0, 1]
 
     var output = stack_allocation[dtype=DType.int](row_major[3, 2, 2]())
     _ = output.fill(0)
@@ -354,7 +354,7 @@ def test_transpose_si64_tiletensor() raises:
     input[1, 1, 1] = 11
     input[1, 1, 2] = 12
 
-    var perm: InlineArray[Scalar[DType.int], 3] = [2, 1, 0]
+    var perm: Array[Int, 3] = [2, 1, 0]
 
     var output = stack_allocation[dtype=DType.int64](row_major[3, 2, 2]())
     _ = output.fill(0)
@@ -600,7 +600,7 @@ def test_transpose_8x8():
     for i in range(num_rows):
         for j in range(num_cols):
             var val = i * num_cols + j
-            matrix[i, j] = Scalar[DType.int](val)
+            matrix[i, j] = Int(val)
 
     transpose_inplace[num_rows, num_cols](matrix)
 
@@ -627,7 +627,7 @@ def test_transpose_16x16():
     for i in range(num_rows):
         for j in range(num_cols):
             var val = i * num_cols + j
-            matrix[i, j] = Scalar[DType.int](val)
+            matrix[i, j] = Int(val)
 
     transpose_inplace[num_rows, num_cols](matrix)
 

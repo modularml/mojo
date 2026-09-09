@@ -14,5 +14,14 @@
 from .arch import qwen3_5_arch
 from .model import Qwen3_5Inputs, Qwen3_5Model
 from .model_config import Qwen3_5Config
+from .reasoning import Qwen3_5ReasoningParser
+from .tool_parser import Qwen3_5ToolParser
 
-__all__ = ["Qwen3_5Config", "Qwen3_5Inputs", "Qwen3_5Model", "qwen3_5_arch"]
+__all__ = [
+    "Qwen3_5Config",
+    "Qwen3_5Inputs",
+    "Qwen3_5Model",
+    "Qwen3_5ReasoningParser",
+    "Qwen3_5ToolParser",
+    "qwen3_5_arch",
+]

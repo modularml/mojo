@@ -52,6 +52,7 @@ class WanTokenizer(PixelGenerationTokenizer):
         base = await super().new_context(request, input_image=input_image)
 
         video_options = request.body.provider_options.video
+        pixel_options = video_options or request.body.provider_options.image
 
         # Wan's execution path always expects 5D latents. Keep image requests
         # image-like at the API layer, but represent them internally as a
@@ -84,13 +85,22 @@ class WanTokenizer(PixelGenerationTokenizer):
         latent_width = 2 * (int(width) // (self._vae_scale_factor * 2))
         image_seq_len = (latent_height // 2) * (latent_width // 2)
 
+        # Resolve flow_shift per request and pass it through instead of
+        # mutating the shared scheduler, so an override can't leak into
+        # later requests.
+        extra_kwargs: dict[str, float] = {}
         if getattr(self._scheduler, "use_flow_sigmas", False):
-            self._scheduler.flow_shift = self._select_wan_flow_shift(
-                height, width
+            request_flow_shift = (
+                pixel_options.flow_shift if pixel_options else None
+            )
+            extra_kwargs["flow_shift"] = (
+                float(request_flow_shift)
+                if request_flow_shift is not None
+                else self._select_wan_flow_shift(height, width)
             )
 
         timesteps, sigmas = self._scheduler.retrieve_timesteps_and_sigmas(
-            image_seq_len, num_inference_steps
+            image_seq_len, num_inference_steps, **extra_kwargs
         )
 
         num_warmup_steps: int = max(

@@ -48,7 +48,11 @@ def _make_config(
         patch_size=patch_size,
         position_embedding_size=position_embedding_size,
     )
-    return SimpleNamespace(dtype=MAX_DTYPE, vision_config=vision_cfg)
+    return SimpleNamespace(
+        dtype=MAX_DTYPE,
+        unquantized_dtype=MAX_DTYPE,
+        vision_config=vision_cfg,
+    )
 
 
 def _build_and_run(

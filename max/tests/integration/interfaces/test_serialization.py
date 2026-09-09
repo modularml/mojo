@@ -12,22 +12,28 @@
 # ===----------------------------------------------------------------------=== #
 """Tests for serialization utilities."""
 
+import gc
 import pickle
 from typing import Any
 
 import msgspec
 import numpy as np
 import numpy.typing as npt
+from max.pipelines.context.outputs import GenerationOutput
+from max.pipelines.context.status import GenerationStatus
 from max.pipelines.modeling.types import RequestID
-from max.pipelines.modeling.types.generation import GenerationOutput
-from max.pipelines.modeling.types.status import GenerationStatus
 from max.pipelines.modeling.types.utils.serialization import (
+    _OOB_SIZE_THRESHOLD,
     msgpack_numpy_decoder,
     msgpack_numpy_encoder,
+    msgpack_numpy_oob_decoder,
+    msgpack_numpy_oob_encoder,
 )
 from max.pipelines.request.open_responses import (
+    ImageGenerationDetails,
     OutputImageContent,
     OutputVideoContent,
+    Usage,
 )
 
 
@@ -238,6 +244,18 @@ def test_generation_output_serialization() -> None:
         output=[
             OutputImageContent.from_numpy(img_array, format="png"),
         ],
+        usage=Usage(
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            image_generation_details=ImageGenerationDetails(
+                width=64,
+                height=64,
+                megapixels=0.004096,
+                steps=28,
+                image_count=1,
+            ),
+        ),
     )
 
     # Encode the GenerationOutput
@@ -254,6 +272,7 @@ def test_generation_output_serialization() -> None:
     assert decoded_output.request_id == test_output.request_id
     assert decoded_output.final_status == test_output.final_status
     assert decoded_output.is_done == test_output.is_done
+    assert decoded_output.usage == test_output.usage
     assert len(decoded_output.output) == len(test_output.output)
 
     # Verify the OutputImageContent is correct
@@ -340,3 +359,124 @@ def test_generation_output_serialization_preserves_output_video_frames() -> (
     assert decoded_video.num_frames == 3
     assert decoded_video.frames is not None
     assert np.array_equal(decoded_video.frames, frames)
+
+
+# ===----------------------------------------------------------------------=== #
+# Out-of-band (OOB) zero-copy serialization
+# ===----------------------------------------------------------------------=== #
+
+
+class _ArrayPayload(msgspec.Struct, kw_only=True):
+    """Payload with a numpy array, for out-of-band serialization tests."""
+
+    array: npt.NDArray[Any]
+    label: str
+
+
+def test_oob_roundtrip_large_array_as_separate_frame() -> None:
+    """A large array round-trips through OOB, riding as its own frame."""
+    arr = np.random.rand(1024 * 1024).astype(np.float32)  # 4 MiB, well above
+    frames = msgpack_numpy_oob_encoder()(_ArrayPayload(array=arr, label="x"))
+
+    # Frame 0 is the msgpack stream; the large array is a second frame.
+    assert len(frames) == 2
+
+    decoded = msgpack_numpy_oob_decoder(_ArrayPayload)(frames)
+    assert isinstance(decoded, _ArrayPayload)
+    assert decoded.label == "x"
+    assert decoded.array.dtype == np.float32
+    assert np.array_equal(decoded.array, arr)
+
+
+def test_oob_small_array_stays_inline() -> None:
+    """An array below the threshold stays inline (a single frame)."""
+    arr = np.arange(4, dtype=np.int64)  # 32 B, well below the threshold
+    frames = msgpack_numpy_oob_encoder()(_ArrayPayload(array=arr, label="s"))
+
+    assert len(frames) == 1
+
+    decoded = msgpack_numpy_oob_decoder(_ArrayPayload)(frames)
+    assert np.array_equal(decoded.array, arr)
+
+
+def test_oob_threshold_boundary() -> None:
+    """The inline/out-of-band split happens exactly at _OOB_SIZE_THRESHOLD."""
+    encoder = msgpack_numpy_oob_encoder()
+    itemsize = np.dtype(np.uint8).itemsize
+
+    just_below = np.zeros(_OOB_SIZE_THRESHOLD - itemsize, dtype=np.uint8)
+    at_threshold = np.zeros(_OOB_SIZE_THRESHOLD, dtype=np.uint8)
+
+    # < threshold: inline (single frame); >= threshold: own out-of-band frame.
+    assert len(encoder(_ArrayPayload(array=just_below, label="lo"))) == 1
+    assert len(encoder(_ArrayPayload(array=at_threshold, label="hi"))) == 2
+
+    decoder = msgpack_numpy_oob_decoder(_ArrayPayload)
+    for arr in (just_below, at_threshold):
+        decoded = decoder(encoder(_ArrayPayload(array=arr, label="b")))
+        assert np.array_equal(decoded.array, arr)
+
+
+def test_oob_roundtrip_dtypes_shapes_and_layout() -> None:
+    """OOB preserves dtype, shape, and value for assorted arrays."""
+    encoder = msgpack_numpy_oob_encoder()
+    decoder = msgpack_numpy_oob_decoder(_ArrayPayload)
+    cases: list[npt.NDArray[Any]] = [
+        np.random.rand(256, 256).astype(np.float32),
+        (np.random.rand(256, 256) * 100).astype(np.float16),
+        (np.random.rand(256, 256) * 65535).astype(np.uint16),
+        np.random.rand(10, 3, 32, 32).astype(np.float32),
+        # Non-C-contiguous source is coerced and round-trips intact.
+        np.asfortranarray(np.random.rand(512, 512).astype(np.float32)),
+    ]
+    for arr in cases:
+        decoded = decoder(encoder(_ArrayPayload(array=arr, label="d")))
+        assert decoded.array.dtype == arr.dtype
+        assert decoded.array.shape == arr.shape
+        assert np.array_equal(decoded.array, arr)
+
+
+def test_oob_zero_copy_view_outlives_frames() -> None:
+    """A copy=False view stays valid and correct after the frames are dropped.
+
+    Guards the lifetime contract: the decoded array's base chain must retain the
+    backing buffer (the received frame, in production) for the view's lifetime.
+    """
+    arr = np.random.rand(1024 * 1024).astype(np.float32)
+    expected = arr.copy()
+    frames = msgpack_numpy_oob_encoder()(_ArrayPayload(array=arr, label="v"))
+    view = msgpack_numpy_oob_decoder(_ArrayPayload, copy=False)(frames).array
+
+    # The zero-copy view aliases ZMQ-owned memory, so it is returned read-only.
+    assert not view.flags.writeable
+
+    # Drop every other reference to the source and the transport frames, force
+    # GC, then scribble fresh allocations over any freed memory.
+    del arr, frames
+    gc.collect()
+    _scribble = [np.full(1024 * 1024, i, np.float32) for i in range(4)]
+
+    assert np.array_equal(view, expected)
+
+
+def test_oob_copy_true_owns_data() -> None:
+    """With copy=True the decoded array owns its data (no aliasing)."""
+    arr = np.random.rand(1024 * 1024).astype(np.float32)
+    frames = msgpack_numpy_oob_encoder()(_ArrayPayload(array=arr, label="c"))
+    decoded = msgpack_numpy_oob_decoder(_ArrayPayload, copy=True)(frames)
+
+    assert decoded.array.base is None
+    assert decoded.array.flags.writeable  # owned copy is mutable
+    assert np.array_equal(decoded.array, arr)
+
+
+def test_oob_encoder_decoder_pickle_roundtrip() -> None:
+    """The OOB encoder/decoder survive pickling (they cross the spawn boundary)."""
+    arr = np.random.rand(1024 * 1024).astype(np.float32)
+    encoder = pickle.loads(pickle.dumps(msgpack_numpy_oob_encoder()))
+    decoder = pickle.loads(
+        pickle.dumps(msgpack_numpy_oob_decoder(_ArrayPayload, copy=True))
+    )
+
+    decoded = decoder(encoder(_ArrayPayload(array=arr, label="p")))
+    assert np.array_equal(decoded.array, arr)

@@ -12,9 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 
 import std.math
-from std.math import ceildiv, sqrt
+from std.math import sqrt
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -52,7 +52,6 @@ def run_slot_indexed_gpu[
     (b) only the pool slots named in ``slot_assignments`` are mutated; the
     remaining slots must equal their initial random fill.
     """
-    comptime RECURRENCE_BLOCK_SIZE = 128
     comptime layout_2d = Layout.row_major[2]()
     comptime layout_4d = Layout.row_major[4]()
     comptime layout_1d = Layout(UNKNOWN_VALUE)
@@ -105,18 +104,16 @@ def run_slot_indexed_gpu[
         beta_h.ptr.store(i, Scalar[work_dtype](v / (v + Float32(1.0))))
 
     # input_row_offsets: [batch_size + 1]
-    var offsets_heap = ctx.enqueue_create_host_buffer[DType.uint32](
-        batch_size + 1
-    )
-    var offsets_h = LayoutTensor[DType.uint32, layout_1d, _](
+    var offsets_heap = ctx.enqueue_create_host_buffer[.uint32](batch_size + 1)
+    var offsets_h = LayoutTensor[.uint32, layout_1d, _](
         offsets_heap,
         RuntimeLayout[layout_1d].row_major(Index(batch_size + 1)),
     )
     var cumsum = 0
-    offsets_h.ptr.store(0, Scalar[DType.uint32](0))
+    offsets_h.ptr.store(0, UInt32(0))
     for b in range(batch_size):
         cumsum += seq_lengths[b]
-        offsets_h.ptr.store(b + 1, Scalar[DType.uint32](cumsum))
+        offsets_h.ptr.store(b + 1, UInt32(cumsum))
 
     # Pool [max_slots, nv, KD, VD] zeroed so initial state for any slot is 0.
     var pool_size = max_slots * num_value_heads * KEY_HEAD_DIM * VALUE_HEAD_DIM
@@ -132,13 +129,13 @@ def run_slot_indexed_gpu[
     for i in range(pool_size):
         pool_initial_h.ptr.store(i, Scalar[state_dtype](0))
 
-    var slot_idx_heap = ctx.enqueue_create_host_buffer[DType.uint32](batch_size)
-    var slot_idx_h = LayoutTensor[DType.uint32, layout_1d, _](
+    var slot_idx_heap = ctx.enqueue_create_host_buffer[.uint32](batch_size)
+    var slot_idx_h = LayoutTensor[.uint32, layout_1d, _](
         slot_idx_heap,
         RuntimeLayout[layout_1d].row_major(Index(batch_size)),
     )
     for b in range(batch_size):
-        slot_idx_h.ptr.store(b, Scalar[DType.uint32](slot_assignments[b]))
+        slot_idx_h.ptr.store(b, UInt32(slot_assignments[b]))
 
     var recur_out_gpu_heap = ctx.enqueue_create_host_buffer[work_dtype](
         total_seq_len * value_dim
@@ -167,9 +164,9 @@ def run_slot_indexed_gpu[
     var beta_device = ctx.enqueue_create_buffer[work_dtype](
         total_seq_len * num_value_heads
     )
-    var offsets_device = ctx.enqueue_create_buffer[DType.uint32](batch_size + 1)
+    var offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     var pool_device = ctx.enqueue_create_buffer[state_dtype](pool_size)
-    var slot_idx_device = ctx.enqueue_create_buffer[DType.uint32](batch_size)
+    var slot_idx_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     var recur_out_device = ctx.enqueue_create_buffer[work_dtype](
         total_seq_len * value_dim
     )
@@ -217,7 +214,8 @@ def run_slot_indexed_gpu[
     var output_seqlen_stride: UInt32 = UInt32(value_dim)
     var output_valuedim_stride: UInt32 = 1
 
-    var total_threads = batch_size * num_value_heads * VALUE_HEAD_DIM
+    # One CTA per (batch, value_head); the block has VALUE_HEAD_DIM threads.
+    var num_blocks = batch_size * num_value_heads
 
     var compiled_func = ctx.compile_function[
         gated_delta_recurrence_fwd_gpu[
@@ -225,7 +223,6 @@ def run_slot_indexed_gpu[
             state_dtype,
             KEY_HEAD_DIM,
             VALUE_HEAD_DIM,
-            RECURRENCE_BLOCK_SIZE,
             recur_out_tt.LayoutType,
             qkv_tt.LayoutType,
             decay_tt.LayoutType,
@@ -239,14 +236,10 @@ def run_slot_indexed_gpu[
     with ctx.push_context():
         ctx.enqueue_function(
             compiled_func,
-            total_threads,
-            batch_size,
-            total_seq_len,
-            num_value_heads,
-            num_key_heads,
-            key_dim,
-            value_dim,
-            conv_dim,
+            Int32(batch_size),
+            Int32(num_value_heads),
+            Int32(num_key_heads),
+            Int32(key_dim),
             recur_out_tt,
             pool_tt,
             slot_idx_tt,
@@ -264,8 +257,8 @@ def run_slot_indexed_gpu[
             pool_value_dim_stride,
             output_seqlen_stride,
             output_valuedim_stride,
-            grid_dim=(ceildiv(total_threads, RECURRENCE_BLOCK_SIZE),),
-            block_dim=(RECURRENCE_BLOCK_SIZE,),
+            grid_dim=(num_blocks,),
+            block_dim=(VALUE_HEAD_DIM,),
         )
 
     with ctx.push_context():
@@ -307,9 +300,9 @@ def run_slot_indexed_gpu[
             var kh = vh // heads_expansion_ratio
             for vd in range(VALUE_HEAD_DIM):
                 # Load initial state column for this (batch, value_head, vd_element)
-                var state_col = SIMD[DType.float32, KEY_HEAD_DIM](0.0)
+                var state_col = SIMD[.float32, KEY_HEAD_DIM](0.0)
                 comptime for kd in range(KEY_HEAD_DIM):
-                    state_col[kd] = Scalar[DType.float32](
+                    state_col[kd] = Float32(
                         pool_ref_h.ptr[
                             UInt32(slot) * pool_slot_stride
                             + UInt32(vh) * pool_value_head_stride
@@ -327,8 +320,8 @@ def run_slot_indexed_gpu[
                     var token_row = UInt32(token) * qkv_seqlen_stride
 
                     # Load Q, K raw vectors and accumulate squared norms
-                    var q_raw = SIMD[DType.float32, KEY_HEAD_DIM](0.0)
-                    var k_raw = SIMD[DType.float32, KEY_HEAD_DIM](0.0)
+                    var q_raw = SIMD[.float32, KEY_HEAD_DIM](0.0)
+                    var k_raw = SIMD[.float32, KEY_HEAD_DIM](0.0)
                     var q_sq = Float32(0.0)
                     var k_sq = Float32(0.0)
                     comptime for kd in range(KEY_HEAD_DIM):
@@ -352,8 +345,8 @@ def run_slot_indexed_gpu[
                     # L2 normalise Q (also scaled) and K
                     var q_inv = Float32(1.0) / sqrt(q_sq + Float32(1e-6))
                     var k_inv = Float32(1.0) / sqrt(k_sq + Float32(1e-6))
-                    var q_ns = SIMD[DType.float32, KEY_HEAD_DIM](0.0)
-                    var k_n = SIMD[DType.float32, KEY_HEAD_DIM](0.0)
+                    var q_ns = SIMD[.float32, KEY_HEAD_DIM](0.0)
+                    var k_n = SIMD[.float32, KEY_HEAD_DIM](0.0)
                     comptime for kd in range(KEY_HEAD_DIM):
                         q_ns[kd] = q_raw[kd] * q_inv * query_scale
                         k_n[kd] = k_raw[kd] * k_inv
@@ -416,7 +409,7 @@ def run_slot_indexed_gpu[
 def test_slot_indexed_single_sequence_targets_chosen_slot() raises:
     """Single sequence, KD=VD=128: writes only to slot 1 of a 3-slot pool."""
     var ctx = DeviceContext()
-    run_slot_indexed_gpu[DType.float32, DType.float32, 128, 128](
+    run_slot_indexed_gpu[.float32, DType.float32, 128, 128](
         batch_size=1,
         total_seq_len=4,
         num_value_heads=1,
@@ -431,7 +424,7 @@ def test_slot_indexed_single_sequence_targets_chosen_slot() raises:
 def test_slot_indexed_gqa_two_sequences() raises:
     """GQA (nv=2 nk=1), two sequences hitting non-adjacent slots, bf16 pool."""
     var ctx = DeviceContext()
-    run_slot_indexed_gpu[DType.float32, DType.bfloat16, 128, 128](
+    run_slot_indexed_gpu[.float32, DType.bfloat16, 128, 128](
         batch_size=2,
         total_seq_len=5,
         num_value_heads=2,
@@ -439,6 +432,40 @@ def test_slot_indexed_gqa_two_sequences() raises:
         max_slots=4,
         seq_lengths=Index(3, 2),
         slot_assignments=Index(3, 0),
+        ctx=ctx,
+        rtol=0.05,
+    )
+
+
+def test_decode_gqa_batch() raises:
+    """Decode shape (seq_len 1 per request), GQA ratio 2, multi-request batch
+    hitting distinct slots — mirrors Qwen3.5 decode."""
+    var ctx = DeviceContext()
+    run_slot_indexed_gpu[.float32, DType.bfloat16, 128, 128](
+        batch_size=4,
+        total_seq_len=4,
+        num_value_heads=8,
+        num_key_heads=4,
+        max_slots=8,
+        seq_lengths=Index(1, 1, 1, 1),
+        slot_assignments=Index(5, 1, 7, 2),
+        ctx=ctx,
+        rtol=0.05,
+    )
+
+
+def test_prefill_gqa_multi_seq() raises:
+    """Prefill shape (longer seqs), GQA ratio 2, two requests in distinct slots.
+    """
+    var ctx = DeviceContext()
+    run_slot_indexed_gpu[.float32, DType.bfloat16, 128, 128](
+        batch_size=2,
+        total_seq_len=24,
+        num_value_heads=8,
+        num_key_heads=4,
+        max_slots=4,
+        seq_lengths=Index(16, 8),
+        slot_assignments=Index(2, 0),
         ctx=ctx,
         rtol=0.05,
     )

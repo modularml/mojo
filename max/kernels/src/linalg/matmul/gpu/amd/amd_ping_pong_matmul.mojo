@@ -20,7 +20,7 @@ from std.math import ceildiv
 from std.sys import align_of, simd_width_of, size_of
 from layout.tile_tensor import stack_allocation
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
@@ -28,15 +28,15 @@ from std.gpu import (
     thread_idx,
     warp_id,
 )
-from std.gpu.host import DeviceContext
-from std.gpu.sync import schedule_barrier, s_waitcnt
+from max.gpu.host import DeviceContext
+from max.gpu.sync import schedule_barrier, s_waitcnt
 from std.sys import llvm_intrinsic
 from std.sys.intrinsics import readfirstlane
 
 from std.utils import Index, IndexList, StaticTuple
 from std.utils.numerics import get_accum_type
 
-from layout import TensorLayout, TileTensor
+from layout import TensorLayout, TensorEngine, TileTensor
 from layout.swizzle import Swizzle
 from layout.tile_layout import row_major, col_major
 from layout.tensor_core import num_matrix_reg
@@ -298,17 +298,37 @@ struct AMDPingPongMatmul[
             Int32(Self.config.num_threads())
         )
     )
+    @__name(
+        t"amd_ping_pong_matmul_{Self.a_type}_{Self.b_type}_{Self.c_type}_BM{Self.BM}_BN{Self.BN}_BK{Self.BK}_WM{Self.WM}_WN{Self.WN}"
+    )
     @staticmethod
     def run[
         a_layout: TensorLayout,
         b_layout: TensorLayout,
         c_layout: TensorLayout,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
+        c_engine: TensorEngine,
     ](
-        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin],
-        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin],
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin],
+        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
     ):
-        """Structured ping-pong GEMM kernel entry point."""
+        """Structured ping-pong GEMM kernel entry point.
+
+        Parameters:
+            a_layout: Memory layout of the `a` input tile (inferred).
+            b_layout: Memory layout of the `b` input tile (inferred).
+            c_layout: Memory layout of the `c` output tile (inferred).
+            a_engine: Engine of the `a` input tile (inferred).
+            b_engine: Engine of the `b` input tile (inferred).
+            c_engine: Engine of the `c` output tile (inferred).
+
+        Args:
+            a: LHS input matrix tile of shape `M` x `K` in `a_type`.
+            b: RHS input matrix tile of shape `N` x `K` in `b_type`.
+            c: Output matrix tile of shape `M` x `N` in `c_type`.
+        """
         Self.validate_config()
 
         comptime BM = Self.BM
@@ -347,31 +367,31 @@ struct AMDPingPongMatmul[
         # === SMEM: double-buffered half-tiles ===
         # A: 2 stages x 2 warp_m groups
         comptime a_half_layout = row_major[half_BM, BK]()
-        var a_s0_g0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s0_g0 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s0_g1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s0_g1 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s1_g0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s1_g0 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s1_g1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s1_g1 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
 
         # B: 2 stages x 2 warp_n groups
         comptime b_half_layout = row_major[half_BN, BK]()
-        var b_s0_h0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s0_h0 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s0_h1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s0_h1 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s1_h0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s1_h0 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s1_h1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s1_h1 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
 
@@ -474,19 +494,23 @@ struct AMDPingPongMatmul[
         )
 
         @always_inline
-        @parameter
+        @__parameter
         def load_a[stage: Int, which: Int](k: Int):
             a_loader.load_tile(
-                a_load_tiles[stage][which],
+                rebind[type_of(a_load_tiles[0][0])](
+                    rebind[type_of(a_load_tiles[0])](a_load_tiles[stage])[which]
+                ),
                 m_offset=which * half_BM,
                 k_offset=k,
             )
 
         @always_inline
-        @parameter
+        @__parameter
         def load_b[stage: Int, which: Int](k: Int):
             b_loader.load_tile(
-                b_load_tiles[stage][which],
+                rebind[type_of(b_load_tiles[0][0])](
+                    rebind[type_of(b_load_tiles[0])](b_load_tiles[stage])[which]
+                ),
                 m_offset=which * half_BN,
                 k_offset=k,
             )
@@ -526,7 +550,7 @@ struct AMDPingPongMatmul[
             Self.LGKM_PER_LOAD_B,
         ](sched_config, target)
 
-        @parameter
+        @__parameter
         @always_inline
         def _bind[entry: ScheduleEntry](k_base: Int):
             comptime k_off = entry.op.k_offset.signed_bk_multiple()
@@ -537,11 +561,19 @@ struct AMDPingPongMatmul[
                 load_b[entry.op.stage, entry.op.subtile](k)
             elif entry.op.tag == MMA_LOAD_A:
                 mma_op.load_a_quadrant[entry.op.subtile](
-                    a_mma_tiles[entry.op.stage][entry.op.subtile]
+                    rebind[type_of(a_mma_tiles[0][0])](
+                        rebind[type_of(a_mma_tiles[0])](
+                            a_mma_tiles[entry.op.stage]
+                        )[entry.op.subtile]
+                    )
                 )
             elif entry.op.tag == MMA_LOAD_B:
                 mma_op.load_b_quadrant[entry.op.subtile](
-                    b_mma_tiles[entry.op.stage][entry.op.subtile]
+                    rebind[type_of(b_mma_tiles[0][0])](
+                        rebind[type_of(b_mma_tiles[0])](
+                            b_mma_tiles[entry.op.stage]
+                        )[entry.op.subtile]
+                    )
                 )
             elif entry.op.tag == MMA:
                 mma_op.mma_quadrant[entry.op.stage, entry.op.subtile]()
@@ -664,10 +696,24 @@ def amd_ping_pong_matmul[
     c: TileTensor[mut=True, c_type, ...],
     ctx: DeviceContext,
 ) raises:
-    """Host launcher for the structured ping-pong matmul."""
+    """Host launcher for the structured ping-pong matmul.
+
+    Parameters:
+        a_type: Element type of the `a` input matrix (inferred).
+        b_type: Element type of the `b` input matrix (inferred).
+        c_type: Element type of the `c` output matrix (inferred).
+        enable_swizzle: Enable LDS bank-conflict avoidance swizzle
+            (defaults to `True`).
+
+    Args:
+        a: LHS input matrix tile of shape `M` x `K`.
+        b: RHS input matrix tile of shape `N` x `K`.
+        c: Output matrix tile of shape `M` x `N`.
+        ctx: Device context used to enqueue the kernel launch.
+    """
     comptime assert a_type == b_type, "A and B must have the same type"
     comptime assert (
-        a_type == DType.bfloat16 or a_type.is_float8()
+        a_type == .bfloat16 or a_type.is_float8()
     ), "A must be bfloat16 or float8_e4m3fn"
 
     comptime is_fp8 = a_type.is_float8()
@@ -676,7 +722,7 @@ def amd_ping_pong_matmul[
     var M = Int(c.dim[0]())
 
     @always_inline
-    @parameter
+    @__parameter
     def run_kernel[config: KernelConfig]() raises:
         comptime kernel = AMDPingPongMatmul[
             a_type,
@@ -684,7 +730,14 @@ def amd_ping_pong_matmul[
             c_type,
             config,
             enable_swizzle,
-        ].run[a.LayoutType, b.LayoutType, c.LayoutType]
+        ].run[
+            type_of(a).LayoutType,
+            type_of(b).LayoutType,
+            type_of(c).LayoutType,
+            type_of(a).Engine,
+            type_of(b).Engine,
+            type_of(c).Engine,
+        ]
 
         ctx.enqueue_function[kernel](
             a,

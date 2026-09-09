@@ -134,7 +134,7 @@ class CollectivesTests:
             Replicated() if isinstance(p, Partial) else p for p in placements
         )
         sharded = transfer_to(
-            Tensor(data), PlacementMapping(mesh, tuple(list(shard_placements)))
+            Tensor(data), PlacementMapping(mesh, tuple(shard_placements))
         )
         return Tensor._from_shards(
             tuple(s.driver_tensor for s in sharded.local_shards),

@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from tensor_core_kernels import (
     test_load_and_mma_and_multiply_operands,
     test_load_operands_ldmatrix,
@@ -256,7 +256,7 @@ def test_load_and_mma_f32_f32_16x16x4(ctx: DeviceContext) raises:
 # CHECK: 48.0 49.0 50.0 51.0 52.0 53.0 54.0 55.0 56.0 57.0 58.0 59.0 60.0 61.0 62.0 63.0
 def test_write_f32_f32_16x16x4(ctx: DeviceContext) raises:
     print("== test_write_f32_f32_16x16x4")
-    test_write_res_operand[DType.float32, DType.float32, Index(16, 16, 4)](ctx)
+    test_write_res_operand[.float32, DType.float32, Index(16, 16, 4)](ctx)
 
 
 # CHECK-LABEL: test_write_f32_f16_16x16x16
@@ -278,7 +278,7 @@ def test_write_f32_f32_16x16x4(ctx: DeviceContext) raises:
 # CHECK: 48.0 49.0 50.0 51.0 52.0 53.0 54.0 55.0 56.0 57.0 58.0 59.0 60.0 61.0 62.0 63.0
 def test_write_f32_f16_16x16x16(ctx: DeviceContext) raises:
     print("== test_write_f32_f16_16x16x16")
-    test_write_res_operand[DType.float32, DType.float16, Index(16, 16, 16)](ctx)
+    test_write_res_operand[.float32, DType.float16, Index(16, 16, 16)](ctx)
 
 
 # CHECK-LABEL: test_write_f32_bf16_16x16x16
@@ -300,9 +300,7 @@ def test_write_f32_f16_16x16x16(ctx: DeviceContext) raises:
 # CHECK: 48.0 49.0 50.0 51.0 52.0 53.0 54.0 55.0 56.0 57.0 58.0 59.0 60.0 61.0 62.0 63.0
 def test_write_f32_bf16_16x16x16(ctx: DeviceContext) raises:
     print("== test_write_f32_bf16_16x16x16")
-    test_write_res_operand[DType.float32, DType.bfloat16, Index(16, 16, 16)](
-        ctx
-    )
+    test_write_res_operand[.float32, DType.bfloat16, Index(16, 16, 16)](ctx)
 
 
 # CHECK-LABEL: test_load_f32_f16_16x16x16_ldmatrix
@@ -516,9 +514,7 @@ def test_load_f32_bf16_16x16x16_ldmatrix(ctx: DeviceContext) raises:
 # CHECK: thread 63 a_vals=[63], b_vals=[63]
 def test_load_f32_f32_16x16x4_ldmatrix(ctx: DeviceContext) raises:
     print("== test_load_f32_f32_16x16x4_ldmatrix")
-    test_load_operands_ldmatrix[DType.float32, DType.float32, Index(16, 16, 4)](
-        ctx
-    )
+    test_load_operands_ldmatrix[.float32, DType.float32, Index(16, 16, 4)](ctx)
 
 
 def main() raises:

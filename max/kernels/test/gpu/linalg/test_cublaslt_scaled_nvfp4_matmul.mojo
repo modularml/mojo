@@ -13,7 +13,7 @@
 
 from std.math import ceildiv
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from internal_utils import assert_almost_equal
 from std.random import rand
 from linalg.matmul.vendor.blas import matmul
@@ -26,8 +26,8 @@ from linalg.fp4_utils import (
     NVFP4_SF_VECTOR_SIZE,
     NVFP4_SF_DTYPE,
 )
-from linalg.fp4_quantization import naive_block_scaled_matmul
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from linalg.block_scaled_quantization import naive_block_scaled_matmul
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 
 
 def test_block_scaled_nvfp4_cublaslt[
@@ -49,7 +49,7 @@ def test_block_scaled_nvfp4_cublaslt[
         transpose_b == True
     ), "Only transpose_b = True is supported for scaled NVFP4 matmul"
 
-    comptime assert in_dtype == DType.float4_e2m1fn and out_dtype in (
+    comptime assert in_dtype == .float4_e2m1fn and out_dtype in (
         DType.float32,
         DType.bfloat16,
     ), (
@@ -123,8 +123,8 @@ def test_block_scaled_nvfp4_cublaslt[
     )
     var b_scales_host = TileTensor(b_scales_host_ptr, b_scales_shape)
 
-    rand(a_scales_host.ptr, a_scales_host.num_elements())
-    rand(b_scales_host.ptr, b_scales_host.num_elements())
+    rand(a_scales_host._storage, a_scales_host.num_elements())
+    rand(b_scales_host._storage, b_scales_host.num_elements())
 
     var a_scales_device = ctx.enqueue_create_buffer[scales_dtype](a_scales_size)
     var a_scales_device_nd = TileTensor(a_scales_device, a_scales_shape)
@@ -153,8 +153,8 @@ def test_block_scaled_nvfp4_cublaslt[
     var c_device_ref = ctx.enqueue_create_buffer[out_dtype](c_size)
     var c_device_ref_nd = TileTensor(c_device_ref, c_shape)
 
-    rand(a_host.ptr, a_host.num_elements(), min=0, max=255)
-    rand(b_host.ptr, b_host.num_elements(), min=0, max=255)
+    rand(a_host._storage, a_host.num_elements(), min=0, max=255)
+    rand(b_host._storage, b_host.num_elements(), min=0, max=255)
 
     # Move operands to the Device
     ctx.enqueue_copy(a_device, a_host_ptr)
@@ -191,14 +191,14 @@ def test_block_scaled_nvfp4_cublaslt[
         ctx,
     )
 
-    ctx.enqueue_copy(c_host.ptr, c_device)
-    ctx.enqueue_copy(c_host_ref.ptr, c_device_ref)
+    ctx.enqueue_copy(c_host._storage, c_device)
+    ctx.enqueue_copy(c_host_ref._storage, c_device_ref)
 
     ctx.synchronize()
 
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=0.01,
         rtol=0.01,
@@ -208,49 +208,49 @@ def test_block_scaled_nvfp4_cublaslt[
 def main() raises:
     with DeviceContext() as ctx:
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(128), Idx[128], Idx[64])
 
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(256), Idx[256], Idx[64 - 32])
 
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(128), Idx[3 * 128], Idx[256 + 32])
 
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(3 * 128), Idx[128], Idx[3 * 64])
 
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(2560), Idx[4096], Idx[1024])
 
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(1000), Idx[4096], Idx[1024])
 
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(1000), Idx[4096 + 64], Idx[1024])
 
         test_block_scaled_nvfp4_cublaslt[
-            DType.bfloat16,
-            DType.float4_e2m1fn,
+            .bfloat16,
+            .float4_e2m1fn,
             True,
         ](ctx, Int(1000), Idx[4096 + 64], Idx[1024 + 64])

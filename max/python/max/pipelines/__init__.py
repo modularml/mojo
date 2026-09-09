@@ -13,19 +13,17 @@
 
 """Types to interface with ML pipelines such as text/token/pixel generation."""
 
-from max.pipelines.modeling.weights.hf_utils import download_weight_files
+from max.pipelines.weights.hf_utils import download_weight_files
 
 from .architectures import register_all_models
-from .core import PixelContext, TextAndVisionContext, TextContext, TTSContext
 from .diffusion.pipeline import PixelGenerationPipeline
 from .lib.config import (
-    AudioGenerationConfig,
     KVCacheConfig,
     LoRAConfig,
     MAXModelConfig,
+    PipelineArgs,
     PipelineConfig,
     PipelineRole,
-    PrependPromptSpeechTokens,
     ProfilingConfig,
     PrometheusMetricsMode,
     RepoType,
@@ -46,21 +44,21 @@ from .lib.interfaces import (
     ModelOutputs,
     PipelineModel,
 )
-from .lib.lora import ADAPTER_CONFIG_FILE
 from .lib.memory_estimation import MemoryEstimator
+from .lib.pipeline_runtime_config import PipelineRuntimeConfig
 from .lib.pipeline_variants.text_generation import (
     TextGenerationPipeline,
     TextGenerationPipelineInterface,
 )
 from .lib.registry import PIPELINE_REGISTRY, SupportedArchitecture
-from .lib.sampling.sampling_config import SamplingConfig
-from .lib.speech_token_pipeline import SpeechTokenGenerationPipeline
 from .lib.tokenizer import (
     IdentityPipelineTokenizer,
     TextAndVisionTokenizer,
     TextTokenizer,
 )
 from .lib.utils import upper_bounded_default
+from .lora import ADAPTER_CONFIG_FILE
+from .sampling.sampling_config import SamplingConfig
 
 # Hydrate the registry.
 register_all_models()
@@ -68,7 +66,6 @@ register_all_models()
 __all__ = [
     "ADAPTER_CONFIG_FILE",
     "PIPELINE_REGISTRY",
-    "AudioGenerationConfig",
     "EmbeddingsPipeline",
     "EmbeddingsPipelineType",
     "GenerateMixin",
@@ -79,25 +76,21 @@ __all__ = [
     "MemoryEstimator",
     "ModelInputs",
     "ModelOutputs",
+    "PipelineArgs",
     "PipelineConfig",
     "PipelineModel",
     "PipelineRole",
-    "PixelContext",
+    "PipelineRuntimeConfig",
     "PixelGenerationPipeline",
-    "PrependPromptSpeechTokens",
     "ProfilingConfig",
     "PrometheusMetricsMode",
     "RepoType",
     "RopeType",
     "SamplingConfig",
     "SpeculativeConfig",
-    "SpeechTokenGenerationPipeline",
     "SupportedArchitecture",
     "SupportedEncoding",
-    "TTSContext",
-    "TextAndVisionContext",
     "TextAndVisionTokenizer",
-    "TextContext",
     "TextGenerationPipeline",
     "TextGenerationPipelineInterface",
     "TextTokenizer",

@@ -29,9 +29,11 @@ Configuration
    :template: autosummary/class.rst
 
    DenoisingCacheConfig
+   DenoisingCacheSettings
    KVConnectorConfig
    MAXConfig
    MAXModelConfigBase
+   PipelineArgs
    PipelineRuntimeConfig
 
 Pipelines
@@ -65,18 +67,8 @@ Tokenizers
    :toctree: generated
    :template: autosummary/class.rst
 
+   AudioGenerationTokenizer
    PixelGenerationTokenizer
-
-LoRA
-----
-
-.. autosummary::
-   :nosignatures:
-   :toctree: generated
-   :template: autosummary/class.rst
-
-   LoRAManager
-   LoRARequestProcessor
 
 Utilities
 ---------
@@ -88,7 +80,10 @@ Utilities
 
    CompilationTimer
    HuggingFaceRepo
+   MemoryPlan
    ModelManifest
+   RetrievedPipeline
+   VisionPreprocessCache
    WeightPathParser
 
 Functions
@@ -108,10 +103,7 @@ Functions
    get_default_max_config_file_section_name
    max_tokens_to_generate
    parse_quant_config
-   rejection_sampler
-   rejection_sampler_with_residuals
    resolve_max_config_inheritance
-   token_sampler
    try_to_load_from_cache
    validate_hf_repo_access
 

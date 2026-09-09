@@ -5,6 +5,7 @@ package(default_visibility = ["//max:consumers"])
 modular_py_library(
     name = "dependencies",
     srcs = glob(["*.py"]),
+    test_docstring_examples = True,
     deps = [
         requirement("fastapi"),
         requirement("pydantic"),

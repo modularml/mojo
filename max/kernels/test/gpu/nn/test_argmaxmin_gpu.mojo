@@ -13,7 +13,7 @@
 
 from std.random import random_float64
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Coord, TileTensor, row_major
 from nn.argmaxmin import argmax, argmin
 from nn.argmaxmin_gpu import argmax_gpu, argmin_gpu
@@ -105,7 +105,7 @@ def test_argmaxmin_gpu[
     ctx.synchronize()
 
     # Test for correctness against CPU reference
-    var out_idxs_cpu_ptr = ctx.enqueue_create_host_buffer[DType.int64](out_size)
+    var out_idxs_cpu_ptr = ctx.enqueue_create_host_buffer[.int64](out_size)
     var out_idxs_cpu = TileTensor(
         out_idxs_cpu_ptr,
         row_major(Coord(out_shape)),
@@ -167,7 +167,7 @@ def test_argmaxmin_gpu_helper[
 
 
 def main() raises:
-    @parameter
+    @__parameter
     def fill_random[
         rank: Int, dtype: DType
     ](buffer: TileTensor[mut=True, dtype, ...]):
@@ -180,13 +180,13 @@ def main() raises:
 
     with DeviceContext() as ctx:  # argmax tests
         # index
-        test_argmaxmin_gpu_helper[DType.int, fill_random](ctx)
+        test_argmaxmin_gpu_helper[.int, fill_random](ctx)
 
         # int64
-        test_argmaxmin_gpu_helper[DType.int64, fill_random](ctx)
+        test_argmaxmin_gpu_helper[.int64, fill_random](ctx)
 
         # int32
-        test_argmaxmin_gpu_helper[DType.int32, fill_random](ctx)
+        test_argmaxmin_gpu_helper[.int32, fill_random](ctx)
 
         # uint64
-        test_argmaxmin_gpu_helper[DType.uint64, fill_random](ctx)
+        test_argmaxmin_gpu_helper[.uint64, fill_random](ctx)

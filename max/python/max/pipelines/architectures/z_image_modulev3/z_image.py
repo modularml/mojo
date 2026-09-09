@@ -23,10 +23,8 @@ from max.experimental.nn.norm import LayerNorm, RMSNorm
 from max.experimental.nn.sequential import ModuleList
 from max.experimental.tensor import Tensor
 from max.graph import TensorType
-from max.pipelines.diffusion.cache import (
-    DenoisingCacheConfig,
-    fbcache_conditional_execution,
-)
+from max.pipelines.diffusion.cache import fbcache_conditional_execution
+from max.pipelines.diffusion.config import DenoisingCacheConfig
 
 from .layers.attention import ZImageAttention
 from .layers.embeddings import RopeEmbedder, TimestepEmbedder

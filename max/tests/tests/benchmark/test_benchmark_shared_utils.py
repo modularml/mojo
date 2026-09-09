@@ -13,12 +13,14 @@
 
 from __future__ import annotations
 
+import logging
 import resource
 import time
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from max.benchmark.benchmark_shared import utils as benchmark_utils
 from max.benchmark.benchmark_shared.utils import (
     argmedian,
     exceeds_deadline,
@@ -58,6 +60,7 @@ def test_get_tokenizer_passes_model_max_length_when_provided(
         model_max_length=4096,
         trust_remote_code=True,
         revision="abc123",
+        local_files_only=False,
     )
 
 
@@ -82,7 +85,133 @@ def test_get_tokenizer_omits_model_max_length_when_unspecified(
         "repo/model",
         trust_remote_code=False,
         revision=None,
+        local_files_only=False,
     )
+
+
+def test_get_tokenizer_forwards_local_files_only(
+    mocker: MockerFixture,
+) -> None:
+    """A cache-only load keeps the Hub out of both transformers lookups."""
+    from_pretrained = mocker.patch(
+        "transformers.AutoTokenizer.from_pretrained",
+    )
+    autoconfig = mocker.patch(
+        "transformers.AutoConfig.from_pretrained",
+        return_value=MagicMock(architectures=[]),
+    )
+
+    get_tokenizer(
+        "repo/model",
+        revision="abc123",
+        trust_remote_code=False,
+        local_files_only=True,
+    )
+
+    from_pretrained.assert_called_once_with(
+        "repo/model",
+        trust_remote_code=False,
+        revision="abc123",
+        local_files_only=True,
+    )
+    autoconfig.assert_called_once_with(
+        "repo/model",
+        trust_remote_code=False,
+        revision="abc123",
+        local_files_only=True,
+    )
+
+
+def test_get_tokenizer_stashes_resolved_architectures(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("transformers.AutoTokenizer.from_pretrained")
+    mocker.patch(
+        "transformers.AutoConfig.from_pretrained",
+        return_value=MagicMock(architectures=["LlamaForCausalLM"]),
+    )
+
+    tokenizer = get_tokenizer("repo/model", revision=None)
+
+    assert tokenizer._resolved_architectures == ["LlamaForCausalLM"]
+
+
+def test_get_tokenizer_skips_autoconfig_when_architectures_provided(
+    mocker: MockerFixture,
+) -> None:
+    """A precomputed architecture list bypasses the AutoConfig Hub lookup."""
+    mocker.patch("transformers.AutoTokenizer.from_pretrained")
+    autoconfig = mocker.patch("transformers.AutoConfig.from_pretrained")
+
+    tokenizer = get_tokenizer(
+        "repo/model", revision=None, architectures=["LlamaForCausalLM"]
+    )
+
+    autoconfig.assert_not_called()
+    assert tokenizer._resolved_architectures == ["LlamaForCausalLM"]
+
+
+def test_get_tokenizer_applies_kimi_override_from_provided_architectures(
+    mocker: MockerFixture,
+) -> None:
+    """The Kimi encode override works from a forwarded architecture list."""
+    inner = MagicMock()
+    real_tokenizer = MagicMock()
+    real_tokenizer.encode = inner
+    mocker.patch(
+        "transformers.AutoTokenizer.from_pretrained",
+        return_value=real_tokenizer,
+    )
+    mocker.patch("transformers.AutoConfig.from_pretrained")
+
+    tokenizer = get_tokenizer(
+        "repo/model",
+        revision=None,
+        architectures=["KimiK25ForConditionalGeneration"],
+    )
+    tokenizer.encode("hello", add_special_tokens=True)
+
+    _, kwargs = inner.call_args
+    assert "add_special_tokens" not in kwargs
+    assert kwargs["allow_special_tokens"] is True
+
+
+def test_get_tokenizer_warns_once_on_autoconfig_failure(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failing AutoConfig probe warns once per model path, not per load."""
+    mocker.patch("transformers.AutoTokenizer.from_pretrained")
+    mocker.patch(
+        "transformers.AutoConfig.from_pretrained",
+        side_effect=OSError("cannot reach hub"),
+    )
+    benchmark_utils._reported_autoconfig_failures.discard("repo/unreachable")
+
+    with caplog.at_level(
+        logging.WARNING, logger="max.benchmark.benchmark_shared.utils"
+    ):
+        first = get_tokenizer("repo/unreachable", revision=None)
+        second = get_tokenizer("repo/unreachable", revision=None)
+
+    assert first._resolved_architectures == []
+    assert second._resolved_architectures == []
+    failures = [
+        r
+        for r in caplog.records
+        if "AutoConfig.from_pretrained failed" in r.getMessage()
+    ]
+    assert len(failures) == 1
+
+
+def test_quiet_hf_hub_retries_lowers_then_restores_level() -> None:
+    hub_logger = logging.getLogger("huggingface_hub")
+    hub_logger.setLevel(logging.WARNING)
+
+    with benchmark_utils._quiet_hf_hub_retries():
+        assert hub_logger.level == logging.ERROR
+
+    assert hub_logger.level == logging.WARNING
 
 
 def test_set_ulimit_updates_soft_limit_when_needed(
@@ -328,3 +457,92 @@ def test_wait_for_server_ready_zero_timeout_tries_once(
 
     assert urlopen.call_count == 1
     sleep.assert_not_called()
+
+
+def test_wait_for_server_ready_aborts_when_liveness_fails(
+    mocker: MockerFixture,
+) -> None:
+    """A dead server aborts immediately instead of polling until timeout."""
+    urlopen = mocker.patch("urllib.request.urlopen")
+    urlopen.side_effect = ConnectionRefusedError()
+    # A long timeout: without the liveness check this would poll for ~hours.
+    mocker.patch("time.monotonic", side_effect=[100.0, 100.0])
+    sleep = mocker.patch("time.sleep")
+
+    with pytest.raises(RuntimeError, match="exited before"):
+        wait_for_server_ready(
+            "localhost",
+            8000,
+            timeout_s=120 * 60,
+            backend="modular",
+            liveness_check=lambda: False,
+        )
+
+    # Aborted on the first failed poll — no sleep, no deadline wait.
+    assert urlopen.call_count == 1
+    sleep.assert_not_called()
+
+
+def test_wait_for_server_ready_live_liveness_does_not_interfere(
+    mocker: MockerFixture,
+) -> None:
+    """A liveness check that stays True lets normal polling proceed to 200."""
+    urlopen = mocker.patch("urllib.request.urlopen")
+    urlopen.side_effect = [
+        ConnectionRefusedError(),
+        _mock_response(200),
+    ]
+    mocker.patch("time.monotonic", side_effect=[100.0, 101.0, 105.0])
+    sleep = mocker.patch("time.sleep")
+    liveness = mocker.Mock(return_value=True)
+
+    elapsed = wait_for_server_ready(
+        "localhost",
+        8000,
+        timeout_s=60,
+        backend="modular",
+        liveness_check=liveness,
+    )
+
+    assert elapsed == pytest.approx(5.0)
+    assert urlopen.call_count == 2
+    # Checked once after the first failed poll; the second poll returned 200.
+    liveness.assert_called_once_with()
+    sleep.assert_called_once_with(5.0)
+
+
+def test_wait_for_server_ready_base_url_uses_url_and_bearer_auth(
+    mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    urlopen = mocker.patch(
+        "urllib.request.urlopen", return_value=_mock_response(200)
+    )
+    mocker.patch("time.monotonic", side_effect=[100.0, 101.0])
+
+    wait_for_server_ready(
+        "localhost",
+        8000,
+        timeout_s=60,
+        backend="modular",
+        base_url="https://example.com/",
+    )
+
+    request = urlopen.call_args.args[0]
+    assert request.full_url == "https://example.com/health"
+    assert request.get_header("Authorization") == "Bearer test-key"
+
+
+def test_wait_for_server_ready_no_base_url_sends_no_auth(
+    mocker: MockerFixture,
+) -> None:
+    urlopen = mocker.patch(
+        "urllib.request.urlopen", return_value=_mock_response(200)
+    )
+    mocker.patch("time.monotonic", side_effect=[100.0, 101.0])
+
+    wait_for_server_ready("localhost", 8000, timeout_s=60, backend="modular")
+
+    request = urlopen.call_args.args[0]
+    assert request.full_url == "http://localhost:8000/health"
+    assert request.get_header("Authorization") is None

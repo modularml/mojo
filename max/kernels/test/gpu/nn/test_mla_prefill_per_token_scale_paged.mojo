@@ -59,7 +59,7 @@ from std.math import ceildiv
 from std.random import randn, seed
 from std.sys import get_defined_int
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import KVCacheStaticParams, PagedKVCacheCollection
 from layout import (
     Idx,
@@ -76,7 +76,7 @@ from nn.attention.mha_mask import CausalMask
 from nn.attention.mha_operand import LayoutTensorMHAOperand
 from nn.attention.gpu.mla import flare_mla_prefill
 from std.testing import assert_almost_equal
-from std.gpu.host.info import _is_sm10x_gpu
+from max.gpu.host.info import _is_sm10x_gpu
 from std.utils.index import Index, IndexList
 
 from _paged_prefill_test_utils import (
@@ -219,10 +219,10 @@ def run_test_paged_prefill_per_token_scale[
     var v_bf16_ptr = alloc[BFloat16](v_bf16_size)
     var cache_bf16_ptr = alloc[BFloat16](cache_size)
 
-    randn[DType.bfloat16](q_bf16_ptr, q_bf16_size)
-    randn[DType.bfloat16](k_bf16_ptr, k_bf16_size)
-    randn[DType.bfloat16](v_bf16_ptr, v_bf16_size)
-    randn[DType.bfloat16](cache_bf16_ptr, cache_size)
+    randn[.bfloat16](q_bf16_ptr, q_bf16_size)
+    randn[.bfloat16](k_bf16_ptr, k_bf16_size)
+    randn[.bfloat16](v_bf16_ptr, v_bf16_size)
+    randn[.bfloat16](cache_bf16_ptr, cache_size)
     for i in range(q_bf16_size):
         q_bf16_ptr[i] *= scale_factor
     for i in range(k_bf16_size):
@@ -247,7 +247,7 @@ def run_test_paged_prefill_per_token_scale[
             for h in range(num_heads):
                 for d in range(depth):
                     var off = ((b * seq_len + s) * num_heads + h) * depth + d
-                    var q_abs = abs(q_bf16_ptr[off]).cast[DType.float32]()
+                    var q_abs = abs(q_bf16_ptr[off]).cast[.float32]()
                     if q_abs > q_max:
                         q_max = q_abs
             q_scale_ptr[b * seq_len_padded + s] = max(
@@ -257,7 +257,7 @@ def run_test_paged_prefill_per_token_scale[
     # Split Q into FP8 nope + BF16 rope (both divided by Q_scale).
     for b in range(batch_size):
         for s in range(seq_len):
-            var qs = q_scale_ptr[b * seq_len_padded + s].cast[DType.bfloat16]()
+            var qs = q_scale_ptr[b * seq_len_padded + s].cast[.bfloat16]()
             for h in range(num_heads):
                 for d in range(depth):
                     var src_off = (
@@ -284,7 +284,7 @@ def run_test_paged_prefill_per_token_scale[
                     var off = (
                         (b * num_keys + j) * num_heads + h
                     ) * kv_depth + d
-                    var k_abs = abs(k_bf16_ptr[off]).cast[DType.float32]()
+                    var k_abs = abs(k_bf16_ptr[off]).cast[.float32]()
                     if k_abs > k_max:
                         k_max = k_abs
             k_scale_ptr[b * num_keys_padded + j] = max(
@@ -294,7 +294,7 @@ def run_test_paged_prefill_per_token_scale[
     # K (FP8) = k_bf16 / K_scale.
     for b in range(batch_size):
         for j in range(num_keys):
-            var ks = k_scale_ptr[b * num_keys_padded + j].cast[DType.bfloat16]()
+            var ks = k_scale_ptr[b * num_keys_padded + j].cast[.bfloat16]()
             for h in range(num_heads):
                 for d in range(kv_depth):
                     var src_off = (
@@ -385,7 +385,7 @@ def run_test_paged_prefill_per_token_scale[
     var tstride = token_stride(CACHE_DEPTH)
     for b in range(batch_size):
         for j in range(num_keys):
-            var ks = k_scale_ptr[b * num_keys + j].cast[DType.bfloat16]()
+            var ks = k_scale_ptr[b * num_keys + j].cast[.bfloat16]()
             var page_in_batch = j // page_size
             var slot_in_page = j % page_size
             # Uniform LUT: each batch's pages are contiguous in the
@@ -408,13 +408,11 @@ def run_test_paged_prefill_per_token_scale[
     var k_scale_device_buf = ctx.enqueue_create_buffer[scale_type](k_scale_size)
     var v_device_buf = ctx.enqueue_create_buffer[qkv_type](v_size)
     var output_device_buf = ctx.enqueue_create_buffer[output_type](o_size)
-    var input_ro_buf = ctx.enqueue_create_buffer[DType.uint32](batch_size + 1)
-    var cache_ro_buf = ctx.enqueue_create_buffer[DType.uint32](batch_size + 1)
+    var input_ro_buf = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
+    var cache_ro_buf = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     var blocks_device = ctx.enqueue_create_buffer[rope_type](block_elems)
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
 
     ctx.enqueue_copy(q_nope_device_buf, q_nope_ptr)
     ctx.enqueue_copy(q_rope_device_buf, q_rope_ptr)
@@ -526,13 +524,13 @@ def run_test_paged_prefill_per_token_scale[
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -540,21 +538,21 @@ def run_test_paged_prefill_per_token_scale[
     )
 
     var kv_collection = PagedKVCacheCollection[rope_type, kv_params, page_size](
-        LayoutTensor[rope_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[rope_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -636,7 +634,7 @@ def run_test_paged_prefill_per_token_scale[
     # values; padded rows stay zero from the init above.
     for b in range(batch_size):
         for s in range(seq_len):
-            var qs = q_scale_ptr[b * seq_len_padded + s].cast[DType.bfloat16]()
+            var qs = q_scale_ptr[b * seq_len_padded + s].cast[.bfloat16]()
             for h in range(num_heads):
                 for d in range(kv_depth):
                     var dst = (
@@ -648,7 +646,7 @@ def run_test_paged_prefill_per_token_scale[
                             * kv_depth
                             + d
                         ]
-                    ).cast[DType.bfloat16]()
+                    ).cast[.bfloat16]()
                     q_ref_host[dst] = qn * qs
                 for d in range(depth - kv_depth):
                     var dst = (
@@ -658,7 +656,7 @@ def run_test_paged_prefill_per_token_scale[
                         ((b * seq_len_padded + s) * num_heads + h)
                         * (depth - kv_depth)
                         + d
-                    ].cast[DType.bfloat16]()
+                    ].cast[.bfloat16]()
                     q_ref_host[dst] = qr * qs
 
     # K_ref_nope = k_fp8 * k_scale
@@ -668,7 +666,7 @@ def run_test_paged_prefill_per_token_scale[
     # propagates to k_ref/v_ref).
     for b in range(batch_size):
         for j in range(num_keys):
-            var ks = k_scale_ptr[b * num_keys_padded + j].cast[DType.bfloat16]()
+            var ks = k_scale_ptr[b * num_keys_padded + j].cast[.bfloat16]()
             for h in range(num_heads):
                 for d in range(kv_depth):
                     var src_off = (
@@ -677,8 +675,8 @@ def run_test_paged_prefill_per_token_scale[
                     var dst = (
                         (b * num_keys_padded + j) * num_heads + h
                     ) * depth + d
-                    k_ref_host[dst] = k_ptr[src_off].cast[DType.bfloat16]() * ks
-                    v_ref_host[dst] = v_ptr[src_off].cast[DType.bfloat16]()
+                    k_ref_host[dst] = k_ptr[src_off].cast[.bfloat16]() * ks
+                    v_ref_host[dst] = v_ptr[src_off].cast[.bfloat16]()
                 for d in range(depth - kv_depth):
                     var dst = (
                         (b * num_keys_padded + j) * num_heads + h
@@ -697,9 +695,9 @@ def run_test_paged_prefill_per_token_scale[
     # ------------------------------------------------------------------
     # Step 11: Run the naive MHA reference on the contiguous K_ref/V_ref.
     # ------------------------------------------------------------------
-    var q_ref_device_buf = ctx.enqueue_create_buffer[DType.bfloat16](q_ref_size)
-    var k_ref_device_buf = ctx.enqueue_create_buffer[DType.bfloat16](k_ref_size)
-    var v_ref_device_buf = ctx.enqueue_create_buffer[DType.bfloat16](v_ref_size)
+    var q_ref_device_buf = ctx.enqueue_create_buffer[.bfloat16](q_ref_size)
+    var k_ref_device_buf = ctx.enqueue_create_buffer[.bfloat16](k_ref_size)
+    var v_ref_device_buf = ctx.enqueue_create_buffer[.bfloat16](v_ref_size)
     var output_ref_device_buf = ctx.enqueue_create_buffer[output_type](
         output_ref_size
     )
@@ -755,14 +753,18 @@ def run_test_paged_prefill_per_token_scale[
     )
 
     var null_valid_length = LayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
+        .uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
     ](
         None,
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(Index(0)),
     )
 
-    var k_ref_operand = LayoutTensorMHAOperand(k_ref_device.to_layout_tensor())
-    var v_ref_operand = LayoutTensorMHAOperand(v_ref_device.to_layout_tensor())
+    var k_ref_operand = LayoutTensorMHAOperand(
+        k_ref_device.as_immut().as_unsafe_any_origin()
+    )
+    var v_ref_operand = LayoutTensorMHAOperand(
+        v_ref_device.as_immut().as_unsafe_any_origin()
+    )
 
     mha_gpu_naive[_is_cache_length_accurate=True](
         q_ref_4d_device.to_layout_tensor(),
@@ -809,10 +811,10 @@ def run_test_paged_prefill_per_token_scale[
                         (b * seq_len_padded + s) * num_heads * kv_depth
                         + h * kv_depth
                         + d
-                    ).cast[DType.float64]()
+                    ).cast[.float64]()
                     var expect = output_ref_host.load(
                         ((b * seq_len_padded + s) * num_heads + h) * depth + d
-                    ).cast[DType.float64]()
+                    ).cast[.float64]()
                     var abs_err = abs(actual - expect)
                     if abs_err > max_abs_err:
                         max_abs_err = abs_err

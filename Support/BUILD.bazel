@@ -1,0 +1,1222 @@
+load(
+    "//bazel:api.bzl",
+    "gentbl_cc_library",
+    "gentbl_mlir_dialect",
+    "gentbl_modular_passes",
+    "mlir_nanobind",
+    "modular_cc_library",
+    "modular_nanobind_library",
+    "modular_shared_library",
+    "pkg_files",
+    "td_library",
+)
+load("//bazel:config.bzl", "ASYNCRT_PROFILING_LOCAL_DEFINES", "CONFIG_SECTION_LOCAL_DEFINES")
+
+# gazelle:default_visibility //visibility:public
+# gazelle:default_features layering_check,parse_headers
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+exports_files(["include/Support/Driver/DriverCommand.td"])
+
+pkg_files(
+    name = "docs",
+    srcs = [
+        ":DEBUGINFODialect.doc",
+        ":DebugInfoToLLVMIncGen.doc",
+        ":DebugInfoTransformPasses.doc",
+        ":MDialect.doc",
+    ],
+    prefix = "Support/docs",
+)
+
+modular_cc_library(
+    name = "SymbolExport",
+    hdrs = [
+        "include/Support/SymbolExport.h",
+    ],
+)
+
+modular_cc_library(
+    name = "ConcurrentAppendingVector",
+    hdrs = ["include/Support/ADT/ConcurrentAppendingVector.h"],
+)
+
+modular_cc_library(
+    name = "Base",
+    srcs = [
+        "lib/AlignedAlloc.cpp",
+        "lib/Config.cpp",
+        "lib/Debugger.cpp",
+        "lib/Error.cpp",
+        "lib/ErrorOr.cpp",
+        "lib/PlatformLibNames.cpp",
+        "lib/Process.cpp",
+        "lib/Random.cpp",
+        "lib/ReferenceCounted.cpp",
+        "lib/StringExtras.cpp",
+    ],
+    hdrs = [
+        "include/Support/AlignedAlloc.h",
+        "include/Support/AssertStream.h",
+        "include/Support/CommandLine.h",
+        "include/Support/Config.h",
+        "include/Support/Debugger.h",
+        "include/Support/Error.h",
+        "include/Support/ErrorOr.h",
+        "include/Support/ForwardDecls.h",
+        "include/Support/FunctionExtras.h",
+        "include/Support/LLVMCompilerForwardDecls.h",
+        "include/Support/LLVMForwardDecls.h",
+        "include/Support/LLVMYAMLForwardDecls.h",
+        "include/Support/LogicalResult.h",
+        "include/Support/MathExtras.h",
+        "include/Support/PlatformLibNames.h",
+        "include/Support/PlatformUtils.h",
+        "include/Support/Preprocessor.h",
+        "include/Support/Process.h",
+        "include/Support/RCRef.h",
+        "include/Support/Random.h",
+        "include/Support/ReferenceCounted.h",
+        "include/Support/STLExtras.h",
+        "include/Support/StringExtras.h",
+    ],
+    local_defines = [
+        "SHARED_LIBRARY_PREFIX='\"lib\"'",
+        "STATIC_LIBRARY_PREFIX='\"lib\"'",
+        "STATIC_LIBRARY_SUFFIX='\".a\"'",
+    ] + select({
+        "@platforms//os:macos": ["SHARED_LIBRARY_SUFFIX='\".dylib\"'"],
+        "@platforms//os:linux": ["SHARED_LIBRARY_SUFFIX='\".so\"'"],
+    }),
+    deps = [
+        ":ConcurrentAppendingVector",
+        ":Globals",
+        ":SymbolExport",
+        "//Config",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "HashUtils",
+    srcs = ["lib/HashUtils.cpp"],
+    hdrs = ["include/Support/HashUtils.h"],
+    deps = [
+        ":Base",
+        ":Compiler",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeOpInterface",
+        "@llvm-project//mlir:BytecodeWriter",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@xxhash",
+    ],
+)
+
+modular_cc_library(
+    name = "Base64",
+    srcs = ["lib/Base64.cpp"],
+    hdrs = ["include/Support/Base64.h"],
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "BinaryID",
+    srcs = ["lib/BinaryID.cpp"],
+    hdrs = ["include/Support/BinaryID.h"],
+    deps = [
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "BuildInfo",
+    srcs = ["lib/BuildInfo.cpp"],
+    hdrs = ["include/Support/BuildInfo.h"],
+    local_defines = ASYNCRT_PROFILING_LOCAL_DEFINES,
+    deps = [
+        ":Base",
+        "//Config",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "CommonCLOptions",
+    srcs = ["lib/CommonCLOptions.cpp"],
+    hdrs = ["include/Support/CommonCLOptions.h"],
+    local_defines = CONFIG_SECTION_LOCAL_DEFINES,
+    deps = [
+        ":Base",
+        ":Configuration",
+        ":Filesystem",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "Buffer",
+    srcs = ["lib/Buffer.cpp"],
+    hdrs = ["include/Support/Buffer.h"],
+    deps = [
+        ":ADT",
+        ":Base",
+        ":Filesystem",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "DeviceSpecs",
+    srcs = ["lib/DeviceSpecs.cpp"],
+    hdrs = ["include/Support/DeviceSpecs.h"],
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
+    ],
+)
+
+modular_cc_library(
+    name = "CPUCache",
+    srcs = ["lib/CPUCache.cpp"],
+    hdrs = ["include/Support/CPUCache.h"],
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "MicroBenchmark",
+    srcs = ["lib/MicroBenchmark.cpp"],
+    hdrs = ["include/Support/MicroBenchmark.h"],
+    deps = [
+        ":Base",
+        ":CPUCache",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "Driver",
+    srcs = glob(["lib/Driver/*.cpp"]),
+    hdrs = glob([
+        "include/Support/Driver/*.h",
+        "include/Support/Driver/*.inc",
+    ]),
+    deps = [
+        ":Base",
+        ":Filesystem",
+        "@llvm-project//llvm:Option",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+# Context class and public API; global context pointer lives in Support:Globals
+# (single definition per process).
+modular_cc_library(
+    name = "Context",
+    srcs = ["lib/Context.cpp"],
+    hdrs = [
+        "include/Support/Context.h",
+        "include/Support/ContextGlobal.h",
+    ],
+    deps = [
+        ":ADT",
+        ":Base",
+        ":Globals",
+        ":SymbolExport",
+        ":TypeID",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "TypeID",
+    srcs = ["lib/TypeID.cpp"],
+    hdrs = ["include/Support/TypeID.h"],
+    deps = [
+        ":Base",
+        ":ConcurrentAppendingVector",
+        ":Globals",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "ADT",
+    srcs = glob([
+        "lib/ADT/*.cpp",
+    ]),
+    hdrs = glob(
+        ["include/Support/ADT/*.h"],
+        exclude = ["include/Support/ADT/ConcurrentAppendingVector.h"],
+    ),
+    deps = [
+        ":Base",
+        ":Globals",
+        ":TypeID",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "BazelRunfiles",
+    srcs = ["lib/BazelRunfiles.cpp"],
+    hdrs = ["include/Support/BazelRunfiles.h"],
+    # max._core resolves the NIXL plugin dir from runfiles via this helper, the
+    # CUDA compilation driver resolves the dlopened NVPTX compiler with it, and
+    # the mojo driver hands its runfiles down to the lldb it spawns.
+    visibility = [
+        "//MLRT:__subpackages__",
+        "//Mojo/tools/mojo:__pkg__",
+        "//max/python/max:__pkg__",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@rules_cc//cc/runfiles",
+    ],
+)
+
+modular_cc_library(
+    name = "NixlPluginDir",
+    srcs = ["lib/NixlPluginDir.cpp"],
+    hdrs = ["include/Support/NixlPluginDir.h"],
+    # Single source of truth for per-vendor NIXL plugin flavor selection,
+    # shared by max._core (runtime) and the MLRT NIXL unittests.
+    visibility = [
+        "//MLRT/unittests/Driver/NIXL:__pkg__",
+        "//Support/unittests:__pkg__",
+        "//max/python/max:__pkg__",
+    ],
+)
+
+modular_cc_library(
+    name = "Configuration",
+    srcs = ["lib/Configuration.cpp"],
+    hdrs = ["include/Support/Configuration.h"],
+    deps = [
+        ":Base",
+        ":BazelRunfiles",
+        ":CacheLog",
+        ":Filesystem",
+        ":Globals",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "CacheLog",
+    hdrs = ["include/Support/CacheLog.h"],
+    deps = ["@llvm-project//llvm:Support"],
+)
+
+modular_cc_library(
+    name = "CrashReporting",
+    srcs = glob(["lib/CrashReporting/*.cpp"]),
+    hdrs = glob(["include/Support/CrashReporting/*.h"]),
+    copts = [
+        "-Wno-undef",  # Silence warnings from crashpad headers
+    ],
+    deps = [
+        ":Base",
+        ":Configuration",
+        "//Config",
+        "@crashpad//:client",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "Filesystem",
+    srcs = [
+        "lib/FileSystemExtras.cpp",
+    ] + glob([
+        "lib/Filesystem/*.cpp",
+    ]),
+    hdrs = [
+        "include/Support/FileSystemExtras.h",
+    ] + glob([
+        "include/Support/Filesystem/*.h",
+    ]),
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "IPInt",
+    srcs = ["lib/IPInt.cpp"],
+    hdrs = ["include/Support/IPInt.h"],
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "IPRational",
+    srcs = ["lib/IPRational.cpp"],
+    hdrs = ["include/Support/IPRational.h"],
+    deps = [
+        ":Base",
+        ":IPInt",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "Stats",
+    srcs = ["lib/Stats.cpp"],
+    hdrs = ["include/Support/Stats.h"],
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "URI",
+    srcs = ["lib/URI.cpp"],
+    hdrs = ["include/Support/URI.h"],
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "ML",
+    srcs = glob(["lib/ML/*.cpp"]),
+    hdrs = glob([
+        "include/Support/ML/*.h",
+        "include/Support/ML/*.def",
+    ]),
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_library(
+    name = "Threading",
+    srcs = glob(["lib/Threading/*.cpp"]),
+    hdrs = glob(["include/Support/Threading/*.h"]),
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "TimeProfiler",
+    srcs = ["lib/Profiling/TimeProfiler.cpp"],
+    hdrs = ["include/Support/Profiling/TimeProfiler.h"],
+    defines = ASYNCRT_PROFILING_LOCAL_DEFINES,
+    deps = [
+        ":Base",
+        ":Globals",
+        ":MArchTargetMinimal",
+        "//Config",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# Minimal range-annotation and profiler-control API: per-copy
+# hot-path gates plus thin forwarders into an optional RangeSink that the
+# host-side profiler integration (:ProfilerHostGlue below) provides by
+# overriding the weak Detail::acquireRangeSink() at link time.
+# Nothing profiler-specific lives here — no dlopen, no plugin ABI, no
+# backend vocabulary — so the library is OSS-clean by construction and every
+# binary links it unconditionally, with no build config and no packaging
+# cost. Binaries without the glue get safe no-ops.
+modular_cc_library(
+    name = "ProfilingRanges",
+    srcs = [
+        "lib/Profiling/ExternalProfilerAnnotation.cpp",
+        "lib/Profiling/Ranges.cpp",
+    ],
+    hdrs = [
+        "include/Support/Profiling/ExternalProfilerAnnotation.h",
+        "include/Support/Profiling/Ranges.h",
+    ],
+    deps = [
+        # Holds the process-global gates + cached sink, so every statically
+        # linked copy of the shim observes the same state (see Ranges.h).
+        ":Globals",
+        ":Base",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# Header-only view of the range API for the profiler plugin implementation
+# (//max/internal/profiler), which compiles against Ranges.h but must NOT
+# link :ProfilingRanges — the plugin defines the same M::Profiling symbols, and
+# pulling both archives into its link would leave symbol resolution to
+# archive order.
+modular_cc_library(
+    name = "ProfilingRangesHeaders",
+    hdrs = ["include/Support/Profiling/Ranges.h"],
+    visibility = ["//max/internal/profiler:__pkg__"],
+    deps = [":Base"],
+)
+
+# The C ABI between :ProfilerHostGlue and the runtime-loaded profiler plugin
+# (//max/internal/profiler:MAXProfilerPlugin). Header-only so the plugin
+# implementation compiles against it without linking any host-side code.
+modular_cc_library(
+    name = "ProfilerPluginABI",
+    hdrs = ["include/Support/Profiling/PluginABI.h"],
+    visibility = ["//max/internal/profiler:__pkg__"],
+)
+
+# Host-side glue for the minimal range API (:ProfilingRanges): provides the STRONG
+# Detail::acquireRangeSink() override (the weak default no-ops), the dlopen
+# loader for libMAXProfilerPlugin.so, and the RangeSink that forwards into
+# the plugin's C call table. Linking this target into a binary is the only
+# profiler wiring there is; alwayslink keeps the override from being dropped
+# from the archive. OSS builds never compile it: the OSS api.bzl stubs the
+# target by name, and KGEN CompilerRT reaches it via internal_deps, which
+# the OSS build drops.
+modular_cc_library(
+    name = "ProfilerHostGlue",
+    srcs = ["lib/ProfilerHostGlue.cpp"],
+    local_defines = select({
+        # Tracy owns CUPTI; the glue compiles its loader out so the two GPU
+        # profilers can never meet in one process. Always assigned a value
+        # (0/1) so ProfilerHostGlue.cpp can use `#if` (lint_ifdefs contract).
+        "//:tracy_enabled": ["MODULAR_TRACY_BUILD=1"],
+        "//conditions:default": ["MODULAR_TRACY_BUILD=0"],
+    }),
+    visibility = [
+        "//MLRT:__pkg__",
+        "//Mojo:__pkg__",
+        "//mach/crates/max-sys-internal:__pkg__",
+        "//max/internal:__pkg__",
+        "//max/internal/profiler:__pkg__",
+        "//max/python/max/_core/internal:__subpackages__",
+        "//max/tests/internal/profiler:__pkg__",
+    ],
+    deps = [
+        # Configuration backs the max-debug.profiling-enabled auto-start knob
+        # the DeviceInit load trigger consults.
+        ":Configuration",
+        ":ProfilerPluginABI",
+        ":ProfilingRanges",
+        "@llvm-project//llvm:Support",
+    ],
+    alwayslink = True,
+)
+
+# Host-side glue for the external profiler annotation sink (:ProfilingRanges'
+# ExternalProfilerAnnotation.h): provides the STRONG
+# Detail::acquireExternalProfilerAnnotationSink() override (the weak default
+# no-ops) and the dlopen loader for the external profiler annotation shim,
+# libmax_profiler_shim.so. Same wiring model as :ProfilerHostGlue — linking
+# this target is the only wiring, alwayslink keeps the override in the
+# archive, KGEN CompilerRT reaches it via internal_deps, and OSS builds drop
+# it and keep the inert weak default.
+modular_cc_library(
+    name = "ExternalProfilerAnnotationHostGlue",
+    srcs = ["lib/ExternalProfilerAnnotationHostGlue.cpp"],
+    visibility = [
+        "//Mojo:__pkg__",
+        "//max/internal/profiler:__pkg__",
+    ],
+    deps = [
+        # StringExtras backs the MODULAR_ENABLE_PROFILING truthiness rule
+        # (isTrueLike), shared with the Python profiler bindings.
+        ":Base",
+        ":ProfilingRanges",
+        "@llvm-project//llvm:Support",
+    ],
+    alwayslink = True,
+)
+
+# NOTE: Passed as defines to propagate to dependents.
+# TRACY_CUDA_ENABLE is propagated so consumers (e.g. CUDADeviceContext.cpp)
+# see the same define and the no-op vs. real initTracyCuda() are consistent.
+# TRACY_ROCM_ENABLE is propagated so consumers (e.g. HIPDeviceContext.cpp)
+# see the same define and the no-op vs. real initTracyRocm() are consistent.
+PROFILING_DEFINES = ASYNCRT_PROFILING_LOCAL_DEFINES + select({
+    "//:tracy_cuda_enabled": ["TRACY_CUDA_ENABLE=1"],
+    "//conditions:default": ["TRACY_CUDA_ENABLE=0"],
+}) + select({
+    "//:tracy_rocm_enabled": ["TRACY_ROCM_ENABLE=1"],
+    "//conditions:default": ["TRACY_ROCM_ENABLE=0"],
+})
+
+PROFILING_DEPS = [
+    ":Base",
+    # Configuration backs the session.debug.profiling_* settings that
+    # Range.cpp reads at enable()/disable() time.
+    ":Configuration",
+    ":Globals",
+    ":MArchTargetMinimal",
+    ":SymbolExport",
+    "//Config",
+    "@llvm-project//llvm:Support",
+] + select({
+    # Tracy without CUDA support
+    "//:tracy_enabled": ["@tracy//:Tracy"],
+    "//conditions:default": [],
+}) + select({
+    # Tracy CUDA support - only when both Tracy and NVIDIA GPU are enabled.
+    # cuda_cupti_headers provides <cupti.h> for TracyCUDA.hpp.
+    # cuda_runtime_headers provides cuda_runtime_api.h (transitively
+    # included by cupti.h) without linking against libcudart.so.
+    # libcudart_stub provides cudaDeviceSynchronize (called by
+    # TracyCUDA.hpp inline functions) via on-demand dlopen of libcudart.so,
+    # avoiding a hard NEEDED entry.
+    "//:tracy_cuda_enabled": [
+        "//bazel/third-party:cuda_cupti_headers",
+        "//bazel/third-party:cuda_runtime_headers",
+        "//bazel/third-party:libcudart_stub",
+    ],
+    "//conditions:default": [],
+}) + select({
+    # Tracy ROCm support - only when both Tracy and AMD GPU are enabled.
+    # rocprofiler_headers is needed for compiling rocprofiler-sdk types
+    # used in the Profiling sources.
+    "//:tracy_rocm_enabled": [
+        "//bazel/third-party:rocprofiler_headers",
+    ],
+    "//conditions:default": [],
+})
+
+# Modular's Tracy profiler integration (CPU zones + the TracyCuda/TracyRocm
+# GPU backends). The FILES live under Support/internal/ so they follow the
+# standardized internal-directory exclusion and are never part of any
+# open-source export; this target keeps the long-standing name so the many
+# compiler-stack consumers keep their dep label and the OSS build keeps
+# stubbing it by name in oss/modular/bazel/api.bzl.
+modular_cc_library(
+    name = "Profiling",
+    srcs = [
+        "internal/Tracy/TracyCuda.cpp",
+        "internal/Tracy/TracyRocm.cpp",
+    ],
+    hdrs = [
+        "internal/Tracy/Tracy.h",
+        "internal/Tracy/TracyCuda.h",
+        "internal/Tracy/TracyRocm.h",
+        "internal/Tracy/TracyZone.h",
+    ],
+    # TracyRocm.cpp uses a constructor to promote Tracy symbols to RTLD_GLOBAL
+    # so that the rocprofiler-sdk plugin can resolve them via dlsym.
+    copts = ["-Wno-global-constructors"],
+    defines = PROFILING_DEFINES,
+    deps = PROFILING_DEPS,
+)
+
+modular_cc_library(
+    name = "MArchTarget",
+    srcs = ["lib/MArchTarget/MArchTarget.cpp"],
+    hdrs = ["include/Support/MArchTarget/MArchTarget.h"],
+    deps = [
+        ":Base",
+        ":CPUCache",
+        ":DeviceSpecs",
+        ":MArchTargetMinimal",
+        ":MDialect",
+        ":Threading",
+        "@llvm-project//clang:basic",
+        "@llvm-project//llvm:AllTargetsAsmParsers",
+        "@llvm-project//llvm:AllTargetsCodeGens",
+        "@llvm-project//llvm:AllTargetsDisassemblers",
+        "@llvm-project//llvm:AllTargetsMCAs",
+        "@llvm-project//llvm:MC",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
+        "@llvm-project//llvm:TargetParser",
+    ],
+)
+
+# This is the version used by KGENCompilerRT-static for linking with external
+# code, and its dependencies are intentionally kept minimal.
+modular_cc_library(
+    name = "MArchTargetMinimal",
+    srcs = [
+        "lib/MArchTarget/Host.cpp",
+        "lib/MArchTarget/MArchTargetMinimal.cpp",
+    ],
+    hdrs = [
+        "include/Support/MArchTarget/Host.h",
+        "include/Support/MArchTarget/MArchTargetMinimal.h",
+    ],
+    deps = [
+        ":Base",
+        ":CPUCache",
+        ":DeviceSpecs",
+        ":Threading",
+        "@llvm-project//clang:basic",
+        "@llvm-project//llvm:AllTargetsAsmParsers",
+        "@llvm-project//llvm:AllTargetsCodeGens",
+        "@llvm-project//llvm:AllTargetsDisassemblers",
+        "@llvm-project//llvm:AllTargetsMCAs",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
+    ],
+)
+
+modular_cc_library(
+    name = "Compiler",
+    srcs = glob(["lib/Compiler/*.cpp"]),
+    hdrs = glob(["include/Support/Compiler/*.h"]),
+    deps = [
+        ":ADT",
+        ":Base",
+        ":Buffer",
+        ":Filesystem",
+        ":ML",
+        ":TimeProfiler",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeOpInterface",
+        "@llvm-project//mlir:BytecodeReader",
+        "@llvm-project//mlir:BytecodeWriter",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+MODULAR_TELEMETRY_COPTS = [
+    "-DWITH_OTLP_HTTP=ON",
+    "-DENABLE_HTTP_SSL_PREVIEW=ON",
+    "-DENABLE_OTLP_HTTP_SSL_PREVIEW=ON",
+    "-Wno-global-constructors",  # Avoid errors coming from opentelemetry
+    "-Wno-covered-switch-default",  # Avoid errors coming from opentelemetry
+]
+
+modular_cc_library(
+    name = "Telemetry",
+    srcs = glob(["lib/Telemetry/**/*.cpp"]),
+    hdrs = glob(["include/Support/Telemetry/**/*.h"]),
+    copts = MODULAR_TELEMETRY_COPTS,
+    defines = [
+        "HAVE_CPP_STDLIB",
+    ],
+    local_defines = select({
+        "//:production_build": [
+            'MODULAR_TELEMETRY_URL=\\"https://telemetry.modular.com:443\\"',
+        ],
+        "//conditions:default": [
+            'MODULAR_TELEMETRY_URL=\\"https://telemetry-dev.modular.com:443\\"',
+        ],
+    }),
+    deps = [
+        ":Base",
+        ":Base64",
+        ":Configuration",
+        ":Filesystem",
+        ":MArchTarget",
+        ":MArchTargetMinimal",
+        ":Threading",
+        "//Config",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
+        "@opentelemetry-cpp//api",
+        "@opentelemetry-cpp//exporters/ostream:ostream_log_record_exporter",
+        "@opentelemetry-cpp//exporters/ostream:ostream_metric_exporter",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_exporter",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_log_record_exporter",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_metric_exporter",
+        "@opentelemetry-cpp//sdk:headers",
+    ],
+)
+
+td_library(
+    name = "MTdFiles",
+    srcs = glob([
+        "include/Support/MDialect/*.td",
+        "include/Support/Compiler/*.td",
+    ]),
+    includes = ["include"],
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "MDialectIncGen",
+    dialect = "M",
+    td_file = "include/Support/MDialect/M.td",
+    deps = [":MTdFiles"],
+)
+
+gentbl_cc_library(
+    name = "MAttrs",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-attrdef-decls",
+            ],
+            "include/Support/MDialect/MAttrs.h.inc",
+        ),
+        (
+            [
+                "-gen-attrdef-defs",
+            ],
+            "include/Support/MDialect/MAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/MDialect/M.td",
+    deps = [":MTdFiles"],
+)
+
+gentbl_cc_library(
+    name = "MTypeInterfaces",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-type-interface-decls",
+            ],
+            "include/Support/MDialect/MTypeInterfaces.h.inc",
+        ),
+        (
+            [
+                "-gen-type-interface-defs",
+            ],
+            "include/Support/MDialect/MTypeInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/MDialect/MTypeInterfaces.td",
+    deps = [":MTdFiles"],
+)
+
+gentbl_cc_library(
+    name = "MAttrInterfaces",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-attr-interface-decls",
+            ],
+            "include/Support/MDialect/MAttrInterfaces.h.inc",
+        ),
+        (
+            [
+                "-gen-attr-interface-defs",
+            ],
+            "include/Support/MDialect/MAttrInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/MDialect/MAttrInterfaces.td",
+    deps = [":MTdFiles"],
+)
+
+gentbl_cc_library(
+    name = "MDialectByteCode",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-bytecode",
+                "-bytecode-dialect=M",
+            ],
+            "include/Support/MDialect/MDialectBytecode.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/MDialect/MDialectBytecode.td",
+    deps = [":MTdFiles"],
+)
+
+modular_cc_library(
+    name = "MDialect",
+    srcs = glob(["lib/MDialect/*.cpp"]),
+    hdrs = glob(["include/Support/MDialect/*.h"]),
+    deps = [
+        ":ADT",
+        ":Base",
+        ":Buffer",
+        ":Compiler",
+        ":Context",
+        ":DeviceSpecs",
+        ":MArchTargetMinimal",
+        ":MAttrInterfaces",
+        ":MAttrs",
+        ":MDialectByteCode",
+        ":MDialectIncGen",
+        ":ML",
+        ":MTypeInterfaces",
+        "//Config",
+        "@llvm-project//llvm:MC",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
+        "@llvm-project//llvm:TargetParser",
+        "@llvm-project//mlir:BytecodeOpInterface",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+filegroup(
+    name = "DebugInfoTdFiles",
+    srcs = glob([
+        "include/Support/DebugInfoDialect/**/*.td",
+        "include/Support/Compiler/*.td",
+    ]),
+)
+
+gentbl_modular_passes(
+    name = "DebugInfoToLLVMIncGen",
+    output_name = "DebugInfoToLLVM",
+    td_file = "include/Support/DebugInfoDialect/DebugInfoToLLVM/DebugInfoToLLVM.td",
+    deps = [
+        ":DebugInfoTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "DebugInfoIncGen",
+    dialect = "debuginfo",
+    td_file = "include/Support/DebugInfoDialect/IR/DebugInfo.td",
+    deps = [
+        ":Base",
+        ":DebugInfoTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "DebugInfoTypeInterfaces",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-op-interface-decls",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoInterfaces.h.inc",
+        ),
+        (
+            [
+                "-gen-op-interface-defs",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/DebugInfoDialect/IR/DebugInfoInterfaces.td",
+    deps = [
+        ":Base",
+        ":DebugInfoTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+modular_cc_library(
+    name = "DebugInfoDialect",
+    srcs = glob(["lib/DebugInfoDialect/IR/*.cpp"]),
+    hdrs = glob(["include/Support/DebugInfoDialect/IR/*.h"]),
+    deps = [
+        ":Base",
+        ":Compiler",
+        ":DebugInfoDialectAttrs",
+        ":DebugInfoDialectBytecode",
+        ":DebugInfoExprAttrInterfaces",
+        ":DebugInfoIncGen",
+        ":DebugInfoTypeInterfaces",
+        ":MDialect",
+        "@llvm-project//llvm:BinaryFormat",
+        "@llvm-project//llvm:CodeGen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeOpInterface",
+        "@llvm-project//mlir:FunctionInterfaces",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+gentbl_cc_library(
+    name = "DebugInfoExprAttrInterfaces",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-attr-interface-decls",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoExprAttrInterfaces.h.inc",
+        ),
+        (
+            [
+                "-gen-attr-interface-defs",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoExprAttrInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/DebugInfoDialect/IR/DebugInfoExprAttrInterfaces.td",
+    deps = [
+        ":Base",
+        ":DebugInfoTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "DebugInfoDialectAttrs",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-enum-decls",
+                "-dialect=debuginfo",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoEnums.h.inc",
+        ),
+        (
+            [
+                "-gen-enum-defs",
+                "-dialect=debuginfo",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoEnums.cpp.inc",
+        ),
+        (
+            [
+                "-gen-attrdef-decls",
+                "-dialect=debuginfo",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoAttrs.h.inc",
+        ),
+        (
+            [
+                "-gen-attrdef-defs",
+                "-dialect=debuginfo",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/DebugInfoDialect/IR/DebugInfo.td",
+    deps = [
+        ":Base",
+        ":DebugInfoTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "DebugInfoDialectBytecode",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-bytecode",
+                "-bytecode-dialect=debuginfo",
+            ],
+            "include/Support/DebugInfoDialect/IR/DebugInfoDialectBytecode.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Support/DebugInfoDialect/IR/DebugInfoDialectBytecode.td",
+    deps = [
+        ":Base",
+        ":DebugInfoTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_modular_passes(
+    name = "DebugInfoTransformPasses",
+    output_name = "Transforms",
+    td_file = "include/Support/DebugInfoDialect/Transforms/Passes.td",
+    deps = [
+        ":DebugInfoTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:PassBaseTdFiles",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "DebugInfoTransforms",
+    srcs = glob(["lib/DebugInfoDialect/Transforms/*.cpp"]),
+    hdrs = glob(["include/Support/DebugInfoDialect/Transforms/*.h"]),
+    deps = [
+        ":Base",
+        ":DebugInfoDialect",
+        ":DebugInfoTransformPasses",
+        "@llvm-project//llvm:BinaryFormat",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FunctionInterfaces",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
+modular_cc_library(
+    name = "DebugInfoToLLVM",
+    srcs = glob([
+        "lib/DebugInfoDialect/DebugInfoToLLVM/**/*.cpp",
+        "lib/DebugInfoDialect/DebugInfoToLLVM/**/*.h",
+    ]),
+    hdrs = glob(["include/Support/DebugInfoDialect/DebugInfoToLLVM/*.h"]),
+    deps = [
+        ":Base",
+        ":DebugInfoDialect",
+        ":DebugInfoToLLVMIncGen",
+        ":DebugInfoTransforms",
+        ":MDialect",
+        "@llvm-project//llvm:BinaryFormat",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMCommonConversion",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
+td_library(
+    name = "DriverCommandTdFiles",
+    srcs = glob(["include/Support/Driver/*.td"]),
+    includes = ["include"],
+    deps = [
+        "@llvm-project//llvm:OptParserTdFiles",
+    ],
+)
+
+td_library(
+    name = "OptTableTdFiles",
+    srcs = ["include/Support/Driver/OptTable.inc"],
+    includes = ["include"],
+)
+
+modular_shared_library(
+    name = "Globals",
+    srcs = glob(["lib/Globals/*.cpp"]),
+    hdrs = glob(["include/Support/Globals/*.h"]) + [
+        "include/Support/ContextGlobal.h",
+    ],
+    # Always link and expose the FallbackTypeIDResolver::registerImplicitTypeID
+    # function. This is used by downstream libraries to decide whether MLIR types
+    # in different SOs are the same type or not.
+    #
+    # See https://github.com/llvm/llvm-project/pull/126999#issuecomment-2661526333
+    # for more details and breadcrumbs.
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-Wl,--undefined=_ZN4mlir6detail22FallbackTypeIDResolver22registerImplicitTypeIDEN4llvm9StringRefE",
+        ],
+        "@platforms//os:macos": [
+            "-Wl,-u,__ZN4mlir6detail22FallbackTypeIDResolver22registerImplicitTypeIDEN4llvm9StringRefE",
+        ],
+    }),
+    output_name = "MSupportGlobals",
+    deps = [
+        ":SymbolExport",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+    ],
+    # TODO: Missing define conditionals for symbol visibility
+    # NOTE: This library should not have any deps to avoid shared object linking issues
+)
+
+modular_cc_library(
+    name = "Diagnostics",
+    srcs = glob(["lib/Diagnostics/**/*.cpp"]),
+    hdrs = glob(["include/Support/Diagnostics/**/*.h"]),
+    deps = [
+        ":Base",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_library(
+    name = "MpscRingBuffer",
+    hdrs = ["include/Support/MpscRingBuffer.h"],
+)
+
+modular_cc_library(
+    name = "Log",
+    srcs = ["lib/Log.cpp"],
+    hdrs = [
+        "include/Support/Log.h",
+        "include/Support/LogChannels.h",
+        "include/Support/SpanGuard.h",
+    ],
+    deps = [
+        "Configuration",
+        ":MpscRingBuffer",
+        ":Threading",
+        "@fmt",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "LogFFI",
+    srcs = ["lib/LogFFI.cpp"],
+    hdrs = ["include/Support/LogFFI.h"],
+    deps = [
+        ":Log",
+        ":SymbolExport",
+    ],
+)
+
+modular_cc_library(
+    name = "Metrics",
+    srcs = ["lib/Metrics.cpp"],
+    hdrs = ["include/Support/Metrics.h"],
+    deps = [
+        ":SymbolExport",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+mlir_nanobind(
+    name = "MDialectNanobindInc",
+    srcs = glob(["include/Support/MDialect/*.td"]),
+    allowlist = "//max/python/max/_core/internal/modules/dialects:allowlist.txt",
+    output_dir = "include/Support/MDialect/Nanobind",
+    deps = [
+        ":MTdFiles",
+    ],
+)
+
+modular_nanobind_library(
+    name = "NanobindUtils",
+    hdrs = glob(["include/Support/Nanobind/*.h"]),
+    deps = [
+        ":Base",
+        ":ML",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:CAPIIRHeaders",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MLIRBindingsPythonNanobindHeaders",
+        "@llvm-project//mlir:Support",
+    ],
+)

@@ -11,8 +11,3 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 """Provides AMD architecture specific utility functions."""
-
-from .block_scaled_mma import (
-    CDNA4F8F6F4MatrixFormat,
-    cdna4_block_scaled_mfma,
-)

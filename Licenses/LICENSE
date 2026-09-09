@@ -1,0 +1,218 @@
+Modular MAX Community License
+Last Modified: August 18, 2026
+
+These Modular MAX Community License terms (these "Terms") are entered into by
+and between Modular Inc ("Modular") and the individual or entity agreeing to
+these Terms (as part of "You" and “Your” as defined in the Terms). These Terms
+govern Your use of the MAX software development kits (“MAX”).
+
+1. LICENSE GRANT.
+
+1.1 MAX SDK Limited Source License. Conditioned upon Your compliance with these
+Terms (including the Attribution and Additional Requirements as provided below),
+Modular hereby grants You a perpetual, worldwide, non-exclusive, no-charge,
+royalty-free license to (a) reproduce and prepare Derivative Works; (b) publicly
+display and publicly perform Derivative Works in object code form; (c)
+sublicense and distribute Derivative Works in object code form; and/or (d) use
+accompanying MAX Documentation provided by Modular (“Documentation”) solely
+internally for the purposes of (a) and (b) above.
+
+    1.1.1 Derivative Works. "Derivative Work" means any work, whether in source
+    or object form, that is based on (or derived from) MAX and for which the
+    editorial revisions, annotations, elaborations, or other modifications that
+    represent, as a whole, an original work of authorship;
+
+    1.1.2 Downstream License for Derivative Works (Object Code Only). The terms
+    under which You distribute Derivative Works must be consistent with the
+    terms of this Agreement, including (without limitation) terms relating to
+    the license grant and license restrictions and protection of Modular’s
+    intellectual property rights;
+
+    1.1.3. Display of Terms. These Terms shall be conspicuously displayed (such
+    as via a “Notice” text file distributed in the top-level directory as part
+    of such Derivative Works) in each copy of a Derivative Work;
+
+    1.1.4 Attribution. You must prominently display the following notice
+    alongside the distribution of any Derivative Works: “MAX is licensed by
+    Modular Inc under the Modular MAX Community License and has been modified by
+    [You]. Copyright Modular Inc IN NO EVENT SHALL MODULAR INC BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH USE OF MAX OR ANY
+    DERIVATIVE WORK THEREOF.”
+
+1.2 MAX Application Development License. In addition to Your license to use the
+MAX SDK pursuant to Section 1.1, certain portions of the MAX SDK may be
+redistributed as part of an application You develop (“Application”) as a result
+of your authorized use of the MAX SDK. Conditioned upon Your compliance with
+these Terms, Modular hereby grants to You the limited right to redistribute
+certain components of MAX as part of Your Applications, in object code form,
+subject to the conditions and limitations set forth below and the Application
+Distribution Requirements. You shall only redistribute the Redistributable
+Components as expressly permitted in these Terms and in the Documentation, in
+accordance with the Application Distribution Requirements.
+
+    “Application Distribution Requirements” means each of the following
+    requirements:
+
+    (a) The Application must have material additional functionality, beyond the
+    included portions of MAX;
+
+    (b) The terms under which You distribute an Application must be consistent
+    with the terms of these Terms, including (without limitation) terms relating
+    to the license grant and license restrictions and protection of Modular’s
+    intellectual property rights;
+
+1.3 Additional Requirements.
+
+    (a) You shall preserve and not obscure any proprietary notices, labels, and
+    marks provided by Modular in MAX, Derivative Works of MAX, Redistributable
+    Components, and Documentation;
+
+    (b) You agree to notify Modular in writing of any known or suspected
+    violation of these Terms and to reasonably enforce the terms of a Derivative
+    Work or an Application. If You receive MAX in original or modified form from
+    any third party, You agree and accept that these Terms are still binding
+    upon You.
+
+    (c) You shall not misrepresent or imply, through any means, that a
+    Derivative Work is a product of Modular or have been endorsed, approved, or
+    validated by Modular.
+
+    (d) You shall not use MAX, or any portion of it, as training data,
+    fine-tuning data, or input to any AI system in order to produce software
+    that reimplements or substitutes for MAX. is prohibited, whether or not it
+    contains literal copies of MAX. This does not restrict using AI tools to
+    read, analyze, improve, or explain MAX, or to develop Your own software that
+    runs on or interoperates with MAX.
+
+1.4 Separately Licensed Components. Portions of MAX have been made available
+under the Apache License, Version 2.0 with LLVM Exception or under other
+separate license terms, as identified in the LICENSE file or license header
+accompanying each such component. Those terms govern those components, and
+control over these Terms in the event of any conflict. Nothing in these Terms
+revokes, narrows, conditions or otherwise modifies any right granted under any
+such separate license.
+
+1.5 Patent License. Conditioned upon Your compliance with these Terms, Modular
+hereby grants to You a perpetual, worldwide, non-exclusive, no-charge,
+royalty-free, irrevocable (except as stated in this section) patent license to
+make, have made, use, offer to sell, sell, import, and otherwise transfer MAX as
+delivered to You by Modular. If You institute patent litigation against any
+entity (including a cross-claim or counterclaim in a lawsuit) alleging that MAX
+constitutes direct or contributory patent infringement, then any patent licenses
+granted to You under these Terms shall terminate as of the date such litigation
+is filed.
+
+2. USAGE DATA; PERSONAL INFORMATION.
+
+2.1 Usage Data. You acknowledge and understand that Your use of MAX may be
+subject to the collection of certain telemetry, usage, and other data which
+captures Your interactions with and use of MAX (collectively, the "Usage Data").
+You agree that Modular and its affiliates may freely use, modify, copy, and/or
+distribute the Usage Data for any purpose, including but not limited to
+improving MAX or any other component or aspect of Modular's and/or its
+affiliates’ products. As between the parties, You acknowledge that Modular owns
+all right, title, and interest in and to the Usage Data and may use it for any
+legitimate purpose, including but not limited to the purposes of improving MAX
+or any other component or aspect of the Modular Platform.
+
+2.2 Personal Information. Any collection, storage, or use of Your personal
+information is governed by Modular’s Privacy Policy
+(<https://www.modular.com/legal/privacy>).
+
+3. OWNERSHIP; FEEDBACK; TRADEMARK LICENSE.
+
+3.1 Ownership. Modular retains all right, title, and interest in and to MAX and
+including but not limited to Redistributable Components, including all
+intellectual property rights therein. Other than as explicitly stated in these
+Terms, no other rights are granted to MAX.
+
+3.2 Feedback. If You share any suggestions, recommendations, or changes to MAX
+or the Documentation, including without limitation, new features or
+functionality relating thereto, or any comments, questions, suggestions, or the
+like (collectively, “Feedback”), Modular and its affiliates are free to use such
+Feedback without any restriction, obligation, or compensation to You.
+
+3.3 Trademark License. If You (a) are a legal entity, and (b) commercially
+deploy MAX as a hosted or managed AI training or inference service to other
+legal entities (“Authorized Product”), You shall use the Powered by Modular word
+mark and/or logo, or any other word mark and/or logo that may be designated by
+Modular (collectively, the “Marks”), in connection with the Authorized Product.
+You shall download the Marks from the website to be designated by Modular (the
+“Brand Portal”) and agree to any applicable terms of use (the “Brand Portal
+Terms of Use”). You shall adhere to all usage and marking requirements set forth
+in the brand guidelines for the Marks on the Brand Portal, which may be revised
+from time to time in Modular’s sole discretion (the “Brand Guidelines”). You
+shall submit all materials bearing the Marks to Modular via the Brand Portal or
+<usage@modular.com> and shall obtain Modular’s written approval prior to any use
+thereof. Modular may withhold its consent or cancel prior authorization for use
+of the Marks if the proposed usage violates the Brand Portal Terms of Use and/or
+Brand Guidelines. Upon termination of or cessation of deployment of the
+Authorized Product, Your obligations under this Section 3.3 shall terminate, and
+You shall immediately discontinue all use of the Marks and any logos, marks, or
+terms confusingly similar thereto. Nothing herein shall be construed as a grant
+of a license or any other rights with respect to Modular’s or its affiliates’
+trademarks, word marks, service marks, logos, trade dress, or other branding.
+
+4. SUPPORT AND UPDATES. Modular is not obligated to provide any support,
+patches, fixes or updates for MAX. However, Modular may, at its sole
+discretion, provide updates, patches, fixes or support at any time.
+
+5. TERMINATION. You may terminate these Terms by ceasing all use of MAX and any
+Documentation. Modular may terminate these Terms upon Your material breach of
+any provision.
+
+6. WARRANTY DISCLAIMER. MAX AND ANY DOCUMENTATION ARE PROVIDED "AS IS" AND TO
+THE EXTENT PERMITTED BY APPLICABLE LAW, MODULAR MAKES NO OTHER WARRANTIES,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. YOU
+ACKNOWLEDGE AND AGREE THAT THE USE OF MAX IS AT YOUR OWN RISK, AND MODULAR
+DOES NOT MAKE ANY REPRESENTATIONS OR WARRANTIES REGARDING THE ACCURACY,
+RELIABILITY, OR COMPLETENESS OF MAX, OR INFORMATION OBTAINED THROUGH MAX.
+MODULAR DOES NOT WARRANT OR GUARANTEE THAT MAX WILL MEET YOUR REQUIREMENTS OR
+EXPECTATIONS FOR ITS APPLICATIONS OR GENERALLY, OR THAT ANY ERRORS OR DEFECTS
+IN MAX WILL BE CORRECTED. FURTHERMORE, MODULAR DOES NOT WARRANT OR MAKE ANY
+REPRESENTATIONS REGARDING THE RESULTS THAT MAY BE OBTAINED FROM THE USE OF
+MAX OR THE SUITABILITY OF MAX FOR ANY PARTICULAR PURPOSE. MODULAR MAKES NO
+WARRANTIES OR REPRESENTATIONS THAT MAX WILL BE COMPATIBLE WITH YOUR SYSTEMS,
+SOFTWARE, OR APPLICATIONS, OR THAT MAX WILL BE SECURE FROM UNAUTHORIZED
+ACCESS, HACKING, OR OTHER POTENTIAL SECURITY THREATS. MODULAR DISCLAIMS ANY
+LIABILITY ARISING OUT OF OR IN CONNECTION WITH THE USE OF MAX. YOU ASSUME ALL
+RISKS AND RESPONSIBILITIES FOR USING MAX TO ACHIEVE YOUR INTENDED RESULTS AND
+FOR THE INSTALLATION, USE, AND RESULTS OBTAINED FROM MAX. ADDITIONALLY,
+VERSIONS OF MAX IDENTIFIED AS ‘PREVIEW VERSIONS’ MAY HAVE ADDITIONAL BUGS OR
+DESIGN FLAWS. MODULAR MAKES NO WARRANTIES ABOUT THE PREVIEW VERSIONS
+WHATSOEVER, AND YOUR USE OF MAX IN COMMERCIAL, PRODUCTION ENVIRONMENTS IN
+VIOLATION OF THIS AGREEMENT IS AT YOUR OWN RISK.
+
+7. INDEMNIFICATION. You shall defend, indemnify and hold harmless Modular, its
+affiliates and their respective officers, directors, employees, agents and
+representatives from any and all third party claims, damages, liabilities, costs
+and fees (including reasonable attorneys’ fees) arising from: (i) Your material
+breach of these Terms; or (ii) an allegation that any Application or Derivative
+Work violates, misappropriates, or infringes any third party intellectual,
+contractual or proprietary right.
+
+8. LIMITATION OF LIABILITY. TO THE EXTENT PERMITTED BY APPLICABLE LAW, IN NO
+EVENT SHALL MODULAR OR ITS LICENSORS BE RESPONSIBLE OR LIABLE WITH RESPECT TO
+ANY SUBJECT MATTER OF THIS AGREEMENT UNDER ANY CONTRACT, NEGLIGENCE, STRICT
+LIABILITY OR OTHER THEORY FOR: (I) LOSS OR INACCURACY OF DATA OR COST OF
+PROCUREMENT OF SUBSTITUTE GOODS, SERVICES, OR TECHNOLOGY; OR (II) ANY INDIRECT,
+INCIDENTAL, OR CONSEQUENTIAL DAMAGES INCLUDING, BUT NOT LIMITED TO LOSS OF
+REVENUES OR PROFITS; (III) ANY MATTER BEYOND ITS REASONABLE CONTROL; OR (IV) ANY
+AMOUNT IN THE AGGREGATE OVER $100. SOME JURISDICTIONS DO NOT ALLOW CERTAIN
+WARRANTY DISCLAIMERS OR LIMITATIONS ON LIABILITY. ONLY DISCLAIMERS OR
+LIMITATIONS THAT ARE LAWFUL IN THE APPLICABLE JURISDICTION WILL APPLY TO YOU,
+AND MODULAR’S LIABILITY WILL BE LIMITED TO THE MAXIMUM EXTENT PERMITTED BY LAW.
+
+9. CHANGES TO THESE TERMS. The version of these Terms that accompany, or is
+displayed at the time of download or installation of, a given release of MAX
+governs Your use of such release. Modular may modify these Terms from time to
+time. Each version of these Terms will be identified by a Last Modified date
+(the “Effective Date”), posted at <https://www.modular.com/legal/community>.
+Modified Terms shall apply to releases of MAX made available on or after the
+Effective Date. By downloading, installing, or using any release of MAX made
+available on or after the Effective Date, You accept those modified Terms.
+Notwithstanding the foregoing, you may continue to use a version of MAX under
+the terms of that license that applied when you downloaded that version unless
+that license was terminated for material breach under Section 5.

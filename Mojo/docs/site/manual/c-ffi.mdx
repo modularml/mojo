@@ -1,0 +1,766 @@
+---
+title: Using Mojo's C foreign function interface to call C libraries
+sidebar_label: Calling C from Mojo
+description: >
+  Call C libraries from Mojo. Pass values, pointers, strings, and structs
+  safely across the FFI boundary.
+---
+
+When you need functionality that's already available in a C library, you
+can call it directly from your Mojo code. Many libraries for graphics,
+databases, hardware control, signal processing, and scientific computing
+expose C APIs.
+
+Mojo emits a direct native call, with no translation layer or extra runtime
+overhead. A C call from Mojo runs as fast as handwritten C.
+
+## C number types
+
+C integer types don't have fixed sizes. Their sizes depend on the target
+platform and its C *ABI*. For example, `int` is commonly 32 bits, while
+`long` is 64 bits on Linux and macOS but 32 bits on Windows.
+
+An ABI (application binary interface) defines how machine code passes
+arguments, returns values, and lays out data in memory.
+
+Use the `std.ffi` module's type aliases when working with C APIs. They
+match the target platform's C ABI, so you don't need to worry about
+platform-specific size differences.
+
+See the [C type reference](#c-type-reference) at the end of this page for a
+list of `std.ffi` type aliases and their equivalent Mojo types.
+
+## Call libc functions
+
+`libc` is the C standard library. It provides functions for memory
+allocation, string manipulation, file I/O, and other common tasks. Mojo
+calls libc functions with `external_call()`. Mojo resolves the symbol for
+you, so you don't need to add anything to your build.
+
+Import `external_call` from `std.ffi`. Parameterize it with the function
+name and return type. Then pass the function arguments in parentheses.
+Mojo infers the argument types from the values you pass, so there's nothing
+else to declare:
+
+```mojo
+def external_call[
+    callee: StaticString,
+    return_type: RegisterPassable,
+    *types: AnyType,
+    num_fixed_args: OptionalReg[Int] = None,
+](*args: *types) -> return_type
+```
+
+The following example calls the C `abs()` function, which returns the
+absolute value of an integer:
+
+```mojo
+from std.ffi import external_call, c_int
+
+def main():
+    # int abs(int n);
+    var n = external_call["abs", c_int](c_int(-42))
+    print(t"Absolute value is 42: {n == 42}")  # True
+```
+
+`c_int` is the `std.ffi` alias for C's `int`. It's 32 bits on every
+platform Mojo targets. Its Mojo counterpart is `Int32`.
+
+### Call variadic C functions
+
+A *variadic* C function takes a variable number of arguments, like
+`printf()` and `snprintf()`. Pass `num_fixed_args` with the number of
+arguments declared before the `...`:
+
+```mojo
+from std.ffi import external_call, c_char, c_int, c_size_t
+
+def main():
+    # int snprintf(char *buf, size_t size, const char *fmt, ...);
+    # Three fixed arguments, so num_fixed_args=3.
+    var buf = Array[c_char, 64](uninitialized=True)
+    var written = external_call["snprintf", c_int, num_fixed_args=3](
+        buf.unsafe_ptr(),
+        c_size_t(64),
+        "score: %d/%d".as_c_string_slice(),
+        c_int(7),
+        c_int(10),
+    )
+    print(t"wrote {written}: {String(unsafe_from_utf8_ptr=buf.unsafe_ptr())}")
+```
+
+Without `num_fixed_args`, Mojo treats every argument as fixed. Some ABIs
+pass variadic arguments differently from fixed ones, so the call can work
+on one target and break on another.
+
+## Use shared libraries
+
+An `OwnedDLHandle` owns a handle to a dynamically linked library with RAII
+semantics. Use it to load shared libraries and retrieve functions as Mojo
+callables, so you can work with libraries such as SQLite, libcurl, camera
+SDKs, GPU vendor libraries, and other native libraries.
+
+Library names differ by platform, so use `platform_map()` to select the right
+one at compile time:
+
+```mojo
+from std.ffi import OwnedDLHandle, c_double
+from std.sys.info import platform_map
+
+comptime LIBM = platform_map["libm", linux="libm.so.6", macos="libm.dylib"]()
+
+def main() raises:
+    var lib = OwnedDLHandle(LIBM)
+    var sqrt = lib.get_function[c_double]("sqrt")
+    print(sqrt(c_double(4.0)))  # Prints: 2.0
+    # Library automatically closed when lib goes out of scope
+```
+
+If `platform_map()` has no value for the target, it raises a compilation
+error. It won't fall through to a library name for another platform.
+
+### Library names
+
+Pass the library as any `os.PathLike`, such as a `String` or a `Path`. Mojo
+resolves the name at runtime. Use the bare name (`libm.dylib`) when the
+library is on the system search path, or a full path
+(`path/to/libm.dylib`) when it isn't.
+
+On Linux, use the ABI-versioned runtime name, such as `libm.so.6`, instead
+of the unversioned `libm.so`. An ABI version doesn't necessarily match the
+library's release version. For example, libcurl 8.21 still uses
+`libcurl.so.4`.
+
+The unversioned name belongs to the development package, where the static
+linker consumes it for options such as `-lm`. It's often a linker script
+rather than a library, so passing it to `dlopen` can fail with an
+`invalid ELF header` error. Find the shared libraries the dynamic linker
+knows about with:
+
+```bash
+ldconfig -p | grep libcurl
+```
+
+macOS uses one name for both purposes. `libcurl.dylib` is both what you
+link against and what you load.
+
+If you omit the library name, `OwnedDLHandle()` opens the current process.
+This is another way to call libc functions and other symbols already linked
+into your program.
+
+### Availability checks
+
+`OwnedDLHandle` loads libraries at runtime, so the library must be available
+when your program runs. If it can't be found, loading fails:
+
+```mojo
+comptime LIBCURL = platform_map[
+    "libcurl", linux="libcurl.so.4", macos="libcurl.dylib"
+]()
+
+try:
+    var lib = OwnedDLHandle(LIBCURL)
+    # use the optional feature
+except:
+    # fall back
+```
+
+You can guard against missing functions with `check_symbol()`. Use it to
+test for optional, versioned, or platform-specific features. The check
+works for both functions and exported globals:
+
+```mojo
+comptime LIBM = platform_map[
+    "libm", linux="libm.so.6", macos="libm.dylib"
+]()
+
+var lib = OwnedDLHandle(LIBM)
+if lib.check_symbol("exp10"):
+    var exp10 = lib.get_function[c_double]("exp10")
+    print(exp10(c_double(2.0)))  # 100.0
+else:
+    print("exp10 not found in libm")
+```
+
+### Retrieve functions by name
+
+`get_function()` looks up a library function by name and returns a callable.
+Parameterize it with the C function's return type. Here's a curses example:
+
+```mojo
+# WinPtr is a pointer to a curses window struct
+var wgetch = lib.get_function[c_int]("wgetch")
+
+# ... later
+
+_ = wgetch(win)  # blocks until a key is pressed.
+```
+
+You don't declare the argument types. Mojo infers them from the values you
+pass at each call, and forwards them using the C calling convention.
+
+Missing symbols raise errors.
+
+## Passing pointers {#pointers}
+
+Many C APIs work with pointers. Mojo represents raw pointers with
+`Pointer[T]`, where `T` is the pointed-to type. When a C API expects a
+`void*`, use `.unsafe_bitcast[NoneType]()` to produce an `OpaquePointer`.
+
+- Use `Pointer(to=value)` to get a pointer to a Mojo value.
+- Use `.unsafe_bitcast[U]()` to reinterpret a pointer as another
+  pointer type.
+
+For example:
+
+```mojo
+var value: c_int = 42
+var p = Pointer(to=value)  # Pointer to a C int
+var opaque: OpaquePointer[origin_of(value)] = p.unsafe_bitcast[NoneType]()
+```
+
+### Typed pointers
+
+C functions often write results through a pointer you provide, rather than
+returning them. Pass `Pointer(to=value)` and C fills in the value. An `imm`
+function argument won't work, and, worse, it fails quietly, leaving the
+value unchanged. Use the `mut` convention or copy the value into a local
+`var` before your call.
+
+This example passes a Mojo floating-point number to C's `frexp`, which
+splits it into a mantissa and an exponent:
+
+```mojo
+from std.ffi import external_call, c_double, c_int
+
+def main():
+    # double frexp(double x, int *exp);
+    # Returns the mantissa and writes the exponent through the pointer.
+    var exponent: c_int = 0
+    var mantissa = external_call["frexp", c_double](
+        c_double(12.0), Pointer(to=exponent)
+    )
+    print(t"12.0 = {mantissa} * 2^{exponent}")  # 0.75 * 2^4
+```
+
+### Opaque pointers {#opaque-pointers}
+
+The C standard library provides `qsort`, a general-purpose sorting
+function.
+
+`qsort` sorts its array in place. You provide a pointer to that array, its
+number of elements, the element size, and a comparison function. Whenever
+`qsort` compares two elements, it calls your Mojo-native comparison
+function.
+
+The comparison function must be *thin*. That is, it can't capture any Mojo
+state as a closure. You must mark it with `abi("C")`, allowing `qsort` to
+call it across the FFI boundary.
+
+The following example sorts a list of C integers. The `compare()`
+function receives two `void*` pointers, casts them back to `c_int*`,
+and returns the comparison result:
+
+```mojo
+from std.ffi import external_call, c_int, c_size_t
+from std.sys import size_of
+
+def compare(
+    a: OpaquePointer[mut=False, _],
+    b: OpaquePointer[mut=False, _],
+) abi("C") -> c_int:
+    var a_value = a.unsafe_bitcast[c_int]()[]
+    var b_value = b.unsafe_bitcast[c_int]()[]
+    # `qsort` only needs to know which value is larger. Compare the values
+    # instead of subtracting them. Large differences can overflow, producing
+    # the wrong comparison result and sorting the values incorrectly.
+    if a_value < b_value:
+        return c_int(-1)
+    return c_int(a_value > b_value)
+
+def main() raises:
+    var numbers: List[c_int] = [5, 2, 9, 1, 5, 6]
+    var count = c_size_t(len(numbers))
+    var size = c_size_t(size_of[c_int]())
+    external_call["qsort", NoneType](
+        numbers.unsafe_ptr(),
+        count,
+        size,
+        compare,
+    )
+    print("Sorted numbers:", numbers)  # [1, 2, 5, 5, 6, 9]
+```
+
+## Passing structs
+
+Struct pointers allow Mojo and C APIs to exchange structured data that goes
+beyond simple values. For example, `clock_gettime()` writes the system's
+monotonic time into a C `struct timespec`.
+
+To read that data from Mojo, define a struct with a C-compatible layout and
+pass a pointer to it:
+
+```mojo
+from std.ffi import external_call, c_int, c_long
+from std.sys.info import platform_map
+
+@fieldwise_init
+struct CTimeSpec(RegisterPassable):  # Matches C's struct timespec.
+    # CLOCK_MONOTONIC differs by platform
+    comptime monotonic = c_int(
+        platform_map["CLOCK_MONOTONIC", linux=1, macos=6]()
+    )
+
+    var tv_sec: c_long
+    var tv_nsec: c_long
+
+    @staticmethod
+    def monotonic_nanos() raises -> c_long:
+        var time_spec = Self(0, 0)
+        if (
+            external_call["clock_gettime", c_int](
+                Self.monotonic,
+                Pointer(to=time_spec),
+            )
+            != 0
+        ):
+            raise Error("clock_gettime failed")
+        return time_spec.tv_sec * 1_000_000_000 + time_spec.tv_nsec
+
+def main() raises:
+    print(t"Monotonic time: {CTimeSpec.monotonic_nanos()} ns")
+```
+
+### C-compatible structs
+
+C-compatible types are ordinary structs with two requirements:
+
+- They conform to `RegisterPassable`.
+- They contain only C-compatible fields.
+
+Field order matters. Declare your fields in the same order as the C struct
+you're mirroring. Mojo uses the corresponding C layout, including padding
+required for [field alignment](/docs/reference/decorators/align/):
+
+```mojo
+# Mirrors C `div_t`: two ints, 8 bytes total.
+@fieldwise_init
+struct DivT(RegisterPassable):
+    var quot: c_int
+    var rem: c_int
+
+def main() raises:
+    var proc = OwnedDLHandle()  # No path: opens the current process
+
+    var div = proc.get_function[DivT]("div")
+    var d = div(c_int(7), c_int(3))
+    print(t"div(7, 3): quot {d.quot} rem {d.rem}")  # 2 1
+```
+
+### Passing lists, arrays, and spans
+
+A Mojo `List[T]` stores its elements contiguously in memory, just like C
+arrays. You pass a list to C as a pointer plus a length, as shown in the
+[`qsort` example](#opaque-pointers).
+
+Mojo list pointers are fragile. Operations that grow the list, such as
+`append()`, may move its storage and leave an earlier pointer stale. So get
+the pointer fresh, right before you use it, after any change to the list.
+
+`Span[T]` is Mojo's built-in pointer-plus-length pair. It wraps a pointer
+to contiguous memory and stores a length. This gives you built-in bounds
+checking and safe iteration.
+
+`Array[T, length]` is Mojo's fixed-size array. It owns its elements inline,
+so Mojo cleans it up and C can fill it through a pointer plus a length.
+
+Both `Span` and `Array` are safe to pass to and from C by pointer. Add a
+length to calls where C needs one.
+
+The following example allocates a 256-byte `Array`, passes it to
+C's `getcwd()`, wraps the filled bytes in a `Span`, and converts them
+to a Mojo `String`:
+
+```mojo
+from std.ffi import external_call, c_char, c_size_t
+
+def main() raises:
+    # char *getcwd(char *buf, size_t size); C fills a buffer that Mojo owns.
+    comptime CAPACITY = 256
+    var buf = Array[c_char, CAPACITY](uninitialized=True)
+
+    var filled = external_call[
+        "getcwd", Optional[Pointer[c_char, origin_of(buf)]]
+    ](buf.unsafe_ptr(), c_size_t(CAPACITY))
+    if not filled:
+        raise Error("getcwd failed")
+
+    # C reports no length, so ask for it, then wrap the bytes in a `Span`.
+    var length = external_call["strlen", c_size_t](buf.unsafe_ptr())
+    var span = Span(
+        unsafe_ptr=buf.unsafe_ptr().unsafe_bitcast[Byte](), length=Int(length)
+    )
+    print(t"{len(span)} bytes: {String(from_utf8=span)}")
+```
+
+`Span`s work with both Mojo and C memory:
+
+- If you wrap a Mojo-owned buffer, the `Span` keeps it alive.
+- If you wrap a C-owned buffer, such as memory from `malloc()`, the `Span`
+  doesn't free it. You must free C-owned memory with C.
+
+## Passing strings
+
+C strings are null-terminated byte arrays (`char*`). Mojo strings are
+length-prefixed UTF-8.
+
+### Convert a Mojo string to a C string
+
+Call `as_c_string_slice()` on a `String` to ensure null termination, and get
+a type safe `CStringSlice` back.
+
+```mojo
+name.as_c_string_slice()
+```
+
+The source string must be mutable because `as_c_string_slice()` may append
+a terminating zero byte. It may also move the string's buffer, so call it
+once and reuse the result.
+
+### Convert a C string to a Mojo string
+
+Use `String(unsafe_from_utf8_ptr=...)` to copy a null-terminated C string
+into a Mojo string:
+
+```mojo
+# Copies the bytes; uses `strlen()`.
+String(unsafe_from_utf8_ptr=c_string_ptr)
+```
+
+When you already know the length, you can wrap the C bytes in a
+non-copying, non-owning `Span[Byte]` and covert that to a Mojo `String`.
+
+For example, C's `strdup()` allocates and returns a copy of a string. You
+can wrap its result in a `Span`, convert the bytes to a Mojo string, then
+free the C-owned memory:
+
+```mojo
+var name: String = "Echo"
+var cptr = external_call[
+    "strdup", Optional[Pointer[c_char, MutUntrackedOrigin]]
+](name.as_c_string_slice())
+if cptr:
+    var ptr = cptr.value()
+    # Ask C for the length. A Mojo string's `byte_length()` measures the
+    # Mojo side, which says nothing about the buffer C returned.
+    var length = external_call["strlen", c_size_t](ptr)
+    var span = Span(unsafe_ptr=ptr.unsafe_bitcast[Byte](), length=Int(length))
+    print(String(from_utf8=span))  # or from_utf8_lossy or unsafe_from_utf8
+    external_call["free", NoneType](ptr.unsafe_bitcast[NoneType]())  # free it
+```
+
+### Convert Mojo string literals to C strings
+
+String literals can be passed to C APIs that expect a null-terminated
+`char*`. Call `as_c_string_slice()` to access the C string:
+
+```mojo
+"libm.so.6".as_c_string_slice()
+```
+
+Mojo performs the conversion at compile time and embeds the null-terminated
+string in the compiled program.
+
+## Memory management
+
+Mojo tracks the lifetime of its own memory. C memory has no Mojo value
+behind it, so there's nothing for Mojo to track. Every allocation that
+crosses the boundary still belongs to one side, and that side remains
+responsible for freeing it:
+
+- Free C memory with C's `free()`.
+- Let Mojo handle its own memory, except for unsafe allocations.
+
+### Allocate C memory
+
+C allocators such as `malloc` return C-owned memory. `malloc` returns
+null when the allocation fails. Wrap the return type in `Optional`:
+
+```mojo
+from std.ffi import external_call, c_size_t
+
+def create_buffer(
+    n: c_size_t,
+) -> Optional[Pointer[UInt8, MutUntrackedOrigin]]:
+    return external_call[
+        "malloc", Optional[Pointer[UInt8, MutUntrackedOrigin]]
+    ](n)
+
+def main() raises:
+    var buf = create_buffer(c_size_t(16))
+    if not buf:
+        raise Error("malloc failed")
+    var ptr = buf.value()
+    ptr[unsafe_offset=0] = 42
+    print(ptr[unsafe_offset=0])  # 42
+    external_call["free", NoneType](ptr.unsafe_bitcast[NoneType]())
+```
+
+`MutUntrackedOrigin` tells Mojo not to reason about this pointer's lifetime.
+It's the opposite of every other origin on this page. Instead of tying the
+pointer to an owner, it says that no Mojo value owns *this* memory. You're
+responsible for keeping it valid and freeing it. You must free it with C's
+memory management functions, such as `free`.
+
+### Free C memory automatically
+
+Pairing every `malloc()` with a matching `free()` by hand is easy to get
+wrong. A context manager can manage the allocation and release it for you.
+When the following block exits, `__exit__()` calls `free()`, even after a
+raised error:
+
+```mojo
+from std.ffi import external_call, c_size_t
+
+struct CBuffer:
+    var ptr: Pointer[UInt8, MutUntrackedOrigin]
+    var size: c_size_t
+
+    def __init__(out self, n: c_size_t) raises:
+        self.size = n
+        var allocated = external_call[
+            "malloc", Optional[Pointer[UInt8, MutUntrackedOrigin]]
+        ](n)
+        if not allocated:
+            raise Error("malloc failed")
+        self.ptr = allocated.value()
+
+    def __enter__(self) -> Pointer[UInt8, MutUntrackedOrigin]:
+        return self.ptr
+
+    def __exit__(self):
+        external_call["free", NoneType](self.ptr.unsafe_bitcast[NoneType]())
+
+def main() raises:
+    with CBuffer(c_size_t(1024)) as buf:
+        buf[unsafe_offset=0] = 42
+        print(buf[unsafe_offset=0])  # 42
+    # The buffer is freed here.
+```
+
+### Null returns
+
+C uses null pointers to mean "nothing" or "failed." A Mojo `Pointer` can't
+be null, so wrap any "maybe null" return in `Optional`. The `malloc`
+examples you just saw showed this pattern.
+
+`Optional`'s empty case adds nothing to the call and costs nothing to pass:
+
+```mojo
+from std.ffi import external_call, c_char
+
+def main() raises:
+    var name: String = "PATH"
+    var found = external_call[
+        "getenv", Optional[Pointer[c_char, MutUntrackedOrigin]]
+    ](name.as_c_string_slice())
+    if found:
+        print(String(unsafe_from_utf8_ptr=found.value()))
+    else:
+        print(t"{name} is not set")
+```
+
+Declaring an unwrapped, non-optional `Pointer` would compile. It would also
+treat C's null as a valid pointer. Dereferencing results in undefined
+behavior and will typically crash your program.
+
+### Keeping Mojo values alive
+
+Pointers into Mojo memory carry an origin that tracks the value's lifetime.
+When you derive a pointer from a variable, Mojo keeps the variable alive
+while the pointer is live. It rejects code that would let the variable die
+first:
+
+```mojo
+from std.ffi import OwnedDLHandle, c_size_t
+
+def main() raises:
+    var proc = OwnedDLHandle()  # No path: opens the current process.
+    var c_strlen = proc.get_function[c_size_t]("strlen")
+
+    # The pointer carries `line`'s origin, so `line` outlives the call.
+    var line = String("Hello")
+    var n = c_strlen(line.as_c_string_slice())
+    print(t"length of '{line}': {n}")  # 5
+
+    # Refill the same variable and call again. The origin still holds.
+    line = "Hello, Mojo!"
+    n = c_strlen(line.as_c_string_slice())
+    print(t"length of '{line}': {n}")  # 12
+```
+
+The pointer's origin ties its lifetime to `line`. Mojo keeps `line` alive
+while C uses the pointer. As a result, you don't need workarounds to extend
+its lifetime.
+
+## Safety
+
+Inside Mojo, the compiler checks types, tracks lifetimes through origins,
+and refuses code that would use a value after it dies. None of that reaches
+across the C boundary. C has no origins, no ownership, and no type
+information Mojo can read, so the compiler emits exactly the call you
+described and trusts you to have described it correctly.
+
+That makes you the type checker. The C header is the contract, and matching
+it is your job:
+
+- **Declare what C declares.** Use the `std.ffi` aliases so your types track
+  the target's C ABI. A mismatch isn't a compile error, it's a wrong answer.
+- **Free memory on the side that allocated it.** C memory needs C's
+  `free()`. Mojo memory has to outlive every C use, including uses that
+  continue after the call returns.
+- **Assume undefined behavior, not exceptions.** A mismatched declaration
+  usually produces a plausible result rather than a crash, so a passing test
+  is weak evidence that a declaration is right.
+
+## Unsafe operations
+
+Mojo marks operations it can't check for you with an `unsafe_` prefix, the
+same convention used throughout the standard library. This page uses four:
+`unsafe_ptr()` to hand C a raw pointer, `unsafe_bitcast()` to reinterpret
+one, `unsafe_offset=` to index past the first element, and
+`String(unsafe_from_utf8_ptr=)` to trust bytes C gave you.
+
+Each `unsafe_` operation marks a guarantee and responsibility you've taken
+over from the compiler.
+
+Origins still help wherever a pointer stays inside Mojo's view. Deriving a
+pointer from a variable, as in `line.as_c_string_slice()`,
+keeps that variable alive for as long as the pointer lives. That protection
+ends when C stores the pointer somewhere Mojo can't see.
+
+`external_call()` and `OwnedDLHandle` are intentionally low level. Neither
+validates C signatures or protects you from ABI mismatches. Small
+declaration mistakes can produce plausible but incorrect results, while
+others fail only at build time or when you move to a different platform.
+
+Each entry names the API it applies to.
+
+### Silently wrong at runtime
+
+- **Type matching** (both): Nothing validates your arguments or return type
+  against the C declaration of the function you're calling.
+- **Return type width** (both): Declaring a narrower return than C returns
+  keeps only the low bits. Declare `strchr`'s `char*` return as `c_int` and a
+  pointer whose real value is 6199428535 comes back as 1904461239. That's
+  truncation rather than noise, so a wrong value can still look plausible.
+  Subtract two truncated pointers and the error cancels, giving you the
+  right offset for the wrong reason.
+- **Argument type width and signedness** (both): Whatever you write becomes
+  the declaration verbatim. Passing a `c_char` where C declares `int` has the
+  callee reading a register the caller never fully set.
+- **Undeclared argument types** (`OwnedDLHandle`): `get_function()` takes the
+  return type only, so nothing connects the arguments to the C function's
+  real signature. Calling `get_function[c_double]("sqrt")` with a `c_int`
+  returns `0.0` instead of failing.
+- **Raw `String` arguments** (`OwnedDLHandle`): `external_call()` rejects a
+  `String` at compile time, but a callable from `get_function()` accepts one
+  and reads whatever the struct's bytes happen to be. Passing a 53-byte
+  `String` to `strlen` returns 5. Always pass
+  `as_c_string_slice()`.
+- **Pointers returned into a library** (`OwnedDLHandle`): When a C function
+  returns a pointer into its own library, the return type must borrow from
+  the handle, as in `Pointer[c_char, lib_origin]` where
+  `comptime lib_origin = ImmOrigin(origin_of(lib))`. Declaring
+  `ImmStaticOrigin` compiles, then reads freed memory once the handle closes
+  the library.
+- **Variadic callees without `num_fixed_args`** (`external_call()`): Pass
+  `num_fixed_args` for every C variadic function. Without it, each argument
+  defaults to a fixed argument of a non-variadic callee, which gets the ABI
+  wrong for `open()` or `snprintf()`. AAPCS on ARM64 macOS passes variadic
+  arguments differently from fixed ones, so the mistake can work on x86-64
+  Linux and break on Apple silicon.
+- **Platform-varying C types** (both): `c_long` and `c_ulong` resolve per
+  target rather than to one fixed width. Every platform Mojo supports today
+  is LP64, so writing `Int64` for a C `long` happens to work. The alias says
+  what you mean and keeps saying it if the supported targets change.
+- **Pointers C keeps after the call** (both): An origin protects a pointer
+  for as long as Mojo can see it. Mojo can't see C storing your pointer for
+  later, so a call returning doesn't mean C is finished with what you passed.
+  Check the C documentation for whether a function retains the pointer.
+- **Non-nul-terminated buffers** (both): A bare `Pointer[c_char]` into a
+  buffer with no terminator sends a C string function reading off the end.
+  `CStringSlice` is the guardrail for this, ensuring a null terminator is
+  present.
+
+### Caught at build time
+
+These fail the build, but not always where you'd expect.
+
+- **Two signatures for one symbol in a module** (`external_call()`):
+  Declaring `strchr` twice with different argument types in the same file
+  fails to build. The diagnostic points into `std.ffi` rather than at either
+  of your call sites. This is easy to hit when a wrapper and an inline call
+  disagree. `get_function()` casts a runtime pointer instead, so it has no
+  module-level declaration to collide.
+- **String arguments** (`external_call()`): Passing a `String` is rejected at
+  compile time, and the error names `as_c_string_slice()` as the fix. This is
+  the one signature mistake the API catches for you. Take care because the
+  checking is narrow, and `OwnedDLHandle` doesn't repeat it.
+- **Return types must be `RegisterPassable`** (both): `return_type` is bound
+  to `RegisterPassable`, so the compiler rejects anything larger. A C
+  function that returns a big struct by value isn't callable directly. C ABIs
+  return those through a hidden pointer argument, so allocate the struct in
+  Mojo, pass a pointer to it, and declare the return type as `NoneType`.
+
+### Limitations
+
+- **`external_call()` can't load dynamic libraries**: It calls C functions by
+  name and leaves the name for Mojo to resolve. Use `OwnedDLHandle` to load a
+  dynamic library at runtime and retrieve its functions.
+- **Function resolution is by C symbol name** (both): C++ functions need
+  `extern "C"` to be callable.
+- **`OwnedDLHandle` resolves everything at runtime**: A wrong library name or
+  a missing symbol fails when the program runs, not when it builds, and the
+  library has to be present on the machine that runs the program rather than
+  the one that built it. `check_symbol()` tests whether a symbol exists and
+  validates nothing about its signature.
+- **`mojo run` and `mojo build` resolve symbols differently**
+  (`external_call()`): `mojo run` finds the symbol in the already loaded
+  process image. `mojo build` links through a C compiler driver instead. libc
+  arrives either way, so a running call is not proof that the same call will
+  link. A symbol from another system library can resolve under `mojo run` and
+  then fail under `mojo build` with `DSO missing from command line`. Name the
+  library in `MODULAR_MOJO_MAX_SYSTEM_LIBS` when that happens.
+
+### What the APIs do check
+
+Two guarantees `OwnedDLHandle` provides that `external_call()` doesn't:
+
+- A missing symbol raises an error rather than aborting the process, so you
+  can probe for optional symbols.
+- The callable from `get_function()` borrows the handle, so the library
+  can't be closed between the lookup and the call.
+
+## C type reference {#c-type-reference}
+
+{/* markdownlint-disable MD013 */}
+
+| C type           | `std.ffi` alias | Equivalent Mojo type | Notes                                               |
+|------------------|-----------------|----------------------|-----------------------------------------------------|
+| `int`            | `c_int`         | `Int32`              | the most common type by far                         |
+| `short`          | `c_short`       | `Int16`              |                                                     |
+| `long`           | `c_long`        | depends on target    | 64-bit on Linux and macOS                           |
+| `long long`      | `c_long_long`   | `Int64`              | Always 64 bits.                                     |
+| `unsigned char`  | `c_uchar`       | `UInt8`              |                                                     |
+| `char`           | `c_char`        | `Int8`               | signed; you'll mostly see it as `char*`             |
+| `unsigned short` | `c_ushort`      | `UInt16`             |                                                     |
+| `unsigned int`   | `c_uint`        | `UInt32`             |                                                     |
+| `unsigned long`  | `c_ulong`       | depends on target    | matches `c_long`                                    |
+| `float`          | `c_float`       | `Float32`            |                                                     |
+| `double`         | `c_double`      | `Float64`            |                                                     |
+| `size_t`         | `c_size_t`      | `UInt`               | for sizes and counts                                |
+| `ssize_t`        | `c_ssize_t`     | `Int`                | for sizes that can be negative                      |
+| `void*`          | `OpaquePointer` | `Pointer[NoneType]`  | see the [pointers section](#pointers), uses origins |
+
+{/* markdownlint-enable MD013 */}

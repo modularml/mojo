@@ -1,0 +1,87 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_run_binary_test")
+
+package(default_visibility = ["//visibility:private"])
+
+# auto_broadcast.py
+modular_py_binary(
+    name = "auto_broadcast",
+    srcs = ["auto_broadcast.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "auto_broadcast_test",
+    size = "large",
+    binary = "auto_broadcast",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# mask_broadcast.py
+modular_py_binary(
+    name = "mask_broadcast",
+    srcs = ["mask_broadcast.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "mask_broadcast_test",
+    size = "large",
+    binary = "mask_broadcast",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# explicit_broadcast.py
+modular_py_binary(
+    name = "explicit_broadcast",
+    srcs = ["explicit_broadcast.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "explicit_broadcast_test",
+    size = "large",
+    binary = "explicit_broadcast",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# fix_rank.py
+modular_py_binary(
+    name = "fix_rank",
+    srcs = ["fix_rank.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "fix_rank_test",
+    size = "large",
+    binary = "fix_rank",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

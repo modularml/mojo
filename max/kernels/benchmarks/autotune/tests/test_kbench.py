@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #

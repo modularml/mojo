@@ -118,90 +118,51 @@ struct ScheduleConfig(ImplicitlyCopyable, Movable):
     structure (Halide-inspired: declare intent, derive consequences).
     Manual wait overrides are available for testing and experimentation
     but should not be needed for correct operation.
-
-    Fields:
-        scheduling: Strategy for op ordering (IDENTITY, GREEDY, or CSP).
-        sched_barrier_mask: Bitmask of which blocks get trailing
-            schedule_barriers. Default: 0b01010101 (blocks 0,2,4,6).
-        auto_waits: Auto-derive wait counts from schedule order (default: True).
-        drain_lgkm_mask: Per-block bitmask for selective LDS drains.
-        auto_drain: Auto-derive drain mask from channel analysis.
-        lds_contention_penalty: CSP solver penalty for LDS port overlap.
-        wait_lgkm_first: Manual wait_lgkm(N) override (used when auto_waits=False).
-        wait_vm_last: Manual wait_vm(N) override (used when auto_waits=False).
-        lgkm_per_load_a: lgkmcnt ops per load_a (for wait derivation).
-        lgkm_per_load_b: lgkmcnt ops per load_b (for wait derivation).
-        lgkm_after_last: Insert wait_lgkm(0) after last block barrier.
-        minimal_barriers: Suppress per-block s_barriers and set_prio
-            pairs; emit `s_barrier` only at TOP (block 0 of each half)
-            and at the first cross-stage block (MID). Use for kernels
-            (like 4-wave inline FP8) whose pipeline depth + cross-stage
-            register rotation provides natural inter-block sync via
-            register-flow + lgkm waits — the per-block sync is then
-            overhead. Default False (preserves the ping-pong layout).
-        omit_mma_set_prio: When also `minimal_barriers=True`, drop the
-            pre-MMA `s_setprio[1]` entirely. `s_setprio` acts as an
-            LLVM scheduling barrier that prevents register-allocator
-            reuse across it, raising VGPR pressure noticeably. The
-            default ping-pong layout depends on the priority hint for
-            warp-scheduler throughput; cross-stage rotation kernels
-            with `rocdl.waves_per_eu=1` already get max priority and
-            the hint is redundant. Default False.
-        global_before_frag: Swap the in-block emission order of global
-            loads (DRAM→LDS prefetches) and fragment loads (LDS→register
-            reads). The default (False) emits frags first then prefetches
-            — correct for ping-pong / simple where frags read a
-            *different* SMEM stage than the prefetches target, so order
-            is irrelevant. Set True for kernels (like 4-wave inline FP8)
-            where frag and prefetch hit the same SMEM region in the same
-            iter; issuing the prefetch first lets its address-gen overlap
-            with the frag's LDS-read while the LDS-read port is free.
-            Default False.
-        barrier_before_pre_ops: Move the per-block `pre_sync`+barrier
-            section to *before* the frag/prefetch section (instead of
-            after, between prefetch and MMA). The default (False) gates
-            barriers as "this MMA's input"; True gates them as "this
-            half-boundary" so frag/prefetch all happen after the barrier
-            commits the previous half's writes — matching the
-            hand-tuned 4-wave layout. Default False.
-        inter_block_lgkm_drain: When True, populate `entry_wait_lgkm` on
-            non-top, non-cross-stage blocks with `wait_lgkm(0)` so an
-            inter-mini LDS drain fires between consecutive same-half
-            MMAs. Hand-tuned 4-wave inline emits this between mini-1 and
-            mini-2 (and between mini-3 and mini-4); the default ping-pong
-            schedule does not. Default False.
     """
 
     var scheduling: SchedulingStrategy
+    """The strategy for op ordering (`IDENTITY`, `GREEDY`, or `CSP`)."""
     var sched_barrier_mask: Int
+    """The bitmask of blocks that get trailing `schedule_barrier` fences.
+    Default: `0b01010101` (blocks 0, 2, 4, 6)."""
     var auto_waits: Bool
+    """Whether to auto-derive wait counts from schedule order."""
     var drain_lgkm_mask: Int
+    """The per-block bitmask for selective LDS drains."""
     var auto_drain: Bool
+    """Whether to auto-derive the drain mask from channel analysis."""
     var lds_contention_penalty: Int
+    """The CSP solver penalty for LDS port overlap."""
     # Manual wait overrides (only used when auto_waits=False).
     var wait_lgkm_first: Int
+    """The manual `wait_lgkm(N)` override (used when `auto_waits=False`)."""
     var wait_vm_last: Int
+    """The manual `wait_vm(N)` override (used when `auto_waits=False`)."""
     var lgkm_per_load_a: Int
+    """The number of `lgkmcnt` ops per channel-A load (for wait derivation)."""
     var lgkm_per_load_b: Int
+    """The number of `lgkmcnt` ops per channel-B load (for wait derivation)."""
     var lgkm_after_last: Bool
+    """Whether to insert `wait_lgkm(0)` after the last block barrier."""
     var minimal_barriers: Bool
-    """Suppresses per-block `s_barrier`s and `set_prio` pairs; emits
-    `s_barrier` only at top-of-half and the first cross-stage block."""
+    """Whether to suppress per-block `s_barrier`s and `set_prio` pairs and
+    emit `s_barrier` only at top-of-half and the first cross-stage block."""
     var omit_mma_set_prio: Bool
-    """When `minimal_barriers=True`, drops the pre-MMA `s_setprio[1]`
-    entirely so the LLVM register allocator can reuse VGPRs across it."""
+    """When `minimal_barriers=True`, whether to drop the pre-MMA
+    `s_setprio[1]` entirely so the LLVM register allocator can reuse VGPRs
+    across it."""
     var max_vgpr: Int
-    """Hint for the cost model on the kernel's VGPR budget. Default
-    is effectively unlimited."""
+    """The hint for the cost model on the kernel's VGPR budget. Default is
+    effectively unlimited."""
     # Per-block emission-shape knobs (default off → ping-pong layout).
     var global_before_frag: Bool
-    """Swaps the in-block emission order of global loads and fragment
-    loads. Default emits frags first then prefetches."""
+    """Whether to swap the in-block emission order of global loads and
+    fragment loads. Default emits frags first then prefetches."""
     var barrier_before_pre_ops: Bool
-    """Moves the per-block `pre_sync` + barrier section to *before*
-    the frag/prefetch section instead of between prefetch and MMA."""
+    """Whether to move the per-block `pre_sync` + barrier section before the
+    frag/prefetch section instead of between prefetch and MMA."""
     var inter_block_lgkm_drain: Bool
-    """When True, populates `entry_wait_lgkm` on non-top, non-cross-stage
+    """Whether to populate `entry_wait_lgkm` on non-top, non-cross-stage
     blocks with `wait_lgkm(0)` so an inter-mini LDS drain fires between
     consecutive same-half MMAs."""
     # When True, every contiguous wait/barrier group inside a block is
@@ -212,8 +173,8 @@ struct ScheduleConfig(ImplicitlyCopyable, Movable):
     # points, preserving the (load + frag + mma) cluster shape around
     # the wait/barrier boundaries. Default False.
     var wrap_waits_with_sched_barrier: Bool
-    """Wraps each contiguous wait/barrier group with `schedule_barrier()`
-    on both sides to fence the LLVM machine scheduler."""
+    """Whether to wrap each contiguous wait/barrier group with
+    `schedule_barrier()` on both sides to fence the LLVM machine scheduler."""
     # Prologue emission strategy. Default False uses
     # `derive_prologue_from_program`'s standard layout: stage-0 prefetches
     # → wait_vm(0) → barrier → stage-1 prefetches → wait_vm(0). True drops
@@ -224,8 +185,8 @@ struct ScheduleConfig(ImplicitlyCopyable, Movable):
     # the main loop's first iter starts with most prefetches still in
     # flight rather than fully drained.
     var partial_prologue_drain: Bool
-    """Skips the framework prologue's `wait_vm(0)` drains and inter-stage
-    barrier so prefetches stay in flight on entry to the kernel."""
+    """Whether to skip the framework prologue's `wait_vm(0)` drains and
+    inter-stage barrier so prefetches stay in flight on entry to the kernel."""
 
     @always_inline
     def __init__(
@@ -467,7 +428,7 @@ struct PipelineConfig(ImplicitlyCopyable, Movable):
     K-partition's leading-quadrant fragments from the *other* SMEM
     stage (4-wave's mini-3/4 register rotation). Relaxes the
     "fragment loads in half h must use stage h" invariant in
-    `program_builder._verify_stage_consistency` — same-stage and
+    `program_builder._verify_stage_consistency`: same-stage and
     cross-stage frags coexist by design when this is True. Default
     False keeps the strict check active for ping-pong and other
     schedules that don't rotate."""
@@ -659,25 +620,25 @@ struct PipelineConfig(ImplicitlyCopyable, Movable):
 struct TargetProfile(ImplicitlyCopyable, Movable):
     """Unified hardware target description.
 
-    Bundles everything the framework needs to know about a specific GPU
-    target into a single struct:
-      - cost_model: per-op costs (resource, latency, role)
-      - pipeline: pipeline structure (depth, MMA grid, buffer strategy)
-
     The algorithm declares WHAT ops exist (logical op table). The
-    TargetProfile describes HOW the hardware executes them. Platform-
-    specific factories (e.g., mi355x_target() in amd_target.mojo) provide
-    both from a single call — no redundant configuration.
+    `TargetProfile` describes HOW the hardware executes them. Platform-
+    specific factories (e.g., `mi355x_target()` in `amd_target.mojo`) provide
+    both from a single call (no redundant configuration).
 
     Usage:
-        # Platform-specific factory (from amd_target):
-        comptime target = mi355x_target()
-        var annotated = annotate_ops(logical_ops, target.cost_model)
-        var config = target.pipeline
+
+    ```mojo
+    # Platform-specific factory (from amd_target):
+    comptime target = mi355x_target()
+    var annotated = annotate_ops(logical_ops, target.cost_model)
+    var config = target.pipeline
+    ```
     """
 
     var cost_model: TargetCostModel
+    """Per-op costs (resource, latency, role)."""
     var pipeline: PipelineConfig
+    """Pipeline structure (depth, MMA grid, buffer strategy)."""
 
     def __init__(
         out self,

@@ -48,13 +48,14 @@ import os
 
 import pytest
 from benchmark_utils import print_results_table
+from layer_mefs import create_runner
 from testbed.correctness import print_correctness_report
 from testbed.harnesses.text_encoder import (
     TextEncoderDynamicParams,
-    TextEncoderHarness,
     TextEncoderStaticParams,
 )
-from testbed.runner import LayerTestRunner, create_session
+from testbed.runner import LayerTestRunner
+from testbed.specs import TEXT_ENCODER
 
 
 def _env_int(name: str, default: int) -> int:
@@ -64,15 +65,20 @@ def _env_int(name: str, default: int) -> int:
 
 
 def _make_static_params() -> TextEncoderStaticParams:
-    """Build static params from env vars, defaulting to small smoke config."""
+    """Build static params from env vars, defaulting to the spec's smoke config.
+
+    Defaulting to the spec keeps an un-overridden run identical to the graph the
+    CPU build action precompiled, so it can skip the compile.
+    """
+    smoke = TEXT_ENCODER.static_params
     return TextEncoderStaticParams(
-        vocab_size=_env_int("TEXT_ENC_VOCAB_SIZE", 1000),
-        d_model=_env_int("TEXT_ENC_D_MODEL", 256),
-        d_kv=_env_int("TEXT_ENC_D_KV", 32),
-        d_ff=_env_int("TEXT_ENC_D_FF", 512),
-        num_layers=_env_int("TEXT_ENC_NUM_LAYERS", 2),
-        num_heads=_env_int("TEXT_ENC_NUM_HEADS", 8),
-        embed_seq_len=_env_int("TEXT_ENC_EMBED_SEQ_LEN", 226),
+        vocab_size=_env_int("TEXT_ENC_VOCAB_SIZE", smoke.vocab_size),
+        d_model=_env_int("TEXT_ENC_D_MODEL", smoke.d_model),
+        d_kv=_env_int("TEXT_ENC_D_KV", smoke.d_kv),
+        d_ff=_env_int("TEXT_ENC_D_FF", smoke.d_ff),
+        num_layers=_env_int("TEXT_ENC_NUM_LAYERS", smoke.num_layers),
+        num_heads=_env_int("TEXT_ENC_NUM_HEADS", smoke.num_heads),
+        embed_seq_len=_env_int("TEXT_ENC_EMBED_SEQ_LEN", smoke.embed_seq_len),
     )
 
 
@@ -93,8 +99,7 @@ def runner() -> LayerTestRunner[
 ]:
     params = _make_static_params()
     print(f"\nTextEncoder config: {params}")
-    session, device = create_session()
-    return LayerTestRunner(TextEncoderHarness(params, session, device))
+    return create_runner(TEXT_ENCODER, params)
 
 
 @pytest.mark.skipif(

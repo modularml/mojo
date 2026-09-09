@@ -11,43 +11,31 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import hf_repo_lock
 import pytest
 from async_asgi_testclient import TestClient
 from fastapi import FastAPI
 from max.driver import DeviceSpec
-from max.pipelines import PipelineConfig
-from max.pipelines.lib import KVCacheConfig, MAXModelConfig
-from max.pipelines.lib.model_manifest import ModelManifest
-from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
+from max.pipelines import PipelineArgs
+from max.pipelines.lib import KVCacheConfig, PipelineRuntimeConfig
 from max.serve.schemas.openai import (
     CreateChatCompletionResponse,
     ListModelsResponse,
-    Model,
+    MaxModel,
 )
 
 SMOLLM_135M_REPO_ID = "HuggingFaceTB/SmolLM-135M"
-SMOLLM_135M_REVISION = hf_repo_lock.revision_for_hf_repo(SMOLLM_135M_REPO_ID)
-assert SMOLLM_135M_REVISION is not None
 
 
 @pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "pipeline_config",
     [
-        PipelineConfig(
-            models=ModelManifest(
-                {
-                    "main": MAXModelConfig(
-                        model_path=SMOLLM_135M_REPO_ID,
-                        huggingface_model_revision=SMOLLM_135M_REVISION,
-                        device_specs=[DeviceSpec.cpu()],
-                        quantization_encoding="float32",
-                        kv_cache=KVCacheConfig(),
-                        max_length=512,
-                    )
-                }
-            ),
+        PipelineArgs(
+            model_path=SMOLLM_135M_REPO_ID,
+            device_specs=[DeviceSpec.cpu()],
+            quantization_encoding="float32",
+            kv_cache=KVCacheConfig(),
+            max_length=512,
             runtime=PipelineRuntimeConfig(max_batch_size=16),
         )
     ],
@@ -61,12 +49,14 @@ async def test_serve_models(app: FastAPI) -> None:
 
         assert len(response.data) == 1
         assert response.data[0].id == SMOLLM_135M_REPO_ID
+        assert response.data[0].max_model_len == 512
 
         raw_response = await client.get("/v1/models/SmolLM-135M")
 
-        response2 = Model.model_validate(raw_response.json())
+        response2 = MaxModel.model_validate(raw_response.json())
 
         assert response2.id == SMOLLM_135M_REPO_ID
+        assert response2.max_model_len == 512
 
 
 MODEL_ALIAS = "foobar"
@@ -77,19 +67,13 @@ MODEL_NAME = "modularai/SmolLM-135M-Instruct-FP32"
 @pytest.mark.parametrize(
     "pipeline_config",
     [
-        PipelineConfig(
-            models=ModelManifest(
-                {
-                    "main": MAXModelConfig(
-                        model_path=MODEL_NAME,
-                        served_model_name=MODEL_ALIAS,
-                        device_specs=[DeviceSpec.cpu()],
-                        quantization_encoding="float32",
-                        kv_cache=KVCacheConfig(),
-                        max_length=512,
-                    )
-                }
-            ),
+        PipelineArgs(
+            model_path=MODEL_NAME,
+            served_model_name=MODEL_ALIAS,
+            device_specs=[DeviceSpec.cpu()],
+            quantization_encoding="float32",
+            kv_cache=KVCacheConfig(),
+            max_length=512,
             runtime=PipelineRuntimeConfig(max_batch_size=16),
         )
     ],

@@ -1,0 +1,42 @@
+load("//bazel:api.bzl", "lit_tests")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+lit_tests(
+    name = "test",
+    srcs = glob([
+        "**/*.mlir",
+    ]),
+    custom_substitutions = {
+        "%driver-tblgen": "$(rlocationpath //Support/tools/driver-tblgen) -I $(dirname $(dirname $(dirname ../../../../$(location //Support:include/Support/Driver/DriverCommand.td)))) -I $(dirname $(dirname $(dirname ../../../../../$(rlocationpath @llvm-project//llvm:include/llvm/Option/OptParser.td))))",
+        "%crash-report-path-info": "$(rlocationpath //AsyncRT/tools/crash-report-path-info)",
+        "%modular-crashpad-handler": "$(rlocationpath @crashpad//:modular-crashpad-handler)",
+    },
+    data = [
+        "//Support:DriverCommandTdFiles",
+        "//Support:include/Support/Driver/DriverCommand.td",
+        "@llvm-project//llvm:include/llvm/Option/OptParser.td",
+    ],
+    env = {
+        "MODULAR_CRASH_REPORTING_ENABLED": "true",
+        "MODULAR_CRASH_REPORTING_HANDLER_PATH": "$(rootpath @crashpad//:modular-crashpad-handler)",
+    },
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    tools = [
+        "//AsyncRT/tools/crash-report-path-info",
+        "//AsyncRT/tools/crash-test-dummy",
+        "//Support/tools/driver-tblgen",
+        "@crashpad//:modular-crashpad-handler",
+    ],
+)

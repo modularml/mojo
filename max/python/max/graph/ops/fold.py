@@ -30,33 +30,50 @@ def fold(
     dilation: int | tuple[int, int] = 1,
     padding: int | tuple[int, int] = 0,
 ) -> TensorValue:
-    """Combines an array of sliding blocks into a larger containing tensor.
+    """Combines an array of sliding local blocks into a larger tensor.
 
-    The input tensor must have shape ``(N, C * kernel_sizes, L)`` where ``N`` is
-    the batch dimension, ``C`` is the number of channels, ``kernel_sizes`` is
-    the product of the kernel sizes, and ``L`` is the number of local blocks.
+    ``L``, the number of blocks, must equal ``prod((output_size[d] + 2 *
+    padding[d] - dilation[d] * (kernel_size[d] - 1) - 1) // stride[d] + 1)``,
+    where ``d`` ranges over all spatial dimensions.
 
-    The resulting output tensor will have shape
-    ``(N, C, output_shape[0], output_shape[1])``.
+    .. code-block:: python
 
-    ``L``, the number of blocks, must be equivalent to:
-    ``prod((output_size[d] + 2 * padding[d] - dilation[d] * (kernel_size[d] - 1) - 1) / stride[d] + 1)``
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType, ops
 
-    where ``d`` is over all spatial dimensions.
+        device = DeviceRef.CPU()
+        # Shape (N, C * kernel_h * kernel_w, L) = (1, 1 * 2 * 2, 9).
+        input_type = TensorType(DType.float32, [1, 4, 9], device=device)
+        with Graph("fold", input_types=[input_type]) as graph:
+            x = graph.inputs[0].tensor
+            # Fold nine 2x2 blocks into a 4x4 image, shape (1, 1, 4, 4).
+            graph.output(
+                ops.fold(x, output_size=(4, 4), kernel_size=(2, 2))
+            )
 
     Args:
-        input: The 3D tensor to fold with shape ``(N, C * kernel sizes, L)``.
-        output_size: Spatial dimensions of the output tensor. Must be a tuple of two ints.
-        kernel_size: The size of the sliding blocks. Must be a tuple of two ints.
-        stride: The stride of the sliding blocks in the input dimension
-            (can be an int or a tuple of two ints).
-        dilation: The spacing between the kernel elements.
-            (can be an int or a tuple of two ints).
-        padding: 0-paddings to be added on both sides of the inputs.
-            (can be an int or a tuple of two ints).
+        input: The 3-D tensor to fold, with shape
+            ``(N, C * kernel_sizes, L)``, where ``N`` is the batch dimension,
+            ``C`` is the number of channels, ``kernel_sizes`` is the product of
+            the kernel sizes, and ``L`` is the number of local blocks.
+        output_size: The spatial dimensions of the output tensor, as a tuple
+            of two ints.
+        kernel_size: The size of the sliding blocks, as a tuple of two ints.
+        stride: The stride of the sliding blocks. Either an int or a tuple of
+            two ints. Defaults to ``1``.
+        dilation: The spacing between kernel elements. Either an int or a
+            tuple of two ints. Defaults to ``1``.
+        padding: The zero-padding added on both sides of the input. Either an
+            int or a tuple of two ints. Defaults to ``0``.
 
     Returns:
-        The folded 4D tensor with shape ``(N, C, output_shape[0], output_shape[1])``.
+        A ``TensorValue`` representing the folded 4-D tensor, with shape
+        ``(N, C, output_size[0], output_size[1])``.
+
+    Raises:
+        ValueError: If the input's channel dimension isn't a multiple of the
+            total kernel size, or if the number of blocks ``L`` doesn't match
+            the value computed from the other arguments.
     """
     input = TensorValue(input)
 

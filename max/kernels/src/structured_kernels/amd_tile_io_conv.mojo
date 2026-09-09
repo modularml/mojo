@@ -17,7 +17,7 @@
 DRAM→LDS warp-cooperative direction. The split parallels the
 existing `TileLoaderLDS` (linear 2D source, coord-indexed) vs
 `SubTileLoaderLDS` (single sub-tile, TileTensor-indexed, async-copies
-alias scope) — same direction, different cooperation or source
+alias scope): same direction, different cooperation or source
 shape. Here the differentiator is the **source layout type**: this
 loader accepts a 4D NHWC input tensor and `(m_offset, k_offset)`
 coordinates in GEMM space (where `M = N*H_out*W_out` and
@@ -52,13 +52,13 @@ comptime sub-paths inside the body, picked at struct instantiation:
     divmods per lane but unblocks shapes the fast path can't cover.
 
 Halo (pad > 0) is handled by routing OOB lanes (h_in or w_in outside
-`[0, H)`/`[0, W)`) to the SRD's `num_records` sentinel — the AMD
+`[0, H)`/`[0, W)`) to the SRD's `num_records` sentinel: the AMD
 buffer-resource hardware bound check then clamps the read to 0.
 Gated by a `_needs_halo_mask` comptime flag so pad=0 callers keep
 their exact instruction stream.
 
 The SRD covers the **full NHWC tensor** (`N*H*W*C` elements), not a
-per-block slice — so OOB reads (deliberate halo or otherwise) are
+per-block slice, so OOB reads (deliberate halo or otherwise) are
 bounded by the actual allocation, in contrast to `TileLoaderLDS`
 which sizes the SRD to the per-block `.tile[BM, K]()` view. The
 full-tensor pattern caps at 4 GiB (AMDBufferResource.num_records is
@@ -74,13 +74,13 @@ SRD-OOB or filter-zero multiplies in the MMA.
 
 from std.math import ceildiv, min
 from std.sys import size_of, simd_width_of
-from std.gpu import WARP_SIZE
-from std.gpu.intrinsics import AMDBufferResource
+from max.gpu import WARP_SIZE
+from max.gpu.intrinsics import AMDBufferResource
 from std.memory import AddressSpace
 from std.sys.intrinsics import readfirstlane
 from std.collections import Optional
 
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from layout.swizzle import Swizzle
 
 from structured_kernels.amd_tile_io import GMemTile, SMemTile, TileLoader
@@ -151,10 +151,10 @@ struct TileLoaderLDSIm2col[
     then computes `addr = ((n*H + h_in)*W + w_in)*C + c` for each lane.
 
     The body picks one of three comptime sub-paths at instantiation:
-    pure-pointwise (R=S=1, no pad — math collapses to `m*C + k`);
+    pure-pointwise (R=S=1, no pad: math collapses to `m*C + k`);
     uniform-substrip (general R×S with `tile_cols ≤ C` and
-    `C % tile_cols == 0` — one (kh, kw) per call); per-lane substrip
-    (otherwise — each lane decomposes its own `k_lane`). Pad > 0
+    `C % tile_cols == 0`: one (kh, kw) per call); per-lane substrip
+    (otherwise: each lane decomposes its own `k_lane`). Pad > 0
     additionally routes halo lanes (h_in or w_in outside `[0, H)`/`[0, W)`)
     to the SRD-OOB sentinel.
 
@@ -353,7 +353,7 @@ struct TileLoaderLDSIm2col[
         The class body computes a chain of integer divisions
         (`subtile_cols // load_width`, `tile_cols // subtile_cols`,
         ..., `tile_rows // rows_per_iteration`). When any link floors
-        to 0, downstream `comptime for` loops unroll 0 times — loader
+        to 0, downstream `comptime for` loops unroll 0 times: loader
         emits no `buffer_load_lds` at all, LDS stays uninitialized,
         MMA reads garbage. These asserts make every link's invariant
         explicit. Mirrors `TileLoaderLDS.__init__`'s checks.
@@ -397,9 +397,12 @@ struct TileLoaderLDSIm2col[
     @always_inline
     def __init__[
         InLayout: TensorLayout,
+        InEngine: TensorEngine,
     ](
         out self,
-        src_nhwc: TileTensor[Self.dtype, InLayout, _],
+        src_nhwc: TileTensor[
+            mut=False, Self.dtype, InLayout, _, Engine=InEngine
+        ],
         warp_id: Int,
         lane_id: Int,
         *,
@@ -417,16 +420,23 @@ struct TileLoaderLDSIm2col[
         the runtime conv geometry fields are populated with zeros and
         the loader uses the comptime template params instead.
 
+        Parameters:
+            InLayout: `TensorLayout` of the input `src_nhwc` `TileTensor`.
+                Must be rank-4 NHWC (or rank-5 NDHWC when `Q > 1`) with
+                static spatial dims matching the struct's `H`, `W`, and
+                `C` params.
+            InEngine: `TensorEngine` of the input `src_nhwc` `TileTensor`.
+
         Args:
             src_nhwc: 4D NHWC input tensor of shape `(N, H, W, C)`.
             warp_id: Warp identifier within the loading warp group.
             lane_id: Lane identifier within the warp.
             m_anchor: M-coordinate (= flat N*H_out*W_out index) of the
                 block origin. Added to `m_offset` at load time.
-                Defaults to 0 — pass per-block origin from the kernel.
+                Defaults to 0: pass per-block origin from the kernel.
             k_anchor: K-coordinate (= flat (kh, kw, c) index) of the
                 block origin. Added to `k_offset` at load time.
-                Defaults to 0 — conv split-K is not yet supported, so
+                Defaults to 0: conv split-K is not yet supported, so
                 callers typically leave this at the default.
         """
         Self._validate_geometry()
@@ -457,7 +467,7 @@ struct TileLoaderLDSIm2col[
         # When `tile_cols <= C and C % tile_cols == 0`, each load_tile call
         # stays within a single (kh, kw) substrip — `load_tile`'s general
         # path takes the uniform-substrip fast path (kh, kw, c_base
-        # computed once per call).  Otherwise (BK > C, or C not a multiple
+        # computed once per call). Otherwise (BK > C, or C not a multiple
         # of BK), the per-lane k_lane spans multiple substrips, and the
         # slow path computes (kh_lane, kw_lane, c_lane) per-lane per call.
         # No comptime assert here — both paths are correct; the comptime
@@ -584,9 +594,12 @@ struct TileLoaderLDSIm2col[
     @always_inline
     def __init__[
         InLayout: TensorLayout,
+        InEngine: TensorEngine,
     ](
         out self,
-        src_nhwc: TileTensor[Self.dtype, InLayout, _],
+        src_nhwc: TileTensor[
+            mut=False, Self.dtype, InLayout, _, Engine=InEngine
+        ],
         warp_id: Int,
         lane_id: Int,
         *,
@@ -603,6 +616,10 @@ struct TileLoaderLDSIm2col[
         / output spatial dims are runtime values (typically read from
         `input.dim()` / `output.dim()` by the launcher). Use when the
         graph compiler can't pin the resolution.
+
+        Parameters:
+            InLayout: `TensorLayout` of the input `src_nhwc` `TileTensor`.
+            InEngine: `TensorEngine` of the input `src_nhwc` `TileTensor`.
 
         Args:
             src_nhwc: 4D NHWC input tensor of shape `(N, H, W, C)`.
@@ -697,9 +714,12 @@ struct TileLoaderLDSIm2col[
     @always_inline
     def __init__[
         InLayout: TensorLayout,
+        InEngine: TensorEngine,
     ](
         out self,
-        src_ndhwc: TileTensor[Self.dtype, InLayout, _],
+        src_ndhwc: TileTensor[
+            mut=False, Self.dtype, InLayout, _, Engine=InEngine
+        ],
         warp_id: Int,
         lane_id: Int,
         *,
@@ -719,6 +739,10 @@ struct TileLoaderLDSIm2col[
         in addition to the spatial H/W ones. The K-decomposition and
         conv params (Q, R, S, stride_d, stride_h, stride_w, dilation_*,
         pad_*, C) stay comptime.
+
+        Parameters:
+            InLayout: `TensorLayout` of the input `src_ndhwc` `TileTensor`.
+            InEngine: `TensorEngine` of the input `src_ndhwc` `TileTensor`.
 
         Args:
             src_ndhwc: 5D NDHWC input tensor of shape `(N, D, H, W, C)`.
@@ -829,7 +853,7 @@ struct TileLoaderLDSIm2col[
           matching the matmul's vmcnt accounting.
 
         - **General R×S path** (M2): the lane's `(m_lane, k_lane)` are
-          decomposed at runtime — `k_lane → (kh, kw, c)` via comptime R, S,
+          decomposed at runtime: `k_lane → (kh, kw, c)` via comptime R, S,
           C divisors (constant-folded to multiply-by-magic); `m_lane →
           (n, h_out, w_out)` via comptime H_out, W_out divisors. Then
           `h_in = h_out * stride_h + kh * dilation_h - pad_h` (similarly
@@ -849,10 +873,8 @@ struct TileLoaderLDSIm2col[
                 flat (kh, kw, c) index ∈ [0, R*S*C)). Must be a
                 multiple of `tile_cols`.
         """
-        comptime SmemPtr = UnsafePointer[
-            Scalar[Self.dtype],
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+        comptime SmemPtr = Pointer[
+            Scalar[Self.dtype], MutAnyOrigin, address_space=.SHARED
         ]
 
         # Absolute GEMM coords for this call. Anchors default to 0, so

@@ -1,0 +1,134 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# AMD variant of the NIXL KV-transfer smoke receiver (mirrors ../receiver.yaml).
+# Differences from the NVIDIA/EFA pod: AMD GPUs + the RoCE IB fabric
+# (amd.com/nic, the CI analog of the Coder "Enable RoCE networking" flag),
+# and the UCCL transport backend instead of libfabric/EFA.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kv-smoke-receiver
+spec:
+  selector:
+    app: kv-smoke-receiver
+  ports:
+    - name: placeholder
+      port: 1
+      targetPort: 1
+  clusterIP: None
+
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kv-smoke-receiver
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 1800
+  template:
+    metadata:
+      labels:
+        app: kv-smoke-receiver
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ecr-secret
+      # Force receiver onto a different node than the sender.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: kv-smoke-sender
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: amd.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: test-script
+          configMap:
+            name: kv-smoke-script
+      containers:
+        - name: receiver
+          image: ENGINE_IMAGE_PLACEHOLDER
+          imagePullPolicy: Always
+          command: ["/bin/bash", "-c"]
+          args:
+            - >-
+              echo '=== RDMA preflight ===';
+              ls -la /dev/infiniband/ 2>&1 || echo 'no /dev/infiniband';
+              ls -la /sys/class/infiniband/ 2>&1 || echo 'no /sys/class/infiniband';
+              ls -la /usr/lib/x86_64-linux-gnu/libibverbs/ 2>&1 || echo 'no providers dir';
+              (dpkg -l | grep -iE 'ibverbs|rdma-core') 2>&1 || echo 'no rdma pkgs';
+              echo '=== end preflight ===';
+              python /smoke/test_transfer_engine_cross_node.py
+              --role receiver
+              --sender-addr tcp://kv-smoke-sender:5555
+              --backend uccl
+              ${SMOKE_EXTRA_ARGS}
+          env:
+            # Unbuffer stdout/stderr so pod logs show progress up to a hang,
+            # even when the pod is SIGKILLed at the wait deadline.
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: SMOKE_EXTRA_ARGS
+              value: EXTRA_ARGS_PLACEHOLDER
+            # UCCL is the AMD default; set explicitly to match the NVIDIA
+            # pod's explicit libfabric selection and to be unambiguous in logs.
+            - name: MODULAR_NIXL_TRANSFER_BACKEND
+              value: uccl
+            - name: UCCL_P2P_TRANSPORT
+              value: rdma
+            # UCCL's cross-process IPC path is broken upstream; force RDMA for
+            # same-host pairs too (harmless internode).
+            - name: UCCL_P2P_DISABLE_IPC
+              value: "1"
+            # Surface UCCL engine diagnostics in pod logs (mirrors the NVIDIA
+            # pod's FI_LOG_LEVEL=warn).
+            - name: NIXL_UCCL_LOG
+              value: "1"
+            - name: MODULAR_DEVICE_CONTEXT_MEMORY_MANAGER_SIZE_PERCENT
+              value: "90"
+          resources:
+            limits:
+              amd.com/gpu: "1"
+              # One matched RoCE NIC per GPU, exposed as amd.com/nic by the
+              # AMD network operator (INFRA-3054). The serving image
+              # (Dockerfile.rocm) ships rdma-core, so UCCL's runtime dlopen of
+              # libibverbs resolves against the system stack.
+              amd.com/nic: "1"
+              memory: 243200Mi
+            requests:
+              amd.com/gpu: "1"
+              amd.com/nic: "1"
+              cpu: 22250m   # guarantee scheduling; no CPU limit so transfers can burst
+              memory: 243200Mi
+          securityContext:
+            # IPC_LOCK: RDMA memory pinning. NET_ADMIN: RDMA device access.
+            capabilities:
+              add:
+                - IPC_LOCK
+                - NET_ADMIN
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: test-script
+              mountPath: /smoke

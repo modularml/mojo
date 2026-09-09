@@ -2,7 +2,7 @@
 
 **Date**: April 9-10, 2026
 **System**: 8x AMD Instinct MI355X OAM (gfx950), TP=8
-**Model**: Llama-3.1-405B (`redhatai/meta-llama-3.1-405b-instruct-fp8-dynamic`)
+**Model**: Llama-3.1-405B (`RedHatAI/Meta-Llama-3.1-405B-Instruct-FP8-dynamic`)
 **PRs under investigation**:
 
 - PR #82119 (`6936b243e61`): Structured prefill kernel

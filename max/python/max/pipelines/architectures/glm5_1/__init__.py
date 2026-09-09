@@ -15,9 +15,15 @@
 from .arch import glm5_1_arch
 from .model import Glm5_1Model
 from .model_config import Glm5_1Config
+from .reasoning import GlmReasoningParser
+from .tokenizer import GlmTokenizer
+from .tool_parser import GlmToolParser
 
 __all__ = [
     "Glm5_1Config",
     "Glm5_1Model",
+    "GlmReasoningParser",
+    "GlmTokenizer",
+    "GlmToolParser",
     "glm5_1_arch",
 ]

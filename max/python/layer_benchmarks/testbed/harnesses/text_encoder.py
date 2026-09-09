@@ -23,7 +23,9 @@ import gc
 from dataclasses import dataclass
 
 import numpy as np
-import torch
+
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from max.driver import Accelerator, Buffer, DLPackArray
 from max.dtype import DType
 from max.engine import InferenceSession

@@ -1,6 +1,0 @@
-max/python/max/_core/internal
-max/internal
-max/tests/internal
-max/tests/integration/kv_cache/internal
-max/examples/internal
-mojo/docs/internal

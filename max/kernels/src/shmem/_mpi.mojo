@@ -43,7 +43,8 @@ def _init_mpi_dylib() -> OwnedDLHandle:
     #   export MODULAR_SHMEM_LIB_DIR="/path/to/venv/lib"
     # will dlopen the library from:
     #   /path/to/venv/lib/libmpi.so
-    if dir_name := getenv("MODULAR_SHMEM_LIB_DIR"):
+    var dir_name = getenv("MODULAR_SHMEM_LIB_DIR")
+    if dir_name:
         lib = String(Path(dir_name) / lib)
 
     var flags = RTLD.NOW | RTLD.GLOBAL
@@ -73,7 +74,9 @@ def _get_mpi_function[
 # Types and constants
 # ===-----------------------------------------------------------------------===#
 
-comptime MPIComm = UnsafePointer[OpaquePointer[MutExternalOrigin], MutAnyOrigin]
+comptime MPIComm = UnsafePointer[
+    OpaquePointer[MutUntrackedOrigin], MutUntrackedOrigin
+]
 
 comptime MPI_THREAD_SINGLE = 0
 comptime MPI_THREAD_FUNNELED = 1
@@ -86,16 +89,14 @@ comptime MPI_THREAD_MULTIPLE = 3
 
 
 def MPI_Init(
-    mut argc: Int, mut argv: Span[StaticString, StaticConstantOrigin]
+    mut argc: Int, mut argv: Span[StaticString, ImmStaticOrigin]
 ) raises:
     """Initialize MPI."""
     var result = _get_mpi_function[
         "MPI_Init",
         def(
-            UnsafePointer[Int, MutAnyOrigin],
-            UnsafePointer[
-                Span[StaticString, StaticConstantOrigin], MutAnyOrigin
-            ],
+            UnsafePointer[Int, origin_of(argc)],
+            UnsafePointer[Span[StaticString, ImmStaticOrigin], origin_of(argv)],
         ) thin -> c_int,
     ]()(UnsafePointer(to=argc), UnsafePointer(to=argv))
     if result != 0:
@@ -104,7 +105,7 @@ def MPI_Init(
 
 def MPI_Init_thread(
     mut argc: Int,
-    mut argv: Span[StaticString, StaticConstantOrigin],
+    mut argv: Span[StaticString, ImmStaticOrigin],
     required: c_int,
     provided: UnsafePointer[c_int, MutAnyOrigin],
 ) raises:
@@ -112,10 +113,8 @@ def MPI_Init_thread(
     var result = _get_mpi_function[
         "MPI_Init_thread",
         def(
-            UnsafePointer[Int, MutAnyOrigin],
-            UnsafePointer[
-                Span[StaticString, StaticConstantOrigin], MutAnyOrigin
-            ],
+            UnsafePointer[Int, origin_of(argc)],
+            UnsafePointer[Span[StaticString, ImmStaticOrigin], origin_of(argv)],
             c_int,
             UnsafePointer[c_int, MutAnyOrigin],
         ) thin -> c_int,
@@ -124,7 +123,7 @@ def MPI_Init_thread(
         raise Error("failed to MPI_Init_thread with error code:", result)
 
 
-def MPI_Initialized(flag: UnsafePointer[c_int, MutExternalOrigin]) raises:
+def MPI_Initialized(flag: UnsafePointer[c_int, MutUntrackedOrigin]) raises:
     """Check if MPI has been initialized.
 
     Raises:
@@ -132,7 +131,7 @@ def MPI_Initialized(flag: UnsafePointer[c_int, MutExternalOrigin]) raises:
     """
     var result = _get_mpi_function[
         "MPI_Initialized",
-        def(UnsafePointer[c_int, MutExternalOrigin]) thin -> c_int,
+        def(UnsafePointer[c_int, MutUntrackedOrigin]) thin -> c_int,
     ]()(flag)
     if result != 0:
         raise Error("failed to check MPI_Initialized with error code:", result)
@@ -200,9 +199,9 @@ def get_mpi_comm_world() raises -> MPIComm:
         If the MPI library is not available or the symbol cannot be found.
     """
     var handle = MPI_LIBRARY.get_or_create_ptr()[].borrow()
-    var comm_world_ptr = handle.get_symbol[OpaquePointer[MutExternalOrigin]](
-        cstr_name="ompi_mpi_comm_world".as_c_string_slice().unsafe_ptr()
+    var comm_world_ptr = handle.get_symbol[OpaquePointer[MutUntrackedOrigin]](
+        cstr_name="ompi_mpi_comm_world".as_c_string_slice()
     )
     if not comm_world_ptr:
         raise Error("symbol ompi_mpi_comm_world not found in MPI library")
-    return comm_world_ptr.value()
+    return comm_world_ptr.value().unsafe_origin_cast[MutUntrackedOrigin]()

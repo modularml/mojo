@@ -1,0 +1,21 @@
+load("//bazel:api.bzl", "modular_cc_library", "modular_versioned_expand_template")
+
+# gazelle:default_visibility //visibility:public
+
+package(default_visibility = ["//visibility:public"])
+
+modular_cc_library(
+    name = "Config",
+    srcs = glob(["lib/**/*.cpp"]) + [
+        ":GeneratedVersion",
+    ],
+    hdrs = glob(["include/**/*.h"]),
+    copts = ["-I$(GENDIR)/Config"],
+)
+
+modular_versioned_expand_template(
+    name = "GeneratedVersion",
+    out = "GeneratedVersion.h",
+    substitutions = {},
+    template = "include/GeneratedVersion.h.tmpl",
+)

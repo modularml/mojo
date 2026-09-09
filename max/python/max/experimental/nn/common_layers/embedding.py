@@ -39,9 +39,13 @@ class VocabParallelEmbedding(Embedding):
     masks out-of-range indices, and all-reduces the results.
     """
 
-    def __init__(self, vocab_size: DimLike, *, dim: DimLike) -> None:
+    def __init__(
+        self, vocab_size: DimLike, *, dim: DimLike, tp_axis: str | None = None
+    ) -> None:
         super().__init__(vocab_size, dim=dim)
-        self.weight._mapping = NamedMapping(self.weight.mesh, (TP, None))
+        if tp_axis is None:
+            tp_axis = TP
+        self.weight._mapping = NamedMapping(self.weight.mesh, (tp_axis, None))
 
     def forward(self, indices: Tensor) -> Tensor:
         """Gather the embeddings for the input indices."""

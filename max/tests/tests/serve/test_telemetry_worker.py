@@ -17,7 +17,7 @@ import time
 from unittest import mock
 
 import pytest
-from max.serve.config import MetricLevel, Settings
+from max.serve.config import Settings
 from max.serve.pipelines import telemetry_worker
 from max.serve.telemetry import process_controller
 from max.serve.telemetry.asyncio_controller import AsyncioMetricClient
@@ -28,13 +28,9 @@ from max.serve.telemetry.metrics import MaxMeasurement
 async def test_telemetry_worker() -> None:
     settings = Settings()
     async with telemetry_worker.start_process_consumer(settings) as worker:
-        client = worker.Client(settings)
-        client.send_measurement(
-            MaxMeasurement("foo", 1), level=MetricLevel.BASIC
-        )
-        client.send_measurement(
-            MaxMeasurement("foo", 2), level=MetricLevel.BASIC
-        )
+        client = worker.Client()
+        client.send_measurement(MaxMeasurement("foo", 1))
+        client.send_measurement(MaxMeasurement("foo", 2))
         time.sleep(100e-3)
         with pytest.raises(queue.Empty):
             worker.queue.get_nowait()
@@ -52,17 +48,11 @@ async def test_unreliable_handle() -> None:
         settings,
         handle_fn=_raise_exception,
     ) as worker:
-        client = worker.Client(settings)
+        client = worker.Client()
 
-        client.send_measurement(
-            MaxMeasurement("foo", 1), level=MetricLevel.BASIC
-        )
-        client.send_measurement(
-            MaxMeasurement("foo", 2), level=MetricLevel.BASIC
-        )
-        client.send_measurement(
-            MaxMeasurement("foo", 3), level=MetricLevel.BASIC
-        )
+        client.send_measurement(MaxMeasurement("foo", 1))
+        client.send_measurement(MaxMeasurement("foo", 2))
+        client.send_measurement(MaxMeasurement("foo", 3))
 
         await asyncio.sleep(1)
 
@@ -71,38 +61,91 @@ async def test_unreliable_handle() -> None:
 
 
 @pytest.mark.asyncio
-async def test_metric_asyncio_client_filtering() -> None:
-    settings = Settings(metric_level=MetricLevel.BASIC)
-    assert settings.metric_level == MetricLevel.BASIC
-
+async def test_metric_asyncio_client_emits() -> None:
     q = mock.MagicMock()
-    client = AsyncioMetricClient(settings.metric_level, q)
+    client = AsyncioMetricClient(q)
 
-    # detailed metrics are dropped
-    client.send_measurement(
-        MaxMeasurement("foo", 1), level=MetricLevel.DETAILED
-    )
-    assert q.put_nowait.call_count == 0
-
-    # basic metrics are allowed
-    client.send_measurement(MaxMeasurement("foo", 1), level=MetricLevel.BASIC)
-    assert q.put_nowait.call_count == 1
+    # Every measurement is enqueued; there is no level-based dropping.
+    client.send_measurement(MaxMeasurement("foo", 1))
+    client.send_measurement(MaxMeasurement("foo", 2))
+    assert q.put_nowait.call_count == 2
 
 
 @pytest.mark.asyncio
-async def test_metric_process_client_filtering() -> None:
-    settings = Settings(metric_level=MetricLevel.BASIC)
-    assert settings.metric_level == MetricLevel.BASIC
-
+async def test_metric_process_client_flushes_immediately() -> None:
     q = mock.MagicMock()
-    client = process_controller.ProcessMetricClient(settings, q)
+    client = process_controller.ProcessMetricClient(q)
 
-    # detailed metrics are dropped
-    client.send_measurement(
-        MaxMeasurement("foo", 1), level=MetricLevel.DETAILED
-    )
-    assert q.put_nowait.call_count == 0
+    # Outside a transaction each measurement is flushed as its own packet.
+    client.send_measurement(MaxMeasurement("foo", 1))
+    client.send_measurement(MaxMeasurement("foo", 2))
+    assert q.put_nowait.call_count == 2
+    assert [len(call.args[0]) for call in q.put_nowait.call_args_list] == [1, 1]
 
-    # basic metrics are allowed
-    client.send_measurement(MaxMeasurement("foo", 1), level=MetricLevel.BASIC)
+
+@pytest.mark.asyncio
+async def test_metric_process_client_transaction_batches() -> None:
+    q = mock.MagicMock()
+    client = process_controller.ProcessMetricClient(q)
+
+    # Inside a transaction, measurements accumulate and flush as one packet
+    # when the transaction closes.
+    with client.transaction():
+        client.send_measurement(MaxMeasurement("foo", 1))
+        client.send_measurement(MaxMeasurement("foo", 2))
+        client.send_measurement(MaxMeasurement("foo", 3))
+        assert q.put_nowait.call_count == 0
+
     assert q.put_nowait.call_count == 1
+    (batch,) = q.put_nowait.call_args.args
+    assert [m.value for m in batch] == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_metric_process_client_nested_transaction_flushes_once() -> None:
+    q = mock.MagicMock()
+    client = process_controller.ProcessMetricClient(q)
+
+    # Only the outermost transaction flushes; a nested transaction must not.
+    with client.transaction():
+        client.send_measurement(MaxMeasurement("foo", 1))
+        with client.transaction():
+            client.send_measurement(MaxMeasurement("foo", 2))
+            assert q.put_nowait.call_count == 0
+        # Still inside the outer transaction: nothing flushed yet.
+        assert q.put_nowait.call_count == 0
+        client.send_measurement(MaxMeasurement("foo", 3))
+
+    assert q.put_nowait.call_count == 1
+    (batch,) = q.put_nowait.call_args.args
+    assert [m.value for m in batch] == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_metric_process_client_transaction_flushes_on_exception() -> None:
+    q = mock.MagicMock()
+    client = process_controller.ProcessMetricClient(q)
+
+    # A body that raises partway through still flushes the already-buffered
+    # measurements as one packet (via the finally) and leaves the transaction
+    # state clean for the next transaction.
+    with pytest.raises(RuntimeError, match="boom"):
+        with client.transaction():
+            client.send_measurement(MaxMeasurement("foo", 1))
+            client.send_measurement(MaxMeasurement("foo", 2))
+            raise RuntimeError("boom")
+
+    assert q.put_nowait.call_count == 1
+    (batch,) = q.put_nowait.call_args.args
+    assert [m.value for m in batch] == [1, 2]
+    assert client.transaction_depth == 0
+    assert client.transaction_buffer == []
+    q = mock.MagicMock()
+    controller = process_controller.ProcessTelemetryController(q)
+
+    controller.close()
+
+    assert q.mock_calls == [
+        mock.call.cancel_join_thread(),
+        mock.call.close(),
+    ]

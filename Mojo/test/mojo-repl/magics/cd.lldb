@@ -1,0 +1,20 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# CHECK: called_function was called
+%cd ../Inputs
+from imported_module import called_function
+called_function()
+
+# CHECK: unable to locate module 'imported_module_2'
+%cd -
+from imported_module_2 import called_function
+called_function()
+

@@ -20,7 +20,7 @@ from max.driver import CPU, Buffer, Device
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType
-from max.graph.ops import div, floor
+from max.graph.ops import div, floor, floor_div
 
 
 def build_models(lhs_dtype: DType, rhs_dtype: DType) -> Graph:
@@ -34,8 +34,8 @@ def build_models(lhs_dtype: DType, rhs_dtype: DType) -> Graph:
 
 def run_models(
     model: Any,
-    lhs_val: int | float,
-    rhs_val: int | float,
+    lhs_val: float,
+    rhs_val: float,
     lhs_dtype: DType,
     rhs_dtype: DType,
     cpu: Device,
@@ -113,3 +113,50 @@ def test_div_and_floordiv_match_python(
         else:
             np.testing.assert_equal(max_div, py_div)
             np.testing.assert_equal(max_floor, py_floor)
+
+
+def build_floor_div_model(lhs_dtype: DType, rhs_dtype: DType) -> Graph:
+    lhs_type = TensorType(lhs_dtype, [], device=DeviceRef.CPU())
+    rhs_type = TensorType(rhs_dtype, [], device=DeviceRef.CPU())
+    with Graph("floor_div", input_types=[lhs_type, rhs_type]) as g:
+        g.output(floor_div(g.inputs[0].tensor, g.inputs[1].tensor))
+    return g
+
+
+@pytest.mark.parametrize(
+    "dtype,cases",
+    [
+        # Signed integers exercise the floor correction: truncation toward zero
+        # would give -3 (not -4) for -7 // 2, so this pins the signed path.
+        (DType.int32, [(7, 2), (-7, 2), (7, -2), (-7, -2), (-6, 3), (0, 5)]),
+        # Unsigned skips the correction (fast path); operands stay non-negative.
+        (DType.uint32, [(7, 2), (18, 5)]),
+        # Float operands route through floor(div(...)).
+        (DType.float32, [(7.5, 2.0), (-7.5, 2.0)]),
+    ],
+)
+def test_floor_div_matches_python(
+    dtype: DType,
+    cases: list[tuple[int | float, int | float]],
+) -> None:
+    """``ops.floor_div`` must match Python ``//`` across sign and dtype."""
+    cpu = CPU()
+    session = InferenceSession(devices=[cpu])
+    model = session.load(build_floor_div_model(dtype, dtype))
+
+    for lhs_val, rhs_val in cases:
+        lhs = Buffer.from_numpy(np.array(lhs_val, dtype=dtype.to_numpy())).to(
+            cpu
+        )
+        rhs = Buffer.from_numpy(np.array(rhs_val, dtype=dtype.to_numpy())).to(
+            cpu
+        )
+        out = model(lhs, rhs)[0]
+        got = (
+            out.to_numpy().item()
+            if isinstance(out, Buffer)
+            else torch.utils.dlpack.from_dlpack(out).numpy().item()
+        )
+        np.testing.assert_equal(
+            got, lhs_val // rhs_val, err_msg=f"floor_div({lhs_val}, {rhs_val})"
+        )

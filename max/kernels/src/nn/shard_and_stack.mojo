@@ -10,11 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements shard-and-stack: shards a tensor across devices and stacks the shards into a higher-rank output."""
 
-from std.algorithm import parallelize, sync_parallelize
-from std.collections import InlineArray
-from std.gpu.host import DeviceBuffer, DeviceContext, DeviceContextList
-from std.memory import memcpy
+from max.algorithm import parallelize, sync_parallelize
+from std.collections import Array
+from max.gpu.host import DeviceBuffer, DeviceContext, DeviceContextArray
+from std.memory import unsafe_memcpy
 from extensibility import InputVariadicTensors, OutputVariadicTensors
 from std.utils import product
 
@@ -102,7 +103,7 @@ def _shard_and_stack_multi_device[
         rank=outputs.rank - 1,
         ...,
     ],
-    dev_ctxs_input: DeviceContextList,
+    dev_ctxs_input: DeviceContextArray,
 ) raises:
     """Multi-device implementation using H2D transfers.
 
@@ -136,8 +137,7 @@ def _shard_and_stack_multi_device[
     var output_elements_per_input = outer_dims * segment_elements
 
     @no_inline
-    @parameter
-    def transfer(tp_index: Int) raises:
+    def transfer(tp_index: Int) raises {imm}:
         # Device context for this output (index 0 is CPU, so +1)
         var gpu_ctx = dev_ctxs_input[tp_index + 1]
         var output_tensor = dyn_outputs[tp_index]
@@ -178,7 +178,7 @@ def _shard_and_stack_multi_device[
                 )
 
     # Enqueue transfers in parallel, one thread per device.
-    sync_parallelize[transfer](outputs.size)
+    sync_parallelize(transfer, outputs.size)
 
 
 def _shard_and_stack_single_device[
@@ -191,7 +191,7 @@ def _shard_and_stack_single_device[
         ...,
     ],
 ) raises:
-    """Single-device implementation using CPU memcpy.
+    """Single-device implementation using CPU unsafe_memcpy.
 
     Parameters:
         axis: The dimension along which to shard the weights.
@@ -217,8 +217,7 @@ def _shard_and_stack_single_device[
     var output_elements_per_input = outer_dims * segment_elements
 
     @no_inline
-    @parameter
-    def process_task(input_idx: Int):
+    def process_task(input_idx: Int) {imm}:
         var input_tensor = dyn_inputs[input_idx]
 
         for tp_index in range(outputs.size):
@@ -246,9 +245,9 @@ def _shard_and_stack_single_device[
                 var src_ptr = input_tensor.unsafe_ptr() + src_offset
                 var dst_ptr = output_tensor.unsafe_ptr() + dst_offset
 
-                memcpy(dest=dst_ptr, src=src_ptr, count=segment_elements)
+                unsafe_memcpy(dest=dst_ptr, src=src_ptr, count=segment_elements)
 
-    parallelize[process_task](inputs.size)
+    parallelize(process_task, inputs.size)
 
 
 def shard_and_stack[
@@ -260,7 +259,7 @@ def shard_and_stack[
         rank=outputs.rank - 1,
         ...,
     ],
-    dev_ctxs_input: DeviceContextList,
+    dev_ctxs_input: DeviceContextArray,
 ) raises:
     """Shard weight tensors across multiple devices for tensor parallelism.
 
@@ -279,7 +278,7 @@ def shard_and_stack[
     _validate_shard_and_stack[axis](outputs, inputs)
 
     # Check if outputs are on different devices than inputs (multi-device mode).
-    comptime is_multi_device = dev_ctxs_input.size > 1
+    comptime is_multi_device = dev_ctxs_input.length > 1
 
     comptime if is_multi_device:
         _shard_and_stack_multi_device[axis](outputs, inputs, dev_ctxs_input)

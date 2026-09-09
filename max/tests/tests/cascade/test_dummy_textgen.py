@@ -17,16 +17,29 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest
-from max.experimental.cascade import GenerateRequest, LocalRuntime
-from max.tests.tests.cascade.dummy_textgen import (
+from max.experimental.cascade import (
+    ChatMessage,
+    GenAIRequest,
+    GenAITextChunk,
+    LocalRuntime,
+    TextGenOptions,
+)
+from max.experimental.cascade.pipelines.dummy_textgen import (
     build_dummy_textgen_pipeline,
 )
 
 
 @pytest.fixture()
 async def runtime() -> AsyncIterator[LocalRuntime]:
-    async with LocalRuntime().open() as rt:
+    async with LocalRuntime() as rt:
         yield rt
+
+
+def _request(prompt: str, num_tokens: int) -> GenAIRequest:
+    return GenAIRequest(
+        messages=[ChatMessage.text("user", prompt)],
+        text=TextGenOptions(num_tokens=num_tokens),
+    )
 
 
 @pytest.mark.asyncio
@@ -34,11 +47,12 @@ async def test_textgen_pipeline(runtime: LocalRuntime) -> None:
     pipeline = await build_dummy_textgen_pipeline()
     await pipeline.deploy(runtime)
 
-    req = GenerateRequest(num_tokens=5)
-    tokens = [token async for token in pipeline.generate(req, "hello, ")]
+    chunks = [
+        chunk async for chunk in pipeline.generate(_request("hello, ", 5))
+    ]
 
-    assert len(tokens) == 5
-    assert all(token == "A" for token in tokens)
+    assert len(chunks) == 5
+    assert all(chunk == GenAITextChunk(text="A") for chunk in chunks)
 
 
 @pytest.mark.asyncio
@@ -47,6 +61,8 @@ async def test_textgen_different_lengths(runtime: LocalRuntime) -> None:
     await pipeline.deploy(runtime)
 
     for num_tokens in [1, 3, 10]:
-        request = GenerateRequest(num_tokens=num_tokens)
-        tokens = [token async for token in pipeline.generate(request, "test")]
-        assert len(tokens) == num_tokens
+        chunks = [
+            chunk
+            async for chunk in pipeline.generate(_request("test", num_tokens))
+        ]
+        assert len(chunks) == num_tokens

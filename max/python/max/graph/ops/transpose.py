@@ -31,20 +31,43 @@ def _axis_bounds(rank: int) -> tuple[int, int]:
 def transpose(x: TensorValueLike, axis_1: int, axis_2: int) -> TensorValue:
     """Transposes two axes of a symbolic tensor.
 
-    For more information, see :obj:`~max.graph.TensorValue.transpose()`.
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("transpose") as graph:
+            # x has shape (2, 3).
+            x = ops.constant(
+                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+                DType.float32,
+                device=device,
+            )
+            # Swap axes 0 and 1, producing shape (3, 2).
+            graph.output(ops.transpose(x, 0, 1))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
         x: The input symbolic tensor to transpose.
-        axis_1: One of the two axes to transpose. If negative, this indexes
-           from the end of the tensor. For example,
-           :code:`transpose(v, -1, -2)` transposes the last two axes.
-        axis_2: The other axis to transpose. May also be negative to index from
-           the end of the tensor.
+        axis_1: One of the two axes to transpose. If negative, this indexes from the
+            end of the tensor. For example, a value of ``-1`` refers to the last
+            axis.
+        axis_2: The other axis to transpose. If negative, this indexes from the end
+            of the tensor.
 
     Returns:
-        A new symbolic tensor with the two specified axes transposed.
-        It has the same elements and dtype, but the order of the elements
-        is different according to the transposition.
+        A ``TensorValue`` representing the input tensor with ``axis_1`` and
+        ``axis_2`` transposed. It has the same elements and dtype as ``x``,
+        with the order of the elements changed according to the transposition.
+        For a rank-zero tensor, axes ``-1`` and ``0`` are accepted and the
+        scalar is returned unchanged.
+
+    Raises:
+        IndexError: If ``axis_1`` or ``axis_2`` is out of range.
     """
     v = TensorValue(x)
 

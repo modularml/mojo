@@ -16,8 +16,7 @@ This module provides type-safe wrappers around low-level barrier primitives,
 improving code readability and reducing error potential.
 """
 
-from std.gpu.memory import AddressSpace
-from std.gpu.sync import named_barrier, named_barrier_arrive
+from max.gpu.sync import named_barrier, named_barrier_arrive
 from layout.tma_async import SharedMemBarrier
 
 from .smem_types import SMemArray
@@ -132,6 +131,10 @@ struct WarpGroupBarrier[num_threads: Int, barrier_id: Int = 0](
 
     Wraps `named_barrier` and `named_barrier_arrive` with compile-time
     thread count and barrier ID for type-safe synchronization.
+
+    Parameters:
+        num_threads: Number of threads participating in the barrier.
+        barrier_id: Hardware named-barrier ID to use (defaults to 0).
     """
 
     @staticmethod

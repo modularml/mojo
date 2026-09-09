@@ -23,7 +23,7 @@ def test_buffer_copy(ctx: SHMEMContext) raises:
 
     var host_buffer = alloc[Float32](length)
     var host_buffer_2 = alloc[Float32](length)
-    var shmem_buffer = ctx.enqueue_create_buffer[DType.float32](length)
+    var shmem_buffer = ctx.enqueue_create_buffer[.float32](length)
 
     iota(host_buffer, length)
 

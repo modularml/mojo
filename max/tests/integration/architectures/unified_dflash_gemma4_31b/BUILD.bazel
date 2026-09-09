@@ -1,0 +1,41 @@
+load("//bazel:api.bzl", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "test_arch_registration",
+    size = "medium",
+    srcs = ["test_arch_registration.py"],
+    deps = [
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/unified_dflash_gemma4_31b",
+        "//max/python/max/pipelines/lib",
+    ],
+)
+
+modular_py_test(
+    name = "test_model_config",
+    size = "medium",
+    srcs = ["test_model_config.py"],
+    data = ["//max/tests/integration/architectures/unified_dflash_gemma4_31b/testdata"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/dflash_llama3",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/unified_dflash_gemma4_31b",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/weights",
+        requirement("numpy"),
+        requirement("transformers"),
+    ],
+)

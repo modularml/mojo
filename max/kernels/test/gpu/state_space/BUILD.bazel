@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -44,21 +45,117 @@ _EXTRA_CONSTRAINTS = {
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
+    "test_kda_chunk_parallel.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "test_kda_chunk_computebound.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "test_kda_gpu.mojo": select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    "test_kda_chunk_fwd.mojo": select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    "test_kda_decode_batch_independence.mojo": select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    "test_sm100_kda_prefill_m128.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "test_sm100_kda_prefill_m64.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "test_sm100_kda_bt16.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "test_kda_glm53_flash.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "bench_sm100_kda_prefill_m128.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "bench_sm100_kda_prefill_m64.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "bench_sm100_kda_bt16.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "bench_kda_chunk_parallel.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
 }
+
+_GPU_MEMORY = {
+    "test_gated_delta.mojo": "3",
+    "test_sm100_kda_prefill_m64.mojo": "8",
+    "test_sm100_kda_prefill_m128.mojo": "8",
+    "test_sm100_kda_bt16.mojo": "8",
+    "test_kda_glm53_flash.mojo": "8",
+    "bench_sm100_kda_prefill_m128.mojo": "8",
+    "bench_sm100_kda_prefill_m64.mojo": "8",
+    "bench_sm100_kda_bt16.mojo": "8",
+    "bench_kda_chunk_parallel.mojo": "8",
+}
+
+_KDA_DEPS = {
+    "test_kda_chunk_computebound.mojo": ["//Kernels/lib/kda"],
+    "test_kda_chunk_fwd.mojo": ["//Kernels/lib/kda"],
+    "test_kda_chunk_parallel.mojo": ["//Kernels/lib/kda"],
+    "test_kda_decode_batch_independence.mojo": ["//Kernels/lib/kda"],
+    "test_kda_gpu.mojo": ["//Kernels/lib/kda"],
+    "bench_kda_chunk_parallel.mojo": ["//Kernels/lib/kda"],
+    "bench_sm100_kda_bt16.mojo": ["//Kernels/lib/kda"],
+    "bench_sm100_kda_prefill_m128.mojo": ["//Kernels/lib/kda"],
+    "bench_sm100_kda_prefill_m64.mojo": ["//Kernels/lib/kda"],
+    "test_sm100_kda_prefill_m64.mojo": ["//Kernels/lib/kda"],
+    "test_sm100_kda_prefill_m128.mojo": ["//Kernels/lib/kda"],
+    "test_sm100_kda_bt16.mojo": ["//Kernels/lib/kda"],
+    "test_kda_glm53_flash.mojo": ["//Kernels/lib/kda"],
+}
+
+# The SM100 KDA ports carry the reference instruction stream; ASSERT=all
+# injects bounds-check printf machinery into their 512/1024-thread kernels
+# and spills them to local memory, so these targets opt out.
+_NO_ASSERTS = [
+    "test_sm100_kda_prefill_m64.mojo",
+    "test_sm100_kda_prefill_m128.mojo",
+    "test_sm100_kda_bt16.mojo",
+    "test_kda_glm53_flash.mojo",
+    "bench_sm100_kda_prefill_m128.mojo",
+    "bench_sm100_kda_prefill_m64.mojo",
+    "bench_sm100_kda_bt16.mojo",
+]
 
 [
     mojo_test(
         name = src + ".test",
         size = "large",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+        enable_assertions = src not in _NO_ASSERTS,
         exec_properties = {
-            "test.resources:gpu-memory": "2",
+            "test.resources:gpu-memory": _GPU_MEMORY.get(src, "2"),
         },
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []),
-        deps = [
+        deps = _KDA_DEPS.get(src, []) + [
             "//max:internal_utils",
             "//max:linalg",
+            "//max:testdata",
             "//max/kernels/src/state_space",
             "@mojo//:std",
         ],

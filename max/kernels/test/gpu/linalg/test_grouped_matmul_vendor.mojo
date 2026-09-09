@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     Idx,
@@ -61,8 +61,8 @@ def test_vendor[
     comptime K = expert_shape[1]
 
     # Total and max number of tokens
-    total_num_tokens = 0
-    max_num_tokens_by_expert = 0
+    var total_num_tokens = 0
+    var max_num_tokens_by_expert = 0
     for i in range(len(num_tokens_by_expert)):
         total_num_tokens += num_tokens_by_expert[i]
         max_num_tokens_by_expert = max(
@@ -79,8 +79,8 @@ def test_vendor[
     var b_host_ptr = alloc[Scalar[b_type]](b_size)
     var c_host_ptr = alloc[Scalar[c_type]](c_size)
     var c_ref_host_ptr = alloc[Scalar[c_type]](c_size)
-    var a_offsets_host_ptr = alloc[Scalar[DType.uint32]](num_active_experts + 1)
-    var expert_ids_host_ptr = alloc[Scalar[DType.int32]](num_active_experts)
+    var a_offsets_host_ptr = alloc[UInt32](num_active_experts + 1)
+    var expert_ids_host_ptr = alloc[Int32](num_active_experts)
 
     var a_host = TileTensor(
         a_host_ptr,
@@ -101,11 +101,11 @@ def test_vendor[
 
     # Create host TileTensors for offsets and expert_ids
     var a_offsets_host = TileTensor(
-        a_offsets_host_ptr.as_any_origin(),
+        a_offsets_host_ptr.as_unsafe_any_origin(),
         row_major(Coord(num_active_experts + 1)),
     )
     var expert_ids_host = TileTensor(
-        expert_ids_host_ptr.as_any_origin(),
+        expert_ids_host_ptr.as_unsafe_any_origin(),
         row_major(Coord(num_active_experts)),
     )
 
@@ -126,10 +126,10 @@ def test_vendor[
     var b_dev_buffer = ctx.enqueue_create_buffer[b_type](b_size)
     var c_dev_buffer = ctx.enqueue_create_buffer[c_type](c_size)
     var c_ref_dev_buffer = ctx.enqueue_create_buffer[c_type](c_size)
-    var a_offsets_dev_buffer = ctx.enqueue_create_buffer[DType.uint32](
+    var a_offsets_dev_buffer = ctx.enqueue_create_buffer[.uint32](
         num_active_experts + 1
     )
-    var expert_ids_dev_buffer = ctx.enqueue_create_buffer[DType.int32](
+    var expert_ids_dev_buffer = ctx.enqueue_create_buffer[.int32](
         num_active_experts
     )
 
@@ -194,7 +194,7 @@ def test_vendor[
     ctx.synchronize()
 
     # Verify results
-    rtol = 1e-2
+    var rtol = 1e-2
     for m in range(total_num_tokens):
         for n in range(N):
             var expect = c_ref_host[m, n][0]
@@ -255,8 +255,8 @@ def test_negative_lora_id_vendor[
     comptime K = expert_shape[1]
 
     # Total and max number of tokens
-    total_num_tokens = 0
-    max_num_tokens_by_expert = 0
+    var total_num_tokens = 0
+    var max_num_tokens_by_expert = 0
     for i in range(len(num_tokens_by_expert)):
         total_num_tokens += num_tokens_by_expert[i]
         max_num_tokens_by_expert = max(
@@ -272,8 +272,8 @@ def test_negative_lora_id_vendor[
     var a_host_ptr = alloc[Scalar[a_type]](a_size)
     var b_host_ptr = alloc[Scalar[b_type]](b_size)
     var c_host_ptr = alloc[Scalar[c_type]](c_size)
-    var a_offsets_host_ptr = alloc[Scalar[DType.uint32]](num_active_experts + 1)
-    var expert_ids_host_ptr = alloc[Scalar[DType.int32]](num_active_experts)
+    var a_offsets_host_ptr = alloc[UInt32](num_active_experts + 1)
+    var expert_ids_host_ptr = alloc[Int32](num_active_experts)
 
     var a_host = TileTensor(
         a_host_ptr,
@@ -290,11 +290,11 @@ def test_negative_lora_id_vendor[
 
     # Create host TileTensors for offsets and expert_ids
     var a_offsets_host = TileTensor(
-        a_offsets_host_ptr.as_any_origin(),
+        a_offsets_host_ptr.as_unsafe_any_origin(),
         row_major(Coord(num_active_experts + 1)),
     )
     var expert_ids_host = TileTensor(
-        expert_ids_host_ptr.as_any_origin(),
+        expert_ids_host_ptr.as_unsafe_any_origin(),
         row_major(Coord(num_active_experts)),
     )
 
@@ -314,10 +314,10 @@ def test_negative_lora_id_vendor[
     var a_dev_buffer = ctx.enqueue_create_buffer[a_type](a_size)
     var b_dev_buffer = ctx.enqueue_create_buffer[b_type](b_size)
     var c_dev_buffer = ctx.enqueue_create_buffer[c_type](c_size)
-    var a_offsets_dev_buffer = ctx.enqueue_create_buffer[DType.uint32](
+    var a_offsets_dev_buffer = ctx.enqueue_create_buffer[.uint32](
         num_active_experts + 1
     )
-    var expert_ids_dev_buffer = ctx.enqueue_create_buffer[DType.int32](
+    var expert_ids_dev_buffer = ctx.enqueue_create_buffer[.int32](
         num_active_experts
     )
 
@@ -428,23 +428,23 @@ def main() raises:
     with DeviceContext() as ctx:
         # Single matmul
         test_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=1,
             expert_shape=Index(256, 256),
         ](1, [128], [0], ctx)
 
         test_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=1,
             expert_shape=Index(512, 1024),
         ](1, [256], [0], ctx)
 
         # Multiple matmuls selecting part of experts
         test_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=4,
             expert_shape=Index(768, 1024),
         ](2, [128, 256], [0, 2], ctx)
@@ -452,8 +452,8 @@ def main() raises:
         # Multiple matmuls selecting part of experts
         # num_tokens not multiple of tile size
         test_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=6,
             expert_shape=Index(1280, 1024),
         ](4, [27, 1500, 300, 150], [0, 3, 2, 4], ctx)
@@ -462,40 +462,40 @@ def main() raises:
         # num_tokens not multiple of tile size
         # expert N dimension not multiple of 256
         test_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=6,
             expert_shape=Index(192, 1024),
         ](4, [27, 1500, 300, 150], [0, 3, 2, 4], ctx)
 
         # Test that expert id of -1 results in 0s in the output
         test_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=2,
             expert_shape=Index(256, 512),
         ](2, [64, 128], [0, -1], ctx)
 
         # Test negative lora_id behavior with vendor matmul
         test_negative_lora_id_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=2,
             expert_shape=Index(256, 512),
         ](2, [64, 128], [0, -1], ctx)
 
         # Additional test cases for different data types
         test_vendor[
-            DType.float32,
-            DType.float32,
+            .float32,
+            .float32,
             num_experts=3,
             expert_shape=Index(384, 768),
         ](2, [100, 200], [1, 2], ctx)
 
         # Test with mixed valid and invalid expert ids
         test_vendor[
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
             num_experts=4,
             expert_shape=Index(512, 512),
         ](3, [50, 100, 75], [0, -1, 2], ctx)

@@ -20,6 +20,7 @@ from std.collections import Optional
 
 import std.benchmark
 from layout import Coord, Idx, TileTensor, row_major
+from layout.tensor_engine import DefaultEngine
 from std.memory import alloc
 from linalg.bmm import batched_matmul
 from linalg.matmul import matmul
@@ -41,19 +42,18 @@ comptime some_constant = 20
 comptime do_benchmarking = False
 
 
-@parameter
-def bench_run[
-    func: def() raises capturing[_] -> None
-]() raises -> std.benchmark.Report:
-    return std.benchmark.run[func3=func](2, 1_000_000, 1, 3)
+def bench_run(
+    func: Some[ImplicitlyCopyable & (def() raises)],
+) raises -> std.benchmark.Report:
+    return std.benchmark.run(func, 2, 1_000_000, 1, 3)
 
 
 def gemm_naive[
-    transpose_b: Bool, element_size: Int
+    transpose_b: Bool
 ](
-    a: TileTensor[element_size=element_size, ...],
-    b: TileTensor[element_size=element_size, ...],
-    c: TileTensor[mut=True, element_size=element_size, ...],
+    a: TileTensor[Engine=DefaultEngine[element_width=1], ...],
+    b: TileTensor[Engine=DefaultEngine[element_width=1], ...],
+    c: TileTensor[mut=True, Engine=DefaultEngine[element_width=1], ...],
     m: Int,
     n: Int,
     k: Int,
@@ -72,11 +72,11 @@ def gemm_naive[
 
 
 def gemm_naive_elementwise[
-    transpose_b: Bool, element_size: Int
+    transpose_b: Bool
 ](
-    a: TileTensor[element_size=element_size, ...],
-    b: TileTensor[element_size=element_size, ...],
-    c: TileTensor[mut=True, element_size=element_size, ...],
+    a: TileTensor[Engine=DefaultEngine[element_width=1], ...],
+    b: TileTensor[Engine=DefaultEngine[element_width=1], ...],
+    c: TileTensor[mut=True, Engine=DefaultEngine[element_width=1], ...],
     m: Int,
     n: Int,
     k: Int,
@@ -100,8 +100,6 @@ def gemm_naive_elementwise[
 
 
 def test_matmul[
-    element_size: Int,
-    //,
     a_type: DType,
     b_type: DType,
     c_type: DType,
@@ -112,29 +110,29 @@ def test_matmul[
     c: TileTensor[
         mut=True,
         c_type,
-        element_size=element_size,
-        address_space=AddressSpace.GENERIC,
+        Engine=DefaultEngine[element_width=1],
+        address_space=.GENERIC,
         ...,
     ],
     a: TileTensor[
         mut=False,
         a_type,
-        element_size=element_size,
-        address_space=AddressSpace.GENERIC,
+        Engine=DefaultEngine[element_width=1],
+        address_space=.GENERIC,
         ...,
     ],
     b: TileTensor[
         mut=False,
         b_type,
-        element_size=element_size,
-        address_space=AddressSpace.GENERIC,
+        Engine=DefaultEngine[element_width=1],
+        address_space=.GENERIC,
         ...,
     ],
     bp: TileTensor[
         mut=True,
         b_type,
-        element_size=element_size,
-        address_space=AddressSpace.GENERIC,
+        Engine=DefaultEngine[element_width=1],
+        address_space=.GENERIC,
         ...,
     ],
     m: Int,
@@ -144,7 +142,9 @@ def test_matmul[
 ) raises -> Int:
     var c1_ptr = alloc[Scalar[c_type]](m * n, alignment=alignment)
     var golden_shape = row_major(Coord(m, n))
-    var golden = TileTensor[element_size=element_size](c1_ptr, golden_shape)
+    var golden = TileTensor[Engine=DefaultEngine[element_width=1]](
+        c1_ptr, golden_shape
+    )
     for i in range(m):
         for j in range(n):
             golden[i, j] = 0
@@ -168,9 +168,7 @@ def test_matmul[
                 pack_transposed_b_ndbuffer[a_type, c_type](b, bp)
 
     @always_inline
-    @__copy_capture(c, a, bp)
-    @parameter
-    def bench_fn_matmul() raises:
+    def bench_fn_matmul() raises {var}:
         if kernel_type_m != 0:
             _matmul_cpu[
                 transpose_b=transpose_b,
@@ -192,7 +190,7 @@ def test_matmul[
     bench_fn_matmul()
 
     comptime if do_benchmarking:
-        var matmul_perf = bench_run[bench_fn_matmul]()
+        var matmul_perf = bench_run(bench_fn_matmul)
         std.benchmark.keep(c[Coord(Idx[0], Idx[0])])
         print(
             "Apple Matmul GFLOP/s for (M, N, K) = (",
@@ -239,7 +237,7 @@ def test_matmul[
 
 
 def test_matmul[
-    lambdas_have_fusion: Bool,
+    has_epilogue_fusion: Bool,
     *,
     a_type: DType,
     b_type: DType,
@@ -302,15 +300,15 @@ def test_matmul[
         for j in range(n):
             c[i, j] = 0
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(c)
     def epilogue_fn[
-        _type: DType, width: SIMDSize, *, alignment: Int = 1
+        _type: DType, width: SIMDLength, *, alignment: Int = 1
     ](idx: IndexList[2], val: SIMD[_type, width]) -> None:
         c.store(Coord(idx), rebind[SIMD[c_type, width]](val + some_constant))
 
-    comptime if lambdas_have_fusion:
+    comptime if has_epilogue_fusion:
         errors = test_matmul[
             a_type,
             b_type,
@@ -363,7 +361,7 @@ def test_shapes[
     b_packed: Bool,
     mixed_kernels: Bool,
 ]() raises:
-    @parameter
+    @__parameter
     def test_shapes_helper[
         transpose_b: Bool = False
     ](m: Int, n: Int, k: Int) raises:
@@ -436,9 +434,9 @@ def test_types[b_packed: Bool, mixed_kernels: Bool]() raises:
 
 
 def bmm_naive(
-    c: TileTensor[mut=True, element_size=1, ...],
-    a: TileTensor[element_size=1, ...],
-    b: TileTensor[element_size=1, ...],
+    c: TileTensor[mut=True, Engine=DefaultEngine[element_width=1], ...],
+    a: TileTensor[Engine=DefaultEngine[element_width=1], ...],
+    b: TileTensor[Engine=DefaultEngine[element_width=1], ...],
     batches: Int,
     m: Int,
     n: Int,
@@ -471,13 +469,22 @@ def test_batched_matmul[
     has_lambda: Bool
 ](
     c: TileTensor[
-        mut=True, address_space=AddressSpace.GENERIC, element_size=1, ...
+        mut=True,
+        address_space=.GENERIC,
+        Engine=DefaultEngine[element_width=1],
+        ...,
     ],
     a: TileTensor[
-        mut=True, address_space=AddressSpace.GENERIC, element_size=1, ...
+        mut=True,
+        address_space=.GENERIC,
+        Engine=DefaultEngine[element_width=1],
+        ...,
     ],
     b: TileTensor[
-        mut=True, address_space=AddressSpace.GENERIC, element_size=1, ...
+        mut=True,
+        address_space=.GENERIC,
+        Engine=DefaultEngine[element_width=1],
+        ...,
     ],
     batches: Int,
     m: Int,
@@ -509,12 +516,12 @@ def test_batched_matmul[
                 c[batch, i, j] = 0
                 golden[batch, i, j] = 0
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(c)
     def epilogue_fn[
         _type: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         rank: Int,
         *,
         alignment: Int = 1,
@@ -525,9 +532,7 @@ def test_batched_matmul[
         )
 
     @always_inline
-    @__copy_capture(c, a, b)
-    @parameter
-    def bench_fn_batched_matmul() raises:
+    def bench_fn_batched_matmul() raises {var}:
         comptime if has_lambda:
             batched_matmul[
                 transpose_a=False,
@@ -543,7 +548,7 @@ def test_batched_matmul[
     bench_fn_batched_matmul()
 
     comptime if do_benchmarking:
-        var batched_matmul_perf = bench_run[bench_fn_batched_matmul]()
+        var batched_matmul_perf = bench_run(bench_fn_batched_matmul)
         std.benchmark.keep(c[Coord(Idx[0], Idx[0], Idx[0])])
         print(
             "Apple Batched Matmul GFLOP/s for (BATCHES, M, N, K) = (",

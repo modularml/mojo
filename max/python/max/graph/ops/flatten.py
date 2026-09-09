@@ -18,25 +18,45 @@ from ..value import TensorValue, TensorValueLike
 def flatten(
     x: TensorValueLike, start_dim: int = 0, end_dim: int = -1
 ) -> TensorValue:
-    """Flattens the specified dims of a symbolic tensor.
+    """Flattens the specified dimensions of a symbolic tensor.
 
-    The number and order of the elements in the tensor is unchanged.
-    All dimensions from ``start_dim`` to ``end_dim`` (inclusive) are merged
-    into a single output dim.
+    This does not change the order or total number of elements in the tensor.
+    All dimensions from ``start_dim`` to ``end_dim`` (inclusive) are merged into
+    a single output dimension.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("flatten") as graph:
+            # x has shape (2, 2, 2).
+            x = ops.constant(
+                [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+                DType.float32,
+                device=device,
+            )
+            # Merge dimensions 1 and 2 into one, producing shape (2, 4).
+            graph.output(ops.flatten(x, start_dim=1))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
         x: The input symbolic tensor to flatten.
         start_dim: The first dimension to flatten. Supports negative indexing.
-            Defaults to 0.
+            Defaults to ``0``.
         end_dim: The last dimension to flatten (inclusive). Supports negative
-            indexing. Defaults to -1.
+            indexing. Defaults to ``-1``.
 
     Returns:
-        A symbolic tensor with the same elements as the input, but with
-        dimensions ``start_dim`` through ``end_dim`` merged into one.
+        A ``TensorValue`` representing the ``start_dim`` through ``end_dim``
+        of ``x`` merged into one dimension.
 
     Raises:
-        IndexError: If ``start_dim`` or ``end_dim`` are out of range.
+        IndexError: If ``start_dim`` or ``end_dim`` is out of range.
         ValueError: If ``start_dim`` comes after ``end_dim``.
     """
     x = TensorValue(x)

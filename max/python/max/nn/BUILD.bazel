@@ -5,6 +5,11 @@ package(default_visibility = ["//max:consumers"])
 modular_py_library(
     name = "nn",
     srcs = glob(["**/*.py"]),
+    # max.experimental.nn is imported only by a docstring example in
+    # __init__.py; it depends back on this target, so keep it out of `deps`.
+    docstring_example_deps = [
+        "//max/python/max/experimental/nn",
+    ],
     # rich is used as a runtime protocol (_rich_traceback_omit) not via import.
     # //max/python/max:tensor is an alias for //max/python/max/experimental;
     # the pydeps tool resolves the alias so it appears as an unused dep since
@@ -13,10 +18,12 @@ modular_py_library(
         requirement("rich"),
         "//max/python/max/experimental",
     ],
+    test_docstring_examples = True,
     deps = [
         requirement("numpy"),
         requirement("rich"),
         requirement("typing-extensions"),
+        "//max/python/max:_core",
         "//max/python/max:tensor",
         "//max/python/max/_kv_cache_ops",
         "//max/python/max/driver",

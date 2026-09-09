@@ -45,14 +45,17 @@ from max.graph.weights import load_weights
 from max.pipelines.architectures.qwen3.text_encoder import (
     Qwen3TextEncoderKleinModel,
 )
-from max.pipelines.core import PixelContext
+from max.pipelines.context import PixelContext
 from max.pipelines.diffusion.cache import (
-    DenoisingCacheConfig,
     TaylorSeerBufferState,
     TaylorSeerCache,
 )
+from max.pipelines.diffusion.config import DenoisingCacheConfig
 from max.pipelines.lib import float32_array_to_buffer
 from max.pipelines.lib.compiled_component import CompiledComponent
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.pipelines.lib.pipeline_executor import PipelineExecutor
 from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
@@ -212,10 +215,6 @@ class Flux2KleinExecutor(
 
     _DEFAULT_VAE_SCALE_FACTOR: int = 8
 
-    _DEFAULT_TAYLORSEER_CACHE_INTERVAL: int = 5
-    _DEFAULT_TAYLORSEER_WARMUP_STEPS: int = 9
-    _DEFAULT_TAYLORSEER_MAX_ORDER: int = 1
-
     def __init__(
         self,
         manifest: ModelManifest,
@@ -228,7 +227,6 @@ class Flux2KleinExecutor(
         self._cache_config: DenoisingCacheConfig = (
             runtime_config.denoising_cache
         )
-        self._resolve_cache_defaults()
 
         vae_config = (
             manifest["vae"].huggingface_config.to_dict()
@@ -243,7 +241,10 @@ class Flux2KleinExecutor(
         )
 
         transformer_config = manifest["transformer"]
-        encoding = transformer_config.quantization_encoding or "bfloat16"
+        resolved_transformer_encoding, _ = (
+            _resolve_component_encoding_and_weights(transformer_config)
+        )
+        encoding = resolved_transformer_encoding or "bfloat16"
         self._model_dtype: DType = (
             DType.bfloat16
             if encoding == "float4_e2m1fnx2"
@@ -263,11 +264,18 @@ class Flux2KleinExecutor(
         text_encoder_entry = manifest["text_encoder"]
         text_encoder_devices = load_devices(text_encoder_entry.device_specs)
         self._text_encoder_device: Device = text_encoder_devices[0]
+        resolved_te_encoding, resolved_te_weight_path = (
+            _resolve_component_encoding_and_weights(text_encoder_entry)
+        )
         self.text_encoder = Qwen3TextEncoderKleinModel(
             config=text_encoder_entry.huggingface_config.to_dict(),
-            encoding=text_encoder_entry.quantization_encoding or "bfloat16",
+            encoding=resolved_te_encoding or "bfloat16",
             devices=text_encoder_devices,
-            weights=load_weights(text_encoder_entry.resolved_weight_paths()),
+            weights=load_weights(
+                text_encoder_entry.resolved_weight_paths(
+                    resolved_te_weight_path
+                )
+            ),
             session=session,
         )
 
@@ -351,18 +359,6 @@ class Flux2KleinExecutor(
                 device=self._model_device,
                 session=session,
             )
-
-    def _resolve_cache_defaults(self) -> None:
-        """Fill nullable DenoisingCacheConfig fields with Flux2 defaults."""
-        cc = self._cache_config
-        if cc.taylorseer_cache_interval is None:
-            cc.taylorseer_cache_interval = (
-                self._DEFAULT_TAYLORSEER_CACHE_INTERVAL
-            )
-        if cc.taylorseer_warmup_steps is None:
-            cc.taylorseer_warmup_steps = self._DEFAULT_TAYLORSEER_WARMUP_STEPS
-        if cc.taylorseer_max_order is None:
-            cc.taylorseer_max_order = self._DEFAULT_TAYLORSEER_MAX_ORDER
 
     @traced(message="Flux2KleinExecutor.prepare_inputs")
     def prepare_inputs(

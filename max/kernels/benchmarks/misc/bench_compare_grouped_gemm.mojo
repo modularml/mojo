@@ -24,6 +24,7 @@ kernel processes all groups in a single persistent launch.
 
 from std.math import ceildiv
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -31,8 +32,8 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.gpu.host import DeviceContext
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 from std.random import rand, seed
 from std.utils import Index
 from layout import CoordLike, Coord, Idx, TileTensor, row_major
@@ -156,13 +157,19 @@ def bench_cublas_per_group[
         2 * Int(m.value()) * Int(n.value()) * Int(k.value()) * num_groups
     )
 
-    @parameter
-    @__copy_capture(a_tensor, b_tensor, c_tensor, sfa_tensor, sfb_tensor)
     @always_inline
-    def bench_func(mut bencher: Bencher):
-        @parameter
+    def bench_func(
+        mut bencher: Bencher,
+    ) {
+        var a_tensor,
+        var b_tensor,
+        var c_tensor,
+        var sfa_tensor,
+        var sfb_tensor,
+        imm,
+    }:
         @always_inline
-        def kernel_launch(ctx: DeviceContext, iteration: Int) raises:
+        def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             # Call cuBLAS once per group (sequential)
             for _g in range(num_groups):
                 vendor_blas.matmul(
@@ -176,11 +183,12 @@ def bench_cublas_per_group[
                     c_row_major=True,
                 )
 
-        bencher.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(bencher, kernel_launch, ctx)
 
     var fmt = String("NVFP4") if is_fp4 else String("MXFP8")
 
-    bench.bench_function[bench_func](
+    bench.bench_function(
+        bench_func,
         BenchId(
             String(
                 "cuBLAS(",
@@ -338,11 +346,11 @@ def bench_structured_kernel[
         length=max_groups, fill=UInt64(Int(sfb_device.unsafe_ptr()))
     )
 
-    var a_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var b_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var c_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var sfa_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var sfb_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
+    var a_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var b_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var c_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var sfa_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var sfb_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
 
     ctx.enqueue_copy(a_ptrs_device, a_ptrs_host)
     ctx.enqueue_copy(b_ptrs_device, b_ptrs_host)
@@ -402,26 +410,26 @@ def bench_structured_kernel[
         2 * Int(m.value()) * Int(n.value()) * Int(k.value()) * num_groups
     )
 
-    @parameter
-    @__copy_capture(
-        a_ptrs_tensor,
-        b_ptrs_tensor,
-        c_ptrs_tensor,
-        sfa_ptrs_tensor,
-        sfb_ptrs_tensor,
-        problem_sizes_tensor,
-        a_template,
-        b_template,
-        c_template,
-        sfa_template,
-        sfb_template,
-        total_tiles,
-    )
     @always_inline
-    def bench_func(mut bencher: Bencher):
-        @parameter
+    def bench_func(
+        mut bencher: Bencher,
+    ) {
+        var a_ptrs_tensor,
+        var b_ptrs_tensor,
+        var c_ptrs_tensor,
+        var sfa_ptrs_tensor,
+        var sfb_ptrs_tensor,
+        var problem_sizes_tensor,
+        var a_template,
+        var b_template,
+        var c_template,
+        var sfa_template,
+        var sfb_template,
+        var total_tiles,
+        imm,
+    }:
         @always_inline
-        def kernel_launch(ctx: DeviceContext, iteration: Int) raises:
+        def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_block_scaled_matmul[
                 transpose_b=transpose_b,
                 max_groups=max_groups,
@@ -443,11 +451,12 @@ def bench_structured_kernel[
                 ctx,
             )
 
-        bencher.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(bencher, kernel_launch, ctx)
 
     var fmt = String("NVFP4") if is_fp4 else String("MXFP8")
 
-    bench.bench_function[bench_func](
+    bench.bench_function(
+        bench_func,
         BenchId(
             String(
                 "STRUCTURED(",

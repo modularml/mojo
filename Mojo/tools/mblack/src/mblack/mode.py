@@ -1,0 +1,276 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+
+# ===----------------------------------------------------------------------=== #
+#
+# File originates from:
+#   Repo:   git@github.com:psf/black.git
+#   Commit: d4a85643a465f5fae2113d07d22d021d4af4795a
+#   Path:   src/black/mode.py
+#
+# ===----------------------------------------------------------------------=== #
+
+"""Data structures configuring Black behavior.
+
+Mostly around Python language feature support per version and Black configuration
+chosen by the user.
+"""
+
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from hashlib import sha256
+from operator import attrgetter
+from typing import Final
+from warnings import warn
+
+from mblack.const import DEFAULT_LINE_LENGTH
+
+
+class TargetVersion(Enum):
+    PY33 = 3
+    PY34 = 4
+    PY35 = 5
+    PY36 = 6
+    PY37 = 7
+    PY38 = 8
+    PY39 = 9
+    PY310 = 10
+    PY311 = 11
+    MOJO = 99
+
+
+class Feature(Enum):
+    F_STRINGS = 2
+    NUMERIC_UNDERSCORES = 3
+    TRAILING_COMMA_IN_CALL = 4
+    TRAILING_COMMA_IN_DEF = 5
+    # The following two feature-flags are mutually exclusive, and exactly one should be
+    # set for every version of python.
+    ASYNC_IDENTIFIERS = 6
+    ASYNC_KEYWORDS = 7
+    ASSIGNMENT_EXPRESSIONS = 8
+    POS_ONLY_ARGUMENTS = 9
+    RELAXED_DECORATORS = 10
+    PATTERN_MATCHING = 11
+    UNPACKING_ON_FLOW = 12
+    ANN_ASSIGN_EXTENDED_RHS = 13
+    EXCEPT_STAR = 14
+    VARIADIC_GENERICS = 15
+    DEBUG_F_STRINGS = 16
+    FORCE_OPTIONAL_PARENTHESES = 50
+
+    # __future__ flags
+    FUTURE_ANNOTATIONS = 51
+
+
+FUTURE_FLAG_TO_FEATURE: Final = {
+    "annotations": Feature.FUTURE_ANNOTATIONS,
+}
+
+
+VERSION_TO_FEATURES: dict[TargetVersion, set[Feature]] = {
+    TargetVersion.PY33: {Feature.ASYNC_IDENTIFIERS},
+    TargetVersion.PY34: {Feature.ASYNC_IDENTIFIERS},
+    TargetVersion.PY35: {
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.ASYNC_IDENTIFIERS,
+    },
+    TargetVersion.PY36: {
+        Feature.F_STRINGS,
+        Feature.NUMERIC_UNDERSCORES,
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.TRAILING_COMMA_IN_DEF,
+        Feature.ASYNC_IDENTIFIERS,
+    },
+    TargetVersion.PY37: {
+        Feature.F_STRINGS,
+        Feature.NUMERIC_UNDERSCORES,
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.TRAILING_COMMA_IN_DEF,
+        Feature.ASYNC_KEYWORDS,
+        Feature.FUTURE_ANNOTATIONS,
+    },
+    TargetVersion.PY38: {
+        Feature.F_STRINGS,
+        Feature.DEBUG_F_STRINGS,
+        Feature.NUMERIC_UNDERSCORES,
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.TRAILING_COMMA_IN_DEF,
+        Feature.ASYNC_KEYWORDS,
+        Feature.FUTURE_ANNOTATIONS,
+        Feature.ASSIGNMENT_EXPRESSIONS,
+        Feature.POS_ONLY_ARGUMENTS,
+        Feature.UNPACKING_ON_FLOW,
+        Feature.ANN_ASSIGN_EXTENDED_RHS,
+    },
+    TargetVersion.PY39: {
+        Feature.F_STRINGS,
+        Feature.DEBUG_F_STRINGS,
+        Feature.NUMERIC_UNDERSCORES,
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.TRAILING_COMMA_IN_DEF,
+        Feature.ASYNC_KEYWORDS,
+        Feature.FUTURE_ANNOTATIONS,
+        Feature.ASSIGNMENT_EXPRESSIONS,
+        Feature.RELAXED_DECORATORS,
+        Feature.POS_ONLY_ARGUMENTS,
+        Feature.UNPACKING_ON_FLOW,
+        Feature.ANN_ASSIGN_EXTENDED_RHS,
+    },
+    TargetVersion.PY310: {
+        Feature.F_STRINGS,
+        Feature.DEBUG_F_STRINGS,
+        Feature.NUMERIC_UNDERSCORES,
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.TRAILING_COMMA_IN_DEF,
+        Feature.ASYNC_KEYWORDS,
+        Feature.FUTURE_ANNOTATIONS,
+        Feature.ASSIGNMENT_EXPRESSIONS,
+        Feature.RELAXED_DECORATORS,
+        Feature.POS_ONLY_ARGUMENTS,
+        Feature.UNPACKING_ON_FLOW,
+        Feature.ANN_ASSIGN_EXTENDED_RHS,
+        Feature.PATTERN_MATCHING,
+    },
+    TargetVersion.PY311: {
+        Feature.F_STRINGS,
+        Feature.DEBUG_F_STRINGS,
+        Feature.NUMERIC_UNDERSCORES,
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.TRAILING_COMMA_IN_DEF,
+        Feature.ASYNC_KEYWORDS,
+        Feature.FUTURE_ANNOTATIONS,
+        Feature.ASSIGNMENT_EXPRESSIONS,
+        Feature.RELAXED_DECORATORS,
+        Feature.POS_ONLY_ARGUMENTS,
+        Feature.UNPACKING_ON_FLOW,
+        Feature.ANN_ASSIGN_EXTENDED_RHS,
+        Feature.PATTERN_MATCHING,
+        Feature.EXCEPT_STAR,
+        Feature.VARIADIC_GENERICS,
+    },
+    TargetVersion.MOJO: {
+        Feature.F_STRINGS,
+        Feature.DEBUG_F_STRINGS,
+        Feature.NUMERIC_UNDERSCORES,
+        Feature.TRAILING_COMMA_IN_CALL,
+        Feature.TRAILING_COMMA_IN_DEF,
+        Feature.ASYNC_KEYWORDS,
+        Feature.FUTURE_ANNOTATIONS,
+        Feature.ASSIGNMENT_EXPRESSIONS,
+        Feature.RELAXED_DECORATORS,
+        Feature.POS_ONLY_ARGUMENTS,
+        Feature.UNPACKING_ON_FLOW,
+        Feature.ANN_ASSIGN_EXTENDED_RHS,
+        Feature.PATTERN_MATCHING,
+        Feature.EXCEPT_STAR,
+        Feature.VARIADIC_GENERICS,
+    },
+}
+
+
+def supports_feature(
+    target_versions: set[TargetVersion], feature: Feature
+) -> bool:
+    return all(
+        feature in VERSION_TO_FEATURES[version] for version in target_versions
+    )
+
+
+class Preview(Enum):
+    """Individual preview style features."""
+
+    annotation_parens = auto()
+    empty_lines_before_class_or_def_with_leading_comments = auto()
+    handle_trailing_commas_in_head = auto()
+    long_docstring_quotes_on_newline = auto()
+    normalize_docstring_quotes_and_prefixes_properly = auto()
+    one_element_subscript = auto()
+    remove_block_trailing_newline = auto()
+    remove_redundant_parens = auto()
+    string_processing = auto()
+    skip_magic_trailing_comma_in_subscript = auto()
+
+
+class Deprecated(UserWarning):
+    """Visible deprecation warning."""
+
+
+@dataclass
+class Mode:
+    target_versions: set[TargetVersion] = field(default_factory=set)
+    line_length: int = DEFAULT_LINE_LENGTH
+    string_normalization: bool = True
+    is_pyi: bool = False
+    is_ipynb: bool = False
+    is_mojo: bool = False
+    skip_source_first_line: bool = False
+    magic_trailing_comma: bool = True
+    experimental_string_processing: bool = False
+    python_cell_magics: set[str] = field(default_factory=set)
+    preview: bool = False
+
+    def __post_init__(self) -> None:
+        if self.experimental_string_processing:
+            warn(
+                "`experimental string processing` has been included in"
+                " `preview` and deprecated. Use `preview` instead.",
+                Deprecated,
+            )
+
+    def __contains__(self, feature: Preview) -> bool:
+        """
+        Provide `Preview.FEATURE in Mode` syntax that mirrors the ``preview`` flag.
+
+        The argument is not checked and features are not differentiated.
+        They only exist to make development easier by clarifying intent.
+        """
+        if feature is Preview.string_processing:
+            return self.preview or self.experimental_string_processing
+        # In Mojo mode, always respect trailing commas in the head component
+        # of bracket splits. Without this, trailing commas in struct
+        # parameters like `struct S[A,](T):` are ignored when conformances
+        # cause the first split to put parameters in the head.
+        if feature is Preview.handle_trailing_commas_in_head:
+            return (
+                self.preview
+                or self.is_mojo
+                or TargetVersion.MOJO in self.target_versions
+            )
+        return self.preview
+
+    def get_cache_key(self) -> str:
+        if self.target_versions:
+            version_str = ",".join(
+                str(version.value)
+                for version in sorted(
+                    self.target_versions, key=attrgetter("value")
+                )
+            )
+        else:
+            version_str = "-"
+        parts = [
+            version_str,
+            str(self.line_length),
+            str(int(self.string_normalization)),
+            str(int(self.is_pyi)),
+            str(int(self.is_ipynb)),
+            str(int(self.skip_source_first_line)),
+            str(int(self.magic_trailing_comma)),
+            str(int(self.experimental_string_processing)),
+            str(int(self.preview)),
+            sha256(
+                (",".join(sorted(self.python_cell_magics))).encode()
+            ).hexdigest(),
+        ]
+        return ".".join(parts)

@@ -30,16 +30,16 @@ from std.math import ceildiv
 from std.math.uutils import ufloordiv, umod
 from std.sys import size_of
 
-from std.gpu import WARP_SIZE, thread_idx
-from std.gpu.memory import AddressSpace, external_memory, fence_mbarrier_init
-from std.gpu.primitives.cluster import (
+from max.gpu import WARP_SIZE, thread_idx
+from max.gpu.memory import external_memory, fence_mbarrier_init
+from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
     cluster_sync,
     elect_one_sync,
     elect_one_sync_with_mask,
 )
-from std.gpu.sync import named_barrier, syncwarp
-from layout import TensorLayout, TileTensor
+from max.gpu.sync import named_barrier, syncwarp
+from layout import DefaultEngine, TensorLayout, TensorEngine, TileTensor
 from structured_kernels.tile_types import (
     TmaOpType,
     static_row_major,
@@ -109,6 +109,11 @@ struct BlockwiseFP8_1D2DMatmulKernel[
     static_K: Int,
     # Cluster shape
     cluster_shape: StaticTuple[Int32, 3] = StaticTuple[Int32, 3](1),
+    b_scales_engine: TensorEngine = DefaultEngine[element_width=1],
+    c_device_engine: TensorEngine = DefaultEngine[element_width=1],
+    offsets_engine: TensorEngine = DefaultEngine[element_width=1],
+    expert_ids_engine: TensorEngine = DefaultEngine[element_width=1],
+    expert_scales_engine: TensorEngine = DefaultEngine[element_width=1],
 ]:
     """Blockwise FP8 1D2D matmul kernel with register-based accumulation.
 
@@ -117,6 +122,35 @@ struct BlockwiseFP8_1D2DMatmulKernel[
 
     Uses 3-warp specialization (Load, MMA, Epilogue) with grid-constant TMAs.
     Work distribution via GroupedWorkIterator1D1D using offset-based addressing.
+
+    Parameters:
+        a_type: Element `DType` of the A input matrix.
+        b_type: Element `DType` of the B input matrix.
+        c_type: Element `DType` of the output C matrix.
+        a_scales_type: Element `DType` of the A-side blockwise scales;
+            must match `b_scales_type`.
+        b_scales_type: Element `DType` of the B-side blockwise scales;
+            must match `a_scales_type`.
+        b_scales_layout: Device `TensorLayout` of the B-scales `TileTensor`,
+            read from GMEM (not via TMA).
+        c_device_layout: Device `TensorLayout` of the output C `TileTensor`
+            used for bounds-checked stores.
+        transpose_b: Whether B is stored transposed; must be `True`.
+        config: Compile-time `MatmulConfig` carrying tile shapes, swizzles,
+            pipeline stage counts, and cluster shape.
+        static_N: Compile-time-known per-expert N dimension (output width,
+            columns of B).
+        static_K: Compile-time-known K contraction dimension; sets the
+            B-scales row stride as `static_K // 128`.
+        cluster_shape: Thread block cluster shape as a
+            `StaticTuple[Int32, 3]` (defaults to `(1, 1, 1)`).
+        b_scales_engine: Engine of the B-scales `TileTensor`.
+        c_device_engine: Engine of the output C `TileTensor`.
+        offsets_engine: Engine of the per-expert offsets
+            `TileTensor`.
+        expert_ids_engine: Engine of the expert-IDs `TileTensor`.
+        expert_scales_engine: Engine of the expert-scales
+            `TileTensor`.
     """
 
     # ========== Derived Constants ==========
@@ -342,6 +376,9 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         tile_shape=Self.config.block_tile_shape,
         cluster=Self.config.cluster_shape,
         cta_group=Self.cta_group,
+        OffsetsEngine=Self.offsets_engine,
+        ExpertIdsEngine=Self.expert_ids_engine,
+        ExpertScalesEngine=Self.expert_scales_engine,
     ]
 
     # ========== Validation ==========
@@ -364,11 +401,24 @@ struct BlockwiseFP8_1D2DMatmulKernel[
     # ========== Kernel Parameter TileTensor Types ==========
 
     comptime BScalesTile = TileTensor[
-        Self.b_scales_type, Self.b_scales_layout, MutAnyOrigin
+        Self.b_scales_type,
+        Self.b_scales_layout,
+        MutAnyOrigin,
+        Engine=Self.b_scales_engine,
+    ]
+
+    # Same tile re-based on one expert's B-scale rows. Offsetting the storage
+    # handle can change the engine, so name the result type through
+    # `OffsetViewType` rather than assuming it is still `BScalesTile`.
+    comptime BScalesExpertTile = Self.BScalesTile.OffsetViewType[
+        TypeList.of[Scalar[Self.BScalesTile.linear_idx_type]]()
     ]
 
     comptime CDeviceTile = TileTensor[
-        Self.c_type, Self.c_device_layout, MutAnyOrigin
+        Self.c_type,
+        Self.c_device_layout,
+        MutAnyOrigin,
+        Engine=Self.c_device_engine,
     ]
 
     # ========== Static Helper Methods ==========
@@ -385,7 +435,23 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         accum_barriers: Self.SmemType.Pipelines.AccumBarriers,
         tmem_dealloc: Self.SmemType.Pipelines.TmemDealloc,
     ):
-        """Initialize barriers and prefetch TMA descriptors."""
+        """Initialize barriers and prefetch TMA descriptors.
+
+        Args:
+            elect_one_warp: True if this thread is in the elected warp
+                (warp 0) that prefetches TMA descriptors and inits barriers.
+            elect_one_thread: True for the single elected thread within the
+                elected warp; gates the one-time setup work.
+            a_tma_op: TMA operation descriptor for the A matrix loads.
+            b_tma_op: TMA operation descriptor for the B matrix loads.
+            a_scales_tma_op: TMA operation descriptor for the A-scales loads.
+            input_barriers: Input pipeline `mbarrier`s synchronizing
+                producer and consumer access to A, B, and A-scales tiles.
+            accum_barriers: Accumulator pipeline `mbarrier`s synchronizing
+                MMA producers and epilogue consumers of TMEM stages.
+            tmem_dealloc: TMEM deallocation barrier for releasing accumulator
+                stages back to the allocator.
+        """
         if elect_one_warp and elect_one_thread:
             a_tma_op.prefetch_descriptor()
             b_tma_op.prefetch_descriptor()
@@ -439,7 +505,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         # C tensor for bounds-checked stores
         c_device: Self.CDeviceTile,
         # Number of active experts
-        num_active_experts: Int,
+        num_active_experts: Int32,
         # K dimension for iteration
         K: UInt32,
     ):
@@ -447,13 +513,33 @@ struct BlockwiseFP8_1D2DMatmulKernel[
 
         Uses grid-constant TMAs with offset-based addressing for 1D-1D layout.
         Accumulates in registers with per-K scaling in CUDA cores.
+
+        Args:
+            a_tma_op: Grid-constant TMA descriptor for the A matrix loads.
+            b_tma_op: Grid-constant TMA descriptor for the B matrix loads.
+            a_scales_tma_op: Grid-constant TMA descriptor for the A-side
+                blockwise scales loads.
+            b_scales: B-side blockwise scales `TileTensor` read from GMEM,
+                with shape `(num_experts * N // 128, K // 128)`.
+            a_offsets: Offset tensor for 1D-1D A tensor addressing, providing
+                per-expert token offsets.
+            expert_ids: Expert ID tensor mapping each work tile to its
+                expert.
+            expert_scales: Per-expert scale factors applied in the epilogue
+                output write.
+            c_device: Output C `TileTensor` used for bounds-checked stores.
+            num_active_experts: Number of active experts in the grouped
+                GEMM.
+            K: K contraction dimension; the inner reduction axis length used
+                to compute `ceildiv(K, BK)` K iterations.
         """
+        var _num_active_experts = Int(num_active_experts)
         Self.validate_config()
 
         # ===== Shared Memory Setup =====
         ref smem = external_memory[
-            Scalar[DType.uint8],
-            address_space=AddressSpace.SHARED,
+            UInt8,
+            address_space=.SHARED,
             alignment=128,
         ]().bitcast[Self.SmemType]()[]
 
@@ -516,7 +602,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         # ===== TMA LOAD WARP =====
         if Self.WarpRole.is_load():
             var load_iter = Self.WorkIterator(
-                num_active_experts, a_offsets, expert_ids, expert_scales
+                _num_active_experts, a_offsets, expert_ids, expert_scales
             )
 
             with input_pipeline.producer() as producer:
@@ -550,7 +636,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         # epilogue reads TMEM per-K to accumulate in registers).
         if Self.WarpRole.is_mma():
             var mma_iter = Self.WorkIterator(
-                num_active_experts, a_offsets, expert_ids, expert_scales
+                _num_active_experts, a_offsets, expert_ids, expert_scales
             )
 
             var tmem = Self.Tmem.allocate(smem.pipelines.tmem_addr())
@@ -581,7 +667,7 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         # ===== EPILOGUE WARPS =====
         if Self.WarpRole.is_epilogue():
             var epi_iter = Self.WorkIterator(
-                num_active_experts, a_offsets, expert_ids, expert_scales
+                _num_active_experts, a_offsets, expert_ids, expert_scales
             )
             Self.MmaEpilogueSync.wait()
 
@@ -609,9 +695,13 @@ struct BlockwiseFP8_1D2DMatmulKernel[
                     var expert_b_scale_offset = (
                         Int(ctx.expert_id()) * n_scale_blocks
                     )
-                    var b_scales_expert = Self.BScalesTile(
-                        ptr=b_scales.ptr + expert_b_scale_offset * b_scales_k,
-                        layout=b_scales.layout,
+                    var b_scales_expert = Self.BScalesExpertTile(
+                        b_scales._offset_storage(
+                            Scalar[Self.BScalesTile.linear_idx_type](
+                                expert_b_scale_offset * b_scales_k
+                            )
+                        ),
+                        b_scales.layout,
                     )
 
                     # Convert absolute N to tile index for b_scales lookup
@@ -673,7 +763,28 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         iter_idx: Int,
         elect_one_cta: Bool,
     ):
-        """Load A, B, and A-scales tiles using TMA."""
+        """Load A, B, and A-scales tiles using TMA.
+
+        Parameters:
+            tiles_origin: Memory origin of the producer tile payload
+                (inferred).
+
+        Args:
+            a_tma_op: Grid-constant TMA descriptor for the A matrix loads.
+            b_tma_op: Grid-constant TMA descriptor for the B matrix loads.
+            a_scales_tma_op: Grid-constant TMA descriptor for the A-side
+                blockwise scales loads.
+            tiles: Producer pipeline stage holding the A, B, and A-scales
+                SMEM tiles and associated barrier.
+            peer_cta_coord: Peer CTA coordinates `(rank_n, rank_m, m_rank)`
+                used for multicast load addressing within the cluster.
+            work_ctx: Work context providing the current tile's `m`, `n`,
+                and `expert_id` coordinates.
+            iter_idx: K-iteration index; the K coordinate is
+                `iter_idx * BK`.
+            elect_one_cta: True if this CTA is the elected CTA in a two-CTA
+                cluster; gates `expect_bytes` setup.
+        """
         var peer_rank_n = peer_cta_coord[0]
         var peer_rank_m = peer_cta_coord[1]
         var peer_m_rank = peer_cta_coord[2]
@@ -706,11 +817,11 @@ struct BlockwiseFP8_1D2DMatmulKernel[
 
             # Peer CTA slicing using TileTensor pattern (ptr + layout)
             var a_peer_tile = type_of(a_tile)(
-                a_tile.ptr + peer_m_rank * Self.a_tma_load_size,
+                a_tile._storage + peer_m_rank * Self.a_tma_load_size,
                 a_tile.layout,
             )
             var b_peer_tile = type_of(b_tile)(
-                b_tile.ptr + peer_rank_m * Self.b_tma_load_size,
+                b_tile._storage + peer_rank_m * Self.b_tma_load_size,
                 b_tile.layout,
             )
 
@@ -759,6 +870,17 @@ struct BlockwiseFP8_1D2DMatmulKernel[
         For blockwise FP8, each K iteration writes a fresh partial to TMEM.
         The epilogue accumulates across K in registers, not TMEM.
         Therefore init_c is always True.
+
+        Parameters:
+            tiles_origin: Memory origin of the input consumer tile payload
+                (inferred).
+
+        Args:
+            tiles: Input consumer stage holding the A and B SMEM tiles and
+                associated barrier.
+            mma_op: MMA operation object performing the tensor core
+                multiply-accumulate into TMEM.
+            tmem_addr: TMEM address offset where MMA writes partial results.
         """
         if elect_one_sync():
             # Loop through k_group_size tiles (typically 1)

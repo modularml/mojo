@@ -29,7 +29,6 @@ from collections.abc import Callable
 from typing import ClassVar
 
 import numpy as np
-import pytest
 from max.experimental.functional import (
     cumsum,
     mean,
@@ -70,15 +69,6 @@ class _Sum:
         expected = t_np.sum(axis=1, keepdims=True)
         np.testing.assert_allclose(result.to_numpy(), expected, rtol=1e-5)
 
-    def test_sharded_axis_raises(self) -> None:
-        """MESH_1D: reducing along the sharded axis raises."""
-        t = transfer_to(
-            Tensor(np.ones((8, 4), dtype=np.float32)),
-            PlacementMapping(self.MESH_1D, (Sharded(0),)),
-        )
-        with pytest.raises(ValueError, match="sharded axis"):
-            sum(t, axis=0)
-
     def test_numerics(self) -> None:
         """MESH_1D with 4 shards: sum along non-sharded axis is correct."""
         t_np = np.arange(32, dtype=np.float32).reshape(8, 4)
@@ -105,15 +95,6 @@ class _Sum:
         assert result_np.shape == (4, 1)
         expected = a_np.sum(axis=1, keepdims=True) * n
         np.testing.assert_allclose(result_np, expected, rtol=1e-5)
-
-    def test_axis_none_sharded_raises(self) -> None:
-        """MESH_1D: sum(Sharded, axis=None) raises — data is split."""
-        t = transfer_to(
-            Tensor(np.ones((8, 4), dtype=np.float32)),
-            PlacementMapping(self.MESH_1D, (Sharded(0),)),
-        )
-        with pytest.raises(ValueError, match="sharded axis"):
-            sum(t, axis=None)
 
     def test_axis_none_replicated_ok(self) -> None:
         """MESH_2: sum(Replicated, axis=None) works — all shards identical."""
@@ -152,15 +133,6 @@ class _Mean:
         expected = t_np.mean(axis=-1, keepdims=True)
         np.testing.assert_allclose(result.to_numpy(), expected, rtol=1e-4)
 
-    def test_axis_none_sharded_raises(self) -> None:
-        """MESH_2: mean(Sharded, axis=None) raises — data is split."""
-        t = transfer_to(
-            Tensor(np.ones((4, 6), dtype=np.float32)),
-            PlacementMapping(self.MESH_2, (Sharded(0),)),
-        )
-        with pytest.raises(ValueError, match="sharded axis"):
-            mean(t, axis=None)
-
 
 # ── Softmax ──────────────────────────────────────────────────────────
 
@@ -188,15 +160,6 @@ class _Softmax:
         expected = e / e.sum(axis=1, keepdims=True)
         np.testing.assert_allclose(arr, expected, rtol=1e-5)
 
-    def test_sharded_axis_raises(self) -> None:
-        """MESH_1D: softmax along sharded axis raises."""
-        t = transfer_to(
-            Tensor(np.ones((8, 4), dtype=np.float32)),
-            PlacementMapping(self.MESH_1D, (Sharded(0),)),
-        )
-        with pytest.raises(ValueError, match="cannot reduce along sharded"):
-            softmax(t, axis=0)
-
 
 # ── Cumsum ──────────────────────────────────────────────────────────
 
@@ -219,15 +182,6 @@ class _Cumsum:
         assert result.placements == (Sharded(0),)
         expected = np.cumsum(t_np, axis=1)
         np.testing.assert_allclose(result.to_numpy(), expected, rtol=1e-5)
-
-    def test_sharded_axis_raises(self) -> None:
-        """MESH_2: cumsum along sharded axis raises."""
-        t = transfer_to(
-            Tensor(np.ones((4, 2), dtype=np.float32)),
-            PlacementMapping(self.MESH_2, (Sharded(0),)),
-        )
-        with pytest.raises(ValueError, match="sharded"):
-            cumsum(t, axis=0)
 
     def test_partial_passthrough(self) -> None:
         """MESH_1D: Partial passes through cumsum (linear op).
@@ -253,5 +207,3 @@ class _Cumsum:
 
 class ReductionTests(_Sum, _Mean, _Softmax, _Cumsum):
     """Aggregates all reduction test classes for thin subclassing."""
-
-    pass

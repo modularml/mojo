@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from max.pipelines.modeling.types import (
+from max.pipelines.context import (
     SamplingParams,
     SamplingParamsGenerationConfigDefaults,
     SamplingParamsInput,

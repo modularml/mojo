@@ -11,26 +11,26 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import thread_idx, warp_id
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.sync import barrier
-from std.gpu.compute.arch.tcgen05 import *
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import thread_idx, warp_id
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.sync import barrier
+from max.gpu.compute.arch.tcgen05 import *
 from layout import Layout, LayoutTensor
 from layout._utils import ManagedLayoutTensor
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_almost_equal
 
 
 def tcgen05_st_ld_roundtrip_kernel[
     M: Int, N: Int
-](data: LayoutTensor[DType.float32, Layout.row_major(M, N), MutAnyOrigin]):
+](data: LayoutTensor[.float32, Layout.row_major(M, N), MutAnyOrigin]):
     var elect_one_warp = warp_id() == 0
     var elect_one_thread = thread_idx.x == 0
 
-    var ptr_tmem_addr = stack_allocation[
-        1, UInt32, address_space=AddressSpace.SHARED, alignment=16
+    var ptr_tmem_addr = unsafe_stack_allocation[
+        1, UInt32, address_space=.SHARED, alignment=16
     ]()
 
     comptime width = N
@@ -41,11 +41,11 @@ def tcgen05_st_ld_roundtrip_kernel[
 
     barrier()
 
-    tmem_addr = ptr_tmem_addr[0]
+    var tmem_addr = ptr_tmem_addr[0]
 
-    var data_st = InlineArray[Scalar[DType.float32], width](uninitialized=True)
-    for n in range(N):
-        data_st[n] = Float32(thread_idx.x * N + n)
+    var data_st = Array[_, width](
+        fill_with=lambda (n: Int) -> Float32: Float32(thread_idx.x * N + n)
+    )
 
     tcgen05_st[
         datapaths=16,
@@ -80,7 +80,7 @@ def test_tcgen05_st_ld_roundtrip(ctx: DeviceContext) raises:
     comptime M = 128
     comptime N = 8
     var data = ManagedLayoutTensor[
-        DType.float32,
+        .float32,
         Layout.row_major(M, N),
     ](ctx)
 
@@ -91,7 +91,7 @@ def test_tcgen05_st_ld_roundtrip(ctx: DeviceContext) raises:
         block_dim=(M),
     )
     ctx.synchronize()
-    data_host = data.tensor()
+    var data_host = data.tensor()
     for m in range(M):
         for n in range(N):
             assert_almost_equal(
@@ -104,7 +104,7 @@ def test_tcgen05_st_ld_roundtrip(ctx: DeviceContext) raises:
 
 def tcgen05_cp_ld_roundtrip_kernel[
     M: Int, N: Int
-](data: LayoutTensor[DType.float32, Layout.row_major(M, N), MutAnyOrigin]):
+](data: LayoutTensor[.float32, Layout.row_major(M, N), MutAnyOrigin]):
     comptime M_smem = 128
     comptime N_smem = 8
     comptime SBO = 256
@@ -112,10 +112,10 @@ def tcgen05_cp_ld_roundtrip_kernel[
 
     comptime smem_layout = Layout.row_major(M_smem, N_smem)
     var smem_tile = LayoutTensor[
-        DType.float32,
+        .float32,
         smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
@@ -180,8 +180,8 @@ def tcgen05_cp_ld_roundtrip_kernel[
     # Spread data to the 4 quadrants accordingly, such that each thread will have
     # [thread_idx.x + 0, ..., thread_idx.x + 3] in it's registers after the `tcgen05.ld`.
 
-    var n = (UInt(thread_idx.x) // 2) % 2 * 4 + (UInt(thread_idx.x) // 8)
-    var k = (UInt(thread_idx.x) // 4) % 2 * 4 + (UInt(thread_idx.x) % 2) * 2
+    var n = (thread_idx.x // 2) % 2 * 4 + (thread_idx.x // 8)
+    var k = (thread_idx.x // 4) % 2 * 4 + (thread_idx.x % 2) * 2
 
     smem_tile[n, k + 0] = Float32(thread_idx.x * 4 + 0)
     smem_tile[n, k + 1] = Float32(thread_idx.x * 4 + 1)
@@ -190,8 +190,8 @@ def tcgen05_cp_ld_roundtrip_kernel[
 
     var elect_one_warp = warp_id() == 0
 
-    var ptr_tmem_addr = stack_allocation[
-        1, UInt32, address_space=AddressSpace.SHARED, alignment=16
+    var ptr_tmem_addr = unsafe_stack_allocation[
+        1, UInt32, address_space=.SHARED, alignment=16
     ]()
 
     comptime width = N
@@ -206,7 +206,7 @@ def tcgen05_cp_ld_roundtrip_kernel[
     # For debugging SRAM data layout:
     # print(smem_tile)
 
-    tmem_addr = ptr_tmem_addr[0]
+    var tmem_addr = ptr_tmem_addr[0]
 
     tcgen05_cp[cta_group=1, datapaths=128, bits=bits](tmem_addr, s_desc)
 
@@ -234,7 +234,7 @@ def test_tcgen05_cp_ld_roundtrip(ctx: DeviceContext) raises:
     comptime M = 32
     comptime N = 4
     var data = ManagedLayoutTensor[
-        DType.float32,
+        .float32,
         Layout.row_major(M, N),
     ](ctx)
     comptime kernel = tcgen05_cp_ld_roundtrip_kernel[M, N]
@@ -244,7 +244,7 @@ def test_tcgen05_cp_ld_roundtrip(ctx: DeviceContext) raises:
         block_dim=(M),
     )
     ctx.synchronize()
-    data_host = data.tensor()
+    var data_host = data.tensor()
     for m in range(M):
         for n in range(N):
             assert_almost_equal(

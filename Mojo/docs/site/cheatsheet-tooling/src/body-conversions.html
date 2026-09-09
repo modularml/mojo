@@ -1,0 +1,173 @@
+<!-- title: Mojo conversions -->
+<!-- subtitle: Make one, convert one, access one. Remember to cast. -->
+<!-- layout: landscape -->
+<!-- width: 1700 -->
+<!-- columns: 3 -->
+<!-- Compiler verified: 2026-08-17, Mojo 1.0.0 (ed45d567) -->
+<!-- Last updated: 2026-08-17 (1.0.0 audit) -->
+
+<style>
+  .sheet .dir{font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin:9px 0 3px;}
+  .sheet .body > .dir:first-child{margin-top:0;}
+  .sheet table.zebra{border-collapse:collapse;width:100%;}
+  .sheet table.zebra td{padding:2px 7px;}
+  .sheet table.zebra td:last-child{color:var(--muted);}
+  .sheet table.zebra tr:nth-child(even){background:var(--accent-soft);}
+</style>
+
+<div class="cathead">Numbers</div>
+
+<section class="panel">
+  <h2>Int <span class="sum">machine-width integer; a 1-lane SIMD</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">42 # IntLiteral
+Int(x) # any Intable: Bool, Int8 …
+Int(s) # any Intable that's raising: String
+Int(Int32(5)) # any numeric scalar, cross-dtype</pre>
+    <p class="dir">convert</p>
+<pre class="code">Float64(i), UInt(i) # to float, to unsigned (same bits)
+String(i), Bool(i) # to text, True if non-zero
+i.cast[DType.int8]() # to another dtype</pre>
+    <p class="edge">Float to Int truncates toward zero; cross-dtype casts wrap
+      (two's complement). <b>Int</b> is <b>Scalar[DType.int]</b>, so <b>.cast</b>
+      works like any SIMD scalar.</p>
+    <p class="edge"><b>Int</b> and <b>UInt</b> share bits: Int(-1) is UInt 2^64-1.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Float64 <span class="sum">IEEE double; a 1-lane SIMD</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">3.14 # FloatLiteral
+Float64(x) # any Floatable: Int, Bool
+Float64(s) # any Floatable that's raising: String
+Float32(x).cast[DType.float64]() # widen a scalar</pre>
+    <p class="dir">convert</p>
+<pre class="code">Int(f) # truncates toward zero
+f.cast[DType.float32]() # narrow (precision loss)
+Bool(f), String(f) # True if non-zero, to text</pre>
+    <p class="edge">No bare <b>Float</b>, and no Float128/256. Convert all other
+      floats (including special purpose) with <b>.cast()</b>.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Bool <span class="sum">true / false, and what's truthy</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">Bool(x) # any Boolable</pre>
+    <p class="dir">convert</p>
+<pre class="code">Int(b), Float64(b), String(b) # 0 or 1, 0.0 or 1.0, "True" or "False"</pre>
+    <p class="dir">truthy <span class="sum">for if / while / and / or / Bool()</span></p>
+    <table class="zebra">
+      <tr><td><b>Numbers</b></td><td>non-zero</td></tr>
+      <tr><td><b>Strings &amp; collections</b></td><td>non-empty</td></tr>
+      <tr><td><b>Optional</b></td><td>None False, else True</td></tr>
+      <tr><td><b>PythonObject</b></td><td>Python's own rules</td></tr>
+    </table>
+    <p class="note">Any type with a <b>__bool__</b> is truthy. Converting a
+      <b>Bool</b> to a number is explicit: <b>Int(b)</b>, never implicit.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>SIMD[T, N] <span class="sum">N lanes of one dtype; Scalar = SIMD[T, 1]</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">SIMD[T, N](x) # splat one value to all lanes
+SIMD[T, 4](a, b, c, d) # per-lane</pre>
+    <p class="dir">convert</p>
+<pre class="code">v.cast[DType.x]() # new dtype, same lane count
+SIMD[T, N](scalar) # splat a Scalar up to N lanes</pre>
+    <p class="edge"><b>N</b> is the lane count, not bit width; a lane's bit
+      width is its <b>DType</b>. Int, Float64, Int8 … are all SIMD scalars.</p>
+  </div>
+</section>
+
+<div class="cathead">Text</div>
+
+<section class="panel">
+  <h2>String <span class="sum">owned, growable UTF-8 text</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">String(x) # any StringSpan, StringLiteral, Writable (Int, Float64, Bool …)
+String(t"{x}") # Not needed for print()
+String(from_utf8=bytes) # raises on bad UTF-8
+String(from_utf8_lossy=bytes) # replaces bad bytes</pre>
+    <p class="dir">convert</p>
+<pre class="code">Int(s) # base-10 parse; raises on "3.5", "0xff", ""
+Float64(s) # parse (1e3, inf ok); raises "", garbage
+Bool(s) # True if non-empty</pre>
+    <p class="dir">access (by byte / codepoint / grapheme)</p>
+<pre class="code">s[byte=i], s[byte=i:j] # also for codepoint and single index grapheme
+s.as_bytes(), s.codepoints(), s.graphemes() # iterators</pre>
+  </div>
+</section>
+
+<div class="cathead">Pointers</div>
+
+<section class="panel">
+  <h2>Pointer[T] <span class="sum">to backing buffer</span></h2>
+  <div class="body">
+    <p class="note">Use <b>unsafe_ptr()</b> to access: <b>List</b>, <b>String</b>,
+      <b>StringSpan</b>, <b>Array</b>, and <b>Span</b>.</p>
+    <p class="dir">access through a pointer</p>
+<pre class="code">buf.unsafe_ptr() # -> Pointer[T]
+p[unsafe_offset=i] # deref one element
+p.unsafe_offset(i)[] # pointer arithmetic, then deref
+p.unsafe_load[width=N]() # read N lanes -> SIMD[T, N]</pre>
+    <p class="dir">vectorize a buffer (the escape hatch)</p>
+<pre class="code">var v = data.unsafe_ptr().unsafe_load[width=8]() # 8 elements -> one SIMD
+var total = v.reduce_add() # SIMD-wide reduce</pre>
+    <p class="edge"><b>Pointer</b> is non-null by design. Use
+      <b>OptionalPointer</b> for a nullable pointer. Unsafe operations carry the
+      <b>unsafe_</b> prefix or an <b>unsafe_</b> keyword.</p>
+  </div>
+</section>
+
+<div class="cathead">Collections</div>
+
+<section class="panel">
+  <h2>List[T] <span class="sum">growable, homogeneous sequence</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">var x: List[T] = [a, b, c] # annotate: unannotated defaults to Array
+List[T](capacity=n) # empty; initial room for n
+List[T](length=n, fill=x) # n copies of x (T: Copyable)
+List(range(n)) # materialize a range
+List(iterable) # from any iterator / iterable</pre>
+    <p class="dir">access</p>
+<pre class="code">list[i], list[i:j] # element by ref, Span view (no copy)
+list.unsafe_take_allocation() # hand off the buffer as an Allocation[T]</pre>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Dict[K, V] <span class="sum">hash map; keys Hashable + Equatable + Movable</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">Dict[K, V]() # empty; fill with d[k] = v
+Dict[K, V](capacity=n) # empty; initial room for n
+Dict.fromkeys(keys, v) # every key maps to v</pre>
+    <p class="dir">access</p>
+<pre class="code">d.setdefault(key, default) # ref; inserts default if absent
+d.get(key) d.find(key) # Optional[V]
+d.keys() d.values() # lazy iterators
+d.items() # iterator of DictEntry (.key / .value)
+d.pop(key) # value, removes it</pre>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Optional[T] <span class="sum">a value, or nothing</span></h2>
+  <div class="body">
+    <p class="dir">make</p>
+<pre class="code">Optional(x) # from a value (T inferred from x)
+Optional[T](), Optional[T](None) # empty</pre>
+    <p class="dir">access</p>
+<pre class="code">o.value(), o.take(), o[] # ref, move out, ref (abort, abort, raise)
+o.or_else(default) # value, or default</pre>
+  </div>
+</section>

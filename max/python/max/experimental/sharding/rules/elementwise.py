@@ -11,193 +11,104 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Placement rules for elementwise ops.
-
-- ``unary_rule`` / ``linear_unary_rule`` — nonlinear / linear unary
-- ``binary_rule`` / ``linear_binary_rule`` — nonlinear / linear binary
-- ``ternary_rule`` — always nonlinear (where)
-"""
+"""Placement rules for unary, binary, and ternary elementwise ops."""
 
 from __future__ import annotations
 
-from max.experimental.sharding.mappings import PlacementMapping
-from max.experimental.sharding.placements import (
-    Partial,
-    Placement,
-    Replicated,
-    Sharded,
-)
+from typing import Any
+
+from max.experimental.sharding.placements import Sharded
 from max.experimental.sharding.types import TensorLayout
+from max.graph.dim import Dim, StaticDim
 
-from ._common import RuleSignature
-
-# ─── Helpers ──────────────────────────────────────────────────────────
-
-
-def _broadcast_adjust(p: Placement, delta: int) -> Placement:
-    return (
-        Sharded(p.axis + delta) if isinstance(p, Sharded) and delta > 0 else p
-    )
+from ..action import ActionSet, AxisAssignment
+from ..cost import P, R, build_action_set
 
 
-def _resolve_partial(p: Placement) -> Placement:
-    return Replicated() if isinstance(p, Partial) else p
+def _is_size_one(dim: Dim) -> bool:
+    """``True`` for a static size-1 dim (a broadcast axis)."""
+    return isinstance(dim, StaticDim) and dim.dim == 1
 
 
-def _maybe_resolve(
-    p: tuple[Placement, ...], resolve: bool
-) -> tuple[Placement, ...]:
-    return tuple(_resolve_partial(x) for x in p) if resolve else p
+def _aligned_axis(layout: TensorLayout, out_axis: int, out_rank: int) -> int:
+    """Input tensor axis that trailing-aligns to ``out_axis``, or ``-1`` if absent."""
+    return out_axis - (out_rank - layout.rank)
 
 
-def _prefer_non_replicated(
-    *all_p: tuple[Placement, ...],
-) -> tuple[Placement, ...]:
-    result: list[Placement] = []
-    for axis_ps in zip(*all_p, strict=True):
-        chosen = Replicated()
-        for p in axis_ps:
-            if not isinstance(p, Replicated):
-                chosen = p
-                break
-        result.append(chosen)
-    return tuple(result)
+def _elementwise_rows(
+    layouts: tuple[TensorLayout, ...], *, linear: bool
+) -> list[AxisAssignment]:
+    """Candidate sharding rows for an elementwise op, aligned by trailing axis.
 
-
-def _align_to_output(
-    input_p: tuple[Placement, ...],
-    output_p: tuple[Placement, ...],
-    input_rank: int,
-    output_rank: int,
-) -> tuple[Placement, ...]:
-    delta = output_rank - input_rank
-    result = list(input_p)
-    for ax in range(len(result)):
-        out_p_ax = output_p[ax]
-        if isinstance(result[ax], Replicated) and isinstance(out_p_ax, Sharded):
-            in_axis = out_p_ax.axis - delta
-            if in_axis >= 0:
-                result[ax] = Sharded(in_axis)
-    return tuple(result)
-
-
-# ─── Unary rules ─────────────────────────────────────────────────────
-
-
-def _unary_impl(x: TensorLayout, *extra: object, linear: bool) -> RuleSignature:
-    mesh = x.mapping.mesh
-    suggested_p = _maybe_resolve(x.mapping.to_placements(), resolve=not linear)
-    m = PlacementMapping(mesh, suggested_p)
-    return (m, *extra), (m,)
-
-
-def unary_rule(x: TensorLayout, *extra: object) -> RuleSignature:
-    """Nonlinear unary: resolves Partials."""
-    return _unary_impl(x, *extra, linear=False)
-
-
-def linear_unary_rule(x: TensorLayout, *extra: object) -> RuleSignature:
-    """Linear unary: Partials pass through."""
-    return _unary_impl(x, *extra, linear=True)
-
-
-# ─── Binary rules ────────────────────────────────────────────────────
-
-
-def _binary_impl(
-    lhs: TensorLayout,
-    rhs: TensorLayout,
-    linear: bool,
-) -> RuleSignature:
-    mesh = lhs.mapping.mesh
-    lhs_p, rhs_p = lhs.mapping.to_placements(), rhs.mapping.to_placements()
-    lhs_rank, rhs_rank = lhs.rank, rhs.rank
-
-    if lhs_rank > rhs_rank:
-        rhs_p = tuple(_broadcast_adjust(p, lhs_rank - rhs_rank) for p in rhs_p)
-    elif rhs_rank > lhs_rank:
-        lhs_p = tuple(_broadcast_adjust(p, rhs_rank - lhs_rank) for p in lhs_p)
-
-    lhs_has_p = any(isinstance(p, Partial) for p in lhs_p)
-    rhs_has_p = any(isinstance(p, Partial) for p in rhs_p)
-    if not (linear and lhs_has_p and rhs_has_p):
-        lhs_p = _maybe_resolve(lhs_p, resolve=lhs_has_p)
-        rhs_p = _maybe_resolve(rhs_p, resolve=rhs_has_p)
-
-    for ax, (pl, pr) in enumerate(zip(lhs_p, rhs_p, strict=True)):
-        if (
-            pl != pr
-            and not isinstance(pl, Replicated)
-            and not isinstance(pr, Replicated)
-        ):
-            raise ValueError(
-                f"binary elementwise: incompatible placements on axis {ax}: "
-                f"{pl} vs {pr}. Redistribute first."
+    For each output axis, offers a symmetric row (all inputs carrying the axis
+    at full extent sharded together) plus one one-sided row per such input
+    (that input sharded alone, the rest Replicated). Inputs that broadcast the
+    axis (absent or size 1) stay Replicated. Prepends the ``(R, ...) -> R``
+    fallback; ``linear`` ops add a ``(P, ...) -> P`` row.
+    """
+    n_in = len(layouts)
+    out_rank = max(layout.rank for layout in layouts)
+    rows: list[AxisAssignment] = [AxisAssignment((R,) * n_in, R)]
+    for out_axis in range(out_rank):
+        aligned = [
+            _aligned_axis(layout, out_axis, out_rank) for layout in layouts
+        ]
+        shardable = [
+            i
+            for i, (k, layout) in enumerate(zip(aligned, layouts, strict=True))
+            if k >= 0 and not _is_size_one(layout.shape[k])
+        ]
+        if not shardable:
+            continue
+        # Symmetric row (all shardable inputs together), then one one-sided
+        # row per shardable input (that input alone, the rest Replicated).
+        active_sets = [shardable]
+        if len(shardable) > 1:
+            active_sets.extend([i] for i in shardable)
+        for active in active_sets:
+            needed = tuple(
+                Sharded(aligned[i]) if i in active else R for i in range(n_in)
             )
-
-    out_p = _prefer_non_replicated(lhs_p, rhs_p)
-    out_rank = max(lhs_rank, rhs_rank)
-    lhs_m = PlacementMapping(
-        mesh, _align_to_output(lhs_p, out_p, lhs.rank, out_rank)
-    )
-    rhs_m = PlacementMapping(
-        mesh, _align_to_output(rhs_p, out_p, rhs.rank, out_rank)
-    )
-    return (lhs_m, rhs_m), (PlacementMapping(mesh, out_p),)
+            rows.append(AxisAssignment(needed, Sharded(out_axis)))
+    if linear:
+        rows.append(AxisAssignment((P,) * n_in, P))
+    return rows
 
 
-def binary_rule(lhs: TensorLayout, rhs: TensorLayout) -> RuleSignature:
-    """Nonlinear binary: resolves Partials."""
-    return _binary_impl(lhs, rhs, linear=False)
+def unary_rule(x: TensorLayout, *extra: Any) -> ActionSet:
+    """Strategies for nonlinear unary ops (relu, exp, ...): Replicated or Sharded."""
+    rows = [
+        AxisAssignment((R,), R),
+        *(AxisAssignment((Sharded(d),), Sharded(d)) for d in range(x.rank)),
+    ]
+    return build_action_set(rows, layouts=(x,), extras=extra)
 
 
-def linear_binary_rule(lhs: TensorLayout, rhs: TensorLayout) -> RuleSignature:
-    """Linear binary: Partials pass through when both sides are Partial."""
-    return _binary_impl(lhs, rhs, linear=True)
+def linear_unary_rule(x: TensorLayout, *extra: Any) -> ActionSet:
+    """Strategies for linear unary ops (negate, cast, ...): adds Partial passthrough."""
+    rows = [
+        AxisAssignment((R,), R),
+        *(AxisAssignment((Sharded(d),), Sharded(d)) for d in range(x.rank)),
+        AxisAssignment((P,), P),
+    ]
+    return build_action_set(rows, layouts=(x,), extras=extra)
 
 
-# ─── Ternary rule ────────────────────────────────────────────────────
+def binary_rule(lhs: TensorLayout, rhs: TensorLayout) -> ActionSet:
+    """Strategies for elementwise binary ops (mul, div, ...): no Partial passthrough."""
+    rows = _elementwise_rows((lhs, rhs), linear=False)
+    return build_action_set(rows, layouts=(lhs, rhs))
+
+
+def linear_binary_rule(lhs: TensorLayout, rhs: TensorLayout) -> ActionSet:
+    """Strategies for linear binary ops (add, sub): Partial passthrough when both Partial."""
+    rows = _elementwise_rows((lhs, rhs), linear=True)
+    return build_action_set(rows, layouts=(lhs, rhs))
 
 
 def ternary_rule(
-    condition: TensorLayout,
-    x: TensorLayout,
-    y: TensorLayout,
-) -> RuleSignature:
-    """Ternary (where): always nonlinear, resolves all Partials."""
-    layouts = [condition, x, y]
-    max_rank = max(l.rank for l in layouts)
-    mesh = condition.mapping.mesh
-
-    all_p = [
-        _maybe_resolve(
-            tuple(
-                _broadcast_adjust(p, max_rank - l.rank)
-                for p in l.mapping.to_placements()
-            ),
-            resolve=True,
-        )
-        for l in layouts
-    ]
-
-    for ax in range(len(all_p[0])):
-        non_rep = [p[ax] for p in all_p if not isinstance(p[ax], Replicated)]
-        if len(set(str(p) for p in non_rep)) > 1:
-            raise ValueError(
-                f"ternary elementwise: incompatible on mesh axis {ax}."
-            )
-
-    out_p = _prefer_non_replicated(*all_p)
-    aligned = [
-        _align_to_output(sp, out_p, l.rank, max_rank)
-        for sp, l in zip(all_p, layouts, strict=True)
-    ]
-    mappings = tuple(PlacementMapping(mesh, ap) for ap in aligned)
-    return mappings, (PlacementMapping(mesh, out_p),)
-
-
-# ─── Backward compatibility aliases ─────────────────────────────────
-
-unary_passthrough = unary_rule
-binary_elementwise = binary_rule
-ternary_elementwise = ternary_rule
+    condition: TensorLayout, x: TensorLayout, y: TensorLayout
+) -> ActionSet:
+    """Strategies for elementwise ternary (``where``): trailing-aligned Sharded."""
+    rows = _elementwise_rows((condition, x, y), linear=False)
+    return build_action_set(rows, layouts=(condition, x, y))

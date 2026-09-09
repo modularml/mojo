@@ -1,0 +1,30 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "flux2_modulev3",
+    srcs = glob(["**/*.py"]),
+    ignore_extra_deps = [
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+    ],
+    deps = [
+        requirement("numpy"),
+        requirement("typing-extensions"),
+        "//max/python/max:tensor",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/nn/hooks",
+        "//max/python/max/pipelines/architectures/flux2",
+        "//max/python/max/pipelines/architectures/flux_modulev3",
+        "//max/python/max/pipelines/architectures/mistral3_modulev3",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/profiler",
+    ],
+)

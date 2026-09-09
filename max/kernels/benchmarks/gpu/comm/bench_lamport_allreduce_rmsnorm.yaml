@@ -1,0 +1,33 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+name: bench_lamport_allreduce_rmsnorm
+file: $KERNEL_BENCHMARKS_ROOT/gpu/comm/bench_lamport_allreduce_rmsnorm.mojo
+
+# Compares the fused `lamport_allreduce_rmsnorm` (single kernel) against the
+# unfused composition `allreduce` + `rms_norm_gpu` (two kernels). Both run
+# under the same Lamport one-shot AR transport for these small bf16
+# messages with P2P -- the only difference is whether the RMSNorm epilogue
+# is fused into the producer or run as a separate consumer kernel.
+#
+# Shape constraints (bf16):
+#   - cols % 8 == 0           (whole 128-bit Lamport packs)
+#   - cols / 8 <= BLOCK_SIZE   (= 1024 on Hopper/Blackwell, capping bf16
+#                               hidden at 8192)
+# num_cols outside that range is skipped by the bench main.
+
+params:
+  - in_dtype: [DType.bfloat16]
+    num_gpus: [2]
+    $num_rows: [1, 4, 8, 16, 32, 64, 128]
+    num_cols: [1024, 2048, 4096, 7168, 8192]

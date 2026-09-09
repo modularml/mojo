@@ -79,6 +79,7 @@ class LocalImageBenchmarkDataset(PixelBenchmarkDataset):
             image_guidance_scale=kwargs.get("image_guidance_scale"),
             image_negative_prompt=kwargs.get("image_negative_prompt"),
             image_seed=kwargs.get("image_seed"),
+            num_frames=kwargs.get("num_frames"),
         )
         requests: list[PixelGenerationSampledRequest] = []
 

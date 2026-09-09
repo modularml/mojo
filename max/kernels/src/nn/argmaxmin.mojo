@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Provides CPU and GPU implementations of the argmax and argmin reduction operations."""
 
 
 # ===-----------------------------------------------------------------------===#
@@ -19,9 +20,9 @@
 from std.math import align_down, ceildiv, iota
 from std.sys.info import simd_width_of
 
-from std.algorithm import sync_parallelize
-from std.algorithm.functional import _get_num_workers
-from std.gpu.host import DeviceContext
+from max.algorithm import sync_parallelize
+from max.algorithm.functional import _get_num_workers
+from max.gpu.host import DeviceContext
 from std.math.math import min as _min
 from layout import TileTensor
 
@@ -29,7 +30,7 @@ from layout import TileTensor
 def _argn[
     is_max: Bool
 ](
-    input: TileTensor,
+    input: TileTensor[mut=False, ...],
     axis: Int,
     output: TileTensor[mut=True, ...],
     ctx: Optional[DeviceContext] = None,
@@ -93,15 +94,20 @@ def _argn[
         )
         chunk_size = ceildiv(parallel_size, num_workers)
 
-    @__copy_capture(
-        axis_size, chunk_size, output_stride, input_stride, parallel_size
-    )
-    @parameter
-    def task_func(task_id: Int):
-        @parameter
+    def task_func(
+        task_id: Int,
+    ) {
+        var axis_size,
+        var chunk_size,
+        var output_stride,
+        var input_stride,
+        var parallel_size,
+        imm,
+    }:
+        @__parameter
         @always_inline
         def cmpeq[
-            dtype: DType, simd_width: SIMDSize
+            dtype: DType, simd_width: SIMDLength
         ](a: SIMD[dtype, simd_width], b: SIMD[dtype, simd_width]) -> SIMD[
             DType.bool, simd_width
         ]:
@@ -110,10 +116,10 @@ def _argn[
             else:
                 return a.ge(b)
 
-        @parameter
+        @__parameter
         @always_inline
         def cmp[
-            dtype: DType, simd_width: SIMDSize
+            dtype: DType, simd_width: SIMDLength
         ](a: SIMD[dtype, simd_width], b: SIMD[dtype, simd_width]) -> SIMD[
             DType.bool, simd_width
         ]:
@@ -128,8 +134,8 @@ def _argn[
         for i in range(start, end):
             var input_offset = i * input_stride
             var output_offset = i * output_stride
-            var input_dim_ptr = input.ptr + input_offset
-            var output_dim_ptr = output.ptr + output_offset
+            var input_dim_ptr = input.ptr.unsafe_offset(input_offset)
+            var output_dim_ptr = output.ptr.unsafe_offset(output_offset)
             var global_val: Scalar[input.dtype]
 
             # initialize limits
@@ -143,14 +149,14 @@ def _argn[
             if axis_size < simd_width:
                 global_values = global_val
             else:
-                global_values = input_dim_ptr.load[width=simd_width]()
+                global_values = input_dim_ptr.unsafe_load[width=simd_width]()
 
             # iterate over values evenly divisible by simd_width
             var indices = iota[output.dtype, simd_width]()
             var global_indices = indices
             var last_simd_index = align_down(axis_size, simd_width)
             for j in range(simd_width, last_simd_index, simd_width):
-                var curr_values = input_dim_ptr.load[width=simd_width](j)
+                var curr_values = input_dim_ptr.unsafe_load[width=simd_width](j)
                 indices += Scalar[output.dtype](simd_width)
 
                 var mask = cmpeq(curr_values, global_values)
@@ -166,7 +172,7 @@ def _argn[
             var idx = Scalar[output.dtype](0)
             var found_min: Bool = False
             for j in range(last_simd_index, axis_size, 1):
-                var elem = input_dim_ptr.load(j)
+                var elem = input_dim_ptr.unsafe_load(j)
                 if cmp(global_val, elem):
                     global_val = elem
                     idx = Scalar[output.dtype](j)
@@ -181,7 +187,7 @@ def _argn[
                 idx = min_indices.reduce_min()
             output_dim_ptr[] = idx
 
-    sync_parallelize[task_func](parallel_size, ctx)
+    sync_parallelize(task_func, parallel_size, ctx)
 
 
 # ===-----------------------------------------------------------------------===#
@@ -190,7 +196,7 @@ def _argn[
 
 
 def argmax(
-    input: TileTensor,
+    input: TileTensor[mut=False, ...],
     axis: Int,
     output: TileTensor[mut=True, ...],
     ctx: Optional[DeviceContext] = None,
@@ -209,8 +215,8 @@ def argmax(
 
 
 def argmax(
-    input: TileTensor,
-    axis_buf: TileTensor,
+    input: TileTensor[mut=False, ...],
+    axis_buf: TileTensor[mut=False, ...],
     output: TileTensor[mut=True, ...],
     ctx: Optional[DeviceContext] = None,
 ) raises where axis_buf.flat_rank == 1:
@@ -233,7 +239,7 @@ def argmax(
 
 
 def argmin(
-    input: TileTensor,
+    input: TileTensor[mut=False, ...],
     axis: Int,
     output: TileTensor[mut=True, ...],
     ctx: Optional[DeviceContext] = None,
@@ -252,8 +258,8 @@ def argmin(
 
 
 def argmin(
-    input: TileTensor,
-    axis_buf: TileTensor,
+    input: TileTensor[mut=False, ...],
+    axis_buf: TileTensor[mut=False, ...],
     output: TileTensor[mut=True, ...],
     ctx: Optional[DeviceContext] = None,
 ) raises where axis_buf.flat_rank == 1:

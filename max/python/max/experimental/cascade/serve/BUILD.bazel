@@ -1,0 +1,61 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+# HTTP route adapters that expose cascade pipelines as FastAPI apps.
+modular_py_library(
+    name = "serve",
+    srcs = glob(
+        ["*.py"],
+        exclude = [
+            "main.py",
+            "__main__.py",
+        ],
+    ),
+    deps = [
+        requirement("fastapi"),
+        requirement("openai"),
+        requirement("pydantic"),
+        requirement("sse-starlette"),
+        requirement("uvicorn"),
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/interfaces",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/request",
+        "//max/python/max/serve/schemas",
+    ],
+)
+
+# The serve CLI as a library
+modular_py_library(
+    name = "main_lib",
+    srcs = ["main.py"],
+    # gguf is imported lazily by the weight loader when a GGUF checkpoint is
+    # selected on the CLI, so it never appears as a static import of main.py.
+    ignore_extra_deps = [
+        requirement("gguf"),
+    ],
+    # The all_pipelines dispatcher target pulls in every architecture (for the
+    # registry's lazy runtime imports), so the server can serve any supported
+    # model the user selects on the CLI.
+    deps = [
+        requirement("cyclopts"),
+        requirement("gguf"),  # Needed for loading gguf files
+        "//max/python/max/experimental/cascade/deployment:context_config",
+        "//max/python/max/experimental/cascade/pipelines:all_pipelines",
+        "//max/python/max/experimental/cascade/serve",
+        "//max/python/max/pipelines/lib",
+    ],
+)
+
+# Experimental cascade serving CLI entrypoint.
+modular_py_binary(
+    name = "main",
+    srcs = ["__main__.py"],
+    main = "__main__.py",
+    tags = [
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [":main_lib"],
+)

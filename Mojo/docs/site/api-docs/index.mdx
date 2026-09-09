@@ -1,0 +1,111 @@
+---
+title: How to read the standard library API documentation
+sidebar_label: Understanding Mojo API syntax
+sidebar_position: 1
+description: >
+  Read Mojo API and function signatures, including declaration syntax,
+  parameters, brackets, parentheses, and slashes.
+---
+
+Standard library declarations use a compact syntax to describe compile-time
+parameters, runtime arguments, ownership, mutability, and calling
+conventions. Mojo idioms appear throughout the API reference.
+
+## How does Mojo use "parameter" and "argument"?
+
+Many languages use *parameter* and *argument* interchangeably, or
+distinguish them only as declarations and call sites. Mojo uses these terms
+differently because neither approach provides enough vocabulary for
+compile-time and runtime programming.
+
+Mojo gives two familiar words more precise meanings:
+
+- **Parameter** refers to compile-time entities.
+- **Argument** refers to runtime values and references.
+
+In declarations, compile-time parameters appear in square brackets (`[]`),
+followed by runtime arguments in parentheses (`()`).
+
+Mojo uses one language for both compile-time and runtime programming,
+rather than separating them into a language plus a macro or template system.
+
+## How is "Self" different from "self"?
+
+`Self` (capital S) is a keyword that refers to an enclosing struct or,
+when used in a trait definition, the type that implements the trait.
+
+Within a type or trait definition, `Self.` identifies compile-time
+parameters and other `comptime` declarations. For example, `Self.T` refers
+to the parameter `T` defined by the enclosing type.
+
+`self` (lowercase) refers to an instance of the enclosing type. Instance
+methods declare `self` as their first argument. Callers do not pass it
+explicitly. You write `instance.method()`, not
+`instance.method(instance)`.
+
+Static methods do not have a `self` argument.
+
+## What are the parameter naming conventions?
+
+Mojo follows naming conventions used in languages like Rust and C++.
+Type parameter names use PascalCase, short (`T`, `E`) or descriptive
+(`ErrorType`, `Element`). By convention, `T`, `U`, `V` are general
+types; `K`/`V` for key-value pairs; `E` for errors; `H` for hashers.
+Value parameter names use lower_snake_case and should be descriptive
+(`capacity`, `hasher`, `tile_x`).
+
+## What do the words before argument names mean?
+
+Argument conventions appear before argument names in function declarations.
+They describe the contract between caller and callee.
+
+They indicate both ownership (`var`, `ref`, unmarked) and what the function
+may do with an argument (`mut`, `out`, `deinit`):
+
+{/* markdownlint-disable MD013 */}
+
+| Convention   | What it means                                                                                            | Example                                                    |
+|--------------|----------------------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| *(unmarked)* | A reference to an existing value with read-only `imm` access.                                            | `def abs[T: Absable](value: T) -> T`                       |
+| `mut`        | A reference to an existing value. The function can modify the value if it is mutable.                    | `def append(mut self, codepoint: Codepoint)`               |
+| `ref`        | A reference to an existing value. The function inherits the value's mutability.                          | `def __getitem__(ref self, idx: Int)`                      |
+| `var`        | The function owns its own value. The caller keeps the original unless ownership is transferred.          | `def insert(mut self, var key: Self.K, var value: Self.V)` |
+| `out`        | An uninitialized slot that the function must initialize before it returns. Used for type initialization. | `def __init__(out self, *, capacity: Int)`                 |
+| `deinit`     | The function takes ownership and destroys the value.                                                     | `def __deinit__(deinit self)`                              |
+
+{/* markdownlint-enable MD013 */}
+
+## What are those symbols in parameter and argument lists?
+
+Three markers divide parameter and argument lists into
+zones that control how callers pass values:
+
+| Marker | Arguments       | Parameters      |
+|--------|-----------------|-----------------|
+| `//`   | No              | Infer-only      |
+| `/`    | Positional-only | Positional-only |
+| `*`    | Keyword-only    | Keyword-only    |
+
+- `//` separates infer-only parameters from named parameters.
+- Everything before `/` is positional-only. Callers must pass these values
+  by position, not by name.
+- Everything after `*` is keyword-only. Callers must pass these values by name.
+
+## Why do variadics have `*` before some type names?
+
+Variadic arguments accept a varying number of values.
+
+- `*` before the argument name accepts any number of positional arguments
+  of the same type.
+- `*` before both the name and the type annotation creates a *variadic
+  pack* that accepts arguments of different types (heterogeneous arguments).
+
+## Why is `def` used as a type?
+
+Function pointers and closures use function types that describe their
+signature. The simplest is `def()`, a function with no arguments and no
+return value. When used as a type, `def` specifies argument and return
+types but not argument names.
+
+For example, `def(Int, Int) -> Int` is a function that takes two `Int`
+arguments and returns an `Int`.

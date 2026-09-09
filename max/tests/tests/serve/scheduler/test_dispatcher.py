@@ -30,7 +30,7 @@ from max.serve.scheduler.di_dispatchers import (
     DispatcherClient,
     DispatcherServer,
 )
-from max.serve.worker_interface.zmq_queue import (
+from max.serve.worker_interface._zmq_queue import (
     ClientIdentity,
     generate_zmq_ipc_path,
 )
@@ -144,7 +144,7 @@ def test_many_servers_one_client() -> None:
             break
 
     assert len(replies) == len(servers)
-    assert set(replies) == set([-1 * i * 100 for i in range(len(servers))])
+    assert set(replies) == {-1 * i * 100 for i in range(len(servers))}
 
 
 def test_spam_server() -> None:

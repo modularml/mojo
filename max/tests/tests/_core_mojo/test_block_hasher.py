@@ -15,8 +15,36 @@
 import hashlib
 
 import numpy as np
+import pytest
 from max._core_mojo import block_hasher
 from pytest_benchmark.fixture import BenchmarkFixture
+
+
+def test_seed_default_matches_unseeded() -> None:
+    """Omitting `seed` must match passing an explicit all-zero seed."""
+    block_size = 32
+    tokens = np.arange(256, dtype=np.int32)
+
+    default = block_hasher(tokens, block_size, b"\x00" * 8)
+    explicit_zero = block_hasher(tokens, block_size, b"\x00" * 8, b"\x00" * 32)
+    assert default == explicit_zero
+
+
+def test_seed_isolation() -> None:
+    """Different seeds on the same tokens must produce disjoint hash lists."""
+    block_size = 32
+    tokens = np.arange(256, dtype=np.int32)
+
+    a = block_hasher(tokens, block_size, b"\x00" * 8, b"\x00" * 32)
+    b = block_hasher(tokens, block_size, b"\x00" * 8, b"\x01" * 32)
+    assert a != b
+    assert all(x != y for x, y in zip(a, b, strict=False))
+
+
+def test_invalid_seed_length_raises() -> None:
+    tokens = np.arange(128, dtype=np.int32)
+    with pytest.raises(ValueError):
+        block_hasher(tokens, 32, b"\x00" * 8, b"\x00" * 16)
 
 
 def test_block_hasher() -> None:
@@ -24,15 +52,15 @@ def test_block_hasher() -> None:
     num_tokens = 3000
     tokens = np.arange(num_tokens, dtype=np.int32)
 
-    hashes = block_hasher(tokens, block_size, 0)
+    hashes = block_hasher(tokens, block_size, b"\x00" * 8)
 
     assert isinstance(hashes, list)
-    assert isinstance(hashes[0], int)
+    assert isinstance(hashes[0], bytes)
     assert len(hashes) == num_tokens // block_size
 
     # It is very unlikely (but not impossible) that a valid hasher will return 0
     # Usually a 0 is indicative of a bug of some sort.
-    assert 0 not in hashes
+    assert b"\x00" * 8 not in hashes
 
     # It is unlikely (but not impossible) that a hasher will return the same value twice.
     # Usually a duplicate is indicative of a bug of some sort.
@@ -42,8 +70,8 @@ def test_block_hasher() -> None:
         seen.add(h)
 
 
-def mojo_block_hasher(tokens: np.ndarray, block_size: int) -> list[int]:
-    return block_hasher(tokens, block_size, 0)
+def mojo_block_hasher(tokens: np.ndarray, block_size: int) -> list[bytes]:
+    return block_hasher(tokens, block_size, b"\x00" * 8)
 
 
 def tensor_block_hasher(tokens: np.ndarray, block_size: int) -> list[int]:

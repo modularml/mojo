@@ -44,6 +44,6 @@ doesn't have the deployment hardware attached:
 
     :::
 
-.. click:: max.entrypoints.pipelines:cli_warm_cache
+.. click:: max._entrypoints.pipelines:cli_warm_cache
   :prog: max warm-cache
   :hide-description:

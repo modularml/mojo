@@ -40,7 +40,11 @@ from max.nn.kernels import (
     flash_attention_ragged,
     rope_split_store_ragged,
 )
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
+from max.nn.kv_cache import (
+    KVCacheParams,
+    MHAKVCacheParams,
+    PagedCacheValues,
+)
 from max.nn.layer import LayerList, Module, Shardable
 from max.nn.linear import MLP, ColumnParallelLinear, Linear
 from max.nn.norm import RMSNorm
@@ -329,6 +333,7 @@ class Qwen25VLDecoderAttentionWithRope(Module, Shardable):
             )
             sharded_num_heads = head_end - head_start
 
+            assert isinstance(self.kv_params, MHAKVCacheParams)
             sharded_head_start, sharded_head_end = _compute_shard_range(
                 self.kv_params.n_kv_heads,
                 shard_idx,

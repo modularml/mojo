@@ -24,7 +24,7 @@ Contains:
   - mma_block_interleave, mma_block_interleave_list, double_buffer_reorder
 """
 
-from std.collections import InlineArray, List
+from std.collections import Array, List
 
 from .config import PipelineConfig, ScheduleConfig, SchedulingStrategy
 from .dependency_graph import LoopBody, OpNode
@@ -45,13 +45,13 @@ def _derive_main_wait_vm(
     """Drain target for the top-of-half / first-cross-stage `entry_wait`.
 
     Walks the body's prefetch loads, sums their per-channel vm_cost,
-    then returns `total - per_half` — i.e. drain to leave one half's
+    then returns `total - per_half`, i.e. drain to leave one half's
     worth of prefetches in flight. The semantic: when this wait fires,
     the previous iter's writes targeting *this* half have committed,
     while future iters' prefetches can stay outstanding.
 
     For 2-half ping-pong / 4-wave (8 prefetches × VMCNT, 4 per half):
-    `(8 - 4) * VMCNT = 4 * VMCNT` — same value as the hardcoded
+    `(8 - 4) * VMCNT = 4 * VMCNT`, same value as the hardcoded
     `4 * config.vm_per_load_a` constant we previously used.
     Generalises correctly for kernels with non-uniform per-half
     prefetch counts and for `num_partitions != 2`.
@@ -249,7 +249,7 @@ def _construct_mma_blocks(
             entry_wait_lgkm = OpDesc.wait_lgkm_n(0)
 
         # Drain LDS reads before DRAM→LDS writes to avoid LDS port
-        # contention.  Only useful when a block has both fragment loads
+        # contention. Only useful when a block has both fragment loads
         # (LDS reads) and global loads (DRAM→LDS writes).
         var has_frag = pre_op_0.is_present() or pre_op_1.is_present()
         var has_dram = gl0.is_present() or gl1.is_present()
@@ -442,7 +442,7 @@ def derive_waits_from_blocks(
     completion if its stage matches the OTHER half's read stage
     (stage != half), because the other half's fragment loads will read
     from that LDS stage after the half-boundary barrier. A load to the
-    SAME half's stage (stage == half) is prefetch — it won't be read
+    SAME half's stage (stage == half) is prefetch; it won't be read
     until the next iteration of this half, so it can remain outstanding.
 
     Returns (wait_lgkm_first, wait_vm_last).
@@ -500,7 +500,7 @@ def derive_waits_from_blocks(
                     completion_vm += vm
         # Allow same-stage prefetch loads to remain outstanding; require
         # other-stage completion loads to finish before the half-boundary
-        # barrier.  Use min across halves (stricter wait wins).
+        # barrier. Use min across halves (stricter wait wins).
         best_vm = min(best_vm, total_vm - completion_vm)
 
     return (best_lgkm, best_vm)
@@ -516,7 +516,7 @@ def derive_safe_max_globals(num_k_mmas: Int) -> Int:
     When globals are uniformly distributed, a prefetch buffer_load_*_lds in
     block b writes to LDS stage h asynchronously. If block b+1's fragment
     loads read from the same stage, the async LDS write must complete before
-    the ds_read — the MMA compute between them must provide enough cycles.
+    the ds_read; the MMA compute between them must provide enough cycles.
 
     With num_k_mmas >= 2, each MMA block has 2+ MMAs (~32 cycles on MI355X),
     providing sufficient latency for async LDS writes (~20 cycles).
@@ -539,7 +539,7 @@ def derive_drain_mask(
     LDS regions.
 
     Skips the drain when fragment loads and the global load share the same
-    channel — sequential access to the same LDS region has less contention.
+    channel: sequential access to the same LDS region has less contention.
 
     Returns a bitmask where bit i=1 means block i should drain lgkm before
     its global loads.
@@ -930,7 +930,7 @@ def verify_schedule(
 ):
     """Verify structural invariants of a finalized pipeline schedule.
 
-    Runs at compile time — zero runtime cost. Catches bugs in schedule
+    Runs at compile time, zero runtime cost. Catches bugs in schedule
     construction that would otherwise surface as silent GPU miscomputes.
 
     Checks:
@@ -944,9 +944,24 @@ def verify_schedule(
 
     Note: these are structural checks on the generated program. They do
     not verify that the execution ordering respects all LDG dependency
-    edges — that is enforced by the scheduler (greedy_schedule /
+    edges; that is enforced by the scheduler (greedy_schedule /
     optimal_schedule) which only places ops whose d=0 predecessors are
     already scheduled.
+
+    Args:
+        program: The finalized `PipelineProgram` to verify.
+        config: Pipeline configuration providing block structure geometry
+            and partition count.
+        lgkm_per_a: Per-channel lgkm cost for channel 0 loads, used to
+            bound `wait_lgkm_first`. 0 means unknown (skips the bound
+            check).
+        lgkm_per_b: Per-channel lgkm cost for channel 1 loads, used to
+            bound `wait_lgkm_first`. 0 means unknown (skips the bound
+            check).
+        wait_lgkm_first: The lgkm wait count applied at the first block of
+            each half. 255 means no wait is emitted.
+        wait_vm_last: The vm wait count applied at the last block of each
+            half.
     """
     var num_blocks = config.blocks_per_partition() * config.num_partitions
     var max_g = config.block_sizing.max_globals
@@ -1185,8 +1200,17 @@ def single_buffer_reorder(
     steady-state, so the output has len(logical) + 1 ops.
 
     Output order:
-        frag[1..T-1], compute[0], sync, store_shared, load_global,
-        compute[1..T-1], sync, frag[0]
+
+    ```text
+    frag[1..T-1], compute[0], sync, store_shared, load_global,
+    compute[1..T-1], sync, frag[0]
+    ```
+
+    Args:
+        logical: The logical iteration's ops in causal order.
+        config: Pipeline configuration providing the loop-carried op
+            selector used to split fragment loads across the iteration
+            boundary.
     """
     var lc = config.loop_carried
     var result = List[OpDesc]()
@@ -1247,6 +1271,12 @@ def optimize_within_barriers(
 
     Edges are derived from the full body, then filtered per segment.
     Only d=0 (intra-iteration) edges are relevant for segment-local ordering.
+
+    Args:
+        body: The op list with fixed barriers delimiting segments to
+            optimize.
+        config: Pipeline configuration used to derive dependency edges for
+            segment scheduling.
     """
     var n = len(body)
 
@@ -1324,10 +1354,12 @@ def mma_block_interleave[
 ](logical: Pipe[N], config: PipelineConfig) -> Pipe[N]:
     """Interleave ops across MMA blocks for latency hiding.
 
-    Takes the logical iteration in causal order — what one ping-pong half
+    Takes the logical iteration in causal order: what one ping-pong half
     computes:
 
-        global_loads → fragment_loads → MMAs
+    ```text
+    global_loads → fragment_loads → MMAs
+    ```
 
     Distributes them across MMA blocks so fragment loads and global loads
     execute during MMA stalls. Fragment loads are placed just before their
@@ -1342,10 +1374,10 @@ def mma_block_interleave[
     var pos = 0
 
     # Classify ops by type.
-    var globals = InlineArray[OpDesc, N](uninitialized=True)
-    var frag_a = InlineArray[OpDesc, N](uninitialized=True)
-    var frag_b = InlineArray[OpDesc, N](uninitialized=True)
-    var mmas = InlineArray[OpDesc, N](uninitialized=True)
+    var globals = Array[OpDesc, N](uninitialized=True)
+    var frag_a = Array[OpDesc, N](uninitialized=True)
+    var frag_b = Array[OpDesc, N](uninitialized=True)
+    var mmas = Array[OpDesc, N](uninitialized=True)
     var n_g = 0
     var n_fa = 0
     var n_fb = 0
@@ -1367,8 +1399,8 @@ def mma_block_interleave[
             n_m += 1
 
     # Track which M-tile rows and N-tile cols have been seen.
-    var seen_m = InlineArray[Int, N](fill=0)
-    var seen_n = InlineArray[Int, N](fill=0)
+    var seen_m = Array[Int, N](fill=0)
+    var seen_n = Array[Int, N](fill=0)
 
     var g_idx = 0  # next global load to place
 
@@ -1442,6 +1474,12 @@ def mma_block_interleave_list(
     Distributes ops across MMA blocks for latency hiding. Fragment loads
     are placed just before their first consumer MMA; global loads fill
     remaining slots. Output order matches the Pipe[N] version exactly.
+
+    Args:
+        logical: The logical iteration's ops in causal order: global
+            loads, fragment loads, then MMAs.
+        config: Pipeline configuration providing block sizing and
+            fragment ordering.
     """
     var sizing = config.block_sizing
     var b_first = config.frag_order.b_before_a

@@ -17,7 +17,7 @@ import json
 import os
 from typing import Any
 
-from max.pipelines.modeling.weights.hf_utils import HuggingFaceRepo
+from max.pipelines.weights.hf_utils import HuggingFaceRepo
 from transformers import AutoConfig, PretrainedConfig
 
 # Process-wide cache keyed by HuggingFaceRepo. Avoids redundant network or
@@ -49,7 +49,7 @@ def load_raw_config_json(repo: HuggingFaceRepo) -> dict[str, Any]:
 
     if repo.repo_type == "local":
         for filename in filenames:
-            parts = [repo.repo_id]
+            parts = [repo.local_path]
             if repo.subfolder is not None:
                 parts.append(repo.subfolder)
             parts.append(filename)
@@ -75,9 +75,12 @@ def load_raw_config_json(repo: HuggingFaceRepo) -> dict[str, Any]:
                 continue
 
     if config_path is None:
+        location = (
+            repo.local_path if repo.repo_type == "local" else repo.repo_id
+        )
         raise FileNotFoundError(
             f"No config.json or scheduler_config.json found in"
-            f" {repo.repo_id}/{repo.subfolder or ''}"
+            f" {location}/{repo.subfolder or ''}"
         )
 
     with open(config_path) as f:

@@ -46,7 +46,7 @@ def measure_gpu_latency(
     Returns:
         Sequence of per-iteration latencies in milliseconds.
     """
-    stream = device.default_stream
+    stream = device.default_queue
     latencies: list[float] = []
 
     # Warmup (outside NVTX range).

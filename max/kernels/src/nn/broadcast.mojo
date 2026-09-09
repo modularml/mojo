@@ -10,10 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements numpy-style tensor broadcasting for CPU and GPU targets."""
 
 
 from layout import TileTensor
-from std.memory import memcpy
+from std.memory import unsafe_memcpy
 
 
 # ===-----------------------------------------------------------------------===#
@@ -24,7 +25,7 @@ from std.memory import memcpy
 def _get_rightmost_broadcast_axis[
     dtype: DType,
 ](
-    input: TileTensor[dtype, ...],
+    input: TileTensor[mut=False, dtype, ...],
     output: TileTensor[mut=True, dtype, ...],
 ) -> Int:
     """
@@ -53,15 +54,16 @@ def _get_rightmost_broadcast_axis[
 def broadcast[
     dtype: DType,
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[dtype, address_space=AddressSpace.GENERIC, ...],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
 ):
     """
     For each axis of `input`, if the dimension is 1, duplicate the data at
     each index of the corresponding axis in `output`, otherwise copy over the
     entire axis to the corresponding axis in `output`.
+
+    Parameters:
+        dtype: The element type of the `input` and `output` tensors.
 
     Args:
         output: The output buffer.
@@ -80,7 +82,7 @@ def broadcast[
     if input_output_have_same_shape:
         var src_ptr = input.ptr
         var dst_ptr = output.ptr
-        memcpy(dest=dst_ptr, src=src_ptr, count=input.num_elements())
+        unsafe_memcpy(dest=dst_ptr, src=src_ptr, count=input.num_elements())
         return
 
     comptime init_axis = 0
@@ -103,10 +105,8 @@ def broadcast_impl[
     dtype: DType,
 ](
     axis: Int,
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[dtype, address_space=AddressSpace.GENERIC, ...],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
     # using `prev` because otherwise computing `next_input_axis_stride` requires
     # dim[axis+1](), which requires more `comptime assert` to keep in bound
     input_prev_axis_stride: Int,
@@ -119,6 +119,9 @@ def broadcast_impl[
     For each axis of `input` ∈ [axis, rank), if the dimension is 1, duplicate the data at
     each index of the corresponding axis in `output`, otherwise copy over the
     entire axis to the corresponding axis in `output`.
+
+    Parameters:
+        dtype: The element type of the `input` and `output` tensors.
 
     Args:
         axis: The axis value.
@@ -136,8 +139,8 @@ def broadcast_impl[
 
     if axis == rightmost_broadcast_axis:
         _tile_1d(
-            output.ptr + output_offset,
-            input.ptr + input_offset,
+            output.ptr.unsafe_offset(output_offset),
+            input.ptr.unsafe_offset(input_offset),
             input_axis_stride,
             Int(output.dim(axis)),
         )
@@ -166,9 +169,12 @@ def broadcast_impl[
     # --> [[1, 1, 1], [0, 0, 0]]   after recursive call to next axis
     # --> [[1, 1, 1], [1, 1, 1]]   after duplicating data in output
     if Int(input.dim(axis)) != Int(output.dim(axis)):
-        var output_tile_start = output.ptr + output_offset
+        var output_tile_start = output.ptr.unsafe_offset(output_offset)
         _tile_1d(
-            output_tile_start + output_axis_stride,  # 1st tile is already there
+            # AnyOrigin needed for exclusivity check
+            (
+                output_tile_start.unsafe_offset(output_axis_stride)
+            ).as_unsafe_any_origin(),  # 1st tile is already there
             output_tile_start,
             output_axis_stride,  # elems_to_copy
             Int(output.dim(axis)) - 1,  # 1st tile is already there
@@ -178,15 +184,15 @@ def broadcast_impl[
 def _tile_1d[
     dtype: DType,
 ](
-    init_dst_ptr: UnsafePointer[
-        mut=True,
+    init_dst_ptr: MutPointer[
         Scalar[dtype],
-        MutAnyOrigin,
-        address_space=AddressSpace.GENERIC,
+        _,
+        address_space=.GENERIC,
     ],
-    src_ptr: ImmutUnsafePointer[
+    src_ptr: ImmPointer[
         Scalar[dtype],
-        address_space=AddressSpace.GENERIC,
+        _,
+        address_space=.GENERIC,
         ...,
     ],
     tile_num_elems: Int,
@@ -197,5 +203,5 @@ def _tile_1d[
     """
     var dst_ptr = init_dst_ptr
     for _ in range(n):
-        memcpy(dest=dst_ptr, src=src_ptr, count=tile_num_elems)
-        dst_ptr = dst_ptr + tile_num_elems
+        unsafe_memcpy(dest=dst_ptr, src=src_ptr, count=tile_num_elems)
+        dst_ptr = dst_ptr.unsafe_offset(tile_num_elems)

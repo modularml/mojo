@@ -20,10 +20,10 @@ then launches the warp-specialized kernel.
 from std.math import align_up, ceildiv
 from std.sys import size_of
 
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.host.info import B200
-from std.gpu.primitives.grid_controls import pdl_launch_attributes, PDLLevel
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host.info import B200
+from max.gpu.primitives.grid_controls import pdl_launch_attributes, PDLLevel
 from layout import (
     ComptimeInt,
     Coord,
@@ -161,7 +161,7 @@ def _create_tma_and_launch[
 
     This function accepts already-reshaped tensors (3D for A/B/C, 5D for
     scale factors) so that TMA descriptor creation and kernel launch live
-    in the same scope -- avoiding scoping issues with @parameter if
+    in the same scope -- avoiding scoping issues with comptime if
     branches (TMA descriptors are scoped references).
     """
     comptime a_type = config.a_type
@@ -208,7 +208,7 @@ def _create_tma_and_launch[
 
     # A matrix TMA
     comptime a_tma_tile_shape = Index(1, BM // cluster_shape[1], BK)
-    a_tma_op = create_tma_tile[
+    var a_tma_op = create_tma_tile[
         matmul_kernel.ATileLayout,
         matmul_kernel.ADescLayout,
         a_tma_tile_shape,
@@ -221,7 +221,7 @@ def _create_tma_and_launch[
     ) if transpose_b else Index(
         1, BK, BN // (cluster_shape[0] // config.cta_group)
     )
-    b_tma_op = create_tma_tile[
+    var b_tma_op = create_tma_tile[
         matmul_kernel.BTileLayout,
         matmul_kernel.BDescLayout,
         b_tma_tile_shape,

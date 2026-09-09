@@ -1,0 +1,17 @@
+load("//bazel:api.bzl", "modular_py_test")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "test_weight_adapter",
+    size = "large",
+    srcs = ["test_weight_adapter.py"],
+    deps = [
+        "//max/python/max/pipelines/architectures/inkling",
+        "//max/python/max/pipelines/architectures/unified_mtp_inkling",
+    ],
+)

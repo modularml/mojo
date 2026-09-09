@@ -30,7 +30,7 @@ body:
       label: Review Mojo's priorities
       description: Please take a look at our roadmap before you file a new feature request.
       options:
-        - label: I have read the [roadmap and priorities](https://docs.modular.com/mojo/roadmap.html#overall-priorities) and I believe this request falls within the priorities.
+        - label: I have read the [roadmap and priorities](https://mojolang.org/docs/roadmap.html#overall-priorities) and I believe this request falls within the priorities.
           required: true
 
   - type: markdown

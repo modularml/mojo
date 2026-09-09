@@ -1,0 +1,63 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# FIXME(26700): split this single long expression into smaller ones. Right now
+# the REPL breaks after using List.
+
+from std.collections import List
+
+struct Point(TrivialRegisterPassable, Copyable, Movable):
+  var x: Int
+  var y: Int
+  def __init__(out self, x: Int, y:Int):
+    self.x = x
+    self.y = y
+
+# CHECK: (List[Int]) vec = (size 5)[1, 2, 3, 4, 5] {
+# CHECK:   (Int) [0] = 1
+# CHECK:   (Int) [1] = 2
+# CHECK:   (Int) [2] = 3
+# CHECK:   (Int) [3] = 4
+# CHECK:   (Int) [4] = 5
+# CHECK: }
+# CHECK: (List[Float32]) vec2 = (size 2)[4.3{{[0-9]*}}, 8.8{{[0-9]*}}] {
+# CHECK:   (Float32) [0] = 4.3{{[0-9]*}}
+# CHECK:   (Float32) [1] = 8.8{{[0-9]*}}
+# CHECK: }
+# CHECK: (List[Point]) vec3 = (size 3) {
+# CHECK:   (Point) [0] = {
+# CHECK:     (Int) x = 1
+# CHECK:     (Int) y = 1
+# CHECK:   }
+# CHECK:   (Point) [1] = {
+# CHECK:     (Int) x = 2
+# CHECK:     (Int) y = 2
+# CHECK:   }
+# CHECK:   (Point) [2] = {
+# CHECK:     (Int) x = 3
+# CHECK:     (Int) y = 3
+# CHECK:   }
+# CHECK: }
+
+var vec = List[Int](capacity=5)
+vec.append(1)
+vec.append(2)
+vec.append(3)
+vec.append(4)
+vec.append(5)
+var vec2 = List[Float32](capacity=2)
+vec2.append(4.3)
+vec2.append(8.8)
+var vec3 = List[Point](capacity=3)
+var p1 = Point(1, 1)
+var p2 = Point(2, 2)
+var p3 = Point(3, 3)
+vec3.append(p1)
+vec3.append(p2)
+vec3.append(p3)

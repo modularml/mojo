@@ -1,0 +1,13 @@
+diff --git a/lldb/tools/lldb-dap/Handler/RequestHandler.cpp b/lldb/tools/lldb-dap/Handler/RequestHandler.cpp
+index b06a43d7421c..102bd63c6ede 100644
+--- a/lldb/tools/lldb-dap/Handler/RequestHandler.cpp
++++ b/lldb/tools/lldb-dap/Handler/RequestHandler.cpp
+@@ -267,7 +267,7 @@ void BaseRequestHandler::PrintWelcomeMessage() const {
+   llvm::raw_string_ostream OS(message);
+ 
+ #ifdef LLDB_DAP_WELCOME_MESSAGE
+-  dap.SendOutput(eOutputCategoryConsole, LLDB_DAP_WELCOME_MESSAGE);
++  dap.SendOutput(OutputType::Console, LLDB_DAP_WELCOME_MESSAGE);
+ #endif
+ 
+   // Trying to provide a brief but helpful welcome message for users to better

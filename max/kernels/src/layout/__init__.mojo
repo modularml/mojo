@@ -13,12 +13,12 @@
 """Provides layout and layout tensor types, which abstract memory layout for
 multidimensional data.
 
-- The [`Layout`](/docs/layout/layout/Layout) type represents a mapping
+- The [`Layout`](/api/mojo/layout/layout/Layout) type represents a mapping
   between a set of logical coordinates and a linear index. It can be used, for
   example, to map logical tensor coordinates to a memory address, or to map GPU
   threads to tiles of data.
 
-- The [`LayoutTensor`](/docs/layout/layout_tensor/LayoutTensor) type is a
+- The [`LayoutTensor`](/api/mojo/layout/layout_tensor/LayoutTensor) type is a
   high-performance tensor with explicit memory layout via a `Layout`.
 """
 from .coord import (
@@ -48,6 +48,7 @@ from .tile_layout import (
 )
 from .runtime_layout import RuntimeLayout
 from .runtime_tuple import RuntimeTuple
+from .numpy import from_numpy, to_numpy
 from .tile_tensor import (
     TileTensor,
     flatten_leading,
@@ -55,4 +56,8 @@ from .tile_tensor import (
     lt_to_tt,
     lt_to_tt_idx,
     LTToTTLayout,
+)
+from .tensor_engine import (
+    TensorEngine,
+    DefaultEngine,
 )

@@ -4,7 +4,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -30,6 +29,9 @@ modular_py_test(
     name = "glm_mla_fp8",
     size = "large",
     srcs = ["test_mla_fp8_glm.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "1",
+    },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],

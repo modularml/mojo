@@ -24,7 +24,7 @@ CUDA context for the rest of the process.  All subprocesses are launched
 in parallel for speed.
 
 Usage:
-    bt-h100 //max/tests/integration/unorganized:compare_fusion_errors \
+    bt-b200 //max/tests/integration/unorganized:compare_fusion_errors \
         --test_output=streamed --cache_test_results=no
 """
 

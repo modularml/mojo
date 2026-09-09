@@ -11,10 +11,19 @@
 # limitations under the License.
 ##===----------------------------------------------------------------------===##
 
-name: bench_kv_cache_ragged_flash_attention
+name: bench_kv_cache_ragged_flash_attention_paged
 file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_kv_cache_ragged_flash_attention_paged.mojo
 
 params:
+
+# llama3.3.70b shapes (TP=4, production serving)
+# Minimal fixed-param block so the dashboard can match BQ specs for this model.
+# BQ specs include: num_q_heads=16/num_kv_heads=2/head_dim=128/model=llama3.3.70b/tp=4
+- num_q_heads: 16
+  num_kv_heads: 2
+  head_dim: 128
+  metadata:
+    MODEL: llama3.3.70b
 
 # llama3.1 shapes
 # token gen
@@ -66,3 +75,12 @@ params:
   $use_random_cache_lengths: False
   metadata:
     MODEL: llama3.2
+
+# llama3.3.70b shapes (TP=4, production serving)
+# Minimal fixed-param block so the dashboard can match BQ specs for this model.
+# BQ specs include: num_q_heads=16/num_kv_heads=2/head_dim=128/model=llama3.3.70b/tp=4
+- num_q_heads: 16
+  num_kv_heads: 2
+  head_dim: 128
+  metadata:
+    MODEL: llama3.3.70b

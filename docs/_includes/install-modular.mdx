@@ -6,7 +6,7 @@ import Link from '@docusaurus/Link';
 import ConditionalVersionDocs from '@site/src/components/ConditionalVersionDocs'
 import Tooltip from '@site/src/components/Tooltip/tooltip';
 
-export default function InstallModular({ folder = "example-project", extraLibraries = [] }) {
+export default function InstallMAX({ folder = "example-project", extraLibraries = [] }) {
   const extraLibsString = extraLibraries.length > 0 ? ' ' + extraLibraries.join(' ') : '';
   const extraLibsDescription = extraLibraries.length > 0
     ? ' and other required packages'
@@ -45,7 +45,7 @@ export default function InstallModular({ folder = "example-project", extraLibrar
                 <p>
                   <b>Tip:</b>{' '}
                   You can skip the <code>-c</code> options if you{' '}
-                  <Link to="/pixi#create-a-project-and-virtual-environment">
+                  <Link to="https://pixi.prefix.dev/dev/reference/pixi_configuration/#default-channels">
                     add these channels as defaults
                   </Link>.
                 </p>
@@ -55,17 +55,17 @@ export default function InstallModular({ folder = "example-project", extraLibrar
 
             <ConditionalVersionDocs version="nightly">
               <li>
-                Install <code>modular</code> ({tooltipNightly}){extraLibsDescription}:
+                Install <code>max</code> with all dependencies ({tooltipNightly}){extraLibsDescription}:
                 <CodeBlock language="sh">
-                  {`pixi add modular${extraLibsString}`}
+                  {`pixi add max-all${extraLibsString}`}
                 </CodeBlock>
               </li>
             </ConditionalVersionDocs>
             <ConditionalVersionDocs version="stable">
               <li>
-                Install <code>modular</code> ({tooltipStable}){extraLibsDescription}:
+                Install <code>max</code> with all dependencies ({tooltipStable}){extraLibsDescription}:
                 <CodeBlock language="sh">
-                  {`pixi add "modular==26.3"${extraLibsString}`}
+                  {`pixi add "max-all==26.5"${extraLibsString}`}
                 </CodeBlock>
               </li>
             </ConditionalVersionDocs>
@@ -106,9 +106,9 @@ export default function InstallModular({ folder = "example-project", extraLibrar
 
             <ConditionalVersionDocs version="nightly">
               <li>
-                Install <code>modular</code> ({tooltipNightly}){extraLibsDescription}:
+                Install <code>max</code> with all dependencies ({tooltipNightly}){extraLibsDescription}:
                 <CodeBlock language="sh">
-                  {`uv add modular${extraLibsString} \\
+                  {`uv add "max[all]"${extraLibsString} \\
     --index https://whl.modular.com/nightly/simple/ \\
     --prerelease allow`}
                 </CodeBlock>
@@ -116,10 +116,9 @@ export default function InstallModular({ folder = "example-project", extraLibrar
             </ConditionalVersionDocs>
             <ConditionalVersionDocs version="stable">
               <li>
-                Install <code>modular</code> ({tooltipStable}){extraLibsDescription}:
+                Install <code>max</code> with all dependencies ({tooltipStable}){extraLibsDescription}:
                 <CodeBlock language="sh">
-                  {`uv add modular${extraLibsString} \\
-    --extra-index-url https://modular.gateway.scarf.sh/simple/`}
+                  {`uv add "max[all]"${extraLibsString}`}
                 </CodeBlock>
               </li>
             </ConditionalVersionDocs>

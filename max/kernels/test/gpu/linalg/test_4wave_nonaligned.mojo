@@ -49,7 +49,7 @@ output store's `if m < M:` / `if n < N:` guard masks the SRD OOB reads
 on both axes. UB is formal only, not a correctness regression.
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.random import rand
 
 from layout import TileTensor, row_major

@@ -19,6 +19,7 @@ MAX Driver Python bindings.
 Provides low-level access to hardware devices and memory management.
 """
 
+import enum
 import os
 import types
 from collections.abc import Callable, Generator, Mapping, Sequence
@@ -34,9 +35,7 @@ class Device:
 
     This is the base class for :class:`CPU` and :class:`Accelerator`.
     Do not instantiate this class directly; use :class:`CPU` for host
-    devices, :class:`Accelerator` for any hardware accelerator (GPU
-    by default), or :class:`NPU` to explicitly select the NPU
-    dispatch path. :class:`NPU` is a subclass of :class:`Accelerator`.
+    devices and :class:`Accelerator` for any hardware accelerator.
 
     .. code-block:: python
 
@@ -44,7 +43,6 @@ class Device:
 
         cpu = driver.CPU()
         gpu = driver.Accelerator()
-        npu = driver.NPU()
     """
 
     def can_access(self, other: Device) -> bool:
@@ -87,6 +85,22 @@ class Device:
 
             device = driver.CPU()
             device.is_host
+        """
+
+    @property
+    def is_host_unified(self) -> bool:
+        """
+        Whether this device and the host draw from one physical memory pool.
+
+        Reports hardware topology, so it does not predict whether a particular
+        buffer is readable from the host.
+
+        .. code-block:: python
+
+            from max import driver
+
+            device = driver.Accelerator()
+            device.is_host_unified
         """
 
     @property
@@ -137,6 +151,7 @@ class Device:
         - ``cpu`` for host devices.
         - ``cuda`` for NVIDIA GPUs.
         - ``hip`` for AMD GPUs.
+        - ``metal`` for Apple GPUs.
 
         .. code-block:: python
 
@@ -166,6 +181,25 @@ class Device:
         """
 
     @property
+    def model_name(self) -> str:
+        """
+        Returns the model name of the device.
+
+        Examples of possible values:
+
+        - ``NVIDIA H100 80GB HBM3`` for an H100.
+        - ``NVIDIA B200`` for a B200.
+        - ``AMD Instinct MI300X`` for an MI300X.
+
+        .. code-block:: python
+
+            from max import driver
+
+            device = driver.Accelerator()
+            device.model_name
+        """
+
+    @property
     def id(self) -> int:
         """
         Returns a zero-based device id.
@@ -187,14 +221,14 @@ class Device:
         """
 
     @property
-    def default_stream(self) -> DeviceStream:
+    def default_queue(self) -> DeviceQueue:
         """
-        Returns the default stream for this device.
+        Returns the default queue for this device.
 
-        The default stream is initialized when the device object is created.
+        The default queue is initialized when the device object is created.
 
         Returns:
-            DeviceStream: The default execution stream for this device.
+            DeviceQueue: The default execution queue for this device.
         """
 
     @property
@@ -211,7 +245,7 @@ class Device:
         Enqueues a Python callable to run on the host after preceding work.
 
         The callable runs on a driver thread once the device's default
-        stream reaches this point, after all previously enqueued work has
+        queue reaches this point, after all previously enqueued work has
         completed. It must not call any device APIs (per the
         ``cuLaunchHostFunc`` contract). Currently only supported on CUDA
         devices.
@@ -237,14 +271,14 @@ class Device:
 
         Like ``__unsafe_enqueue_py_host_func``, except the kickoff host
         node dispatches ``fn`` onto ``cpu``'s AsyncRT worker pool and
-        returns immediately, so the GPU stream can proceed to
+        returns immediately, so the GPU queue can proceed to
         subsequent nodes concurrently with ``fn`` running on an
         AsyncRT worker thread.
 
         When ``fn`` finishes, the worker atomic-stores ``value``
         (release ordering) to the 64-bit memory at ``flag``. Pair with
-        ``DeviceStream.wait_for_host_value(flag, value)`` on the same
-        stream to gate the downstream consumer kernel.
+        ``DeviceQueue.wait_for_host_value(flag, value)`` on the same
+        queue to gate the downstream consumer kernel.
 
         The trampoline keeps refcounts on ``flag``'s underlying MLRT
         allocation AND on ``cpu``'s AsyncRT CPUDevice, so neither can
@@ -270,8 +304,6 @@ class Device:
                 the enqueue.
         """
 
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
     def __eq__(self, arg: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     def _device_context_ptr(self) -> int:
@@ -286,18 +318,11 @@ class Accelerator(Device):
         """
         Creates an accelerator device with the specified ID and memory limit.
 
-        Represents any hardware accelerator (GPU or NPU) attached to the
-        host. Constructing ``Accelerator()`` directly produces a GPU-labeled
-        device, which is the dispatch path the graph compiler uses for
-        CUDA, HIP, Metal and any other GPU-class backend. Use the
-        :class:`NPU` subclass to explicitly select the NPU dispatch path
-        instead.
-
-        :class:`NPU` is a subclass of ``Accelerator``, so any
-        ``isinstance(device, Accelerator)`` check is satisfied by both GPU
-        and NPU devices. Treat ``Accelerator`` as "any non-CPU device"
-        when writing isinstance checks; use the concrete subclass when
-        you specifically need the GPU or NPU dispatch path.
+        Represents any hardware accelerator attached to the host: the
+        graph compiler reaches CUDA, HIP, Metal and plugin-provided
+        backends alike through this one device class. Use
+        ``isinstance(device, Accelerator)`` to mean "any non-CPU device",
+        and :attr:`api` to tell the concrete backends apart.
 
         Repeated instantiations with a previously-used device-id will still
         refer to the first such instance that was created. This is especially
@@ -315,8 +340,6 @@ class Accelerator(Device):
           device = driver.Accelerator(id=1)  # Second GPU
           # Get device id
           device_id = device.id
-          # NPU is also an Accelerator
-          isinstance(driver.NPU(), driver.Accelerator)  # True
 
         Args:
             id (int, optional): The device ID to use. Defaults to -1, which selects
@@ -324,37 +347,6 @@ class Accelerator(Device):
 
         Returns:
             Accelerator: A new Accelerator device object.
-        """
-
-class NPU(Accelerator):
-    def __init__(self, id: int = -1) -> None:
-        """
-        Creates an NPU accelerator device.
-
-        ``NPU`` is a subclass of :class:`Accelerator`: an NPU **is an**
-        accelerator, and ``isinstance(device, Accelerator)`` returns
-        ``True`` for any ``NPU`` instance. The reason to construct an
-        ``NPU`` instead of a bare ``Accelerator`` is to select the NPU
-        dispatch path: the graph compiler stamps an ``"npu"`` device
-        label, emits ``target="npu"`` Mojo kernels, and routes through
-        the NPU plugin hook rather than the default GPU dispatch path.
-
-        On platforms without an NPU backend the device will still be
-        created, but downstream graph compilation will fail with an
-        unsupported target error.
-
-        .. code-block:: python
-
-            from max import driver
-            device = driver.NPU()
-            device = driver.NPU(id=0)
-
-        Args:
-            id (int, optional): The device ID to use. Defaults to -1, which
-                selects the first available NPU.
-
-        Returns:
-            NPU: A new NPU device object.
         """
 
 class CPU(Device):
@@ -382,12 +374,12 @@ class CompletionFlag:
     """
     An 8-byte completion flag in pinned host memory mapped into a device's address space.
 
-    Lets a CPU thread signal a GPU stream (or vice versa) by
+    Lets a CPU thread signal a GPU queue (or vice versa) by
     writing a 64-bit value to a single location that's visible to
-    both. Pair with ``DeviceStream.wait_for_host_value`` (added in
+    both. Pair with ``DeviceQueue.wait_for_host_value`` (added in
     a follow-on PR) or the ``mo.wait_host_value`` graph op to gate
     downstream GPU work on a host-produced result without a
-    second stream or a blocking host callback.
+    second queue or a blocking host callback.
 
     Currently requires a CUDA-backed ``Device``; constructing
     against any other backend raises ``RuntimeError``.
@@ -418,7 +410,7 @@ class CompletionFlag:
         """
         Device-visible 64-bit address of the 8-byte slot.
 
-        Suitable for passing to graph ops or stream APIs that wait
+        Suitable for passing to graph ops or queue APIs that wait
         on a memory value.
         """
 
@@ -480,7 +472,7 @@ class DeviceEvent:
     Provides access to an event object.
 
     An event can be used to wait for the GPU execution to reach a certain
-    point on the given stream.
+    point on the given queue.
 
     .. code-block:: python
 
@@ -489,9 +481,9 @@ class DeviceEvent:
         device = driver.Accelerator()
         # Create an event on the device
         event = driver.DeviceEvent(device)
-        # Record an event on the device (default stream)
-        device.default_stream.record_event(event)
-        # Wait for execution on the default stream to reach the event
+        # Record an event on the device (default queue)
+        device.default_queue.record_event(event)
+        # Wait for execution on the default queue to reach the event
         event.synchronize()
     """
 
@@ -520,7 +512,7 @@ class DeviceEvent:
 
     def synchronize(self) -> None:
         """
-        Ensures all operations on this stream complete before returning.
+        Ensures all operations on this queue complete before returning.
 
         Raises:
             ValueError: If any enqueued operations had an internal error.
@@ -542,7 +534,7 @@ class DeviceEvent:
         Returns the elapsed GPU time in milliseconds between this event and ``end_event``.
 
         Both events must have been created with ``enable_timing=True``
-        and recorded on a stream before calling this method. The end
+        and recorded on a queue before calling this method. The end
         event must be synchronized before calling this method.
 
         Args:
@@ -563,51 +555,130 @@ class DeviceEvent:
             start = driver.DeviceEvent(device, enable_timing=True)
             end = driver.DeviceEvent(device, enable_timing=True)
 
-            stream = device.default_stream
-            stream.record_event(start)
+            queue = device.default_queue
+            queue.record_event(start)
             # ... GPU work ...
-            stream.record_event(end)
+            queue.record_event(end)
             end.synchronize()
 
             elapsed_ms = start.elapsed_time(end)
         """
 
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
     def __eq__(self, arg: object, /) -> bool: ...
 
-class DeviceStream:
+class LaunchTraceEntry:
     """
-    Provides access to a stream of execution on a device.
+    One operation recorded by ``max.driver.begin_launch_trace``.
 
-    A stream represents a sequence of operations that will be executed in order.
-    Multiple streams on the same device can execute concurrently.
+    Describes a kernel launch, memory copy, or memset enqueued on a
+    device stream. Only the field group matching ``kind`` is
+    meaningful; the other groups hold zero values. ``stream_index``
+    identifies which stream enqueued the operation, so entries from
+    different streams can be told apart in the single enqueue-ordered
+    list. ``semantic_hash`` is a deterministic hash of the launch
+    parameters that excludes memory addresses, so it is stable across
+    runs and suitable for change-detection in tests.
+    """
+
+    class OperationKind(enum.Enum):
+        """The kind of operation a trace entry describes."""
+
+        KERNEL_LAUNCH = 0
+
+        MEMCPY = 1
+
+        MEMSET = 2
+
+    class MemcpyKind(enum.Enum):
+        """The direction of a memcpy entry."""
+
+        NONE = 0
+
+        HTOD = 1
+
+        DTOH = 2
+
+        DTOD = 3
+
+    @property
+    def kind(self) -> LaunchTraceEntry.OperationKind:
+        """The kind of operation this entry represents."""
+
+    @property
+    def name(self) -> str:
+        """
+        The kernel name, or the driver API name for copies/memsets (e.g. ``cuMemcpyHtoD``).
+        """
+
+    @property
+    def semantic_hash(self) -> int:
+        """Deterministic, address-free hash of the operation parameters."""
+
+    @property
+    def grid_x(self) -> int: ...
+    @property
+    def grid_y(self) -> int: ...
+    @property
+    def grid_z(self) -> int: ...
+    @property
+    def block_x(self) -> int: ...
+    @property
+    def block_y(self) -> int: ...
+    @property
+    def block_z(self) -> int: ...
+    @property
+    def shared_mem_bytes(self) -> int: ...
+    @property
+    def stream_index(self) -> int:
+        """
+        Identifies the stream this operation was enqueued on, assigned in first-seen order within a trace.
+        """
+
+    @property
+    def memcpy_kind(self) -> LaunchTraceEntry.MemcpyKind:
+        """The copy direction; ``NONE`` unless ``kind`` is ``MEMCPY``."""
+
+    @property
+    def memcpy_byte_size(self) -> int: ...
+    @property
+    def memset_byte_size(self) -> int: ...
+    @property
+    def memset_value(self) -> int: ...
+    @property
+    def memset_value_size(self) -> int: ...
+
+class DeviceQueue:
+    """
+    Provides access to a queue of execution on a device.
+
+    A queue represents a sequence of operations that will be executed in order.
+    Multiple queues on the same device can execute concurrently.
 
     .. code-block:: python
 
         from max import driver
         # Create a default accelerator device
         device = driver.Accelerator()
-        # Get the default stream for the device
-        stream = device.default_stream
-        # Create a new stream of execution on the device
-        new_stream = driver.DeviceStream(device)
+        # Get the default queue for the device
+        queue = device.default_queue
+        # Create a new queue of execution on the device
+        new_queue = driver.DeviceQueue(device)
     """
 
     def __init__(self, device: Device) -> None:
         """
-        Creates a new stream of execution associated with the device.
+        Creates a new queue of execution associated with the device.
 
         Args:
-            device (Device): The device to create the stream on.
+            device (Device): The device to create the queue on.
 
         Returns:
-            DeviceStream: A new stream of execution.
+            DeviceQueue: A new queue of execution.
         """
 
     def synchronize(self) -> None:
         """
-        Ensures all operations on this stream complete before returning.
+        Ensures all operations on this queue complete before returning.
 
         Raises:
             ValueError: If any enqueued operations had an internal error.
@@ -616,11 +687,11 @@ class DeviceStream:
     @overload
     def record_event(self) -> DeviceEvent:
         """
-        Records an event on this stream.
+        Records an event on this queue.
 
         Returns:
             DeviceEvent: A new event that will be signaled when all operations
-                submitted to this stream before this call have completed.
+                submitted to this queue before this call have completed.
 
         Raises:
             ValueError: If recording the event failed.
@@ -629,48 +700,48 @@ class DeviceStream:
     @overload
     def record_event(self, event: DeviceEvent) -> None:
         """
-        Records an existing event on this stream.
+        Records an existing event on this queue.
 
         Args:
-            event (DeviceEvent): The event to record on this stream.
+            event (DeviceEvent): The event to record on this queue.
 
         Raises:
             ValueError: If recording the event failed.
         """
 
     @overload
-    def wait_for(self, stream: DeviceStream) -> None:
+    def wait_for(self, stream: DeviceQueue) -> None:
         """
-        Ensures all operations on the other stream complete before future work submitted to this stream is scheduled.
+        Ensures all operations on the other queue complete before future work submitted to this queue is scheduled.
 
         Args:
-            stream (DeviceStream): The stream to wait for.
+            stream (DeviceQueue): The queue to wait for.
         """
 
     @overload
     def wait_for(self, device: Device) -> None:
         """
-        Ensures all operations on device's default stream complete before future work submitted to this stream is scheduled.
+        Ensures all operations on device's default queue complete before future work submitted to this queue is scheduled.
 
         Args:
-            device (Device): The device whose default stream to wait for.
+            device (Device): The device whose default queue to wait for.
         """
 
     def wait_for_host_value(self, flag: CompletionFlag, value: int) -> None:
         """
-        Stalls the stream until ``flag``'s 64-bit value equals ``value``.
+        Stalls the queue until ``flag``'s 64-bit value equals ``value``.
 
         Wraps the MLRT ``DeviceStream::enqueueWaitOnHostValue`` primitive
         (CUDA's ``cuStreamWaitValue64``). Typically paired with
         ``Device.__unsafe_enqueue_async_py_host_func`` to gate
         downstream GPU work on a host-side AsyncRT task that signals
-        ``flag`` when it finishes -- a stream-internal sync that
+        ``flag`` when it finishes -- a queue-internal sync that
         avoids a host ``synchronize()`` and captures cleanly into a
         CUDA graph as a wait-value node.
 
         Args:
             flag (CompletionFlag): The completion flag to wait on.
-                The stream observes ``flag.device_ptr`` via the
+                The queue observes ``flag.device_ptr`` via the
                 pinned device-mapped alias.
             value (int): The 64-bit value to wait for (equality).
 
@@ -684,24 +755,24 @@ class DeviceStream:
         self, fn: Callable, flag: CompletionFlag, value: int, cpu: CPU
     ) -> None:
         """
-        Stream-targeted variant of ``Device.__unsafe_enqueue_async_py_host_func``.
+        Queue-targeted variant of ``Device.__unsafe_enqueue_async_py_host_func``.
 
-        Enqueues a kickoff host node on **this** stream that dispatches ``fn``
+        Enqueues a kickoff host node on **this** queue that dispatches ``fn``
         onto ``cpu``'s AsyncRT worker pool and returns immediately. When ``fn``
         finishes, the worker atomic-stores ``value`` (release ordering) to the
         64-bit memory at ``flag``. Pair with
-        ``DeviceStream.wait_for_host_value(flag, value)`` on a consumer stream
+        ``DeviceQueue.wait_for_host_value(flag, value)`` on a consumer queue
         to gate downstream GPU work.
 
         Use this overload when you need the host callback to run on a side
-        stream concurrently with the model stream's forward pass; the
-        ``Device`` overload always targets the default stream and therefore
-        serializes against any other default-stream work. As of this
-        writing no production caller dispatches via this stream
+        queue concurrently with the model queue's forward pass; the
+        ``Device`` overload always targets the default queue and therefore
+        serializes against any other default-queue work. As of this
+        writing no production caller dispatches via this queue
         overload -- ``StructuredOutputOverlapState.enqueue_async_callback``
-        intentionally lands on the device default stream so the
+        intentionally lands on the device default queue so the
         trampoline's ``flag.reset()`` is naturally ordered against the
-        next iter's captured-graph wait. The stream variant is exposed
+        next iter's captured-graph wait. The queue variant is exposed
         as future-facing API and exercised by the GPU integration test
         (``test_structured_output_overlap_gpu.py``).
 
@@ -721,14 +792,54 @@ class DeviceStream:
 
     @property
     def device(self) -> Device:
-        """The device this stream is executing on."""
+        """The device this queue is executing on."""
 
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def _device_context_ptr(self) -> int:
+        """Gets the AsyncRT DeviceContext pointer for this specific queue."""
+
+    @property
+    def native_stream_handle(self) -> int:
+        """
+        The native stream handle as an integer, or ``0`` if there is none.
+
+        The handle is the CUDA ``CUstream`` / HIP ``hipStream_t``; ``0`` means
+        the stream has no native handle (e.g. a CPU device). Lets native code
+        outside MLRT order its own work against this stream -- for example,
+        record a CUDA event on it. The handle remains owned by this stream; do
+        not destroy it.
+
+        Returns:
+            int: The native stream handle, or ``0`` if there is none.
+        """
+
     def __eq__(self, arg: object, /) -> bool: ...
 
 def accelerator_count() -> int:
     """Returns number of accelerator devices available."""
+
+def begin_launch_trace() -> None:
+    """
+    Starts a process-global recording of enqueued device operations.
+
+    Records kernel launches, memory copies, and memsets across **all**
+    streams into one enqueue-ordered list, clearing any previous trace.
+    No stream or device handle is needed, so work enqueued on streams the
+    caller does not hold (e.g. a compiled graph's internal stream) is still
+    captured. Only CUDA and HIP devices record entries; on other devices the
+    trace is always empty. Intended for tests and debugging: pair with
+    ``take_launch_trace`` to assert which device work a code path enqueues
+    and on which stream.
+    """
+
+def take_launch_trace() -> list[LaunchTraceEntry]:
+    """
+    Stops the global recording and returns the recorded entries.
+
+    Returns:
+        list[LaunchTraceEntry]: The operations enqueued since
+            ``begin_launch_trace``, in enqueue order across all streams.
+            Each entry's ``stream_index`` identifies its stream.
+    """
 
 def __unsafe_pack_py_host_func(fn: Callable) -> tuple[int, int]:
     """
@@ -838,6 +949,61 @@ def get_virtual_device_target_arch() -> str:
         str: The target GPU architecture string, or empty string if not set.
     """
 
+def set_virtual_cpu_target(cpu: str) -> None:
+    """
+    Sets the CPU target for host-independent kernel codegen.
+
+    When set before any CPU kernel compilation (e.g. before importing
+    ``max._interpreter_ops``), CPU kernels compile for this fixed target
+    instead of the build host's CPU, so the kernel cache can ship to and be
+    reused on a different host. Mirrors
+    :func:`set_virtual_device_target_arch` for GPUs.
+
+    Args:
+        cpu (str): An LLVM target-CPU name (e.g. "x86-64-v3",
+            "neoverse-n1"), or "generic" for the most-portable baseline of
+            the host arch family ("x86-64" on x86_64, the armv8-a baseline
+            on AArch64; other families raise an error). Empty string
+            restores host-CPU codegen. "native" is rejected because it
+            would re-leak the build host's CPU.
+    """
+
+def get_virtual_cpu_target() -> str:
+    """
+    Gets the current virtual CPU target.
+
+    Returns:
+        str: The CPU target string, or empty string if not set (host CPU).
+    """
+
+class Usage(enum.Flag):
+    """
+    Allocation-intent descriptor for :obj:`Buffer`.
+
+    Flags compose with ``|`` and are tested with ``in``. ``max.driver``
+    owns the flag set and its per-backend mapping.
+    """
+
+    _boundary_: enum.FlagBoundary = ...
+
+    _flag_mask_: int = 1
+
+    _singles_mask_: int = 1
+
+    _all_bits_: int = 3
+
+    _inverted_: None = None
+
+    DEFAULT = 0
+    """
+    The allocation Buffer performs today: device memory for a non-host device, ordinary host memory for the CPU.
+    """
+
+    STAGING = 1
+    """
+    Host memory for staging transfers to and from the given device. May be page-locked, depending on the backend.
+    """
+
 class Buffer:
     """
     Device-resident buffer representation.
@@ -865,8 +1031,9 @@ class Buffer:
         dtype (DType): Data type of buffer elements.
         shape (Sequence[int]): Tuple of positive, non-zero integers denoting the buffer shape.
         device (Device, optional): Device to allocate buffer onto. Defaults to the CPU.
-        pinned (bool, optional): If True, memory is page-locked (pinned). Defaults to False.
-        stream (DeviceStream, optional): Stream to associate the buffer with.
+        stream (DeviceQueue, optional): Queue to associate the buffer with.
+        usage (Usage, optional): Allocation intent, see :obj:`Usage`.
+            Defaults to ``Usage.DEFAULT``.
     """
 
     @overload
@@ -875,15 +1042,15 @@ class Buffer:
         dtype: max._core.dtype.DType,
         shape: Sequence[int],
         device: Device | None = None,
-        pinned: bool = False,
+        usage: Usage = Usage.DEFAULT,
     ) -> None: ...
     @overload
     def __init__(
         self,
         dtype: max._core.dtype.DType,
         shape: Sequence[int],
-        stream: DeviceStream,
-        pinned: bool = False,
+        stream: DeviceQueue,
+        usage: Usage = Usage.DEFAULT,
     ) -> None: ...
     @overload
     def __init__(
@@ -894,7 +1061,7 @@ class Buffer:
         """Device on which tensor is resident."""
 
     @property
-    def stream(self) -> DeviceStream:
+    def stream(self) -> DeviceQueue:
         """Stream to which tensor is bound."""
 
     @property
@@ -954,12 +1121,12 @@ class Buffer:
         """Creates a contiguous copy of the buffer."""
 
     @overload
-    def copy(self, stream: DeviceStream) -> Buffer:
+    def copy(self, stream: DeviceQueue) -> Buffer:
         """
-        Creates a deep copy on the device associated with the stream.
+        Creates a deep copy on the device associated with the queue.
 
         Args:
-            stream (DeviceStream): The stream to associate the new buffer with.
+            stream (DeviceQueue): The queue to associate the new buffer with.
 
         Returns:
             Buffer: A new buffer that is a copy of this buffer.
@@ -999,7 +1166,7 @@ class Buffer:
         shape: Sequence[int],
         mode: numpy._MemMapModeKind = "copyonwrite",
         offset: int = 0,
-    ):
+    ) -> Buffer:
         """
         Creates a memory-mapped buffer from a binary file on disk.
 
@@ -1074,13 +1241,13 @@ class Buffer:
         """
 
     @overload
-    def to(self, stream: DeviceStream) -> Buffer:
+    def to(self, stream: DeviceQueue) -> Buffer:
         """
-        Returns a buffer that's guaranteed to be on the given device and associated with the given stream.
+        Returns a buffer that's guaranteed to be on the given device and associated with the given queue.
 
         The buffer is only copied if the requested device is different from the
         device upon which the buffer is already resident. If the destination
-        stream is on the same device, then a new reference to the same buffer is
+        queue is on the same device, then a new reference to the same buffer is
         returned.
         """
 
@@ -1094,12 +1261,12 @@ class Buffer:
         """
 
     @overload
-    def to(self, streams: Sequence[DeviceStream]) -> list[Buffer]:
+    def to(self, streams: Sequence[DeviceQueue]) -> list[Buffer]:
         """
-        Returns a list of buffers that are guaranteed to be on the given streams.
+        Returns a list of buffers that are guaranteed to be on the given queues.
 
-        The buffers are only copied if the requested streams are different from the
-        stream upon which the buffer is already resident.
+        The buffers are only copied if the requested queues are different from the
+        queue upon which the buffer is already resident.
         """
 
     def to_numpy(self) -> numpy.ndarray:
@@ -1115,7 +1282,13 @@ class Buffer:
 
     @property
     def pinned(self) -> bool:
-        """Whether or not the underlying memory is pinned (page-locked)."""
+        """
+        Whether the allocation landed in the device's host memory space. Ask ``usage`` for what was requested.
+        """
+
+    @property
+    def usage(self) -> Usage:
+        """Allocation intent. Slices and views report their parent's usage."""
 
     def view(
         self, dtype: max._core.dtype.DType, shape: Sequence[int] | None = None
@@ -1132,7 +1305,7 @@ class Buffer:
         shape: Sequence[int],
         dtype: max._core.dtype.DType,
         device: Device | None = None,
-        pinned: bool = False,
+        usage: Usage = Usage.DEFAULT,
     ) -> Buffer:
         """
         Allocates a buffer with all elements initialized to zero.
@@ -1142,8 +1315,8 @@ class Buffer:
             dtype (DType): The data type of the buffer.
             device (Device, optional): The device to allocate the buffer on.
                 Defaults to None (CPU).
-            pinned (bool, optional): If True, allocate pinned host memory for
-                non-CPU devices. Defaults to False.
+            usage (Usage, optional): Allocation intent, see :obj:`Usage`.
+                Defaults to ``Usage.DEFAULT``.
 
         Returns:
             Buffer: A new buffer filled with zeros.
@@ -1189,6 +1362,16 @@ class Buffer:
     def _data_ptr(self) -> int:
         """Gets the memory address of the buffer data. Internal use only."""
 
+def _batch_inplace_copy(dsts: Sequence[Buffer], srcs: Sequence[Buffer]) -> None:
+    """
+    Batched copy of ``srcs`` into ``dsts``.
+
+    Sources may be host, pinned, same-device or peer memory in any mix. One
+    submission only orders the writes on its own stream, so destinations are
+    grouped by device and submitted one batch per device. Identical pairs
+    (``dst is src``) are skipped. All buffers must have matching sizes.
+    """
+
 class DevicePinnedBuffer(Buffer):
     """
     Creates a pinned host memory allocation tied to the given device.
@@ -1226,7 +1409,7 @@ class DevicePinnedBuffer(Buffer):
         dtype (DType): Data type of buffer elements.
         shape (Sequence[int]): Tuple of positive, non-zero integers denoting the buffer shape.
         device (Device): GPU/Accelerator device to associate buffer with. Must not be CPU.
-        stream (DeviceStream, optional): Stream to associate the buffer with.
+        stream (DeviceQueue, optional): Queue to associate the buffer with.
 
     Raises:
         ValueError: If is a CPU device.
@@ -1241,7 +1424,7 @@ class DevicePinnedBuffer(Buffer):
         self,
         dtype: max._core.dtype.DType,
         shape: Sequence[int],
-        stream: DeviceStream,
+        stream: DeviceQueue,
     ) -> None: ...
     def __dlpack__(
         self, *, stream: int | None = None, **kwargs
@@ -1281,5 +1464,77 @@ class DevicePinnedBuffer(Buffer):
             ValueError: If is a CPU device.
         """
 
+    def __getitem__(
+        self, idx: int | slice | Sequence[int | slice]
+    ) -> DevicePinnedBuffer:
+        """
+        Gets a buffer slice, preserving the device-pinned type.
+
+        Unlike :obj:`Buffer.__getitem__`, the returned slice is itself a
+        :obj:`DevicePinnedBuffer`, so reads such as ``to_numpy`` on the slice
+        keep the no-synchronization behavior of device-pinned memory.
+        """
+
+    def _view(
+        self, dtype: max._core.dtype.DType, shape: Sequence[int]
+    ) -> DevicePinnedBuffer: ...
+
 def _release_buffers_to_borrowed(buffers: Sequence[Buffer]) -> list[Buffer]:
     """Convert owning buffers into borrowed wrappers over the same storage."""
+
+def _unsafe_alloc_fast_pinned_buffer(
+    dtype: max._core.dtype.DType,
+    shape: Sequence[int],
+    device: Device,
+    threads: int = 16,
+    chunk_bytes: int = 536870912,
+) -> DevicePinnedBuffer:
+    """
+    Fast page-locked host allocation for very large host KV-cache buffers.
+
+    Maps one contiguous region and faults it in across ``threads`` parallel
+    workers while a single consumer registers it with the device in
+    ``chunk_bytes`` chunks, overlapping the two phases. Far faster than the
+    per-call ``cuMemAllocHost`` path, and it avoids the ``cuMemAllocHost``
+    failure on single >1 TiB allocations.
+
+    UNSAFE / low-level (host KV-cache offloading). The returned buffer is
+    NOT garbage-collected: it must be freed explicitly via
+    :func:`_unsafe_free_fast_pinned_buffer`, and forgetting to do so leaks
+    the mapping. No host/device synchronization is performed -- before
+    reading the region on the host (or freeing it) the caller must ensure
+    the GPU is done accessing it (host-synchronize the relevant streams).
+
+    Args:
+        dtype (DType): Data type of buffer elements (typically ``uint8``).
+        shape (Sequence[int]): Buffer shape, e.g. ``[num_blocks, bytes_per_block]``.
+        device (Device): GPU/Accelerator device the memory is registered against. Must not be CPU.
+        threads (int, optional): Number of parallel page-touch workers. Defaults to 16.
+        chunk_bytes (int, optional): Per-call host-register granularity in bytes. Defaults to 512 MiB.
+
+    Returns:
+        DevicePinnedBuffer: A pinned host buffer over the mapping. Must be
+        freed with :func:`_unsafe_free_fast_pinned_buffer`.
+
+    Raises:
+        ValueError: If ``device`` is a CPU device.
+    """
+
+def _unsafe_free_fast_pinned_buffer(buffer: DevicePinnedBuffer) -> None:
+    """
+    Free a buffer from :func:`_unsafe_alloc_fast_pinned_buffer` (unregister + munmap).
+
+    UNSAFE / low-level. The caller MUST first host-synchronize every GPU
+    stream that issued copies into the region -- the buffer does not track
+    them, and unmapping a region a stream is still copying to/from is a
+    use-after-free. After this call the buffer (and any view/slice of it)
+    must not be used.
+
+    Args:
+        buffer (DevicePinnedBuffer): A buffer from
+            :func:`_unsafe_alloc_fast_pinned_buffer`.
+
+    Raises:
+        ValueError: If the buffer was not produced by
+            :func:`_unsafe_alloc_fast_pinned_buffer`, or was already freed.
+    """

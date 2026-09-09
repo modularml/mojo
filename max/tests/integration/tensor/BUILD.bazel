@@ -1,43 +1,42 @@
-load("//bazel:api.bzl", "modular_py_library", "modular_py_test", "requirement")
+load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("//max/tests/integration/xarch_warm:eager_py_test.bzl", "modular_eager_py_test")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
 
-modular_py_library(
-    name = "conftest",
-    srcs = ["conftest.py"],
-    imports = ["."],
-    deps = [
-        "//max/python/max:tensor",
-        "//max/python/max/driver",
-    ],
-)
-
-modular_py_test(
+modular_eager_py_test(
     name = "tests",
     size = "large",
     srcs = glob(
         ["*.py"],
         exclude = [
-            "conftest.py",
+            "test_cond_symbolic_dim_gpu.py",
+            # Composite-executor machinery tests; split out below.
+            "test_custom_cache_timing.py",
             "test_flashinfer_fp4_gemm.py",
+            "test_from_dim.py",
+            "test_functional_custom.py",
             "test_functional_custom_gpu.py",
             "test_philox_torch_divergence.py",
+            "test_reduce_add_rmsnorm_fusion.py",
         ],
     ),
-    data = [
-        "//max/tests/integration/Inputs/kernel_verification_ops",
-    ],
+    # CPU-only suite (GPU test files are separate targets below).
+    cpu_only = True,
     env = {
-        "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
+        # Don't background-compile every eager graph (SDLC-4307 CI cpu/mem).
+        "MAX_EAGER_EXECUTOR": "fallback-internal",
     },
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
     imports = ["."],
     per_test_shard_count = {
-        "test_functional_other.py": 8,
+        "test_functional_other.py": 10,
     },
     target_compatible_with = select({
         # Takes too long, this is mostly just testing plumbing into other code so low value.
@@ -47,15 +46,51 @@ modular_py_test(
         "//conditions:default": [],
     }),
     deps = [
-        ":conftest",
         "//max/python/max:tensor",
+        "//max/python/max/_interpreter_ops",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/experimental/testing",
+        "//max/python/max/graph",
+        requirement("ml-dtypes"),
+        requirement("numpy"),
+    ],
+)
+
+# These test the default composite executor itself, so no executor override.
+modular_eager_py_test(
+    name = "tests_composite_executor",
+    size = "large",
+    srcs = [
+        "test_custom_cache_timing.py",
+        "test_functional_custom.py",
+    ],
+    cpu_only = True,
+    data = ["//max/tests/integration/Inputs/kernel_verification_ops"],
+    env = {
+        "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
+    },
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
+    imports = ["."],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        # FIXME: MOCO-2411
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        requirement("numpy"),
     ],
 )
 
@@ -84,10 +119,10 @@ modular_py_test(
         "//conditions:default": ["//:nvidia_gpu"],
     }),
     deps = [
-        ":conftest",
         "//max/python/max:tensor",
         "//max/python/max/dtype",
         "//max/python/max/experimental/nn",
+        "//max/python/max/experimental/testing",
     ],
 )
 
@@ -106,6 +141,25 @@ modular_py_test(
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/experimental",
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_reduce_add_rmsnorm_fusion",
+    srcs = ["test_reduce_add_rmsnorm_fusion.py"],
+    gpu_constraints = ["//:b200_gpu"],
+    imports = ["."],
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        requirement("ml-dtypes"),
+        requirement("numpy"),
         requirement("torch"),
     ],
 )
@@ -130,5 +184,48 @@ modular_py_test(
         requirement("flashinfer-python"),
         requirement("ninja"),
         requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_cond_symbolic_dim_gpu",
+    srcs = ["test_cond_symbolic_dim_gpu.py"],
+    gpu_constraints = ["//:b200_gpu"],
+    imports = ["."],
+    tags = [
+        "gpu",
+        "no-mypy",
+    ],
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_from_dim",
+    srcs = ["test_from_dim.py"],
+    imports = ["."],
+    tags = [
+        "no-mypy",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        requirement("numpy"),
     ],
 )

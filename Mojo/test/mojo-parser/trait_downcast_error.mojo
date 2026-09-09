@@ -1,0 +1,27 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+
+
+# RUN: %parse-mojo-isolated -verify-diagnostics %s
+
+
+struct Foo(Movable where False):
+    pass
+
+
+def trait_downcast_concrete_type(x: Foo):
+    # COM: mis-uses of downcast on a concrete type should be detected during
+    # parsing time.
+
+    # expected-error @below {{'Foo' value has no attribute 'copy'}}
+    var _ = trait_downcast[Copyable](x).copy()

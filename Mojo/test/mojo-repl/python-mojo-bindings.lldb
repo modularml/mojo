@@ -1,0 +1,38 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+%%python
+def foo():
+  a = 12
+b = '123'
+import os, sys
+import platform
+import json as myjson, io as _io
+class bar:
+  def func():
+    z = None
+
+# CHECK-NOT: (PythonObject) a =
+# CHECK: (PythonObject) b =
+# CHECK: (PythonObject) foo =
+# CHECK: (PythonObject) myjson =
+# CHECK: (PythonObject) os =
+# CHECK: (PythonObject) platform =
+# CHECK: (PythonObject) sys =
+# CHECK-NOT: (PythonObject) z =
+
+# Expressions that don't declare symbols shouldn't fail and shouldn't produce
+# output variables.
+
+%%python
+print(420)
+
+# CHECK: 420
+# CHECK-NOT: (PythonObject)

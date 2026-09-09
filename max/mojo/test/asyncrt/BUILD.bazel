@@ -1,0 +1,89 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+_TEST_DATA = [
+    "asyncrt_test_utils.mojo",
+]
+
+_CPU_TESTS = [
+    "test_smoke.mojo",
+    "test_copies.mojo",
+    "test_host_mapped.mojo",
+    "test_timing.mojo",
+    "test_memset.mojo",
+    "test_device_pointer.mojo",
+]
+
+_APPLE_GPU_INCOMPATIBLE = select({
+    "//:apple_gpu": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
+_MACOS_INCOMPATIBLE = select({
+    "@platforms//os:macos": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
+_EXTRA_CONSTRAINTS = {
+    "test_hip.mojo": ["//:amd_gpu"],
+    "test_cuda.mojo": ["//:nvidia_gpu"],
+    "test_host_func.mojo": ["//:nvidia_gpu"],
+    "test_copies.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: GEX-2562
+    "test_smoke.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: GEX-2554
+    "test_elementwise.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: MOCO-4091
+    # Metal has no `create_stream` (MetalDeviceContext::streamCreate is
+    # unimplemented), so the multi-stream select_stream test cannot run.
+    "test_select_stream.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: DRIV-102
+}
+
+# TODO(GEX-3549): asyncrt CPU `DeviceContext` memcpy path returns garbage
+# values on macOS (`_run_fake_memcpy` asserts at index 32 with an
+# uninitialized-looking value). Only the .cpu.test variant is affected; the
+# GPU variant already excludes Apple GPU via _APPLE_GPU_INCOMPATIBLE above.
+_CPU_EXTRA_CONSTRAINTS = {
+    "test_copies.mojo": _MACOS_INCOMPATIBLE,
+}
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = _TEST_DATA + [src],
+        copts = [
+            "-D",
+            "MODULAR_ASYNCRT_DEVICE_CONTEXT_V2=gpu",
+        ],
+        exec_properties = {
+            "test.resources:gpu-memory": "1.5",
+        },
+        main = src,
+        tags = ["gpu"],
+        target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []),
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+        ],
+    )
+    for src in glob(
+        ["**/*.mojo"],
+        exclude = _TEST_DATA,
+    )
+]
+
+[
+    mojo_test(
+        name = src + ".cpu.test",
+        srcs = _TEST_DATA + [src],
+        copts = [
+            "-D",
+            "MODULAR_ASYNCRT_DEVICE_CONTEXT_V2=cpu",
+        ],
+        main = src,
+        target_compatible_with = _CPU_EXTRA_CONSTRAINTS.get(src, []),
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+        ],
+    )
+    for src in _CPU_TESTS
+]

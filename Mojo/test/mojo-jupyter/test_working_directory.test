@@ -1,0 +1,10 @@
+//===----------------------------------------------------------------------===//
+//
+// This file is Modular Inc proprietary.
+//
+//===----------------------------------------------------------------------===//
+
+// RUN: %mojo_jupyter_executor %S/test_working_directory.ipynb | FileCheck %s
+
+// Check the import of a file in the current working directory.
+// CHECK: print_from_input

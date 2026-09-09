@@ -1,0 +1,50 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# NVFP4 target variant of gemma4_31b_dflash.yaml. The encoding is detected
+# from the checkpoint (packed uint8 weights + modelopt quantization_config),
+# so it is not pinned here; only the MLP linears are quantized, attention and
+# lm_head stay bfloat16 per the checkpoint's ignore list.
+#
+# The KV cache format is left at the encoding default (bfloat16) for both the
+# target tree and the drafter's own cache; fp8 KV is a separate follow-up.
+# Against those bfloat16 caches 131072 does not fit (it needs one more KV page
+# than the pool holds), so the context is capped one power-of-two step down.
+model:
+  model_path: nvidia/Gemma-4-31B-IT-NVFP4
+  device_specs: [0]
+  max_length: 98304
+  kv_cache:
+    device_memory_utilization: 0.90
+
+# The drafter taps target hidden states and was trained against bfloat16
+# ones, so it stays bfloat16 regardless of the target's encoding.
+draft_model:
+  model_path: z-lab/gemma-4-31B-it-DFlash
+  device_specs: [0]
+  quantization_encoding: bfloat16
+
+# The DFlash checkpoint's block_size 16 counts the anchor slot plus 15
+# drafted tokens; the drafter is only defined at its trained block size, so
+# num_speculative_tokens must match (the pipeline pins it either way).
+speculative:
+  speculative_method: dflash
+  num_speculative_tokens: 15
+
+# model_type gemma4 reserves a vision encoder cache by default; this pair
+# serves text-only. max_batch_size bounds the capture ladder as in
+# gemma4_31b_dflash.yaml; NVFP4 target weights leave it more headroom here
+# than the bfloat16 recipe does.
+runtime:
+  vision_cache_utilization: 0
+  device_graph_capture: true
+  max_batch_size: 64

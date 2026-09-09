@@ -14,6 +14,10 @@ modular_py_library(
         "no-mypy",
         "no-pydeps",
     ],
+    # Not opted into test_docstring_examples: the test binary's directory is
+    # this package, so modeling/types/ shadows stdlib `types` on sys.path[0]
+    # and the rules_python bootstrap crashes on Python <= 3.11 (the same
+    # shadowing the no-pydeps tag works around).
     deps = [
         "//max/python/max:_core",
         "//max/python/max/config",
@@ -24,6 +28,7 @@ modular_py_library(
         "//max/python/max/experimental/nn",
         "//max/python/max/graph",
         "//max/python/max/nn",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/request",
         "//max/python/max/profiler",
         requirement("huggingface-hub"),

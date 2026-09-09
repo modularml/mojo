@@ -1,0 +1,34 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+
+# RUN: %repl <%s 2>%t | FileCheck %s -check-prefix=CHECK
+# RUN: cat %t | FileCheck %s -check-prefix=CHECK-STDERR
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# Test a simple parser error.
+var var = 10
+# CHECK-STDERR: Expression [3]:2:9: unexpected token in expression
+
+# Check that we can fix this in a following expression.
+var value = 25
+print(value)
+# CHECK: 25
+
+# Test an error diagnosed in the MLIR pass pipeline, not during the parser.
+def foo() -> Int:
+    pass
+# CHECK-STDERR: Expression [5]:2:5: return expected at end of function with results
+
+# Test an error diagnosed in the MLIR pass pipeline, not during the parser.
+def foo() -> Int:
+    return 0
+# CHECK-STDERR-NOT: return expected at end of function with results
+
+# Test declaration of an uninitialized value.
+var some_uninit : String
+

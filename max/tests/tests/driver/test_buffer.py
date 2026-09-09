@@ -22,9 +22,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
-from max.driver import CPU, Accelerator, Buffer, accelerator_count
+from max.driver import CPU, Accelerator, Buffer, Usage, accelerator_count
 from max.dtype import DType
 
 
@@ -41,6 +41,71 @@ def test_tensor() -> None:
     tensor2 = Buffer(DType.float32, shape)
     shape[0] = 1
     assert (2, 3) == tensor2.shape
+
+
+def test_repr() -> None:
+    # repr shows metadata only, not the element values.
+    tensor = Buffer(DType.float32, (3, 4))
+    text = repr(tensor)
+    assert text.startswith("max.driver.Buffer(")
+    assert "DType.float32" in text
+    assert "(3, 4)" in text
+
+
+def test_str_scalar() -> None:
+    tensor = Buffer.scalar(5, DType.int32)
+    text = str(tensor)
+    assert text.startswith("Buffer(")
+    assert "5" in text
+    assert "dtype=DType.int32" in text
+    assert "shape=()" in text
+    assert "device=" in text
+
+
+def test_str_shows_data() -> None:
+    # str should include the actual data values.
+    arr = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.int32)
+    tensor = Buffer.from_numpy(arr)
+    text = str(tensor)
+    assert text.startswith("Buffer(")
+    for value in range(1, 7):
+        assert str(value) in text
+    assert "dtype=DType.int32" in text
+    assert "shape=(2, 3)" in text
+    # The formatted data should match numpy's own rendering.
+    assert np.array2string(arr, prefix="Buffer(") in text
+
+
+def test_str_1d_float() -> None:
+    tensor = Buffer.from_numpy(np.array([1.5, 2.5, 3.5], dtype=np.float32))
+    text = str(tensor)
+    assert "1.5" in text
+    assert "2.5" in text
+    assert "3.5" in text
+    assert "dtype=DType.float32" in text
+
+
+def test_str_summarizes_large_buffer() -> None:
+    # Large buffers should be summarized with an ellipsis rather than dumping
+    # every element.
+    tensor = Buffer.from_numpy(np.arange(100_000, dtype=np.int32))
+    text = str(tensor)
+    assert "..." in text
+    assert "shape=(100000,)" in text
+
+
+def test_str_bfloat16() -> None:
+    # bfloat16 is not natively representable in numpy, so values must be read
+    # element-wise and shown as decoded numbers (not raw bytes).
+    torch_value = torch.tensor([1.0, 2.0, 3.0]).type(torch.bfloat16)
+    tensor = Buffer.from_dlpack(torch_value)
+    assert tensor.dtype == DType.bfloat16
+    text = str(tensor)
+    assert "1" in text
+    assert "2" in text
+    assert "3" in text
+    assert "dtype=DType.bfloat16" in text
+    assert "shape=(3,)" in text
 
 
 @pytest.mark.parametrize("dtype", list(DType))
@@ -301,10 +366,14 @@ def test_host_host_copy() -> None:
 
 
 def test_pinning() -> None:
-    # We're not actually testing the behavior of pinning here,
-    # just the construction and accessor.
+    # A host device can't page-lock, so staging there is a plain allocation.
     assert not Buffer(DType.int32, (1, 1), device=CPU()).pinned
-    assert Buffer(DType.int32, (1, 1), device=CPU(), pinned=True).pinned
+
+    staging_on_host = Buffer(
+        DType.int32, (1, 1), device=CPU(), usage=Usage.STAGING
+    )
+    assert not staging_on_host.pinned
+    assert staging_on_host.usage == Usage.STAGING
 
     if accelerator_count():
         tensor = Buffer(DType.int32, (1, 1), device=CPU())
@@ -443,6 +512,10 @@ def test_torch_tensor_conversion() -> None:
     assert torch.all(torch.eq(bool_tensor, reconverted_bool))
 
 
+# Whichever of these runs first pays torch's one-time lazy init inside its
+# first example -- ~1.5s against hypothesis' 200ms per-example deadline on a
+# contended CI worker. Neither asserts anything about speed.
+@settings(deadline=None)
 @given(st.floats())
 def test_setitem_bfloat16(value: float) -> None:
     tensor = Buffer(DType.bfloat16, (1,))
@@ -462,6 +535,7 @@ def test_setitem_bfloat16(value: float) -> None:
         torch.testing.assert_close(expected, result, equal_nan=True)
 
 
+@settings(deadline=None)
 @given(st.floats())
 def test_getitem_bfloat16(value: float) -> None:
     torch_value = torch.tensor([value]).type(torch.bfloat16)
@@ -1061,3 +1135,87 @@ def test_tensor_slicing_to_numpy_3d(device_factory: type) -> None:
         expected,
         f"3D second dimension slice failed on {device_factory.__name__}",
     )
+
+
+# The cases below replace the C++ unit tests over `DeviceMemory::createView`
+# (CreateViewTest.cpp) that went away with the GenericML Driver layer. That
+# logic survives as `Python::createStorageView`.
+#
+# Only the unaligned view below actually enters `createStorageView`: `view()`
+# takes an early return that just adjusts `startOffset` whenever the byte
+# offset divides evenly into the target dtype, and element reads compute their
+# own offset in `Buffer::data()`. The rest cover the slice arithmetic around
+# it, which nothing else pins this directly.
+
+
+def test_view_byte_offset_basic() -> None:
+    # A slice starting partway into a buffer must read from the corresponding
+    # byte offset, not from the base pointer.
+    tensor = Buffer(DType.float32, (16,))
+    for i in range(16):
+        tensor[i] = np.float32(i)
+
+    tail = tensor[8:]
+    assert tail.shape == (8,)
+    for i in range(8):
+        assert tail[i].item() == float(i + 8)
+
+
+def test_view_byte_offset_cross_dtype() -> None:
+    # The core bug scenario: storage allocated as one dtype, viewed as another,
+    # then offset. The byte offset must come from the view's dtype rather than
+    # the storage's, or the reinterpreted slice reads the wrong bytes.
+    tensor = Buffer(DType.bfloat16, (8,))  # 8 * 2 == 16 bytes
+    as_bytes = tensor.view(DType.uint8, (16,))
+    for i in range(16):
+        as_bytes[i] = np.uint8(i)
+
+    tail = as_bytes[12:]
+    assert tail.shape == (4,)
+    for i in range(4):
+        assert tail[i].item() == i + 12
+
+
+def test_view_zero_offset_shares_storage() -> None:
+    # A view with no offset and an equivalent spec shares the original buffer
+    # rather than creating a sub-buffer, so writes are visible both ways.
+    tensor = Buffer(DType.float32, (4,))
+    for i in range(4):
+        tensor[i] = np.float32(i)
+
+    same = tensor.view(DType.float32, (4,))
+    same[0] = np.float32(99)
+    assert tensor[0].item() == 99.0
+
+    # Reinterpreting the whole buffer at a wider dtype also aliases it.
+    as_int = tensor.view(DType.int32, (4,))
+    assert as_int.shape == (4,)
+
+
+def test_view_out_of_bounds_rejected() -> None:
+    # A view wider than its backing storage must be refused rather than
+    # silently reading past the end.
+    tensor = Buffer(DType.float32, (4,))  # 16 bytes
+    with pytest.raises((ValueError, RuntimeError)):
+        tensor.view(DType.float32, (8,))  # 32 bytes
+
+
+def test_unaligned_cross_dtype_view_offsets_storage() -> None:
+    # The core bug scenario from CreateViewTest, and the one path that reaches
+    # `Python::createStorageView`: a slice whose byte offset is not a multiple
+    # of the target dtype's size cannot be folded into a startOffset, so the
+    # view has to materialize a sub-buffer starting at that byte offset. If the
+    # offset were dropped, these reads would come from the base of the buffer.
+    tensor = Buffer(DType.uint8, (16,))
+    for i in range(16):
+        tensor[i] = np.uint8(i)
+
+    window = tensor[3:7]  # 4 bytes, byte offset 3
+    assert window.shape == (4,)
+
+    as_i16 = window.view(DType.int16, (2,))  # 4 bytes; 3 % 2 != 0 -> unaligned
+    assert as_i16.shape == (2,)
+
+    # Little-endian: bytes (3, 4) -> 0x0403, bytes (5, 6) -> 0x0605.
+    assert as_i16[0].item() == 0x0403
+    assert as_i16[1].item() == 0x0605

@@ -29,15 +29,15 @@ async def start_telemetry_consumer(
         yield NoopClient()
 
     elif method == MetricRecordingMethod.SYNC:
-        yield SyncClient(settings)
+        yield SyncClient()
 
     elif method == MetricRecordingMethod.ASYNCIO:
-        async with start_asyncio_consumer(settings.metric_level) as controller:
+        async with start_asyncio_consumer() as controller:
             yield controller
 
     elif method == MetricRecordingMethod.PROCESS:
         async with start_process_consumer(settings) as controller:
-            yield controller.Client(settings)
+            yield controller.Client()
 
     else:
         raise Exception(f"Unrecognized metric_recording: {method}")

@@ -19,12 +19,15 @@ E8M0 words.
 """
 
 from std.memory import bitcast
-from std.sys import llvm_intrinsic
+from std.os import abort
+from std.sys import llvm_intrinsic, size_of
 from std.sys.info import _cdna_4_or_newer
+
+from linalg.mx_format import MXFormat
 
 
 @fieldwise_init
-struct CDNA4F8F6F4MatrixFormat(TrivialRegisterPassable):
+struct CDNA4F8F6F4MatrixFormat(Equatable, TrivialRegisterPassable):
     """Represents the CDNA4 `f8f6f4` operand format selector."""
 
     var _value: Int32
@@ -38,6 +41,75 @@ struct CDNA4F8F6F4MatrixFormat(TrivialRegisterPassable):
     def __init__(out self, value: Int):
         self._value = Int32(value)
 
+    def __init__(out self, mx_format: MXFormat):
+        """Maps a vendor-neutral MX element format onto this CDNA4 selector.
+
+        Written out rather than passing the value through, so the neutral type's
+        numbering stays independent of what the hardware happens to encode.
+
+        Args:
+            mx_format: The MX element format to select.
+        """
+        if mx_format == MXFormat.FP8_E4M3:
+            self = Self.FLOAT8_E4M3
+        elif mx_format == MXFormat.FP8_E5M2:
+            self = Self.FLOAT8_E5M2
+        elif mx_format == MXFormat.FP6_E2M3:
+            self = Self.FLOAT6_E2M3
+        elif mx_format == MXFormat.FP6_E3M2:
+            self = Self.FLOAT6_E3M2
+        elif mx_format == MXFormat.FP4_E2M1:
+            self = Self.FLOAT4_E2M1
+        else:
+            abort("invalid MX format")
+
+    def __eq__(self, other: Self) -> Bool:
+        return self._value == other._value
+
+    def bits_per_element(self) -> Int:
+        """Returns how many bits one operand element occupies.
+
+        Note this is the *payload* width, not the fragment width: 32 FP6
+        elements occupy 24 bytes but travel in a 32-byte fragment. Use
+        `simd_width` for the fragment.
+
+        Returns:
+            The element width in bits.
+        """
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT8_E4M3:
+            return 8
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT8_E5M2:
+            return 8
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT6_E2M3:
+            return 6
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT6_E3M2:
+            return 6
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT4_E2M1:
+            return 4
+        abort("invalid matrix format")
+
+    def simd_width(self) -> SIMDLength:
+        """Returns the operand fragment width, in bytes, this format expects.
+
+        FP6 holds only 24 payload bytes, but 24 is not a power of two, so
+        it asks for 32. InstCombine narrows the operand back down, so the
+        padding costs nothing. Stage FP6 loads as 24 bytes, not 32.
+
+        Returns:
+            The fragment width in bytes.
+        """
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT8_E4M3:
+            return 32
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT8_E5M2:
+            return 32
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT6_E2M3:
+            return 32
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT6_E3M2:
+            return 32
+        if self == CDNA4F8F6F4MatrixFormat.FLOAT4_E2M1:
+            return 16
+        abort("invalid matrix format")
+
 
 @always_inline
 def cdna4_block_scaled_mfma[
@@ -46,9 +118,9 @@ def cdna4_block_scaled_mfma[
     a_matrix_format: CDNA4F8F6F4MatrixFormat,
     b_matrix_format: CDNA4F8F6F4MatrixFormat,
 ](
-    mut d: SIMD[DType.float32, _],
-    a: SIMD[DType.uint8, 32],
-    b: SIMD[DType.uint8, 32],
+    mut d: SIMD[.float32, _],
+    a: SIMD[.uint8, _],
+    b: SIMD[.uint8, _],
     packed_scale_word_a: Int32,
     packed_scale_word_b: Int32,
 ):
@@ -62,10 +134,13 @@ def cdna4_block_scaled_mfma[
         _cdna_4_or_newer()
     ), "CDNA4 block-scaled MFMA wrappers require CDNA4 or newer"
     comptime assert (
-        d.size == 16 or d.size == 4
+        d.length == 16 or d.length == 4
     ), "accumulator width must be 16 (32x32x64) or 4 (16x16x128)"
+    comptime assert a.length == a_matrix_format.simd_width(), "bad a width"
+    comptime assert b.length == b_matrix_format.simd_width(), "bad b width"
+
     comptime intrinsic = (
-        "llvm.amdgcn.mfma.scale.f32.32x32x64.f8f6f4" if d.size
+        "llvm.amdgcn.mfma.scale.f32.32x32x64.f8f6f4" if d.length
         == 16 else "llvm.amdgcn.mfma.scale.f32.16x16x128.f8f6f4"
     )
     # The ISA names the scale-byte selector {OP_SEL_HI, OP_SEL}. Together
@@ -73,10 +148,10 @@ def cdna4_block_scaled_mfma[
     # scale word: 0 -> bits 7:0, 1 -> 15:8, 2 -> 23:16, 3 -> 31:24.
     d = llvm_intrinsic[
         intrinsic,
-        SIMD[DType.float32, d.size],
+        SIMD[.float32, d.length],
     ](
-        bitcast[DType.int32, 8](a),
-        bitcast[DType.int32, 8](b),
+        bitcast[.int32, a.length // size_of[DType.int32]()](a),
+        bitcast[.int32, b.length // size_of[DType.int32]()](b),
         d,
         a_matrix_format,
         b_matrix_format,

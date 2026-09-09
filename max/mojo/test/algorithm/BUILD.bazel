@@ -1,0 +1,68 @@
+load("//bazel:api.bzl", "mojo_filecheck_test", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+_FILECHECK_TESTS = [
+    "test_reductions.mojo",
+    "test_stencil.mojo",
+]
+
+_MOJO_COMPILE_OPTS = {}
+
+_DISABLED_ASSERTIONS = []
+
+[
+    mojo_filecheck_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ] + _MOJO_COMPILE_OPTS.get(src, []),
+        enable_assertions = src not in _DISABLED_ASSERTIONS,
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in _FILECHECK_TESTS
+]
+
+mojo_test(
+    name = "test_parallelize.mojo.test",
+    srcs = ["test_parallelize.mojo"],
+    copts = [
+        "--debug-level",
+        "full",
+        "-D",
+        "ASSERT=warn",
+    ],
+    enable_assertions = False,  # ASSERT cannot be passed more than once
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+        "@mojo//:test_utils",
+    ],
+)
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        enable_assertions = src not in _DISABLED_ASSERTIONS,
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(
+        ["*.mojo"],
+        exclude = _FILECHECK_TESTS + ["test_parallelize.mojo"],
+    )
+]

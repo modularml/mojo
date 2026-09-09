@@ -22,14 +22,53 @@ import numpy as np
 import pytest
 from max.driver import CPU, Buffer
 from max.dtype import DType
-from max.engine import InferenceSession, Model
+from max.engine import Model
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheInputs, KVCacheInputsPerDevice, KVCacheParams
-from max.pipelines.lib import ModelOutputs
+from max.nn.kv_cache import (
+    BatchCharacteristics,
+    KVCacheInputs,
+    KVCacheInputsPerDevice,
+    KVCacheParams,
+    MHAAttnKey,
+)
+from max.nn.kv_cache.utils import MultiAttnKey
 from max.pipelines.lib.graph_capture import ServeGraphCaptureRunner
 from test_common.mocks.pipeline_model import MockModelInputs
 
 MiB = 1024 * 1024
+
+
+def _gk(batch_size: int) -> MultiAttnKey:
+    """Builds the non-spec capture key the runner produces for ``batch_size``.
+
+    The mock resolver returns ``MHAAttnKey(batch_size, q=1, num_partitions=1)``
+    for every probed length, which the runner folds into a ``MultiAttnKey``
+    keyed by ``"verify"`` (no ``"draft"`` without speculative decoding).
+    """
+    return MultiAttnKey.from_dict(
+        {
+            "verify": MHAAttnKey(
+                batch_size=batch_size, max_prompt_length=1, num_partitions=1
+            )
+        }
+    )
+
+
+def _mock_kv_params() -> SimpleNamespace:
+    """A minimal KVCacheParams stand-in exposing the dispatch resolver API."""
+    return SimpleNamespace(
+        devices=[DeviceRef.CPU()],
+        is_mla=False,
+        n_kv_heads_per_device=1,
+        num_q_heads_per_device=1,
+        is_fp8_kv_dtype=False,
+        data_parallel_degree=1,
+        num_draft_tokens_per_step=0,
+        graph_capture_probe_cache_lengths=lambda max_cache_length, q: [1],
+        resolve_attn_key=lambda batch_size, q, cache_length: MHAAttnKey(
+            batch_size=batch_size, max_prompt_length=q, num_partitions=1
+        ),
+    )
 
 
 @pytest.fixture
@@ -77,19 +116,23 @@ class OutputAllocatingModel:
 
 
 def _make_kv_per_device() -> KVCacheInputsPerDevice[Buffer, Buffer]:
-    max_lengths = np.array([[0, 1]], dtype=np.uint32)
+    max_prompt_length = np.array([0], dtype=np.uint32)
+    max_cache_length = np.array([1], dtype=np.uint32)
     dispatch = np.array([1, 1, 1, 1], dtype=np.int64)
     return KVCacheInputsPerDevice(
         kv_blocks=Buffer.zeros((1,), dtype=DType.float32),
         cache_lengths=Buffer.from_numpy(np.array([0], dtype=np.uint32)),
         lookup_table=Buffer.from_numpy(np.array([0], dtype=np.uint32)),
-        max_lengths=Buffer.from_numpy(max_lengths),
+        max_prompt_length=Buffer.from_numpy(max_prompt_length),
+        max_cache_length=Buffer.from_numpy(max_cache_length),
         attention_dispatch_metadata=Buffer.from_numpy(dispatch),
     )
 
 
 @contextmanager
-def _warmup_model_inputs(batch_size: int) -> Iterator[MockModelInputs]:
+def _warmup_model_inputs(
+    batch_size: int, batch_characteristics: BatchCharacteristics
+) -> Iterator[MockModelInputs]:
     yield MockModelInputs(
         active_batch_size=batch_size,
         eos_prob=0.0,
@@ -112,20 +155,9 @@ def test_warmup_pre_ready_releases_capture_outputs(
     # memory manager can reuse the same backing allocation.
     output_bytes = 48 * MiB
     model = OutputAllocatingModel(output_bytes)
-    kv_params = SimpleNamespace(
-        devices=[DeviceRef.CPU()],
-        is_mla=False,
-        n_kv_heads_per_device=1,
-        num_q_heads_per_device=1,
-        is_fp8_kv_dtype=False,
-        data_parallel_degree=1,
-    )
+    kv_params = _mock_kv_params()
     runner = ServeGraphCaptureRunner(
         model=cast(Model, model),
-        execute_model=lambda model_inputs: ModelOutputs(
-            logits=Buffer.zeros((1,), dtype=DType.float32)
-        ),
-        session=cast(InferenceSession, object()),
         kv_params=cast(KVCacheParams, kv_params),
         warmup_model_inputs=_warmup_model_inputs,
         max_cache_length_upper_bound=1,
@@ -134,11 +166,7 @@ def test_warmup_pre_ready_releases_capture_outputs(
 
     runner.warmup_pre_ready()
 
-    assert sorted(runner.graph_entries) == [
-        (1, 1, 1, 0),
-        (2, 1, 1, 0),
-        (3, 1, 1, 0),
-    ]
+    assert set(runner.graph_entries) == {_gk(1), _gk(2), _gk(3)}
     for _inputs, outputs in runner.graph_entries.values():
         assert outputs.logits.num_elements == output_bytes
 
@@ -150,20 +178,9 @@ def test_release_graph_drops_entry_and_forwards_to_model(
 
     output_bytes = 48 * MiB
     model = OutputAllocatingModel(output_bytes)
-    kv_params = SimpleNamespace(
-        devices=[DeviceRef.CPU()],
-        is_mla=False,
-        n_kv_heads_per_device=1,
-        num_q_heads_per_device=1,
-        is_fp8_kv_dtype=False,
-        data_parallel_degree=1,
-    )
+    kv_params = _mock_kv_params()
     runner = ServeGraphCaptureRunner(
         model=cast(Model, model),
-        execute_model=lambda model_inputs: ModelOutputs(
-            logits=Buffer.zeros((1,), dtype=DType.float32)
-        ),
-        session=cast(InferenceSession, object()),
         kv_params=cast(KVCacheParams, kv_params),
         warmup_model_inputs=_warmup_model_inputs,
         max_cache_length_upper_bound=1,
@@ -172,19 +189,18 @@ def test_release_graph_drops_entry_and_forwards_to_model(
 
     runner.warmup_pre_ready()
 
-    captured_keys = sorted(runner.graph_entries)
-    assert captured_keys == [(1, 1, 1, 0), (2, 1, 1, 0)]
+    assert set(runner.graph_entries) == {_gk(1), _gk(2)}
 
-    target = captured_keys[0]
+    target = _gk(1)
     runner.release_graph(target)
 
     assert target not in runner.graph_entries
-    assert sorted(runner.graph_entries) == [(2, 1, 1, 0)]
+    assert set(runner.graph_entries) == {_gk(2)}
     assert len(model.released_graph_keys) == 1
 
     # Releasing the same key again is idempotent at the runner level and still
     # forwards to the model (engine-side release is also a no-op for unknown
     # keys, so this is safe).
     runner.release_graph(target)
-    assert sorted(runner.graph_entries) == [(2, 1, 1, 0)]
+    assert set(runner.graph_entries) == {_gk(2)}
     assert len(model.released_graph_keys) == 2

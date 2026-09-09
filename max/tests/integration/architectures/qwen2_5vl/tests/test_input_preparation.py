@@ -36,53 +36,48 @@ import numpy as np
 import pytest
 from max.nn.kv_cache import KVCacheInputs
 from max.nn.parallel import ParallelArrayOps
+from max.pipelines.architectures.qwen2_5vl.batch_processor import (
+    Qwen2_5VLBatchProcessor,
+)
 from max.pipelines.architectures.qwen2_5vl.context import (
     Qwen2_5VLTextAndVisionContext,
 )
-from max.pipelines.architectures.qwen2_5vl.model import Qwen2_5VLModel
+from max.pipelines.architectures.qwen2_5vl.model import Qwen2_5VLInputs
 from max.pipelines.architectures.qwen2_5vl.tokenizer import Qwen2_5VLTokenizer
-from max.pipelines.core import TextAndVisionContext
-from max.pipelines.lib import KVCacheConfig
-from max.pipelines.modeling.types import (
+from max.pipelines.context import (
     EOSTracker,
+    SamplingParams,
+    TextAndVisionContext,
+    TokenBuffer,
+)
+from max.pipelines.lib import KVCacheConfig, PipelineRuntimeConfig
+from max.pipelines.modeling.types import (
     ImageContentPart,
     RequestID,
-    SamplingParams,
     TextContentPart,
     TextGenerationRequest,
     TextGenerationRequestMessage,
-    TokenBuffer,
 )
 from pytest_mock import MockerFixture
 from transformers import Qwen2_5_VLConfig
 
 
-def create_mock_qwen_model(mocker: MockerFixture) -> Qwen2_5VLModel:
-    """Create a minimal mock Qwen2_5VLModel instance for testing.
+def create_mock_qwen_batch_processor(
+    mocker: MockerFixture,
+) -> Qwen2_5VLBatchProcessor:
+    """Create a minimal mock batch processor instance for testing.
 
-    This mocks the model initialization to avoid loading actual weights
-    and needing GPU/device setup, while keeping the actual prepare_initial_token_inputs
+    This mocks dependencies to avoid loading actual weights and needing
+    GPU/device setup, while keeping the actual prepare_initial_token_inputs
     logic intact.
 
     Args:
         mocker: pytest-mock fixture for patching
 
     Returns:
-        Mocked Qwen2_5VLModel instance ready for testing
+        Mocked Qwen2_5VLBatchProcessor instance ready for testing
     """
-    # Mock the parent class __init__ to avoid complex initialization
-    mocker.patch(
-        "max.pipelines.lib.interfaces.pipeline_model.PipelineModel.__init__",
-        return_value=None,
-    )
 
-    # Mock the load_model method that loads actual weights
-    mocker.patch(
-        "max.pipelines.architectures.qwen2_5vl.model.Qwen2_5VLModel.load_model",
-        return_value=(Mock(), Mock()),  # vision_model, language_model
-    )
-
-    # Mock Tensor operations to work with numpy arrays
     def mock_tensor_from_numpy(arr: np.ndarray) -> Mock:
         """Mock Tensor.from_numpy to return an object with .to() and .to_numpy() methods.
 
@@ -124,57 +119,42 @@ def create_mock_qwen_model(mocker: MockerFixture) -> Qwen2_5VLModel:
     )
     mock_config.text_config.hidden_size = 2048
 
-    # Create a minimal model instance with mocked dependencies
-    model = Qwen2_5VLModel.__new__(Qwen2_5VLModel)
+    processor = Qwen2_5VLBatchProcessor.__new__(Qwen2_5VLBatchProcessor)
 
-    # Create a mock model_config with required attributes
-    mock_model_config = Mock()
-    mock_model_config.spatial_merge_size = 2
-
-    # Set required attributes for prepare_initial_token_inputs
     mock_device = Mock()
-    model.devices = [mock_device]
-    model._parallel_ops = ParallelArrayOps(max_workers=1)
-    model.signal_buffers = [Mock()]
-    model.vision_model = Mock()
-    model.language_model = Mock()
-    model.model_config = mock_model_config
     mock_pipeline_config = Mock()
     mock_pipeline_config.model.huggingface_config = mock_config
-    model.pipeline_config = mock_pipeline_config
+    processor.runtime = Mock()
+    processor.runtime.devices = [mock_device]
+    processor.runtime.signal_buffers = [Mock()]
+    processor.runtime.pipeline_config = mock_pipeline_config
+    processor._parallel_ops = ParallelArrayOps(max_workers=1)
 
-    # Mock the _batch_image_token_indices method to avoid complex image processing
     def mock_batch_image_token_indices(
-        self: Qwen2_5VLModel, context_batch: list[TextAndVisionContext]
-    ) -> tuple[list[Mock], list[Mock]]:
+        self: Qwen2_5VLBatchProcessor,
+        context_batch: list[TextAndVisionContext],
+    ) -> list[Mock]:
         """Return empty indices for scenarios without actual image processing.
 
         Args:
-            self: The model instance (required for instance method)
+            self: The batch processor instance (required for instance method)
             context_batch: List of contexts to process
 
         Returns:
-            Tuple of (scatter_indices, gather_indices) as mock tensor lists
+            Per-device scatter index buffers as mock tensor lists
         """
-        # Return mock tensors that have the .to() method
         mock_scatter = Mock()
         mock_scatter.to = Mock(return_value=mock_scatter)
         mock_scatter.shape = (0,)  # Empty
+        return [mock_scatter]
 
-        mock_gather = Mock()
-        mock_gather.to = Mock(return_value=mock_gather)
-        mock_gather.shape = (0,)  # Empty
-
-        return [mock_scatter], [mock_gather]  # scatter_indices, gather_indices
-
-    # Use mocker.patch.object to properly mock the method (avoids mypy errors)
     mocker.patch.object(
-        Qwen2_5VLModel,
+        Qwen2_5VLBatchProcessor,
         "_batch_image_token_indices",
         mock_batch_image_token_indices,
     )
 
-    return model
+    return processor
 
 
 # ============================================================================
@@ -349,6 +329,10 @@ def mock_pipeline_config(qwen_token_ids: dict[str, int]) -> MagicMock:
 
     # Create mock pipeline config
     pipeline_config = MagicMock()
+    # A real runtime config, not a MagicMock: the tokenizer sizes its
+    # preprocessed image cache from these budgets, and arithmetic on a
+    # MagicMock raises.
+    pipeline_config.runtime = PipelineRuntimeConfig()
     pipeline_config.model = model_config
     return pipeline_config
 
@@ -498,11 +482,11 @@ async def test_qwen_input_preparation__position_ids_after_reset(
     # ========================================================================
     # SECTION 4: Get Position IDs from Reset Context
     # ========================================================================
-    model = create_mock_qwen_model(mocker)
+    processor = create_mock_qwen_batch_processor(mocker)
     mock_kv_cache = Mock(spec=KVCacheInputs)
 
     # Get position IDs from reset context (should trigger recomputation)
-    reset_qwen_inputs = model.prepare_initial_token_inputs(
+    reset_qwen_inputs: Qwen2_5VLInputs = processor.prepare_initial_token_inputs(
         replica_batches=[[context]],
         kv_cache_inputs=mock_kv_cache,
         return_n_logits=1,
@@ -523,7 +507,7 @@ async def test_qwen_input_preparation__position_ids_after_reset(
     context2 = await tokenizer.new_context(request2)
 
     # Get position IDs from fresh context
-    fresh_qwen_inputs = model.prepare_initial_token_inputs(
+    fresh_qwen_inputs: Qwen2_5VLInputs = processor.prepare_initial_token_inputs(
         replica_batches=[[context2]],
         kv_cache_inputs=mock_kv_cache,
         return_n_logits=1,
@@ -688,11 +672,11 @@ async def test_qwen_input_preparation__position_ids_after_reset_with_image(
     # ========================================================================
     # SECTION 4: Get Position IDs from Reset Context
     # ========================================================================
-    model = create_mock_qwen_model(mocker)
+    processor = create_mock_qwen_batch_processor(mocker)
     mock_kv_cache = Mock(spec=KVCacheInputs)
 
     # Get position IDs from reset context (should trigger recomputation)
-    reset_qwen_inputs = model.prepare_initial_token_inputs(
+    reset_qwen_inputs: Qwen2_5VLInputs = processor.prepare_initial_token_inputs(
         replica_batches=[[context]],
         kv_cache_inputs=mock_kv_cache,
         return_n_logits=1,
@@ -726,7 +710,7 @@ async def test_qwen_input_preparation__position_ids_after_reset_with_image(
     assert len(context2.tokens) == len(context.tokens)
 
     # Get position IDs from fresh context
-    fresh_qwen_inputs = model.prepare_initial_token_inputs(
+    fresh_qwen_inputs: Qwen2_5VLInputs = processor.prepare_initial_token_inputs(
         replica_batches=[[context2]],
         kv_cache_inputs=mock_kv_cache,
         return_n_logits=1,
@@ -795,7 +779,7 @@ def test_qwen_text_only_decoder_posids_increment_on_first_decode(
     3. Assert: decode_position_ids[0] == prefill_position_ids[-1] + 1
     """
     # Create mock model and text-only context.
-    model = create_mock_qwen_model(mocker)
+    processor = create_mock_qwen_batch_processor(mocker)
 
     # Create a text-only prompt of length L=33.
     L = 33
@@ -839,7 +823,7 @@ def test_qwen_text_only_decoder_posids_increment_on_first_decode(
     # Build inputs for prefill phase.
     dummy_kv_inputs = Mock(spec=KVCacheInputs)
 
-    prefill_inputs = model.prepare_initial_token_inputs(
+    prefill_inputs: Qwen2_5VLInputs = processor.prepare_initial_token_inputs(
         replica_batches=[[ctx]],
         kv_cache_inputs=dummy_kv_inputs,
         return_n_logits=1,
@@ -858,7 +842,7 @@ def test_qwen_text_only_decoder_posids_increment_on_first_decode(
     # Mimic the pipeline's next iteration: move to decode phase with single active token.
     ctx.tokens.advance_with_token(0)
 
-    step1_inputs = model.prepare_initial_token_inputs(
+    step1_inputs: Qwen2_5VLInputs = processor.prepare_initial_token_inputs(
         replica_batches=[[ctx]],
         kv_cache_inputs=dummy_kv_inputs,
         return_n_logits=1,

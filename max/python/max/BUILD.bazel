@@ -1,4 +1,6 @@
+load("@aspect_bazel_lib//lib:write_source_files.bzl", "write_source_files")
 load("//bazel:api.bzl", "modular_generate_stubfiles", "modular_nanobind_extension", "modular_py_library", "requirement")
+load("//bazel:config.bzl", "TOP_LEVEL_TAG")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -22,8 +24,10 @@ modular_nanobind_extension(
     module_name = "_core",
     new_link_root = "../modular/lib",
     deps = [
-        "//MLRT:AsyncRT/Nanobind",
+        "//Support:BazelRunfiles",
         "//Support:NanobindUtils",
+        "//Support:NixlPluginDir",
+        "//max/python/max/_core/internal:AsyncRTPython",
         "//max/python/max/_core/internal/modules",
         "@llvm-project//llvm:Support",
     ],
@@ -31,7 +35,19 @@ modular_nanobind_extension(
 
 modular_generate_stubfiles(
     name = "_core",
-    additional_update_targets = ["//max/python/max/_mlir/_mlir_libs:_mlir.sync-stubfiles"],
+    additional_update_targets = [
+        "//max/python/max/_mlir/_mlir_libs:_mlir.sync-stubfiles",
+    ] + select({
+        # nixl.pyi is diff-tested separately (linux-x86_64 only, see below); keep
+        # it in the one-shot `./utils/sync-stubfiles.sh` update flow.
+        "//:linux_x86_64": [":_core.sync-stubfiles.nixl"],
+        "//conditions:default": [],
+    }),
+    # nixl.pyi is platform-specific: the upstream NIXL library ships prebuilt
+    # binaries for linux-x86_64 only, so the _core.nixl binding -- and its
+    # generated stub -- is empty elsewhere. Exclude it from the cross-platform
+    # diff test here; it gets its own linux-x86_64-gated diff test below.
+    diff_test_exclude = ["_core/nixl.pyi"],
     diff_test_failure_message = """
 A stubfile is out of sync with its generated counterpart.
 If you modified just a .pyi file, you need to modify the corresponding .cpp file instead.
@@ -67,18 +83,41 @@ When you modify a .cpp file in the _core/src directory, you can run
     ],
 )
 
+# nixl.pyi carries the full linux-x86_64 _core.nixl API and stays the committed
+# source of truth (downstream type-checking reads it on every platform). The
+# binding is empty off linux-x86_64, so only diff-test the generated stub where
+# the binding is real; elsewhere this target is incompatible (skipped), and
+# `./utils/sync-stubfiles.sh` leaves the committed stub untouched.
+write_source_files(
+    name = "_core.sync-stubfiles.nixl",
+    testonly = True,
+    diff_test_failure_message = "max/python/max/_core/nixl.pyi is out of sync. Run './utils/sync-stubfiles.sh' on a linux-x86_64 host and commit the result.",
+    files = {"_core/nixl.pyi": ":stubfiles/_core/nixl.pyi"},
+    tags = [
+        TOP_LEVEL_TAG,
+        "skip-external-ci",  # Generated file does not exist externally
+        "stubfiles",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//conditions:default": [
+            "@platforms//os:linux",
+            "@platforms//cpu:x86_64",
+        ],
+    }),
+)
+
 modular_py_library(
     name = "interpreter",
     srcs = [
         "_interpreter.py",
     ],
     # _interpreter_ops is optional - Mojo kernels may not be available
-    ignore_extra_deps = [
-        "//max/python/max/_interpreter_ops",
+    ignore_unresolved_imports = [
+        "._interpreter_ops.lookup_handler",
     ],
     deps = [
         ":_core",
-        "//max/python/max/_interpreter_ops",
         "//max/python/max/driver",
         "//max/python/max/graph",
     ],
@@ -92,46 +131,12 @@ modular_py_library(
     ],
 )
 
+modular_py_library(
+    name = "_eager_policy",
+    srcs = ["_eager_policy.py"],
+)
+
 alias(
     name = "tensor",
     actual = "//max/python/max/experimental",
-)
-
-modular_py_library(
-    name = "max",
-    srcs = [],
-    tags = ["no-pydeps"],  # All deps are unused
-    deps = [
-        ":_core",
-        ":tensor",
-        "//max/python/max/_core_mojo",
-        "//max/python/max/_distributed_ops",
-        "//max/python/max/diagnostics",
-        "//max/python/max/driver",
-        "//max/python/max/dtype",
-        "//max/python/max/engine",
-        "//max/python/max/entrypoints",
-        "//max/python/max/entrypoints:_pipelines",
-        "//max/python/max/entrypoints:gpu-query",
-        "//max/python/max/entrypoints:pipelines",
-        "//max/python/max/entrypoints:replay_recording",
-        "//max/python/max/experimental/cascade",
-        "//max/python/max/experimental/nn",
-        "//max/python/max/experimental/torch",
-        "//max/python/max/graph",
-        "//max/python/max/kv_cache",
-        "//max/python/max/mlir",
-        "//max/python/max/nn",
-        "//max/python/max/nn/hooks",
-        "//max/python/max/pipelines",
-        "//max/python/max/pipelines/architectures",
-        "//max/python/max/pipelines/modeling",
-        "//max/python/max/profiler",
-        "//max/python/max/serve",
-        "//max/python/max/serve:debug",
-        "//max/python/max/serve/mocks",
-        "//max/python/max/support",
-        "//max/python/max/sys",
-        "//max/python/max/sys/_hal",
-    ],
 )

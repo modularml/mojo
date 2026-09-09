@@ -11,10 +11,6 @@ mojo_aliases = use_repo_rule("//bazel:mojo_aliases.bzl", "mojo_aliases")
 
 mojo_aliases(name = "mojo")
 
-mblack_alias = use_repo_rule("//bazel:mblack_alias.bzl", "mblack_alias")
-
-mblack_alias(name = "mblack")
-
 modular_wheel_repository = use_repo_rule("//bazel:modular_wheel_repository.bzl", "modular_wheel_repository")
 
 modular_wheel_repository(name = "modular_wheel")
@@ -32,56 +28,17 @@ link_hack(
 )
 
 register_toolchains(
+    "//bazel/internal:mojo_toolchain",
     "@mojo_toolchains//...",
     "//bazel/internal/cc-toolchain:all",
     "//bazel/internal:mojo_copts_toolchain",
 )
 
-http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+llvm_source = use_extension("//bazel/public-patches:llvm_source.bzl", "llvm_source")
+use_repo(llvm_source, "llvm-raw")
 
-# This section is derived from the full LLVM workspace, available at
-# llvm-project/utils/bazel/WORKSPACE. If there are changes in
-# LLVM that require updating these dependencies, this file may also need to
-# be updated in the future.
-http_archive(
-    name = "llvm_zlib",
-    build_file = "@llvm-raw//utils/bazel/third_party_build:zlib-ng.BUILD",
-    dev_dependency = True,
-    sha256 = "e36bb346c00472a1f9ff2a0a4643e590a254be6379da7cddd9daeb9a7f296731",
-    strip_prefix = "zlib-ng-2.0.7",
-    urls = [
-        "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/2.0.7.zip",
-    ],
-)
-
-http_archive(
-    name = "llvm_zstd",
-    build_file = "@llvm-raw//utils/bazel/third_party_build:zstd.BUILD",
-    dev_dependency = True,
-    sha256 = "7c42d56fac126929a6a85dbc73ff1db2411d04f104fae9bdea51305663a83fd0",
-    strip_prefix = "zstd-1.5.2",
-    urls = [
-        "https://github.com/facebook/zstd/releases/download/v1.5.2/zstd-1.5.2.tar.gz",
-    ],
-)
-
-# NOTE: These versions don't particularly match what modular uses internally, this is only used for test dependencies
-LLVM_COMMIT = "3b0880a2c270c3bd493f39b2812afc7984198d8c"
-
-LLVM_SHA = "f5b48d9c444fd4bcc19e97e560ff05d209abcd2244e12209fa274cb5bcca42c7"
-
-http_archive(
-    name = "llvm-raw",
-    build_file_content = "exports_files(glob([\"**\"]))",
-    dev_dependency = True,
-    sha256 = LLVM_SHA,
-    strip_prefix = "llvm-project-{}".format(LLVM_COMMIT),
-    url = "https://github.com/llvm/llvm-project/archive/{}.tar.gz".format(LLVM_COMMIT),
-)
-
-llvm_configure = use_repo_rule("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure")
-
-llvm_configure(name = "llvm-project")
+llvm_configure = use_extension("//bazel/public-patches:llvm_project.bzl", "llvm_configure")
+use_repo(llvm_configure, "llvm-project")
 
 cfg_workaround = use_repo_rule("//bazel/internal:cfg_workaround.bzl", "cfg_workaround")
 

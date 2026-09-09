@@ -14,7 +14,8 @@
 # Figure 4.4: Incorrect barrier usage example (from PMPP Chapter 4)
 # This demonstrates a common mistake with conditional synchronization
 
-from std.gpu import thread_idx, barrier
+from max.gpu import thread_idx
+from max.gpu.sync import barrier
 
 # ========================== KERNEL CODE ==========================
 

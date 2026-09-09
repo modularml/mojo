@@ -17,9 +17,9 @@ input dtype and target GPU architecture. Currently supports NVFP4, MXFP4,
 and MXFP8 on SM100.
 """
 
-from std.gpu.host import DeviceContext
-from std.gpu.host.info import _is_sm10x_gpu
-from std.gpu.primitives.grid_controls import PDLLevel
+from max.gpu.host import DeviceContext
+from max.gpu.host.info import _is_sm10x_gpu
+from max.gpu.primitives.grid_controls import PDLLevel
 from layout import TileTensor
 
 from linalg.matmul.gpu.sm100_structured.grouped_block_scaled_1d1d import (
@@ -32,23 +32,41 @@ def grouped_matmul_block_scaled_dispatch[
     target: StaticString = "cpu",
     pdl_level: PDLLevel = PDLLevel.ON,
 ](
-    c: TileTensor[...],
-    a: TileTensor[...],
-    b: TileTensor[...],
-    a_scales: TileTensor[...],
-    b_scales: TileTensor[...],
-    a_offsets: TileTensor[...],
-    a_scale_offsets: TileTensor[...],
-    expert_ids: TileTensor[...],
-    expert_scales: TileTensor[...],
+    c: TileTensor,
+    a: TileTensor,
+    b: TileTensor,
+    a_scales: TileTensor,
+    b_scales: TileTensor,
+    a_offsets: TileTensor,
+    a_scale_offsets: TileTensor,
+    expert_ids: TileTensor,
+    expert_scales: TileTensor,
     num_active_experts: Int,
     estimated_total_m: Int,
     ctx: DeviceContext,
 ) raises:
     """Dispatch grouped block-scaled matmul to format-specific implementation.
 
-    Currently NVFP4, MXFP4, and MXFP8 on SM100 are supported. See
-    `grouped_matmul_block_scaled_sm100_dispatch` for parameter documentation.
+    Currently NVFP4, MXFP4, and MXFP8 on SM100 are supported.
+
+    Parameters:
+        transpose_b: Whether B is transposed (must be True).
+        target: Target device (unused, for MOGG interface compatibility).
+        pdl_level: Programmatic dependent launch level.
+
+    Args:
+        c: Output tensor (total_tokens, N).
+        a: Input A tensor (total_tokens, K//2 packed).
+        b: Weight tensor B (num_experts, N, K//2 packed).
+        a_scales: Scale factors for A (5D).
+        b_scales: Scale factors for B (6D).
+        a_offsets: Per-expert token offsets (num_active_experts + 1).
+        a_scale_offsets: Per-expert scale offsets (num_active_experts).
+        expert_ids: Active expert IDs (num_active_experts).
+        expert_scales: Per-expert output scaling (num_experts).
+        num_active_experts: Number of active experts.
+        estimated_total_m: Estimated number of total non-padded tokens.
+        ctx: Device context.
     """
     comptime assert _is_sm10x_gpu(
         ctx.default_device_info

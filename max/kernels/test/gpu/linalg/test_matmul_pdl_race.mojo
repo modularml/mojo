@@ -29,9 +29,9 @@ This is currently only checking via `_matmul_gpu` dispatch for a single shape
 and only for bfloat16.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
-from std.gpu.host import DeviceContext
-from std.gpu.primitives.grid_controls import (
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu.host import DeviceContext
+from max.gpu.primitives.grid_controls import (
     PDLLevel,
     launch_dependent_grids,
     wait_on_dependent_grids,
@@ -46,15 +46,16 @@ from std.sys import get_defined_int
 def consumer_kernel[
     dtype: DType,
 ](
-    input: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    output: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    length: Int,
+    input: MutPointer[Scalar[dtype], MutAnyOrigin],
+    output: MutPointer[Scalar[dtype], MutAnyOrigin],
+    length_dev: Int32,
 ):
     """Consumer kernel that reads matmul output after PDL wait.
 
     Waits for dependent grids (matmul) before reading.
     Copies input to output (can verify output later on host).
     """
+    var length = Int(length_dev)
     wait_on_dependent_grids()
 
     var tid = thread_idx.x + block_idx.x * block_dim.x
@@ -145,7 +146,7 @@ def run_pdl_race_test[
         ctx.enqueue_function[kernel](
             c_device,
             result_device,
-            M * N,
+            Int32(M * N),
             grid_dim=num_blocks,
             block_dim=num_threads,
             attributes=pdl_launch_attributes(PDLLevel.OVERLAP_AT_END),
@@ -225,6 +226,6 @@ def main() raises:
         var iters = get_defined_int["ITERS", 100]()
 
         # Test with bfloat16 (common for SM90 matmul)
-        run_pdl_race_test[DType.bfloat16, M, N, K](ctx, iters)
+        run_pdl_race_test[.bfloat16, M, N, K](ctx, iters)
 
         print("All PDL race tests passed!")

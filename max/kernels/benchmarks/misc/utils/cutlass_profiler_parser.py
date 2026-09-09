@@ -101,7 +101,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     prefix = f"matmul_M{args.dims[0]}_N{args.dims[1]}_K{args.dims[2]}"
-    dump_file = args.output if args.output else prefix + "_config.csv"
+    dump_file = args.output or prefix + "_config.csv"
 
     args_map = defaultdict(str)
     args_map["kernels"] = "--kernels"

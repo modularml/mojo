@@ -5,9 +5,12 @@ package(default_visibility = ["//max:consumers"])
 modular_py_library(
     name = "telemetry",
     srcs = glob(["*.py"]),
+    test_docstring_examples = True,
     deps = [
+        "//max/python/max/profiler",
         "//max/python/max/serve:config",
         "//max/python/max/serve:process_control",
+        requirement("numpy"),
         requirement("opentelemetry-sdk"),
         requirement("opentelemetry-exporter-otlp-proto-http"),
         requirement("opentelemetry-exporter-prometheus"),

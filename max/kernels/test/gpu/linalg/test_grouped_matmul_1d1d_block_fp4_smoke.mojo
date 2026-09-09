@@ -18,8 +18,8 @@ block-scaled FP4 variants (e.g. NVFP4, MXFP4).
 """
 
 from std.math import ceildiv
-from std.gpu.host import DeviceContext
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.gpu.host import DeviceContext
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 from std.random import rand
 from layout import Coord, Idx, TileTensor, row_major
 from std.utils.index import Index, IndexList
@@ -77,13 +77,13 @@ def _test_grouped_1d1d_block_fp4_impl[
     var total_tokens = num_active_experts * tokens_per_expert
 
     # Offsets and expert IDs
-    var a_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var a_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         num_active_experts + 1
     )
-    var a_scale_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var a_scale_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         num_active_experts
     )
-    var expert_ids_host = ctx.enqueue_create_host_buffer[DType.int32](
+    var expert_ids_host = ctx.enqueue_create_host_buffer[.int32](
         num_active_experts
     )
 
@@ -128,11 +128,9 @@ def _test_grouped_1d1d_block_fp4_impl[
     var a_buf = ctx.enqueue_create_buffer[a_type](total_tokens * packed_K)
     var b_buf = ctx.enqueue_create_buffer[b_type](num_experts * N * packed_K)
     var c_buf = ctx.enqueue_create_buffer[c_type](total_tokens * N)
-    var a_off_buf = ctx.enqueue_create_buffer[DType.uint32](
-        num_active_experts + 1
-    )
-    var a_soff_buf = ctx.enqueue_create_buffer[DType.uint32](num_active_experts)
-    var eid_buf = ctx.enqueue_create_buffer[DType.int32](num_active_experts)
+    var a_off_buf = ctx.enqueue_create_buffer[.uint32](num_active_experts + 1)
+    var a_soff_buf = ctx.enqueue_create_buffer[.uint32](num_active_experts)
+    var eid_buf = ctx.enqueue_create_buffer[.int32](num_active_experts)
     var a_sf_buf = ctx.enqueue_create_buffer[sf_dtype](a_sf_size)
     var b_sf_buf = ctx.enqueue_create_buffer[sf_dtype](b_sf_size)
 
@@ -146,8 +144,8 @@ def _test_grouped_1d1d_block_fp4_impl[
     ctx.enqueue_copy(b_sf_buf, b_sf_host)
 
     # Expert scales
-    var es_buf = ctx.enqueue_create_buffer[DType.float32](num_experts)
-    var es_host = ctx.enqueue_create_host_buffer[DType.float32](num_experts)
+    var es_buf = ctx.enqueue_create_buffer[.float32](num_experts)
+    var es_host = ctx.enqueue_create_host_buffer[.float32](num_experts)
     for i in range(num_experts):
         es_host[i] = 1.0
     ctx.enqueue_copy(es_buf, es_host)
@@ -196,7 +194,7 @@ def _test_grouped_1d1d_block_fp4_impl[
                 Idx[SF_ATOM_K],
             )
         ),
-    ).as_any_origin()
+    ).as_unsafe_any_origin()
     var b_scales_tt = TileTensor(
         b_sf_buf,
         row_major(
@@ -209,7 +207,7 @@ def _test_grouped_1d1d_block_fp4_impl[
                 Idx[SF_ATOM_K],
             )
         ),
-    ).as_any_origin()
+    ).as_unsafe_any_origin()
 
     # Launch kernel
     comptime mma_shape = Index(128 * cta_group, mma_n, 32)
@@ -270,7 +268,7 @@ def _test_grouped_1d1d_mixed_experts[
 ](
     ctx: DeviceContext,
     num_active_experts: Int,
-    tokens_per_expert_ptr: UnsafePointer[Int, _],
+    tokens_per_expert_ptr: ImmPointer[Int, _],
 ) raises:
     """Test with non-uniform runtime tokens per expert (dynamic switching).
 
@@ -301,13 +299,13 @@ def _test_grouped_1d1d_mixed_experts[
         mma_n,
     )
 
-    var a_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var a_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         num_active_experts + 1
     )
-    var a_scale_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var a_scale_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         num_active_experts
     )
-    var expert_ids_host = ctx.enqueue_create_host_buffer[DType.int32](
+    var expert_ids_host = ctx.enqueue_create_host_buffer[.int32](
         num_active_experts
     )
 
@@ -350,11 +348,9 @@ def _test_grouped_1d1d_mixed_experts[
     var a_buf = ctx.enqueue_create_buffer[a_type](total_tokens * packed_K)
     var b_buf = ctx.enqueue_create_buffer[b_type](num_experts * N * packed_K)
     var c_buf = ctx.enqueue_create_buffer[c_type](total_tokens * N)
-    var a_off_buf = ctx.enqueue_create_buffer[DType.uint32](
-        num_active_experts + 1
-    )
-    var a_soff_buf = ctx.enqueue_create_buffer[DType.uint32](num_active_experts)
-    var eid_buf = ctx.enqueue_create_buffer[DType.int32](num_active_experts)
+    var a_off_buf = ctx.enqueue_create_buffer[.uint32](num_active_experts + 1)
+    var a_soff_buf = ctx.enqueue_create_buffer[.uint32](num_active_experts)
+    var eid_buf = ctx.enqueue_create_buffer[.int32](num_active_experts)
     var a_sf_buf = ctx.enqueue_create_buffer[sf_dtype](a_sf_size)
     var b_sf_buf = ctx.enqueue_create_buffer[sf_dtype](b_sf_size)
 
@@ -366,8 +362,8 @@ def _test_grouped_1d1d_mixed_experts[
     ctx.enqueue_copy(a_sf_buf, a_sf_host)
     ctx.enqueue_copy(b_sf_buf, b_sf_host)
 
-    var es_buf = ctx.enqueue_create_buffer[DType.float32](num_experts)
-    var es_host = ctx.enqueue_create_host_buffer[DType.float32](num_experts)
+    var es_buf = ctx.enqueue_create_buffer[.float32](num_experts)
+    var es_host = ctx.enqueue_create_host_buffer[.float32](num_experts)
     for i in range(num_experts):
         es_host[i] = 1.0
     ctx.enqueue_copy(es_buf, es_host)
@@ -412,7 +408,7 @@ def _test_grouped_1d1d_mixed_experts[
                 Idx[SF_ATOM_K],
             )
         ),
-    ).as_any_origin()
+    ).as_unsafe_any_origin()
     var b_scales_tt = TileTensor(
         b_sf_buf.unsafe_ptr().bitcast[Scalar[sf_dtype]](),
         row_major(
@@ -425,7 +421,7 @@ def _test_grouped_1d1d_mixed_experts[
                 Idx[SF_ATOM_K],
             )
         ),
-    ).as_any_origin()
+    ).as_unsafe_any_origin()
 
     comptime mma_shape = Index(128 * cta_group, mma_n, 32)
     comptime config = BlockScaledMatmulConfig[
@@ -477,7 +473,7 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
 ]() raises:
     var ctx = DeviceContext()
 
-    @parameter
+    @__parameter
     @always_inline
     def test_grouped_1d1d_block_fp4[
         num_experts: Int,
@@ -630,7 +626,7 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
     # load method per expert based on group_size vs SF_MN_GROUP_SIZE.
     print("\n=== Grouped 1D1D NVFP4 Mixed-Expert Dynamic Switching Tests ===")
 
-    @parameter
+    @__parameter
     @always_inline
     def mixed4[
         num_experts: Int,

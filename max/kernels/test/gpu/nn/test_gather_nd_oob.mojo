@@ -11,9 +11,9 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Coord, TileTensor, row_major
-from nn.gather_scatter import _gather_nd_impl, gather_nd_shape
+from nn.gather_scatter import gather_nd, gather_nd_shape
 
 from std.utils import IndexList
 
@@ -25,9 +25,9 @@ def execute_gather_nd_test[
     indices_rank: Int,
     batch_dims: Int,
 ](
-    data_host_ptr: UnsafePointer[Scalar[data_type], _],
+    data_host_ptr: Pointer[Scalar[data_type], _],
     data_shape: IndexList[data_rank],
-    indices_host_ptr: UnsafePointer[Scalar[indices_type], _],
+    indices_host_ptr: Pointer[Scalar[indices_type], _],
     indices_shape: IndexList[indices_rank],
     ctx: DeviceContext,
 ) raises:
@@ -85,7 +85,7 @@ def execute_gather_nd_test[
     )
 
     # execute the kernel
-    _gather_nd_impl[batch_dims, target="gpu"](
+    gather_nd[batch_dims, target="gpu"](
         data_device_tensor,
         indices_device_tensor,
         actual_output_tensor,
@@ -118,9 +118,7 @@ def test_gather_nd_oob(ctx: DeviceContext) raises:
     comptime indices_rank = 2
     var indices_shape = IndexList[indices_rank](2, 2)
     var indices_size = 4
-    var indices_host_ptr = ctx.enqueue_create_host_buffer[DType.int64](
-        indices_size
-    )
+    var indices_host_ptr = ctx.enqueue_create_host_buffer[.int64](indices_size)
     var indices_tensor = TileTensor(
         indices_host_ptr, row_major(Coord(indices_shape))
     )

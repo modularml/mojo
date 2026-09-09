@@ -1,0 +1,318 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
+load(":interp_cache.bzl", "compose_warm_cache", "warm_interp_cache")
+
+# oss/max-llm-book (test_gpt2_accel) force-loads this warm cache (MXF-533), so it
+# needs visibility here. This local directive extends the inherited //max/tests
+# default so gazelle (run by `//:format`) keeps the extra entry below instead of
+# regenerating it back to the parent directive's list.
+# gazelle:default_visibility //max/tests:__subpackages__,//:__pkg__,//oss/modular/max/tests:__subpackages__,//oss/max-llm-book:__subpackages__,//utils/benchmarking/kepler:__pkg__
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/max-llm-book:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+    "//utils/benchmarking/kepler:__pkg__",
+])
+
+# The eager-interpreter GC sweep tests share the sibling interpreter tests'
+# macOS incompatibility (FIXME: MOCO-2411); validate on Linux.
+_MACOS_INCOMPATIBLE = select({
+    "@platforms//os:macos": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
+# Host-CPU target for the virtual warm, sourced per build platform from the same
+# mapping the mojo toolchain uses (the `-target-triple`/`--target-cpu` select on
+# `_mojo_copts_toolchain` in oss/modular/bazel/internal/BUILD.bazel). Mirrored
+# inline because that select is not an importable symbol, so the warmed CPU
+# kernels target the same CPU the rest of the build does instead of a hardcoded
+# pin. The CI GPU lanes are all x86 hosts today (-> x86-64-v3); the aarch64 pair
+# mirrors the toolchain so an aarch64-hosted GPU box (e.g. Grace) needs no edit.
+_CPU_TARGET = select({
+    "//:linux_x86_64": "triple=x86_64-unknown-linux-gnu;cpu=x86-64-v3",
+    "//:linux_aarch64": "triple=aarch64-unknown-linux-gnu;cpu=neoverse-n1",
+})
+
+# GPU target for the virtual warm, keyed on the CI GPU-lane constraint the same
+# way precompile_pipeline threads its per-spec `target`, adding a lane is a
+# select branch, not a code edit. Covers the GPUs supported in CI today; the
+# arch strings match accelerator_architecture_name() on each box.
+# warm_accelerators is gated (below) to these same constraints, so off-GPU
+# configs are skipped before this select resolves, no default needed.
+_GPU_TARGET = select({
+    "//:a10_gpu": "cuda:sm_86",
+    "//:b200_gpu": "cuda:sm_100a",
+    "//:h100_gpu": "cuda:sm_90a",
+    "//:mi355_gpu": "hip:gfx950",
+})
+
+# Compatible only on the CI GPU lanes this warm cache targets (NVIDIA + AMD).
+# CPU-only workers and macOS fall to the default and are incompatible, so the
+# test stays macOS-incompatible and the GPU select above never resolves off-lane.
+_GPU_LANE_ONLY = select({
+    "//:a10_gpu": [],
+    "//:b200_gpu": [],
+    "//:h100_gpu": [],
+    "//:mi355_gpu": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+# --- Eager-interpreter GC sweep warm cache -----------------------------------
+# Split per device class (CPU vs accelerator) AND per GC family so each fragment
+# stays under the 900s action timeout and they run in parallel. warm_cpu
+# composes the CPU fragments (CPU consumers); compose composes CPU + accelerator
+# (GPU consumers). Both composite names are unchanged, so consumers don't move.
+
+# Shared target config so the producer and consumer can't drift, the warmed
+# cache key includes the host-CPU target and device arch, so they must match.
+modular_py_library(
+    name = "warm_config",
+    srcs = ["warm_config.py"],
+    visibility = ["//visibility:public"],
+)
+
+# Warm-adoption pytest plugin auto-registered by modular_eager_py_test via
+# `-p eager_warm_plugin`. imports = ["."] so it loads by bare module name.
+modular_py_library(
+    name = "eager_warm_plugin",
+    testonly = True,
+    srcs = ["eager_warm_plugin.py"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+    deps = ["@rules_python//python/runfiles"],
+)
+
+# Shared producer helpers (per-slot compile+export loop + stamp/manifest
+# writers) for warm_cpu and warm_accelerators. _interpreter_ops is imported via
+# importlib inside its functions (the virtual knobs must be set before it
+# imports), so it is not a static dep here, the binaries carry it.
+modular_py_library(
+    name = "warm_lib",
+    srcs = ["warm_lib.py"],
+    visibility = ["//visibility:public"],
+    deps = ["//max/python/max/engine"],
+)
+
+# CPU-slot producer. "manual" so wildcards don't pick it up standalone; built as
+# a dep of warm_cpu / compose. _interpreter_ops is imported via importlib (the
+# virtual knobs must be set before it imports), so it's in ignore_extra_deps for
+# the static pydeps scan.
+modular_py_binary(
+    name = "warm_cpu_bin",
+    srcs = ["warm_cpu.py"],
+    ignore_extra_deps = ["//max/python/max/_interpreter_ops"],
+    main = "warm_cpu.py",
+    tags = ["manual"],
+    target_compatible_with = _MACOS_INCOMPATIBLE,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":warm_lib",
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        requirement("click"),
+    ],
+)
+
+# Accelerator-slot producer. NOT GPU-gated: it compiles the sm_100a sweep via
+# virtual devices with no physical GPU (needs only NVPTX+ptxas codegen, present
+# in the toolchain).
+modular_py_binary(
+    name = "warm_accelerators_bin",
+    srcs = ["warm_accelerators.py"],
+    ignore_extra_deps = ["//max/python/max/_interpreter_ops"],
+    main = "warm_accelerators.py",
+    tags = ["manual"],
+    target_compatible_with = _MACOS_INCOMPATIBLE,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":warm_config",
+        ":warm_lib",
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        requirement("click"),
+    ],
+)
+
+# Merge logic in its own library so test_compose can import it without also
+# owning compose.py (a src can't belong to two py targets). Pure stdlib.
+modular_py_library(
+    name = "compose_lib",
+    srcs = ["compose_lib.py"],
+    visibility = ["//visibility:public"],
+)
+
+# Compose producer: no MAX runtime (just file moves + a JSON manifest merge via
+# a click CLI), so no device needed.
+modular_py_binary(
+    name = "compose_bin",
+    srcs = ["compose.py"],
+    main = "compose.py",
+    tags = ["manual"],
+    target_compatible_with = _MACOS_INCOMPATIBLE,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":compose_lib",
+        requirement("click"),
+    ],
+)
+
+# Unit test for compose_lib.merge (pure stdlib, runs on any platform).
+modular_py_test(
+    name = "test_compose",
+    srcs = ["test_compose.py"],
+    deps = [":compose_lib"],
+)
+
+# Mirrors gc_compile.GC_FAMILIES (names only; Starlark can't read the Python
+# registry); the producer validates --family against it. Fragments don't cache
+# per-family yet -- each depends on the whole _interpreter_ops package (any
+# family change re-runs all) -- MXF-539.
+_WARM_FAMILIES = [
+    "matmul",
+    "unary",
+    "binary",
+    "reduce_axis",
+    "shape_rearrange",
+    "gather",
+    "scatter",
+    "scatter_nd",
+    "scatter_nd_add",
+    "scatter_nd_max",
+    "scatter_nd_min",
+    "scatter_nd_mul",
+    "resize",
+    "pooling",
+    "conv",
+    "topk",
+    "select",
+    "layer_norm",
+    "rms_norm",
+    "group_norm",
+    "cast",
+    "band_part",
+    "nonzero",
+    "nms",
+    "random",
+    "range",
+    "roi_align",
+    "data_movement",
+]
+
+# CPU fragment per family: no --target -> lane-independent (cfg=exec), shared.
+[
+    warm_interp_cache(
+        name = "warm_cpu_" + fam,
+        binary = ":warm_cpu_bin",
+        cpu_target = _CPU_TARGET,
+        family = fam,
+        target_compatible_with = _MACOS_INCOMPATIBLE,
+    )
+    for fam in _WARM_FAMILIES
+]
+
+# Accelerator fragment per family: --target keys it per GPU lane (all slots).
+[
+    warm_interp_cache(
+        name = "warm_accel_" + fam,
+        binary = ":warm_accelerators_bin",
+        cpu_target = _CPU_TARGET,
+        family = fam,
+        target = _GPU_TARGET,
+        target_compatible_with = _GPU_LANE_ONLY,
+    )
+    for fam in _WARM_FAMILIES
+]
+
+# CPU-consumer dir: union of the CPU fragments (name kept: warm_cpu).
+compose_warm_cache(
+    name = "warm_cpu",
+    binary = ":compose_bin",
+    target_compatible_with = _MACOS_INCOMPATIBLE,
+    warms = ["warm_cpu_" + fam for fam in _WARM_FAMILIES],
+)
+
+# GPU-consumer dir: union of all fragments (name kept: compose).
+compose_warm_cache(
+    name = "compose",
+    binary = ":compose_bin",
+    target_compatible_with = _GPU_LANE_ONLY,
+    warms = ["warm_cpu_" + fam for fam in _WARM_FAMILIES] +
+            ["warm_accel_" + fam for fam in _WARM_FAMILIES],
+)
+
+# Consumer: a real GPU box (>=2 GPUs, to exercise multi-slot adoption) on any CI GPU
+# lane. Depends on the warmed cache dir as a build input, raises if it isn't
+# populated, then asserts the virtual-warmed stamp context matches this real box
+# (i.e. adoptable here).
+modular_py_test(
+    name = "test_interp_warm_cache",
+    timeout = "long",
+    srcs = ["test_interp_warm_cache.py"],
+    data = [":compose"],
+    env = {
+        "XARCH_DERIVED_RLOCATION": "$(rlocationpath :compose)",
+        # Cache logging on so a cold recompile would emit compileMojoToBinary;
+        # the receipt asserts its ABSENCE (force-load bypasses the keyed lookup,
+        # so there are no cache-hit lines, the force-load marker is the signal).
+        "MODULAR_ENABLE_CACHE_LOGGING": "1",
+        # Opt in to asserted-toolchain force-load adoption (closed-loop CI).
+        "MODULAR_EAGER_WARM_ADOPT_ASSERTED": "1",
+        # Reserve GPU memory for torch's tiny input/reference tensors: MAX's
+        # allocator otherwise grabs nearly all of it, leaving torch <20MiB and
+        # OOMing torch.randn/assert_close (matches test_interpreter_ops_gpu).
+        "MODULAR_TORCH_MEMORY_PERCENT": "0.6",
+    },
+    ignore_extra_deps = ["//max/python/max/_interpreter_ops"],
+    tags = ["gpu"],
+    # Every CI GPU lane we warm for, and only where the box has >=2 GPUs so the
+    # receipt exercises multi-slot adoption. The warm has WARM_DEVICE_COUNT
+    # slots (warm_config.py); any box with 2..that-many GPUs adopts via the
+    # device-count ceiling. macOS + CPU-only stay incompatible via the lane
+    # gate's default.
+    target_compatible_with = _GPU_LANE_ONLY + ["//:has_multi_gpu"],
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        requirement("torch"),
+    ],
+)
+
+# CPU-only consumer: a GPU-less box (m7i/m7g, or the CPU side of any linux box
+# with the GPUs hidden). Points MODULAR_DERIVED_PATH at the CPU-only warm and,
+# under MAX_EAGER_OP_PRECOMPILE=1, force-loads the CPU MEFs at the import-time
+# precompile instead of a cold compile, proving both CPU force-load and the
+# precompile-adoption path with accelerator_count()==0.
+modular_py_test(
+    name = "test_cpu_warm_cache",
+    timeout = "long",
+    srcs = ["test_cpu_warm_cache.py"],
+    data = [":warm_cpu"],
+    env = {
+        "XARCH_DERIVED_RLOCATION": "$(rlocationpath :warm_cpu)",
+        # Cache logging on so a cold recompile would emit compileMojoToBinary;
+        # the receipt asserts its ABSENCE (force-load bypasses the keyed lookup,
+        # so the force-load marker is the signal).
+        "MODULAR_ENABLE_CACHE_LOGGING": "1",
+        # Opt in to asserted-toolchain force-load adoption (closed-loop CI).
+        "MODULAR_EAGER_WARM_ADOPT_ASSERTED": "1",
+        # Exercise the import-time precompile-adoption path (the whole point):
+        # the sweep runs at the first _interpreter_ops import and force-loads.
+        "MAX_EAGER_OP_PRECOMPILE": "1",
+        # Force a CPU-only box so manifest_adoptable's CPU-only branch (accel==0)
+        # applies even on a GPU CI worker; the test asserts accelerator_count()==0.
+        "CUDA_VISIBLE_DEVICES": "",
+        "HIP_VISIBLE_DEVICES": "",
+    },
+    ignore_extra_deps = ["//max/python/max/_interpreter_ops"],
+    # Runs on the m7i/m7g CPU lanes + the CPU side of any linux box; no "gpu" tag
+    # or GPU-lane gate. macOS stays incompatible (MOCO-2411).
+    target_compatible_with = _MACOS_INCOMPATIBLE,
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        requirement("torch"),
+    ],
+)

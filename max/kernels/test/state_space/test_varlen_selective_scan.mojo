@@ -182,31 +182,27 @@ def run_varlen_selective_scan_fwd[
     )
 
     # query_start_loc: (batch + 1,) - cumulative sequence lengths
-    var query_start_loc_heap = List(
-        length=batch + 1, fill=Scalar[DType.int32](0)
-    )
-    var query_start_loc_h = LayoutTensor[DType.int32, layout_1d, _](
+    var query_start_loc_heap = List(length=batch + 1, fill=Int32(0))
+    var query_start_loc_h = LayoutTensor[.int32, layout_1d, _](
         query_start_loc_heap,
         RuntimeLayout[layout_1d].row_major(Index(batch + 1)),
     )
     var cumsum = 0
-    query_start_loc_h.ptr.store(0, Scalar[DType.int32](0))
+    query_start_loc_h.ptr.store(0, Int32(0))
     for i in range(batch):
         cumsum += seq_lengths[i]
-        query_start_loc_h.ptr.store(i + 1, Scalar[DType.int32](cumsum))
+        query_start_loc_h.ptr.store(i + 1, Int32(cumsum))
 
     # cache_indices: (batch,) - can be empty or identity mapping
-    var cache_indices_heap = List(length=batch, fill=Scalar[DType.int32](0))
-    var cache_indices_h = LayoutTensor[DType.int32, layout_1d, _](
+    var cache_indices_heap = List(length=batch, fill=Int32(0))
+    var cache_indices_h = LayoutTensor[.int32, layout_1d, _](
         cache_indices_heap, RuntimeLayout[layout_1d].row_major(Index(batch))
     )
     for i in range(batch):
-        cache_indices_h.ptr.store(i, Scalar[DType.int32](i))
+        cache_indices_h.ptr.store(i, Int32(i))
 
     # has_initial_state: (batch,) - can be empty or all False
-    var has_initial_state_heap = List(
-        length=batch, fill=Scalar[DType.bool](False)
-    )
+    var has_initial_state_heap = List(length=batch, fill=Scalar[.bool](False))
 
     # Initialize input data
     random(u_h)
@@ -460,15 +456,13 @@ def run_varlen_selective_state_update[
     )
 
     # state_batch_indices: (batch,) - can be empty or identity
-    var state_batch_indices_heap = List(
-        length=batch, fill=Scalar[DType.int32](0)
-    )
-    var state_batch_indices_h = LayoutTensor[DType.int32, layout_1d, _](
+    var state_batch_indices_heap = List(length=batch, fill=Int32(0))
+    var state_batch_indices_h = LayoutTensor[.int32, layout_1d, _](
         state_batch_indices_heap,
         RuntimeLayout[layout_1d].row_major(Index(batch)),
     )
     for i in range(batch):
-        state_batch_indices_h.ptr.store(i, Scalar[DType.int32](i))
+        state_batch_indices_h.ptr.store(i, Int32(i))
 
     # Initialize input data
     random(x_h)

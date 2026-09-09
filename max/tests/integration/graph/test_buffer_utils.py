@@ -32,6 +32,10 @@ from max.graph.buffer_utils import (
         (DType.float32, DType.int32),
         (DType.int32, DType.float32),
         (DType.float32, DType.float64),
+        # f16 on host hops through numpy: aarch64 CPU targets reject f16
+        # graphs, which broke Wan FP8 weight adaptation on macOS/Graviton.
+        (DType.float16, DType.float32),
+        (DType.float32, DType.float16),
     ],
 )
 def test_cast_tensor_to(
@@ -64,6 +68,23 @@ def test_cast_tensor_to_same_dtype(session: InferenceSession) -> None:
     )
     result = cast_tensor_to(tensor, DType.float32, session=session)
     assert result is tensor
+
+
+def test_cast_tensor_to_f16_to_bf16(session: InferenceSession) -> None:
+    """f16 -> bf16 on host: the f16 leg uses numpy, the bf16 leg a graph."""
+    device = CPU()
+    np_array = np.array([1.0, 2.0, 3.0], dtype=np.float16)
+    tensor = Buffer.from_numpy(np_array).to(device)
+
+    result = cast_tensor_to(tensor, DType.bfloat16, session=session)
+
+    assert result.dtype == DType.bfloat16
+    assert result.shape == tensor.shape
+    # numpy has no bf16, so verify values by casting back to f32.
+    roundtrip = cast_tensor_to(result, DType.float32, session=session)
+    np.testing.assert_allclose(
+        roundtrip.to_numpy(), np_array.astype(np.float32), rtol=1e-2
+    )
 
 
 def test_cast_dlpack_to(session: InferenceSession) -> None:

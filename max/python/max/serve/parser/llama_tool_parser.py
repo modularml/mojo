@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Mapping
+from typing import Any
 
 from max.pipelines.lib.tool_parsing import register
 from max.pipelines.modeling.types import (
@@ -72,3 +74,12 @@ class LlamaToolParser:
     def reset(self) -> None:
         """Resets internal state for a new streaming session."""
         self._buffer = ""
+
+    def set_streaming_tool_schemas(
+        self, schemas: Mapping[str, dict[str, Any]]
+    ) -> None:
+        """No-op: this format does not need schema-driven streaming.
+
+        See ``ToolParser.set_streaming_tool_schemas``.
+        """
+        return

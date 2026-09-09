@@ -19,8 +19,10 @@ from max.driver import (
     Accelerator,
     Buffer,
     DevicePinnedBuffer,
-    DeviceStream,
+    DeviceQueue,
+    Usage,
     accelerator_api,
+    batch_inplace_copy,
 )
 from max.dtype import DType
 
@@ -290,14 +292,17 @@ def test_zero_copy_on_to_stream_on_same_device(is_pinned: bool) -> None:
     gpu = Accelerator()
     data = np.arange(24).reshape(2, 3, 4).astype(np.int32)
     tensor = Buffer(
-        shape=data.shape, dtype=DType.int32, device=gpu, pinned=is_pinned
+        shape=data.shape,
+        dtype=DType.int32,
+        device=gpu,
+        usage=Usage.STAGING if is_pinned else Usage.DEFAULT,
     )
     tensor.inplace_copy_from(Buffer.from_numpy(data))
     stream1 = tensor.stream
     tensor1 = tensor.to(stream1)
     assert tensor1 is tensor
     assert tensor1.stream is stream1
-    stream2 = DeviceStream(gpu)
+    stream2 = DeviceQueue(gpu)
     assert stream2 != stream1
     tensor2 = tensor.to(stream2)
     assert tensor2 is not tensor
@@ -311,3 +316,180 @@ def test_zero_copy_on_to_stream_on_same_device(is_pinned: bool) -> None:
     assert tensor2.stream is stream2
     assert tensor2.stream is not stream1
     assert (tensor2.to_numpy() == tensor.to_numpy()).all()
+
+
+def test_batch_inplace_copy_same_device_parity() -> None:
+    """Batched H2D into one GPU matches a per-copy loop bit-exactly.
+
+    Positive-path smoke for memBatchCopy (cuMemcpyBatchAsync on CUDA 12.8+,
+    sequential fallback otherwise).
+    """
+    gpu = Accelerator()
+    n = 5
+    srcs = [
+        Buffer.from_numpy(np.full((8,), float(i + 1), dtype=np.float32))
+        for i in range(n)
+    ]
+    batch_dsts = [Buffer(DType.float32, (8,), device=gpu) for _ in range(n)]
+    loop_dsts = [Buffer(DType.float32, (8,), device=gpu) for _ in range(n)]
+
+    batch_inplace_copy(batch_dsts, srcs)
+    for dst, src in zip(loop_dsts, srcs, strict=True):
+        dst.inplace_copy_from(src)
+
+    gpu.synchronize()
+    for i, (batch_dst, loop_dst) in enumerate(
+        zip(batch_dsts, loop_dsts, strict=True)
+    ):
+        np.testing.assert_array_equal(
+            batch_dst.to(CPU()).to_numpy(),
+            loop_dst.to(CPU()).to_numpy(),
+            err_msg=f"batch vs per-copy mismatch at index {i}",
+        )
+
+
+def test_batch_inplace_copy_device_to_device_same_gpu_parity() -> None:
+    """Batched same-GPU DtoD matches a per-copy inplace_copy_from loop.
+
+    Exercises memBatchCopy on device-resident sources (cuMemcpyBatchAsync when
+    available, sequential copyTo otherwise).
+    """
+    gpu = Accelerator()
+    n = 5
+    srcs = [
+        Buffer.from_numpy(np.full((8,), float(i + 1), dtype=np.float32)).to(gpu)
+        for i in range(n)
+    ]
+    batch_dsts = [Buffer(DType.float32, (8,), device=gpu) for _ in range(n)]
+    loop_dsts = [Buffer(DType.float32, (8,), device=gpu) for _ in range(n)]
+
+    batch_inplace_copy(batch_dsts, srcs)
+    for dst, src in zip(loop_dsts, srcs, strict=True):
+        dst.inplace_copy_from(src)
+
+    gpu.synchronize()
+    for i, (batch_dst, loop_dst) in enumerate(
+        zip(batch_dsts, loop_dsts, strict=True)
+    ):
+        np.testing.assert_array_equal(
+            batch_dst.to(CPU()).to_numpy(),
+            loop_dst.to(CPU()).to_numpy(),
+            err_msg=f"DtoD batch vs per-copy mismatch at index {i}",
+        )
+
+
+def test_batch_inplace_copy_mixed_host_device_sources_parity() -> None:
+    """Mixed CPU-host + device sources in one batch succeed with value parity.
+
+    Both kinds share one destination device, so they ride a single submission:
+    UVA resolves each source pointer's direction inside cuMemcpyBatchAsync.
+    """
+    gpu = Accelerator()
+    host_src = Buffer.from_numpy(np.array([1.0, 2.0], dtype=np.float32))
+    device_src = Buffer.from_numpy(np.array([3.0, 4.0], dtype=np.float32)).to(
+        gpu
+    )
+    batch_dsts = [
+        Buffer(DType.float32, (2,), device=gpu),
+        Buffer(DType.float32, (2,), device=gpu),
+    ]
+    loop_dsts = [
+        Buffer(DType.float32, (2,), device=gpu),
+        Buffer(DType.float32, (2,), device=gpu),
+    ]
+    srcs = [host_src, device_src]
+
+    batch_inplace_copy(batch_dsts, srcs)
+    for dst, src in zip(loop_dsts, srcs, strict=True):
+        dst.inplace_copy_from(src)
+
+    gpu.synchronize()
+    for i, (batch_dst, loop_dst) in enumerate(
+        zip(batch_dsts, loop_dsts, strict=True)
+    ):
+        np.testing.assert_array_equal(
+            batch_dst.to(CPU()).to_numpy(),
+            loop_dst.to(CPU()).to_numpy(),
+            err_msg=f"mixed-source batch vs per-copy mismatch at index {i}",
+        )
+
+
+def test_batch_inplace_copy_skips_identity_on_accelerator() -> None:
+    """Identity pairs on GPU are no-ops; adjacent pairs still copy."""
+    gpu = Accelerator()
+    stable = Buffer.from_numpy(np.array([42.0], dtype=np.float32)).to(gpu)
+    other_src = Buffer.from_numpy(np.array([99.0], dtype=np.float32))
+    other_dst = Buffer(DType.float32, (1,), device=gpu)
+    other_dst.inplace_copy_from(
+        Buffer.from_numpy(np.array([0.0], dtype=np.float32))
+    )
+    gpu.synchronize()
+
+    # stable is both src and dst (identity no-op); other_* is a real H2D copy.
+    batch_inplace_copy([stable, other_dst], [stable, other_src])
+    gpu.synchronize()
+
+    np.testing.assert_array_equal(stable.to(CPU()).to_numpy(), [42.0])
+    np.testing.assert_array_equal(other_dst.to(CPU()).to_numpy(), [99.0])
+
+
+def test_batch_inplace_copy_pinned_poison_pill_parity() -> None:
+    """Mostly DtoD plus DevicePinnedBuffer pairs: value parity vs per-copy loop.
+
+    Matches the production device-0 preface poison-pill shape: several pure
+    device→device pairs plus pinned src→device and pinned→pinned. Pinned
+    buffers are storage-host but ``is_host`` is false (device-based), so they
+    used to de-batch the whole group. Asserts value parity only; no in-tree
+    memcpy-API counter for submission shape.
+    """
+    gpu = Accelerator()
+    n_dtod = 4
+
+    def _fill_pinned(value: float) -> DevicePinnedBuffer:
+        pinned = DevicePinnedBuffer(dtype=DType.float32, shape=(8,), device=gpu)
+        pinned.inplace_copy_from(
+            Buffer.from_numpy(np.full((8,), value, dtype=np.float32))
+        )
+        return pinned
+
+    device_srcs = [
+        Buffer.from_numpy(np.full((8,), float(i + 1), dtype=np.float32)).to(gpu)
+        for i in range(n_dtod)
+    ]
+    pinned_to_device_src = _fill_pinned(100.0)
+    pinned_to_pinned_src = _fill_pinned(200.0)
+
+    # Predicate mismatch that caused the regression: pinned but not is_host.
+    assert pinned_to_device_src.pinned and not pinned_to_device_src.is_host
+    assert pinned_to_pinned_src.pinned and not pinned_to_pinned_src.is_host
+
+    srcs: list[Buffer] = [
+        *device_srcs,
+        pinned_to_device_src,
+        pinned_to_pinned_src,
+    ]
+    batch_dsts: list[Buffer] = [
+        *[Buffer(DType.float32, (8,), device=gpu) for _ in range(n_dtod)],
+        Buffer(DType.float32, (8,), device=gpu),
+        DevicePinnedBuffer(dtype=DType.float32, shape=(8,), device=gpu),
+    ]
+    loop_dsts: list[Buffer] = [
+        *[Buffer(DType.float32, (8,), device=gpu) for _ in range(n_dtod)],
+        Buffer(DType.float32, (8,), device=gpu),
+        DevicePinnedBuffer(dtype=DType.float32, shape=(8,), device=gpu),
+    ]
+    assert batch_dsts[-1].pinned and loop_dsts[-1].pinned
+
+    batch_inplace_copy(batch_dsts, srcs)
+    for dst, src in zip(loop_dsts, srcs, strict=True):
+        dst.inplace_copy_from(src)
+
+    gpu.synchronize()
+    for i, (batch_dst, loop_dst) in enumerate(
+        zip(batch_dsts, loop_dsts, strict=True)
+    ):
+        np.testing.assert_array_equal(
+            batch_dst.to_numpy(),
+            loop_dst.to_numpy(),
+            err_msg=f"pinned-poison-pill batch vs per-copy mismatch at index {i}",
+        )

@@ -154,103 +154,103 @@ def main():
     def test_no_score_threshold():
         print("== test_no_score_threshold")
         var box_list = [
-            BoxCoords[DType.float32](0.0, 0.0, 1.0, 1.0),
-            BoxCoords[DType.float32](0.0, 0.1, 1.0, 1.1),
-            BoxCoords[DType.float32](0.0, -0.1, 1.0, 0.9),
-            BoxCoords[DType.float32](0.0, 10.0, 1.0, 11.0),
-            BoxCoords[DType.float32](0.0, 10.1, 1.0, 11.1),
-            BoxCoords[DType.float32](0.0, 100.0, 1.0, 101.0),
+            BoxCoords[.float32](0.0, 0.0, 1.0, 1.0),
+            BoxCoords[.float32](0.0, 0.1, 1.0, 1.1),
+            BoxCoords[.float32](0.0, -0.1, 1.0, 0.9),
+            BoxCoords[.float32](0.0, 10.0, 1.0, 11.0),
+            BoxCoords[.float32](0.0, 10.1, 1.0, 11.1),
+            BoxCoords[.float32](0.0, 100.0, 1.0, 101.0),
         ]
         var scores_list: List[Float32] = [0.9, 0.75, 0.6, 0.95, 0.5, 0.3]
 
-        test_case[DType.float32](
+        test_case[.float32](
             1, 1, 6, Float32(0.5), Float32(0.0), 3, box_list, scores_list
         )
 
     def test_flipped_coords():
         print("== test_flipped_coords")
         var box_list = [
-            BoxCoords[DType.float32](1.0, 1.0, 0.0, 0.0),
-            BoxCoords[DType.float32](1.0, 1.1, 0.0, 0.1),
-            BoxCoords[DType.float32](1.0, 0.9, 0.0, -0.1),
-            BoxCoords[DType.float32](1.0, 11.0, 0.0, 10.0),
-            BoxCoords[DType.float32](1.0, 11.1, 0.0, 10.1),
-            BoxCoords[DType.float32](1.0, 101.0, 0.0, 100.0),
+            BoxCoords[.float32](1.0, 1.0, 0.0, 0.0),
+            BoxCoords[.float32](1.0, 1.1, 0.0, 0.1),
+            BoxCoords[.float32](1.0, 0.9, 0.0, -0.1),
+            BoxCoords[.float32](1.0, 11.0, 0.0, 10.0),
+            BoxCoords[.float32](1.0, 11.1, 0.0, 10.1),
+            BoxCoords[.float32](1.0, 101.0, 0.0, 100.0),
         ]
         var scores_list: List[Float32] = [0.9, 0.75, 0.6, 0.95, 0.5, 0.3]
 
-        test_case[DType.float32](
+        test_case[.float32](
             1, 1, 6, Float32(0.5), Float32(0.0), 3, box_list, scores_list
         )
 
     def test_reflect_over_yx():
         print("== test_reflect_over_yx")
         var box_list = [
-            BoxCoords[DType.float32](-1.0, -1.0, 0.0, 0.0),
-            BoxCoords[DType.float32](-1.0, -1.1, 0.0, -0.1),
-            BoxCoords[DType.float32](-1.0, -0.9, 0.0, 0.1),
-            BoxCoords[DType.float32](-1.0, -11.0, 0.0, -10.0),
-            BoxCoords[DType.float32](-1.0, -11.1, 0.0, -10.1),
-            BoxCoords[DType.float32](-1.0, -101.0, 0.0, -100.0),
+            BoxCoords[.float32](-1.0, -1.0, 0.0, 0.0),
+            BoxCoords[.float32](-1.0, -1.1, 0.0, -0.1),
+            BoxCoords[.float32](-1.0, -0.9, 0.0, 0.1),
+            BoxCoords[.float32](-1.0, -11.0, 0.0, -10.0),
+            BoxCoords[.float32](-1.0, -11.1, 0.0, -10.1),
+            BoxCoords[.float32](-1.0, -101.0, 0.0, -100.0),
         ]
         var scores_list: List[Float32] = [0.9, 0.75, 0.6, 0.95, 0.5, 0.3]
 
-        test_case[DType.float32](
+        test_case[.float32](
             1, 1, 6, Float32(0.5), Float32(0.0), 3, box_list, scores_list
         )
 
     def test_score_threshold():
         print("== test_score_threshold")
         var box_list = [
-            BoxCoords[DType.float32](0.0, 0.0, 1.0, 1.0),
-            BoxCoords[DType.float32](0.0, 0.1, 1.0, 1.1),
-            BoxCoords[DType.float32](0.0, -0.1, 1.0, 0.9),
-            BoxCoords[DType.float32](0.0, 10.0, 1.0, 11.0),
-            BoxCoords[DType.float32](0.0, 10.1, 1.0, 11.1),
-            BoxCoords[DType.float32](0.0, 100.0, 1.0, 101.0),
+            BoxCoords[.float32](0.0, 0.0, 1.0, 1.0),
+            BoxCoords[.float32](0.0, 0.1, 1.0, 1.1),
+            BoxCoords[.float32](0.0, -0.1, 1.0, 0.9),
+            BoxCoords[.float32](0.0, 10.0, 1.0, 11.0),
+            BoxCoords[.float32](0.0, 10.1, 1.0, 11.1),
+            BoxCoords[.float32](0.0, 100.0, 1.0, 101.0),
         ]
         var scores_list: List[Float32] = [0.9, 0.75, 0.6, 0.95, 0.5, 0.3]
 
-        test_case[DType.float32](
+        test_case[.float32](
             1, 1, 6, Float32(0.5), Float32(0.4), 3, box_list, scores_list
         )
 
     def test_limit_outputs():
         print("== test_limit_outputs")
         var box_list = [
-            BoxCoords[DType.float32](0.0, 0.0, 1.0, 1.0),
-            BoxCoords[DType.float32](0.0, 0.1, 1.0, 1.1),
-            BoxCoords[DType.float32](0.0, -0.1, 1.0, 0.9),
-            BoxCoords[DType.float32](0.0, 10.0, 1.0, 11.0),
-            BoxCoords[DType.float32](0.0, 10.1, 1.0, 11.1),
-            BoxCoords[DType.float32](0.0, 100.0, 1.0, 101.0),
+            BoxCoords[.float32](0.0, 0.0, 1.0, 1.0),
+            BoxCoords[.float32](0.0, 0.1, 1.0, 1.1),
+            BoxCoords[.float32](0.0, -0.1, 1.0, 0.9),
+            BoxCoords[.float32](0.0, 10.0, 1.0, 11.0),
+            BoxCoords[.float32](0.0, 10.1, 1.0, 11.1),
+            BoxCoords[.float32](0.0, 100.0, 1.0, 101.0),
         ]
         var scores_list: List[Float32] = [0.9, 0.75, 0.6, 0.95, 0.5, 0.3]
 
-        test_case[DType.float32](
+        test_case[.float32](
             1, 1, 6, Float32(0.5), Float32(0.0), 2, box_list, scores_list
         )
 
     def test_single_box():
         print("== test_single_box")
         var box_list = [
-            BoxCoords[DType.float32](0.0, 0.0, 1.0, 1.0),
+            BoxCoords[.float32](0.0, 0.0, 1.0, 1.0),
         ]
         var scores_list: List[Float32] = [0.9]
 
-        test_case[DType.float32](
+        test_case[.float32](
             1, 1, 1, Float32(0.5), Float32(0.0), 2, box_list, scores_list
         )
 
     def test_two_classes():
         print("== test_two_classes")
         var box_list = [
-            BoxCoords[DType.float32](0.0, 0.0, 1.0, 1.0),
-            BoxCoords[DType.float32](0.0, 0.1, 1.0, 1.1),
-            BoxCoords[DType.float32](0.0, -0.1, 1.0, 0.9),
-            BoxCoords[DType.float32](0.0, 10.0, 1.0, 11.0),
-            BoxCoords[DType.float32](0.0, 10.1, 1.0, 11.1),
-            BoxCoords[DType.float32](0.0, 100.0, 1.0, 101.0),
+            BoxCoords[.float32](0.0, 0.0, 1.0, 1.0),
+            BoxCoords[.float32](0.0, 0.1, 1.0, 1.1),
+            BoxCoords[.float32](0.0, -0.1, 1.0, 0.9),
+            BoxCoords[.float32](0.0, 10.0, 1.0, 11.0),
+            BoxCoords[.float32](0.0, 10.1, 1.0, 11.1),
+            BoxCoords[.float32](0.0, 100.0, 1.0, 101.0),
         ]
         var scores_list: List[Float32] = [
             0.9,
@@ -267,25 +267,25 @@ def main():
             0.3,
         ]
 
-        test_case[DType.float32](
+        test_case[.float32](
             1, 2, 6, Float32(0.5), Float32(0.0), 2, box_list, scores_list
         )
 
     def test_two_batches():
         print("== test_two_batches")
         var box_list = [
-            BoxCoords[DType.float32](0.0, 0.0, 1.0, 1.0),
-            BoxCoords[DType.float32](0.0, 0.1, 1.0, 1.1),
-            BoxCoords[DType.float32](0.0, -0.1, 1.0, 0.9),
-            BoxCoords[DType.float32](0.0, 10.0, 1.0, 11.0),
-            BoxCoords[DType.float32](0.0, 10.1, 1.0, 11.1),
-            BoxCoords[DType.float32](0.0, 100.0, 1.0, 101.0),
-            BoxCoords[DType.float32](0.0, 0.0, 1.0, 1.0),
-            BoxCoords[DType.float32](0.0, 0.1, 1.0, 1.1),
-            BoxCoords[DType.float32](0.0, -0.1, 1.0, 0.9),
-            BoxCoords[DType.float32](0.0, 10.0, 1.0, 11.0),
-            BoxCoords[DType.float32](0.0, 10.1, 1.0, 11.1),
-            BoxCoords[DType.float32](0.0, 100.0, 1.0, 101.0),
+            BoxCoords[.float32](0.0, 0.0, 1.0, 1.0),
+            BoxCoords[.float32](0.0, 0.1, 1.0, 1.1),
+            BoxCoords[.float32](0.0, -0.1, 1.0, 0.9),
+            BoxCoords[.float32](0.0, 10.0, 1.0, 11.0),
+            BoxCoords[.float32](0.0, 10.1, 1.0, 11.1),
+            BoxCoords[.float32](0.0, 100.0, 1.0, 101.0),
+            BoxCoords[.float32](0.0, 0.0, 1.0, 1.0),
+            BoxCoords[.float32](0.0, 0.1, 1.0, 1.1),
+            BoxCoords[.float32](0.0, -0.1, 1.0, 0.9),
+            BoxCoords[.float32](0.0, 10.0, 1.0, 11.0),
+            BoxCoords[.float32](0.0, 10.1, 1.0, 11.1),
+            BoxCoords[.float32](0.0, 100.0, 1.0, 101.0),
         ]
         var scores_list: List[Float32] = [
             0.9,
@@ -302,7 +302,7 @@ def main():
             0.3,
         ]
 
-        test_case[DType.float32](
+        test_case[.float32](
             2, 1, 6, Float32(0.5), Float32(0.0), 2, box_list, scores_list
         )
 

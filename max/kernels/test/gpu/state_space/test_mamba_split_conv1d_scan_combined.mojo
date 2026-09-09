@@ -13,8 +13,8 @@
 
 from std.math import ceildiv, exp, exp2, log, rsqrt
 
-from std.gpu.host import DeviceContext
-from layout import Layout, LayoutTensor, RuntimeLayout
+from max.gpu.host import DeviceContext
+from layout import Layout, LayoutTensor, RuntimeLayout, TileTensor, row_major
 from layout._fillers import random
 from state_space.selective_scan import (
     mamba_split_conv1d_scan_combined_cpu,
@@ -215,182 +215,108 @@ def run_mamba_split_conv1d_scan_combined_gpu[
             ctx.enqueue_copy(outproj_weight_d, outproj_weight_h)
             ctx.enqueue_copy(outproj_bias_d, outproj_bias_h)
 
-    # Create LayoutTensors for GPU
-    var zxbcdt_gpu_lt = LayoutTensor[dtype, layout_3d](
-        zxbcdt_d,
-        RuntimeLayout[layout_3d].row_major(
-            Index(batch, seqlen, zxbcdt_channels)
-        ),
+    # Create TileTensors for GPU
+    var zxbcdt_gpu_lt = TileTensor(
+        zxbcdt_d, row_major(batch, seqlen, zxbcdt_channels)
     )
-    var conv_weight_gpu_lt = LayoutTensor[dtype, layout_2d](
-        conv_weight_d,
-        RuntimeLayout[layout_2d].row_major(Index(conv_weight_channels, width)),
+    var conv_weight_gpu_lt = TileTensor(
+        conv_weight_d, row_major(conv_weight_channels, width)
     )
-    var conv_bias_gpu_lt = LayoutTensor[dtype, layout_1d](
-        conv_bias_d, RuntimeLayout[layout_1d].row_major(Index(conv_bias_size))
-    )
-    var dt_bias_gpu_lt = LayoutTensor[dtype, layout_1d](
-        dt_bias_d, RuntimeLayout[layout_1d].row_major(Index(dt_bias_size))
-    )
-    var A_gpu_lt = LayoutTensor[dtype, layout_1d](
-        A_d, RuntimeLayout[layout_1d].row_major(Index(A_size))
-    )
-    var D_gpu_lt = LayoutTensor[dtype, layout_2d](
+    var conv_bias_gpu_lt = TileTensor(conv_bias_d, row_major(conv_bias_size))
+    var dt_bias_gpu_lt = TileTensor(dt_bias_d, row_major(dt_bias_size))
+    var A_gpu_lt = TileTensor(A_d, row_major(A_size))
+    var D_gpu_lt = TileTensor(
         D_d,
-        RuntimeLayout[layout_2d].row_major(
-            Index(
+        row_major(
+            (
                 nheads if has_D else 0,
                 headdim if has_D and D_size > nheads else 0,
             )
         ),
     )
-    var x_gpu_lt = LayoutTensor[dtype, layout_4d](
-        x_d,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, dim, n_chunks, 2 * dstate)
-        ),
+    var x_gpu_lt = TileTensor(x_d, row_major(batch, dim, n_chunks, 2 * dstate))
+    var out_z_gpu_lt = TileTensor(out_z_d, row_major(batch, dim, seqlen))
+    var dt_gpu_lt = TileTensor(dt_d, row_major(batch, nheads, seqlen))
+    var B_gpu_lt = TileTensor(B_d, row_major(batch, ngroups, dstate, seqlen))
+    var C_gpu_lt = TileTensor(C_d, row_major(batch, ngroups, dstate, seqlen))
+    var z_gpu_lt = TileTensor(z_d, row_major(batch, dim, seqlen))
+    var rmsnorm_weight_gpu_lt = TileTensor(
+        rmsnorm_weight_d, row_major(rmsnorm_weight_size)
     )
-    var out_z_gpu_lt = LayoutTensor[dtype, layout_3d](
-        out_z_d, RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen))
-    )
-    var dt_gpu_lt = LayoutTensor[dtype, layout_3d](
-        dt_d, RuntimeLayout[layout_3d].row_major(Index(batch, nheads, seqlen))
-    )
-    var B_gpu_lt = LayoutTensor[dtype, layout_4d](
-        B_d,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, ngroups, dstate, seqlen)
-        ),
-    )
-    var C_gpu_lt = LayoutTensor[dtype, layout_4d](
-        C_d,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, ngroups, dstate, seqlen)
-        ),
-    )
-    var z_gpu_lt = LayoutTensor[dtype, layout_3d](
-        z_d, RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen))
-    )
-    var rmsnorm_weight_gpu_lt = LayoutTensor[dtype, layout_1d](
-        rmsnorm_weight_d,
-        RuntimeLayout[layout_1d].row_major(Index(rmsnorm_weight_size)),
-    )
-    var outproj_weight_gpu_lt = LayoutTensor[dtype, layout_2d](
+    var outproj_weight_gpu_lt = TileTensor(
         outproj_weight_d,
-        RuntimeLayout[layout_2d].row_major(
-            Index(out_dim if has_outproj else 0, dim if has_outproj else 0)
-        ),
+        row_major((out_dim if has_outproj else 0, dim if has_outproj else 0)),
     )
-    var outproj_bias_gpu_lt = LayoutTensor[dtype, layout_1d](
-        outproj_bias_d,
-        RuntimeLayout[layout_1d].row_major(Index(outproj_bias_size)),
+    var outproj_bias_gpu_lt = TileTensor(
+        outproj_bias_d, row_major(outproj_bias_size)
     )
-    var output_gpu_gpu_lt = LayoutTensor[dtype, layout_3d](
+    var output_gpu_gpu_lt = TileTensor(
         output_gpu_d,
-        RuntimeLayout[layout_3d].row_major(
-            Index(batch, seqlen, out_dim if has_outproj else dim)
-        ),
+        row_major(batch, seqlen, out_dim if has_outproj else dim),
     )
 
-    # Create CPU LayoutTensors for reference
-    var zxbcdt_cpu_lt = LayoutTensor[dtype, layout_3d](
-        zxbcdt_h,
-        RuntimeLayout[layout_3d].row_major(
-            Index(batch, seqlen, zxbcdt_channels)
-        ),
+    # Create CPU TileTensors for reference
+    var zxbcdt_cpu_lt = TileTensor(
+        zxbcdt_h, row_major(batch, seqlen, zxbcdt_channels)
     )
-    var conv_weight_cpu_lt = LayoutTensor[dtype, layout_2d](
-        conv_weight_h,
-        RuntimeLayout[layout_2d].row_major(Index(conv_weight_channels, width)),
+    var conv_weight_cpu_lt = TileTensor(
+        conv_weight_h, row_major(conv_weight_channels, width)
     )
-    var conv_bias_cpu_lt = LayoutTensor[dtype, layout_1d](
-        conv_bias_h, RuntimeLayout[layout_1d].row_major(Index(conv_bias_size))
-    )
-    var dt_bias_cpu_lt = LayoutTensor[dtype, layout_1d](
-        dt_bias_h, RuntimeLayout[layout_1d].row_major(Index(dt_bias_size))
-    )
-    var A_cpu_lt = LayoutTensor[dtype, layout_1d](
-        A_h, RuntimeLayout[layout_1d].row_major(Index(A_size))
-    )
-    var D_cpu_lt = LayoutTensor[dtype, layout_2d](
+    var conv_bias_cpu_lt = TileTensor(conv_bias_h, row_major(conv_bias_size))
+    var dt_bias_cpu_lt = TileTensor(dt_bias_h, row_major(dt_bias_size))
+    var A_cpu_lt = TileTensor(A_h, row_major(A_size))
+    var D_cpu_lt = TileTensor(
         D_h,
-        RuntimeLayout[layout_2d].row_major(
-            Index(
+        row_major(
+            (
                 nheads if has_D else 0,
                 headdim if has_D and D_size > nheads else 0,
             )
         ),
     )
-    var x_cpu_lt = LayoutTensor[dtype, layout_4d](
-        x_h,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, dim, n_chunks, 2 * dstate)
-        ),
+    var x_cpu_lt = TileTensor(x_h, row_major(batch, dim, n_chunks, 2 * dstate))
+    var out_z_cpu_lt = TileTensor(out_z_h, row_major(batch, dim, seqlen))
+    var dt_cpu_lt = TileTensor(dt_h, row_major(batch, nheads, seqlen))
+    var B_cpu_lt = TileTensor(B_h, row_major(batch, ngroups, dstate, seqlen))
+    var C_cpu_lt = TileTensor(C_h, row_major(batch, ngroups, dstate, seqlen))
+    var z_cpu_lt = TileTensor(z_h, row_major(batch, dim, seqlen))
+    var rmsnorm_weight_cpu_lt = TileTensor(
+        rmsnorm_weight_h, row_major(rmsnorm_weight_size)
     )
-    var out_z_cpu_lt = LayoutTensor[dtype, layout_3d](
-        out_z_h, RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen))
-    )
-    var dt_cpu_lt = LayoutTensor[dtype, layout_3d](
-        dt_h, RuntimeLayout[layout_3d].row_major(Index(batch, nheads, seqlen))
-    )
-    var B_cpu_lt = LayoutTensor[dtype, layout_4d](
-        B_h,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, ngroups, dstate, seqlen)
-        ),
-    )
-    var C_cpu_lt = LayoutTensor[dtype, layout_4d](
-        C_h,
-        RuntimeLayout[layout_4d].row_major(
-            Index(batch, ngroups, dstate, seqlen)
-        ),
-    )
-    var z_cpu_lt = LayoutTensor[dtype, layout_3d](
-        z_h, RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen))
-    )
-    var rmsnorm_weight_cpu_lt = LayoutTensor[dtype, layout_1d](
-        rmsnorm_weight_h,
-        RuntimeLayout[layout_1d].row_major(Index(rmsnorm_weight_size)),
-    )
-    var outproj_weight_cpu_lt = LayoutTensor[dtype, layout_2d](
+    var outproj_weight_cpu_lt = TileTensor(
         outproj_weight_h,
-        RuntimeLayout[layout_2d].row_major(
-            Index(out_dim if has_outproj else 0, dim if has_outproj else 0)
-        ),
+        row_major((out_dim if has_outproj else 0, dim if has_outproj else 0)),
     )
-    var outproj_bias_cpu_lt = LayoutTensor[dtype, layout_1d](
-        outproj_bias_h,
-        RuntimeLayout[layout_1d].row_major(Index(outproj_bias_size)),
+    var outproj_bias_cpu_lt = TileTensor(
+        outproj_bias_h, row_major(outproj_bias_size)
     )
-    var output_cpu_cpu_lt = LayoutTensor[dtype, layout_3d](
+    var output_cpu_cpu_lt = TileTensor(
         output_cpu_h,
-        RuntimeLayout[layout_3d].row_major(
-            Index(batch, seqlen, out_dim if has_outproj else dim)
-        ),
+        row_major(batch, seqlen, out_dim if has_outproj else dim),
     )
 
-    var epsilon = Scalar[dtype](0.001)
+    var epsilon = Float32(0.001)
 
     # Run CPU kernel
     mamba_split_conv1d_scan_combined_cpu[
         dtype,
         DSTATE,
-        zxbcdt_cpu_lt.layout,
-        conv_weight_cpu_lt.layout,
-        conv_bias_cpu_lt.layout,
-        output_cpu_cpu_lt.layout,
-        x_cpu_lt.layout,
-        out_z_cpu_lt.layout,
-        dt_cpu_lt.layout,
-        A_cpu_lt.layout,
-        B_cpu_lt.layout,
-        C_cpu_lt.layout,
-        D_cpu_lt.layout,
-        z_cpu_lt.layout,
-        dt_bias_cpu_lt.layout,
-        rmsnorm_weight_cpu_lt.layout,
-        outproj_weight_cpu_lt.layout,
-        outproj_bias_cpu_lt.layout,
+        zxbcdt_cpu_lt.LayoutType,
+        conv_weight_cpu_lt.LayoutType,
+        conv_bias_cpu_lt.LayoutType,
+        output_cpu_cpu_lt.LayoutType,
+        x_cpu_lt.LayoutType,
+        out_z_cpu_lt.LayoutType,
+        dt_cpu_lt.LayoutType,
+        A_cpu_lt.LayoutType,
+        B_cpu_lt.LayoutType,
+        C_cpu_lt.LayoutType,
+        D_cpu_lt.LayoutType,
+        z_cpu_lt.LayoutType,
+        dt_bias_cpu_lt.LayoutType,
+        rmsnorm_weight_cpu_lt.LayoutType,
+        outproj_weight_cpu_lt.LayoutType,
+        outproj_bias_cpu_lt.LayoutType,
     ](
         batch,
         seqlen,
@@ -404,23 +330,23 @@ def run_mamba_split_conv1d_scan_combined_gpu[
         Int8(1) if norm_before_gate else Int8(0),
         Int8(1) if has_rmsnorm else Int8(0),
         Int8(1) if has_outproj else Int8(0),
-        zxbcdt_cpu_lt.as_any_origin(),
-        conv_weight_cpu_lt.as_any_origin(),
-        conv_bias_cpu_lt.as_any_origin(),
-        dt_bias_cpu_lt.as_any_origin(),
-        A_cpu_lt.as_any_origin(),
-        D_cpu_lt.as_any_origin(),
-        x_cpu_lt.as_any_origin(),
-        out_z_cpu_lt.as_any_origin(),
-        dt_cpu_lt.as_any_origin(),
-        B_cpu_lt.as_any_origin(),
-        C_cpu_lt.as_any_origin(),
-        z_cpu_lt.as_any_origin(),
-        rmsnorm_weight_cpu_lt.as_any_origin(),
-        outproj_weight_cpu_lt.as_any_origin(),
-        outproj_bias_cpu_lt.as_any_origin(),
-        output_cpu_cpu_lt.as_any_origin(),
-        epsilon,
+        zxbcdt_cpu_lt.as_unsafe_any_origin(),
+        conv_weight_cpu_lt.as_unsafe_any_origin(),
+        conv_bias_cpu_lt.as_unsafe_any_origin(),
+        dt_bias_cpu_lt.as_unsafe_any_origin(),
+        A_cpu_lt.as_unsafe_any_origin(),
+        D_cpu_lt.as_unsafe_any_origin(),
+        x_cpu_lt.as_unsafe_any_origin(),
+        out_z_cpu_lt.as_unsafe_any_origin(),
+        dt_cpu_lt.as_unsafe_any_origin(),
+        B_cpu_lt.as_unsafe_any_origin(),
+        C_cpu_lt.as_unsafe_any_origin(),
+        z_cpu_lt.as_unsafe_any_origin(),
+        rmsnorm_weight_cpu_lt.as_unsafe_any_origin(),
+        outproj_weight_cpu_lt.as_unsafe_any_origin(),
+        outproj_bias_cpu_lt.as_unsafe_any_origin(),
+        output_cpu_cpu_lt.as_unsafe_any_origin(),
+        epsilon.cast[dtype](),
     )
 
     # Run GPU kernel
@@ -432,36 +358,37 @@ def run_mamba_split_conv1d_scan_combined_gpu[
         mamba_split_conv1d_scan_combined_gpu[
             dtype,
             DSTATE,
-            zxbcdt_gpu_lt.layout,
-            conv_weight_gpu_lt.layout,
-            conv_bias_gpu_lt.layout,
-            output_gpu_gpu_lt.layout,
-            x_gpu_lt.layout,
-            out_z_gpu_lt.layout,
-            dt_gpu_lt.layout,
-            A_gpu_lt.layout,
-            B_gpu_lt.layout,
-            C_gpu_lt.layout,
-            D_gpu_lt.layout,
-            z_gpu_lt.layout,
-            dt_bias_gpu_lt.layout,
-            rmsnorm_weight_gpu_lt.layout,
-            outproj_weight_gpu_lt.layout,
-            outproj_bias_gpu_lt.layout,
+            zxbcdt_gpu_lt.LayoutType,
+            conv_weight_gpu_lt.LayoutType,
+            conv_bias_gpu_lt.LayoutType,
+            output_gpu_gpu_lt.LayoutType,
+            x_gpu_lt.LayoutType,
+            out_z_gpu_lt.LayoutType,
+            dt_gpu_lt.LayoutType,
+            A_gpu_lt.LayoutType,
+            B_gpu_lt.LayoutType,
+            C_gpu_lt.LayoutType,
+            D_gpu_lt.LayoutType,
+            z_gpu_lt.LayoutType,
+            dt_bias_gpu_lt.LayoutType,
+            rmsnorm_weight_gpu_lt.LayoutType,
+            outproj_weight_gpu_lt.LayoutType,
+            outproj_bias_gpu_lt.LayoutType,
+            zxbcdt_gpu_lt.Engine,
         ]
     ]()
 
     ctx.enqueue_function(
         compiled_kernel,
-        total_batch_dim,
-        batch,
-        seqlen,
-        dim,
-        nheads,
-        headdim,
-        ngroups,
-        width,
-        chunk_size,
+        Int32(total_batch_dim),
+        Int32(batch),
+        Int32(seqlen),
+        Int32(dim),
+        Int32(nheads),
+        Int32(headdim),
+        Int32(ngroups),
+        Int32(width),
+        Int32(chunk_size),
         Int8(1) if delta_softplus else Int8(0),
         Int8(1) if norm_before_gate else Int8(0),
         Int8(1) if has_rmsnorm else Int8(0),
@@ -482,7 +409,7 @@ def run_mamba_split_conv1d_scan_combined_gpu[
         outproj_weight_gpu_lt,
         outproj_bias_gpu_lt,
         output_gpu_gpu_lt,
-        epsilon,
+        epsilon.cast[dtype](),
         grid_dim=(num_blocks,),
         block_dim=(BLOCK_SIZE,),
     )
@@ -525,7 +452,7 @@ def run_mamba_split_conv1d_scan_combined_gpu[
 
             # Pre-load A value (same for all DSTATE entries within a head)
             var A_val_raw = Float32(A_h[h])
-            var A_ref = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var A_ref = SIMD[.float32, MAX_DSTATE](0.0)
             for n in range(dstate):
                 A_ref[n] = A_val_raw * LOG2E
 
@@ -543,7 +470,7 @@ def run_mamba_split_conv1d_scan_combined_gpu[
                 rmsnorm_w = Float32(rmsnorm_weight_h[d_idx])
 
             # Initialize state for selective scan
-            var state_ref = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var state_ref = SIMD[.float32, MAX_DSTATE](0.0)
 
             for t in range(seqlen):
                 # --- Step 1: Load z from zxbcdt ---
@@ -583,8 +510,8 @@ def run_mamba_split_conv1d_scan_combined_gpu[
                 var x_val = silu_ref(conv_sum_x)
 
                 # --- Step 4: Causal conv1d for B and C channels ---
-                var B_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
-                var C_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+                var B_vals = SIMD[.float32, MAX_DSTATE](0.0)
+                var C_vals = SIMD[.float32, MAX_DSTATE](0.0)
                 for n in range(dstate):
                     # B channel: dim + group_id * dstate + n (in xBC space)
                     var B_ch = dim + group_id * dstate + n

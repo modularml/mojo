@@ -26,9 +26,14 @@ The key stress scenarios:
 
 from std.math import align_up, ceildiv
 from std.random import randn, seed
-from std.sys import argv, get_defined_int, has_nvidia_gpu_accelerator
+from std.sys import (
+    argv,
+    get_defined_int,
+    has_amd_gpu_accelerator,
+    has_nvidia_gpu_accelerator,
+)
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import KVCacheStaticParams, PagedKVCacheCollection
 from layout import (
     Idx,
@@ -37,19 +42,18 @@ from layout import (
     RuntimeLayout,
     TileTensor,
     UNKNOWN_VALUE,
-    lt_to_tt,
     row_major,
 )
 from std.memory import alloc
 from nn.attention.gpu.mha import mha_gpu_naive
-from nn.attention.mha_mask import NullMask
+from nn.attention.mha_mask import CausalMask, MHAMask, NullMask
 from nn.attention.mha_utils import MHAConfig
 from nn.attention.gpu.mla import flare_mla_decoding
 from nn.attention.gpu.nvidia.sm100.mla_decode_dispatch import (
     MLADispatchScalarArgs,
 )
 from std.testing import assert_almost_equal
-from std.gpu.host.info import B200, _is_sm10x_gpu
+from max.gpu.host.info import B200, _is_sm10x_gpu
 from std.utils.index import Index, IndexList
 
 
@@ -230,20 +234,16 @@ def run_test_paged_variable[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[q_type](out_size)
@@ -261,13 +261,13 @@ def run_test_paged_variable[
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -277,21 +277,21 @@ def run_test_paged_variable[
     # Build PagedKVCacheCollection using the pattern from existing tests:
     # wrap .ptr into LayoutTensors with appropriate origins
     var kv_collection = PagedKVCacheCollection[kv_type, kv_params, PAGE_SIZE](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -324,14 +324,14 @@ def run_test_paged_variable[
     # -----------------------------------------------------------------------
     var mla_args = MLADispatchScalarArgs[
         num_heads=num_heads,
-        is_fp8_kv=(kv_type == DType.float8_e4m3fn),
+        is_fp8_kv=(kv_type == .float8_e4m3fn),
     ](
         batch_size,
         max_cache_len,
         q_max_seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
     print("  Launching MLA decode kernel...")
 
@@ -347,7 +347,7 @@ def run_test_paged_variable[
         row_offsets_tt,
         scale,
         ctx,
-        lt_to_tt(scalar_args_buf_lt),
+        scalar_args_buf_tt,
         q_max_seq_len=q_max_seq_len,
     )
 
@@ -472,7 +472,7 @@ def run_test_paged_variable[
         var out_offset = b * num_heads * V_DEPTH
         for h in range(num_heads):
             for d in range(V_DEPTH):
-                var expect = ref_b_host[d + DEPTH * h].cast[DType.float64]()
+                var expect = ref_b_host[d + DEPTH * h].cast[.float64]()
                 var actual = out_host[out_offset + V_DEPTH * h + d].cast[
                     DType.float64
                 ]()
@@ -686,20 +686,16 @@ def run_test_paged_variable_multiq[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[q_type](out_size)
@@ -716,13 +712,13 @@ def run_test_paged_variable_multiq[
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -730,21 +726,21 @@ def run_test_paged_variable_multiq[
     )
 
     var kv_collection = PagedKVCacheCollection[kv_type, kv_params, PAGE_SIZE](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -777,14 +773,14 @@ def run_test_paged_variable_multiq[
     # -----------------------------------------------------------------------
     var mla_args = MLADispatchScalarArgs[
         num_heads=num_heads,
-        is_fp8_kv=(kv_type == DType.float8_e4m3fn),
+        is_fp8_kv=(kv_type == .float8_e4m3fn),
     ](
         batch_size,
         max_cache_len,
         q_max_seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
     print("  Launching MLA decode kernel...")
 
@@ -800,7 +796,7 @@ def run_test_paged_variable_multiq[
         row_offsets_tt,
         scale,
         ctx,
-        lt_to_tt(scalar_args_buf_lt),
+        scalar_args_buf_tt,
         q_max_seq_len=q_max_seq_len,
     )
 
@@ -1174,20 +1170,16 @@ def run_test_paged_variable_ragged_q[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[q_type](out_size)
@@ -1204,13 +1196,13 @@ def run_test_paged_variable_ragged_q[
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -1220,21 +1212,21 @@ def run_test_paged_variable_ragged_q[
     # max_seq_length = q_max_seq_len (the maximum across all batches)
     # max_cache_length = max_cache_len (the maximum cache length)
     var kv_collection = PagedKVCacheCollection[kv_type, kv_params, PAGE_SIZE](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -1267,14 +1259,14 @@ def run_test_paged_variable_ragged_q[
     # -----------------------------------------------------------------------
     var mla_args = MLADispatchScalarArgs[
         num_heads=num_heads,
-        is_fp8_kv=(kv_type == DType.float8_e4m3fn),
+        is_fp8_kv=(kv_type == .float8_e4m3fn),
     ](
         batch_size,
         max_cache_len,
         q_max_seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
     print("  Launching MLA decode kernel...")
 
@@ -1290,7 +1282,7 @@ def run_test_paged_variable_ragged_q[
         row_offsets_tt,
         scale,
         ctx,
-        lt_to_tt(scalar_args_buf_lt),
+        scalar_args_buf_tt,
         q_max_seq_len=q_max_seq_len,
     )
 
@@ -1617,20 +1609,16 @@ def run_bench_paged_variable[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[q_type](out_size)
@@ -1644,13 +1632,13 @@ def run_bench_paged_variable[
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -1658,21 +1646,21 @@ def run_bench_paged_variable[
     )
 
     var kv_collection = PagedKVCacheCollection[kv_type, kv_params, PAGE_SIZE](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -1703,25 +1691,26 @@ def run_bench_paged_variable[
     # Step 7: Pre-compute scalar args and benchmark
     var mla_args = MLADispatchScalarArgs[
         num_heads=num_heads,
-        is_fp8_kv=(kv_type == DType.float8_e4m3fn),
+        is_fp8_kv=(kv_type == .float8_e4m3fn),
     ](
         batch_size,
         max_cache_len,
         q_max_seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @parameter
     @always_inline
-    @__copy_capture(
-        out_tt,
-        q_tt,
-        kv_cache,
-        row_offsets_tt,
-        scalar_args_buf_lt,
-    )
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {
+        var out_tt,
+        var q_tt,
+        var kv_cache,
+        var row_offsets_tt,
+        var scalar_args_buf_tt,
+        imm,
+    }:
         flare_mla_decoding[
             rank=3,
             config=MHAConfig[q_type](num_heads, DEPTH),
@@ -1734,7 +1723,7 @@ def run_bench_paged_variable[
             row_offsets_tt,
             scale,
             ctx,
-            lt_to_tt(scalar_args_buf_lt),
+            scalar_args_buf_tt,
             q_max_seq_len=q_max_seq_len,
         )
 
@@ -1743,7 +1732,7 @@ def run_bench_paged_variable[
     # Warmup
     kernel_launch(ctx)
 
-    var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+    var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
         nrun
     )
     var mstime = nstime / 1000000
@@ -1947,21 +1936,17 @@ def run_test_paged_variable_native_fp8[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     # FP8 Q to device
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_fp8_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     # Output is BF16
@@ -1978,13 +1963,13 @@ def run_test_paged_variable_native_fp8[
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -1992,21 +1977,21 @@ def run_test_paged_variable_native_fp8[
     )
 
     var kv_collection = PagedKVCacheCollection[kv_type, kv_params, PAGE_SIZE](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -2040,14 +2025,14 @@ def run_test_paged_variable_native_fp8[
     # -----------------------------------------------------------------------
     var mla_args = MLADispatchScalarArgs[
         num_heads=num_heads,
-        is_fp8_kv=(kv_type == DType.float8_e4m3fn),
+        is_fp8_kv=(kv_type == .float8_e4m3fn),
     ](
         batch_size,
         max_cache_len,
         q_max_seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
     print("  Launching native FP8 MLA decode kernel...")
 
     flare_mla_decoding[
@@ -2062,7 +2047,7 @@ def run_test_paged_variable_native_fp8[
         row_offsets_tt,
         scale,
         ctx,
-        lt_to_tt(scalar_args_buf_lt),
+        scalar_args_buf_tt,
         q_max_seq_len=q_max_seq_len,
     )
 
@@ -2181,7 +2166,7 @@ def run_test_paged_variable_native_fp8[
         var out_offset = b * num_heads * V_DEPTH
         for h in range(num_heads):
             for d in range(V_DEPTH):
-                var expect = ref_b_host[d + DEPTH * h].cast[DType.float64]()
+                var expect = ref_b_host[d + DEPTH * h].cast[.float64]()
                 var actual = out_host[out_offset + V_DEPTH * h + d].cast[
                     DType.float64
                 ]()
@@ -2212,6 +2197,494 @@ def run_test_paged_variable_native_fp8[
     print("  PASS:", name, "\n")
 
     # Cleanup
+
+    _ = blocks_device
+    _ = cache_lengths_device
+    _ = lookup_table_device
+    _ = q_device
+    _ = row_offsets_device
+    _ = out_device
+    _ = row_offsets_host^
+    _ = lookup_table_host^
+    _ = cache_lengths_host^
+    _ = blocks_bf16^
+    _ = blocks_host^
+    _ = out_host^
+    _ = q_bf16_host^
+    _ = q_fp8_host^
+
+
+# ===-----------------------------------------------------------------------===#
+# Core test: native FP8 paged path with truly ragged Q (per-batch seq_len)
+# ===-----------------------------------------------------------------------===#
+
+
+def run_test_paged_variable_ragged_q_native_fp8[
+    mask_t: MHAMask,
+    //,
+    num_heads: Int,
+](
+    name: StringLiteral,
+    cache_lengths: List[Int],
+    seq_lens: List[Int],
+    mask: mask_t,
+    ctx: DeviceContext,
+) raises:
+    """Native FP8 (Q=FP8, KV=FP8, output=BF16) MLA decode through the paged KV
+    cache with per-batch variable Q sequence lengths (ragged Q).
+
+    This is the AMD MTP fold exercised through the production paged + ragged
+    layout path (the AMD fold is FP8-only and requires num_heads <= 16). Uniform
+    `seq_lens` give a uniform multi-Q fold; differing `seq_lens` give the
+    variable-draft-length case, which is supported: the comptime `q_seq_len`
+    (== q_max_seq_len) is only the padding ceiling, while the runtime
+    per-sequence length drives the SRD valid-row clamp, the per-token causal
+    offset, the split-K stat writer, and the ragged reducer, so short sequences'
+    pad rows are dropped. Pass `CausalMask()` to exercise that per-token causal
+    offset (the discriminating case for variable Q); `NullMask()` covers the
+    unmasked reduction.
+
+    `mask` is applied to both the kernel and the per-batch GPU-naive reference,
+    which uses BF16 Q and dequantized BF16 K with `num_keys = cache_len + this
+    batch's seq_len` — so `mha_gpu_naive`'s `score_row = y + cache_len` matches
+    the kernel's per-token `num_keys - seq_len + token`.
+    """
+    comptime q_type = DType.float8_e4m3fn
+    comptime kv_type = DType.float8_e4m3fn
+    comptime ref_type = DType.bfloat16
+
+    var batch_size = len(cache_lengths)
+    assert (
+        len(seq_lens) == batch_size
+    ), "cache_lengths and seq_lens must have same length"
+    var q_max_seq_len = 0
+    var total_q_tokens = 0
+    for i in range(batch_size):
+        if seq_lens[i] > q_max_seq_len:
+            q_max_seq_len = seq_lens[i]
+        total_q_tokens += seq_lens[i]
+
+    print(
+        "test:",
+        name,
+        " batch_size:",
+        batch_size,
+        " num_heads:",
+        num_heads,
+        " q_type:",
+        q_type,
+        " kv_type:",
+        kv_type,
+        " q_max_seq_len:",
+        q_max_seq_len,
+        " total_q_tokens:",
+        total_q_tokens,
+    )
+    for i in range(batch_size):
+        print(
+            "  batch",
+            i,
+            ": cache_len=",
+            cache_lengths[i],
+            " q_seq_len=",
+            seq_lens[i],
+        )
+
+    var max_cache_len = 0
+    var total_pages = 0
+    for i in range(batch_size):
+        if cache_lengths[i] > max_cache_len:
+            max_cache_len = cache_lengths[i]
+        total_pages += ceildiv(cache_lengths[i] + seq_lens[i], PAGE_SIZE)
+
+    comptime scale = Float32(0.125)
+    comptime group = num_heads
+
+    # -----------------------------------------------------------------------
+    # Step 1: Create the paged KV cache on host (FP8 + BF16 reference copy)
+    # -----------------------------------------------------------------------
+    comptime kv_params = KVCacheStaticParams(
+        num_heads=KV_NUM_HEADS, head_size=DEPTH, is_mla=True
+    )
+    comptime kv_dim2 = 1
+
+    var block_shape = IndexList[6](
+        total_pages,
+        kv_dim2,
+        NUM_LAYERS,
+        PAGE_SIZE,
+        kv_params.num_heads,
+        kv_params.head_size,
+    )
+    var block_elems = (
+        total_pages
+        * kv_dim2
+        * NUM_LAYERS
+        * PAGE_SIZE
+        * kv_params.num_heads
+        * kv_params.head_size
+    )
+
+    var blocks_host = List(length=block_elems, fill=Scalar[kv_type](0))
+    var blocks_bf16 = List(length=block_elems, fill=Scalar[ref_type](0))
+    randn(
+        blocks_bf16,
+        mean=0.0,
+        standard_deviation=0.5,
+    )
+    for i in range(block_elems):
+        blocks_host[i] = blocks_bf16[i].cast[kv_type]()
+
+    var _page_stride = (
+        kv_dim2
+        * NUM_LAYERS
+        * PAGE_SIZE
+        * kv_params.num_heads
+        * kv_params.head_size
+    )
+    var _tok_stride = kv_params.num_heads * kv_params.head_size
+
+    var cache_lengths_host = List(length=batch_size, fill=UInt32(0))
+    for i in range(batch_size):
+        cache_lengths_host[i] = UInt32(cache_lengths[i])
+
+    var max_num_keys_any_batch = 0
+    for i in range(batch_size):
+        var nk = cache_lengths[i] + seq_lens[i]
+        if nk > max_num_keys_any_batch:
+            max_num_keys_any_batch = nk
+    var max_pages_per_batch = align_up(
+        ceildiv(max_num_keys_any_batch, PAGE_SIZE), 8
+    )
+    var lut_size = batch_size * max_pages_per_batch
+    var lookup_table_host = List(length=lut_size, fill=UInt32(0))
+
+    var page_offset = 0
+    for i in range(batch_size):
+        var num_pages_i = ceildiv(cache_lengths[i] + seq_lens[i], PAGE_SIZE)
+        for p in range(num_pages_i):
+            lookup_table_host[i * max_pages_per_batch + p] = UInt32(
+                page_offset + p
+            )
+        page_offset += num_pages_i
+
+    # Zero out tail slots in both FP8 and BF16 copies.
+    var cur_page = 0
+    for bi in range(batch_size):
+        var num_keys_i = cache_lengths[bi] + seq_lens[bi]
+        var num_pages_i = ceildiv(num_keys_i, PAGE_SIZE)
+        for pg in range(num_pages_i):
+            var valid_toks = num_keys_i - pg * PAGE_SIZE
+            if valid_toks > PAGE_SIZE:
+                valid_toks = PAGE_SIZE
+            var base = cur_page * _page_stride + valid_toks * _tok_stride
+            var zero_count = (PAGE_SIZE - valid_toks) * _tok_stride
+            for z in range(zero_count):
+                blocks_host[base + z] = 0
+                blocks_bf16[base + z] = 0
+            cur_page += 1
+
+    # -----------------------------------------------------------------------
+    # Step 2: Q tensor — generate BF16, keep copy, cast to FP8
+    # -----------------------------------------------------------------------
+    var q_size = total_q_tokens * num_heads * DEPTH
+    var q_bf16_host = List(length=q_size, fill=Scalar[ref_type](0))
+    randn(q_bf16_host, mean=0.0, standard_deviation=0.5)
+    var q_fp8_host = List(length=q_size, fill=Scalar[q_type](0))
+    for i in range(q_size):
+        q_fp8_host[i] = q_bf16_host[i].cast[q_type]()
+
+    # -----------------------------------------------------------------------
+    # Step 3: input_row_offsets — truly ragged per batch
+    # -----------------------------------------------------------------------
+    var row_offsets_host = List(length=batch_size + 1, fill=UInt32(0))
+    row_offsets_host[0] = UInt32(0)
+    for i in range(batch_size):
+        row_offsets_host[i + 1] = row_offsets_host[i] + UInt32(seq_lens[i])
+
+    # -----------------------------------------------------------------------
+    # Step 4: Output tensor (BF16)
+    # -----------------------------------------------------------------------
+    var out_size = total_q_tokens * num_heads * V_DEPTH
+    var out_host = List(length=out_size, fill=Scalar[ref_type](0))
+
+    # -----------------------------------------------------------------------
+    # Step 5: Copy everything to device
+    # -----------------------------------------------------------------------
+    var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
+    ctx.enqueue_copy(blocks_device, blocks_host)
+
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
+    ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
+
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
+    ctx.enqueue_copy(lookup_table_device, lookup_table_host)
+
+    var q_device = ctx.enqueue_create_buffer[q_type](q_size)
+    ctx.enqueue_copy(q_device, q_fp8_host)
+
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
+    ctx.enqueue_copy(row_offsets_device, row_offsets_host)
+
+    var out_device = ctx.enqueue_create_buffer[ref_type](out_size)
+
+    ctx.synchronize()
+
+    # -----------------------------------------------------------------------
+    # Step 6: Build LayoutTensors and PagedKVCacheCollection on device
+    # -----------------------------------------------------------------------
+    var blocks_lt = LayoutTensor[kv_type, Layout.row_major[6]()](
+        blocks_device.unsafe_ptr(),
+        RuntimeLayout[Layout.row_major[6]()].row_major(block_shape),
+    )
+
+    comptime cl_layout = Layout(UNKNOWN_VALUE)
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
+        cache_lengths_device.unsafe_ptr(),
+        RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
+    )
+
+    comptime lt_layout_2d = Layout.row_major[2]()
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
+        lookup_table_device.unsafe_ptr(),
+        RuntimeLayout[lt_layout_2d].row_major(
+            IndexList[2](batch_size, max_pages_per_batch)
+        ),
+    )
+
+    var kv_collection = PagedKVCacheCollection[kv_type, kv_params, PAGE_SIZE](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
+            blocks_lt.ptr,
+            RuntimeLayout[Layout.row_major[6]()](
+                blocks_lt.runtime_layout.shape.value,
+                blocks_lt.runtime_layout.stride.value,
+            ),
+        ),
+        LayoutTensor[mut=False, .uint32, cl_layout](
+            cache_lengths_lt.ptr,
+            RuntimeLayout[cl_layout](
+                cache_lengths_lt.runtime_layout.shape.value,
+                cache_lengths_lt.runtime_layout.stride.value,
+            ),
+        ),
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
+            lookup_table_lt.ptr,
+            RuntimeLayout[lt_layout_2d](
+                lookup_table_lt.runtime_layout.shape.value,
+                lookup_table_lt.runtime_layout.stride.value,
+            ),
+        ),
+        UInt32(q_max_seq_len),
+        UInt32(max_cache_len),
+    )
+
+    var kv_cache = kv_collection.get_key_cache(0)
+
+    var q_tt = TileTensor(
+        q_device,
+        row_major((total_q_tokens, Idx[num_heads], Idx[DEPTH])),
+    )
+
+    var out_tt = TileTensor(
+        out_device,
+        row_major((total_q_tokens, Idx[num_heads], Idx[V_DEPTH])),
+    )
+
+    var row_offsets_tt = TileTensor(
+        row_offsets_device,
+        row_major(batch_size + 1),
+    )
+
+    # -----------------------------------------------------------------------
+    # Step 7: Pre-compute scalar args and call the kernel
+    # -----------------------------------------------------------------------
+    var mla_args = MLADispatchScalarArgs[
+        num_heads=num_heads,
+        is_fp8_kv=(kv_type == .float8_e4m3fn),
+    ](
+        batch_size,
+        max_cache_len,
+        q_max_seq_len,
+        ctx,
+    )
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
+
+    print("  Launching native FP8 MLA decode kernel (ragged Q)...")
+
+    flare_mla_decoding[
+        rank=3,
+        config=MHAConfig[q_type](num_heads, DEPTH),
+        ragged=True,
+    ](
+        out_tt,
+        q_tt,
+        kv_cache,
+        mask,
+        row_offsets_tt,
+        scale,
+        ctx,
+        scalar_args_buf_tt,
+        q_max_seq_len=q_max_seq_len,
+    )
+
+    ctx.synchronize()
+    print("  Kernel completed successfully (no crash).")
+
+    # -----------------------------------------------------------------------
+    # Step 8: Numerical verification using mha_gpu_naive reference (BF16)
+    # -----------------------------------------------------------------------
+    ctx.enqueue_copy(out_host, out_device)
+    ctx.synchronize()
+
+    print("  Computing GPU naive reference per batch and comparing...")
+
+    var rtol = 8e-2
+    var atol = 5e-1
+    var total_checked = 0
+    var max_abs_err = Float64(0)
+
+    var q_token_offset = 0
+
+    for b in range(batch_size):
+        var cache_len = cache_lengths[b]
+        var b_seq_len = seq_lens[b]
+        var ref_num_keys = cache_len + b_seq_len
+
+        # Extract contiguous BF16 K for this batch from bf16 paged blocks.
+        var k_b_size = ref_num_keys * KV_NUM_HEADS * DEPTH
+        var k_b_host = List(length=k_b_size, fill=Scalar[ref_type](0))
+
+        var page_base_b = 0
+        for bi in range(b):
+            page_base_b += ceildiv(cache_lengths[bi] + seq_lens[bi], PAGE_SIZE)
+
+        for tok in range(ref_num_keys):
+            var page_idx = tok // PAGE_SIZE
+            var tok_in_page = tok % PAGE_SIZE
+            var physical_page = page_base_b + page_idx
+
+            var src_offset = (
+                physical_page
+                * kv_dim2
+                * NUM_LAYERS
+                * PAGE_SIZE
+                * kv_params.num_heads
+                * kv_params.head_size
+                + tok_in_page * kv_params.num_heads * kv_params.head_size
+            )
+            var dst_offset = tok * KV_NUM_HEADS * DEPTH
+            for d in range(KV_NUM_HEADS * DEPTH):
+                k_b_host[dst_offset + d] = blocks_bf16[src_offset + d]
+
+        # BF16 Q for this batch: [1, b_seq_len, num_heads, depth]
+        var q_b_size = b_seq_len * num_heads * DEPTH
+        var q_b_host = List(length=q_b_size, fill=Scalar[ref_type](0))
+        var q_batch_start = q_token_offset * num_heads * DEPTH
+        for i in range(q_b_size):
+            q_b_host[i] = q_bf16_host[q_batch_start + i]
+
+        var ref_b_size = b_seq_len * num_heads * DEPTH
+        var ref_b_host = List(length=ref_b_size, fill=Scalar[ref_type](0))
+
+        var k_b_device = ctx.enqueue_create_buffer[ref_type](k_b_size)
+        ctx.enqueue_copy(k_b_device, k_b_host)
+
+        var q_b_device = ctx.enqueue_create_buffer[ref_type](q_b_size)
+        ctx.enqueue_copy(q_b_device, q_b_host)
+
+        var ref_b_device = ctx.enqueue_create_buffer[ref_type](ref_b_size)
+        ctx.synchronize()
+
+        var q_b_tt = TileTensor(
+            q_b_device,
+            row_major((Idx[1], b_seq_len, Idx[num_heads], Idx[DEPTH])),
+        )
+        var k_b_tt = TileTensor(
+            k_b_device,
+            row_major(
+                (
+                    Idx[1],
+                    ref_num_keys,
+                    Idx[KV_NUM_HEADS],
+                    Idx[DEPTH],
+                )
+            ),
+        )
+        var ref_b_tt = TileTensor(
+            ref_b_device,
+            row_major((Idx[1], b_seq_len, Idx[num_heads], Idx[DEPTH])),
+        )
+
+        mha_gpu_naive(
+            q_b_tt.to_layout_tensor(),
+            k_b_tt.to_layout_tensor(),
+            k_b_tt.to_layout_tensor(),
+            mask,
+            ref_b_tt.to_layout_tensor(),
+            scale,
+            1,  # batch_size
+            b_seq_len,  # this batch's seq_len
+            ref_num_keys,  # cache_len + this batch's seq_len
+            num_heads,
+            DEPTH,
+            group,
+            ctx,
+        )
+
+        ctx.synchronize()
+        ctx.enqueue_copy(ref_b_host, ref_b_device)
+        ctx.synchronize()
+
+        for s in range(b_seq_len):
+            var out_offset = (q_token_offset + s) * num_heads * V_DEPTH
+            var ref_s_offset = s * num_heads * DEPTH
+            for h in range(num_heads):
+                for d in range(V_DEPTH):
+                    var expect = ref_b_host[ref_s_offset + d + DEPTH * h].cast[
+                        DType.float64
+                    ]()
+                    var actual = out_host[out_offset + V_DEPTH * h + d].cast[
+                        DType.float64
+                    ]()
+                    var abs_err = abs(actual - expect)
+                    if abs_err > max_abs_err:
+                        max_abs_err = abs_err
+                    if abs_err > 2e-1:
+                        print(
+                            "batch",
+                            b,
+                            "tok",
+                            s,
+                            "head",
+                            h,
+                            "dim",
+                            d,
+                            "actual",
+                            actual,
+                            "expect",
+                            expect,
+                        )
+                    assert_almost_equal(actual, expect, atol=atol, rtol=rtol)
+
+            total_checked += num_heads * V_DEPTH
+
+        q_token_offset += b_seq_len
+
+        _ = k_b_device
+        _ = q_b_device
+        _ = ref_b_device
+        _ = ref_b_host^
+        _ = q_b_host^
+        _ = k_b_host^
+
+    print(
+        "  Verified:",
+        total_checked,
+        "elements, max_abs_err:",
+        max_abs_err,
+    )
+
+    print("  PASS:", name, "\n")
 
     _ = blocks_device
     _ = cache_lengths_device
@@ -2375,20 +2848,16 @@ def run_bench_paged_variable_native_fp8[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[ref_type](out_size)
@@ -2402,13 +2871,13 @@ def run_bench_paged_variable_native_fp8[
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -2416,21 +2885,21 @@ def run_bench_paged_variable_native_fp8[
     )
 
     var kv_collection = PagedKVCacheCollection[kv_type, kv_params, PAGE_SIZE](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -2461,19 +2930,26 @@ def run_bench_paged_variable_native_fp8[
     # Step 7: Pre-compute scalar args and benchmark
     var mla_args = MLADispatchScalarArgs[
         num_heads=num_heads,
-        is_fp8_kv=(kv_type == DType.float8_e4m3fn),
+        is_fp8_kv=(kv_type == .float8_e4m3fn),
     ](
         batch_size,
         max_cache_len,
         q_max_seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @parameter
     @always_inline
-    @__copy_capture(out_tt, q_tt, kv_cache, row_offsets_tt, scalar_args_buf_lt)
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {
+        var out_tt,
+        var q_tt,
+        var kv_cache,
+        var row_offsets_tt,
+        var scalar_args_buf_tt,
+        imm,
+    }:
         flare_mla_decoding[
             rank=3,
             config=MHAConfig[q_type](num_heads, DEPTH),
@@ -2486,7 +2962,7 @@ def run_bench_paged_variable_native_fp8[
             row_offsets_tt,
             scale,
             ctx,
-            lt_to_tt(scalar_args_buf_lt),
+            scalar_args_buf_tt,
             q_max_seq_len=q_max_seq_len,
         )
 
@@ -2495,7 +2971,7 @@ def run_bench_paged_variable_native_fp8[
     # Warmup
     kernel_launch(ctx)
 
-    var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+    var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
         nrun
     )
     var mstime = nstime / 1000000
@@ -2537,10 +3013,10 @@ def run_both_kv_types[
     num_heads: Int
 ](name: StringLiteral, cache_lengths: List[Int], ctx: DeviceContext) raises:
     """Run correctness test for both bf16 and fp8 KV types."""
-    run_test_paged_variable[DType.bfloat16, DType.bfloat16, num_heads](
+    run_test_paged_variable[.bfloat16, DType.bfloat16, num_heads](
         name + "_bf16", cache_lengths, ctx
     )
-    run_test_paged_variable[DType.bfloat16, DType.float8_e4m3fn, num_heads](
+    run_test_paged_variable[.bfloat16, DType.float8_e4m3fn, num_heads](
         name + "_fp8", cache_lengths, ctx
     )
 
@@ -2556,10 +3032,10 @@ def run_bench_both_kv_types[
     num_heads: Int
 ](name: StringLiteral, cache_lengths: List[Int], ctx: DeviceContext) raises:
     """Run benchmark for both bf16 and fp8 KV types."""
-    run_bench_paged_variable[DType.bfloat16, DType.bfloat16, num_heads](
+    run_bench_paged_variable[.bfloat16, DType.bfloat16, num_heads](
         name + "_bf16", cache_lengths, ctx
     )
-    run_bench_paged_variable[DType.bfloat16, DType.float8_e4m3fn, num_heads](
+    run_bench_paged_variable[.bfloat16, DType.float8_e4m3fn, num_heads](
         name + "_fp8", cache_lengths, ctx
     )
 
@@ -2580,7 +3056,7 @@ def run_multiq_both_kv_types[
     ctx: DeviceContext,
 ) raises:
     """Run multi-Q correctness test for both bf16 and fp8 KV types."""
-    run_test_paged_variable_multiq[DType.bfloat16, DType.bfloat16, num_heads](
+    run_test_paged_variable_multiq[.bfloat16, DType.bfloat16, num_heads](
         name + "_bf16", cache_lengths, q_max_seq_len, ctx
     )
     run_test_paged_variable_multiq[
@@ -2612,7 +3088,7 @@ def run_ragged_q_both_kv_types[
     ctx: DeviceContext,
 ) raises:
     """Run ragged-Q correctness test for both bf16 and fp8 KV types."""
-    run_test_paged_variable_ragged_q[DType.bfloat16, DType.bfloat16, num_heads](
+    run_test_paged_variable_ragged_q[.bfloat16, DType.bfloat16, num_heads](
         name + "_bf16", cache_lengths, seq_lens, ctx
     )
     run_test_paged_variable_ragged_q[
@@ -3002,5 +3478,162 @@ def main() raises:
                 print("=" * 72)
                 print("ALL TESTS PASSED")
                 print("=" * 72)
+        elif has_amd_gpu_accelerator():
+            # ---------------------------------------------------------------
+            # AMD MI355 / gfx950 path. The AMD MLA decode kernel supports
+            # single-token decode (S=1) for any num_heads; the MTP token fold
+            # (S = q_seq_len > 1) is FP8-only and requires num_heads <= 16
+            # (Kimi-K2.5 TP=4). qkv_fp8's `test_decoding_fold` only covers the
+            # contiguous-K dense uniform path — this exercises the fold through
+            # the production paged KV cache + ragged input-row-offsets layout.
+            #
+            # Why a separate block from the NVIDIA SM100 path above (not just
+            # reusing its groups): the *helpers* are shared — Group A drives the
+            # same `run_test_paged_variable` / `run_test_paged_variable_native_
+            # fp8` that the NVIDIA groups use. Only the config lists are disjoint,
+            # for backend reasons: the NVIDIA groups cover num_heads up to 128
+            # (full DeepSeek) with bf16 + fp8-converter KV, neither of which is in
+            # the AMD MTP fold envelope (FP8-only, num_heads <= 16). Running them
+            # on AMD would route S=1 (no fold) or hit the host `raise`. The AMD-
+            # specific value-add is the ragged/paged multi-Q fold (Groups B/C) —
+            # the production layout no NVIDIA group exercises.
+            # ---------------------------------------------------------------
+            print("=" * 72)
+            print("MLA Decode Paged Variable-Length Test (AMD MI355/gfx950)")
+            print("=" * 72)
+            print()
+
+            # -----------------------------------------------------------
+            # Group A: S=1 paged decode (single query token per batch).
+            # Confirms the AMD paged decode path works through this harness
+            # for both BF16 and native-FP8 (Q=FP8, KV=FP8) decode.
+            # -----------------------------------------------------------
+            print("--- Group A: S=1 paged decode (16 heads) ---")
+
+            var amd_cl: List[Int] = [30, 256, 640, 1024]
+            run_test_paged_variable[.bfloat16, DType.bfloat16, 16](
+                "amd_s1_bf16", amd_cl, ctx
+            )
+            run_test_paged_variable_native_fp8[16](
+                "amd_s1_native_fp8", amd_cl, ctx
+            )
+
+            # -----------------------------------------------------------
+            # Group B: uniform multi-Q FP8 fold (S>1, every sequence has
+            # exactly q_max_seq_len query tokens). M = num_heads*S <= 128 →
+            # supported. This is the AMD MTP fold through the paged + ragged
+            # layout path. Expected to PASS.
+            # -----------------------------------------------------------
+            print("--- Group B: uniform multi-Q FP8 fold (16 heads) ---")
+
+            var amd_sl_s2: List[Int] = [2, 2, 2, 2]  # M=32, warp-local (2,1)
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_uniform_s2", amd_cl, amd_sl_s2, NullMask(), ctx
+            )
+
+            var amd_sl_s4: List[Int] = [4, 4, 4, 4]  # M=64, warp-local (4,1)
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_uniform_s4", amd_cl, amd_sl_s4, NullMask(), ctx
+            )
+
+            # -----------------------------------------------------------
+            # Group C: VARIABLE ragged-Q FP8 fold — POSITIVE correctness.
+            # Per-batch query length differs while q_max_seq_len is only the
+            # padding ceiling; the runtime per-sequence length drives the SRD
+            # clamp, causal offset, split-K stat writer, and ragged reducer, so
+            # short sequences' pad rows are dropped and live rows land at the
+            # right slot. The reference (mha_gpu_naive per batch) is fully
+            # variable-aware. Covers both np=1 (small caches) and split-K (np>1,
+            # large caches — the reducer's ragged remap + pad-row skip).
+            #
+            # Both masks are run: NullMask validates the ragged remap / reduce /
+            # pad-row skip, and CausalMask validates the per-token causal offset
+            # `score_row = num_keys - seq_len + token`. Causal is the only mask
+            # that *discriminates* the runtime per-sequence seq_len from the
+            # comptime q_max_seq_len ceiling (under NullMask the offset never
+            # affects output), so the variable configs below are the only place
+            # that per-token offset is exercised with a non-uniform seq_len.
+            # -----------------------------------------------------------
+            print(
+                "--- Group C: variable ragged-Q FP8 fold correctness (16"
+                " heads) ---"
+            )
+
+            # np=1: tiny caches (1 page each) so the heuristic returns
+            # num_partitions=1 → the decode kernel writes the ragged output
+            # directly, not via the reducer.
+            var amd_cl_var_tiny: List[Int] = [30, 64, 96, 120]
+            var amd_sl_var: List[Int] = [1, 3, 2, 4]
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_var_np1_tiny", amd_cl_var_tiny, amd_sl_var, NullMask(), ctx
+            )
+            # CAUSAL np=1: per-token causal offset on the direct ragged-write
+            # path (no reducer). seq_lens=[1,3,2,4] so the runtime per-sequence
+            # length != q_max_seq_len=4 for 3 of 4 batches — the discriminating
+            # case a comptime-seq_len regression would fail.
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_var_np1_tiny_causal",
+                amd_cl_var_tiny,
+                amd_sl_var,
+                CausalMask(),
+                ctx,
+            )
+
+            # np>1 (small): small caches, variable seq_lens (M up to 64).
+            var amd_cl_var_small: List[Int] = [256, 1024, 512, 2048]
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_var_npk_small",
+                amd_cl_var_small,
+                amd_sl_var,
+                NullMask(),
+                ctx,
+            )
+            # CAUSAL np>1: same variable seq_lens through the row-keyed split-K
+            # reducer's ragged remap — validates the per-token causal offset is
+            # preserved across the reduce (a head-keyed or comptime-seq_len bug
+            # would mismatch the per-batch causal reference).
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_var_npk_small_causal",
+                amd_cl_var_small,
+                amd_sl_var,
+                CausalMask(),
+                ctx,
+            )
+
+            # np>1: large caches force split-K; variable seq_lens exercise the
+            # reducer's ragged output remap + short-sequence pad-row skip.
+            var amd_cl_var_big: List[Int] = [256, 65536, 1024, 32768]
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_var_npk_mixed", amd_cl_var_big, amd_sl_var, NullMask(), ctx
+            )
+
+            # np>1, uniform-large cache, variable seq_lens (every batch deep
+            # context → every batch split-K; ragged Q row count varies).
+            var amd_cl_var_uniform_big: List[Int] = [
+                65536,
+                65536,
+                65536,
+                65536,
+            ]
+            var amd_sl_var_b: List[Int] = [1, 4, 2, 3]
+            run_test_paged_variable_ragged_q_native_fp8[16](
+                "amd_var_npk_uniformcache",
+                amd_cl_var_uniform_big,
+                amd_sl_var_b,
+                NullMask(),
+                ctx,
+            )
+
+            # H=8 variable case: DEFERRED. It passes under the JIT `mojo run`
+            # path, but the H=8 ragged ladder instantiates all S=1..8 kernels and
+            # the S=6 fold (`_48x128x128_True_nqh8`) crashes the LLVM register
+            # allocator under the AOT `--config=kernels` build (a pre-existing
+            # backend bug — the dense `_False_nqh8` twin compiles fine; only the
+            # ragged variant tips regalloc over its VGPR threshold). Re-enable
+            # once that's fixed; production fold is num_heads=16, covered above.
+
+            print("=" * 72)
+            print("ALL TESTS PASSED")
+            print("=" * 72)
         else:
-            print("Skipping: requires B200 GPU")
+            print("Skipping: requires B200 or AMD GPU")

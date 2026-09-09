@@ -24,30 +24,120 @@ from __future__ import annotations
 import functools
 from collections.abc import Callable
 
-from max.driver import Device
+from max.driver import Accelerator, Device
+from max.experimental import tensor as _experimental_tensor
+from max.experimental.realization_context import ensure_context
 from max.experimental.sharding import (
     DeviceMapping,
     DeviceMesh,
     Partial,
+    Placement,
     PlacementMapping,
     Replicated,
     Sharded,
 )
+from max.experimental.sharding.per_shard_dim import global_dim
 from max.experimental.tensor import Tensor
-from max.graph import BufferValue, DeviceRef, TensorValue, ops
+from max.graph import BufferValue, DeviceRef, Shape, TensorValue, ops
+from max.graph.dim import Dim, StaticDim, SymbolicDim
+from max.graph.ops.slice_tensor import SliceIndex
 
-from .utils import (
-    _devices_are_unique,
-    _even_split_along_axis,
-    _mesh_axis_groups,
-    _signal_buffers,
-    ensure_context,
-    is_sharded_on,
-)
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Group-loop engine
-# ═════════════════════════════════════════════════════════════════════════
+def _devices_are_unique(shards: list[TensorValue]) -> bool:
+    """True when all shards live on distinct physical devices."""
+    devices = [str(s.device) for s in shards]
+    return len(set(devices)) == len(devices)
+
+
+def _signal_buffers(mesh: DeviceMesh) -> list[BufferValue] | None:
+    """Returns the active context's signal buffers for ``mesh``, if available."""
+    ctx = _experimental_tensor.current_realization_context(None)
+    if ctx is None:
+        return None
+
+    if hasattr(ctx, "signal_buffers") and ctx.signal_buffers is not None:
+        if not any(isinstance(d, Accelerator) for d in mesh.devices):
+            return None
+        return ctx.signal_buffers
+
+    if hasattr(ctx, "ensure_signal_buffers"):
+        return ctx.ensure_signal_buffers(mesh)
+
+    return None
+
+
+def _mesh_axis_groups(mesh: DeviceMesh, mesh_axis: int) -> list[list[int]]:
+    """Partitions device indices into groups communicating along ``mesh_axis``."""
+    axis_size = mesh.mesh_shape[mesh_axis]
+    stride = 1
+    for k in range(mesh_axis + 1, len(mesh.mesh_shape)):
+        stride *= mesh.mesh_shape[k]
+    groups: list[list[int]] = []
+    visited: set[int] = set()
+    for base in range(mesh.num_devices):
+        if base in visited:
+            continue
+        group = [base + i * stride for i in range(axis_size)]
+        visited.update(group)
+        groups.append(group)
+    return groups
+
+
+def _even_split_sizes(dim: int, n: int) -> list[int]:
+    """Splits ``dim`` into ``n`` sizes that differ by at most 1."""
+    base, rem = divmod(dim, n)
+    return [base + (1 if i < rem else 0) for i in range(n)]
+
+
+def _even_split_along_axis(
+    sv: TensorValue, axis: int, n: int
+) -> list[TensorValue]:
+    """Splits ``sv`` into ``n`` load-balanced chunks along ``axis``."""
+    dim = sv.shape[axis]
+    if isinstance(dim, StaticDim):
+        return list(ops.split(sv, _even_split_sizes(int(dim), n), axis=axis))
+
+    rank_ndim = len(sv.shape)
+    chunks: list[TensorValue] = []
+    for i in range(n):
+        start = (i * dim) // n
+        stop = ((i + 1) * dim) // n
+        size = stop - start
+        start_tv = ops.shape_to_tensor([start])
+        stop_tv = ops.shape_to_tensor([stop])
+        indices: list[SliceIndex] = [slice(None)] * rank_ndim
+        indices[axis] = (slice(start_tv, stop_tv, 1), size)
+        chunks.append(ops.slice_tensor(sv, indices))
+    return chunks
+
+
+def _rebind_axis(tv: TensorValue, axis: int, new_dim: Dim) -> TensorValue:
+    """Rebinds only ``axis`` of ``tv`` to ``new_dim``; leaves every other axis as-is."""
+    new_shape = list(tv.shape)
+    new_shape[axis] = new_dim
+    return ops.rebind(tv, Shape(new_shape))
+
+
+def _make_split_symbolic_dim(
+    dim: Dim,
+    axis_name: str,
+    coord: int,
+    tensor_axis: int,
+    fallback_prefix: str,
+) -> SymbolicDim:
+    """Mints a per-device symbolic dim for a split axis, severing it from ``dim``.
+
+    The chunks of a dynamic axis are ordinarily algebraic functions of their
+    parent, so their extents stay related to it. This instead gives each
+    device an independent symbol, for the axis whose per-device extents
+    nothing global relates.
+    """
+    dim = global_dim(dim)
+    if isinstance(dim, SymbolicDim):
+        return SymbolicDim(f"{dim.name}_{axis_name}_{coord}")
+    return SymbolicDim(
+        f"{fallback_prefix}_{axis_name}_{coord}_axis{tensor_axis}"
+    )
 
 
 def _apply_per_group(
@@ -56,17 +146,9 @@ def _apply_per_group(
     new_placement: Replicated | Sharded | Partial,
     *,
     hw_op: Callable[[list[TensorValue], list[BufferValue]], list[TensorValue]],
-    sim_op: Callable[[list[TensorValue]], list[TensorValue]],
+    sim_op: Callable[[list[TensorValue], tuple[int, ...]], list[TensorValue]],
 ) -> Tensor:
-    """Apply a collective operation per-group along a mesh axis.
-
-    Two dispatch paths:
-
-    1. **Hardware collective** (real multi-device, signal buffers available):
-       uses ``hw_op`` with per-group signal buffers.
-    2. **Simulated graph** (same-device mesh in graph context):
-       uses ``sim_op`` with pairwise graph ops.
-    """
+    """Applies a collective operation per group along a mesh axis."""
     mesh = t.mesh
     groups = _mesh_axis_groups(mesh, mesh_axis)
     new_p = list(t.placements)
@@ -86,18 +168,61 @@ def _apply_per_group(
                 group_signals = [signal_bufs[idx] for idx in group]
                 group_result = hw_op(group_inputs, group_signals)
             else:
-                group_result = sim_op(group_inputs)
+                group_result = sim_op(group_inputs, tuple(group))
             for i, idx in enumerate(group):
                 result[idx] = group_result[i]
 
+        # Per-rank IR after the collective carries the honest algebraic
+        # form (e.g. ``batch_dp_0 + batch_dp_1``); :attr:`Tensor.shape`
+        # reads back the same dim on every rank and collapses the wrapper.
         return Tensor.from_shard_values(
-            result, PlacementMapping(mesh, new_placements)
+            result,
+            PlacementMapping(mesh, new_placements),
         )
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Primitive collectives (single mesh-axis, explicit parameters)
-# ═════════════════════════════════════════════════════════════════════════
+def _colocate_then_redistribute(
+    inputs: list[TensorValue],
+    op: Callable[[list[TensorValue]], TensorValue],
+) -> list[TensorValue]:
+    """Run a same-device op on per-rank inputs and redistribute the result."""
+    target_device = inputs[0].device
+    colocated = [
+        v if v.device == target_device else v.to(target_device) for v in inputs
+    ]
+    result = op(colocated)
+    return [
+        result if v.device == target_device else result.to(v.device)
+        for v in inputs
+    ]
+
+
+def _sim_reduce_scatter(
+    inputs: list[TensorValue], scatter_axis: int
+) -> list[TensorValue]:
+    """Simulate reduce-scatter: sum the partial inputs, then scatter the chunks.
+
+    Used when no signal buffers are available (single-device or simulated
+    multi-device). Reduces on the first input's device, splits along
+    ``scatter_axis`` into one chunk per rank, and ships each chunk to its
+    rank's device.
+    """
+    n = len(inputs)
+    target_device = inputs[0].device
+    colocated = [
+        v if v.device == target_device else v.to(target_device) for v in inputs
+    ]
+    reduced = functools.reduce(ops.add, colocated)
+    # TODO(MXF-493): `_even_split_along_axis` splits uneven chunks and return
+    # the smallest chunks first, while the actual reduce-scatter kernel splits
+    # the chunks from largest to smallest.
+    chunks = _even_split_along_axis(reduced, scatter_axis, n)
+    return [
+        chunk
+        if inputs[i].device == target_device
+        else chunk.to(inputs[i].device)
+        for i, chunk in enumerate(chunks)
+    ]
 
 
 def allreduce_sum(t: Tensor, mesh_axis: int = 0) -> Tensor:
@@ -121,11 +246,17 @@ def allreduce_sum(t: Tensor, mesh_axis: int = 0) -> Tensor:
         mesh_axis,
         Replicated(),
         hw_op=lambda inputs, sigs: ops.allreduce.sum(inputs, sigs),
-        sim_op=lambda inputs: [functools.reduce(ops.add, inputs)] * len(inputs),
+        sim_op=lambda inputs, _group: _colocate_then_redistribute(
+            inputs, lambda c: functools.reduce(ops.add, c)
+        ),
     )
 
 
-def allgather(t: Tensor, tensor_axis: int = 0, mesh_axis: int = 0) -> Tensor:
+def allgather(
+    t: Tensor,
+    tensor_axis: int = 0,
+    mesh_axis: int = 0,
+) -> Tensor:
     """All-gathers a tensor's shards along a mesh axis.
 
     Transitions the tensor's placement on ``mesh_axis`` from
@@ -149,12 +280,16 @@ def allgather(t: Tensor, tensor_axis: int = 0, mesh_axis: int = 0) -> Tensor:
         hw_op=lambda inputs, sigs: ops.allgather(
             inputs, sigs, axis=tensor_axis
         ),
-        sim_op=lambda inputs: [ops.concat(inputs, tensor_axis)] * len(inputs),
+        sim_op=lambda inputs, _group: _colocate_then_redistribute(
+            inputs, lambda c: ops.concat(c, tensor_axis)
+        ),
     )
 
 
 def reduce_scatter(
-    t: Tensor, scatter_axis: int = 0, mesh_axis: int = 0
+    t: Tensor,
+    scatter_axis: int = 0,
+    mesh_axis: int = 0,
 ) -> Tensor:
     """Reduces a tensor across a mesh axis and scatters the result.
 
@@ -174,18 +309,26 @@ def reduce_scatter(
     Returns:
         A tensor with the reduced and re-sharded result.
     """
-    t = allreduce_sum(t, mesh_axis=mesh_axis)
-    return _local_split(t, mesh_axis=mesh_axis, tensor_axis=scatter_axis)
+    return _apply_per_group(
+        t,
+        mesh_axis,
+        Sharded(scatter_axis),
+        hw_op=lambda inputs, sigs: ops.reducescatter.sum(
+            inputs, sigs, axis=scatter_axis
+        ),
+        sim_op=lambda inputs, _group: _sim_reduce_scatter(inputs, scatter_axis),
+    )
 
 
-def _local_split(t: Tensor, mesh_axis: int, tensor_axis: int) -> Tensor:
-    """Replicated → Sharded: each device slices its local copy (no communication)."""
+def _local_split(t: Tensor, mesh_axis: int, target: Sharded) -> Tensor:
+    """``Replicated -> Sharded``: each device slices its local copy with no communication."""
+    tensor_axis = target.axis
     mesh = t.mesh
     n = mesh.mesh_shape[mesh_axis]
     groups = _mesh_axis_groups(mesh, mesh_axis)
 
     new_p = list(t.placements)
-    new_p[mesh_axis] = Sharded(tensor_axis)
+    new_p[mesh_axis] = target
     new_placements = tuple(new_p)
 
     with ensure_context():
@@ -200,86 +343,88 @@ def _local_split(t: Tensor, mesh_axis: int, tensor_axis: int) -> Tensor:
                 )
                 result[idx] = split_chunks[rank_in_group]
         return Tensor.from_shard_values(
-            result, PlacementMapping(mesh, new_placements)
+            result,
+            PlacementMapping(mesh, new_placements),
         )
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Scatter — distribute a non-distributed tensor onto a mesh
-# ═════════════════════════════════════════════════════════════════════════
-
-
 def _scatter(t: Tensor, target: DeviceMapping) -> Tensor:
-    """Distribute a non-distributed tensor across a mesh.
-
-    Splits along Sharded axes and transfers each piece to its device.
-    Replicated axes duplicate the data.  Partial placement is invalid
-    for scatter (there is no "partial" source data).
-
-    The loop iterates over mesh axes, expanding ``shard_tvs`` at each
-    step.  Invariant: after processing axis *k*, ``len(shard_tvs)``
-    equals ``product(mesh_shape[:k+1])``.
-    """
+    """Distributes a non-distributed tensor across a mesh."""
     assert not t.is_distributed, "_scatter expects a non-distributed tensor"
     mesh = target.mesh
     placements = target.to_placements()
 
+    # Size-1 axes cannot host a shard.
+    src_shape = t.shape
+    for mesh_axis, p in enumerate(placements):
+        ax = p.localized_axis()
+        if ax is None or not 0 <= ax < len(src_shape):
+            continue
+        dim = src_shape[ax]
+        if isinstance(dim, StaticDim) and dim.dim == 1:
+            from max.experimental.sharding.mode import ShardingError
+
+            raise ShardingError(
+                f"_scatter: placement {p!r} on mesh axis "
+                f"{mesh.axis_names[mesh_axis]!r} targets tensor axis {ax} "
+                f"with static extent 1; cannot split a size-1 axis. Use "
+                f"Replicated() on this mesh axis instead."
+            )
+
     with ensure_context():
         tv = t.__tensorvalue__()
 
-        # Fast path: transfer fully-Replicated tensor using single
-        # distributed_broadcast collective.
-        if mesh.num_devices > 1 and all(
-            isinstance(p, Replicated) for p in placements
-        ):
-            shard_tvs = _broadcast_replicated(tv, mesh)
-            return Tensor.from_shard_values(
-                shard_tvs, PlacementMapping(mesh, placements)
-            )
-
-        # General path: split along Sharded axes, duplicate along Replicated
-        # axes, then transfer each piece to its target device.
         shard_tvs = [tv]
         for mesh_axis in range(mesh.ndim):
             p = placements[mesh_axis]
             n = mesh.mesh_shape[mesh_axis]
-            if isinstance(p, Sharded):
+            tensor_axis = p.localized_axis()
+            if tensor_axis is not None:
                 new_tvs: list[TensorValue] = []
                 for sv in shard_tvs:
-                    new_tvs.extend(_even_split_along_axis(sv, p.axis, n))
+                    new_tvs.extend(_even_split_along_axis(sv, tensor_axis, n))
                 shard_tvs = new_tvs
             elif isinstance(p, Replicated):
                 shard_tvs = [sv for sv in shard_tvs for _ in range(n)]
             else:
-                raise ValueError("Cannot scatter with Partial placement.")
+                raise ValueError(
+                    f"Cannot scatter with placement {type(p).__name__}; "
+                    "scatter requires Replicated or a placement that localizes "
+                    "a single tensor axis (override ``localized_axis()``)."
+                )
         shard_tvs = [
             ops.transfer_to(sv, DeviceRef.from_device(mesh.devices[i]))
             for i, sv in enumerate(shard_tvs)
         ]
         return Tensor.from_shard_values(
-            shard_tvs, PlacementMapping(mesh, placements)
+            shard_tvs,
+            PlacementMapping(mesh, placements),
         )
 
 
-def _broadcast_replicated(
-    tv: TensorValue, mesh: DeviceMesh
-) -> list[TensorValue]:
-    """Broadcast values to every device using one collective op."""
-    signal_bufs = _signal_buffers(mesh)
-    if signal_bufs is None:
-        # If the device mesh is just CPUs, fall back to per-device transfers.
-        return [
-            ops.transfer_to(tv, DeviceRef.from_device(d)) for d in mesh.devices
-        ]
-    mesh_device_refs = [DeviceRef.from_device(d) for d in mesh.devices]
-    if tv.device not in mesh_device_refs:
-        tv = ops.transfer_to(tv, mesh_device_refs[0])
-    return ops.distributed_broadcast(tv, signal_bufs)
+def distributed_broadcast(t: Tensor, mesh: DeviceMesh) -> Tensor:
+    """Replicates a non-distributed tensor onto every device with one collective.
 
+    Args:
+        t: A non-distributed source tensor.
+        mesh: The device mesh to replicate onto.
 
-# ═════════════════════════════════════════════════════════════════════════
-#  transfer_to — the ONE public entry point
-# ═════════════════════════════════════════════════════════════════════════
+    Returns:
+        A distributed tensor with :class:`Replicated` placement on every axis.
+    """
+    with ensure_context():
+        signal_buffers = _signal_buffers(mesh)
+        if signal_buffers is None:
+            raise RuntimeError("No signal buffers available for broadcast.")
+        if t.mesh.num_devices > 1:
+            raise RuntimeError(
+                "`F.distributed_broadcast` requires the source tensor to be non-distributed."
+            )
+        shards = ops.distributed_broadcast(TensorValue(t), signal_buffers)
+        return Tensor.from_shard_values(
+            shards,
+            PlacementMapping(mesh, (Replicated(),) * mesh.ndim),
+        )
 
 
 def transfer_to(
@@ -306,7 +451,6 @@ def transfer_to(
     if isinstance(target, Device):
         target = PlacementMapping(DeviceMesh.single(target), (Replicated(),))
 
-    # Short-circuit for single-device tensors.
     if t.real and not t.is_distributed and target.mesh.num_devices == 1:
         mesh_device = target.mesh.devices[0]
         if t.device == mesh_device:
@@ -315,21 +459,18 @@ def transfer_to(
 
     target_p = target.to_placements()
 
-    # ── Non-distributed input: scatter onto target mesh ─────────────
     if not t.is_distributed:
         return _scatter(t, target)
 
-    # ── Cross-mesh: gather → transfer → scatter ─────────────────────
+    # Cross-mesh: gather, transfer, scatter.
     if t.mesh != target.mesh:
         source_mesh = t.mesh
         target_mesh = target.mesh
 
-        # Resolve to fully Replicated on source mesh first.
         replicated_p = tuple(Replicated() for _ in range(source_mesh.ndim))
         if t.placements != replicated_p:
             t = transfer_to(t, PlacementMapping(source_mesh, replicated_p))
 
-        # All shards are identical — take one and transfer.
         single = t.local_shards[0]
         with ensure_context():
             if single.real:
@@ -346,45 +487,93 @@ def transfer_to(
             return single
         return _scatter(single, target)
 
-    # ── Same mesh: three-pass collective redistribution ──────────────
+    # Phase-ordered redistribution: reduce Partials first, then unwind
+    # Sharded to Replicated, then anything remaining (R -> S, etc.). This
+    # avoids double-sharded transit on one tensor dim when a tensor axis
+    # is sharded along multiple mesh axes.
     if t.placements == target_p:
         return t
 
     mesh = t.mesh
 
-    # Pass 1: resolve Partials.
-    # Re-read t.placements[ax] each iteration — prior passes may change t.
+    # Phase 0: resolve Partials first (allreduce / reduce_scatter).
     for ax in range(mesh.ndim):
         cp, tp = t.placements[ax], target_p[ax]
-        if not isinstance(cp, Partial):
-            continue
-        if isinstance(tp, Partial):
-            # Same reduce op → no-op; different reduce ops → unsupported.
-            if cp == tp:
-                continue
-            raise NotImplementedError(
-                f"Partial({cp.reduce_op}) → Partial({tp.reduce_op}) "
-                "redistribution is not supported."
-            )
-        if isinstance(tp, Sharded) and not is_sharded_on(t, tp.axis, ax):
-            t = reduce_scatter(t, scatter_axis=tp.axis, mesh_axis=ax)
-        else:
-            t = allreduce_sum(t, mesh_axis=ax)
+        if isinstance(cp, Partial) and cp != tp:
+            t = _axis_transition(t, cp, tp, mesh_axis=ax)
 
-    # Pass 2: gather Sharded axes that need to become Replicated or re-shard
-    # to a different tensor axis.
-    for ax in range(mesh.ndim):
+    # Phase 1: allgather Sharded to Replicated; reverse mesh-axis order
+    # preserves element ordering when one tensor axis is sharded along
+    # multiple mesh axes.
+    for ax in reversed(range(mesh.ndim)):
         cp, tp = t.placements[ax], target_p[ax]
-        if isinstance(cp, Sharded) and (
-            isinstance(tp, Replicated)
-            or (isinstance(tp, Sharded) and cp.axis != tp.axis)
-        ):
-            t = allgather(t, tensor_axis=cp.axis, mesh_axis=ax)
+        if isinstance(cp, Sharded) and cp != tp:
+            t = _axis_transition(t, cp, Replicated(), mesh_axis=ax)
 
-    # Pass 3: local split for Replicated → Sharded (zero communication).
+    # Phase 2: anything still mismatched (now Replicated -> {Sharded, Partial}).
     for ax in range(mesh.ndim):
         cp, tp = t.placements[ax], target_p[ax]
-        if isinstance(cp, Replicated) and isinstance(tp, Sharded):
-            t = _local_split(t, mesh_axis=ax, tensor_axis=tp.axis)
+        if cp != tp:
+            t = _axis_transition(t, cp, tp, mesh_axis=ax)
 
     return t
+
+
+def _axis_transition(
+    t: Tensor, source: Placement, target: Placement, *, mesh_axis: int
+) -> Tensor:
+    """Inserts the collective for ``source -> target`` on one mesh axis."""
+    if source == target:
+        return t
+    if isinstance(source, Replicated) and isinstance(target, Sharded):
+        return _local_split(t, mesh_axis=mesh_axis, target=target)
+    if isinstance(source, Sharded) and isinstance(target, Replicated):
+        return allgather(
+            t,
+            tensor_axis=source.axis,
+            mesh_axis=mesh_axis,
+        )
+    if isinstance(source, Sharded) and isinstance(target, Sharded):
+        if source == target:
+            return t
+        if source.axis == target.axis:
+            return t
+        t = allgather(
+            t,
+            tensor_axis=source.axis,
+            mesh_axis=mesh_axis,
+        )
+        return _local_split(t, mesh_axis=mesh_axis, target=target)
+    if isinstance(source, Partial):
+        if source.reduce_op.value in ("min", "max"):
+            raise NotImplementedError(
+                f"Partial({source.reduce_op}) redistribution is not supported."
+            )
+        if isinstance(target, Replicated):
+            return allreduce_sum(t, mesh_axis=mesh_axis)
+        if isinstance(target, Sharded):
+            already_sharded = any(
+                i != mesh_axis and p.localized_axis() == target.axis
+                for i, p in enumerate(t.placements)
+            )
+            if already_sharded:
+                return allreduce_sum(t, mesh_axis=mesh_axis)
+            return reduce_scatter(
+                t,
+                mesh_axis=mesh_axis,
+                scatter_axis=target.axis,
+            )
+        if isinstance(target, Partial):
+            raise NotImplementedError(
+                f"Partial({source.reduce_op}) -> "
+                f"Partial({target.reduce_op}) redistribution is not "
+                "supported."
+            )
+    # Custom-placement hook for subclasses.
+    if hasattr(source, "materialize_to"):
+        return source.materialize_to(t, target, mesh_axis=mesh_axis)
+    if hasattr(target, "materialize_from"):
+        return target.materialize_from(t, source, mesh_axis=mesh_axis)
+    raise NotImplementedError(
+        f"No transition {type(source).__name__} -> {type(target).__name__}"
+    )

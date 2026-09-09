@@ -246,10 +246,10 @@ def test_idx2crd_flat_row_major() raises:
 def test_idx2crd_nested_zipped_divide() raises:
     """Test idx2crd on a nested layout from zipped_divide."""
     var base = row_major[6, 8]()
-    var layout = zipped_divide[coord[2, 2]()](base)
+    var layout = zipped_divide[coord[2, 2]](base)
 
     # coord[1,1] maps to linear index 24
-    var linear_idx = Int(layout(coord[1, 1]()))
+    var linear_idx = Int(layout(coord[1, 1]))
     assert_equal(linear_idx, 24)
 
     # Inverse: idx2crd(24) should give nested coords ((1, 0), (1, 0))
@@ -265,7 +265,7 @@ def test_idx2crd_nested_zipped_divide() raises:
 def test_idx2crd_nested_roundtrip() raises:
     """Verify that crd2idx(idx2crd(i)) == i for all valid indices."""
     var base = row_major[4, 6]()
-    var layout = zipped_divide[coord[2, 3]()](base)
+    var layout = zipped_divide[coord[2, 3]](base)
 
     for i in range(24):
         var coords = layout.idx2crd(i)

@@ -18,8 +18,8 @@ from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import DeviceRef
+from max.pipelines.context import SamplingParams
 from max.pipelines.lib import SamplingConfig, token_sampler
-from max.pipelines.modeling.types import SamplingParams
 
 
 @pytest.fixture(scope="module")
@@ -293,3 +293,93 @@ def test_batch_sampling_arguments(
     test_top_p_sampling()
     test_top_k_sampling()
     test_temperature_sampling()
+
+
+def test_top_k_zero_selects_all(
+    session: InferenceSession, basic_token_sampler: Model
+) -> None:
+    """Test that a raw ``top_k=0`` selects all tokens (does not emit ``-1``).
+
+    At the user/graph layer ``topk_fused_sampling`` remaps ``top_k=0`` to ``-1``
+    via ``ops.where`` (the kernel's "select all" encoding, in turn remapped to
+    ``max_k``). The result must be a valid token id in ``[0, vocab_size)`` and
+    never the ``-1`` sentinel. The ``top_k`` buffer is built with a raw ``0``
+    (not via ``SamplingParams``, whose ``__post_init__`` would rewrite ``0`` to
+    ``-1`` before the graph ever sees it).
+    """
+    device = session.devices[0]
+
+    batch_size = 2
+    vocab_size = 8
+
+    # Peaked logits: with top_k=1 the control row deterministically samples
+    # token 0, while the select-all (top_k=0) row is free to sample across the
+    # full distribution.
+    logits_np = np.array(
+        [[10.0, 8.0, 2.0, -1.0, -1.5, -2.0, -2.5, -3.0]],
+        dtype=np.float32,
+    )
+    batch_logits_np = np.repeat(logits_np, repeats=batch_size, axis=0)
+    logits = Buffer.from_dlpack(batch_logits_np).to(device)
+
+    prev_tokens = Buffer(
+        shape=(batch_size, 0),
+        dtype=DType.int64,
+        device=device,
+    )
+
+    # Row 0: raw top_k=0 (select-all under test). Row 1: top_k=1 control.
+    k = np.array([0, 1], dtype=np.int64)
+    top_k = Buffer.from_numpy(k).to(device)
+    # max_k must be > 0; use vocab_size so the select-all row can see every
+    # token.
+    max_k = Buffer.from_numpy(np.array(vocab_size, dtype=np.int64))
+
+    temperature = np.array([1.0] * batch_size, dtype=np.float32)
+    temperature_tensor = Buffer.from_numpy(temperature).to(device)
+    top_p = np.array([1.0] * batch_size, dtype=np.float32)
+    top_p_tensor = Buffer.from_numpy(top_p).to(device)
+    min_top_p_tensor = Buffer.from_numpy(
+        np.array(np.min(top_p), dtype=np.float32)
+    )
+    min_p = Buffer.from_numpy(
+        np.array([0.0] * batch_size, dtype=np.float32)
+    ).to(device)
+
+    num_trials = 100
+    batch_sampled_tokens: list[list[int]] = [[] for _ in range(batch_size)]
+    for seed_val in range(num_trials):
+        seed_array = np.array([seed_val] * batch_size, dtype=np.uint64)
+        seed_tensor = Buffer.from_numpy(seed_array).to(device)
+        tokens = basic_token_sampler(
+            logits,
+            prev_tokens,
+            top_k,
+            max_k,
+            temperature_tensor,
+            top_p_tensor,
+            min_top_p_tensor,
+            min_p,
+            seed_tensor,
+        )[0]
+        assert isinstance(tokens, Buffer)
+        tokens_np = tokens.to_numpy()
+        for i in range(batch_size):
+            batch_sampled_tokens[i].append(tokens_np[i].item())
+
+    # Primary assertion: the top_k=0 (select-all) row must always produce a
+    # valid token id and never the -1 sentinel.
+    for tok in batch_sampled_tokens[0]:
+        assert tok != -1, "top_k=0 must select-all, not emit the -1 sentinel"
+        assert 0 <= tok < vocab_size, (
+            f"top_k=0 sampled an out-of-range token {tok}"
+        )
+
+    # Stronger assertion: select-all really samples the full distribution
+    # rather than just the argmax, so multiple distinct tokens appear.
+    assert len(set(batch_sampled_tokens[0])) > 1, (
+        "top_k=0 should sample across the full distribution"
+    )
+
+    # Control row: top_k=1 deterministically samples the argmax (token 0).
+    assert set(batch_sampled_tokens[1]) == {0}

@@ -1,0 +1,15 @@
+{
+  "target": "attn_res_mix",
+  "spec": {
+    "tokens": 1,
+    "hidden": 7168,
+    "cands": 3,
+    "dist": 0,
+    "pdl": 1,
+    "dt": 1
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "production decode shape in the bf16 dtype a served K3 instantiates, PDL armed",
+  "findings": []
+}

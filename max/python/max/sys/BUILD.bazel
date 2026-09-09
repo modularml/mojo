@@ -1,8 +1,0 @@
-load("//bazel:api.bzl", "modular_py_library")
-
-package(default_visibility = ["//max:consumers"])
-
-modular_py_library(
-    name = "sys",
-    srcs = ["__init__.py"],
-)

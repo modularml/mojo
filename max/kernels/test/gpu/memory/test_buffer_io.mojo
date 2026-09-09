@@ -13,13 +13,14 @@
 
 from std.math import align_down
 
-from std.gpu import barrier, thread_idx
-from std.gpu.host import DeviceContext, get_gpu_target
-from std.gpu.host.compile import _compile_code
-from std.gpu.host.info import MI355X
-from std.gpu.intrinsics import AMDBufferResource
-from std.gpu.memory import CacheOperation
-from std.memory import stack_allocation
+from max.gpu import thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext, get_gpu_target
+from max.gpu.host.compile import _compile_code
+from max.gpu.host.info import MI355X
+from max.gpu.intrinsics import AMDBufferResource
+from max.gpu.memory import CacheOperation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_equal, assert_true
 
 comptime size = 257
@@ -28,7 +29,7 @@ comptime size_clip = size - 5
 
 def kernel[
     dtype: DType, width: Int
-](a: UnsafePointer[Scalar[dtype], MutAnyOrigin]):
+](a: MutPointer[Scalar[dtype], MutAnyOrigin]):
     var aligned_size = align_down(size, width)
     var buffer = AMDBufferResource(a, size_clip)
     for i in range(0, aligned_size, width):
@@ -41,10 +42,8 @@ def kernel[
 
 def kernel_lds[
     dtype: DType, width: Int
-](a: UnsafePointer[Scalar[dtype], MutAnyOrigin]):
-    var a_shared = stack_allocation[
-        size, dtype, address_space=AddressSpace.SHARED
-    ]()
+](a: MutPointer[Scalar[dtype], MutAnyOrigin]):
+    var a_shared = unsafe_stack_allocation[size, dtype, address_space=.SHARED]()
 
     var aligned_size = align_down(size, width)
     var buffer = AMDBufferResource(a, size_clip)
@@ -64,51 +63,39 @@ def kernel_lds[
 
 # Assembly test kernels for different cache policies
 def cache_policy_kernel_always():
-    var dummy_ptr = UnsafePointer[Float32, MutAnyOrigin].unsafe_dangling()
+    var dummy_ptr = MutPointer[Float32, MutAnyOrigin].unsafe_dangling()
     var buffer = AMDBufferResource(dummy_ptr, 1024)
     var offset = Int32(thread_idx.x)  # Use dynamic offset to force offen mode
-    var v = buffer.load[DType.float32, 4, cache_policy=CacheOperation.ALWAYS](
-        offset
-    )
-    buffer.store[DType.float32, 4, cache_policy=CacheOperation.ALWAYS](
-        offset, v
-    )
+    var v = buffer.load[.float32, 4, cache_policy=CacheOperation.ALWAYS](offset)
+    buffer.store[.float32, 4, cache_policy=CacheOperation.ALWAYS](offset, v)
 
 
 def cache_policy_kernel_streaming():
-    var dummy_ptr = UnsafePointer[Float32, MutAnyOrigin].unsafe_dangling()
+    var dummy_ptr = MutPointer[Float32, MutAnyOrigin].unsafe_dangling()
     var buffer = AMDBufferResource(dummy_ptr, 1024)
     var offset = Int32(thread_idx.x)  # Use dynamic offset to force offen mode
     var v = buffer.load[
         DType.float32, 4, cache_policy=CacheOperation.STREAMING
     ](offset)
-    buffer.store[DType.float32, 4, cache_policy=CacheOperation.STREAMING](
-        offset, v
-    )
+    buffer.store[.float32, 4, cache_policy=CacheOperation.STREAMING](offset, v)
 
 
 def cache_policy_kernel_global():
-    var dummy_ptr = UnsafePointer[Float32, MutAnyOrigin].unsafe_dangling()
+    var dummy_ptr = MutPointer[Float32, MutAnyOrigin].unsafe_dangling()
     var buffer = AMDBufferResource(dummy_ptr, 1024)
     var offset = Int32(thread_idx.x)  # Use dynamic offset to force offen mode
-    var v = buffer.load[DType.float32, 4, cache_policy=CacheOperation.GLOBAL](
-        offset
-    )
-    buffer.store[DType.float32, 4, cache_policy=CacheOperation.GLOBAL](
-        offset, v
-    )
+    var v = buffer.load[.float32, 4, cache_policy=CacheOperation.GLOBAL](offset)
+    buffer.store[.float32, 4, cache_policy=CacheOperation.GLOBAL](offset, v)
 
 
 def cache_policy_kernel_volatile():
-    var dummy_ptr = UnsafePointer[Float32, MutAnyOrigin].unsafe_dangling()
+    var dummy_ptr = MutPointer[Float32, MutAnyOrigin].unsafe_dangling()
     var buffer = AMDBufferResource(dummy_ptr, 1024)
     var offset = Int32(thread_idx.x)  # Use dynamic offset to force offen mode
-    var v = buffer.load[DType.float32, 4, cache_policy=CacheOperation.VOLATILE](
+    var v = buffer.load[.float32, 4, cache_policy=CacheOperation.VOLATILE](
         offset
     )
-    buffer.store[DType.float32, 4, cache_policy=CacheOperation.VOLATILE](
-        offset, v
-    )
+    buffer.store[.float32, 4, cache_policy=CacheOperation.VOLATILE](offset, v)
 
 
 @always_inline
@@ -188,8 +175,8 @@ def test_cache_policy_assembly_volatile() raises:
 
 
 def test_buffer[dtype: DType, width: Int](ctx: DeviceContext) raises:
-    a_host_buf = alloc[Scalar[dtype]](size)
-    a_device_buf = ctx.enqueue_create_buffer[dtype](size)
+    var a_host_buf = alloc[Scalar[dtype]](size)
+    var a_device_buf = ctx.enqueue_create_buffer[dtype](size)
 
     for i in range(size):
         a_host_buf[i] = Scalar[dtype](i + 1)
@@ -210,8 +197,8 @@ def test_buffer[dtype: DType, width: Int](ctx: DeviceContext) raises:
 
 
 def test_buffer_lds[dtype: DType, width: Int](ctx: DeviceContext) raises:
-    a_host_buf = alloc[Scalar[dtype]](size)
-    a_device_buf = ctx.enqueue_create_buffer[dtype](size)
+    var a_host_buf = alloc[Scalar[dtype]](size)
+    var a_device_buf = ctx.enqueue_create_buffer[dtype](size)
 
     for i in range(size):
         a_host_buf[i] = Scalar[dtype](i + 1)
@@ -240,12 +227,12 @@ def main() raises:
     # Test functional behavior
     with DeviceContext() as ctx:
         comptime for width in [1, 2, 4, 8]:
-            test_buffer[DType.bfloat16, width](ctx)
+            test_buffer[.bfloat16, width](ctx)
 
         comptime for width in [1, 2, 4, 8, 16]:
-            test_buffer[DType.int8, width](ctx)
+            test_buffer[.int8, width](ctx)
 
-        test_buffer_lds[DType.float32, 1](ctx)
+        test_buffer_lds[.float32, 1](ctx)
 
         comptime if ctx.default_device_info == MI355X:
-            test_buffer_lds[DType.bfloat16, 8](ctx)
+            test_buffer_lds[.bfloat16, 8](ctx)

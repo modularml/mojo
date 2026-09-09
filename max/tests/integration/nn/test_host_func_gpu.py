@@ -45,8 +45,8 @@ def accelerator() -> Accelerator:
 
 def test_launch_host_func_runs_callback(accelerator: Accelerator) -> None:
     """Enqueues a Python callback through the custom op and verifies it ran."""
-    if accelerator.api != "cuda":
-        pytest.skip("mo.launch_host_func is only supported on CUDA devices")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("mo.launch_host_func is only supported on CUDA/HIP devices")
 
     calls: list[str] = []
 

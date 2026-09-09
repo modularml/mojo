@@ -1,24 +1,78 @@
 load(
     "//bazel:api.bzl",
+    "modular_py_binary",
+    "modular_py_library",
     "modular_py_test",
     "requirement",
 )
+load("//max/tests/integration/test_common:mef_precompile.bzl", "precompiled_mefs")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
 
-modular_py_test(
-    name = "yarn-rotary-embeddings",
-    srcs = glob(["**/test_yarn_rotary_embeddings.py"]) + ["conftest.py"],
+filegroup(
+    name = "config",
+    srcs = ["testdata/config.json"],
+)
+
+modular_py_library(
+    name = "_graph_defs",
+    testonly = True,
+    srcs = [
+        "_graph_defs.py",
+    ],
     data = [
-        "//max/tests/integration/architectures/gpt-oss/testdata",
+        ":config",
+    ],
+    imports = ["."],
+    deps = [
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/lib",
+        requirement("transformers"),
+    ],
+)
+
+modular_py_binary(
+    name = "_precompile_graphs",
+    testonly = True,
+    srcs = ["_precompile_graphs.py"],
+    data = [
+        ":config",
     ],
     env = {
-        "PIPELINES_TESTDATA": "max/tests/integration/architectures/gpt-oss/testdata",
+        "PIPELINES_TESTDATA": "$(location :config)",
+    },
+    deps = [
+        ":_graph_defs",
+        "//max/tests/integration/test_common:mef_precompile",
+    ],
+)
+
+precompiled_mefs(
+    name = "precompiled_mef",
+    producer = ":_precompile_graphs",
+    # TODO: If there's only one spec, the API is a little silly
+    specs = ["spec"],
+    tags = ["manual"],
+)
+
+modular_py_test(
+    name = "yarn-rotary-embeddings",
+    srcs = [
+        "conftest.py",
+        "test_yarn_rotary_embeddings.py",
+    ],
+    data = [
+        ":config",
+        ":precompiled_mef",
+    ],
+    env = {
+        "PIPELINES_TESTDATA": "$(location :config)",
+        "MEF_RLOCATION": "$(rlocationpath :precompiled_mef)",
         "MODULAR_TORCH_MEMORY_PERCENT": "0.6",
     },
     exec_properties = {
@@ -33,11 +87,10 @@ modular_py_test(
         "no-sandbox",
     ],
     deps = [
+        ":_graph_defs",
         "//max/python/max/driver",
         "//max/python/max/engine",
-        "//max/python/max/graph",
-        "//max/python/max/nn",
-        "//max/python/max/pipelines/lib",
+        "//max/tests/integration/test_common:mef_precompile",
         requirement("torch"),
         requirement("transformers"),
     ],

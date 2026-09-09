@@ -117,8 +117,7 @@ def _remap_state_dict(
             state_dict[key] = tensor
 
     cpu_device = CPU()
-    for key in state_dict:
-        tensor = state_dict[key]
+    for key, tensor in state_dict.items():
         if isinstance(tensor, WeightData):
             src_dtype = tensor.dtype
             dlpack_obj = tensor.to_buffer()

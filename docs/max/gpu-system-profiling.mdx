@@ -14,17 +14,23 @@ You should use `nsys` when you need to understand _where_ time is being spent
 across your application, such as which kernels are slow. You can then deep-dive
 into specific kernel performance
 [Nsight Compute](https://github.com/modular/modular/blob/main/max/docs/kernel-profiling.md),
-or our purpose-built
-[`kbench` tool](https://github.com/modular/modular/tree/main/max/kernels/benchmarks/autotune#readme)
-that helps you benchmark, autotune, and analyze Mojo kernel performance.
+or our purpose-built [`kbench` tool](https://modul.ar/kbench) that helps you
+benchmark, autotune, and analyze Mojo kernel performance.
+
+An AI coding agent can run this for you with the `profile-model` skill, which
+automates the same workflow: a GPU utilization check, then a kernel breakdown,
+then a single-kernel deep dive. It works on NVIDIA or AMD GPUs and for any model
+MAX can run, including custom architectures loaded with
+`--custom-architectures`. See [Modular skills](/coding-assistants#skills) to
+install it.
 
 <img src={require('./images/nsight-systems.png').default} alt="" />
 
 ## Requirements
 
-- [NVIDIA GPU compatible with MAX](/max/packages#gpu-compatibility)
+- [NVIDIA GPU compatible with MAX](/packages#gpu-compatibility)
 - [NVIDIA driver version compatible with
-  MAX](/max/packages#gpu-software-requirements)
+  MAX](/packages#gpu-software-requirements)
 
 ### Verify your `nsys` installation
 
@@ -53,12 +59,65 @@ or install it with your package manager. For example, on Ubuntu/Debian:
 sudo apt-get install nsight-systems
 ```
 
+## Quickly profile with `--profile`
+
+For a one-command introduction to profiling, [`max generate`](/cli/generate)
+and [`max benchmark`](/cli/benchmark) accept a `--profile` flag. When
+Nsight Systems is available, the timed run is captured into an `.nsys-rep`
+file and a ranked top-N GPU kernel summary is printed to your terminal:
+
+```bash
+max generate \
+  --model modularai/Llama-3.1-8B-Instruct-GGUF \
+  --prompt "hello" \
+  --num-warmups 1 \
+  --profile
+```
+
+You'll get output like this at the end of the run:
+
+```output
+=== Top 15 GPU kernels (98.6% of GPU time, 30.50 ms total) ===
+     %       total     calls  kernel
+ 29.1%     8.87 ms       256  gemv_split_k_bfloat16_bfloat16_bfloat16_256_…
+ 18.4%     5.61 ms       248  gemv_split_k_bfloat16_bfloat16_bfloat16_128_…
+  6.7%     2.05 ms       288  elementwise_View_mo_slice_…
+  4.1%     1.25 ms       256  sm100_mha_1q_depth128_bfloat16_bfloat16_…
+  …
+
+Full profile saved to: ./max-profile.nsys-rep
+Open with: nsys-ui ./max-profile.nsys-rep
+```
+
+A Python/CPU summary is also printed using `cProfile`. The capture window
+is bounded by `cudaProfilerStart`/`cudaProfilerStop` so warmup and graph
+compile time are excluded — you only see the actual inference work. NVTX
+ranges from MAX's runtime tracing are also captured into the `.nsys-rep`
+(visible in `nsys-ui`); the terminal summary table covers GPU kernels only.
+
+Useful options:
+
+- `--profile-output PATH` overrides the default `.nsys-rep` location
+  (defaults to `$BUILD_WORKSPACE_DIRECTORY/max-profile.nsys-rep`, or
+  `./max-profile.nsys-rep`).
+- `--profile-top-n N` controls the number of rows in both summary tables
+  (default `15`).
+
+If `nsys` is not installed or you're not on an NVIDIA GPU, `--profile` falls
+back to a Python/CPU-only summary so the flag still produces something
+useful. The full GPU breakdown requires Nsight Systems — see [Verify your
+`nsys` installation](#verify-your-nsys-installation) below.
+
+For finer control over the trace (selecting trace categories, NUMA binding,
+attaching to a separately running server, etc.), use `nsys` directly as
+described in the rest of this page.
+
 ## Profile a MAX model
 
 When profiling code built with MAX, you have to explicitly enable profiling by
 setting the `MODULAR_ENABLE_PROFILING` environment variable to `detailed` or by
 calling
-[`InferenceSession.gpu_profiling()`](/max/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.gpu_profiling)
+[`InferenceSession.gpu_profiling()`](/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.gpu_profiling)
 before you load your model.
 
 In most cases, you'll probably use `MODULAR_ENABLE_PROFILING` so you don't have
@@ -111,8 +170,8 @@ ready to run inference.
 
 For example, here's how to profile a benchmark workload:
 
-1. Make sure you're in a project environment with [the `modular` package
-installed](/max/packages#install).
+1. Make sure you're in a project environment with [the `max[all]` or
+`max[benchmark]` package installed](/packages#install).
 
 2. The next step deploys Google Gemma 3, so in order for MAX to download the
 model weights, you must first agree to the [Gemma 3
@@ -123,7 +182,7 @@ Token](https://huggingface.co/settings/tokens):
     export HF_TOKEN="hf_..."
     ```
 
-3. Start the MAX server ([`max serve`](/max/cli/serve)) with `nsys launch`
+3. Start the MAX server ([`max serve`](/cli/serve)) with `nsys launch`
 (this doesn't start profiling yet):
 
     ```bash
@@ -158,7 +217,7 @@ Token](https://huggingface.co/settings/tokens):
     Collecting data...
     ```
 
-6. In the second terminal, use [`max benchmark`](/max/cli/benchmark) to
+6. In the second terminal, use [`max benchmark`](/cli/benchmark) to
 run a benchmark workload:
 
     ```bash
@@ -225,10 +284,12 @@ Guide](https://docs.nvidia.com/nsight-systems/AnalysisGuide/index.html).
 
 ## Enable MAX profiling markers
 
-To enable MAX profiling markers, set the `MODULAR_ENABLE_PROFILING` environment
-variable to `detailed`, call the
-[`InferenceSession.gpu_profiling()`](/max/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.gpu_profiling)
-method, or add the `--gpu-profiling` option to [`max serve`](/max/cli/serve).
+Enable MAX profiling markers with the `MODULAR_ENABLE_PROFILING` environment
+variable (recommended): it needs no code or command changes and applies to any
+MAX process, including one launched under `nsys`. The
+[`InferenceSession.gpu_profiling()`](/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.gpu_profiling)
+method and the `--gpu-profiling` option for [`max serve`](/cli/serve) are
+alternatives that override the environment variable when set.
 
 ### Enable profiling with an environment variable
 
@@ -251,7 +312,7 @@ MODULAR_ENABLE_PROFILING=detailed \
 ### Enable profiling with Python
 
 You can enable MAX profiling markers from Python by calling the
-[`InferenceSession.gpu_profiling()`](/max/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.gpu_profiling)
+[`InferenceSession.gpu_profiling()`](/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.gpu_profiling)
 method before you load your model:
 
 ```python
@@ -267,7 +328,7 @@ environment variable if also used, and you must call it before `load()`.
 ### Enable profiling with a `max` CLI option
 
 You can also enable MAX profiling markers by adding the `--gpu-profiling`
-option to [`max serve`](/max/cli/serve). For example:
+option to [`max serve`](/cli/serve). For example:
 
 ```bash
 max serve --gpu-profiling detailed \
@@ -329,8 +390,11 @@ Detailed instructions for analyzing the `nsys` profile results.
 Compute](https://github.com/modular/modular/blob/main/max/docs/kernel-profiling.md):
 A companion to Nsight Systems for kernel-level profiling on NVIDIA GPUs.
 
-- [`kbench`
-tool](https://github.com/modular/modular/tree/main/max/kernels/benchmarks/autotune#readme):
+- [`kbench` tool](https://modul.ar/kbench):
 A Python-based toolkit that builds and executes Mojo kernel benchmarks across a
 grid of parameter combinations to help you autotune and analyze Mojo kernel
 performance on any hardware.
+
+- [The `profile-model` skill](https://github.com/modular/skills/tree/main/profile-model):
+An AI coding agent skill that automates GPU utilization checks, kernel
+breakdowns, and single-kernel deep dives on NVIDIA and AMD GPUs.

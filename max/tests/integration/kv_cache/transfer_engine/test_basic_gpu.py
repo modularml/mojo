@@ -16,6 +16,7 @@ import os
 
 import numpy as np
 import pytest
+from _transfer_engine_helpers import kv_memory
 from max.driver import CPU, Accelerator
 from max.driver.buffer import Buffer
 from max.dtype import DType
@@ -28,30 +29,12 @@ def test_constructor() -> None:
     # ok - DP=1, TP=1
     _ = KVTransferEngine(
         "abc",
-        [[tensor]],
-        total_num_pages=2,
+        [[kv_memory(tensor, 2)]],
     )
     _ = KVTransferEngine(
         "abc",
-        [[tensor.to(Accelerator())]],
-        total_num_pages=2,
+        [[kv_memory(tensor.to(Accelerator()), 2)]],
     )
-
-    # total_num_pages is 0
-    with pytest.raises(ValueError):
-        _ = KVTransferEngine(
-            "abc",
-            [[tensor]],
-            total_num_pages=0,
-        )
-
-    # bytes is not divisible by total_num_pages
-    with pytest.raises(ValueError):
-        _ = KVTransferEngine(
-            "abc",
-            [[tensor]],
-            total_num_pages=3,
-        )
 
 
 def test_initiate_send_transfer() -> None:
@@ -70,13 +53,11 @@ def test_initiate_send_transfer() -> None:
     # DP=1, TP=1
     engine_1 = KVTransferEngine(
         "engine_1",
-        [[blocks_1]],
-        total_num_pages=total_num_pages,
+        [[kv_memory(blocks_1, total_num_pages)]],
     )
     engine_2 = KVTransferEngine(
         "engine_2",
-        [[blocks_2]],
-        total_num_pages=total_num_pages,
+        [[kv_memory(blocks_2, total_num_pages)]],
     )
 
     engine_1.connect(engine_2.metadata)
@@ -160,15 +141,15 @@ def test_ensure_we_use_memory_manager() -> None:
         ValueError,
         match="MODULAR_DEVICE_CONTEXT_MEMORY_MANAGER_SIZE_PERCENT must be set when using TransferEngine with GPU memory",
     ):
-        engine = KVTransferEngine("engine", [[acc_tensor]], total_num_pages=1)
+        engine = KVTransferEngine("engine", [[kv_memory(acc_tensor, 1)]])
 
     # ok
-    engine = KVTransferEngine("engine", [[cpu_tensor]], total_num_pages=1)
+    engine = KVTransferEngine("engine", [[kv_memory(cpu_tensor, 1)]])
     engine.cleanup()
 
     # ok
     os.environ["MODULAR_DEVICE_CONTEXT_MEMORY_MANAGER_SIZE_PERCENT"] = "99"
-    engine = KVTransferEngine("engine", [[acc_tensor]], total_num_pages=1)
+    engine = KVTransferEngine("engine", [[kv_memory(acc_tensor, 1)]])
     engine.cleanup()
 
 
@@ -178,14 +159,14 @@ def test_dp_structure_validation() -> None:
 
     # Empty outer list should fail
     with pytest.raises(ValueError, match="must contain at least one replica"):
-        _ = KVTransferEngine("engine", [], total_num_pages=2)
+        _ = KVTransferEngine("engine", [])
 
     # Empty inner list should fail
     with pytest.raises(ValueError, match="must contain at least one tensor"):
-        _ = KVTransferEngine("engine", [[]], total_num_pages=2)
+        _ = KVTransferEngine("engine", [[]])
 
     # Valid DP=1, TP=1
-    engine = KVTransferEngine("engine", [[tensor]], total_num_pages=2)
+    engine = KVTransferEngine("engine", [[kv_memory(tensor, 2)]])
     engine.cleanup()
 
 
@@ -197,15 +178,14 @@ def test_multi_replica_construction() -> None:
     # DP=2, TP=1
     engine = KVTransferEngine(
         "engine",
-        [[tensor1], [tensor2]],
-        total_num_pages=2,
+        [[kv_memory(tensor1, 2)], [kv_memory(tensor2, 2)]],
     )
 
     engine.cleanup()
 
 
 def test_replicas_must_have_same_tp_degree() -> None:
-    """Test that all replicas must have the same number of TP shards.
+    """Test that all replicas must have the same bytes_per_page.
 
     Note: This test validates the error message but uses TP=1 for both replicas
     since CPU only supports TP=1. The validation would work the same for GPU.
@@ -223,28 +203,22 @@ def test_replicas_must_have_same_tp_degree() -> None:
     ):
         _ = KVTransferEngine(
             "engine",
-            [[t1], [t2]],  # Different shapes lead to different bytes_per_page
-            total_num_pages=2,
+            [
+                [kv_memory(t1, 2)],
+                [kv_memory(t2, 2)],
+            ],  # Different shapes lead to different bytes_per_page
         )
 
 
 def test_replicas_must_have_same_total_num_pages() -> None:
-    """Test that all replicas must have the same total_num_pages."""
-    # Create tensors with different sizes
-    t1 = Buffer(DType.int8, (20,), device=CPU())  # 20 elements
-    t2 = Buffer(DType.int8, (30,), device=CPU())  # 30 elements
+    """All groups must agree on total_num_pages, read off the buffers."""
+    t2 = Buffer(DType.int8, (20,), device=CPU())  # 2 pages of 10 bytes
+    t3 = Buffer(DType.int8, (30,), device=CPU())  # 3 pages of 10 bytes
 
-    # Both replicas should validate against the same total_num_pages
-    # This should fail because t2 has 30 elements but total_num_pages=2
-    # means each tensor should have elements divisible by 2
-    with pytest.raises(
-        ValueError,
-        match=r"num elements .* must be divisible by total number of pages",
-    ):
+    with pytest.raises(ValueError, match=r"total_num_pages"):
         _ = KVTransferEngine(
             "engine",
-            [[t1], [t2]],
-            total_num_pages=3,  # 20 is not divisible by 3
+            [[kv_memory(t2, 2)], [kv_memory(t3, 3)]],
         )
 
 
@@ -257,13 +231,11 @@ def test_replica_idx_validation() -> None:
     # DP=2, TP=1
     engine_1 = KVTransferEngine(
         "engine_1",
-        [[tensor1], [tensor2]],
-        total_num_pages=3,
+        [[kv_memory(tensor1, 3)], [kv_memory(tensor2, 3)]],
     )
     engine_2 = KVTransferEngine(
         "engine_2",
-        [[tensor1], [tensor2]],
-        total_num_pages=3,
+        [[kv_memory(tensor1, 3)], [kv_memory(tensor2, 3)]],
     )
 
     engine_1.connect(engine_2.metadata)

@@ -1,0 +1,30 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+
+def foo() -> Float32:
+  return 3.14
+# CHECK: 3.14
+print(foo())
+
+def foo() -> Float64:
+  return 1.23
+# CHECK: 1.23
+print(foo())
+
+def bar(b: Bool) -> Float32:
+  return 1.111
+
+def bar(f: Float32) -> Float32:
+  return 2.222
+
+# CHECK: 1.11{{[0-9]+}}
+print(bar(True))
+

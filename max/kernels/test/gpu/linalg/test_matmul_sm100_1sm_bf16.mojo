@@ -14,8 +14,8 @@
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from internal_utils import assert_almost_equal
 from std.random import rand
 from layout import TileTensor, Coord, CoordLike, row_major, Idx
@@ -127,8 +127,8 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
             for k_idx in range(K):
                 b_host[n_idx, k_idx] = Float32(n_idx + k_idx).cast[b_type]()
     else:
-        rand(a_host.ptr, a_host.num_elements())
-        rand(b_host.ptr, b_host.num_elements())
+        rand(a_host._storage, a_host.num_elements())
+        rand(b_host._storage, b_host.num_elements())
 
     # Move operands to the Device
     ctx.enqueue_copy(a_device, a_host_ptr)
@@ -155,7 +155,7 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
         ctx,
     )
 
-    comptime assert a_type != DType.float8_e4m3fn or transpose_b, (
+    comptime assert a_type != .float8_e4m3fn or transpose_b, (
         "Testing is only supported for transposed_b==True when"
         " a_type==float8_e4m3fn. Add the non-transposed case if needed."
     )
@@ -181,8 +181,8 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
 
     comptime rtol = 1e-2
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=0.0001,
         rtol=rtol,
@@ -229,7 +229,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
@@ -247,7 +247,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -266,7 +266,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](4, 2, 1),
@@ -286,7 +286,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](8, 2, 1),
@@ -304,7 +304,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](4, 4, 1),

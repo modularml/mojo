@@ -16,17 +16,19 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import ClassVar, Literal
 
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.graph.weights import WeightData
 from max.nn.kv_cache import KVCacheParams
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
+from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
 from max.pipelines.lib.interfaces.arch_config import (
     ArchConfigWithStoredKVParams,
 )
+from max.pipelines.modeling.config_enums import SupportedEncoding
 from transformers import AutoConfig
 from typing_extensions import Self, override
 
@@ -41,6 +43,12 @@ class Olmo2Config(Llama3Config):
     Olmo2 models have an explicit head_dim field in their configuration.
     """
 
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "bfloat16",
+        "float32",
+    }
+
     @classmethod
     def construct_kv_params(
         cls,
@@ -49,19 +57,24 @@ class Olmo2Config(Llama3Config):
         devices: list[DeviceRef],
         kv_cache_config: KVCacheConfig,
         cache_dtype: DType,
+        *,
+        allow_kv_head_replication: bool = False,
     ) -> KVCacheParams:
         """Olmo2 does not support data parallelism; delegate to grouped-attention default."""
         if pipeline_config.model.data_parallel_degree > 1:
             raise ValueError(
                 "Data parallelism is not supported for Olmo2 models"
             )
-        return ArchConfigWithStoredKVParams.construct_kv_params(
+        kv_params = ArchConfigWithStoredKVParams.construct_kv_params(
             huggingface_config,
             pipeline_config,
             devices,
             kv_cache_config,
             cache_dtype,
+            allow_kv_head_replication=allow_kv_head_replication,
         )
+        assert isinstance(kv_params, KVCacheParams)
+        return kv_params
 
     @staticmethod
     def calculate_attention_multiplier(huggingface_config: AutoConfig) -> float:
@@ -86,6 +99,8 @@ class Olmo2Config(Llama3Config):
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         model_config = model_config or pipeline_config.model
         huggingface_config = model_config.huggingface_config
@@ -95,7 +110,9 @@ class Olmo2Config(Llama3Config):
                 "but config could not be loaded. "
                 "Please ensure the model repository contains a valid config.json file."
             )
-        return cls.initialize_from_config(pipeline_config, huggingface_config)
+        return cls.initialize_from_config(
+            pipeline_config, huggingface_config, max_seq_len=max_seq_len
+        )
 
     @classmethod
     def initialize_from_config(
@@ -103,6 +120,8 @@ class Olmo2Config(Llama3Config):
         pipeline_config: PipelineConfig,
         huggingface_config: AutoConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes an Olmo2Config instance from pipeline and HuggingFace configuration.
 
@@ -124,14 +143,17 @@ class Olmo2Config(Llama3Config):
         """
         # Get the base config from Llama3Config
         base_config = Llama3Config.initialize_from_config(
-            pipeline_config, huggingface_config, model_config
+            pipeline_config,
+            huggingface_config,
+            model_config,
+            max_seq_len=max_seq_len,
         )
 
         kv_cache_config = pipeline_config.model.kv_cache
-        quantization_encoding = pipeline_config.model.quantization_encoding
-        if quantization_encoding is None:
-            raise ValueError("quantization_encoding must not be None")
-        cache_dtype = pipeline_config.model.kv_cache.cache_dtype
+        cache_dtype = cache_dtype_for_encoding(
+            base_config.quantization_encoding,
+            pipeline_config.model.kv_cache.kv_cache_format,
+        )
         n_devices = len(pipeline_config.model.device_specs)
 
         device_refs = [
@@ -176,9 +198,9 @@ class Olmo2Config(Llama3Config):
             devices=base_config.devices,
             clip_qkv=base_config.clip_qkv,
             use_subgraphs=base_config.use_subgraphs,
-            lora_config=base_config.lora_config,
             logits_scaling=base_config.logits_scaling,
             data_parallel_degree=base_config.data_parallel_degree,
+            quantization_encoding=base_config.quantization_encoding,
         )
 
     def finalize(
@@ -187,7 +209,7 @@ class Olmo2Config(Llama3Config):
         state_dict: dict[str, WeightData],
         return_logits: ReturnLogits,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
-        norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm",
+        norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm",
         attention_bias: bool = False,
     ) -> None:
         """Define parameters that can't be determined just from the pipeline config.

@@ -30,9 +30,10 @@ import gc
 
 import numpy as np
 from max._core.engine import CompiledModels, ModelMetadata
+from max._core.mlrt import AsyncValue
 from max.driver import CPU, Buffer
 from max.dtype import DType
-from max.engine import InferenceSession, Model
+from max.engine import CompiledModel, InferenceSession, Model
 from max.graph import DeviceRef, Graph, TensorType, TensorValue
 
 
@@ -49,17 +50,23 @@ def _make_graph() -> Graph:
     )
 
 
+def _handle(compiled: CompiledModel) -> AsyncValue[CompiledModels]:
+    handle = compiled._compiled
+    assert isinstance(handle, AsyncValue)
+    return handle
+
+
 def test_compile_returns_compiled_models() -> None:
     session = InferenceSession(devices=[CPU()])
     compiled = session.compile(_make_graph())
-    handle = compiled._compiled.result()
+    handle = _handle(compiled).result()
     assert isinstance(handle, CompiledModels)
     assert len(handle) >= 1
 
 
 def test_compiled_models_len_and_indexing() -> None:
     session = InferenceSession(devices=[CPU()])
-    handle = session.compile(_make_graph())._compiled.result()
+    handle = _handle(session.compile(_make_graph())).result()
     assert len(handle) == 1
     spec = handle[0]
     assert isinstance(spec, ModelMetadata)
@@ -68,7 +75,7 @@ def test_compiled_models_len_and_indexing() -> None:
 
 def test_compiled_models_iteration() -> None:
     session = InferenceSession(devices=[CPU()])
-    handle = session.compile(_make_graph())._compiled.result()
+    handle = _handle(session.compile(_make_graph())).result()
     specs = list(handle)
     assert len(specs) == 1
     assert all(isinstance(s, ModelMetadata) for s in specs)
@@ -76,13 +83,13 @@ def test_compiled_models_iteration() -> None:
 
 def test_compiled_models_names() -> None:
     session = InferenceSession(devices=[CPU()])
-    handle = session.compile(_make_graph())._compiled.result()
+    handle = _handle(session.compile(_make_graph())).result()
     assert handle.names == ["identity_add"]
 
 
 def test_model_metadata_input_output_metadata() -> None:
     session = InferenceSession(devices=[CPU()])
-    handle = session.compile(_make_graph())._compiled.result()
+    handle = _handle(session.compile(_make_graph())).result()
     spec = handle[0]
     assert len(spec.input_metadata) == 1
     assert spec.input_metadata[0].dtype == DType.float32
@@ -96,7 +103,7 @@ def test_compiled_models_outlives_session() -> None:
     compiled = session.compile(_make_graph())
     del session
     gc.collect()
-    handle = compiled._compiled.result()
+    handle = _handle(compiled).result()
     assert len(handle) == 1
     assert handle.names == ["identity_add"]
 
@@ -105,7 +112,7 @@ def test_model_metadata_outlives_compiled_models() -> None:
     """``keep_alive<0, 1>`` on ``__getitem__`` keeps the parent CompiledModels alive."""
     session = InferenceSession(devices=[CPU()])
     compiled = session.compile(_make_graph())
-    spec = compiled._compiled.result()[0]
+    spec = _handle(compiled).result()[0]
     del compiled
     del session
     gc.collect()
@@ -119,7 +126,7 @@ def test_await_compiled_models() -> None:
 
     async def go() -> object:
         session = InferenceSession(devices=[CPU()])
-        return await session.compile(_make_graph())._compiled
+        return await _handle(session.compile(_make_graph()))
 
     handle = asyncio.run(go())
     assert isinstance(handle, CompiledModels)

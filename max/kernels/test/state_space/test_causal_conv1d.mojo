@@ -38,10 +38,10 @@ def main() raises:
 @always_inline
 def silu_ref[dtype: DType](x: Scalar[dtype]) -> Scalar[dtype]:
     """Reference SiLU implementation: x * sigmoid(x) = x / (1 + exp(-x))."""
-    var x_f32 = x.cast[DType.float32]()
+    var x_f32 = x.cast[.float32]()
     var neg_x = -x_f32
     var exp_neg_x = exp(neg_x)
-    var one = Scalar[DType.float32](1.0)
+    var one = Float32(1.0)
     var sigmoid_x = one / (one + exp_neg_x)
     return (x_f32 * sigmoid_x).cast[dtype]()
 
@@ -193,32 +193,32 @@ def run_causal_conv1d[
 
 def test_basic_causal_conv1d() raises:
     """Test basic causal conv1d without activation."""
-    run_causal_conv1d[DType.float32, "none"](2, 4, 8, 3)
+    run_causal_conv1d[.float32, "none"](2, 4, 8, 3)
 
 
 def test_causal_conv1d_with_silu() raises:
     """Test causal conv1d with SiLU activation."""
-    run_causal_conv1d[DType.float32, "silu"](2, 4, 8, 3)
+    run_causal_conv1d[.float32, "silu"](2, 4, 8, 3)
 
 
 def test_causal_conv1d_width_4() raises:
     """Test causal conv1d with kernel width 4."""
-    run_causal_conv1d[DType.float32, "none"](2, 8, 16, 4)
+    run_causal_conv1d[.float32, "none"](2, 8, 16, 4)
 
 
 def test_causal_conv1d_silu_width_3() raises:
     """Test causal conv1d with SiLU activation and width 3."""
-    run_causal_conv1d[DType.float32, "silu"](2, 8, 16, 3)
+    run_causal_conv1d[.float32, "silu"](2, 8, 16, 3)
 
 
 def test_causal_conv1d_various_widths() raises:
     """Test causal conv1d with various kernel widths."""
-    run_causal_conv1d[DType.float32, "none"](2, 4, 8, 1)
-    run_causal_conv1d[DType.float32, "none"](2, 4, 8, 2)
-    run_causal_conv1d[DType.float32, "none"](2, 4, 8, 3)
-    run_causal_conv1d[DType.float32, "none"](2, 4, 8, 4)
+    run_causal_conv1d[.float32, "none"](2, 4, 8, 1)
+    run_causal_conv1d[.float32, "none"](2, 4, 8, 2)
+    run_causal_conv1d[.float32, "none"](2, 4, 8, 3)
+    run_causal_conv1d[.float32, "none"](2, 4, 8, 4)
 
 
 def test_causal_conv1d_large_sequence() raises:
     """Test causal conv1d with larger sequence length."""
-    run_causal_conv1d[DType.float32, "none"](2, 16, 128, 3)
+    run_causal_conv1d[.float32, "none"](2, 16, 128, 3)

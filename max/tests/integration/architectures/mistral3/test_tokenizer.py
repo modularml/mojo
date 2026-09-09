@@ -62,7 +62,6 @@ def mock_tokenizer_base(mocker: MockerFixture) -> None:
         # Set the essential attributes that parent class would set
         instance.model_path = model_path
         instance.delegate = MagicMock()
-        return None
 
     mocker.patch(
         "max.pipelines.architectures.mistral3.tokenizer.TextTokenizer.__init__",

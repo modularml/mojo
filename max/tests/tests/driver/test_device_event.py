@@ -63,7 +63,7 @@ def test_device_event_timing_param_default(
 ) -> None:
     """Test that events without timing param still work (backward compat)."""
     event = DeviceEvent(device)
-    device.default_stream.record_event(event)
+    device.default_queue.record_event(event)
     event.synchronize()
     assert event.is_ready()
 
@@ -73,7 +73,7 @@ def test_device_event_elapsed_time(device: driver.Accelerator) -> None:
     start = DeviceEvent(device, enable_timing=True)
     end = DeviceEvent(device, enable_timing=True)
 
-    stream = device.default_stream
+    stream = device.default_queue
     stream.record_event(start)
     stream.record_event(end)
     end.synchronize()
@@ -90,7 +90,7 @@ def test_elapsed_time_without_timing_raises(
     start = DeviceEvent(device)  # enable_timing=False (default)
     end = DeviceEvent(device)  # enable_timing=False (default)
 
-    stream = device.default_stream
+    stream = device.default_queue
     stream.record_event(start)
     stream.record_event(end)
     end.synchronize()

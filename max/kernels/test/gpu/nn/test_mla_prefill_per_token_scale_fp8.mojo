@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from std.random import randn
 from layout.tile_tensor import TileTensor
 from layout.tile_layout import row_major
@@ -82,12 +82,10 @@ def test_prefill[
     var cache_ptr = ctx.enqueue_create_host_buffer[rope_type](cache_size)
     var output_ptr = ctx.enqueue_create_host_buffer[output_type](o_size)
 
-    var q_bf16_ptr = ctx.enqueue_create_host_buffer[DType.bfloat16](q_size)
-    var k_bf16_ptr = ctx.enqueue_create_host_buffer[DType.bfloat16](k_size)
-    var v_bf16_ptr = ctx.enqueue_create_host_buffer[DType.bfloat16](v_size)
-    var cache_bf16_ptr = ctx.enqueue_create_host_buffer[DType.bfloat16](
-        cache_size
-    )
+    var q_bf16_ptr = ctx.enqueue_create_host_buffer[.bfloat16](q_size)
+    var k_bf16_ptr = ctx.enqueue_create_host_buffer[.bfloat16](k_size)
+    var v_bf16_ptr = ctx.enqueue_create_host_buffer[.bfloat16](v_size)
+    var cache_bf16_ptr = ctx.enqueue_create_host_buffer[.bfloat16](cache_size)
 
     randn(q_bf16_ptr.as_span())
     randn(k_bf16_ptr.as_span())
@@ -107,10 +105,10 @@ def test_prefill[
         cache_bf16_ptr[i] *= scale_factor
 
     # input row offsets and cache row offsets
-    var input_row_offsets = ctx.enqueue_create_host_buffer[DType.uint32](
+    var input_row_offsets = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
-    var cache_row_offsets = ctx.enqueue_create_host_buffer[DType.uint32](
+    var cache_row_offsets = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
     for i in range(batch_size):
@@ -231,10 +229,10 @@ def test_prefill[
         for j in range(seq_len):
             for h in range(num_heads):
                 for d in range(depth):
-                    q_bf16_value = q_bf16[Coord(i * seq_len + j, h, d)]
-                    q_scale_value = q_scale[
+                    var q_bf16_value = q_bf16[Coord(i * seq_len + j, h, d)]
+                    var q_scale_value = q_scale[
                         Coord(i * seq_len + j, Idx[0])
-                    ].cast[DType.bfloat16]()
+                    ].cast[.bfloat16]()
                     if d < kv_depth:
                         q_nope[Coord(i * seq_len + j, h, d)] = (
                             q_bf16_value / q_scale_value
@@ -263,10 +261,10 @@ def test_prefill[
         for j in range(num_keys):
             for h in range(num_heads):
                 for d in range(kv_depth):
-                    k_bf16_value = k_bf16[Coord(i * num_keys + j, h, d)]
-                    k_scale_value = k_scale[
+                    var k_bf16_value = k_bf16[Coord(i * num_keys + j, h, d)]
+                    var k_scale_value = k_scale[
                         Coord(i * num_keys + j, Idx[0])
-                    ].cast[DType.bfloat16]()
+                    ].cast[.bfloat16]()
                     k[Coord(i * num_keys + j, h, d)] = (
                         k_bf16_value / k_scale_value
                     ).cast[qkv_type]()
@@ -275,7 +273,7 @@ def test_prefill[
         for j in range(num_keys):
             for h in range(num_heads):
                 for d in range(kv_depth):
-                    v_bf16_value = v_bf16[Coord(i * num_keys + j, h, d)]
+                    var v_bf16_value = v_bf16[Coord(i * num_keys + j, h, d)]
                     v[Coord(i * num_keys + j, h, d)] = (v_bf16_value).cast[
                         qkv_type
                     ]()
@@ -285,10 +283,10 @@ def test_prefill[
         for j in range(num_keys):
             for h in range(cache_num_heads):
                 for d in range(cache_depth):
-                    cache_bf16_value = cache_bf16[Coord(i, j, h, d)]
-                    k_scale_value = k_scale[
+                    var cache_bf16_value = cache_bf16[Coord(i, j, h, d)]
+                    var k_scale_value = k_scale[
                         Coord(i * num_keys + j, Idx[0])
-                    ].cast[DType.bfloat16]()
+                    ].cast[.bfloat16]()
                     cache[Coord(i, j, h, d)] = (
                         cache_bf16_value / k_scale_value
                     ).cast[rope_type]()
@@ -302,10 +300,10 @@ def test_prefill[
     var cache_device_ptr = ctx.enqueue_create_buffer[rope_type](cache_size)
     var output_device_ptr = ctx.enqueue_create_buffer[output_type](o_size)
 
-    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
-    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
 
@@ -396,14 +394,14 @@ def test_prefill[
     ctx.enqueue_copy(output_ptr, output_device_ptr)
 
     var dangling_valid_length = TileTensor(
-        UnsafePointer[UInt32, MutAnyOrigin].unsafe_dangling(),
+        MutPointer[UInt32, MutAnyOrigin].unsafe_dangling(),
         row_major(Coord(Idx[0])),
     )
 
-    var k_ref_host_ptr = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var k_ref_host_ptr = ctx.enqueue_create_host_buffer[.bfloat16](
         batch_size * num_keys * num_heads * depth
     )
-    var v_ref_host_ptr = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var v_ref_host_ptr = ctx.enqueue_create_host_buffer[.bfloat16](
         batch_size * num_keys * num_heads * depth
     )
     var output_ref_host_ptr = ctx.enqueue_create_host_buffer[output_type](
@@ -436,7 +434,7 @@ def test_prefill[
     # Build a faithful reference using the SAME quantized data the kernel
     # receives, dequantized back to BF16. This tests the kernel's per-token
     # scaling logic rather than FP8 approximation quality.
-    var q_ref_host_ptr = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var q_ref_host_ptr = ctx.enqueue_create_host_buffer[.bfloat16](
         batch_size * seq_len * num_heads * depth
     )
     var q_ref_host = TileTensor(
@@ -484,12 +482,11 @@ def test_prefill[
             for h in range(num_heads):
                 for d in range(kv_depth):
                     k_ref_host[Coord(b, s, h, d)] = (
-                        k[Coord(b * num_keys + s, h, d)].cast[DType.bfloat16]()
-                        * ks
+                        k[Coord(b * num_keys + s, h, d)].cast[.bfloat16]() * ks
                     )
                     v_ref_host[Coord(b, s, h, d)] = v[
                         Coord(b * num_keys + s, h, d)
-                    ].cast[DType.bfloat16]()
+                    ].cast[.bfloat16]()
 
     for b in range(batch_size):
         for s in range(num_keys):
@@ -505,11 +502,11 @@ def test_prefill[
                     ]
                     v_ref_host[Coord(b, s, h, d + kv_depth)] = 0
 
-    var q_ref_device_ptr = ctx.enqueue_create_buffer[DType.bfloat16](q_size)
-    var k_ref_device_ptr = ctx.enqueue_create_buffer[DType.bfloat16](
+    var q_ref_device_ptr = ctx.enqueue_create_buffer[.bfloat16](q_size)
+    var k_ref_device_ptr = ctx.enqueue_create_buffer[.bfloat16](
         batch_size * num_keys * num_heads * depth
     )
-    var v_ref_device_ptr = ctx.enqueue_create_buffer[DType.bfloat16](
+    var v_ref_device_ptr = ctx.enqueue_create_buffer[.bfloat16](
         batch_size * num_keys * num_heads * depth
     )
     var output_ref_device_ptr = ctx.enqueue_create_buffer[output_type](
@@ -563,8 +560,12 @@ def test_prefill[
         row_major(Coord(batch_size, seq_len, Idx[num_heads], Idx[depth])),
     )
 
-    var k_ref_operand = LayoutTensorMHAOperand(k_ref_device.to_layout_tensor())
-    var v_ref_operand = LayoutTensorMHAOperand(v_ref_device.to_layout_tensor())
+    var k_ref_operand = LayoutTensorMHAOperand(
+        k_ref_device.as_immut().as_unsafe_any_origin()
+    )
+    var v_ref_operand = LayoutTensorMHAOperand(
+        v_ref_device.as_immut().as_unsafe_any_origin()
+    )
 
     # create reference output
     mha_gpu_naive[_is_cache_length_accurate=True](
@@ -591,8 +592,8 @@ def test_prefill[
         for j in range(seq_len):
             for h in range(num_heads):
                 for d in range(kv_depth):
-                    lhs = output[Coord(i * seq_len + j, h, d)]
-                    rhs = output_ref_host[Coord(i, j, h, d)]
+                    var lhs = output[Coord(i * seq_len + j, h, d)]
+                    var rhs = output_ref_host[Coord(i, j, h, d)]
                     if abs(lhs - rhs) > 5e-2:
                         print("[", i, j, h, d, "]", lhs, rhs, lhs / rhs)
                     assert_almost_equal(
@@ -723,6 +724,68 @@ def test_mla_prefill_qkv_fp8[
         cache_num_heads=1,
         batch_size=batch_size,
     ](120, 240, ctx)
+    # In-kernel 2Q->1Q switch: num_heads=128 keeps the dispatch at 2Q
+    # (BM=256), so the per-tile switch handles short tails. seq_len=300
+    # tiles as [0,256) (full) + [256,300) whose 44 remaining rows (<= 128)
+    # route to the 1Q body — exercising the per-token 1Q FUSED load/mma and
+    # the k_scale stride-2 path from a 2Q launch — and validating that the
+    # would-be empty 2Q second half (folded by `output_nonempty`) is
+    # exactly that tile. seq_len=428 tiles as [0,256) + [256,428) whose 172
+    # remaining rows (> 128) stay on the 2Q body with both output halves
+    # non-empty (WG1 covers 44 valid rows), the complementary case.
+    test_prefill[
+        qkv_type,
+        rope_type,
+        scale_type,
+        output_type,
+        depth=192,
+        num_heads=128,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+    ](300, 300, ctx)
+    test_prefill[
+        qkv_type,
+        rope_type,
+        scale_type,
+        output_type,
+        depth=192,
+        num_heads=128,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+    ](428, 428, ctx)
+    # Short query chunk over a long cache, 16 heads: routes to the 1Q
+    # (num_qo=1) kernel via the dispatch heuristic (prompt_len <= 128)
+    # while iterating many KV tiles. 800 keys -> odd T (1Q tail path);
+    # 768 keys -> even T (1Q main-loop only). Exercises the 1Q load /
+    # mma rewrite AND the 1Q k_scale stride-2 fix in fa4_softmax.
+    test_prefill[
+        qkv_type,
+        rope_type,
+        scale_type,
+        output_type,
+        depth=192,
+        num_heads=16,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+    ](100, 800, ctx)
+    test_prefill[
+        qkv_type,
+        rope_type,
+        scale_type,
+        output_type,
+        depth=192,
+        num_heads=16,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+    ](64, 768, ctx)
 
 
 def main() raises:

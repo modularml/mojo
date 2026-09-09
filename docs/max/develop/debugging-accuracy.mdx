@@ -29,7 +29,7 @@ MODULAR_DEBUG=nan-check max serve --model modularai/Llama-3.1-8B-Instruct-GGUF
 ```
 
 If you also enable
-[`source-tracebacks`](/max/develop/debugging-tracing#map-ops-to-python-source),
+[`source-tracebacks`](/develop/debugging-tracing#map-ops-to-python-source),
 MAX includes the Python source location where you defined the operation.
 
 ## Detect uninitialized memory reads
@@ -59,9 +59,9 @@ This check adds runtime overhead, so disable it after debugging sessions.
 These are just a couple of debugging tools MAX provides. Explore the following
 resources to learn about additional debugging scenarios:
 
-- [Trace op execution](/max/develop/debugging-tracing): See which ops
+- [Trace op execution](/develop/debugging-tracing): See which ops
   MAX runs and map them back to Python source.
-- [Debug GPU errors](/max/develop/debugging-gpu): Force synchronous GPU
+- [Debug GPU errors](/develop/debugging-gpu): Force synchronous GPU
   dispatch and enable kernel-level bounds checking.
-- [Diagnose runtime errors](/max/develop/debugging-errors): Capture
+- [Diagnose runtime errors](/develop/debugging-errors): Capture
   Mojo stack traces and IR dumps for unrecoverable failures.

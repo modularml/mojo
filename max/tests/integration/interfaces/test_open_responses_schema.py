@@ -14,17 +14,23 @@
 
 import json
 
+import numpy as np
 import pytest
+from max.pipelines.context.outputs import GenerationOutput
+from max.pipelines.context.status import GenerationStatus
+from max.pipelines.modeling.types import RequestID
 from max.pipelines.request.open_responses import (
     AssistantMessage,
     FunctionCall,
     FunctionToolParam,
+    ImageGenerationDetails,
     InputTextContent,
     OpenResponsesRequestBody,
     OutputTextContent,
     ResponseResource,
     SystemMessage,
     ToolChoiceValueEnum,
+    Usage,
     UserMessage,
 )
 from max.pipelines.request.provider_options import (
@@ -424,3 +430,72 @@ def test_create_response_body_with_partial_provider_options() -> None:
     assert request.provider_options.image is not None
     assert request.provider_options.image.width == 512
     assert request.provider_options.image.height == 512
+
+
+def test_image_generation_details_from_images() -> None:
+    """Details are measured from the actual output arrays."""
+    pixel_data = np.zeros((2, 512, 768, 3), dtype=np.uint8)
+
+    details = ImageGenerationDetails.from_images(pixel_data, steps=28)
+
+    assert details.width == 768
+    assert details.height == 512
+    assert details.megapixels == pytest.approx(0.393216)
+    assert details.steps == 28
+    assert details.image_count == 2
+
+
+def test_image_generation_details_from_images_empty_raises() -> None:
+    """Empty pixel data cannot produce image generation details."""
+    with pytest.raises(ValueError, match="empty pixel data"):
+        ImageGenerationDetails.from_images(
+            np.zeros((0, 512, 512, 3), dtype=np.uint8), steps=28
+        )
+
+
+def test_from_generation_output_populates_usage() -> None:
+    """Pipeline-reported usage flows through to the response."""
+    usage = Usage(
+        input_tokens=0,
+        output_tokens=0,
+        total_tokens=0,
+        image_generation_details=ImageGenerationDetails(
+            width=1024,
+            height=1024,
+            megapixels=1.048576,
+            steps=28,
+            image_count=1,
+        ),
+    )
+    generation_output = GenerationOutput(
+        request_id=RequestID(value="req-1"),
+        final_status=GenerationStatus.END_OF_SEQUENCE,
+        output=[OutputTextContent(type="output_text", text="ok")],
+        usage=usage,
+    )
+
+    response = ResponseResource.from_generation_output(
+        generation_output, model="flux.2-klein-9b"
+    )
+
+    assert response.usage == usage
+    assert response.usage is not None
+    assert response.usage.image_generation_details is not None
+    assert response.usage.image_generation_details.megapixels == pytest.approx(
+        1.048576
+    )
+
+
+def test_from_generation_output_without_usage() -> None:
+    """Outputs that carry no usage keep the response usage unset."""
+    generation_output = GenerationOutput(
+        request_id=RequestID(value="req-1"),
+        final_status=GenerationStatus.END_OF_SEQUENCE,
+        output=[OutputTextContent(type="output_text", text="ok")],
+    )
+
+    response = ResponseResource.from_generation_output(
+        generation_output, model="flux.2-klein-9b"
+    )
+
+    assert response.usage is None

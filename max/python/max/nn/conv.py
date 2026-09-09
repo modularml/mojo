@@ -41,7 +41,15 @@ class Conv2d(Module, Shardable):
 
     .. code-block:: python
 
-        conv = nn.Conv2d(
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef
+        from max.nn import Conv2d
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
+        conv = Conv2d(
             kernel_size=3,
             in_channels=64,
             out_channels=128,
@@ -50,7 +58,7 @@ class Conv2d(Module, Shardable):
             padding=0,
             has_bias=False,
             name="conv2d_weight",
-            device=DeviceRef.GPU(),
+            device=device_ref,
         )
     """
 
@@ -318,7 +326,15 @@ class Conv1D(Module):
 
     .. code-block:: python
 
-        conv = nn.Conv1D(
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef
+        from max.nn import Conv1D
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
+        conv = Conv1D(
             kernel_size=3,
             in_channels=64,
             out_channels=128,
@@ -327,7 +343,7 @@ class Conv1D(Module):
             padding=0,
             has_bias=False,
             name="conv1d_weight",
-            device=DeviceRef.GPU(),
+            device=device_ref,
         )
     """
 
@@ -515,7 +531,15 @@ class Conv3D(Module):
 
     .. code-block:: python
 
-        conv = nn.Conv3D(
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef
+        from max.nn import Conv3D
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
+        conv = Conv3D(
             depth=3,
             height=3,
             width=3,
@@ -526,7 +550,7 @@ class Conv3D(Module):
             padding=0,
             has_bias=False,
             name="conv3d_weight",
-            device=DeviceRef.GPU(),
+            device=device_ref,
         )
     """
 

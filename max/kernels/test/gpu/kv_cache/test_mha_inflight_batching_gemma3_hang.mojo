@@ -14,24 +14,35 @@
 """Regression test for PAQ-2333: GPU attention kernel hang with inflight
 batching on Gemma3 27B.
 
-The hang is a TMA transaction barrier deadlock (SYNCS.PHASECHK.TRANS64.TRYWAIT)
-in the SM100 FA4 attention kernel when processing a mixed TG+CE batch. Certain
-combinations of seq_lens and cache_lens trigger the deadlock.
+Production hit a TMA transaction barrier deadlock
+(SYNCS.PHASECHK.TRANS64.TRYWAIT) in the SM100 FA4 attention kernel on a mixed
+TG+CE batch. This file drives that batch -- 230 TG (seq_len 1, cache 100-1000)
+plus 40 CE (seq_len 50-1000) over 270 requests -- and gates on the kernel both
+returning and producing no NaN/Inf.
+
+It does not, however, pin the deadlock. As first committed the batch
+oversubscribed its own KV block pool, so it died in host setup before any
+launch and never reached FA4 at any page size (see `num_blocks` below). A pass
+here therefore means "this shape mix completes", not "the TMA deadlock class is
+fixed".
 """
 
-from std.collections import Set
 from std.math import ceildiv, rsqrt
 from std.random import random_ui64, seed
 from std.sys.defines import get_defined_int
 from layout._utils import ManagedLayoutTensor
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import (
     KVCacheStaticParams,
     PagedKVCacheCollection,
 )
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
 from layout._fillers import random
-from kv_cache_test_utils import assert_no_nan_inf, padded_lut_cols
+from kv_cache_test_utils import (
+    assert_no_nan_inf,
+    padded_lut_cols,
+    random_distinct,
+)
 from nn.attention.gpu.mha import flash_attention
 from nn.attention.mha_mask import CausalMask
 from std.utils import IndexList
@@ -55,12 +66,40 @@ def test_paged_ragged_attention[
     var total_length = 0
     var max_full_context_length = 0
     var max_prompt_length = 0
+    # Pages the batch needs: one per `page_size` keys per request, rounded up
+    # per request (pages are never shared between requests here).
+    var total_pages = 0
     for i in range(batch_size):
         max_full_context_length = max(
             max_full_context_length, cache_lengths[i] + valid_lengths[i]
         )
         max_prompt_length = max(max_prompt_length, valid_lengths[i])
         total_length += valid_lengths[i]
+        total_pages += ceildiv(cache_lengths[i] + valid_lengths[i], page_size)
+
+    # `num_paged_blocks` is the production pool size the repro quotes, but the
+    # randomized batch is not sized against it: per-request round-up costs up
+    # to `page_size - 1` keys per request, and at 270 requests that overshoots
+    # the pool at every page size in the sweep (695 / 1275 / 2406 blocks needed
+    # vs 647).
+    #
+    # The LUT below hands out DISTINCT blocks, so an undersized pool is
+    # unsatisfiable, and it fails LOUDLY but in the wrong place:
+    # `random_distinct(n, k)` takes the `k`-prefix of `randperm(n)`, and
+    # `List.shrink` calls `abort()` when `k > n`. So the repro dies in host
+    # setup before any launch -- which is exactly what happened here for its
+    # whole history, turning a kernel hang repro into a host-side failure that
+    # still looked like a timeout. Grow the pool to what the batch needs.
+    #
+    # `total_pages` is the EXACT requirement, not a bound: it is accumulated by
+    # the loop above with the same `ceildiv(cache + valid, page_size)`
+    # expression the LUT loop below consumes, so `k <= n` holds by
+    # construction. Sizing from `max_full_context_length` instead (as
+    # `test_batch_kv_cache_flash_attention_causal_mask_ragged_paged.mojo` does)
+    # is also correct but ~1.7x looser here, and being page-size-invariant it
+    # would hide the fact that the requirement GROWS as `page_size` shrinks --
+    # which is the reason this repro never ran.
+    var num_blocks = max(num_paged_blocks, total_pages)
 
     comptime row_offsets_layout = Layout(UNKNOWN_VALUE)
     comptime cache_lengths_layout = Layout(UNKNOWN_VALUE)
@@ -91,11 +130,11 @@ def test_paged_ragged_attention[
     var q_ragged_rl = RuntimeLayout[q_ragged_layout].row_major(q_ragged_shape)
     var output_rl = RuntimeLayout[output_layout].row_major(output_shape)
 
-    var input_row_offsets = ManagedLayoutTensor[
-        DType.uint32, row_offsets_layout
-    ](row_offsets_rl, ctx)
+    var input_row_offsets = ManagedLayoutTensor[.uint32, row_offsets_layout](
+        row_offsets_rl, ctx
+    )
     var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_lengths_layout
+        .uint32, cache_lengths_layout
     ](cache_lengths_rl, ctx)
     var q_ragged = ManagedLayoutTensor[dtype, q_ragged_layout](q_ragged_rl, ctx)
     var test_output = ManagedLayoutTensor[dtype, output_layout](output_rl, ctx)
@@ -114,7 +153,7 @@ def test_paged_ragged_attention[
     random(q_ragged_tensor)
 
     var kv_block_paged_shape = IndexList[6](
-        num_paged_blocks,
+        num_blocks,
         2,
         num_layers,
         page_size,
@@ -138,7 +177,7 @@ def test_paged_ragged_attention[
     var kv_block_paged = ManagedLayoutTensor[dtype, kv_block_6d_layout](
         kv_block_paged_rl, ctx
     )
-    var paged_lut = ManagedLayoutTensor[DType.uint32, paged_lut_layout](
+    var paged_lut = ManagedLayoutTensor[.uint32, paged_lut_layout](
         paged_lut_rl, ctx
     )
 
@@ -149,15 +188,16 @@ def test_paged_ragged_attention[
     random(kv_block_paged_tensor)
 
     var paged_lut_tensor = paged_lut.tensor[update=False]()
-    var paged_lut_set = Set[Int]()
+    # Sample one distinct paged block per page across the whole batch up
+    # front, then hand them out in iteration order. `num_blocks >= total_pages`
+    # by construction above.
+    var paged_blocks = random_distinct(num_blocks, total_pages)
+    var page_pos = 0
     for bs in range(batch_size):
         var seq_len = cache_lengths[bs] + valid_lengths[bs]
         for block_idx in range(ceildiv(seq_len, page_size)):
-            var randval = Int(random_ui64(0, UInt64(num_paged_blocks - 1)))
-            while randval in paged_lut_set:
-                randval = Int(random_ui64(0, UInt64(num_paged_blocks - 1)))
-            paged_lut_set.add(randval)
-            paged_lut_tensor[bs, block_idx] = UInt32(randval)
+            paged_lut_tensor[bs, block_idx] = UInt32(paged_blocks[page_pos])
+            page_pos += 1
 
     var kv_block_paged_lt = kv_block_paged.device_tensor()
     var cache_lengths_lt = cache_lengths_managed.device_tensor()
@@ -196,7 +236,9 @@ def test_paged_ragged_attention[
         "max_context_len=",
         max_full_context_length,
         "num_pages=",
-        num_paged_blocks,
+        num_blocks,
+        "pages_needed=",
+        total_pages,
     )
 
     flash_attention[ragged=True](
@@ -227,8 +269,13 @@ def main() raises:
         # Mixed TG+CE batch with randomized shapes that triggers TMA deadlock.
         # 230 TG requests (seq_len=1) with cache_lens 100-1000
         # 40 CE requests with seq_lens 50-1000
-        # 647 paged KV cache blocks (matching Gemma3 27B server config)
-        print("=== PAQ-2333 repro: 230 TG + 40 CE, 647 pages, seed=42 ===")
+        #
+        # 647 is the Gemma3 27B server pool size this repro quotes, but it is
+        # only a floor: the batch needs more than that at every swept page size,
+        # so the pool grows to what it actually needs. The run line below prints
+        # the pool that was allocated (`num_pages=`) and the requirement it was
+        # sized from (`pages_needed=`).
+        print("=== PAQ-2333 repro: 230 TG + 40 CE, seed=42 ===")
         var active_lens = List[Int]()
         var cache_lens = List[Int]()
         for _ in range(230):

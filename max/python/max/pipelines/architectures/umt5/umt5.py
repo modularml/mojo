@@ -44,7 +44,7 @@ class UMT5LayerNorm(Module):
         eps: float = 1e-6,
         *,
         dtype: DType = DType.float32,
-        device: DeviceRef = DeviceRef.GPU(),
+        device: DeviceRef = DeviceRef.GPU(),  # noqa: B008
     ) -> None:
         super().__init__()
         self.weight = Weight("weight", dtype, [hidden_size], device)

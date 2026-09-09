@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -56,18 +55,119 @@ modular_py_test(
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
+    ignore_extra_deps = [requirement("jinja2")],
     tags = [
         "gpu",
         "manual",
-        "no-pydeps",  # TODO: Fix and re-enable
         "no-sandbox",
         "requires-network",
         "run-in-hf-workflow",  # TODO(AITLIB-293): Remove this once we have a way to run these tests on CI.
     ],
     deps = [
-        "//max/python/max",
-        "//max/tests/integration:hf_repo_lock",
+        "//max/python/max/driver",
+        "//max/python/max/engine",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
         "//max/tests/integration/test_common:mocks",
+        requirement("jinja2"),
+        requirement("numpy"),
+        requirement("pytest-asyncio"),
+        requirement("requests"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_xgrammar_torch_free",
+    size = "small",
+    srcs = [
+        "test_xgrammar_torch_free.py",
+    ],
+    env = {
+        "MODULAR_PATH": ".",
+    },
+    deps = [
+        "//max/python/max:_core",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_kimi_reasoning_toolarg_enforcement",
+    size = "small",
+    srcs = [
+        "test_kimi_reasoning_toolarg_enforcement.py",
+    ],
+    env = {
+        "MODULAR_PATH": ".",
+    },
+    deps = [
+        "//max/python/max:_core",
+        "//max/python/max/_xgrammar",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_inkling_reasoning_toolarg_enforcement",
+    # Loading the real Inkling tokenizer (200k vocab) dominates the runtime
+    # when INKLING_TOKENIZER_DIR is set.
+    size = "medium",
+    srcs = [
+        "test_inkling_reasoning_toolarg_enforcement.py",
+    ],
+    env = {
+        "MODULAR_PATH": ".",
+    },
+    deps = [
+        "//max/python/max/pipelines/architectures/inkling",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/tests/integration/architectures/inkling:grammar_harness",
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_xgrammar_shim",
+    size = "small",
+    srcs = [
+        "test_xgrammar_shim.py",
+    ],
+    env = {
+        "MODULAR_PATH": ".",
+    },
+    deps = [
+        "//max/python/max/_xgrammar",
+        requirement("numpy"),
+    ],
+)
+
+# The prompt tokenizer is faked, so unlike test_pixel_tokenizer this needs
+# neither a checkpoint nor network access, and runs on CI.
+modular_py_test(
+    name = "test_audio_tokenizer",
+    size = "small",
+    srcs = [
+        "test_audio_tokenizer.py",
+    ],
+    env = {
+        "MODULAR_PATH": ".",
+    },
+    # Import-bound: pulling the whole pipelines stack dominates the wall time
+    # and outruns the 300s "small" budget on the shared BuildBuddy macOS
+    # workers, timing out during pytest collection. Nothing here is actually
+    # macOS-incompatible, so skip the CI job rather than the platform -- it
+    # still runs locally on a Mac.
+    tags = ["skip-ci-macos"],
+    deps = [
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/request",
+        requirement("numpy"),
         requirement("pytest-asyncio"),
     ],
 )
@@ -123,7 +223,6 @@ modular_py_test(
     ],
     deps = [
         "//max/python/max/pipelines/lib",
-        "//max/tests/integration:hf_repo_lock",
         requirement("llguidance"),
         requirement("transformers"),
     ],

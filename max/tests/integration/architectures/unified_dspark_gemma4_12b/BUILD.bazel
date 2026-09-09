@@ -1,0 +1,121 @@
+load("//bazel:api.bzl", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "test_arch_registration",
+    size = "medium",
+    srcs = ["test_arch_registration.py"],
+    deps = [
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_12b",
+    ],
+)
+
+modular_py_test(
+    name = "test_model_config",
+    size = "medium",
+    srcs = ["test_model_config.py"],
+    deps = [
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_12b",
+        "//max/python/max/pipelines/lib",
+    ],
+)
+
+modular_py_test(
+    name = "test_markov_head",
+    size = "medium",
+    srcs = ["test_markov_head.py"],
+    # Import-bound: the torch + max imports dominate the wall time, dwarfing the
+    # two short test bodies. That startup cost starves on contended macOS
+    # workers and trips the timeout; the markov head itself is exercised on the
+    # GPU lanes, so macOS coverage buys nothing here.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_12b",
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_unified_graph_compile",
+    size = "enormous",
+    srcs = ["test_unified_graph_compile.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "8",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # The full unified-graph compile takes ~7 min on CI — too heavy for
+    # presubmit (the unified dflash arches ship no presubmit compile test
+    # at all). Run explicitly / from scheduled jobs only.
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_12b",
+        "//max/python/max/pipelines/lib",
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_dspark_gemma4_module",
+    size = "enormous",
+    srcs = ["test_dspark_gemma4_module.py"],
+    env = {
+        # The torch reference holds ~5.7 GiB of checkpoint weights.
+        "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
+    },
+    env_inherit = ["HF_TOKEN"],
+    exec_properties = {
+        "test.resources:gpu-memory": "24",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "gpu",
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_12b",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/integration/test_common:context_utils",
+        requirement("huggingface-hub"),
+        requirement("numpy"),
+        requirement("safetensors"),
+        requirement("torch"),
+    ],
+)

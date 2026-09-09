@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -17,7 +16,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from max.pipelines.modeling.types.tokens import Range, TokenBuffer
+from max.pipelines.context.tokens import Range, TokenBuffer
 
 
 def test_token_buffer__tokens_validation_during_init() -> None:
@@ -206,6 +205,27 @@ def test_token_buffer__reset_as_new_prompt() -> None:
 
     with pytest.raises(ValueError):
         _ = token_buffer.consume_recently_generated_tokens()
+
+
+def test_token_buffer__reset_as_new_prompt_deletes_last_generated_token() -> (
+    None
+):
+    """Bool trailing deletion drops the last generated token before reset."""
+    token_buffer = TokenBuffer(array=np.array([9, 10], dtype=np.int64))
+    token_buffer.advance_with_token(11)
+    token_buffer.advance_with_token(12)
+
+    token_buffer.reset_as_new_prompt(delete_last_generated_token=True)
+
+    assert token_buffer.generated_length == 0
+    np.testing.assert_array_equal(
+        token_buffer.all, np.array([9, 10, 11], dtype=np.int64)
+    )
+    assert token_buffer.prompt_length == 3
+
+    prompt_only = TokenBuffer(array=np.array([9, 10], dtype=np.int64))
+    with pytest.raises(ValueError):
+        prompt_only.reset_as_new_prompt(delete_last_generated_token=True)
 
 
 def test_token_buffer__getitem_access() -> None:

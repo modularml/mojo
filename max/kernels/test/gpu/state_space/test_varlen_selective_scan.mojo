@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -77,9 +77,9 @@ def run_varlen_selective_scan_fwd_gpu[
     var z_gpu_h = alloc[Scalar[dtype]](max(z_size, 1))
     var delta_bias_size = dim if has_delta_bias else 0
     var delta_bias_h = alloc[Scalar[dtype]](max(delta_bias_size, 1))
-    var query_start_loc_h = alloc[Scalar[DType.int32]](batch + 1)
-    var cache_indices_h = alloc[Scalar[DType.int32]](batch)
-    var has_initial_state_h = alloc[Scalar[DType.bool]](batch)
+    var query_start_loc_h = alloc[Int32](batch + 1)
+    var cache_indices_h = alloc[Int32](batch)
+    var has_initial_state_h = alloc[Scalar[.bool]](batch)
 
     # Create LayoutTensors for initialization
     var u_init = LayoutTensor[dtype, layout_2d](
@@ -141,18 +141,18 @@ def run_varlen_selective_scan_fwd_gpu[
 
     # Initialize query_start_loc (cumulative lengths)
     var cumsum = 0
-    query_start_loc_h.store(0, Scalar[DType.int32](0))
+    query_start_loc_h.store(0, Int32(0))
     for i in range(batch):
         cumsum += seq_lengths[i]
-        query_start_loc_h.store(i + 1, Scalar[DType.int32](cumsum))
+        query_start_loc_h.store(i + 1, Int32(cumsum))
 
     # Initialize cache_indices (identity mapping)
     for i in range(batch):
-        cache_indices_h.store(i, Scalar[DType.int32](i))
+        cache_indices_h.store(i, Int32(i))
 
     # Initialize has_initial_state (all False)
     for i in range(batch):
-        has_initial_state_h.store(i, Scalar[DType.bool](False))
+        has_initial_state_h.store(i, Scalar[.bool](False))
 
     # Copy z for GPU
     if has_z:
@@ -164,56 +164,64 @@ def run_varlen_selective_scan_fwd_gpu[
         ssm_states_gpu_h.store(i, ssm_states_cpu_h.load(i))
 
     # Create LayoutTensors for CPU kernel
-    var ssm_states_cpu = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
+    var ssm_states_cpu = LayoutTensor[dtype, layout_3d](
         ssm_states_cpu_h,
         RuntimeLayout[layout_3d].row_major(Index(batch, dim, dstate)),
     )
-    var output_cpu = LayoutTensor[dtype, layout_2d, MutAnyOrigin](
+    var output_cpu = LayoutTensor[dtype, layout_2d](
         output_cpu_h,
         RuntimeLayout[layout_2d].row_major(Index(dim, total_length)),
     )
-    var u_cpu = LayoutTensor[dtype, layout_2d, MutAnyOrigin](
-        u_h, RuntimeLayout[layout_2d].row_major(Index(dim, total_length))
+    var u_cpu = LayoutTensor[dtype, layout_2d](
+        u_h,
+        RuntimeLayout[layout_2d].row_major(Index(dim, total_length)),
     )
-    var delta_cpu = LayoutTensor[dtype, layout_2d, MutAnyOrigin](
-        delta_h, RuntimeLayout[layout_2d].row_major(Index(dim, total_length))
+    var delta_cpu = LayoutTensor[dtype, layout_2d](
+        delta_h,
+        RuntimeLayout[layout_2d].row_major(Index(dim, total_length)),
     )
-    var A_cpu = LayoutTensor[dtype, layout_2d, MutAnyOrigin](
-        A_h, RuntimeLayout[layout_2d].row_major(Index(dim, dstate))
+    var A_cpu = LayoutTensor[dtype, layout_2d](
+        A_h,
+        RuntimeLayout[layout_2d].row_major(Index(dim, dstate)),
     )
-    var B_cpu = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
+    var B_cpu = LayoutTensor[dtype, layout_3d](
         B_h,
         RuntimeLayout[layout_3d].row_major(
             Index(ngroups, dstate, total_length)
         ),
     )
-    var C_cpu = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
+    var C_cpu = LayoutTensor[dtype, layout_3d](
         C_h,
         RuntimeLayout[layout_3d].row_major(
             Index(ngroups, dstate, total_length)
         ),
     )
-    var D_cpu = LayoutTensor[dtype, layout_1d, MutAnyOrigin](
-        D_h, RuntimeLayout[layout_1d].row_major(Index(D_size))
+    var D_cpu = LayoutTensor[dtype, layout_1d](
+        D_h,
+        RuntimeLayout[layout_1d].row_major(Index(D_size)),
     )
-    var z_cpu = LayoutTensor[dtype, layout_2d, MutAnyOrigin](
+    var z_cpu = LayoutTensor[dtype, layout_2d](
         z_cpu_h,
         RuntimeLayout[layout_2d].row_major(
             Index(dim if has_z else 0, total_length if has_z else 0)
         ),
     )
-    var delta_bias_cpu = LayoutTensor[dtype, layout_1d, MutAnyOrigin](
-        delta_bias_h, RuntimeLayout[layout_1d].row_major(Index(delta_bias_size))
+    var delta_bias_cpu = LayoutTensor[dtype, layout_1d](
+        delta_bias_h,
+        RuntimeLayout[layout_1d].row_major(Index(delta_bias_size)),
     )
-    var query_start_loc_cpu = LayoutTensor[
-        DType.int32, layout_1d, MutAnyOrigin
-    ](query_start_loc_h, RuntimeLayout[layout_1d].row_major(Index(batch + 1)))
-    var cache_indices_cpu = LayoutTensor[DType.int32, layout_1d, MutAnyOrigin](
-        cache_indices_h, RuntimeLayout[layout_1d].row_major(Index(batch))
+    var query_start_loc_cpu = LayoutTensor[.int32, layout_1d](
+        query_start_loc_h,
+        RuntimeLayout[layout_1d].row_major(Index(batch + 1)),
     )
-    var has_initial_state_cpu = LayoutTensor[
-        DType.bool, layout_1d, MutAnyOrigin
-    ](has_initial_state_h, RuntimeLayout[layout_1d].row_major(Index(batch)))
+    var cache_indices_cpu = LayoutTensor[.int32, layout_1d](
+        cache_indices_h,
+        RuntimeLayout[layout_1d].row_major(Index(batch)),
+    )
+    var has_initial_state_cpu = LayoutTensor[.bool, layout_1d](
+        has_initial_state_h,
+        RuntimeLayout[layout_1d].row_major(Index(batch)),
+    )
 
     # Strides for row-major layout using IndexList types
     var u_strides = IndexList[2](total_length, 1)
@@ -325,9 +333,9 @@ def run_varlen_selective_scan_fwd_gpu[
     var D_d = ctx.enqueue_create_buffer[dtype](max(D_size, 1))
     var z_d = ctx.enqueue_create_buffer[dtype](max(z_size, 1))
     var delta_bias_d = ctx.enqueue_create_buffer[dtype](max(delta_bias_size, 1))
-    var query_start_loc_d = ctx.enqueue_create_buffer[DType.int32](batch + 1)
-    var cache_indices_d = ctx.enqueue_create_buffer[DType.int32](batch)
-    var has_initial_state_d = ctx.enqueue_create_buffer[DType.bool](batch)
+    var query_start_loc_d = ctx.enqueue_create_buffer[.int32](batch + 1)
+    var cache_indices_d = ctx.enqueue_create_buffer[.int32](batch)
+    var has_initial_state_d = ctx.enqueue_create_buffer[.bool](batch)
 
     # Copy to device
     ctx.enqueue_copy(u_d, u_h)
@@ -388,14 +396,14 @@ def run_varlen_selective_scan_fwd_gpu[
     var delta_bias_gpu_lt = LayoutTensor[dtype, layout_1d, MutAnyOrigin](
         delta_bias_d, RuntimeLayout[layout_1d].row_major(Index(delta_bias_size))
     )
-    var query_start_loc_gpu_lt = LayoutTensor[
-        DType.int32, layout_1d, MutAnyOrigin
-    ](query_start_loc_d, RuntimeLayout[layout_1d].row_major(Index(batch + 1)))
-    var cache_indices_gpu_lt = LayoutTensor[
-        DType.int32, layout_1d, MutAnyOrigin
-    ](cache_indices_d, RuntimeLayout[layout_1d].row_major(Index(batch)))
+    var query_start_loc_gpu_lt = LayoutTensor[.int32, layout_1d, MutAnyOrigin](
+        query_start_loc_d, RuntimeLayout[layout_1d].row_major(Index(batch + 1))
+    )
+    var cache_indices_gpu_lt = LayoutTensor[.int32, layout_1d, MutAnyOrigin](
+        cache_indices_d, RuntimeLayout[layout_1d].row_major(Index(batch))
+    )
     var _has_initial_state_gpu_lt = LayoutTensor[
-        DType.bool, layout_1d, MutAnyOrigin
+        .bool, layout_1d, MutAnyOrigin
     ](has_initial_state_d, RuntimeLayout[layout_1d].row_major(Index(batch)))
 
     # Create TileTensors for GPU kernel
@@ -493,9 +501,9 @@ def run_varlen_selective_scan_fwd_gpu[
 
     ctx.enqueue_function(
         compiled_kernel,
-        dim,
-        ngroups,
-        batch,
+        Int32(dim),
+        Int32(ngroups),
+        Int32(batch),
         Int32(-1),  # pad_slot_id
         Int8(1) if delta_softplus else Int8(0),
         u_gpu_tt,
@@ -529,6 +537,7 @@ def run_varlen_selective_scan_fwd_gpu[
     var output_to_check = z_d if has_z else output_gpu_d
     var output_to_check_host = z_gpu_h if has_z else output_gpu_h
     ctx.enqueue_copy(output_to_check_host, output_to_check)
+    ctx.synchronize()
 
     # Compare outputs
     var output_to_check_cpu = z_cpu_h if has_z else output_cpu_h

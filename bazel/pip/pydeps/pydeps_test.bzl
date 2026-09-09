@@ -40,12 +40,6 @@ def _pydeps_test_impl(ctx):
         raw_sources = raw_py_sources + raw_non_py_sources
 
         if not raw_sources:
-            # FIXME: This is an odd special case, it is used as a "I just want to use MAX" dependency,
-            # so it sort of goes against the point of this test in the first place.
-            if str(dep.label) == "@@//max/python/max:max":
-                env["DEP_SOURCES"][label] = []
-                continue
-
             fail("Error: Dependency {} has no source files.".format(dep.label))
 
         # Whether we like it or not, //foo/bar:baz.py is always importable as foo.bar.baz

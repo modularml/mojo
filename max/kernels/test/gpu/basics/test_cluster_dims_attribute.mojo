@@ -11,8 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
-from std.gpu import block_idx, cluster_dim, cluster_idx
+from max.gpu.host import DeviceContext
+from max.gpu import block_idx, cluster_dim, cluster_idx
 
 from std.utils.static_tuple import StaticTuple
 

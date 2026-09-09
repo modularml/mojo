@@ -14,16 +14,16 @@
 
 from std.sys.info import _accelerator_arch
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
-from std.gpu.host.info import GPUInfo, _is_sm10x_gpu
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
+from max.gpu.host.info import GPUInfo, _is_sm10x_gpu
 from std.testing import assert_true
 
 
 def test_operation[
     dtype: DType,
     target_arch: StaticString,
-    op_fn: def[width: SIMDSize](
+    op_fn: def[width: SIMDLength](
         x: SIMD[dtype, width], y: type_of(x)
     ) thin raises -> type_of(x),
     op_name: StaticString,
@@ -40,14 +40,14 @@ def test_operation[
     # sm_100 has support for f32x2 add/sub/mul/fma.
     var prefix: String
 
-    comptime if target_arch == "sm_80" and dtype == DType.bfloat16:
+    comptime if target_arch == "sm_80" and dtype == .bfloat16:
         prefix = "fma.rn"
     else:
         prefix = String(op_name)
 
-    comptime if dtype == DType.float16:
+    comptime if dtype == .float16:
         suffix = ".f16"
-    elif dtype == DType.float32:
+    elif dtype == .float32:
         suffix = ".f32"
     else:
         suffix = ".bf16"
@@ -63,7 +63,7 @@ def test_operation[
 
 def test_add[dtype: DType, target_arch: StaticString]() raises:
     def add[
-        width: SIMDSize
+        width: SIMDLength
     ](x: SIMD[dtype, width], y: type_of(x)) -> type_of(x):
         return x + y
 
@@ -72,7 +72,7 @@ def test_add[dtype: DType, target_arch: StaticString]() raises:
 
 def test_sub[dtype: DType, target_arch: StaticString]() raises:
     def sub[
-        width: SIMDSize
+        width: SIMDLength
     ](x: SIMD[dtype, width], y: type_of(x)) -> type_of(x):
         return x - y
 
@@ -81,7 +81,7 @@ def test_sub[dtype: DType, target_arch: StaticString]() raises:
 
 def test_mul[dtype: DType, target_arch: StaticString]() raises:
     def mul[
-        width: SIMDSize
+        width: SIMDLength
     ](x: SIMD[dtype, width], y: type_of(x)) -> type_of(x):
         return x * y
 
@@ -98,26 +98,26 @@ def test_half_float_instruction_selection() raises:
         test_operations[dtype, "sm_80"]()
         test_operations[dtype, "sm_90"]()
 
-    test_types[DType.bfloat16]()
-    test_types[DType.float16]()
+    test_types[.bfloat16]()
+    test_types[.float16]()
 
 
 def test_fma[dtype: DType]() raises:
     def fma[
-        width: SIMDSize
+        width: SIMDLength
     ](x: SIMD[dtype, width], y: type_of(x), z: type_of(x)) -> type_of(x):
         return x * y + z
 
     def fma_manual[
-        width: SIMDSize
+        width: SIMDLength
     ](x: SIMD[dtype, width], y: type_of(x), z: type_of(x)) -> type_of(x):
         return x.fma(y, z)
 
-    comptime if dtype == DType.bfloat16:
+    comptime if dtype == .bfloat16:
         assert_true("fma.rn.bf16 " in _compile_code[fma[width=1]]())
         assert_true("fma.rn.bf16x2 " in _compile_code[fma[width=2]]())
         assert_true("fma.rn.bf16x2 " in _compile_code[fma[width=8]]())
-    elif dtype == DType.float32:
+    elif dtype == .float32:
         assert_true("fma.rn.f32 " in _compile_code[fma_manual[width=1]]())
         assert_true("fma.rn.f32x2 " in _compile_code[fma_manual[width=2]]())
         assert_true("fma.rn.f32x2 " in _compile_code[fma_manual[width=8]]())
@@ -129,7 +129,7 @@ def test_fma[dtype: DType]() raises:
 
 def test_cast() raises:
     def cast[
-        src_type: DType, dst_type: DType, width: SIMDSize
+        src_type: DType, dst_type: DType, width: SIMDLength
     ](src: SIMD[src_type, width]) -> SIMD[dst_type, width]:
         return src.cast[dst_type]()
 
@@ -162,14 +162,14 @@ def test_cast() raises:
 def main() raises:
     test_half_float_instruction_selection()
 
-    test_fma[DType.bfloat16]()
-    test_fma[DType.float16]()
+    test_fma[.bfloat16]()
+    test_fma[.float16]()
 
     test_cast()
 
     comptime device = GPUInfo.from_name[_accelerator_arch()]()
 
     comptime if _is_sm10x_gpu(device):
-        test_add[DType.float32, "sm_100"]()
-        test_mul[DType.float32, "sm_100"]()
-        test_fma[DType.float32]()
+        test_add[.float32, "sm_100"]()
+        test_mul[.float32, "sm_100"]()
+        test_fma[.float32]()

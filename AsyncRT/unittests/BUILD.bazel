@@ -1,0 +1,124 @@
+load("//bazel:api.bzl", "modular_cc_test")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_test(
+    name = "AllocatorTest",
+    timeout = "short",
+    srcs = ["AllocatorTest.cpp"],
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Support:Base",
+        "//Support:Globals",
+        "//Support:Threading",
+    ],
+)
+
+modular_cc_test(
+    name = "AsyncValueTest",
+    size = "small",
+    srcs = ["AsyncValueTest.cpp"],
+    target_compatible_with = select({
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//AsyncRT:Support",
+        "//Support:Globals",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "DebuggingAllocatorsTest",
+    size = "small",
+    srcs = ["DebuggingAllocatorsTest.cpp"],
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Support:Globals",
+    ],
+)
+
+modular_cc_test(
+    name = "CPUDeviceTest",
+    size = "small",
+    srcs = ["CPUDeviceTest.cpp"],
+    target_compatible_with = select({
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Support:Globals",
+    ],
+)
+
+modular_cc_test(
+    name = "WorkQueueTest",
+    size = "small",
+    srcs = ["WorkQueueTest.cpp"],
+    target_compatible_with = select({
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Support:Threading",
+    ],
+)
+
+modular_cc_test(
+    name = "WorkerSignalAltStackTest",
+    size = "small",
+    srcs = ["WorkerSignalAltStackTest.cpp"],
+    # Asyncrt altstack is disabled on sanitizer builds, so there is nothing to test.
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Support:Threading",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "TypeIDTest",
+    size = "small",
+    srcs = ["TypeIDTest.cpp"],
+    deps = [
+        "//AsyncRT:Support",
+        "//Support:Base",
+        "//Support:Globals",
+        "//Support:TypeID",
+    ],
+)
+
+modular_cc_test(
+    name = "TimerHeapTest",
+    size = "small",
+    srcs = ["TimerHeapTest.cpp"],
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//AsyncRT:Support",
+        "//Support:Globals",
+    ],
+)

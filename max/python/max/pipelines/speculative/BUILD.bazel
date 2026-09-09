@@ -5,52 +5,13 @@ package(default_visibility = ["//max:consumers"])
 modular_py_library(
     name = "speculative",
     srcs = glob(["**/*.py"]),
-    ignore_unresolved_imports = [
-        # lib depends on speculative at runtime, so speculative cannot dep on lib
-        # — these are resolved via the shared Python path at runtime.
-        "max.pipelines.lib.interfaces",
-        "max.pipelines.lib.interfaces.ModelInputs",
-        "max.pipelines.lib.interfaces.PipelineModel",
-        "max.pipelines.lib.interfaces.PipelineModelWithKVCache",
-        "max.pipelines.lib.pipeline_variants.text_generation",
-        "max.pipelines.lib.pipeline_variants.text_generation.TextGenerationPipelineInterface",
-        "max.pipelines.lib.pipeline_variants.text_generation.get_eos_tokens",
-        "max.pipelines.lib.pipeline_variants.text_generation.calculate_num_steps",
-        "max.pipelines.lib.pipeline_variants.utils",
-        "max.pipelines.lib.pipeline_variants.utils.build_response",
-        "max.pipelines.lib.sampling",
-        "max.pipelines.lib.sampling.SamplingConfig",
-        "max.pipelines.lib.sampling.RejectionRunner",
-        "max.pipelines.lib.sampling.SyntheticRunner",
-        "max.pipelines.lib.sampling.rejection_runner_registry",
-        "max.pipelines.lib.sampling.SamplerInputs",
-        "max.pipelines.lib.sampling.apply_logits_processors",
-        "max.pipelines.lib.sampling.sampling",
-        "max.pipelines.lib.sampling.sampling.TokenSampler",
-        "max.pipelines.lib.config",
-        "max.pipelines.lib.config.MAXModelConfig",
-        "max.pipelines.lib.config.PipelineConfig",
-        # Conditional import at runtime in base.py; architectures already depend on lib
-        "max.pipelines.architectures.deepseekV3_nextn.model.maybe_build_deepseekv3_nextn_kwargs",
-    ],
-    # lib depends on speculative at runtime (SpeculativeConfig), so speculative
-    # cannot depend on lib — creating a circular Bazel dep. The TYPE_CHECKING
-    # imports of PipelineConfig/MAXModelConfig from lib therefore cannot be
-    # resolved by mypy when building this target in isolation.
-    tags = ["no-mypy"],
+    test_docstring_examples = True,
     deps = [
         "//max/python/max/config",
-        "//max/python/max/driver",
         "//max/python/max/dtype",
-        "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/core",
-        "//max/python/max/pipelines/kv_cache",
-        "//max/python/max/pipelines/modeling",
-        "//max/python/max/profiler",
-        requirement("numpy"),
         requirement("pydantic"),
-        requirement("transformers"),
+        requirement("typing-extensions"),
     ],
 )

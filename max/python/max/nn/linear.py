@@ -55,18 +55,27 @@ class Linear(Module, Shardable):
 
     .. code-block:: python
 
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType
+        from max.nn import Linear
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
         linear_layer = Linear(
             in_dim=256,
             out_dim=128,
             dtype=DType.float32,
-            device=DeviceRef.GPU(),
+            device=device_ref,
             name="linear",
             has_bias=True
         )
 
-        # Input tensor of shape: [batch, ..., 256]
-        input_tensor: TensorValue
-        output = linear_layer(input_tensor)
+        input_type = TensorType(DType.float32, [1, 256], device=device_ref)
+        with Graph("linear", input_types=[input_type]) as graph:
+            output = linear_layer(graph.inputs[0])
+            graph.output(output)
     """
 
     weight: Weight
@@ -127,12 +136,14 @@ class Linear(Module, Shardable):
         self.clip_weight = clip_weight
         self.quant_config = quant_config
 
-        # Packed FP4 weights are stored as uint8 (two values per byte).
-        weight_dtype = (
-            DType.uint8
-            if quant_config is not None and quant_config.is_fp4
-            else dtype
-        )
+        # Packed FP4 weights are stored as uint8 (two values per byte); int8
+        # W8A8 weights are stored as int8 (RTN-quantized at load).
+        weight_dtype = dtype
+        if quant_config is not None:
+            if quant_config.is_fp4:
+                weight_dtype = DType.uint8
+            elif quant_config.is_int8_w8a8:
+                weight_dtype = DType.int8
 
         if not is_sharding:
             self.weight = Weight(
@@ -217,6 +228,10 @@ class Linear(Module, Shardable):
             k_dim = int(self.weight.shape[1])
             if quant_config.is_fp4:
                 k_dim *= 2  # FP4 weights are packed 2x as uint8
+            elif quant_config.is_mxfp6:
+                # Four 6-bit codes per three bytes. Exact: K is a multiple of
+                # 32, so the packed width is always a multiple of 3.
+                k_dim = k_dim * 4 // 3
             weight_scale_shape = (
                 ceildiv(
                     int(self.weight.shape[0]),
@@ -518,6 +533,20 @@ class Linear(Module, Shardable):
         if self.clip_weight:
             weight = clamp(weight, -self.clip_weight, self.clip_weight)
 
+        # The int8 W8A8 (Apple M5) matmul fuses the bias into its dequant
+        # epilogue; hand it in so the `.bias` op fires instead of a separate
+        # add. Every other path still adds the bias below.
+        fuse_bias = (
+            self.bias is not None
+            and self.quant_config is not None
+            and self.quant_config.is_int8_w8a8
+        )
+        fused_bias = (
+            self.bias.to(x.device)
+            if fuse_bias and self.bias is not None
+            else None
+        )
+
         res = linear(
             x,
             weight,
@@ -526,9 +555,10 @@ class Linear(Module, Shardable):
             self.input_scale,
             self.weight_scale,
             self.weight_scale_2,
+            bias=fused_bias,
         )
 
-        if self.bias is not None:
+        if self.bias is not None and not fuse_bias:
             res += self.bias.to(res.device)
         return res
 
@@ -541,17 +571,25 @@ def linear(
     input_scale: TensorValue | None = None,
     weight_scale: TensorValue | None = None,
     weight_scale_2: TensorValue | None = None,
+    bias: TensorValue | None = None,
 ) -> TensorValue:
-    """Computes x @ weight.T with quantization support."""
+    """Computes x @ weight.T (+bias) with quantization support.
+
+    ``bias`` is only consumed by the int8 W8A8 (Apple M5) path, which fuses it
+    into the matmul dequant epilogue; for every other path it is ignored and
+    the caller is responsible for adding it.
+    """
     if quantization_encoding is not None:
         return ops.qmatmul(quantization_encoding, None, x, weight)
     elif quant_config:
         assert weight_scale is not None
 
-        # The FP4 matmul kernel requires rank-2 inputs. Flatten leading
-        # dims before the call and restore them afterward.
+        # The FP4 and static-scaled FP8 matmul kernels require rank-2
+        # inputs. Flatten leading dims before the call and restore them
+        # afterward. (LLM callers already pass rank-2 ragged activations;
+        # this only engages for batched rank-3+ inputs such as the Wan DiT.)
         leading_dims: list[Dim] | None = None
-        if quant_config.is_fp4 and x.rank > 2:
+        if x.rank > 2:
             leading_dims = list(x.shape[:-1])
             m_dim: Dim = Dim(1)
             for d in leading_dims:
@@ -565,6 +603,7 @@ def linear(
             input_scale,
             quant_config,
             weight_scale_2,
+            bias=bias,
         )
 
         if leading_dims is not None:
@@ -613,16 +652,19 @@ class ColumnParallelLinear(Linear):
 
     .. code-block:: python
 
+        from max.driver import Accelerator, CPU, accelerator_count
         from max.dtype import DType
         from max.graph import DeviceRef
         from max.nn import ColumnParallelLinear
 
-        num_devices = 4
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
         distributed_linear = ColumnParallelLinear(
-            in_dim,
-            out_dim,
+            256,
+            128,
             DType.float32,
-            devices=[DeviceRef.GPU(i) for i in range(num_devices)],
+            devices=[device_ref],
         )
     """
 
@@ -1073,14 +1115,18 @@ class MLP(Module, Shardable):
         else:
             raise ValueError(f"Unsupported sharding strategy: {strategy}")
 
-    def shard(self, devices: Iterable[DeviceRef]) -> list[MLP]:
+    def shard(self, devices: Iterable[DeviceRef]) -> Sequence[MLP]:
         """Creates sharded views of this MLP across multiple devices.
+
+        The return type is the covariant ``Sequence`` so subclasses (for
+        example non-gated experts) can override with their own shard type
+        while still satisfying ``Shardable``'s ``Sequence[Self]`` contract.
 
         Args:
             devices: Iterable of devices to place the shards on.
 
         Returns:
-            List of sharded MLP instances, one for each device.
+            Sharded MLP instances, one for each device.
         """
         if self.sharding_strategy is None:
             raise ValueError("Sharding strategy is not set")
@@ -1121,6 +1167,155 @@ class MLP(Module, Shardable):
             # if the weights can be stacked.
             sharded._parent_layer = self
 
+            shards.append(sharded)
+
+        return shards
+
+
+class FusedMLP(Module, Shardable):
+    """Stores the gate and up projections as one pre-fused weight.
+
+    The checkpoint provides ``gate_up_proj_fused`` with shape
+    ``[2 * feed_forward_length, hidden_dim]``, with gate rows followed by up
+    rows. Only bias-free, unquantized projections are supported.
+    """
+
+    def __init__(
+        self,
+        dtype: DType,
+        hidden_dim: int,
+        feed_forward_length: int,
+        devices: Sequence[DeviceRef],
+        activation_function: str = "silu",
+        swiglu_limit: float = 0.0,
+        is_sharding: bool = False,
+    ) -> None:
+        """Initializes the fused MLP layer.
+
+        Args:
+            dtype: :class:`~max.dtype.DType` for the layer weights.
+            hidden_dim: The last dimension of the layer input.
+            feed_forward_length: Size of the intermediate projection.
+            devices: Devices to place the weights on. Single-device only.
+            activation_function: Activation applied to the gate output.
+            swiglu_limit: Optional SwiGLU clamp limit (0 disables clamping).
+            is_sharding: Disable weight creation during sharding.
+        """
+        super().__init__()
+        if len(devices) != 1:
+            raise ValueError(
+                f"FusedMLP requires exactly one device, got {len(devices)}"
+            )
+        self.devices = devices
+        self.num_devices = len(devices)
+        self.hidden_dim = hidden_dim
+        self.feed_forward_length = feed_forward_length
+        self.swiglu_limit = swiglu_limit
+        self._activation_function_name = activation_function
+        self.activation_function = activation_function_from_name(
+            activation_function
+        )
+        self._sharding_strategy: ShardingStrategy | None = None
+
+        if not is_sharding:
+            # Byte-layout contract with the engine / weight adapter (row-major):
+            # [gate rows; up rows] -> [2 * feed_forward_length, hidden_dim].
+            self.gate_up_proj_fused = Weight(
+                "gate_up_proj_fused",
+                dtype,
+                [2 * feed_forward_length, hidden_dim],
+                devices[0],
+            )
+            self.down_proj = Linear(
+                in_dim=feed_forward_length,
+                out_dim=hidden_dim,
+                dtype=dtype,
+                device=devices[0],
+            )
+
+    def __call__(self, x: TensorValueLike) -> TensorValue:
+        """Applies the fused MLP transformation to the input."""
+        output = linear(TensorValue(x), self.gate_up_proj_fused)
+        gate_out, up_out = ops.split(
+            output,
+            [self.feed_forward_length, self.feed_forward_length],
+            axis=-1,
+        )
+        gate_out = self.activation_function(gate_out)
+
+        if self.swiglu_limit > 0:
+            lim = ops.constant(
+                self.swiglu_limit, gate_out.dtype, device=gate_out.device
+            )
+            neg_lim = ops.constant(
+                -self.swiglu_limit, up_out.dtype, device=up_out.device
+            )
+            gate_out = ops.min(gate_out, lim)
+            up_out = ops.min(ops.max(up_out, neg_lim), lim)
+
+        return self.down_proj(gate_out * up_out)
+
+    @property
+    def sharding_strategy(self) -> ShardingStrategy | None:
+        """Get the fused MLP sharding strategy."""
+        return self._sharding_strategy
+
+    @sharding_strategy.setter
+    def sharding_strategy(self, strategy: ShardingStrategy) -> None:
+        """Sets the sharding strategy.
+
+        Replication across devices and single-device tensor parallelism are
+        supported. Tensor parallelism across multiple devices is not.
+        """
+        if strategy.is_tensor_parallel and strategy.num_devices != 1:
+            raise ValueError(
+                "FusedMLP does not support tensor parallelism across "
+                f"{strategy.num_devices} devices"
+            )
+        self._sharding_strategy = strategy
+        if strategy.is_replicate:
+            self.gate_up_proj_fused.sharding_strategy = strategy
+            self.down_proj.sharding_strategy = strategy
+        elif strategy.is_tensor_parallel:
+            self.gate_up_proj_fused.sharding_strategy = (
+                ShardingStrategy.rowwise(strategy.num_devices)
+            )
+            self.down_proj.sharding_strategy = ShardingStrategy.columnwise(
+                strategy.num_devices
+            )
+        else:
+            raise ValueError(f"Unsupported sharding strategy: {strategy}")
+
+    def shard(self, devices: Iterable[DeviceRef]) -> list[FusedMLP]:
+        """Creates sharded views of this fused MLP (single-device only).
+
+        Args:
+            devices: Iterable of devices to place the shards on.
+
+        Returns:
+            List of sharded ``FusedMLP`` instances, one per device.
+        """
+        if self.sharding_strategy is None:
+            raise ValueError("Sharding strategy is not set")
+
+        sharded_gate_up = self.gate_up_proj_fused.shard(devices)
+        sharded_down_projs = self.down_proj.shard(devices)
+
+        shards = []
+        for device, gate_up, down_proj in zip(
+            devices, sharded_gate_up, sharded_down_projs, strict=True
+        ):
+            sharded = FusedMLP(
+                dtype=self.gate_up_proj_fused.dtype,
+                hidden_dim=self.hidden_dim,
+                feed_forward_length=self.feed_forward_length,
+                devices=[device],
+                activation_function=self._activation_function_name,
+                swiglu_limit=self.swiglu_limit,
+                is_sharding=True,
+            )
+            sharded.gate_up_proj_fused = gate_up
+            sharded.down_proj = down_proj
             shards.append(sharded)
 
         return shards

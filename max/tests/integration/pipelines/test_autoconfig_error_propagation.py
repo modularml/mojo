@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 from max.pipelines import PIPELINE_REGISTRY
-from max.pipelines.modeling.weights.hf_utils import HuggingFaceRepo
+from max.pipelines.weights.hf_utils import HuggingFaceRepo
 
 
 def test_custom_model_type_surfaces_autoconfig_error(tmp_path: Path) -> None:

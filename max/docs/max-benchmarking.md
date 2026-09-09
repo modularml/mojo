@@ -5,7 +5,7 @@
 > If you're using MAX as an application developer (via the `modular` package),
 > you should instead use the `max benchmark` command line tool—see the more
 > detailed guide to [benchmark MAX on
-> GPUs](https://docs.modular.com/max/deploy/benchmark).
+> GPUs](https://max.modular.com/serve/benchmark/).
 
 This guide describes how to benchmark the performance of a MAX model
 server—measuring throughput, latency, and resource utilization—using
@@ -49,7 +49,7 @@ python benchmark_serving.py --help
 ```
 
 For more information, see the [`max benchmark`
-documentation](/max/cli/benchmark).
+documentation](https://max.modular.com/cli/benchmark).
 
 ## Config files
 
@@ -97,20 +97,22 @@ Benchmark duration (s):                  46.27
 Total input tokens:                      100895
 Total generated tokens:                  106511
 Request throughput (req/s):              10.81
-Input token throughput (tok/s):          2180.51
-Output token throughput (tok/s):         2301.89
----------------Time to First Token----------------
-Mean TTFT (ms):                          15539.31
-Median TTFT (ms):                        15068.37
-P99 TTFT (ms):                           33034.17
------Time per Output Token (excl. 1st token)------
-Mean TPOT (ms):                          34.23
-Median TPOT (ms):                        28.47
-P99 TPOT (ms):                           138.55
----------------Inter-token Latency----------------
-Mean ITL (ms):                           26.76
-Median ITL (ms):                         5.42
-P99 ITL (ms):                            228.45
+------------- Client Experience Metrics -------------
+Total TPM (input+output, whole bench):   268435.20
+Global Cached Token Rate:                12.50%
+------------ Latency & Throughput Percentiles -------------
+┌───────────────────────────┬──────────┬─────────┬──────────┬──────────┬──────────┬──────────┐
+│ Metric                    │     Mean │     Std │      P50 │      P90 │      P95 │      P99 │
+├───────────────────────────┼──────────┼─────────┼──────────┼──────────┼──────────┼──────────┤
+│ TTFT (ms)                 │ 15539.31 │ 4200.50 │ 15068.37 │ 28000.00 │ 31000.00 │ 33034.17 │
+│ TPOT (ms)                 │    34.23 │   18.10 │    28.47 │    60.20 │    95.40 │   138.55 │
+│ ITL (ms)                  │    26.76 │   22.40 │     5.42 │    48.90 │   120.30 │   228.45 │
+│ Request Latency (ms)      │ 20345.10 │ 5120.30 │ 19980.40 │ 30120.50 │ 33450.10 │ 35880.90 │
+│ Input throughput (tok/s)  │  2180.51 │  210.30 │  2200.10 │  1980.40 │  1900.20 │  1820.60 │
+│ Output throughput (tok/s) │  2301.89 │  180.70 │  2320.50 │  2100.30 │  2010.80 │  1950.40 │
+└───────────────────────────┴──────────┴─────────┴──────────┴──────────┴──────────┴──────────┘
+  TPOT = (latency - TTFT) / (output_tokens - 1)
+  Throughput P90/P95/P99 are reversed (bottom 10/5/1%; higher is better)
 -------------------Token Stats--------------------
 Max input tokens:                        933
 Max output tokens:                       806

@@ -19,7 +19,8 @@ from huggingface_hub import constants as hf_hub_constants
 from huggingface_hub import errors as hf_hub_errors
 from max.graph.weights import WeightsFormat
 from max.pipelines.lib import HuggingFaceRepo
-from max.pipelines.modeling.weights.hf_utils import (
+from max.pipelines.weights.hf_utils import (
+    _hf_hub_download_with_retry,
     generate_local_model_path,
     validate_hf_repo_access,
 )
@@ -88,12 +89,12 @@ def test_huggingface_repo__encodings_supported(
 
 
 def test_huggingface_repo__encodings_supported_online_fp8_fallback() -> None:
-    with patch(
-        "max.pipelines.modeling.weights.hf_utils.validate_hf_repo_access"
+    with (
+        patch.object(hf_hub_constants, "HF_HUB_OFFLINE", False),
+        patch("max.pipelines.weights.hf_utils.validate_hf_repo_access"),
     ):
         hf_repo = HuggingFaceRepo(
-            repo_id="RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic",
-            repo_type="online",
+            repo_id="RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic"
         )
 
     with (
@@ -121,7 +122,7 @@ def test_huggingface_repo__encodings_supported_online_fp8_fallback() -> None:
 
 def test_huggingface_repo__get_files_for_encoding(
     tiny_llama_1_1b_chat_v1_0_local_path: str,
-    qwen_32b_preview_local_path: str,
+    qwq_32b_local_path: str,
     mistral_nemo_instruct_2407_local_path: str,
 ) -> None:
     # Test a Safetensors repo.
@@ -134,28 +135,25 @@ def test_huggingface_repo__get_files_for_encoding(
 
     # Test a Safetensors repo.
     # Safetensors repo, should not have a valid gguf_architecture.
-    hf_repo = HuggingFaceRepo(repo_id=qwen_32b_preview_local_path)
+    hf_repo = HuggingFaceRepo(repo_id=qwq_32b_local_path)
     files = hf_repo.files_for_encoding("bfloat16")
     assert WeightsFormat.safetensors in files
-    assert len(files[WeightsFormat.safetensors]) == 17
+    assert len(files[WeightsFormat.safetensors]) == 14
     assert sorted(files[WeightsFormat.safetensors]) == [
-        Path("model-00001-of-00017.safetensors"),
-        Path("model-00002-of-00017.safetensors"),
-        Path("model-00003-of-00017.safetensors"),
-        Path("model-00004-of-00017.safetensors"),
-        Path("model-00005-of-00017.safetensors"),
-        Path("model-00006-of-00017.safetensors"),
-        Path("model-00007-of-00017.safetensors"),
-        Path("model-00008-of-00017.safetensors"),
-        Path("model-00009-of-00017.safetensors"),
-        Path("model-00010-of-00017.safetensors"),
-        Path("model-00011-of-00017.safetensors"),
-        Path("model-00012-of-00017.safetensors"),
-        Path("model-00013-of-00017.safetensors"),
-        Path("model-00014-of-00017.safetensors"),
-        Path("model-00015-of-00017.safetensors"),
-        Path("model-00016-of-00017.safetensors"),
-        Path("model-00017-of-00017.safetensors"),
+        Path("model-00001-of-00014.safetensors"),
+        Path("model-00002-of-00014.safetensors"),
+        Path("model-00003-of-00014.safetensors"),
+        Path("model-00004-of-00014.safetensors"),
+        Path("model-00005-of-00014.safetensors"),
+        Path("model-00006-of-00014.safetensors"),
+        Path("model-00007-of-00014.safetensors"),
+        Path("model-00008-of-00014.safetensors"),
+        Path("model-00009-of-00014.safetensors"),
+        Path("model-00010-of-00014.safetensors"),
+        Path("model-00011-of-00014.safetensors"),
+        Path("model-00012-of-00014.safetensors"),
+        Path("model-00013-of-00014.safetensors"),
+        Path("model-00014-of-00014.safetensors"),
     ]
 
     # Test a Safetensors repo, with both shared files and consolidated safetensors
@@ -165,7 +163,7 @@ def test_huggingface_repo__get_files_for_encoding(
     assert Path("consolidated.safetensors") not in files
 
     # Test a Safetensors repo, with the wrong encoding requested.
-    hf_repo = HuggingFaceRepo(repo_id=qwen_32b_preview_local_path)
+    hf_repo = HuggingFaceRepo(repo_id=qwq_32b_local_path)
     files = hf_repo.files_for_encoding("float32")
     assert len(files) == 0
 
@@ -173,7 +171,7 @@ def test_huggingface_repo__get_files_for_encoding(
 def test_huggingface_repo__encoding_for_file(
     llama_3_1_8b_instruct_local_path: str,
     tiny_llama_1_1b_chat_v1_0_local_path: str,
-    qwen_32b_preview_local_path: str,
+    qwq_32b_local_path: str,
 ) -> None:
     # This repo, has one safetensors file, and its a bf16 file.
     hf_repo = HuggingFaceRepo(repo_id=tiny_llama_1_1b_chat_v1_0_local_path)
@@ -181,9 +179,9 @@ def test_huggingface_repo__encoding_for_file(
     assert model_encoding == "bfloat16"
 
     # This repo, has many safetensors file, and they are bf16.
-    hf_repo = HuggingFaceRepo(repo_id=qwen_32b_preview_local_path)
+    hf_repo = HuggingFaceRepo(repo_id=qwq_32b_local_path)
     model_encoding = hf_repo.encoding_for_file(
-        "model-00014-of-00017.safetensors"
+        "model-00014-of-00014.safetensors"
     )
     assert model_encoding == "bfloat16"
 
@@ -208,7 +206,7 @@ class TestValidateHfRepoAccess:
     def test_valid_repo_access_success(self) -> None:
         """Test that valid repository access doesn't raise any exception."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             mock_exists.return_value = True
 
@@ -222,7 +220,7 @@ class TestValidateHfRepoAccess:
     def test_repo_not_exists_raises_value_error(self) -> None:
         """Test that non-existent repository raises ValueError with appropriate message."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             mock_exists.return_value = False
 
@@ -240,7 +238,7 @@ class TestValidateHfRepoAccess:
     ) -> None:
         """Test that GatedRepoError raises ValueError with authentication guidance."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             original_error = hf_hub_errors.GatedRepoError(
                 "Repository is gated", response=MagicMock()
@@ -273,7 +271,7 @@ class TestValidateHfRepoAccess:
     def test_repository_not_found_error_raises_value_error(self) -> None:
         """Test that RepositoryNotFoundError raises ValueError with helpful message."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             original_error = hf_hub_errors.RepositoryNotFoundError(
                 "Repository not found", response=MagicMock()
@@ -296,7 +294,7 @@ class TestValidateHfRepoAccess:
     def test_revision_not_found_error_raises_value_error(self) -> None:
         """Test that RevisionNotFoundError raises ValueError with helpful message."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             original_error = hf_hub_errors.RevisionNotFoundError(
                 "Revision not found", response=MagicMock()
@@ -321,7 +319,7 @@ class TestValidateHfRepoAccess:
     ) -> None:
         """Test that unexpected exceptions raise ValueError with fallback message."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             original_error = ConnectionError("Network timeout")
             mock_exists.side_effect = original_error
@@ -343,7 +341,7 @@ class TestValidateHfRepoAccess:
     def test_entry_not_found_error_raises_value_error(self) -> None:
         """Test that EntryNotFoundError raises ValueError with helpful message."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             original_error = hf_hub_errors.EntryNotFoundError("Entry not found")
             mock_exists.side_effect = original_error
@@ -361,7 +359,7 @@ class TestValidateHfRepoAccess:
     def test_function_calls_repo_exists_with_correct_parameters(self) -> None:
         """Test that the function calls _repo_exists_with_retry with correct parameters."""
         with patch(
-            "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+            "max.pipelines.weights.hf_utils._repo_exists_with_retry"
         ) as mock_exists:
             mock_exists.return_value = True
 
@@ -381,7 +379,7 @@ class TestValidateHfRepoAccess:
 
         for repo_id, revision in test_cases:
             with patch(
-                "max.pipelines.modeling.weights.hf_utils._repo_exists_with_retry"
+                "max.pipelines.weights.hf_utils._repo_exists_with_retry"
             ) as mock_exists:
                 mock_exists.return_value = False
 
@@ -396,7 +394,7 @@ class TestValidateHfRepoAccess:
 class TestGenerateLocalModelPath:
     def test_uses_cached_snapshot_when_available(self) -> None:
         with patch(
-            "max.pipelines.modeling.weights.hf_utils.huggingface_hub.snapshot_download",
+            "max.pipelines.weights.hf_utils.huggingface_hub.snapshot_download",
             return_value="/tmp/cached-model",
         ) as mock_snapshot_download:
             model_path = generate_local_model_path("org/model", "abc123")
@@ -412,7 +410,7 @@ class TestGenerateLocalModelPath:
         with (
             patch.object(hf_hub_constants, "HF_HUB_OFFLINE", False),
             patch(
-                "max.pipelines.modeling.weights.hf_utils.huggingface_hub.snapshot_download",
+                "max.pipelines.weights.hf_utils.huggingface_hub.snapshot_download",
                 side_effect=hf_hub_errors.LocalEntryNotFoundError("cache miss"),
             ) as mock_snapshot_download,
         ):
@@ -433,7 +431,7 @@ class TestGenerateLocalModelPath:
         with (
             patch.object(hf_hub_constants, "HF_HUB_OFFLINE", True),
             patch(
-                "max.pipelines.modeling.weights.hf_utils.huggingface_hub.snapshot_download",
+                "max.pipelines.weights.hf_utils.huggingface_hub.snapshot_download",
                 side_effect=hf_hub_errors.LocalEntryNotFoundError("cache miss"),
             ) as mock_snapshot_download,
         ):
@@ -448,3 +446,88 @@ class TestGenerateLocalModelPath:
             revision="abc123",
             local_files_only=True,
         )
+
+
+class TestLocalPath:
+    def test_online_repo_raises(self) -> None:
+        with (
+            patch.object(hf_hub_constants, "HF_HUB_OFFLINE", False),
+            patch("max.pipelines.weights.hf_utils.validate_hf_repo_access"),
+        ):
+            repo = HuggingFaceRepo(repo_id="org/model")
+
+        assert repo.repo_type == "online"
+        with pytest.raises(ValueError, match="online repo"):
+            _ = repo.local_path
+
+    def test_offline_repo_keeps_hub_id(self) -> None:
+        # Under HF_HUB_OFFLINE the repo resolves from the local cache, but
+        # repo_id stays the hub id so hub and transformers APIs keep working;
+        # the snapshot directory is exposed via local_path.
+        snapshot_dir = "/tmp/hub/models--org--model/snapshots/abc123"
+        with (
+            patch.object(hf_hub_constants, "HF_HUB_OFFLINE", True),
+            patch(
+                "max.pipelines.weights.hf_utils.huggingface_hub.snapshot_download",
+                return_value=snapshot_dir,
+            ),
+        ):
+            repo = HuggingFaceRepo(repo_id="org/model", revision="abc123")
+
+        assert repo.repo_type == "local"
+        assert repo.repo_id == "org/model"
+        assert repo.local_path == snapshot_dir
+
+    def test_offline_repo_weight_files_are_repo_relative(self) -> None:
+        # Weight paths must be stripped of the snapshot directory rather than
+        # the hub id, so downstream code can re-join them onto local_path.
+        with tempfile.TemporaryDirectory() as snapshot_dir:
+            (Path(snapshot_dir) / "model-00001.safetensors").touch()
+            subfolder = Path(snapshot_dir) / "text_encoder"
+            subfolder.mkdir()
+            (subfolder / "model-00002.safetensors").touch()
+            with (
+                patch.object(hf_hub_constants, "HF_HUB_OFFLINE", True),
+                patch(
+                    "max.pipelines.weights.hf_utils.huggingface_hub.snapshot_download",
+                    return_value=snapshot_dir,
+                ),
+            ):
+                repo = HuggingFaceRepo(repo_id="org/model", revision="abc123")
+
+            assert sorted(repo.weight_files[WeightsFormat.safetensors]) == [
+                "model-00001.safetensors",
+                "text_encoder/model-00002.safetensors",
+            ]
+
+    def test_on_disk_repo_returns_repo_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = HuggingFaceRepo(repo_id=temp_dir)
+
+            assert repo.repo_type == "local"
+            assert repo.local_path == temp_dir
+
+
+def test_hf_hub_download_retries_on_racy_cache_entry() -> None:
+    """A racy `.incomplete` FileNotFoundError triggers one force_download retry."""
+    with patch(
+        "max.pipelines.weights.hf_utils.huggingface_hub.hf_hub_download",
+        side_effect=[FileNotFoundError("dangling .incomplete"), "/cache/w.st"],
+    ) as mock_download:
+        result = _hf_hub_download_with_retry(
+            repo_id="org/model", filename="w.st", force_download=False
+        )
+    assert result == "/cache/w.st"
+    assert mock_download.call_args_list[0].kwargs["force_download"] is False
+    assert mock_download.call_args_list[1].kwargs["force_download"] is True
+
+
+def test_hf_hub_download_does_not_retry_offline_miss() -> None:
+    """An offline/uncached miss (LocalEntryNotFoundError) is surfaced at once."""
+    with patch(
+        "max.pipelines.weights.hf_utils.huggingface_hub.hf_hub_download",
+        side_effect=hf_hub_errors.LocalEntryNotFoundError("offline"),
+    ) as mock_download:
+        with pytest.raises(hf_hub_errors.LocalEntryNotFoundError):
+            _hf_hub_download_with_retry(repo_id="org/model", filename="w.st")
+    assert mock_download.call_count == 1

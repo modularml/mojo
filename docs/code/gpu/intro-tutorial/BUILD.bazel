@@ -1,0 +1,28 @@
+load("//bazel:api.bzl", "modular_run_binary_test", "mojo_binary")
+
+package(default_visibility = ["//visibility:private"])
+
+MOJO_SRCS = glob(["*.mojo"])
+
+[
+    mojo_binary(
+        name = src.split(".")[0],
+        srcs = [src],
+        target_compatible_with = ["//:has_gpu"],
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+        ],
+    )
+    for src in MOJO_SRCS
+]
+
+[
+    modular_run_binary_test(
+        name = src.split(".")[0] + "_test",
+        size = "small",
+        binary = src.split(".")[0],
+        tags = ["gpu"],
+    )
+    for src in MOJO_SRCS
+]

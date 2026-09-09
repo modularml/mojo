@@ -2,52 +2,28 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
 
 modular_py_test(
     name = "kv_cache",
-    srcs = glob(
-        ["*.py"],
-        exclude = [
-            "test_disk_tier.py",
-            "test_benchmark_disk_tier.py",
-        ],
-    ),
+    srcs = glob(["*.py"]),
+    per_test_tags = {
+        # Relies on ambient environment, not really hermetic.
+        "test_ucx_env.py": ["skip-external-ci"],
+    },
     deps = [
+        "//max/python/max:_core",
+        "//max/python/max/driver",
         "//max/python/max/dtype",
+        "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gpt_oss",
         "//max/python/max/pipelines/kv_cache",
-    ],
-)
-
-modular_py_test(
-    name = "test_disk_tier",
-    srcs = [
-        "__init__.py",
-        "test_disk_tier.py",
-    ],
-    deps = [
-        "//max/python/max/pipelines/kv_cache",
-        requirement("numpy"),
-    ],
-)
-
-modular_py_test(
-    name = "benchmark_disk_tier",
-    srcs = [
-        "__init__.py",
-        "test_benchmark_disk_tier.py",
-    ],
-    tags = [
-        "manual",
-    ],
-    deps = [
-        "//max/python/max/pipelines/kv_cache",
-        requirement("numpy"),
-        requirement("pytest-benchmark"),
+        "//max/python/max/pipelines/kv_cache:nixl_backend",
+        "//max/python/max/pipelines/lib",
+        requirement("msgspec"),
     ],
 )

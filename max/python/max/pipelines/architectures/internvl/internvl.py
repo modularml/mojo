@@ -43,7 +43,7 @@ from max.nn.comm import Allreduce
 from max.nn.embedding import VocabParallelEmbedding
 from max.nn.kernels import flash_attention_gpu
 from max.nn.kv_cache import PagedCacheValues
-from max.nn.layer import LayerList, Module, Shardable
+from max.nn.layer import LayerList, Module, Shardable, SubgraphInput
 from max.nn.linear import MLP, ColumnParallelLinear, Linear
 from max.nn.norm import LayerNorm, RMSNorm
 from max.nn.rotary_embedding import DynamicRotaryEmbedding
@@ -68,29 +68,6 @@ class DeviceAttentionParams:
     device_heads: int
     head_start: int
     head_dim: int
-
-
-def _unpack_kv_collections(
-    kv_collections: Sequence[PagedCacheValues],
-) -> tuple[
-    list[BufferValue],
-    list[TensorValue],
-    list[TensorValue],
-    list[TensorValue],
-    list[TensorValue],
-]:
-    """Split ``PagedCacheValues`` into flat tensor lists for subgraph inputs."""
-    return (
-        [kv.kv_blocks for kv in kv_collections],
-        [kv.cache_lengths for kv in kv_collections],
-        [kv.lookup_table for kv in kv_collections],
-        [kv.max_lengths for kv in kv_collections],
-        [
-            kv.attention_dispatch_metadata
-            for kv in kv_collections
-            if kv.attention_dispatch_metadata is not None
-        ],
-    )
 
 
 class InternVLDecoderLayer(Module):
@@ -194,11 +171,7 @@ class InternVLDecoderLayer(Module):
         layer_idx: TensorValue,
         xs: list[TensorValue],
         signal_buffers: list[BufferValue],
-        kv_blocks: list[BufferValue],
-        kv_cache_lengths: list[TensorValue],
-        kv_lookup_table: list[TensorValue],
-        kv_max_lengths: list[TensorValue],
-        kv_dispatch_metadata: list[TensorValue],
+        kv_collections: list[PagedCacheValues],
         freqs_cis: list[TensorValue],
         input_row_offsets: list[TensorValue],
     ) -> list[TensorValue]:
@@ -208,11 +181,7 @@ class InternVLDecoderLayer(Module):
             layer_idx: The index of this layer in the model.
             xs: The input hidden states, one per device.
             signal_buffers: Communication buffers for distributed execution.
-            kv_blocks: Paged KV cache blocks, one per device.
-            kv_cache_lengths: Per-device cache length tensors.
-            kv_lookup_table: Per-device cache lookup tables.
-            kv_max_lengths: Per-device max-length tensors.
-            kv_dispatch_metadata: Per-device attention dispatch metadata.
+            kv_collections: Per-device paged KV cache values.
             freqs_cis: Per-device RoPE frequencies.
             input_row_offsets: Offsets for flattened input sequences.
 
@@ -224,27 +193,6 @@ class InternVLDecoderLayer(Module):
             norm_shard(x)
             for norm_shard, x in zip(
                 self.input_layernorm_shards, xs, strict=True
-            )
-        ]
-
-        # Re-pack KV cache tensors into PagedCacheValues so the attention
-        # layer can consume them. Subgraphs only accept flat Values as
-        # arguments, so the caller unpacks into the constituent tensors.
-        kv_collections = [
-            PagedCacheValues(
-                kv_blocks=kv_block,
-                cache_lengths=cache_lengths,
-                lookup_table=lookup_table,
-                max_lengths=max_lengths,
-                attention_dispatch_metadata=dispatch_metadata,
-            )
-            for kv_block, cache_lengths, lookup_table, max_lengths, dispatch_metadata in zip(
-                kv_blocks,
-                kv_cache_lengths,
-                kv_lookup_table,
-                kv_max_lengths,
-                kv_dispatch_metadata,
-                strict=True,
             )
         ]
 
@@ -419,31 +367,18 @@ class InternVLLanguageModel(DistributedLogitsPostprocessMixin, Module):
         # Create position embeddings shared across the decoder layers.
         freqs_cis = [self.rope.freqs_cis.to(device) for device in self.devices]
 
-        # Subgraphs only accept flat Values, so unpack PagedCacheValues into
-        # constituent tensors and re-pack inside each decoder layer.
-        (
-            kv_blocks,
-            kv_cache_lengths,
-            kv_lookup_table,
-            kv_max_lengths,
-            dispatch_metadata_tensors,
-        ) = _unpack_kv_collections(kv_collections)
-
         signal_buffers_list = list(signal_buffers)
         input_row_offsets_list = list(input_row_offsets)
+        kv_collections_list = list(kv_collections)
 
         def inputs_for_layer(
             idx: int, h: list[TensorValue]
-        ) -> list[Value[Any] | Sequence[Value[Any]]]:
+        ) -> list[SubgraphInput]:
             return [
                 ops.constant(idx, DType.uint32, device=DeviceRef.CPU()),
                 h,
                 signal_buffers_list,
-                kv_blocks,
-                kv_cache_lengths,
-                kv_lookup_table,
-                kv_max_lengths,
-                dispatch_metadata_tensors,
+                kv_collections_list,
                 freqs_cis,
                 input_row_offsets_list,
             ]

@@ -149,13 +149,13 @@ def calculate_num_patches_for_image(
 
     # Calculate the existing image aspect ratio.
     target_ratios = list(
-        set(
+        {
             (i, j)
             for n in range(min_num, max_num + 1)
             for i in range(1, n + 1)
             for j in range(1, n + 1)
             if min_num <= i * j <= max_num
-        )
+        }
     )
     target_ratios = sorted(target_ratios, key=lambda x: x[0] * x[1])
 
@@ -211,13 +211,13 @@ def crop_into_patches(
 
     # Calculate the existing image aspect ratio.
     target_ratios = list(
-        set(
+        {
             (i, j)
             for n in range(min_num, max_num + 1)
             for i in range(1, n + 1)
             for j in range(1, n + 1)
             if min_num <= i * j <= max_num
-        )
+        }
     )
     target_ratios = sorted(target_ratios, key=lambda x: x[0] * x[1])
 
@@ -569,7 +569,10 @@ class InternVLTokenizer(TextAndVisionTokenizer):
         )
 
         # Initialize default EOS token IDs (required by parent class new_context method)
-        self._default_eos_token_ids = set([self.eos])
+        eos_token_id = self.delegate.eos_token_id
+        self._eos_token_ids = (
+            {eos_token_id} if eos_token_id is not None else set()
+        )
 
         self._reasoning_parser_name: str | None = (
             pipeline_config.runtime.reasoning_parser

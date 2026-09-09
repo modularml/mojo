@@ -21,8 +21,14 @@ struct COOMatrix(DevicePassable, TrivialRegisterPassable):
     var numNonzeros: Int
     var numRows: Int
     var numCols: Int
+
+    @__allow_legacy_any_origin_fields
     var rowIdx: UnsafePointer[UInt32, MutAnyOrigin]
+
+    @__allow_legacy_any_origin_fields
     var colIdx: UnsafePointer[UInt32, MutAnyOrigin]
+
+    @__allow_legacy_any_origin_fields
     var value: UnsafePointer[Float32, MutAnyOrigin]
 
     def _to_device_type(
@@ -56,8 +62,14 @@ struct CSRMatrix(DevicePassable, TrivialRegisterPassable):
     var numRows: Int
     var numCols: Int
     var numNonzeros: Int
+
+    @__allow_legacy_any_origin_fields
     var rowPtrs: UnsafePointer[UInt32, MutAnyOrigin]
+
+    @__allow_legacy_any_origin_fields
     var colIdx: UnsafePointer[UInt32, MutAnyOrigin]
+
+    @__allow_legacy_any_origin_fields
     var value: UnsafePointer[Float32, MutAnyOrigin]
 
     def _to_device_type(
@@ -91,7 +103,11 @@ struct ELLMatrix(DevicePassable, TrivialRegisterPassable):
     var numRows: Int
     var numCols: Int
     var nnzPerRow: Int
+
+    @__allow_legacy_any_origin_fields
     var colIdx: UnsafePointer[UInt32, MutAnyOrigin]
+
+    @__allow_legacy_any_origin_fields
     var value: UnsafePointer[Float32, MutAnyOrigin]
 
     def _to_device_type(
@@ -123,8 +139,14 @@ struct CSCMatrix(DevicePassable, TrivialRegisterPassable):
     var numRows: Int
     var numCols: Int
     var numNonzeros: Int
+
+    @__allow_legacy_any_origin_fields
     var colPtrs: UnsafePointer[UInt32, MutAnyOrigin]
+
+    @__allow_legacy_any_origin_fields
     var rowIdxs: UnsafePointer[UInt32, MutAnyOrigin]
+
+    @__allow_legacy_any_origin_fields
     var values: UnsafePointer[Float32, MutAnyOrigin]
 
     def _to_device_type(
@@ -184,12 +206,12 @@ def generate_sparse_matrix(
             if random_float64() > Float64(sparsity):
                 row_idx.append(UInt32(r))
                 col_idx.append(UInt32(c))
-                values.append(random_float64().cast[DType.float32]())
+                values.append(random_float64().cast[.float32]())
 
 
 def verify(
     y_ref: List[Float32],
-    d_y: UnsafePointer[Float32, MutAnyOrigin],
+    d_y: UnsafePointer[mut=False, Float32, _],
     rows: Int,
 ) -> Bool:
     var correct = True

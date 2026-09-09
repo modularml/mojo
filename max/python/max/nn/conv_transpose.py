@@ -33,16 +33,25 @@ class ConvTranspose1d(Module):
 
     .. code-block:: python
 
-        conv = nn.ConvTranspose1d(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride,
-            padding,
-            output_padding,
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef
+        from max.nn import ConvTranspose1d
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
+        conv = ConvTranspose1d(
+            length=3,
+            in_channels=64,
+            out_channels=128,
+            dtype=DType.float32,
+            stride=1,
+            padding=0,
+            output_padding=0,
             has_bias=False,
-            name="conv3d_weight",
-            device=DeviceRef.GPU(),
+            name="conv_transpose1d_weight",
+            device=device_ref,
         )
     """
 
@@ -250,16 +259,24 @@ class WeightNormConvTranspose1d(Module):
 
     .. code-block:: python
 
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef
+        from max.nn import WeightNormConvTranspose1d
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
         conv = WeightNormConvTranspose1d(
-            length=kernel_size,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            dtype=dtype,
-            stride=stride,
-            padding=padding,
-            output_padding=output_padding,
+            length=3,
+            in_channels=64,
+            out_channels=128,
+            dtype=DType.float32,
+            stride=1,
+            padding=0,
+            output_padding=0,
             has_bias=False,
-            device=DeviceRef.GPU(),
+            device=device_ref,
         )
     """
 
@@ -348,7 +365,11 @@ class WeightNormConvTranspose1d(Module):
         self.bias = self.conv.bias
 
         del self.conv.weight
-        del self.conv.bias
+        # ``bias`` is only set as an instance attribute when ``has_bias=True``;
+        # otherwise it resolves to the dataclass class default and cannot be
+        # deleted through the instance.
+        if "bias" in vars(self.conv):
+            del self.conv.bias
 
     def __call__(self, x: TensorValue) -> TensorValue:
         """Apply the weight normalized convolution to input ``x``.

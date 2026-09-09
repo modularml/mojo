@@ -44,10 +44,9 @@ Coverage:
   is a follow-up — see the kernel's docstring).
 """
 
-from std.gpu import barrier
-from std.gpu.host import DeviceContext
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.memory import (
     async_copy_commit_group,
     async_copy_wait_all,
 )
@@ -76,17 +75,17 @@ comptime _BLOCK_DIM = 4
 
 
 def generic_to_shared_to_generic_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Roundtrip a tile through shared memory: GENERIC -> SHARED -> GENERIC."""
     comptime thread_layout = row_major(Idx[2], Idx[2])
 
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
 
     GenericToSharedTileCopier[thread_layout]().copy(smem, src)
     barrier()
@@ -94,8 +93,8 @@ def generic_to_shared_to_generic_kernel(
 
 
 def generic_to_local_to_generic_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Roundtrip a tile through registers: GENERIC -> LOCAL -> GENERIC.
 
@@ -106,17 +105,17 @@ def generic_to_local_to_generic_kernel(
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
     # Per-thread fragment of a 4x4 tile under a 2x2 thread layout.
-    var local = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.LOCAL
-    ](row_major[2, 2]())
+    var local = stack_allocation[dtype=DType.float32, address_space=.LOCAL](
+        row_major[2, 2]()
+    )
 
     GenericToLocalTileCopier[thread_layout]().copy(local, src)
     LocalToGenericTileCopier[thread_layout]().copy(dst, local)
 
 
 def shared_local_shared_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Roundtrip a tile through shared -> local -> shared -> generic.
 
@@ -130,15 +129,15 @@ def shared_local_shared_kernel(
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
 
-    var smem_in = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
-    var smem_out = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
-    var local = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.LOCAL
-    ](row_major[2, 2]())
+    var smem_in = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
+    var smem_out = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
+    var local = stack_allocation[dtype=DType.float32, address_space=.LOCAL](
+        row_major[2, 2]()
+    )
 
     GenericToSharedTileCopier[thread_layout]().copy(smem_in, src)
     barrier()
@@ -149,8 +148,8 @@ def shared_local_shared_kernel(
 
 
 def swizzled_local_to_shared_to_generic_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Swizzled roundtrip: GENERIC -> LOCAL -> SHARED (swizzled) ->
     GENERIC (swizzled).
@@ -167,12 +166,12 @@ def swizzled_local_to_shared_to_generic_kernel(
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
 
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
-    var local = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.LOCAL
-    ](row_major[2, 2]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
+    var local = stack_allocation[dtype=DType.float32, address_space=.LOCAL](
+        row_major[2, 2]()
+    )
 
     GenericToLocalTileCopier[thread_layout]().copy(local, src)
     LocalToSharedTileCopier[thread_layout, swizzle=swizzle]().copy(smem, local)
@@ -181,8 +180,8 @@ def swizzled_local_to_shared_to_generic_kernel(
 
 
 def async_generic_to_shared_to_generic_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Roundtrip a tile through shared memory using `cp.async` for the
     DRAM->SMEM leg: GENERIC -> SHARED (async) -> GENERIC.
@@ -196,9 +195,9 @@ def async_generic_to_shared_to_generic_kernel(
 
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
 
     GenericToSharedAsyncTileCopier[thread_layout]().copy(smem, src)
     async_copy_commit_group()
@@ -208,8 +207,8 @@ def async_generic_to_shared_to_generic_kernel(
 
 
 def async_generic_to_shared_to_generic_8b_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Roundtrip with 8-byte (2x f32) async copies.
 
@@ -221,9 +220,9 @@ def async_generic_to_shared_to_generic_8b_kernel(
 
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
 
     GenericToSharedAsyncTileCopier[thread_layout]().copy(
         smem.vectorize[1, 2](), src.vectorize[1, 2]()
@@ -235,8 +234,8 @@ def async_generic_to_shared_to_generic_8b_kernel(
 
 
 def async_generic_to_shared_to_generic_16b_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Roundtrip with 16-byte (4x f32) async copies.
 
@@ -248,9 +247,9 @@ def async_generic_to_shared_to_generic_16b_kernel(
 
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
 
     GenericToSharedAsyncTileCopier[thread_layout]().copy(
         smem.vectorize[1, 4](), src.vectorize[1, 4]()
@@ -269,8 +268,8 @@ comptime _BF16_NUM_ELEMENTS = _BF16_ROWS * _BF16_COLS
 
 
 def async_generic_to_shared_to_generic_16b_bf16_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin],
+    src_ptr: MutPointer[BFloat16, MutAnyOrigin],
+    dst_ptr: MutPointer[BFloat16, MutAnyOrigin],
 ):
     """Roundtrip with 16-byte (8x bf16) async copies.
 
@@ -284,9 +283,9 @@ def async_generic_to_shared_to_generic_16b_bf16_kernel(
 
     var src = TileTensor(src_ptr, row_major[_BF16_ROWS, _BF16_COLS]())
     var dst = TileTensor(dst_ptr, row_major[_BF16_ROWS, _BF16_COLS]())
-    var smem = stack_allocation[
-        dtype=DType.bfloat16, address_space=AddressSpace.SHARED
-    ](row_major[_BF16_ROWS, _BF16_COLS]())
+    var smem = stack_allocation[dtype=DType.bfloat16, address_space=.SHARED](
+        row_major[_BF16_ROWS, _BF16_COLS]()
+    )
 
     GenericToSharedAsyncTileCopier[thread_layout]().copy(
         smem.vectorize[1, 8](), src.vectorize[1, 8]()
@@ -298,8 +297,8 @@ def async_generic_to_shared_to_generic_16b_bf16_kernel(
 
 
 def masked_async_generic_to_shared_to_generic_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Smoke-test the masked async write path with a fully in-bounds src.
 
@@ -320,9 +319,9 @@ def masked_async_generic_to_shared_to_generic_kernel(
 
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
 
     GenericToSharedAsyncTileCopier[thread_layout, masked=True]().copy(smem, src)
     async_copy_commit_group()
@@ -332,8 +331,8 @@ def masked_async_generic_to_shared_to_generic_kernel(
 
 
 def access_size_swizzled_vectorized_async_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Production-shaped swizzle + vectorize on the async path.
 
@@ -351,9 +350,9 @@ def access_size_swizzled_vectorized_async_kernel(
 
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
 
     GenericToSharedAsyncTileCopier[thread_layout, swizzle=swizzle]().copy(
         smem.vectorize[1, simd_size](),
@@ -369,8 +368,8 @@ def access_size_swizzled_vectorized_async_kernel(
 
 
 def swizzled_async_generic_to_shared_to_generic_kernel(
-    src_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    src_ptr: MutPointer[Float32, MutAnyOrigin],
+    dst_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Swizzled async roundtrip: GENERIC -> SHARED (cp.async, swizzled) ->
     GENERIC (swizzled).
@@ -385,9 +384,9 @@ def swizzled_async_generic_to_shared_to_generic_kernel(
 
     var src = TileTensor(src_ptr, row_major[_N, _N]())
     var dst = TileTensor(dst_ptr, row_major[_N, _N]())
-    var smem = stack_allocation[
-        dtype=DType.float32, address_space=AddressSpace.SHARED
-    ](row_major[_N, _N]())
+    var smem = stack_allocation[dtype=DType.float32, address_space=.SHARED](
+        row_major[_N, _N]()
+    )
 
     GenericToSharedAsyncTileCopier[thread_layout, swizzle=swizzle]().copy(
         smem, src
@@ -400,25 +399,25 @@ def swizzled_async_generic_to_shared_to_generic_kernel(
 
 def _run_roundtrip[
     kernel_fn: def(
-        UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-        UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+        MutPointer[Float32, MutAnyOrigin],
+        MutPointer[Float32, MutAnyOrigin],
     ) thin -> None,
 ](name: String, ctx: DeviceContext) raises:
     print("==", name)
 
-    var src_host = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
+    var src_host = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
     for i in range(_NUM_ELEMENTS):
         src_host[i] = Float32(i + 1)
 
-    var src_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
-    var dst_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
+    var src_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
+    var dst_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
     ctx.enqueue_copy(src_dev, src_host)
 
     ctx.enqueue_function[kernel_fn](
         src_dev, dst_dev, grid_dim=(1), block_dim=(_BLOCK_DIM)
     )
 
-    var dst_host = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
+    var dst_host = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
     ctx.enqueue_copy(dst_host, dst_dev)
     ctx.synchronize()
 
@@ -474,23 +473,19 @@ def test_async_generic_to_shared_to_generic_16b_bf16(
     var name = "test_async_generic_to_shared_to_generic_16b_bf16"
     print("==", name)
 
-    var src_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
-        _BF16_NUM_ELEMENTS
-    )
+    var src_host = ctx.enqueue_create_host_buffer[.bfloat16](_BF16_NUM_ELEMENTS)
     for i in range(_BF16_NUM_ELEMENTS):
         src_host[i] = BFloat16(i + 1)
 
-    var src_dev = ctx.enqueue_create_buffer[DType.bfloat16](_BF16_NUM_ELEMENTS)
-    var dst_dev = ctx.enqueue_create_buffer[DType.bfloat16](_BF16_NUM_ELEMENTS)
+    var src_dev = ctx.enqueue_create_buffer[.bfloat16](_BF16_NUM_ELEMENTS)
+    var dst_dev = ctx.enqueue_create_buffer[.bfloat16](_BF16_NUM_ELEMENTS)
     ctx.enqueue_copy(src_dev, src_host)
 
     ctx.enqueue_function[async_generic_to_shared_to_generic_16b_bf16_kernel](
         src_dev, dst_dev, grid_dim=(1), block_dim=(_BF16_ROWS)
     )
 
-    var dst_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
-        _BF16_NUM_ELEMENTS
-    )
+    var dst_host = ctx.enqueue_create_host_buffer[.bfloat16](_BF16_NUM_ELEMENTS)
     ctx.enqueue_copy(dst_host, dst_dev)
     ctx.synchronize()
 

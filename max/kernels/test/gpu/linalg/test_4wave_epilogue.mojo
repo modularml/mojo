@@ -27,7 +27,7 @@ Compile-time configuration:
 from std.sys import align_of, get_defined_int
 
 from layout import Coord, Idx, TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.utils import IndexList
 import linalg.matmul.vendor.blas as vendor_blas
 from std.testing import assert_equal
@@ -73,7 +73,9 @@ def test_4wave_epilogue[
     var a_tt = TileTensor(device_a, row_major[M, K]())
     var b_tt = TileTensor(device_b, row_major[N, K]())
     var c_tt = TileTensor(device_c, row_major[M, N]())
-    var out_tt = TileTensor(device_out, row_major[M, N]())
+    # Capture the raw pointer: `@__copy_capture` byte-copies, so a
+    # `DeviceBuffer`-backed tile would reach the device as a host reference.
+    var out_tt = TileTensor(device_out.unsafe_ptr(), row_major[M, N]())
 
     ctx.enqueue_memset(device_c_ref, 0)
     var c_ref_tt = TileTensor(device_c_ref, row_major[M, N]())
@@ -90,12 +92,12 @@ def test_4wave_epilogue[
 
     # Capturing lambda: writes the SIMD into `out_tt` at the supplied
     # global coords. 4wave hits this with `width=c_frag_size=4`.
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(out_tt)
     def epilogue_fn[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = align_of[SIMD[_dtype, width]](),
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> None:
@@ -120,7 +122,7 @@ def test_4wave_epilogue[
         var printed = 0
         var max_rel_err = Float32(0.0)
         comptime rel_tol = Float32(0.05) if in_dtype.is_float8() else (
-            Float32(1.6e-2) if in_dtype == DType.bfloat16 else Float32(1e-3)
+            Float32(1.6e-2) if in_dtype == .bfloat16 else Float32(1e-3)
         )
         comptime abs_tol = Float32(0.01) if in_dtype.is_float8() else Float32(
             1e-5
@@ -194,11 +196,11 @@ def main() raises:
         # In-main dtype iteration (HK MHA pattern). One BUILD target
         # per file; three dtype specializations compile into one binary.
         print("-- dtype=float8_e4m3fn --")
-        run_dtype_sweep[DType.float8_e4m3fn](ctx)
+        run_dtype_sweep[.float8_e4m3fn](ctx)
         print("-- dtype=bfloat16 --")
-        run_dtype_sweep[DType.bfloat16](ctx)
+        run_dtype_sweep[.bfloat16](ctx)
         print("-- dtype=float16 --")
-        run_dtype_sweep[DType.float16](ctx)
+        run_dtype_sweep[.float16](ctx)
         print("==== AMD 4-wave epilogue tests passed ====")
 
         print("==== AMD 4-wave epilogue Tests passed ====")

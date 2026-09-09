@@ -14,7 +14,7 @@
 from std.random import rand, randint
 
 from std.benchmark import *
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Coord, TileTensor, row_major
 from nn.gather_scatter import gather_elements
 
@@ -22,17 +22,17 @@ from std.utils.index import Index
 
 
 def bench_gather(mut m: Bench, spec: GatherSpec) raises:
-    @parameter
     @always_inline
-    def bench_gather_wrapper(mut b: Bencher, concrete_spec: GatherSpec) raises:
+    def bench_gather_wrapper(
+        mut b: Bencher, concrete_spec: GatherSpec
+    ) raises {}:
         bench_gather(b, concrete_spec)
 
-    m.bench_with_input[GatherSpec, bench_gather_wrapper](
-        BenchId("gather", String(spec)), spec
+    m.bench_with_input(
+        bench_gather_wrapper, BenchId("gather", String(spec)), spec
     )
 
 
-@parameter
 def bench_gather(mut bencher: Bencher, spec: GatherSpec) raises:
     var index_rand_min = 0
     var index_rand_max = spec.m1 - 1
@@ -62,9 +62,12 @@ def bench_gather(mut bencher: Bencher, spec: GatherSpec) raises:
     var output_tensor = TileTensor(output_ptr, row_major(Coord(indices_shape)))
 
     @always_inline
-    @parameter
-    @__copy_capture(data_tensor, indices_tensor, output_tensor)
-    def bench_fn() raises:
+    def bench_fn() raises {
+        var data_tensor,
+        var indices_tensor,
+        var output_tensor,
+        imm,
+    }:
         gather_elements(
             data_tensor,
             indices_tensor,
@@ -73,7 +76,7 @@ def bench_gather(mut bencher: Bencher, spec: GatherSpec) raises:
             DeviceContext(api="cpu"),
         )
 
-    bencher.iter[bench_fn]()
+    bencher.iter(bench_fn)
 
 
 @fieldwise_init

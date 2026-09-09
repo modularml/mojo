@@ -12,27 +12,27 @@
 # ===----------------------------------------------------------------------=== #
 """Verify FP8 E4M3 → FP16 casts emit paired cvt.rn.f16x2.e4m3x2 on SM100."""
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
 from std.testing import *
 
 
 def fp8_e4m3_to_f16_2(
-    a: SIMD[DType.float8_e4m3fn, 2],
-) -> SIMD[DType.float16, 2]:
-    return a.cast[DType.float16]()
+    a: SIMD[.float8_e4m3fn, 2],
+) -> SIMD[.float16, 2]:
+    return a.cast[.float16]()
 
 
 def fp8_e4m3_to_f16_8(
-    a: SIMD[DType.float8_e4m3fn, 8],
-) -> SIMD[DType.float16, 8]:
-    return a.cast[DType.float16]()
+    a: SIMD[.float8_e4m3fn, 8],
+) -> SIMD[.float16, 8]:
+    return a.cast[.float16]()
 
 
 def fp8_e4m3_to_f32_8(
-    a: SIMD[DType.float8_e4m3fn, 8],
-) -> SIMD[DType.float32, 8]:
-    return a.cast[DType.float32]()
+    a: SIMD[.float8_e4m3fn, 8],
+) -> SIMD[.float32, 8]:
+    return a.cast[.float32]()
 
 
 def test_fp8_e4m3_to_f16_paired_cvt() raises:

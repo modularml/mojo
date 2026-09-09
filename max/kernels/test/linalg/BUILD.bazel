@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "lit_tests", "mojo_filecheck_test", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -29,17 +30,13 @@ _EXTRA_CONSTRAINTS = {
         "//:asan": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
-    "test_transpose.mojo": select({
-        # TODO: causes leak in elaborator
-        "//:asan": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
 }
 
 [
     mojo_filecheck_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         target_compatible_with = _EXTRA_CONSTRAINTS.get(src, []),
         deps = [
             "//max:internal_utils",
@@ -54,6 +51,7 @@ _EXTRA_CONSTRAINTS = {
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         target_compatible_with = _EXTRA_CONSTRAINTS.get(src, []),
         deps = [
             "//max:internal_utils",

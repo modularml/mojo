@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -10,7 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-#!/usr/bin/env python3
 
 """Unified setup script for prefill & grouped GEMM benchmarks.
 
@@ -653,7 +653,7 @@ def ensure_max_venv() -> Path:
     env = os.environ.copy()
     env.setdefault("MAX_JOBS", str(DEFAULT_MAX_JOBS))
     sh(
-        ["./bazelw", "run", "//max/python/max/entrypoints:pipelines.venv"],
+        ["./bazelw", "run", "//max/python/max/_entrypoints:pipelines.venv"],
         env=env,
         cwd=str(REPO_ROOT),
     )

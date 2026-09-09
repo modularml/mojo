@@ -9,7 +9,6 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -24,11 +23,10 @@ modular_py_test(
         requirement("jinja2"),
     ],
     tags = [
-        "no-sandbox",
         "requires-network",
     ],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/internvl",
         "//max/python/max/pipelines/modeling",
         requirement("pillow"),
         requirement("pytest-asyncio"),

@@ -20,7 +20,7 @@ from types import TracebackType
 from typing import Annotated, Any, Protocol, runtime_checkable
 
 from . import _bindtools
-from ._types import ClockStats, GPUStats, MemoryStats, UtilizationStats
+from .types import ClockStats, GPUStats, MemoryStats, UtilizationStats
 
 _rsmi_status_t = Annotated[int, ctypes.c_int]
 _rsmi_memory_type_t = Annotated[int, ctypes.c_int]

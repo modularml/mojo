@@ -15,10 +15,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from max.graph.weights import WeightData
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
+from max.pipelines.modeling.config_enums import SupportedEncoding
 from transformers import AutoConfig
 
 from ..llama3.model_config import Llama3Config
@@ -29,6 +30,12 @@ DEFAULT_ROPE_THETA = 10000.0
 @dataclass(kw_only=True)
 class LFM2Config(Llama3Config):
     """Model configuration for LFM2 graph construction/execution."""
+
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "float32"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "float32",
+        "bfloat16",
+    }
 
     layer_types: list[str] = field(default_factory=list)
     conv_L_cache: int = 3
@@ -87,10 +94,15 @@ class LFM2Config(Llama3Config):
         pipeline_config: Any,
         huggingface_config: AutoConfig,
         model_config: Any = None,
+        *,
+        max_seq_len: int,
     ) -> LFM2Config:
         cls._ensure_optional_rope_fields(huggingface_config)
         cfg = super().initialize_from_config(
-            pipeline_config, huggingface_config, model_config
+            pipeline_config,
+            huggingface_config,
+            model_config,
+            max_seq_len=max_seq_len,
         )
         cfg.layer_types = list(getattr(huggingface_config, "layer_types", []))
         cfg.conv_L_cache = int(getattr(huggingface_config, "conv_L_cache", 3))
@@ -131,6 +143,13 @@ class LFM2Config(Llama3Config):
         )
         self.norm_method = "rms_norm"
         self.rms_norm_eps = float(getattr(huggingface_config, "norm_eps", 1e-5))
+        # transformers >= 5 folds LiquidAI's custom `tie_embedding` config key
+        # into the standard `tie_word_embeddings` field (and drops the original),
+        # so read that first and fall back to the legacy key for older versions.
         self.tie_word_embeddings = bool(
-            getattr(huggingface_config, "tie_embedding", False)
+            getattr(
+                huggingface_config,
+                "tie_word_embeddings",
+                getattr(huggingface_config, "tie_embedding", False),
+            )
         )

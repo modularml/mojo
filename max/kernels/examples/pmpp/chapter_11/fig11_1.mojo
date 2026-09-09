@@ -14,8 +14,8 @@
 
 # ========================== CPU CODE ==========================
 def sequential_scan(
-    input: UnsafePointer[Float32, MutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
+    input: UnsafePointer[mut=False, Float32, _],
+    output: UnsafePointer[mut=True, Float32, _],
     N: UInt32,
 ):
     """Sequential scan (inclusive scan) on CPU.

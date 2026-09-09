@@ -14,8 +14,8 @@
 
 import std.sys
 
-from std.gpu import thread_idx
-from std.gpu.host.compile import _compile_code, get_gpu_target
+from max.gpu import thread_idx
+from max.gpu.host.compile import _compile_code, get_gpu_target
 from layout.tile_layout import Layout
 from layout import Coord, Idx
 from std.testing import assert_true
@@ -49,13 +49,13 @@ def test_codegen_memory[
     assert_true("ld.local" not in nvidia_asm and "st.local" not in nvidia_asm)
 
 
-def kernel_mixed_dimensions(x: Int, ptr: UnsafePointer[Int32, MutAnyOrigin]):
+def kernel_mixed_dimensions(x: Int, ptr: MutPointer[Int32, MutAnyOrigin]):
     # Create layout with mixed compile-time and runtime dimensions
     var layout = Layout(shape=(Idx[8], x), stride=(x, Idx[1]))
     ptr[0] = Int32(layout(Coord(Idx[0], x - 1)))
 
 
-def kernel_thread_idx(ptr: UnsafePointer[Int32, MutAnyOrigin]):
+def kernel_thread_idx(ptr: MutPointer[Int32, MutAnyOrigin]):
     comptime layout = Layout(shape=(Idx[8], Idx[2]), stride=(Idx[1], Idx[1]))
     ptr[0] = Int32(layout(Coord(thread_idx.x, thread_idx.y)))
 

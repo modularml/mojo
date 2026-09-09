@@ -11,59 +11,49 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Placement rules for normalization."""
+"""Placement rules for ``layer_norm`` and ``rms_norm``."""
 
 from __future__ import annotations
 
-from max.experimental.sharding.mappings import PlacementMapping
-from max.experimental.sharding.placements import (
-    Partial,
-    Replicated,
-    Sharded,
-)
+from max.experimental.sharding.placements import Sharded
 from max.experimental.sharding.types import TensorLayout
 
-from ._common import RuleSignature, is_replicated, replicated_mapping
+from ..action import ActionSet, AxisAssignment
+from ..cost import R, build_action_set
 
 
-def normalization_rule(
-    x: TensorLayout,
-    weight: TensorLayout,
-    *args: object,
-) -> RuleSignature:
-    """Placement rule for normalization: rejects sharded norm dimensions."""
-    # weight placement must be replicated.
-    weight_placements = weight.mapping.to_placements()
-    if any(not is_replicated(p) for p in weight_placements):
-        raise ValueError(
-            f"Normalization: weight must be replicated, but got {weight_placements}"
-        )
-
-    x_placements = x.mapping.to_placements()
-    suggested_x_placements = tuple(
-        Replicated() if isinstance(p, Partial) else p for p in x_placements
+def layer_norm_rule(
+    input: TensorLayout,
+    gamma: TensorLayout,
+    beta: TensorLayout,
+    epsilon: float,
+) -> ActionSet:
+    """Strategies for ``layer_norm``: shard only on leading (pre-norm) axes."""
+    leading = range(input.rank - gamma.rank)
+    rows = [
+        AxisAssignment((R, R, R), R),
+        *(AxisAssignment((Sharded(d), R, R), Sharded(d)) for d in leading),
+    ]
+    return build_action_set(
+        rows, layouts=(input, gamma, beta), extras=(epsilon,)
     )
 
-    norm_start = x.rank - weight.rank
-    for p in suggested_x_placements:
-        if isinstance(p, Sharded) and p.axis >= norm_start:
-            raise ValueError(
-                f"layer_norm: cannot normalize along sharded axis "
-                f"{p.axis}. Gather first or shard a different axis."
-            )
 
-    mesh = x.mapping.mesh
-    suggested_x_mapping = PlacementMapping(mesh, suggested_x_placements)
-
-    suggested_weight_mapping = replicated_mapping(weight.mapping, mesh)
-
-    suggested_args: list[object] = []
-    for arg in args:
-        if isinstance(arg, TensorLayout):
-            suggested_args.append(replicated_mapping(arg.mapping, mesh))
-        else:
-            suggested_args.append(arg)
-
-    return (suggested_x_mapping, suggested_weight_mapping, *suggested_args), (
-        suggested_x_mapping,
+def rms_norm_rule(
+    input: TensorLayout,
+    weight: TensorLayout,
+    epsilon: float,
+    weight_offset: float = 0.0,
+    multiply_before_cast: bool = False,
+) -> ActionSet:
+    """Strategies for ``rms_norm``: shard only on leading (pre-norm) axes."""
+    leading = range(input.rank - weight.rank)
+    rows = [
+        AxisAssignment((R, R), R),
+        *(AxisAssignment((Sharded(d), R), Sharded(d)) for d in leading),
+    ]
+    return build_action_set(
+        rows,
+        layouts=(input, weight),
+        extras=(epsilon, weight_offset, multiply_before_cast),
     )

@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol
+from typing import Protocol
 
 from max.dtype import DType
 from max.graph import (
@@ -23,14 +23,13 @@ from max.graph import (
     ShardingStrategy,
     TensorValue,
     TensorValueLike,
-    Value,
     ops,
 )
 from max.nn.comm.allreduce import Allreduce
 
 from ..embedding import VocabParallelEmbedding
 from ..kv_cache import KVCacheParams, PagedCacheValues
-from ..layer import LayerList, Module, Shardable
+from ..layer import LayerList, Module, Shardable, SubgraphInput
 from ..linear import ColumnParallelLinear
 from ..rotary_embedding import RotaryEmbedding
 from .transformer import (
@@ -52,15 +51,17 @@ def distributed_logits_postprocess(
     h: Sequence[TensorValue],
     input_row_offsets: Sequence[TensorValue],
     return_n_logits: TensorValue,
-    norm_shards: Sequence[Callable[[TensorValue], TensorValue]],
     lm_head: Callable[
         [list[TensorValue], Sequence[BufferValue]], Sequence[TensorValue]
     ],
     signal_buffers: Sequence[BufferValue],
     return_logits: ReturnLogits,
     device: DeviceRef,
+    norm_shards: Sequence[Callable[[TensorValue], TensorValue]] | None = None,
     return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
     logits_scaling: float = 1.0,
+    logit_softcapping: float | None = None,
+    capture_hidden_states: list[list[TensorValue]] | None = None,
 ) -> tuple[TensorValue, ...]:
     """Common logits postprocessing for multi-device sharded models.
 
@@ -72,26 +73,37 @@ def distributed_logits_postprocess(
         h: Per-device hidden states from the final transformer layer.
         input_row_offsets: Per-device row offsets for ragged batching.
         return_n_logits: Number of logits to return per sequence.
-        norm_shards: Per-device normalization functions.
         lm_head: Language model head (takes per-device inputs + signal buffers).
         signal_buffers: Signal buffers for collective operations.
         return_logits: Which logits to return.
         device: Primary device for scalar ops (e.g. ops.range).
+        norm_shards: Per-device normalization functions. When None, hidden
+            states are passed directly to lm_head without normalization.
         return_hidden_states: Which hidden states to return.
         logits_scaling: Scaling factor for logits.
+        capture_hidden_states: For ``SELECTED_LAYERS`` mode, the per-layer
+            captured hidden states gathered during the layer loop. See
+            :func:`extract_hs`.
 
     Returns:
         Tuple of (last_logits, [logits, offsets], [hidden_states]).
     """
+
+    def _maybe_norm(
+        tensors: Sequence[TensorValue],
+    ) -> list[TensorValue]:
+        if norm_shards is not None:
+            return forward_sharded_layers(norm_shards, tensors)
+        return list(tensors)
+
     # Gather last tokens per device and compute last-token logits.
     last_token_indices = [offsets[1:] - 1 for offsets in input_row_offsets]
     last_token_h = [
         ops.gather(h_device, indices, axis=0)
         for h_device, indices in zip(h, last_token_indices, strict=True)
     ]
-    norm_last_token = forward_sharded_layers(norm_shards, last_token_h)
     last_logits = ops.cast(
-        lm_head(norm_last_token, signal_buffers)[0],
+        lm_head(_maybe_norm(last_token_h), signal_buffers)[0],
         DType.float32,
     )
 
@@ -99,43 +111,42 @@ def distributed_logits_postprocess(
     offsets = None
 
     if return_logits == ReturnLogits.VARIABLE and h:
-        return_range = ops.range(
-            start=return_n_logits[0],
-            stop=0,
-            step=-1,
-            out_dim="return_n_logits_range",
-            dtype=DType.int64,
-            device=device,
-        )
         last_indices = [
             ops.reshape(
-                ops.unsqueeze(row_offset[1:], -1) - return_range,
+                ops.unsqueeze(row_offset[1:], -1)
+                - ops.range(
+                    start=return_n_logits[0],
+                    stop=0,
+                    step=-1,
+                    out_dim="return_n_logits_range",
+                    dtype=DType.int64,
+                    device=row_offset.device,
+                ),
                 shape=(-1,),
             )
             for row_offset in input_row_offsets
         ]
 
-        variable_tokens = [
-            norm(ops.gather(h_device, indices, axis=0))
-            for norm, h_device, indices in zip(
-                norm_shards, h, last_indices, strict=True
-            )
-        ]
+        variable_tokens = _maybe_norm(
+            [
+                ops.gather(h_device, indices, axis=0)
+                for h_device, indices in zip(h, last_indices, strict=True)
+            ]
+        )
         logits = ops.cast(
             lm_head(variable_tokens, signal_buffers)[0], DType.float32
         )
         offsets = ops.range(
             0,
-            last_indices[0].shape[0] + return_n_logits[0],
+            TensorValue(last_indices[0].shape[0]) + return_n_logits[0],
             return_n_logits[0],
             out_dim="logit_offsets",
             dtype=DType.int64,
             device=device,
         )
     elif return_logits == ReturnLogits.ALL and h:
-        all_normalized = forward_sharded_layers(norm_shards, h)
         logits = ops.cast(
-            lm_head(all_normalized, signal_buffers)[0], DType.float32
+            lm_head(_maybe_norm(h), signal_buffers)[0], DType.float32
         )
         offsets = input_row_offsets[0]
 
@@ -143,6 +154,14 @@ def distributed_logits_postprocess(
         last_logits = last_logits / logits_scaling
         if logits is not None:
             logits = logits / logits_scaling
+
+    if logit_softcapping is not None:
+        # Softcap: cap * tanh(logits / cap), bounding logits to (-cap, cap).
+        last_logits = ops.tanh(last_logits / logit_softcapping) * (
+            logit_softcapping
+        )
+        if logits is not None:
+            logits = ops.tanh(logits / logit_softcapping) * logit_softcapping
 
     ret_val: tuple[TensorValue, ...] = (last_logits,)
     if offsets is not None:
@@ -154,6 +173,7 @@ def distributed_logits_postprocess(
         last_token_hs_distributed=last_token_h,
         all_hs_distributed=h,
         normalizer=norm_shards,
+        capture_hidden_states=capture_hidden_states,
     )
     return ret_val
 
@@ -173,6 +193,7 @@ class DistributedLogitsPostprocessMixin:
     devices: list[DeviceRef]
     return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE
     logits_scaling: float = 1.0
+    logit_softcapping: float | None = None
 
     def _postprocess_logits(
         self,
@@ -180,6 +201,7 @@ class DistributedLogitsPostprocessMixin:
         input_row_offsets: Sequence[TensorValue],
         return_n_logits: TensorValue,
         signal_buffers: Sequence[BufferValue],
+        capture_hidden_states: list[list[TensorValue]] | None = None,
     ) -> tuple[TensorValue, ...]:
         return distributed_logits_postprocess(
             h,
@@ -192,6 +214,8 @@ class DistributedLogitsPostprocessMixin:
             device=self.devices[0],
             return_hidden_states=self.return_hidden_states,
             logits_scaling=self.logits_scaling,
+            logit_softcapping=self.logit_softcapping,
+            capture_hidden_states=capture_hidden_states,
         )
 
 
@@ -237,37 +261,12 @@ class DistributedTransformerBlock(Module):
         layer_idx: TensorValue,
         xs: list[TensorValue],
         signal_buffers: list[BufferValue],
-        kv_blocks: list[BufferValue],
-        kv_cache_lengths: list[TensorValue],
-        kv_lookup_table: list[TensorValue],
-        kv_max_lengths: list[TensorValue],
-        kv_dispatch_metadata: list[TensorValue],
+        kv_collections: list[PagedCacheValues],
         freqs_cis: list[TensorValue],
         input_row_offsets: list[TensorValue],
     ) -> list[TensorValue]:
         # Apply input layer norm to each shard
         norm_xs = forward_sharded_layers(self.input_layernorm_shards, xs)
-
-        # We have to unpack our PagedCacheValues into constituent parts so
-        # subgraphs have only max.graph.Values as arguments.
-        # Re-pack those arguments into a nice structured type.
-        kv_collections = [
-            PagedCacheValues(
-                kv_blocks=kv_block,
-                cache_lengths=cache_lengths,
-                lookup_table=lookup_table,
-                max_lengths=max_lengths,
-                attention_dispatch_metadata=dispatch_metadata,
-            )
-            for kv_block, cache_lengths, lookup_table, max_lengths, dispatch_metadata in zip(
-                kv_blocks,
-                kv_cache_lengths,
-                kv_lookup_table,
-                kv_max_lengths,
-                kv_dispatch_metadata,
-                strict=True,
-            )
-        ]
 
         attn_outs = self.self_attn(
             layer_idx,
@@ -350,38 +349,14 @@ class DistributedTransformer(DistributedLogitsPostprocessMixin, Module):
             input_row_offsets.to(self.devices[0]), signal_buffers
         )
 
-        dispatch_metadata_tensors: list[TensorValue] = []
-        for kv_collection in kv_collections:
-            assert kv_collection.attention_dispatch_metadata is not None
-            dispatch_metadata_tensors.append(
-                kv_collection.attention_dispatch_metadata
-            )
-
-        kv_blocks = [
-            kv_collection.kv_blocks for kv_collection in kv_collections
-        ]
-        kv_cache_lengths = [
-            kv_collection.cache_lengths for kv_collection in kv_collections
-        ]
-        kv_lookup_table = [
-            kv_collection.lookup_table for kv_collection in kv_collections
-        ]
-        kv_max_lengths = [
-            kv_collection.max_lengths for kv_collection in kv_collections
-        ]
-
         def inputs_for_layer(
             idx: int, h: list[TensorValue]
-        ) -> list[Value[Any] | Sequence[Value[Any]]]:
+        ) -> list[SubgraphInput]:
             return [
                 ops.constant(idx, DType.uint32, device=DeviceRef.CPU()),
                 h,
                 signal_buffers,
-                kv_blocks,
-                kv_cache_lengths,
-                kv_lookup_table,
-                kv_max_lengths,
-                dispatch_metadata_tensors,
+                kv_collections,
                 freqs_cis,
                 input_row_offsets_per_device,
             ]

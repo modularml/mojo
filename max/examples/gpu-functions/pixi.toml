@@ -1,0 +1,19 @@
+[workspace]
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+description = "Examples of using Mojo to write GPU functions"
+name = "Mojo GPU Functions"
+platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
+version = "0.1.0"
+
+[tasks]
+vector_addition = "mojo run vector_addition.mojo"
+grayscale = "mojo run grayscale.mojo"
+naive_matrix_multiplication = "mojo run naive_matrix_multiplication.mojo"
+mandelbrot = "mojo run mandelbrot.mojo"
+reduction = "mojo run reduction.mojo"
+test = { depends-on = ["vector_addition", "grayscale", "naive_matrix_multiplication", "mandelbrot"] }
+
+[dependencies]
+mojo = "*"
+max = "*"

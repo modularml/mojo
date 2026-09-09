@@ -15,7 +15,10 @@
 
 from __future__ import annotations
 
+import contextvars
 import math
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from max.driver import CPU, Device
@@ -23,15 +26,7 @@ from max.driver import CPU, Device
 
 @dataclass(frozen=True)
 class DeviceMesh:
-    """An N-dimensional logical grid of devices.
-
-    Args:
-        devices: A flat tuple of devices in row-major order.
-        mesh_shape: The shape of the logical grid (for example, ``(2, 4)``
-            for DP=2, TP=4).
-        axis_names: The human-readable names for each axis (for example,
-            ``("dp", "tp")``).
-    """
+    """An N-dimensional logical grid of devices."""
 
     devices: tuple[Device, ...]
     """The devices in the mesh, in row-major order."""
@@ -60,10 +55,6 @@ class DeviceMesh:
             raise ValueError(
                 f"axis_names must be unique, got {self.axis_names}"
             )
-        # Device homogeneity: either all devices are the same physical
-        # device (simulated multi-device on one CPU/GPU) or all devices
-        # are distinct (real multi-device).  Mixed meshes (some repeated,
-        # some different) are not supported.
         if len(self.devices) > 1:
             unique = set(self.devices)
             n_unique = len(unique)
@@ -88,15 +79,8 @@ class DeviceMesh:
     def axis_size(self, axis: str | int) -> int:
         """Returns the size of a mesh axis by name or index.
 
-        Args:
-            axis: The mesh axis to look up, either by name or by integer
-                index.
-
-        Returns:
-            The number of devices along the requested axis.
-
         Raises:
-            ValueError: If ``axis`` is a name that doesn't exist on the mesh.
+            ValueError: If ``axis`` is a name not on the mesh.
             IndexError: If ``axis`` is an integer outside ``[0, ndim)``.
         """
         idx = self._resolve_axis(axis)
@@ -157,11 +141,7 @@ class DeviceMesh:
 
     @staticmethod
     def single(device: Device) -> DeviceMesh:
-        """Creates a trivial single-device mesh.
-
-        Args:
-            device: The single device the mesh wraps.
-        """
+        """Creates a trivial single-device mesh."""
         return DeviceMesh(devices=(device,), mesh_shape=(1,), axis_names=("_",))
 
     @staticmethod
@@ -178,7 +158,55 @@ class DeviceMesh:
     def is_simulated(self) -> bool:
         """Returns ``True`` if all mesh slots reference the same device.
 
-        A simulated mesh uses graph-level ops (add, concat, split) to
-        emulate multi-device collectives on a single CPU or GPU.
+        A simulated mesh uses graph-level ops to emulate multi-device
+        collectives on a single CPU or GPU.
         """
         return self.num_devices > 1 and len(set(self.devices)) == 1
+
+
+_active_mesh: contextvars.ContextVar[DeviceMesh | None] = (
+    contextvars.ContextVar("active_mesh", default=None)
+)
+
+
+def get_active_mesh() -> DeviceMesh | None:
+    """Returns the mesh from the current :func:`mesh_context`, or ``None``."""
+    return _active_mesh.get(None)
+
+
+@contextmanager
+def mesh_context(mesh: DeviceMesh) -> Iterator[DeviceMesh]:
+    """Publishes ``mesh`` to spec-first :class:`NamedMapping` constructions.
+
+    JAX-style: when a :class:`NamedMapping` is created without an explicit
+    mesh inside this block, it picks up ``mesh`` from this context and
+    resolves the spec against it.
+
+    .. code-block:: python
+
+        from max.driver import CPU
+        from max.experimental.sharding import (
+            DeviceMesh,
+            get_active_mesh,
+            mesh_context,
+        )
+
+        mesh = DeviceMesh(
+            devices=(CPU(), CPU()), mesh_shape=(2,), axis_names=("tp",)
+        )
+
+        with mesh_context(mesh):
+            # Spec-first constructions inside this block resolve against
+            # ``mesh`` without naming it explicitly.
+            active = get_active_mesh()
+
+    .. invisible-code-block: python
+
+        assert active is mesh
+        assert get_active_mesh() is None  # cleared on block exit
+    """
+    token = _active_mesh.set(mesh)
+    try:
+        yield mesh
+    finally:
+        _active_mesh.reset(token)

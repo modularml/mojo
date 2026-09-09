@@ -41,14 +41,28 @@ def while_loop(
 
     .. code-block:: python
 
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+
         def predicate(x):
             return x < 10
 
         def body(x):
             return x + 1
 
-        x = ops.constant(0, DType.int32, device=device)
-        result = ops.while_loop(x, predicate, body)
+        with Graph("while_loop_example") as graph:
+            x = ops.constant(0, DType.int32, device=device)
+            graph.output(*ops.while_loop(x, predicate, body))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        assert int(result.to_numpy()) == 10
 
     Args:
         initial_values: The initial values for the loop arguments. Must be

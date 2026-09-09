@@ -34,27 +34,27 @@ def main() raises:
 def test_load_scalar_static_layout() raises:
     """Test load_scalar with a static 2x3 row-major layout."""
     comptime layout = Layout.row_major(2, 3)
-    var storage: InlineArray[Float32, 6] = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    var storage: Array[Float32, 6] = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
 
-    var tensor = LayoutTensor[DType.float32, layout](storage.unsafe_ptr())
+    var tensor = LayoutTensor[.float32, layout](storage.unsafe_ptr())
 
     # Test scalar access at various positions
-    var v00: Scalar[DType.float32] = tensor.load_scalar(0, 0)
+    var v00: Float32 = tensor.load_scalar(0, 0)
     assert_equal(v00, 0.0)
 
-    var v01: Scalar[DType.float32] = tensor.load_scalar(0, 1)
+    var v01: Float32 = tensor.load_scalar(0, 1)
     assert_equal(v01, 1.0)
 
-    var v02: Scalar[DType.float32] = tensor.load_scalar(0, 2)
+    var v02: Float32 = tensor.load_scalar(0, 2)
     assert_equal(v02, 2.0)
 
-    var v10: Scalar[DType.float32] = tensor.load_scalar(1, 0)
+    var v10: Float32 = tensor.load_scalar(1, 0)
     assert_equal(v10, 3.0)
 
-    var v11: Scalar[DType.float32] = tensor.load_scalar(1, 1)
+    var v11: Float32 = tensor.load_scalar(1, 1)
     assert_equal(v11, 4.0)
 
-    var v12: Scalar[DType.float32] = tensor.load_scalar(1, 2)
+    var v12: Float32 = tensor.load_scalar(1, 2)
     assert_equal(v12, 5.0)
 
 
@@ -63,31 +63,31 @@ def test_load_scalar_dynamic_layout() raises:
     comptime layout = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
 
     var dynamic_layout = RuntimeLayout[
-        layout, element_type=DType.int32, linear_idx_type=DType.int32
+        layout, element_type=.int32, linear_idx_type=.int32
     ](
-        RuntimeTuple[layout.shape, element_type=DType.int32](3, 4),
-        RuntimeTuple[layout.stride, element_type=DType.int32](4, 1),
+        RuntimeTuple[layout.shape, element_type=.int32](3, 4),
+        RuntimeTuple[layout.stride, element_type=.int32](4, 1),
     )
 
-    var storage = InlineArray[Float32, 12](uninitialized=True)
-    for i in range(12):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, 12](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
 
     var tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         layout,
-        layout_int_type=DType.int32,
-        linear_idx_type=DType.int32,
+        layout_int_type=.int32,
+        linear_idx_type=.int32,
     ](storage.unsafe_ptr(), dynamic_layout)
 
     # Test load_scalar at various positions
-    var v00: Scalar[DType.float32] = tensor.load_scalar(0, 0)
+    var v00: Float32 = tensor.load_scalar(0, 0)
     assert_equal(v00, 0.0)
 
-    var v11: Scalar[DType.float32] = tensor.load_scalar(1, 1)
+    var v11: Float32 = tensor.load_scalar(1, 1)
     assert_equal(v11, 5.0)  # row 1, col 1 = 1*4 + 1 = 5
 
-    var v23: Scalar[DType.float32] = tensor.load_scalar(2, 3)
+    var v23: Float32 = tensor.load_scalar(2, 3)
     assert_equal(v23, 11.0)  # row 2, col 3 = 2*4 + 3 = 11
 
 
@@ -96,37 +96,37 @@ def test_load_scalar_with_runtime_tuple() raises:
     comptime layout = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
 
     var dynamic_layout = RuntimeLayout[
-        layout, element_type=DType.int32, linear_idx_type=DType.int32
+        layout, element_type=.int32, linear_idx_type=.int32
     ](
-        RuntimeTuple[layout.shape, element_type=DType.int32](4, 4),
-        RuntimeTuple[layout.stride, element_type=DType.int32](4, 1),
+        RuntimeTuple[layout.shape, element_type=.int32](4, 4),
+        RuntimeTuple[layout.stride, element_type=.int32](4, 1),
     )
 
-    var storage = InlineArray[Float32, 16](uninitialized=True)
-    for i in range(16):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, 16](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
 
     var tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         layout,
-        layout_int_type=DType.int32,
-        linear_idx_type=DType.int32,
+        layout_int_type=.int32,
+        linear_idx_type=.int32,
     ](storage.unsafe_ptr(), dynamic_layout)
 
     # Test load_scalar with RuntimeTuple
     var coord = RuntimeTuple[layout.shape, element_type=DType.int32](2, 3)
-    var val: Scalar[DType.float32] = tensor.load_scalar(coord)
+    var val: Float32 = tensor.load_scalar(coord)
     assert_equal(val, 11.0)  # row 2, col 3 = 2*4 + 3 = 11
 
 
 def test_load_scalar_matches_getitem_lane0() raises:
     """Test that load_scalar returns the same value as __getitem__[0]."""
     comptime layout = Layout.row_major(4, 4)
-    var storage = InlineArray[Float32, 16](uninitialized=True)
-    for i in range(16):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, 16](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
 
-    var tensor = LayoutTensor[DType.float32, layout](storage.unsafe_ptr())
+    var tensor = LayoutTensor[.float32, layout](storage.unsafe_ptr())
 
     # Verify load_scalar matches the 0th lane of __getitem__
     for i in range(4):
@@ -144,11 +144,11 @@ def test_load_scalar_vectorized_element_size_gt_1() raises:
     """
     # Create an 8x8 tensor and vectorize it to have 4-element vectors
     comptime layout = Layout.row_major(8, 8)
-    var storage = InlineArray[Float32, 64](uninitialized=True)
-    for i in range(64):
-        storage[i] = Float32(i)
+    var storage = Array[Float32, 64](
+        fill_with=lambda (i: Int) -> Float32: Float32(i)
+    )
 
-    var tensor = LayoutTensor[DType.float32, layout](storage.unsafe_ptr())
+    var tensor = LayoutTensor[.float32, layout](storage.unsafe_ptr())
 
     # Vectorize to 1x4 elements - this creates a tensor where each "element"
     # is a SIMD[float32, 4] (element_size = 4)

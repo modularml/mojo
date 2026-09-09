@@ -48,6 +48,8 @@ class ThroughputMeasure:
             The throughput values as a floating point 64.
         """
         # TODO: do we need support other units of time (ms, ns)?
+        if elapsed_sec == 0:
+            return 0.0
         return (self.value * 1e-9) / elapsed_sec
 
 
@@ -79,6 +81,13 @@ class Bench:
     ITERS_LABEL = "iters"
 
     def dump_report(self, output_path: Path | None = None) -> None:
+        if self.met == 0:
+            repro = " ".join(sys.argv)
+            print(
+                f"WARNING: '{self.name}' reported elapsed_sec=0; benchmark"
+                f" likely failed. Reporting 0 throughput.\nRepro: {repro}",
+                file=sys.stderr,
+            )
         metrics = [self.BENCH_LABEL, self.MET_LABEL, self.ITERS_LABEL] + [
             f"{m.metric.name} ({m.metric.unit})" for m in self.metric_list
         ]

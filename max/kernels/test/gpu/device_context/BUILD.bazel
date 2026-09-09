@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_filecheck_test", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -6,6 +7,11 @@ _APPLE_GPU_INCOMPATIBLE = select({
     "//:apple_gpu": ["@platforms//:incompatible"],
     "//conditions:default": [],
 })
+
+_GPU_MEMORY = {
+    "test_device_context.mojo": "2",
+    "test_device_context_cpu.mojo": "1",
+}
 
 _EXTRA_MOJO_TEST_CONSTRAINTS = {
     "test_dump_sass.mojo": ["//:nvidia_gpu"],
@@ -23,11 +29,16 @@ _EXTRA_MOJO_TEST_CONSTRAINTS = {
         name = src + ".test",
         size = "large",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+        exec_properties = {
+            "test.resources:gpu-memory": _GPU_MEMORY.get(src, "1.5"),
+        },
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_MOJO_TEST_CONSTRAINTS.get(src, []),
         deps = [
             "//max:internal_utils",
             "//max:kv_cache",
+            "//max:layout",
             "//max:linalg",
             "//max:nn",
             "//max:quantization",
@@ -37,59 +48,12 @@ _EXTRA_MOJO_TEST_CONSTRAINTS = {
     for src in glob(
         ["**/*.mojo"],
         exclude = [
-            "test_device_context_hal.mojo",
             "test_device_external_function.mojo",
             "test_function_error.mojo",
             "test_function_error_sync_mode.mojo",
         ],
     )
 ]
-
-# Tests for the HAL-backed `DeviceContext` require the appropriate neo-driver
-# plugin to be available.
-mojo_test(
-    name = "test_device_context_hal.mojo.test",
-    size = "large",
-    srcs = ["test_device_context_hal.mojo"],
-    data = select({
-        "//:nvidia_gpu": ["//Target:CUDAPlugin.so"],
-        "//:apple_gpu": ["//Target:MetalPlugin.so"],
-        "//:amd_gpu": ["//Target:HIPPlugin.so"],
-        "//conditions:default": [],
-    }),
-    env = select({
-        "//:nvidia_gpu": {
-            "MODULAR_DRIVER_PLUGINS": "CUDA@$(rootpath //Target:CUDAPlugin.so)",
-        },
-        "//:apple_gpu": {
-            "MODULAR_DRIVER_PLUGINS": "Metal@$(rootpath //Target:MetalPlugin.so)",
-        },
-        "//:amd_gpu": {
-            "MODULAR_DRIVER_PLUGINS": "HIP@$(rootpath //Target:HIPPlugin.so)",
-        },
-        "//conditions:default": {},
-    }),
-    tags = ["gpu"],
-    target_compatible_with = ["//:has_gpu"] + select({
-        "//:nvidia_gpu": [],
-        "//:apple_gpu": [],
-        "//:amd_gpu": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }) + select({
-        # TODO(KERN-2927): Hangs >1h on macOS BuildBuddy workers then SIGSEGV's
-        # remote-exec. Likely Metal HAL driver issue. Re-enable when fixed.
-        "@platforms//os:macos": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//max:internal_utils",
-        "//max:kv_cache",
-        "//max:linalg",
-        "//max:nn",
-        "//max:quantization",
-        "@mojo//:std",
-    ],
-)
 
 filegroup(
     name = "vec_add_cubin_sm80",
@@ -112,6 +76,7 @@ filegroup(
 mojo_test(
     name = "test_device_external_function.mojo.test",
     srcs = ["test_device_external_function.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     data = select({
         "//:b200_gpu": [":vec_add_cubin_sm100"],
         "//:h100_gpu": [":vec_add_cubin_sm90"],
@@ -128,6 +93,7 @@ mojo_test(
         "//:nvidia_gpu",
     ],
     deps = [
+        "//max:max_mojo",
         "@mojo//:std",
     ],
 )
@@ -135,6 +101,7 @@ mojo_test(
 mojo_filecheck_test(
     name = "test_function_error.mojo.test",
     srcs = ["test_function_error.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     expect_crash = True,
     tags = ["gpu"],
     target_compatible_with = ["//:nvidia_gpu"] + select({
@@ -154,6 +121,7 @@ mojo_filecheck_test(
 mojo_filecheck_test(
     name = "test_function_error_sync_mode.mojo.test",
     srcs = ["test_function_error_sync_mode.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     env = {
         "MODULAR_DEBUG": "device-sync-mode",
     },

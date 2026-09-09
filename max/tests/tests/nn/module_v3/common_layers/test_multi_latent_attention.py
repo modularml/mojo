@@ -42,7 +42,7 @@ from max.graph import (
     SymbolicDim,
     TensorValue,
 )
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParams, MLAKVCacheParams
 
 # Small model dimensions for fast graph-trace tests.
 _N_HEADS = 8
@@ -58,13 +58,11 @@ _CACHE_HEAD_DIM = _KV_LORA_RANK + _QK_ROPE_HEAD_DIM  # 80
 
 
 def _make_kv_params(devices: Sequence[Device]) -> KVCacheParams:
-    return KVCacheParams(
+    return MLAKVCacheParams(
         dtype=DType.float32,
-        n_kv_heads=1,
         head_dim=_CACHE_HEAD_DIM,
         num_layers=_NUM_LAYERS,
         devices=[DeviceRef.from_device(device) for device in devices],
-        is_mla=True,
         num_q_heads=_N_HEADS,
         page_size=_PAGE_SIZE,
     )
@@ -293,5 +291,5 @@ def test_data_parallel_layer_symbolic(
 
         out = layer(x, kv_collection, freqs_cis, input_row_offsets)
 
-    assert list(out.shape) == ["dynamic_size", _HIDDEN_SIZE]
+    assert out.shape == x.shape
     assert out.mapping.mesh == mesh

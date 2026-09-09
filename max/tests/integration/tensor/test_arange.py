@@ -14,10 +14,10 @@
 from __future__ import annotations
 
 import pytest
-from conftest import assert_all_close
 from max.driver import CPU
 from max.dtype import DType
 from max.experimental.tensor import Tensor, default_dtype
+from max.experimental.testing import assert_all_close
 
 
 def test_range_like() -> None:

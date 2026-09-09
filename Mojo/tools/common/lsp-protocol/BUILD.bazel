@@ -1,0 +1,14 @@
+load("//bazel:api.bzl", "modular_cc_library")
+
+package(default_visibility = ["//Mojo:consumers"])
+
+modular_cc_library(
+    name = "lsp-protocol",
+    srcs = glob(["*.cpp"]),
+    hdrs = glob(["*.h"]),
+    include_prefix = ".",
+    deps = [
+        "//Support:Base",
+        "@llvm-project//mlir:MlirLspServerSupportLib",
+    ],
+)

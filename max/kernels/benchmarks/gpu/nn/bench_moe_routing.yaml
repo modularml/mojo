@@ -47,3 +47,61 @@ params:
   n_experts_per_tok: 2
   n_groups: 1
   topk_group: 1
+
+# Decode (1 token, top-K=8)
+- num_tokens: 1
+  num_experts: 256       # DSv3 logical
+  n_experts_per_tok: 8
+  n_groups: 8
+  topk_group: 4
+- num_tokens: 1
+  num_experts: 384       # Kimi K2.5 logical
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1
+# Prefill (4K, 8K, 16K tokens)
+- num_tokens: 4096
+  num_experts: 384
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1
+
+# Decode w/ small batch (low concurrency)
+- num_tokens: 8
+  num_experts: 384
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1
+
+# Decode w/ Eagle-3 speculation window (one full tile_tokens block)
+- num_tokens: 16
+  num_experts: 384
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1
+
+# Decode w/ batched concurrent requests
+- num_tokens: 64
+  num_experts: 384
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1
+
+- num_tokens: 256
+  num_experts: 384
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1
+
+# Larger prefill points for resolving h0 vs h1 delta
+- num_tokens: 8192
+  num_experts: 384
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1
+
+- num_tokens: 16384
+  num_experts: 384
+  n_experts_per_tok: 8
+  n_groups: 1
+  topk_group: 1

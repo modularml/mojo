@@ -1,0 +1,479 @@
+---
+title: Image and video to text
+sidebar_label: Image to text
+description: Use the MAX chat completions endpoint with image or video input to generate descriptions and answer questions about visual content
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import SmallCards from '@site/src/components/SmallCards';
+import InstallMAX from '../_includes/install-modular.mdx';
+import InstallOpenAI from '../_includes/install-openai.mdx';
+import Requirements from '@site/src/components/Requirements';
+import { requirementsWithGPU } from '../requirements';
+
+Multimodal large language models are capable of processing images, video, and
+text together in a single request. They can describe visual content, answer
+questions about images or video, and support tasks such as image captioning,
+document analysis, chart interpretation, optical character recognition (OCR),
+video summarization, and content moderation.
+
+Explore our [supported models](/models/) to select the best model for your
+use case.
+
+## Endpoint
+
+You can interact with a multimodal LLM through the
+[`v1/chat/completions`](/rest-api/create-chat-completion/) endpoint
+by including image or video inputs alongside text in the request. This allows
+you to provide an image URL, video URL, or base64-encoded data as part of the
+conversation.
+
+### URL input
+
+Within the `v1/chat/completions` request body, the `"messages"` array accepts
+inline image or video URLs.
+
+<Tabs>
+<TabItem value="image" label="Image input">
+
+Use `image_url` to pass an image:
+
+```json
+"messages": [
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "What is in this image?"
+      },
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "https://example.com/path/to/image.jpg"
+        }
+      }
+    ]
+  }
+]
+```
+
+</TabItem>
+<TabItem value="video" label="Video input">
+
+Use `video_url` to pass a video:
+
+```json
+"messages": [
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "What is happening in this video?"
+      },
+      {
+        "type": "video_url",
+        "video_url": {
+          "url": "https://example.com/path/to/video.mp4"
+        }
+      }
+    ]
+  }
+]
+```
+
+</TabItem>
+</Tabs>
+
+Both `image_url` and `video_url` also accept base64-encoded data URIs
+(such as `data:image/jpeg;base64,...` or `data:video/mp4;base64,...`).
+
+The `image_url` object also accepts an optional `max_long_side_pixel` integer
+sizing hint, which downscales the image so its longest side is at most that many
+pixels before the model processes it:
+
+```json
+"image_url": {
+  "url": "https://example.com/path/to/image.jpg",
+  "max_long_side_pixel": 1024
+}
+```
+
+The `video_url` object accepts optional sampling and sizing hints, all positive
+numbers: `fps` (frames per second to sample), `max_frames` (the maximum number
+of frames to sample), and `max_long_side_pixel` (downscale each frame so its
+longest side is at most that many pixels):
+
+```json
+"video_url": {
+  "url": "https://example.com/path/to/video.mp4",
+  "fps": 1,
+  "max_frames": 64,
+  "max_long_side_pixel": 1024
+}
+```
+
+### Local file input
+
+To use local images or videos, you must configure allowed directories before
+starting the server. This prevents unauthorized file access by restricting
+which paths the server can read from.
+
+Set the `MAX_SERVE_ALLOWED_IMAGE_ROOTS` environment variable to a JSON-formatted
+list of allowed directories:
+
+```bash
+export MAX_SERVE_ALLOWED_IMAGE_ROOTS='["/path/to/files"]'
+```
+
+Then reference files with an absolute `file://` path:
+
+<Tabs>
+<TabItem value="image" label="Image input">
+
+```json
+"messages": [
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "What is in this image?"
+      },
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "file:///path/to/files/image.jpg"
+        }
+      }
+    ]
+  }
+]
+```
+
+</TabItem>
+<TabItem value="video" label="Video input">
+
+```json
+"messages": [
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "What is happening in this video?"
+      },
+      {
+        "type": "video_url",
+        "video_url": {
+          "url": "file:///path/to/files/video.mp4"
+        }
+      }
+    ]
+  }
+]
+```
+
+</TabItem>
+</Tabs>
+
+The file path must be within a directory listed in
+`MAX_SERVE_ALLOWED_IMAGE_ROOTS`. If no allowed roots are configured, all
+`file:///` requests return a 400 error.
+
+The maximum file size is 20 MiB by default, which you can adjust by setting the
+`MAX_SERVE_MAX_LOCAL_IMAGE_BYTES` environment variable to a value in bytes.
+
+## Quickstart
+
+In this quickstart, learn how to set up and run
+[Gemma 4 31B Instruct](https://huggingface.co/google/gemma-4-31B-it),
+which excels at tasks such as image captioning, visual question answering, and
+video summarization.
+
+:::caution GPU required
+
+To run Gemma 4 31B Instruct, your system must have a [compatible
+GPU](/packages#gpu-compatibility) with >96 GiB of GPU RAM.
+
+Due to the model's memory requirements, we recommend an NVIDIA B200 or AMD
+MI355X.
+
+:::
+
+System requirements:
+
+<Requirements requirementsData={requirementsWithGPU}
+url="/packages#system-requirements" />
+
+### Set up your environment
+
+Create a Python project to install our APIs and CLI tools:
+
+<InstallMAX folder="vision-quickstart" />
+
+### Serve your model
+
+Agree to the [Gemma 4 license](https://huggingface.co/google/gemma-4-31B-it) and
+make your Hugging Face [access token](https://huggingface.co/settings/tokens)
+available in your environment:
+
+```bash
+export HF_TOKEN="hf_..."
+```
+
+Then, use the [`max serve`](/cli/serve) command to start a
+local model server with the Gemma 4 31B Instruct model:
+
+```bash
+max serve \
+  --model google/gemma-4-31B-it
+```
+
+:::note
+
+You may need to specify the `--max-length` and `--max-batch-size` parameters
+depending on the amount of memory you have access to.
+
+:::
+
+This will create a server running the `google/gemma-4-31B-it`
+multimodal model on `http://localhost:8000/v1/chat/completions`, an [OpenAI
+compatible endpoint](https://platform.openai.com/docs/guides/images-vision).
+
+While this example uses the Gemma 4 31B Instruct model, you can replace it with
+any image-to-text or video-to-text model listed in our
+[supported models](/models/).
+
+The endpoint is ready when you see this message printed in your terminal:
+
+```bash
+Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+For a complete list of `max` CLI commands and options, refer to the
+[MAX CLI reference](/cli).
+
+### Describe an image
+
+Open a new terminal window, navigate to your project directory, and activate
+your virtual environment.
+
+MAX supports OpenAI's REST APIs and you can interact
+with the model using either the OpenAI Python SDK or curl:
+
+<Tabs>
+<TabItem value="python" label="Python">
+
+You can use OpenAI's Python client to interact with the vision model.
+First, install the OpenAI API:
+
+<InstallOpenAI />
+
+Then, create a client and make a request to the model:
+
+```python title="generate-image-description.py"
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="EMPTY")
+
+response = client.chat.completions.create(
+    model="google/gemma-4-31B-it",
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "What is in this image?"
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/0052a70beed5bf71b92610a43a52df6d286cd5f3/diffusers/rabbit.jpg"
+                    }
+                }
+            ]
+        }
+    ],
+    max_completion_tokens=300
+)
+
+print(response.choices[0].message.content)
+```
+
+In this example, you're using the OpenAI Python client to interact with the MAX
+endpoint running on local host `8000`. The `client` object is initialized with
+the base URL `http://0.0.0.0:8000/v1` and the API key is ignored.
+
+When you run this code, the model should respond with information about the
+image:
+
+```sh
+python generate-image-description.py
+```
+
+```output
+Here's a breakdown of what's in the image:
+
+*   **Peter Rabbit:** The main focus is a realistic-looking depiction of Peter
+Rabbit, the character from Beatrix Potter's stories...
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+You can send requests to the local endpoint using `curl`.
+The following request includes an image URL and a question to answer about the
+provided image:
+
+```bash
+curl -N http://localhost:8000/v1/chat/completions \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "google/gemma-4-31B-it",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "What is in this image?"
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/0052a70beed5bf71b92610a43a52df6d286cd5f3/diffusers/rabbit.jpg"
+          }
+        }
+      ]
+    }
+  ],
+  "max_completion_tokens": 300
+}' | grep -o '"content":"[^"]*"' | sed 's/"content":"//g' | sed 's/"//g' | tr -d '\n' | sed 's/\\n/\n/g'
+```
+
+This sends an object location to an image along with a text prompt to the model.
+You should receive a response similar to this:
+
+```output
+Here's a breakdown of what's in the image:
+
+*   **Peter Rabbit:** The main focus is a realistic, anthropomorphic
+(human-like) rabbit character...
+```
+
+</TabItem>
+</Tabs>
+
+### Describe a video
+
+<Tabs>
+<TabItem value="python" label="Python">
+
+Create a new file and make a request to the model with a video URL:
+
+```python title="generate-video-description.py"
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="EMPTY")
+
+completion = client.chat.completions.create(
+    model="google/gemma-4-31B-it",
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Describe what is happening in this video"
+                },
+                {
+                    "type": "video_url",
+                    "video_url": {
+                        "url": "https://avtshare01.rz.tu-ilmenau.de/avt-vqdb-uhd-1/test_1/segments/bigbuck_bunny_8bit_15000kbps_1080p_60.0fps_h264.mp4"
+                    }
+                }
+            ]
+        }
+    ],
+    max_completion_tokens=300
+)
+
+print(completion.choices[0].message.content)
+```
+
+Run the script to get a description of the video:
+
+```sh
+python generate-video-description.py
+```
+
+```output
+The video is an animated short film featuring a large, fluffy rabbit in a
+colorful meadow. The rabbit wanders through the environment, encountering
+butterflies and small birds. The animation has a warm, lighthearted tone with
+vibrant natural scenery...
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+You can send requests to the local endpoint using `curl`.
+The following request includes a video URL and a prompt to describe it:
+
+```bash
+curl -N http://localhost:8000/v1/chat/completions \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "google/gemma-4-31B-it",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Describe what is happening in this video"
+        },
+        {
+          "type": "video_url",
+          "video_url": {
+            "url": "https://avtshare01.rz.tu-ilmenau.de/avt-vqdb-uhd-1/test_1/segments/bigbuck_bunny_8bit_15000kbps_1080p_60.0fps_h264.mp4"
+          }
+        }
+      ]
+    }
+  ],
+  "max_completion_tokens": 300
+}' | grep -o '"content":"[^"]*"' | sed 's/"content":"//g' | sed 's/"//g' | tr -d '\n' | sed 's/\\n/\n/g'
+```
+
+You should receive a response similar to this:
+
+```output
+The video is an animated short film featuring a large, fluffy rabbit in a
+colorful meadow. The rabbit wanders through the environment, encountering
+butterflies and small birds. The animation has a warm, lighthearted tone with
+vibrant natural scenery...
+```
+
+</TabItem>
+</Tabs>
+
+For complete details on all available API endpoints and options, see the [MAX
+Serve API documentation](/rest-api/).
+
+## Next steps
+
+Now that you can analyze images and video, try adding structured output to get
+consistent, formatted responses. You can also explore other endpoints and
+deployment options.
+
+- [Structured output](/serve/structured-output): Enable structured output
+  with your GenAI deployments for predictable responses.
+- [Embeddings](/serve/embeddings): Learn how to use the MAX embeddings
+  endpoint to create embeddings for input text.
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.

@@ -49,15 +49,15 @@ def create_agent(
         ),
     )
 
-    # ucx should be available as a plugin.
-    assert "ucx" in agent.get_available_plugins()
+    # Upstream NIXL plugin names are uppercase (UCX, LIBFABRIC).
+    assert "UCX" in agent.get_available_plugins()
 
-    # Create ucx backend
-    ucx_params = agent.get_plugin_params("ucx")
+    # Create UCX backend.
+    ucx_params = agent.get_plugin_params("UCX")
     # Add GPU device ID to parameters if specified.
     if gpu_device_id is not None:
         ucx_params[0]["gpu_device_id"] = str(gpu_device_id)
-    ucx_backend = agent.create_backend(type="ucx", init_params=ucx_params[0])
+    ucx_backend = agent.create_backend(type="UCX", init_params=ucx_params[0])
 
     return agent, ucx_backend
 
@@ -265,11 +265,16 @@ def test_memory_transfer(device: Device) -> None:
 
 
 def test_get_transfer_telemetry_enabled_by_env() -> None:
-    os.environ["MODULAR_NIXL_TELEMETRY_ENABLE"] = "y"
+    # Upstream NIXL reads NIXL_TELEMETRY_ENABLE / NIXL_TELEMETRY_DIR /
+    # NIXL_TELEMETRY_RUN_INTERVAL (not the MODULAR_-prefixed fork names).
+    # The binding's get_transfer_telemetry() calls upstream getXferTelemetry()
+    # which returns NIXL_ERR_NO_TELEMETRY if telemetry was not enabled at
+    # nixlAgent construction time.
+    os.environ["NIXL_TELEMETRY_ENABLE"] = "y"
     telemetry_dir = Path("/tmp") / "nixl_py_telem_env"
     telemetry_dir.mkdir(parents=True, exist_ok=True)
-    os.environ["MODULAR_NIXL_TELEMETRY_DIR"] = str(telemetry_dir)
-    os.environ["MODULAR_NIXL_TELEMETRY_RUN_INTERVAL"] = "1"
+    os.environ["NIXL_TELEMETRY_DIR"] = str(telemetry_dir)
+    os.environ["NIXL_TELEMETRY_RUN_INTERVAL"] = "1"
     try:
         buffer_size = 1024
         agent_1_name = "agent_telemetry_1"
@@ -355,6 +360,6 @@ def test_get_transfer_telemetry_enabled_by_env() -> None:
         assert agent_1.deregister_memory(reg_dlist_1) == Status.SUCCESS
         assert agent_2.deregister_memory(reg_dlist_2) == Status.SUCCESS
     finally:
-        os.environ.pop("MODULAR_NIXL_TELEMETRY_ENABLE", None)
-        os.environ.pop("MODULAR_NIXL_TELEMETRY_DIR", None)
-        os.environ.pop("MODULAR_NIXL_TELEMETRY_RUN_INTERVAL", None)
+        os.environ.pop("NIXL_TELEMETRY_ENABLE", None)
+        os.environ.pop("NIXL_TELEMETRY_DIR", None)
+        os.environ.pop("NIXL_TELEMETRY_RUN_INTERVAL", None)

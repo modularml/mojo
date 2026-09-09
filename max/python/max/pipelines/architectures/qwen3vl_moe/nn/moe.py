@@ -59,5 +59,3 @@ class Qwen3VLMoE(StackedMoE):
     Uses StackedMoE defaults: concatenated gate/up format, silu activation,
     no bias, no shared experts.
     """
-
-    pass

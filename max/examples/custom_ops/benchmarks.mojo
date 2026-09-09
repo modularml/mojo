@@ -29,16 +29,14 @@ from std.benchmark import (
     ThroughputMeasure,
 )
 from std.bit import log2_floor
-from std.gpu.host import DeviceBuffer, DeviceContext
+from max.gpu.host import DeviceBuffer, DeviceContext
 from kernels.matrix_multiplication import MatrixMultiplication
 from kernels.tensor_core_mma import TensorCoreMMA
 from kernels.top_k import TopK
 from layout.int_tuple import product, to_index_list
 from extensibility import (
-    Input,
     IOSpec,
     ManagedTensorSlice,
-    Output,
     StaticTensorSpec,
     get_row_major_tensor_spec_static,
 )
@@ -120,32 +118,30 @@ def top_k() raises:
 
     var cpu_ctx = DeviceContext(api="cpu")
 
-    var in_vals = Tensor[Input, val_spec](cpu_ctx).rand()
-    var out_vals = Tensor[Output, val_spec](cpu_ctx).rand()
-    var out_idxs = Tensor[Output, idx_spec](cpu_ctx).rand()
+    var in_vals = Tensor[IOSpec.Input, val_spec](cpu_ctx).rand()
+    var out_vals = Tensor[IOSpec.Output, val_spec](cpu_ctx).rand()
+    var out_idxs = Tensor[IOSpec.Output, idx_spec](cpu_ctx).rand()
 
     var b = Bench()
     var flops = ThroughputMeasure(BenchMetric.flops, els * log2_floor(K))
     var elements = ThroughputMeasure(BenchMetric.elements, els)
-    var metrics = [flops, elements]
+    var metrics: List = [flops, elements]
 
-    @parameter
-    def top_k_cpu() raises:
+    def top_k_cpu() raises {imm}:
         TopK.execute[K=K, target="cpu"](
             out_vals.slice, out_idxs.slice, in_vals.slice, cpu_ctx
         )
 
-    b.bench_function[top_k_cpu](BenchId("top_k_custom", "cpu"), metrics)
+    b.bench_function(top_k_cpu, BenchId("top_k_custom", "cpu"), metrics)
 
     comptime if has_nvidia_gpu_accelerator():
         var gpu_ctx = DeviceContext()
 
-        var out_vals_dev = Tensor[Output, val_spec](gpu_ctx).rand()
-        var out_idxs_dev = Tensor[Output, idx_spec](gpu_ctx).rand()
-        var in_vals_dev = Tensor[Input, val_spec](gpu_ctx).rand()
+        var out_vals_dev = Tensor[IOSpec.Output, val_spec](gpu_ctx).rand()
+        var out_idxs_dev = Tensor[IOSpec.Output, idx_spec](gpu_ctx).rand()
+        var in_vals_dev = Tensor[IOSpec.Input, val_spec](gpu_ctx).rand()
 
-        @parameter
-        def top_k_gpu() raises:
+        def top_k_gpu() raises {imm}:
             TopK.execute[K=K, target="gpu"](
                 out_vals_dev.slice,
                 out_idxs_dev.slice,
@@ -153,7 +149,7 @@ def top_k() raises:
                 gpu_ctx,
             )
 
-        b.bench_function[top_k_gpu](BenchId("top_k_custom", "gpu"), metrics)
+        b.bench_function(top_k_gpu, BenchId("top_k_custom", "gpu"), metrics)
     b.config.verbose_metric_names = False
     print(b)
 
@@ -175,22 +171,21 @@ def matmul() raises:
 
     var cpu_ctx = DeviceContext(api="cpu")
 
-    var a = Tensor[Input, a_spec](cpu_ctx).rand()
-    var b = Tensor[Input, b_spec](cpu_ctx).rand()
-    var c = Tensor[Output, c_spec](cpu_ctx).rand()
+    var a = Tensor[IOSpec.Input, a_spec](cpu_ctx).rand()
+    var b = Tensor[IOSpec.Input, b_spec](cpu_ctx).rand()
+    var c = Tensor[IOSpec.Output, c_spec](cpu_ctx).rand()
 
     var bench = Bench()
     var flops = ThroughputMeasure(BenchMetric.flops, FLOPS)
     var elements = ThroughputMeasure(BenchMetric.elements, M * N)
-    var metrics = [flops, elements]
+    var metrics: List = [flops, elements]
 
-    @parameter
-    def matmul_cpu() raises:
+    def matmul_cpu() raises {imm}:
         MatrixMultiplication["naive"].execute[target="cpu"](
             c.slice, a.slice, b.slice, cpu_ctx
         )
 
-    bench.bench_function[matmul_cpu](BenchId("cpu", "naive"), metrics)
+    bench.bench_function(matmul_cpu, BenchId("cpu", "naive"), metrics)
 
     comptime if (
         has_amd_gpu_accelerator()
@@ -198,20 +193,18 @@ def matmul() raises:
         or has_nvidia_gpu_accelerator()
     ):
         var gpu_ctx = DeviceContext()
-        var a_dev = Tensor[Input, a_spec](gpu_ctx).rand()
-        var b_dev = Tensor[Input, b_spec](gpu_ctx).rand()
-        var c_dev = Tensor[Output, c_spec](gpu_ctx).rand()
+        var a_dev = Tensor[IOSpec.Input, a_spec](gpu_ctx).rand()
+        var b_dev = Tensor[IOSpec.Input, b_spec](gpu_ctx).rand()
+        var c_dev = Tensor[IOSpec.Output, c_spec](gpu_ctx).rand()
 
-        @parameter
-        def bench_matmul_kernel[impl: StaticString]() raises:
-            @parameter
-            def bench_gpu() raises:
+        def bench_matmul_kernel[impl: StaticString]() raises {mut bench, imm}:
+            def bench_gpu() raises {imm}:
                 MatrixMultiplication[impl].execute[target="gpu"](
                     c_dev.slice, a_dev.slice, b_dev.slice, gpu_ctx
                 )
 
-            bench.bench_function[bench_gpu](
-                BenchId("gpu", String(impl)), metrics
+            bench.bench_function(
+                bench_gpu, BenchId("gpu", String(impl)), metrics
             )
 
         bench_matmul_kernel["naive"]()
@@ -247,14 +240,14 @@ def tensor_core_mma() raises:
 
     var cpu_ctx = DeviceContext(api="cpu")
 
-    var a = Tensor[Input, a_spec](cpu_ctx).rand()
-    var b = Tensor[Input, b_spec](cpu_ctx).rand()
-    var c = Tensor[Output, c_spec](cpu_ctx).rand()
+    var a = Tensor[IOSpec.Input, a_spec](cpu_ctx).rand()
+    var b = Tensor[IOSpec.Input, b_spec](cpu_ctx).rand()
+    var c = Tensor[IOSpec.Output, c_spec](cpu_ctx).rand()
 
     var bench = Bench()
     var flops = ThroughputMeasure(BenchMetric.flops, FLOPS)
     var elements = ThroughputMeasure(BenchMetric.elements, M * N)
-    var metrics = [flops, elements]
+    var metrics: List = [flops, elements]
 
     comptime perform_validation = False
 
@@ -266,14 +259,12 @@ def tensor_core_mma() raises:
     # TODO: Add NVIDIA GPU support
     comptime if has_amd_gpu_accelerator():
         var gpu_ctx = DeviceContext()
-        var a_dev = Tensor[Input, a_spec](gpu_ctx).rand()
-        var b_dev = Tensor[Input, b_spec](gpu_ctx).rand()
-        var c_dev = Tensor[Output, c_spec](gpu_ctx).rand()
+        var a_dev = Tensor[IOSpec.Input, a_spec](gpu_ctx).rand()
+        var b_dev = Tensor[IOSpec.Input, b_spec](gpu_ctx).rand()
+        var c_dev = Tensor[IOSpec.Output, c_spec](gpu_ctx).rand()
 
-        @parameter
-        def bench_matmul_kernel[impl: StaticString]() raises:
-            @parameter
-            def bench_gpu() raises:
+        def bench_matmul_kernel[impl: StaticString]() raises {mut bench, imm}:
+            def bench_gpu() raises {imm}:
                 TensorCoreMMA[impl].execute[target="gpu", M=M, N=N, K=K](
                     c_dev.slice,
                     a_dev.slice,
@@ -282,8 +273,8 @@ def tensor_core_mma() raises:
                     gpu_ctx,
                 )
 
-            bench.bench_function[bench_gpu](
-                BenchId("gpu", String(impl)), metrics
+            bench.bench_function(
+                bench_gpu, BenchId("gpu", String(impl)), metrics
             )
 
         bench_matmul_kernel["naive_tensor"]()

@@ -17,11 +17,11 @@ from __future__ import annotations
 
 import random
 
-from max.benchmark.benchmark_shared.metrics import SteadyStateResult
 from max.benchmark.benchmark_shared.request import RequestFuncOutput
 from max.benchmark.benchmark_shared.steady_state import (
     _rolling_mad_over_median,
     detect_steady_state,
+    reject_metric_outliers,
 )
 
 
@@ -366,58 +366,68 @@ def test_steady_state_indices_map_to_original_order() -> None:
         assert out.success
 
 
-def test_steady_state_metric_suffixes_match_full_run_keys() -> None:
-    """Every steady-state suffix should correspond to a full-run result key.
+def test_reject_metric_outliers_keep_all_for_small_input() -> None:
+    """With fewer than 2 values every element is kept."""
+    assert reject_metric_outliers([]) == []
+    assert reject_metric_outliers([0.5]) == [True]
 
-    Guards against adding a full-run metric without a steady-state counterpart
-    (or vice versa).
+
+def test_reject_metric_outliers_keep_all_when_mad_zero() -> None:
+    """When all values are identical MAD==0 and nothing is rejected."""
+    values = [0.05] * 20
+    keep = reject_metric_outliers(values)
+    assert all(keep)
+    assert len(keep) == 20
+
+
+def test_reject_metric_outliers_drops_extremes() -> None:
+    """Clear outliers (modified z-score >> 3.5) are rejected.
+
+    The MAD is only non-zero when the center of the distribution has spread.
+    Use a mix of values with two different levels so the MAD is positive,
+    then inject extreme outliers.
     """
-    from unittest.mock import MagicMock
+    # Build a stable set with some natural spread (so MAD > 0).
+    # Values alternate between 0.04 and 0.06 → median≈0.05, MAD≈0.01.
+    center = [0.04, 0.06] * 9  # 18 values; median 0.05, MAD 0.01
+    outliers = [100.0, -100.0]  # |mz| ≈ 0.6745 * 99.95 / 0.01 ≈ 6740 >> 3.5
+    values = center + outliers
+    keep = reject_metric_outliers(values)
+    assert len(keep) == len(values)
+    # The last two (outliers) must be rejected
+    assert keep[-1] is False
+    assert keep[-2] is False
+    # All stable values must be kept (|mz| ≤ 0.6745)
+    assert all(keep[:18])
 
-    from max.benchmark.benchmark_shared.metrics import (
-        StandardPercentileMetrics,
-    )
 
-    mock_metrics = MagicMock()
-    mock_metrics.request_throughput = 10.0
-    mock_metrics.ttft_ms = StandardPercentileMetrics(
-        [0.05], scale_factor=1000.0
-    )
-    mock_metrics.tpot_ms = StandardPercentileMetrics(
-        [0.02], scale_factor=1000.0
-    )
-    mock_metrics.itl_ms = StandardPercentileMetrics([0.02], scale_factor=1000.0)
-    mock_metrics.latency_ms = StandardPercentileMetrics(
-        [0.5], scale_factor=1000.0
-    )
+def test_reject_metric_outliers_constant_0645_factor() -> None:
+    """Modified z-score uses the 0.6745 Iglewicz-Hoaglin constant.
 
-    ss = SteadyStateResult(
-        detected=True,
-        start_index=0,
-        end_index=1,
-        count=1,
-        warning=None,
-        mode="full",
-        metrics=mock_metrics,
-    )
-    result_keys = set(ss.to_result_dict().keys())
+    With a known dataset the threshold at k=3.5 maps to a specific
+    absolute deviation from the median. Verify the constant is correct by
+    checking that a value just at the boundary is kept and one beyond is
+    dropped.
+    """
+    import numpy as np
 
-    # Full-run keys that must have steady-state counterparts
-    expected_metric_suffixes = {
-        "request_throughput",
-        "mean_ttft_ms",
-        "p99_ttft_ms",
-        "mean_tpot_ms",
-        "p99_tpot_ms",
-        "mean_itl_ms",
-        "p99_itl_ms",
-        "mean_latency_ms",
-        "p99_latency_ms",
-    }
-    actual_suffixes = {
-        k.removeprefix("steady_state_")
-        for k in result_keys
-        if k.startswith("steady_state_")
-        and k[len("steady_state_") :] in expected_metric_suffixes
-    }
-    assert actual_suffixes == expected_metric_suffixes
+    # Build 10 values with median=0 and MAD=1.
+    # Boundary: |mz| = 0.6745 * |x| / 1 = 3.5  =>  |x| = 3.5/0.6745 ≈ 5.189
+    base = [-1.0, -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+    # median = 0; MAD = median(|x|) = 1.0
+    assert float(np.median(np.abs(np.array(base) - np.median(base)))) == 1.0
+
+    threshold_val = 3.5 / 0.6745  # ≈ 5.189
+    below = base + [threshold_val - 0.01]  # |mz| < 3.5 → keep
+    above = base + [threshold_val + 0.01]  # |mz| > 3.5 → drop
+
+    assert reject_metric_outliers(below)[-1] is True
+    assert reject_metric_outliers(above)[-1] is False
+
+
+def test_reject_metric_outliers_symmetric() -> None:
+    """Rejection is symmetric around the median."""
+    values = [0.0] * 10 + [10.0, -10.0]
+    keep = reject_metric_outliers(values)
+    # Both extremes should be rejected (or both kept; they're symmetric)
+    assert keep[-1] == keep[-2]

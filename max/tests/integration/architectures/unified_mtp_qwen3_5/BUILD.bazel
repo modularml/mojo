@@ -1,0 +1,68 @@
+# Unified Qwen3.5 MTP integration tests.
+
+load(
+    "//bazel:api.bzl",
+    "modular_py_test",
+    "requirement",
+)
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "test_state_rollback",
+    srcs = ["test_state_rollback.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/unified_mtp_qwen3_5",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_weight_registry",
+    srcs = ["test_weight_registry.py"],
+    # Same constraint as test_state_pool_dtype: constructing the fused model
+    # reaches `Allreduce.__init__`, which instantiates `Accelerator(id=0)`
+    # unconditionally.
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    tags = ["gpu"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/architectures/unified_mtp_qwen3_5",
+    ],
+)
+
+modular_py_test(
+    name = "test_state_pool_dtype",
+    srcs = ["test_state_pool_dtype.py"],
+    # Builds the base and speculative graphs to compare their declared pool
+    # dtype. Construction reaches `Allreduce.__init__`, which instantiates
+    # `Accelerator(id=0)` unconditionally; with no CUDA device that aborts the
+    # process inside the driver rather than raising.
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    tags = ["gpu"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/architectures/unified_mtp_qwen3_5",
+    ],
+)

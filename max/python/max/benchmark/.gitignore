@@ -1,8 +1,6 @@
 # pixi environments
 .pixi
 *.egg-info
-# magic environments
-.magic
 # Ignore all .json files except those in the datasets subdirectory
 *.json
 !datasets/*.json

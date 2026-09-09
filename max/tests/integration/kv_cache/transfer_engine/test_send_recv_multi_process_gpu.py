@@ -21,6 +21,7 @@ import time
 
 import numpy as np
 import pytest
+from _transfer_engine_helpers import kv_memory
 from max.driver import Accelerator
 from max.driver.buffer import Buffer
 from max.pipelines.kv_cache import KVTransferEngine
@@ -54,8 +55,7 @@ def transfer_routine_sender(
     # Create engine (DP=1, TP=1)
     engine = KVTransferEngine(
         "engine_1",
-        [[blocks]],
-        total_num_pages=total_num_pages,
+        [[kv_memory(blocks, total_num_pages)]],
     )
 
     # Connect with peer
@@ -117,8 +117,7 @@ def transfer_routine_receiver(
     # Create engine (DP=1, TP=1)
     engine = KVTransferEngine(
         "engine_2",
-        [[blocks]],
-        total_num_pages=total_num_pages,
+        [[kv_memory(blocks, total_num_pages)]],
     )
 
     # Connect with peer

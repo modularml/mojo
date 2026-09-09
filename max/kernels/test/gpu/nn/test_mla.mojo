@@ -18,8 +18,8 @@ from std.sys import (
     has_nvidia_gpu_accelerator,
 )
 
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -27,7 +27,6 @@ from layout import (
     RuntimeLayout,
     TileTensor,
     UNKNOWN_VALUE,
-    lt_to_tt,
     row_major,
 )
 from nn.attention.gpu.mha import mha_gpu_naive
@@ -39,7 +38,7 @@ from nn.attention.gpu.nvidia.sm100.mla_decode_dispatch import (
     MLADispatchScalarArgs,
 )
 from std.testing import assert_almost_equal
-from std.gpu.host.info import _is_sm10x_gpu
+from max.gpu.host.info import _is_sm10x_gpu
 
 
 from std.utils.index import Index
@@ -172,28 +171,29 @@ def test[
         num_heads=num_heads,
         _is_cache_length_accurate=True,
     ](batch_size, num_keys, seq_len, ctx)
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @parameter
     @always_inline
-    @__copy_capture(
-        q_device,
-        k_device,
-        output_device,
-        scalar_args_buf_lt,
-    )
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {
+        var q_device,
+        var k_device,
+        var output_device,
+        var scalar_args_buf_tt,
+        imm,
+    }:
         flare_mla_decoding[
             config=MHAConfig[qkv_type](num_heads, depth),
             decoding_warp_split_k=decoding_warp_split_k,
         ](
-            output_device.as_any_origin(),
+            output_device.as_unsafe_any_origin(),
             q_device,
             k_device,
             CausalMask(),
             scale,
             ctx,
-            lt_to_tt(scalar_args_buf_lt),
+            scalar_args_buf_tt,
             num_partitions=num_partitions,
         )
 
@@ -203,7 +203,7 @@ def test[
         # Warmup
         kernel_launch(ctx)
 
-        var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+        var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
             nrun
         )
         var sectime = nstime / 1000000
@@ -233,9 +233,11 @@ def test[
         )
         ctx.enqueue_copy(output_ref_device_ptr, output_ptr)
 
-        var k_operand = LayoutTensorMHAOperand(k_device.to_layout_tensor())
+        var k_operand = LayoutTensorMHAOperand(
+            k_device.as_immut().as_unsafe_any_origin()
+        )
         var null_valid_length = LayoutTensor[
-            DType.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
+            .uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
         ](
             None,
             RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(Index(0)),
@@ -278,12 +280,12 @@ def test[
                         d
                         + depth * (h + s * num_heads)
                         + b * depth * num_heads * seq_len
-                    ].cast[DType.float64]()
+                    ].cast[.float64]()
                     var actual = flash_output_ptr[
                         d
                         + (depth - 64) * (h + s * num_heads)
                         + b * (depth - 64) * num_heads * seq_len
-                    ].cast[DType.float64]()
+                    ].cast[.float64]()
                     # if not isclose(actual, expect, atol=1e-3, rtol=rtol):
                     #     var rerr = abs((actual - expect) / expect)
                     #     print(h, s, d, actual, expect, rerr)
@@ -354,10 +356,10 @@ def test_prefill[
     randn(cache_ptr.as_span())
 
     # input row offsets and cache row offsets
-    var input_row_offsets = ctx.enqueue_create_host_buffer[DType.uint32](
+    var input_row_offsets = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
-    var cache_row_offsets = ctx.enqueue_create_host_buffer[DType.uint32](
+    var cache_row_offsets = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
     for i in range(batch_size):
@@ -401,10 +403,10 @@ def test_prefill[
     var v_device_ptr = ctx.enqueue_create_buffer[qkv_type](v_size)
     var cache_device_ptr = ctx.enqueue_create_buffer[k_rope_type](cache_size)
     var output_device_ptr = ctx.enqueue_create_buffer[output_type](o_size)
-    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
-    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
 
@@ -453,18 +455,19 @@ def test_prefill[
         row_major(batch_size + 1),
     )
 
-    @parameter
     @always_inline
-    @__copy_capture(
-        q_device,
-        k_device,
-        v_device,
-        cache_device,
-        input_row_offsets_device,
-        cache_row_offsets_device,
-        output_device,
-    )
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {
+        var q_device,
+        var k_device,
+        var v_device,
+        var cache_device,
+        var input_row_offsets_device,
+        var cache_row_offsets_device,
+        var output_device,
+        imm,
+    }:
         flare_mla_prefill[rank=3](
             output_device,
             q_device,
@@ -486,7 +489,7 @@ def test_prefill[
         for _i in range(20):
             kernel_launch(ctx)
 
-        var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+        var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
             nrun
         )
         var sectime = nstime / 1000000
@@ -588,14 +591,18 @@ def test_prefill[
     ctx.enqueue_copy(v_ref_device_ptr, v_ref_ptr)
 
     var null_valid_length = LayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
+        .uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
     ](
         None,
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(Index(0)),
     )
 
-    var k_ref_operand = LayoutTensorMHAOperand(k_ref_device.to_layout_tensor())
-    var v_ref_operand = LayoutTensorMHAOperand(v_ref_device.to_layout_tensor())
+    var k_ref_operand = LayoutTensorMHAOperand(
+        k_ref_device.as_immut().as_unsafe_any_origin()
+    )
+    var v_ref_operand = LayoutTensorMHAOperand(
+        v_ref_device.as_immut().as_unsafe_any_origin()
+    )
 
     # create reference output
     mha_gpu_naive[_is_cache_length_accurate=True](
@@ -638,9 +645,9 @@ def test_prefill[
         for s in range(seq_len):
             for h in range(num_heads):
                 for d in range(kv_depth):
-                    lhs = output_rank4[b, s, h, d]
-                    rhs = output_ref[b, s, h, d]
-                    if abs((lhs - rhs)).cast[DType.float64]() > atol:
+                    var lhs = output_rank4[b, s, h, d]
+                    var rhs = output_ref[b, s, h, d]
+                    if abs((lhs - rhs)).cast[.float64]() > atol:
                         print(b, s, h, d, lhs, rhs)
                     # print(b, s, h, d, lhs, rhs)
                     assert_almost_equal(
@@ -664,7 +671,7 @@ def test_decoding[
     batch_size: Int,
     num_partitions: Optional[Int],
     split_k: Bool,
-    qkv_type: DType = DType.bfloat16,
+    qkv_type: DType = .bfloat16,
     output_type: DType = qkv_type,
 ](ctx: DeviceContext, use_index_input: Bool) raises:
     comptime if _is_sm10x_gpu(ctx.default_device_info):
@@ -879,6 +886,66 @@ def test_decoding[
         ](1, 2048, ctx, use_index_input=use_index_input)
 
 
+def test_decoding_partial_head_group[
+    batch_size: Int,
+    num_partitions: Optional[Int],
+    split_k: Bool,
+    qkv_type: DType = .bfloat16,
+    output_type: DType = qkv_type,
+](ctx: DeviceContext, use_index_input: Bool) raises:
+    """Covers head counts whose last head group is partial, with a
+    full-multiple control at the same shape so a failure is attributable to
+    the head count alone.
+    """
+    comptime for num_heads in [128, 96, 72]:
+        test[
+            qkv_type,
+            576,
+            num_heads,
+            group=num_heads,
+            against_gpu_naive=True,
+            batch_size=batch_size,
+            num_partitions=num_partitions,
+            decoding_warp_split_k=split_k,
+            output_type=output_type,
+        ](1, 1024, ctx, use_index_input=use_index_input)
+
+
+def test_decoding_k3_head_counts[
+    batch_size: Int,
+    num_partitions: Optional[Int],
+    split_k: Bool,
+](ctx: DeviceContext, seq_len: Int, num_keys: Int) raises:
+    """Kimi K3's per-device Q-head counts at TP2/TP4/TP8 -- 48, 24 and 12.
+
+    K3 serves bf16 KV, and the only K3 head count measured so far (12, in
+    `test_mla_decode_kv_fp8.mojo`) was measured under fp8 KV. These are the
+    counts `compute_mla_dispatch_scalars_runtime` has to enumerate for K3's
+    latent cache to dispatch at all, so they are measured here first.
+
+    48/24/12 are all a single head group. K3's TP1 count of 96 leaves a partial
+    tail head group, which `test_decoding_partial_head_group` covers directly,
+    so it is not repeated here. Of the three, only 12 tails the *combine* grid,
+    which blocks 8 heads per CTA at `warps_per_head=1` and so leaves 4 -- and
+    only a split-K run reaches that kernel at all.
+
+    The control comes FIRST at this exact shape and batch: an assert aborts the
+    run, so ordering a supported count ahead of an unusual one is what makes a
+    failure attributable to the head count rather than to the shape.
+    """
+    comptime for num_heads in [128, 48, 24, 12]:
+        test[
+            DType.bfloat16,
+            576,
+            num_heads,
+            group=num_heads,
+            against_gpu_naive=True,
+            batch_size=batch_size,
+            num_partitions=num_partitions,
+            decoding_warp_split_k=split_k,
+        ](seq_len, num_keys, ctx)
+
+
 def test_mla_prefill[
     batch_size: Int,
     qkv_type: DType,
@@ -962,6 +1029,64 @@ def test_mla_prefill[
         batch_size=batch_size,
         output_type=output_type,
     ](120, 240, ctx)
+    # In-kernel 2Q->1Q switch: num_heads=128 makes the 2Q grid large
+    # enough that the dispatch heuristic keeps the launch at 2Q (BM=256),
+    # so the per-tile switch — not the dispatch-time one — handles short
+    # tails. seq_len=300 tiles as [0,256) (full) + [256,300) whose
+    # remaining 44 rows (<= 128) route to the 1Q body; the would-be empty
+    # 2Q second half is exactly that tile, validating `output_nonempty`.
+    # seq_len=428 tiles as [0,256) (full) + [256,428) whose 172 remaining
+    # rows (> 128) stay on the 2Q body with both output halves non-empty
+    # (WG1 covers 44 valid rows), the complementary `output_nonempty` case.
+    test_prefill[
+        qkv_type,
+        k_rope_type,
+        depth=192,
+        num_heads=128,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+        output_type=output_type,
+    ](300, 300, ctx)
+    test_prefill[
+        qkv_type,
+        k_rope_type,
+        depth=192,
+        num_heads=128,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+        output_type=output_type,
+    ](428, 428, ctx)
+    # Short query chunk over a long cache history: routes to the 1Q
+    # (num_qo=1) kernel via the dispatch heuristic (prompt_len <= 128)
+    # while iterating many KV tiles. 800 keys = 7 BN=128 tiles (odd T:
+    # exercises the 1Q tail path); 768 keys = 6 tiles (even T: 1Q
+    # main-loop only).
+    test_prefill[
+        qkv_type,
+        k_rope_type,
+        depth=192,
+        num_heads=128,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+        output_type=output_type,
+    ](100, 800, ctx)
+    test_prefill[
+        qkv_type,
+        k_rope_type,
+        depth=192,
+        num_heads=128,
+        kv_depth=128,
+        cache_depth=576,
+        cache_num_heads=1,
+        batch_size=batch_size,
+        output_type=output_type,
+    ](64, 768, ctx)
 
 
 def main() raises:
@@ -970,6 +1095,13 @@ def main() raises:
         test_decoding[27, 1, False](ctx, False)
         test_decoding[128, 1, False](ctx, False)
         test_decoding[0, 1, False](ctx, False)
+
+        comptime if _is_sm10x_gpu(ctx.default_device_info):
+            test_decoding_partial_head_group[1, 1, False](ctx, False)
+            test_decoding_partial_head_group[2, 1, False](ctx, False)
+            # Under split-K a tail overrun would corrupt the next split's
+            # partials, which the combine kernel then folds into the output.
+            test_decoding_partial_head_group[1, 2, True](ctx, False)
 
         comptime if has_amd_gpu_accelerator():
             test_decoding[1, 4, False](ctx, False)
@@ -998,6 +1130,14 @@ def main() raises:
                 qkv_type=DType.float8_e4m3fn,
                 output_type=DType.bfloat16,
             ](ctx, False)
+
+        comptime if _is_sm10x_gpu(ctx.default_device_info):
+            test_decoding_k3_head_counts[2, 1, False](ctx, 1, 512)
+            test_decoding_k3_head_counts[1, 1, False](ctx, 1, 4096)
+            # Split-K is what launches the combine kernel, whose 8-head block
+            # these counts tail; an overrun there folds one split's partials
+            # into the next head's output.
+            test_decoding_k3_head_counts[1, 2, True](ctx, 1, 4096)
 
         # test mla prefill
         test_mla_prefill[2, DType.bfloat16, DType.bfloat16](ctx)

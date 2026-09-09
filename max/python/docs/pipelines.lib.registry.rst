@@ -19,6 +19,7 @@ max.pipelines.lib.registry
    PipelineModelType
    PipelineRegistry
    PipelineTypes
+   RetrievedPipeline
    SupportedArchitecture
 
 .. autosummary::

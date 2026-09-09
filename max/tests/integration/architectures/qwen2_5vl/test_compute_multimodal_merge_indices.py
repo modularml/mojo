@@ -21,8 +21,11 @@ import numpy as np
 from max.pipelines.architectures.qwen2_5vl.context import (
     Qwen2_5VLTextAndVisionContext,
 )
+from max.pipelines.context import (
+    ImageMetadata,
+    TokenBuffer,
+)
 from max.pipelines.lib.vlm_utils import compute_multimodal_merge_indices
-from max.pipelines.modeling.types import ImageMetadata, TokenBuffer
 
 
 def test_compute_multimodal_merge_indices() -> None:

@@ -30,8 +30,9 @@ Both launch a 1-block / 1-warp kernel, build a
 bit-exact against the expected slice.
 """
 
-from std.gpu import barrier, thread_idx
-from std.gpu.host import DeviceContext
+from max.gpu import thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
 from std.memory import AddressSpace
 from std.testing import assert_equal
 from layout import (
@@ -71,12 +72,12 @@ def _pattern(i: Int, j: Int) -> BFloat16:
 
 
 def kernel_case_a(
-    src_ptr: UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin],
-    out_ptr: UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin],
+    src_ptr: MutPointer[BFloat16, MutAnyOrigin],
+    out_ptr: MutPointer[BFloat16, MutAnyOrigin],
 ):
     # SMEM destination: (BN, DEPTH) row-major.
     comptime dst_layout = row_major[BN, DEPTH]()
-    var dst_smem = tt_stack_allocation[DType.bfloat16, AddressSpace.SHARED](
+    var dst_smem = tt_stack_allocation[.bfloat16, address_space=.SHARED](
         dst_layout
     )
 
@@ -86,15 +87,11 @@ def kernel_case_a(
         Coord[ComptimeInt[BN], ComptimeInt[DEPTH]].element_types,
         Coord[ComptimeInt[DEPTH], ComptimeInt[1]].element_types,
     ]
-    var src = TileTensor[
-        DType.bfloat16,
-        src_layout_a,
-        MutAnyOrigin,
-    ](src_ptr, src_layout_a())
-
-    var loader = SubTileLoaderLDS[DType.bfloat16, swizzle=Optional[Swizzle]()](
-        src
+    var src = TileTensor[.bfloat16, src_layout_a, MutAnyOrigin](
+        src_ptr, src_layout_a()
     )
+
+    var loader = SubTileLoaderLDS[.bfloat16, swizzle=Optional[Swizzle]()](src)
     loader.load(dst_smem, src)
     barrier()
 
@@ -104,17 +101,17 @@ def kernel_case_a(
     var total = BN * DEPTH
     var i = tid
     while i < total:
-        out_ptr[i] = dst_smem.ptr[i]
+        out_ptr[i] = dst_smem._storage[i]
         i += 64
 
 
 def kernel_case_b(
-    src_ptr: UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin],
-    out_ptr: UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin],
+    src_ptr: MutPointer[BFloat16, MutAnyOrigin],
+    out_ptr: MutPointer[BFloat16, MutAnyOrigin],
 ):
     # SMEM destination: (BN, DEPTH) row-major, same as Case A.
     comptime dst_layout = row_major[BN, DEPTH]()
-    var dst_smem = tt_stack_allocation[DType.bfloat16, AddressSpace.SHARED](
+    var dst_smem = tt_stack_allocation[.bfloat16, address_space=.SHARED](
         dst_layout
     )
 
@@ -124,15 +121,11 @@ def kernel_case_b(
         Coord[ComptimeInt[BN], ComptimeInt[DEPTH]].element_types,
         Coord[ComptimeInt[CACHE_DEPTH_B], ComptimeInt[1]].element_types,
     ]
-    var src = TileTensor[
-        DType.bfloat16,
-        src_layout_b,
-        MutAnyOrigin,
-    ](src_ptr, src_layout_b())
-
-    var loader = SubTileLoaderLDS[DType.bfloat16, swizzle=Optional[Swizzle]()](
-        src
+    var src = TileTensor[.bfloat16, src_layout_b, MutAnyOrigin](
+        src_ptr, src_layout_b()
     )
+
+    var loader = SubTileLoaderLDS[.bfloat16, swizzle=Optional[Swizzle]()](src)
     loader.load(dst_smem, src)
     barrier()
 
@@ -140,7 +133,7 @@ def kernel_case_b(
     var total = BN * DEPTH
     var i = tid
     while i < total:
-        out_ptr[i] = dst_smem.ptr[i]
+        out_ptr[i] = dst_smem._storage[i]
         i += 64
 
 
@@ -154,16 +147,16 @@ def test_case_a(ctx: DeviceContext) raises:
 
     var size = BN * DEPTH
 
-    var host_in = ctx.enqueue_create_host_buffer[DType.bfloat16](size)
-    var host_out = ctx.enqueue_create_host_buffer[DType.bfloat16](size)
+    var host_in = ctx.enqueue_create_host_buffer[.bfloat16](size)
+    var host_out = ctx.enqueue_create_host_buffer[.bfloat16](size)
 
     # Fill input with deterministic pattern.
     for i in range(BN):
         for j in range(DEPTH):
             host_in[i * DEPTH + j] = _pattern(i, j)
 
-    var dev_in = ctx.enqueue_create_buffer[DType.bfloat16](size)
-    var dev_out = ctx.enqueue_create_buffer[DType.bfloat16](size)
+    var dev_in = ctx.enqueue_create_buffer[.bfloat16](size)
+    var dev_out = ctx.enqueue_create_buffer[.bfloat16](size)
     ctx.enqueue_copy(dev_in, host_in)
 
     ctx.enqueue_function[kernel_case_a](
@@ -191,8 +184,8 @@ def test_case_b(ctx: DeviceContext) raises:
     var full_size = BN * CACHE_DEPTH_B
     var out_size = BN * DEPTH
 
-    var host_in = ctx.enqueue_create_host_buffer[DType.bfloat16](full_size)
-    var host_out = ctx.enqueue_create_host_buffer[DType.bfloat16](out_size)
+    var host_in = ctx.enqueue_create_host_buffer[.bfloat16](full_size)
+    var host_out = ctx.enqueue_create_host_buffer[.bfloat16](out_size)
 
     # Fill the entire cache buffer with (i, j) pattern; we'll only read
     # columns [512, 576) via the src tile ptr + head_dim_offset.
@@ -200,13 +193,13 @@ def test_case_b(ctx: DeviceContext) raises:
         for j in range(CACHE_DEPTH_B):
             host_in[i * CACHE_DEPTH_B + j] = _pattern(i, j)
 
-    var dev_in = ctx.enqueue_create_buffer[DType.bfloat16](full_size)
-    var dev_out = ctx.enqueue_create_buffer[DType.bfloat16](out_size)
+    var dev_in = ctx.enqueue_create_buffer[.bfloat16](full_size)
+    var dev_out = ctx.enqueue_create_buffer[.bfloat16](out_size)
     ctx.enqueue_copy(dev_in, host_in)
 
     # Pass a pointer already offset by head_dim_offset — mirrors what
     # KVCacheIterator.next_tile does for the MLA rope slice.
-    var dev_in_offset = UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin](
+    var dev_in_offset = MutPointer[BFloat16, MutAnyOrigin](
         unsafe_from_address=Int(dev_in.unsafe_ptr()) + head_dim_offset * 2
     )
 

@@ -98,21 +98,17 @@ def print_result(result: ScenarioResult, verbose: bool = False) -> None:
         f"{result.test_name}"
     )
 
-    if result.detail and (
-        verbose or result.verdict in (Verdict.FAIL, Verdict.INTERESTING)
-    ):
-        print(f"    {DIM}↳ {result.detail}{RESET}")
-
-    if result.error and (verbose or result.verdict == Verdict.FAIL):
-        print(f"    {RED}↳ error: {result.error[:200]}{RESET}")
-
-    if verbose and result.request_body:
-        req_preview = result.request_body[:200].replace("\n", " ")
-        print(f"    {DIM}↳ request: {req_preview}{RESET}")
-
-    if verbose and result.response_body:
-        body_preview = result.response_body[:200].replace("\n", " ")
-        print(f"    {DIM}↳ body: {body_preview}{RESET}")
+    if verbose or result.verdict in (Verdict.FAIL, Verdict.INTERESTING):
+        for prefix, field, color in [
+            ("", result.detail, DIM),
+            ("error: ", result.error, RED),
+            ("request: ", result.request_body, DIM),
+            ("body: ", result.response_body, DIM),
+        ]:
+            if not field:
+                continue
+            field = field.replace("\n", " ")
+            print(f"    {color}↳ {prefix}{field}{RESET}")
 
 
 def print_summary(

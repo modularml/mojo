@@ -14,7 +14,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import ClassVar
 
 from max.dtype import DType
 from max.graph import DeviceRef
@@ -23,23 +24,77 @@ from max.nn.kv_cache.cache_params import (
     KVCacheParams,
     KVCacheQuantizationConfig,
     MultiKVCacheParams,
+    spec_decode_cache_slack,
 )
 from max.pipelines.architectures.deepseekV3.model_config import DeepseekV3Config
+from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
+from max.pipelines.lib.config.model_config import _select_quantization_encoding
 from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
-from max.pipelines.modeling.config_enums import supported_encoding_dtype
+from max.pipelines.modeling.config_enums import (
+    SupportedEncoding,
+    supported_encoding_dtype,
+)
+from max.pipelines.speculative.config import SpeculativeMethod
 from transformers import AutoConfig
 from typing_extensions import Self, override
+
+
+def resolve_indexer_types(
+    huggingface_config: AutoConfig, num_hidden_layers: int
+) -> list[str]:
+    """Resolve the per-layer indexer schedule for DeepSeek Sparse Attention.
+
+    Each layer is either ``"full"`` (runs its own lightning indexer top-k) or
+    ``"shared"`` (reuses the top-k selection from the most recent full layer).
+
+    If the model doesn't provide an indexer schedule, it will default to all
+    ``"full"`` layers.
+    """
+    types = getattr(huggingface_config, "indexer_types", None)
+    if types is not None:
+        return list(types)
+
+    pattern = getattr(huggingface_config, "index_topk_pattern", None)
+    if pattern is not None:
+        if isinstance(pattern, str):
+            return [{"F": "full", "S": "shared"}[c] for c in pattern]
+        return list(pattern)
+
+    freq = max(getattr(huggingface_config, "index_topk_freq", 1) or 1, 1)
+    offset = getattr(huggingface_config, "index_skip_topk_offset", 2)
+    return [
+        "full" if (max(i - offset + 1, 0) % freq) == 0 else "shared"
+        for i in range(num_hidden_layers)
+    ]
 
 
 @dataclass(kw_only=True)
 class DeepseekV3_2Config(DeepseekV3Config):
     """Configuration for DeepseekV3.2 models."""
 
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "float8_e4m3fn"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {"float8_e4m3fn"}
+
+    unpadded_vocab_size: int | None = None
+
     # Added parameters for the Indexer used in DeepSeek Sparse Attention.
     index_head_dim: int = 128
     index_n_heads: int = 64
     index_topk: int = 2048
+    indexer_types: list[str] = field(default_factory=list)
+    # GLM-5.x sets indexer_rope_interleave=true.
+    indexer_rope_interleave: bool = False
+
+    kv_b_proj_dtype: DType | None = None
+    """Storage dtype of ``kv_b_proj`` when it differs from the rest of the
+    attention block.
+
+    ``None`` keeps it quantized with the other three sparse-MLA projections,
+    which is what DeepSeek-V3.2 and GLM-5.2 ship. A checkpoint that leaves this
+    one projection unquantized sets it here: the absorb then reads the weight
+    directly instead of dequantizing, and declares no
+    ``kv_b_proj.weight_scale``."""
 
     @staticmethod
     def construct_kv_params(
@@ -66,6 +121,15 @@ class DeepseekV3_2Config(DeepseekV3Config):
             scale_dtype=DType.float32, quantization_granularity=32
         )
         assert isinstance(mla_kv_params, KVCacheParams)
+
+        speculative_method: SpeculativeMethod | None = None
+        num_draft_tokens: int = 0
+        if pipeline_config.speculative:
+            speculative_method = pipeline_config.speculative.speculative_method
+            num_draft_tokens = (
+                pipeline_config.speculative.num_speculative_tokens or 0
+            )
+
         indexer_kv_params = kv_cache_config.to_params(
             dtype=indexer_cache_dtype,
             # Similar to MLA, the indexer's k-cache uses a single KV head.
@@ -78,9 +142,13 @@ class DeepseekV3_2Config(DeepseekV3Config):
             is_mla=True,
             num_q_heads=huggingface_config.num_attention_heads,
             kvcache_quant_config=indexer_kvcache_quant_config,
+            speculative_method=speculative_method,
+            num_draft_tokens=num_draft_tokens,
         )
         assert isinstance(indexer_kv_params, KVCacheParams)
-        return MultiKVCacheParams.from_params(mla_kv_params, indexer_kv_params)
+        return MultiKVCacheParams.from_params(
+            {"mla": mla_kv_params, "indexer": indexer_kv_params}
+        )
 
     @override
     @classmethod
@@ -88,6 +156,8 @@ class DeepseekV3_2Config(DeepseekV3Config):
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a DeepseekV3_2Config instance from pipeline configuration.
 
@@ -111,11 +181,13 @@ class DeepseekV3_2Config(DeepseekV3Config):
                 "Please ensure the model repository contains a valid config.json file."
             )
         kv_cache_config = model_config.kv_cache
-        quantization_encoding = model_config.quantization_encoding
-        if quantization_encoding is None:
-            raise ValueError("quantization_encoding must not be None")
+        quantization_encoding = _select_quantization_encoding(
+            model_config, cls.DEFAULT_ENCODING
+        )
         dtype = supported_encoding_dtype(quantization_encoding)
-        cache_dtype = model_config.kv_cache.cache_dtype
+        cache_dtype = cache_dtype_for_encoding(
+            quantization_encoding, model_config.kv_cache.kv_cache_format
+        )
 
         device_refs = [
             DeviceRef(spec.device_type, spec.id)
@@ -158,7 +230,9 @@ class DeepseekV3_2Config(DeepseekV3Config):
             first_k_dense_replace=config.first_k_dense_replace,
             norm_topk_prob=config.norm_topk_prob,
             hidden_act=config.hidden_act,
-            max_position_embeddings=config.max_position_embeddings,
+            max_position_embeddings=config.max_position_embeddings
+            + spec_decode_cache_slack(kv_params),
+            max_seq_len=max_seq_len,
             rms_norm_eps=config.rms_norm_eps,
             tie_word_embeddings=config.tie_word_embeddings,
             rope_theta=get_rope_theta(config),
@@ -171,4 +245,11 @@ class DeepseekV3_2Config(DeepseekV3Config):
             index_head_dim=config.index_head_dim,
             index_n_heads=config.index_n_heads,
             index_topk=config.index_topk,
+            indexer_types=resolve_indexer_types(
+                config, config.num_hidden_layers
+            ),
+            indexer_rope_interleave=getattr(
+                config, "indexer_rope_interleave", False
+            ),
+            quantization_encoding=quantization_encoding,
         )

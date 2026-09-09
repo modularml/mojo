@@ -75,6 +75,7 @@ from std.sys import (
 )
 
 import linalg.matmul.vendor.blas as vendor_blas
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -82,7 +83,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from internal_utils import arg_parse, CacheBustingBuffer
 from internal_utils._utils import InitializationType
 from layout import CoordLike, Coord, Idx, TileTensor, row_major
@@ -148,7 +149,14 @@ def _launch_default[
         c_dtype,
         True,
         config,
-    ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+    ].run[
+        c.LayoutType,
+        a.LayoutType,
+        b.LayoutType,
+        c.Engine,
+        a.Engine,
+        b.Engine,
+    ]
     ctx.enqueue_function[k](
         c,
         a,
@@ -266,15 +274,21 @@ def _bench_one_kernel[
         # Dummy 1-element workspace for non-split-K kernels — never read.
         split_k_workspace = SplitKWorkspace[num_splits](ctx, 1)
 
-    @parameter
-    @__copy_capture(
-        cb_a, cb_b, cb_c, shape_c, shape_a, shape_b, split_k_workspace
-    )
     @always_inline
-    def bench_func(mut b: Bencher):
-        @parameter
+    def bench_func(
+        mut b: Bencher,
+    ) {
+        var cb_a,
+        var cb_b,
+        var cb_c,
+        var shape_c,
+        var shape_a,
+        var shape_b,
+        var split_k_workspace,
+        imm,
+    }:
         @always_inline
-        def kernel_launch(ctx: DeviceContext, iteration: Int) raises:
+        def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             var tensor_a = TileTensor(
                 cb_a.offset_ptr(iteration), row_major(shape_a)
             )
@@ -299,6 +313,7 @@ def _bench_one_kernel[
                     block_k_override=bk_4wave,
                 ](tensor_a, tensor_b, tensor_c, ctx)
             elif kernel_id == KERNEL_4WAVE_SPLIT_K:
+                var local_workspace = split_k_workspace.copy()
                 amd_4wave_split_k_matmul[
                     num_splits=num_splits,
                     enable_swizzle=enable_swizzle,
@@ -310,7 +325,7 @@ def _bench_one_kernel[
                     tensor_b,
                     tensor_c,
                     ctx,
-                    workspace=split_k_workspace,
+                    workspace=local_workspace,
                 )
             elif kernel_id == KERNEL_VENDOR:
                 vendor_blas.matmul[use_tf32=True](
@@ -322,7 +337,7 @@ def _bench_one_kernel[
                     transpose_b=transpose_b,
                 )
 
-        b.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(b, kernel_launch, ctx)
 
     var flops = ThroughputMeasure(
         BenchMetric.flops,
@@ -331,7 +346,8 @@ def _bench_one_kernel[
         * Int(shape_c[1].value())
         * Int(shape_a[1].value()),
     )
-    b.bench_function[bench_func](
+    b.bench_function(
+        bench_func,
         BenchId(
             _get_run_name[
                 dtype,
@@ -508,9 +524,9 @@ def _shape_set_m_values(shape_set_id: Int, N: Int, single_M: Int) -> List[Int]:
 
 
 def main() raises:
-    comptime dtype = get_defined_dtype["dtype", DType.float8_e4m3fn]()
+    comptime dtype = get_defined_dtype["dtype", .float8_e4m3fn]()
     comptime assert (
-        dtype.is_float8() or dtype == DType.bfloat16 or dtype == DType.float16
+        dtype.is_float8() or dtype == .bfloat16 or dtype == .float16
     ), "bench_amd_matmul supports float8_e4m3fn, bfloat16, or float16"
 
     comptime N = get_defined_int["N", 4096]()

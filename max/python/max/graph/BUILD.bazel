@@ -9,6 +9,15 @@ modular_py_library(
         "//max:builtin_kernels",
         "//max:builtin_primitives",
     ],
+    # Runtime deps the examples import that this library cannot carry:
+    # engine and nn depend on graph.
+    docstring_example_deps = [
+        "//max/python/max/engine",
+        "//max/python/max/nn",
+    ],
+    # Each example compiles its own graph; sharded to stay under CI's 800s
+    # test-timeout clamp.
+    docstring_example_shard_count = 8,
     ignore_unresolved_imports = [
         # `buffer_utils` imports `max.engine.InferenceSession` but `engine` depends
         # on `graph`, so `engine` cannot be added to this library's deps.
@@ -16,6 +25,7 @@ modular_py_library(
         # Optional dependency
         "gguf",
     ],
+    test_docstring_examples = True,
     deps = [
         "//max/python/max:_core",
         "//max/python/max:_mlir_context",

@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -11,16 +12,23 @@ _DEPS = [
 
 _FP8_FP4_TESTS = [
     "test_scaled_matmul.mojo",
+    "test_scaled_matmul_pathological_bscale.mojo",
     "test_scaled_fp8_quantization.mojo",
     "test_scaled_nvfp4_quantization.mojo",
     "test_nvfp4_block_scales_interleave.mojo",
     "test_scaled_mxfp8_quantization.mojo",
     "test_scaled_nvfp4_quantization_async.mojo",
+    "test_nvfp4_quantization_near_zero.mojo",
     "test_grouped_nvfp4_quantization.mojo",
 ]
 
 _EXTRA_CONSTRAINTS = {
     "test_scaled_matmul.mojo": select({
+        "//:h100_gpu": ["//:h100_gpu"],
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    "test_scaled_matmul_pathological_bscale.mojo": select({
         "//:h100_gpu": ["//:h100_gpu"],
         "//:b200_gpu": ["//:b200_gpu"],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -45,6 +53,10 @@ _EXTRA_CONSTRAINTS = {
         "//:b200_gpu": ["//:b200_gpu"],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
+    "test_nvfp4_quantization_near_zero.mojo": select({
+        "//:b200_gpu": ["//:b200_gpu"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     "test_grouped_nvfp4_quantization.mojo": select({
         "//:b200_gpu": ["//:b200_gpu"],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -55,8 +67,9 @@ _EXTRA_CONSTRAINTS = {
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         exec_properties = {
-            "test.resources:gpu-memory": "3",
+            "test.resources:gpu-memory": "4",
         },
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []),
@@ -69,6 +82,7 @@ _EXTRA_CONSTRAINTS = {
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"],
         deps = _DEPS,
@@ -84,6 +98,7 @@ _EXTRA_CONSTRAINTS = {
 mojo_test(
     name = "test_multistage_gemm_q.mojo.test",
     srcs = ["test_multistage_gemm_q.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     # KERN-2339: Bounds check reveals vectorized store bug: n=0, width=4 but valid range is [0, 2]
     enable_assertions = False,
     exec_properties = {

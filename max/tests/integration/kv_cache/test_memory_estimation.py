@@ -18,10 +18,12 @@ from max.nn.kv_cache import (
     KVCacheParams,
     KVCacheQuantizationConfig,
     KVConnectorType,
+    MHAKVCacheParams,
+    MLAKVCacheParams,
     compute_num_device_blocks,
-    compute_num_host_blocks,
     estimated_memory_size,
 )
+from max.pipelines.kv_cache.config import KVConnectorConfig
 
 INF = 999999999
 GIB = 1024 * 1024 * 1024
@@ -32,9 +34,9 @@ def create_params(
     tp: int = 1,
     page_size: int = 128,
     dtype: DType = DType.float32,
-    quantization_config: KVCacheQuantizationConfig = KVCacheQuantizationConfig(),
+    quantization_config: KVCacheQuantizationConfig = KVCacheQuantizationConfig(),  # noqa: B008
 ) -> KVCacheParams:
-    return KVCacheParams(
+    return MHAKVCacheParams(
         dtype=dtype,
         n_kv_heads=8,
         head_dim=128,
@@ -161,6 +163,48 @@ def test_limited_mem() -> None:
         )
 
 
+def test_max_seq_len_exceeds_capacity() -> None:
+    params = create_params()
+    # 1 GiB fits 1024 pages of 128 tokens each; one extra token needs a 1025th.
+    oversized_seq_len = 1024 * 128 + 1
+
+    # By default the oversized config only warns (memory estimation probes
+    # such configs during binary search).
+    assert (
+        compute_num_device_blocks(
+            params=params,
+            available_cache_memory=GIB,
+            max_batch_size=1,
+            max_seq_len=oversized_seq_len,
+        )
+        == 1024
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="one request at the max sequence length",
+    ):
+        compute_num_device_blocks(
+            params=params,
+            available_cache_memory=GIB,
+            max_batch_size=1,
+            max_seq_len=oversized_seq_len,
+            require_max_seq_len_fits=True,
+        )
+
+    # A config that exactly fits does not raise.
+    assert (
+        compute_num_device_blocks(
+            params=params,
+            available_cache_memory=GIB,
+            max_batch_size=1,
+            max_seq_len=1024 * 128,
+            require_max_seq_len_fits=True,
+        )
+        == 1024
+    )
+
+
 def test_dp2() -> None:
     params = create_params(dp=2)
     assert (
@@ -213,7 +257,7 @@ def test_bytes_per_block() -> None:
     page_size = 128
     data_parallel_degree = 1
 
-    params = KVCacheParams(
+    params = MHAKVCacheParams(
         dtype=dtype,
         n_kv_heads=n_kv_heads,
         head_dim=head_dim,
@@ -266,25 +310,33 @@ def test_quantized_kv_cache() -> None:
 
 
 def _create_mla_params(tp: int, is_mla: bool = True) -> KVCacheParams:
-    """Create KVCacheParams for MLA with local connector and host swap space."""
-    return KVCacheParams(
+    """Create KVCacheParams for MLA with a tiered connector and host swap space."""
+    shared_kwargs = dict(
         dtype=DType.float32,
-        n_kv_heads=8,
         head_dim=128,
         num_layers=1,
         page_size=128,
         data_parallel_degree=1,
         devices=[DeviceRef.GPU(i) for i in range(tp)],
-        is_mla=is_mla,
-        num_q_heads=32 if is_mla else None,
         enable_prefix_caching=True,
-        kv_connector=KVConnectorType.local,
-        host_kvcache_swap_space_gb=1,
+        kv_connector_config=KVConnectorConfig(
+            type=KVConnectorType.tiered,
+            host_offload_max_gb=1,
+        ),
     )
+    if is_mla:
+        return MLAKVCacheParams(num_q_heads=32, **shared_kwargs)  # type: ignore[arg-type]
+    return MHAKVCacheParams(n_kv_heads=8, **shared_kwargs)  # type: ignore[arg-type]
 
 
 def test_host_blocks_mla_tp_scaling() -> None:
-    """With TP MLA, host block count should be independent of TP degree."""
+    """With TP MLA, host block count should be independent of TP degree.
+
+    ``replicates_kv_across_tp`` is what the host row width keys off (via
+    ``KVCacheMemory.replicated``), so it must be set exactly when the per-device
+    ``bytes_per_block`` grew by the TP degree. See
+    ``test_rust_tier_host_row.py`` for the row width itself.
+    """
     params_tp1 = _create_mla_params(tp=1)
     params_tp8 = _create_mla_params(tp=8)
 
@@ -293,16 +345,9 @@ def test_host_blocks_mla_tp_scaling() -> None:
     # TP=8 MLA replicates KV on every device.
     assert params_tp8.replicates_kv_across_tp
 
-    # bytes_per_block grows with TP (each device holds full KV), but the fix
-    # divides it back out for the host where only one copy is needed.
+    # bytes_per_block grows with TP (each device holds full KV); the host stores
+    # one copy, which is what keeps the host block count TP-independent.
     assert params_tp8.bytes_per_block == params_tp1.bytes_per_block * 8
-
-    host_blocks_tp1 = compute_num_host_blocks(params_tp1)
-    host_blocks_tp8 = compute_num_host_blocks(params_tp8)
-
-    # Despite bytes_per_block being 8x larger, host blocks should be the same
-    # because on CPU/disk we only store one copy of the KV state.
-    assert host_blocks_tp8 == host_blocks_tp1
 
 
 def test_host_blocks_non_mla_tp_no_scaling() -> None:
@@ -313,9 +358,6 @@ def test_host_blocks_non_mla_tp_no_scaling() -> None:
     assert not params_tp1.replicates_kv_across_tp
     assert not params_tp8.replicates_kv_across_tp
 
-    host_blocks_tp1 = compute_num_host_blocks(params_tp1)
-    host_blocks_tp8 = compute_num_host_blocks(params_tp8)
-
-    # Non-MLA shards KV across TP, so bytes_per_block is constant regardless
-    # of TP and the host block count stays the same.
-    assert host_blocks_tp1 == host_blocks_tp8
+    # Non-MLA shards KV across TP, so bytes_per_block is already constant
+    # regardless of TP and the host stores every shard.
+    assert params_tp1.bytes_per_block == params_tp8.bytes_per_block

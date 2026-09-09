@@ -17,20 +17,32 @@ This module provides tools for profiling and tracing MAX operations to analyze
 performance characteristics. Profiling captures timing information for code
 execution, which helps identify bottlenecks and optimize your models.
 
-To enable profiling, set the ``MODULAR_ENABLE_PROFILING=1`` environment
-variable before running your code. Without this variable, profiling calls will
-be no-ops with minimal overhead.
+To enable in-runtime NVTX markers, set ``MODULAR_ENABLE_PROFILING`` to ``on``
+or ``detailed`` before running your code. Without it, profiling calls are
+no-ops with minimal overhead.
 
-The profiler supports three usage patterns:
+The profiler exposes two layers:
 
-1. **Context manager**: Use :class:`Tracer` as a context manager to profile a
-   code block.
-2. **Decorator**: Use :func:`@traced <traced>` to profile entire functions.
-3. **Manual stack**: Use :class:`Tracer` methods to explicitly control profiling
-   spans.
+1. **In-source spans**: :class:`Tracer` (context manager / manual stack) and
+   :func:`@traced <traced>` (decorator) emit NVTX ranges around blocks or
+   functions. These show up in any Nsight Systems capture of the process.
+2. **One-shot CLI capture**: :func:`maybe_reexec_under_nsys` re-launches the
+   current process under ``nsys profile`` and renders a top-N kernel summary
+   on exit; :func:`profiled_region` is the corresponding context manager
+   that brackets the timed region with ``cudaProfilerStart``/``Stop`` and
+   prints a ``cProfile`` Python/CPU summary. These power the
+   ``--profile`` flag on ``max generate`` / ``max benchmark``.
 """
 
-from max.profiler import cpu, gpu
+from max.profiler import cpu, gpu, oneshot
+from max.profiler.oneshot import (
+    OneShotCapture,
+    ProfileBackend,
+    default_profile_output,
+    detect_backend,
+    maybe_reexec_under_nsys,
+    profiled_region,
+)
 
 try:
     from max._core.profiler import is_profiling_enabled, set_gpu_profiling_state
@@ -49,10 +61,17 @@ except ImportError:
     set_gpu_profiling_state = _not_available
 
 __all__ = [
+    "OneShotCapture",
+    "ProfileBackend",
     "Tracer",
     "cpu",
+    "default_profile_output",
+    "detect_backend",
     "gpu",
     "is_profiling_enabled",
+    "maybe_reexec_under_nsys",
+    "oneshot",
+    "profiled_region",
     "set_gpu_profiling_state",
     "traced",
 ]

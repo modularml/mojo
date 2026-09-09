@@ -1,35 +1,186 @@
-# Codeowners for modular/modular repo.
-# Every line is a file pattern that is followed by one or more code owners.
-# Order is important; the last matching pattern takes the most precedence.
-
-* @modular/max-code-reviewers
-
-# CI
+* @modular/public-repo-maintainers
+*.git* @modular/sdlc
+*.shellcheckrc @modular/sdlc
+/*.clang* @modular/sdlc
+/*.git* @modular/sdlc
+/context7.json @modular/mojo-docs
+*.bazel @modular/sdlc
+*.buildifier.json @modular/sdlc
+*.bzl @modular/sdlc
+/tools/* @modular/sdlc
+/.bazel* @modular/sdlc
+/bazel* @modular/sdlc
+/AsyncRT/ @modular/runtime
+/docs/ @modular/mojo-docs
+/AI_TOOL_POLICY.md @modular/mojo-docs
+/max/CONTRIBUTING.md @modular/mojo-docs
+/max/docs/development.md @modular/mojo-docs @modular/max-serve
+/Mojo/CLAUDE.md @modular/stdlib
+/Mojo/CONTRIBUTING.md @modular/stdlib
+/Mojo/README.md @modular/stdlib
+/Mojo/docs/site/ @modular/mojo-docs
+/Mojo/docs/compiler/ @modular/compiler
+/Mojo/docs/stdlib/ @modular/stdlib
+/Mojo/docs/contributing/ @alisterburt @JoeLoser @dgurchenkov
+/Mojo/docs/contributing/stdlib/ @modular/stdlib
+/Mojo/docs/contributing/compiler/ @modular/compiler
+/Mojo/examples/ @modular/mojo-docs
+/Mojo/include/ @modular/compiler
+/Mojo/integration-test/ @modular/stdlib
+/Mojo/lib/ @modular/compiler
+/Mojo/proposals/ @modular/stdlib
+/Mojo/python/ @modular/stdlib
+/Mojo/stdlib/ @modular/stdlib
+/Mojo/stdlib/std/runtime @modular/compiler
+/Mojo/test/ @modular/compiler
+/Mojo/test/mojo-debug/ @modular/compiler
+/Mojo/test/mojo-jupyter/ @modular/compiler
+/Mojo/test/mojo-lsp-server/ @modular/compiler
+/Mojo/test/mojo-lsp-server-node/ @modular/compiler
+/Mojo/test/mojo-repl/ @modular/compiler
+/Mojo/test/mojo-tool/ @modular/compiler
+/Mojo/tools/ @modular/compiler
+/Mojo/tools/mblack/ @modular/compiler
+/Mojo/tools/mojo/ @modular/compiler
+/Mojo/tools/mojo/Build/ @modular/compiler
+/Mojo/tools/mojo/Common/ @modular/compiler
+/Mojo/tools/mojo/Precompile/ @modular/compiler
+/Mojo/tools/mojo/Run/ @modular/compiler
+/Mojo/tools/mojo/mojo.cpp @modular/compiler
+/Mojo/tools/mojo/*.td @modular/compiler
+/Mojo/tools/mojo/BUILD.bazel @modular/compiler
+/Mojo/tools/mojo-jupyter-executor/ @modular/compiler
+/Mojo/tools/mojo-lsp-server/ @modular/compiler
+/Mojo/tools/mojo-lsp-test-client/ @modular/compiler
+/Mojo/tools/mojo-repl-entry-point/ @modular/compiler
+/Mojo/unittests @modular/compiler
+/Mojo/unittests/mojo-debug/ @modular/compiler
+/Mojo/utils/ @modular/compiler
+/Mojo/**/Compiler @modular/compiler
+/Mojo/**/ExecutionEngine @modular/compiler
+/Mojo/**/MojoJupyter @modular/compiler
+/Mojo/**/MojoLLDB @modular/compiler
+/Mojo/**/MojoTooling @modular/compiler
+/Mojo/**/ToolCommon @modular/compiler
+/max/mojo/max/__init__.mojo @modular/stdlib @modular/genai @modular/driver
+/max/mojo/max/_category_.json @modular/mojo-docs
+/max/mojo/max/algorithm/ @modular/stdlib @modular/genai
+/max/mojo/max/benchmark/ @modular/stdlib
+/max/mojo/max/gpu/ @modular/stdlib @modular/genai
+/max/mojo/max/gpu/host @modular/stdlib @modular/genai @modular/driver
+/max/mojo/max/runtime @modular/stdlib @modular/compiler
+/max/mojo/max/_plugin/ @modular/stdlib @modular/genai
+/max/mojo/test/atomic/ @modular/stdlib
+/max/mojo/test/algorithm/ @modular/stdlib @modular/genai
+/max/mojo/test/asyncrt/ @modular/stdlib @modular/genai @modular/runtime
+/max/mojo/test/benchmark/ @modular/stdlib
+/max/mojo/test/compile/ @modular/stdlib
+/max/mojo/test/gpu/ @modular/stdlib @modular/genai
+/max/mojo/test/math/ @modular/stdlib
+/max/mojo/test/runtime/ @modular/stdlib
+/max/include/ @modular/runtime
+/max/kernels @modular/genai
+/max/kernels/benchmarks/autotune @modular/max-sdk @modular/genai
+/max/kernels/src/graph_compiler @modular/runtime
+/max/kernels/src/layout @modular/genai
+/max/kernels/test/gpu/layout @modular/genai
+/max/kernels/test/layout @modular/genai
+/max/python/docs/ @modular/mojo-docs
+/max/python/layer_benchmarks/ @modular/max-sdk @modular/max-serve
+/max/python/max/_core/ @modular/max-sdk @modular/runtime
+/max/python/max/_core_types/ @modular/runtime
+/max/python/max/_eager_policy.py @modular/max-sdk
+/max/python/max/_interpreter.py @modular/max-sdk
+/max/python/max/_interpreter_ops/ @modular/max-sdk
+/max/python/max/_kv_cache_ops/ @modular/max-serve @modular/max-sdk
+/max/python/max/_mlir_context.py @modular/max-sdk
+/max/python/max/_mlir/ @modular/max-sdk
+/max/python/max/_xgrammar/ @modular/max-serve @modular/max-sdk
+/max/python/max/benchmark @modular/max-sdk @modular/max-serve
+/max/python/max/config/ @modular/max-sdk
+/max/python/max/diagnostics/ @modular/max-sdk
+/max/python/max/driver/ @modular/driver
+/max/python/max/dtype/ @modular/driver
+/max/python/max/engine/ @modular/driver
+/max/python/max/_entrypoints/ @modular/max-sdk
+/max/python/max/experimental/ @modular/max-sdk
+/max/python/max/experimental/cascade/ @modular/max-serve @modular/max-sdk
+/max/python/max/graph/ @modular/max-sdk
+/max/python/max/kv_cache/ @modular/max-serve @modular/max-sdk
+/max/python/max/mlir/ @modular/max-sdk
+/max/python/max/nn/ @modular/max-sdk
+/max/python/max/pipelines/ @modular/max-sdk @modular/max-serve
+/max/python/max/pipelines/architectures/ @modular/max-serve
+/max/python/max/pipelines/modeling/ @modular/max-sdk
+/max/python/max/pipelines/request/ @modular/max-sdk
+/max/python/max/serve/ @modular/max-serve
+/max/python/max/serve/recordreplay/ @modular/max-sdk @modular/max-serve
+/max/python/max/support/ @modular/compiler
+/max/tests/docstring_examples/ @modular/mojo-docs
+/max/tests/integration/accuracy/ @modular/max-serve
+/max/tests/integration/architectures/ @modular/max-serve
+/max/tests/integration/pipelines/ @modular/max-sdk
+/max/tests/integration/c/ @modular/max-sdk @modular/runtime
+/max/tests/integration/cli/ @modular/max-serve
+/max/tests/integration/dataprocessing/ @modular/max-sdk
+/max/tests/integration/graph/ @modular/max-sdk
+/max/tests/integration/interfaces/ @modular/max-sdk
+/max/tests/integration/kv_cache/ @modular/max-serve
+/max/tests/integration/nn/ @modular/max-sdk
+/max/tests/integration/serve/ @modular/max-serve
+/max/tests/integration/tensor @modular/max-sdk
+/max/tests/integration/unorganized/sampling @modular/max-serve
+/max/tests/integration/xarch_warm/ @modular/max-sdk
+/max/tests/tests/benchmark/ @modular/max-sdk
+/max/tests/tests/cascade/ @modular/max-serve @modular/max-sdk
+/max/tests/tests/profiler/ @modular/max-sdk
+/max/tests/tests/driver/ @modular/driver
+/max/tests/tests/_entrypoints/ @modular/max-sdk
+/max/tests/tests/engine/ @modular/driver
+/max/tests/tests/graph/ @modular/max-sdk
+/max/tests/tests/kv_cache/ @modular/max-serve @modular/max-sdk
+/max/tests/tests/pipelines/ @modular/max-serve @modular/max-sdk
+/max/tests/tests/nixl/ @modular/runtime
+/max/tests/tests/nn/ @modular/max-sdk
+/max/tests/tests/serve/ @modular/max-serve
+/max/tests/tests/serve/recordreplay/ @modular/max-sdk @modular/max-serve
+/max/tests/tests/support/ @modular/compiler
+/max/tests/tests/torch/ @modular/max-sdk
+/max/tests/tests/compile_pool_parent_exit_subprocess.py @modular/max-sdk
+/max/tests/tests/test_compilation.py @modular/max-sdk
+/max/tests/tests/test_compile_pool.py @modular/max-sdk
+/max/tests/tests/test_compile_serialization.py @modular/max-sdk
+/max/tests/tests/test_dim_substitute.py @modular/max-sdk
+/max/tests/tests/test_eager_cold_start_policy.py @modular/max-sdk
+/max/tests/tests/test_executor.py @modular/max-sdk
+/max/tests/tests/test_functional_signatures.py @modular/mojo-docs
+/max/tests/tests/test_functional_threading.py @modular/max-sdk
+/max/tests/tests/test_generated_dialects.py @modular/runtime @modular/max-sdk
+/max/tests/tests/test_interpreter.py @modular/max-sdk
+/max/tests/tests/test_interpreter_ops.py @modular/max-sdk
+/max/tests/tests/test_interpreter_ops_gpu.py @modular/max-sdk
+/max/tests/tests/test_passes.py @modular/max-sdk
+/max/tests/tests/test_session_read.py @modular/max-sdk
+/max/tests/tests/test_support.py @modular/max-sdk
+/max/tests/tests/test_tensor.py @modular/max-sdk
+/max/tests/tests/test_tree_utils.py @modular/max-sdk
+/max/tests/tests/mojo_runtime_foreign_thread_subprocess.py @modular/runtime
+/max/tests/tests/test_mojo_runtime_foreign_thread.py @modular/runtime
 /.github/ @modular/sdlc
-/bazel/ @modular/sdlc
-
-# Standard Library
-/mojo/stdlib/         @modular/stdlib
-/mojo/stdlib/stdlib/gpu/host @modular/stdlib
-/mojo/stdlib/stdlib/gpu/host/device_context.mojo @modular/driver @modular/stdlib
-/mojo/stdlib/stdlib/gpu/runtime @modular/stdlib @modular/mojo-lang
-/mojo/stdlib/test/asyncrt @modular/stdlib @modular/runtime
-
-# Kernel Library
-/max/kernels    @modular/kernels
-
-# Tracing
-/mojo/stdlib/gpu/host/_tracing.mojo @modular/stdlib @modular/kernels @modular/mojo-tooling
-/mojo/stdlib/gpu/profiler.mojo @modular/stdlib @modular/kernels @modular/mojo-tooling
-/mojo/stdlib/runtime/tracing.mojo @modular/mojo-lang @modular/mojo-tooling
-/mojo/stdlib/test/runtime/tracing.mojo @modular/mojo-lang @modular/mojo-tooling
-
-# Documentation
-/mojo/docs/         @modular/mojo-docs
-
-/mojo/docs/nightly-changelog.md @modular/stdlib
-
-/mojo/stdlib/docs/  @modular/mojo-docs @modular/stdlib
-
-# Examples
-/examples/mojo/     @jackos @arthurevans @KenJones-Modular
+/utils @modular/max-sdk
+/utils/local_transformers_setup/ @modular/max-serve
+/Support/ @modular/compiler
+/Support/**/Compiler/ @modular/compiler
+/Support/**/DebugInfoDialect @modular/compiler
+/Support/**/MArchTarget/ @modular/compiler
+/Support/**/MDialect/ @modular/compiler
+/Support/**/Telemetry/ @modular/max-sdk
+/Support/tools/driver-tblgen @modular/compiler
+pixi.toml @modular/sdlc
+pyproject.toml @modular/sdlc
+/Mojo/**/CompilerProfiling* @modular/compiler
+/Mojo/lib/CompilerRT/Tracing.cpp @modular/compiler
+/max/python/max/**/profiler* @modular/max-sdk
+/Support/**/Profiling/ @modular/compiler
+/Support/include/Support/Profiling/PluginABI.h @modular/max-sdk
+/Support/lib/ProfilerHostGlue.cpp @modular/max-sdk

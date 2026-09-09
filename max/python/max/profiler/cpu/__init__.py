@@ -17,6 +17,6 @@ This module allows collecting CPU utilization metrics for a set of
 processes, identified by PID.
 """
 
-from ._collector import CPUMetricsCollector as CPUMetricsCollector
-from ._collector import collect_pids_for_port as collect_pids_for_port
-from ._types import CPUMetrics as CPUMetrics
+from .collector import CPUMetricsCollector as CPUMetricsCollector
+from .collector import collect_pids_for_port as collect_pids_for_port
+from .types import CPUMetrics as CPUMetrics

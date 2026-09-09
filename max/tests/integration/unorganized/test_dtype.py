@@ -34,6 +34,8 @@ int_dtype = st.sampled_from(
 float_dtype = st.sampled_from(
     [
         DType.float4_e2m1fn,
+        DType.float6_e2m3fn,
+        DType.float6_e3m2fn,
         DType.float8_e4m3fn,
         DType.float8_e4m3fnuz,
         DType.float8_e5m2,
@@ -54,10 +56,12 @@ def test_roundtrip() -> None:
 
 @given(dtype=int_dtype | float_dtype)
 def test_numpy_roundtrip(dtype: DType) -> None:
-    # There is no f4 / float8 / bf16 in numpy, so we cannot roundtrip
-    # f4 / float8 / bf16
+    # There is no f4 / f6 / float8 / bf16 in numpy, so we cannot roundtrip
+    # f4 / f6 / float8 / bf16
     if dtype in [
         DType.float4_e2m1fn,
+        DType.float6_e2m3fn,
+        DType.float6_e3m2fn,
         DType.float8_e4m3fn,
         DType.float8_e4m3fnuz,
         DType.float8_e5m2,
@@ -96,6 +100,8 @@ def test_dtype_alignment() -> None:
     assert DType.float64.align == 8
     assert DType.bfloat16.align == 2
     assert DType.float4_e2m1fn.align == 1
+    assert DType.float6_e2m3fn.align == 1
+    assert DType.float6_e3m2fn.align == 1
     assert DType.float8_e4m3fn.align == 1
     assert DType.float8_e4m3fnuz.align == 1
     assert DType.float8_e5m2.align == 1
@@ -175,6 +181,22 @@ class TestFinfo:
         assert info.max == 6.0
         assert info.min == -6.0
         assert info.tiny == 1.0
+
+    def test_float6_e2m3fn(self) -> None:
+        info = finfo(DType.float6_e2m3fn)
+        assert info.bits == 6
+        assert info.eps == 0.125
+        assert info.max == 7.5
+        assert info.min == -7.5
+        assert info.tiny == 1.0
+
+    def test_float6_e3m2fn(self) -> None:
+        info = finfo(DType.float6_e3m2fn)
+        assert info.bits == 6
+        assert info.eps == 0.25
+        assert info.max == 28.0
+        assert info.min == -28.0
+        assert info.tiny == 0.25
 
     @pytest.mark.parametrize("dtype", [DType.int32, DType.bool, DType.uint8])
     def test_non_float_raises_type_error(self, dtype: DType) -> None:

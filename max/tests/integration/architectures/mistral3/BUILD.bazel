@@ -8,7 +8,6 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -22,7 +21,7 @@ modular_py_test(
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/mistral3",
         "//max/python/max/pipelines/lib",
         requirement("pytest-mock"),
         requirement("transformers"),

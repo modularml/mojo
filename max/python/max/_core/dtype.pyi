@@ -76,6 +76,16 @@ class DType(enum.Enum):
     4-bit floating-point with 2 exponent bits and 1 mantissa bits, finite values only.
     """
 
+    float6_e2m3fn = 65
+    """
+    6-bit floating-point with 2 exponent bits and 3 mantissa bits, finite values only.
+    """
+
+    float6_e3m2fn = 66
+    """
+    6-bit floating-point with 3 exponent bits and 2 mantissa bits, finite values only.
+    """
+
     float8_e8m0fnu = 73
     """
     8-bit floating-point with 8 exponent bits and 0 mantissa bits, finite values only.

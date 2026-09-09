@@ -116,6 +116,9 @@ class Attention(Module):
         attn_mask = ops.rebind(
             attn_mask, (scores.shape[0], 1, scores.shape[2], scores.shape[3])
         )
+        # If there's an accuracy issues, check
+        # the dtypes here first.
+        attn_mask = attn_mask.cast(scores.dtype)
         # This avoids the symbolic dimension mismatch issue
         scores = ops.softmax(scores * scale + attn_mask)
 

@@ -14,11 +14,11 @@
 """Figure 15.14: Matrix multiplication with double buffering (software pipelining)."""
 
 from std.math import ceildiv
-from std.gpu import barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
 from std.itertools import product
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 
 comptime bM = 64
 comptime bN = 64
@@ -34,11 +34,7 @@ def loadTile(
     lda: Int,
     maxRow: Int,
     maxCol: Int,
-    T_s: UnsafePointer[
-        Scalar[DType.float32],
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
-    ],
+    T_s: UnsafePointer[mut=True, Float32, _, address_space=.SHARED],
     ldas: Int,
     height: Int,
     width: Int,
@@ -65,14 +61,14 @@ def loadTile(
         row += subtile * num_rows_per_tile
 
         if row < maxRow and col < maxCol:
-            T_s[row * ldas + col] = Scalar[DType.float32](T[row * lda + col])
+            T_s[row * ldas + col] = Float32(T[row * lda + col])
         else:
-            T_s[row * ldas + col] = Scalar[DType.float32](0.0)
+            T_s[row * ldas + col] = Float32(0.0)
 
 
 def mm_tiled_kernel_double_buffer(
-    A: UnsafePointer[Float32, MutAnyOrigin],
-    B: UnsafePointer[Float32, MutAnyOrigin],
+    A: UnsafePointer[Float32, ImmutAnyOrigin],
+    B: UnsafePointer[Float32, ImmutAnyOrigin],
     C: UnsafePointer[Float32, MutAnyOrigin],
     M: UInt32,
     N: UInt32,
@@ -104,18 +100,18 @@ def mm_tiled_kernel_double_buffer(
     var tCol = tile_y * tN
 
     # Register accumulator
-    var Cr = SIMD[DType.float32, tM * tN](0.0)
+    var Cr = SIMD[.float32, tM * tN](0.0)
 
     # Allocate double-buffered shared memory (2 sets of tiles)
-    var A_s = stack_allocation[
+    var A_s = unsafe_stack_allocation[
         2 * bM * bK,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
-    var B_s = stack_allocation[
+    var B_s = unsafe_stack_allocation[
         2 * bK * bN,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
 
     # Pointers to current and next buffers (using offsets)
@@ -224,7 +220,7 @@ def mm_tiled_kernel_double_buffer(
 def cpu_mm(
     A: UnsafePointer[Float32, _],
     B: UnsafePointer[Float32, _],
-    C: UnsafePointer[Float32, MutAnyOrigin],
+    C: UnsafePointer[mut=True, Float32, _],
     M: Int,
     N: Int,
     K: Int,

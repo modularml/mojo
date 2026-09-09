@@ -2,7 +2,7 @@
 
 # **MAX NVIDIA base container**
 
-[Modular Accelerated eXecution (MAX)⁠](https://docs.modular.com/max/) provides
+[Modular Accelerated eXecution (MAX)⁠](https://max.modular.com/) provides
 a high-performance, flexible platform for AI workloads, leveraging modern GPUs
 to deliver accelerated generative AI performance while maintaining portability
 across different hardware configurations and cloud providers.
@@ -15,7 +15,7 @@ heavier frameworks like cuDNN.
 This container is ideal for users who need a streamlined solution with faster
 downloads and a smaller footprint. For more information on container contents
 and instance compatibility, see
-[MAX containers⁠](https://docs.modular.com/max/container/) in the MAX
+[MAX containers⁠](https://max.modular.com/container/) in the MAX
 documentation.
 
 ### **Quick Start**
@@ -55,7 +55,7 @@ Nightlies
 ### **Documentation**
 
 For more information on Modular and its products, visit the
-[Modular documentation site⁠](https://docs.modular.com/).
+[Modular documentation site⁠](https://max.modular.com/).
 
 ### **Community**
 

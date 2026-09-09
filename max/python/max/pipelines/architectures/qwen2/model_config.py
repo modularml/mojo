@@ -12,11 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import ClassVar, Literal
 
 from max.graph.weights import WeightData
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
 from max.pipelines.architectures.llama3.model_config import Llama3Config
+from max.pipelines.modeling.config_enums import SupportedEncoding
 from transformers import AutoConfig
 
 
@@ -24,13 +25,19 @@ from transformers import AutoConfig
 class Qwen2Config(Llama3Config):
     """Model configuration for Qwen2 graph construction/execution."""
 
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "float32",
+        "bfloat16",
+    }
+
     def finalize(
         self,
         huggingface_config: AutoConfig,
         state_dict: dict[str, WeightData],
         return_logits: ReturnLogits,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
-        norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm",
+        norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm",
         attention_bias: bool = False,
     ) -> None:
         super().finalize(

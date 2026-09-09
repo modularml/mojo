@@ -82,7 +82,7 @@ any reshape: MAX pads `bias` on the left to `(1, features)` and broadcasts it
 across every row in the batch. The following example adds an `(8,)` bias to
 `(4, 8)` activations:
 
-{/* @sync: _examples/broadcasting/auto_broadcast.py */}
+{/* @sync: ../../code/develop/broadcasting/auto_broadcast.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -110,7 +110,7 @@ dimension, yet the operation works without any reshape: MAX pads the leading
 dimension automatically, applying the same mask to every sequence in the batch.
 The following example adds an `(8, 8)` mask to `(2, 8, 8)` scores:
 
-{/* @sync: _examples/broadcasting/mask_broadcast.py */}
+{/* @sync: ../../code/develop/broadcasting/mask_broadcast.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -135,14 +135,14 @@ rather than let the operation infer it, `F.broadcast_to` provides that control.
 
 When you need the target shape explicit in code rather than inferred from an
 operation,
-[`F.broadcast_to(x, shape)`](/max/api/python/experimental.functional#max.experimental.functional.broadcast_to)
+[`F.broadcast_to(x, shape)`](/api/python/experimental.functional#max.experimental.functional.broadcast_to)
 expands a tensor directly to a target shape without running an elementwise
 operation.
 
 The following example uses `F.broadcast_to` to expand a `(1, features)` weight
 vector to `(batch, features)`:
 
-{/* @sync: _examples/broadcasting/explicit_broadcast.py */}
+{/* @sync: ../../code/develop/broadcasting/explicit_broadcast.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -182,11 +182,11 @@ Adding a `(features,)` vector to a `(seq_len, batch, features)` tensor fails
 because right-alignment places `features` against `features`, but the
 `(seq_len, batch)` dimensions have no counterpart in the vector. The solution is
 to introduce the missing leading dimensions with
-[`Tensor.unsqueeze(axis)`](/max/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.unsqueeze)
+[`Tensor.unsqueeze(axis)`](/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.unsqueeze)
 before the operation. The following example adds two leading dimensions to a
 `(features,)` vector so it aligns with a `(seq_len, batch, features)` tensor:
 
-{/* @sync: _examples/broadcasting/fix_rank.py */}
+{/* @sync: ../../code/develop/broadcasting/fix_rank.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -244,7 +244,5 @@ covers how to extract and combine values by position, runtime indices, or
 boolean masks (`F.where` relies on the broadcasting rules from this page):
 
 - **Slice, gather, mask, and scatter tensor values**:
-  [Indexing and slicing](/max/develop/indexing)
-- **Compile ops and see how shapes carry into graphs**:
-  [Get started with MAX graphs](/max/develop/get-started-with-max-graph-in-python)
-- **Review elementwise APIs**: [Basic operations](/max/develop/basic-ops)
+  [Indexing and slicing](/develop/indexing)
+- **Review elementwise APIs**: [Basic operations](/develop/basic-ops)

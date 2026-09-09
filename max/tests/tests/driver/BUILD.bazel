@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -12,9 +11,11 @@ modular_py_test(
     srcs = glob(
         ["*.py"],
         exclude = [
+            "test_buffer_sync_contracts.py",
             "test_device_event.py",
             "test_buffer_device_pinned.py",
             "test_host_func.py",
+            "test_launch_trace.py",
         ],
     ),
     tags = [
@@ -35,8 +36,10 @@ modular_py_test(
         "accelerator_tests/test_buffer.py",
         "accelerator_tests/test_device.py",
         "test_buffer_device_pinned.py",
+        "test_buffer_sync_contracts.py",
         "test_device_event.py",
         "test_host_func.py",
+        "test_launch_trace.py",
     ],
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],

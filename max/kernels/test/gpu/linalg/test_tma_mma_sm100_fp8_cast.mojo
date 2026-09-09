@@ -23,14 +23,15 @@ from std.sys import size_of
 import linalg.matmul.vendor.blas as vendor_blas
 
 from std.math.uutils import udivmod
-from std.gpu import WARP_SIZE, barrier
-from std.gpu.primitives.cluster import block_rank_in_cluster
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, lane_id, thread_idx, warp_id as get_warp_id
-from std.gpu.memory import external_memory, fence_async_view_proxy
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.compute.arch.tcgen05 import *
+from max.gpu import WARP_SIZE
+from max.gpu.sync import barrier
+from max.gpu.primitives.cluster import block_rank_in_cluster
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import block_idx, lane_id, thread_idx, warp_id as get_warp_id
+from max.gpu.memory import external_memory, fence_async_view_proxy
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.compute.arch.tcgen05 import *
 from layout import IntTuple, Layout, LayoutTensor
 from layout._fillers import random
 from layout._utils import ManagedLayoutTensor
@@ -88,10 +89,10 @@ def cpu_matmul_naive[
                 else:
                     b_idx = k * N + n
                 acc += (
-                    A.ptr.load(a_idx).cast[DType.float32]()
-                    * B.ptr.load(b_idx).cast[DType.float32]()
+                    A.ptr.load(a_idx).cast[.float32]()
+                    * B.ptr.load(b_idx).cast[.float32]()
                 )
-            c_idx = m * N + n
+            var c_idx = m * N + n
             C.ptr.store(c_idx, acc.cast[C.dtype]())
 
 
@@ -117,7 +118,7 @@ def tma_umma_kernel_sgs[
     a_tma_op: TMATensorTile[a_type, a_tile_rank, a_tile_shape, a_desc_shape],
     b: LayoutTensor[b_gmem_type, b_layout, ImmutAnyOrigin],  # FP8 in gmem
     c: LayoutTensor[c_type, c_layout, MutAnyOrigin],
-    num_iters: Int,
+    num_iters_dev: Int32,
 ):
     """Kernel with A via TMA to smem, B from gmem->registers->cast->smem.
 
@@ -125,12 +126,13 @@ def tma_umma_kernel_sgs[
     Matrix B: FP8 in global memory, loaded to registers, cast to BF16, stored to smem
     MMA: Uses BF16 operands (KIND_F16)
     """
+    var num_iters = Int(num_iters_dev)
     comptime assert num_threads == 128 or num_threads == 256
     comptime assert (
-        a_type == DType.bfloat16
+        a_type == .bfloat16
     ), "a_type must be bfloat16 for this kernel"
     comptime assert (
-        b_gmem_type == DType.float8_e4m3fn
+        b_gmem_type == .float8_e4m3fn
     ), "b_gmem_type must be float8_e4m3fn for this kernel"
 
     comptime BM = block_tile_shape[0]
@@ -158,16 +160,12 @@ def tma_umma_kernel_sgs[
         b_smem_type, BN, BK, swizzle_mode=b_swizzle
     ]()
 
-    a_smem = rebind[
-        UnsafePointer[
-            Scalar[a_type],
-            address_space=AddressSpace.SHARED,
-            ExternalOrigin[mut=True],
-        ]
+    var a_smem = rebind[
+        MutPointer[Scalar[a_type], address_space=.SHARED, MutUntrackedOrigin]
     ](
         external_memory[
             Scalar[a_type],
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
             alignment=128,
             name="tmem_test_dynamic_shared_memory",
         ]()
@@ -176,14 +174,14 @@ def tma_umma_kernel_sgs[
         a_type,
         a_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ]
     comptime b_smem_tile_t = LayoutTensor[
         b_smem_type,  # BF16 in smem
         b_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ]
 
@@ -198,8 +196,8 @@ def tma_umma_kernel_sgs[
     ) == 0, "preserve alignment"
     var b_smem = (a_smem + a_size).bitcast[Scalar[b_smem_type]]()
 
-    var a_smem_tile = a_smem_tile_t(a_smem)
-    var b_smem_tile = b_smem_tile_t(b_smem)
+    var a_smem_tile = a_smem_tile_t(a_smem.as_unsafe_any_origin())
+    var b_smem_tile = b_smem_tile_t(b_smem.as_unsafe_any_origin())
 
     # Shared memory pointer to hold tensor memory address
     var ptr_tmem_addr = (b_smem + b_size).bitcast[UInt32]()
@@ -207,13 +205,13 @@ def tma_umma_kernel_sgs[
     comptime accum_type = get_accum_type[a_type]()
 
     comptime c_frag_size = MMA_M * MMA_N // Int(num_threads)
-    var c_frag: InlineArray[Scalar[accum_type], c_frag_size]
+    var c_frag: Array[Scalar[accum_type], c_frag_size]
 
     comptime a_expected_bytes = a_size * size_of[a_type]()
     # B is loaded manually, not via TMA
 
-    tma_mbar = (ptr_tmem_addr + 2).bitcast[SharedMemBarrier]()
-    mma_mbar = tma_mbar + 1
+    var tma_mbar = (ptr_tmem_addr + 2).bitcast[SharedMemBarrier]()
+    var mma_mbar = tma_mbar + 1
 
     if thread_idx.x == 0:
         tma_mbar[0].init()
@@ -234,7 +232,7 @@ def tma_umma_kernel_sgs[
     # tensor memory allocation
     barrier()
 
-    tmem_addr = ptr_tmem_addr[0]
+    var tmem_addr = ptr_tmem_addr[0]
 
     comptime if num_threads > 128:
         if thread_idx.x >= 128:
@@ -271,21 +269,21 @@ def tma_umma_kernel_sgs[
         or b_swizzle == TensorMapSwizzle.SWIZZLE_NONE else b_stride01
     ) * size_of[b_smem_type]()
 
-    adesc = MMASmemDescriptor.create[aSBO, aLBO, a_swizzle](a_smem_tile.ptr)
-    bdesc = MMASmemDescriptor.create[bSBO, bLBO, b_swizzle](b_smem_tile.ptr)
+    var adesc = MMASmemDescriptor.create[aSBO, aLBO, a_swizzle](a_smem_tile.ptr)
+    var bdesc = MMASmemDescriptor.create[bSBO, bLBO, b_swizzle](b_smem_tile.ptr)
 
     # Use KIND_F16 since both A and B are BF16 in smem
     comptime mma_kind = UMMAKind.KIND_F16
-    idesc = UMMAInsDescriptor[mma_kind].create[
+    var idesc = UMMAInsDescriptor[mma_kind].create[
         accum_type,
         a_type,
         b_smem_type,  # bfloat16
-        Index[dtype=DType.uint32](mma_shape[0], mma_shape[1]),
+        Index[dtype=.uint32](mma_shape[0], mma_shape[1]),
         transpose_a=False,  # A is not transposed
         transpose_b=transpose_b,
     ]()
 
-    comptime num_warps = num_threads // Int(WARP_SIZE)
+    comptime num_warps = num_threads // WARP_SIZE
     var warp_id = get_warp_id()
 
     comptime if num_threads > 128:
@@ -323,8 +321,10 @@ def tma_umma_kernel_sgs[
         comptime swizzle = make_swizzle[b_smem_type, b_swizzle]()
 
         comptime for elem in range(elems_per_thread // simd_size):
-            local_idx = simd_size * (elem * num_threads + tid)
+            var local_idx = simd_size * (elem * num_threads + tid)
 
+            var n_local: Int
+            var k_local: Int
             # Compute local tile coordinates based on memory layout
             # transpose_b=True: gmem NxK (K fast), smem K-major (K fast)
             # transpose_b=False: gmem KxN (N fast), smem N-major (N fast)
@@ -334,9 +334,10 @@ def tma_umma_kernel_sgs[
                 k_local, n_local = divmod(local_idx, BN)
 
             # Global coordinates
-            gmem_n = block_idx.x * BN + n_local
-            gmem_k = Int(i) * BK + k_local
+            var gmem_n = block_idx.x * BN + n_local
+            var gmem_k = Int(i) * BK + k_local
 
+            var fp8_val: SIMD[b_gmem_type, simd_size]
             # Load from gmem - layout is NxK when transpose_b, KxN otherwise
             comptime if transpose_b:
                 fp8_val = b.ptr.load[width=simd_size, alignment=simd_size](
@@ -348,12 +349,12 @@ def tma_umma_kernel_sgs[
                 )
 
             # Cast and store to smem using local coordinates
-            bf16_val = fp8_val.cast[b_smem_type]()
+            var bf16_val = fp8_val.cast[b_smem_type]()
             var n_q, n_r = divmod(n_local, b_shape00)
-            n_offset = n_q * b_stride01 + n_r * b_stride00
+            var n_offset = n_q * b_stride01 + n_r * b_stride00
             var k_q, k_r = divmod(k_local, b_shape10)
-            k_offset = k_q * b_stride11 + k_r * b_stride10
-            offset = swizzle(n_offset + k_offset)
+            var k_offset = k_q * b_stride11 + k_r * b_stride10
+            var offset = swizzle(n_offset + k_offset)
             b_smem_tile.ptr.store[alignment=2 * simd_size](offset, bf16_val)
 
         # Sync: wait for TMA to complete and all threads to finish storing to smem
@@ -407,17 +408,17 @@ def tma_umma_kernel_sgs[
         tcgen05_release_allocation_lock[1]()
         tcgen05_dealloc[1](tmem_addr, max_tmem_cols)
 
-    ctile = c.tile[BM, BN](block_idx.y, block_idx.x)
+    var ctile = c.tile[BM, BN](block_idx.y, block_idx.x)
 
     comptime for m_mma in range(num_m_mmas):
         comptime for n_mma in range(num_n_mmas):
             comptime mma_id = n_mma * num_m_mmas + m_mma
 
-            c_gmem_warp_tile = ctile.tile[MMA_M // Int(num_warps), MMA_N](
+            var c_gmem_warp_tile = ctile.tile[MMA_M // Int(num_warps), MMA_N](
                 4 * m_mma + warp_id, n_mma
             )
 
-            c_gmem_frag = c_gmem_warp_tile.vectorize[1, 2]().distribute[
+            var c_gmem_frag = c_gmem_warp_tile.vectorize[1, 2]().distribute[
                 Layout.row_major(8, 4)
             ](lane_id())
 
@@ -507,7 +508,7 @@ def test_tma_umma_fp8_b[
     ) if transpose_b else Layout.row_major(K, N)
     var b = ManagedLayoutTensor[b_gmem_type, b_layout](ctx)
     # Create a BF16 copy of B for reference computation (cuBLAS needs matching types)
-    var b_bf16 = ManagedLayoutTensor[DType.bfloat16, b_layout](ctx)
+    var b_bf16 = ManagedLayoutTensor[.bfloat16, b_layout](ctx)
 
     var b_extreme: Float32 = 10
     random(
@@ -522,9 +523,7 @@ def test_tma_umma_fp8_b[
     var b_bf16_host = b_bf16.tensor[update=False]()
     for row in range(b_layout.shape[0].value()):
         for col in range(b_layout.shape[1].value()):
-            b_bf16_host[row, col] = b_host_for_copy[row, col].cast[
-                DType.bfloat16
-            ]()
+            b_bf16_host[row, col] = b_host_for_copy[row, col].cast[.bfloat16]()
 
     var c = ManagedLayoutTensor[
         c_type,
@@ -537,7 +536,7 @@ def test_tma_umma_fp8_b[
     ](ctx)
 
     # Only A uses TMA
-    a_tma_op = create_tensor_tile[
+    var a_tma_op = create_tensor_tile[
         Index(BM, BK),
         swizzle_mode=a_swizzle,
     ](ctx, a.device_tensor())
@@ -572,7 +571,7 @@ def test_tma_umma_fp8_b[
         a_tma_op,
         b.device_tensor(),
         c.device_tensor(),
-        Int(K // BK),
+        Int32(K // BK),
         grid_dim=(N // BN, M // BM),
         block_dim=(block_dim),
         shared_mem_bytes=Int(smem_use),
@@ -594,7 +593,7 @@ def test_tma_umma_fp8_b[
     ctx.synchronize()
 
     # Get kernel results back from device
-    c_host = c.tensor()
+    var c_host = c.tensor()
     # Use c_ref_host directly since CPU reference wrote to it
 
     for m in range(M):
@@ -636,9 +635,9 @@ def main() raises:
                     # Test single block case with SWIZZLE_NONE for B
                     # to avoid swizzle complexity in manual B loading
                     test_tma_umma_fp8_b[
-                        DType.bfloat16,  # A type
-                        DType.float8_e4m3fn,  # B gmem type
-                        DType.bfloat16,  # C type
+                        .bfloat16,  # A type
+                        .float8_e4m3fn,  # B gmem type
+                        .bfloat16,  # C type
                         Index(MMA_M, 128, BK),  # prob_shape matching block_tile
                         Index(MMA_M, 128, BK),  # block_tile
                         Index(MMA_M, 128, MMA_K),  # mma_shape
@@ -649,9 +648,9 @@ def main() raises:
 
                     # Test with multiple K iterations
                     test_tma_umma_fp8_b[
-                        DType.bfloat16,
-                        DType.float8_e4m3fn,
-                        DType.bfloat16,
+                        .bfloat16,
+                        .float8_e4m3fn,
+                        .bfloat16,
                         Index(MMA_M, 128, BK * 2),  # 2 K iterations
                         Index(MMA_M, 128, BK),
                         Index(MMA_M, 128, MMA_K),
@@ -662,9 +661,9 @@ def main() raises:
 
                     # Test multi-block in M dimension
                     test_tma_umma_fp8_b[
-                        DType.bfloat16,
-                        DType.float8_e4m3fn,
-                        DType.bfloat16,
+                        .bfloat16,
+                        .float8_e4m3fn,
+                        .bfloat16,
                         Index(MMA_M * 2, 128, BK),  # 2 M blocks
                         Index(MMA_M, 128, BK),
                         Index(MMA_M, 128, MMA_K),
@@ -675,9 +674,9 @@ def main() raises:
 
                     # Test multi-block in N dimension
                     test_tma_umma_fp8_b[
-                        DType.bfloat16,
-                        DType.float8_e4m3fn,
-                        DType.bfloat16,
+                        .bfloat16,
+                        .float8_e4m3fn,
+                        .bfloat16,
                         Index(MMA_M, 128 * 2, BK),  # 2 N blocks
                         Index(MMA_M, 128, BK),
                         Index(MMA_M, 128, MMA_K),

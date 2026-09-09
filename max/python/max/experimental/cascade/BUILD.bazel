@@ -2,15 +2,26 @@ load("//bazel:api.bzl", "modular_py_library")
 
 package(default_visibility = ["//max:consumers"])
 
-# Umbrella target: pulls in the full cascade surface (core + runtimes +
-# pipelines). External consumers should depend on this; internal consumers
-# depend on the more specific subtargets to keep strict-deps happy.
+# Umbrella target: pulls in the full cascade surface (core + pipelines +
+# serve). External consumers should depend on this; internal consumers depend
+# on the more specific subtargets to keep strict-deps happy.
+#
+# Remote runtimes (``grpc_runtime``, ``http_runtime``) are opt-in and pull
+# heavier deps (``grpcio``, ``aiohttp``, ``fastapi``); depend on them
+# explicitly when needed.
 modular_py_library(
     name = "cascade",
     srcs = ["__init__.py"],
+    ignore_extra_deps = [
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/experimental/cascade/pipelines:all_pipelines",
+        "//max/python/max/experimental/cascade/serve",
+    ],
     deps = [
         "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/interfaces",
         "//max/python/max/experimental/cascade/pipelines",
-        "//max/python/max/experimental/cascade/runtimes",
+        "//max/python/max/experimental/cascade/pipelines:all_pipelines",
+        "//max/python/max/experimental/cascade/serve",
     ],
 )

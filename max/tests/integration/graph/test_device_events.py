@@ -70,11 +70,11 @@ class TestEventRecording:
         b_dev = b_buf.to(device)
 
         # Test both record_event() overloads
-        event1 = device.default_stream.record_event()  # Creates new event
+        event1 = device.default_queue.record_event()  # Creates new event
         model.execute(a_dev, b_dev)
 
         event2 = driver.DeviceEvent(device)
-        device.default_stream.record_event(event2)  # Records existing event
+        device.default_queue.record_event(event2)  # Records existing event
 
         # Synchronize and verify
         event2.synchronize()
@@ -97,7 +97,7 @@ class TestEventRecording:
         start = driver.DeviceEvent(device, enable_timing=True)
         end = driver.DeviceEvent(device, enable_timing=True)
 
-        stream = device.default_stream
+        stream = device.default_queue
         stream.record_event(start)
         model.execute(a_dev, b_dev)
         stream.record_event(end)

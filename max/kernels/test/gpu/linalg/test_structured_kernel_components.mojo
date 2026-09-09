@@ -13,7 +13,7 @@
 
 from linalg.matmul.gpu.amd.warp_spec_matmul import warp_specialized_matmul
 from layout import TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 import linalg.matmul.vendor.blas as vendor_blas
 from std.testing import assert_equal
 from std.random import random_si64
@@ -34,19 +34,19 @@ def test_warp_specialization_amd[
     consumer_warps: Int,
     pipeline_stages: Int = 1,
 ](ctx: DeviceContext) raises:
-    var device_a = ctx.enqueue_create_buffer[DType.bfloat16](M * K)
-    var device_b = ctx.enqueue_create_buffer[DType.bfloat16](N * K)
-    var device_c = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var device_c_ref = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var device_a = ctx.enqueue_create_buffer[.bfloat16](M * K)
+    var device_b = ctx.enqueue_create_buffer[.bfloat16](N * K)
+    var device_c = ctx.enqueue_create_buffer[.float32](M * N)
+    var device_c_ref = ctx.enqueue_create_buffer[.float32](M * N)
 
     with device_a.map_to_host() as host_a, device_b.map_to_host() as host_b:
         for i in range(M * K):
             var val = random_si64(0, 20)
-            host_a[i] = val.cast[DType.bfloat16]()
+            host_a[i] = val.cast[.bfloat16]()
 
         for i in range(K * N):
             var val = random_si64(0, 20)
-            host_b[i] = val.cast[DType.bfloat16]()
+            host_b[i] = val.cast[.bfloat16]()
 
     var a_tt = TileTensor(device_a, row_major[M, K]())
     var b_tt = TileTensor(device_b, row_major[N, K]())

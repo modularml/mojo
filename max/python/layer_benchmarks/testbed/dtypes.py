@@ -15,7 +15,8 @@
 
 from collections.abc import Mapping
 
-import torch
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from max.dtype import DType
 
 DTYPE_MAP: Mapping[str, tuple[DType, torch.dtype]] = {

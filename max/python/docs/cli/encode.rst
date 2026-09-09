@@ -14,6 +14,6 @@ For example, encode a sentence with a Sentence-Transformers model:
 The command prints the embedding vector and timing for the run. Pair it with
 ``max list`` to see which encoder architectures MAX supports.
 
-.. click:: max.entrypoints.pipelines:encode
+.. click:: max._entrypoints.pipelines:encode
   :prog: max encode
   :hide-description:

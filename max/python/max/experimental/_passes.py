@@ -72,11 +72,20 @@ def _fixup_graph(graph: Graph) -> None:
             [builtin.StringAttr(f"input{i}") for i in range(len(graph.inputs))]
         )
 
+        # Parameters already declared by a body op (e.g. data-dependent
+        # output dims like NMS's num_selected) must not be redeclared as
+        # graph result parameters: KGEN allows exactly one declaration per
+        # scope.
+        body_declared = {
+            decl.name.value
+            for body_op in block
+            for decl in getattr(body_op, "output_param_decls", ())
+        }
         result_params = {
             dim: None
             for result in results
             for dim in getattr(result.type, "parameters", ())
-            if dim not in input_params
+            if dim not in input_params and str(dim) not in body_declared
         }
         op.result_parameters = kgen.ParamDeclArrayAttr(
             [kgen.ParamDeclAttr(str(dim), si64) for dim in result_params]

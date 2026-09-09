@@ -39,10 +39,10 @@ def main() raises:
 @always_inline
 def silu_ref[dtype: DType](x: Scalar[dtype]) -> Scalar[dtype]:
     """Reference SiLU implementation: x * sigmoid(x) = x / (1 + exp(-x))."""
-    var x_f32 = x.cast[DType.float32]()
+    var x_f32 = x.cast[.float32]()
     var neg_x = -x_f32
     var exp_neg_x = exp(neg_x)
-    var one = Scalar[DType.float32](1.0)
+    var one = Float32(1.0)
     var sigmoid_x = one / (one + exp_neg_x)
     return (x_f32 * sigmoid_x).cast[dtype]()
 
@@ -359,40 +359,40 @@ def run_causal_conv1d_update[
 
 def test_basic_causal_conv1d_update() raises:
     """Test basic causal conv1d update with bias."""
-    run_causal_conv1d_update[DType.float32, True, "none"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, True, "none"](2, 4, 1, 3, 4)
 
 
 def test_causal_conv1d_update_with_silu() raises:
     """Test causal conv1d update with SiLU activation."""
-    run_causal_conv1d_update[DType.float32, True, "silu"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, True, "silu"](2, 4, 1, 3, 4)
 
 
 def test_causal_conv1d_update_without_bias() raises:
     """Test causal conv1d update without bias."""
-    run_causal_conv1d_update[DType.float32, False, "none"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, False, "none"](2, 4, 1, 3, 4)
 
 
 def test_causal_conv1d_update_seqlen_greater_than_one() raises:
     """Test causal conv1d update with seqlen > 1."""
-    run_causal_conv1d_update[DType.float32, True, "none"](2, 4, 4, 3, 4)
+    run_causal_conv1d_update[.float32, True, "none"](2, 4, 4, 3, 4)
 
 
 def test_causal_conv1d_update_various_widths() raises:
     """Test causal conv1d update with various kernel widths."""
-    run_causal_conv1d_update[DType.float32, True, "none"](2, 4, 1, 2, 3)
-    run_causal_conv1d_update[DType.float32, True, "none"](2, 4, 1, 3, 4)
-    run_causal_conv1d_update[DType.float32, True, "none"](2, 4, 1, 4, 5)
+    run_causal_conv1d_update[.float32, True, "none"](2, 4, 1, 2, 3)
+    run_causal_conv1d_update[.float32, True, "none"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, True, "none"](2, 4, 1, 4, 5)
 
 
 def test_causal_conv1d_update_larger_state() raises:
     """Test causal conv1d update with larger state length."""
-    run_causal_conv1d_update[DType.float32, True, "none"](2, 8, 1, 3, 8)
+    run_causal_conv1d_update[.float32, True, "none"](2, 8, 1, 3, 8)
 
 
 def test_causal_conv1d_update_combinations() raises:
     """Test causal conv1d update with various bias and activation combinations.
     """
-    run_causal_conv1d_update[DType.float32, False, "none"](2, 4, 1, 3, 4)
-    run_causal_conv1d_update[DType.float32, True, "none"](2, 4, 1, 3, 4)
-    run_causal_conv1d_update[DType.float32, False, "silu"](2, 4, 1, 3, 4)
-    run_causal_conv1d_update[DType.float32, True, "silu"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, False, "none"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, True, "none"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, False, "silu"](2, 4, 1, 3, 4)
+    run_causal_conv1d_update[.float32, True, "silu"](2, 4, 1, 3, 4)

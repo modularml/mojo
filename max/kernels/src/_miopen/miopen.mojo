@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host._amdgpu_hip import hipStream_t
+from max.gpu.host._amdgpu_hip import hipStream_t
 
 from .types import (
     Handle,

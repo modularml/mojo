@@ -16,7 +16,7 @@
 from std.math import ceildiv
 from std.sys.info import simd_width_of
 
-from layout import IntTuple, Layout, LayoutTensor
+from layout import Coord, IntTuple, Layout, LayoutTensor
 from nn.conv.conv import ConvDirectNHWC, ConvInfoStatic
 from nn.conv.conv_utils import ConvShape, get_micro_kernel_shape
 
@@ -75,16 +75,16 @@ def static_conv(
 ):
     var conv_shape = ConvShape[2](
         n=N,
-        input_dims=Index(H, W),
-        output_dims=Index(HO, WO),
-        filter_dims=Index(R, S),
+        input_dims=Coord(Index(H, W)),
+        output_dims=Coord(Index(HO, WO)),
+        filter_dims=Coord(Index(R, S)),
         c=C,
         f=F,
-        stride=Index(stride_h, stride_w),
-        dilation=Index(dilation_h, dilation_w),
-        pad_d=Index(0, 0),
-        pad_h=Index(pad_bottom, pad_top),
-        pad_w=Index(pad_left, pad_right),
+        stride=Coord(Index(stride_h, stride_w)),
+        dilation=Coord(Index(dilation_h, dilation_w)),
+        pad_d=Coord(Index(0, 0)),
+        pad_h=Coord(Index(pad_bottom, pad_top)),
+        pad_w=Coord(Index(pad_left, pad_right)),
         num_groups=num_groups,
     )
 
@@ -112,25 +112,21 @@ def static_conv(
 def test_static_conv() raises:
     print("== test_static_conv")
 
-    var output_stack = InlineArray[Scalar[value_type], N * HO * WO * F](
-        uninitialized=True
-    )
+    var output_stack = Array[Scalar[value_type], N * HO * WO * F](fill=0.0)
     var output = LayoutTensor[value_type, Layout.row_major(N, HO, WO, F)](
         output_stack
-    ).fill(0.0)
-    var input_stack = InlineArray[Scalar[value_type], N * H * W * C](
-        uninitialized=True
     )
+    var input_stack = Array[Scalar[value_type], N * H * W * C](fill=1.0)
     var input = LayoutTensor[value_type, Layout.row_major(N, H, W, C)](
         input_stack
-    ).fill(1.0)
-    var filter_stack = InlineArray[
+    )
+    var filter_stack = Array[
         Scalar[value_type], num_micro_tile * R * S * C * micro_kernel_f_size
-    ](uninitialized=True)
+    ](fill=1.0)
     var filter = LayoutTensor[
         value_type,
         Layout.row_major(num_micro_tile, R, S, C, micro_kernel_f_size),
-    ](filter_stack).fill(1.0)
+    ](filter_stack)
 
     static_conv(output, input, filter)
 

@@ -24,7 +24,13 @@ big_ints = st.one_of(
     st.integers(min_value=2**64),
 )
 
-UNSUPPORTED_DTYPES = {DType.bool, DType.float4_e2m1fn, DType.float8_e8m0fnu}
+UNSUPPORTED_DTYPES = {
+    DType.bool,
+    DType.float4_e2m1fn,
+    DType.float6_e2m3fn,
+    DType.float6_e3m2fn,
+    DType.float8_e8m0fnu,
+}
 
 unsupported_dtypes = st.sampled_from(list(UNSUPPORTED_DTYPES))
 supported_dtypes = st.sampled_from(list(set(DType) - UNSUPPORTED_DTYPES))

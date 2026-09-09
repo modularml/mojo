@@ -239,6 +239,20 @@ def simulate_fp4_blockwise_quantize(
     return x_deq.reshape(orig_shape)
 
 
+def _torch_swigluoai(
+    gate: torch.Tensor,
+    up: torch.Tensor,
+    alpha: float,
+    limit: float,
+) -> torch.Tensor:
+    gate_clamped = torch.clamp(gate.float(), max=limit)
+    up_clamped = torch.clamp(up.float(), min=-limit, max=limit)
+    activated = (
+        gate_clamped * torch.sigmoid(alpha * gate_clamped) * (up_clamped + 1.0)
+    )
+    return activated.to(gate.dtype)
+
+
 def torch_moe(
     input_token: torch.Tensor,
     moe_weights: dict[str, torch.Tensor],
@@ -247,6 +261,9 @@ def torch_moe(
     *,
     block_size: int,
     scale_dtype: torch.dtype,
+    use_swigluoai: bool = False,
+    swiglu_alpha: float = 0.0,
+    swiglu_limit: float = 0.0,
 ) -> torch.Tensor:
     """Single-token MoE reference with FP4 quantization simulation."""
     assert input_token.shape[0] == 1
@@ -267,8 +284,18 @@ def torch_moe(
 
         expert_gate = input_token @ gate_weight.T
         expert_up = input_token @ up_weight.T
+        activated = (
+            _torch_swigluoai(
+                expert_gate,
+                expert_up,
+                swiglu_alpha,
+                swiglu_limit,
+            )
+            if use_swigluoai
+            else torch.nn.functional.silu(expert_gate) * expert_up
+        )
         down_input = simulate_fp4_blockwise_quantize(
-            torch.nn.functional.silu(expert_gate) * expert_up,
+            activated,
             block_size=block_size,
             scale_dtype=scale_dtype,
         )
@@ -281,8 +308,18 @@ def torch_moe(
     shared_down_weight = moe_weights["shared_experts.down_proj.weight"]
     shared_expert_gate = input_token @ shared_gate_weight.T
     shared_expert_up = input_token @ shared_up_weight.T
+    shared_activated = (
+        _torch_swigluoai(
+            shared_expert_gate,
+            shared_expert_up,
+            swiglu_alpha,
+            swiglu_limit,
+        )
+        if use_swigluoai
+        else torch.nn.functional.silu(shared_expert_gate) * shared_expert_up
+    )
     shared_down_input = simulate_fp4_blockwise_quantize(
-        torch.nn.functional.silu(shared_expert_gate) * shared_expert_up,
+        shared_activated,
         block_size=block_size,
         scale_dtype=scale_dtype,
     )
@@ -522,14 +559,49 @@ def test_ep_moe_nvfp4(
         )
 
 
+def _shuffle_b_5d(src: torch.Tensor) -> torch.Tensor:
+    """Lay a row-major MXFP4 B weight ``[N, K_bytes]`` out in the AMD CDNA4
+    ``preb`` 5D layout. Byte-identical to the Mojo ``b_5d_grouped_layout`` in
+    ``max/kernels/src/linalg/matmul/gpu/amd/block_scaled_preshuffle_layouts.mojo``.
+    """
+    N, K_BYTES = src.shape
+    src_v = src.reshape(N // 16, 16, K_BYTES // 64, 4, 16).permute(
+        0, 2, 3, 1, 4
+    )
+    return src_v.contiguous().reshape(N, K_BYTES)
+
+
+def _shuffle_scale_4d(src: torch.Tensor) -> torch.Tensor:
+    """Lay a row-major MXFP4 E8M0 weight scale ``[MN, K_scales]`` out in the
+    ``preb`` 4D-cell layout addressed by ``Shuffler.scale_4d_byte_off`` (same
+    Mojo source). This is the static weight-scale permutation, distinct from
+    the runtime activation-scale slot packing.
+    """
+    MN, K_SCALES = src.shape
+    src_v = src.reshape(MN // 32, 2, 16, K_SCALES // 8, 2, 4).permute(
+        0, 3, 5, 2, 4, 1
+    )
+    return src_v.contiguous().reshape(MN, K_SCALES)
+
+
 @pytest.mark.skipif(
     accelerator_api() != "hip", reason="FP4 kernel only supports AMD GPUs"
 )
 @pytest.mark.parametrize("n_devices", [2])
+@pytest.mark.parametrize(
+    "fused_shared_expert",
+    [False, True],
+    ids=["split-dispatch-wait", "distributed-fused-dispatch"],
+)
 def test_ep_moe_mxfp4(
     n_devices: int,
+    fused_shared_expert: bool,
     moe_weights_mxfp4: dict[str, torch.Tensor],
 ) -> None:
+    # Exercises the MXFP4 EP A-scale preshuffle fold end-to-end against the
+    # PyTorch reference. The false case covers split dispatch-wait with standard
+    # SiLU; the true case covers multi-device fused dispatch with SwiGLU-OAI.
+    # Both cases use the preshuffled-B grouped matmul.
     assert n_devices <= accelerator_count(), (
         "Devices are not enough to run EP test"
     )
@@ -538,6 +610,9 @@ def test_ep_moe_mxfp4(
     top_k = 8
     max_tokens_per_rank = 128
     dtype = DType.uint8
+    use_swigluoai = fused_shared_expert
+    swiglu_alpha = 1.702
+    swiglu_limit = 7.0
 
     # Copy weights to CPU for session.load (moe_weights_mxfp4 lives on GPU).
     moe_weights_fp4 = moe_weights_mxfp4
@@ -556,6 +631,29 @@ def test_ep_moe_mxfp4(
             )
         else:
             wrapped_moe_weights_fp4[key] = value
+
+    # Lay the loaded routed-expert B weights + E8M0 B-scales out in
+    # the AMD CDNA4 `preb` layout (block_scaled_preshuffled_b=True below routes the
+    # grouped matmul to the preb kernel). Applied only to the CPU copy fed to
+    # load_state_dict; the GPU copy the torch reference dequantizes is left
+    # untouched. The permutations are byte-exact to the Mojo source of truth
+    # max/kernels/src/linalg/matmul/gpu/amd/block_scaled_preshuffle_layouts.mojo.
+    for _k in list(wrapped_moe_weights_fp4):
+        _v = wrapped_moe_weights_fp4[_k]
+        # With separate shared-expert execution, its weights remain row-major.
+        # With shared-expert fusion, it joins the grouped preb matmul and its
+        # weights and scales must also be preshuffled.
+        if (
+            not isinstance(_v, torch.Tensor)
+            or _k == "gate.gate_score.weight"
+            or (_k.startswith("shared_experts.") and not fused_shared_expert)
+        ):
+            continue
+        if _k.endswith(".weight") and _v.dtype == torch.uint8:
+            wrapped_moe_weights_fp4[_k] = _shuffle_b_5d(_v.contiguous())
+        elif _k.endswith(".weight_scale") and _v.dtype == torch.float8_e8m0fnu:
+            _scale = _shuffle_scale_4d(_v.contiguous().view(torch.uint8))
+            wrapped_moe_weights_fp4[_k] = _scale.view(torch.float8_e8m0fnu)
 
     # Initialize devices
     devices = [Accelerator(id) for id in range(n_devices)]
@@ -581,6 +679,7 @@ def test_ep_moe_mxfp4(
         attn_quantized_layers=set(),
         embedding_output_dtype=None,
         format=QuantFormat.MXFP4,
+        block_scaled_preshuffled_b=True,
     )
 
     # Create EP configuration
@@ -594,7 +693,9 @@ def test_ep_moe_mxfp4(
         n_gpus_per_node=n_devices,
         n_nodes=int(os.environ.get("SHMEM_TOTAL_NODES", "1")),
         dispatch_quant_config=fp4_config,
-        fused_shared_expert=True,
+        # Cover both the split dispatch-wait path and the multi-device fused
+        # dispatch path.
+        fused_shared_expert=fused_shared_expert,
     )
 
     # Initialize EP communication
@@ -615,6 +716,9 @@ def test_ep_moe_mxfp4(
         apply_router_weight_first=False,
         ep_batch_manager=ep_batch_manager,
         quant_config=fp4_config,
+        use_swigluoai=use_swigluoai,
+        swiglu_alpha=swiglu_alpha,
+        swiglu_limit=swiglu_limit,
     )
     moe.sharding_strategy = ShardingStrategy.expert_parallel(n_devices)
     moe_shards = moe.shard(devices_ref)
@@ -717,6 +821,13 @@ def test_ep_moe_mxfp4(
         for k in moe_weights_fp4
         if k.endswith(".weight") and moe_weights_fp4[k].dtype == torch.uint8
     ]
+    # Confirm the A-scale fold actually activated during the forward
+    # trace (configure_ep_scale_fusion sets this flag); guards against the gate
+    # silently degrading to a no-op if a default or gate condition changes.
+    assert ep_batch_manager.config.mxfp4_a_scales_preshuffled, (
+        "MXFP4 EP A-scale fold did not activate; the numeric gate would be moot"
+    )
+
     for key in weight_keys:
         weight = moe_weights_fp4.pop(key)
         scale = moe_weights_fp4.pop(f"{key}_scale")
@@ -735,6 +846,9 @@ def test_ep_moe_mxfp4(
             all_topk_weights[tok_idx : tok_idx + 1],
             block_size=32,
             scale_dtype=torch.float8_e8m0fnu,
+            use_swigluoai=use_swigluoai,
+            swiglu_alpha=swiglu_alpha,
+            swiglu_limit=swiglu_limit,
         )
         cos_sim = torch.nn.functional.cosine_similarity(
             all_outputs[tok_idx : tok_idx + 1].float(),

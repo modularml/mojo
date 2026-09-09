@@ -15,13 +15,13 @@ from std.math import ceildiv
 from std.sys import size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import barrier
-from std.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
-from std.gpu.host import DeviceContext, Dim
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, thread_idx
-from std.gpu import warp_id as get_warp_id
-from std.gpu.memory import fence_mbarrier_init
+from max.gpu.sync import barrier
+from max.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
+from max.gpu.host import DeviceContext, Dim
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import block_idx, thread_idx
+from max.gpu import warp_id as get_warp_id
+from max.gpu.memory import fence_mbarrier_init
 from layout import Layout, LayoutTensor
 from layout._fillers import arange
 from layout._utils import ManagedLayoutTensor
@@ -38,7 +38,7 @@ from layout.tma_async import (
     _idx_product,
     create_tma_tile,
 )
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_almost_equal
 
 from std.utils.index import Index, IndexList
@@ -77,7 +77,7 @@ def multicast_tma_wgmma_kernel[
         a_type,
         a_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
@@ -85,12 +85,12 @@ def multicast_tma_wgmma_kernel[
         b_type,
         b_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
     comptime accum_type = get_accum_type[a_type]()
-    wgmma_op = TensorCoreAsync[
+    var wgmma_op = TensorCoreAsync[
         accum_type,
         a_type,
         b_type,
@@ -119,7 +119,7 @@ def multicast_tma_wgmma_kernel[
         accum_type,
         Layout.row_major(num_m_mmas * num_n_mmas, c_frag_size),
         MutAnyOrigin,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ].stack_allocation()
 
     _ = c_reg_tile.fill(0.0)
@@ -134,10 +134,10 @@ def multicast_tma_wgmma_kernel[
     var rank_m = block_rank / CLUSTER_N
     var rank_n = block_rank % CLUSTER_N
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
     if thread_idx.x == 0:
@@ -169,7 +169,7 @@ def multicast_tma_wgmma_kernel[
                         a_smem_slice,
                         mbar[0],
                         (i * BK, a_gmem_slice_coord),
-                        multicast_mask.cast[DType.uint16](),
+                        multicast_mask.cast[.uint16](),
                     )
 
                 else:
@@ -178,7 +178,7 @@ def multicast_tma_wgmma_kernel[
                             a_smem_tile,
                             mbar[0],
                             (i * BK, block_idx.y * BM),
-                            multicast_mask.cast[DType.uint16](),
+                            multicast_mask.cast[.uint16](),
                         )
 
             else:
@@ -211,7 +211,7 @@ def multicast_tma_wgmma_kernel[
                             block_idx.x * BN,
                             i * BK,
                         ),
-                        (multicast_mask << rank_n).cast[DType.uint16](),
+                        (multicast_mask << rank_n).cast[.uint16](),
                     )
 
                 else:
@@ -226,7 +226,7 @@ def multicast_tma_wgmma_kernel[
                                 block_idx.x * BN,
                                 i * BK,
                             ),
-                            (multicast_mask << rank_n).cast[DType.uint16](),
+                            (multicast_mask << rank_n).cast[.uint16](),
                         )
 
             else:
@@ -257,8 +257,8 @@ def multicast_tma_wgmma_kernel[
 
         barrier()
 
-    c_gmem_tile = c.tile[BM, BN](block_idx.y, block_idx.x)
-    warp_id = get_warp_id()
+    var c_gmem_tile = c.tile[BM, BN](block_idx.y, block_idx.x)
+    var warp_id = get_warp_id()
 
     comptime for m_mma in range(num_m_mmas):
         comptime for n_mma in range(num_n_mmas):
@@ -266,13 +266,13 @@ def multicast_tma_wgmma_kernel[
 
             # (m_mma, n_mma) is coordinates for a warp group's tile.
             # A warp group is 4x1 warps.
-            warp_tile = c_gmem_tile.tile[wgmma_shape[0] // 4, wgmma_shape[1]](
-                m_mma * 4 + warp_id, n_mma
-            )
+            var warp_tile = c_gmem_tile.tile[
+                wgmma_shape[0] // 4, wgmma_shape[1]
+            ](m_mma * 4 + warp_id, n_mma)
 
             # Tile at (mma_id, 0) is a long vector containing all fragments
             # for this warp.
-            c_frag = c_reg_tile.tile[1, c_frag_size](mma_id, 0)
+            var c_frag = c_reg_tile.tile[1, c_frag_size](mma_id, 0)
 
             # A warp is organized as row_major(8, 4) and each thread owns 2 contiguous
             # elementwise. This pattern repeats to fill the warp tile.
@@ -377,7 +377,7 @@ def test_multicast_tma_wgmma[
         b_type, BN, BK, swizzle_mode=b_swizzle
     ]()
 
-    a_tma_op = create_tma_tile[
+    var a_tma_op = create_tma_tile[
         Index(BM // CLUSTER_N, BK) if partitioned_multicast else Index(BM, BK),
         swizzle_mode=a_swizzle,
     ](ctx, a.device_tensor())
@@ -385,7 +385,7 @@ def test_multicast_tma_wgmma[
     comptime b_tma_op_shape = Index(
         BN // CLUSTER_M, BK
     ) if partitioned_multicast else Index(BN, BK)
-    b_tma_op = create_tma_tile[
+    var b_tma_op = create_tma_tile[
         b_tma_op_shape if transpose_b else Index(BK, BN),
         is_k_major=transpose_b,
         swizzle_mode=b_swizzle,
@@ -434,8 +434,8 @@ def test_multicast_tma_wgmma[
 
     ctx.synchronize()
 
-    c_host = c.tensor()
-    c_host_ref = c_ref.tensor()
+    var c_host = c.tensor()
+    var c_host_ref = c_ref.tensor()
 
     for m in range(M):
         for n in range(N):
@@ -454,9 +454,9 @@ def main() raises:
     with DeviceContext() as ctx:
         # 2x1 cluster tests
         test_multicast_tma_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(128, 16, 128),
             Index(64, 16, 64),
             Index(64, 8, 16),
@@ -465,9 +465,9 @@ def main() raises:
         ](ctx)
 
         test_multicast_tma_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(128, 160, 128),
             Index(64, 160, 64),
             Index(64, 80, 16),
@@ -477,9 +477,9 @@ def main() raises:
 
         comptime for multicast_mode in range(2):
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 16, 128),
                 Index(64, 16, 64),
                 Index(64, 8, 16),
@@ -491,9 +491,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 160, 128),
                 Index(64, 160, 64),
                 Index(64, 80, 16),
@@ -505,9 +505,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 16, 64),
                 Index(64, 16, 32),
                 Index(64, 8, 16),
@@ -519,9 +519,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 160, 64),
                 Index(64, 160, 32),
                 Index(64, 80, 16),
@@ -533,9 +533,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 16, 32),
                 Index(64, 16, 16),
                 Index(64, 8, 16),
@@ -547,9 +547,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 160, 32),
                 Index(64, 160, 16),
                 Index(64, 80, 16),
@@ -562,9 +562,9 @@ def main() raises:
 
         # 2x2 cluster tests
         test_multicast_tma_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(128, 16, 128),
             Index(64, 8, 64),
             Index(64, 8, 16),
@@ -573,9 +573,9 @@ def main() raises:
         ](ctx)
 
         test_multicast_tma_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(128, 160, 128),
             Index(64, 80, 64),
             Index(64, 80, 16),
@@ -585,9 +585,9 @@ def main() raises:
 
         comptime for multicast_mode in range(2):
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 32, 128),
                 Index(64, 16, 64),
                 Index(64, 8, 16),
@@ -599,9 +599,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 320, 128),
                 Index(64, 160, 64),
                 Index(64, 80, 16),
@@ -613,9 +613,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 32, 64),
                 Index(64, 16, 32),
                 Index(64, 8, 16),
@@ -627,9 +627,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 320, 64),
                 Index(64, 160, 32),
                 Index(64, 80, 16),
@@ -641,9 +641,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 32, 32),
                 Index(64, 16, 16),
                 Index(64, 8, 16),
@@ -655,9 +655,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(128, 320, 32),
                 Index(64, 160, 16),
                 Index(64, 80, 16),
@@ -670,9 +670,9 @@ def main() raises:
 
         # 1x2 cluster tests
         test_multicast_tma_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(64, 16, 128),
             Index(64, 8, 64),
             Index(64, 8, 16),
@@ -681,9 +681,9 @@ def main() raises:
         ](ctx)
 
         test_multicast_tma_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(64, 160, 128),
             Index(64, 80, 64),
             Index(64, 80, 16),
@@ -693,9 +693,9 @@ def main() raises:
 
         comptime for multicast_mode in range(2):
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(64, 32, 128),
                 Index(64, 16, 64),
                 Index(64, 8, 16),
@@ -707,9 +707,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(64, 320, 128),
                 Index(64, 160, 64),
                 Index(64, 80, 16),
@@ -721,9 +721,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(64, 32, 64),
                 Index(64, 16, 32),
                 Index(64, 8, 16),
@@ -735,9 +735,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(64, 320, 64),
                 Index(64, 160, 32),
                 Index(64, 80, 16),
@@ -749,9 +749,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(64, 32, 32),
                 Index(64, 16, 16),
                 Index(64, 8, 16),
@@ -763,9 +763,9 @@ def main() raises:
             ](ctx)
 
             test_multicast_tma_wgmma[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 Index(64, 320, 32),
                 Index(64, 160, 16),
                 Index(64, 80, 16),

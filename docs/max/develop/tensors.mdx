@@ -10,34 +10,43 @@ They represent multi-dimensional arrays of numbers used for model inputs,
 outputs, and parameters.
 
 If you're coming from NumPy, think of a MAX
-[`Tensor`](/max/api/python/generated/max.experimental.tensor.Tensor) like a
-NumPy
+[`Tensor`](/api/python/generated/max.experimental.tensor.Tensor) like a NumPy
 [`ndarray`](https://numpy.org/devdocs/reference/arrays.ndarray.html#arrays-ndarray).
 
-A tensor is a multi-dimensional array of numbers. You can think of tensors as:
+## Tensor basics
 
-- Rank 0 (scalar): a single number (like `72.5`)
-- Rank 1 (vector): a 1-D tensor or list of numbers (like `[1, 2, 3, 4]`)
-- Rank 2 (matrix): a 2-D tensor or table of numbers (like a spreadsheet with
-  rows and columns)
-- Rank 3+ (higher-dimensional arrays): a 3-or-more dimensional tensor (stacks of
-  matrices or more complex structures)
+A tensor is a multi-dimensional array of numbers. The *rank* of a tensor is the
+number of dimensions it has:
+
+| Rank | Description                                                                     | Example                                |
+|------|---------------------------------------------------------------------------------|----------------------------------------|
+| 0    | A single number, called a scalar                                                | `72`                                   |
+| 1    | A 1-D list of numbers, called a vector                                          | `[1, 2, 3, 4]`                         |
+| 2    | A 2-D grid of numbers like a spreadsheet with rows and columns, called a matrix | `[[1, 2, 3], [4, 5, 6]]`               |
+| 3+   | A 3-or-more dimensional array, such as a stack of matrices                      | `[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]` |
+
+While the examples above show tensors as nested lists, tensors are stored as a
+single flat sequence of numbers. A tensor's *shape* records how many values sit
+along each dimension, which is what tells MAX how to group that flat data back
+into rows, columns, and higher dimensions.
 
 :::tip Coming from PyTorch or NumPy?
 
 There are some key differences between tensors in MAX and tensors in PyTorch or
 NumPy. For example, many math operations use the functional API (`F.sqrt()`
 instead of `.sqrt()`), and reduction operations keep dimensions by default.
+Check the [MAX Python API](/api/python/) reference to see the exact behavior
+of MAX tensors.
 
 :::
 
 ## Create a tensor
 
 You can create a tensor from a Python list using the
-[`Tensor()`](/max/api/python/generated/max.experimental.tensor.Tensor)
+[`Tensor()`](/api/python/generated/max.experimental.tensor.Tensor)
 constructor:
 
-{/* @sync: _examples/tensors/create_first_tensor.py */}
+{/* @sync: ../../code/develop/tensors/create_first_tensor.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -49,7 +58,7 @@ print(x)
 ```
 
 This imports the
-[`Tensor`](/max/api/python/generated/max.experimental.tensor.Tensor) class and
+[`Tensor`](/api/python/generated/max.experimental.tensor.Tensor) class and
 creates a 1-D tensor (a vector) with the values `[1, 2, 3, 4, 5]`. The
 `Tensor()` constructor creates a tensor from a tensor-like object—it can be a
 list, a NumPy array, or a PyTorch tensor.
@@ -82,14 +91,14 @@ tensor = Tensor.from_numpy(np_array).to(Accelerator())
 Notice that when creating the tensors, the output shows the dtype and device.
 The dtype is the data type of the tensor, and the device is the device on which
 the tensor will be stored. We'll cover dtypes and devices in more detail in the
-[Data Types (dtype)](/max/develop/dtypes) and
-[Devices](/max/develop/tensors#device) sections.
+[Data Types (dtype)](/develop/dtypes) and
+[Devices](/develop/tensors#device) sections.
 
 :::
 
 You can also create tensors with any number of dimensions by nesting lists:
 
-{/* @sync: _examples/tensors/create_multi_dim.py */}
+{/* @sync: ../../code/develop/tensors/create_multi_dim.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -112,11 +121,11 @@ TensorType(dtype=float32, shape=[Dim(2), Dim(2), Dim(2)], device=cpu:0): [1.0, 2
 
 MAX provides convenient functions for creating tensors with specific patterns,
 such as
-[`ones()`](/max/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.ones)
+[`ones()`](/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.ones)
 and
-[`zeros()`](/max/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.zeros):
+[`zeros()`](/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.zeros):
 
-{/* @sync: _examples/tensors/create_factory.py */}
+{/* @sync: ../../code/develop/tensors/create_factory.py */}
 
 ```python
 from max.driver import CPU
@@ -139,17 +148,17 @@ TensorType(dtype=float32, shape=[Dim(3), Dim(4)], device=cpu:0): [1.0, 1.0, 1.0,
 TensorType(dtype=float32, shape=[Dim(2), Dim(3)], device=cpu:0): [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ```
 
-For random data, you can use one of several functions from the
-[`random`](/max/api/python/experimental.random) module, such as
-[`random.normal()`](/max/api/python/generated/max.experimental.random.normal):
+For random data, you can use one of several functions from
+[`max.experimental.functional`](/api/python/experimental.functional/), such as
+[`F.normal()`](/api/python/experimental.functional/#max.experimental.functional.normal):
 
-{/* @sync: _examples/tensors/create_random.py */}
+{/* @sync: ../../code/develop/tensors/create_random.py */}
 
 ```python
-from max.experimental import random
+import max.experimental.functional as F
 
 # Random values from a normal distribution
-random_tensor = random.normal([3, 3])
+random_tensor = F.normal([3, 3])
 print(random_tensor)
 ```
 
@@ -163,7 +172,9 @@ You can adjust the mean and standard deviation of the normal distribution to
 create tensors with different values:
 
 ```python
-random_tensor = random.normal([3, 3], mean=0.0, std=1.0)
+import max.experimental.functional as F
+
+random_tensor = F.normal([3, 3], mean=0.0, std=1.0)
 print(random_tensor)
 ```
 
@@ -192,7 +203,7 @@ contents.
 The *shape* tells you the size of each dimension of the tensor. It's a list
 where each number represents the size along that dimension:
 
-{/* @sync: _examples/tensors/properties_shape.py */}
+{/* @sync: ../../code/develop/tensors/properties_shape.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -219,7 +230,7 @@ The expected output is:
 ```
 
 In this example, the
-[`shape`](/max/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.shape)
+[`shape`](/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.shape)
 property returns a list of `Dim` objects representing the size of each
 dimension.
 
@@ -228,7 +239,7 @@ dimension.
 The *rank* (also called number of dimensions) tells you how many axes the
 tensor has:
 
-{/* @sync: _examples/tensors/properties_rank.py */}
+{/* @sync: ../../code/develop/tensors/properties_rank.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -249,7 +260,7 @@ print(cube.rank)  # 3
 data stored in the tensor. For example, a tensor can contain integers: `int32`,
 floating-point numbers: `float32`, or booleans: `bool`.
 
-{/* @sync: _examples/tensors/properties_dtype.py */}
+{/* @sync: ../../code/develop/tensors/properties_dtype.py */}
 
 ```python
 from max.dtype import DType
@@ -264,13 +275,13 @@ integers = Tensor.ones([2, 2], dtype=DType.int32)
 
 MAX supports a wide range of dtypes, including all standard NumPy and PyTorch
 dtypes. You will learn more about dtypes in the
-[Data Types (dtype)](/max/develop/dtypes) section.
+[Data Types (dtype)](/develop/dtypes) section.
 
 ### Device
 
 The *device* tells you where the tensor operation occurs and is stored:
 
-{/* @sync: _examples/tensors/properties_device.py */}
+{/* @sync: ../../code/develop/tensors/properties_device.py */}
 
 ```python
 from max.driver import CPU
@@ -288,7 +299,7 @@ specifying either the `CPU()` or `Accelerator()` class.
 
 You can check how many numbers are stored in the tensor:
 
-{/* @sync: _examples/tensors/properties_num_elements.py */}
+{/* @sync: ../../code/develop/tensors/properties_num_elements.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -304,12 +315,12 @@ In this example, the expected output is:
 ```
 
 The
-[`num_elements()`](/max/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.num_elements)
+[`num_elements()`](/api/python/generated/max.experimental.tensor.Tensor#max.experimental.tensor.Tensor.num_elements)
 function returns the total number of elements in the tensor, which is the
 product of the dimensions.
 
 ## Next steps
 
 Now that you understand tensor basics, continue to
-[Data Types (dtype)](/max/develop/dtypes) to learn how to
+[Data Types (dtype)](/develop/dtypes) to learn how to
 control tensor precision and memory usage.

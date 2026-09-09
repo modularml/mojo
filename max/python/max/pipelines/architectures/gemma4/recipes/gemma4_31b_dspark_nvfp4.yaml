@@ -1,0 +1,53 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# NVFP4 target variant of gemma4_31b_dspark.yaml. The encoding is detected
+# from the checkpoint (packed uint8 weights + modelopt hf_quant_config), so
+# it is not pinned here; only the MLP linears are quantized, attention and
+# lm_head stay bfloat16 per the checkpoint's ignore list.
+#
+# kv_cache_format applies to the target KV tree only (matching the tuned
+# gemma4 MTP recipes); the drafter's own causal-SWA cache stays bfloat16
+# (see speculators_common.construct_draft_kv_params).
+model:
+  model_path: nvidia/Gemma-4-31B-IT-NVFP4
+  device_specs: [0]
+  max_length: 8192
+  kv_cache:
+    kv_cache_format: float8_e4m3fn
+    kv_cache_page_size: 128
+    device_memory_utilization: 0.75
+
+# The drafter taps target hidden states and was trained against bfloat16
+# ones, so it stays bfloat16 regardless of the target's encoding.
+draft_model:
+  model_path: RedHatAI/gemma-4-31B-it-speculator.dspark
+  device_specs: [0]
+  quantization_encoding: bfloat16
+
+# The speculators checkpoint's block_size 8 counts the anchor slot plus 7
+# drafted tokens (sample_from_anchor: false); num_speculative_tokens must
+# match the trained draft count of 7.
+speculative:
+  speculative_method: dflash
+  num_speculative_tokens: 7
+
+# model_type gemma4 reserves a vision encoder cache by default; this pair
+# serves text-only.
+#
+# max_batch_size bounds the device-graph-capture ladder as in
+# gemma4_31b_dspark.yaml; NVFP4 weights and the fp8 KV pool leave the
+# ladder even more headroom here than in the bfloat16 recipe.
+runtime:
+  vision_cache_utilization: 0
+  max_batch_size: 64
+  device_graph_capture: true

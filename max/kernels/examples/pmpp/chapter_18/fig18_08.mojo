@@ -18,8 +18,8 @@ incoming neighbors were visited in the previous level. If so, the vertex
 marks itself as visited at the current level.
 """
 
-from std.gpu import block_dim, block_idx, grid_dim, thread_idx
-from std.gpu.host import DeviceContext
+from max.gpu import block_dim, block_idx, grid_dim, thread_idx
+from max.gpu.host import DeviceContext
 from std.atomic import Atomic
 from std.collections import List
 
@@ -37,12 +37,14 @@ comptime BLOCK_SIZE = 256
 def bfs_kernel(
     dst_ptrs: UnsafePointer[UInt32, MutAnyOrigin],
     src: UnsafePointer[UInt32, MutAnyOrigin],
-    num_vertices: Int,
+    num_vertices_dev: Int32,
     level: UnsafePointer[UInt32, MutAnyOrigin],
     new_vertex_visited: UnsafePointer[UInt32, MutAnyOrigin],
     curr_level: UInt32,
 ):
     """BFS kernel: vertex-centric pull-based traversal using CSC graph."""
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var num_vertices = Int(num_vertices_dev)
     var vertex = block_idx.x * block_dim.x + thread_idx.x
 
     if vertex < num_vertices:
@@ -84,10 +86,10 @@ def main() raises:
     var start_vertex = 0
     h_level[start_vertex] = 0
 
-    var d_dst_ptrs = ctx.enqueue_create_buffer[DType.uint32](NUM_VERTICES + 1)
-    var d_src = ctx.enqueue_create_buffer[DType.uint32](num_edges)
-    var d_level = ctx.enqueue_create_buffer[DType.uint32](NUM_VERTICES)
-    var d_new_vertex_visited = ctx.enqueue_create_buffer[DType.uint32](1)
+    var d_dst_ptrs = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES + 1)
+    var d_src = ctx.enqueue_create_buffer[.uint32](num_edges)
+    var d_level = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES)
+    var d_new_vertex_visited = ctx.enqueue_create_buffer[.uint32](1)
 
     var h_dst_ptrs = alloc[UInt32](NUM_VERTICES + 1)
     var h_src = alloc[UInt32](num_edges)
@@ -112,7 +114,7 @@ def main() raises:
         ctx.enqueue_function[bfs_kernel](
             d_dst_ptrs,
             d_src,
-            NUM_VERTICES,
+            Int32(NUM_VERTICES),
             d_level,
             d_new_vertex_visited,
             curr_level,

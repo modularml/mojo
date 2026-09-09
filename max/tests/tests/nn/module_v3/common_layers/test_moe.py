@@ -18,12 +18,10 @@ from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from max.driver import CPU, Device
-from max.dtype import DType
+from max.driver import Device
 from max.experimental import functional as F
 from max.experimental.nn.common_layers.mesh_axis import TP
 from max.experimental.nn.common_layers.moe import (
-    ExpertParallelMoE,
     MoE,
     TensorParallelMoE,
 )
@@ -34,10 +32,6 @@ from max.experimental.sharding import (
     Replicated,
 )
 from max.experimental.tensor import Tensor
-from max.graph import BufferValue, TensorValue
-from max.nn.comm.ep import EPBatchManager, EPConfig
-from max.nn.comm.ep.ep_config import NUM_GROUPS
-from max.nn.comm.ep.ep_manager import get_ep_local_sync_counters_size
 
 # Small dimensions for fast graph-trace tests.
 _HIDDEN_DIM = 256
@@ -82,16 +76,18 @@ def test_layer(mock_accelerator: MagicMock) -> None:
         ).to(devices[0])
 
         gate_up_proj = layer.gate_up_proj
-        assert list(gate_up_proj.shape) == [
+        assert len(gate_up_proj) == 1
+        assert list(gate_up_proj[0].shape) == [
             _NUM_EXPERTS,
             2 * _MOE_DIM,
             _HIDDEN_DIM,
         ]
-        assert gate_up_proj.device == devices[0]
+        assert gate_up_proj[0].device == devices[0]
 
         down_proj = layer.down_proj
-        assert list(down_proj.shape) == [_NUM_EXPERTS, _HIDDEN_DIM, _MOE_DIM]
-        assert down_proj.device == devices[0]
+        assert len(down_proj) == 1
+        assert list(down_proj[0].shape) == [_NUM_EXPERTS, _HIDDEN_DIM, _MOE_DIM]
+        assert down_proj[0].device == devices[0]
 
         x = Tensor.zeros([_SEQ_LEN, _HIDDEN_DIM], device=devices[0])
         out = layer(x)
@@ -116,24 +112,29 @@ def test_tensor_parallel_layer(mock_accelerator: MagicMock) -> None:
         ).to(mesh)
 
         # Each device holds a slice of every expert: 2*moe_dim is split along
-        # the output axis by num_devices.
+        # the output axis by num_devices. The weights are a per-device bundle
+        # of single-device tensors, one per mesh device.
         gate_up_proj = layer.gate_up_proj
-        assert list(gate_up_proj.shape) == [
-            _NUM_EXPERTS,
-            2 * _MOE_DIM // num_devices,
-            _HIDDEN_DIM,
-        ]
-        assert gate_up_proj.mapping.mesh == mesh
+        assert len(gate_up_proj) == num_devices
+        for i, shard in enumerate(gate_up_proj):
+            assert list(shard.shape) == [
+                _NUM_EXPERTS,
+                2 * _MOE_DIM // num_devices,
+                _HIDDEN_DIM,
+            ]
+            assert shard.device == devices[i]
 
         # down_proj weight is [hidden_dim, moe_dim]; shard_and_stack splits the
         # last axis (moe_dim, the contraction dim) by num_devices.
         down_proj = layer.down_proj
-        assert list(down_proj.shape) == [
-            _NUM_EXPERTS,
-            _HIDDEN_DIM,
-            _MOE_DIM // num_devices,
-        ]
-        assert down_proj.mapping.mesh == mesh
+        assert len(down_proj) == num_devices
+        for i, shard in enumerate(down_proj):
+            assert list(shard.shape) == [
+                _NUM_EXPERTS,
+                _HIDDEN_DIM,
+                _MOE_DIM // num_devices,
+            ]
+            assert shard.device == devices[i]
 
         x = Tensor.zeros([_SEQ_LEN, _HIDDEN_DIM], device=replicated_mapping)
         out = layer(x)
@@ -142,99 +143,3 @@ def test_tensor_parallel_layer(mock_accelerator: MagicMock) -> None:
     assert out.mapping.mesh == mesh
     # Output is a partial sum that must be all-reduced across TP ranks.
     assert out.mapping.to_placements() == (Partial(),)
-
-
-def _build_ep_batch_manager(
-    config: EPConfig, devices: list[Device]
-) -> EPBatchManager:
-    """Construct an EPBatchManager and attach placeholder buffer values.
-
-    Bypasses :meth:`EPBatchManager.fetch_buffers` so the EP forward path can
-    be traced under :func:`F.lazy` without wiring up real graph inputs.
-    """
-    mgr = EPBatchManager(config)
-    n_devices = config.n_gpus_per_node
-    n_experts_for_counters = (
-        config.n_experts // n_devices
-        if config.use_allreduce
-        else config.n_experts
-    )
-    counter_size = get_ep_local_sync_counters_size(n_experts_for_counters)
-
-    # Per-group, per-device atomic counters (BufferValue, int32, on each GPU).
-    mgr._atomic_counters = []
-    for _ in range(NUM_GROUPS):
-        group: list[BufferValue] = []
-        for i in range(n_devices):
-            buf = Tensor.zeros(
-                [counter_size], dtype=DType.int32, device=devices[i]
-            )
-            group.append(BufferValue(buf))
-        mgr._atomic_counters.append(group)
-
-    # Per-group send/recv/recv_count pointer tensors (uint64, on CPU).
-    def _make_ptrs() -> list[TensorValue]:
-        return [
-            TensorValue(
-                Tensor.zeros([n_devices], dtype=DType.uint64, device=CPU())
-            )
-            for _ in range(NUM_GROUPS)
-        ]
-
-    mgr._send_buf_ptrs = _make_ptrs()
-    mgr._recv_buf_ptrs = _make_ptrs()
-    mgr._recv_count_ptrs = _make_ptrs()
-    return mgr
-
-
-def test_expert_parallel_layer(mock_accelerator: MagicMock) -> None:
-    """Traces an ExpertParallelMoE in a lazy context and verifies output mapping."""
-    with F.lazy():
-        devices = [mock_accelerator(0), mock_accelerator(1)]
-        num_devices = len(devices)
-        num_local_experts = _NUM_EXPERTS // num_devices
-        mesh = DeviceMesh(tuple(devices), (num_devices,), (TP,))
-        replicated_mapping = PlacementMapping(mesh, (Replicated(),))
-
-        ep_config = EPConfig(
-            dispatch_dtype=DType.bfloat16,
-            combine_dtype=DType.bfloat16,
-            hidden_size=_HIDDEN_DIM,
-            top_k=_NUM_EXPERTS_PER_TOKEN,
-            n_experts=_NUM_EXPERTS,
-            max_tokens_per_rank=_SEQ_LEN,
-            n_gpus_per_node=num_devices,
-            n_nodes=1,
-        )
-        ep_batch_manager = _build_ep_batch_manager(ep_config, devices)
-
-        layer = ExpertParallelMoE(
-            hidden_dim=_HIDDEN_DIM,
-            num_experts=_NUM_EXPERTS,
-            num_experts_per_token=_NUM_EXPERTS_PER_TOKEN,
-            moe_dim=_MOE_DIM,
-            ep_batch_manager=ep_batch_manager,
-        ).to(mesh)
-
-        # Each device holds num_local_experts full-size experts.
-        gate_up_proj = layer.gate_up_proj
-        assert list(gate_up_proj.shape) == [
-            num_local_experts,
-            2 * _MOE_DIM,
-            _HIDDEN_DIM,
-        ]
-        assert gate_up_proj.mapping.mesh == mesh
-
-        down_proj = layer.down_proj
-        assert list(down_proj.shape) == [
-            num_local_experts,
-            _HIDDEN_DIM,
-            _MOE_DIM,
-        ]
-        assert down_proj.mapping.mesh == mesh
-
-        x = Tensor.zeros([_SEQ_LEN, _HIDDEN_DIM], device=replicated_mapping)
-        out = layer(x)
-
-    assert list(out.shape) == [_SEQ_LEN, _HIDDEN_DIM]
-    assert out.mapping.mesh == mesh

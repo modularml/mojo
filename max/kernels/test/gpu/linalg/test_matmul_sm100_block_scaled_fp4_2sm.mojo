@@ -11,8 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 from std.sys import size_of
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import Idx
 from linalg.matmul.gpu.sm100.testbed_block_scaled_fp4 import (
     test_blackwell_block_scaled_matmul_tma_umma_warp_specialized,

@@ -1,0 +1,15 @@
+{
+  "target": "attn_res_mix",
+  "spec": {
+    "tokens": 1,
+    "hidden": 7168,
+    "cands": 3,
+    "dist": 0,
+    "pdl": 1,
+    "dt": 0
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "production decode shape (one token, real hidden) with PDL armed",
+  "findings": []
+}

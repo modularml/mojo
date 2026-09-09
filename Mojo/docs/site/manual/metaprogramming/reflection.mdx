@@ -1,0 +1,423 @@
+---
+title: Reflection
+description:
+  Compile-time reflection utilities for introspecting Mojo types
+  and functions
+---
+
+<!--
+VERIFIED: std/reflection/__init__.mojo, std/reflection/reflect.mojo,
+     std/reflection/type_info.mojo, std/reflection/location.mojo,
+     std/reflection/struct_fields.mojo, builtin/comparable.mojo
+-->
+
+Reflection helps you write code that inspects its own structure at
+compile time and reports information about types. This makes it
+possible to build features like structural validation, automatic
+comparisons, serialization, safer assertions, and richer error
+messages without hardcoding details for specific type
+implementations.
+
+:::caution
+Mojo reflection is newly introduced and currently incomplete. Some reflection
+capabilities are limited, unstable, or not yet fully exposed through the
+language interface. This page describes the direction of the feature as well
+as the parts that are available today.
+
+All examples reflect the state of the language at the time this page was
+published. They may change as reflection support matures.
+:::
+
+## Why reflection?
+
+Reflection is one of Mojo's powerful compile-time features. It lets
+you inspect types, access fields, and generate code that adapts to a
+struct's shape.
+
+For example, define a struct, conform it to `Equatable`, and the `==`
+operator automatically works:
+
+```mojo
+@fieldwise_init
+struct Sensor(Equatable, Hashable, Writable):
+    var id: Int
+    var label: String
+    var reading: Float64
+```
+
+This code uses no operator overload or boilerplate.
+
+Mojo inspects the struct at compile time, checks that each field supports
+equality, and generates the comparison code. That is what reflection does.
+
+Reflection has no runtime cost. The compiler does the work up front and
+emits code as efficient as manually written code.
+
+:::note
+In this example, `Sensor` also conforms to `Hashable` and `Writable`.
+By conforming, instances work as `Dict` keys or `Set` elements, and print
+cleanly, without extra code.
+:::
+
+## Inspect a type
+
+Use the `reflect[T]` alias to inspect a type at compile time. Built into
+Mojo, it resolves to `Reflected[T]`, a handle type with static methods
+for querying a type.
+
+This code uses `reflect[T]` to inspect a type's structure:
+
+```mojo
+def show_type[T: AnyType]():
+    comptime type_name = reflect[T].name()
+    comptime field_count = reflect[T].field_count()
+    comptime field_names = reflect[T].field_names()
+    comptime field_types = reflect[T].field_types()
+
+    print("struct", type_name)
+
+    comptime for idx in range(field_count):
+        comptime field_name = field_names[idx]
+        comptime field_type = reflect[field_types[idx]].name()
+        var intro = "├──" if idx < (field_count - 1) else "└──"
+        print(intro, " var ", field_name, ": ", field_type, sep="")
+```
+
+Create some types to test this with:
+
+```mojo
+@fieldwise_init
+struct MyStruct:
+    var x: String
+    var y: Optional[Int]
+
+comptime DefaultItemCount = 10
+
+struct ParameterizedStruct[
+    T: Movable & Deinitable, item_count: Int = DefaultItemCount
+]:
+    var list: List[Self.T]
+    def __init__(out self):
+        self.list = List[Self.T](capacity=Self.item_count)
+
+def main():
+    show_type[MyStruct](); print()
+    show_type[Optional[Float64]](); print()
+    show_type[Dict[Int, String]](); print()
+    show_type[ParameterizedStruct[String, item_count=5]]()
+```
+
+When run, this code prints each struct's name and fields with their types.
+The `comptime for` loop over fields resolves at compile time. At runtime,
+only the resulting `print()` calls execute:
+
+```text
+struct tests.MyStruct
+├── var x: String
+└── var y: std.collections.optional.Optional[SIMD[DType.int, 1]]
+
+struct std.collections.optional.Optional[SIMD[DType.float64, 1]]
+└── var _value: std.utils.variant.Variant[<unprintable>, {}]
+
+struct std.collections.dict.Dict[SIMD[DType.int, 1], String, \
+    std.hashlib._ahash.AHasher[[0, 0, 0, 0] : SIMD[DType.uint64, 4]]]
+├── var _table: std.collections._swisstable.SwissTable[\
+    SIMD[DType.int, 1], String, std.hashlib._ahash.AHasher[\
+    [0, 0, 0, 0] : SIMD[DType.uint64, 4]]]
+└── var _order: List[SIMD[DType.int32, 1]]
+
+struct tests.ParameterizedStruct[String, 5 : SIMD[DType.int, 1]]
+└── var list: List[String]
+```
+
+The output uses compiler-resolved names, and the exact rendering may drift
+as the compiler evolves.
+
+Names appear with their parameters applied. Some print bare and others carry
+a module path: `Int`, `Float64`, `Bool`, `String`, and `List` show no path,
+while `Dict`, `Optional`, and `Set` show theirs. Your own structs carry the
+name of the module that declares them. Aliases resolve to what they alias,
+so `Int` and `Float64` show up as the one-element SIMD types underneath.
+Parameter values print with their type attached.
+
+If you only need the base type name, use `base_name()`:
+
+```mojo
+print(reflect[List[Int]].base_name())          # List
+print(reflect[Dict[String, Int]].base_name())  # Dict
+```
+
+:::note
+When you need one field, access it by name instead of iterating:
+
+```mojo
+comptime host_handle = reflect[Config].field["host"]
+var default_host: host_handle.T = "localhost"
+
+print(default_host)  # localhost
+```
+
+Name-based lookup requires a concrete type. If `T` is parameterized, use
+index-based iteration instead.
+:::
+
+## Detect field-level changes between two values
+
+Compare two values and list which fields differ. Use this for test
+assertions, audit logs, change tracking, or debugging.
+
+```mojo
+def diff_fields[T: AnyType](a: T, b: T) -> List[String]:
+    comptime names = reflect[T].field_names()
+    comptime types = reflect[T].field_types()
+    var diffs = List[String]()
+
+    comptime for idx in range(reflect[T].field_count()):
+        comptime if conforms_to(types[idx], Equatable):
+            ref a_val = reflect[T].field_ref[idx](a)
+            ref b_val = reflect[T].field_ref[idx](b)
+            if a_val != b_val:
+                diffs.append(String(comptime (names[idx])))
+
+    return diffs^
+```
+
+For example, consider a configuration type:
+
+```mojo
+@fieldwise_init
+struct Config(Equatable):
+    var host: String
+    var port: Int
+    var verbose: Bool
+    var timeout: Float64
+```
+
+`diff_fields()` compares two `Config` values and returns the field names
+that differ:
+
+```mojo
+def main():
+    var old = Config("localhost", 8080, False, 30.0)
+    var new = Config("localhost", 9090, True, 30.0)
+
+    var changes = diff_fields(old, new)
+    for name in changes:
+        print("changed:", name)
+    # changed: port
+    # changed: verbose
+```
+
+## Write once, reuse everywhere with traits
+
+Reflection is powerful when used in traits with provided methods. The
+method runs for any conforming struct that meets the trait requirements.
+
+`MakeCopyable` duplicates every copyable field from one instance to another:
+
+```mojo
+trait MakeCopyable:
+    def copy_to(self, mut other: Self):
+        comptime field_count = reflect[Self].field_count()
+        comptime field_types = reflect[Self].field_types()
+
+        comptime Usable = Copyable & Deinitable
+        comptime for idx in range(field_count):
+            comptime field_type = field_types[idx]
+            comptime if conforms_to(field_type, Usable):
+                reflect[Self].field_ref[idx](other) = reflect[Self].field_ref[
+                    idx
+                ](self).copy()
+```
+
+Conforming structs receive `copy_to()` without writing an implementation.
+As a trait method, `copy_to()` has direct access to `Self`. You don't
+need a type parameter.
+
+```mojo
+@fieldwise_init
+struct MultiType(MakeCopyable, Writable):
+    var w: String
+    var x: Int
+    var y: Bool
+    var z: Float64
+
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write(String(t"[{self.w}, {self.x}, {self.y}, {self.z}]"))
+
+
+def main():
+    var original = MultiType("Hello", 1, True, 2.5)
+    var target = MultiType("", 0, False, 0.0)
+
+    original.copy_to(target)
+    print(target)  # [Hello, 1, True, 2.5]
+```
+
+You define the behavior once. Every conforming struct gets it as a
+provided method.
+
+## Layout, source locations, and type utilities
+
+These tools expose lower-level details such as layout, lifetimes, and
+source information.
+
+### Field layout and byte offsets
+
+When you need field layout for zero-copy serialization, C interop, or
+alignment, use `field_offset()`:
+
+```mojo
+struct Packet:
+    var flags: UInt8
+    var id: UInt32
+    var payload: UInt64
+
+def show_layout[T: AnyType]():
+    var names = materialize[reflect[T].field_names()]()
+    comptime for i in range(reflect[T].field_count()):
+        comptime off = reflect[T].field_offset[index=i]()
+        print(names[i], "at byte", off)
+
+def main():
+    show_layout[Packet]()
+    # flags at byte 0
+    # id at byte 4     (alignment padding: 3 bytes)
+    # payload at byte 8
+```
+
+`field_offset` accepts `name=` or `index=` and accounts for alignment
+padding. The gap between `flags` (1 byte) and `id` (byte 4) shows the
+compiler inserting 3 bytes of padding so `id` aligns to a 4-byte boundary.
+
+### Types and origins
+
+Two functions provide compile-time access to type and lifetime
+information from expressions:
+
+**`type_of(x)`** returns the type of an expression for use in parameter
+positions:
+
+```mojo
+def make_default[T: Defaultable]() -> T:
+    return T()
+
+def main():
+    var x = 42
+    var y = make_default[type_of(x)]()
+    print(y)  # 0
+```
+
+**`origin_of(x)`** captures the origin (lifetime and mutability) of a
+reference.
+
+In Mojo, every reference has an _origin_ that tracks which value it reads
+from and whether it can mutate that value. `origin_of(x)` captures this
+information at compile time so you can thread it through function
+signatures.
+
+It appears in signatures where a returned reference must be tied to an
+input's lifetime:
+
+```mojo
+from std.os import abort
+
+def first_ref[
+    T: Movable
+](ref list: List[T]) -> ref[list[0]] T:
+    if not list:
+        abort("empty list")
+    return list[0]
+
+def main():
+    var l: List[Int] = [1, 2, 3]
+    ref x = first_ref(l)
+    print(x)  # 1
+    x += 10   # modifies the original list through the reference
+    print(l)  # [11, 2, 3]
+
+    l = []
+    first_ref(l)  # aborts with "empty list"
+```
+
+The returned reference shares its origin with `list`, so the compiler
+knows it is valid as long as `list` is. Both are available without
+imports.
+
+### Source locations
+
+**`call_location()`** returns the caller's source location, not the
+location of the `call_location()` call itself. When building assertions or
+validators, error messages are more useful when they point to the call
+site:
+
+```mojo
+from std.reflection import call_location
+
+@always_inline
+def require(
+    cond: Bool, msg: String = "requirement failed"
+) raises:
+    if not cond:
+        raise Error(call_location().prefix(msg))
+
+def main() raises:
+    var x = 5
+    require(x > 10, "x must be > 10")
+    # Error: At /path/to/file.mojo:10:5: x must be > 10
+```
+
+Mark the enclosing function `@always_inline` (or
+`@always_inline("nodebug")`). The decorator is what guarantees the location
+the function reports; without it, the result depends on whether the compiler
+inlined the call anyway. `call_location()` also accepts an optional
+`inline_count` parameter. The default (1) reports the immediate caller's
+call site. Higher values skip additional levels, and the compiler must
+inline every level in the chain.
+
+**`source_location()`** returns the location where `source_location()` is
+called. This is less useful for debugging because it reports the location of
+the call, not the caller:
+
+```mojo
+from std.reflection import source_location
+
+def log(msg: String):
+    var loc = source_location()
+    print(
+        "[", loc.file_name(), ":", loc.line(), "] ",
+        msg, sep=""
+    )
+
+def main():
+    log("starting up")
+    # [/path/to/file.mojo:4:15] starting up
+```
+
+### Function names
+
+Retrieve a function's source name or linker symbol at compile time. Use
+this for logging, tracing, or dispatch:
+
+```mojo
+from std.reflection import get_function_name, get_linkage_name
+
+def process_data():
+    pass
+
+def main():
+    print(get_function_name[process_data]())  # process_data
+    print(get_linkage_name[process_data]())   # mangled symbol
+```
+
+- **`get_function_name[func]()`** returns the name as written in source code.
+- **`get_linkage_name[func]()`** returns the mangled symbol name.
+
+Both take the function as a parameter value.
+
+## Learn more
+
+- Visit the reflection
+  [package documentation](/docs/std/reflection/)
+  for API details.
+- Learn more about [traits](/docs/manual/traits/).

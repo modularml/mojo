@@ -13,6 +13,7 @@
 
 from std.sys import get_defined_dtype, get_defined_int, size_of
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     BenchConfig,
@@ -21,7 +22,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from internal_utils import get_defined_shape, int_list_to_tuple
 from layout import TileTensor, row_major
 from nn.pad_gpu import pad_constant, get_padding_output_shape
@@ -33,13 +34,11 @@ def bench_pad_gpu[
     rank: Int, //, dtype: DType, shape: IndexList[rank], pad_size: Int
 ](ctx: DeviceContext, mut b: Bench) raises:
     # Create paddings with uniform pre/post padding on all dimensions.
-    var paddings_stack = InlineArray[Scalar[DType.int], 2 * rank](
-        uninitialized=True
-    )
+    var paddings_stack = Array[Int, 2 * rank](uninitialized=True)
     var paddings = TileTensor(paddings_stack, row_major[2 * rank]())
     for i in range(rank):
-        paddings[2 * i] = Scalar[DType.int](pad_size)
-        paddings[2 * i + 1] = Scalar[DType.int](pad_size)
+        paddings[2 * i] = Int(pad_size)
+        paddings[2 * i + 1] = Int(pad_size)
 
     var output_shape = get_padding_output_shape(shape, paddings)
     var input_size = shape.flattened_length()
@@ -49,12 +48,10 @@ def bench_pad_gpu[
     var out_device = ctx.enqueue_create_buffer[dtype](output_size)
     var constant = Scalar[dtype](0)
 
-    @parameter
     @always_inline
-    def bench_fn(mut b: Bencher) raises:
-        @parameter
+    def bench_fn(mut b: Bencher) raises {mut out_device, imm}:
         @always_inline
-        def kernel_launch(ctx: DeviceContext) raises:
+        def kernel_launch(ctx: DeviceContext) raises {mut out_device, imm}:
             pad_constant(
                 out_device.unsafe_ptr(),
                 output_shape,
@@ -65,12 +62,13 @@ def bench_pad_gpu[
                 ctx,
             )
 
-        b.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(b, kernel_launch, ctx)
 
     # Total memory traffic: read input + write output.
     var total_bytes = (input_size + output_size) * size_of[dtype]()
 
-    b.bench_function[bench_fn](
+    b.bench_function(
+        bench_fn,
         BenchId(
             "pad_constant",
             input_id=String(dtype, "/", shape, "/pad=", pad_size),
@@ -85,7 +83,7 @@ def bench_pad_gpu[
 
 
 def main() raises:
-    comptime dtype = get_defined_dtype["dtype", DType.float32]()
+    comptime dtype = get_defined_dtype["dtype", .float32]()
     comptime shape = int_list_to_tuple[
         get_defined_shape["shape", "256x256"]()
     ]()

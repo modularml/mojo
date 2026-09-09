@@ -40,7 +40,7 @@ def convert_safetensor_state_dict(
         # checkpoints (e.g. `k_proj.k_scale`, `v_proj.v_scale`). MAX reads
         # KV cache scales from a separate configuration path, so these keys
         # would otherwise trigger a strict load_state_dict failure.
-        if max_name.endswith(".k_scale") or max_name.endswith(".v_scale"):
+        if max_name.endswith((".k_scale", ".v_scale")):
             continue
         new_state_dict[max_name] = value.data()
 

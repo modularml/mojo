@@ -13,7 +13,7 @@
 
 from std.math import ceildiv
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import KVCacheStaticParams, PagedKVCacheCollection
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
 from layout._utils import ManagedLayoutTensor
@@ -40,14 +40,12 @@ def test_kv_cache_radd[
     assert (
         num_active_loras <= batch_size
     ), "num_active_loras must be less than or equal to batch_size"
-    var cache_lengths = ManagedLayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE)
-    ](
+    var cache_lengths = ManagedLayoutTensor[.uint32, Layout(UNKNOWN_VALUE)](
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(Index(batch_size)),
         ctx,
     )
     var input_row_offsets_slice = ManagedLayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE)
+        .uint32, Layout(UNKNOWN_VALUE)
     ](
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(
             Index(num_active_loras + 1)
@@ -80,7 +78,7 @@ def test_kv_cache_radd[
 
     input_row_offsets_slice_host[num_active_loras] = UInt32(running_total)
 
-    num_paged_blocks = ceildiv(
+    var num_paged_blocks = ceildiv(
         batch_size * max_full_context_length * 2, page_size
     )
 
@@ -208,7 +206,7 @@ def test_kv_cache_radd[
                         )
 
     # now check that the lora-augmented entries are correct
-    arange_counter = 0
+    var arange_counter = 0
     for i in range(batch_size - num_active_loras, batch_size):
         for c in range(prompt_lens[i]):
             var actual_len = c + cache_lens[i]
@@ -247,25 +245,25 @@ def test_kv_cache_radd[
 
 def main() raises:
     with DeviceContext() as ctx:
-        test_kv_cache_radd[DType.float32, 8, 128, 128](
+        test_kv_cache_radd[.float32, 8, 128, 128](
             IndexList[4](10, 20, 30, 40),
             IndexList[4](40, 30, 20, 10),
             2,
             ctx,
         )
-        test_kv_cache_radd[DType.float32, 8, 128, 128](
+        test_kv_cache_radd[.float32, 8, 128, 128](
             IndexList[4](10, 20, 30, 40),
             IndexList[4](40, 30, 20, 10),
             4,
             ctx,
         )
-        test_kv_cache_radd[DType.float32, 8, 128, 128](
+        test_kv_cache_radd[.float32, 8, 128, 128](
             IndexList[4](10, 20, 30, 40),
             IndexList[4](40, 30, 20, 10),
             0,
             ctx,
         )
-        test_kv_cache_radd[DType.float32, 8, 128, 128](
+        test_kv_cache_radd[.float32, 8, 128, 128](
             IndexList[1](10),
             IndexList[1](40),
             1,

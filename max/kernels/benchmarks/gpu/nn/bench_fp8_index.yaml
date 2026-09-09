@@ -30,3 +30,11 @@ params:
   $batch_size: [1, 2, 4]
   $seq_len: [128, 512]
   $num_keys: [128, 512, 1024]
+
+# GLM 5.x replicated indexer (num_heads=32) on an MTP step: 6 tokens over a deep
+# cache, which routes through the key-split arm of the K-streaming prefill kernel.
+- num_heads: 32
+  depth: 128
+  $batch_size: [8]
+  $num_keys: [107228]
+  $seq_len: [6]

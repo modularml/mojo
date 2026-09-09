@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 from extensibility import *
 from extensibility import InputTensor, OutputTensor
-import extensibility as compiler
+import extensibility
 
 
 # This function has the same name as the parameter for the kernel registration.
@@ -20,7 +20,7 @@ def top_k():
     pass
 
 
-@compiler.register("parameter_name_overload")
+@extensibility.register("parameter_name_overload")
 struct ParameterNameOverload:
     # The top_k parameter matches the name of the top_k function defined above.
     @staticmethod

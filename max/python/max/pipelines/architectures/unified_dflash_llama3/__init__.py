@@ -12,13 +12,15 @@
 # ===----------------------------------------------------------------------=== #
 """DFlash speculative decoding for Llama3 with unified graph compilation."""
 
+from max.pipelines.lib.interfaces.batch_processor import PersistentInputBuffers
+from max.pipelines.speculative._dflash import DflashDraftHFConfig
+
 from .arch import unified_dflash_llama3_arch
 from .model import (
-    PersistentInputBuffers,
     UnifiedDflashLlama3Inputs,
     UnifiedDflashLlama3Model,
 )
-from .model_config import DflashDraftHFConfig, UnifiedDflashLlama3Config
+from .model_config import UnifiedDflashLlama3Config
 
 __all__ = [
     "DflashDraftHFConfig",

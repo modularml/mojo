@@ -1,0 +1,45 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Regression test: print() crashed in the JIT/REPL with SIGSEGV because
+# LLDB's symbol resolution matched the POSIX `write` symbol to a C++ method
+# instead of libc's write(2).
+
+print()
+
+# CHECK: {{^$}}
+
+print(42)
+
+# CHECK: 42
+
+print("hello world")
+
+# CHECK: hello world
+
+print(1, 2, 3)
+
+# CHECK: 1 2 3
+
+# Regression test: printing String variables from a prior REPL block used to
+# produce garbage output. String.__init__(StringLiteral) stores a raw pointer
+# into the JIT data section (via pop.string.address) without heap-copying. The
+# JIT execution unit was not persisted in REPL mode, so the data section was
+# freed and the next block's JIT data allocated over it. With multiple strings
+# in a block, all but the last would read garbage from the next block's JIT data
+# section, which reuses the same process memory.
+var x = String("short")
+var y = String("a longer string value")
+
+# Without the fix, print(x) outputs garbage because block 2's JIT data section
+# reuses block 1's memory, overwriting "short"'s storage.
+print(x)
+print(y)
+
+# CHECK: short
+# CHECK: a longer string value

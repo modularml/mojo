@@ -104,6 +104,19 @@ class PixelProviderOptionsBase(BaseModel):
         gt=0.0,
     )
 
+    flow_shift: float | None = Field(
+        None,
+        description=(
+            "Flow-matching scheduler shift parameter for the UniPC "
+            "flow-sigma scheduler. Higher values push the noise schedule "
+            "toward later timesteps and typically produce smoother "
+            "long-horizon dynamics; lower values weight early timesteps "
+            "more. When unset, the model's per-pipeline default is used. "
+            "Ignored by schedulers that do not support it."
+        ),
+        gt=0.0,
+    )
+
     response_format: GeneratedMediaResponseFormat = Field(
         GeneratedMediaResponseFormat.b64_json,
         description=(

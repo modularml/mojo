@@ -6,6 +6,9 @@ config.llvm_use_sanitizer = "@LLVM_USE_SANITIZER@"
 if @ENABLE_ASSERTIONS@:
     config.available_features.add("ASSERTIONS")
 
+if @MODULAR_PRODUCTION@:
+    config.available_features.add("production")
+
 config.mojo_version_major = @MOJO_VERSION_MAJOR@
 config.mojo_version_minor = @MOJO_VERSION_MINOR@
 config.mojo_version_patch = @MOJO_VERSION_PATCH@

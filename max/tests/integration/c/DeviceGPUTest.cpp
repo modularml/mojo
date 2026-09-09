@@ -40,6 +40,112 @@ TEST_F(GPUTest, SynchronizeGPUDevice) {
   EXPECT_SUCCESS(status, "Failed to synchronize GPU device");
 }
 
+// Test for borrowing a pointer that already lives on the
+// device must alias it in place (zero-copy), not allocate a fresh device
+// buffer and copy into it. If it copies, in-place mutation of the borrowed
+// buffer is lost because the model runs against the private copy.
+TEST_F(GPUTest, BorrowDevicePointerAliasesInPlace) {
+  std::vector<float> hostData = {1.0f, 2.0f, 3.0f, 4.0f};
+  int64_t shape[] = {4};
+
+  // Stage data onto the GPU and capture its device pointer.
+  M_TensorSpec *hostSpec = M_newTensorSpec(shape, 1, M_FLOAT32, "input0", host);
+  M_AsyncTensorMap *hostMap = M_newAsyncTensorMap(context);
+  M_borrowTensorInto(hostMap, hostData.data(), hostSpec, status);
+  EXPECT_SUCCESS(status, "Failed to borrow host tensor");
+  M_AsyncTensor *hostTensor = M_getTensorByNameFrom(hostMap, "input0", status);
+  M_AsyncTensor *deviceTensor =
+      M_copyTensorToDevice(hostTensor, gpuDevice, status);
+  EXPECT_SUCCESS(status, "Failed to copy tensor to GPU");
+  const void *devicePtr = M_getTensorData(deviceTensor);
+
+  // Borrowing that device pointer into a GPU spec must reuse it in place
+  // rather than allocate an alignment-padded copy at a different address.
+  M_TensorSpec *gpuSpec =
+      M_newTensorSpec(shape, 1, M_FLOAT32, "input0", gpuDevice);
+  M_AsyncTensorMap *gpuMap = M_newAsyncTensorMap(context);
+  M_borrowTensorInto(gpuMap, (void *)(uintptr_t)devicePtr, gpuSpec, status);
+  EXPECT_SUCCESS(status, "Failed to borrow device tensor");
+  M_AsyncTensor *borrowed = M_getTensorByNameFrom(gpuMap, "input0", status);
+  EXPECT_SUCCESS(status, "Failed to get borrowed device tensor");
+  EXPECT_EQ(M_getTensorData(borrowed), devicePtr);
+
+  // Free the borrowing map first so its no-op destructor runs before the
+  // tensor that actually owns the device allocation.
+  M_freeAsyncTensorMap(gpuMap);
+  M_freeTensorSpec(gpuSpec);
+  M_freeTensor(deviceTensor);
+  M_freeTensor(hostTensor);
+  M_freeAsyncTensorMap(hostMap);
+  M_freeTensorSpec(hostSpec);
+}
+
+// End-to-end regression test for when a model with a `BufferType`
+// input mutates that input in place and the caller borrowed a device pointer
+// for it, the mutation must be visible through the caller's pointer.
+TEST_F(GPUTest, BorrowDevicePointerReflectsInPlaceMutation) {
+  const char *mefPath = getenv("MUTATE_MEF_PATH");
+  ASSERT_NE(mefPath, nullptr) << "MUTATE_MEF_PATH not set";
+
+  // Compile the GPU mutate model: buffer[...] = buffer[...] * 2 + 1.
+  M_CompileConfig *compileConfig = M_newCompileConfig();
+  M_setModelPath(compileConfig, mefPath);
+  M_AsyncCompiledModel *compiledModel =
+      M_compileModelSync(context, &compileConfig, status);
+  EXPECT_SUCCESS(status, "Failed to compile mutate model");
+  M_AsyncModel *model = M_initModel(context, compiledModel, nullptr, status);
+  EXPECT_SUCCESS(status, "Failed to initialize mutate model");
+
+  // Stage known data onto the GPU and capture its device pointer. This stands
+  // in for the caller's device-resident buffer that they expect mutated.
+  std::vector<float> original = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  int64_t shape[] = {10};
+  M_TensorSpec *hostSpec = M_newTensorSpec(shape, 1, M_FLOAT32, "input0", host);
+  M_AsyncTensorMap *hostMap = M_newAsyncTensorMap(context);
+  M_borrowTensorInto(hostMap, original.data(), hostSpec, status);
+  EXPECT_SUCCESS(status, "Failed to borrow host tensor");
+  M_AsyncTensor *hostTensor = M_getTensorByNameFrom(hostMap, "input0", status);
+  M_AsyncTensor *deviceTensor =
+      M_copyTensorToDevice(hostTensor, gpuDevice, status);
+  EXPECT_SUCCESS(status, "Failed to copy tensor to GPU");
+  void *devicePtr = const_cast<void *>(M_getTensorData(deviceTensor));
+
+  // Borrow that device pointer (zero-copy) as the model's `BufferType` input.
+  M_TensorSpec *gpuSpec =
+      M_newTensorSpec(shape, 1, M_FLOAT32, "input0", gpuDevice);
+  M_AsyncTensorMap *inputs = M_newAsyncTensorMap(context);
+  M_borrowTensorInto(inputs, devicePtr, gpuSpec, status);
+  EXPECT_SUCCESS(status, "Failed to borrow device tensor");
+
+  // Run the model; it mutates the borrowed buffer in place.
+  M_AsyncTensorMap *outputs =
+      M_executeModelSync(context, model, inputs, status);
+  EXPECT_SUCCESS(status, "Failed to execute mutate model");
+
+  // Copy the *same* device allocation back to host and confirm the mutation
+  // landed in it. If the borrow had copied instead of aliased, this allocation
+  // would still hold the original 1..10 values.
+  M_AsyncTensor *result = M_copyTensorToDevice(deviceTensor, host, status);
+  EXPECT_SUCCESS(status, "Failed to copy result back to host");
+  const float *resultData = static_cast<const float *>(M_getTensorData(result));
+  for (size_t i = 0; i < original.size(); ++i)
+    EXPECT_FLOAT_EQ(resultData[i], original[i] * 2.0f + 1.0f)
+        << "In-place mutation not reflected at index " << i;
+
+  // Free the borrowing map first so its no-op destructor runs before the
+  // tensor that owns the device allocation.
+  M_freeTensor(result);
+  M_freeAsyncTensorMap(outputs);
+  M_freeAsyncTensorMap(inputs);
+  M_freeTensorSpec(gpuSpec);
+  M_freeTensor(deviceTensor);
+  M_freeTensor(hostTensor);
+  M_freeAsyncTensorMap(hostMap);
+  M_freeTensorSpec(hostSpec);
+  M_freeModel(model);
+  M_freeCompiledModel(compiledModel);
+}
+
 TEST_F(GPUTest, MoveTensorToGPU) {
   // Create a tensor on host
   std::vector<float> inputData = {1.0f, 2.0f, 3.0f, 4.0f,

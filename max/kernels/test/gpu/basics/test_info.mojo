@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host.info import *
+from max.gpu.host.info import *
 from std.testing import *
 
 

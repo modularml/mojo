@@ -1,0 +1,25 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+# Cascade workers that wrap MAX model inference (tokenizer + model worker).
+# These pull heavier deps (transformers, the pipelines registry, the serve
+# model-worker subprocess); depend on them explicitly when needed rather than
+# via the top-level ``cascade`` umbrella target.
+modular_py_library(
+    name = "workers",
+    srcs = glob(["*.py"]),
+    deps = [
+        requirement("numpy"),
+        requirement("transformers"),
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/interfaces",
+        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/serve:config",
+        "//max/python/max/serve/pipelines",
+        "//max/python/max/serve/worker_interface",
+    ],
+)

@@ -11,12 +11,12 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import barrier, block_idx, thread_idx, WARP_SIZE
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
-from std.gpu.primitives.id import lane_id, warp_id
-from std.gpu.primitives.warp import shuffle_up
+from max.gpu import block_idx, thread_idx, WARP_SIZE
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
+from max.gpu.primitives.id import lane_id, warp_id
+from max.gpu.primitives.warp import shuffle_up
 
 from std.math import abs
 
@@ -51,7 +51,7 @@ def warp_scan(val: Float32) -> Float32:
 
 # ========================== KERNEL CODE ==========================
 def scan_kernel(
-    input: UnsafePointer[Float32, MutAnyOrigin],
+    input: UnsafePointer[Float32, ImmutAnyOrigin],
     output: UnsafePointer[Float32, MutAnyOrigin],
     N: UInt32,
 ):
@@ -65,20 +65,20 @@ def scan_kernel(
     var block_segment = block_idx.x * COARSE_FACTOR * BLOCK_DIM
 
     # Allocate shared memory
-    var buffer_s = stack_allocation[
+    var buffer_s = unsafe_stack_allocation[
         COARSE_FACTOR * BLOCK_DIM,
         Float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var warp_sums = stack_allocation[
+    var warp_sums = unsafe_stack_allocation[
         NUM_WARPS,
         Float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var thread_sums = stack_allocation[
+    var thread_sums = unsafe_stack_allocation[
         BLOCK_DIM,
         Float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # Load data to shared memory
@@ -143,8 +143,8 @@ def scan_kernel(
 
 # ========================== TEST CODE ==========================
 def cpu_scan(
-    input: UnsafePointer[Float32, MutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
+    input: UnsafePointer[mut=False, Float32, _],
+    output: UnsafePointer[mut=True, Float32, _],
     N: UInt32,
 ):
     """CPU reference scan implementation.

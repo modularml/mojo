@@ -1,0 +1,712 @@
+---
+title: Mojo numeric types reference
+sidebar_label: Numeric types
+sidebar_position: 8
+description: >
+  Complete reference for Mojo numeric types. Covers SIMD,
+  DType, Scalar, Int, UInt, sized integers, floating-point
+  types, Byte, numeric literals, and explicit conversions.
+---
+
+<!--
+VERIFIED: builtin/simd.mojo (SIMD, Scalar, UInt, Byte, sized
+type aliases, MAX/MIN/MAX_FINITE/MIN_FINITE),
+builtin/int.mojo (Int, Indexer, BITWIDTH),
+builtin/dtype.mojo (DType enum), builtin/int_literal.mojo
+(IntLiteral, arbitrary precision, materializes to Int),
+builtin/float_literal.mojo (FloatLiteral, materializes to
+Float64, nan/infinity/negative_infinity/negative_zero),
+builtin/type_aliases.mojo, ExprNode.h (kIntLiteral,
+kFloatLiteral), ASTType.h (register passability),
+prelude __init__.mojo,
+DType support matrix (compiler team, Notion),
+BFloat16 Apple Silicon status (DevRel)
+-->
+
+Mojo's numeric primitives are built on `SIMD` vectors. Every fixed-width
+numeric type is a one-element `SIMD` called a `Scalar`. The `DType`
+specifies the kind of values stored in a `SIMD` vector, such as `int`,
+`uint`, `float32`, `int64`, or `uint8`. Mojo provides sized and unsized
+integer types, floating-point types, and `Byte` for raw byte data.
+
+## `SIMD` {#simd}
+
+`SIMD` stands for "Single Instruction, Multiple Data". It
+lets the CPU operate on multiple values at once using a single
+instruction.
+
+A `SIMD` value stores one or more values of the same type in a
+fixed-size vector. The number of values is called the *width*,
+and it must be a power of two.
+
+The width is part of the type. For example,
+`SIMD[.float32, 4]` is a vector of four 32-bit floats.
+`SIMD[.int8, 16]` is a vector of sixteen 8-bit integers.
+
+When the first `SIMD` parameter expects a `DType` value, you can write
+`.float32` instead of `DType.float32`. The same shorthand works in
+`.cast[.int32]()` and other APIs that take a `DType` argument.
+
+When a `SIMD` value holds one value, it behaves like a scalar.
+When it holds several, operations apply to all values at once:
+
+```mojo
+var v = SIMD[.float32, 4](1.0, 2.0, 3.0, 4.0)
+var doubled = v * 2.0   # All four elements doubled
+print(doubled) # [2.0, 4.0, 6.0, 8.0]
+```
+
+Modern CPUs can process 4, 8, 16, or more values in parallel
+with SIMD, which can significantly improve performance over
+scalar operations.
+
+:::note
+`SIMD` has a hard limit of 2**15 (32768) elements. This is a
+compile-time limit, not a runtime one.
+
+In practice, the usable width is much smaller and depends on
+the hardware. For example, `SIMD[.float32, 4]` fits in a
+128-bit register, while `SIMD[.float32, 16]` requires
+512 bits, which matches or exceeds the width of most SIMD registers.
+
+Always benchmark to find the optimal width for your workload
+and target hardware.
+:::
+
+### Element access
+
+Read and write individual elements by index ("*lane*"):
+
+```mojo
+v[0]       # Read element 0 → Scalar[.float32]
+v[0] = 5.0 # Write element 0
+```
+
+### Operations
+
+Arithmetic, comparison, and bitwise operations apply to all
+elements at once:
+
+```mojo
+var a = SIMD[.float32, 4](1.0, 2.0, 3.0, 4.0)
+var b = SIMD[.float32, 4](5.0, 6.0, 7.0, 8.0)
+
+var sum = a + b        # [6.0, 8.0, 10.0, 12.0]
+var prod = a * b       # [5.0, 12.0, 21.0, 32.0]
+```
+
+Reductions combine all elements into a single value:
+
+```mojo
+a.reduce_add()         # 10.0
+a.reduce_max()         # 4.0
+a.reduce_min()         # 1.0
+```
+
+Casting converts each element to a different numeric type.
+The number of elements stays the same, even when the target
+type is wider or narrower:
+
+```mojo
+var a = SIMD[.float32, 4](1.0, 2.0, 3.0, 4.0)
+var ints = a.cast[.int32]()    # [1, 2, 3, 4]
+var wide = a.cast[.float64]()  # 4 × Float64
+var tiny = a.cast[.float16]()  # 4 × Float16
+```
+
+Clamping restricts elements to a range. Both bounds are
+inclusive, so the result can equal the bounds:
+
+```mojo
+# max(min(self, upper_bound), lower_bound)
+a.clamp(1.5, 3.5)     # [1.5, 2.0, 3.0, 3.5]
+```
+
+`min()` and `max()` are free functions, not methods:
+
+```mojo
+min(a, b)              # Element-wise minimum
+max(a, b)              # Element-wise maximum
+```
+
+## `Scalar` {#scalar}
+
+A `SIMD` with one element is called a `Scalar`. Every fixed-width numeric name
+in Mojo is a `Scalar` alias:
+
+```mojo
+# These are all the same type
+var a: Scalar[.float32] = 3.14
+var b: Float32 = 3.14
+var c: SIMD[.float32, 1] = 3.14
+```
+
+When you write `Float32`, you're writing `Scalar[.float32]`, which is
+`SIMD[.float32, 1]`.
+
+## `DType` specifications {#dtype}
+
+`DType` names the kind of values stored in a `SIMD` vector, such as
+`float32`, `int64`, or `uint8`. A `DType` doesn't store data. It tells
+`SIMD` how to interpret each element and which operations to use:
+
+```mojo
+# DType selects a number kind, such as 32-bit float or 8-bit integer
+var x: SIMD[.float32, 4] = # ...  # four 32-bit floats
+var y: SIMD[.int8, 16] = # ...    # sixteen 8-bit ints
+```
+
+Use `DType` to write functions that work across numeric kinds:
+
+```mojo
+# Double a value. The cast is required because the parameterized type
+# parameter can't be used directly with the literal `2`.
+def double[T: DType](x: Scalar[T]) -> Scalar[T]:
+    return x * UInt8(2).cast[T]()
+```
+
+### Integer DType specifications
+
+In contexts that expect a `DType` value, write the contextual form (for
+example `.int32` instead of `DType.int32`). The tables list every member:
+
+| Signed    | Width   | Unsigned     | Width   |
+|-----------|---------|--------------|---------|
+| `.int8`   | 8-bit   | `.uint8`     | 8-bit   |
+| `.int16`  | 16-bit  | `.uint16`    | 16-bit  |
+| `.int32`  | 32-bit  | `.uint32`    | 32-bit  |
+| `.int64`  | 64-bit  | `.uint64`    | 64-bit  |
+| `.int128` | 128-bit | `.uint128`   | 128-bit |
+| `.int256` | 256-bit | `.uint256`   | 256-bit |
+| `.int`    | Machine | `.uint`      | Machine |
+
+### Floating-point DType specifications
+
+| Value              | Selects                    |
+|--------------------|----------------------------|
+| `.float16`         | 16-bit IEEE half           |
+| `.bfloat16`        | 16-bit brain float         |
+| `.float32`         | 32-bit IEEE single         |
+| `.float64`         | 64-bit IEEE double         |
+| `.float8_e4m3fn`   | 8-bit (4-exp, 3-mantissa)  |
+| `.float8_e4m3fnuz` | 8-bit, unsigned zero       |
+| `.float8_e5m2`     | 8-bit (5-exp, 2-mantissa)  |
+| `.float8_e5m2fnuz` | 8-bit, unsigned zero       |
+| `.float8_e8m0fnu`  | 8-bit (8-exp, no mantissa) |
+| `.float4_e2m1fn`   | 4-bit (2-exp, 1-mantissa)  |
+
+### Other DType specifications
+
+| Value   | Selects         |
+|---------|-----------------|
+| `.bool` | Boolean (1-bit) |
+
+## Integers
+
+### The unsized `Int` type {#int}
+
+`Int` is Mojo's default integer. When you write `var x = 42`,
+you assign an `Int`. It's the type behind loop counters, collection
+indices, and `len()` results:
+
+```mojo
+def main():
+    var a: Int = 42
+    comptime a_type = reflect[type_of(a)].name()
+    print("a:", a_type) # a: SIMD[DType.int, 1]
+```
+
+`Int` matches the hardware's native word size. Under the hood it wraps the
+machine's index register directly, which is why it's the natural choice for
+counting and addressing.
+
+`Int` is 64-bit on most platforms today, but that isn't guaranteed. Code
+that depends on a specific width should use a sized type.
+
+`Int` is equivalent to `Scalar[.int]` and `SIMD[.int, 1]`.
+
+### Integer-type bounds
+
+`Int` exposes its bounds as compile-time constants:
+
+| Constant       | Value                           |
+|----------------|---------------------------------|
+| `Int.MAX`      | Maximum representable value     |
+| `Int.MIN`      | Minimum representable value     |
+
+```mojo
+print(Int.MIN)        # -9223372036854775808
+print(Int.MAX)        # 9223372036854775807
+```
+
+All integer types offer `MAX` and `MIN` as well:
+
+| Constant             | Value                       |
+|----------------------|-----------------------------|
+| `<Integer-Type>.MAX` | Maximum representable value |
+| `<Integer-Type>.MIN` | Minimum representable value |
+
+For example:
+
+```mojo
+print(UInt.MIN)       # 0
+print(UInt.MAX)       # 18446744073709551615
+
+print(UInt8.MAX)      # 255
+print(Int8.MIN)       # -128
+print(UInt32.MAX)     # 4294967295
+print(Int32.MIN)     # -2147483648
+
+print(SIMD[.int16, 1].MIN)  # -32768
+```
+
+### `UInt` {#uint}
+
+`UInt` is a machine-width unsigned integer:
+
+```mojo
+def main():
+    var b: UInt = 42
+    comptime b_type = reflect[type_of(b)].name()
+    print("b:", b_type) # b: SIMD[DType.uint, 1]
+```
+
+### Sized integer types
+
+Sized integer types have a declared width that stays the same on every
+platform.
+
+| Signed   | Width   | Unsigned  | Width   |
+|----------|---------|-----------|---------|
+| `Int8`   | 8-bit   | `UInt8`   | 8-bit   |
+| `Int16`  | 16-bit  | `UInt16`  | 16-bit  |
+| `Int32`  | 32-bit  | `UInt32`  | 32-bit  |
+| `Int64`  | 64-bit  | `UInt64`  | 64-bit  |
+| `Int128` | 128-bit | `UInt128` | 128-bit |
+| `Int256` | 256-bit | `UInt256` | 256-bit |
+
+Each is an alias for a one-element `SIMD`. For example,
+`Int32` is `Scalar[.int32]`, which is
+`SIMD[.int32, 1]`. The unsigned types follow the same
+pattern.
+
+**Using sized vs unsized integers**:
+
+- Use `Int` and `UInt` for counts, indices, loop bounds, and
+  general-purpose math. It's what the standard library expects and returns.
+
+- Use sized integers when width matters: file layouts, pixel data, hardware
+registers, or any context where the number of bits is part of the contract.
+
+- Use named types for scalar work and `SIMD` when you need vectors.
+
+```mojo
+var general = 42                         # Int (machine width)
+var small: UInt8 = 255
+var large: Int64 = -9_000_000_000
+var pair = SIMD[.uint32, 2](10, 20)  # a 2-element vector
+```
+
+### `Byte` {#byte}
+
+`Byte` is another name for `UInt8`:
+
+```mojo
+var buf: List[Byte] = [0x48, 0x65, 0x6C, 0x6C, 0x6F]
+```
+
+Use `Byte` when the data represents raw bytes rather than
+small numbers. It's the element type used in many I/O and
+memory interfaces.
+
+## Floating point types
+
+Mojo doesn't provide a `Float` type analogous to `Int`. Instead it
+provides numerous fixed-width floating-point types. Each is an alias for a
+one-element `SIMD`:
+
+<!-- markdownlint-disable MD013 -->
+
+| Type              | Bits      | Standard          | What it is                                    |
+|-------------------|-----------|-------------------|-----------------------------------------------|
+| `Float16`         | 16        | IEEE 754 binary16 | `Scalar[.float16]`                            |
+| `Float32`         | 32        | IEEE 754 binary32 | `Scalar[.float32]`                            |
+| `Float64`         | 64        | IEEE 754 binary64 | `Scalar[.float64]`                            |
+| `BFloat16`        | 16        | Brain float       | `Scalar[.bfloat16]`                           |
+| `Float4_e2m1fn`   | 4         | OCP MX            | `Scalar[.float4_e2m1fn]`                      |
+| `Float8_e4m3fn`   | 8         | OFP8              | `Scalar[.float8_e4m3fn]`                      |
+| `Float8_e4m3fnuz` | 8         | --                | `Scalar[.float8_e4m3fnuz]`                    |
+| `Float8_e5m2`     | 8         | OFP8              | `Scalar[.float8_e5m2]`                        |
+| `Float8_e5m2fnuz` | 8         | --                | `Scalar[.float8_e5m2fnuz]`                    |
+| `Float8_e8m0fnu`  | 8         | OFP8 §5.4         | `Scalar[.float8_e8m0fnu]`                     |
+| `FloatLiteral`    | arbitrary | --                | Compile-time only. Materializes to `Float64`. |
+
+<!-- markdownlint-enable MD013 -->
+
+:::note
+
+- IEEE-754 is the IEEE Standard for Floating-Point Arithmetic.
+- OFP8 is an 8-bit Floating Point Specification, which creates
+  a standard for representing floating-point numbers in a
+  compact format.
+
+:::
+
+### `Float16` {#float16}
+
+16-bit IEEE 754 half-precision. The motivation is throughput and
+memory bandwidth: half the storage of `Float32` means twice the
+values fit in registers and cache, and GPU tensor cores process it
+at higher throughput. 1 sign bit, 5 exponent bits, 10 mantissa bits.
+
+The narrower exponent range limits dynamic range to roughly ±65504.
+Values beyond that overflow to infinity; very small values underflow
+to zero. This makes `Float16` workable for inference but less ideal
+for training, where gradients can span many orders of magnitude. Use
+`BFloat16` for training instead.
+
+`Float16` is natively accelerated on GPUs. On CPU, it requires ARM FP16
+extension or Intel AVX-512 FP16. Other CPUs fall back to software emulation.
+
+### `Float32` {#float32}
+
+32-bit IEEE 754 single-precision. 23 mantissa bits give roughly 7
+significant decimal digits; 8 exponent bits cover a range from
+roughly 1e-38 to 3.4e38. 1 sign bit, 8 exponent bits, 23 mantissa
+bits.
+
+`Float32` is natively accelerated on all GPU and CPU architectures. Use for
+general numeric work and GPU computation.
+
+### `Float64` {#float64}
+
+64-bit IEEE 754 double-precision. Use when 7 significant decimal
+digits aren't enough: scientific simulations, financial calculations,
+or accumulated sums where rounding errors compound. 52 mantissa bits
+give roughly 15-16 significant decimal digits. 1 sign bit, 11
+exponent bits, 52 mantissa bits.
+
+### `BFloat16` {#bfloat16}
+
+16-bit brain floating-point developed by Google Brain for deep
+learning. 1 sign bit, 8 exponent bits, 7 mantissa bits.
+
+Google Brain designed it to solve a specific problem with `Float16`
+in training: `Float16`'s 5 exponent bits create a dynamic range too
+narrow for neural networks. Gradients overflow and underflow.
+`BFloat16` matches `Float32`'s 8 exponent bits exactly, so values
+stay in range throughout forward and backward passes.
+
+The matching exponent range also makes `Float32`/`BFloat16`
+conversion cheap: just truncate or extend the mantissa, no remapping.
+This makes mixed-precision training feasible: compute in `BFloat16`
+for speed and memory savings, keep optimizer state in `Float32` for
+precision. That combination drove its wide adoption as a training
+format.
+
+Use it for ML training and inference on supported hardware. The
+7-bit mantissa is too imprecise for scientific or financial work.
+
+`BFloat16` is not supported on all platforms. It's currently unavailable on
+Apple Silicon. Natively accelerated on NVIDIA Ampere (A100) and later,
+AMD MI300X and later, and Intel CPUs with AMX or AVX-512 BF16
+(Sapphire Rapids and later).
+
+### Low-precision types
+
+Fewer bits per value means more values per register, less memory
+bandwidth, and higher throughput on specialized hardware. You trade
+mantissa precision for the ability to fit larger models or larger
+batches on the same silicon. These formats follow the OCP
+Microscaling Formats (MX) and OFP8 specifications.
+
+There's no single `Float8` type in Mojo. It's a colloquial umbrella for
+the five 8-bit floating-point variants exposed as `Scalar` aliases:
+`Float8_e4m3fn`, `Float8_e4m3fnuz`, `Float8_e5m2`, `Float8_e5m2fnuz`,
+and `Float8_e8m0fnu`. Each has its own exponent/mantissa layout and set
+of supported operations. `.float8_e3m4` also exists as a dtype
+value but has no `Scalar` alias; use `Scalar[.float8_e3m4]`
+directly.
+
+`Float8` formats are used in machine learning workloads where memory
+bandwidth matters more than precision. These types require GPU hardware for
+efficient execution.
+
+`Float8` types can't convert to or from any integer type on any
+platform, including `Bool`. They only convert between floating-point
+types: `Float16`, `Float32`, `Float64`, `BFloat16`, and other
+supported `Float8` variants.
+
+### Floating point naming conventions
+
+The suffixes encode special properties of each format:
+
+- **`fn`**: finite -- no infinity or negative infinity encodings
+- **`uz`**: unsigned zero -- no negative zero encoding
+- **`fnu`**: finite, no sign, unsigned zero
+
+The name encodes the layout: `e4m3` means 4 exponent bits and
+3 mantissa bits. `fn` means no infinities, and `uz` means
+unsigned zero.
+
+For example, `Float4_e2m1fn` is a 4-bit format with 2 exponent
+bits and 1 mantissa bit, defined by the Open Compute MX
+specification.
+
+:::note Vendor naming
+`Float8_e4m3fn` is the same format across vendors, but named
+differently: Mojo, PyTorch, JAX, and LLVM call it `e4m3fn`, while
+OCP, NVIDIA CUDA, and AMD ROCm call it `e4m3`.
+:::
+
+### Hardware requirements
+
+Support varies significantly by type and operation. None of these
+types support arithmetic at runtime on CPU.
+
+**Arithmetic support** (tested on ARM CPU, NVPTX sm_90a, AMDGCN gfx942):
+
+| Type              | Comptime | CPU | NVPTX | AMDGCN |
+|-------------------|----------|-----|-------|--------|
+| `Float8_e4m3fn`   | ✅       | ❌  | ✅    | ❌     |
+| `Float8_e4m3fnuz` | ✅       | ❌  | ❌    | ❌     |
+| `Float8_e5m2`     | ✅       | ❌  | ✅    | ❌     |
+| `Float8_e5m2fnuz` | ✅       | ❌  | ❌    | ❌     |
+| `.float8_e3m4`    | ❌       | ❌  | ❌    | ❌     |
+
+NVPTX support for `Float8_e4m3fn` and `Float8_e5m2` is emulated by
+the compiler: operands are upconverted to a wider type, the operation
+runs in that wider type, and the result is downconverted back. There
+are no native fp8 arithmetic instructions.
+
+- `Float8_e3m4` has no arithmetic support at any stage,
+  including comptime. Most of its conversions work only at comptime.
+
+- `Float4_e2m1fn` requires NVIDIA Blackwell (B200) or later.
+
+- `Float32` and `Float64` are the portable alternatives for CPU and
+  cross-platform code.
+
+### IEEE 754 special values
+
+IEEE 754 floating-point types support special values:
+
+| Value  | Meaning           |
+|--------|-------------------|
+| `inf`  | Positive infinity |
+| `-inf` | Negative infinity |
+| `nan`  | Not a number      |
+| `-0.0` | Negative zero     |
+
+Access these via `SIMD` constants:
+
+```mojo
+var x = Float32.MAX           # largest value
+var y = Float32.MIN           # smallest value
+var z = Float32.MAX_FINITE    # largest finite value
+var w = Float32.MIN_FINITE    # smallest (most negative) finite value
+```
+
+`MAX` and `MIN` may be infinite for floating-point types.
+`MAX_FINITE` and `MIN_FINITE` give the largest and smallest
+representable finite values.
+
+Low-precision formats marked `fn` (finite) don't have infinity
+encodings. Formats marked `uz` (unsigned zero) don't have negative
+zero.
+
+### Floating point precision
+
+Floating-point arithmetic introduces rounding errors. Two values
+that look equal after computation may differ by a tiny amount.
+Comparing with `==` can give unexpected results:
+
+```mojo
+# Compile-time: exact result
+comptime exact = 3.0 * (4.0 / 3.0 - 1.0)
+
+# Force runtime: rounding error appears
+var three = 3.0
+var finite = three * (4.0 / three - 1.0)
+
+print(exact, finite)
+# 1.0 0.99999999999999978
+print(exact == finite) # False
+```
+
+For approximate comparisons, check whether the difference is within
+an acceptable tolerance with `std.math`'s `isclose()`.
+
+## Numeric literals
+
+Mojo has two compile-time literal types: `IntLiteral` and
+`FloatLiteral`. They support arbitrary precision and exist
+only during compilation.
+
+### IntLiteral
+
+When you write a bare integer like `42`, its type is
+`IntLiteral`. It doesn't become a concrete type until it's
+used in a context that requires one:
+
+```mojo
+var a: Int = 42            # Becomes Int
+var b: Int8 = 42           # Becomes Int8
+var c: Float32 = 42        # Becomes Float32
+var d: UInt64 = 1_000_000  # Becomes UInt64
+```
+
+`IntLiteral` is arbitrary-precision at compile time. It has no fixed bit
+width, so compile-time calculations won't overflow or lose precision. At
+runtime, `IntLiteral` values materialize to `Int`:
+
+```mojo
+# Compile-time: arbitrary precision, no overflow
+comptime big = 2 ** 200
+
+# Runtime: materializes to Int (word-sized)
+var x = 42  # IntLiteral 42 materializes to Int
+```
+
+`IntLiteral` supports all arithmetic and comparison operators at
+compile time.
+
+### FloatLiteral
+
+When you write a decimal constant like `3.14`, its type is
+`FloatLiteral`. It doesn't become a concrete type until it's
+used in a context that requires one:
+
+```mojo
+var x: Float32 = 3.14     # Becomes Float32
+var y: Float64 = 3.14     # Becomes Float64
+var z: BFloat16 = 0.5     # Becomes BFloat16
+```
+
+`FloatLiteral` provides compile-time constants for special values:
+
+| Constant                         | Value             |
+|----------------------------------|-------------------|
+| `FloatLiteral.nan`               | Not a number      |
+| `FloatLiteral.infinity`          | Positive infinity |
+| `FloatLiteral.negative_infinity` | Negative infinity |
+| `FloatLiteral.negative_zero`     | Negative zero     |
+
+Use `is_nan()` and `is_neg_zero()` to test for these values, since
+`nan == nan` is `False` and `negative_zero == 0.0` is `True`.
+
+### Literals in expressions
+
+Literals adapt to the types around them. When a literal appears
+next to a typed value, it takes on that value's type:
+
+```mojo
+var x = Float32(1.0)
+var y = x * 0.5           # 0.5 becomes Float32
+var z = x + 2             # 2 becomes Float32
+```
+
+This isn't implicit conversion. The literal doesn't have a
+runtime type yet. It becomes whatever type the context
+requires.
+
+Variables have a fixed type and never convert implicitly.
+
+## Explicit conversions
+
+Converting between numeric types always requires an explicit
+initializer or cast. Mojo doesn't perform implicit numeric
+conversions between variables:
+
+```mojo
+var i = 42                        # Int
+var f = Float32(i)                # Int → Float32
+var u = UInt64(i)                 # Int → UInt64
+var narrow = Int8(i)              # Int → Int8
+```
+
+Between `SIMD`-based types, use `.cast[]`:
+
+```mojo
+var a = Float32(3.14)
+var b = a.cast[.int32]()     # Float32 → Int32
+var c = a.cast[.float64]()   # Float32 → Float64
+```
+
+Between `Int` and `SIMD`-based types, use initializers:
+
+```mojo
+var i = 42                        # Int
+var s = Int64(i)                  # Int → Int64
+var back = Int(s)                 # Int64 → Int
+```
+
+### Why conversions are explicit
+
+Implicit numeric conversions can hide precision loss and sign
+changes. For example, `Int64(-1)` becoming
+`UInt64(18446744073709551615)` is a bug, not a convenience.
+Mojo requires an explicit conversion so the intent is clear.
+
+Literals are the exception. A literal like `42` can become
+`Float32(42.0)` because the compiler performs the conversion
+at compile time and can guarantee it is exact.
+
+Variables are different. A value like `x: Int = 300` becoming
+an `Int8` would silently lose data, so Mojo requires you to
+write the conversion explicitly.
+
+## Sharp edges
+
+### `Int` width is platform-dependent
+
+`Int` is 64-bit on most platforms today, but it's defined as
+machine width. Code that assumes 64-bit `Int` will break on
+32-bit targets. Use `Int64` when you need a fixed width.
+
+### Integer arithmetic wraps on overflow
+
+Integer arithmetic wraps on overflow using two's complement:
+
+- Signed overflow wraps into the negative range. Adding `1` to
+  `Int8` value `127` produces `-128`.
+- Unsigned overflow wraps to zero. Adding `1` to `UInt8` value
+  `255` produces `0`.
+
+Mojo doesn't trap on overflow. If you need overflow detection,
+check the operands before the operation.
+
+```mojo
+var x = Int8(127)
+var y = x + Int8(1)    # -128 (wraps)
+```
+
+### Float-to-int truncates toward zero
+
+```mojo
+var x = Int(Float32(3.9))    # 3, not 4
+var y = Int(Float32(-3.9))   # -3, not -4
+```
+
+### NaN comparisons always return `False`
+
+This includes `NaN == NaN`. It affects SIMD masks and
+conditional selection:
+
+```mojo
+var x = Float32.MAX * 2.0    # inf
+var nan = x - x              # NaN
+print(nan == nan)            # False
+```
+
+### 128-bit and 256-bit integers are software-emulated
+
+`Int128`, `Int256`, `UInt128`, and `UInt256` exist but have
+limited hardware support on most platforms. Avoid them in
+performance-critical code without benchmarking.
+
+### Float8 types require GPU hardware
+
+The `Float8` variants are designed for ML workloads on GPUs
+with native support. On CPUs, operations on these types may
+be emulated or unavailable.

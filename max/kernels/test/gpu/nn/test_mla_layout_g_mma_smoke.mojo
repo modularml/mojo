@@ -16,7 +16,7 @@
 Purpose
 =======
 Phase A9.1 of the MLA decode Layout G design (BM=32, BN=64) requires the
-custom raw-PTX `bulk_mma_ws` wrapper (mla_decode_utils.mojo:1828) to accept
+custom raw-PTX `bulk_mma_ws` wrapper (attention_utils.mojo) to accept
 M=32 even though the Mojo stdlib `_get_f8f6f4_mma_shape`
 (mma_nvidia_sm100.mojo:345) only allows M in {64, 128}.  The custom wrapper
 in MLA decode bypasses the stdlib shape table by feeding the descriptor M
@@ -59,24 +59,24 @@ for the design context.
 """
 
 from std.math import ceildiv
-from std.memory import UnsafePointer, alloc
+from std.memory import alloc
 from std.random import rand, randn, seed
 from std.sys import size_of
 
-from std.gpu import barrier, thread_idx, warp_id as get_warp_id
-from std.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
-from std.gpu.host.info import B200, _is_sm10x_gpu
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu import thread_idx, warp_id as get_warp_id
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
+from max.gpu.host.info import B200, _is_sm10x_gpu
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.memory import (
     external_memory,
 )
-from std.gpu.compute.arch.mma_nvidia_sm100 import (
+from max.gpu.compute.arch.mma_nvidia_sm100 import (
     UMMAInsDescriptor,
     UMMAKind,
     mma_arrive,
 )
-from std.gpu.compute.arch.tcgen05 import (
+from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
     tcgen05_dealloc,
     tcgen05_fence_after,
@@ -100,8 +100,7 @@ from layout.tma_async import (
 )
 from linalg.arch.sm100.mma import smem_descriptor
 from linalg.matmul.gpu import matmul_kernel_naive
-from nn.attention.gpu.nvidia.sm100.attention_utils import elect
-from nn.attention.gpu.nvidia.sm100.mla_decode_utils import bulk_mma_ws
+from nn.attention.gpu.nvidia.sm100.attention_utils import bulk_mma_ws, elect
 from std.testing import assert_true
 from std.utils.index import Index, IndexList
 
@@ -201,7 +200,7 @@ def qk_smoke_kernel[
 
     # ---- Dynamic SMEM ----
     var smem_base = external_memory[
-        UInt8, address_space=AddressSpace.SHARED, alignment=128
+        UInt8, address_space=.SHARED, alignment=128
     ]()
     var a_smem_ptr = (smem_base + QK_A_OFFSET).bitcast[Scalar[FP8_TYPE]]()
     var b_smem_ptr = (smem_base + QK_B_OFFSET).bitcast[Scalar[FP8_TYPE]]()
@@ -209,15 +208,13 @@ def qk_smoke_kernel[
     var a_smem_tile = LayoutTensor[
         FP8_TYPE,
         Layout.row_major(QK_M, QK_K),
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ](a_smem_ptr)
     var b_smem_tile = LayoutTensor[
         FP8_TYPE,
         Layout.row_major(QK_N, QK_K),
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ](b_smem_ptr)
 
@@ -371,7 +368,7 @@ def pv_smoke_kernel[
     """SS .ws MMA: C [32,512] = A [32,64] x B [512,64] (mn-major B, FP8)."""
 
     var smem_base = external_memory[
-        UInt8, address_space=AddressSpace.SHARED, alignment=128
+        UInt8, address_space=.SHARED, alignment=128
     ]()
     var a_smem_ptr = (smem_base + PV_A_OFFSET).bitcast[Scalar[FP8_TYPE]]()
     var b_smem_ptr = (smem_base + PV_B_OFFSET).bitcast[Scalar[FP8_TYPE]]()
@@ -379,8 +376,7 @@ def pv_smoke_kernel[
     var a_smem_tile = LayoutTensor[
         FP8_TYPE,
         Layout.row_major(PV_M, PV_K),
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ](a_smem_ptr)
     # B is mn-major: [PV_N rows, PV_K cols] but the descriptor will treat
@@ -388,8 +384,7 @@ def pv_smoke_kernel[
     var b_smem_tile = LayoutTensor[
         FP8_TYPE,
         Layout.row_major(PV_N, PV_K),
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ](b_smem_ptr)
 
@@ -515,14 +510,14 @@ def pv_smoke_kernel[
 # ---------------------------------------------------------------------------
 def fill_random_fp8[
     dtype: DType
-](ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin], n: Int):
+](ptr: MutPointer[Scalar[dtype], MutAnyOrigin], n: Int):
     """Generates random FP8 values via float32 RNG -> cast.
 
     randn doesn't directly support float8_e4m3fn, so we draw float32
     values, scale them down to fit FP8's e4m3 range, and cast.
     """
     var f32_buf = alloc[Float32](n)
-    randn[DType.float32](f32_buf, n)
+    randn[.float32](f32_buf, n)
     for i in range(n):
         # Scale to ~[-2, 2] to keep values well inside FP8 e4m3 range
         # (max representable ~448, but we want non-saturated values).
@@ -538,8 +533,8 @@ def fill_random_fp8[
 def dequant_fp8_to_bf16[
     src_dtype: DType, dst_dtype: DType
 ](
-    src: UnsafePointer[Scalar[src_dtype], MutAnyOrigin],
-    dst: UnsafePointer[Scalar[dst_dtype], MutAnyOrigin],
+    src: ImmPointer[Scalar[src_dtype], _],
+    dst: MutPointer[Scalar[dst_dtype], _],
     n: Int,
 ):
     for i in range(n):
@@ -627,13 +622,13 @@ def test_qk_smoke(ctx: DeviceContext) raises:
         row_major(Coord(QK_M, QK_N)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[REF_TYPE], ImmutAnyOrigin](
+        ImmPointer[Scalar[REF_TYPE], ImmutAnyOrigin](
             unsafe_from_address=Int(a_ref_dev.unsafe_ptr())
         ),
         row_major(Coord(QK_M, QK_K)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[REF_TYPE], ImmutAnyOrigin](
+        ImmPointer[Scalar[REF_TYPE], ImmutAnyOrigin](
             unsafe_from_address=Int(b_ref_dev.unsafe_ptr())
         ),
         row_major(Coord(QK_N, QK_K)),
@@ -654,9 +649,9 @@ def test_qk_smoke(ctx: DeviceContext) raises:
         c_ref_tt,
         a_tt,
         b_tt,
-        QK_M,
-        QK_N,
-        QK_K,
+        Int32(QK_M),
+        Int32(QK_N),
+        Int32(QK_K),
         grid_dim=(
             ceildiv(QK_M, NAIVE_BLOCK_DIM),
             ceildiv(QK_N, NAIVE_BLOCK_DIM),
@@ -819,13 +814,13 @@ def test_pv_smoke(ctx: DeviceContext) raises:
         row_major(Coord(PV_M, PV_N)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[REF_TYPE], ImmutAnyOrigin](
+        ImmPointer[Scalar[REF_TYPE], ImmutAnyOrigin](
             unsafe_from_address=Int(a_ref_dev.unsafe_ptr())
         ),
         row_major(Coord(PV_M, PV_K)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[REF_TYPE], ImmutAnyOrigin](
+        ImmPointer[Scalar[REF_TYPE], ImmutAnyOrigin](
             unsafe_from_address=Int(b_ref_dev.unsafe_ptr())
         ),
         row_major(Coord(PV_N, PV_K)),
@@ -846,9 +841,9 @@ def test_pv_smoke(ctx: DeviceContext) raises:
         c_ref_tt,
         a_tt,
         b_tt,
-        PV_M,
-        PV_N,
-        PV_K,
+        Int32(PV_M),
+        Int32(PV_N),
+        Int32(PV_K),
         grid_dim=(
             ceildiv(PV_M, NAIVE_BLOCK_DIM),
             ceildiv(PV_N, NAIVE_BLOCK_DIM),

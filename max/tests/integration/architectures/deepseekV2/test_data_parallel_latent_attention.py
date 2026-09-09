@@ -24,7 +24,7 @@ from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.attention.multi_latent_attention import (
     DataParallelLatentAttentionWithRope,
 )
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
+from max.nn.kv_cache import MLAKVCacheParams
 from max.nn.rotary_embedding import (
     DeepseekYarnRopeScalingParams,
     DeepseekYarnRotaryEmbedding,
@@ -70,14 +70,12 @@ def generate_latent_attention_max_outputs_dp(
         scaling_params=scaling_params,
     )
 
-    kv_params = KVCacheParams(
+    kv_params = MLAKVCacheParams(
         dtype=DType.bfloat16,
-        n_kv_heads=1,
         head_dim=576,
         num_layers=config.num_hidden_layers,
         devices=[DeviceRef.GPU()],
         page_size=128,
-        is_mla=True,
         num_q_heads=config.num_attention_heads,
     )
 
@@ -118,16 +116,14 @@ def generate_latent_attention_max_outputs_dp(
             input_types=(
                 hidden_state_type,
                 input_row_offsets_type,
-                *kv_params.get_symbolic_inputs().flatten(),
+                *kv_params.flattened_kv_inputs(),
             ),
         ) as graph:
             hidden_states = graph.inputs[0].tensor
             input_row_offsets = graph.inputs[1].tensor
-            kv_collection: PagedCacheValues = (
-                kv_params.get_symbolic_inputs()
-                .unflatten(iter(graph.inputs[2:]))
-                .inputs[0]
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(graph.inputs[2:])
+            ).inputs[0]
             out_list = dp_attention(
                 ops.constant(0, DType.uint32, device=DeviceRef.CPU()),
                 xs=[hidden_states],
@@ -148,7 +144,7 @@ def generate_latent_attention_max_outputs_dp(
     batch = []
     for _ in range(batch_size):
         context = create_text_context(np.empty(prompt_lens[0]))
-        kv_manager.claim(context.request_id, replica_idx=0)
+        kv_manager.claim(context)
         batch.append(context)
 
     input_row_offsets = Buffer(DType.uint32, [batch_size + 1])
@@ -162,8 +158,8 @@ def generate_latent_attention_max_outputs_dp(
         all_outputs = []
         for tok_idx in range(total_tokens):
             for ctx in batch:
-                kv_manager.alloc(ctx, replica_idx=0, num_steps=1)
-            kv_inputs = kv_manager.runtime_inputs([batch]).inputs[0]
+                kv_manager.alloc(ctx)
+            kv_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
             input_tensor_device = (
                 Buffer.from_numpy(
                     input_tensor[:, tok_idx, :].view(torch.float16).numpy()
@@ -180,14 +176,15 @@ def generate_latent_attention_max_outputs_dp(
             for ctx in batch:
                 ctx.update(42)
 
-            kv_manager.step([batch])
+            for ctx in batch:
+                kv_manager.step(ctx)
             torch_output = from_dlpack(max_output[0]).to(torch.bfloat16)
             all_outputs.append(torch_output[:, None, :].to("cpu"))
         return torch.concat(all_outputs, dim=1)
 
     for ctx in batch:
-        kv_manager.alloc(ctx, replica_idx=0, num_steps=1)
-    kv_inputs = kv_manager.runtime_inputs([batch]).inputs[0]
+        kv_manager.alloc(ctx)
+    kv_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
     input_tensor_device = (
         Buffer.from_numpy(input_tensor[0, :, :].view(torch.float16).numpy())
         .view(DType.bfloat16)

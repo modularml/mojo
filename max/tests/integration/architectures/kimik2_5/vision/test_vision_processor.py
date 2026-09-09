@@ -36,7 +36,7 @@ from max.pipelines.architectures.kimik2_5.vision_processor import (
     normalize,
     timestamp_as_str,
 )
-from max.pipelines.core.exceptions import InputError
+from max.pipelines.context.exceptions import InputError
 from PIL import Image
 from transformers import AutoImageProcessor
 

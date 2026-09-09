@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from max.pipelines.request import (
+    InputImageContent,
     OpenResponsesRequest,
     OpenResponsesRequestBody,
     RequestID,
@@ -236,3 +237,121 @@ def test_openresponses_request_inherits_from_request() -> None:
     assert isinstance(request.request_id, RequestID)
     # Verify it has a __str__ method that returns the request_id
     assert str(request) == str(request.request_id)
+
+
+# ---------------------------------------------------------------------------
+# Web image URLs are fetched through the server-supplied fetcher.
+#
+# InputImageContent accepts data: URIs only, so an http(s) image must be inlined
+# before the body validates. This library owns no downloader of its own -- the
+# byte caps and host validation live in the injected fetcher -- so a web URL with
+# no fetcher installed is rejected rather than fetched unguarded.
+# ---------------------------------------------------------------------------
+
+_TINY_PNG_DATA_URI = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="
+)
+
+
+def _image_request_body(url: str) -> str:
+    return json.dumps(
+        {
+            "model": "test-model",
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": "what is this?"},
+                        {"type": "input_image", "image_url": url},
+                    ],
+                }
+            ],
+        }
+    )
+
+
+def _image_part(request: OpenResponsesRequest) -> InputImageContent:
+    """Narrow the parsed body down to its one image content part."""
+    assert isinstance(request.body.input, list)
+    content = request.body.input[0].content
+    assert isinstance(content, list)
+    part = content[1]
+    assert isinstance(part, InputImageContent)
+    return part
+
+
+@pytest.mark.asyncio
+async def test_web_image_url_fetched_through_injected_fetcher(
+    mock_fastapi_request: Any,
+) -> None:
+    """A web URL is handed to the server's fetcher and replaced by its result."""
+    fetcher = AsyncMock(return_value=_TINY_PNG_DATA_URI)
+    mock_fastapi_request.app.state.media_data_uri_fetcher = fetcher
+    mock_fastapi_request.body = AsyncMock(
+        return_value=_image_request_body("https://example.com/cat.png").encode()
+    )
+
+    request = await OpenResponsesRequest.from_fastapi_request(
+        mock_fastapi_request
+    )
+
+    fetcher.assert_awaited_once_with("https://example.com/cat.png")
+    assert _image_part(request).image_url == _TINY_PNG_DATA_URI
+
+
+@pytest.mark.asyncio
+async def test_web_image_url_rejected_when_no_fetcher_installed(
+    mock_fastapi_request: Any,
+) -> None:
+    """Without a fetcher a web URL is a clean error, never an unguarded fetch."""
+    mock_fastapi_request.app.state = MagicMock(spec=[])
+    mock_fastapi_request.body = AsyncMock(
+        return_value=_image_request_body(
+            "http://169.254.169.254/latest"
+        ).encode()
+    )
+
+    with pytest.raises(ValueError, match="data: URI"):
+        await OpenResponsesRequest.from_fastapi_request(mock_fastapi_request)
+
+
+@pytest.mark.asyncio
+async def test_data_uri_image_is_not_fetched(
+    mock_fastapi_request: Any,
+) -> None:
+    """A data URI passes through untouched, with no fetch attempted."""
+    fetcher = AsyncMock()
+    mock_fastapi_request.app.state.media_data_uri_fetcher = fetcher
+    mock_fastapi_request.body = AsyncMock(
+        return_value=_image_request_body(_TINY_PNG_DATA_URI).encode()
+    )
+
+    request = await OpenResponsesRequest.from_fastapi_request(
+        mock_fastapi_request
+    )
+
+    fetcher.assert_not_awaited()
+    assert _image_part(request).image_url == _TINY_PNG_DATA_URI
+
+
+@pytest.mark.asyncio
+async def test_fetcher_error_propagates_unchanged(
+    mock_fastapi_request: Any,
+) -> None:
+    """The fetcher's own message reaches the client, not a re-wrapped one.
+
+    The previous implementation caught the network error and echoed ``str(e)``,
+    which distinguished refused from reachable-but-not-an-image and turned the
+    endpoint into a host scanner.
+    """
+    mock_fastapi_request.app.state.media_data_uri_fetcher = AsyncMock(
+        side_effect=ValueError("image exceeds the maximum allowed size of 10MB")
+    )
+    mock_fastapi_request.body = AsyncMock(
+        return_value=_image_request_body("https://example.com/big.png").encode()
+    )
+
+    with pytest.raises(ValueError, match="exceeds the maximum") as excinfo:
+        await OpenResponsesRequest.from_fastapi_request(mock_fastapi_request)
+    assert "example.com" not in str(excinfo.value)

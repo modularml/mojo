@@ -1,0 +1,80 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+# Metal-only: `MetalDeviceTypeEncoder._buffers` is Metal-specific state, so this
+# test is compatible only with the Apple GPU toolchain.
+mojo_test(
+    name = "test_metal_device_type_encoder.mojo.test",
+    srcs = ["test_metal_device_type_encoder.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = select({
+        "//:apple_gpu": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)
+
+# Tests programmatic Metal GPU frame capture. The test handles non-Metal
+# contexts gracefully, so it is not restricted to the Apple GPU toolchain.
+# It does need a GPU build, though: `DeviceContext` resolves
+# `GPUInfo.from_name[_accelerator_arch()]()` at compile time, which fails the
+# "Unknown GPU architecture" constraint on CPU-only platforms (e.g. Graviton).
+# `//:has_gpu` keeps it vendor-agnostic while excluding CPU-only build configs.
+mojo_test(
+    name = "test_metal_capture.mojo.test",
+    srcs = ["test_metal_capture.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)
+
+# Tests `DeviceBuffer.unsafe_host_ptr()`. Vendor-agnostic: the Metal half is
+# gated on `ctx.api()` at runtime and the remaining test asserts that devices
+# without unified memory raise. `//:has_gpu` excludes CPU-only build configs,
+# where `DeviceContext` fails the compile-time GPU-arch constraint.
+mojo_test(
+    name = "test_device_buffer_host_ptr.mojo.test",
+    srcs = ["test_device_buffer_host_ptr.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)
+
+# `//:has_gpu` excludes CPU-only build configs, where `DeviceContext` fails the
+# compile-time GPU-arch constraint.
+mojo_test(
+    name = "test_device_is_host_unified.mojo.test",
+    srcs = ["test_device_is_host_unified.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)
+
+# Real by-value GPU launch test for `Coord`'s `DevicePassable` conformance.
+# Vendor-agnostic: `//:has_gpu` excludes CPU-only build configs (where
+# `DeviceContext` fails the compile-time GPU-arch constraint) without pinning
+# to a single toolchain.
+mojo_test(
+    name = "test_coord_device_launch.mojo.test",
+    srcs = ["test_coord_device_launch.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+        "@mojo//:test_utils",
+    ],
+)

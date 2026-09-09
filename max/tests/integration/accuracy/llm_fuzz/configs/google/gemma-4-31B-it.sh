@@ -19,7 +19,6 @@ max_length=131072
 extra_pipelines_args=(
   --device-memory-utilization=0.75
   --max-batch-input-tokens 32768
-  --max-num-steps 1
   --enable-prefix-caching
   --kv-cache-format float8_e4m3fn
   --enable-structured-output

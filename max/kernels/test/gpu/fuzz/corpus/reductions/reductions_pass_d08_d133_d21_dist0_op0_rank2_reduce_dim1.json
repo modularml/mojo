@@ -1,0 +1,16 @@
+{
+  "target": "reductions",
+  "spec": {
+    "rank": 2,
+    "reduce_dim": 1,
+    "d0": 8,
+    "d1": 33,
+    "d2": 1,
+    "op": 0,
+    "dist": 0
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "one past the warp modulus on a non-empty axis: 33 is not a multiple of the SIMD width, so the row drops to the scalar warp path. Guards the ordinary shapes against a regression in the row-count helper that replaced the division.",
+  "findings": []
+}

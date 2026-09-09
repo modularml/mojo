@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements the ONNX CumSum operator, computing prefix sums along a specified tensor axis."""
 
 from layout import Coord, Idx, TileTensor, coord_to_index_list, row_major
 
@@ -21,11 +22,9 @@ def cumsum[
     dtype: DType,
     exclusive: Bool,
     reverse: Bool,
-](
-    output: TileTensor[mut=True, dtype, ...],
-    input: TileTensor[dtype, ...],
+    *,
     axis: Int,
-):
+](output: TileTensor[mut=True, dtype, ...], input: TileTensor[dtype, ...],):
     """
     Implements the CumSum operator from the ONNX spec:
     https://github.com/onnx/onnx/blob/main/docs/Operators.md#CumSum
@@ -37,11 +36,11 @@ def cumsum[
         dtype: Type of the input and output tensors.
         exclusive: If set to True, return exclusive sum (top element not included).
         reverse: If set to True, perform cumsum operation in reverse direction.
+        axis: The axis on which to perform the cumsum operation.
 
     Args:
         output: The output tensor.
         input: The input tensor.
-        axis: The axis on which to perform the cumsum operation.
     """
     comptime assert (
         input.rank == output.rank
@@ -50,10 +49,10 @@ def cumsum[
     comptime accum_type = DType.float64 if dtype == DType.float32 else get_accum_type[
         dtype
     ]()
-    assert (
+    comptime assert (
         -input.rank <= axis < input.rank
     ), "Axis value must be in range [-rank, rank)"
-    var axis_pos = axis if axis >= 0 else axis + input.rank
+    comptime axis_pos = axis if axis >= 0 else axis + input.rank
 
     var shape = coord_to_index_list(input.layout.shape_coord())
 

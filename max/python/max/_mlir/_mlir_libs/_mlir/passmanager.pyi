@@ -94,8 +94,3 @@ class PassManager:
         """
         Run the pass manager on the provided operation, raising an MLIRError on failure.
         """
-
-    def __str__(self) -> str:
-        """
-        Print the textual representation for this PassManager, suitable to be passed to `parse` for round-tripping.
-        """

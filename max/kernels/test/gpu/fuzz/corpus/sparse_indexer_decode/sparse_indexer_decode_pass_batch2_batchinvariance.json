@@ -1,0 +1,18 @@
+{
+  "target": "sparse_indexer_decode",
+  "spec": {
+    "batch": 2,
+    "max_seq": 20480,
+    "min_seq": 20480,
+    "pattern": 0,
+    "topk": 16,
+    "init_blocks": 0,
+    "local_blocks": 1,
+    "dist": 1,
+    "seed": 448383
+  },
+  "verdict": "PASS",
+  "oracle": "batch_invariance",
+  "detail": "M3 indexer config (topk 16, one local block): one probe request scored at batch slot 0 under co-batches of 2 and 8. The scorer sizes split-K as 512/batch, so the probe is cut into 256 chunks in one composition and 64 in the other; its scores and its selected blocks must still match bit-for-bit, because those scores choose which blocks attention reads.",
+  "findings": []
+}

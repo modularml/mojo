@@ -17,6 +17,7 @@ Submodules
 .. toctree::
    :maxdepth: 1
 
+   pipelines.diffusion.config
    pipelines.diffusion.schedulers
 
 Pipelines
@@ -52,6 +53,7 @@ Denoising cache
    :template: autosummary/class.rst
 
    DenoisingCacheConfig
+   DenoisingCacheSettings
    DenoisingCacheState
    TaylorSeer
    TaylorSeerBufferState

@@ -14,33 +14,56 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.graph.weights import WeightData, WeightsFormat, weights_format
-from max.nn.kv_cache import KVCacheParams
+from max.graph.weights import WeightData
+from max.nn.kv_cache import KVCacheParamInterface, MultiKVCacheParams
 from max.nn.quant_config import QuantConfig
 from max.nn.rotary_embedding import YarnScalingParams
 from max.nn.transformer import ReturnLogits
-from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.architectures.gpt_oss.hybrid_kv_params_util import (
+    hybrid_swa_full_kv_params,
+)
+from max.pipelines.kv_cache import cache_dtype_for_encoding
+from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
+from max.pipelines.lib.config.model_config import (
+    _interleaved_rope_weights,
+    _select_quantization_encoding,
+)
 from max.pipelines.lib.interfaces.arch_config import (
     ArchConfigWithKVCache,
+    ArchConfigWithPermissiveMaxSeqLen,
     ArchConfigWithStoredKVParams,
 )
 from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
-from max.pipelines.lib.quant import parse_quant_config
-from max.pipelines.modeling.config_enums import supported_encoding_dtype
+from max.pipelines.modeling.config_enums import (
+    SupportedEncoding,
+    supported_encoding_dtype,
+)
+from max.pipelines.weights.quant import parse_quant_config
 from transformers import AutoConfig
 from typing_extensions import Self, override
 
 
 @dataclass(kw_only=True)
-class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
+class GptOssConfig(
+    ArchConfigWithPermissiveMaxSeqLen,
+    ArchConfigWithStoredKVParams,
+    ArchConfigWithKVCache,
+):
     """Configuration for GPT OSS models.
 
     Contains parameters specific to the GPT OSS architecture, typically
     extracted from a HuggingFace configuration object's text config.
     """
+
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "bfloat16",
+        "float4_e2m1fnx2",
+    }
 
     # GPT OSS specific parameters
     vocab_size: int
@@ -128,8 +151,8 @@ class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
     interleaved_rope_weights: bool
     """True if the rope weights are in interleaved complex format."""
 
-    kv_params: KVCacheParams
-    """KV cache parameters."""
+    kv_params: KVCacheParamInterface
+    """KV cache parameters (sliding-window and full-attention groups)."""
 
     quant_config: QuantConfig | None = None
     """Float8/Float4 quantization configuration, if applicable."""
@@ -141,8 +164,7 @@ class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
     return_logits: ReturnLogits = ReturnLogits.LAST_TOKEN
     """Whether to return the last token, all logits, or a variable number of logits."""
 
-    def get_max_seq_len(self) -> int:
-        return self.max_position_embeddings
+    quantization_encoding: SupportedEncoding | None = None
 
     @staticmethod
     def get_num_layers(huggingface_config: AutoConfig) -> int:
@@ -156,27 +178,35 @@ class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
         """
         return huggingface_config.num_hidden_layers
 
-    @staticmethod
-    def calculate_max_seq_len(
-        pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        """Calculates the maximum sequence length for the model.
-
-        Uses the `max_length` from the :obj:`max.pipelines.config.PipelineConfig` if provided,
-        otherwise falls back to the `max_position_embeddings` from the HuggingFace
-        configuration's text config.
-
-        Args:
-            pipeline_config: The MAX Engine pipeline configuration.
-            huggingface_config: The HuggingFace model configuration object (:obj:`transformers.AutoConfig`).
-
-        Returns:
-            The calculated maximum sequence length.
-        """
-        max_seq_len = pipeline_config.model.max_length
-        if max_seq_len:
-            return max_seq_len
-        return huggingface_config.max_position_embeddings
+    @classmethod
+    def construct_kv_params(
+        cls,
+        huggingface_config: AutoConfig,
+        pipeline_config: PipelineConfig,
+        devices: list[DeviceRef],
+        kv_cache_config: KVCacheConfig,
+        cache_dtype: DType,
+        *,
+        allow_kv_head_replication: bool = False,
+    ) -> MultiKVCacheParams:
+        """Constructor for hybrid sliding + full KV tree."""
+        layer_types = getattr(
+            huggingface_config,
+            "layer_types",
+            ["sliding_attention", "full_attention"]
+            * (huggingface_config.num_hidden_layers // 2),
+        )
+        return hybrid_swa_full_kv_params(
+            layer_types=layer_types,
+            sliding_window=huggingface_config.sliding_window,
+            pipeline_config=pipeline_config,
+            devices=devices,
+            kv_cache_config=kv_cache_config,
+            cache_dtype=cache_dtype,
+            n_kv_heads=huggingface_config.num_key_value_heads,
+            head_dim=cls.get_head_dim(huggingface_config),
+            allow_kv_head_replication=allow_kv_head_replication,
+        )
 
     @override
     @classmethod
@@ -184,6 +214,8 @@ class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a GptOssConfig instance from pipeline configuration.
 
@@ -207,22 +239,20 @@ class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
                 "Please ensure the model repository contains a valid config.json file."
             )
         kv_cache_config = model_config.kv_cache
-        quantization_encoding = model_config.quantization_encoding
-        if quantization_encoding is None:
-            raise ValueError("quantization_encoding must not be None")
+        quantization_encoding = _select_quantization_encoding(
+            model_config, cls.DEFAULT_ENCODING
+        )
         dtype = supported_encoding_dtype(quantization_encoding)
         # For MXFP4 models, non-quantized layers (embedding, attention, norm,
         # lm_head) are BF16.  The MoE expert weights use MXFP4 packed uint8
         # but are initialized separately via StackedMoE._init_mxfp4_weights.
         if quantization_encoding == "float4_e2m1fnx2":
             dtype = DType.bfloat16
-        cache_dtype = model_config.kv_cache.cache_dtype
-
-        _weights_format = weights_format(model_config.weight_path)
-        interleaved_rope_weights = (
-            _weights_format == WeightsFormat.gguf
-            and model_config.rope_type == "normal"
+        cache_dtype = cache_dtype_for_encoding(
+            quantization_encoding, model_config.kv_cache.kv_cache_format
         )
+
+        interleaved_rope_weights = _interleaved_rope_weights(model_config)
         device_refs = [
             DeviceRef(spec.device_type, spec.id)
             for spec in model_config.device_specs
@@ -305,7 +335,7 @@ class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             num_key_value_heads=huggingface_config.num_key_value_heads,
             head_dim=huggingface_config.head_dim,
             hidden_activation=hidden_activation,
-            max_position_embeddings=huggingface_config.max_position_embeddings,
+            max_position_embeddings=max_seq_len,
             rms_norm_eps=huggingface_config.rms_norm_eps,
             rope_theta=get_rope_theta(huggingface_config),
             attention_bias=huggingface_config.attention_bias,
@@ -332,6 +362,7 @@ class GptOssConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             devices=device_refs,
             interleaved_rope_weights=interleaved_rope_weights,
             kv_params=kv_params,
+            quantization_encoding=quantization_encoding,
         )
 
     def finalize(

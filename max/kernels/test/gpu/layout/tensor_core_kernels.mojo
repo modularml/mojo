@@ -13,9 +13,10 @@
 
 from std.io.io import _printf
 
-from std.gpu import WARP_SIZE, barrier
-from std.gpu.host import DeviceContext
-from std.gpu import thread_idx
+from max.gpu import WARP_SIZE
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import thread_idx
 from layout import Layout, LayoutTensor
 from layout._fillers import arange
 from layout._utils import ManagedLayoutTensor, load_to_simd
@@ -38,16 +39,16 @@ def mma_load_and_multiply[
 ):
     var mma = TensorCore[dst_dtype, dtype, inst_shape, transpose_b]()
     var a_reg_tile = mma.load_a(lhs)
-    var a_frags = load_to_simd(a_reg_tile).cast[DType.float64]()
+    var a_frags = load_to_simd(a_reg_tile).cast[.float64]()
     var b_reg_tile = mma.load_b(rhs)
-    var b_frags = load_to_simd(b_reg_tile).cast[DType.float64]()
+    var b_frags = load_to_simd(b_reg_tile).cast[.float64]()
 
     var c_reg_tile = mma.c_reg_tile_type.stack_allocation().fill(1.0)
     var d_reg_tile = mma.mma_op(a_reg_tile, b_reg_tile, c_reg_tile)
-    var d_frags = load_to_simd(d_reg_tile).cast[DType.float64]()
+    var d_frags = load_to_simd(d_reg_tile).cast[.float64]()
 
     # NVIDIA
-    comptime if a_frags.size == 8 and b_frags.size == 4:
+    comptime if a_frags.length == 8 and b_frags.length == 4:
         _printf[
             "thread %u a_vals=[%g %g %g %g %g %g %g %g], b_vals=[%g %g %g %g],"
             " d_vals=[%g %g %g %g]\n"
@@ -70,7 +71,7 @@ def mma_load_and_multiply[
             d_frags[2],
             d_frags[3],
         )
-    elif a_frags.size == 4 and b_frags.size == 2:
+    elif a_frags.length == 4 and b_frags.length == 2:
         _printf[
             "thread %u a_vals=[%g %g %g %g], b_vals=[%g %g], d_vals=[%g %g %g"
             " %g]\n"
@@ -87,7 +88,7 @@ def mma_load_and_multiply[
             d_frags[2],
             d_frags[3],
         )
-    elif a_frags.size == 2 and b_frags.size == 1:
+    elif a_frags.length == 2 and b_frags.length == 1:
         _printf[
             "thread %u a_vals=[%g %g], b_vals=[%g], d_vals=[%g %g %g %g]\n"
         ](
@@ -101,7 +102,7 @@ def mma_load_and_multiply[
             d_frags[3],
         )
     # AMD-MI300
-    elif a_frags.size == 4 and b_frags.size == 4:
+    elif a_frags.length == 4 and b_frags.length == 4:
         _printf[
             "thread %u a_vals=[%g %g %g %g], b_vals=[%g %g %g %g], d_vals=[%g"
             " %g %g %g]\n"
@@ -120,7 +121,7 @@ def mma_load_and_multiply[
             d_frags[2],
             d_frags[3],
         )
-    elif a_frags.size == 1 and b_frags.size == 1:
+    elif a_frags.length == 1 and b_frags.length == 1:
         _printf["thread %u a_vals=[%g], b_vals=[%g], d_vals=[%g %g %g %g]\n"](
             thread_idx.x,
             a_frags[0],
@@ -142,7 +143,9 @@ def mma_write_operand_kernel[
 ](output: LayoutTensor[dst_dtype, layout, MutAnyOrigin]):
     var mma = TensorCore[dst_dtype, dtype, inst_shape]()
     var thread_reg_tile = mma.c_reg_tile_type.stack_allocation()
-    var thread_reg_tile_v = thread_reg_tile.vectorize[1, mma.c_reg_type.size]()
+    var thread_reg_tile_v = thread_reg_tile.vectorize[
+        1, mma.c_reg_type.length
+    ]()
     thread_reg_tile_v[0, 0] = rebind[type_of(thread_reg_tile_v[0, 0])](
         mma.c_reg_type(thread_idx.x)
     )
@@ -215,14 +218,14 @@ def mma_load_and_print_operands_kernel_ldmatrix[
         dtype,
         lhs.layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     var b_smem = LayoutTensor[
         dtype,
         rhs.layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     comptime thread_layout = Layout.row_major(WARP_SIZE // 4, 4)
@@ -230,14 +233,14 @@ def mma_load_and_print_operands_kernel_ldmatrix[
     copy_dram_to_sram[thread_layout=thread_layout](b_smem, rhs)
     barrier()
 
-    comptime a_simd_width = mma.a_reg_type.size
-    comptime b_simd_width = mma.b_reg_type.size
+    comptime a_simd_width = mma.a_reg_type.length
+    comptime b_simd_width = mma.b_reg_type.length
     var a_reg_tile = (
         LayoutTensor[
             dtype,
             Layout.row_major(1, a_simd_width),
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ]
         .stack_allocation()
         .vectorize[1, a_simd_width]()
@@ -248,7 +251,7 @@ def mma_load_and_print_operands_kernel_ldmatrix[
             dtype,
             Layout.row_major(1, b_simd_width),
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ]
         .stack_allocation()
         .vectorize[1, b_simd_width]()
@@ -257,11 +260,11 @@ def mma_load_and_print_operands_kernel_ldmatrix[
     mma.load_a(a_smem, a_reg_tile)
     mma.load_b(b_smem, b_reg_tile)
 
-    var a_frags = a_reg_tile[0, 0].cast[DType.float64]()
-    var b_frags = b_reg_tile[0, 0].cast[DType.float64]()
+    var a_frags = a_reg_tile[0, 0].cast[.float64]()
+    var b_frags = b_reg_tile[0, 0].cast[.float64]()
 
     # NVIDIA
-    comptime if a_frags.size == 4 and b_frags.size == 2:
+    comptime if a_frags.length == 4 and b_frags.length == 2:
         _printf["thread %u a_vals=[%g %g %g %g], b_vals=[%g %g]\n"](
             thread_idx.x,
             a_frags[0],
@@ -271,7 +274,7 @@ def mma_load_and_print_operands_kernel_ldmatrix[
             b_frags[0],
             b_frags[1],
         )
-    elif a_frags.size == 8 and b_frags.size == 4:
+    elif a_frags.length == 8 and b_frags.length == 4:
         _printf[
             "thread %u a_vals=[%g %g %g %g %g %g %g %g], b_vals=[%g %g %g %g]\n"
         ](
@@ -290,7 +293,7 @@ def mma_load_and_print_operands_kernel_ldmatrix[
             b_frags[3],
         )
     # AMD-MI300
-    elif a_frags.size == 4 and b_frags.size == 4:
+    elif a_frags.length == 4 and b_frags.length == 4:
         _printf["thread %u a_vals=[%g %g %g %g], b_vals=[%g %g %g %g]\n"](
             thread_idx.x,
             a_frags[0],
@@ -302,7 +305,7 @@ def mma_load_and_print_operands_kernel_ldmatrix[
             b_frags[2],
             b_frags[3],
         )
-    elif a_frags.size == 1 and b_frags.size == 1:
+    elif a_frags.length == 1 and b_frags.length == 1:
         _printf["thread %u a_vals=[%g], b_vals=[%g]\n"](
             thread_idx.x,
             a_frags[0],

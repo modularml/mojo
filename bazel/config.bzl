@@ -16,6 +16,7 @@ MODULAR_CONFIGS = [
     "default",
     "debug_modular",
     "debug_everything",
+    "dev",
     "ci_build",
     "release",
     "production",
@@ -23,4 +24,18 @@ MODULAR_CONFIGS = [
     "tsan",
     "ubsan",
     "coverage",
+]
+
+ASYNCRT_PROFILING_LOCAL_DEFINES = [
+    "MODULAR_ASYNCRT_MAX_PROFILING_LEVEL=0000000",
+]
+
+CONFIG_SECTION_LOCAL_DEFINES = [
+    "MAX_CONFIG_SECTION=max",
+    "MOJO_CONFIG_SECTION=mojo-max",
+]
+
+KERNEL_PROFILING_LOCAL_DEFINES = [
+    "MODULAR_ENABLE_GPU_PROFILING=0",
+    "MODULAR_ENABLE_GPU_PROFILING_DETAILED=0",
 ]

@@ -14,12 +14,12 @@
 """Diffusion-specific pipeline components."""
 
 from .cache import (
-    DenoisingCacheConfig,
     DenoisingCacheState,
     TaylorSeerBufferState,
     TaylorSeerCache,
     fbcache_conditional_execution,
 )
+from .config import DenoisingCacheConfig, DenoisingCacheSettings
 from .first_block_cache import FirstBlockCache, FirstBlockCacheState
 from .interface import (
     CompileWrapper,
@@ -33,6 +33,7 @@ from .taylorseer import TaylorSeer, TaylorSeerState, run_denoising_step
 __all__ = [
     "CompileWrapper",
     "DenoisingCacheConfig",
+    "DenoisingCacheSettings",
     "DenoisingCacheState",
     "DiffusionPipeline",
     "DiffusionPipelineOutput",

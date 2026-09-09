@@ -20,7 +20,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, cast
 
-import hf_repo_lock
 from transformers import AutoConfig, PretrainedConfig
 
 # Common keys used in HuggingFace configs to specify number of hidden layers
@@ -150,11 +149,9 @@ def create_layer_overrides(
     if num_hidden_layers == "all":
         return {}
 
-    revision = hf_repo_lock.revision_for_hf_repo(pipeline_name)
-
     try:
         config = AutoConfig.from_pretrained(
-            pipeline_name, revision=revision, trust_remote_code=True
+            pipeline_name, trust_remote_code=True
         )
     except Exception as e:
         raise ValueError(

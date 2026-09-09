@@ -20,7 +20,7 @@ from types import TracebackType
 from typing import Annotated, Any, NamedTuple, Protocol, runtime_checkable
 
 from . import _bindtools
-from ._types import (
+from .types import (
     ClockStats,
     GPUStats,
     MemoryStats,

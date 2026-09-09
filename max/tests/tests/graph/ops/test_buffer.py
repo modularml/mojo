@@ -370,7 +370,7 @@ def test_buffer_ops_sequence_after_inplace_custom() -> None:
     ) as graph:
         buffer = graph.inputs[0].buffer
 
-        # @compiler.register("mutable_test_op") increments the first element.
+        # @extensibility.register("mutable_test_op") increments the first element.
         ops.inplace_custom(
             "mutable_test_op",
             device=buffer.device,

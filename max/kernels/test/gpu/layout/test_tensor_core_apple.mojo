@@ -14,6 +14,7 @@
 
 Tests all supported type combinations:
 - Float: {F16, BF16, F32} x {F16, BF16, F32} -> F32 (9 combos)
+- FP8: {E4M3, E5M2} inputs -> F32 (e4m3xe4m3, e5m2xe5m2, mixed)
 - Integer: {I8, U8} x {I8, U8} -> I32 (4 combos)
 - Strided loads (col_stride > 1)
 - Runtime transpose
@@ -24,14 +25,14 @@ accumulator type. Verify D[i] is close to the original A[i].
 
 from std.sys.info import _accelerator_arch
 
-from std.gpu import WARP_SIZE
-from std.gpu.compute.arch.mma_apple import (
+from max.gpu import WARP_SIZE
+from max.gpu.compute.arch.mma_apple import (
     _mma_apple,
     _mma_apple_transposable,
     apple_mma_load,
     apple_mma_store,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 
 comptime _N = 16
 comptime _NUM_ELEMENTS = _N * _N
@@ -45,9 +46,9 @@ comptime _NUM_ELEMENTS = _N * _N
 def mma_kernel[
     a_dtype: DType, b_dtype: DType, d_dtype: DType
 ](
-    a_ptr: UnsafePointer[Scalar[a_dtype], MutAnyOrigin],
-    b_ptr: UnsafePointer[Scalar[b_dtype], MutAnyOrigin],
-    d_ptr: UnsafePointer[Scalar[d_dtype], MutAnyOrigin],
+    a_ptr: MutPointer[Scalar[a_dtype], MutAnyOrigin],
+    b_ptr: MutPointer[Scalar[b_dtype], MutAnyOrigin],
+    d_ptr: MutPointer[Scalar[d_dtype], MutAnyOrigin],
 ):
     var a_frag = apple_mma_load[a_dtype](a_ptr, _N)
     var b_frag = apple_mma_load[b_dtype](b_ptr, _N)
@@ -114,16 +115,16 @@ def run_mma_test[
 
 
 def mma_strided_kernel(
-    a_ptr: UnsafePointer[Float32, MutAnyOrigin],
-    b_ptr: UnsafePointer[Float32, MutAnyOrigin],
-    d_ptr: UnsafePointer[Float32, MutAnyOrigin],
+    a_ptr: MutPointer[Float32, MutAnyOrigin],
+    b_ptr: MutPointer[Float32, MutAnyOrigin],
+    d_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
-    var a_frag = apple_mma_load[DType.float32](a_ptr, _N * 2, col_stride=2)
-    var b_frag = apple_mma_load[DType.float32](b_ptr, _N * 2, col_stride=2)
-    var c_frag = SIMD[DType.float32, 8](0)
-    var d_frag = SIMD[DType.float32, 8](0)
+    var a_frag = apple_mma_load[.float32](a_ptr, _N * 2, col_stride=2)
+    var b_frag = apple_mma_load[.float32](b_ptr, _N * 2, col_stride=2)
+    var c_frag = SIMD[.float32, 8](0)
+    var d_frag = SIMD[.float32, 8](0)
     _mma_apple(d_frag, a_frag, b_frag, c_frag)
-    apple_mma_store[DType.float32](d_ptr, _N, d_frag)
+    apple_mma_store[.float32](d_ptr, _N, d_frag)
 
 
 def run_mma_test_strided(ctx: DeviceContext) raises:
@@ -133,8 +134,8 @@ def run_mma_test_strided(ctx: DeviceContext) raises:
     comptime _BUF_COLS = _N * _STRIDE
     comptime _BUF_SIZE = _N * _BUF_COLS
 
-    var a_host = ctx.enqueue_create_host_buffer[DType.float32](_BUF_SIZE)
-    var b_host = ctx.enqueue_create_host_buffer[DType.float32](_BUF_SIZE)
+    var a_host = ctx.enqueue_create_host_buffer[.float32](_BUF_SIZE)
+    var b_host = ctx.enqueue_create_host_buffer[.float32](_BUF_SIZE)
 
     for i in range(_BUF_SIZE):
         a_host[i] = Float32(0)
@@ -149,9 +150,9 @@ def run_mma_test_strided(ctx: DeviceContext) raises:
     for i in range(_N):
         b_host[i * _BUF_COLS + i * _STRIDE] = Float32(1)
 
-    var a_dev = ctx.enqueue_create_buffer[DType.float32](_BUF_SIZE)
-    var b_dev = ctx.enqueue_create_buffer[DType.float32](_BUF_SIZE)
-    var d_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
+    var a_dev = ctx.enqueue_create_buffer[.float32](_BUF_SIZE)
+    var b_dev = ctx.enqueue_create_buffer[.float32](_BUF_SIZE)
+    var d_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
 
     ctx.enqueue_copy(a_dev, a_host)
     ctx.enqueue_copy(b_dev, b_host)
@@ -160,7 +161,7 @@ def run_mma_test_strided(ctx: DeviceContext) raises:
         a_dev, b_dev, d_dev, grid_dim=(1), block_dim=(WARP_SIZE)
     )
 
-    var d_host = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
+    var d_host = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
     ctx.enqueue_copy(d_host, d_dev)
     ctx.synchronize()
 
@@ -183,40 +184,40 @@ def run_mma_test_strided(ctx: DeviceContext) raises:
 
 
 def mma_rt_transpose_kernel(
-    a_ptr: UnsafePointer[Float32, MutAnyOrigin],
-    b_ptr: UnsafePointer[Float32, MutAnyOrigin],
-    d_ff_ptr: UnsafePointer[Float32, MutAnyOrigin],
-    d_tf_ptr: UnsafePointer[Float32, MutAnyOrigin],
-    d_ft_ptr: UnsafePointer[Float32, MutAnyOrigin],
-    d_tt_ptr: UnsafePointer[Float32, MutAnyOrigin],
+    a_ptr: MutPointer[Float32, MutAnyOrigin],
+    b_ptr: MutPointer[Float32, MutAnyOrigin],
+    d_ff_ptr: MutPointer[Float32, MutAnyOrigin],
+    d_tf_ptr: MutPointer[Float32, MutAnyOrigin],
+    d_ft_ptr: MutPointer[Float32, MutAnyOrigin],
+    d_tt_ptr: MutPointer[Float32, MutAnyOrigin],
 ):
     """Runs MMA for all 4 transpose combos: (F,F), (T,F), (F,T), (T,T)."""
-    var a_frag = apple_mma_load[DType.float32](a_ptr, _N)
-    var b_frag = apple_mma_load[DType.float32](b_ptr, _N)
-    var zero = SIMD[DType.float32, 8](0)
+    var a_frag = apple_mma_load[.float32](a_ptr, _N)
+    var b_frag = apple_mma_load[.float32](b_ptr, _N)
+    var zero = SIMD[.float32, 8](0)
 
-    var d_ff = SIMD[DType.float32, 8](0)
+    var d_ff = SIMD[.float32, 8](0)
     _mma_apple_transposable(d_ff, a_frag, b_frag, zero, False, False)
-    apple_mma_store[DType.float32](d_ff_ptr, _N, d_ff)
+    apple_mma_store[.float32](d_ff_ptr, _N, d_ff)
 
-    var d_tf = SIMD[DType.float32, 8](0)
+    var d_tf = SIMD[.float32, 8](0)
     _mma_apple_transposable(d_tf, a_frag, b_frag, zero, True, False)
-    apple_mma_store[DType.float32](d_tf_ptr, _N, d_tf)
+    apple_mma_store[.float32](d_tf_ptr, _N, d_tf)
 
-    var d_ft = SIMD[DType.float32, 8](0)
+    var d_ft = SIMD[.float32, 8](0)
     _mma_apple_transposable(d_ft, a_frag, b_frag, zero, False, True)
-    apple_mma_store[DType.float32](d_ft_ptr, _N, d_ft)
+    apple_mma_store[.float32](d_ft_ptr, _N, d_ft)
 
-    var d_tt = SIMD[DType.float32, 8](0)
+    var d_tt = SIMD[.float32, 8](0)
     _mma_apple_transposable(d_tt, a_frag, b_frag, zero, True, True)
-    apple_mma_store[DType.float32](d_tt_ptr, _N, d_tt)
+    apple_mma_store[.float32](d_tt_ptr, _N, d_tt)
 
 
 def _check_transpose(
     name: String,
-    a: UnsafePointer[Scalar[DType.float32], ...],
-    b: UnsafePointer[Scalar[DType.float32], ...],
-    d: UnsafePointer[Scalar[DType.float32], ...],
+    a: ImmPointer[Float32, _],
+    b: ImmPointer[Float32, _],
+    d: ImmPointer[Float32, _],
     ta: Bool,
     tb: Bool,
 ) -> Bool:
@@ -243,19 +244,19 @@ def run_mma_test_runtime_transpose(ctx: DeviceContext) raises:
     print("== test_runtime_transpose")
 
     # Semi-random values in {-2, -1, 0, 1, 2} — no special structure.
-    var a_host = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
-    var b_host = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
+    var a_host = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
+    var b_host = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
     for i in range(_N):
         for j in range(_N):
             a_host[i * _N + j] = Float32((i * 7 + j * 3) % 5 - 2)
             b_host[i * _N + j] = Float32((i * 5 + j * 11) % 5 - 2)
 
-    var a_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
-    var b_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
-    var d_ff_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
-    var d_tf_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
-    var d_ft_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
-    var d_tt_dev = ctx.enqueue_create_buffer[DType.float32](_NUM_ELEMENTS)
+    var a_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
+    var b_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
+    var d_ff_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
+    var d_tf_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
+    var d_ft_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
+    var d_tt_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
 
     ctx.enqueue_copy(a_dev, a_host)
     ctx.enqueue_copy(b_dev, b_host)
@@ -271,10 +272,10 @@ def run_mma_test_runtime_transpose(ctx: DeviceContext) raises:
         block_dim=(WARP_SIZE),
     )
 
-    var d_ff = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
-    var d_tf = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
-    var d_ft = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
-    var d_tt = ctx.enqueue_create_host_buffer[DType.float32](_NUM_ELEMENTS)
+    var d_ff = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
+    var d_tf = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
+    var d_ft = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
+    var d_tt = ctx.enqueue_create_host_buffer[.float32](_NUM_ELEMENTS)
     ctx.enqueue_copy(d_ff, d_ff_dev)
     ctx.enqueue_copy(d_tf, d_tf_dev)
     ctx.enqueue_copy(d_ft, d_ft_dev)
@@ -326,6 +327,13 @@ def run_mma_test_runtime_transpose(ctx: DeviceContext) raises:
 # CHECK: {{PASS|SKIP}}
 # CHECK-LABEL: test_f32_f32
 # CHECK: {{PASS|SKIP}}
+# FP8 combos: {E4M3, E5M2} inputs -> F32
+# CHECK-LABEL: test_e4m3_e4m3
+# CHECK: {{PASS|SKIP}}
+# CHECK-LABEL: test_e5m2_e5m2
+# CHECK: {{PASS|SKIP}}
+# CHECK-LABEL: test_e4m3_e5m2
+# CHECK: {{PASS|SKIP}}
 # Integer 8-bit combos: {I8, U8} x {I8, U8} -> I32
 # CHECK-LABEL: test_i8_i8
 # CHECK: {{PASS|SKIP}}
@@ -358,6 +366,9 @@ def _skip_all():
     _skip("test_f32_f16")
     _skip("test_f32_bf16")
     _skip("test_f32_f32")
+    _skip("test_e4m3_e4m3")
+    _skip("test_e5m2_e5m2")
+    _skip("test_e4m3_e5m2")
     _skip("test_i8_i8")
     _skip("test_i8_u8")
     _skip("test_u8_i8")
@@ -380,39 +391,51 @@ def main() raises:
         return
 
     # Float combos (tight tolerance for F16/BF16 hw rounding)
-    run_mma_test[DType.float16, DType.float16, DType.float32](
+    run_mma_test[.float16, DType.float16, DType.float32](
         "test_f16_f16", ctx, tol=0.00001
     )
-    run_mma_test[DType.float16, DType.bfloat16, DType.float32](
+    run_mma_test[.float16, DType.bfloat16, DType.float32](
         "test_f16_bf16", ctx, tol=0.00001
     )
-    run_mma_test[DType.float16, DType.float32, DType.float32](
+    run_mma_test[.float16, DType.float32, DType.float32](
         "test_f16_f32", ctx, tol=0.00001
     )
-    run_mma_test[DType.bfloat16, DType.float16, DType.float32](
+    run_mma_test[.bfloat16, DType.float16, DType.float32](
         "test_bf16_f16", ctx, tol=0.00001
     )
-    run_mma_test[DType.bfloat16, DType.bfloat16, DType.float32](
+    run_mma_test[.bfloat16, DType.bfloat16, DType.float32](
         "test_bf16_bf16", ctx, tol=0.00001
     )
-    run_mma_test[DType.bfloat16, DType.float32, DType.float32](
+    run_mma_test[.bfloat16, DType.float32, DType.float32](
         "test_bf16_f32", ctx, tol=0.00001
     )
-    run_mma_test[DType.float32, DType.float16, DType.float32](
+    run_mma_test[.float32, DType.float16, DType.float32](
         "test_f32_f16", ctx, tol=0.00001
     )
-    run_mma_test[DType.float32, DType.bfloat16, DType.float32](
+    run_mma_test[.float32, DType.bfloat16, DType.float32](
         "test_f32_bf16", ctx, tol=0.00001
     )
-    run_mma_test[DType.float32, DType.float32, DType.float32](
+    run_mma_test[.float32, DType.float32, DType.float32](
         "test_f32_f32", ctx, tol=0.00001
     )
 
+    # tol=0: A @ I is exact (1.0 is representable in fp8), so D reproduces the
+    # fp8-rounded A bit-for-bit.
+    run_mma_test[.float8_e4m3fn, DType.float8_e4m3fn, DType.float32](
+        "test_e4m3_e4m3", ctx
+    )
+    run_mma_test[.float8_e5m2, DType.float8_e5m2, DType.float32](
+        "test_e5m2_e5m2", ctx
+    )
+    run_mma_test[.float8_e4m3fn, DType.float8_e5m2, DType.float32](
+        "test_e4m3_e5m2", ctx
+    )
+
     # Integer combos
-    run_mma_test[DType.int8, DType.int8, DType.int32]("test_i8_i8", ctx)
-    run_mma_test[DType.int8, DType.uint8, DType.int32]("test_i8_u8", ctx)
-    run_mma_test[DType.uint8, DType.int8, DType.int32]("test_u8_i8", ctx)
-    run_mma_test[DType.uint8, DType.uint8, DType.int32]("test_u8_u8", ctx)
+    run_mma_test[.int8, DType.int8, DType.int32]("test_i8_i8", ctx)
+    run_mma_test[.int8, DType.uint8, DType.int32]("test_i8_u8", ctx)
+    run_mma_test[.uint8, DType.int8, DType.int32]("test_u8_i8", ctx)
+    run_mma_test[.uint8, DType.uint8, DType.int32]("test_u8_u8", ctx)
 
     # Feature tests
     run_mma_test_strided(ctx)

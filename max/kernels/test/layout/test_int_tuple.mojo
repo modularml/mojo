@@ -181,6 +181,29 @@ def test_sorted() raises:
     assert_true(IntTuple(4, 6, 8) < IntTuple(5, 6, 7))
 
 
+def test_apply() raises:
+    print("== test_apply")
+
+    def double(x: Int) {} -> Int:
+        return x * 2
+
+    assert_equal(apply(IntTuple(1, 2, 3), double), IntTuple(2, 4, 6))
+    assert_equal(
+        apply(IntTuple(1, IntTuple(2, 3), 4), double),
+        IntTuple(2, IntTuple(4, 6), 8),
+    )
+
+    var offset = 10
+
+    def add_offset(x: Int) {imm} -> Int:
+        return x + offset
+
+    assert_equal(
+        apply(IntTuple(1, IntTuple(2, 3)), add_offset),
+        IntTuple(11, IntTuple(12, 13)),
+    )
+
+
 def test_product() raises:
     print("== test_product")
 
@@ -511,6 +534,7 @@ def main() raises:
     test_tuple_basic_ops()
     test_sorted()
 
+    test_apply()
     test_product()
     test_inner_product()
     test_shape_div()

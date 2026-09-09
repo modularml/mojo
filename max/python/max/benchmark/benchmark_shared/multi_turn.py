@@ -27,6 +27,7 @@ try:
 except ImportError:
     from taskgroup import TaskGroup  # Python < 3.11 backport
 
+import numpy as np
 from max.benchmark.benchmark_shared.config import SamplingConfig
 from max.benchmark.benchmark_shared.datasets import ChatSession
 from max.benchmark.benchmark_shared.datasets.types import TextContentBlock
@@ -37,20 +38,27 @@ from max.benchmark.benchmark_shared.request import (
     BaseRequestFuncInput,
     BaseRequestFuncOutput,
     ChatMessage,
-    ProgressBarRequestDriver,
     RequestCounter,
     RequestDriver,
     RequestFuncInput,
     RequestFuncOutput,
+    mark_cancelled_if_past_deadline,
+    progressbar_request_driver,
 )
 from max.benchmark.benchmark_shared.utils import (
+    deadline_passed,
     deadline_remaining_s,
     exceeds_deadline,
 )
-from tqdm.asyncio import tqdm
 from transformers import PreTrainedTokenizerBase
 
 logger = logging.getLogger(__name__)
+
+
+def _poisson_interval(request_rate: float, burstiness: float) -> float:
+    """Gamma-distributed inter-arrival time for a target Poisson session rate."""
+    theta = 1.0 / (request_rate * burstiness)
+    return float(np.random.gamma(shape=burstiness, scale=theta))
 
 
 async def chat_session_driver(
@@ -63,13 +71,18 @@ async def chat_session_driver(
     sampling: SamplingConfig,
     ignore_first_turn_stats: bool = False,
     benchmark_should_end_time: int | None = None,
-    randomize_session_start: bool = False,
     run_prefix: str | None = None,
     run_prefix_len: int = 0,
+    est_ttft_ms: float = 0.0,
+    est_tpot_ms: float = 0.0,
+    use_session_id_as_cache_salt: bool = False,
 ) -> list[RequestFuncOutput]:
     request_func_input = RequestFuncInput(
         model=model_id,
         session_id=str(chat_session.id),
+        cache_salt=str(chat_session.id)
+        if use_session_id_as_cache_salt
+        else None,
         sampling=sampling,
         prompt=[],
         images=[],
@@ -154,18 +167,28 @@ async def chat_session_driver(
 
         if not applied_initial_sleep:
             applied_initial_sleep = True
-            if randomize_session_start:
-                delay_ms = messages[content_idx + 1].delay_until_next_message
-                if delay_ms and delay_ms > 0:
-                    sleep_s = random.uniform(0, delay_ms) / 1000
-                    if exceeds_deadline(sleep_s, benchmark_should_end_time):
-                        return session_outputs
-                    await asyncio.sleep(sleep_s)
+            if (
+                content_idx > 0
+            ):  # pre-warmed: phase-spread across inter-turn window
+                # Spread the first measured turn across the just-completed
+                # turn's occupancy window R_{k} + D_{k} (generation + sleep).
+                # A draw landing in the generation portion (u < R_k) means the
+                # session would still be generating, so fire immediately;
+                # otherwise sleep the remaining delay u - R_k. With zero runtime
+                # estimates R_k = 0 and this is uniform[0, D_k] as before.
+                prev_msg = messages[content_idx - 1]
+                delay_ms = prev_msg.delay_until_next_message or 0.0
+                runtime_ms = est_ttft_ms + est_tpot_ms * prev_msg.num_tokens
+                window_ms = delay_ms + runtime_ms
+                if window_ms > 0:
+                    u = random.uniform(0, window_ms)
+                    sleep_s = max(0.0, u - runtime_ms) / 1000
+                    if sleep_s > 0:
+                        if exceeds_deadline(sleep_s, benchmark_should_end_time):
+                            return session_outputs
+                        await asyncio.sleep(sleep_s)
 
-        if (
-            benchmark_should_end_time is not None
-            and time.perf_counter_ns() >= benchmark_should_end_time
-        ):
+        if deadline_passed(benchmark_should_end_time):
             response = RequestFuncOutput(
                 cancelled=True, request_submit_time=time.perf_counter()
             )
@@ -181,12 +204,19 @@ async def chat_session_driver(
                         "Expected RequestFuncOutput in text-generation benchmark flow."
                     )
                 response = raw_response
+                mark_cancelled_if_past_deadline(
+                    response, benchmark_should_end_time
+                )
             except asyncio.TimeoutError:
                 response = RequestFuncOutput(
                     cancelled=True, request_submit_time=time.perf_counter()
                 )
 
         if not (ignore_first_turn_stats and content_idx == prefix_end_idx):
+            # Tag with session + turn order so per-turn cache retention can
+            # compare each measured turn against the previous one in-session.
+            response.session_id = str(chat_session.id)
+            response.turn_index = len(session_outputs)
             session_outputs.append(response)
 
         if not response.success:
@@ -205,10 +235,10 @@ async def chat_session_driver(
         )
         chat_len += output_len
 
-        if delay_ms := messages[content_idx + 1].delay_until_next_message:
-            sleep_s = delay_ms / 1000
+        if next_delay_ms := messages[content_idx + 1].delay_until_next_message:
+            sleep_s = next_delay_ms / 1000
             if exceeds_deadline(sleep_s, benchmark_should_end_time):
-                break
+                return session_outputs
             await asyncio.sleep(sleep_s)
 
         content_idx += 2
@@ -225,6 +255,7 @@ async def prerun_warmup_turns(
     sampling: SamplingConfig,
     max_concurrency: int,
     disable_tqdm: bool = False,
+    use_session_id_as_cache_salt: bool = False,
 ) -> None:
     """Send one warmup request per session with prefix_turns > 0.
 
@@ -269,6 +300,9 @@ async def prerun_warmup_turns(
             pending_request = RequestFuncInput(
                 model=model_id,
                 session_id=str(session.id),
+                cache_salt=str(session.id)
+                if use_session_id_as_cache_salt
+                else None,
                 sampling=sampling,
                 prompt=list(message_history),
                 images=[],
@@ -299,25 +333,38 @@ async def prerun_warmup_turns(
         " requests to seed the prefix cache..."
     )
 
-    pbar = (
-        None
-        if disable_tqdm
-        else tqdm(total=len(requests_to_fire), desc="warmup")
-    )
-    if pbar is not None:
-        request_driver = ProgressBarRequestDriver(request_driver, pbar)
-
     semaphore = asyncio.Semaphore(max_concurrency)
+    warmup_results: list[BaseRequestFuncOutput | None] = [None] * len(
+        requests_to_fire
+    )
 
-    async def _fire(req: RequestFuncInput) -> None:
-        async with semaphore:
-            await request_driver.request(req)
+    with progressbar_request_driver(
+        request_driver,
+        len(requests_to_fire),
+        disable_tqdm=disable_tqdm,
+        desc="warmup",
+    ) as driver:
 
-    try:
-        await asyncio.gather(*(_fire(r) for r in requests_to_fire))
-    finally:
-        if pbar is not None:
-            pbar.close()
+        async def _fire(idx: int, req: RequestFuncInput) -> None:
+            async with semaphore:
+                warmup_results[idx] = await driver.request(req)
+
+        await asyncio.gather(
+            *(_fire(idx, r) for idx, r in enumerate(requests_to_fire))
+        )
+
+    for idx, result in enumerate(warmup_results):
+        if result is None:
+            raise RuntimeError(
+                f"Warmup-prerun task {idx} did not produce a result"
+                " (this is a bug)"
+            )
+        if not result.success:
+            raise ValueError(
+                f"Warmup-prerun request failed at index {idx}"
+                f" (prompt_len: {requests_to_fire[idx].prompt_len}),"
+                f" error: {result.error}"
+            )
     logger.info("[warmup-prerun] complete.")
 
 
@@ -336,9 +383,13 @@ async def run_multiturn_benchmark(
     warmup_delay_ms: float,
     max_concurrency: int | None,
     sampling: SamplingConfig,
-    randomize_session_start: bool = False,
     run_prefix: str | None = None,
     run_prefix_len: int = 0,
+    request_rate: float = float("inf"),
+    burstiness: float = 1.0,
+    est_ttft_ms: float = 0.0,
+    est_tpot_ms: float = 0.0,
+    use_session_id_as_cache_salt: bool = False,
 ) -> dict[str, list[RequestFuncOutput]]:
     """Run multi-turn chat benchmark scenario.
 
@@ -375,9 +426,11 @@ async def run_multiturn_benchmark(
                 sampling=sampling,
                 ignore_first_turn_stats=ignore_first_turn_stats,
                 benchmark_should_end_time=benchmark_should_end_time,
-                randomize_session_start=randomize_session_start,
                 run_prefix=run_prefix,
                 run_prefix_len=run_prefix_len,
+                est_ttft_ms=est_ttft_ms,
+                est_tpot_ms=est_tpot_ms,
+                use_session_id_as_cache_salt=use_session_id_as_cache_salt,
             )
         session_id = (
             str(chat_session.id)
@@ -386,13 +439,28 @@ async def run_multiturn_benchmark(
         )
         return session_id, outputs
 
+    # Pre-warmed sessions (prefix_turns > 0) get phase-spread jitter inside
+    # chat_session_driver. Cold-start sessions are paced here: Poisson
+    # inter-arrival when request_rate is finite, warmup_delay_ms stagger otherwise.
+    use_rate_pacing = request_rate != float("inf")
+
+    async def _pace_cold_start(idx: int) -> bool:
+        """Pace a cold-start session launch. Returns True if the deadline was hit."""
+        if use_rate_pacing and idx > 0:
+            sleep_s = _poisson_interval(request_rate, burstiness)
+        elif warmup_delay_ms > 0 and max_concurrency and idx < max_concurrency:
+            sleep_s = warmup_delay_ms / 1000
+        else:
+            return False
+        if exceeds_deadline(sleep_s, benchmark_should_end_time):
+            return True
+        await asyncio.sleep(sleep_s)
+        return False
+
     tasks: list[asyncio.Task[tuple[str, list[RequestFuncOutput]]]] = []
     for idx, chat_session in enumerate(chat_sessions):
-        if warmup_delay_ms > 0 and max_concurrency and idx < max_concurrency:
-            sleep_s = warmup_delay_ms / 1000
-            if exceeds_deadline(sleep_s, benchmark_should_end_time):
-                break
-            await asyncio.sleep(sleep_s)
+        if chat_session.prefix_turns == 0 and await _pace_cold_start(idx):
+            break
         tasks.append(
             asyncio.create_task(limited_chat_session_driver(chat_session, idx))
         )
@@ -401,14 +469,24 @@ async def run_multiturn_benchmark(
         await asyncio.gather(*tasks)
     )
 
-    if (
-        benchmark_should_end_time is not None
-        and time.perf_counter_ns() < benchmark_should_end_time
-    ):
-        logger.warning(
-            "All chat sessions completed before the time limit. "
-            "Consider increasing --num-chat-sessions for more stable load."
-        )
+    if benchmark_should_end_time is not None:
+        if deadline_passed(benchmark_should_end_time):
+            total_turns = sum(len(v) for v in outputs_by_session.values())
+            cancelled = sum(
+                1 for v in outputs_by_session.values() for o in v if o.cancelled
+            )
+            logger.info(
+                "Benchmark stopped by the duration limit"
+                " (--max-benchmark-duration-s):"
+                f" {total_turns} turns dispatched across"
+                f" {len(outputs_by_session)} sessions,"
+                f" {cancelled} cancelled in flight."
+            )
+        else:
+            logger.warning(
+                "All chat sessions completed before the time limit. "
+                "Consider increasing --num-chat-sessions for more stable load."
+            )
 
     return outputs_by_session
 
@@ -440,16 +518,13 @@ class ConcurrentTurnsRequestDriver(RequestDriver):
         self, request_func_input: BaseRequestFuncInput
     ) -> BaseRequestFuncOutput:
         async with self._semaphore:
-            if (
-                self._benchmark_should_end_time is not None
-                and time.perf_counter_ns() >= self._benchmark_should_end_time
-            ):
+            if deadline_passed(self._benchmark_should_end_time):
                 return request_func_input.get_output_type()(
                     cancelled=True, request_submit_time=time.perf_counter()
                 )
             remaining_s = deadline_remaining_s(self._benchmark_should_end_time)
             try:
-                return await asyncio.wait_for(
+                output = await asyncio.wait_for(
                     self._request_driver.request(request_func_input),
                     timeout=remaining_s,
                 )
@@ -457,6 +532,9 @@ class ConcurrentTurnsRequestDriver(RequestDriver):
                 return request_func_input.get_output_type()(
                     cancelled=True, request_submit_time=time.perf_counter()
                 )
+            return mark_cancelled_if_past_deadline(
+                output, self._benchmark_should_end_time
+            )
 
 
 async def run_kv_cache_stress_benchmark(
@@ -474,9 +552,13 @@ async def run_kv_cache_stress_benchmark(
     lora_manager: LoRABenchmarkManager | None,
     warmup_delay_ms: float,
     sampling: SamplingConfig,
-    randomize_session_start: bool = False,
     run_prefix: str | None = None,
     run_prefix_len: int = 0,
+    request_rate: float = float("inf"),
+    burstiness: float = 1.0,
+    est_ttft_ms: float = 0.0,
+    est_tpot_ms: float = 0.0,
+    use_session_id_as_cache_salt: bool = False,
 ) -> dict[str, list[RequestFuncOutput]]:
     """Run a KV-cache stress benchmark with independent conversation and turn concurrency.
 
@@ -507,8 +589,15 @@ async def run_kv_cache_stress_benchmark(
     )
 
     # Queue holds (original_index, session) pairs so LoRA assignment is stable.
+    # Pre-warmed sessions (prefix_turns > 0) are enqueued first so workers
+    # always dequeue them before cold-start sessions. This ensures a warm
+    # session is never blocked behind a cold session that is rate-gating.
     session_queue: asyncio.Queue[tuple[int, ChatSession]] = asyncio.Queue()
-    for idx, session in enumerate(chat_sessions):
+    indexed = sorted(
+        enumerate(chat_sessions),
+        key=lambda pair: 0 if pair[1].prefix_turns > 0 else 1,
+    )
+    for idx, session in indexed:
         await session_queue.put((idx, session))
 
     num_workers = min(max_concurrent_conversations, len(chat_sessions))
@@ -516,20 +605,55 @@ async def run_kv_cache_stress_benchmark(
         {} for _ in range(num_workers)
     ]
 
+    use_rate_pacing = request_rate != float("inf")
+    session_rate_gate: asyncio.Queue[None] = asyncio.Queue()
+
+    async def _emit_rate_tokens() -> None:
+        """Produce session-start permits at the target Poisson/gamma rate."""
+        while True:
+            await asyncio.sleep(_poisson_interval(request_rate, burstiness))
+            await session_rate_gate.put(None)
+
+    async def _wait_for_rate_token() -> bool:
+        """Block until a session-start permit arrives.
+
+        Returns True if the benchmark deadline passed before a permit was
+        granted. Polls with a bounded timeout so the worker can observe the
+        deadline rather than blocking on the gate indefinitely.
+        """
+        while not deadline_passed(benchmark_should_end_time):
+            remaining_s = deadline_remaining_s(benchmark_should_end_time)
+            timeout = 1.0 if remaining_s is None else min(1.0, remaining_s)
+            try:
+                await asyncio.wait_for(session_rate_gate.get(), timeout=timeout)
+                return False
+            except asyncio.TimeoutError:
+                continue
+        return True
+
     async def _conversation_worker(worker_idx: int) -> None:
-        # Stagger workers to avoid thundering-herd at startup.
         if warmup_delay_ms > 0:
             sleep_s = worker_idx * warmup_delay_ms / 1000
             if exceeds_deadline(sleep_s, benchmark_should_end_time):
                 return
             await asyncio.sleep(sleep_s)
 
-        local_count = 0
+        session_count = 0
         while True:
+            if deadline_passed(benchmark_should_end_time):
+                return
+
             try:
                 idx, chat_session = session_queue.get_nowait()
             except asyncio.QueueEmpty:
                 return
+
+            # Pre-warmed sessions (prefix_turns > 0) have their KV cache
+            # populated; start them immediately. Cold-start sessions
+            # (prefix_turns == 0) are rate-gated like new arrivals.
+            if use_rate_pacing and chat_session.prefix_turns == 0:
+                if await _wait_for_rate_token():
+                    return
 
             lora_id = (
                 lora_manager.get_lora_for_request(idx) if lora_manager else None
@@ -544,28 +668,53 @@ async def run_kv_cache_stress_benchmark(
                 sampling=sampling,
                 ignore_first_turn_stats=ignore_first_turn_stats,
                 benchmark_should_end_time=benchmark_should_end_time,
-                randomize_session_start=randomize_session_start,
                 run_prefix=run_prefix,
                 run_prefix_len=run_prefix_len,
+                est_ttft_ms=est_ttft_ms,
+                est_tpot_ms=est_tpot_ms,
+                use_session_id_as_cache_salt=use_session_id_as_cache_salt,
             )
             session_id = (
                 str(chat_session.id)
                 if chat_session.id is not None
-                else f"anonymous-w{worker_idx}-{local_count}"
+                else f"anonymous-w{worker_idx}-{session_count}"
             )
-            local_count += 1
+            session_count += 1
             worker_outputs[worker_idx].setdefault(session_id, []).extend(
                 outputs
             )
 
-    async with TaskGroup() as tg:
-        for i in range(num_workers):
-            tg.create_task(_conversation_worker(i))
+    rate_emitter_task: asyncio.Task[None] | None = None
+    if use_rate_pacing:
+        rate_emitter_task = asyncio.create_task(_emit_rate_tokens())
+    try:
+        async with TaskGroup() as tg:
+            for i in range(num_workers):
+                tg.create_task(_conversation_worker(i))
+    finally:
+        if rate_emitter_task is not None:
+            rate_emitter_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await rate_emitter_task
 
     outputs_by_session: dict[str, list[RequestFuncOutput]] = {}
     for worker_dict in worker_outputs:
         for sid, outs in worker_dict.items():
             outputs_by_session.setdefault(sid, []).extend(outs)
+
+    if deadline_passed(benchmark_should_end_time):
+        total_turns = sum(len(v) for v in outputs_by_session.values())
+        cancelled = sum(
+            1 for v in outputs_by_session.values() for o in v if o.cancelled
+        )
+        logger.info(
+            "Benchmark stopped by the duration limit"
+            " (--max-benchmark-duration-s):"
+            f" {total_turns} turns dispatched across"
+            f" {len(outputs_by_session)} sessions,"
+            f" {cancelled} cancelled in flight."
+        )
+
     return outputs_by_session
 
 
@@ -578,6 +727,7 @@ async def chat_judge_session_driver(
     max_output_tokens: int,
     sampling: SamplingConfig,
     benchmark_should_end_time: int | None = None,
+    use_session_id_as_cache_salt: bool = False,
 ) -> list[RequestFuncOutput]:
     """Drive one chat-judge session: every turn already has its full
     context inlined as text in the user message, so we send
@@ -625,12 +775,12 @@ async def chat_judge_session_driver(
             prompt_len=system_num_tokens + message.num_tokens,
             max_tokens=max_output_tokens,
             ignore_eos=False,
+            cache_salt=str(chat_session.id)
+            if use_session_id_as_cache_salt
+            else None,
         )
 
-        if (
-            benchmark_should_end_time is not None
-            and time.perf_counter_ns() >= benchmark_should_end_time
-        ):
+        if deadline_passed(benchmark_should_end_time):
             response = RequestFuncOutput(
                 cancelled=True, request_submit_time=time.perf_counter()
             )
@@ -646,6 +796,9 @@ async def chat_judge_session_driver(
                         "Expected RequestFuncOutput in chat-judge benchmark flow."
                     )
                 response = raw_response
+                mark_cancelled_if_past_deadline(
+                    response, benchmark_should_end_time
+                )
             except asyncio.TimeoutError:
                 response = RequestFuncOutput(
                     cancelled=True, request_submit_time=time.perf_counter()
@@ -660,6 +813,12 @@ async def chat_judge_session_driver(
                     f"server error response: {response.error}"
                 )
             break
+
+        if next_delay_ms := message.delay_until_next_message:
+            sleep_s = next_delay_ms / 1000
+            if exceeds_deadline(sleep_s, benchmark_should_end_time):
+                return session_outputs
+            await asyncio.sleep(sleep_s)
 
     return session_outputs
 
@@ -678,6 +837,7 @@ async def run_chat_judge_benchmark(
     warmup_delay_ms: float,
     max_concurrency: int | None,
     sampling: SamplingConfig,
+    use_session_id_as_cache_salt: bool = False,
 ) -> dict[str, list[RequestFuncOutput]]:
     """Run the chat-judge multi-turn scenario."""
     request_counter = RequestCounter(
@@ -704,6 +864,7 @@ async def run_chat_judge_benchmark(
                 max_output_tokens=max_output_tokens,
                 sampling=sampling,
                 benchmark_should_end_time=benchmark_should_end_time,
+                use_session_id_as_cache_salt=use_session_id_as_cache_salt,
             )
         session_id = (
             str(chat_session.id)
@@ -725,9 +886,8 @@ async def run_chat_judge_benchmark(
                 await asyncio.sleep(sleep_s)
             tg.create_task(limited_session_driver(chat_session, idx))
 
-    if (
-        benchmark_should_end_time is not None
-        and time.perf_counter_ns() < benchmark_should_end_time
+    if benchmark_should_end_time is not None and not deadline_passed(
+        benchmark_should_end_time
     ):
         logger.warning(
             "All chat-judge sessions completed before the time limit. "

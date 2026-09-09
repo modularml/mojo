@@ -1,0 +1,54 @@
+load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
+
+package(default_visibility = ["//max:consumers"])
+
+exports_files([
+    "run_sanitizer.sh",
+    "stress_schedule.sh",
+])
+
+# Positive control for the compute-sanitizer lanes. This target intentionally
+# performs an out-of-bounds global write and therefore only "passes" when run
+# under `compute-sanitizer --tool memcheck --error-exitcode 1` (which turns the
+# finding into a non-zero exit). It is tagged `manual` so it is excluded from
+# `//...` and `//max/kernels/test/gpu/...` wildcard expansion -- it must never
+# run in the normal GPU suite or the nightly sanitizer lane. Invoke it
+# explicitly to validate that a sanitizer lane catches real bugs:
+#
+#   ./bazelw test --config=cs-memcheck \
+#     //max/kernels/test/gpu/compute_sanitizer:positive_control_memcheck_oob.mojo.test
+mojo_test(
+    name = "positive_control_memcheck_oob.mojo.test",
+    srcs = ["positive_control_memcheck_oob.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)
+
+# Positive control for the NaN-poison allocator mode
+# (`MODULAR_DEBUG_DEVICE_ALLOCATOR=poison-all`): a kernel that reads an
+# uninitialized buffer. With poison ON it raises (dst is NaN); OFF it may
+# silently pass on pool garbage. Tagged `manual` -- never runs in the normal
+# suite.
+mojo_test(
+    name = "positive_control_poison_uninit.mojo.test",
+    srcs = ["positive_control_poison_uninit.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)

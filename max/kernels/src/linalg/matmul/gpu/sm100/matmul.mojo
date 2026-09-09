@@ -10,44 +10,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""SM100 matmul - COMPATIBILITY LAYER for grouped_matmul.
+"""SM100 matmul - TileTensor-native compatibility layer for grouped_matmul.
 
 NOTE: This module is maintained for backward compatibility with grouped_matmul
 implementations that depend on internal functions (WarpRole, consumer_main_loop,
 stsm_helper, shared_memory_epilogue, register_epilogue, accum_arrive).
+The helper surface is TileTensor-native; legacy callers should adapt at their
+own boundary before entering this module.
 
 For new code, use sm100_structured directly:
 - Import configs from: linalg.matmul.gpu.sm100_structured.config
 - Import matmul from: linalg.matmul.gpu.sm100_structured.matmul
 """
 
-from std.sys import simd_width_of, size_of
+from std.sys import align_of, simd_width_of, size_of
 from std.math.uutils import umod, ufloordiv, udivmod
 
-from std.gpu import WARP_SIZE, lane_id, warp_id
-from std.gpu.primitives.cluster import elect_one_sync
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.compute.mma import st_matrix
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.sync import (
+from max.gpu import WARP_SIZE, lane_id, warp_id
+from max.gpu.primitives.cluster import elect_one_sync
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.compute.mma import st_matrix
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.sync import (
     named_barrier,
     umma_arrive_leader_cta,
     mbarrier_arrive,
 )
-from std.gpu.compute.arch.tcgen05 import *
+from max.gpu.compute.arch.tcgen05 import *
 from layout import (
     Coord,
     IntTuple,
     Idx,
     Layout,
-    LayoutTensor,
-    RuntimeTuple,
+    RuntimeLayout,
     TileTensor,
-    UNKNOWN_VALUE,
     row_major,
     col_major,
 )
-from layout.runtime_tuple import idx2crd
 from layout.swizzle import Swizzle
 from layout.tile_layout import (
     TensorLayout,
@@ -63,11 +62,23 @@ from std.utils.static_tuple import StaticTuple
 
 from ....arch.sm100 import MmaOpSM100_SS
 from ....utils import elementwise_compute_lambda_type
-from .pipeline import ProducerConsumerPipeline
+from .pipeline import ProducerConsumerPipeline, MbarPtr
 
 
 @fieldwise_init
 struct WarpRole[has_scheduler: Bool = True](TrivialRegisterPassable):
+    """Warp-role assignments for the SM100 warp-specialized matmul kernel.
+
+    Each warp is statically assigned to one of four roles: `Mma` computes
+    UMMA instructions using TCGEN05; `MainLoad` issues TMA requests to fill
+    the A/B shared-memory pipeline; `Scheduler` advances the tile work queue;
+    `Epilogue` writes accumulator results to global memory. The role indices
+    shift by one when `has_scheduler` is `True`.
+
+    Parameters:
+        has_scheduler: Whether a dedicated scheduler warp is present.
+    """
+
     var _role: Int32
 
     comptime Mma = Self(6) if Self.has_scheduler else Self(5)
@@ -166,7 +177,7 @@ def consumer_main_loop[
 ):
     """TileTensor overload of `consumer_main_loop`.
 
-    Accepts `SMemTileArray2D` instead of `LayoutTensorIter`, indexing directly
+    Accepts `SMemTileArray2D` instead of iterator-based shared-memory tiles, indexing directly
     into the tile arrays to get TileTensor tiles for MMA. The tile dimension
     and swizzle parameters (a_dim0, a_dim1, etc.) are explicit because Mojo
     requires them for overload resolution with parametric struct arguments.
@@ -193,7 +204,7 @@ def consumer_main_loop[
 
 
 comptime RLayout32Bits[layout: Layout] = RuntimeLayout[
-    layout, element_type=DType.uint32, linear_idx_type=DType.uint32
+    layout, element_type=.uint32, linear_idx_type=.uint32
 ]
 
 
@@ -204,14 +215,27 @@ def f32_frag_to_smem[
     vec_size: Int,
     DstLayout: TensorLayout,
 ](
-    vec: InlineArray[Scalar[vec_dtype], vec_size],
-    dst: TileTensor[
-        _, DstLayout, MutAnyOrigin, address_space=AddressSpace.SHARED
-    ],
+    vec: Array[Scalar[vec_dtype], vec_size],
+    dst: TileTensor[_, DstLayout, MutAnyOrigin, address_space=.SHARED],
 ):
+    """Writes an FP32 TCGEN05 accumulator fragment to a swizzled shared-memory tile.
+
+    Implements a manual 8×4 thread-to-element distribution for FP32 fragments,
+    since the compiler cannot prove `all_dims_known` through migrated layout types.
+    Each lane writes a pair of FP32 values at the correct swizzled row/column offset.
+
+    Parameters:
+        swizzle_mode: Shared memory swizzle mode to apply.
+        vec_dtype: Element type of the source fragment (must be FP32).
+        vec_size: Number of elements in the fragment (= 2 × frag_rows × frag_cols).
+        DstLayout: Layout of the destination shared-memory tile.
+
+    Args:
+        vec: Source accumulator fragment as a flat inline array.
+        dst: Destination tile in shared memory.
+    """
     # Manual implementation of dst.vectorize[1, 2]().distribute[row_major(8, 4)]
-    # because the compiler can't prove `all_dims_known` through layout types
-    # produced by `lt_to_tt()`. See MSTDL-2422.
+    # because the compiler can't prove `all_dims_known` through migrated layout types. See MSTDL-2422.
     comptime stride0: Int = dst.static_stride[0]
     comptime shape0 = dst.static_shape[0]
     comptime shape1 = dst.static_shape[1]
@@ -248,12 +272,30 @@ def stsm_helper[
     transpose_c: Bool = False,
     swizzle_mode: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
 ](
-    vec: InlineArray[Scalar[vec_dtype], vec_size],
-    dst: TileTensor[
-        _, DstLayout, MutAnyOrigin, address_space=AddressSpace.SHARED
-    ],
+    vec: Array[Scalar[vec_dtype], vec_size],
+    dst: TileTensor[_, DstLayout, MutAnyOrigin, address_space=.SHARED],
     warp_offset: UInt32 = 0,
 ):
+    """Stores a TCGEN05 accumulator fragment to shared memory using st.matrix or scalar stores.
+
+    Routes to `f32_frag_to_smem` for FP32 fragments, or uses `st_matrix` hardware
+    instructions (`stsmx4` or `stsmx2`) for narrower types. Applies swizzle addressing
+    so the destination layout matches subsequent TMA-store or register-epilogue consumers.
+
+    Parameters:
+        swizzle: Swizzle descriptor for shared memory address computation.
+        stageN: Column stage dimension used to select stsmx4 vs stsmx2 path.
+        vec_dtype: Fragment element type.
+        vec_size: Number of elements in the fragment.
+        DstLayout: Static layout of the destination tile in shared memory.
+        transpose_c: Whether to transpose the C tile before writing (FP32 only).
+        swizzle_mode: TMA swizzle mode for FP32 fallback path.
+
+    Args:
+        vec: Accumulator fragment to write.
+        dst: Destination tile in shared memory.
+        warp_offset: Per-warp row offset within the tile (default 0).
+    """
     comptime if size_of[dst.dtype]() == 4:
         comptime assert not transpose_c, "transpose_c must be False"
         return f32_frag_to_smem[swizzle_mode](vec, dst)
@@ -314,205 +356,13 @@ def stsm_helper[
         comptime for k in range(stmtx_simd_width):
             var src = SIMD[vec_dtype, cast_width]()
             comptime for _j in range(cast_width):
-                src[_j] = rebind[Scalar[vec_dtype]](
-                    vec[i * stsmx_lane_size + k * cast_width + _j]
-                )
+                src[_j] = vec[i * stsmx_lane_size + k * cast_width + _j]
             var casted = src.cast[dst.dtype]()
             comptime for _j in range(cast_width):
                 v[k * cast_width + _j] = casted[_j]
         st_matrix[simd_width=stmtx_simd_width, transpose=transpose_c](
-            dst.ptr + offset, bitcast[DType.float32, stmtx_simd_width](v)
+            dst.ptr + offset, bitcast[.float32, stmtx_simd_width](v)
         )
-
-
-@always_inline
-def shared_memory_epilogue[
-    MMA_M: Int,
-    data_paths: Int,
-    num_stages: Int,
-    stage: Int,
-    stageN: Int,
-    c_type: DType,
-    shared_n: Int,
-    simd_size: Int,
-    c_smem_upper_layout: Layout,
-    c_smem_lower_layout: Layout,
-    swizzle: Swizzle,
-    compute_lambda_fn: elementwise_compute_lambda_type,
-    num_output_warps: Int,
-](
-    M: UInt32,
-    N: UInt32,
-    c_col: Int,
-    c_row: Int,
-    c_smem_warp_tile_upper: LayoutTensor[
-        c_type, c_smem_upper_layout, MutAnyOrigin, ...
-    ],
-    c_smem_warp_tile_lower: LayoutTensor[
-        c_type, c_smem_lower_layout, MutAnyOrigin, ...
-    ],
-):
-    # Here we start keeping track of the index / indices this thread is
-    # responsible for in shared memory. This is represented with shared_memory_row
-    # and shared_memory_column and the children of these values shared_memory_row_upper_half
-    # shared_memory_row_lower_half. We also need to update the global memory column c_col by
-    # stageN since we are sliding through the overall compute block.
-
-    var staged_c_col = c_col + stage * stageN
-
-    var warp_id = warp_id()
-    var shared_memory_row = warp_id * 32
-
-    var shared_memory_row_upper_half: Int = shared_memory_row
-    var shared_memory_row_lower_half: Int = shared_memory_row + 16
-
-    # This distribute layout allocates vectors to corresponding threads. If stageN is 32, 8 x 4 is used since each row of
-    # 4 threads can access 8 elements (8 x 4 = 32). If stageN is 16 then 16 x 2 is used. Since each fragment contains 16 rows,
-    # there will be 2 chunks created when using 8x4.
-
-    comptime distribute_cols = stageN // simd_size
-    comptime distribute_rows = WARP_SIZE // distribute_cols
-
-    comptime distribute_layout = Layout.row_major(
-        distribute_rows, distribute_cols
-    )
-    var c_smem_upper_frag = c_smem_warp_tile_upper.vectorize[
-        1, simd_size
-    ]().distribute[distribute_layout, swizzle=swizzle](lane_id())
-
-    var c_smem_lower_frag = c_smem_warp_tile_lower.vectorize[
-        1, simd_size
-    ]().distribute[distribute_layout, swizzle=swizzle](lane_id())
-
-    comptime fragment_size = c_smem_upper_frag.layout.size()
-
-    var local_row, local_col = udivmod(lane_id(), distribute_cols)
-
-    var shared_memory_col = local_col * simd_size
-    shared_memory_row_lower_half += local_row
-    shared_memory_row_upper_half += local_row
-
-    comptime for i in range(fragment_size):
-        comptime alignment = align_of[SIMD[c_type, simd_size]]()
-
-        # these offsets are swizzled so to retrieve the corresponding gmem offset we need to remove the swizzle
-        # luckily removing the swizzle is as simple as swizzling a second time
-        var swz_offset_upper = (
-            shared_memory_row_upper_half * shared_n + shared_memory_col
-        )
-        var swz_offset_lower = (
-            shared_memory_row_lower_half * shared_n + shared_memory_col
-        )
-
-        var offset_upper = swizzle(swz_offset_upper)
-        var offset_lower = swizzle(swz_offset_lower)
-
-        var shared_upper_row: Int64
-        var shared_upper_col: Int64
-        var shared_lower_row: Int64
-        var shared_lower_col: Int64
-
-        # Now that we have the true index we, need to add the global tile index to find the corresponding
-        # index, in gmem. However the data will be stored in tensor memory differently depending on
-        # MMA_M size, we take that into account here.
-
-        comptime if MMA_M != 256:
-            comptime blocked_m_128_layout = blocked_product(
-                Layout.row_major(data_paths * 2, stageN),
-                Layout.col_major(2, 2),
-                coalesce_output=True,
-            )
-
-            var upper_coord = idx2crd(
-                RuntimeTuple[IntTuple(UNKNOWN_VALUE)](offset_upper),
-                RuntimeTuple[
-                    blocked_m_128_layout.shape,
-                    element_type=DType.int64,
-                ](),
-                RuntimeTuple[
-                    blocked_m_128_layout.stride,
-                    element_type=DType.int64,
-                ](),
-            )
-
-            var lower_coord = idx2crd(
-                RuntimeTuple[IntTuple(UNKNOWN_VALUE)](offset_lower),
-                RuntimeTuple[
-                    blocked_m_128_layout.shape,
-                    element_type=DType.int64,
-                ](),
-                RuntimeTuple[
-                    blocked_m_128_layout.stride,
-                    element_type=DType.int64,
-                ](),
-            )
-
-            shared_upper_row = upper_coord[0].get_int()
-            shared_lower_row = lower_coord[0].get_int()
-
-            var section_offset_upper = upper_coord[1][1].get_int()
-            var col_offset_upper = upper_coord[1][0].get_int()
-
-            var section_offset_lower = lower_coord[1][1].get_int()
-            var col_offset_lower = lower_coord[1][0].get_int()
-
-            shared_upper_col = (
-                section_offset_upper * Int64(num_stages * stageN)
-                + col_offset_upper
-            )
-            shared_lower_col = (
-                section_offset_lower * Int64(num_stages * stageN)
-                + col_offset_lower
-            )
-
-        else:
-            # can't cast to uint64 as it's not supported yet
-            # this will cost us slightly in performance
-            comptime fast_div = FastDiv[DType.uint32](shared_n)
-
-            shared_upper_row = (
-                Scalar[DType.int](offset_upper).cast[fast_div.uint_type]()
-                / fast_div
-            ).cast[DType.int64]()
-            shared_upper_col = Int64(offset_upper % shared_n)
-
-            shared_lower_row = (
-                Scalar[DType.int](offset_lower).cast[fast_div.uint_type]()
-                / fast_div
-            ).cast[DType.int64]()
-            shared_lower_col = Int64(offset_lower % shared_n)
-
-        # now we need to add the global tile offset
-        var global_upper_row = shared_upper_row + Int64(c_row)
-        var global_upper_col = shared_upper_col + Int64(staged_c_col)
-        var global_lower_row = shared_lower_row + Int64(c_row)
-        var global_lower_col = shared_lower_col + Int64(staged_c_col)
-
-        if global_upper_row < Int64(Int(M)) and global_upper_col < Int64(
-            Int(N)
-        ):
-            var reg_val = compute_lambda_fn[alignment=alignment](
-                (Int(global_upper_row), Int(global_upper_col)),
-                c_smem_upper_frag[i, 0],
-            )
-            c_smem_upper_frag[i, 0] = reg_val
-
-        if global_lower_row < Int64(Int(M)) and global_lower_col < Int64(
-            Int(N)
-        ):
-            var reg_val = compute_lambda_fn[alignment=alignment](
-                (Int(global_lower_row), Int(global_lower_col)),
-                c_smem_lower_frag[i, 0],
-            )
-            c_smem_lower_frag[i, 0] = reg_val
-
-        # If more than one chunk is created (happens when 8x4 is used)
-        # they will be spaced 8 rows away from each other
-
-        shared_memory_row_upper_half += distribute_rows
-        shared_memory_row_lower_half += distribute_rows
-
-    named_barrier[Int32(num_output_warps * WARP_SIZE)]()
 
 
 @always_inline
@@ -536,6 +386,36 @@ def shared_memory_epilogue[
     c_smem_warp_tile_upper: TileTensor[mut=True, c_type, ...],
     c_smem_warp_tile_lower: TileTensor[mut=True, c_type, ...],
 ):
+    """Applies a compute epilogue to a C tile stored in shared memory for SM100 matmul.
+
+    Reads the upper and lower warp sub-tiles from shared memory, un-swizzles the
+    element addresses to recover (row, col) coordinates in the global C matrix,
+    and calls `compute_lambda_fn` with the resulting SIMD values. Supports both
+    MMA_M=128 and MMA_M=256 tensor-memory layouts.
+
+    Parameters:
+        MMA_M: M dimension of a single MMA tile (128 or 256).
+        data_paths: Number of TCGEN05 data paths used in the column layout.
+        num_stages: Number of epilogue pipeline stages in the N dimension.
+        stage: Current epilogue pipeline stage index.
+        stageN: N dimension of one epilogue stage.
+        c_type: Element type of the C tile in shared memory.
+        shared_n: Column count of the shared-memory C tile, used as the
+            row stride in elements.
+        simd_size: SIMD vector width used to distribute the shared-memory
+            fragment across lanes.
+        swizzle: Swizzle descriptor for shared memory address computation.
+        compute_lambda_fn: Elementwise lambda applied to each output element.
+        num_output_warps: Number of warps participating in the epilogue.
+
+    Args:
+        M: Total M dimension of the problem (used for bounds checking).
+        N: Total N dimension of the problem (used for bounds checking).
+        c_col: Global column offset for this output tile.
+        c_row: Global row offset for this output tile.
+        c_smem_warp_tile_upper: Upper warp half of the C tile in shared memory.
+        c_smem_warp_tile_lower: Lower warp half of the C tile in shared memory.
+    """
     # Here we start keeping track of the index / indices this thread is
     # responsible for in shared memory. This is represented with shared_memory_row
     # and shared_memory_column and the children of these values shared_memory_row_upper_half
@@ -632,18 +512,16 @@ def shared_memory_epilogue[
         else:
             # can't cast to uint64 as it's not supported yet
             # this will cost us slightly in performance
-            comptime fast_div = FastDiv[DType.uint32](shared_n)
+            comptime fast_div = FastDiv[.uint32](shared_n)
 
             shared_upper_row = (
-                Scalar[DType.int](offset_upper).cast[fast_div.uint_type]()
-                / fast_div
-            ).cast[DType.int64]()
+                Int(offset_upper).cast[fast_div.uint_type]() / fast_div
+            ).cast[.int64]()
             shared_upper_col = Int64(offset_upper % shared_n)
 
             shared_lower_row = (
-                Scalar[DType.int](offset_lower).cast[fast_div.uint_type]()
-                / fast_div
-            ).cast[DType.int64]()
+                Int(offset_lower).cast[fast_div.uint_type]() / fast_div
+            ).cast[.int64]()
             shared_lower_col = Int64(offset_lower % shared_n)
 
         # now we need to add the global tile offset
@@ -693,7 +571,7 @@ def _compute_register_lambda_fn[
 ](
     top_coord: StaticTuple[UInt32, 2],
     bottom_coord: StaticTuple[UInt32, 2],
-    mut frag: InlineArray[Scalar[epilogue_dtype], frag_size],
+    mut frag: Array[Scalar[epilogue_dtype], frag_size],
     staged_c_row: UInt32,
     staged_c_col: UInt32,
 ):
@@ -760,12 +638,43 @@ def register_epilogue[
     cta_group: Int,
     is_lower_frag_required: Bool,
 ](
-    mut upper_frag_casted: InlineArray[Scalar[epilogue_dtype], frag_size],
-    mut lower_frag_casted: InlineArray[Scalar[epilogue_dtype], frag_size],
+    mut upper_frag_casted: Array[Scalar[epilogue_dtype], frag_size],
+    mut lower_frag_casted: Array[Scalar[epilogue_dtype], frag_size],
     c_row: UInt32,
     c_col: UInt32,
     N: UInt32,
 ):
+    """Applies an elementwise compute epilogue to accumulator fragments held in tensor memory.
+
+    Computes the global (row, col) coordinate of each element in the upper and
+    lower accumulator fragments based on the TCGEN05 tensor-memory fragment
+    layout, the MMA_M tile shape, and the CTA group configuration, then invokes
+    `compute_lambda_fn` to transform each element in place. The lower fragment
+    is processed only when `is_lower_frag_required` is `True`.
+
+    Parameters:
+        MMA_M: M dimension of a single MMA tile (64, 128, or 256).
+        data_paths: Number of TCGEN05 data paths (must be 16).
+        num_stages: Number of epilogue pipeline stages in the N dimension.
+        bits: Tensor-memory load width in bits (must be 256).
+        stage: Current epilogue pipeline stage index.
+        stageN: N dimension of one epilogue stage.
+        compute_lambda_fn: Elementwise lambda applied to each output element.
+        num_output_warps: Number of warps participating in the epilogue.
+        epilogue_dtype: Element type of the output fragments.
+        frag_size: Number of elements per fragment.
+        repeats: Number of 16x256b loads repeated per fragment.
+        transpose_c: Whether the C tile is transposed.
+        cta_group: Number of CTAs in the UMMA group.
+        is_lower_frag_required: Whether the lower fragment needs processing.
+
+    Args:
+        upper_frag_casted: Upper accumulator fragment to transform in place.
+        lower_frag_casted: Lower accumulator fragment to transform in place.
+        c_row: Global row offset of the output tile.
+        c_col: Global column offset of the output tile.
+        N: Total N dimension of the problem (used for bounds checking).
+    """
     comptime assert (
         bits == 256 and data_paths == 16
     ), "Only 16x256b tensor memory load is supported"
@@ -816,7 +725,7 @@ def register_epilogue[
 
     comptime for i in range(repeats):
         # each tensor memory load (16x256b) may be repeated based on our desired size.
-        # if thats the case our fragment will be repeated as well. So process it in chunks i.e
+        # if that's the case our fragment will be repeated as well. So process it in chunks i.e
         # one 16x256b at a time.
         # inc represents the shift in global memory offset for each chunk, based on the repeat, and
         # offset represents the offset into the fragment for each chunk.
@@ -855,9 +764,24 @@ def register_epilogue[
 def accum_arrive[
     cta_group: Int
 ](mma_output_pipeline: ProducerConsumerPipeline, mma_output_stage: UInt32):
+    """Signals arrival at the MMA output pipeline barrier for a given stage.
+
+    Dispatches between a plain `mbarrier_arrive` for single-CTA groups and
+    `umma_arrive_leader_cta` for multi-CTA UMMA groups, where only the leader
+    CTA signals arrival.
+
+    Parameters:
+        cta_group: Number of CTAs in the UMMA group.
+
+    Args:
+        mma_output_pipeline: Producer-consumer pipeline tracking MMA completion.
+        mma_output_stage: Pipeline stage index to arrive at.
+    """
     comptime if cta_group == 1:
-        _ = mbarrier_arrive(mma_output_pipeline.consumer_mbar(mma_output_stage))
+        _ = mbarrier_arrive(
+            rebind[MbarPtr](mma_output_pipeline.consumer_mbar(mma_output_stage))
+        )
     else:
         umma_arrive_leader_cta(
-            mma_output_pipeline.consumer_mbar(mma_output_stage)
+            rebind[MbarPtr](mma_output_pipeline.consumer_mbar(mma_output_stage))
         )

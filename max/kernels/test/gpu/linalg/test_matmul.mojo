@@ -22,14 +22,9 @@ from std.sys import (
 )
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.algorithm.functional import elementwise
-from std.gpu.host import DeviceContext, get_gpu_target
-from layout import (
-    Coord,
-    Idx,
-    TileTensor,
-    row_major,
-)
+from max.algorithm.functional import elementwise
+from max.gpu.host import DeviceContext, get_gpu_target
+from layout import Coord, Idx, TileTensor, row_major, coord_to_index_list
 from layout._fillers import arange as arange, random
 from linalg.matmul.gpu import _matmul_gpu, multistage_gemm
 from linalg.utils_gpu import MatmulConfig
@@ -41,16 +36,16 @@ from std.utils.index import Index
 
 
 comptime epilogue_func_type = def[
-    dtype: DType, width: SIMDSize, *, alignment: Int = 1
+    dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](IndexList[2], IndexList[2], SIMD[dtype, width]) capturing -> SIMD[
     dtype, width
 ]
 
 
-@parameter
+@__parameter
 @always_inline
 def epilogue_test_fn[
-    dtype: DType, width: SIMDSize, *, alignment: Int = 1
+    dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](
     idx: IndexList[2],
     dim_space: IndexList[2],
@@ -98,7 +93,7 @@ def test[
     m: Int,
     n: Int,
     k: Int,
-    rtol: Float64 = 1e-3 if dtype == DType.float32 else 1e-2,
+    rtol: Float64 = 1e-3 if dtype == .float32 else 1e-2,
     max_ulp_distance: Optional[Int] = None,
 ) raises:
     comptime assert Bool(N) and Bool(
@@ -187,12 +182,12 @@ def test[
     ctx.enqueue_copy(c_device_buffer, c_host_ptr)
     ctx.enqueue_copy(c_device_ref_buffer, c_host_ref_ptr)
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(c_device, m, n)
     def epilogue_fn[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = align_of[SIMD[_dtype, width]](),
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> None:
@@ -264,29 +259,25 @@ def test[
     comptime pack_size = simd_width_of[dtype, target=get_gpu_target()]()
 
     @always_inline
-    @__copy_capture(c_device_ref, m, n)
-    @parameter
-    def func[
-        simd_width: Int, rank: Int, alignment: Int = 1
-    ](idx0: IndexList[rank]):
-        var idx = rebind[IndexList[2]](idx0)
-
-        var val = c_device_ref.load_linear[width=simd_width](idx)
+    def func[simd_width: Int, alignment: Int = 1](idx0: Coord) {var}:
+        var val = c_device_ref.load[width=simd_width](idx0)
 
         var update_val = val
 
         comptime if lambda_fn:
             comptime element_lambda = lambda_fn.value()
-            update_val = element_lambda(idx, (m, n), val)
+            update_val = element_lambda(
+                rebind[IndexList[2]](coord_to_index_list(idx0)), (m, n), val
+            )
 
-        c_device_ref.store_linear[alignment=alignment * size_of[dtype]()](
-            idx,
-            update_val,
+        c_device_ref.store[alignment=alignment * size_of[dtype]()](
+            idx0, update_val
         )
 
     comptime if lambda_fn:
-        elementwise[func, pack_size, target="gpu"](
-            IndexList[2](m, n),
+        elementwise[pack_size, target="gpu"](
+            func,
+            (m, n),
             ctx,
         )
     ctx.synchronize()
@@ -319,38 +310,38 @@ def main() raises:
     with DeviceContext() as ctx:
         print("===> tfloat32-float32 mma")
         test[
-            DType.float32,
+            .float32,
             arange_a=True,
             arange_b=True,
             N=Int(12288),
             K=Int(4096),
         ](ctx, 512, 12288, 4096)
-        test[DType.float32, arange_a=True, N=Int(384), K=Int(128)](
+        test[.float32, arange_a=True, N=Int(384), K=Int(128)](
             ctx, 256, 384, 128
         )
-        test[DType.float32, arange_b=True, N=Int(4096), K=Int(4096)](
+        test[.float32, arange_b=True, N=Int(4096), K=Int(4096)](
             ctx, 128, 4096, 4096
         )
         test[
-            DType.float32,
+            .float32,
             arange_a=True,
             arange_b=True,
             N=Int(12288),
             K=Int(4096),
         ](ctx, 512, 12288, 4096)
-        test[DType.float32, N=Int(4096), K=Int(11008)](ctx, 23, 4096, 11008)
-        test[DType.float32, N=Int(4096), K=Int(12288)](ctx, 67, 4096, 12288)
-        test[DType.float32, N=Int(4096), K=Int(4096)](ctx, 555, 4096, 4096)
+        test[.float32, N=Int(4096), K=Int(11008)](ctx, 23, 4096, 11008)
+        test[.float32, N=Int(4096), K=Int(12288)](ctx, 67, 4096, 12288)
+        test[.float32, N=Int(4096), K=Int(4096)](ctx, 555, 4096, 4096)
 
         print("===> bfloat16-float32 mma")
         test[
-            DType.bfloat16,
+            .bfloat16,
             arange_a=True,
             transpose_b=True,
             config=MatmulConfig[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 transpose_b=True,
             ](
                 block_tile_shape=Index(64, 128, 64),
@@ -360,27 +351,27 @@ def main() raises:
             N=Int(128),
             K=Int(128),
         ](ctx, 100, 128, 128)
-        test[DType.bfloat16, arange_b=True, N=Int(12288), K=Int(3072)](
+        test[.bfloat16, arange_b=True, N=Int(12288), K=Int(3072)](
             ctx, 1024, 12288, 3072
         )
         test[
-            DType.bfloat16,
+            .bfloat16,
             arange_a=True,
             arange_b=True,
             N=Int(5120),
             K=Int(3072),
         ](ctx, 1024, 5120, 3072)
-        test[DType.bfloat16, N=Int(3072), K=Int(32768)](ctx, 1024, 3072, 32768)
-        test[DType.bfloat16, N=Int(3072), K=Int(3072)](ctx, 1024, 3072, 3072)
+        test[.bfloat16, N=Int(3072), K=Int(32768)](ctx, 1024, 3072, 32768)
+        test[.bfloat16, N=Int(3072), K=Int(3072)](ctx, 1024, 3072, 3072)
 
         comptime if has_nvidia_gpu_accelerator():
             test[
-                DType.bfloat16,
+                .bfloat16,
                 transpose_b=True,
                 config=MatmulConfig[
-                    DType.bfloat16,
-                    DType.bfloat16,
-                    DType.bfloat16,
+                    .bfloat16,
+                    .bfloat16,
+                    .bfloat16,
                     transpose_b=True,
                 ](
                     block_tile_shape=Index(16, 64, 64),
@@ -393,12 +384,12 @@ def main() raises:
                 K=Int(4096),
             ](ctx, 32, 4096, 4096)
             test[
-                DType.bfloat16,
+                .bfloat16,
                 transpose_b=True,
                 config=MatmulConfig[
-                    DType.bfloat16,
-                    DType.bfloat16,
-                    DType.bfloat16,
+                    .bfloat16,
+                    .bfloat16,
+                    .bfloat16,
                     transpose_b=True,
                 ](
                     block_tile_shape=Index(32, 64, 32),
@@ -413,13 +404,13 @@ def main() raises:
 
         print("===> tfloat32-float32 mma with epilogue")
         test[
-            DType.float32,
+            .float32,
             lambda_fn=epilogue_test_fn,
             N=Int(3072),
             K=Int(3072),
         ](ctx, 999, 3072, 3072)
         test[
-            DType.float32,
+            .float32,
             lambda_fn=epilogue_test_fn,
             N=Int(12288),
             K=Int(2048),
@@ -430,72 +421,93 @@ def main() raises:
         # bfloat16, we need a larger tolerance since the reference may reduce
         # in float32.
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(3072),
             K=Int(12288),
         ](ctx, 14, 3072, 12288, rtol=2e-2)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(12288),
             K=Int(3072),
         ](ctx, 33, 12288, 3072)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(5120),
             K=Int(3072),
         ](ctx, 101, 5120, 3072)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(3072),
             K=Int(32768),
         ](ctx, 400, 3072, 32768, rtol=2e-2)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(3072),
             K=Int(3072),
         ](ctx, 910, 3072, 3072)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(6144),
             K=Int(4096),
         ](ctx, 50, 6144, 4096)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(4096),
             K=Int(4096),
         ](ctx, 22, 4096, 4096)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(28672),
             K=Int(4096),
         ](ctx, 88, 28672, 4096)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(4096),
             K=Int(14336),
         ](ctx, 100, 4096, 14336)
         test[
-            DType.bfloat16,
+            .bfloat16,
             transpose_b=True,
             lambda_fn=epilogue_test_fn,
             N=Int(128256),
             K=Int(4096),
         ](ctx, 600, 128256, 4096)
+
+        # Unaligned N: N * size_of(bfloat16) % 16 != 0, so a tile GEMM's TMA
+        # output descriptor is misaligned and the dispatcher has to route
+        # around it. At m <= 64 the split-K GEMV takes these, odd N included.
+        # The three m values land in its three tile_m bands.
+        print("===> bfloat16 unaligned N")
+        test[.bfloat16, transpose_b=True, N=Int(258), K=Int(4096)](
+            ctx, 6, 258, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(258), K=Int(4096)](
+            ctx, 12, 258, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(258), K=Int(4096)](
+            ctx, 64, 258, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(257), K=Int(4096)](
+            ctx, 6, 257, 4096
+        )
+        test[.bfloat16, transpose_b=True, N=Int(514), K=Int(4096)](
+            ctx, 32, 514, 4096
+        )

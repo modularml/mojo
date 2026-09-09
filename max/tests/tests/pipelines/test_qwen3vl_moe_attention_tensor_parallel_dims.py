@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.linear import Linear
 from max.pipelines.architectures.qwen3vl_moe.nn.text_attention import (
     Qwen3VLMoEDecoderAttentionWithRope,
@@ -40,7 +40,7 @@ def test_attention_stores_per_module_kv_heads_distinct_from_kv_cache_global() ->
     local_q_heads = 8
     hidden_size = 1024
 
-    kv_params = KVCacheParams(
+    kv_params = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=global_kv_heads,
         head_dim=head_dim,
@@ -61,6 +61,7 @@ def test_attention_stores_per_module_kv_heads_distinct_from_kv_cache_global() ->
     )
 
     assert attn.num_key_value_heads == local_kv_heads
+    assert isinstance(attn.kv_params, MHAKVCacheParams)
     assert attn.kv_params.n_kv_heads == global_kv_heads
 
     q_w, k_w, v_w = attn.qkv_proj._out_dims

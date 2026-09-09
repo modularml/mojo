@@ -27,7 +27,6 @@ SMEM Organization:
 """
 
 
-from std.gpu.memory import AddressSpace
 from layout import Layout
 from std.utils.index import IndexList
 from layout.tensor_core_async import tile_layout_k_major_typed

@@ -1,0 +1,15 @@
+{
+  "target": "attn_res_mix",
+  "spec": {
+    "tokens": 8,
+    "hidden": 256,
+    "cands": 8,
+    "dist": 1,
+    "pdl": 0,
+    "dt": 1
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "bf16 at the widest candidate axis, where the softmax has the most room to amplify a score error",
+  "findings": []
+}

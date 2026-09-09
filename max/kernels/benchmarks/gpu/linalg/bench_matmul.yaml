@@ -70,3 +70,15 @@ params:
   N: 576
   K: 576
   use_vendor_blas: [True, False]
+
+# Small-M production shapes - regression coverage on B200. These shapes were
+# slow vs torch.compile (cuBLASLt nvjet) at M={32,64,128}; M=1 is a win.
+- $M: [1, 32, 64, 128, 256]
+  N: 1536
+  K: 1536
+  use_vendor_blas: [True, False]
+
+- $M: [1, 32, 64, 128, 256]
+  N: 1536
+  K: 4096
+  use_vendor_blas: [True, False]

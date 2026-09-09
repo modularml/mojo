@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-from max.driver import CPU
 from max.dtype import DType
 from max.experimental import functional as F
 from max.experimental.nn import Linear
@@ -23,7 +22,8 @@ from max.experimental.nn.common_layers.functional_kernels import (
     grouped_matmul_ragged,
     moe_create_indices,
 )
-from max.experimental.nn.common_layers.moe import MoE, MoEGate
+from max.experimental.nn.common_layers.moe import MoEGate
+from max.experimental.nn.module import Module
 from max.experimental.nn.sequential import ModuleList
 from max.experimental.tensor import Tensor
 
@@ -78,7 +78,7 @@ class GptOssMoEGate(MoEGate):
         return topk_indices, topk_scores
 
 
-class GptOssMoE(MoE):
+class GptOssMoE(Module[[Tensor], Tensor]):
     """GptOss-style MoE implementation with custom activation and biases."""
 
     def __init__(self, config: GptOssConfig):
@@ -86,22 +86,23 @@ class GptOssMoE(MoE):
         Args:
             config: The configuration for the GPT OSS Model.
         """
-        # Store GptOss-specific parameters
-        self.alpha = 1.702
-        self.limit = 7.0
-
         self.config = config
 
-        # Initialize parent class
-        super().__init__(
+        self.hidden_dim = config.hidden_size
+        self.num_experts = config.num_local_experts
+        self.num_experts_per_token = config.num_experts_per_tok
+        self.apply_router_weight_first = False
+        self.gate = GptOssMoEGate(
             hidden_dim=config.hidden_size,
             num_experts=config.num_local_experts,
             num_experts_per_token=config.num_experts_per_tok,
-            moe_dim=config.intermediate_size,
-            gate_cls=GptOssMoEGate,
-            has_shared_experts=False,
-            apply_router_weight_first=False,
         )
+        self.moe_dim = config.intermediate_size
+
+        self.alpha = 1.702
+        self.limit = 7.0
+
+        self._init_experts()
 
     def _init_experts(self) -> None:
         # Instead of creating individual MLP experts, we'll use combined weight tensors
@@ -196,7 +197,7 @@ class GptOssMoE(MoE):
             self.gate_up_proj,
             expert_start_indices,
             expert_ids,
-            expert_usage_stats.to(CPU()),
+            expert_usage_stats,
         )
 
         # Apply bias based on expert assignment
@@ -226,7 +227,7 @@ class GptOssMoE(MoE):
             self.down_proj,
             expert_start_indices,
             expert_ids,
-            expert_usage_stats.to(CPU()),
+            expert_usage_stats,
         )
 
         # Apply bias based on expert assignment
@@ -253,8 +254,5 @@ class GptOssMoE(MoE):
             routed_expert_out = F.squeeze(
                 F.sum(routed_expert_out, axis=2), axis=2
             ).cast(x.dtype)
-
-        if self.shared_experts is not None:
-            routed_expert_out += self.shared_experts(x)
 
         return routed_expert_out

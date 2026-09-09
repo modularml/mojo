@@ -25,8 +25,8 @@ from std.random import rand, random_float64, seed
 from std.sys import align_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.gpu.host import DeviceContext
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 from std.memory import alloc
 from internal_utils import assert_almost_equal
 from layout import (
@@ -178,12 +178,12 @@ def test_grouped_gemm_epilogue[
     var c_tensor_lt = c_tensor.to_layout_tensor()
 
     # Define epilogue lambda that adds original C value to matmul result
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(c_tensor_lt)
     def epilogue_add_c[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = align_of[SIMD[_dtype, width]](),
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> SIMD[
@@ -194,8 +194,8 @@ def test_grouped_gemm_epilogue[
 
     # Initialize random data
     seed(42)
-    rand(a_host.ptr, a_host.num_elements())
-    rand(b_host.ptr, b_host.num_elements())
+    rand(a_host._storage, a_host.num_elements())
+    rand(b_host._storage, b_host.num_elements())
 
     # Initialize C with random values for epilogue test
     for i in range(Int(m.value())):
@@ -207,7 +207,7 @@ def test_grouped_gemm_epilogue[
     # Copy to device
     ctx.enqueue_copy(a_device, a_host_ptr)
     ctx.enqueue_copy(b_device, b_host_ptr)
-    ctx.enqueue_copy(c_device, c_host.ptr)
+    ctx.enqueue_copy(c_device, c_host._storage)
     ctx.enqueue_copy(sfa_device, sfa_host_ptr)
     ctx.enqueue_copy(sfb_device, sfb_host_ptr)
 
@@ -224,7 +224,7 @@ def test_grouped_gemm_epilogue[
     )
 
     # Problem sizes tensor
-    var problem_sizes_host = ctx.enqueue_create_host_buffer[DType.int32](
+    var problem_sizes_host = ctx.enqueue_create_host_buffer[.int32](
         max_groups * 4
     )
     problem_sizes_host[0] = Int32(Int(m.value()))  # M
@@ -232,9 +232,7 @@ def test_grouped_gemm_epilogue[
     problem_sizes_host[2] = Int32(Int(k.value()))  # K
     problem_sizes_host[3] = Int32(1)  # L (batch)
 
-    var problem_sizes_device = ctx.enqueue_create_buffer[DType.int32](
-        max_groups * 4
-    )
+    var problem_sizes_device = ctx.enqueue_create_buffer[.int32](max_groups * 4)
     ctx.enqueue_copy(problem_sizes_device, problem_sizes_host)
 
     var problem_sizes_tensor = TileTensor(
@@ -242,11 +240,11 @@ def test_grouped_gemm_epilogue[
     )
 
     # Pointer arrays
-    var a_ptrs_host = ctx.enqueue_create_host_buffer[DType.uint64](max_groups)
-    var b_ptrs_host = ctx.enqueue_create_host_buffer[DType.uint64](max_groups)
-    var c_ptrs_host = ctx.enqueue_create_host_buffer[DType.uint64](max_groups)
-    var sfa_ptrs_host = ctx.enqueue_create_host_buffer[DType.uint64](max_groups)
-    var sfb_ptrs_host = ctx.enqueue_create_host_buffer[DType.uint64](max_groups)
+    var a_ptrs_host = ctx.enqueue_create_host_buffer[.uint64](max_groups)
+    var b_ptrs_host = ctx.enqueue_create_host_buffer[.uint64](max_groups)
+    var c_ptrs_host = ctx.enqueue_create_host_buffer[.uint64](max_groups)
+    var sfa_ptrs_host = ctx.enqueue_create_host_buffer[.uint64](max_groups)
+    var sfb_ptrs_host = ctx.enqueue_create_host_buffer[.uint64](max_groups)
 
     a_ptrs_host[0] = UInt64(Int(a_device.unsafe_ptr()))
     b_ptrs_host[0] = UInt64(Int(b_device.unsafe_ptr()))
@@ -254,11 +252,11 @@ def test_grouped_gemm_epilogue[
     sfa_ptrs_host[0] = UInt64(Int(sfa_device.unsafe_ptr()))
     sfb_ptrs_host[0] = UInt64(Int(sfb_device.unsafe_ptr()))
 
-    var a_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var b_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var c_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var sfa_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var sfb_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
+    var a_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var b_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var c_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var sfa_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var sfb_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
 
     ctx.enqueue_copy(a_ptrs_device, a_ptrs_host)
     ctx.enqueue_copy(b_ptrs_device, b_ptrs_host)
@@ -360,19 +358,19 @@ def test_grouped_gemm_epilogue[
     ctx.synchronize()
 
     # Copy results back
-    ctx.enqueue_copy(c_host.ptr, c_device)
-    ctx.enqueue_copy(c_host_ref.ptr, c_device_ref)
+    ctx.enqueue_copy(c_host._storage, c_device)
+    ctx.enqueue_copy(c_host_ref._storage, c_device_ref)
     ctx.synchronize()
 
     # Apply epilogue lambda on CPU to reference
     var c_tensor_host_lt = c_host_original.to_layout_tensor()
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(c_tensor_host_lt)
     def epilogue_add_c_host[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = align_of[SIMD[_dtype, width]](),
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> SIMD[
@@ -391,8 +389,8 @@ def test_grouped_gemm_epilogue[
     # Compare results
     comptime rtol = 1e-2
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=0.0001,
         rtol=rtol,

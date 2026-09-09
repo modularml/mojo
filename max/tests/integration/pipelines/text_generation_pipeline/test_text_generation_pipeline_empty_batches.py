@@ -16,16 +16,15 @@ from unittest.mock import MagicMock
 import pytest
 from max.driver import Buffer
 from max.dtype import DType
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import (
     KVCacheConfig,
-    MAXModelConfig,
+    PipelineArgs,
+    PipelineConfig,
+    PipelineRuntimeConfig,
     TextGenerationPipeline,
 )
-from max.pipelines.lib.config import PipelineConfig
 from max.pipelines.lib.interfaces import ModelOutputs
-from max.pipelines.lib.model_manifest import ModelManifest
-from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
 from max.pipelines.lib.registry import PIPELINE_REGISTRY
 from max.pipelines.modeling.types import PipelineTask, TextGenerationInputs
 
@@ -34,17 +33,13 @@ from max.pipelines.modeling.types import PipelineTask, TextGenerationInputs
 def pipeline() -> TextGenerationPipeline[TextContext]:
     """Retrieve the text generation pipeline once for all tests in this module."""
     _, p = PIPELINE_REGISTRY.retrieve(
-        PipelineConfig(
-            models=ModelManifest(
-                {
-                    "main": MAXModelConfig(
-                        model_path="kathywu95/deepseek-v3-small-random",
-                        kv_cache=KVCacheConfig(enable_prefix_caching=False),
-                        max_length=100,
-                    )
-                }
-            ),
-            runtime=PipelineRuntimeConfig(max_batch_size=2),
+        PipelineConfig.from_args(
+            PipelineArgs(
+                model_path="kathywu95/deepseek-v3-small-random",
+                kv_cache=KVCacheConfig(enable_prefix_caching=False),
+                max_length=100,
+                runtime=PipelineRuntimeConfig(max_batch_size=2),
+            )
         ),
         task=PipelineTask.TEXT_GENERATION,
     )
@@ -97,7 +92,6 @@ def test_text_generation_pipeline__empty_batches(
     # Generate empty batches for inputs
     inputs: TextGenerationInputs[TextContext] = TextGenerationInputs(
         batches=[[], []],
-        num_steps=1,
     )
 
     # Execute the pipeline

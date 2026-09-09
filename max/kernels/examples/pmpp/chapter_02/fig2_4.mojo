@@ -19,9 +19,9 @@
 
 
 def vec_add(
-    a_h: UnsafePointer[Float32, MutExternalOrigin],
-    b_h: UnsafePointer[Float32, MutExternalOrigin],
-    c_h: UnsafePointer[Float32, MutExternalOrigin],
+    a_h: UnsafePointer[Float32, MutUntrackedOrigin],
+    b_h: UnsafePointer[Float32, MutUntrackedOrigin],
+    c_h: UnsafePointer[Float32, MutUntrackedOrigin],
     n: Int,
 ):
     """Compute vector sum C_h = A_h + B_h on the CPU.

@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.primitives.warp import vote, shuffle_idx
-from std.gpu.primitives.id import lane_id
+from max.gpu import block_idx, thread_idx
+from max.gpu.host import DeviceContext
+from max.gpu.primitives.warp import vote, shuffle_idx
+from max.gpu.primitives.id import lane_id
 from std.bit import pop_count, count_trailing_zeros
 from std.atomic import Atomic
 
@@ -63,7 +63,7 @@ def filter_kernel(
         passes = cond(val)
 
     # Create coalesced group (threads that passed the condition)
-    var active_threads_mask = vote[DType.uint32](passes)
+    var active_threads_mask = vote[.uint32](passes)
 
     if passes:
         # Get group properties

@@ -20,7 +20,7 @@ lines of code to building custom neural networks from scratch, each layer builds
 upon the others so you can move between levels seamlessly as requirements evolve.
 
 For an introduction, see the
-`Model developer guide </max/develop/>`_.
+`Model developer guide </develop/>`_.
 
 Modules
 =======
@@ -31,9 +31,9 @@ Modules
    driver
    dtype
    engine
-   entrypoints
    experimental
    graph
    nn
    pipelines
    profiler
+   support.image

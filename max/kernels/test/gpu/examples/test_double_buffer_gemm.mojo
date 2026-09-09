@@ -16,9 +16,10 @@ from std.math.uutils import udivmod
 from std.sys import argv, simd_width_of
 from std.sys.info import has_nvidia_gpu_accelerator, is_nvidia_gpu
 
-from std.gpu import WARP_SIZE, barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import async_copy_wait_all
+from max.gpu import WARP_SIZE, block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.memory import async_copy_wait_all
 from layout import Coord, Idx, IntTuple, LayoutTensor, TileTensor, row_major
 from layout.layout import *
 from layout.layout_tensor import (
@@ -94,7 +95,7 @@ def sgemm_double_buffer[
             a_type,
             Layout.row_major(2 * BK, BM_padded),
             MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
         ]
         .stack_allocation()
         .slice[:, :BM]()
@@ -108,7 +109,7 @@ def sgemm_double_buffer[
             b_type,
             Layout.row_major(2 * BK, BN),
             MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
         ]
         .stack_allocation()
         .split[2]()
@@ -149,12 +150,12 @@ def sgemm_double_buffer[
 
     # Double buffer in registers (fragments in nvidia terms).
     comptime layout_a = Layout.row_major(TM)
-    var a_reg: InlineArray[
+    var a_reg: Array[
         LayoutTensor[
             a_type,
             layout_a,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ],
         2,
     ] = [
@@ -162,22 +163,22 @@ def sgemm_double_buffer[
             a_type,
             layout_a,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ].stack_allocation(),
         LayoutTensor[
             a_type,
             layout_a,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ].stack_allocation(),
     ]
     comptime layout_b = Layout.row_major(TN)
-    var b_reg: InlineArray[
+    var b_reg: Array[
         LayoutTensor[
             b_type,
             layout_b,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ],
         2,
     ] = [
@@ -185,13 +186,13 @@ def sgemm_double_buffer[
             b_type,
             layout_b,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ].stack_allocation(),
         LayoutTensor[
             b_type,
             layout_b,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ].stack_allocation(),
     ]
     comptime layout_c = Layout.row_major(TM, TN)
@@ -200,7 +201,7 @@ def sgemm_double_buffer[
             c_type,
             layout_c,
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ]
         .stack_allocation()
         .fill(0)
@@ -324,10 +325,10 @@ def test(ctx: DeviceContext) raises:
     comptime b_layout = Layout(IntTuple(K, N), IntTuple(N, 1))
     comptime c_layout = Layout(IntTuple(M, N), IntTuple(N, 1))
 
-    var a_host = ctx.enqueue_create_host_buffer[DType.float32](M * K)
-    var b_host = ctx.enqueue_create_host_buffer[DType.float32](K * N)
-    var c_host = ctx.enqueue_create_host_buffer[DType.float32](M * N)
-    var c_host_ref = ctx.enqueue_create_host_buffer[DType.float32](M * N)
+    var a_host = ctx.enqueue_create_host_buffer[.float32](M * K)
+    var b_host = ctx.enqueue_create_host_buffer[.float32](K * N)
+    var c_host = ctx.enqueue_create_host_buffer[.float32](M * N)
+    var c_host_ref = ctx.enqueue_create_host_buffer[.float32](M * N)
     ctx.synchronize()
 
     for i in range(M * K):
@@ -336,17 +337,17 @@ def test(ctx: DeviceContext) raises:
     for i in range(K * N):
         b_host[i] = Float32(i)
 
-    var a_device = ctx.enqueue_create_buffer[DType.float32](M * K)
-    var b_device = ctx.enqueue_create_buffer[DType.float32](K * N)
-    var c_device = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var c_device_ref = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var a_device = ctx.enqueue_create_buffer[.float32](M * K)
+    var b_device = ctx.enqueue_create_buffer[.float32](K * N)
+    var c_device = ctx.enqueue_create_buffer[.float32](M * N)
+    var c_device_ref = ctx.enqueue_create_buffer[.float32](M * N)
 
     ctx.enqueue_copy(a_device, a_host)
     ctx.enqueue_copy(b_device, b_host)
 
-    var c_tensor = LayoutTensor[DType.float32, c_layout](c_device)
-    var a_tensor = LayoutTensor[DType.float32, a_layout](a_device)
-    var b_tensor = LayoutTensor[DType.float32, b_layout](b_device)
+    var c_tensor = LayoutTensor[.float32, c_layout](c_device)
+    var a_tensor = LayoutTensor[.float32, a_layout](a_device)
+    var b_tensor = LayoutTensor[.float32, b_layout](b_device)
 
     comptime gemm = sgemm_double_buffer[
         DType.float32,
@@ -370,8 +371,7 @@ def test(ctx: DeviceContext) raises:
         comptime nwarmup = 2
 
         @always_inline
-        @parameter
-        def run_func(ctx: DeviceContext) raises:
+        def run_func(ctx: DeviceContext) raises {imm}:
             ctx.enqueue_function[gemm](
                 c_tensor,
                 a_tensor,
@@ -384,7 +384,7 @@ def test(ctx: DeviceContext) raises:
         for _ in range(nwarmup):
             run_func(ctx)
 
-        var nstime = Float64(ctx.execution_time[run_func](nrun)) / Float64(nrun)
+        var nstime = Float64(ctx.execution_time(run_func, nrun)) / Float64(nrun)
         var sectime = nstime * 1e-9
         var TFlop = 2.0 * M * N * K * 1e-12
         print(nrun, "runs avg(s)", sectime, "TFlops/s", TFlop / sectime)
@@ -411,13 +411,13 @@ def test(ctx: DeviceContext) raises:
         row_major(Coord(M, N)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin](
+        ImmPointer[Float32, ImmutAnyOrigin](
             unsafe_from_address=Int(a_device.unsafe_ptr())
         ),
         row_major(Coord(M, K)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin](
+        ImmPointer[Float32, ImmutAnyOrigin](
             unsafe_from_address=Int(b_device.unsafe_ptr())
         ),
         row_major(Coord(K, N)),
@@ -436,9 +436,9 @@ def test(ctx: DeviceContext) raises:
         c_ref_tt,
         a_tt,
         b_tt,
-        M,
-        N,
-        K,
+        Int32(M),
+        Int32(N),
+        Int32(K),
         grid_dim=(ceildiv(M, BLOCK_DIM), ceildiv(N, BLOCK_DIM), 1),
         block_dim=(BLOCK_DIM, BLOCK_DIM, 1),
     )

@@ -36,7 +36,7 @@ MI355X-only; the dispatcher gates on `amdgpu:gfx950` and returns
 False on any other accelerator (which would skip the test silently).
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.random import rand
 
 from layout import Coord, Idx, TileTensor, row_major
@@ -49,8 +49,8 @@ from nn.conv.gpu.amd.dispatch_3d import dispatch_amd_4wave_conv3d
 def _permute_qrscf_to_fcqrs_host[
     dtype: DType
 ](
-    src_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    src_ptr: ImmPointer[Scalar[dtype], _],
+    dst_ptr: MutPointer[Scalar[dtype], _],
     *,
     Q: Int,
     R: Int,
@@ -79,7 +79,7 @@ def test_4wave_conv3d_vs_miopen[
     C_in: Int,
     C_out: Int,
     # Output spatial dims — caller computes (Mojo's comptime evaluator
-    # doesn't bind locally-derived `comptime D_out = ...` cleanly into
+    # doesn't bind locally-derived `comptime D_out: DType = ...` cleanly into
     # `Idx[D_out]` template positions in 5D row_major calls; passing
     # them as explicit function template params sidesteps the issue.
     D_out: Int,
@@ -154,38 +154,36 @@ def test_4wave_conv3d_vs_miopen[
     )
 
     # -------- Allocate buffers --------
-    var input_dev = ctx.enqueue_create_buffer[DType.bfloat16](
-        N * D * H * W * C_in
-    )
-    var filter_qrscf_dev = ctx.enqueue_create_buffer[DType.bfloat16](
+    var input_dev = ctx.enqueue_create_buffer[.bfloat16](N * D * H * W * C_in)
+    var filter_qrscf_dev = ctx.enqueue_create_buffer[.bfloat16](
         Q * R * S * C_in * C_out
     )
-    var filter_fcqrs_dev = ctx.enqueue_create_buffer[DType.bfloat16](
+    var filter_fcqrs_dev = ctx.enqueue_create_buffer[.bfloat16](
         C_out * C_in * Q * R * S
     )
-    var output_qrscf_dev = ctx.enqueue_create_buffer[DType.bfloat16](
+    var output_qrscf_dev = ctx.enqueue_create_buffer[.bfloat16](
         N * D_out * H_out * W_out * C_out
     )
-    var output_fcqrs_dev = ctx.enqueue_create_buffer[DType.bfloat16](
+    var output_fcqrs_dev = ctx.enqueue_create_buffer[.bfloat16](
         N * D_out * H_out * W_out * C_out
     )
-    var output_miopen_dev = ctx.enqueue_create_buffer[DType.bfloat16](
+    var output_miopen_dev = ctx.enqueue_create_buffer[.bfloat16](
         N * D_out * H_out * W_out * C_out
     )
 
     # -------- Init random input + filters --------
-    var input_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var input_host = ctx.enqueue_create_host_buffer[.bfloat16](
         N * D * H * W * C_in
     )
-    var filter_qrscf_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var filter_qrscf_host = ctx.enqueue_create_host_buffer[.bfloat16](
         Q * R * S * C_in * C_out
     )
     rand(input_host.unsafe_ptr(), N * D * H * W * C_in)
     rand(filter_qrscf_host.unsafe_ptr(), Q * R * S * C_in * C_out)
-    var filter_fcqrs_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var filter_fcqrs_host = ctx.enqueue_create_host_buffer[.bfloat16](
         C_out * C_in * Q * R * S
     )
-    _permute_qrscf_to_fcqrs_host[DType.bfloat16](
+    _permute_qrscf_to_fcqrs_host[.bfloat16](
         filter_qrscf_host.unsafe_ptr(),
         filter_fcqrs_host.unsafe_ptr(),
         Q=Q,
@@ -313,13 +311,13 @@ def test_4wave_conv3d_vs_miopen[
 
     # -------- Compare both legs to MIOpen --------
     comptime output_elems = M_total * C_out
-    var output_qrscf_host_cmp = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var output_qrscf_host_cmp = ctx.enqueue_create_host_buffer[.bfloat16](
         output_elems
     )
-    var output_fcqrs_host_cmp = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var output_fcqrs_host_cmp = ctx.enqueue_create_host_buffer[.bfloat16](
         output_elems
     )
-    var output_miopen_host_cmp = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var output_miopen_host_cmp = ctx.enqueue_create_host_buffer[.bfloat16](
         output_elems
     )
     ctx.enqueue_copy(output_qrscf_host_cmp, output_qrscf_dev)

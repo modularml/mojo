@@ -7,8 +7,8 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 You can serve a model with a custom architecture using the same [`max
-serve`](/max/cli/serve/) command that runs [MAX-supported
-models](/max/models/). Once `max serve` loads your architecture package, your
+serve`](/cli/serve/) command that runs [MAX-supported
+models](/models/). Once `max serve` loads your architecture package, your
 model gets batching, KV cache management, tokenization, and the rest of the MAX
 serving stack on top of it. This page teaches you how to make your custom
 architecture package compatible with `max serve`.
@@ -16,7 +16,7 @@ architecture package compatible with `max serve`.
 :::note
 
 If you don't have a complete custom architecture package, see the [Model
-bring-up workflow](/max/develop/model-bringup-workflow/) to learn how to
+bring-up workflow](/develop/model-bringup-workflow/) to learn how to
 implement one.
 
 :::
@@ -26,7 +26,7 @@ implement one.
 A custom model architecture package is a Python package (a directory containing
 an `__init__.py`) that MAX can import. To serve the model, the `__init__.py`
 must expose an `ARCHITECTURES` list of
-[`SupportedArchitecture`](/max/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture/)<!-- rumdl-disable-line MD013 -->
+[`SupportedArchitecture`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture/)<!-- rumdl-disable-line MD013 -->
 instances. Each `SupportedArchitecture`
 instance bundles the model class, config, tokenizer, encodings, and weight
 adapters under a name.
@@ -40,8 +40,8 @@ from .arch import my_arch
 ARCHITECTURES = [my_arch]
 ```
 
-A typical `arch.py` defines a [`SupportedArchitecture`](/max/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture/)<!-- rumdl-disable-line MD013 -->
-using types from [`max.pipelines.modeling.types`](/max/api/python/pipelines.modeling.types):
+A typical `arch.py` defines a [`SupportedArchitecture`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture/)<!-- rumdl-disable-line MD013 -->
+using types from [`max.pipelines.modeling.types`](/api/python/pipelines.modeling.types):
 
 ```python title="arch.py"
 from max.graph.weights import WeightsFormat
@@ -87,6 +87,12 @@ run the command from outside your architecture's root directory, you can pass
 an import path followed by a colon and the Python package name, such as
 `folder/path/to/import:my_arch_package`.
 
+An AI coding agent can run this for you with the `serve-model` skill, which
+sets up the environment and picks the flags your model needs, including
+`--custom-architectures`, `--devices`, `--quantization-encoding`, and
+`--trust-remote-code`. See [Modular skills](/coding-assistants#skills) to
+install it.
+
 :::caution Trust remote code
 
 Some Hugging Face repos ship custom Python files (such as `modeling_*.py` or
@@ -104,7 +110,7 @@ When the server is ready to accept requests, you'll see:
 Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
 
-The server exposes an [OpenAI-compatible API](/max/rest-api/). Send a chat
+The server exposes an [OpenAI-compatible API](/rest-api/). Send a chat
 completion request with cURL or the OpenAI Python client:
 
 <Tabs>
@@ -118,7 +124,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
     "messages": [
       {"role": "user", "content": "Hello! Can you help me with a simple task?"}
     ],
-    "max_tokens": 100
+    "max_completion_tokens": 100
   }'
 ```
 
@@ -138,7 +144,7 @@ response = client.chat.completions.create(
     messages=[
         {"role": "user", "content": "Hello! Can you help me with a simple task?"}
     ],
-    max_tokens=100,
+    max_completion_tokens=100,
 )
 
 print(response.choices[0].message.content)
@@ -168,16 +174,18 @@ double check that:
   `.gguf` checkpoint needs a `WeightsFormat.gguf` entry, and so on).
 
 To learn more about these fields, see [Model
-pipeline](/max/develop/pipelines#supported-architecture).
+pipeline](/develop/pipelines#supported-architecture).
 
 ## Next steps
 
 Now that you know how to serve your model, you can layer on serving features
 and performance optimizations that work with any architecture that MAX loads.
 
-- [Prefix caching](/max/serve/prefix-caching): Reuse the KV cache across
+- [Prefix caching](/serve/prefix-caching): Reuse the KV cache across
   requests that share a prompt prefix to cut time-to-first-token on repeated
   workloads.
-- [LoRA adapters](/max/serve/lora-adapters): Serve multiple fine-tuned
+- [LoRA adapters](/serve/lora-adapters): Serve multiple fine-tuned
   adapters on top of your base architecture without loading separate model
   copies.
+- [Benchmark MAX on NVIDIA or AMD GPUs](/serve/benchmark): Measure the
+  throughput and latency of the endpoint you just started.

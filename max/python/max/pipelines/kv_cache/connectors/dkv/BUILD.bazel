@@ -12,17 +12,30 @@ modular_py_library(
         # Provided transitively by the parent //max/python/max/pipelines/kv_cache
         # target. Declaring them here would create a circular dependency
         # since kv_cache depends on this package.
-        "max.pipelines.kv_cache",
         "max.nn",
         "max._core",
         "max.driver",
-        "max.interfaces",
         "max.profiler",
         "msgspec",
-        "dkv",
+        # The high-level connector client (pyo3 module), provided at runtime
+        # only (private dkv-connector wheel); OSS MAX lazily imports it.
+        "dkv_connector",
     ],
     tags = [
         "no-mypy",
         "no-pydeps",
+    ],
+    deps = [
+        # The connector interface only (KVConnector / KVConnectorTransfer /
+        # CompletedTransfer). This is the lightweight interface target, not the
+        # full kv_cache library, so there is no cycle (kv_cache depends on this
+        # package, but this package depends only on the interface).
+        "//max/python/max/pipelines/kv_cache:kv_connector",
+        # The MODULAR_NIXL_TRANSFER_BACKEND validator shared with the transfer
+        # engine. Also a leaf target, so it introduces no cycle.
+        "//max/python/max/pipelines/kv_cache:nixl_backend",
+        # The NIXL plugin preload, needed before the Rust client creates its
+        # agent. Also a leaf target, so it introduces no cycle.
+        "//max/python/max/pipelines/kv_cache:nixl_plugin_deps",
     ],
 )

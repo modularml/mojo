@@ -64,6 +64,10 @@ class RunConfig:
     # Populated by fuzz.py before scenarios run; None when --validation-only is off.
     validator: ValidatorClient | None = None
     k2vv_mode: str = "quick"
+    # Node count the image stress scenarios scale their concurrency by, so a
+    # multi-node deployment is driven at the same per-node pressure a single
+    # pod sees.
+    image_stress_nodes: int = 1
 
 
 class FuzzClient:
@@ -818,12 +822,21 @@ class FuzzClient:
         self,
         payloads: list[dict[str, Any]],
         max_concurrent: int | None = None,
+        timeout: float | None = None,
     ) -> list[RawResponse]:
+        """Sends ``payloads`` concurrently, capped at ``max_concurrent``.
+
+        ``timeout`` overrides the run's per-request timeout, which the default
+        30s is for interactive-sized requests. A batch of multi-hundred-
+        megapixel image requests needs longer, and without an override every
+        one of them reports TIMEOUT -- indistinguishable from the hang such a
+        batch is usually sent to look for.
+        """
         sem = asyncio.Semaphore(max_concurrent or self.config.max_concurrency)
 
         async def _send(p: dict[str, Any]) -> RawResponse:
             async with sem:
-                return await self.post_json(p)
+                return await self.post_json(p, timeout=timeout)
 
         return await asyncio.gather(*[_send(p) for p in payloads])
 

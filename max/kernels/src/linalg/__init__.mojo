@@ -13,5 +13,6 @@
 """Provides CPU and GPU implementations of linear algebra functions."""
 
 from .matmul.gpu.sm100_structured.grouped_block_scaled_1d1d import (
+    grouped_matmul_swiglu_mxfp8_dispatch,
     grouped_matmul_swiglu_nvfp4_dispatch,
 )

@@ -28,7 +28,7 @@ __all__ = ["Tracer", "traced"]
 _FuncType = TypeVar("_FuncType", bound=Callable[..., Any])
 
 # For the list of valid colors, take a look at the struct `Color` in:
-# `oss/modular/mojo/stdlib/stdlib/gpu/host/_tracing.mojo`
+# `Mojo/stdlib/stdlib/gpu/host/_tracing.mojo`
 
 
 @overload
@@ -112,7 +112,7 @@ def traced(
             else:
                 return func(*args, **kwargs)
 
-    return wrapper
+    return wrapper  # type: ignore
 
 
 class Tracer:

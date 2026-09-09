@@ -11,11 +11,13 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Vendor-backed matrix multiplication dispatch for TileTensor operands."""
+
 from std.sys import simd_width_of, size_of, has_nvidia_gpu_accelerator
 
-from std.algorithm import elementwise
-from std.gpu.host import DeviceContext, get_gpu_target
-from std.gpu.host.info import B200
+from max.algorithm import elementwise
+from max.gpu.host import DeviceContext, get_gpu_target
+from max.gpu.host.info import B200
 from layout import (
     Coord,
     Idx,
@@ -42,7 +44,25 @@ def matmul[
     responsible for allocating `c`; for fp32-accumulate-and-quantize
     patterns, allocate an fp32 scratch buffer at the call site and supply
     an `elementwise_lambda_fn` that reads from it and writes the final
-    quantized output."""
+    quantized output.
+
+    Parameters:
+        transpose_b: Whether to treat `b` as transposed, computing
+            `a @ b.T` instead of `a @ b` (defaults to `False`).
+        elementwise_lambda_fn: Optional elementwise epilogue applied to
+            each output tile after the matmul. When `None`, the raw
+            matmul result is written to `c` unchanged (defaults to
+            `None`).
+
+    Args:
+        c: Output matrix of shape `(m, n)` and rank 2 that receives the
+            matmul result. Caller-allocated and mutable.
+        a: Left-hand input matrix of rank 2.
+        b: Right-hand input matrix of rank 2, transposed when
+            `transpose_b` is `True`.
+        ctx: Device context used to select the vendor dispatch path and
+            query device capabilities.
+    """
     comptime assert c.flat_rank == 2, "c must be of rank 2"
     comptime assert a.flat_rank == 2, "a must be of rank 2"
     comptime assert b.flat_rank == 2, "b must be of rank 2"
@@ -76,18 +96,17 @@ def matmul[
             row_major(Coord(Int(c.dim[0]()), Int(c.dim[1]()))),
         )
 
-        @parameter
-        @__copy_capture(c_tt)
         def epilogue_wrapper[
-            simd_width: Int, rank: Int, alignment: Int = 1
-        ](idx: IndexList[rank]):
-            var c_coord = Index(idx[0], idx[1])
-            var c_val = c_tt.load_linear[
+            simd_width: Int, alignment: Int = 1
+        ](idx: Coord) {var}:
+            var c_val = c_tt.load[
                 width=simd_width,
                 # Load takes alignment in bytes, lambda takes number of elements
                 alignment=alignment * size_of[c_type](),
             ](idx)
-            epilogue[c_type, simd_width, alignment=alignment](c_coord, c_val)
+            epilogue[c_type, simd_width, alignment=alignment](
+                Index(idx[0].value(), idx[1].value()), c_val
+            )
 
         var m = Int(c.dim[0]())
         var n = Int(c.dim[1]())
@@ -102,4 +121,4 @@ def matmul[
             c_row_major=True,
             transpose_b=transpose_b,
         )
-        elementwise[epilogue_wrapper, simd_size, target="gpu"](Index(m, n), ctx)
+        elementwise[simd_size, target="gpu"](epilogue_wrapper, (m, n), ctx)

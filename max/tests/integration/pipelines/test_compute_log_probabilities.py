@@ -21,11 +21,11 @@ import pytest
 from max.driver import CPU, Accelerator, Buffer, accelerator_count
 from max.engine import InferenceSession, Model
 from max.graph import DeviceRef
+from max.pipelines.context import LogProbabilities
 from max.pipelines.lib.log_probabilities import (
     compute_log_probabilities_ragged,
     log_probabilities_ragged_graph,
 )
-from max.pipelines.modeling.types import LogProbabilities
 from test_common.numerics import log_softmax
 
 

@@ -71,6 +71,7 @@ def _make_max_vision_config() -> SimpleNamespace:
     )
     return SimpleNamespace(
         devices=[DeviceRef.GPU()],
+        unquantized_dtype=DType.bfloat16,
         vision_config=vision_cfg,
     )
 

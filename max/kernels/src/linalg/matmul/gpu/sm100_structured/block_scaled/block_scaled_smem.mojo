@@ -23,7 +23,6 @@ Each SMEM struct is a thin wrapper that adds the appropriate pipeline bundle.
 """
 
 from std.math import align_up
-from std.gpu.memory import AddressSpace
 from layout.tensor_core_async import tile_sf_layout_k_major
 from std.utils.index import IndexList
 
@@ -62,6 +61,16 @@ struct BlockScaledTileCore[
     Contains derived constants, layouts, tile storage, tile accessors, and
     size utilities. Shared between BlockScaledSmem (CLC),
     GroupedBlockScaledSmem (CLC + TMA descriptors), and Grouped1D1DSmem (no CLC).
+
+    Parameters:
+        a_type: Element type of the A operand matrix.
+        b_type: Element type of the B operand matrix.
+        c_type: Element type of the C output matrix.
+        sfa_dtype: Element type of the A operand scaling factors.
+        sfb_dtype: Element type of the B operand scaling factors.
+        transpose_b: Whether the B operand is stored in transposed layout.
+        config: Block-scaled matmul configuration providing tile shapes,
+            pipeline stage counts, and scaling factor layout parameters.
     """
 
     # ========== Derived Constants ==========
@@ -221,6 +230,16 @@ struct BlockScaledSmem[
     """SMEM struct for block-scaled matmul with CLC scheduler pipeline.
 
     Thin wrapper over BlockScaledTileCore + SmemPipelineBundle.
+
+    Parameters:
+        a_type: Element type of the A operand matrix.
+        b_type: Element type of the B operand matrix.
+        c_type: Element type of the C output matrix.
+        sfa_dtype: Element type of the A operand scaling factors.
+        sfb_dtype: Element type of the B operand scaling factors.
+        transpose_b: Whether the B operand is stored in transposed layout.
+        config: Block-scaled matmul configuration providing tile shapes,
+            pipeline stage counts, and scaling factor layout parameters.
     """
 
     # ========== Core (tile storage + constants) ==========
@@ -305,25 +324,45 @@ struct BlockScaledSmem[
 
 @always_inline
 def sf_k_group_size[config: BlockScaledMatmulConfig]() -> Int:
-    """Compute SF_K_GROUP_SIZE from config."""
+    """Compute SF_K_GROUP_SIZE from config.
+
+    Parameters:
+        config: Block-scaled matmul configuration providing the scaling
+            factor vector size used to compute the K group size.
+    """
     return SF_ATOM_K * config.vec_sf_size
 
 
 @always_inline
 def sf_bk[config: BlockScaledMatmulConfig]() -> Int:
-    """Compute SF_BK from config."""
+    """Compute SF_BK from config.
+
+    Parameters:
+        config: Block-scaled matmul configuration providing the scaling
+            factor K tile count and vector size.
+    """
     return sf_k_group_size[config]() * config.num_sf_k_tiles
 
 
 @always_inline
 def sfa_dim0[config: BlockScaledMatmulConfig]() -> Int:
-    """Compute SFA first dimension from config."""
+    """Compute SFA first dimension from config.
+
+    Parameters:
+        config: Block-scaled matmul configuration providing the block
+            tile M dimension.
+    """
     return (config.block_tile_shape[0] // SF_MN_GROUP_SIZE) * SF_ATOM_M[0]
 
 
 @always_inline
 def sfa_dim1[config: BlockScaledMatmulConfig]() -> Int:
-    """Compute SFA second dimension from config."""
+    """Compute SFA second dimension from config.
+
+    Parameters:
+        config: Block-scaled matmul configuration providing the block
+            tile K dimension and scaling factor parameters.
+    """
     return (sf_bk[config]() // (SF_ATOM_K * config.vec_sf_size)) * (
         SF_ATOM_M[1] * SF_ATOM_K
     )
@@ -331,7 +370,12 @@ def sfa_dim1[config: BlockScaledMatmulConfig]() -> Int:
 
 @always_inline
 def sfb_dim0[config: BlockScaledMatmulConfig]() -> Int:
-    """Compute SFB first dimension from config."""
+    """Compute SFB first dimension from config.
+
+    Parameters:
+        config: Block-scaled matmul configuration providing the MMA N
+            dimension and scaling factor parameters.
+    """
     return (
         align_up(config.mma_shape[1], SF_MN_GROUP_SIZE) // SF_MN_GROUP_SIZE
     ) * SF_ATOM_M[0]
@@ -339,7 +383,12 @@ def sfb_dim0[config: BlockScaledMatmulConfig]() -> Int:
 
 @always_inline
 def sfb_dim1[config: BlockScaledMatmulConfig]() -> Int:
-    """Compute SFB second dimension from config."""
+    """Compute SFB second dimension from config.
+
+    Parameters:
+        config: Block-scaled matmul configuration providing the block
+            tile K dimension and scaling factor parameters.
+    """
     return (sf_bk[config]() // (SF_ATOM_K * config.vec_sf_size)) * (
         SF_ATOM_M[1] * SF_ATOM_K
     )

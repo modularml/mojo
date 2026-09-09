@@ -22,6 +22,16 @@ Provider options
    MaxProviderOptions
    ProviderOptions
 
+Audio options
+-------------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated
+   :template: autosummary/class.rst
+
+   AudioProviderOptions
+
 Image and video options
 -----------------------
 

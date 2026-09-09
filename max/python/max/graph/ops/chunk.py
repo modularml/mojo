@@ -18,21 +18,38 @@ from .validation import assert_valid_axis
 
 
 def chunk(x: TensorValueLike, chunks: int, axis: int = 0) -> list[TensorValue]:
-    """Chunk the tensor into an exact number of chunks along the specified dim.
+    """Splits a tensor into equal-sized chunks along an axis.
 
-    Example:
-        >>> a = TensorValue([1, 2, 3, 4, 5])
-        >>> chunk(a, 2, 0)
-        [TensorValue([1, 2]), TensorValue([3, 4])]
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("chunk_example") as graph:
+            x = ops.constant([1, 2, 3, 4, 5, 6], DType.int32, device=device)
+
+            # Split into three equal chunks along axis 0
+            chunks = ops.chunk(x, 3, axis=0)  # [1, 2], [3, 4], and [5, 6]
+            graph.output(*chunks)
+
+        model = InferenceSession().load(graph)
+        a, b, c = model.execute()
 
     Args:
         x: The tensor to chunk.
-        chunks: The number of chunks to split the tensor into.
-            `chunks` must statically evenly divide `x.shape[axis]`.
-        axis: The axis to split the tensor along.
+        chunks: The number of chunks. Must be a positive integer that evenly
+            divides the size of ``x`` along ``axis``.
+        axis: The axis to split along. Defaults to ``0``.
 
     Returns:
-        A list of `chunks` tensors.
+        A list of ``TensorValue`` objects (chunks), each the same size along ``axis``.
+
+    Raises:
+        ValueError: If ``chunks`` does not evenly divide the size of ``x`` along
+            ``axis``, or if ``x`` is a scalar and ``chunks`` is greater than ``1``.
+        IndexError: If ``axis`` is out of range for the rank of ``x``.
     """
     # TODO(GEX-1943): once we have control flow in the graph, this can be updated to
     # dynamic chunk counts while still supporting algebraic dims. For now,

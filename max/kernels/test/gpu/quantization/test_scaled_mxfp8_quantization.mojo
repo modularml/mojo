@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Layout,
     LayoutTensor,
@@ -20,7 +20,7 @@ from layout import (
     lt_to_tt,
 )
 from layout._fillers import random
-from linalg.fp4_quantization import (
+from linalg.block_scaled_quantization import (
     quantize_dynamic_scaled_fp4fp8,
 )
 from std.math import ceildiv
@@ -127,9 +127,9 @@ def test_dynamic_mxfp8_quant[
     # Run the quantization kernel
     quantize_dynamic_scaled_fp4fp8[SF_VECTOR_SIZE=SF_VECTOR_SIZE](
         ctx,
-        lt_to_tt(output_tensor).as_any_origin(),
-        lt_to_tt(scales_tensor).as_any_origin(),
-        lt_to_tt(input_tensor).as_any_origin(),
+        lt_to_tt(output_tensor).as_unsafe_any_origin(),
+        lt_to_tt(scales_tensor).as_unsafe_any_origin(),
+        lt_to_tt(input_tensor).as_unsafe_any_origin(),
         num_cols=n,
         num_cols_padded=n,
     )
@@ -202,10 +202,10 @@ def test_dynamic_mxfp8_quant[
 
                         var fp8_sf = get_scale_factor[
                             SF_VECTOR_SIZE=SF_VECTOR_SIZE
-                        ](scales_tensor_host.as_any_origin(), idx0, idx1)
+                        ](scales_tensor_host.as_unsafe_any_origin(), idx0, idx1)
 
                         var output_dequantized = (
-                            output * fp8_sf.cast[DType.float32]()
+                            output * fp8_sf.cast[.float32]()
                         )
 
                         var left = abs(output_dequantized - ref_output)
@@ -214,7 +214,7 @@ def test_dynamic_mxfp8_quant[
                         if left > right:
                             mismatch_count += 1
 
-                mismatch_rate = Float64(mismatch_count) / Float64(m * n)
+                var mismatch_rate = Float64(mismatch_count) / Float64(m * n)
                 if (1 - mismatch_rate) < 0.999:
                     raise Error("Too many mismatches!")
                 print(

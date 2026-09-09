@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "modular_cc_test")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_test(
+    name = "InitTests",
+    srcs = glob(["*.cpp"]),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+        "@llvm-project//llvm:Support",
+    ],
+)

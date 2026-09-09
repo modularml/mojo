@@ -156,7 +156,14 @@ class Upsample2D(Module[[Tensor], Tensor]):
             Upsampled tensor, optionally convolved.
         """
         if self.interpolate:
-            x = interpolate_2d_nearest(x, scale_factor=2)  # type: ignore[assignment]
+            # ``interpolate_2d_nearest`` drops to a raw graph ``TensorValue``
+            # (its ``.device`` is a ``DeviceRef``). Re-lift to an experimental
+            # ``Tensor`` so a downstream ``Conv2d`` — which colocates its weight
+            # via ``weight.to(x.device)`` — sees a concrete device like every
+            # other conv in the decoder.
+            x = Tensor.from_graph_value(
+                interpolate_2d_nearest(x, scale_factor=2)
+            )
 
         if self.use_conv and self.conv is not None:
             x = self.conv(x)

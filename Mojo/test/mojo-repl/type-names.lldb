@@ -1,0 +1,28 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# CHECK: (Int) x =
+var x = 12
+
+# CHECK: (String) y = "foo"
+var y = "foo"
+
+struct Bar:
+  def __init__(out self):
+    pass
+
+# CHECK: (Bar) z =
+var z = Bar()
+
+# CHECK: (DType) dtype =
+# CHECK: (__mlir_type.`!kgen.dtype`) dtype_value =
+var dtype = DType.bool
+var dtype_value = dtype.get_value()
+

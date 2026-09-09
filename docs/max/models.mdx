@@ -12,10 +12,10 @@ but you can use any model from Hugging Face that's based on an architecture
 below.
 
 To deploy any of these models with MAX, pass the model name to the [`max
-serve`](/max/cli/serve/) or [`docker run`](/max/container/) command. Try it now
-by following the [MAX quickstart guide](/max/get-started/). Or if you want to
+serve`](/cli/serve/) or [`docker run`](/container/) command. Try it now
+by following the [MAX quickstart guide](/get-started/). Or if you want to
 serve a custom model, see the tutorial to [serve custom model
-architectures](/max/develop/serve-custom-model-architectures/).
+architectures](/develop/serve-custom-model-architectures/).
 
 You can also see the
 [model source code in GitHub](https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures).
@@ -84,17 +84,25 @@ You can also see the
       </td>
       <td className='modality'>text-to-text</td>
       <td className='encodings'>bfloat16, float32</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/diffusion_gemma"><code>DiffusionGemmaForBlockDiffusion</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/nvidia/diffusiongemma-26B-A4B-it-NVFP4">nvidia/diffusiongemma-26B-A4B-it-NVFP4</a>,<br/>
+        <a href="https://huggingface.co/google/diffusiongemma-26B-A4B-it">google/diffusiongemma-26B-A4B-it</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
       <td className='gpus'>No</td>
     </tr>
     <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/exaone"><code>ExaoneForCausalLM</code></a></td>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/dspark_draft"><code>DSparkDraftModel</code></a></td>
       <td className='models'>
-        <a href="https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct">LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct</a>,<br/>
-        <a href="https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct">LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct</a>,<br/>
-        <a href="https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-32B-Instruct">LGAI-EXAONE/EXAONE-3.5-32B-Instruct</a>
+        <a href="https://huggingface.co/RedHatAI/gemma-4-31B-it-speculator.dspark">RedHatAI/gemma-4-31B-it-speculator.dspark</a>
       </td>
       <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float32, q6_k</td>
+      <td className='encodings'>bfloat16</td>
       <td className='gpus'>No</td>
     </tr>
     <tr>
@@ -146,13 +154,32 @@ You can also see the
       <td className='gpus'>Yes</td>
     </tr>
     <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/gemma4_assistant"><code>Gemma4AssistantForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/google/gemma-4-31B-it-assistant">google/gemma-4-31B-it-assistant</a>,<br/>
+        <a href="https://huggingface.co/google/gemma-4-26B-A4B-it-assistant">google/gemma-4-26B-A4B-it-assistant</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dspark_gemma4_12b"><code>Gemma4DSparkModel</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/deepseek-ai/dspark_gemma4_12b_block7">deepseek-ai/dspark_gemma4_12b_block7</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/gemma4"><code>Gemma4ForConditionalGeneration</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
         <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>
       </td>
       <td className='modality'>image-to-text,<br/>text-to-text,<br/>video-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
+      <td className='encodings'>bfloat16, float16, float4_e2m1fnx2</td>
       <td className='gpus'>Yes</td>
     </tr>
     <tr>
@@ -160,6 +187,8 @@ You can also see the
       <td className='models'>
         <a href="https://huggingface.co/zai-org/GLM-5.1">zai-org/GLM-5.1</a>,<br/>
         <a href="https://huggingface.co/zai-org/GLM-5.1-FP8">zai-org/GLM-5.1-FP8</a>,<br/>
+        <a href="https://huggingface.co/zai-org/GLM-5.2">zai-org/GLM-5.2</a>,<br/>
+        <a href="https://huggingface.co/zai-org/GLM-5.2-FP8">zai-org/GLM-5.2-FP8</a>,<br/>
         <a href="https://huggingface.co/zai-org/GLM-5">zai-org/GLM-5</a>
       </td>
       <td className='modality'>text-to-text</td>
@@ -188,6 +217,15 @@ You can also see the
       <td className='gpus'>No</td>
     </tr>
     <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/hy_v3"><code>HYV3ForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/tencent/Hy3-preview">tencent/Hy3-preview</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/idefics3"><code>Idefics3ForConditionalGeneration</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/HuggingFaceM4/Idefics3-8B-Llama3">HuggingFaceM4/Idefics3-8B-Llama3</a>
@@ -195,6 +233,24 @@ You can also see the
       <td className='modality'>image-to-text,<br/>text-to-text</td>
       <td className='encodings'>bfloat16</td>
       <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/ideogram4"><code>Ideogram4Pipeline</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/ideogram-ai/ideogram-4-fp8">ideogram-ai/ideogram-4-fp8</a>
+      </td>
+      <td className='modality'>text-to-image</td>
+      <td className='encodings'>bfloat16</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/inkling"><code>InklingForConditionalGeneration</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/thinkingmachines/Inkling">thinkingmachines/Inkling</a>
+      </td>
+      <td className='modality'>image-to-text,<br/>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
+      <td className='gpus'>Yes</td>
     </tr>
     <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/internvl"><code>InternVLChatModel</code></a></td>
@@ -209,7 +265,8 @@ You can also see the
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/kimik2_5"><code>KimiK25ForConditionalGeneration</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/nvidia/Kimi-K2.5-NVFP4">nvidia/Kimi-K2.5-NVFP4</a>,<br/>
-        <a href="https://huggingface.co/nvidia/Kimi-K2.6-NVFP4">nvidia/Kimi-K2.6-NVFP4</a>
+        <a href="https://huggingface.co/nvidia/Kimi-K2.6-NVFP4">nvidia/Kimi-K2.6-NVFP4</a>,<br/>
+        <a href="https://huggingface.co/amd/Kimi-K2.7-Code-MXFP4">amd/Kimi-K2.7-Code-MXFP4</a>
       </td>
       <td className='modality'>image-to-text,<br/>text-to-text</td>
       <td className='encodings'>bfloat16, float4_e2m1fnx2, float8_e4m3fn</td>
@@ -225,6 +282,15 @@ You can also see the
       <td className='gpus'>Yes</td>
     </tr>
     <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/laguna"><code>LagunaForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/poolside/Laguna-M.1-NVFP4">poolside/Laguna-M.1-NVFP4</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/lfm2"><code>Lfm2ForCausalLM</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/LiquidAI/LFM2.5-350M">LiquidAI/LFM2.5-350M</a>,<br/>
@@ -232,6 +298,24 @@ You can also see the
       </td>
       <td className='modality'>text-to-text</td>
       <td className='encodings'>bfloat16, float32</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/llama4"><code>Llama4ForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/unsloth/Llama-4-Scout-17B-16E-Instruct">unsloth/Llama-4-Scout-17B-16E-Instruct</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float8_e4m3fn</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/llama4"><code>Llama4ForConditionalGeneration</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/unsloth/Llama-4-Scout-17B-16E-Instruct">unsloth/Llama-4-Scout-17B-16E-Instruct</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float8_e4m3fn</td>
       <td className='gpus'>No</td>
     </tr>
     <tr>
@@ -280,6 +364,15 @@ You can also see the
       <td className='gpus'>Yes</td>
     </tr>
     <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/minimax_music3"><code>MiniMaxMusic3ModularPipeline</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/MiniMaxAI/MiniMax-Music3">MiniMaxAI/MiniMax-Music3</a>
+      </td>
+      <td className='modality'>text-to-audio</td>
+      <td className='encodings'>bfloat16</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/mistral3"><code>Mistral3ForConditionalGeneration</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503">mistralai/Mistral-Small-3.1-24B-Instruct-2503</a>
@@ -304,6 +397,16 @@ You can also see the
       </td>
       <td className='modality'>text-to-embeddings</td>
       <td className='encodings'>bfloat16, float32</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/nemotron_h"><code>NemotronHForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-4B-FP8">nvidia/NVIDIA-Nemotron-3-Nano-4B-FP8</a>,<br/>
+        <a href="https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8">nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float8_e4m3fn</td>
       <td className='gpus'>No</td>
     </tr>
     <tr>
@@ -371,11 +474,12 @@ You can also see the
     <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/qwen3_5"><code>Qwen3_5ForConditionalGeneration</code></a></td>
       <td className='models'>
-        <a href="https://huggingface.co/Qwen/Qwen3.5-27B">Qwen/Qwen3.5-27B</a>
+        <a href="https://huggingface.co/Qwen/Qwen3.5-27B">Qwen/Qwen3.5-27B</a>,<br/>
+        <a href="https://huggingface.co/Qwen/Qwen3.8-27B">Qwen/Qwen3.8-27B</a>
       </td>
       <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float32</td>
-      <td className='gpus'>No</td>
+      <td className='encodings'>bfloat16, float32, float4_e2m1fnx2, float8_e4m3fn</td>
+      <td className='gpus'>Yes</td>
     </tr>
     <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/qwen3"><code>Qwen3ForCausalLM</code></a></td>
@@ -456,12 +560,50 @@ You can also see the
       <td className='gpus'>Yes</td>
     </tr>
     <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dflash_gemma4_31b"><code>UnifiedDflashGemma4_31BForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
+        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dflash_kimi_k25"><code>UnifiedDflashKimiK25ForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/nvidia/Kimi-K2.5-NVFP4">nvidia/Kimi-K2.5-NVFP4</a>
+      </td>
+      <td className='modality'>image-to-text,<br/>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2, float8_e4m3fn</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dflash_llama3"><code>UnifiedDflashLlama3ForCausalLM</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct">meta-llama/Llama-3.2-3B-Instruct</a>
       </td>
       <td className='modality'>text-to-text</td>
       <td className='encodings'>bfloat16, float32</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dspark_gemma4_12b"><code>UnifiedDSparkGemma4_12BForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/google/gemma-4-12B-it">google/gemma-4-12B-it</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16</td>
+      <td className='gpus'>No</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dspark_gemma4_31b"><code>UnifiedDSparkGemma4_31BForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
+        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
       <td className='gpus'>No</td>
     </tr>
     <tr>
@@ -474,13 +616,52 @@ You can also see the
       <td className='gpus'>Yes</td>
     </tr>
     <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_gemma4"><code>UnifiedMTPGemma4ForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>,<br/>
+        <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
+        <a href="https://huggingface.co/nvidia/Gemma-4-26B-A4B-NVFP4">nvidia/Gemma-4-26B-A4B-NVFP4</a>,<br/>
+        <a href="https://huggingface.co/google/gemma-4-26B-A4B-it">google/gemma-4-26B-A4B-it</a>
+      </td>
+      <td className='modality'>image-to-text,<br/>text-to-text,<br/>video-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_glm5_2"><code>UnifiedMTPGlmMoeDsaForCausalLM</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/zai-org/GLM-5.2-FP8">zai-org/GLM-5.2-FP8</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2, float8_e4m3fn</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_inkling"><code>UnifiedMTPInklingForConditionalGeneration</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/thinkingmachines/Inkling">thinkingmachines/Inkling</a>
+      </td>
+      <td className='modality'>image-to-text,<br/>text-to-text</td>
+      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_qwen3_5"><code>UnifiedMTPQwen3_5ForConditionalGeneration</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/RadixArk/Qwen3.8-27B-NVFP4">RadixArk/Qwen3.8-27B-NVFP4</a>
+      </td>
+      <td className='modality'>text-to-text</td>
+      <td className='encodings'>bfloat16, float32, float4_e2m1fnx2, float8_e4m3fn</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/wan"><code>WanImageToVideoPipeline</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers">Wan-AI/Wan2.2-I2V-A14B-Diffusers</a>,<br/>
         <a href="https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-720P-Diffusers">Wan-AI/Wan2.1-I2V-14B-720P-Diffusers</a>
       </td>
-      <td className='modality'>text-to-image</td>
-      <td className='encodings'>bfloat16, float32</td>
+      <td className='modality'>image-to-video</td>
+      <td className='encodings'>bfloat16, float32, float8_e4m3fn</td>
       <td className='gpus'>No</td>
     </tr>
     <tr>
@@ -491,18 +672,8 @@ You can also see the
         <a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">Wan-AI/Wan2.2-TI2V-5B-Diffusers</a>,<br/>
         <a href="https://huggingface.co/yetter-ai/Wan2.2-TI2V-5B-Turbo-Diffusers">yetter-ai/Wan2.2-TI2V-5B-Turbo-Diffusers</a>
       </td>
-      <td className='modality'>text-to-image</td>
-      <td className='encodings'>bfloat16, float32</td>
-      <td className='gpus'>No</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/z_image_modulev3"><code>ZImagePipeline</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/Tongyi-MAI/Z-Image">Tongyi-MAI/Z-Image</a>,<br/>
-        <a href="https://huggingface.co/Zyphra/Z-Image">Zyphra/Z-Image</a>
-      </td>
-      <td className='modality'>text-to-image</td>
-      <td className='encodings'>bfloat16</td>
+      <td className='modality'>text-to-video</td>
+      <td className='encodings'>bfloat16, float32, float8_e4m3fn</td>
       <td className='gpus'>No</td>
     </tr>
   </tbody>

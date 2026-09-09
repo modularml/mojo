@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
 from max.pipelines.lib import (
     SupportedArchitecture,
     TextTokenizer,
@@ -20,6 +21,7 @@ from max.pipelines.lib import (
 from max.pipelines.modeling.types import PipelineTask
 
 from ..llama3 import weight_adapters as llama3_weight_adapters
+from ..llama3.batch_processor import Llama3BatchProcessor
 from ..llama3.model_config import Llama3Config
 from .model import DFlashLlama3Model
 
@@ -41,14 +43,17 @@ dflash_llama_arch = SupportedArchitecture(
         "float32",
     },
     pipeline_model=DFlashLlama3Model,
+    batching=Llama3BatchProcessor,
     context_type=TextContext,
     tokenizer=TextTokenizer,
-    rope_type="normal",
     default_weights_format=WeightsFormat.safetensors,
-    multi_gpu_supported=False,
+    multi_gpu_supported=True,
     weight_adapters={
         WeightsFormat.safetensors: llama3_weight_adapters.convert_safetensor_state_dict,
     },
     task=PipelineTask.TEXT_GENERATION,
     config=Llama3Config,
+    memory_planner=PagedMemoryPlanner,
+    supports_overlap_scheduler=False,
+    supports_device_graph_capture=False,
 )

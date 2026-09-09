@@ -14,7 +14,7 @@
 import json
 
 import pytest
-from max.entrypoints import pipelines
+from max._entrypoints import pipelines
 
 
 def test_pipelines_list_json(capsys: pytest.CaptureFixture[str]) -> None:

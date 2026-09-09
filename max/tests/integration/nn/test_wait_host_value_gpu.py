@@ -74,8 +74,8 @@ def test_wait_host_value_releases_on_callback_store(
     accelerator: Accelerator,
 ) -> None:
     """The graph runs callback -> wait, observing the callback's flag store."""
-    if accelerator.api != "cuda":
-        pytest.skip("mo.wait_host_value is only supported on CUDA devices")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("mo.wait_host_value is only supported on CUDA/HIP devices")
 
     flag = CompletionFlag(accelerator)
 
@@ -133,8 +133,8 @@ def test_wait_host_value_passes_when_flag_already_set(
     Builds a wait-only graph (no launch_host_func), pre-sets the flag
     from the main thread, and confirms the graph executes without hang.
     """
-    if accelerator.api != "cuda":
-        pytest.skip("mo.wait_host_value is only supported on CUDA devices")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("mo.wait_host_value is only supported on CUDA/HIP devices")
 
     flag = CompletionFlag(accelerator)
     flag.signal(1)

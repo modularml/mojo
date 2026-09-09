@@ -15,8 +15,51 @@ name: bench_normalization
 file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_normalization.mojo
 
 params:
- 
-- shape: 1x1x4096
-- shape: 1x512x4096
-- shape: 1x1024x4096
+
+# rows x cols across common LLM hidden sizes.
+- shape: 1x8192x8192
+- shape: 1x16384x8192
+- shape: 1x8192x7168
+- shape: 1x8192x3072
+- shape: 1x16384x4096
 - shape: 1x4096x4096
+- shape: 1x4096x2048
+- shape: 1x8192x2048
+- shape: 1x4096x5120
+- shape: 1x8192x4096
+- shape: 1x32768x4096
+- shape: 1x16384x2048
+- shape: 1x8192x5120
+- shape: 1x8192x6144
+- shape: 1x8192x2880
+# Columns not divisible by the SIMD width (ragged / scalar-tail path).
+- shape: 1x8192x2879
+- shape: 1x8192x4100
+# Wide rows that exercise the two-pass block path.
+- shape: 1x2048x32768
+# Narrow hidden sizes.
+- shape: 1x8192x1024
+- shape: 1x8192x512
+- shape: 1x8192x256
+- shape: 1x8192x1536
+- shape: 1x8192x768
+- shape: 1x8192x128
+- shape: 1x32768x1536
+- shape: 1x8192x3584
+- shape: 1x8192x2560
+- shape: 1x4096x2880
+- shape: 1x4096x8192
+- shape: 1x2048x16384
+- shape: 1x2048x8192
+- shape: 1x2048x4096
+- shape: 1x2048x2880
+- shape: 1x2048x2048
+- shape: 1x1024x8192
+- shape: 1x1024x4096
+- shape: 1x1024x2048
+- shape: 1x512x8192
+- shape: 1x512x4096
+# Narrow exact-fit row that hits the single-pass warp-per-row path
+# (cols == chunks * WARP_SIZE * simd_width).
+- shape: 1x24576x256
+

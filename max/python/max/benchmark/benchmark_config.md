@@ -90,3 +90,23 @@ benchmark_config:
   max_concurrency: "1,2,4,8"
   request_rate: "1.0,2.0,4.0,inf"
 ```
+
+## Passing arbitrary request fields with `extra_body`
+
+`extra_body` injects arbitrary top-level fields onto every text-generation
+request payload — for fields that lack a dedicated flag (`stop`,
+`chat_template_kwargs`, vendor extensions, and so on). In a config file it is a
+native mapping under the `benchmark_config` block:
+
+```yaml
+benchmark_config:
+  model: "modularai/Llama-3.1-8B-Instruct-GGUF"
+  extra_body:
+    stop: ["}"]
+    chat_template_kwargs:
+      reasoning_effort: "low"
+```
+
+On the CLI, `--extra-body` also accepts an inline JSON object or a path to a
+YAML/JSON file. Fields are merged after the dedicated flags (last-writer-wins);
+see the `extra_body` field description for the full merge semantics.

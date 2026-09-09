@@ -18,7 +18,11 @@ import sys
 from unittest.mock import patch
 
 import pytest
-from max.benchmark.benchmark_serving import _resolve_skip_counts, parse_args
+from max.benchmark.benchmark_serving import (
+    _resolve_skip_counts,
+    _seed_for_concurrency,
+    parse_args,
+)
 
 
 def test_resolve_skip_counts() -> None:
@@ -67,6 +71,17 @@ def test_resolve_skip_counts() -> None:
 
     # ignore_first_turn_stats with skip_first=0 (falsy): no override
     assert rsc(request_rate=2.0, ignore_first_turn_stats=True) == (0, 0)
+
+
+def test_seed_for_concurrency_is_deterministic() -> None:
+    """Same (seed, max_concurrency) always derives the same sub-seed."""
+    assert _seed_for_concurrency(24301, 4) == _seed_for_concurrency(24301, 4)
+
+
+def test_seed_for_concurrency_differs_across_concurrency_levels() -> None:
+    """Different concurrency levels get distinct sub-seeds from one base seed."""
+    seeds = {_seed_for_concurrency(24301, mc) for mc in [1, 4, 6, 8, 16]}
+    assert len(seeds) == 5
 
 
 def test_parse_args_pre_parses_concurrency_and_request_rate_sweeps() -> None:

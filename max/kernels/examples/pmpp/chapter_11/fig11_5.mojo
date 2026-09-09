@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 
 from std.math import abs
 
@@ -24,7 +24,7 @@ comptime SEG_SIZE = 256
 
 # ========================== KERNEL CODE ==========================
 def scan_kernel(
-    input: UnsafePointer[Float32, MutAnyOrigin],
+    input: UnsafePointer[Float32, ImmutAnyOrigin],
     output: UnsafePointer[Float32, MutAnyOrigin],
     N: UInt32,
 ):
@@ -36,22 +36,22 @@ def scan_kernel(
         N: Number of elements.
     """
     # Allocate shared memory for two buffers
-    var bufferA = stack_allocation[
+    var bufferA = unsafe_stack_allocation[
         SEG_SIZE,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
-    var bufferB = stack_allocation[
+    var bufferB = unsafe_stack_allocation[
         SEG_SIZE,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
 
     var tx = thread_idx.x
     var idx = block_idx.x * SEG_SIZE + tx
 
     # Read input into first buffer
-    bufferA[tx] = Scalar[DType.float32](input[idx])
+    bufferA[tx] = Float32(input[idx])
 
     # Ping-pong between buffers
     var in_buffer = bufferA
@@ -64,7 +64,7 @@ def scan_kernel(
         if tx >= stride:
             addend = Float32(in_buffer[tx - stride])
         # Add it to output buffer position
-        out_buffer[tx] = Scalar[DType.float32](addend + Float32(in_buffer[tx]))
+        out_buffer[tx] = Float32(addend + Float32(in_buffer[tx]))
 
         # Swap buffers
         var tmp = in_buffer
@@ -77,8 +77,8 @@ def scan_kernel(
 
 # ========================== TEST CODE ==========================
 def cpu_scan(
-    input: UnsafePointer[Float32, MutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
+    input: UnsafePointer[mut=False, Float32, _],
+    output: UnsafePointer[mut=True, Float32, _],
     N: UInt32,
 ):
     """CPU reference scan implementation.

@@ -1,0 +1,37 @@
+load("//bazel:api.bzl", "modular_cc_library")
+
+# gazelle:default_visibility //visibility:public
+# gazelle:default_features layering_check,parse_headers
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_library(
+    name = "Init",
+    srcs = [
+        "lib/DevelopmentSignalHandler.cpp",
+        "lib/Init.cpp",
+    ],
+    hdrs = [
+        "include/Init/DevelopmentSignalHandler.h",
+        "include/Init/Init.h",
+    ],
+    deps = [
+        "//AsyncRT:Runtime",
+        "//Config",
+        "//Support:Base",
+        "//Support:Configuration",
+        "//Support:Context",
+        "//Support:CrashReporting",
+        "//Support:MArchTarget",
+        "//Support:MArchTargetMinimal",
+        "//Support:SymbolExport",
+        "//Support:Telemetry",
+        "@llvm-project//llvm:Support",
+    ],
+)

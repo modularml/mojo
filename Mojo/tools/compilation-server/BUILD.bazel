@@ -1,0 +1,27 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(default_visibility = ["//Mojo:consumers"])
+
+modular_cc_binary(
+    name = "compilation-server",
+    srcs = glob([
+        "*.cpp",
+        "*.h",
+    ]),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+        "//Mojo:MojoTooling",
+        "//Mojo:ObjectCompiler",
+        "//Mojo:Pipeline",
+        "//Mojo:Support",
+        "//Mojo:ToolCommon",
+        "//Mojo/tools/common/lsp-protocol",
+        "//Support:Base",
+        "//Support:Context",
+        "//Support:Globals",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:MlirLspServerLib",
+    ],
+)

@@ -26,13 +26,14 @@ from max.nn.attention import (
 )
 from max.nn.kv_cache import (
     KVCacheParams,
+    MHAKVCacheParams,
     PagedCacheValues,
 )
 from max.nn.rotary_embedding import RotaryEmbedding
 
 
 def create_kv_params(n_kv_heads: int = 8) -> KVCacheParams:
-    return KVCacheParams(
+    return MHAKVCacheParams(
         n_kv_heads=n_kv_heads,
         head_dim=64,
         num_layers=1,

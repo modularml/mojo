@@ -26,7 +26,6 @@ def add(x: SIMD, y: type_of(x)) -> type_of(x):
     return x + y
 
 
-@parameter
 def bench_gather_reduce(mut b: Bencher):
     comptime type = DType.float32
     var num_rows = 500000
@@ -54,10 +53,9 @@ def bench_gather_reduce(mut b: Bencher):
     var indices = TileTensor(indices_storage, row_major(Coord(indices_shape)))
     for i in range(Int(indices.dim[0]())):
         for j in range(Int(indices.dim[1]())):
-            indices[i, j] = random_si64(0, num_rows).cast[DType.int32]()
+            indices[i, j] = random_si64(0, num_rows).cast[.int32]()
 
-    @parameter
-    def to_bench():
+    def to_bench() {imm}:
         gather_reduce[type, 0, 1, simd_width_of[type](), add](
             output,
             input,
@@ -65,14 +63,14 @@ def bench_gather_reduce(mut b: Bencher):
             0,
         )
 
-    b.iter[to_bench]()
+    b.iter(to_bench)
 
     print(output[0, 0])
 
 
 def main() raises:
     var m = Bench()
-    m.bench_function[bench_gather_reduce](
-        BenchId("gather_reduce_dlrm1_multihot")
+    m.bench_function(
+        bench_gather_reduce, BenchId("gather_reduce_dlrm1_multihot")
     )
     m.dump_report()

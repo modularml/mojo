@@ -25,4 +25,5 @@ from .api import (
     Model,
     PrintStyle,
     TensorSpec,
+    read,
 )

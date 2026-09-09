@@ -1,0 +1,52 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# Full sweep for the CDNA4 fused MXFP8 QKV benchmark: both attention variants
+# across the decode and prefill shapes. The .mojo runs one variant at one shape
+# per invocation (defaulting to dense at decode bs=1), so a plain `bazel run`
+# stays short and this file is how you get the whole matrix.
+#
+# Every knob is `$`-prefixed, i.e. a runtime arg rather than a `-D` define, so
+# the whole sweep reuses a single build.
+
+name: bench_fused_qkv_matmul_mxfp8_amd
+file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_fused_qkv_matmul_mxfp8_amd.mojo
+
+params:
+
+# Decode: one token per prompt, swept over batch. has_indexer=False is the dense
+# band set [Wq|Wk|Wv] (N_total=2304); True adds IndexQ/IndexK (2560).
+- $seq_len: 1
+  $batch_size: [1, 4, 8, 16, 32, 64, 128, 256]
+  $has_indexer: [False, True]
+  $is_verify: False
+  metadata:
+    MODEL: minimax-m3
+
+# MTP target verification: one prompt containing the sampled token and three
+# draft tokens. This has the same total M as decode batch 4 but a different
+# ragged-row topology for the fused KV-cache scatter.
+- $seq_len: 4
+  $batch_size: 1
+  $has_indexer: [False, True]
+  $is_verify: True
+  metadata:
+    MODEL: minimax-m3
+
+# Prefill: two 256-token prompts.
+- $seq_len: 256
+  $batch_size: 2
+  $has_indexer: [False, True]
+  $is_verify: False
+  metadata:
+    MODEL: minimax-m3

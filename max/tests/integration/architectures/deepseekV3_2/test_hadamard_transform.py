@@ -10,29 +10,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Test comparing MAX Hadamard transform implementation to PyTorch."""
+"""Test comparing MAX Hadamard transform implementation to PyTorch.
+
+The graphs are compiled to MEFs by a CPU-only build action
+(``:hadamard_mefs`` via ``mef_precompile.bzl``); this test does NOT compile. It
+initializes each :data:`HADAMARD_SPECS` MEF and compares its output against the
+PyTorch reference transform.
+"""
 
 from __future__ import annotations
 
 import math
-from typing import Any
 
 import pytest
 import scipy.linalg
 import torch
 import torch.nn.functional as F
+from _hadamard_graphs import HADAMARD_SPECS, HadamardSpec
 from max.driver import Accelerator, Buffer
-from max.dtype import DType
 from max.engine import InferenceSession
-from max.graph import DeviceRef, Dim, Graph, TensorType
-from max.pipelines.architectures.deepseekV3_2.layers import (
-    HadamardTransform,
-)
+from test_common.mef_precompile import init_from_mef, mefs_from_env
 from torch.utils.dlpack import from_dlpack
 
 # Check if outputs are close with appropriate tolerance
 RTOL = 2 * torch.finfo(torch.bfloat16).eps
 ATOL = 8 * torch.finfo(torch.bfloat16).eps
+
+TORCH_DTYPE = torch.bfloat16
 
 
 def hadamard_transform_ref(x: torch.Tensor, scale: float = 1.0) -> torch.Tensor:
@@ -67,88 +71,31 @@ def hadamard_transform_ref(x: torch.Tensor, scale: float = 1.0) -> torch.Tensor:
     return out[..., :dim].reshape(*x_shape)
 
 
-def generate_max_hadamard_transform(
-    x: torch.Tensor,
-    shape: tuple[Dim],
-    scale: float,
-    dtype: DType = DType.bfloat16,
-) -> torch.Tensor:
-    """Generate output using MAX Hadamard transform.
-
-    Args:
-        x: Input tensor of shape (..., dim).
-        dim: Dimension of the Hadamard matrix.
-        scale: Scale factor to apply after the transform.
-        dtype: Data type for MAX computation.
-
-    Returns:
-        Transformed tensor using MAX matmul operation.
-    """
-    cuda = Accelerator()
-    session = InferenceSession(devices=[cuda])
-
-    with Graph(
-        "hadamard_transform_test",
-        input_types=[
-            TensorType(
-                dtype=dtype,
-                shape=shape,
-                device=DeviceRef.GPU(),
-            )
-        ],
-    ) as graph:
-        inputs = graph.inputs[0].tensor
-        hadamard_transform = HadamardTransform(scale)
-        result = hadamard_transform(inputs)
-        graph.output(result)
-
-    model = session.load(graph)
-    x_buffer = Buffer.from_dlpack(x).to(cuda)
-    max_output = model.execute(x_buffer)[0]
-
-    return max_output
-
-
-@pytest.mark.parametrize(
-    "input_shape,scale",
-    [
-        # ((), 1.0), # will raise (correctly)
-        # ((1,), 1.0),
-        ((1, 2), 1.0),
-        # ((1, 3), 1.0),
-        ((2, 6), 0.5),
-        # ((4, 16), 2.0),
-        ((2, 1, 3), 1.0),
-        # ((3, 3, 4, 2), 1.0), # times out
-    ],
-)
+@pytest.mark.parametrize("spec", HADAMARD_SPECS, ids=lambda s: s.name)
 @torch.no_grad()
-def test_hadamard_transform(
-    input_shape: tuple,  # type: ignore[type-arg]
-    scale: float,
-    torch_dtype: Any = torch.bfloat16,
-) -> None:
+def test_hadamard_transform(spec: HadamardSpec) -> None:
     """Test Hadamard transform comparing MAX vs PyTorch implementation.
 
     Args:
-        batch_size: Batch size for input tensor.
-        dim: Dimension of the Hadamard matrix (must be power of 2).
-        scale: Scale factor to apply after transform.
-        dtype: Data type for MAX computation.
+        spec: The precompiled parametrization (input shape and scale) to run.
     """
-    assert len(input_shape), "Need at least one dim."
+    mef_path = mefs_from_env("HADAMARD_MEF_RLOCATIONS")[f"{spec.name}.mef"]
+    assert mef_path.is_file(), f"precompiled MEF missing: {mef_path}"
 
     # Create random input tensor
     torch.manual_seed(42)
-    input_tensor = torch.randn(*input_shape, dtype=torch_dtype, device="cuda")
+    input_tensor = torch.randn(*spec.shape, dtype=TORCH_DTYPE, device="cuda")
 
     # Generate PyTorch output
-    torch_output = hadamard_transform_ref(input_tensor, scale)
+    torch_output = hadamard_transform_ref(input_tensor, spec.scale)
 
-    # Generate MAX output
-    max_output = generate_max_hadamard_transform(
-        input_tensor, input_tensor.shape, scale
-    )
+    # Generate MAX output. The graph bakes the Hadamard matrix in as a
+    # constant, so there are no weights to bind.
+    device = Accelerator()
+    session = InferenceSession(devices=[device])
+    model = init_from_mef(session, mef_path)
+    max_output = model.execute(Buffer.from_dlpack(input_tensor).to(device))[0]
+
     # Convert MAX output to torch for comparison
     max_output_torch = from_dlpack(max_output)
 

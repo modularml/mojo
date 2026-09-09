@@ -36,57 +36,11 @@ from max.nn.kernels import (
     flash_attention_gpu,
     flash_attention_ragged_gpu,
 )
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
-from modular_graph_test import are_all_tensor_values
+from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
+from test_common.modular_graph_test import are_all_tensor_values
 from torch.nn.functional import scaled_dot_product_attention
 
 TORCH_DTYPE = torch.bfloat16
-
-
-def null_mask_max_flash_attn(
-    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
-) -> torch.Tensor:
-    dtype = torch_dtype_to_max(q.dtype)
-    _batch, _q_seq_len, nheads, head_dim = q.shape
-
-    # Graph types.
-    q_type = TensorType(
-        dtype,
-        shape=["batch", "q_seq_len", nheads, head_dim],
-        device=DeviceRef.GPU(),
-    )
-    kv_type = TensorType(
-        dtype,
-        shape=["batch", "kv_seq_len", nheads, head_dim],
-        device=DeviceRef.GPU(),
-    )
-
-    session = InferenceSession(devices=[Accelerator()])
-
-    # Stage ops.
-
-    # Construct and compile the MAX graph flash attention.
-    graph = Graph(
-        "flash_attn",
-        forward=partial(
-            flash_attention_gpu,
-            scale=math.sqrt(1.0 / head_dim),
-            mask_variant=MHAMaskVariant.NULL_MASK,
-        ),
-        input_types=[
-            q_type,
-            kv_type,
-            kv_type,
-        ],
-    )
-
-    # Compile model.
-    model = session.load(graph)
-
-    # Execute.
-    output = model.execute(q.detach(), k.detach(), v.detach())[0]
-    assert isinstance(output, Buffer)
-    return torch.from_dlpack(output)
 
 
 def causal_max_flash_attn(
@@ -256,6 +210,7 @@ def compute_ragged_max_flash_attn(
     [
         ([64, 64, 64, 16, 16, 4], 16, 128),  # Variable length sequences
         ([100], 32, 128),  # Single sequence
+        ([256, 64], 16, 80),  # MiniMax M3 vision attention
     ],
 )
 def test_ragged_flash_attention_gpu(
@@ -323,8 +278,12 @@ def test_ragged_flash_attention_gpu(
         k_single = k_ragged[start_idx:end_idx].unsqueeze(0)
         v_single = v_ragged[start_idx:end_idx].unsqueeze(0)
 
-        # Run null mask flash attention on the single sequence
-        out_single = null_mask_max_flash_attn(q_single, k_single, v_single)
+        out_single = scaled_dot_product_attention(
+            q_single.permute(0, 2, 1, 3),
+            k_single.permute(0, 2, 1, 3),
+            v_single.permute(0, 2, 1, 3),
+            scale=math.sqrt(1.0 / head_dim),
+        ).permute(0, 2, 1, 3)
         reference_outputs.append(out_single.squeeze(0))
 
     # Compare ragged output with reference output
@@ -391,7 +350,7 @@ def test_cross_attention_ragged_rejects_q_max_seq_len_on_gpu() -> None:
     page_size = 128
     dtype = DType.bfloat16
 
-    kv_params = KVCacheParams(
+    kv_params = MHAKVCacheParams(
         dtype=dtype,
         n_kv_heads=n_kv_heads,
         head_dim=head_dim,
@@ -413,7 +372,8 @@ def test_cross_attention_ragged_rejects_q_max_seq_len_on_gpu() -> None:
     lookup_table_type = TensorType(
         DType.uint32, ["batch", "max_pages"], DeviceRef.GPU()
     )
-    max_lengths_type = TensorType(DType.uint32, [1], DeviceRef.CPU())
+    max_prompt_length_type = TensorType(DType.uint32, [1], DeviceRef.CPU())
+    max_cache_length_type = TensorType(DType.uint32, [1], DeviceRef.CPU())
     layer_idx_type = TensorType(DType.uint32, [1], DeviceRef.CPU())
     kv_input_row_offsets_type = TensorType(
         DType.uint32, ["kv_batch_plus_one"], DeviceRef.GPU()
@@ -430,7 +390,8 @@ def test_cross_attention_ragged_rejects_q_max_seq_len_on_gpu() -> None:
                 kv_blocks_type,
                 cache_lengths_type,
                 lookup_table_type,
-                max_lengths_type,
+                max_prompt_length_type,
+                max_cache_length_type,
                 layer_idx_type,
                 kv_input_row_offsets_type,
                 q_max_seq_len_type,
@@ -442,7 +403,8 @@ def test_cross_attention_ragged_rejects_q_max_seq_len_on_gpu() -> None:
                 kv_blocks,
                 cache_lengths,
                 lookup_table,
-                max_lengths,
+                max_prompt_length,
+                max_cache_length,
                 layer_idx,
                 kv_input_row_offsets,
                 q_max_seq_len,
@@ -453,7 +415,8 @@ def test_cross_attention_ragged_rejects_q_max_seq_len_on_gpu() -> None:
             assert isinstance(kv_blocks, BufferValue)
             assert isinstance(cache_lengths, TensorValue)
             assert isinstance(lookup_table, TensorValue)
-            assert isinstance(max_lengths, TensorValue)
+            assert isinstance(max_prompt_length, TensorValue)
+            assert isinstance(max_cache_length, TensorValue)
             assert isinstance(layer_idx, TensorValue)
             assert isinstance(kv_input_row_offsets, TensorValue)
             assert isinstance(q_max_seq_len, TensorValue)
@@ -462,7 +425,8 @@ def test_cross_attention_ragged_rejects_q_max_seq_len_on_gpu() -> None:
                 kv_blocks=kv_blocks,
                 cache_lengths=cache_lengths,
                 lookup_table=lookup_table,
-                max_lengths=max_lengths,
+                max_prompt_length=max_prompt_length,
+                max_cache_length=max_cache_length,
             )
 
             cross_attention_ragged(

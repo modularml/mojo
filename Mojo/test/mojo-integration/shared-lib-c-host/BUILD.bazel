@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "lit_tests", "modular_cc_binary")
+
+package(default_visibility = ["//visibility:private"])
+
+# Minimal non-Mojo host binary that dlopens a Mojo-built shared library and
+# calls its exported C-ABI entry point.
+modular_cc_binary(
+    name = "c_host",
+    testonly = True,
+    srcs = ["c_host.c"],
+)
+
+lit_tests(
+    name = "test",
+    srcs = glob(["*.mojo"]),
+    data = [":c_host"],
+    mojo_deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+    tools = ["//Mojo/tools/mojo"],
+)

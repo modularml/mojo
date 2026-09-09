@@ -1,0 +1,255 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_run_binary_test")
+
+package(default_visibility = ["//visibility:private"])
+
+# arithmetic.py
+modular_py_binary(
+    name = "arithmetic",
+    srcs = ["arithmetic.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "arithmetic_test",
+    size = "large",
+    binary = "arithmetic",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# tensor_math_ops.py
+modular_py_binary(
+    name = "tensor_math_ops",
+    srcs = ["tensor_math_ops.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tensor_math_ops_test",
+    size = "large",
+    binary = "tensor_math_ops",
+    # FIXME: MOCO-3605 — Metal AIR compiler doesn't support bf16 sqrt
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# tensor_reshape.py
+modular_py_binary(
+    name = "tensor_reshape",
+    srcs = ["tensor_reshape.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tensor_reshape_test",
+    size = "large",
+    binary = "tensor_reshape",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# tensor_transpose.py
+modular_py_binary(
+    name = "tensor_transpose",
+    srcs = ["tensor_transpose.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tensor_transpose_test",
+    size = "large",
+    binary = "tensor_transpose",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# tensor_transpose_t.py
+modular_py_binary(
+    name = "tensor_transpose_t",
+    srcs = ["tensor_transpose_t.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tensor_transpose_t_test",
+    size = "large",
+    binary = "tensor_transpose_t",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# tensor_permute.py
+modular_py_binary(
+    name = "tensor_permute",
+    srcs = ["tensor_permute.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tensor_permute_test",
+    size = "large",
+    binary = "tensor_permute",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# concat.py
+modular_py_binary(
+    name = "concat",
+    srcs = ["concat.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "concat_test",
+    size = "large",
+    binary = "concat",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# tensor_reductions.py
+modular_py_binary(
+    name = "tensor_reductions",
+    srcs = ["tensor_reductions.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tensor_reductions_test",
+    size = "large",
+    binary = "tensor_reductions",
+    # FIXME: MOCO-3605 — Metal AIR compiler doesn't support bf16 convert
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# tensor_matmul.py
+modular_py_binary(
+    name = "tensor_matmul",
+    srcs = ["tensor_matmul.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tensor_matmul_test",
+    size = "large",
+    binary = "tensor_matmul",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# functional_activations.py
+modular_py_binary(
+    name = "functional_activations",
+    srcs = ["functional_activations.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "functional_activations_test",
+    size = "large",
+    binary = "functional_activations",
+    # FIXME: MOCO-3605 — Metal AIR compiler doesn't support bf16 fmax
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# random_basic.py
+modular_py_binary(
+    name = "random_basic",
+    srcs = ["random_basic.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "random_basic_test",
+    size = "large",
+    binary = "random_basic",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# compose_linear_layer.py
+modular_py_binary(
+    name = "compose_linear_layer",
+    srcs = ["compose_linear_layer.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "compose_linear_layer_test",
+    size = "large",
+    binary = "compose_linear_layer",
+    # FIXME: MOCO-3605 — Metal AIR compiler doesn't support bf16 fmax
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

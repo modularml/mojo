@@ -1,0 +1,61 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# TODO(MOTO-1007): Remove this once we have a fix for asan.
+# UNSUPPORTED: asan
+
+# COM: Check if we can produce a help message for the `mojo debug` command.
+# RUN: %debug --help | FileCheck %s --check-prefix=CHECK-DEBUGGER-HELP
+# CHECK-DEBUGGER-HELP: mojo-debug
+
+# COM: Check if the --help run arg is not processed as a debugger option.
+# RUN: %debug -X -o -X 'run' -X -b mojo run --help | FileCheck %s --check-prefix=CHECK-TARGET-HELP
+# CHECK-TARGET-HELP: mojo-run
+
+# COM: Check if the CLI attach command is created properly with pid.
+# RUN: %debug --pid 123 --dry-run | FileCheck %s --check-prefix=CHECK-PID
+# CHECK-PID: -p 123
+
+# COM: Check if the CLI attach command is created properly with process name.
+# RUN: %debug --process-name foo --dry-run | FileCheck %s --check-prefix=CHECK-PROC-NAME
+# CHECK-PROC-NAME: -n foo
+
+# COM: Check if the CLI attach command can fail in the presence of compilation options.
+# RUN: not env %debug --pid 123 --dry-run -O0 2>&1 | FileCheck %s --check-prefix=CHECK-PID-WITH-COMPILATION-OPTION
+# CHECK-PID-WITH-COMPILATION-OPTION: unexpected compilation option '--optimization-level'
+
+# COM: Check if we can build correctly the JIT debug command.
+# RUN: %debug --debug-level=line-tables -X foo --debug-level none --dry-run target.mojo --debug-level full | FileCheck %s --check-prefix=CHECK-JIT-DEBUG
+# CHECK-JIT-DEBUG: foo -- {{.*}}/mojo run -O0 --debug-level=full --debug-level line-tables --debug-level none target.mojo --debug-level full
+
+# COM: Check that `-Xlinker` flags are forwarded through to the JIT'd
+# `mojo run` invocation, so that `external_call` against a shared library
+# resolves the same way it does under `mojo run`.
+# RUN: %debug -X foo --dry-run -Xlinker -L/tmp -Xlinker -lfoo target.mojo | FileCheck %s --check-prefix=CHECK-JIT-XLINKER
+# CHECK-JIT-XLINKER: foo -- {{.*}}/mojo run -O0 --debug-level=full -Xlinker -L/tmp -Xlinker -lfoo target.mojo
+
+# COM: Check if we can build correctly the binary debug command.
+# RUN: %debug -X foo --dry-run target.exe --debug-level full | FileCheck %s --check-prefix=CHECK-BINARY-DEBUG
+# CHECK-BINARY-DEBUG: foo -- target.exe --debug-level full
+
+# COM: Check if we fail when building a binary debug command with additional compilation options.
+# RUN: not env %debug --debug-level=line-tables -X foo --dry-run target.exe --debug-level full 2>&1 | FileCheck %s --check-prefix=CHECK-BINARY-DEBUG-WITH-COMPILATION-OPTION
+# CHECK-BINARY-DEBUG-WITH-COMPILATION-OPTION: unexpected compilation option '--debug-level'
+
+# COM: Check that the driver rejects unknown arguments (e.g. user typo)
+# RUN: not mojo debug --cusa-gdb 2>&1 | FileCheck %s --check-prefix=CHECK-UNRECOGNIZED
+# CHECK-UNRECOGNIZED: unrecognized argument '--cusa-gdb'
+
+# COM: Check that the driver rejects unknown arguments (e.g. user typo), with target file
+# RUN: not mojo debug --cusa-gdb --dry-run target.mojo 2>&1 | FileCheck %s --check-prefix=CHECK-UNRECOGNIZED-BEFORE-TARGET
+# CHECK-UNRECOGNIZED-BEFORE-TARGET: unrecognized argument '--cusa-gdb'
+
+# COM: Check that unknown arguments passed after the target don't error out
+# RUN: mojo debug --dry-run target.mojo --unknown-arg --a --b -c | FileCheck %s --check-prefix=CHECK-TARGET-ALLOWED-ARGS
+# CHECK-TARGET-ALLOWED-ARGS: target.mojo --unknown-arg --a --b -c
+
+# COM: Check that --help overrides unknown arguments
+# RUN: mojo debug --help --cusa-gdb | FileCheck %s --check-prefix=CHECK-HELP-OVERRIDES-UNKNOWN
+# CHECK-HELP-OVERRIDES-UNKNOWN: mojo debug

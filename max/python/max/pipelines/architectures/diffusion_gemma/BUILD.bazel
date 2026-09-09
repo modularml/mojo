@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "diffusion_gemma",
+    srcs = glob(["**/*.py"]),
+    deps = [
+        requirement("numpy"),
+        requirement("transformers"),
+        requirement("typing-extensions"),
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma3",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+    ],
+)

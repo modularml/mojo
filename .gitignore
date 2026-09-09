@@ -163,3 +163,9 @@ examples/models/*
 
 # Kgen trace
 kgen.trace.*
+
+# Don't commit the nightly changelog file generated via write-nightly-release.py
+docs/releases/nightly.md
+Mojo/docs/site/releases/nightly.md
+
+.bazelignore

@@ -1,0 +1,87 @@
+diff --git a/tcmalloc/BUILD b/tcmalloc/BUILD
+index 1e909cd..ab75da5 100644
+--- a/tcmalloc/BUILD
++++ b/tcmalloc/BUILD
+@@ -143,6 +143,37 @@ cc_library(
+     alwayslink = 1,
+ )
+ 
++# TCMalloc with NUMA awareness and without global malloc/free replacement.
++# Use this when you need NUMA-partitioned allocation via
++# TCMallocInternalMemalignNumaPartition without overriding the system allocator.
++# Add a dep on :want_numa_aware to enable NUMA awareness at runtime by default.
++cc_library(
++    name = "tcmalloc_internal_methods_only_numa_aware",
++    srcs = [
++        "tcmalloc.cc",
++    ],
++    hdrs = [
++        "tcmalloc.h",
++    ],
++    copts = TCMALLOC_DEFAULT_COPTS + [
++        "-DTCMALLOC_INTERNAL_METHODS_ONLY",
++        "-DTCMALLOC_INTERNAL_NUMA_AWARE",
++    ],
++    linkstatic = 1,
++    visibility = ["//visibility:public"],
++    deps = tcmalloc_deps + [
++        ":alloc_at_least",
++        ":common_numa_aware",
++        ":malloc_hook",
++        "//tcmalloc/internal:allocation_guard",
++        "//tcmalloc/internal:overflow",
++        "//tcmalloc/internal:page_size",
++        "@com_google_absl//absl/time",
++        "@com_google_absl//absl/types:span",
++    ],
++    alwayslink = 1,
++)
++
+ # Provides tcmalloc always; use per-thread mode.
+ cc_library(
+     name = "tcmalloc_deprecated_perthread",
+@@ -384,11 +415,7 @@ cc_library(
+     name = "want_numa_aware",
+     srcs = ["want_numa_aware.cc"],
+     copts = ["-g0"] + TCMALLOC_DEFAULT_COPTS,
+-    visibility = [
+-        "//tcmalloc:__pkg__",
+-        "//tcmalloc/internal:__pkg__",
+-        "//tcmalloc/testing:__pkg__",
+-    ],
++    visibility = ["//visibility:public"],
+     deps = [
+         "//tcmalloc/internal:config",
+         "@com_google_absl//absl/base:core_headers",
+diff --git a/tcmalloc/tcmalloc.cc b/tcmalloc/tcmalloc.cc
+index c4a7d65..36da929 100644
+--- a/tcmalloc/tcmalloc.cc
++++ b/tcmalloc/tcmalloc.cc
+@@ -1277,6 +1277,13 @@ extern "C" ABSL_CACHELINE_ALIGNED void* TCMallocInternalMemalign(
+   return fast_alloc(size, MallocPolicy().AlignAs(align));
+ }
+ 
++extern "C" ABSL_CACHELINE_ALIGNED void* TCMallocInternalMemalignNumaPartition(
++    size_t align, size_t size, size_t numa_partition) noexcept {
++  TC_ASSERT(absl::has_single_bit(align));
++  return fast_alloc(
++      size, MallocPolicy().AlignAs(align).InNumaPartition(numa_partition));
++}
++
+ extern "C" ABSL_CACHELINE_ALIGNED void* TCMallocInternalNewAligned(
+     size_t size, std::align_val_t alignment) {
+   TC_ASSERT(absl::has_single_bit(static_cast<size_t>(alignment)));
+diff --git a/tcmalloc/tcmalloc.h b/tcmalloc/tcmalloc.h
+index e158f71..b831261 100644
+--- a/tcmalloc/tcmalloc.h
++++ b/tcmalloc/tcmalloc.h
+@@ -67,6 +67,9 @@ ABSL_ATTRIBUTE_UNUSED void* TCMallocInternalAlignedAlloc(size_t align,
+ ABSL_ATTRIBUTE_UNUSED void* TCMallocInternalMemalign(size_t align,
+                                                      size_t size) noexcept
+     ABSL_ATTRIBUTE_SECTION(google_malloc);
++ABSL_ATTRIBUTE_UNUSED void* TCMallocInternalMemalignNumaPartition(
++    size_t align, size_t size, size_t numa_partition) noexcept
++    ABSL_ATTRIBUTE_SECTION(google_malloc);
+ ABSL_ATTRIBUTE_UNUSED int TCMallocInternalPosixMemalign(void** ptr,
+                                                         size_t align,
+                                                         size_t size) noexcept

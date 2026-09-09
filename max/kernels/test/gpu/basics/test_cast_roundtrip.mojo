@@ -11,18 +11,19 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 from std.testing import assert_equal, assert_true
 
 from std.utils.numerics import inf, isnan, nan, neg_inf
 
 
 def id(
-    input: UnsafePointer[Float32, ImmutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
-    len: Int,
+    input: ImmPointer[Float32, ImmutAnyOrigin],
+    output: MutPointer[Float32, MutAnyOrigin],
+    len_dev: Int32,
 ):
+    var len = Int(len_dev)
     var tid = global_idx.x
     if tid >= len:
         return
@@ -35,18 +36,18 @@ def run_vec_add(ctx: DeviceContext) raises:
 
     comptime length = 1024
 
-    var in_host = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var in_host = ctx.enqueue_create_host_buffer[.float32](length)
 
     for i in range(length):
         in_host[i] = Float32(i)
 
-    in_host[4] = nan[DType.float32]()
-    in_host[5] = inf[DType.float32]()
-    in_host[6] = neg_inf[DType.float32]()
+    in_host[4] = nan[.float32]()
+    in_host[5] = inf[.float32]()
+    in_host[6] = neg_inf[.float32]()
     in_host[7] = -0.0
 
-    var in_device = ctx.enqueue_create_buffer[DType.float32](length)
-    var out_device = ctx.enqueue_create_buffer[DType.float32](length)
+    var in_device = ctx.enqueue_create_buffer[.float32](length)
+    var out_device = ctx.enqueue_create_buffer[.float32](length)
 
     in_device.enqueue_copy_from(in_host)
 
@@ -56,7 +57,7 @@ def run_vec_add(ctx: DeviceContext) raises:
     ctx.enqueue_function[kernel](
         in_device,
         out_device,
-        length,
+        Int32(length),
         grid_dim=(length // block_dim),
         block_dim=(block_dim),
     )
@@ -66,9 +67,9 @@ def run_vec_add(ctx: DeviceContext) raises:
         1.0,
         2.0,
         3.0,
-        nan[DType.float32](),
-        inf[DType.float32](),
-        neg_inf[DType.float32](),
+        nan[.float32](),
+        inf[.float32](),
+        neg_inf[.float32](),
         -0.0,
         8.0,
         9.0,

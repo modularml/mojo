@@ -38,11 +38,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import torch
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from max.driver import DLPackArray
 from max.dtype import DType
 from max.graph import DeviceRef, Graph, TensorType, ops
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.rotary_embedding import RotaryEmbedding
 from max.pipelines.architectures.qwen3.layers.attention import Qwen3Attention
 from transformers.models.qwen3.configuration_qwen3 import Qwen3Config
@@ -92,7 +93,7 @@ class Qwen3AttentionHarness(RaggedAttentionHarness[Qwen3AttentionStaticParams]):
         rope_theta = p.rope_theta
         qk_norm_eps = p.qk_norm_eps
 
-        kv_params = KVCacheParams(
+        kv_params = MHAKVCacheParams(
             dtype=DType.bfloat16,
             n_kv_heads=n_kv_heads,
             head_dim=head_dim,
@@ -162,7 +163,7 @@ class Qwen3AttentionHarness(RaggedAttentionHarness[Qwen3AttentionStaticParams]):
         input_row_offsets_type = TensorType(
             DType.uint32, shape=["input_row_offsets_len"], device=device_ref
         )
-        flattened_kv_types = kv_params.get_symbolic_inputs().flatten()
+        flattened_kv_types = kv_params.flattened_kv_inputs()
 
         with Graph(
             "Qwen3Attention",
@@ -173,11 +174,9 @@ class Qwen3AttentionHarness(RaggedAttentionHarness[Qwen3AttentionStaticParams]):
             ),
         ) as graph:
             inputs, input_row_offsets, *kv_cache = graph.inputs
-            kv_collection = (
-                kv_params.get_symbolic_inputs()
-                .unflatten(iter(kv_cache))
-                .inputs[0]
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(kv_cache)
+            ).inputs[0]
             layer_idx_const = ops.constant(
                 0, DType.uint32, device=DeviceRef.CPU()
             )

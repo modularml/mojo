@@ -1,0 +1,65 @@
+load("//bazel:api.bzl", "mojo_filecheck_test", "mojo_test")
+
+package(default_visibility = ["//visibility:private"])
+
+# Tests that must run on a GPU.
+_GPU_FILECHECK_TESTS = [
+    "test_unsafe_from_address_overflow.mojo",
+]
+
+_EXPECT_CRASH = [
+    "test_unsafe_from_address_overflow.mojo",
+]
+
+_GPU_CONSTRAINTS = {
+    # Metal `SHARED` pointers are as wide as `Int`, so the width guard under
+    # test is compiled out and there is no assert left to trip.
+    "test_unsafe_from_address_overflow.mojo": select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+}
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        target_compatible_with = select({
+            "//:asan": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(
+        ["*.mojo"],
+        exclude = _GPU_FILECHECK_TESTS,
+    )
+]
+
+[
+    mojo_filecheck_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        expect_crash = src in _EXPECT_CRASH,
+        tags = ["gpu"],
+        target_compatible_with = ["//:has_gpu"] + _GPU_CONSTRAINTS.get(src, []),
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in _GPU_FILECHECK_TESTS
+]

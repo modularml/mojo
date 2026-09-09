@@ -10,25 +10,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""
+Implements blockwise scaled FP8 matrix multiplication kernels targeting the
+NVIDIA SM100 (Blackwell) architecture using 1D A-scales and 2D B-scales.
+"""
 from std.collections import Optional
 from std.math import ceildiv, gcd
 from std.math.uutils import umod, ufloordiv
 from std.sys import align_of, size_of
 
-from std.gpu import WARP_SIZE, barrier
-from std.gpu.primitives.cluster import block_rank_in_cluster
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, lane_id, thread_idx, warp_id as get_warp_id
-from std.gpu.memory import external_memory
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.compute.arch.tcgen05 import *
-from layout import IntTuple, Layout, LayoutTensor, RuntimeLayout, TileTensor
+from max.gpu import WARP_SIZE
+from max.gpu.sync import barrier
+from max.gpu.primitives.cluster import block_rank_in_cluster, elect_one_sync
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import block_idx, lane_id, warp_id as get_warp_id
+from max.gpu.memory import external_memory
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.compute.arch.tcgen05 import *
+from layout import Coord, TensorLayout, TileTensor, coord, row_major
 from layout.tensor_core_async import (
     tile_layout_k_major_typed,
 )
+from structured_kernels.kernel_common import _to_batched_3d
 from structured_kernels.tile_types import (
     SMemTileArray2D,
+    SMemTileArray2DRowMajor,
     swizzle_mode_to_bytes,
 )
 from layout.tma_async import SharedMemBarrier, TMATensorTile, create_tensor_tile
@@ -37,29 +44,12 @@ from std.utils.index import Index, IndexList
 from std.utils.numerics import get_accum_type
 from std.utils.static_tuple import StaticTuple
 
+from internal_utils.fp8_utils import cast_saturating
+
 from ....arch.sm100 import MmaOpSM100_SS
 from ....utils import elementwise_epilogue_type
 
 comptime logger = Logger()
-
-comptime smem_layout_3D[layout: Layout] = Layout(
-    IntTuple(
-        1,
-        layout.shape[0].owned_copy(),
-        layout.shape[1].owned_copy(),
-    ),
-    IntTuple(
-        0,
-        layout.stride[0].owned_copy(),
-        layout.stride[1].owned_copy(),
-    ),
-)
-
-comptime _3D_layout[layout: Layout, rank: Int] = Layout.row_major(
-    layout.shape[0].value() if rank == 3 else 1,
-    layout.shape[1 if rank == 3 else 0].value(),
-    layout.shape[2 if rank == 3 else 1].value(),
-)
 
 
 @__name(
@@ -71,10 +61,10 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     c_type: DType,
     a_scales_type: DType,
     b_scales_type: DType,
-    a_layout: Layout,
-    c_layout: Layout,
-    a_scales_layout: Layout,
-    b_scales_layout: Layout,
+    a_layout: TensorLayout,
+    c_layout: TensorLayout,
+    a_scales_layout: TensorLayout,
+    b_scales_layout: TensorLayout,
     a_tile_rank: Int,
     a_tile_shape: IndexList[a_tile_rank],
     a_desc_shape: IndexList[a_tile_rank],
@@ -100,28 +90,29 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
 ](
     a_tma_op: TMATensorTile[a_type, a_tile_rank, a_tile_shape, a_desc_shape],
     b_tma_op: TMATensorTile[b_type, b_tile_rank, b_tile_shape, b_desc_shape],
-    c: LayoutTensor[mut=True, c_type, c_layout, ...],
+    c: TileTensor[mut=True, c_type, c_layout, MutAnyOrigin],
     a_scales_tma_op: TMATensorTile[
         a_scales_type,
         a_scales_tile_rank,
         a_scales_tile_shape,
         a_scales_desc_shape,
     ],
-    b_scales: LayoutTensor[mut=False, b_scales_type, b_scales_layout, ...],
-    num_iters: Int,
+    b_scales: TileTensor[b_scales_type, b_scales_layout, ImmutAnyOrigin],
+    num_iters: Int32,
 ):
+    var _num_iters = Int(num_iters)
     comptime assert transpose_b, "Only support transposed B"
     comptime assert num_threads == 128
 
     comptime accum_type = get_accum_type[a_type]()
 
     comptime assert (
-        b_scales_type == a_scales_type == accum_type == DType.float32
+        b_scales_type == a_scales_type == accum_type == .float32
     ), "Only support float32 for a_scales and b_scales"
 
-    comptime N = c_layout.shape[1].value()
-    comptime K = a_layout.shape[2].value()
-    var M = c.dim(0)
+    comptime N = c_layout.static_shape[1]
+    comptime K = a_layout.static_shape[2]
+    var M = c.dim[0]()
 
     comptime BM = block_tile_shape[0]
     comptime BN = block_tile_shape[1]
@@ -139,9 +130,9 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     ), "BN <= BK or gcd(BN, BK) == BN - BK"
 
     # make sure A and B scales are compatible
-    comptime b_scales_n = b_scales_layout.shape[0].value()
-    comptime b_scales_k = b_scales_layout.shape[1].value()
-    comptime a_scales_k = a_scales_layout.shape[1].value()
+    comptime b_scales_n = b_scales_layout.static_shape[0]
+    comptime b_scales_k = b_scales_layout.static_shape[1]
+    comptime a_scales_k = a_scales_layout.static_shape[1]
 
     # B-scale N-direction block size is supplied by the caller via
     # `b_scaling_block_n` (defaults to 128). It cannot be derived from
@@ -151,31 +142,12 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     comptime B_SCALING_BLOCK_K = K // b_scales_k
     comptime A_SCALING_BLOCK = K // a_scales_k
 
-    comptime a_scales_smem_layout = Layout.row_major(1, BM)
-    comptime a_scales_smem_layout_3D = smem_layout_3D[a_scales_smem_layout]
-
-    a_smem = external_memory[
+    var a_smem = external_memory[
         Scalar[a_type],
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
         name="tmem_test_dynamic_shared_memory",
-    ]().as_any_origin()
-
-    comptime a_scales_smem_tile_t = LayoutTensor[
-        a_scales_type,
-        a_scales_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
-        alignment=128,
-    ]
-
-    comptime a_scales_smem_tile_t_3D = LayoutTensor[
-        a_scales_type,
-        a_scales_smem_layout_3D,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
-        alignment=128,
-    ]
+    ]().as_unsafe_any_origin()
 
     comptime a_size = tile_layout_k_major_typed[
         a_type, BM, BK, swizzle_mode=a_swizzle
@@ -183,7 +155,7 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     comptime b_size = tile_layout_k_major_typed[
         b_type, BN, BK, swizzle_mode=b_swizzle
     ].static_product
-    comptime a_scales_size = a_scales_smem_layout.size()
+    comptime a_scales_size = BM
 
     comptime assert (
         (a_size * size_of[a_type]()) % 128
@@ -201,26 +173,35 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     # 3D view of the same shared memory tile are used for TMA loads
     # 2D view of the same shared memory tile are used for MMA operations
 
-    # TileTensor views for both TMA producer and MMA consumer.
-    var a_smem_tt = SMemTileArray2D[
+    # TileTensor views for both TMA producer and MMA consumer. The size guards
+    # keep the TileTensor array's explicit dimensions in lockstep with the
+    # TMA/MMA swizzled tile layouts used for pointer partitioning.
+    comptime ASMemTiles = SMemTileArray2D[
         a_type,
         BM,
         BK,
         1,
         swizzle_mode_to_bytes[a_swizzle],
-    ](a_smem)
-    var b_smem_tt = SMemTileArray2D[
+    ]
+    comptime BSMemTiles = SMemTileArray2D[
         b_type,
         BN,
         BK,
         1,
         swizzle_mode_to_bytes[b_swizzle],
-    ](b_smem)
+    ]
+    comptime assert ASMemTiles.tile_size == a_size, "A SMEM tile size mismatch"
+    comptime assert BSMemTiles.tile_size == b_size, "B SMEM tile size mismatch"
+    var a_smem_tt = ASMemTiles(a_smem)
+    var b_smem_tt = BSMemTiles(b_smem)
     var a_smem_tile = a_smem_tt[0]
     var b_smem_tile = b_smem_tt[0]
 
-    var a_scales_smem_tile_2D_view = a_scales_smem_tile_t(a_scales_smem)
-    var a_scales_smem_tile_3D_view = a_scales_smem_tile_t_3D(a_scales_smem)
+    var a_scales_smem_tiles = SMemTileArray2DRowMajor[
+        a_scales_type, 1, BM, 1, 128
+    ](a_scales_smem)
+    var a_scales_smem_tile_2D_view = a_scales_smem_tiles[0]
+    var a_scales_smem_tile_3D_view = _to_batched_3d(a_scales_smem_tile_2D_view)
 
     var ptr_tmem_addr = (a_scales_smem + a_scales_size).bitcast[UInt32]()
 
@@ -229,10 +210,12 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     comptime a_scales_expected_bytes = a_scales_size * size_of[a_scales_type]()
     comptime expected_bytes = a_expected_bytes + b_expected_bytes + a_scales_expected_bytes
 
-    tma_mbar = (ptr_tmem_addr + 2).bitcast[SharedMemBarrier]()
-    mma_mbar = tma_mbar + 1
+    var tma_mbar = (ptr_tmem_addr + 2).bitcast[SharedMemBarrier]()
+    var mma_mbar = tma_mbar + 1
 
-    var elect_one_thread = thread_idx.x == 0
+    var warp_id = get_warp_id()
+    var elect_one_warp = warp_id == 0
+    var elect_one_thread = elect_one_warp and elect_one_sync()
 
     if elect_one_thread:
         tma_mbar[0].init()
@@ -240,9 +223,6 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
 
     var tma_phase: UInt32 = 0
     var mma_phase: UInt32 = 0
-
-    var warp_id = get_warp_id()
-    var elect_one_warp = warp_id == 0
     var elect_one_cta = block_rank_in_cluster() % 2 == 0
     comptime max_tmem_cols = 512
 
@@ -252,7 +232,7 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     # wait for tensor memory to be allocated
     barrier()
 
-    tmem_addr = ptr_tmem_addr[0]
+    var tmem_addr = ptr_tmem_addr[0]
 
     var mma_op = MmaOpSM100_SS[
         c_type,
@@ -269,7 +249,7 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
 
     # final results accumulator regs for C
     comptime c_frag_size = MMA_M * MMA_N // num_threads
-    var c_frag = InlineArray[Scalar[accum_type], c_frag_size](
+    var c_frag = Array[Scalar[accum_type], c_frag_size](
         fill=Scalar[accum_type](0)
     )
 
@@ -281,9 +261,9 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     comptime assert (
         total_repeat % repeat == 0
     ), "total_repeat must be divisible by repeat"
-    var c_frag_temp: InlineArray[Scalar[accum_type], temp_cfrags_size]
+    var c_frag_temp: Array[Scalar[accum_type], temp_cfrags_size]
 
-    for k_iter in range(num_iters):
+    for k_iter in range(_num_iters):
         if elect_one_thread:
             tma_mbar[0].expect_bytes(Int32(expected_bytes))
 
@@ -418,8 +398,8 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
     comptime num_warps = num_threads // WARP_SIZE
     warp_id = get_warp_id()
 
-    ctile, ctile_coords, _ = c.tile_with_offset[BM, BN](
-        block_idx.y, block_idx.x
+    var ctile, ctile_coords, _ = c.tile_with_offset[BM, BN](
+        Coord(block_idx.y, block_idx.x)
     )
     comptime c_coord_type = type_of(ctile_coords)
 
@@ -427,48 +407,55 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
         comptime for n_mma in range(num_n_mmas):
             comptime mma_id = n_mma * num_m_mmas + m_mma
 
-            c_gmem_warp_tile, _c_gmem_warp_tile_coords, _ = (
+            var c_gmem_warp_tile, _c_gmem_warp_tile_coords, _ = (
                 ctile.tile_with_offset[MMA_M // num_warps, MMA_N](
-                    4 * m_mma + warp_id, n_mma
+                    Coord(4 * m_mma + warp_id, n_mma)
                 )
             )
-            c_gmem_warp_tile_coords = ctile_coords + rebind[c_coord_type](
+            var c_gmem_warp_tile_coords = ctile_coords + rebind[c_coord_type](
                 _c_gmem_warp_tile_coords
             )
 
-            c_gmem_frag, _c_gmem_frag_coords, _ = c_gmem_warp_tile.vectorize[
-                1, 2
-            ]().distribute_with_offset[Layout.row_major(8, 4)](lane_id())
-            new_c_gmem_frag_coords = rebind[c_coord_type](_c_gmem_frag_coords)
+            var c_gmem_frag, _c_gmem_frag_coords, _ = (
+                c_gmem_warp_tile.vectorize[1, 2]().distribute_with_offset[
+                    row_major[8, 4]()
+                ](lane_id())
+            )
+            var new_c_gmem_frag_coords = rebind[c_coord_type](
+                _c_gmem_frag_coords
+            )
             new_c_gmem_frag_coords[1] *= 2
-            c_gmem_frag_coords = (
+            var c_gmem_frag_coords = (
                 c_gmem_warp_tile_coords + new_c_gmem_frag_coords
             )
 
-            comptime num_vecs_m = c_gmem_frag.layout.shape[0].value()
-            comptime num_vecs_n = c_gmem_frag.layout.shape[1].value()
-            comptime c_row_stride = c.layout.stride[0].value()
+            comptime num_vecs_m = type_of(c_gmem_frag).static_shape[0]
+            comptime num_vecs_n = type_of(c_gmem_frag).static_shape[1]
+            comptime c_row_stride = type_of(c).static_stride[0]
             comptime assert (
-                c.layout.stride[1].value() == 1
+                type_of(c).static_stride[1] == 1
             ), "the last dim's stride must be 1"
 
             comptime for n_vec in range(num_vecs_n):
                 comptime for m_vec in range(num_vecs_m):
                     comptime i_vec = n_vec * num_vecs_m + m_vec
-                    comptime dst_idx = type_of(c_gmem_frag).layout(
-                        IntTuple(m_vec, n_vec)
-                    )
-                    comptime dst_m_offset, dst_n_offset = divmod(
+                    var dst_idx = Int(c_gmem_frag.layout(coord[m_vec, n_vec]))
+                    var dst_m_offset, dst_n_offset = divmod(
                         dst_idx, c_row_stride
                     )
                     var m = UInt32(c_gmem_frag_coords[0] + dst_m_offset)
                     var n = UInt32(c_gmem_frag_coords[1] + dst_n_offset)
 
                     if m < UInt32(M) and n < UInt32(N):
-                        var c_mn = SIMD[accum_type, 2](
-                            c_frag[2 * i_vec],
-                            c_frag[2 * i_vec + 1],
-                        ).cast[c_type]()
+                        # Saturating: a plain cast of an out-of-range f32 to
+                        # FP8 yields NaN on NVIDIA (the `cvt` is not
+                        # `satfinite`). No-op for non-FP8 `c_type`.
+                        var c_mn = cast_saturating[c_type](
+                            SIMD[accum_type, 2](
+                                c_frag[2 * i_vec],
+                                c_frag[2 * i_vec + 1],
+                            )
+                        )
 
                         comptime if elementwise_lambda_fn:
                             comptime alignment = align_of[SIMD[c_type, 2]]()
@@ -477,9 +464,7 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_kernel[
                                 (Int(m), Int(n)), c_mn
                             )
                         else:
-                            c_gmem_frag[m_vec, n_vec] = rebind[
-                                c_gmem_frag.element_type
-                            ](c_mn)
+                            c_gmem_frag[m_vec, n_vec] = c_mn
 
 
 @__llvm_metadata(`nvvm.cluster_dim`=cluster_shape)
@@ -495,10 +480,10 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_wrapper[
     c_type: DType,
     a_scales_type: DType,
     b_scales_type: DType,
-    a_layout: Layout,
-    c_layout: Layout,
-    a_scales_layout: Layout,
-    b_scales_layout: Layout,
+    a_layout: TensorLayout,
+    c_layout: TensorLayout,
+    a_scales_layout: TensorLayout,
+    b_scales_layout: TensorLayout,
     a_tile_rank: Int,
     a_tile_shape: IndexList[a_tile_rank],
     a_desc_shape: IndexList[a_tile_rank],
@@ -520,17 +505,19 @@ def matmul_sm100_blockwise_scaled_fp8_1d2d_wrapper[
 ](
     a_tma_op: TMATensorTile[a_type, a_tile_rank, a_tile_shape, a_desc_shape],
     b_tma_op: TMATensorTile[b_type, b_tile_rank, b_tile_shape, b_desc_shape],
-    c: LayoutTensor[c_type, c_layout, MutAnyOrigin],
+    c: TileTensor[mut=True, c_type, c_layout, MutAnyOrigin],
     a_scales_tma_op: TMATensorTile[
         a_scales_type,
         a_scales_tile_rank,
         a_scales_tile_shape,
         a_scales_desc_shape,
     ],
-    b_scales: LayoutTensor[b_scales_type, b_scales_layout, MutAnyOrigin],
-    num_iters: Int,
+    b_scales: TileTensor[b_scales_type, b_scales_layout, ImmutAnyOrigin],
+    num_iters: Int32,
 ):
-    # NOTE: This wrapper is necessary because batched blockwise scaling has a wrapper kernel
+    var _num_iters2 = Int(
+        num_iters
+    )  # NOTE: This wrapper is necessary because batched blockwise scaling has a wrapper kernel
     # for allocating matrices across the z index that kernel calls the function
     # `matmul_sm100_blockwise_scaled_fp8_1d2d_kernel` as well. That function requires the decroators
     # to not be present on the function so we moved it to this wrapper.
@@ -588,86 +575,71 @@ def matmul_sm100_blockwise_scaled_fp8[
     b_scales: TileTensor,
     ctx: DeviceContext,
 ) raises:
+    """
+    Enqueues a blockwise scaled FP8 GEMM on SM100 with 1D A-scales and 2D
+    B-scales onto the supplied device context.
+
+    Validates the operand dtypes, ranks, and scale granularities, builds the
+    TMA tile descriptors for A, B, and A-scales, and launches the
+    `matmul_sm100_blockwise_scaled_fp8_1d2d_wrapper` kernel over a
+    two-dimensional grid covering the M and N dimensions.
+
+    Parameters:
+        transpose_b: Whether B is loaded transposed; must be `True` (only
+            the transposed-B path is supported).
+        umma_shape: 3D MMA instruction shape `(MMA_M, MMA_N, MMA_K)` used by
+            the TCgen05 tensor core operations.
+        block_tile_shape: 3D block tile shape `(BM, BN, BK)` giving the
+            per-CTA tile dimensions along the M, N, and K axes. `BK` must
+            be 64 or 128.
+        a_swizzle: TMA swizzle mode applied to A shared memory loads
+            (defaults to `TensorMapSwizzle.SWIZZLE_128B`).
+        b_swizzle: TMA swizzle mode applied to B shared memory loads
+            (defaults to `TensorMapSwizzle.SWIZZLE_128B`).
+        elementwise_lambda_fn: Optional elementwise epilogue lambda applied
+            to each output element of `c` in place of a direct store
+            (defaults to `None`).
+
+    Args:
+        c: Rank-2 output `TileTensor` accumulating the scaled GEMM result.
+        a: Rank-2 `TileTensor` of A operands with `float8_e4m3fn` elements.
+        b: Rank-2 `TileTensor` of B operands with `float8_e4m3fn` elements.
+        a_scales: Rank-2 `TileTensor` of A scale factors with `float32`
+            elements and 1D scaling granularity along K.
+        b_scales: Rank-2 `TileTensor` of B scale factors with `float32`
+            elements and 2D scaling granularity along N and K.
+        ctx: Device context used to enqueue the kernel launch.
+    """
     comptime assert transpose_b, "Only support transposed B"
 
-    # Convert TileTensor params to LayoutTensor at the boundary.
-    # Internal kernel functions retain LayoutTensor for GPU-specific operations.
-    var a_lt = a.to_layout_tensor()
-    var b_lt = b.to_layout_tensor()
-    var c_lt = c.to_layout_tensor()
-    var a_scales_lt = a_scales.to_layout_tensor()
-    var b_scales_lt = b_scales.to_layout_tensor()
-
-    comptime a_type = type_of(a_lt).dtype
-    comptime b_type = type_of(b_lt).dtype
-    comptime c_type = type_of(c_lt).dtype
-    comptime a_scales_type = type_of(a_scales_lt).dtype
-    comptime b_scales_type = type_of(b_scales_lt).dtype
+    comptime a_type = type_of(a).dtype
+    comptime b_type = type_of(b).dtype
+    comptime c_type = type_of(c).dtype
+    comptime a_scales_type = type_of(a_scales).dtype
+    comptime b_scales_type = type_of(b_scales).dtype
 
     comptime assert (
-        a_type == b_type and a_type == DType.float8_e4m3fn
+        a_type == b_type and a_type == .float8_e4m3fn
     ), "Only support float8_e4m3fn"
 
     comptime assert (
-        a_scales_type == b_scales_type and a_scales_type == DType.float32
+        a_scales_type == b_scales_type and a_scales_type == .float32
     ), "Only support float32 for scales"
 
-    comptime a_layout_tensor_3D = LayoutTensor[
-        a_type,
-        _3D_layout[a_lt.layout, a_lt.rank],
-        a_lt.origin,
-        address_space=a_lt.address_space,
-        element_layout=a_lt.element_layout,
-        layout_int_type=a_lt.layout_int_type,
-        linear_idx_type=a_lt.linear_idx_type,
-        masked=a_lt.masked,
-        alignment=a_lt.alignment,
-    ]
-
-    comptime b_layout_tensor_3D = LayoutTensor[
-        b_type,
-        _3D_layout[b_lt.layout, b_lt.rank],
-        b_lt.origin,
-        address_space=b_lt.address_space,
-        element_layout=b_lt.element_layout,
-        layout_int_type=b_lt.layout_int_type,
-        linear_idx_type=b_lt.linear_idx_type,
-        masked=b_lt.masked,
-        alignment=b_lt.alignment,
-    ]
-
-    comptime a_scales_layout_tensor_3D = LayoutTensor[
-        a_scales_type,
-        _3D_layout[a_scales_lt.layout, a_scales_lt.rank],
-        a_scales_lt.origin,
-        address_space=a_scales_lt.address_space,
-        element_layout=a_scales_lt.element_layout,
-        layout_int_type=a_scales_lt.layout_int_type,
-        linear_idx_type=a_scales_lt.linear_idx_type,
-        masked=a_scales_lt.masked,
-        alignment=a_scales_lt.alignment,
-    ]
-
-    var a_3D = a_layout_tensor_3D(
-        a_lt.ptr,
-        RuntimeLayout[a_layout_tensor_3D.layout].row_major(
-            IndexList[3](1, a_lt.dim(0), a_lt.dim(1)),
-        ),
+    comptime assert (
+        type_of(a).LayoutType.rank == 2
+        and type_of(b).LayoutType.rank == 2
+        and type_of(c).LayoutType.rank == 2
+        and type_of(a_scales).LayoutType.rank == 2
+        and type_of(b_scales).LayoutType.rank == 2
+    ), (
+        "basic blockwise FP8 expects rank-2 A, B, C, A-scales, and B-scales"
+        " TileTensors"
     )
 
-    var b_3D = b_layout_tensor_3D(
-        b_lt.ptr,
-        RuntimeLayout[b_layout_tensor_3D.layout].row_major(
-            IndexList[3](1, b_lt.dim(0), b_lt.dim(1)),
-        ),
-    )
-
-    var a_scales_3D = a_scales_layout_tensor_3D(
-        a_scales_lt.ptr,
-        RuntimeLayout[a_scales_layout_tensor_3D.layout].row_major(
-            IndexList[3](1, a_scales_lt.dim(0), a_scales_lt.dim(1)),
-        ),
-    )
+    var a_3D = _to_batched_3d(a)
+    var b_3D = _to_batched_3d(b)
+    var a_scales_3D = _to_batched_3d(a_scales)
 
     comptime BM = block_tile_shape[0]
     comptime BN = block_tile_shape[1]
@@ -678,33 +650,33 @@ def matmul_sm100_blockwise_scaled_fp8[
         128,
     ), "blockwise scaled fp8 only supports BK in (64, 128)"
 
-    var M = c_lt.dim(0)
-    var N = c_lt.dim(1)
-    var K = a_3D.dim(2)
+    var M = c.dim[0]()
+    var N = c.dim[1]()
+    var K = a_3D.dim[2]()
 
-    var a_scales_dim0 = a_scales_3D.dim(1)
-    var a_scales_dim1 = a_scales_3D.dim(2)
-    var b_scales_dim1 = b_scales_lt.dim(1)
+    var a_scales_dim0 = a_scales_3D.dim[1]()
+    var a_scales_dim1 = a_scales_3D.dim[2]()
+    var b_scales_dim1 = b_scales.dim[1]()
 
     # The K-direction scale granularity is fixed at BK
     # (k_scale_granularity == BK). The N-direction granularity may be
     # finer and is independent of BK_kernel.
     if (
-        a_scales_dim0 != b_scales_dim1
-        or K % a_scales_dim0 != 0
-        or (K // a_scales_dim0) != BK
+        Int(a_scales_dim0) != Int(b_scales_dim1)
+        or Int(K) % Int(a_scales_dim0) != 0
+        or (Int(K) // Int(a_scales_dim0)) != BK
     ):
         raise Error(
-            "a_scales_3D.dim(1) must equal b_scales.dim(1), K must be"
+            "a_scales_3D.dim[1]() must equal b_scales.dim[1](), K must be"
             " divisible by a_scales.dim(1), and (K // a_scales.dim(1)) must"
             " equal BK."
         )
 
     var padding_size = 16 // size_of[a_scales_type]()
-    if a_scales_dim1 % padding_size != 0:
+    if Int(a_scales_dim1) % padding_size != 0:
         raise Error(
-            "a_scales_3D.dim(2) must be divisible by 16 bytes. This is required"
-            " by NVIDIA SM90+ TMA instructions!"
+            "a_scales_3D.dim[2]() must be divisible by 16 bytes. This is"
+            " required by NVIDIA SM90+ TMA instructions!"
         )
 
     logger.info(
@@ -714,17 +686,17 @@ def matmul_sm100_blockwise_scaled_fp8[
     logger.info("Problem Shape: MNK=[", M, ", ", N, ", ", K, "]", sep="")
     logger.info(
         "A Scales Shape: [",
-        a_scales_3D.dim(1),
+        a_scales_3D.dim[1](),
         ", ",
-        a_scales_3D.dim(2),
+        a_scales_3D.dim[2](),
         "]",
         sep="",
     )
     logger.info(
         "B Scales Shape: [",
-        b_scales_lt.dim(0),
+        b_scales.dim[0](),
         ", ",
-        b_scales_lt.dim(1),
+        b_scales.dim[1](),
         "]",
         sep="",
     )
@@ -755,21 +727,8 @@ def matmul_sm100_blockwise_scaled_fp8[
 
     comptime block_dim = 128
 
-    # Convert c and b_scales LayoutTensors to MutAnyOrigin for the kernel
-    # wrapper, which declares device-side pointer boundary as MutAnyOrigin.
-    comptime CLTType = LayoutTensor[
-        c_type,
-        type_of(c_lt).layout,
-        MutAnyOrigin,
-    ]
-    var c_kernel = rebind[CLTType](c_lt)
-
-    comptime BScalesLTType = LayoutTensor[
-        b_scales_type,
-        type_of(b_scales_lt).layout,
-        MutAnyOrigin,
-    ]
-    var b_scales_kernel = rebind[BScalesLTType](b_scales_lt)
+    var c_kernel = c.as_unsafe_any_origin()
+    var b_scales_kernel = b_scales.as_immut().as_unsafe_any_origin()
 
     comptime kernel = matmul_sm100_blockwise_scaled_fp8_1d2d_wrapper[
         a_type,
@@ -777,10 +736,10 @@ def matmul_sm100_blockwise_scaled_fp8[
         c_type,
         a_scales_type,
         b_scales_type,
-        type_of(a_3D).layout,
-        type_of(c_kernel).layout,
-        type_of(a_scales_3D).layout,
-        type_of(b_scales_kernel).layout,
+        type_of(a_3D).LayoutType,
+        type_of(c_kernel).LayoutType,
+        type_of(a_scales_3D).LayoutType,
+        type_of(b_scales_kernel).LayoutType,
         type_of(a_tma_op).rank,
         type_of(a_tma_op).tile_shape,
         type_of(a_tma_op).desc_shape,
@@ -805,8 +764,8 @@ def matmul_sm100_blockwise_scaled_fp8[
         c_kernel,
         a_scales_tma_op,
         b_scales_kernel,
-        ceildiv(K, BK),
-        grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
+        Int32(ceildiv(Int(K), BK)),
+        grid_dim=(ceildiv(Int(N), BN), ceildiv(Int(M), BM)),
         block_dim=(block_dim),
         shared_mem_bytes=smem_use,
         func_attribute=FuncAttribute.MAX_DYNAMIC_SHARED_SIZE_BYTES(

@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from ._loader_wrappers import GGUFWeights
 from .format import WeightsFormat, weights_format
 from .load import load_weights
 from .load_safetensors import SafetensorWeights
+from .loader_wrappers import GGUFWeights
 from .weights import WeightData, Weights, WeightsAdapter
 
 __all__ = [

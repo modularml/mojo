@@ -89,13 +89,13 @@ config_setting(
 
 string_flag(
     name = "max_base_version",
-    build_setting_default = "26.4.0",
+    build_setting_default = "26.6.0",
     make_variable = "MAX_BASE_VERSION",
 )
 
 string_flag(
     name = "mojo_base_version",
-    build_setting_default = "1.0.0",
+    build_setting_default = "1.1.0",
     make_variable = "MOJO_BASE_VERSION",
 )
 
@@ -116,6 +116,48 @@ string_flag(
     name = "modular_version_sha",
     build_setting_default = "deadbeef",
 )
+
+bool_flag(
+    name = "use_prebuilt_mojo_toolchain",
+    build_setting_default = True,
+    tags = [ALLOW_UNUSED_TAG],
+)
+
+config_setting(
+    name = "use_prebuilt_mojo_toolchain_disabled",
+    flag_values = {":use_prebuilt_mojo_toolchain": "false"},
+    tags = [ALLOW_UNUSED_TAG],
+)
+
+[
+    config_setting(
+        name = name + "_prebuilt_mojo_toolchain_enabled",
+        constraint_values = constraints,
+        flag_values = {":use_prebuilt_mojo_toolchain": "true"},
+        # Only used in OSS build
+        tags = ["maybe-unused"],
+    )
+    for name, constraints in [
+        (
+            "linux_x86_64",
+            [
+                "@platforms//cpu:x86_64",
+                "@platforms//os:linux",
+            ],
+        ),
+        (
+            "linux_aarch64",
+            [
+                "@platforms//cpu:aarch64",
+                "@platforms//os:linux",
+            ],
+        ),
+        (
+            "macos",
+            ["@platforms//os:macos"],
+        ),
+    ]
+]
 
 config_setting(
     name = "linux_x86_64",
@@ -140,14 +182,20 @@ alias(
 )
 
 alias(
-    name = "format-fast",
-    actual = "//bazel/lint:fix-fast",
+    name = "lint-all",
+    actual = "//bazel/lint:lint-all",
     tags = [TOP_LEVEL_TAG],
 )
 
 alias(
     name = "format",
-    actual = "//bazel/lint:fix",
+    actual = "//bazel/lint:format",
+    tags = [TOP_LEVEL_TAG],
+)
+
+alias(
+    name = "format-all",
+    actual = "//bazel/lint:format-all",
     tags = [TOP_LEVEL_TAG],
 )
 
@@ -160,30 +208,8 @@ platform(
     exec_properties = {
         "Pool": "m7i-large-executors",
         "OSFamily": "Linux",
-        "container-image": "docker://466483404629.dkr.ecr.us-east-1.amazonaws.com/modular-build-env:ubuntu2204",
+        "container-image": "docker://381491890578.dkr.ecr.us-east-1.amazonaws.com/modular-build-env:ubuntu2204",
         "dockerNetwork": "off",
-    },
-)
-
-platform(
-    name = "h100-platform",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
-        ":nvidia_gpu",
-        ":has_gpu",
-        ":has_multi_gpu",
-        ":has_4_gpus",
-        ":h100_gpu",
-    ],
-    exec_properties = {
-        "OSFamily": "Linux",
-        "Pool": "h100-executors",
-        "container-image": "docker://381491890578.dkr.ecr.us-east-1.amazonaws.com/modular-build-env:ubuntu2204-gpu",
-        "dockerNetwork": "off",
-        "test.resources:gpu-count": "0.01",
-        "test.resources:gpu-memory": DEFAULT_GPU_MEMORY,
-        "test.resources:gpu-1": "0.01",
     },
 )
 
@@ -202,7 +228,6 @@ platform(
         "Pool": "b200-executors",
         "container-image": "docker://381491890578.dkr.ecr.us-east-1.amazonaws.com/modular-build-env:ubuntu2204-gpu",
         "dockerNetwork": "off",
-        "test.resources:gpu-count": "0.01",
         "test.resources:gpu-memory": DEFAULT_GPU_MEMORY,
         "test.resources:gpu-1": "0.01",
     },
@@ -222,7 +247,6 @@ platform(
         "Pool": "b200-executors-benchmark",
         "container-image": "docker://381491890578.dkr.ecr.us-east-1.amazonaws.com/modular-build-env:ubuntu2204-gpu",
         "dockerNetwork": "off",
-        "test.resources:gpu-count": "0.01",
         "test.resources:gpu-memory": DEFAULT_GPU_MEMORY,
         "test.resources:gpu-1": "0.01",
     },
@@ -243,7 +267,6 @@ platform(
         "Pool": "mi355-executors",
         "container-image": "docker://381491890578.dkr.ecr.us-east-1.amazonaws.com/modular-build-env:ubuntu2204-rocm",
         "dockerNetwork": "off",
-        "test.resources:gpu-count": "0.01",
         "test.resources:gpu-memory": DEFAULT_GPU_MEMORY,
         "test.resources:gpu-1": "0.01",
     },
@@ -401,4 +424,21 @@ bool_flag(
 config_setting(
     name = "use_vllm_setting",
     flag_values = {"//:use_vllm": "true"},
+)
+
+# When set, GPU tests disable MAX's device memory manager (caching allocator)
+# so each `enqueue_create_buffer` is a 1:1 device allocation and
+# compute-sanitizer memcheck/initcheck see true per-buffer bounds. Without this,
+# small OOBs and OOB reads land inside the shared ~205MB pool and go undetected.
+# Consumed by `get_default_test_env` in bazel/internal/config.bzl.
+bool_flag(
+    name = "gpu_disable_memory_manager",
+    build_setting_default = False,
+    tags = [ALLOW_UNUSED_TAG],
+)
+
+config_setting(
+    name = "gpu_memory_manager_disabled",
+    flag_values = {"//:gpu_disable_memory_manager": "true"},
+    tags = [ALLOW_UNUSED_TAG],
 )

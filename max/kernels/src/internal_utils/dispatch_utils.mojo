@@ -42,7 +42,7 @@ struct Table[type: TuningConfig](Writable):
 
         for i in range(len(self.configs)):
             var cfg = self.configs[i]
-            var res = String.write(cfg)
+            var res = String(cfg)
             if res in keys:
                 print(
                     "ERROR: Redundant Entry [",
@@ -76,8 +76,9 @@ struct Table[type: TuningConfig](Writable):
     #     These indices are marked valid in the flag and may not represent the entire domain.
     #   - Returns a list of matching indices, not the entire domain.
     def query_index[
-        rule: def(Self.type) capturing -> Bool, domain: List[Int] = List[Int]()
-    ](self) -> List[Int]:
+        rule_fn: ImplicitlyCopyable & def(Self.type) -> Bool,
+        domain: List[Int] = List[Int](),
+    ](self, *, rule: rule_fn) -> List[Int]:
         var flag: List[Bool]
 
         comptime if len(domain):
@@ -98,15 +99,14 @@ struct Table[type: TuningConfig](Writable):
 
     # Apply rule on all configs in the table and return list of all the unique results.
     def query_values[
-        ret_type: Comparable & ImplicitlyCopyable & ImplicitlyDestructible,
-        rule: def(Self.type) capturing -> ret_type,
+        ret_type: Comparable & ImplicitlyCopyable & Deinitable,
+        rule_fn: ImplicitlyCopyable & def(Self.type) -> ret_type,
         domain: List[Int] = List[Int](),
-    ](self) -> List[ret_type]:
+    ](self, *, rule: rule_fn) -> List[ret_type]:
         var result = List[ret_type]()
 
         @always_inline
-        @parameter
-        def _get_search_domain() -> List[Int]:
+        def _get_search_domain() {imm} -> List[Int]:
             if len(materialize[domain]()):
                 return materialize[domain]()
             else:
@@ -115,20 +115,19 @@ struct Table[type: TuningConfig](Writable):
         var search_domain = _get_search_domain()
 
         for idx in search_domain:
-            value = rule(self.configs[idx])
+            var value = rule(self.configs[idx])
             if value not in result:
                 result.append(value)
 
-        @parameter
         def _cmp(lsh: ret_type, rhs: ret_type) -> Bool:
             return lsh < rhs
 
-        _quicksort[_cmp](result)
+        _quicksort(result, _cmp)
         return result^
 
     def find[
-        rule: def(Self.type) capturing -> Bool,
-    ](self) -> List[Self.type]:
+        rule_fn: ImplicitlyCopyable & def(Self.type) -> Bool,
+    ](self, *, rule: rule_fn) -> List[Self.type]:
         var result = List[Self.type]()
 
         for config in self.configs:

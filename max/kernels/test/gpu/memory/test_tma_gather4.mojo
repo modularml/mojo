@@ -40,26 +40,25 @@ See ``nn/mha_operand.mojo`` for the trait definition and implementations.
 from std.math import ceildiv
 from std.sys.info import size_of
 
-from std.gpu import block_dim, thread_idx
-from std.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import (
+from max.gpu import block_dim, thread_idx
+from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import (
     TensorMapSwizzle,
     TMADescriptor,
     create_tma_descriptor,
     prefetch_tma_descriptor,
 )
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.memory import (
     cp_async_bulk_tensor_2d_gather4,
     external_memory,
 )
-from std.gpu.sync import (
+from max.gpu.sync import (
     barrier,
     mbarrier_arrive_expect_tx_shared,
     mbarrier_init,
     mbarrier_try_wait_parity_shared,
 )
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.random import rand, randn, seed
 from std.utils.index import IndexList
 
@@ -90,7 +89,7 @@ def gather4_raw_smoke_kernel[
     dtype: DType, row_width: Int
 ](
     descriptor: TMADescriptor,
-    d_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    d_out: MutPointer[Scalar[dtype], MutAnyOrigin],
     row0: Int32,
     row1: Int32,
     row2: Int32,
@@ -99,12 +98,12 @@ def gather4_raw_smoke_kernel[
     """Minimal kernel: single gather4 via raw intrinsic, 4 rows."""
     var shmem = external_memory[
         Scalar[dtype],
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ]()
 
-    var mbar = stack_allocation[1, Int64, address_space=AddressSpace.SHARED]()
-    var descriptor_ptr = UnsafePointer(to=descriptor).bitcast[NoneType]()
+    var mbar = unsafe_stack_allocation[1, Int64, address_space=.SHARED]()
+    var descriptor_ptr = Pointer(to=descriptor).bitcast[NoneType]()
     mbarrier_init(mbar, 1)
 
     if thread_idx.x == 0:
@@ -139,9 +138,9 @@ def gather4_raw_smoke_kernel[
 def _verify_gathered_rows[
     dtype: DType, row_width: Int
 ](
-    h_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    h_source: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    h_indices: UnsafePointer[Int32, MutAnyOrigin],
+    h_out: ImmPointer[Scalar[dtype], _],
+    h_source: ImmPointer[Scalar[dtype], _],
+    h_indices: ImmPointer[Int32, _],
     num_rows: Int,
 ) raises:
     """Verifies gathered output rows match the source buffer at the expected
@@ -152,8 +151,8 @@ def _verify_gathered_rows[
             var got = h_out[gather_idx * row_width + col]
             var expected = h_source[src_row * row_width + col]
             assert_equal(
-                got.cast[DType.float32](),
-                expected.cast[DType.float32](),
+                got.cast[.float32](),
+                expected.cast[.float32](),
                 msg=String(
                     "Mismatch at gathered row ",
                     gather_idx,
@@ -227,7 +226,7 @@ def test_raw_smoke[
     ctx.synchronize()
 
     # Build a 4-element index array for the unified verification helper.
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](4)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](4)
     h_indices[0] = r0
     h_indices[1] = r1
     h_indices[2] = r2
@@ -287,9 +286,7 @@ def _run_paged_gather4_test[
 
     # Build cache_lengths.
     comptime cache_len_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_len_layout
-    ](
+    var cache_lengths_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -300,7 +297,7 @@ def _run_paged_gather4_test[
     # Build lookup_table with shuffled page assignments.
     comptime lut_layout = Layout.row_major[2]()
     var max_pages_per_seq = (tokens_per_seq + page_size - 1) // page_size
-    var lut_managed = ManagedLayoutTensor[DType.uint32, lut_layout](
+    var lut_managed = ManagedLayoutTensor[.uint32, lut_layout](
         RuntimeLayout[lut_layout].row_major(
             IndexList[2](batch_size, num_blocks)
         ),
@@ -339,7 +336,7 @@ def _run_paged_gather4_test[
     # Physical row = phys_block * stride + offset_in_page
     # where stride = kv_dim * num_layers * page_size.
     comptime paged_stride = kv_dim * num_layers * page_size
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         var seq_idx = i % batch_size
         var tok_idx = (i * 3 + 7) % tokens_per_seq
@@ -349,7 +346,7 @@ def _run_paged_gather4_test[
         var phys_row = phys_block * paged_stride + offset_in_page
         h_indices[i] = Int32(phys_row)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Launch kernel.
@@ -484,9 +481,7 @@ def test_continuous_kv_cache[
 
     # Build cache_lengths.
     comptime cache_len_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_len_layout
-    ](
+    var cache_lengths_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -495,7 +490,7 @@ def test_continuous_kv_cache[
         cache_lengths_host[i] = UInt32(tokens_per_seq)
 
     # Build lookup_table (1D: one block per batch entry).
-    var lookup_managed = ManagedLayoutTensor[DType.uint32, cache_len_layout](
+    var lookup_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -520,7 +515,7 @@ def test_continuous_kv_cache[
     # Physical row = block_id * stride + tok_idx
     # where stride = 2 * num_layers * max_seq_len.
     comptime cont_stride = 2 * num_layers * max_seq_len
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     var lookup_ptr = lookup_host.ptr
     for i in range(topk):
         var seq_idx = i % batch_size
@@ -529,7 +524,7 @@ def test_continuous_kv_cache[
         var phys_row = block_id * cont_stride + tok_idx
         h_indices[i] = Int32(phys_row)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Launch kernel.
@@ -609,11 +604,11 @@ def test_device_buffer_overload[
     )
 
     # Build gather indices on host.
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         h_indices[i] = Int32((i * 7 + 3) % num_tokens)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Launch while-loop kernel.
@@ -696,8 +691,8 @@ def gather4_kernel[
     kv_tile: TMATensorTile[
         dtype, tile_rank, tile_shape_param, desc_shape_param
     ],
-    d_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    d_indices: UnsafePointer[Int32, MutAnyOrigin],
+    d_out: MutPointer[Scalar[dtype], MutAnyOrigin],
+    d_indices: MutPointer[Int32, MutAnyOrigin],
     num_tiles: Int32,
 ):
     """While-loop gather4 loader using the level 3 TMATensorTile API.
@@ -714,20 +709,20 @@ def gather4_kernel[
         dtype,
         smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
-    var mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
     if thread_idx.x == 0:
         mbar[0].init(1)
-        var desc_ptr = UnsafePointer(to=kv_tile.descriptor).bitcast[NoneType]()
+        var desc_ptr = Pointer(to=kv_tile.descriptor).bitcast[NoneType]()
         prefetch_tma_descriptor(desc_ptr)
     barrier()
 
@@ -816,11 +811,11 @@ def test_wide_gather4_device_buffer[
     ](ctx, d_data, num_tokens)
 
     # Build gather indices.
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         h_indices[i] = Int32((i * 7 + 3) % num_tokens)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Launch kernel.
@@ -913,9 +908,7 @@ def test_wide_gather4_paged_kv[
 
     # Build cache_lengths.
     comptime cache_len_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_len_layout
-    ](
+    var cache_lengths_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -926,7 +919,7 @@ def test_wide_gather4_paged_kv[
     # Build lookup_table.
     comptime lut_layout = Layout.row_major[2]()
     var max_pages_per_seq = (tokens_per_seq + page_size - 1) // page_size
-    var lut_managed = ManagedLayoutTensor[DType.uint32, lut_layout](
+    var lut_managed = ManagedLayoutTensor[.uint32, lut_layout](
         RuntimeLayout[lut_layout].row_major(
             IndexList[2](batch_size, num_blocks)
         ),
@@ -956,7 +949,7 @@ def test_wide_gather4_paged_kv[
 
     # Build gather indices.
     comptime paged_stride = kv_dim * num_layers * page_size
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         var seq_idx = i % batch_size
         var tok_idx = (i * 3 + 7) % tokens_per_seq
@@ -966,7 +959,7 @@ def test_wide_gather4_paged_kv[
         var phys_row = phys_block * paged_stride + offset_in_page
         h_indices[i] = Int32(phys_row)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Launch kernel.
@@ -1060,9 +1053,7 @@ def test_wide_gather4_continuous_kv[
 
     # Build cache_lengths.
     comptime cache_len_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_len_layout
-    ](
+    var cache_lengths_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -1071,7 +1062,7 @@ def test_wide_gather4_continuous_kv[
         cache_lengths_host[i] = UInt32(tokens_per_seq)
 
     # Build lookup_table (1D: one block per batch entry).
-    var lookup_managed = ManagedLayoutTensor[DType.uint32, cache_len_layout](
+    var lookup_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -1096,7 +1087,7 @@ def test_wide_gather4_continuous_kv[
 
     # Build gather indices.
     comptime cont_stride = 2 * num_layers * max_seq_len
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     var lookup_ptr = lookup_host.ptr
     for i in range(topk):
         var seq_idx = i % batch_size
@@ -1105,7 +1096,7 @@ def test_wide_gather4_continuous_kv[
         var phys_row = block_id * cont_stride + tok_idx
         h_indices[i] = Int32(phys_row)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Launch kernel.
@@ -1199,9 +1190,7 @@ def test_wide_gather4_mha_operand[
 
     # Build cache_lengths.
     comptime cache_len_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_len_layout
-    ](
+    var cache_lengths_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -1212,7 +1201,7 @@ def test_wide_gather4_mha_operand[
     # Build lookup_table.
     comptime lut_layout = Layout.row_major[2]()
     var max_pages_per_seq = (tokens_per_seq + page_size - 1) // page_size
-    var lut_managed = ManagedLayoutTensor[DType.uint32, lut_layout](
+    var lut_managed = ManagedLayoutTensor[.uint32, lut_layout](
         RuntimeLayout[lut_layout].row_major(
             IndexList[2](batch_size, num_blocks)
         ),
@@ -1243,7 +1232,7 @@ def test_wide_gather4_mha_operand[
 
     # Build gather indices.
     comptime paged_stride = kv_dim * num_layers * page_size
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         var seq_idx = i % batch_size
         var tok_idx = (i * 3 + 7) % tokens_per_seq
@@ -1253,7 +1242,7 @@ def test_wide_gather4_mha_operand[
         var phys_row = phys_block * paged_stride + offset_in_page
         h_indices[i] = Int32(phys_row)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Launch kernel.
@@ -1351,11 +1340,11 @@ def test_non_divisible_width[
     )
 
     # Build gather indices.
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         h_indices[i] = Int32((i * 7 + 3) % num_tokens)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # Output uses padded_row_width so the kernel writes full column groups.
@@ -1399,8 +1388,8 @@ def test_non_divisible_width[
             var got = h_out[gather_idx * padded_row_width + col]
             var expected = h_data[src_row * tile_width + col]
             assert_equal(
-                got.cast[DType.float32](),
-                expected.cast[DType.float32](),
+                got.cast[.float32](),
+                expected.cast[.float32](),
                 msg=String(
                     "Mismatch at gathered row ",
                     gather_idx,
@@ -1414,8 +1403,8 @@ def test_non_divisible_width[
         for col in range(tile_width, padded_row_width):
             var got = h_out[gather_idx * padded_row_width + col]
             assert_equal(
-                got.cast[DType.float32](),
-                Scalar[DType.float32](0),
+                got.cast[.float32](),
+                Float32(0),
                 msg=String(
                     "Expected zero at OOB col ",
                     col,
@@ -1455,14 +1444,14 @@ def gather4_tile_api_kernel[
     desc_shape: IndexList[tile_rank],
 ](
     g4t_tma: TMATensorTile[dtype, tile_rank, tile_shape, desc_shape],
-    d_indices: UnsafePointer[Int32, MutAnyOrigin],
-    output: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    d_indices: MutPointer[Int32, MutAnyOrigin],
+    output: MutPointer[Scalar[dtype], MutAnyOrigin],
 ):
     """Loads bn rows via async_copy_gather4_tile, then copies SMEM to
     global output for verification."""
     comptime smem_bytes = bn * cols * size_of[dtype]()
     var smem_base = external_memory[
-        UInt8, address_space=AddressSpace.SHARED, alignment=128
+        UInt8, address_space=.SHARED, alignment=128
     ]()
     var smem_ptr = smem_base.bitcast[Scalar[dtype]]()
     var mbar = (smem_base + smem_bytes).bitcast[SharedMemBarrier]()
@@ -1523,11 +1512,11 @@ def test_gather4_tile_api[
     randn[dtype](k_full_host.ptr, total_tokens * cols)
 
     # ---- Build bn non-contiguous indices ----
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](bn)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](bn)
     for i in range(bn):
         h_indices[i] = Int32((i * 37 + 13) % total_tokens)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](bn)
+    var d_indices = ctx.enqueue_create_buffer[.int32](bn)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # ---- Build reference K_gathered on host ----
@@ -1675,9 +1664,7 @@ def test_gather4_tile_api_paged[
 
     # ---- Build cache_lengths ----
     comptime cache_len_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_len_layout
-    ](
+    var cache_lengths_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -1688,7 +1675,7 @@ def test_gather4_tile_api_paged[
     # ---- Build lookup_table ----
     comptime lut_layout = Layout.row_major[2]()
     var max_pages_per_seq = (tokens_per_seq + page_size - 1) // page_size
-    var lut_managed = ManagedLayoutTensor[DType.uint32, lut_layout](
+    var lut_managed = ManagedLayoutTensor[.uint32, lut_layout](
         RuntimeLayout[lut_layout].row_major(
             IndexList[2](batch_size, num_blocks)
         ),
@@ -1716,7 +1703,7 @@ def test_gather4_tile_api_paged[
     var kv_cache = collection.get_key_cache(0)
 
     # ---- Build gather indices from the paged cache ----
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         var tok_idx = (i * 37 + 13) % tokens_per_seq
         var page_within_seq = tok_idx // page_size
@@ -1725,7 +1712,7 @@ def test_gather4_tile_api_paged[
         var phys_row = phys_block * paged_stride + offset_in_page
         h_indices[i] = Int32(phys_row)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # ---- Build reference K_gathered on host ----
@@ -1821,7 +1808,7 @@ def main() raises:
     with DeviceContext() as ctx:
         # Level 2 raw smoke test.
         print("--- Kernel 1: Level 2 raw smoke test ---")
-        test_raw_smoke[DType.bfloat16, 128, 1024](ctx)
+        test_raw_smoke[.bfloat16, 128, 1024](ctx)
 
         # DeviceBuffer overload of create_tma_tile_gather4.
         print(

@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
+from typing import Any, cast
 
 from max._core import Block as _CBlock
 from max._core import OpBuilder
@@ -44,7 +45,12 @@ from ..value import (
 
 def parallel(
     inputs: Sequence[Sequence[TensorValueLike]],
-    body_fn: Callable[..., TensorValue | Iterable[TensorValue]],
+    body_fn: Callable[
+        ...,
+        TensorValue
+        | Iterable[TensorValue]
+        | tuple[TensorValue | Iterable[TensorValue], _ChainValue],
+    ],
     *,
     buffers: Iterable[BufferValueLike] | None = None,
     chain: _ChainValue | None = None,
@@ -65,15 +71,20 @@ def parallel(
 
     When ``chain`` is provided, the parallel region is sequenced relative
     to prior ops and the returned ``out_chain`` represents completion of
-    all parallel launches.
+    all parallel launches.  The in-chain enters the body through a trailing
+    ``_ChainValue`` argument (after the bundle representatives and the
+    buffer), and the body must thread it and return the resulting out-chain
+    as the second element of a ``(tensors, out_chain)`` tuple.
 
     Args:
         inputs: Per-bundle, per-launch tensors.  Each inner sequence is
             one bundle's launches; all bundles must share the same launch
             count and per-launch device labels.
         body_fn: Callable receiving one ``TensorValue`` per input bundle
-            (and optionally one ``BufferValue`` for ``buffers``) and
-            returning one ``TensorValue`` per output bundle.
+            (then optionally one ``BufferValue`` for ``buffers`` and one
+            ``_ChainValue`` for ``chain``).  A chainless body returns one
+            ``TensorValue`` per output bundle; a chained body returns
+            ``(tensors, out_chain)``.
         buffers: Optional per-launch buffer values (one per launch).
         chain: Optional chain value for sequencing.
         result_types: Per-output-bundle, per-launch result types.
@@ -166,25 +177,54 @@ def parallel(
                 Value.from_mlir(_CValue._from_cmlir(arg))
                 for arg in body_block.arguments
             ]
+            # The body block has one representative arg per input bundle,
+            # followed by a trailing !mo.chain arg when the parallel is chained.
+            # The in-chain enters the body through that arg, the body threads it
+            # through its buffer ops, and yields the result as the terminator's
+            # last operand.
+            n_bundles = len(bundle_inputs)
+            bundle_args = block_args[:n_bundles]
+            chain_arg = block_args[n_bundles] if chain is not None else None
+
+            call_args: list[Value[Any]] = list(bundle_args)
             if buffer_inputs is not None:
-                body_result = body_fn(*block_args, buffer_inputs[0])
-            else:
-                body_result = body_fn(*block_args)
+                call_args.append(buffer_inputs[0])
+            if chain_arg is not None:
+                call_args.append(chain_arg)
+            body_result = body_fn(*call_args)
 
-            if isinstance(body_result, TensorValue):
-                body_result = [body_result]
+            # A chained body returns ``(tensors, out_chain)``; a chainless body
+            # returns just ``tensors``.
+            out_chain_value: Value[Any] | None = None
+            if chain is not None:
+                # A chained body always yields a (tensors, out_chain) pair.
+                assert isinstance(body_result, tuple) and len(body_result) == 2
+                body_tensors, out_chain_value = body_result
             else:
-                body_result = list(body_result)
+                # A chainless body returns the tensors directly; the chained
+                # 2-tuple form is excluded by the chain-is-None contract.
+                body_tensors = cast(
+                    "TensorValue | Iterable[TensorValue]", body_result
+                )
 
-            if len(body_result) != len(output_bundles):
+            if isinstance(body_tensors, TensorValue):
+                output_tensors = [body_tensors]
+            else:
+                output_tensors = list(body_tensors)
+
+            if len(output_tensors) != len(output_bundles):
                 raise ValueError(
-                    f"parallel body yielded {len(body_result)} tensor(s), "
+                    f"parallel body yielded {len(output_tensors)} tensor(s), "
                     f"expected {len(output_bundles)} (one per output bundle)"
                 )
 
+            yield_operands: list[Value[Any]] = list(output_tensors)
+            if out_chain_value is not None:
+                yield_operands.append(out_chain_value)
+
             graph._add_op_generated(
                 YieldOp,
-                operands=body_result,
+                operands=yield_operands,
                 parameters=kgen.ParameterExprArrayAttr([]),
             )
 

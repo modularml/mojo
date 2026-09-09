@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 import argparse
+import sys
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -228,7 +229,7 @@ if __name__ == "__main__":
 
     if list_sms:
         print(df_filtered["sm_id"].unique())
-        exit(0)
+        sys.exit(0)
 
     # Group by block_idx_x and block_idx_y, then sort by role and split into separate dataframes
     grouped = df_filtered.groupby(["sm_id"])

@@ -74,7 +74,7 @@ class Idefics3VisionAttention(MultiheadAttention):
         super().__init__(
             num_attention_heads=num_attention_heads,
             hidden_size=hidden_size,
-            devices=devices_list if devices_list else None,
+            devices=devices_list or None,
             dtype=dtype,
             scale=scale,
             qkv_has_bias=True,  # Idefics3 uses bias in QKV projections

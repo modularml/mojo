@@ -1,0 +1,51 @@
+load("//bazel:api.bzl", "modular_cc_library")
+
+# gazelle:default_visibility //Cache:consumers
+# gazelle:default_features layering_check,parse_headers
+
+package(
+    default_visibility = ["//Cache:consumers"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+package_group(
+    name = "consumers",
+    packages = [
+        "//Cache/...",
+        "//GraphCompiler/...",
+        "//Mojo/...",
+    ],
+)
+
+modular_cc_library(
+    name = "Cache",
+    srcs = glob(["lib/**/*.cpp"]),
+    hdrs = glob(["include/Cache/**/*.h"]),
+    deps = [
+        "//AsyncRT:CompilerSupport",
+        "//AsyncRT:Runtime",
+        "//AsyncRT:Support",
+        "//Config",
+        "//Support:Base",
+        "//Support:Base64",
+        "//Support:Buffer",
+        "//Support:CacheLog",
+        "//Support:Compiler",
+        "//Support:Configuration",
+        "//Support:Context",
+        "//Support:Filesystem",
+        "//Support:HashUtils",
+        "//Support:Telemetry",
+        "//Support:TimeProfiler",
+        "//Support:URI",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AsmParser",
+        "@llvm-project//mlir:BytecodeWriter",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+    ],
+)

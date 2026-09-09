@@ -20,6 +20,8 @@ from max.driver import CPU
 from max.dtype import DType
 from max.experimental import functional as F
 from max.experimental import realization_context as rc
+from max.experimental.executor import CompilingExecutor
+from max.experimental.support import _session
 from max.experimental.tensor import (
     Tensor,
     TensorType,
@@ -167,7 +169,7 @@ def test_graph_context_using_realized_tensors() -> None:
     with Graph("test", input_types=[input_type]) as graph:
         graph.output(eager + graph.inputs[0].tensor)
 
-    model = rc._session().load(graph)
+    model = _session().load(graph)
     input = Tensor.ones([3, 3], dtype=DType.float32, device=CPU())
     output = model(input)[0]
     assert output[0, 0].item() == 6
@@ -186,7 +188,7 @@ def test_graph_context_using_lazy_tensors() -> None:
 
     assert lazy.real
 
-    model = rc._session().load(graph)
+    model = _session().load(graph)
     input = Tensor.ones([3, 3], dtype=DType.float32, device=CPU())
     output = model(input)[0]
     assert output[0, 0].item() == 6
@@ -216,3 +218,49 @@ def test_nested_contexts() -> None:
 
         assert not a.real
     assert not a.real
+
+
+# ---------------------------------------------------------------------------
+# default_realization_context
+# ---------------------------------------------------------------------------
+
+
+def test_set_default_realization_context_scoped() -> None:
+    """ensure_context constructs implicit contexts via the installed factory."""
+    created: list[rc.EagerRealizationContext] = []
+
+    def factory() -> rc.EagerRealizationContext:
+        ctx = rc.EagerRealizationContext(use_interpreter=False)
+        created.append(ctx)
+        return ctx
+
+    with rc.set_default_realization_context(factory):
+        # No explicit context: realization goes through ensure_context.
+        t = Tensor.zeros([2]) + 1.0
+        assert created, "factory was not used for the implicit context"
+        # use_interpreter=False routes through the compile-only executor.
+        for ctx in created:
+            assert isinstance(ctx._executor, CompilingExecutor)
+        assert t.real
+    # Exiting the scope restores the previous factory.
+    assert rc._DEFAULT_REALIZATION_CONTEXT is rc.EagerRealizationContext
+
+
+def test_set_default_realization_context_takes_effect_immediately() -> None:
+    """The set happens at call time; discarding the handle keeps it."""
+
+    def factory() -> rc.EagerRealizationContext:
+        return rc.EagerRealizationContext(use_interpreter=False)
+
+    undo = rc.set_default_realization_context(factory)
+    try:
+        assert rc._DEFAULT_REALIZATION_CONTEXT is factory
+    finally:
+        undo.__exit__(None, None, None)
+    assert rc._DEFAULT_REALIZATION_CONTEXT is rc.EagerRealizationContext
+
+
+def test_default_realization_context_default_is_eager() -> None:
+    """The out-of-the-box default constructs an EagerRealizationContext."""
+    ctx = rc.default_realization_context()
+    assert isinstance(ctx, rc.EagerRealizationContext)

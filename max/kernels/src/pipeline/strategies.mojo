@@ -23,18 +23,20 @@ These structs are an *opt-in* alternative to the flat-field
 `ScheduleConfig` constructor; existing callers passing flat kwargs
 continue to work unchanged. Use via:
 
-    var sc = ScheduleConfig.from_strategies(
-        barrier=BarrierStrategy.minimal_no_set_prio(
-            sched_barrier_mask=0xFF,
-            wrap_waits=True,
-        ),
-        wait=WaitStrategy.auto_with_inter_block_drain(),
-        load=LoadStrategy.default(),
-        scheduling=SchedulingStrategy.IDENTITY,
-    )
+```mojo
+var sc = ScheduleConfig.from_strategies(
+    barrier=BarrierStrategy.minimal_no_set_prio(
+        sched_barrier_mask=0xFF,
+        wrap_waits=True,
+    ),
+    wait=WaitStrategy.auto_with_inter_block_drain(),
+    load=LoadStrategy.default(),
+    scheduling=SchedulingStrategy.IDENTITY,
+)
+```
 
 Strategy methods named `default()` return the framework's default
-(ping-pong) behaviour — passing only `scheduling` to
+(ping-pong) behaviour, passing only `scheduling` to
 `from_strategies` reproduces `ScheduleConfig()` exactly.
 """
 
@@ -49,24 +51,7 @@ from .config import SchedulingStrategy
 
 @fieldwise_init
 struct BarrierStrategy(Copyable, Movable):
-    """How the schedule emits barriers and barrier-adjacent fences.
-
-    Fields:
-        minimal: Suppress per-block s_barriers and set_prio pairs;
-            emit `s_barrier` only at top-of-half and the first
-            cross-stage block. See `ScheduleConfig.minimal_barriers`.
-        omit_set_prio: When `minimal=True`, drop the pre-MMA
-            `s_setprio[1]` entirely. See
-            `ScheduleConfig.omit_mma_set_prio`.
-        sched_barrier_mask: Bitmask of which blocks get trailing
-            `schedule_barrier` fences. Default: 0b01010101.
-        wrap_waits_sched_barrier: Wrap each contiguous wait/barrier
-            group with `schedule_barrier` on both sides. See
-            `ScheduleConfig.wrap_waits_with_sched_barrier`.
-        barrier_before_pre_ops: Move the pre_sync + barrier section
-            ahead of the frag/global section in each block. See
-            `ScheduleConfig.barrier_before_pre_ops`.
-    """
+    """How the schedule emits barriers and barrier-adjacent fences."""
 
     var minimal: Bool
     """Suppresses per-block `s_barrier`s and `set_prio` pairs; emits
@@ -138,24 +123,7 @@ struct BarrierStrategy(Copyable, Movable):
 
 @fieldwise_init
 struct WaitStrategy(Copyable, Movable):
-    """How the schedule derives and places vmcnt/lgkmcnt waits.
-
-    Fields:
-        auto_waits: Auto-derive wait counts from program structure.
-        drain_lgkm_mask: Per-block bitmask for selective LDS drains.
-        auto_drain: Auto-derive `drain_lgkm_mask` from channel
-            analysis.
-        wait_lgkm_first: Manual wait_lgkm override (used when
-            `auto_waits=False`). 255 = unset.
-        wait_vm_last: Manual wait_vm override.
-        lgkm_after_last: Insert `wait_lgkm(0)` after the last block's
-            barrier.
-        inter_block_lgkm_drain: Emit `wait_lgkm(0)` at non-top,
-            non-cross interior block starts.
-        partial_prologue_drain: Skip standard `wait_vm(0)` drains in
-            the framework prologue (kernel emits its own partial
-            drains via `bootstrap_frags`).
-    """
+    """How the schedule derives and places vmcnt/lgkmcnt waits."""
 
     var auto_waits: Bool
     """Auto-derives wait counts from program structure."""
@@ -227,23 +195,14 @@ struct WaitStrategy(Copyable, Movable):
 
 @fieldwise_init
 struct LoadStrategy(Copyable, Movable):
-    """In-block ordering of fragment loads vs global prefetches.
-
-    Fields:
-        global_before_frag: Emit globals before frags in each block.
-            See `ScheduleConfig.global_before_frag`.
-        lgkm_per_load_a: lgkmcnt entries per channel-A frag-load (for
-            wait derivation; auto-derived from kernel geometry —
-            see `pipeline.geometry.KernelGeometry`).
-        lgkm_per_load_b: lgkmcnt entries per channel-B frag-load.
-    """
+    """In-block ordering of fragment loads vs global prefetches."""
 
     var global_before_frag: Bool
     """Emits global prefetches before fragment loads in each block.
     See `ScheduleConfig.global_before_frag`."""
     var lgkm_per_load_a: Int
     """`lgkmcnt` entries per channel-A frag-load (for wait derivation;
-    auto-derived from kernel geometry — see
+    auto-derived from kernel geometry; see
     `pipeline.geometry.KernelGeometry`)."""
     var lgkm_per_load_b: Int
     """`lgkmcnt` entries per channel-B frag-load."""

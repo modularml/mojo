@@ -12,13 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 """DeepSeek-V3.2 mixture-of-experts architecture for text generation."""
 
-from .arch import DeepseekV32HFConfig, deepseekV3_2_arch
+from .arch import deepseekV3_2_arch
 from .model import DeepseekV3_2Model
 from .model_config import DeepseekV3_2Config
 
 __all__ = [
     "DeepseekV3_2Config",
     "DeepseekV3_2Model",
-    "DeepseekV32HFConfig",
     "deepseekV3_2_arch",
 ]

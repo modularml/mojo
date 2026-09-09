@@ -11,14 +11,14 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.collections import Set
-from std.math import rsqrt
-from std.random import random_ui64, seed
+from std.math import ceildiv, rsqrt
+from std.random import seed
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
+from kv_cache_test_utils import random_distinct
 from kv_cache.types import (
-    ContinuousBatchingKVCacheCollection,
     KVCacheStaticParams,
+    PagedKVCacheCollection,
 )
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
 from layout._utils import ManagedLayoutTensor
@@ -39,29 +39,21 @@ def execute_flash_attention[
     num_q_heads: Int, dtype: DType, kv_params: KVCacheStaticParams
 ](
     batch_size: Int,
-    valid_length: LayoutTensor[DType.uint32, Layout(UNKNOWN_VALUE), _],
+    valid_length: LayoutTensor[.uint32, Layout(UNKNOWN_VALUE), _],
     max_seq_len: Int,
     num_layers: Int,
     layer_idx: Int,
-    cache_valid_length: LayoutTensor[DType.uint32, Layout(UNKNOWN_VALUE), _],
+    cache_valid_length: LayoutTensor[.uint32, Layout(UNKNOWN_VALUE), _],
     ctx: DeviceContext,
 ) raises:
-    comptime num_blocks = 32
-    comptime CollectionType = ContinuousBatchingKVCacheCollection[
-        dtype, kv_params
-    ]
+    comptime page_size = 128
+    var pages_per_seq = ceildiv(max_seq_len, page_size)
+    # Twice what the batch needs, so the lookup table indexes sparsely into the
+    # pool instead of covering a dense prefix of it.
+    var num_blocks = 2 * batch_size * pages_per_seq
 
-    debug_assert(
-        batch_size < num_blocks,
-        "batch_size passed to unit test (",
-        batch_size,
-        ") is larger than configured num_blocks (",
-        num_blocks,
-        ")",
-    )
-
-    max_prompt_len = 0
-    max_context_len = 0
+    var max_prompt_len = 0
+    var max_context_len = 0
 
     for i in range(batch_size):
         max_prompt_len = max(max_prompt_len, Int(valid_length[i]))
@@ -82,7 +74,7 @@ def execute_flash_attention[
     random(q.tensor())
 
     var valid_lengths = ManagedLayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE)
+        .uint32, Layout.row_major(UNKNOWN_VALUE)
     ](
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(
             Index(batch_size)
@@ -113,7 +105,7 @@ def execute_flash_attention[
 
     # initialize our KVCache
     var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE)
+        .uint32, Layout(UNKNOWN_VALUE)
     ](
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(Index(batch_size)),
         ctx,
@@ -130,7 +122,7 @@ def execute_flash_attention[
         num_blocks,
         2,
         num_layers,
-        max_seq_len,
+        page_size,
         kv_params.num_heads,
         kv_params.head_size,
     )
@@ -147,23 +139,25 @@ def execute_flash_attention[
     random(kv_block_host_tensor)
 
     # Create lookup table
-    var lookup_table = ManagedLayoutTensor[DType.uint32, Layout(UNKNOWN_VALUE)](
-        RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(Index(batch_size)),
+    comptime lut_layout = Layout.row_major[2]()
+    var lookup_table = ManagedLayoutTensor[.uint32, lut_layout](
+        RuntimeLayout[lut_layout].row_major(
+            IndexList[2](batch_size, pages_per_seq)
+        ),
         ctx,
     )
 
     # Initialize lookup table
     var lookup_table_host = lookup_table.tensor[update=False]()
-    # hacky way to get random block indices
-    var block_idx_set = Set[Int]()
-    var idx = 0
-    while len(block_idx_set) < batch_size:
-        var randval = Int(random_ui64(0, num_blocks - 1))
-        if randval in block_idx_set:
-            continue
-        block_idx_set.add(randval)
-        lookup_table_host[idx] = UInt32(randval)
-        idx += 1
+    # Every page of every sequence gets a distinct physical block, so an
+    # off-by-one in the page lookup reads another sequence's data rather than
+    # aliasing back onto the correct row.
+    var lut_blocks = random_distinct(num_blocks, batch_size * pages_per_seq)
+    for batch_idx in range(batch_size):
+        for page_idx in range(pages_per_seq):
+            lookup_table_host[batch_idx, page_idx] = UInt32(
+                lut_blocks[batch_idx * pages_per_seq + page_idx]
+            )
 
     # Create layout tensors for GPU operations
     var q_tensor = q.device_tensor()
@@ -173,7 +167,9 @@ def execute_flash_attention[
     var kv_block_tensor = kv_block.device_tensor()
     var lookup_table_tensor = lookup_table.device_tensor()
 
-    var kv_collection_device = CollectionType(
+    var kv_collection_device = PagedKVCacheCollection[
+        dtype, kv_params, page_size
+    ](
         kv_block_tensor,
         cache_lengths_device,
         lookup_table_tensor,
@@ -233,7 +229,7 @@ def execute_flash_attention_suite(ctx: DeviceContext) raises:
     comptime dtypes = (DType.bfloat16,)
     var bs = 2
     var valid_length_managed = ManagedLayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE)
+        .uint32, Layout(UNKNOWN_VALUE)
     ](
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(Index(bs)),
         ctx,
@@ -241,7 +237,7 @@ def execute_flash_attention_suite(ctx: DeviceContext) raises:
     var valid_length = valid_length_managed.tensor[update=False]()
 
     var cache_valid_length_managed = ManagedLayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE)
+        .uint32, Layout(UNKNOWN_VALUE)
     ](
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(Index(bs)),
         ctx,
@@ -249,7 +245,7 @@ def execute_flash_attention_suite(ctx: DeviceContext) raises:
     var cache_valid_length = cache_valid_length_managed.tensor[update=False]()
 
     comptime for dtype_idx in range(len(dtypes)):
-        comptime dtype = dtypes[dtype_idx]
+        comptime dtype = rebind[DType](dtypes[dtype_idx])
         # Replit context encoding [testing even query valid lengths].
         valid_length[0] = 128
         valid_length[1] = 64

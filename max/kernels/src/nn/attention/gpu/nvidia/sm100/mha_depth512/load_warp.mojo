@@ -52,8 +52,9 @@ from nn.attention.gpu.nvidia.sm100.attention_utils import (
     PagedRowIndices,
     kv_sub_tile_rows,
     kv_num_sub_tiles,
+    kv_tma_fold_chunks,
 )
-from nn.attention.gpu.nvidia.sm90.attention import (
+from nn.attention.gpu.nvidia.common import (
     KVTMATile,
     MHAPosition,
     OptionalPointer,
@@ -107,6 +108,53 @@ def depth512_load[
     ],
     kv_lut: KVLUTType,
 ):
+    """Issues TMA loads for one pair-CTA attention tile's Q, K, and V data.
+
+    Drives the producer side of the staged KV pipeline for a single
+    attention tile, loading Q (per-CTA), K (per-CTA half of BN), and V
+    (depth-split sub-tiles) into SMEM via non-multicast TMA copies.
+    The peeled-first iteration co-arrives Q with the first K depth stage
+    on a shared barrier so the MMA can start immediately; the main loop
+    issues full-tile K/V loads; the peeled-last iteration handles
+    partial pages when `page_size < BN`. Mask checks use `PairBM` so both
+    CTAs make identical skip decisions and pipeline barriers stay
+    synchronized.
+
+    Parameters:
+        KVLUTType: Paged key-value lookup table type supplying the element
+            `dtype`, `page_size`, and row-to-page mappings used by `kv_lut`.
+        MaskType: Attention mask type driving per-tile skip and load
+            decisions via `start_column`, `last_masked_set_end`, and
+            `status` queries.
+        qkv_dtype: Element `DType` of the Q, K, and V tensors; must match
+            `KVLUTType.dtype` and `config.qkv_dtype`.
+        config: Depth-512 SM100 pair-CTA attention configuration providing
+            tile sizes (`BM`, `BN`, `BK0`, `BK1`), stage counts, swizzle
+            mode, GQA grouping, and `split_o` controls.
+        ValidLengthType: Optional pointer type for per-sequence valid
+            lengths; `is_null` is `False` for ragged variable-length
+            sequences.
+        _is_cache_length_accurate: Whether the reported KV cache length
+            exactly matches the count of valid tokens.
+        MaxSeqLenType: Type of the maximum sequence length, either a
+            comptime static `Int` or a runtime value; selects the decoding
+            vs. prefill path via `_is_decoding`.
+        is_leader: Whether this CTA is the leader (even-ranked) CTA in
+            the pair-CTA cluster; the leader issues `expect_bytes` and
+            selects the first half of K/V rows.
+
+    Args:
+        smem: Shared-memory allocator and stage buffers for the kernel.
+        score_row: Starting row of the Q tile within the current sequence.
+        num_keys: Number of valid KV keys for the current sequence.
+        seq_info: Per-sequence metadata (prompt index, head index, etc.).
+        max_seq_len: Maximum sequence length (static or dynamic).
+        mask: Attention mask driving per-tile skip/load decisions.
+        q_tma_op: TMA descriptor for Q tile loads.
+        k_tma_op: TMA descriptor for K tile loads (per-CTA half).
+        v_tma_op: TMA descriptor for V tile loads (per-sub-tile).
+        kv_lut: Paged key-value lookup table supplying row-to-page mappings.
+    """
     comptime assert KVLUTType.dtype == config.qkv_dtype
     comptime qkv_type = KVLUTType.dtype
     comptime BM = config.BM
@@ -175,7 +223,7 @@ def depth512_load[
         KVLUTType.dtype,
         type_of(tt_row_major[q_elems]()),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]
 
     # kv_elems: per-stage SMEM element count, used for pipeline stage indexing.
@@ -215,6 +263,38 @@ def depth512_load[
     comptime k_bytes_pp = BK0 * k_tma_tile_rows * qkv_size
     comptime v_bytes_pp = config.v_cols_per_cta * v_tma_tile_rows * qkv_size
 
+    # Depth-chunk TMA fold (SM100). MUST match `mha_sm100_depth512_dispatch`
+    # which builds `k_tma_op` / `v_tma_op` with the same `kv_tma_fold_chunks`
+    # values (single source of truth). The matching descriptor rank and
+    # issue-coord rank are guaranteed because the same comptime predicate drives
+    # both builder and issue site. The per-issue byte total is unchanged: one
+    # folded TMA carries the same bytes as the N per-chunk TMAs.
+    #
+    # K: box_rows == k_tma_tile_rows, smem_BN == BN // 2 (K's per-CTA tile_rows),
+    # mirroring the issue site's `smem_BN=BN // 2`.
+    comptime k_fold_chunks = kv_tma_fold_chunks[
+        qkv_type,
+        config.swizzle_mode,
+        BK=BK0,
+        head_size=config.qk_depth,
+        box_rows=k_tma_tile_rows,
+        smem_BN=BN // 2,
+        page_size=page_size,
+    ]()
+    # V: folds the `v_cols_per_cta` depth columns. box_rows == v_tma_tile_rows,
+    # smem_BN == BK1 (V's per-sub-tile tile_rows = BN // num_pv_stages); the fold
+    # is byte-equivalent because `_tma_copy_kv_impl` writes V chunks at stride
+    # `tile_rows * gran == BK1 * gran` and the rank-4 box reproduces that stride.
+    comptime v_fold_chunks = kv_tma_fold_chunks[
+        qkv_type,
+        config.swizzle_mode,
+        BK=config.v_cols_per_cta,
+        head_size=config.ov_depth,
+        box_rows=v_tma_tile_rows,
+        smem_BN=BK1,
+        page_size=page_size,
+    ]()
+
     # ---- SMEM pointers ------------------------------------------------------
 
     var q_smem = rebind[SharedMemPointer[Scalar[KVLUTType.dtype]]](
@@ -247,9 +327,9 @@ def depth512_load[
     else:
         kv_head_idx = seq_info.head_idx // UInt32(group)
 
-    e = elect()
+    var e = elect()
 
-    @parameter
+    @__parameter
     @always_inline
     def _kv_num_valid_pages(current_kv_row: UInt32) -> UInt32:
         """Valid paged entries in a BK1-row range starting at `current_kv_row`.
@@ -275,11 +355,11 @@ def depth512_load[
         )
 
     var kv_row: UInt32 = mask.start_column[PairBM_mask, BN, page_size](
-        score_row
+        seq_info.prompt_idx, score_row
     )
     var iter_count: UInt32 = (
         mask.last_masked_set_end[PairBM_mask, BN, page_size](
-            score_row, num_keys
+            seq_info.prompt_idx, score_row, num_keys
         )
         - 1
     )
@@ -325,7 +405,7 @@ def depth512_load[
 
     # ---- V load helper (peeled + loop share this) ----------------------------
 
-    @parameter
+    @__parameter
     @always_inline
     def _load_v_stage[
         pv_stage: Int
@@ -338,7 +418,7 @@ def depth512_load[
         prevents `0 * non-finite = NaN` propagation in `O += P * V`
         when masked V rows would otherwise contain stale or
         uninitialized SMEM (most common when this is the very first
-        write to the SMEM slot — typically the only iter is partial,
+        write to the SMEM slot, typically the only iter is partial,
         i.e. `seq_len <= BN`). Because each OOB TMA still arrives at
         `mbar` with its byte count, we always set the full
         `v_expect_bytes` regardless of `v_needs_partial`.
@@ -354,6 +434,7 @@ def depth512_load[
             num_v_sub_tiles=num_pv_stages,
             v_sub_tile_idx=pv_stage,
             oob_fill_pages=v_needs_partial,
+            fold_chunks=v_fold_chunks,
         ](
             v_tma_op,
             kv_smem + kv_pipeline.state.index() * UInt32(kv_elems),
@@ -367,7 +448,7 @@ def depth512_load[
 
     # ---- K load helper (peeled-first, main, peeled-last share this) ---------
 
-    @parameter
+    @__parameter
     @always_inline
     def _produce_k[
         partial: Bool,
@@ -382,7 +463,7 @@ def depth512_load[
         `with_q`: True only at the peeled-first iteration where Q
             co-arrives on the same mbar. Implies (a) Q stage bytes
             bundle into `expect_bytes_pred`, and (b) `producer_acquire()`
-            is skipped (init pre-acquired this slot — calling acquire
+            is skipped (init pre-acquired this slot; calling acquire
             here would phase-mismatch). The Q TMA itself stays at the
             call site since `fuse_gqa` branching is per-call.
 
@@ -393,7 +474,7 @@ def depth512_load[
         `kv_nvp_0`, `kv_nvp_1`: per-CTA-half valid-page counts. Used for
             `expect_bytes_pred` when partial=True (sum) and for the
             per-CTA `k_num_valid_pages` (selected by `is_leader`).
-            Defaults to 0 — fine for partial=False since both are unused
+            Defaults to 0, fine for partial=False since both are unused
             (full-tile bytes from `k_expect_bytes`; TMA loop is
             comptime-unrolled).
         """
@@ -416,6 +497,7 @@ def depth512_load[
         paged_rows.tma_copy_k[
             needs_partial=partial,
             smem_BN=BN // 2,
+            fold_chunks=k_fold_chunks,
         ](
             k_tma_op,
             kv_smem + kv_pipeline.state.index() * UInt32(kv_elems),
@@ -520,6 +602,7 @@ def depth512_load[
         comptime if check_mask:
             if (
                 mask.status(
+                    seq_info.prompt_idx,
                     Index[dtype=DType.int32](Int(score_row), Int(kv_row)),
                     Index[dtype=DType.int32](PairBM_mask, BN),
                 )
@@ -575,6 +658,7 @@ def depth512_load[
             comptime if check_mask:
                 if (
                     mask.status(
+                        seq_info.prompt_idx,
                         Index[dtype=DType.int32](Int(score_row), Int(kv_row)),
                         Index[dtype=DType.int32](PairBM_mask, BN),
                     )

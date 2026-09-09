@@ -1,0 +1,173 @@
+---
+title: Embeddings
+sidebar_label: Embeddings
+description: Learn how to use the MAX embeddings endpoint to create embeddings for input text
+github_url: https://github.com/modular/modular/tree/main/max/examples/embedding-knowledge-base/
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import SmallCards from '@site/src/components/SmallCards';
+import InstallMAX from '../_includes/install-modular.mdx';
+import InstallOpenAI from '../_includes/install-openai.mdx';
+import Requirements from '@site/src/components/Requirements';
+import { requirementsNoGPU } from '../requirements';
+
+Text embeddings are rich numerical representations of text. They capture
+semantic meaning in a way that allows computers to compare, cluster, and search
+text effectively.
+
+Use embeddings whenever you need to measure similarity between pieces of text,
+perform semantic search, build recommendation systems, or cluster documents.
+They are foundational for many modern NLP tasks.
+
+In contemporary GenAI applications, embeddings are especially powerful in
+agentic workflows, including:
+
+- **Retrieval-Augmented Generation (RAG):** Embeddings make it possible to store
+  and search large collections of documents, grounding model responses in your
+  own data instead of relying only on a model's training knowledge.
+- **Context injection for agents:** Embeddings help agents decide which pieces
+  of external knowledge (APIs, tools, or documents) are most relevant to the
+  current query.
+- **Personalization and recommendations:** By embedding both user data and
+  content, systems can deliver more tailored results.
+- **Clustering and analytics:** Embeddings allow grouping similar inputs for
+  downstream tasks like summarization, deduplication, and insight extraction.
+
+## Endpoint
+
+MAX supports the
+[`v1/embeddings`](/rest-api/create-embedding/) endpoint, which is
+fully compatible with the OpenAI API.
+
+To use the endpoint, provide the ID of an embedding model along with the text
+to embed. The API returns numerical embeddings that capture the semantic
+meaning of each input. The request payload should look similar to the following:
+
+```json
+{
+  "model": "sentence-transformers/all-mpnet-base-v2",
+  "input": "The food was delicious and the service was excellent."
+}
+```
+
+## Quickstart
+
+Serve and interact with an embedding model using an OpenAI-compatible endpoint.
+Specifically, we'll use MAX to serve the
+[all-mpnet-base-v2](https://huggingface.co/sentence-transformers/all-mpnet-base-v2)
+model, which is a powerful transformer that excels at capturing semantic
+relationships in text.
+
+System requirements:
+
+<Requirements requirementsData={requirementsNoGPU}
+url="/packages#system-requirements" />
+
+### Set up your environment
+
+Create a Python project to install our APIs and CLI tools:
+
+<InstallMAX folder="embeddings-quickstart" />
+
+### Serve your model
+
+Use the [`max serve`](/cli/serve) command to start a local model server
+with the `all-mpnet-base-v2` model:
+
+```sh
+max serve \
+  --model sentence-transformers/all-mpnet-base-v2
+```
+
+This will create a server running the `all-mpnet-base-v2` embedding model on
+`http://localhost:8000/v1/embeddings`, an [OpenAI compatible
+endpoint](https://platform.openai.com/docs/api-reference/embeddings).
+
+The endpoint is ready when you see this message printed in your terminal:
+
+```output
+Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+For a complete list of `max` CLI commands and options, refer to the
+[MAX CLI reference](/cli).
+
+### Interact with your model
+
+MAX supports OpenAI's REST APIs and you can interact with
+the model using either the OpenAI Python SDK or curl:
+
+<Tabs>
+<TabItem value="python" label="Python">
+
+You can use OpenAI's Python client to interact with the model.
+First, install the OpenAI API:
+
+<InstallOpenAI />
+
+Then, create a client and make a request to the model:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="EMPTY")
+
+# Create embeddings
+response = client.embeddings.create(
+    model="sentence-transformers/all-mpnet-base-v2",
+    input="Run an embedding model with MAX!",
+)
+
+print(f"{response.data[0].embedding[:5]}")
+```
+
+You should receive a response similar to this:
+
+```json
+{"data":[{"index":0,"embedding":[-0.06595132499933243,0.005941616836935282,0.021467769518494606,0.23037832975387573,
+```
+
+The text has been shortened for brevity. This returns a numerical representation
+of the input text that can be used for semantic comparisons.
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+The following `curl` command sends an embeddings request to the model:
+
+```sh
+curl http://localhost:8000/v1/embeddings \
+-H "Content-Type: application/json" \
+-d '{
+    "input": "Run an embedding model with MAX!",
+    "model": "sentence-transformers/all-mpnet-base-v2"
+}'
+```
+
+You should receive a response similar to this:
+
+```json
+{"data":[{"index":0,"embedding":[-0.06595132499933243,0.005941616836935282,0.021467769518494606,0.23037832975387573,
+```
+
+The text has been shortened for brevity. This returns a numerical representation
+of the input text that can be used for semantic comparisons.
+
+</TabItem>
+</Tabs>
+
+For complete details on all available API endpoints and options, see the
+[REST API documentation](/rest-api/).
+
+## Next steps
+
+Now that you have successfully set up MAX with an OpenAI-compatible embeddings
+endpoint, checkout out these other docs:
+
+- [Build a model graph with Module](/develop/modules): Learn how to
+  compose modules, write custom modules with explicit weights, load checkpoint
+  data, and construct a model graph.
+- [Build custom ops for GPUs](/develop/build-custom-ops): Write custom GPU
+  and CPU operations in Mojo and load them into a MAX graph.

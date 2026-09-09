@@ -20,7 +20,7 @@ from std.random import rand
 from std.testing import assert_false
 
 from layout import Idx, TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from nn.conv.conv import Naive2dConvolution, conv_gpu
 from std.utils.index import Index, IndexList
 
@@ -141,8 +141,8 @@ def test_grouped_conv2d[
     var max_diff: Float32 = 0.0
     var errors = 0
     for i in range(out_size):
-        var gpu_val = out_gpu_host[i].cast[DType.float32]()
-        var ref_val = out_ref_host[i].cast[DType.float32]()
+        var gpu_val = out_gpu_host[i].cast[.float32]()
+        var ref_val = out_ref_host[i].cast[.float32]()
         var diff = abs(gpu_val - ref_val)
         if diff > max_diff:
             max_diff = diff

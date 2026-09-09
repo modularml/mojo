@@ -1,0 +1,423 @@
+---
+title: Operators
+sidebar_label: Operators
+sidebar_position: 5
+description: >-
+  Arithmetic, comparison, bitwise, boolean, and assignment
+  operators in Mojo, with precedence and examples.
+---
+
+<!--
+Removed:
+
+- SIMD/Scalar section (scalar aliases, elementwise ops, type matching,
+  .cast(), elementwise comparison methods like .lt(), .eq()) [TYPES]
+- IntLiteral/FloatLiteral compile-time precision details [TYPES]
+- The DType explanation [OVERKILL]
+- Exponentiation accepting an Int exponent specifically [INSIDE BASEBALL]
+- StringLiteral vs String distinction (indexing but not slicing) [TYPES]
+-->
+
+Operators are symbols and keywords that act on values. They support
+addition, comparison, bitwise operations, and boolean logic using operator
+syntax instead of method calls.
+
+Mojo's operator syntax mirrors Python. Symbols, precedence, and
+associativity use Python conventions, so most behavior will feel familiar
+if you've used Python, C, Rust, or similar languages.
+
+That said, a few details are specific to Mojo. Boolean operators use words
+(`and`, `or`, `not`) instead of symbols like `&&` and `||`. The ternary
+expression places the condition in the middle. The caret (`^`) serves as
+both bitwise XOR and the transfer sigil for ownership and memory management.
+
+## Arithmetic
+
+Standard arithmetic operators match what you see in most languages:
+
+```mojo
+print(7 + 3)    # 10, add
+print(7 - 3)    # 4, subtract
+print(7 * 3)    # 21, multiply
+```
+
+Exponentiation uses two stars (`**`) and not a caret (`^`). If you prefer
+a function form, call `pow(base, exponent)`:
+
+```mojo
+print(2 ** 8)   # 256 (exponentiation)
+```
+
+### Unary symbols
+
+Three prefix operators apply to single values. Place the operator to the
+immediate left of the value without spaces:
+
+- `-x` negates (`-7`, the operator is `-`, the expression is `7`)
+- `+x` is a no-op identity (`+7`)
+- `~x` inverts bits (`var a: Int8 = -128; print(~a) # 127`)
+
+### Division and remainder
+
+Mojo has two division operators, and the difference matters
+for negative numbers:
+
+```mojo
+var a = -7
+var b = 4
+print(a / b)   # -1 (truncates toward zero)
+print(a // b)  # -2 (rounds toward negative infinity)
+```
+
+- Use `/` when you want truncation toward zero.
+- Use `//` when you want floor division.
+
+For floating-point types, `/` performs standard division and `//`
+returns a float rounded down to the nearest whole number.
+
+The modulo operator `%` returns the remainder, following this rule:
+
+```text
+a == b * (a // b) + (a % b)
+```
+
+For example:
+
+```mojo
+print(7 % 3)    # 1
+print(-7 % 4)   # 1
+print(7 % -4)   # -1
+```
+
+### Exponentiation
+
+The `**` operator is right-associative, so it groups from the
+right:
+
+```mojo
+print(2 ** 3 ** 2)  # 512, same as 2 ** (3 ** 2)
+```
+
+Exponentiation is one of only two right-associative operators in
+Mojo. The other is the ternary conditional expression (`if`-`else`).
+
+### Matrix multiplication
+
+The `@` operator performs matrix multiplication. If you've
+used NumPy, this will look familiar.
+
+Mojo doesn't include a built-in matrix type, but any type
+that implements `__matmul__()` can use it.
+
+## Comparisons
+
+Mojo provides six comparison operators: `==`, `!=`, `<`,
+`<=`, `>`, and `>=`. Each returns a `Bool` value:
+
+```mojo
+print(10 > 5)     # True
+print(10 == 10)   # True
+print(10 != 10)   # False
+```
+
+### Floating-point comparison
+
+Don't compare floating-point values with the equality operator (`==`).
+Small rounding errors accumulate, and values that look equal often aren't:
+
+```mojo
+from std.math import isclose
+
+var total: Float64 = 0.0
+for _ in range(10):
+    total += 0.1
+print(total == 1.0)        # False
+```
+
+Use `isclose()` for approximate comparison on any
+floating-point type.
+
+```mojo
+print(isclose(total, 1.0)) # True
+```
+
+### Chained comparisons
+
+You can chain comparisons to check a range or a sequence of
+conditions in one expression. Each pair is evaluated from left to
+right:
+
+```mojo
+var x = 5
+print(1 < x < 10)      # True, 1 < x and x < 10
+print(1 < x < 3)       # False, 1 < x and x < 3
+print(1 < x <= 5 < 9)  # True, 1 < x and x <= 5 and 5 < 9
+```
+
+The expression `a < b < c` is equivalent to `(a < b) and (b < c)`.
+The middle value is evaluated once, not twice. This matters when the
+value comes from a function:
+
+```mojo
+var short_item_list: List[Int] = [1, 2, 3, 4, 5]
+var ok = 0 < len(short_item_list) <= 10
+print(ok) # True
+```
+
+Comparison, membership, and identity operators share the same precedence,
+so you can combine them in a single chain. As a hypothetical example:
+
+```mojo
+5 != a < b in c is d
+```
+
+This evaluates as:
+
+```mojo
+(5 != a) and (a < b) and (b in c) and (c is d)
+```
+
+## Bitwise operations
+
+Bitwise operators work on integer types at the bit level. They let
+you inspect and manipulate individual bits directly.
+
+AND (`&`) keeps bits that are set in both operands, OR (`|`) keeps bits set
+in either, and XOR (`^`) keeps bits that differ:
+
+```mojo
+var flags: UInt8 = 0b0000_0101
+var mask: UInt8 = 0b0000_0011
+print(flags & mask)   # 1 (only bit 0 set in both)
+print(flags | mask)   # 7 (bits 0, 1, and 2)
+print(flags ^ mask)   # 6 (bits 1 and 2 differ)
+```
+
+Left shift (`<<`) and right shift (`>>`) move bits by a given number
+of positions. Left shift by *n* is equivalent to multiplying by 2^n,
+right shift to dividing by 2^n:
+
+```mojo
+print(1 << 4)    # 16
+print(16 >> 2)   # 4
+print(-16 >> 2)  # -4
+```
+
+Among the bitwise operators, precedence runs: NOT (`~`) is tightest,
+then shift operators, then AND, then XOR, then OR. If the grouping isn't
+obvious, use parentheses.
+
+:::caution
+Mojo uses the caret (`^`) for both bitwise XOR and the transfer operator.
+In expressions where the meaning could be ambiguous, Mojo treats it as XOR.
+For example, `x^+1` is `(x ^ (+1))`, not `((x^) + 1)`.
+:::
+
+## Boolean logic
+
+Mojo uses words for boolean operators instead of symbols like `&&`
+or `||`. The operators read like plain language:
+
+```mojo
+print(True and False)   # False
+print(True or False)    # True
+print(not True)         # False
+```
+
+### Short-circuit evaluation
+
+The `and` and `or` operators stop as soon as the result is known.
+With `and`, if the left side is falsy, the right side isn't
+evaluated. With `or`, if the left side is truthy, the right side is
+skipped.
+
+```mojo
+def always_true() -> Bool:
+    print("called")
+    return True
+
+# The string "called" never prints because the left side
+# of `and` is already False:
+print(False and always_true())  # False
+```
+
+This behavior is useful when the right side has side effects or is
+expensive to compute.
+
+### Truthiness
+
+Types that conform to `Boolable` have a truth value, so they can be
+used directly in boolean expressions and `if` conditions. The rules
+are predictable: zero, empty strings, empty collections, and `None`
+are falsy. Everything else is truthy.
+
+```mojo
+var name = "Mojo"
+if name:
+    print("Name is set")
+```
+
+## Membership and identity
+
+### `in` and `not in`
+
+The `in` operator checks whether a collection contains a value:
+
+```mojo
+var colors: List[String] = ["red", "green", "blue"]
+print("red" in colors)         # True
+print("yellow" not in colors)  # True
+```
+
+It also works with strings to check for substrings:
+
+```mojo
+var food = "peanut butter"
+if "nut" in food:
+    print("Contains a nut")  # prints
+```
+
+### `is` and `is not`
+
+Identity operators check whether two values refer to the same object,
+not just whether they are equal. The most common use is checking
+`Optional` values against `None`:
+
+```mojo
+var opt: Optional[Int] = None
+if opt is None:
+    print("No value")  # prints
+
+opt = 42
+if opt is not None:
+    print("Has a value")  # prints
+```
+
+## String operators
+
+Strings support concatenation with `+` and repetition with `*`:
+
+```mojo
+var greeting = "Hello" + " " + "Mojo"
+print(greeting)   # Hello Mojo
+print("ha" * 3)   # hahaha
+print("=" * 40)   # a line of 40 equals signs
+```
+
+:::note
+When building a string from multiple values, the multi-argument
+`String()` initializer is more efficient than chaining `+`:
+
+```mojo
+var result = String("Point (", x, ", ", y, ")")
+
+# or
+
+var result = String(t"Point({x}, {y})")
+```
+
+:::
+
+Strings compare lexicographically. Uppercase letters sort before
+lowercase:
+
+```mojo
+print("Zebra" < "ant")   # True
+print("bird" == "bird")  # True
+```
+
+## Conditional expression
+
+Mojo uses `if`-`else` for conditional expressions instead of `? :`.
+The condition sits in the middle:
+
+```mojo
+var score = 80
+var result = "pass" if score > 65 else "fail"
+print(result)  # pass
+```
+
+You can use this form anywhere an expression is valid, including
+function arguments:
+
+```mojo
+def greet(name: String):
+    print("Hello,", name)
+
+greet("Sami" if True else "Cass")  # Hello, Sami
+```
+
+Like exponentiation, chained ternary expressions are right-associative.
+They group from the right, which can be hard to read:
+
+```mojo
+var value = 50
+var label = (
+    "low" if value < 10
+    else "high" if value > 100
+    else "mid"
+)
+print(label)  # mid
+```
+
+## Assignment operators
+
+### In-place assignment
+
+Most binary operators have a compound assignment form: `+=`, `-=`, `*=`,
+`/=`, `//=`, `%=`, `**=`, `@=`, `&=`, `|=`, `^=`, `<<=`, and `>>=`. These
+update the left-hand value instead of creating a new one:
+
+```mojo
+var count = 0
+count += 1
+count += 1
+print(count)  # 2
+
+var flags: UInt8 = 0b0000_0001
+flags |= 0b0000_0100
+print(flags)  # 5 (bits 0 and 2 set)
+```
+
+For types that store data on the heap, in-place operators can avoid
+allocating intermediate values. A type must implement its in-place methods
+explicitly, so not every type that supports `+` also supports `+=`.
+
+### Walrus operator
+
+The walrus operator (`:=`, officially an *assignment expression*) assigns a
+value inside an expression. The assigned value becomes the result of that
+expression.
+
+Press Return without entering text to terminate the loop. Non-empty strings are
+truthy:
+
+```mojo
+while (var name := input("Name or return: ")):
+    print("Hello,", name)
+```
+
+`input()` is a raising function, so call it from a raising function or
+handle its errors with `try`.
+
+## Precedence
+
+When an expression mixes operators, precedence determines what runs first.
+From tightest to loosest, they are: calls and attribute access,
+exponentiation, unary prefix operators, arithmetic (multiply and divide
+before add and subtract), shifts, bitwise operators (AND before XOR before
+OR), comparisons, boolean logic (`not` before `and` before `or`),
+conditional expression, and the walrus operator.
+
+When in doubt, use parentheses. They cost nothing at runtime and make
+your intent clear both when you write the code and when it is later read
+and maintained:
+
+```mojo
+# Clear without thinking about precedence
+var ready = (age >= 18) and (score > threshold)
+```
+
+Assignment operators (`=`, `+=`, `-=`, and others) are
+statements, not expressions. You can't mix them into
+expressions.

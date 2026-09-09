@@ -132,7 +132,7 @@ def test_reshapes__zero_dim(
         graph.output(out)
 
 
-def shapes_plus_ones(shapes=shapes()):  # noqa: ANN001, ANN201
+def shapes_plus_ones(shapes=shapes()):  # noqa: ANN001, ANN201, B008
     ones = st.lists(st.just(1))
     shapes = shapes.flatmap(lambda shape: ones.map(lambda ones: shape + ones))
     return shapes.flatmap(st.permutations)

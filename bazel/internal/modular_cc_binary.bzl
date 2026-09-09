@@ -64,6 +64,7 @@ def modular_cc_binary(
         copts = [],
         data = [],
         deps = [],
+        internal_deps = [],
         env = {},
         mojo_deps = [],
         toolchains = [],
@@ -81,6 +82,7 @@ def modular_cc_binary(
         copts: See cc_library docs
         data: See cc_binary docs
         deps: See cc_binary docs
+        internal_deps: Same as `deps`, but excluded for external builds.
         env: Env to set when using bazel run
         mojo_deps: mojo_library targets the binary depends on at runtime
         toolchains: See cc_binary docs
@@ -115,7 +117,7 @@ def modular_cc_binary(
         srcs = srcs,
         copts = copts,
         data = data + extra_data,
-        deps = extra_deps + deps,
+        deps = extra_deps + deps + internal_deps,
         env = extra_env | env,
         toolchains = toolchains + extra_toolchains,
         testonly = testonly,

@@ -28,7 +28,7 @@ from std.random import rand
 from std.testing import assert_false
 
 from layout import Idx, TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from nn.conv.conv import conv_gpu, conv_cudnn
 
 from std.utils.index import IndexList
@@ -174,8 +174,8 @@ def test_flux_conv_layer[
     var max_diff: Float32 = 0.0
     var errors = 0
     for i in range(out_size):
-        var sm100_val = out_sm100_host_ptr[i].cast[DType.float32]()
-        var cudnn_val = out_cudnn_host_ptr[i].cast[DType.float32]()
+        var sm100_val = out_sm100_host_ptr[i].cast[.float32]()
+        var cudnn_val = out_cudnn_host_ptr[i].cast[.float32]()
         var diff = abs(sm100_val - cudnn_val)
         if diff > max_diff:
             max_diff = diff

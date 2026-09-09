@@ -15,7 +15,7 @@
 from std.collections import Optional
 from std.sys import align_of
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from linalg.matmul.gpu.sm90.config import MatmulConfig as MatmulConfigSM90
 from linalg.matmul.gpu.sm90.testbed_swapAB import (
     test_matmul_sm90_swapAB_comparison,
@@ -357,11 +357,11 @@ def main() raises:
         # Each position gets val + row + col * 0.5, creating unique values
         # Using larger offsets that are significant in bf16 precision
         # If indexing is wrong, the reference and swapAB results will mismatch
-        @parameter
+        @__parameter
         @always_inline
         def coord_lambda[
             _dtype: DType,
-            width: SIMDSize,
+            width: SIMDLength,
             *,
             alignment: Int = align_of[SIMD[_dtype, width]](),
         ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> SIMD[

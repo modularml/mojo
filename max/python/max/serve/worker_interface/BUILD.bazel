@@ -6,9 +6,13 @@ modular_py_library(
     name = "worker_interface",
     srcs = glob(["*.py"]),
     deps = [
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lora",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/request",
         "//max/python/max/serve:queue",
         "//max/python/max/serve:scheduler_result",
+        "//max/python/max/serve/telemetry",
         requirement("psutil"),
         requirement("pyzmq"),
     ],

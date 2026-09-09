@@ -11,6 +11,15 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Implements the ARM I8MM (8-bit integer matrix multiply) CPU microkernel.
+
+Provides `Inner_matmul_i8mm`, an `InnerMatmulKernel` conforming struct that
+performs 8-bit integer matrix multiplication using the `_neon_matmul` NEON
+intrinsic. It accumulates `int32` or `uint32` results from `uint8`/`uint8`,
+`uint8`/`int8`, or `int8`/`int8` operand pairs (i8mm does not support a
+signed-`A`, unsigned-`B` pair) through `LoadStore_i8mm`.
+"""
+
 from std.math import align_up
 from std.sys import prefetch
 from std.sys.info import align_of
@@ -34,14 +43,37 @@ struct LoadStore_i8mm[
     tile_rows: Int,
     tile_columns: Int,
 ]:
+    """Handles C-tile load and store operations for the I8MM microkernel.
+
+    Manages a local accumulator tile of shape `(tile_rows, tile_columns //
+    simd_size)` and provides helpers to initialize it, load an existing C
+    sub-tile from memory, and store results back with optional boundary checks.
+
+    Parameters:
+        dtype: Accumulator data type.
+        simd_size: SIMD lane count (must be 4 for I8MM).
+        single_row: Whether the tile has only one effective row (M=1 path).
+        tile_rows: Number of accumulator rows (half of kernel_rows for I8MM pairs).
+        tile_columns: Number of accumulator columns (kernel_cols).
+    """
+
     comptime num_simd_cols = Self.tile_columns // Self.simd_size
+    """Number of SIMD-width column groups in the output tile."""
     var output_tile: _Accumulator[
         Self.dtype, Self.tile_rows, Self.num_simd_cols, Self.simd_size
     ]
+    """Accumulation buffer holding the partial sums for the output tile."""
     var skip_boundary_check: Bool
+    """Whether to skip partial-tile boundary handling on load and store."""
 
     @always_inline
     def __init__(out self, skip_boundary_check: Bool):
+        """Initializes the tile buffer with a boundary-check setting.
+
+        Args:
+            skip_boundary_check: Whether to skip partial-tile boundary
+                handling on load and store.
+        """
         self.output_tile = _Accumulator[
             Self.dtype, Self.tile_rows, Self.num_simd_cols, Self.simd_size
         ]()
@@ -142,6 +174,16 @@ struct LoadStore_i8mm[
 # implements the I8MM microkernel.
 @fieldwise_init
 struct Inner_matmul_i8mm(InnerMatmulKernel, Movable):
+    """ARM I8MM (8-bit integer matrix multiply) microkernel for CPU matmul.
+
+    Implements `InnerMatmulKernel` using the `_neon_matmul` intrinsic to
+    compute 8-bit integer dot products in pairs of two rows. Operates on a
+    pre-packed A buffer (packed by `packA_i8mm`) and a packed B tile, and
+    accumulates `int32` or `uint32` results from `uint8`/`uint8`,
+    `uint8`/`int8`, or `int8`/`int8` operands (not signed-`A`, unsigned-`B`)
+    in `LoadStore_i8mm`.
+    """
+
     # Parameters for global reference.
 
     @always_inline
@@ -161,10 +203,10 @@ struct Inner_matmul_i8mm(InnerMatmulKernel, Movable):
         local accumulation buffer while processing a single column of A.
 
         Args:
-            a: TODO.
-            b_packed: TODO.
+            a: Input A matrix tile being processed.
+            b_packed: Packed B matrix tile in cache-friendly layout.
             c_local: Pre-allocated local buffer for c partial sums.
-            global_offset: TODO.
+            global_offset: Global (M, N, K) coordinate offset for this tile.
             tile_n_k_idx: Index tuple with (n, k) coordinates within the current
                 processing tile to index the packed B matrix.
         """
@@ -195,9 +237,11 @@ struct Inner_matmul_i8mm(InnerMatmulKernel, Movable):
         comptime for idx0 in range(kernel_rows):
             comptime for idx1 in range(kernel_cols // simd_size):
                 comptime alignment = align_of[SIMD[c_local.dtype, simd_size]]()
-                var a_val = a_ptr.load[width=simd_size * 4](2 * idx0 * K)
+                var a_val = a_ptr.load[width=SIMDLength(simd_size) * 4](
+                    2 * idx0 * K
+                )
                 var b_val = (b_ptr + 16 * idx1).load[
-                    width=simd_size * 4, alignment=alignment
+                    width=SIMDLength(simd_size) * 4, alignment=alignment
                 ]()
                 var c_val = c_local[idx0, idx1]
                 c_val = _neon_matmul(c_val, a_val, b_val)
@@ -220,6 +264,27 @@ struct Inner_matmul_i8mm(InnerMatmulKernel, Movable):
     ):
         """Utility function on the inner loop. Run the inner kernel on the whole
         (kernel_rows2, TileN, TileK) tile.
+
+        Parameters:
+            kernel_rows: Number of rows in the inner kernel tile. Halved
+                internally for I8MM row pairing unless equal to 1.
+            kernel_cols: Number of columns in the inner kernel tile, also
+                the N-dimension step size.
+            simd_size: SIMD lane count for the I8MM dot-product intrinsic
+                (must be 4).
+
+        Args:
+            c: Output C matrix tile where accumulated results are stored.
+            a: Input A matrix tile in pre-packed layout, read non-transposed.
+            b_packed: Packed B matrix tile in cache-friendly rank-3 layout.
+            global_offset: Global (M, N, K) coordinate offset of this tile
+                within the full matmul problem space.
+            global_bound: Global (M, N, K) upper bound of the full matmul
+                problem space, used for boundary checking.
+            tile_n_k: Index list with the (N, K) range to process within
+                this tile.
+            skip_boundary_check: Whether to skip boundary checks when loading
+                and storing the C tile.
         """
         comptime assert b_packed.flat_rank == 3, "b_packed must be rank 3"
 

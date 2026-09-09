@@ -13,11 +13,13 @@
 
 """Implements ragged token merging for speculative decoding workflows."""
 
-__all__ = ["RaggedTokenMerger", "ragged_token_merger"]
+__all__ = [
+    "RaggedTokenMerger",
+    "compute_host_merged_offsets",
+    "ragged_token_merger",
+]
 
-from max.driver import Buffer
 from max.dtype import DType
-from max.engine import InferenceSession
 from max.graph import DeviceRef, Dim, Graph, TensorType, TensorValue, ops
 from max.nn.kernels import merge_ragged_tensors
 from max.nn.layer import Module
@@ -125,35 +127,26 @@ class RaggedTokenMerger(Module):
         return merged_tensor, merged_offsets
 
 
-class _RaggedTokenMergerRunner:
-    """Runner for the ragged token merger."""
+def compute_host_merged_offsets(
+    host_input_row_offsets: TensorValue,
+    draft_tokens: TensorValue,
+) -> TensorValue:
+    """Computes merged offsets on CPU, avoiding D2H copies.
 
-    def __init__(
-        self, session: InferenceSession, device_ref: DeviceRef
-    ) -> None:
-        self._model = session.load(ragged_token_merger(device=device_ref))
-        self._device = device_ref.to_device()
-
-    def run(
-        self,
-        tokens: Buffer,
-        input_row_offsets: Buffer,
-        draft_tokens: Buffer,
-    ) -> tuple[Buffer, Buffer]:
-        """Runs the ragged token merger."""
-        if tokens.device != self._device:
-            raise ValueError(
-                f"Tokens must be on device {self._device}, got {tokens.device}"
-            )
-        if input_row_offsets.device != self._device:
-            raise ValueError(
-                f"Input row offsets must be on device {self._device}, got {input_row_offsets.device}"
-            )
-        if draft_tokens.device != self._device:
-            raise ValueError(
-                f"Draft tokens must be on device {self._device}, got {draft_tokens.device}"
-            )
-        merged_tokens, merged_offsets = self._model(
-            tokens, input_row_offsets, draft_tokens
-        )
-        return merged_tokens, merged_offsets
+    ``merged_offsets[i] = host_input_row_offsets[i] + i * K`` where ``K`` is
+    the number of draft tokens per request. This mirrors the GPU-side merge
+    logic in :class:`RaggedTokenMerger` but stays on CPU so CUDA graph capture
+    is not blocked by a device-to-host transfer.
+    """
+    K = ops.shape_to_tensor([draft_tokens.shape[1]])[0].cast(DType.uint32)
+    batch_size_plus_one = ops.shape_to_tensor(
+        [host_input_row_offsets.shape[0]]
+    )[0]
+    indices = ops.range(
+        start=0,
+        stop=batch_size_plus_one,
+        out_dim=host_input_row_offsets.shape[0],
+        device=DeviceRef.CPU(),
+        dtype=DType.uint32,
+    )
+    return host_input_row_offsets + indices * K

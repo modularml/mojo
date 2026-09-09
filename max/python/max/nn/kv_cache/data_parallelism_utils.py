@@ -52,15 +52,35 @@ def split_input_row_offsets(
 ) -> list[TensorValue]:
     """Split the input row offsets into data parallel splits.
 
+    The following example splits the row offsets of a 4-request batch into two
+    data parallel replicas, using ``data_parallel_splits = [0, 2, 4]`` to place
+    the first two requests on replica 0 and the last two on replica 1:
+
     .. code-block:: python
 
-        # Input
-        num_replicas = 2
-        input_row_offsets = [0, offset_1, offset_2, offset_3, offset_4]
-        data_parallel_splits = [0, 2, 4]
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType
+        from max.nn.kv_cache.data_parallelism_utils import (
+            split_input_row_offsets,
+        )
 
-        # Output
-        split_offsets = [0, offset_1, offset_2], [0, new_offset_3, new_offset_4]
+        cpu = DeviceRef.CPU()
+        with Graph(
+            "split_input_row_offsets_example",
+            input_types=(
+                TensorType(DType.uint32, ["offsets_len"], device=cpu),
+                TensorType(DType.int64, [3], device=cpu),
+            ),
+        ) as graph:
+            input_row_offsets, data_parallel_splits = (
+                v.tensor for v in graph.inputs
+            )
+            split_offsets = split_input_row_offsets(
+                num_replicas=2,
+                input_row_offsets=input_row_offsets,
+                data_parallel_splits=data_parallel_splits,
+            )
+            graph.output(*split_offsets)
 
     The method computes new offsets by subtracting the previous offset from
     the current offset (e.g. ``new_offset_3 = offset_3 - offset_2``).

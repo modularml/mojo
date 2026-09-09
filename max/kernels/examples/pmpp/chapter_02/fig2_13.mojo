@@ -15,16 +15,16 @@
 # Demonstrates the complete pattern for GPU execution
 
 from std.math import ceildiv
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 
 # ========================== KERNEL CODE ==========================
 
 
 def vec_add_kernel(
-    a: UnsafePointer[Float32, MutExternalOrigin],
-    b: UnsafePointer[Float32, MutExternalOrigin],
-    c: UnsafePointer[Float32, MutExternalOrigin],
+    a: UnsafePointer[Float32, MutUntrackedOrigin],
+    b: UnsafePointer[Float32, MutUntrackedOrigin],
+    c: UnsafePointer[Float32, MutUntrackedOrigin],
     n: Int,
 ):
     """GPU kernel for vector addition.
@@ -44,9 +44,9 @@ def vec_add_kernel(
 
 
 def vec_add(
-    a: UnsafePointer[Float32, MutExternalOrigin],
-    b: UnsafePointer[Float32, MutExternalOrigin],
-    c: UnsafePointer[Float32, MutExternalOrigin],
+    a: UnsafePointer[Float32, MutUntrackedOrigin],
+    b: UnsafePointer[Float32, MutUntrackedOrigin],
+    c: UnsafePointer[Float32, MutUntrackedOrigin],
     n: Int,
     ctx: DeviceContext,
 ) raises:

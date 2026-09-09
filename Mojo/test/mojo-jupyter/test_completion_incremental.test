@@ -1,0 +1,19 @@
+//===----------------------------------------------------------------------===//
+//
+// This file is Modular Inc proprietary.
+//
+//===----------------------------------------------------------------------===//
+
+// RUN: %mojo_jupyter_executor %S/test_completion_incremental.ipynb | FileCheck %s
+
+// Test that code completion works correctly across multiple evaluated cells,
+// exercising the incremental completion cache. Definitions from earlier cells
+// (Animal, Vehicle) must be visible in later completion requests.
+
+// Check completions for Animal members (defined in cell 0, completed in cell 3).
+// CHECK: completion: name
+// CHECK: completion: legs
+
+// Check completions for Vehicle members (defined in cell 2, completed in cell 4).
+// CHECK: completion: make
+// CHECK: completion: wheels

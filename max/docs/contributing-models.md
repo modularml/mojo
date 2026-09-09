@@ -9,7 +9,7 @@ This document walks through the process to create a new model architecture and
 register it with MAX for serving. It's focused on the project setup and
 developer workflow—for an API programming guide using the MAX Python API, see
 the
-[custom model architectures tutorial](https://docs.modular.com/max/develop/serve-custom-model-architectures/).
+[custom model architectures tutorial](https://max.modular.com/develop/serve-custom-model-architectures/).
 
 ## 1. Set up your development environment
 
@@ -57,7 +57,7 @@ exactly match the model class name in your Hugging Face model's configuration.
 config to your internal format.
 
 For more information about how to build your model see our
-[custom model architectures tutorial](https://docs.modular.com/max/develop/serve-custom-model-architectures/).
+[custom model architectures tutorial](https://max.modular.com/develop/serve-custom-model-architectures/).
 
 ### Test your architecture
 
@@ -65,13 +65,13 @@ While developing the model, you can use the `--custom-architectures` flag to
 run your model (before it's registered):
 
 ```bash
-./bazelw run //max/python/max/entrypoints:pipelines -- serve \
+./bazelw run //max/python/max/_entrypoints:pipelines -- serve \
   --model your-org/your-model-name \
   --custom-architectures path/to/your/architecture
 ```
 
 This `entrypoints:pipelines serve` command is the equivalent of [`max
-serve`](https://docs.modular.com/max/cli/serve) except it runs directly from
+serve`](https://max.modular.com/cli/serve) except it runs directly from
 your local code.
 
 After you register your architecture with MAX alongside the other models,
@@ -99,7 +99,7 @@ Once registered, you can serve models using your architecture without the
 `--custom-architectures` option:
 
 ```bash
-./bazelw run //max/python/max/entrypoints:pipelines -- serve \
+./bazelw run //max/python/max/_entrypoints:pipelines -- serve \
   --model-path your-org/your-model-name
 ```
 
@@ -107,7 +107,7 @@ For models that require custom code execution (such as custom tokenizers or
 model implementations on Hugging Face), add the `--trust-remote-code` flag:
 
 ```bash
-./bazelw run //max/python/max/entrypoints:pipelines -- serve \
+./bazelw run //max/python/max/_entrypoints:pipelines -- serve \
   --model-path your-org/your-model-name --trust-remote-code
 ```
 
@@ -173,7 +173,7 @@ For help investigating inaccuracy issues, see the guide to
 Start your model server in one terminal:
 
 ```bash
-./bazelw run //max/python/max/entrypoints:pipelines -- serve \
+./bazelw run //max/python/max/_entrypoints:pipelines -- serve \
   --model-path your-org/your-model-name
 ```
 
@@ -240,10 +240,10 @@ model:
 
 | Model                            | Task            | Accuracy | vs Reference |
 |----------------------------------|-----------------|----------|--------------|
-| meta-llama/llama-3.1-8b-instruct | gsm8k_cot_llama | 0.878    | 101.4%       |
-| unsloth/gpt-oss-20b-bf16         | gsm8k_cot_llama | 0.947    | 98.1%        |
-| qwen/qwen2.5-vl-7b-instruct      | gsm8k_cot_llama | 0.787    | 100.3%       |
-| qwen/qwen2.5-vl-7b-instruct      | chartqa         | 0.812    | 100.3%       |
+| meta-llama/Llama-3.1-8B-Instruct | gsm8k_cot_llama | 0.878    | 101.4%       |
+| unsloth/gpt-oss-20b-BF16         | gsm8k_cot_llama | 0.947    | 98.1%        |
+| Qwen/Qwen2.5-VL-7B-Instruct      | gsm8k_cot_llama | 0.787    | 100.3%       |
+| Qwen/Qwen2.5-VL-7B-Instruct      | chartqa         | 0.812    | 100.3%       |
 
 > [!NOTE]
 > Accuracy numbers may vary across GPU types. If your model scores
@@ -269,8 +269,8 @@ Before submitting your custom architecture to the repo:
 - Check out these other docs:
 
   - [Debug MAX model accuracy](/max/docs/accuracy-debugging.md)
-  - [Op logging in MAX](/max/docs/modeling/op-logging.md)
-  - [GPU profiling with Nsight Systems](https://docs.modular.com/max/gpu-system-profiling)
+  - [Op logging in MAX](/max/docs/op-logging.md)
+  - [GPU profiling with Nsight Systems](https://max.modular.com/gpu-system-profiling)
 
 - For detailed examples, explore the existing architecture implementations in
 the [`max/pipelines/architectures/`](/max/python/max/pipelines/architectures/)

@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -14,28 +13,64 @@ modular_py_test(
         exclude = [
             "test_bounded_cache.py",
             "test_reasoning.py",
+            "test_structured_output_backend.py",
         ],
     ),
+    ignore_extra_deps = [
+        # Imported via string at runtime
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+    ],
     imports = ["."],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
+        "//max/python/max/_entrypoints",
+        "//max/python/max/_xgrammar",
         "//max/python/max/config",
         "//max/python/max/driver",
         "//max/python/max/dtype",
-        "//max/python/max/entrypoints",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines:logging_utils",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+        "//max/python/max/pipelines/architectures/minimax_m2",
+        "//max/python/max/pipelines/architectures/unified_dflash_kimi_k25",
+        "//max/python/max/pipelines/architectures/unified_dflash_llama3",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/speculative",
+        "//max/python/max/pipelines/weights",
         "//max/python/max/serve/parser",
         requirement("click"),
-        requirement("pyyaml"),
+        requirement("cyclopts"),
+        requirement("numpy"),
         requirement("pydantic"),
         requirement("pytest-mock"),
+        requirement("pyyaml"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_structured_output_backend",
+    srcs = ["test_structured_output_backend.py"],
+    # tokenizers is a transitive dependency of transformers but doesn't have
+    # an unversioned bazel alias, so we need to ignore its unresolved imports
+    ignore_unresolved_imports = [
+        "tokenizers.Tokenizer",
+        "tokenizers.models.WordLevel",
+    ],
+    deps = [
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        requirement("numpy"),
+        requirement("transformers"),
     ],
 )
 
@@ -55,7 +90,8 @@ modular_py_test(
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/architectures/minimax_m2",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         requirement("numpy"),

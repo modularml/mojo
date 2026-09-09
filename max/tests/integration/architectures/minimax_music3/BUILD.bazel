@@ -1,0 +1,37 @@
+# MiniMax Music 3 tests.
+#
+# CPU only, and deliberately so: the checkpoint is 28 GB across five networks
+# and does not fit a CI accelerator, so what is covered here is the logic that
+# can be wrong without a GPU -- the window plan's three coordinate systems, the
+# prompt contract, the weight rewrites, and the registration. The end-to-end
+# numerical gates live outside the repo and run on an A10G.
+
+load("//bazel:api.bzl", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "tests",
+    srcs = glob(["test_*.py"]),
+    # Imported for its __init__ alone, which hydrates the lazy architecture
+    # table; without it max.pipelines is a namespace package and the registry
+    # lookup finds nothing.
+    ignore_extra_deps = ["//max/python/max/pipelines"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/minimax_music3",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        requirement("numpy"),
+    ],
+)

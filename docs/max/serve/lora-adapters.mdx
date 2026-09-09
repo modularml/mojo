@@ -4,8 +4,7 @@ sidebar_label: LoRA adapters
 description: Use LoRA adapters with MAX to serve task-specific, fine-tuned variants of LLMs
 ---
 
-import InstallModular from '../../_includes/install-modular.mdx';
-import MDXListing from '@site/src/components/Listing/MDXListing';
+import InstallMAX from '../_includes/install-modular.mdx';
 
 [LoRA (Low-Rank Adaptation)](https://arxiv.org/pdf/2106.09685) is a
 parameter-efficient fine-tuning (PEFT) technique that allows you to adapt a
@@ -68,16 +67,18 @@ loaded from a local file path.
 Currently MAX only supports LoRA adapters for Llama 3 models for query, key,
 value, and output (QKVO) layers. Stay tuned for additional updates on
 multi-modal model LoRA adapter support and additional layer implementations by
-following our [release notes](/max/changelog).
+following our [release notes](/releases/).
 
 :::
 
 ### MAX CLI argument
 
 You can statically or dynamically load LoRA adapters when serving a model with
-the [`max` CLI](/max/cli). To use LoRA adapters, configure the appropriate
-[`max serve`](/max/cli/serve) arguments for your use case:
+the [`max` CLI](/cli). To use LoRA adapters, configure the appropriate
+[`max serve`](/cli/serve) arguments for your use case:
 
+- `--prefer-module-v3`: LoRA serving requires a ModuleV3 architecture, so you
+  must pass this flag to select the ModuleV3 variant of the model.
 - `--lora-paths {name}={path} {name}={path}`: **(optional)** A mapping from
 each adapter's name to its path, in the form of `{name}={path} {name}={path}`.
 - `--max-lora-rank`: **(optional, `int`)** Any LoRA adapter loaded when serving
@@ -88,13 +89,13 @@ to manage concurrently. This should be configured based on your available GPU
 memory.
 - `--enable-lora`: **(optional)** Allows LoRA adapter use in inference requests
 and enables the API for dynamic loading and unloading. For more information, see
-[dynamic serving](/max/serve/lora-adapters#dynamic-serving).
+[dynamic serving](/serve/lora-adapters#dynamic-serving).
 - `--no-enable-lora`: **(optional)** Does not allow the use of LoRA adapters.
 Models served with the `max` CLI use `--no-enable-lora` by default. Any
 LoRA-related arguments in an inference request are ignored. LoRA dynamic serving
 APIs are unavailable.
 - `--no-enable-prefix-caching`: LoRA adapters are not compatible with
-[prefix caching](/max/serve/prefix-caching), which is enabled by default. You
+[prefix caching](/serve/prefix-caching), which is enabled by default. You
 must disable prefix caching to use LoRA adapters.
 
 Each `{name}` is a user-defined identifier for an adapter. Each `{path}` is a
@@ -109,6 +110,7 @@ with the `--enable-lora` argument:
 ```bash
 max serve \
       --model meta-llama/Llama-3.1-8B-Instruct \
+      --prefer-module-v3 \
       --enable-lora \
       --no-enable-prefix-caching
 ```
@@ -161,6 +163,14 @@ adapter must only use the following layer projections:
 - `v_proj`
 - `o_proj`
 
+MAX fuses the query, key, and value projections into a single `qkv_proj`
+layer internally and applies each adapter to its corresponding projection.
+
+LoRA adapters are not compatible with the overlap scheduler. MAX
+automatically keeps the overlap scheduler off when you enable LoRA, and
+explicitly passing `--enable-overlap-scheduler` together with `--enable-lora`
+raises an error.
+
 ## Quickstart
 
 We can quickly deploy Llama 3.1 8B Instruct using MAX as a backend with LoRA
@@ -168,7 +178,7 @@ adapters.
 
 1. Create a virtual environment and install the `max` CLI:
 
-    <InstallModular folder="lora-adapter" />
+    <InstallMAX folder="lora-adapter" />
 
 2. Find the path to your local LoRA adapter
 
@@ -199,6 +209,7 @@ adapters.
     ```bash
     max serve \
       --model meta-llama/Llama-3.1-8B-Instruct \
+      --prefer-module-v3 \
       --enable-lora \
       --no-enable-prefix-caching \
       --max-num-loras 10 \
@@ -209,7 +220,7 @@ adapters.
    `finance`.
    :::note
    You can optionally
-   [dynamically load and unload LoRA adapters](/max/serve/lora-adapters#dynamic-serving).
+   [dynamically load and unload LoRA adapters](/serve/lora-adapters#dynamic-serving).
    :::
 
 4. Run inference using a specific adapter
@@ -223,7 +234,7 @@ adapters.
         -d '{
             "model": "meta-llama/Llama-3.1-8B-Instruct",
             "prompt": "What is an iron condor?",
-            "max_tokens": 150,
+            "max_completion_tokens": 150,
             "lora": "finance"
         }'
     ```
@@ -234,16 +245,9 @@ adapters.
 
 If you're using PEFT weights that have already been merged with the base model,
 check out our guide on [bringing your own model into
-MAX](/max/develop/max-pipeline-bring-your-own-model).
+MAX](/develop/max-pipeline-bring-your-own-model).
 
 If you're eager for LoRA support for a different base model, you can
 [check out the community](https://www.modular.com/community) to start
 contributing, or start a discussion in the [forum](https://forum.modular.com/).
 We'd love to hear from you!
-
-export const docs = [
-  '../../develop/max-pipeline-bring-your-own-model',
-  '../../develop/serve-custom-model-architectures',
-];
-
-<MDXListing mdxList={docs} />

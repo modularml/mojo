@@ -1,0 +1,30 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(
+    default_visibility = ["//Cache:__subpackages__"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_binary(
+    name = "cache-mgr",
+    srcs = glob(["*.cpp"]),
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//AsyncRT:Support",
+        "//Cache",
+        "//Init",
+        "//Support:ADT",
+        "//Support:Base",
+        "//Support:Buffer",
+        "//Support:CommonCLOptions",
+        "//Support:Context",
+        "//Support:Globals",
+        "//Support:URI",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+    ],
+)

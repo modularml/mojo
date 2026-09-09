@@ -18,11 +18,41 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any, ClassVar, Protocol, TypeVar, runtime_checkable
 
-from .tokenizer import PipelineTokenizer
+from max.pipelines.request import RequestType
+
+from .tokenizer import PipelineTokenizer, TokenizerEncoded, UnboundContextType
 
 _T = TypeVar("_T")
+
+
+@runtime_checkable
+class ReasoningPipelineTokenizer(
+    PipelineTokenizer[UnboundContextType, TokenizerEncoded, RequestType],
+    Protocol[UnboundContextType, TokenizerEncoded, RequestType],
+):
+    """:class:`PipelineTokenizer` that exposes its reasoning-delimiter token ids.
+
+    Implemented by architecture-specific tokenizers that drive a reasoning
+    parser (Gemma 4, Kimi K2.5, MiniMax M2). The tokenizer resolves the
+    delimiter ids once at construction and exposes them as instance
+    attributes so callers — for example
+    :class:`~max.pipelines.lib.pipeline_variants.overlap_text_generation.OverlapTextGenerationPipeline`'s
+    thinking-mode temperature scaling — can read them directly without
+    re-encoding ``<think>``/``</think>`` or depending on the reasoning
+    parser registry.
+    """
+
+    @property
+    def reasoning_start_token_id(self) -> int:
+        """The token id that opens a reasoning span (e.g. ``<|channel>``)."""
+        ...
+
+    @property
+    def reasoning_end_token_id(self) -> int:
+        """The token id that closes a reasoning span (e.g. ``<channel|>``)."""
+        ...
 
 
 class ReasoningSpan:
@@ -100,6 +130,28 @@ class ParsedReasoningDelta:
 
 class ReasoningParser(ABC):
     """Parser for identifying reasoning spans in model output."""
+
+    REASONING_START: ClassVar[str | None] = None
+    """Text delimiter that opens a reasoning span (e.g. ``"<think>"``).
+
+    Subclasses declare their delimiters here and resolve token ids from them,
+    so each model's delimiters are written down exactly once. Consumers that
+    work in the text domain rather than the token domain read them from here
+    instead of restating them.
+
+    Declare both delimiters or neither. ``None`` means this parser has no text
+    form at all, so a text-domain consumer cannot bound a reasoning span and
+    will leave reasoning in the assistant's content; declaring only one is a
+    bug, since a span needs both ends. A parser whose chat template prefills
+    the opening delimiter still declares it -- whether a given turn emits it is
+    a property of the request, not of the parser.
+    """
+
+    REASONING_END: ClassVar[str | None] = None
+    """Text delimiter that closes a reasoning span (e.g. ``"</think>"``).
+
+    See :attr:`REASONING_START` for the declaration contract.
+    """
 
     @abstractmethod
     def stream(

@@ -20,7 +20,7 @@ buffer. Implementations:
   bytes to the kernel ABI. Its `store` is `pass`, so the body of the
   surrounding `comptime if enable_trace:` strips entirely at compile
   time.
-- `GmemTrace` wraps a single `UnsafePointer[UInt64]` to a buffer sized
+- `GmemTrace` wraps a single `Pointer[UInt64]` to a buffer sized
   for `num_blocks * events_per_block` slots and records timestamps via
   PTX `globaltimer` (lowered from `global_perf_counter_ns`).
 
@@ -112,17 +112,17 @@ struct GmemTrace(TraceBuf):
     comptime device_type: AnyType = Self
     """Device-side type alias. `GmemTrace` is trivially device-passable."""
 
-    var ptr: UnsafePointer[UInt64, MutAnyOrigin]
+    var ptr: UnsafePointer[UInt64, MutUntrackedOrigin]
     """Device pointer to a `u64` buffer sized for the caller's
     `num_blocks * events_per_block` slot count, zero-initialized on
     first use."""
 
     @always_inline
-    def __init__(out self, ptr: UnsafePointer[UInt64, MutAnyOrigin]):
+    def __init__(out self, ptr: UnsafePointer[UInt64, MutUntrackedOrigin]):
         """Wraps a device pointer as a trace buffer.
 
         Args:
-            ptr: Device-side `UnsafePointer[UInt64]` with room for
+            ptr: Device-side `Pointer[UInt64]` with room for
                 `num_blocks * events_per_block` slots, zero-initialized
                 on first use.
         """

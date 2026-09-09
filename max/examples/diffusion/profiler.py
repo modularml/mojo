@@ -13,9 +13,10 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 
@@ -28,16 +29,39 @@ class Stat:
 
     calls: int = 0
     total_s: float = 0.0
+    samples: list[float] = field(default_factory=list)
 
     def add(self, dt_s: float) -> None:
         """Accumulate a duration sample in seconds."""
         self.calls += 1
         self.total_s += dt_s
+        self.samples.append(dt_s)
 
     @property
     def avg_s(self) -> float:
         """Average duration per call in seconds."""
         return self.total_s / self.calls if self.calls else 0.0
+
+    @property
+    def std_s(self) -> float:
+        """Sample standard deviation of per-call durations in seconds."""
+        if len(self.samples) < 2:
+            return 0.0
+        mean = self.avg_s
+        var = sum((s - mean) ** 2 for s in self.samples) / (
+            len(self.samples) - 1
+        )
+        return math.sqrt(var)
+
+    @property
+    def min_s(self) -> float:
+        """Minimum per-call duration in seconds."""
+        return min(self.samples) if self.samples else 0.0
+
+    @property
+    def max_s(self) -> float:
+        """Maximum per-call duration in seconds."""
+        return max(self.samples) if self.samples else 0.0
 
 
 class _Patcher:
@@ -164,7 +188,6 @@ class ExecuteProfiler(AbstractContextManager["ExecuteProfiler"]):
         self, exc_type: object, exc: BaseException | None, tb: object
     ) -> None:
         self._patcher.restore()
-        return None
 
     def report(self, unit: str = "ms") -> None:
         """Print a full profiling report with component and method tables."""
@@ -180,11 +203,14 @@ class ExecuteProfiler(AbstractContextManager["ExecuteProfiler"]):
             self.stats.items(), key=lambda kv: kv[1].total_s, reverse=True
         )
         lines: list[str] = [
-            f"{'methods':<30} {'calls':>7} {'total':>12} {'avg':>12} ({unit})"
+            f"{'methods':<30} {'calls':>7} {'total':>12} {'avg':>12} "
+            f"{'std':>12} {'min':>12} {'max':>12} ({unit})"
         ]
         for name, st in items:
             lines.append(
-                f"{name:<30} {st.calls:>7d} {st.total_s * mul:>12.3f} {st.avg_s * mul:>12.3f}"
+                f"{name:<30} {st.calls:>7d} {st.total_s * mul:>12.3f} "
+                f"{st.avg_s * mul:>12.3f} {st.std_s * mul:>12.3f} "
+                f"{st.min_s * mul:>12.3f} {st.max_s * mul:>12.3f}"
             )
         return "\n".join(lines)
 
@@ -197,11 +223,14 @@ class ExecuteProfiler(AbstractContextManager["ExecuteProfiler"]):
             reverse=True,
         )
         lines: list[str] = [
-            f"{'components':<30} {'calls':>7} {'total':>12} {'avg':>12} ({unit})"
+            f"{'components':<30} {'calls':>7} {'total':>12} {'avg':>12} "
+            f"{'std':>12} {'min':>12} {'max':>12} ({unit})"
         ]
         for name, st in items:
             lines.append(
-                f"{name:<30} {st.calls:>7d} {st.total_s * mul:>12.3f} {st.avg_s * mul:>12.3f}"
+                f"{name:<30} {st.calls:>7d} {st.total_s * mul:>12.3f} "
+                f"{st.avg_s * mul:>12.3f} {st.std_s * mul:>12.3f} "
+                f"{st.min_s * mul:>12.3f} {st.max_s * mul:>12.3f}"
             )
         return "\n".join(lines)
 

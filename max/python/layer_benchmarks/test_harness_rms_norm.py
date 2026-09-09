@@ -16,14 +16,13 @@
 from __future__ import annotations
 
 import pytest
+from layer_mefs import create_runner
 from testbed.harnesses.rms_norm import (
     RMSNormDynamicParams,
-    RMSNormHarness,
     RMSNormStaticParams,
 )
-from testbed.runner import LayerTestRunner, create_session
-
-_STATIC_PARAMS = RMSNormStaticParams(dim=4096, eps=1e-6)
+from testbed.runner import LayerTestRunner
+from testbed.specs import RMS_NORM
 
 _SMOKE_SHAPES = [
     RMSNormDynamicParams(batch_size=1, seq_len=1024),
@@ -35,8 +34,7 @@ _SMOKE_SHAPES = [
 def runner() -> LayerTestRunner[
     RMSNormStaticParams, RMSNormDynamicParams, None
 ]:
-    session, device = create_session()
-    return LayerTestRunner(RMSNormHarness(_STATIC_PARAMS, session, device))
+    return create_runner(RMS_NORM)
 
 
 def test_benchmark_smoke(

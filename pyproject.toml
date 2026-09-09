@@ -14,12 +14,11 @@ force-exclude = '''
 (
   /(
       third-party/llvm-project
-    | third-party/vllm-benchmarks
     | \.derived
     | venv
-    | utils/mblack
-    | KGEN/test/mojo-parser
-    | KGEN/test/mojo-tool/format
+    | Mojo/test/mojo-parser
+    | Mojo/test/mojo-tool/format
+    | Mojo/tools/mblack
     | max/python/max/serve/schemas
     | utils/packaging/tests
     | Faux/mojo_llm_from_scratch
@@ -29,16 +28,28 @@ force-exclude = '''
 
 [tool.ruff]
 line-length = 80  # Must match above
+# Honor extend-exclude even for explicitly-passed files (presubmit fast-mode
+# lints changed files by path); matches [tool.black] force-exclude above.
+force-exclude = true
 src = ["something-that-doesnt-exist"] # Stop ruff from assuming any root directory is a python module
 extend-exclude = [
+  ".git",
+  # Machine-authored agent state (skills, agent scripts). Already excluded from
+  # rumdl and typos; these helper scripts are not shipped product code.
+  ".claude",
   "**/lit.cfg.py", # Globals that aren't imported
   "*.ipynb",
   "*_pb2.py", # Generated protobuf stubs
   "*_pb2.pyi", # Generated protobuf stubs
   "*max/serve/schemas/openai.py", # Generated file
   "third-party",
+  # Vendored verbatim from xgrammar v0.2.2 (hack-to-own); kept unformatted so a
+  # future re-vendor diffs cleanly against upstream.
+  "*max/python/max/_xgrammar/structural_tag.py",
+  "*max/python/max/_xgrammar/builtin_structural_tag.py",
+  "*max/python/max/_xgrammar/openai_tool_call_schema.py",
   "bazel/internal/llvm-lit/lit.common.cfg.py", # Globals that aren't imported
-  "utils/mblack/tests",
+  "Mojo/tools/mblack/tests",
   "Faux/mojo_llm_from_scratch/**", # Experimental from-scratch LLM project
 ]
 
@@ -48,23 +59,48 @@ ignore = [
   "ANN003", # TODO: Missing type annotation for **kwargs
   "ANN204", # TODO: Missing return type annotation for special method
   "ANN401", # TODO: Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
-  "B008", # Do not perform function call in argument defaults
+  "ASYNC210", # Async functions should not call blocking HTTP methods
+  "ASYNC230", # Async functions should not open files with blocking methods like `open`
+  "ASYNC251", # Async functions should not call `time.sleep`
   "B017", # Do not assert blind exception: `Exception`
   "B028", # No explicit `stacklevel` keyword argument found
+  "BLE001", # Do not catch blind exception: `Exception`
+  "C408", # Rewrites `dict(foo="bar")` to `{"foo": "bar"}`, questionable readability improvement
   "D105", # undocumented-magic-method
   "D107", # Missing docstring in __init__ (constructor args go in class docstring)
+  "DTZ001", # `datetime.datetime()` called without a `tzinfo` argument
+  "DTZ005", # `datetime.datetime.now()` called without a `tz` argument
+  "DTZ006", # `datetime.datetime.fromtimestamp()` called without a `tz` argument
+  "DTZ007", # Naive datetime constructed using `datetime.datetime.strptime()` without %z
+  "DTZ011", # `datetime.date.today()` used
   "E402", # TODO: import top of file
+  "E501", # Line length, no autofix.
   "E722", # bare except
   "E731", # TODO: Don't assign lambda
   "E741", # TODO: Ambiguous variable name
-  "F403", # glob imports
-  "F405", # TODO: glob imports undefined
   "F821", # TODO: Undefined names, means script is invalid
+  "FLY002", # TODO: The strings this flags are usually quite silly looking
   "FURB122", # Questionable readability improvement
+  "G201", # Use .exception() instead of .error() on loggers
+  "ISC004", # TODO: Unparenthesized implicit string concatenation in collection
+  "LOG015", # Use of root logger, usually low value in standalone scripts
+  "N999", # Invalid or non_snake_case module names. Former: TODO, latter: maybe not worth it.
+  "PERF402", # TODO: Use `list` or `list.copy` to create a copy of a list
+  "PLC0105", # Something about type variables and covariance
+  "PLC0414", # Import alias does not rename original package - we do this intentionally in several places
+  "PLW1508", # Invalid type for environment variable default - we do this a lot and it's usually valid.
+  "PLW1510", # subprocess.run without explicit `check` - low value
+  "PYI019", # Adds typing_extensions in a lot of places in pre-3.11 world. Maybe revisit when we drop 3.10.
+  "PYI034", # Fine, but can't be auto-applied to stubfiles, and adds typing_extensions everywhere in pre-3.11 world.
+  "PYI036", # TODO: `__exit__` annotations
+  "PYI059", # TODO: Reorders `Generic` base classes, could be slightly risky
   "RUF005", # Consider iterable unpacking instead of concatenation
   "RUF010", # Use explicit conversion flag
   "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
   "RUF015", # Prefer `next(iter(iterable))` over single element slice
+  "S102",  # Checks for `exec` (security concern, TODO maybe enable on a subset of targets)
+  "S110",  # Checks for try-except-pass, suggests logging
+  "S112",  # Checks for try-except-continue, suggests logging
   "SIM102", # Collapsible if
   "SIM105", # Suppressible exception
   "SIM108", # Use ternary operator
@@ -73,11 +109,14 @@ ignore = [
   "SIM117", # Merge with statements
   "SIM300", # YODA conditions
   "SIM905", # Use a list literal instead of str.split
+  "TRY002", # TODO: Suggests to use more specific errors than "Exception"
+  "TRY004", # TODO: Suggests TypeError for invalid types
 ]
 extend-select = [
   "ANN", # Require function type annotations
   "B", # Bugbear lints
   "D", # Pydocstyle lints
+  "E", # Pydocstyle lints
   "FURB", # Refurb lints for modernization
   "I", # Import sorting lints
   "RUF", # Ruff specific lints
@@ -97,7 +136,6 @@ convention = "google"
 # With exceptions for these packages:
 "max/python/max/benchmark/**/*" = ["D"]
 "max/python/max/config/**/*" = ["D"]
-"max/python/max/entrypoints/**/*" = ["D"]
 "max/python/max/pipelines/kv_cache/connectors/**/*" = ["D"]
 "max/python/max/mlir/**/*" = ["D"]
 "max/python/max/nn/**/*" = ["D"]
@@ -108,14 +146,17 @@ convention = "google"
 # Exclude private packages and modules (NOTE: this allows max/_core/*.pyi files):
 "max/python/max/_core_mojo/**/*" = ["D"]
 "max/python/max/_core_types/**/*" = ["D"]
+"max/python/max/_entrypoints/**/*" = ["D"]
 "max/python/max/_interpreter_ops/**/*" = ["D"]
 "max/python/max/_mlir/**/*" = ["D"]
 "max/python/max/_core/dialects/**/*" = ["D"]
 "max/python/max/_core/internal/**/*" = ["D"]
 "max/python/max/**/_*.py" = ["D"]
-# Ignore ANN001 (function argument missing type annotation) for auto-generated
-# stubfiles
-"*.pyi" = ["ANN001", "ANN201", "ANN202", "ANN205", "ANN206", "D200", "D212", "D418"]
+# Disable most annotations for third-party stubfiles
+# PYI001 is a valid fix but isn't autogenerated correctly by nanobind
+"*/_mlir/*.pyi" = ["ANN001", "ANN201", "ANN202", "ANN205", "ANN206", "D200", "D212", "D418", "PYI001"]
+# Be a little less strict with docs in first-party stubfiles
+"*/_core/*.pyi" = ["D200", "D212", "D418", "PYI001"]
 # Ignore type annotations for the llm-book tutorial files
 "oss/llm-book/**/*.py" = ["ANN001", "ANN201", "ANN202"]
 # Ignore type annotations, intentional math unicode (×), and common tutorial code patterns
@@ -155,6 +196,16 @@ follow_imports = "skip"
 [[tool.mypy.overrides]]
 module = "cyclopts.*"
 ignore_missing_imports = true
+
+# Private MiniMax-M3 graph hooks diverge from the shared load_model template
+# signatures; suppress only the files that inherit those hooks.
+[[tool.mypy.overrides]]
+module = "minimax_m3.model"
+disable_error_code = ["misc"]
+
+[[tool.mypy.overrides]]
+module = "minimax_m3.eagle3_model"
+disable_error_code = ["override"]
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

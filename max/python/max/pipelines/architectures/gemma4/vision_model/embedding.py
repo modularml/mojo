@@ -39,9 +39,12 @@ class Gemma4VisionPatchEmbedder(Module):
         super().__init__()
         self.config = config
         self.device = device
-        self.dtype = config.dtype
+        # Use unquantized_dtype (not config.dtype) so quantized models still
+        # embed patches in a real float dtype.
+        self.dtype = config.unquantized_dtype
 
         vision_cfg = config.vision_config
+        assert vision_cfg is not None
         hidden_size = vision_cfg.hidden_size
         patch_size = vision_cfg.patch_size
         self.hidden_size = hidden_size
@@ -50,14 +53,14 @@ class Gemma4VisionPatchEmbedder(Module):
         self.input_proj = Linear(
             3 * patch_size**2,
             hidden_size,
-            dtype=DType.bfloat16,
+            dtype=self.dtype,
             device=self.device,
             has_bias=False,
         )
 
         self.position_embedding_table = Weight(
             "position_embedding_table",
-            dtype=DType.bfloat16,
+            dtype=self.dtype,
             shape=(2, self.position_embedding_size, hidden_size),
             device=self.device,
         )
@@ -79,10 +82,10 @@ class Gemma4VisionPatchEmbedder(Module):
             Patch embeddings of shape ``[total_patches, hidden_size]``.
         """
         # 1. Normalise pixel values from [0, 1] to [-1, 1].
-        patches = ops.cast(patches_flat, DType.bfloat16)
+        patches = ops.cast(patches_flat, self.dtype)
         patches = patches * ops.constant(
-            2.0, DType.bfloat16, device=self.device
-        ) - ops.constant(1.0, DType.bfloat16, device=self.device)
+            2.0, self.dtype, device=self.device
+        ) - ops.constant(1.0, self.dtype, device=self.device)
 
         # 2. Linear projection: [total_patches, 3*ps²] → [total_patches, hidden]
         hidden = self.input_proj(patches)

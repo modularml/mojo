@@ -40,7 +40,7 @@ from std.math import ceildiv, nan
 from std.random import randn, seed
 from std.sys import has_nvidia_gpu_accelerator
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import (
     KVCacheStaticParams,
     PagedKVCache,
@@ -53,7 +53,6 @@ from layout import (
     RuntimeLayout,
     TileTensor,
     UNKNOWN_VALUE,
-    lt_to_tt,
     row_major,
 )
 from nn.attention.gpu.mha import mha_gpu_naive
@@ -64,7 +63,7 @@ from nn.attention.gpu.nvidia.sm100.mla_decode_dispatch import (
 )
 from nn.attention.mha_utils import MHAConfig
 from std.testing import assert_almost_equal
-from std.gpu.host.info import B200, _is_sm10x_gpu
+from max.gpu.host.info import B200, _is_sm10x_gpu
 from std.utils.index import Index, IndexList
 
 
@@ -87,8 +86,8 @@ comptime KV_NUM_HEADS = 1  # MLA has 1 KV head
 
 
 def create_interleaved_q_data(
-    q_host_fp8: UnsafePointer[mut=True, Scalar[DType.float8_e4m3fn], _],
-    q_ref_bf16: UnsafePointer[mut=True, BFloat16, _],
+    q_host_fp8: MutPointer[Float8_e4m3fn, _],
+    q_ref_bf16: MutPointer[BFloat16, _],
     total_q_tokens: Int,
     num_heads: Int,
 ) raises:
@@ -120,14 +119,14 @@ def create_interleaved_q_data(
             # Content: quantize BF16 -> FP8, store in interleaved, dequant for ref
             for d in range(V_DEPTH):
                 var val = content_bf16[content_start + d]
-                var fp8_val = val.cast[DType.float8_e4m3fn]()
+                var fp8_val = val.cast[.float8_e4m3fn]()
                 q_host_fp8[fp8_row_start + d] = fp8_val
                 # Dequantized for reference
-                q_ref_bf16[ref_row_start + d] = fp8_val.cast[DType.bfloat16]()
+                q_ref_bf16[ref_row_start + d] = fp8_val.cast[.bfloat16]()
 
             # Rope: BF16 stored as raw bytes in the FP8 buffer, and in ref
             var rope_byte_ptr = (q_host_fp8 + fp8_row_start + V_DEPTH).bitcast[
-                Scalar[DType.bfloat16]
+                BFloat16
             ]()
             for d in range(ROPE_DIM):
                 rope_byte_ptr[d] = rope_bf16[rope_start + d]
@@ -137,7 +136,7 @@ def create_interleaved_q_data(
 
 
 def create_interleaved_kv_block_data(
-    blocks_host: UnsafePointer[mut=True, Scalar[DType.float8_e4m3fn], _],
+    blocks_host: MutPointer[Float8_e4m3fn, _],
     block_elems: Int,
     total_pages: Int,
     page_size: Int,
@@ -174,19 +173,19 @@ def create_interleaved_kv_block_data(
         for d in range(V_DEPTH):
             blocks_host[fp8_row_start + d] = content_bf16[
                 content_start + d
-            ].cast[DType.float8_e4m3fn]()
+            ].cast[.float8_e4m3fn]()
 
         # Rope: store BF16 bytes in the FP8 buffer
         var rope_byte_ptr = (blocks_host + fp8_row_start + V_DEPTH).bitcast[
-            Scalar[DType.bfloat16]
+            BFloat16
         ]()
         for d in range(ROPE_DIM):
             rope_byte_ptr[d] = rope_bf16[rope_start + d]
 
 
 def extract_bf16_kv_from_block(
-    blocks_host: UnsafePointer[mut=False, Scalar[DType.float8_e4m3fn], _],
-    k_bf16_out: UnsafePointer[mut=True, Scalar[DType.bfloat16], _],
+    blocks_host: ImmPointer[Float8_e4m3fn, _],
+    k_bf16_out: MutPointer[BFloat16, _],
     physical_page: Int,
     tok_in_page: Int,
     kv_dim2: Int,
@@ -211,9 +210,7 @@ def extract_bf16_kv_from_block(
             ]()
 
         # Copy BF16 rope
-        var rope_src = (blocks_host + src_row + V_DEPTH).bitcast[
-            Scalar[DType.bfloat16]
-        ]()
+        var rope_src = (blocks_host + src_row + V_DEPTH).bitcast[BFloat16]()
         for d in range(ROPE_DIM):
             k_bf16_out[dst_row + V_DEPTH + d] = rope_src[d]
 
@@ -337,11 +334,9 @@ def run_test[
     )
     # Initialize ALL scale slots to NaN (poison unused slots).
     # Valid token scales get overwritten below.
-    var scales_host = ctx.enqueue_create_host_buffer[DType.float32](
-        scales_elems
-    )
+    var scales_host = ctx.enqueue_create_host_buffer[.float32](scales_elems)
     for i in range(scales_elems):
-        scales_host[i] = nan[DType.float32]()
+        scales_host[i] = nan[.float32]()
     # Then set valid token scales to 1.0
     var _scale_page_stride = (
         kv_dim2 * NUM_LAYERS * PAGE_SIZE * kv_params.num_heads * head_dim_gran
@@ -359,30 +354,24 @@ def run_test[
                     _cur_page_s * _scale_page_stride
                     + tok_in_page * kv_params.num_heads * head_dim_gran
                 )
-                scales_host[offset] = Scalar[DType.float32](1.0)
+                scales_host[offset] = Float32(1.0)
             _cur_page_s += 1
 
     # -------------------------------------------------------------------
     # Step 1c: Create per-Q-token scales (all 1.0)
     # -------------------------------------------------------------------
-    var q_scales_host = ctx.enqueue_create_host_buffer[DType.float32](
-        total_q_tokens
-    )
+    var q_scales_host = ctx.enqueue_create_host_buffer[.float32](total_q_tokens)
     for i in range(total_q_tokens):
-        q_scales_host[i] = Scalar[DType.float32](1.0)
+        q_scales_host[i] = Float32(1.0)
 
     # Cache lengths and lookup table
-    var cache_lengths_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_host = ctx.enqueue_create_host_buffer[.uint32](batch_size)
     for i in range(batch_size):
         cache_lengths_host[i] = UInt32(cache_lengths[i])
 
     var max_pages_per_batch = ceildiv(max_cache_len + q_max_seq_len, PAGE_SIZE)
     var lut_size = batch_size * max_pages_per_batch
-    var lookup_table_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        lut_size
-    )
+    var lookup_table_host = ctx.enqueue_create_host_buffer[.uint32](lut_size)
     for i in range(lut_size):
         lookup_table_host[i] = UInt32(0)
 
@@ -414,7 +403,7 @@ def run_test[
     # -------------------------------------------------------------------
     # Step 3: input_row_offsets (batch_size + 1 elements)
     # -------------------------------------------------------------------
-    var row_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var row_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
     row_offsets_host[0] = UInt32(0)
@@ -433,28 +422,22 @@ def run_test[
     var blocks_device = ctx.enqueue_create_buffer[fp8_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var scales_device = ctx.enqueue_create_buffer[DType.float32](scales_elems)
+    var scales_device = ctx.enqueue_create_buffer[.float32](scales_elems)
     ctx.enqueue_copy(scales_device, scales_host)
 
-    var q_scales_device = ctx.enqueue_create_buffer[DType.float32](
-        total_q_tokens
-    )
+    var q_scales_device = ctx.enqueue_create_buffer[.float32](total_q_tokens)
     ctx.enqueue_copy(q_scales_device, q_scales_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[fp8_type](q_size)
     ctx.enqueue_copy(q_device, q_host_fp8)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[bf16_type](out_size)
@@ -469,19 +452,19 @@ def run_test[
         RuntimeLayout[Layout.row_major[6]()].row_major(block_shape),
     )
 
-    var scales_lt = LayoutTensor[DType.float32, Layout.row_major[6]()](
+    var scales_lt = LayoutTensor[.float32, Layout.row_major[6]()](
         scales_device.unsafe_ptr(),
         RuntimeLayout[Layout.row_major[6]()].row_major(scales_shape),
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -495,22 +478,22 @@ def run_test[
         scale_dtype_=DType.float32,
         quantization_granularity_=PHYSICAL_DIM,
     ](
-        LayoutTensor[fp8_type, Layout.row_major[6](), MutAnyOrigin](
-            blocks_lt.ptr,
+        LayoutTensor[fp8_type, Layout.row_major[6]()](
+            blocks_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
-            cache_lengths_lt.ptr,
+        LayoutTensor[mut=False, .uint32, cl_layout](
+            cache_lengths_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
-            lookup_table_lt.ptr,
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
+            lookup_table_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
                 lookup_table_lt.runtime_layout.stride.value,
@@ -518,8 +501,8 @@ def run_test[
         ),
         UInt32(q_max_seq_len),
         UInt32(max_cache_len),
-        LayoutTensor[DType.float32, Layout.row_major[6](), MutAnyOrigin](
-            scales_lt.ptr,
+        LayoutTensor[.float32, Layout.row_major[6]()](
+            scales_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[Layout.row_major[6]()](
                 scales_lt.runtime_layout.shape.value,
                 scales_lt.runtime_layout.stride.value,
@@ -547,10 +530,10 @@ def run_test[
         row_major(batch_size + 1),
     )
 
-    # q_scale_ptr: reinterpret as UnsafePointer with MutAnyOrigin
-    var q_scale_ptr = rebind[
-        UnsafePointer[mut=True, Scalar[DType.float32], MutAnyOrigin]
-    ](q_scales_device.unsafe_ptr())
+    # q_scale_ptr: reinterpret as Pointer with MutAnyOrigin
+    var q_scale_ptr = rebind[MutPointer[Float32, MutAnyOrigin]](
+        q_scales_device.unsafe_ptr()
+    )
 
     # -------------------------------------------------------------------
     # Step 7: Call the full production dispatch path
@@ -562,7 +545,7 @@ def run_test[
         num_heads=num_heads,
         is_fp8_kv=True,
     ](batch_size, max_cache_len, q_max_seq_len, ctx)
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
     flare_mla_decoding[
         rank=3,
         config=MHAConfig[fp8_type](num_heads, LOGICAL_DEPTH),
@@ -576,7 +559,7 @@ def run_test[
         row_offsets_tt,
         scale,
         ctx,
-        scalar_args_buf=lt_to_tt(scalar_args_buf_lt),
+        scalar_args_buf=scalar_args_buf_tt,
         q_max_seq_len=q_max_seq_len,
         q_scale_ptr=q_scale_ptr,
     )
@@ -924,11 +907,9 @@ def run_test_with_scales[
     )
     # Initialize ALL scale slots to NaN (poison unused slots to
     # deterministically catch OOB scale reads in the kernel).
-    var scales_host = ctx.enqueue_create_host_buffer[DType.float32](
-        scales_elems
-    )
+    var scales_host = ctx.enqueue_create_host_buffer[.float32](scales_elems)
     for i in range(scales_elems):
-        scales_host[i] = nan[DType.float32]()
+        scales_host[i] = nan[.float32]()
 
     # Fill valid token slots with non-trivial per-token scales.
     # scale(token) = palette[(page * PAGE_SIZE + tok_in_page) * 3]
@@ -957,9 +938,7 @@ def run_test_with_scales[
     # -------------------------------------------------------------------
     # Step 1c: Create per-Q-token scales (sigma_Q)
     # -------------------------------------------------------------------
-    var q_scales_host = ctx.enqueue_create_host_buffer[DType.float32](
-        total_q_tokens
-    )
+    var q_scales_host = ctx.enqueue_create_host_buffer[.float32](total_q_tokens)
     for i in range(total_q_tokens):
         q_scales_host[i] = _scale_palette((i + 42) * 5)
     print("  sigma_Q values:")
@@ -1003,25 +982,21 @@ def run_test_with_scales[
                         + tok_fp8_base
                         + kh * PHYSICAL_DIM
                         + V_DEPTH
-                    ).bitcast[Scalar[DType.bfloat16]]()
+                    ).bitcast[BFloat16]()
                     for d in range(ROPE_DIM):
                         rope_ptr[d] = (
-                            rope_ptr[d].cast[DType.float32]() / sigma_kv_t
+                            rope_ptr[d].cast[.float32]() / sigma_kv_t
                         ).cast[bf16_type]()
             cur_page += 1
 
     # Cache lengths and lookup table
-    var cache_lengths_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_host = ctx.enqueue_create_host_buffer[.uint32](batch_size)
     for i in range(batch_size):
         cache_lengths_host[i] = UInt32(cache_lengths[i])
 
     var max_pages_per_batch = ceildiv(max_cache_len + q_max_seq_len, PAGE_SIZE)
     var lut_size = batch_size * max_pages_per_batch
-    var lookup_table_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        lut_size
-    )
+    var lookup_table_host = ctx.enqueue_create_host_buffer[.uint32](lut_size)
     for i in range(lut_size):
         lookup_table_host[i] = UInt32(0)
 
@@ -1066,24 +1041,23 @@ def run_test_with_scales[
             # Divide Q_rope BF16 in the interleaved FP8 buffer
             var fp8_rope_ptr = (
                 q_host_fp8.unsafe_ptr() + row_idx * PHYSICAL_DIM + V_DEPTH
-            ).bitcast[Scalar[DType.bfloat16]]()
+            ).bitcast[BFloat16]()
             for d in range(ROPE_DIM):
                 fp8_rope_ptr[d] = (
-                    fp8_rope_ptr[d].cast[DType.float32]() / sigma_q_t
+                    fp8_rope_ptr[d].cast[.float32]() / sigma_q_t
                 ).cast[bf16_type]()
 
             # Also update the BF16 reference Q_rope (used by mha_gpu_naive)
             var ref_rope_start = row_idx * LOGICAL_DEPTH + V_DEPTH
             for d in range(ROPE_DIM):
                 q_ref_bf16[ref_rope_start + d] = (
-                    q_ref_bf16[ref_rope_start + d].cast[DType.float32]()
-                    / sigma_q_t
+                    q_ref_bf16[ref_rope_start + d].cast[.float32]() / sigma_q_t
                 ).cast[bf16_type]()
 
     # -------------------------------------------------------------------
     # Step 3: input_row_offsets (batch_size + 1 elements)
     # -------------------------------------------------------------------
-    var row_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var row_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
     row_offsets_host[0] = UInt32(0)
@@ -1102,28 +1076,22 @@ def run_test_with_scales[
     var blocks_device = ctx.enqueue_create_buffer[fp8_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var scales_device = ctx.enqueue_create_buffer[DType.float32](scales_elems)
+    var scales_device = ctx.enqueue_create_buffer[.float32](scales_elems)
     ctx.enqueue_copy(scales_device, scales_host)
 
-    var q_scales_device = ctx.enqueue_create_buffer[DType.float32](
-        total_q_tokens
-    )
+    var q_scales_device = ctx.enqueue_create_buffer[.float32](total_q_tokens)
     ctx.enqueue_copy(q_scales_device, q_scales_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[fp8_type](q_size)
     ctx.enqueue_copy(q_device, q_host_fp8)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[bf16_type](out_size)
@@ -1138,19 +1106,19 @@ def run_test_with_scales[
         RuntimeLayout[Layout.row_major[6]()].row_major(block_shape),
     )
 
-    var scales_lt = LayoutTensor[DType.float32, Layout.row_major[6]()](
+    var scales_lt = LayoutTensor[.float32, Layout.row_major[6]()](
         scales_device.unsafe_ptr(),
         RuntimeLayout[Layout.row_major[6]()].row_major(scales_shape),
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -1167,22 +1135,22 @@ def run_test_with_scales[
         scale_dtype_=DType.float32,
         quantization_granularity_=PHYSICAL_DIM,
     ](
-        LayoutTensor[fp8_type, Layout.row_major[6](), MutAnyOrigin](
-            blocks_lt.ptr,
+        LayoutTensor[fp8_type, Layout.row_major[6]()](
+            blocks_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
-            cache_lengths_lt.ptr,
+        LayoutTensor[mut=False, .uint32, cl_layout](
+            cache_lengths_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
-            lookup_table_lt.ptr,
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
+            lookup_table_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
                 lookup_table_lt.runtime_layout.stride.value,
@@ -1191,8 +1159,8 @@ def run_test_with_scales[
         UInt32(q_max_seq_len),
         UInt32(max_cache_len),
         # Pass the scales tensor
-        LayoutTensor[DType.float32, Layout.row_major[6](), MutAnyOrigin](
-            scales_lt.ptr,
+        LayoutTensor[.float32, Layout.row_major[6]()](
+            scales_lt.ptr.as_unsafe_any_origin(),
             RuntimeLayout[Layout.row_major[6]()](
                 scales_lt.runtime_layout.shape.value,
                 scales_lt.runtime_layout.stride.value,
@@ -1220,10 +1188,10 @@ def run_test_with_scales[
         row_major(batch_size + 1),
     )
 
-    # q_scale_ptr: reinterpret as UnsafePointer with MutAnyOrigin
-    var q_scale_ptr = rebind[
-        UnsafePointer[mut=True, Scalar[DType.float32], MutAnyOrigin]
-    ](q_scales_device.unsafe_ptr())
+    # q_scale_ptr: reinterpret as Pointer with MutAnyOrigin
+    var q_scale_ptr = rebind[MutPointer[Float32, MutAnyOrigin]](
+        q_scales_device.unsafe_ptr()
+    )
 
     # -------------------------------------------------------------------
     # Step 7: Call the full production dispatch path with scales
@@ -1235,7 +1203,7 @@ def run_test_with_scales[
         num_heads=num_heads,
         is_fp8_kv=True,
     ](batch_size, max_cache_len, q_max_seq_len, ctx)
-    var scalar_args_buf_lt2 = mla_args2.gpu_layout_tensor()
+    var scalar_args_buf_tt2 = mla_args2.gpu_tile_tensor()
     flare_mla_decoding[
         rank=3,
         config=MHAConfig[fp8_type](num_heads, LOGICAL_DEPTH),
@@ -1249,7 +1217,7 @@ def run_test_with_scales[
         row_offsets_tt,
         scale,
         ctx,
-        scalar_args_buf=lt_to_tt(scalar_args_buf_lt2),
+        scalar_args_buf=scalar_args_buf_tt2,
         q_max_seq_len=q_max_seq_len,
         q_scale_ptr=q_scale_ptr,
     )
@@ -1328,7 +1296,7 @@ def run_test_with_scales[
                 for d in range(LOGICAL_DEPTH):
                     var idx = dst_offset + kh * LOGICAL_DEPTH + d
                     k_b_host[idx] = (
-                        k_b_host[idx].cast[DType.float32]() * sigma_kv_t
+                        k_b_host[idx].cast[.float32]() * sigma_kv_t
                     ).cast[bf16_type]()
 
         # Q for this batch: BF16 [1, 1, num_heads, LOGICAL_DEPTH=576]

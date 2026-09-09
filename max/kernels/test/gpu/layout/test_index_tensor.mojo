@@ -13,7 +13,7 @@
 
 from std.random import random_ui64
 
-from std.gpu.host import DeviceContext, DeviceBuffer
+from max.gpu.host import DeviceContext, DeviceBuffer
 from layout import Idx, TileTensor, coord_to_index_list, row_major
 from nn.index_tensor import _index_tensor_impl
 from std.testing import assert_equal, assert_true
@@ -26,11 +26,9 @@ def execute_index_tensor_test[
     //,
     batch_dims: Int,
 ](
-    data_device: TileTensor[data_type, address_space=AddressSpace.GENERIC, ...],
-    indices_device: TileTensor[address_space=AddressSpace.GENERIC, ...],
-    expected_output_device: TileTensor[
-        data_type, address_space=AddressSpace.GENERIC, ...
-    ],
+    data_device: TileTensor[data_type, address_space=.GENERIC, ...],
+    indices_device: TileTensor[address_space=.GENERIC, ...],
+    expected_output_device: TileTensor[data_type, address_space=.GENERIC, ...],
     expected_output_device_buffer: DeviceBuffer[data_type],
     ctx: DeviceContext,
 ) raises:
@@ -48,8 +46,8 @@ def execute_index_tensor_test[
     )
     # Convert all tensors to dynamic layouts before calling the kernel
     _index_tensor_impl[batch_dims, target="gpu"](
-        data_device.make_dynamic[DType.int64](),
-        indices_device.make_dynamic[DType.int64](),
+        data_device.make_dynamic[.int64](),
+        indices_device.make_dynamic[.int64](),
         actual_output_tensor,
         ctx,
     )
@@ -94,7 +92,7 @@ def test_index_tensor_DLRM(ctx: DeviceContext) raises:
 
     # We have a 2D tensor of shape (index_len, 2).
     comptime indices_layout = row_major(Idx[index_len], Idx[2])
-    var indices = ctx.enqueue_create_buffer[DType.uint64](index_len * 2)
+    var indices = ctx.enqueue_create_buffer[.uint64](index_len * 2)
     with indices.map_to_host() as indices_host:
         var indices_host_tensor = TileTensor(indices_host, indices_layout)
         for i in range(index_len):
@@ -166,7 +164,7 @@ def test_index_tensor_DLRM_batch(ctx: DeviceContext) raises:
 
     # We have a 2D tensor of shape (index_len, 2).
     comptime indices_layout = row_major(Idx[index_len], Idx[2])
-    var indices = ctx.enqueue_create_buffer[DType.uint64](index_len * 2)
+    var indices = ctx.enqueue_create_buffer[.uint64](index_len * 2)
     with indices.map_to_host() as indices_host:
         var indices_host_tensor = TileTensor(indices_host, indices_layout)
         for i in range(index_len):

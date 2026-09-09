@@ -15,16 +15,18 @@ from std.math import ceildiv
 from std.sys import get_defined_int
 
 from comm.sync import enable_p2p
-from std.gpu import global_idx
-from std.gpu.host import DeviceBuffer, DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceBuffer, DeviceContext
 from std.testing import assert_almost_equal, assert_true
 
 
 def p2p_copy_kernel(
-    dst: UnsafePointer[Float32, MutAnyOrigin],
-    src: UnsafePointer[Float32, ImmutAnyOrigin],
-    num_elements: Int,
+    dst: MutPointer[Float32, MutAnyOrigin],
+    src: ImmPointer[Float32, ImmutAnyOrigin],
+    num_elements_dev: Int32,
 ):
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var num_elements = Int(num_elements_dev)
     var tid = global_idx.x
     if tid < num_elements:
         dst[tid] = src[tid]
@@ -32,8 +34,8 @@ def p2p_copy_kernel(
 
 def launch_p2p_copy_kernel(
     ctx1: DeviceContext,
-    dst_buf: DeviceBuffer[DType.float32],
-    src_buf: DeviceBuffer[DType.float32],
+    dst_buf: DeviceBuffer[.float32],
+    src_buf: DeviceBuffer[.float32],
     num_elements: Int,
 ) raises:
     comptime BLOCK_SIZE = 256
@@ -43,7 +45,7 @@ def launch_p2p_copy_kernel(
     ctx1.enqueue_function[p2p_copy_kernel](
         dst_buf,
         src_buf,
-        num_elements,
+        Int32(num_elements),
         grid_dim=grid_size,
         block_dim=BLOCK_SIZE,
     )
@@ -74,9 +76,9 @@ def main() raises:
     print("Checkpoint - successfully enabled peer access")
 
     # Create and initialize device buffers
-    var dst_buf = ctx1.create_buffer_sync[DType.float32](length)
+    var dst_buf = ctx1.create_buffer_sync[.float32](length)
     dst_buf.enqueue_fill(1.0)
-    var src_buf = ctx2.create_buffer_sync[DType.float32](length)
+    var src_buf = ctx2.create_buffer_sync[.float32](length)
 
     # Initialize source data
     with src_buf.map_to_host() as host_data:

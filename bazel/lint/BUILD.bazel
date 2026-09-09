@@ -1,18 +1,9 @@
-load("@buildifier_prebuilt//:rules.bzl", "buildifier")
-load("@rules_multirun//:defs.bzl", "command", "multirun")
+load("@rules_multirun//:defs.bzl", "multirun")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "mojo_binary", "requirement")
+load(":linter.bzl", "linter")
 
 package(default_visibility = ["//visibility:public"])
-
-_BUILDIFIER_IGNORES = [
-    "./.derived/*",
-    "./.git/*",
-    "./CloudInfra/go/pkg/*",
-    "./third-party/llvm-project/*",
-    "./oss/max-llm-book/.pixi/*",
-    "./oss/skills/port-an-llm-to-max/.pixi/*",
-]
 
 modular_py_library(
     name = "lint_helpers",
@@ -20,83 +11,48 @@ modular_py_library(
     imports = ["."],
 )
 
-buildifier(
-    name = "buildifier.check",
-    exclude_patterns = _BUILDIFIER_IGNORES,
-    lint_mode = "warn",
-    mode = "diff",
+modular_py_binary(
+    name = "buildifier_wrapper",
+    srcs = ["buildifier_wrapper.py"],
+    data = ["@buildifier_prebuilt//:buildifier"],
+    deps = [":lint_helpers"],
 )
 
-buildifier(
-    name = "buildifier.fix",
-    exclude_patterns = _BUILDIFIER_IGNORES,
-    lint_mode = "fix",
-    mode = "fix",
+linter(
+    base_name = "buildifier",
+    binary = ":buildifier_wrapper",
 )
 
-sh_binary(
-    name = "ruff-wrapper",
-    srcs = ["ruff-wrapper.sh"],
+modular_py_binary(
+    name = "ruff_wrapper",
+    srcs = ["ruff_wrapper.py"],
     data = select({
         "//:linux_x86_64": ["@ruff-x86_64-unknown-linux-gnu//:ruff"],
         "//:linux_aarch64": ["@ruff-aarch64-unknown-linux-gnu//:ruff"],
         "@platforms//os:macos": ["@ruff-aarch64-apple-darwin//:ruff"],
     }),
+    deps = [":lint_helpers"],
 )
 
-command(
-    name = "ruff.check",
-    arguments = ["check"],
-    command = ":ruff-wrapper",
+linter(
+    base_name = "ruff",
+    binary = ":ruff_wrapper",
 )
 
-command(
-    name = "ruff.fix",
-    arguments = ["fix"],
-    command = ":ruff-wrapper",
-)
-
-command(
-    name = "ruff.fix-fast",
-    arguments = ["fix"],
-    command = ":ruff-wrapper",
-    environment = {"FAST": "1"},
-)
-
-alias(
-    name = "rumdl",
-    actual = select({
-        "//:linux_x86_64": "@rumdl-x86_64-unknown-linux-musl//:rumdl",
-        "//:linux_aarch64": "@rumdl-aarch64-unknown-linux-musl//:rumdl",
-        "@platforms//os:macos": "@rumdl-aarch64-apple-darwin//:rumdl",
+modular_py_binary(
+    name = "rumdl_wrapper",
+    srcs = ["rumdl_wrapper.py"],
+    data = select({
+        "//:linux_x86_64": ["@rumdl-x86_64-unknown-linux-musl//:rumdl"],
+        "//:linux_aarch64": ["@rumdl-aarch64-unknown-linux-musl//:rumdl"],
+        "@platforms//os:macos": ["@rumdl-aarch64-apple-darwin//:rumdl"],
     }),
-    tags = ["maybe-unused"],  # TODO: Remove when used
+    deps = [":lint_helpers"],
 )
 
-command(
-    name = "rumdl.check",
-    arguments = [
-        "check",
-        ".",
-        "--config",
-        "$(location :.rumdl.toml)",
-    ],
-    command = ":rumdl",
-    data = [":.rumdl.toml"],
-    run_from_workspace_root = True,
-)
-
-command(
-    name = "rumdl.fix",
-    arguments = [
-        "fmt",
-        ".",
-        "--config",
-        "$(location :.rumdl.toml)",
-    ],
-    command = ":rumdl",
-    data = [":.rumdl.toml"],
-    run_from_workspace_root = True,
+linter(
+    base_name = "rumdl",
+    binary = ":rumdl_wrapper",
 )
 
 modular_py_binary(
@@ -105,138 +61,93 @@ modular_py_binary(
     tags = ["no-pydeps"],  # TODO: Fix and re-enable
     deps = [
         ":lint_helpers",
-        "@mblack",
+        "//Mojo/tools/mblack",
     ],
 )
 
-[
-    command(
-        name = name + "." + ("check" if check else "fix") + ("-fast" if fast else ""),
-        command = base_command,
-        environment = {
-            "FAST": str(fast),
-            "CHECK": str(check),
-        },
-    )
-    for name, base_command in [
-        ("mblack", ":mblack-wrapper"),
-    ]
-    for check in (True, False)
-    for fast in (True, False)
-]
+linter(
+    base_name = "mblack",
+    binary = ":mblack-wrapper",
+)
 
+# No fix or fast mode
 modular_py_binary(
     name = "lint_docstrings",
     srcs = ["lint_docstrings.py"],
     deps = [":lint_helpers"],
 )
 
-command(
-    name = "lint-docstrings.check",
-    command = ":lint_docstrings",
-    run_from_workspace_root = True,
+linter(
+    base_name = "lint_docstrings",
+    binary = ":lint_docstrings",
+    has_fix = False,
 )
 
+# No fix or fast mode
 modular_py_binary(
     name = "action-versions-pinned",
     srcs = ["action-versions-pinned.py"],
     deps = [requirement("pyyaml")],
 )
 
-command(
-    name = "action-versions-pinned.check",
-    command = ":action-versions-pinned",
-    run_from_workspace_root = True,
-)
-
 mojo_binary(
     name = "check_licenses",
     srcs = [":check_licenses.mojo"],
-    deps = ["@mojo//:std"],
+    deps = [
+        ":lint_helpers",
+        "@mojo//:std",
+    ],
 )
 
-command(
-    name = "check_licenses.check",
-    command = ":check_licenses",
-    run_from_workspace_root = True,
+linter(
+    base_name = "check_licenses",
+    binary = ":check_licenses",
+    has_fast = False,
 )
 
-command(
-    name = "check_licenses.fix",
-    arguments = ["--fix"],
-    command = ":check_licenses",
-    run_from_workspace_root = True,
-)
-
-alias(
-    name = "shellcheck",
-    actual = select({
-        "//:linux_x86_64": "@shellcheck-linux.x86_64//:shellcheck",
-        "//:linux_aarch64": "@shellcheck-linux.aarch64//:shellcheck",
-        "@platforms//os:macos": "@shellcheck-darwin.aarch64//:shellcheck",
+modular_py_binary(
+    name = "shellcheck_wrapper",
+    srcs = ["shellcheck_wrapper.py"],
+    data = select({
+        "//:linux_x86_64": ["@shellcheck-linux.x86_64//:shellcheck"],
+        "//:linux_aarch64": ["@shellcheck-linux.aarch64//:shellcheck"],
+        "@platforms//os:macos": ["@shellcheck-darwin.aarch64//:shellcheck"],
     }),
+    deps = [":lint_helpers"],
 )
 
-sh_binary(
-    name = "shellcheck-wrapper",
-    srcs = ["shellcheck-wrapper.sh"],
-    data = [":shellcheck"],
-)
-
-command(
-    name = "shellcheck.check",
-    command = ":shellcheck-wrapper",
+linter(
+    base_name = "shellcheck",
+    binary = ":shellcheck_wrapper",
+    has_fix = False,
 )
 
 multirun(
-    name = "lint",
+    name = "multirun",
     buffer_output = True,
     commands = [
-        ":action-versions-pinned.check",
-        ":buildifier.check",
-        ":check_licenses.check",
-        ":mblack.check",
-        ":ruff.check",
-        ":rumdl.check",
-        ":shellcheck.check",
+        ":action-versions-pinned",
+        ":buildifier_wrapper",
+        ":check_licenses",
+        ":lint_docstrings",
+        ":mblack-wrapper",
+        ":ruff_wrapper",
+        ":rumdl_wrapper",
+        ":shellcheck_wrapper",
     ],
     jobs = 0,
 )
 
-COMMON_FIX_COMMANDS = [
-    ":buildifier.fix",
-    ":check_licenses.fix",
-    ":rumdl.fix",
+[
+    sh_binary(
+        name = ("lint" if check else "format") + ("" if fast else "-all"),
+        srcs = ["linter_wrapper.sh"],
+        data = ["//bazel/lint:multirun"],
+        env = {
+            "CHECK": str(check),
+            "FAST": str(fast),
+        },
+    )
+    for check in (True, False)
+    for fast in (True, False)
 ]
-
-multirun(
-    name = "fix-fast",
-    buffer_output = True,
-    commands = COMMON_FIX_COMMANDS + [
-        ":mblack.fix-fast",
-        ":ruff.fix-fast",
-    ],
-    jobs = 0,
-)
-
-multirun(
-    name = "fix",
-    buffer_output = True,
-    commands = COMMON_FIX_COMMANDS + [
-        ":mblack.fix",
-        ":ruff.fix",
-    ],
-    jobs = 0,
-)
-
-sh_binary(
-    name = "format",
-    srcs = ["format-wrapper.sh"],
-    data = ["//bazel/lint:fix"],
-)
-
-sh_binary(
-    name = "format-fast",
-    srcs = ["format-fast-wrapper.sh"],
-    data = ["//bazel/lint:fix-fast"],
-)

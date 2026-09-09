@@ -67,12 +67,12 @@ def round_by_factor(number: int, factor: int) -> int:
     return round(number / factor) * factor
 
 
-def ceil_by_factor(number: int | float, factor: int) -> int:
+def ceil_by_factor(number: float, factor: int) -> int:
     """Returns the smallest integer greater than or equal to 'number' that is divisible by 'factor'."""
     return math.ceil(number / factor) * factor
 
 
-def floor_by_factor(number: int | float, factor: int) -> int:
+def floor_by_factor(number: float, factor: int) -> int:
     """Returns the largest integer less than or equal to 'number' that is divisible by 'factor'."""
     return math.floor(number / factor) * factor
 
@@ -140,7 +140,7 @@ def fetch_image(
         image_obj = image
     elif isinstance(image, bytes):
         image_obj = Image.open(io.BytesIO(image))
-    elif image.startswith("http://") or image.startswith("https://"):
+    elif image.startswith(("http://", "https://")):
         # fix memory leak issue while using BytesIO
         with requests.get(image, stream=True) as response:
             response.raise_for_status()
@@ -188,7 +188,7 @@ def fetch_image(
 def smart_nframes(
     ele: dict[str, Any],
     total_frames: int,
-    video_fps: int | float,
+    video_fps: float,
 ) -> int:
     """calculate the number of frames for video used for model inputs.
 
@@ -229,7 +229,7 @@ def smart_nframes(
             )
         nframes = min(min(max(nframes, min_frames), max_frames), total_frames)
         nframes = floor_by_factor(nframes, FRAME_FACTOR)
-    if not (FRAME_FACTOR <= nframes and nframes <= total_frames):
+    if not (FRAME_FACTOR <= nframes <= total_frames):
         raise ValueError(
             f"nframes should in interval [{FRAME_FACTOR}, {total_frames}], but got {nframes}."
         )

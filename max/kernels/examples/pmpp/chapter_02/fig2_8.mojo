@@ -14,15 +14,15 @@
 # Figure 2.8: Memory management - allocate, copy, and free device memory
 # This demonstrates the basic pattern for GPU memory management
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 
 # ========================== KERNEL CODE ==========================
 
 
 def vec_add(
-    a_h: UnsafePointer[Float32, MutExternalOrigin],
-    b_h: UnsafePointer[Float32, MutExternalOrigin],
-    c_h: UnsafePointer[Float32, MutExternalOrigin],
+    a_h: UnsafePointer[Float32, MutUntrackedOrigin],
+    b_h: UnsafePointer[Float32, MutUntrackedOrigin],
+    c_h: UnsafePointer[Float32, MutUntrackedOrigin],
     n: Int,
     ctx: DeviceContext,
 ) raises:

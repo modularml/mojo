@@ -1,0 +1,23 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_binary(
+    name = "system-info",
+    srcs = glob(["*.cpp"]),
+    deps = [
+        "//Support:Base",
+        "//Support:Globals",
+        "//Support:MArchTarget",
+        "//Support:MArchTargetMinimal",
+        "//Support:MDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
+    ],
+)

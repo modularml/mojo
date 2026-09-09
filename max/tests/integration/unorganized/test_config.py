@@ -23,7 +23,7 @@ from max.pipelines import PIPELINE_REGISTRY, PipelineConfig
 from max.pipelines.lib import MAXModelConfig
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
-from test_common.mocks import mock_estimate_memory_footprint
+from test_common.mocks import mock_plan_from_sizes
 from test_common.pipeline_model_dummy import (
     DUMMY_LLAMA_ARCH,
     DUMMY_LLAMA_GPTQ_ARCH,
@@ -32,7 +32,7 @@ from test_common.registry import prepare_registry
 
 
 @prepare_registry
-@mock_estimate_memory_footprint
+@mock_plan_from_sizes
 @pytest.mark.skipif(
     accelerator_count() == 0, reason="GPTQ only supported on gpu"
 )
@@ -74,7 +74,7 @@ def test_config__raises_with_unsupported_GPTQ_format() -> None:
 
 @prepare_registry
 @pytest.mark.skip("TODO: AITLIB-238")
-@mock_estimate_memory_footprint
+@mock_plan_from_sizes
 @pytest.mark.skipif(
     platform.machine() in ["arm64", "aarch64"],
     reason="BF16 is not supported on ARM CPU architecture",
@@ -185,7 +185,7 @@ def test_config__update_weight_paths(
         assert config.model.weight_path == [Path("model.safetensors")]
 
         with pytest.raises(ValueError):
-            # This example, should raise as we dont have q4_k listed as supported.
+            # This example, should raise as we don't have q4_k listed as supported.
             config = PipelineConfig(
                 models=ModelManifest(
                     {

@@ -3,15 +3,14 @@ title: Structured output
 description: Enable structured output with your GenAI deployments for predictable responses
 ---
 
-import MDXListing from '@site/src/components/Listing/MDXListing';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-MAX supports the generation of structured output using
-[llguidance](https://github.com/guidance-ai/llguidance) as a backend.
-Structured output, also sometimes referred to as constrained decoding, allows
-users to enforce specific output formats, ensuring structured and predictable
-responses from a model.
+MAX supports structured output using
+[xgrammar](https://github.com/mlc-ai/xgrammar) as the default backend, and you
+can switch to [llguidance](https://github.com/guidance-ai/llguidance).
+Structured output, also called constrained decoding, lets you enforce specific
+output formats so a model returns structured, predictable responses.
 
 ## When to use structured output
 
@@ -19,13 +18,17 @@ If you want to structure a model's output when it responds to a user, then you
 should use a structured output `response_format`.
 
 If you are connecting a model to tools, functions, data, or other systems, then
-you should use [function calling](/max/serve/function-calling) instead of
+you should use [function calling](/serve/function-calling) instead of
 structured outputs.
+
+Learn more about
+[structured output](https://handbook.modular.com/model-interaction/structured-outputs/)
+in the LLM Inference Handbook.
 
 ## How structured output works
 
 To use structured output, include the `--enable-structured-output` flag when
-serving your model with the [`max` CLI](/max/cli).
+serving your model with the [`max` CLI](/cli).
 
 ```bash
 max serve \
@@ -33,17 +36,28 @@ max serve \
   --enable-structured-output
 ```
 
+You can tune structured output behavior with the following options:
+
+- `--structured-output-backend`: Selects the grammar backend for constrained
+  decoding, either `xgrammar` (the default) or `llguidance`. Some architectures
+  declare their own default, but an explicit value on the command line
+  overrides it.
+- `--structured-output-any-whitespace`: Controls whether structured output
+  grammars accept whitespace between JSON tokens. The default, `false`,
+  constrains the model to compact JSON, which mitigates runaway output on some
+  models. Pass `true` to allow whitespace-tolerant JSON.
+
 :::note
 
 The examples on this page use image input with a multimodal model. For
 environment setup and additional image and video input options (including local
-files), see [Image and video to text](/max/inference/image-to-text).
+files), see [Image and video to text](/serve/image-to-text).
 
 :::
 
 Both the
-[`/chat/completions`](/max/rest-api/#POST/v1/chat/completions) and
-[`/completions`](/max/rest-api/#POST/v1/completions) API endpoints are
+[`/chat/completions`](/rest-api/create-chat-completion/) and
+[`/completions`](/rest-api/create-completion/) API endpoints are
 compatible with structured output.
 
 You can define your structured output response format in two ways:
@@ -99,7 +113,7 @@ response = client.chat.completions.create(
             ]
         }
     ],
-    max_tokens=300,
+    max_completion_tokens=300,
     response_format={
         "type": "json_schema",
         "json_schema": {
@@ -158,7 +172,7 @@ print(response.choices[0].message.content)
         ]
       }
     ],
-    "max_tokens": 300,
+    "max_completion_tokens": 300,
     "response_format": {
       "type": "json_schema",
       "json_schema": {
@@ -265,7 +279,7 @@ completion = client.chat.completions.parse(
             ]
         }
     ],
-    max_tokens=300,
+    max_completion_tokens=300,
     response_format=ImageAnalysis,
 )
 
@@ -285,13 +299,10 @@ deployments.
 
 ## Next steps
 
-Next, try processing local image files, running batch inference offline, or
-deploying to the cloud.
+Next, try processing local image files or deploying to the cloud.
 
-export const docs = [
-  '../../inference/image-to-text.mdx',
-  '../../serve/offline-inference.mdx',
-  '../../deploy/local-to-cloud.mdx',
-];
-
-<MDXListing mdxList={docs} />
+- [Image and video to text](/serve/image-to-text): Use the MAX chat
+  completions endpoint with image or video input to generate descriptions and
+  answer questions about visual content.
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.

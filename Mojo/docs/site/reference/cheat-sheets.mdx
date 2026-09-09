@@ -1,0 +1,240 @@
+---
+title: Mojo cheat sheets
+sidebar_label: Cheat sheets
+description: Quick reference cards for Mojo essentials.
+---
+
+<!-- markdownlint-disable MD033 -->
+
+import {useColorMode} from '@docusaurus/theme-common';
+
+export const basicsSheet = {
+  id: 'mojo-cheat-sheet-basics',
+  lightPng: require('./assets/basics/mojo-cheat-sheet-basics-light.png').default,
+  lightPdf: require('./assets/basics/mojo-cheat-sheet-basics-light.pdf').default,
+  lightSvg: require('./assets/basics/mojo-cheat-sheet-basics-light.svg').default,
+  darkPng: require('./assets/basics/mojo-cheat-sheet-basics-dark.png').default,
+  darkPdf: require('./assets/basics/mojo-cheat-sheet-basics-dark.pdf').default,
+  darkSvg: require('./assets/basics/mojo-cheat-sheet-basics-dark.svg').default,
+};
+
+export const compiletimeSheet = {
+  id: 'mojo-cheat-sheet-compile-time',
+  lightPng: require('./assets/compile-time/mojo-cheat-sheet-compile-time-light.png').default,
+  lightPdf: require('./assets/compile-time/mojo-cheat-sheet-compile-time-light.pdf').default,
+  lightSvg: require('./assets/compile-time/mojo-cheat-sheet-compile-time-light.svg').default,
+  darkPng: require('./assets/compile-time/mojo-cheat-sheet-compile-time-dark.png').default,
+  darkPdf: require('./assets/compile-time/mojo-cheat-sheet-compile-time-dark.pdf').default,
+  darkSvg: require('./assets/compile-time/mojo-cheat-sheet-compile-time-dark.svg').default,
+};
+
+export const traitsSheet = {
+  id: 'mojo-cheat-sheet-traits',
+  lightPng: require('./assets/traits/mojo-cheat-sheet-traits-light.png').default,
+  lightPdf: require('./assets/traits/mojo-cheat-sheet-traits-light.pdf').default,
+  lightSvg: require('./assets/traits/mojo-cheat-sheet-traits-light.svg').default,
+  darkPng: require('./assets/traits/mojo-cheat-sheet-traits-dark.png').default,
+  darkPdf: require('./assets/traits/mojo-cheat-sheet-traits-dark.pdf').default,
+  darkSvg: require('./assets/traits/mojo-cheat-sheet-traits-dark.svg').default,
+};
+
+export const ownershipSheet = {
+  id: 'mojo-cheat-sheet-ownership',
+  lightPng: require('./assets/ownership/mojo-cheat-sheet-ownership-light.png').default,
+  lightPdf: require('./assets/ownership/mojo-cheat-sheet-ownership-light.pdf').default,
+  lightSvg: require('./assets/ownership/mojo-cheat-sheet-ownership-light.svg').default,
+  darkPng: require('./assets/ownership/mojo-cheat-sheet-ownership-dark.png').default,
+  darkPdf: require('./assets/ownership/mojo-cheat-sheet-ownership-dark.pdf').default,
+  darkSvg: require('./assets/ownership/mojo-cheat-sheet-ownership-dark.svg').default,
+};
+
+export const typesSheet = {
+  id: 'mojo-cheat-sheet-types-and-literals',
+  lightPng: require('./assets/types-literals/mojo-cheat-sheet-types-and-literals-light.png').default,
+  lightPdf: require('./assets/types-literals/mojo-cheat-sheet-types-and-literals-light.pdf').default,
+  lightSvg: require('./assets/types-literals/mojo-cheat-sheet-types-and-literals-light.svg').default,
+  darkPng: require('./assets/types-literals/mojo-cheat-sheet-types-and-literals-dark.png').default,
+  darkPdf: require('./assets/types-literals/mojo-cheat-sheet-types-and-literals-dark.pdf').default,
+  darkSvg: require('./assets/types-literals/mojo-cheat-sheet-types-and-literals-dark.svg').default,
+};
+
+export const convertSheet = {
+  id: 'mojo-cheat-sheet-conversions',
+  lightPng: require('./assets/conversions/mojo-cheat-sheet-conversions-light.png').default,
+  lightPdf: require('./assets/conversions/mojo-cheat-sheet-conversions-light.pdf').default,
+  lightSvg: require('./assets/conversions/mojo-cheat-sheet-conversions-light.svg').default,
+  darkPng: require('./assets/conversions/mojo-cheat-sheet-conversions-dark.png').default,
+  darkPdf: require('./assets/conversions/mojo-cheat-sheet-conversions-dark.pdf').default,
+  darkSvg: require('./assets/conversions/mojo-cheat-sheet-conversions-dark.svg').default,
+};
+
+export const Preview = ({sheet, alt}) => {
+  const {colorMode} = useColorMode();
+  const img = colorMode === 'dark' ? sheet.darkPng : sheet.lightPng;
+  return (
+    <a
+      className="cheatsheet-preview"
+      href={img}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={alt}
+      title="Open the full-size cheat sheet in a new tab"
+      style={{
+        position: 'relative',
+        display: 'block',
+        height: '190px',
+        overflow: 'hidden',
+        cursor: 'zoom-in',
+        marginTop: '0.75rem',
+        borderRadius: '10px',
+        backgroundImage: `url(${img})`,
+        backgroundSize: '130%',
+        backgroundPosition: 'top left',
+        backgroundRepeat: 'no-repeat',
+      }}>
+      <span
+        className="cheatsheet-badge"
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: '0.5rem',
+          right: '0.5rem',
+          padding: '0.15rem 0.55rem',
+          borderRadius: '999px',
+          fontSize: '0.72rem',
+          fontWeight: 700,
+          color: '#fff',
+          background: 'rgba(0, 0, 0, 0.65)',
+        }}>
+        ⤢ Full size
+      </span>
+    </a>
+  );
+};
+
+export const DownloadRow = ({label, svg, png, pdf, name}) => (
+  <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+    <span
+      style={{
+        fontSize: '0.8rem',
+        fontWeight: 400,
+        minWidth: '2.75rem',
+        color: 'var(--ifm-color-emphasis-700)',
+      }}>
+      {label}
+    </span>
+    <div className="button-group">
+      <a className="button button--sm button--outline button--primary" href={svg} download={`${name}.svg`}>SVG</a>
+      <a className="button button--sm button--outline button--primary" href={png} download={`${name}.png`}>PNG</a>
+      <a className="button button--sm button--outline button--primary" href={pdf} download={`${name}.pdf`}>PDF</a>
+    </div>
+  </div>
+);
+
+export const Downloads = ({sheet}) => (
+  <div
+    style={{
+      marginTop: '1.1rem',
+      paddingTop: '1rem',
+      borderTop: '1px solid var(--ifm-color-emphasis-200)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.5rem',
+    }}>
+    <DownloadRow label="Download light" svg={sheet.lightSvg} png={sheet.lightPng} pdf={sheet.lightPdf} name={`${sheet.id}-light`} />
+    <DownloadRow label="Download dark" svg={sheet.darkSvg} png={sheet.darkPng} pdf={sheet.darkPdf} name={`${sheet.id}-dark`} />
+  </div>
+);
+
+export const CheatSheet = ({sheet, alt, children}) => (
+  <div
+    className="cheatsheet-card"
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      border: '1px solid var(--ifm-color-emphasis-300)',
+      borderRadius: '12px',
+      padding: '1.25rem',
+      background: 'var(--ifm-background-color)',
+    }}>
+    <div>{children}</div>
+    <Preview sheet={sheet} alt={alt} />
+    <Downloads sheet={sheet} />
+  </div>
+);
+
+Quick-reference cards for Mojo syntax and types. Each preview matches your
+light or dark theme. Click a preview to open it full size, or download a PNG
+or PDF to keep.
+
+<style>{`
+  .cheatsheet-card { transition: border-color 0.15s ease; }
+  .cheatsheet-card:hover { border-color: var(--ifm-color-primary); }
+  .cheatsheet-card .button { border-width: 1px; font-weight: 400; }
+  .cheatsheet-card h2 { margin-top: 0; margin-bottom: 0.4rem; font-size: 1.25rem; }
+  .cheatsheet-card p { margin-bottom: 0; font-size: 0.9rem; line-height: 1.45; color: var(--ifm-color-emphasis-700); }
+  .cheatsheet-badge { opacity: 0; transition: opacity 0.15s ease; }
+  .cheatsheet-card:hover .cheatsheet-badge { opacity: 1; }
+  .cheatsheet-preview { transition: background-size 0.3s ease, border-color 0.15s ease; }
+  .cheatsheet-preview:hover { background-size: 138%; }
+`}</style>
+
+<div
+  style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+    gap: '1.5rem',
+    margin: '1.5rem 0',
+  }}>
+
+<CheatSheet sheet={basicsSheet} alt="Mojo basics cheat sheet">
+
+## Mojo basics {#mojo-basics}
+
+Syntax essentials. The core you reach for first.
+
+</CheatSheet>
+
+<CheatSheet sheet={compiletimeSheet} alt="Mojo compile-time cheat sheet">
+
+## Compile-time {#compile-time}
+
+Mojo's superpower. Less for runtime to do.
+
+</CheatSheet>
+
+<CheatSheet sheet={traitsSheet} alt="Mojo traits cheat sheet">
+
+## Traits {#traits}
+
+Shared capabilities and requirements.
+
+</CheatSheet>
+
+<CheatSheet sheet={ownershipSheet} alt="Mojo ownership cheat sheet">
+
+## Ownership {#ownership}
+
+Who owns what and when?
+
+</CheatSheet>
+
+<CheatSheet sheet={typesSheet} alt="Mojo types and literals cheat sheet">
+
+## Types and literals {#types-and-literals}
+
+Types, literals, and the sharp edges. Know before you write.
+
+</CheatSheet>
+
+<CheatSheet sheet={convertSheet} alt="Mojo conversions cheat sheet">
+
+## Type conversions {#conversions}
+
+Create it or convert it, and get back to work.
+
+</CheatSheet>
+
+</div>
+
+<!-- markdownlint-enable MD033 -->

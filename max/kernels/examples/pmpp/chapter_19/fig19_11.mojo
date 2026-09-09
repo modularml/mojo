@@ -26,10 +26,10 @@ with shared memory. The key optimization is that B is loaded from X using
 complex indexing that implicitly performs the im2col transformation.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim, barrier
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 
 from conv_utils import idx_x, idx_y, conv_cpu, init_data, verify_results
 
@@ -37,15 +37,15 @@ comptime TILE_WIDTH = 16
 
 
 def conv_layer_mm_kernel(
-    C: Int,
-    M: Int,
-    H: Int,
-    W: Int,
-    K: Int,
-    N_batch: Int,
-    F: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    X: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    Y: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    C_dev: Int32,
+    M_dev: Int32,
+    H_dev: Int32,
+    W_dev: Int32,
+    K_dev: Int32,
+    N_batch_dev: Int32,
+    F: UnsafePointer[Float32, ImmutAnyOrigin],
+    X: UnsafePointer[Float32, ImmutAnyOrigin],
+    Y: UnsafePointer[Float32, MutAnyOrigin],
 ):
     """Tiled matrix multiplication kernel for convolution.
 
@@ -54,30 +54,37 @@ def conv_layer_mm_kernel(
     to matrix form (im2col) during the load to shared memory.
 
     Args:
-        C: Input channels.
-        M: Output channels.
-        H: Input height.
-        W: Input width.
-        K: Kernel size.
-        N_batch: Batch size.
+        C_dev: Input channels.
+        M_dev: Output channels.
+        H_dev: Input height.
+        W_dev: Input width.
+        K_dev: Kernel size.
+        N_batch_dev: Batch size.
         F: Filter tensor pointer.
         X: Input tensor pointer.
         Y: Output tensor pointer.
     """
+    # Int is not device-passable; widen the fixed-width args.
+    var C = Int(C_dev)
+    var M = Int(M_dev)
+    var H = Int(H_dev)
+    var W = Int(W_dev)
+    var K = Int(K_dev)
+    var N_batch = Int(N_batch_dev)
     var H_out = H - K + 1
     var W_out = W - K + 1
 
     # Allocate shared memory for tiles
     # Fds[TILE_WIDTH][TILE_WIDTH] + Bds[TILE_WIDTH][TILE_WIDTH]
-    var Fds = stack_allocation[
+    var Fds = unsafe_stack_allocation[
         TILE_WIDTH * TILE_WIDTH,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
-    var Bds = stack_allocation[
+    var Bds = unsafe_stack_allocation[
         TILE_WIDTH * TILE_WIDTH,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
 
     var bx = block_idx.x
@@ -195,9 +202,9 @@ def main() raises:
     var ctx = DeviceContext()
 
     # Allocate device memory
-    var d_X = ctx.enqueue_create_buffer[DType.float32](size_X)
-    var d_F = ctx.enqueue_create_buffer[DType.float32](size_F)
-    var d_Y = ctx.enqueue_create_buffer[DType.float32](size_Y)
+    var d_X = ctx.enqueue_create_buffer[.float32](size_X)
+    var d_F = ctx.enqueue_create_buffer[.float32](size_F)
+    var d_Y = ctx.enqueue_create_buffer[.float32](size_Y)
 
     # Copy to device
     ctx.enqueue_copy(d_X, h_X)
@@ -215,12 +222,12 @@ def main() raises:
     print("Launching MM Kernel with Grid(", grid_x, ",", grid_y, ",", N, ")")
 
     ctx.enqueue_function[conv_layer_mm_kernel](
-        C,
-        M,
-        H,
-        W,
-        K,
-        N,
+        Int32(C),
+        Int32(M),
+        Int32(H),
+        Int32(W),
+        Int32(K),
+        Int32(N),
         d_F,
         d_X,
         d_Y,

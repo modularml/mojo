@@ -126,6 +126,8 @@ typedef enum M_Dtype {
 
   /// Bits 0 through 3 indicate the kind of FP value.
   M_FLOAT4_E2M1FN = 0 | mIsFloat,
+  M_FLOAT6_E2M3FN = 1 | mIsFloat,
+  M_FLOAT6_E3M2FN = 2 | mIsFloat,
   /// Some slots are left blank here to enable us to support more lower
   /// precision types in the future.
   M_FLOAT8_E8M0FNU = 9 | mIsFloat,
@@ -203,6 +205,17 @@ typedef enum M_ValueType {
 /// You can create this with `M_newWeightsRegistry()`.
 /// When you're done, call `M_freeWeightsRegistry()`.
 typedef struct M_WeightsRegistry M_WeightsRegistry;
+
+/// Holds the tensors parsed from one or more safetensors files.
+///
+/// The tensor data is borrowed from the loaded files and stays valid for the
+/// lifetime of this object. You can enumerate tensors, read their data and
+/// metadata, or build a `M_WeightsRegistry` from all of them with
+/// `M_newWeightsRegistryFromSafetensors()`.
+///
+/// You can create this with `M_loadSafetensors()`.
+/// When you're done, call `M_freeSafetensors()`.
+typedef struct M_Safetensors M_Safetensors;
 
 /// Represents the type of device. `M_HOST` is the CPU; `M_ACCELERATOR`
 /// is any non-CPU compute device (GPU or NPU). The closed set of valid

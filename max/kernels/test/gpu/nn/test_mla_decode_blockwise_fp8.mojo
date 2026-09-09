@@ -34,7 +34,7 @@ from std.math import ceildiv
 from std.random import randn, seed
 from std.sys import argv, has_nvidia_gpu_accelerator
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import KVCacheStaticParams, PagedKVCacheCollection
 from layout import (
     Idx,
@@ -43,7 +43,6 @@ from layout import (
     RuntimeLayout,
     TileTensor,
     UNKNOWN_VALUE,
-    lt_to_tt,
     row_major,
 )
 from std.memory import alloc
@@ -55,7 +54,7 @@ from nn.attention.gpu.nvidia.sm100.mla_decode_dispatch import (
 )
 from nn.attention.mha_utils import MHAConfig
 from std.testing import assert_almost_equal
-from std.gpu.host.info import B200, _is_sm10x_gpu
+from max.gpu.host.info import B200, _is_sm10x_gpu
 from std.utils.index import Index, IndexList
 
 
@@ -203,9 +202,7 @@ def run_test_blockwise_fp8[
         * head_dim_gran
     )
 
-    var scales_host = ctx.enqueue_create_host_buffer[DType.float32](
-        scales_elems
-    )
+    var scales_host = ctx.enqueue_create_host_buffer[.float32](scales_elems)
 
     # Assign non-uniform per-block, per-token scales.
     # scale(token_global, block_idx) = palette[(token_global * 7 + block_idx) % 9]
@@ -253,18 +250,14 @@ def run_test_blockwise_fp8[
     # Step 1c: Build lookup table and zero out unused token slots
     # -----------------------------------------------------------------------
 
-    var cache_lengths_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_host = ctx.enqueue_create_host_buffer[.uint32](batch_size)
     for i in range(batch_size):
         cache_lengths_host[i] = UInt32(cache_lengths[i])
 
     # Match production: max_pages_per_batch covers cache_len + 1 tokens.
     var max_pages_per_batch = ceildiv(max_cache_len + q_max_seq_len, page_size)
     var lut_size = batch_size * max_pages_per_batch
-    var lookup_table_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        lut_size
-    )
+    var lookup_table_host = ctx.enqueue_create_host_buffer[.uint32](lut_size)
     # Zero-init: unused per-batch slots must be 0.
     for i in range(lut_size):
         lookup_table_host[i] = UInt32(0)
@@ -317,7 +310,7 @@ def run_test_blockwise_fp8[
     # -----------------------------------------------------------------------
     # Step 3: input_row_offsets (batch_size + 1 elements)
     # -----------------------------------------------------------------------
-    var row_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var row_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
     row_offsets_host[0] = UInt32(0)
@@ -336,23 +329,19 @@ def run_test_blockwise_fp8[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var scales_device = ctx.enqueue_create_buffer[DType.float32](scales_elems)
+    var scales_device = ctx.enqueue_create_buffer[.float32](scales_elems)
     ctx.enqueue_copy(scales_device, scales_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[q_type](out_size)
@@ -370,19 +359,19 @@ def run_test_blockwise_fp8[
     )
 
     # Scales LayoutTensor (6D, same layout pattern as blocks)
-    var scales_lt = LayoutTensor[DType.float32, Layout.row_major[6]()](
+    var scales_lt = LayoutTensor[.float32, Layout.row_major[6]()](
         scales_device.unsafe_ptr(),
         RuntimeLayout[Layout.row_major[6]()].row_major(scales_shape),
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -397,21 +386,21 @@ def run_test_blockwise_fp8[
         scale_dtype_=DType.float32,
         quantization_granularity_=quant_granularity,
     ](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -421,7 +410,7 @@ def run_test_blockwise_fp8[
         UInt32(q_max_seq_len),
         UInt32(max_cache_len),
         # Pass the scales tensor
-        LayoutTensor[DType.float32, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[.float32, Layout.row_major[6]()](
             scales_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 scales_lt.runtime_layout.shape.value,
@@ -456,7 +445,7 @@ def run_test_blockwise_fp8[
         1,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
     print("  Launching MLA decode kernel (blockwise FP8)...")
 
@@ -472,7 +461,7 @@ def run_test_blockwise_fp8[
         row_offsets_tt,
         scale,
         ctx,
-        lt_to_tt(scalar_args_buf_lt),
+        scalar_args_buf_tt,
         q_max_seq_len=q_max_seq_len,
     )
 
@@ -533,7 +522,7 @@ def run_test_blockwise_fp8[
                         + h * kv_params.head_size
                         + d
                     )
-                    var fp8_val = blocks_host[src_offset].cast[DType.float32]()
+                    var fp8_val = blocks_host[src_offset].cast[.float32]()
 
                     var block_idx = d // quant_granularity
                     var scale_offset = (
@@ -615,7 +604,7 @@ def run_test_blockwise_fp8[
         var out_offset = b * num_heads * V_DEPTH
         for h in range(num_heads):
             for d in range(V_DEPTH):
-                var expect = ref_b_host[d + DEPTH * h].cast[DType.float64]()
+                var expect = ref_b_host[d + DEPTH * h].cast[.float64]()
                 var actual = out_host[out_offset + V_DEPTH * h + d].cast[
                     DType.float64
                 ]()
@@ -741,9 +730,7 @@ def run_bench_blockwise_fp8[
         * head_dim_gran
     )
     # Use uniform scale=1.0 for benchmark (perf is scale-value independent)
-    var scales_host = ctx.enqueue_create_host_buffer[DType.float32](
-        scales_elems
-    )
+    var scales_host = ctx.enqueue_create_host_buffer[.float32](scales_elems)
     scales_host.enqueue_fill(Float32(1.0))
 
     var _tok_stride = kv_params.num_heads * kv_params.head_size
@@ -755,17 +742,13 @@ def run_bench_blockwise_fp8[
         * kv_params.head_size
     )
 
-    var cache_lengths_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_host = ctx.enqueue_create_host_buffer[.uint32](batch_size)
     for i in range(batch_size):
         cache_lengths_host[i] = UInt32(cache_lengths[i])
 
     var max_pages_per_batch = ceildiv(max_cache_len + q_max_seq_len, page_size)
     var lut_size = batch_size * max_pages_per_batch
-    var lookup_table_host = ctx.enqueue_create_host_buffer[DType.uint32](
-        lut_size
-    )
+    var lookup_table_host = ctx.enqueue_create_host_buffer[.uint32](lut_size)
     # Zero-init: unused per-batch slots must be 0.
     for i in range(lut_size):
         lookup_table_host[i] = UInt32(0)
@@ -800,7 +783,7 @@ def run_bench_blockwise_fp8[
     randn(q_host.as_span(), mean=0.0, standard_deviation=0.5)
 
     # Step 3: input_row_offsets
-    var row_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var row_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
     row_offsets_host[0] = UInt32(0)
@@ -815,23 +798,19 @@ def run_bench_blockwise_fp8[
     var blocks_device = ctx.enqueue_create_buffer[kv_type](block_elems)
     ctx.enqueue_copy(blocks_device, blocks_host)
 
-    var scales_device = ctx.enqueue_create_buffer[DType.float32](scales_elems)
+    var scales_device = ctx.enqueue_create_buffer[.float32](scales_elems)
     ctx.enqueue_copy(scales_device, scales_host)
 
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     ctx.enqueue_copy(cache_lengths_device, cache_lengths_host)
 
-    var lookup_table_device = ctx.enqueue_create_buffer[DType.uint32](lut_size)
+    var lookup_table_device = ctx.enqueue_create_buffer[.uint32](lut_size)
     ctx.enqueue_copy(lookup_table_device, lookup_table_host)
 
     var q_device = ctx.enqueue_create_buffer[q_type](q_size)
     ctx.enqueue_copy(q_device, q_host)
 
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
     ctx.enqueue_copy(row_offsets_device, row_offsets_host)
 
     var out_device = ctx.enqueue_create_buffer[q_type](out_size)
@@ -844,19 +823,19 @@ def run_bench_blockwise_fp8[
         RuntimeLayout[Layout.row_major[6]()].row_major(block_shape),
     )
 
-    var scales_lt = LayoutTensor[DType.float32, Layout.row_major[6]()](
+    var scales_lt = LayoutTensor[.float32, Layout.row_major[6]()](
         scales_device.unsafe_ptr(),
         RuntimeLayout[Layout.row_major[6]()].row_major(scales_shape),
     )
 
     comptime cl_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_lt = LayoutTensor[DType.uint32, cl_layout](
+    var cache_lengths_lt = LayoutTensor[.uint32, cl_layout](
         cache_lengths_device.unsafe_ptr(),
         RuntimeLayout[cl_layout].row_major(IndexList[1](batch_size)),
     )
 
     comptime lt_layout_2d = Layout.row_major[2]()
-    var lookup_table_lt = LayoutTensor[DType.uint32, lt_layout_2d](
+    var lookup_table_lt = LayoutTensor[.uint32, lt_layout_2d](
         lookup_table_device.unsafe_ptr(),
         RuntimeLayout[lt_layout_2d].row_major(
             IndexList[2](batch_size, max_pages_per_batch)
@@ -870,21 +849,21 @@ def run_bench_blockwise_fp8[
         scale_dtype_=DType.float32,
         quantization_granularity_=quant_granularity,
     ](
-        LayoutTensor[kv_type, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[kv_type, Layout.row_major[6]()](
             blocks_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 blocks_lt.runtime_layout.shape.value,
                 blocks_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, cl_layout, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, cl_layout](
             cache_lengths_lt.ptr,
             RuntimeLayout[cl_layout](
                 cache_lengths_lt.runtime_layout.shape.value,
                 cache_lengths_lt.runtime_layout.stride.value,
             ),
         ),
-        LayoutTensor[DType.uint32, lt_layout_2d, ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, lt_layout_2d](
             lookup_table_lt.ptr,
             RuntimeLayout[lt_layout_2d](
                 lookup_table_lt.runtime_layout.shape.value,
@@ -893,7 +872,7 @@ def run_bench_blockwise_fp8[
         ),
         UInt32(q_max_seq_len),
         UInt32(max_cache_len),
-        LayoutTensor[DType.float32, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[.float32, Layout.row_major[6]()](
             scales_lt.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 scales_lt.runtime_layout.shape.value,
@@ -926,18 +905,19 @@ def run_bench_blockwise_fp8[
         1,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @parameter
     @always_inline
-    @__copy_capture(
-        out_tt,
-        q_tt,
-        kv_cache,
-        row_offsets_tt,
-        scalar_args_buf_lt,
-    )
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {
+        var out_tt,
+        var q_tt,
+        var kv_cache,
+        var row_offsets_tt,
+        var scalar_args_buf_tt,
+        imm,
+    }:
         flare_mla_decoding[
             rank=3,
             config=MHAConfig[q_type](num_heads, DEPTH),
@@ -950,7 +930,7 @@ def run_bench_blockwise_fp8[
             row_offsets_tt,
             scale,
             ctx,
-            lt_to_tt(scalar_args_buf_lt),
+            scalar_args_buf_tt,
             q_max_seq_len=q_max_seq_len,
         )
 
@@ -959,7 +939,7 @@ def run_bench_blockwise_fp8[
     # Warmup
     kernel_launch(ctx)
 
-    var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+    var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
         nrun
     )
     var mstime = nstime / 1000000

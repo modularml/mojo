@@ -1,0 +1,1049 @@
+---
+title: GPU block and warp operations and synchronization
+sidebar_label: Block and warp operations and synchronization
+description: A description of GPU block and warp operations and synchronization.
+github_url: https://github.com/modular/modular/tree/main/max/examples/gpu-block-and-warp
+---
+
+When multiple GPU threads write to the same memory location without a defined
+order of execution, a *race condition* occurs. The final outcome of the
+computation becomes non-deterministic, depending on the scheduling and timing
+of execution of threads by the GPU hardware. Such bugs are notoriously
+difficult to debug because they may not appear consistently in every run.
+
+To write correct and robust parallel programs, you need explicit
+mechanisms to coordinate the execution of threads and manage the visibility of
+their memory operations. These mechanisms are known as *synchronization
+primitives*. They are not merely performance optimizations; they are essential
+tools for correctness. Without them, threads operate in complete isolation,
+unable to safely share intermediate results, divide complex tasks, or perform
+the collective computations that are the hallmark of high-performance GPU
+algorithms.
+
+A *barrier* is a fundamental synchronization primitive that creates a meeting
+point in the program where all participating threads must wait for each other.
+When a thread reaches a barrier, it pauses execution until every other thread
+in the group also arrives. This ensures that all threads proceed together past
+the barrier, maintaining consistent state and preventing race conditions when
+accessing shared data.
+
+Mojo provides two complementary categories of GPU coordination tools.
+*Synchronization primitives* like `barrier()` and `syncwarp()` coordinate
+thread execution and enforce memory visibility, but they don't perform
+computation themselves—they're pure coordination mechanisms. In contrast,
+*collective operations* like reductions, broadcasts, and prefix sums combine
+synchronization with common computational patterns: they coordinate threads
+*and* compute a result. Use synchronization primitives when you need explicit
+control over when threads coordinate (such as managing access to shared memory
+between distinct phases of an algorithm), and use collective operations when
+you need to aggregate or distribute data across threads (such as computing a
+sum or maximum across a thread block or warp). Both types of tools are
+essential for writing correct and efficient GPU code, and understanding when to
+use each is key to building robust parallel algorithms.
+
+This guide covers Mojo's low-level primitives for managing coordination at the
+thread block and warp levels. For foundational GPU architecture concepts and
+detailed explanations of the GPU execution model, see
+[Intro to GPUs](/gpu/architecture/). For a discussion of basic kernel creation
+and device management, see [GPU programming fundamentals](/gpu/fundamentals/).
+The tiled matrix multiplication example later in this chapter uses
+[`TileTensor`](/api/mojo/layout/tile_tensor/TileTensor/) and
+[`stack_allocation()`](/api/mojo/layout/tile_tensor/stack_allocation/) to
+allocate shared memory tiles. For an introduction to `TileTensor`
+itself—including how to create one in global, shared, or local memory—see
+[Using `TileTensor`](/tile-tensor/tensors/#creating-a-tiletensor-in-shared-or-local-memory).
+
+We'll explore Mojo's synchronization and collective communication primitives
+for coordinating parallel work on the GPU. Key topics include:
+
+- [Block-level synchronization and operations](#block-level-synchronization-and-operations):
+  How to coordinate all threads within a thread block using
+  [`barrier()`](/api/mojo/max/gpu/sync/sync/barrier/) and block reduction
+  operations from the
+  [`gpu.primitives.block`](/api/mojo/max/gpu/primitives/block/) module.
+- [Warp-level operations](#warp-level-operations): How to perform fine-grained
+  synchronization with
+  [`syncwarp()`](/api/mojo/max/gpu/sync/sync/syncwarp/) and
+  leverage high-speed data exchange using
+  [`gpu.primitives.warp`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/)
+  primitives.
+- [Best practices and common pitfalls](#best-practices-and-common-pitfalls): How
+  to use these primitives correctly to write reliable and portable GPU code.
+
+## Block-level synchronization and operations
+
+This section covers coordination mechanisms for all threads within a thread
+block:
+
+- [The `barrier()` primitive](#the-barrier-primitive): The fundamental
+  synchronization primitive that ensures all threads reach the same point
+  before proceeding.
+- [Block-level reduction operations](#block-level-reduction-operations):
+  Higher-level collective operations (`sum`, `max`, `min`, `broadcast`,
+  `prefix_sum`) that combine synchronization with computation.
+- [Block synchronization example](#block-synchronization-example-tiled-matrix-multiplication):
+  A complete tiled matrix multiplication demonstrating practical barrier usage.
+
+These tools serve different but complementary purposes: `barrier()` is a pure
+synchronization primitive for coordinating execution and memory visibility,
+while block reduction operations are collective computations that internally
+handle their own synchronization. You can use `barrier()` to build custom
+coordination patterns, or use block reductions when you need both coordination
+and computation together.
+
+### The `barrier()` primitive
+
+The [`gpu.sync.barrier()`](/api/mojo/max/gpu/sync/sync/barrier/)
+function is the primary mechanism for coordinating all threads within a single
+thread block. It creates a synchronization point in the kernel's execution flow
+that no thread can pass until every other thread in its block has also reached
+that point.
+
+The `barrier()` primitive does two things: it acts as both an execution barrier
+and a memory fence.
+
+- Execution barrier: As an execution barrier, `barrier()` ensures that the
+  execution of all threads in a block is paused at that point in the program.
+  The hardware scheduler will not allow any thread to proceed past the barrier
+  until all threads in that block have signaled their arrival.
+
+- Memory fence: As a memory fence, `barrier()` enforces a strict ordering on
+  memory operations. It guarantees that all writes to shared memory (and global
+  memory, with respect to other threads in the same block) performed by any
+  thread *before* the barrier are completed and made visible to all other
+  threads in the block *after* they pass the barrier. This guarantee is what
+  prevents race conditions when threads communicate via shared memory.
+
+The most common use case for `barrier()` is managing access to the fast,
+on-chip shared memory shared by all threads within a block. Here's how a
+typical algorithm works:
+
+1. Threads in a block cooperatively load a segment of data from the high-latency
+   global memory into a shared memory array. Each thread is responsible for
+   loading one or more elements.
+
+2. A call to `barrier()` is made. This is essential to ensure that the entire
+   data segment is fully loaded into shared memory before any thread attempts to
+   use it.
+
+3. Threads perform computations, reading from and writing to the shared memory
+   array. This phase leverages the low latency of shared memory to accelerate
+   the algorithm.
+
+4. If the computation itself involves multiple stages of shared memory
+   communication, another `barrier()` call may be necessary to ensure the
+   results of one stage are visible before the next begins.
+
+5. Finally, threads write their results from shared memory back to global
+   memory.
+
+:::caution Caution
+
+A `barrier()` must be encountered by all threads within a block to avoid a
+deadlock. Placing a `barrier()` inside a conditional statement (such as an `if`
+or `else` block) is a common source of bugs. If the condition causes some
+threads to execute the `barrier()` while others skip it, the threads that reach
+the barrier will wait indefinitely for the other threads to arrive, causing the
+kernel to hang. Therefore, `barrier()` should be used in conditional code only
+if it is guaranteed that all threads in the block will evaluate the condition
+identically and follow the same execution path.
+
+:::
+
+The Mojo `barrier()` function is functionally equivalent to the
+`__syncthreads()` intrinsic in both NVIDIA CUDA and AMD HIP and
+`threadgroup_barrier(mem_flags::mem_threadgroup)` in Apple Metal, providing a
+portable syntax for this fundamental operation.
+
+:::tip
+
+For fine-grained synchronization within a single warp, see
+[`syncwarp()`](#warp-level-synchronization), which provides faster coordination
+for threads executing together in the same warp without requiring block-wide
+synchronization.
+
+:::
+
+### Block-level reduction operations
+
+In addition to the basic `barrier()` primitive, Mojo provides higher-level
+block-wide collective operations through the
+[`gpu.primitives.block`](/api/mojo/max/gpu/primitives/block/)
+module. These operations combine the coordination functionality of `barrier()`
+with common computational patterns, offering both convenience and performance
+benefits.
+
+The `gpu.primitives.block` module includes several reduction primitives:
+
+- [`sum(val)`](/api/mojo/max/gpu/primitives/block/sum/):
+  Computes the sum of `val` across all threads in the block.
+- [`max(val)`](/api/mojo/max/gpu/primitives/block/max/):
+  Computes the maximum `val` across all threads in the block.
+- [`min(val)`](/api/mojo/max/gpu/primitives/block/min/):
+  Computes the minimum `val` across all threads in the block.
+- [`broadcast(val, src_thread=0)`](/api/mojo/max/gpu/primitives/block/broadcast/):
+  Broadcasts the value from `src_thread` to all other threads in the block.
+- [`prefix_sum[exclusive=False](val)`](/api/mojo/max/gpu/primitives/block/prefix_sum/):
+  Computes an inclusive (default) or exclusive prefix sum (scan) across threads
+  in the block. A prefix sum transforms an input sequence into cumulative sums:
+  given $[x_0, x_1, x_2, x_3]$, an *inclusive* scan produces $[x_0, x_0+x_1,
+  x_0+x_1+x_2, x_0+x_1+x_2+x_3]$ where each thread receives the sum of all
+  values up to and including its own, while an *exclusive* scan produces $[0,
+  x_0, x_0+x_1, x_0+x_1+x_2]$ where each thread receives the sum of all values
+  *before* it.
+
+These operations automatically handle the necessary synchronization and shared
+memory management internally, making them both easier to use correctly and
+often more efficient than manually implementing equivalent functionality with
+`barrier()` and shared memory operations.
+
+:::tip Tip
+
+Use `gpu.primitives.block` operations when you need to aggregate data across all
+threads in a thread block (which may span multiple warps). Use
+`gpu.primitives.warp` operations, as described in
+[Warp-level reduction operations](#warp-level-reduction-operations), when you
+need to aggregate only within a single warp, as they are significantly faster.
+For algorithms that reduce large datasets, use a hybrid approach: first reduce
+within warps using `gpu.primitives.warp` primitives, then combine warp results
+using `gpu.primitives.block` operations.
+
+:::
+
+### Using block operations in practice
+
+Block-level operations are commonly used in multi-stage algorithms where
+threads must coordinate through shared memory. A typical pattern involves:
+
+1. Load phase: Threads cooperatively load data into shared memory
+2. Synchronize: Use `barrier()` to ensure all data is loaded
+3. Compute phase: Process data using shared memory
+4. Reduce phase: Use block reduction operations to aggregate results
+
+This pattern appears in algorithms like tiled matrix multiplication, stencil
+operations, and parallel reductions, where the combination of shared memory
+and proper synchronization enables significant performance improvements over
+naive approaches.
+
+### Block synchronization example: tiled matrix multiplication
+
+Matrix multiplication benefits from a technique called *tiling*, where we break
+large matrices into smaller tiles that fit in the GPU's fast shared memory.
+Instead of repeatedly reading from slow global memory, threads in a block
+cooperatively load a tile into shared memory once, then all threads can access
+it multiple times. This creates a classic *producer-consumer* pattern: threads
+work together to load data (producer phase), then all threads use that data to
+compute results (consumer phase). Without proper synchronization between these
+phases, the algorithm produces incorrect results. For a deeper understanding of
+the tiling strategy, see
+[this section of our blog post on optimizing matrix multiplication on NVIDIA's Blackwell](https://www.modular.com/blog/matrix-multiplication-on-nvidias-blackwell-part-2-using-hardware-features-to-optimize-matmul#shared-memory).
+
+{/* @sync: ../../../../../max/examples/gpu-block-and-warp/tiled_matmul.mojo */}
+
+```mojo title="tiled_matmul.mojo"
+from std.math import ceildiv
+from std.sys import exit, has_accelerator
+
+# GPU programming imports from open source stdlib and max accelerator library
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import thread_idx, block_idx
+
+# TileTensor support from open source layout package
+from layout import TileTensor, stack_allocation
+from layout.tile_layout import row_major
+
+# Data type selection: float32 provides good balance of precision and performance
+comptime float_dtype = DType.float32
+
+# Matrix dimensions: chosen to be small enough for easy understanding
+# while still demonstrating tiling concepts effectively
+comptime MATRIX_SIZE = 64  # 64x64 matrices
+comptime MATRIX_M = MATRIX_SIZE  # Number of rows in matrices A and C
+comptime MATRIX_N = MATRIX_SIZE  # Number of columns in matrices B and C
+comptime MATRIX_K = MATRIX_SIZE  # Shared dimension (A cols = B rows)
+
+# Tile dimensions: chosen to fit comfortably in GPU shared memory
+# and demonstrate clear blocking behavior
+comptime TILE_SIZE = 16  # 16x16 tiles balance memory usage and parallelism
+comptime TILE_M = TILE_SIZE  # Tile height for matrix A and C
+comptime TILE_N = TILE_SIZE  # Tile width for matrix B and C
+comptime TILE_K = TILE_SIZE  # Tile depth for the K dimension
+
+# Derived constants
+comptime NUM_TILES_PER_SIDE = MATRIX_SIZE // TILE_SIZE  # Number of tiles per matrix side (4)
+comptime THREADS_PER_TILE = TILE_SIZE * TILE_SIZE  # Threads needed per tile (256)
+comptime TOTAL_TILES_TO_PROCESS = NUM_TILES_PER_SIDE  # Tiles to process in K dimension
+
+# TileTensor provides type-safe multi-dimensional data access with automatic memory layout handling
+# Layout definitions using example matrix dimensions
+comptime matrix_a_layout = row_major[MATRIX_M, MATRIX_K]()  # A: M x K
+comptime matrix_b_layout = row_major[MATRIX_K, MATRIX_N]()  # B: K x N
+comptime matrix_c_layout = row_major[MATRIX_M, MATRIX_N]()  # C: M x N
+
+# Layout definitions for tile access
+comptime tile_a_layout = row_major[TILE_M, TILE_K]()
+comptime tile_b_layout = row_major[TILE_K, TILE_N]()
+
+
+def tiled_matmul_kernel(
+    matrix_a: TileTensor[float_dtype, type_of(matrix_a_layout), MutAnyOrigin],
+    matrix_b: TileTensor[float_dtype, type_of(matrix_b_layout), MutAnyOrigin],
+    matrix_c: TileTensor[float_dtype, type_of(matrix_c_layout), MutAnyOrigin],
+):
+    # Thread and block indices
+    var thread_x = thread_idx.x
+    var thread_y = thread_idx.y
+    var block_x = block_idx.x
+    var block_y = block_idx.y
+
+    # Global matrix coordinates
+    var global_row = block_y * TILE_M + thread_y
+    var global_col = block_x * TILE_N + thread_x
+
+    # Tile starting positions
+    var tile_row_start = block_y * TILE_M
+    var tile_col_start = block_x * TILE_N
+
+    # Allocate shared memory tiles for fast on-chip access
+    var tile_a_shared = stack_allocation[
+        float_dtype, address_space=.SHARED
+    ](tile_a_layout)
+
+    var tile_b_shared = stack_allocation[
+        float_dtype, address_space=.SHARED
+    ](tile_b_layout)
+
+    # Initialize accumulator and start tiling loop
+    var accumulator: matrix_c.ElementType = 0.0
+
+    # Iterate through tiles along K dimension
+    # Use comptime for to unroll the loop at compile time
+    comptime for k_tile in range(0, MATRIX_K, TILE_K):
+        # Cooperative tile loading
+        # Calculate global coordinates for tile loading
+        var a_global_row = tile_row_start + thread_y
+        var a_global_col = k_tile + thread_x
+        var b_global_row = k_tile + thread_y
+        var b_global_col = tile_col_start + thread_x
+
+        # Bounds checking
+        var load_a_valid = (a_global_row < MATRIX_M) and (
+            a_global_col < MATRIX_K
+        )
+        var load_b_valid = (b_global_row < MATRIX_K) and (
+            b_global_col < MATRIX_N
+        )
+
+        # Load tiles into shared memory with bounds checking
+        if load_a_valid:
+            tile_a_shared[thread_y, thread_x] = matrix_a[
+                a_global_row, a_global_col
+            ]
+        else:
+            tile_a_shared[thread_y, thread_x] = 0.0
+
+        if load_b_valid:
+            tile_b_shared[thread_y, thread_x] = matrix_b[
+                b_global_row, b_global_col
+            ]
+        else:
+            tile_b_shared[thread_y, thread_x] = 0.0
+
+        # Ensure all threads finish loading tiles before any thread starts computing
+        barrier()
+
+        # Compute dot product using shared memory tiles
+        comptime for k in range(TILE_K):
+            var a_element = tile_a_shared[thread_y, k]
+            var b_element = tile_b_shared[k, thread_x]
+            accumulator += a_element * b_element
+
+        # Ensure all threads finish computing before any thread loads next tiles
+        barrier()
+
+    # Write final result to global memory with bounds checking
+    if (global_row < MATRIX_M) and (global_col < MATRIX_N):
+        matrix_c[global_row, global_col] = accumulator
+```
+
+This tiled algorithm leverages the GPU's memory hierarchy for better
+performance. Shared memory is an on-chip cache that's much faster than global
+memory, but it's limited in size—a typical block might have only 48KB available.
+We break the computation into stages: threads cooperatively load small tiles
+from global memory into this fast shared memory, perform computations on those
+tiles, then repeat for the next set of tiles. Each thread loads one element per
+tile, creating coalesced memory accesses that maximize bandwidth. Once a tile
+sits in shared memory, all threads in the block can access it repeatedly without
+triggering expensive global memory reads.
+
+The first `barrier()` call appears immediately after the cooperative tile
+loading phase. This synchronization point is critical: it ensures that all
+threads in the block finish writing their elements to shared memory before any
+thread begins reading from it to compute results. Without this barrier, you'd
+have a classic read-before-write race condition. Fast threads could race ahead
+and start reading from shared memory locations that slow threads haven't
+populated yet, leading to incorrect results from uninitialized data. Even worse,
+the bug would be non-deterministic—sometimes the code would work (if threads
+happened to execute in a favorable order), and sometimes it would fail, making
+debugging extremely difficult. The barrier eliminates this unpredictability by
+establishing a clear happens-before relationship: all writes complete before any
+reads begin.
+
+The second `barrier()` call appears at the end of the computation phase, right
+before the loop continues to load the next set of tiles. This barrier solves the
+opposite problem: it prevents write-during-read races. Without it, fast threads
+could finish their computations and start loading new tile data into shared
+memory while slow threads are still reading the old data for their calculations.
+This would corrupt the shared memory with partially overwritten values, again
+producing incorrect results. The pattern is symmetric: the first barrier
+protects readers from seeing incomplete writes, while the second protects
+readers from concurrent overwrites. Together, these two barriers implement a
+safe producer-consumer cycle: load → barrier → compute → barrier → repeat. Both
+barriers are absolutely essential—removing either one breaks the algorithm's
+correctness.
+
+## Warp-level operations
+
+While the thread block is the scope for shared memory communication, the warp is
+the fundamental unit of execution scheduling. Because threads within a warp are
+executed simultaneously by the hardware, communication between them happens much
+faster than communication that requires coordination across different warps.
+Mojo provides a suite of primitives for these high-speed, intra-warp operations,
+which are essential for many performance-critical optimization patterns.
+
+This section covers high-speed coordination and data exchange within a single
+warp:
+
+- [Warp-level synchronization](#warp-level-synchronization): How to use
+  `syncwarp()` for fine-grained synchronization within a warp, and when it's
+  needed vs. when it's not.
+- [Warp-level data exchange](#warp-level-data-exchange): Register-to-register
+  communication with shuffle operations (`shuffle_up`, `shuffle_down`,
+  `shuffle_xor`, `shuffle_idx`, `broadcast`).
+- [Warp-level reduction operations](#warp-level-reduction-operations):
+  High-performance collective operations (`sum`, `max`, `min`, `prefix_sum`)
+  that operate only within a warp.
+
+### Warp-level synchronization
+
+The
+[`gpu.sync.syncwarp()`](/api/mojo/max/gpu/sync/sync/syncwarp/)
+function provides a more granular synchronization barrier that operates only on
+the threads within a single warp.
+
+This function handles *thread divergence*. On some GPU architectures, threads
+within a warp can follow different execution paths due to conditional branching.
+`syncwarp()` forces the specified threads in the warp to reconverge at a single
+point before proceeding.
+
+:::tip
+
+For coordinating threads across multiple warps within a thread block, use
+[`barrier()`](#the-barrier-primitive) instead, which synchronizes all threads in
+the block and provides memory fence guarantees for shared memory access.
+
+:::
+
+The `syncwarp()` function takes an optional `mask` argument. This is a 32-bit or
+64-bit integer (depending on the warp size of the architecture) that acts as a
+bitmask. The `i`th bit of the mask corresponds to the thread at lane `i` within
+the warp. If a bit is set to 1, the corresponding thread participates in the
+synchronization; if it is 0, it does not. The default value of -1 (all bits set
+to 1) synchronizes all threads in the warp.
+
+Understanding `syncwarp()` requires knowing its platform-dependent behavior,
+which Mojo's portable API abstracts away:
+
+- On NVIDIA GPUs supporting independent thread scheduling (Volta architecture
+  and newer), threads within a warp can genuinely diverge. In this context,
+  `syncwarp()` compiles to an active hardware instruction (`bar.warp.sync`) that
+  forces the participating threads to wait for each other. It is necessary for
+  correctness in algorithms that rely on warp-synchronous behavior.
+
+- On AMD GPUs, threads within a wavefront (the AMD equivalent of a warp) are
+  guaranteed by the hardware to execute in lock-step. They cannot diverge in the
+  same way. Consequently, `syncwarp()` is a **no-op** on AMD architectures; the
+  Mojo compiler emits no instruction for it.
+
+- On Apple silicon GPUs, this provides only execution synchronization within a
+  SIMD group (the Apple equivalent of a warp), with no memory fence (the Apple
+  Metal equivalent of `simdgroup_barrier(mem_flags::mem_none)`). Lane masks are
+  not supported, so the `mask` argument is ignored and all active lanes must
+  reach this point.
+
+This difference highlights a key benefit of Mojo. You write code against a
+single, portable API. The compiler is responsible for generating the correct,
+architecture-specific code. Therefore, if an algorithm relies on `syncwarp()`
+for correctness on NVIDIA hardware, it still behaves as expected on other
+vendors' hardware.
+
+:::note
+
+[Warp shuffle operations](#warp-level-data-exchange) (like `shuffle_down()`,
+`shuffle_xor()`, etc.) and
+[warp reduction operations](#warp-level-reduction-operations) (like `max()`,
+`prefix_sum()`, `sum()`, etc.) provide **implicit synchronization** and do
+**not** require `syncwarp()` calls before them. Calling `syncwarp()` before a
+warp shuffle or reduction operation is redundant and unnecessary.
+
+:::
+
+### Warp-level data exchange
+
+Shuffle operations are the cornerstone of high-performance warp-level
+algorithms. These primitives enable threads within a warp to exchange data
+directly through registers, making them essential for implementing efficient
+parallel patterns like reductions, stencil computations, and sliding window
+operations.
+
+Unlike shared memory communication that requires explicit synchronization and
+memory transactions, shuffle operations use the warp's simultaneous execution
+to achieve near-zero latency data exchange. This makes them ideal for:
+
+- Neighbor data access: Access elements from adjacent threads in stencil
+  operations or convolutions.
+- Tree-structured reductions: Implement butterfly patterns for parallel
+  reductions and prefix operations.
+- Data broadcasting: Distribute computed values or constants across all threads
+  in a warp.
+- Sliding window algorithms: Efficiently compute running maximums, minimums, or
+  moving averages.
+
+#### Warp shuffle operations
+
+The
+[`gpu.primitives.warp`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/)
+module provides five shuffle primitives, each optimized for specific data
+movement patterns:
+
+- [`shuffle_up(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_up/):
+  Each thread receives the value from a thread with a lower lane ID (that is,
+  from lane current_lane - `offset`). If the resulting lane ID is less than 0,
+  the thread receives an undefined value.
+
+  <figure>
+
+  ![](../images/gpu/shuffle-up.png#light)
+  ![](../images/gpu/shuffle-up-dark.png#dark)
+
+  <figcaption>
+  <b>Figure 1.</b> The `shuffle_up()` operation, with a `offset` of 2.
+  </figcaption>
+
+  </figure>
+
+- [`shuffle_down(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_down/):
+  Each thread receives a value from a thread with a higher lane ID (that is,
+  from lane current_lane + `offset`). If the resulting lane ID is greater than
+  or equal to the warp size, the thread receives an undefined value.
+
+  <figure>
+
+  ![](../images/gpu/shuffle-down.png#light)
+  ![](../images/gpu/shuffle-down-dark.png#dark)
+
+  <figcaption>
+  <b>Figure 2.</b> The `shuffle_down()` operation, with a `offset` of 2.
+  </figcaption>
+
+  </figure>
+
+- [`shuffle_xor(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_xor/):
+  Each thread exchanges its value with the thread at lane current_lane XOR
+  `offset`. This is particularly useful for implementing butterfly patterns
+  common in algorithms like FFTs and parallel reductions.
+
+  <figure>
+
+  ![](../images/gpu/shuffle-xor.png#light)
+  ![](../images/gpu/shuffle-xor-dark.png#dark)
+
+  <figcaption>
+  <b>Figure 3.</b> The `shuffle_xor()` operation, with an `offset` of 1.
+  </figcaption>
+
+  </figure>
+
+- [`shuffle_idx(value, offset)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/shuffle_idx/):
+  Each thread receives the value from the thread at the specified `offset`. This
+  is effectively a broadcast from one lane to all others in the warp. Essential
+  for sharing computed results or constants across the entire warp.
+
+  <figure>
+
+  ![](../images/gpu/shuffle-idx.png#light)
+  ![](../images/gpu/shuffle-idx-dark.png#dark)
+
+  <figcaption>
+  <b>Figure 4.</b> The `shuffle_idx()` operation, with a `offset` of 2.
+  </figcaption>
+
+  </figure>
+
+- [`broadcast(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/broadcast/):
+  A convenience wrapper around `shuffle_idx()` that distributes the value from
+  lane 0 to all other threads in the warp.
+
+  <figure>
+
+  ![](../images/gpu/broadcast.png#light)
+  ![](../images/gpu/broadcast-dark.png#dark)
+
+  <figcaption>
+  <b>Figure 5.</b> The `broadcast()` operation.
+  </figcaption>
+
+  </figure>
+
+All of these primitives other than `broadcast()` take an optional `mask`
+argument that serves a dual purpose:
+
+1. **Thread participation**: The mask specifies which threads participate in the
+   shuffle operation. It is a 32-bit or 64-bit integer (depending on the warp
+   size) where the `i`th bit corresponds to lane `i`. If a bit is set to 1, that
+   thread participates; if 0, it does not.
+
+2. **Implicit synchronization**: The mask also provides automatic
+   synchronization for all participating threads. All threads whose bits are set
+   in the mask will be synchronized before the shuffle completes, ensuring
+   correct data exchange even after divergent control flow.
+
+The default value of -1 (all bits set to 1) includes all threads in the warp.
+
+:::caution Warning
+
+When using a full mask (all bits set) in divergent code, **all threads in the
+warp must eventually reach the shuffle instruction**, even if some threads don't
+actively use the result. If some threads take a path that never reaches the
+shuffle, those threads will never arrive at the synchronization point, causing
+the other threads to hang indefinitely waiting for them.
+
+:::
+
+These five primitives form the foundation for complex warp-level algorithms and
+serve as building blocks for higher-level collective operations.
+
+#### Choosing the right shuffle primitive
+
+While each shuffle primitive can technically perform any data exchange pattern,
+certain operations naturally fit specific use cases. Understanding these
+patterns helps you write more efficient and readable code.
+
+- If you need to share one thread's data with everyone else, reach for
+  `broadcast()` when the source is lane 0, or `shuffle_idx()` for any other
+  lane. Think of distributing a loop bound that one thread computed, or sharing
+  a decision that a "leader" thread made.
+
+- For algorithms that process neighboring data—like stencil operations or
+  convolutions—`shuffle_up()` and `shuffle_down()` are your best bet. These let
+  you grab values from adjacent threads without the coordination overhead of
+  shared memory. A sliding window average becomes as simple as adding your
+  neighbors' values to your own.
+
+- When implementing tree-structured algorithms like parallel reductions,
+  `shuffle_xor()` shines. Its butterfly communication pattern naturally maps to
+  how these algorithms exchange data. Most high-performance reduction
+  implementations use `shuffle_xor()` because it has excellent instruction
+  scheduling properties.
+
+Here are some specific patterns where each primitive excels.
+
+`shuffle_idx()` and `broadcast()` work well for:
+
+- Distributing computed constants or array bounds
+- Implementing voting mechanisms across the warp
+- Sharing results from a designated "leader" thread
+
+`shuffle_up()` and `shuffle_down()` are perfect for:
+
+- Stencil computations that need neighboring grid points
+- Finite difference schemes requiring adjacent values
+- Any sliding window algorithm (moving averages, local extrema)
+
+`shuffle_xor()` excels at:
+
+- Parallel reductions using butterfly patterns
+- Any computation with power-of-2 communication strides
+
+When optimizing performance, prefer shuffle operations over shared memory for
+register-sized data, and remember that `shuffle_xor()` typically has the best
+instruction scheduling characteristics for reduction patterns.
+
+### Warp-level reduction operations
+
+The `gpu.primitives.warp` module also provides higher-level functions for
+performing common reduction computations across all threads in a warp. These
+functions take advantage of hardware-specific intrinsics where possible, and
+fall back to shuffle-based reduction on other architectures:
+
+- [`max(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/max/):
+  Computes the maximum `value` across all threads in the warp. The result is
+  broadcast to all lanes.
+
+- [`min(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/min/):
+  Computes the minimum `value` across all threads in the warp. The result is
+  broadcast to all lanes.
+
+- [`sum(value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/sum/):
+  Computes the sum of `value` across all threads in the warp. The result is
+  broadcast to all lanes.
+
+- [`prefix_sum[exclusive=False](value)`](https://docs.modular.com/api/mojo/max/gpu/primitives/warp/prefix_sum/):
+  Computes an inclusive (default) or exclusive prefix sum (scan) across threads
+  in the warp. A prefix sum transforms an input sequence into cumulative sums:
+  given $[x_0, x_1, x_2, x_3]$, an *inclusive* scan produces $[x_0, x_0+x_1,
+  x_0+x_1+x_2, x_0+x_1+x_2+x_3]$ where each thread receives the sum of all
+  values up to and including its own, while an *exclusive* scan produces $[0,
+  x_0, x_0+x_1, x_0+x_1+x_2]$ where each thread receives the sum of all values
+  *before* it.
+
+You'll find these primitives most useful when computing aggregates across
+threads that are already working closely together. Use `sum()` for computing
+totals, averages, or accumulating values across small data segments. The `max()`
+and `min()` functions work well for finding extremes in your data or
+implementing voting mechanisms where threads need consensus. `prefix_sum()` is
+particularly valuable for *scan* operations—computing running totals or building
+cumulative results as you process data. It's essential for algorithms that need
+to track "how much have we processed so far?" at each step. These operations are
+significantly faster than a block-level reduction that uses shared memory and
+`barrier()` calls.
+
+### Using warp operations in practice
+
+Warp operations excel in algorithms that require frequent, fine-grained data
+exchange between nearby threads. Common patterns include:
+
+- Sliding window operations: Use `shuffle_up()` and `shuffle_down()` to
+  access neighboring lane values.
+
+- Butterfly reductions: Use `shuffle_xor()` for efficient tree-like
+  reduction patterns that minimize the number of shuffle steps.
+
+- Broadcasting computed values: Use `broadcast()` to share a single thread's
+  computation result (like a loop bound or pointer) across the entire warp.
+
+These operations are particularly valuable in algorithms where the overhead of
+block-level synchronization would be prohibitive, such as in inner loops of
+compute-intensive kernels or when processing data that naturally aligns with
+warp boundaries.
+
+## Advanced synchronization mechanisms
+
+Beyond the fundamental `barrier()` and `syncwarp()` primitives, Mojo provides
+additional synchronization mechanisms for specialized use cases and
+architecture-specific optimizations. These advanced primitives enable
+fine-grained control over memory ordering, asynchronous operations, and
+instruction scheduling. However, most of these mechanisms are available only on
+specific architectures. Consult the Mojo API reference documentation for the
+latest information on availability.
+
+Mechanisms currently available only on NVIDIA GPUs:
+
+- **Semaphores**
+  ([`gpu.sync.semaphore.Semaphore`](/api/mojo/max/gpu/sync/semaphore/Semaphore/),
+  [`gpu.sync.semaphore.NamedBarrierSemaphore`](/api/mojo/max/gpu/sync/semaphore/NamedBarrierSemaphore/)):
+  Device-wide semaphore implementations for inter-CTA synchronization using
+  shared lock variables. Provides
+  [`fetch()`](/api/mojo/max/gpu/sync/semaphore/Semaphore/#fetch),
+  [`wait()`](/api/mojo/max/gpu/sync/semaphore/Semaphore/#wait),
+  [`release()`](/api/mojo/max/gpu/sync/semaphore/Semaphore/#release), and
+  [`state()`](/api/mojo/max/gpu/sync/semaphore/Semaphore/#state) methods for
+  state management methods for coordinating work across thread blocks.
+
+- **Named barriers**
+  ([`gpu.sync.named_barrier()`](/api/mojo/max/gpu/sync/sync/named_barrier/),
+  [`gpu.sync.named_barrier_arrive()`](/api/mojo/max/gpu/sync/sync/named_barrier_arrive/)):
+  Hardware-accelerated block-level barriers using barrier IDs (0-16) for
+  split-phase synchronization patterns. Useful for TMA operations and
+  high-performance pipeline algorithms.
+
+- **Memory barriers**: A suite of functions for tracking asynchronous memory
+  operations and coordinating phased synchronization in shared memory. Includes
+  [`gpu.sync.mbarrier_init()`](/api/mojo/max/gpu/sync/sync/mbarrier_init/),
+  ([`gpu.sync.mbarrier_arrive()`](/api/mojo/max/gpu/sync/sync/mbarrier_arrive/),
+  [`gpu.sync.mbarrier_arrive_expect_tx_shared()`](/api/mojo/max/gpu/sync/sync/mbarrier_arrive_expect_tx_shared/),
+  [`gpu.sync.mbarrier_arrive_expect_tx_relaxed()`](/api/mojo/max/gpu/sync/sync/mbarrier_arrive_expect_tx_relaxed/),
+  [`gpu.sync.mbarrier_test_wait()`](/api/mojo/max/gpu/sync/sync/mbarrier_test_wait/),
+  and
+  [`gpu.sync.mbarrier_try_wait_parity_shared()`](/api/mojo/max/gpu/sync/sync/mbarrier_try_wait_parity_shared/)).
+
+- **Thread fence**
+  ([`gpu.intrinsics.threadfence()`](https://docs.modular.com/api/mojo/max/gpu/intrinsics/threadfence/)):
+  Memory ordering fence (no execution barrier) that ensures memory operations
+  are visible within a specified scope (block, GPU-wide, or system). Essential
+  for lock-free algorithms and cross-block communication.
+
+- **Async bulk copy synchronization**
+  ([`gpu.sync.cp_async_bulk_commit_group()`](/api/mojo/max/gpu/sync/sync/cp_async_bulk_commit_group/),
+  [`gpu.sync.cp_async_bulk_wait_group()`](/api/mojo/max/gpu/sync/sync/cp_async_bulk_wait_group/)):
+  Functions for coordinating asynchronous bulk memory transfer groups. Essential
+  for managing pipeline stages with bulk memory operations.
+
+Mechanisms currently available only on AMD GPUs:
+
+- **Schedule barriers**
+  ([`gpu.sync.schedule_barrier()`](/api/mojo/max/gpu/sync/sync/schedule_barrier/),
+  [`gpu.sync.schedule_group_barrier()`](/api/mojo/max/gpu/sync/sync/schedule_group_barrier/)):
+  Compiler instruction scheduling controls that allow selective reordering of
+  instruction types across barriers. Enables performance optimizations by
+  controlling which instruction categories can cross the barrier.
+
+- **Wait count**
+  ([`gpu.sync.s_waitcnt()`](/api/mojo/max/gpu/sync/sync/s_waitcnt/),
+  [`gpu.sync.s_waitcnt_barrier()`](/api/mojo/max/gpu/sync/sync/s_waitcnt_barrier/)):
+  Precise synchronization primitives that wait for outstanding memory operations
+  to complete based on counter values (vector memory, export, and LGKM
+  counters). Available on **AMD CDNA GPUs only** (not available on older AMD
+  architectures).
+
+## Best practices and common pitfalls
+
+Now that we've covered the core synchronization primitives, let's focus on using
+them correctly to write reliable and portable GPU code. Understanding common
+pitfalls is essential for avoiding bugs that are difficult to reproduce and
+debug.
+
+This section provides guidance for writing correct, portable, and efficient GPU
+code:
+
+- [Writing correct synchronized code](#writing-correct-synchronized-code):
+  Avoiding race conditions, deadlocks, and understanding when to use
+  `syncwarp()` vs. when shuffle operations handle synchronization automatically.
+- [Choosing the right synchronization level](#choosing-the-right-synchronization-level):
+  When to use warp-level operations vs. block-level synchronization.
+- [Writing portable GPU code](#writing-portable-gpu-code): Using Mojo's
+  abstractions to write code that works across NVIDIA, AMD, and Apple hardware.
+
+### Writing correct synchronized code
+
+Correctness should always be your first priority. The following issues are
+common sources of bugs in parallel programs.
+
+#### Understanding and avoiding race conditions
+
+As a quick reminder, a race condition occurs when multiple threads write to the
+same memory location without a defined order of execution, leading to a
+non-deterministic outcome. Here's a simple example where threads attempt to
+update a shared counter:
+
+```mojo
+# INCORRECT: Race condition
+shared_counter[0] += my_value  # Multiple threads modify same location
+```
+
+This leads to "lost updates" because the read-modify-write sequence isn't
+atomic. To prevent this, you must use synchronization primitives like
+`barrier()` to coordinate access or use
+[`Atomic`](https://mojolang.org/docs/std/atomic/atomic/Atomic/) operations for
+simple updates. For example, you could use the
+[`Atomic.fetch_add()`](https://mojolang.org/docs/std/atomic/atomic/Atomic/#fetch_add)
+method to atomically increment the counter:
+
+```mojo
+# CORRECT: Atomic increment
+_ = Atomic.fetch_add(shared_counter[0], my_value)
+```
+
+#### Avoiding deadlocks with `barrier()`
+
+A `barrier()` must be encountered by all threads within a block to avoid a
+deadlock. Placing a `barrier()` inside a conditional statement is a frequent
+source of bugs. If the condition causes some threads to execute the `barrier()`
+while others skip it, the threads that reach the barrier will wait indefinitely
+for the others to arrive, causing the kernel to hang.
+
+Therefore, `barrier()` should be used in conditional code only if it's
+guaranteed that all threads in the block will evaluate the condition identically
+and follow the same execution path.
+
+#### When to use `syncwarp()`
+
+The `syncwarp()` primitive is needed when coordinating access to shared or
+global memory after divergent control flow within a warp. However, it is **not**
+needed before warp shuffle operations or warp reduction operations, as those
+operations provide their own implicit synchronization via the mask parameter.
+
+Use `syncwarp()` when:
+
+- Threads in a warp diverge and then need to synchronize before accessing shared
+  memory
+- You need to ensure all threads in a warp have completed their divergent
+  execution paths before proceeding to a shared memory operation
+
+Do **not** use `syncwarp()` before:
+
+- Warp shuffle operations (`shuffle_down()`, `shuffle_xor()`, etc.) - these
+  synchronize automatically
+- Warp reduction operations (`warp.sum()`, `warp.max()`, etc.) - these also
+  synchronize automatically
+
+Here's an example where `syncwarp()` **is** needed (for shared memory
+coordination):
+
+```mojo
+if thread_idx.x < 16:
+    shared_data[thread_idx.x] = compute_something()
+else:
+    shared_data[thread_idx.x] = compute_something_else()
+
+# syncwarp() needed here because threads diverged before writing to shared memory
+syncwarp()
+var result = shared_data[some_index]  # Now safe to read
+```
+
+And here's an example where `syncwarp()` is **not** needed (shuffle operations):
+
+```mojo
+var value: Float32
+if thread_idx.x < 16:
+    value = compute_something()
+else:
+    value = compute_something_else()
+
+# No syncwarp() needed - shuffle_down() synchronizes automatically via its mask
+var result = warp.shuffle_down(value, 1)
+```
+
+#### Handling shuffle boundary conditions
+
+When using `shuffle_up()` and `shuffle_down()`, be mindful of edge cases. A
+thread will receive an undefined value if the source lane is out of bounds
+(for example, `current_lane - offset < 0`). When implementing patterns like
+sliding windows, you must add logic to handle these boundary conditions
+correctly.
+
+### Choosing the right synchronization level
+
+The core principle for designing efficient GPU algorithms is to coordinate
+between warps with `barrier()` and shared memory, and optimize within warps with
+`gpu.primitives.warp` primitives.
+
+This hierarchical approach mirrors the GPU's architecture. Intra-warp
+communication is extremely fast, while cross-warp communication is more
+expensive.
+
+- Use `gpu.primitives.warp` primitives for:
+  - High-frequency operations inside tight loops.
+  - Data exchange between neighboring threads (stencils, sliding windows).
+  - Reductions or scans over small, warp-sized chunks of data.
+  - Anywhere performance is latency-critical.
+
+- Use `barrier()` and `gpu.primitives.block` primitives for:
+  - Coordinating access to shared memory between multiple warps.
+  - Implementing multi-phase algorithms with distinct load, compute, and store
+    stages.
+  - Aggregating results from multiple warps within a block.
+
+### Writing portable GPU code
+
+Mojo is designed to write portable GPU code, but it's helpful to understand how.
+
+First, Mojo's GPU operations have automatic fallback mechanisms. For example, a
+`gpu.primitives.warp.max()` call will automatically use specialized `redux`
+instructions on the newest NVIDIA hardware but will fall back to a shuffle-based
+implementation that works on any other GPU. You get performance where available
+and correctness everywhere else.
+
+Second, always avoid hardcoding hardware-specific values. The most common
+mistake is assuming a warp size of 32. Use the
+[`gpu.WARP_SIZE`](https://docs.modular.com/api/mojo/max/gpu/#warp_size) constant
+to ensure your code works correctly on all vendors' hardware.
+
+Finally, for highly-tuned kernels, you can use `comptime if` blocks to write
+architecture-specific code paths while keeping a single source file.
+
+```mojo
+from std.sys import is_amd_gpu, is_apple_gpu, is_nvidia_gpu
+
+def adaptive_algorithm():
+    comptime if is_nvidia_gpu():
+        nvidia_optimized_path()
+    elif is_amd_gpu():
+        amd_optimized_path()
+    elif is_apple_gpu():
+        apple_optimized_path()
+    else:
+        # Conservative fallback for future hardware support
+        portable_path()
+```
+
+### Debugging synchronization issues
+
+Synchronization bugs can be tricky. Here are some strategies to find them:
+
+- Isolate the problem: Use simple, predictable data patterns (like each thread's
+  ID) to verify your logic before using real data. Validate your parallel
+  algorithm's output against a simple, sequential CPU version.
+
+- Trace execution: Add `print()` statements to trace intermediate values and
+  understand how data flows through your warp-level shuffles or reduction trees.
+
+  :::note Known limitation
+
+  On Apple silicon GPUs, each `print()` call inside a GPU kernel currently
+  supports at most one string literal argument. This restriction does not apply
+  to NVIDIA or AMD GPUs.
+
+  :::
+
+- Expose scheduling-dependent bugs: Test with different thread block sizes. A
+  bug that appears with one configuration but not another often points to a race
+  condition.
+
+- Use dedicated tools: For complex issues, use vendor-provided GPU debugging
+  tools (like the
+  [NVIDIA Compute Sanitizer](https://developer.nvidia.com/compute-sanitizer))
+  which can detect race conditions and memory access errors.
+
+## Conclusion and key takeaways
+
+### Summary of primitives and patterns
+
+We've covered Mojo's low-level toolkit for managing concurrency and
+communication in GPU kernels. These primitives are the fundamental building
+blocks for writing correct and high-performance parallel algorithms.
+
+- `gpu.sync.barrier()`: The essential primitive for correctness across warps. It
+  provides a block-wide synchronization point that acts as both an execution
+  barrier and a memory fence, primarily to coordinate access to shared memory.
+
+- `gpu.sync.syncwarp()`: A fine-grained primitive for managing thread divergence
+  within a single warp. It's necessary for correctness on hardware that supports
+  independent thread scheduling.
+
+- `gpu.primitives.block` operations: High-level primitives that combine
+  synchronization with common computational patterns (like reductions) across
+  all threads in a block. They simplify code and are often more efficient than
+  manual implementations.
+
+- `gpu.primitives.warp` primitives: The essential toolkit for performance. By
+  enabling direct register-to-register communication within a warp, these
+  primitives allow for extremely fast collective operations that avoid the
+  higher latency of shared memory.
+
+### The core mental model
+
+The effective use of these primitives stems from a hierarchical approach to GPU
+algorithm design. Your key takeaway should be to coordinate between warps with
+`barrier()` and shared memory, and optimize within warps with
+`gpu.primitives.warp` primitives.
+
+This principle encourages you to structure algorithms to maximize intra-warp
+computation and communication, which is extremely fast, and to use the more
+costly block-level synchronization only when necessary to combine results or
+manage data dependencies between warps.
+
+### Next steps
+
+To gain hands-on experience with the concepts in this guide, we encourage you
+to explore the following resources:
+
+- [Mojo GPU Puzzles](https://puzzles.modular.com/): An interactive, hands-on
+  guide to mastering GPU programming patterns in Mojo, including parallel
+  reductions and other algorithms that rely on these primitives.
+
+- [MAX accelerator library](https://github.com/modular/modular/tree/main/max/kernels):
+  For higher-level examples, the accelerator library contains numerous
+  production-grade kernels that use these low-level primitives to build highly
+  optimized operations for AI and numerical computing.

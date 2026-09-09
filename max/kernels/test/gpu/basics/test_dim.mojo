@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import Dim
+from max.gpu.host import Dim
 from std.testing import assert_equal
 
 

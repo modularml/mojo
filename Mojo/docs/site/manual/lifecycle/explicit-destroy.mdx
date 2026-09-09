@@ -1,0 +1,248 @@
+---
+title: Explicit destruction
+sidebar_position: 5
+description: Require values to be deliberately destroyed in code.
+---
+
+Normally, Mojo automatically destroys a value after its last use. Explicit
+destruction lets a type opt out of that behavior and require its values to
+be deliberately destroyed. A type that does this is an explicitly destroyed
+type.
+
+Explicit destruction uses an unsatisfiable `Deinitable` constraint.
+Mark types with a `Deinitable where False` conditional conformance:
+
+```mojo
+@fieldwise_init
+struct Example(Deinitable where (False, "call 'cleanup()'")):
+    def cleanup(deinit self):
+        # perform cleanup operations
+        pass
+
+def main():
+    var value = Example()
+    # use value
+    value^.cleanup()
+```
+
+Provide named deinitializer methods that use the `deinit self` argument
+convention. Make the error message actionable and follow Mojo best practices:
+use lower case for `call`, put method and function names in single quotes,
+include the parentheses, and omit the final period.
+
+Values that require explicit destruction must be consumed by a named
+deinitializer or transferred out of scope. Otherwise, the compiler reports
+an error.
+
+## When to use explicit destruction
+
+Choose explicit destruction when cleanup must be controlled in code. Common
+cases include:
+
+- Cleanup can fail and requires error handling.
+- Multiple cleanup paths are possible.
+- The order of cleanup operations matters.
+- Cleanup is expensive and should be deliberate.
+
+Examples:
+
+```mojo
+# Multiple cleanup paths
+@fieldwise_init
+struct Transaction(
+    Deinitable where (False, "call 'commit()' or 'rollback()'")
+):
+    def commit(deinit self) raises:  # Offers error handling
+        # ...
+        pass
+
+    def rollback(deinit self):
+        # ...
+        pass
+
+# Order matters
+struct MutexGuard(Deinitable where False):
+    # Must be called to release the lock before other operations
+    def unlock(deinit self):
+        # ...
+        pass
+```
+
+### Raising deinitializers
+
+`__deinit__()` can't raise; the compiler rejects the `raises` keyword on it.
+A named deinitializer can raise, which lets cleanup report failure to its
+caller.
+
+Because `deinit self` consumes the value at the call, the binding is consumed
+whether the call returns or raises. The caller can't invoke another
+deinitializer on that same instance.
+
+If the type contains explicitly destroyed fields, the deinitializer must
+dispose of them before it raises. Implicitly destructible fields are cleaned
+up during unwinding.
+
+## Custom error messages
+
+Add a custom message to the `where` constraint to improve compiler
+diagnostics:
+
+```mojo
+struct CustomFileHandle(
+    Deinitable where (False, "call 'save_and_close()' or 'discard()'")
+):
+    def save_and_close(deinit self) raises:
+        pass
+
+    def discard(deinit self):
+        pass
+```
+
+## Parameterized code and explicit destruction
+
+Parameterized code using broad constraints like `AnyType` and `Movable` can
+accept both implicitly and explicitly destroyed values. However, that code
+*can't* destroy values that require explicit destruction except under
+specific circumstances.
+
+These are the key patterns:
+
+```mojo
+# Error if T requires explicit destruction
+def owning_function[T: AnyType](var value: T):
+    pass  # Error: value abandoned here
+
+# Constrain T to Deinitable when implicit destruction is acceptable
+def deinitable_function[T: Deinitable](var value: T):
+    pass  # value.__deinit__() called automatically
+
+# Return the value so the caller keeps destruction responsibility
+def pass_through_function[T: Movable](var value: T) -> T:
+    return value^
+
+# Accept a deinitializer so the function can destroy the value
+def consuming_function[
+    T: Movable, //, Cleanup: def(var T)
+](var value: T, consume: Cleanup):
+    consume(value^)  # deinitialize here
+```
+
+### Example types for parameterized destruction
+
+The following examples use two types with different destruction requirements:
+`Basic` is destroyed implicitly, while `Tally` requires explicit destruction.
+
+```mojo
+from std.memory import Allocation, Layout, alloc, dealloc
+@fieldwise_init
+struct Basic(Movable):
+    var string: String
+
+    def __deinit__(deinit self):
+        print(t"Destroying Basic: {self.string}")
+
+struct Tally(Movable, Deinitable where (
+    False,
+    "call 'destroy()' to free the counters"
+)):
+    var counts: Allocation[Int64]
+
+    def __init__(out self, buckets: Int):
+        self.counts = alloc(Layout[Int64](count=buckets))
+        self.counts.unsafe_span().fill(0)
+
+    def record(mut self, bucket: Int):
+        self.counts.unsafe_span()[bucket] += 1
+
+    def destroy(deinit self):
+        print(t"Destroying Tally: {self.counts.unsafe_span()}")
+        dealloc(self.counts^)
+```
+
+### Parametric pass-through
+
+A parameterized pass-through function doesn't need to know its value's
+destruction model. The caller retains responsibility for ending the value's
+lifetime:
+
+```mojo
+def pass_through[T: Movable](var value: T) -> T:
+    # perform work with value
+    return value^
+```
+
+Since the function doesn't maintain value ownership, it doesn't need to
+know *how* to destroy it:
+
+```mojo
+var tally = Tally(3)
+tally.record(2)
+tally = pass_through(tally^)
+tally^.destroy()  # Destroying Tally: [0, 0, 1]
+
+var basic = Basic("Hello")
+_ = pass_through(basic^)  # Destroying Basic: Hello
+```
+
+### Parametric consumption: Movable
+
+Pass a deinitializer to a parameterized function so it knows how to consume
+any `Movable` value. The caller may transfer the value or a copy, knowing
+it won't be abandoned.
+
+```mojo
+def consuming_method[
+    T: Movable, //, Cleanup: def(var T)
+](var value: T, consume: Cleanup):
+    print(t"Consuming: {reflect[T].name()}")
+    consume(value^)
+```
+
+Each explicitly destroyed type has an unknown set of deinitializer methods.
+Parametric code can't anticipate what these are. Using a lambda helps you
+pass a type-specific deinitializer to a consuming parametric function.
+
+For example, a `Tally` value:
+
+```mojo
+var tally = Tally(2)
+tally.record(1)
+
+comptime tally_consumer = lambda (var t: Tally): t^.destroy()
+consuming_method(tally^, tally_consumer)
+
+# Output:
+# Consuming: <module_name>.Tally (consuming_method)
+# Destroying Tally: [0, 1] (destroy())
+```
+
+### Parametric consumption: Deinitable
+
+There's nothing to pass for all-Deinitable types that use no-argument
+deinitializers:
+
+```mojo
+# Works across all Deinitable types
+comptime implicit_consumer = lambda [T: Deinitable](
+    var value: T
+): T.__deinit__(value^)
+```
+
+For example, a `Basic` value:
+
+```mojo
+var basic = Basic("World")
+consuming_method(basic^, implicit_consumer[Basic])
+
+# Output:
+# Consuming: <module_name>.Basic (from `consuming_method()`)
+# Destroying Basic: World (from `__deinit__()`)
+```
+
+## Related
+
+- [Value destruction](/docs/manual/lifecycle/death/) - Complete coverage of
+  value destruction and lifetime management
+- [`AnyType`](/docs/std/traits/anytype/AnyType/) - Base trait for all types
+- [`Deinitable`](/docs/std/traits/deinitable/Deinitable/) - Trait for
+  automatically deinitializable types

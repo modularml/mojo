@@ -1,8 +1,8 @@
 load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("//max/tests/integration/xarch_warm:eager_py_test.bzl", "modular_eager_py_test")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -12,9 +12,14 @@ modular_py_test(
     srcs = glob(
         ["*.py"],
         exclude = [
+            "compile_pool_parent_exit_subprocess.py",
             "mojo_runtime_background_thread_subprocess_asyncio.py",
             "mojo_runtime_background_thread_subprocess_thread.py",
             "mojo_runtime_foreign_thread_subprocess.py",
+            "test_compile_pool.py",
+            "test_dim_substitute.py",
+            "test_eager_cold_start_policy.py",
+            "test_executor.py",
             "test_flashinfer_cubin.py",
             "test_interpreter.py",
             "test_interpreter_ops.py",
@@ -23,6 +28,17 @@ modular_py_test(
             "test_mojo_runtime_foreign_thread.py",
         ],
     ),
+    # Don't background-compile every eager graph (SDLC-4307 CI cpu/mem).
+    env = {"MAX_EAGER_EXECUTOR": "fallback-internal"},
+    ignore_extra_deps = [
+        # Unsure why, test_tensor slows down if this doesn't exist.
+        "//max/python/max/_interpreter_ops",
+    ],
+    # Every case compiles a distinct graph, which serializes past the timeout
+    # in one process.
+    per_test_shard_count = {
+        "test_compilation.py": 4,
+    },
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
@@ -31,13 +47,30 @@ modular_py_test(
         "//max/python/max:_core",
         "//max/python/max:_mlir_context",
         "//max/python/max:tensor",
+        "//max/python/max/_interpreter_ops",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/experimental/nn",
         "//max/python/max/graph",
         "//max/python/max/mlir",
-        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/context",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_compile_pool",
+    srcs = [
+        "compile_pool_parent_exit_subprocess.py",
+        "test_compile_pool.py",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/experimental",
+        "//max/python/max/graph",
         requirement("numpy"),
     ],
 )
@@ -55,6 +88,7 @@ modular_py_test(
     ],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//:asan": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
@@ -118,6 +152,14 @@ modular_py_test(
 )
 
 modular_py_test(
+    name = "test_dim_substitute",
+    srcs = ["test_dim_substitute.py"],
+    deps = [
+        "//max/python/max/graph",
+    ],
+)
+
+modular_eager_py_test(
     name = "test_interpreter_ops",
     timeout = "long",
     srcs = ["test_interpreter_ops.py"],
@@ -126,6 +168,7 @@ modular_py_test(
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
+        "//max/python/max:_core",
         "//max/python/max:tensor",
         "//max/python/max/_interpreter_ops",
         "//max/python/max/driver",
@@ -135,7 +178,7 @@ modular_py_test(
     ],
 )
 
-modular_py_test(
+modular_eager_py_test(
     name = "test_interpreter_ops_gpu",
     timeout = "long",
     srcs = ["test_interpreter_ops_gpu.py"],
@@ -145,17 +188,61 @@ modular_py_test(
     exec_properties = {
         "test.resources:gpu-memory": "4",
     },
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
     tags = ["gpu"],
     target_compatible_with = ["//:nvidia_gpu"],
     deps = [
         "//max/python/max:_core",
         "//max/python/max:interpreter",
         "//max/python/max:tensor",
+        "//max/python/max/_interpreter_ops",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/graph",
         requirement("numpy"),
         requirement("torch"),
+    ],
+)
+
+modular_eager_py_test(
+    name = "test_eager_cold_start_policy",
+    timeout = "eternal",
+    srcs = ["test_eager_cold_start_policy.py"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    deps = [
+        "//max/python/max:_core",
+        "//max/python/max:_eager_policy",
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        "//max/python/max/graph",
+    ],
+)
+
+modular_py_test(
+    name = "test_executor",
+    srcs = ["test_executor.py"],
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    deps = [
+        "//max/python/max:interpreter",
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/experimental",
+        "//max/python/max/graph",
     ],
 )
 
@@ -165,6 +252,8 @@ test_suite(
     name = "cpu_local_tests",
     tests = [
         ":max_tests",
+        ":test_compile_pool",
+        ":test_dim_substitute",
         ":test_interpreter",
         ":test_interpreter_ops",
         ":test_mojo_runtime_background_thread_import",

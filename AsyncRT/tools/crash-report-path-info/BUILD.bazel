@@ -1,0 +1,23 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(
+    default_visibility = ["//AsyncRT:__subpackages__"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_binary(
+    name = "crash-report-path-info",
+    srcs = glob(["*.cpp"]),
+    deps = [
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+        "//Support:Base",
+        "//Support:Configuration",
+        "//Support:CrashReporting",
+        "//Support:Globals",
+        "@llvm-project//llvm:Support",
+    ],
+)

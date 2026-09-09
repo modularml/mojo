@@ -1,10 +1,12 @@
 load("//bazel:api.bzl", "mojo_filecheck_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
 mojo_filecheck_test(
     name = "test_cluster.mojo.test",
     srcs = ["test_cluster.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = ["gpu"],
     target_compatible_with = [
         "//:b200_gpu",

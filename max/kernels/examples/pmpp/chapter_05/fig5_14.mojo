@@ -15,19 +15,19 @@
 # Handles matrix dimensions that are not divisible by tile width
 
 from std.math import ceildiv
-from std.gpu import block_idx, thread_idx, barrier
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 
 # ========================== KERNEL CODE ==========================
 
 
 def matrix_mul_tiled_boundary_kernel(
-    M: UnsafePointer[Float32, MutExternalOrigin],
-    N: UnsafePointer[Float32, MutExternalOrigin],
-    P: UnsafePointer[Float32, MutExternalOrigin],
-    Width: Int,
+    M: UnsafePointer[Float32, MutUntrackedOrigin],
+    N: UnsafePointer[Float32, MutUntrackedOrigin],
+    P: UnsafePointer[Float32, MutUntrackedOrigin],
+    width_dev: Int32,
 ):
     """Tiled matrix multiplication kernel with boundary checking.
 
@@ -37,20 +37,22 @@ def matrix_mul_tiled_boundary_kernel(
         M: Input matrix M (device).
         N: Input matrix N (device).
         P: Output matrix P = M * N (device).
-        Width: Matrix dimension (Width x Width matrices).
+        width_dev: Matrix dimension (Width x Width matrices).
     """
+    # Int is not device-passable; widen the fixed-width arg.
+    var Width = Int(width_dev)
     comptime TILE_WIDTH = 16
 
     # Allocate shared memory tiles
-    var Mds = stack_allocation[
+    var Mds = unsafe_stack_allocation[
         TILE_WIDTH * TILE_WIDTH,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
-    var Nds = stack_allocation[
+    var Nds = unsafe_stack_allocation[
         TILE_WIDTH * TILE_WIDTH,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
 
     var tx = thread_idx.x
@@ -66,18 +68,18 @@ def matrix_mul_tiled_boundary_kernel(
     for ph in range(num_phases):
         # Collaborative loading of M and N tiles into shared memory with boundary checks
         if Row < Width and (ph * TILE_WIDTH + tx) < Width:
-            Mds[ty * TILE_WIDTH + tx] = Scalar[DType.float32](
+            Mds[ty * TILE_WIDTH + tx] = Float32(
                 M[Row * Width + ph * TILE_WIDTH + tx]
             )
         else:
-            Mds[ty * TILE_WIDTH + tx] = Scalar[DType.float32](0.0)
+            Mds[ty * TILE_WIDTH + tx] = Float32(0.0)
 
         if (ph * TILE_WIDTH + ty) < Width and Col < Width:
-            Nds[ty * TILE_WIDTH + tx] = Scalar[DType.float32](
+            Nds[ty * TILE_WIDTH + tx] = Float32(
                 N[(ph * TILE_WIDTH + ty) * Width + Col]
             )
         else:
-            Nds[ty * TILE_WIDTH + tx] = Scalar[DType.float32](0.0)
+            Nds[ty * TILE_WIDTH + tx] = Float32(0.0)
 
         barrier()
 
@@ -95,9 +97,9 @@ def matrix_mul_tiled_boundary_kernel(
 
 
 def matmul_tiled_boundary(
-    h_a: UnsafePointer[Float32, MutExternalOrigin],
-    h_b: UnsafePointer[Float32, MutExternalOrigin],
-    h_c: UnsafePointer[Float32, MutExternalOrigin],
+    h_a: UnsafePointer[Float32, MutUntrackedOrigin],
+    h_b: UnsafePointer[Float32, MutUntrackedOrigin],
+    h_c: UnsafePointer[Float32, MutUntrackedOrigin],
     width: Int,
     ctx: DeviceContext,
 ) raises:
@@ -141,7 +143,7 @@ def matmul_tiled_boundary(
         d_a,
         d_b,
         d_c,
-        width,
+        Int32(width),
         grid_dim=(grid_dim_x, grid_dim_y, 1),
         block_dim=(block_dim_x, block_dim_y, 1),
     )
@@ -158,9 +160,9 @@ def matmul_tiled_boundary(
 
 
 def cpu_matmul(
-    a: UnsafePointer[Float32, MutExternalOrigin],
-    b: UnsafePointer[Float32, MutExternalOrigin],
-    c: UnsafePointer[Float32, MutExternalOrigin],
+    a: UnsafePointer[Float32, MutUntrackedOrigin],
+    b: UnsafePointer[Float32, MutUntrackedOrigin],
+    c: UnsafePointer[Float32, MutUntrackedOrigin],
     width: Int,
 ):
     """CPU reference implementation for matrix multiplication.
@@ -179,8 +181,8 @@ def cpu_matmul(
 
 
 def initialize(
-    a: UnsafePointer[Float32, MutExternalOrigin],
-    b: UnsafePointer[Float32, MutExternalOrigin],
+    a: UnsafePointer[Float32, MutUntrackedOrigin],
+    b: UnsafePointer[Float32, MutUntrackedOrigin],
     width: Int,
 ):
     """Initialize input matrices with test data.

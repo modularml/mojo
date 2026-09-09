@@ -1,0 +1,28 @@
+/*
+ * N.B. This is a temporary file to preserve the existing build semantics.
+ * Source-based version patches will break all incremental caching (for good
+ * reasons, since any file including this header will need to be invalidated on
+ * *any* source change). Instead, link-based stamps should be used.
+ */
+
+#define MAX_VERSION_MAJOR    @MAX_VERSION_MAJOR@
+#define MAX_VERSION_MINOR    @MAX_VERSION_MINOR@
+#define MAX_VERSION_PATCH    @MAX_VERSION_PATCH@
+#define MAX_VERSION_LABEL    "@MAX_VERSION_LABEL@"
+#define MAX_VERSION_STRING   "@MAX_VERSION_STRING@"
+
+#define MOJO_VERSION_MAJOR    @MOJO_VERSION_MAJOR@
+#define MOJO_VERSION_MINOR    @MOJO_VERSION_MINOR@
+#define MOJO_VERSION_PATCH    @MOJO_VERSION_PATCH@
+#define MOJO_VERSION_LABEL    "@MOJO_VERSION_LABEL@"
+#define MOJO_VERSION_STRING   "@MOJO_VERSION_STRING@"
+
+#define MODULAR_BUILD_TYPE_LOWER "@MODULAR_BUILD_TYPE_LOWER@"
+#define MODULAR_VERSION_REVISION "@MODULAR_VERSION_REVISION@"
+
+// TODO: Remove
+#define MODULAR_VERSION_MAJOR    @MODULAR_VERSION_MAJOR@
+#define MODULAR_VERSION_MINOR    @MODULAR_VERSION_MINOR@
+#define MODULAR_VERSION_PATCH    @MODULAR_VERSION_PATCH@
+#define MODULAR_VERSION_LABEL    "@MODULAR_VERSION_LABEL@"
+#define MODULAR_VERSION_STRING   "@MODULAR_VERSION_STRING@"

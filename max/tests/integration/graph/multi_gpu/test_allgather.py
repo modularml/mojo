@@ -169,3 +169,67 @@ def test_allgather_execution_uneven(
         assert isinstance(output, Buffer)
         assert output.device == accel_devices[n]
         assert np.equal(output.to(host).to_numpy(), expected_output).all()
+
+
+def test_grouped_allgather_execution() -> None:
+    """Tests grouped allgather with independent contiguous groups."""
+    num_gpus = 4
+    group_size = 2
+    if num_gpus > accelerator_count():
+        pytest.skip(
+            f"Not enough GPUs to run allgather test with {num_gpus} GPUs."
+        )
+
+    H = 256
+    shapes = [(5, H), (4, H), (3, H), (2, H)]
+    devices = [DeviceRef.GPU(id=i) for i in range(num_gpus)]
+    signals = Signals(devices)
+    with Graph(
+        "grouped_allgather",
+        input_types=cast(
+            list[Type[Any]],
+            [
+                TensorType(dtype=DType.float32, shape=shape, device=device)
+                for shape, device in zip(shapes, devices, strict=True)
+            ]
+            + signals.input_types(),
+        ),
+    ) as graph:
+        allgather_outputs = ops.allgather(
+            inputs=(v.tensor for v in graph.inputs[:num_gpus]),
+            signal_buffers=(v.buffer for v in graph.inputs[num_gpus:]),
+            axis=0,
+            group_size=group_size,
+        )
+        graph.output(*allgather_outputs)
+
+    host = CPU()
+    accel_devices = [Accelerator(n) for n in range(num_gpus)]
+    session = InferenceSession(devices=[host, *accel_devices])
+    compiled = session.load(graph)
+
+    numpy_inputs = []
+    tensor_inputs = []
+    offset = 0
+    for shape, device in zip(shapes, accel_devices, strict=True):
+        size = int(np.prod(shape))
+        arr = np.arange(size, dtype=np.float32).reshape(shape) + offset
+        numpy_inputs.append(arr)
+        tensor_inputs.append(Buffer.from_numpy(arr).to(device))
+        offset += size
+
+    outputs = compiled.execute(*tensor_inputs, *signals.buffers())
+
+    expected_by_group = []
+    for group_start in range(0, num_gpus, group_size):
+        expected_by_group.append(
+            np.concatenate(
+                numpy_inputs[group_start : group_start + group_size], axis=0
+            )
+        )
+
+    for dev_idx, output in enumerate(outputs):
+        assert isinstance(output, Buffer)
+        assert output.device == accel_devices[dev_idx]
+        expected = expected_by_group[dev_idx // group_size]
+        assert np.array_equal(output.to(host).to_numpy(), expected)

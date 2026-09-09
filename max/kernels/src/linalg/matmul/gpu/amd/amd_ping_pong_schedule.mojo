@@ -156,7 +156,7 @@ def _logical_half[h: Int]() -> List[OpDesc]:
     """Logical op table for one half of the ping-pong algorithm.
 
     Pure data: declares WHAT ops exist with buffer metadata only.
-    No resource kinds, no latencies, no roles — those come from the
+    No resource kinds, no latencies, no roles: those come from the
     TargetCostModel.
     """
     comptime s = h
@@ -185,11 +185,11 @@ struct DeclarativeSchedule[
 ](PipelineSchedule):
     """Constraint-based pipeline: algorithm declares ops, target supplies costs.
 
-    The algorithm specifies WHAT ops exist — just the tag and buffer metadata
+    The algorithm specifies WHAT ops exist: just the tag and buffer metadata
     (stage, subtile, channel, k_offset). No resource kinds, no latencies,
     no roles.
 
-    The TargetProfile specifies HOW the hardware executes them — per-op costs
+    The TargetProfile specifies HOW the hardware executes them: per-op costs
     (resource, latency, role) via the cost model, and pipeline structure
     (depth, MMA grid, buffer strategy) via the pipeline config. One factory
     call (e.g., mi355x_target()) provides everything.
@@ -238,7 +238,7 @@ struct DeclarativeSchedule[
         """Algorithm description: WHAT ops exist, with buffer metadata only.
 
         Returns 24 logical ops (2 halves x 12 ops) from the ping-pong op
-        table. No resource kinds, no latencies, no roles — those come from
+        table. No resource kinds, no latencies, no roles: those come from
         the TargetProfile's cost model. See _logical_half() for the table.
         """
         var ops = _logical_half[0]()

@@ -1,32 +1,64 @@
 """Define bazel dependencies common to the internal and external repos."""
 
-bazel_dep(name = "apple_support", version = "1.24.2", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "abseil-cpp", version = "20250814.2")
+bazel_dep(name = "apple_support", version = "2.3.0", repo_name = "build_bazel_apple_support")
 bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
+bazel_dep(name = "aspect_rules_js", version = "2.9.2")  # TODO: bump to pnpm >v9 for v3
+bazel_dep(name = "aspect_rules_ts", version = "3.7.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "curl", version = "8.12.0")
+bazel_dep(name = "fmt", version = "11.2.0")
 bazel_dep(name = "gazelle", version = "0.50.0")
 bazel_dep(name = "google_benchmark", version = "1.9.4")
 bazel_dep(name = "grpc", version = "1.76.0.bcr.1", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "opentelemetry-cpp", version = "1.19.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "protobuf", version = "33.5", repo_name = "com_google_protobuf")
 bazel_dep(name = "rules_cc", version = "0.2.18")
-bazel_dep(name = "rules_mojo", version = "0.6.0")
+bazel_dep(name = "rules_nodejs", version = "6.7.3")
+bazel_dep(name = "rules_mojo")
 bazel_dep(name = "rules_multirun", version = "0.13.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_pycross", version = "0.8.1")
 bazel_dep(name = "rules_python", version = "1.8.5")
 bazel_dep(name = "rules_shell", version = "0.6.1")
+bazel_dep(name = "tcmalloc", version = "0.0.0-20250927-12f2552")
+bazel_dep(name = "tomlplusplus", version = "3.4.0")
 bazel_dep(name = "with_cfg.bzl", version = "0.10.3")
+bazel_dep(name = "xxhash", version = "0.8.3.bcr.1")
+
+# Necessary for LLVM
+bazel_dep(name = "zlib-ng", version = "2.3.3", repo_name = "llvm_zlib")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.1", repo_name = "llvm_zstd")
+
+# TODO: Bump when deps go past this version
+bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.1")
 
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.1", dev_dependency = True)
 
 archive_override(
-    module_name = "rules_mojo",
-    integrity = "sha256-U1nZFqGyqmfDV7ifCB79d1ctwQ6lRY35ecckbpUX/Fc=",
-    strip_prefix = "rules_mojo-be8b3078e2a4fb36356bc2c29e906b0ca253c0f8",
+    module_name = "rules_cc",
+    integrity = "sha256-xPt/jPo70Y+LPhowjcTLhMxwtkZtw7QBwO969n7mWPo=",
+    strip_prefix = "rules_cc-ad214a9cb17d41e4e03199d61d436974a2261885",
     urls = [
-        "https://github.com/modular/rules_mojo/archive/be8b3078e2a4fb36356bc2c29e906b0ca253c0f8.tar.gz",
+        "https://github.com/bazelbuild/rules_cc/archive/ad214a9cb17d41e4e03199d61d436974a2261885.tar.gz",
+    ],
+)
+
+archive_override(
+    module_name = "rules_mojo",
+    integrity = "sha256-wciBGAfb+aWWW6XuNiWqLtfiaLIE1evNzhS5q5gt0/w=",
+    patch_strip = 1,
+    patches = [
+        # Left as a patch for now since it may not worth upstreaming.
+        # Also includes a toolchain change which has to be done in lockstep to the current commit
+        # That piece can be removed after the 8/5 nightly.
+        "//bazel/public-patches:rules_mojo_toolchain.patch",
+    ],
+    strip_prefix = "rules_mojo-47643a3b441c20c3a351b8807e37c547338557c8",
+    urls = [
+        "https://github.com/modular/rules_mojo/archive/47643a3b441c20c3a351b8807e37c547338557c8.tar.gz",
     ],
 )
 
@@ -41,6 +73,11 @@ archive_override(
         # TODO: Should we submit this upstream or force our deps to directly
         # depend on the things that provide their pyi files?
         "//bazel/public-patches:rules_mypy_pyi_files.patch",
+        # https://github.com/bazel-contrib/rules_mypy/pull/141
+        "//bazel/public-patches:rules_mypy_transitives.patch",
+        # The aspect applies to every top-level target, so target-configured
+        # type stubs make any cross-compile fail during loading. TODO: upstream.
+        "//bazel/public-patches:rules_mypy_exec_types.patch",
     ],
     strip_prefix = "rules_mypy-0.41.0",
     urls = [
@@ -102,6 +139,17 @@ single_version_override(
     version = "1.76.0.bcr.1",
 )
 
+# Expose the :toml++-src target (header-only impl) to external repos
+# (consumed by @nixl_upstream). The BCR patch creates the target but leaves
+# its visibility restricted.
+single_version_override(
+    module_name = "tomlplusplus",
+    patch_strip = 1,
+    patches = [
+        "//bazel/public-patches:tomlplusplus-visibility.patch",
+    ],
+)
+
 DEFAULT_PYTHON_VERSION = "3.13"
 
 PYTHON_VERSIONS = [
@@ -161,7 +209,97 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
-RUFF_VERSION = "0.14.0"
+# ......................... NIXL (KV transfer) ................................
+#
+# Upstream NIXL (github.com/ai-dynamo/nixl) plus its UCX / libfabric backends.
+# These live here (rather than the internal MODULE.bazel) because an
+# OSS-mirrored target (//max/tests/tests/nixl) depends on @nixl_upstream via
+# its plugin `.so` data deps, so the repos must resolve in both the internal
+# build and the standalone OSS-mirror build. The overlay BUILD files live in
+# //bazel/public-patches (an OSS-visible, symlinked overlay dir) so the
+# build_file labels resolve in both contexts.
+# BEGIN_NIXL_GENERATED
+# NOTE: Use 'update-nixl' to update these values (utils/update_nixl.py).
+# To add a NIXL patch, drop a bazel/public-patches/nixl-*.patch file and add it
+# to the patches list below (same pattern as LLVM patches above).
+http_archive(
+    name = "nixl_upstream",
+    build_file = "//bazel/public-patches:nixl_upstream.BUILD",
+    patch_args = ["-p1"],
+    patches = [],
+    sha256 = "74ab77453bd117e80e4bda14aa5fe4050b7767cedb04357b65b485e7c7101612",
+    strip_prefix = "nixl-1.3.0",
+    url = "https://github.com/ai-dynamo/nixl/archive/refs/tags/v1.3.0.tar.gz",
+)
+# END_NIXL_GENERATED
+
+http_archive(
+    name = "ucx_prebuilt",
+    build_file = "//bazel/public-patches:ucx_prebuilt.BUILD",
+    sha256 = "5e3488de55c83f8a6440c597063117721319fa8433c0d35a66c1a14702f7d46c",
+    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/ucx_prebuilt/501d8fd1611247ac46efb1a56fca3b16b9feae2f/5e3488de55c83f8a6440c597063117721319fa8433c0d35a66c1a14702f7d46c/ucx-prebuilt-linux-x86-64.tar.gz",
+)
+
+# UCCL transport library for the AMD NIXL UCCL backend. Built by
+# utils/build-uccl.sh (on an AMD ROCm box) at the pinned UCCL revision in the
+# version segment of the URL below; bump that + the sha256 to update UCCL.
+http_archive(
+    name = "uccl_prebuilt",
+    build_file = "//bazel/public-patches:uccl_prebuilt.BUILD",
+    sha256 = "d27db64e4d88db03f2c0c61ffa1a9681c93a6aa023298c110b659749101ac985",
+    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/uccl_prebuilt/66170bc299205228f0170bc1638594a39af9ffd5/d27db64e4d88db03f2c0c61ffa1a9681c93a6aa023298c110b659749101ac985/uccl-prebuilt-rocm-linux-x86-64.tar.gz",
+)
+
+http_archive(
+    name = "efa_libfabric_prebuilt",
+    build_file = "//bazel/public-patches:efa_libfabric_prebuilt.BUILD",
+    sha256 = "40fddd77f62e14bb60bafff5b979011cbaa3ac61598d53183da168db779eafda",
+    strip_prefix = "efa-libfabric-prebuilt",
+    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/efa-libfabric-prebuilt/2.4.0amzn5.0-mod4/40fddd77f62e14bb60bafff5b979011cbaa3ac61598d53183da168db779eafda/efa-libfabric-prebuilt-cpu.tar.xz",
+)
+
+http_archive(
+    name = "efa_libfabric_prebuilt_cuda",
+    build_file = "//bazel/public-patches:efa_libfabric_prebuilt.BUILD",
+    sha256 = "b11916953f7737b5967ff4b8e188a87ee0141196c333cc7dbf54878c90d535f2",
+    strip_prefix = "efa-libfabric-prebuilt",
+    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/efa-libfabric-prebuilt/2.4.0amzn5.0-mod4/b11916953f7737b5967ff4b8e188a87ee0141196c333cc7dbf54878c90d535f2/efa-libfabric-prebuilt-cuda.tar.xz",
+)
+
+# CUDA Driver API + runtime headers used by libfabric_plugin_lib (-DHAVE_CUDA).
+# These are the NVIDIA cuda_cudart redistributables; no CUDA runtime is linked.
+# Repo names match the internal tree so bazel/third-party/BUILD.bazel aliases
+# (@cuda_x86_64//:cuda_headers etc.) keep working in both build contexts.
+CUDART_VERSION = "13.1.80"
+
+http_archive(
+    name = "cuda_x86_64",
+    build_file = "//bazel/public-patches:cuda_cudart.BUILD",
+    sha256 = "b626f4790f46bc9324a1047f2fbcc9a42bc4a722b053056e61cc00da54ad6f32",
+    strip_prefix = "cuda_cudart-linux-x86_64-{}-archive".format(CUDART_VERSION),
+    url = "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/linux-x86_64/cuda_cudart-linux-x86_64-{}-archive.tar.xz".format(CUDART_VERSION),
+)
+
+http_archive(
+    name = "cuda_sbsa",  # 64b ARM
+    build_file = "//bazel/public-patches:cuda_cudart.BUILD",
+    sha256 = "b0f50edb6bd7a4a1b6c642167cbb1aab4765dbf94a96f98e48e1ae53243c6011",
+    strip_prefix = "cuda_cudart-linux-sbsa-{}-archive".format(CUDART_VERSION),
+    url = "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/linux-sbsa/cuda_cudart-linux-sbsa-{}-archive.tar.xz".format(CUDART_VERSION),
+)
+
+# asio: async I/O library used by @nixl_upstream and MLRT.
+# The repo name is unchanged from the internal declaration; internal consumers
+# (MLRT/BUILD.bazel) keep working since common.MODULE.bazel is include()d.
+http_archive(
+    name = "asio",
+    build_file = "//bazel/public-patches:asio.BUILD",
+    sha256 = "755bd7f85a4b269c67ae0ea254907c078d408cce8e1a352ad2ed664d233780e8",
+    strip_prefix = "asio-asio-1-30-2",
+    url = "https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz",
+)
+
+RUFF_VERSION = "0.16.3"
 
 [
     http_archive(
@@ -175,9 +313,9 @@ RUFF_VERSION = "0.14.0"
         ),
     )
     for arch, sha in [
-        ("x86_64-unknown-linux-gnu", "28fe06f700caf99eee235f90e6e349f48b7f9a4b0d42e3ee5b3686f9259649a3"),
-        ("aarch64-unknown-linux-gnu", "60fc3b464a723456ba1bc8cd91d29806753c885f72e26ac67b718cee6b35aaca"),
-        ("aarch64-apple-darwin", "0b7c193d5c45eda02226720eb75239fabeca995d5a0eb3830fd2973caa3030ec"),
+        ("x86_64-unknown-linux-gnu", "7ab3b978d2c0b1c96b2323d4e5c4f35284ae1cdf35d2f7399595c74c805f5fa3"),
+        ("aarch64-unknown-linux-gnu", "b9cc833f5db856484b38718c9da195a6ec990707307bda30530913a09705419a"),
+        ("aarch64-apple-darwin", "136a4db6512d9b16dda56ac8604696ed65c3b1a914a142de029e7f8d5006f1d9"),
     ]
 ]
 
@@ -235,8 +373,8 @@ genrule(
     outs = [
         "libnvshmem_host.so.3",
         "nvshmem_bootstrap_mpi.so.3",
-        "nvshmem_transport_ibrc.so.3",
-        "nvshmem_transport_ibgda.so.3",
+        "nvshmem_transport_ibrc.so.6",
+        "nvshmem_transport_ibgda.so.6",
     ],
     cmd = '''
         # Copy all lib/*.so* files from our prebuilt tar
@@ -246,9 +384,9 @@ genrule(
     ''',
 )
 """,
-    # commit: https://github.com/modularml/NVSHMEM/commit/e88ac46a9d0b5964cbfe5866dbaf61534348978c
-    sha256 = "ff68bc9870dadb363b826687c0aae51750ef9c5a167c98a26de0ff2be1d28493",
-    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/nvshmem/3.4.5/ff68bc9870dadb363b826687c0aae51750ef9c5a167c98a26de0ff2be1d28493/nvshmem.tar.gz",
+    # commit: https://github.com/modularml/NVSHMEM/commit/b6dd5d0955d731a3a9ba031febadb2f1aab910da
+    sha256 = "1a5457d699fe86e81fc5728acd11fc49abb83ab11ffb72b5d89ddaadd5e98e4b",
+    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/nvshmem/3.7.0/1a5457d699fe86e81fc5728acd11fc49abb83ab11ffb72b5d89ddaadd5e98e4b/nvshmem.tar.gz",
 )
 
 mojo = use_extension("@rules_mojo//mojo:extensions.bzl", "mojo")
@@ -276,6 +414,7 @@ mojo.gpu_toolchains(
         "NVIDIA GeForce GTX 1060": "gtx1060",
         "NVIDIA GeForce GTX 970": "gtx970",
         "GB10": "gb10",
+        "MI300A": "mi300a",
         "MI300X": "mi300x",
         "MI325": "mi325",
         "MI355": "mi355",
@@ -287,6 +426,7 @@ mojo.gpu_toolchains(
         "AMD Radeon Pro W7900": "W7900",
         "Phoenix3": "780M",
         "Strix Halo": "strixhalo",
+        "VanGogh": "steamdeck",
         "Metal 1": "",  # M1. Officially is not supported
         "Metal 2": "metal2",  # M2 + macOS 15
         "Metal 3": "metal3",  # M3 + macOS 15
@@ -306,6 +446,7 @@ mojo.gpu_toolchains(
         "h200": "nvidia:sm_90a",
         "l4": "nvidia:sm_89",
         "gfx90a": "amdgpu:gfx90a",
+        "mi300a": "amdgpu:gfx942",
         "mi300x": "amdgpu:gfx942",
         "mi325": "amdgpu:gfx942",
         "mi355": "amdgpu:gfx950",
@@ -319,6 +460,7 @@ mojo.gpu_toolchains(
         "gb10": "nvidia:sm_121",
         "rx6900xt": "amdgpu:gfx1030",
         "strixhalo": "amdgpu:gfx1151",
+        "steamdeck": "amdgpu:gfx1033",
         "metal2": "metal:2",
         "metal3": "metal:3",
         "metal4": "metal:4",
@@ -468,6 +610,17 @@ http_file(
     urls = ["https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/flash_attn/sm100/3f4db99ab00437fb50c61da11d0647e5ab7aeab1b0b7337ae048dd8ee1b308b2/flash_attn-2.8.3-py3-none-any.whl"],
 )
 
+# aiter (AMD AI Tensor Engine for ROCm) for AMD GPU benchmarks. Built from
+# AMD's aiter source (v0.1.12); not on PyPI, so hosted like flash_attn above.
+# cp313 binary wheel with prebuilt gfx950 .so kernels; the excluded mha ops
+# JIT-compile at first use. Carries the MLA and MXFP4 ops the PyPI wheel lacks.
+http_file(
+    name = "aiter_wheel",
+    downloaded_file_path = "amd_aiter-0.1.12.post2-cp313-cp313-linux_x86_64.whl",
+    sha256 = "6e7fbb8aea9abe1ebb0c60d054872caacf09de8d8f50c6db6578a312f62b5b5f",
+    urls = ["https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/aiter/gfx950/6e7fbb8aea9abe1ebb0c60d054872caacf09de8d8f50c6db6578a312f62b5b5f/amd_aiter-0.1.12.post2-cp313-cp313-linux_x86_64.whl"],
+)
+
 # https://github.com/modularml/breathe
 http_archive(
     name = "breathe",
@@ -541,6 +694,67 @@ RUMDL_VERSION = "0.1.95"
         ("aarch64-apple-darwin", "sha256-zzNLRkJuqQH6pAi+/dZMSB0zY4BXiySnfGqJXqybpNA="),
     ]
 ]
+
+http_archive(
+    name = "crashpad",
+    build_file = "//bazel/public-patches:crashpad.BUILD",
+    patch_args = ["-p1"],
+    patches = [
+        "//bazel/public-patches:crashpad.patch",
+    ],
+    sha256 = "a0a02abd861da5a768ef95c88f8a343fe518cd2de21b2b0533e13ff0424bfb2c",
+    strip_prefix = "crashpad",
+    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/crashpad/031c47b4b3349d784d330f670360bb8af0266da3/a0a02abd861da5a768ef95c88f8a343fe518cd2de21b2b0533e13ff0424bfb2c/crashpad.tar.gz",
+)
+
+single_version_override(
+    module_name = "opentelemetry-cpp",
+    patch_strip = 1,
+    patches = [
+        # TODO: Remove next bump
+        "//bazel/public-patches:opentelemetry-cpp-loads.patch",
+    ],
+)
+
+single_version_override(
+    module_name = "tcmalloc",
+    patch_strip = 1,
+    patches = [
+        "//bazel/public-patches:tcmalloc-visibility.patch",
+        "//bazel/public-patches:tcmalloc-local-dynamic.patch",
+        "//bazel/public-patches:tcmalloc-numa.patch",
+        "//bazel/public-patches:tcmalloc-glibc-rseq.patch",
+    ],
+)
+
+# TODO: Comment very out of date
+# Must be rebuilt when updating with: MACOSX_DEPLOYMENT_TARGET=11.0 build-tcmalloc
+# And uploaded to s3 with: aws s3 cp tcmalloc.tar.gz s3://modular-bazel-artifacts-public/artifacts/gperftools/VERSION/SHA/tcmalloc.tar.gz
+http_archive(
+    name = "gperftools-macos",
+    build_file = "//bazel/public-patches:gperftools-macos.BUILD",
+    sha256 = "0d1dbb0273d94d32e28ccb53971d1473cab9bde90a463251f6f117867cf2d680",
+    url = "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/gperftools/2.15/0d1dbb0273d94d32e28ccb53971d1473cab9bde90a463251f6f117867cf2d680/tcmalloc.tar.gz",
+)
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
+
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
+node.toolchain(node_version = "22.15.1")
+
+npm.npm_translate_lock(
+    name = "mojo-lsp-server-node-tests",
+    data = ["//Mojo/test/mojo-lsp-server-node:package.json"],
+    dev = True,
+    pnpm_lock = "//Mojo/test/mojo-lsp-server-node:pnpm-lock.yaml",
+)
+use_repo(npm, "mojo-lsp-server-node-tests")
+
+rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext", dev_dependency = True)
+rules_ts_ext.deps(
+    ts_version_from = "//Mojo/test/mojo-lsp-server-node:package.json",
+)
+use_repo(rules_ts_ext, "npm_typescript")
 
 # BEGIN GENERATED LOGIT_VERIFICATION GOLDEN HTTP_FILES
 
@@ -711,11 +925,6 @@ LOGIT_VERIFICATION_GOLDENS = [
         "url": "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/torch_idefics3_8b_llama3_golden/3/996834f83014e543593c5a9ae283b16e33e05575720cce9ec4e175c0ad3a5283/torch_idefics3_8b_llama3_golden.tar.gz",
     },
     {
-        "name": "torch_exaone_3_5_2_4b_instruct_float32_golden.tar.gz",
-        "sha256": "ae16f10ebd7514f5d60f25755babbcff9636a4fa1c68d1470f614474fa907427",
-        "url": "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/torch_exaone_3_5_2_4b_instruct_float32_golden/1/ae16f10ebd7514f5d60f25755babbcff9636a4fa1c68d1470f614474fa907427/torch_exaone_3_5_2_4b_instruct_float32_golden.tar.gz",
-    },
-    {
         "name": "torch_phi_3_5_mini_instruct_bfloat16_golden.tar.gz",
         "sha256": "23beeadd54f6b299463a0bb5c8d2bdbe010ba27dabb686f942d33e56ec4d0870",
         "url": "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/torch_phi_3_5_mini_instruct_bfloat16_golden/1/23beeadd54f6b299463a0bb5c8d2bdbe010ba27dabb686f942d33e56ec4d0870/torch_phi_3_5_mini_instruct_bfloat16_golden.tar.gz",
@@ -754,11 +963,6 @@ LOGIT_VERIFICATION_GOLDENS = [
         "name": "torch_deepseek-ai_deepseek-v3_1-terminus_golden.tar.gz",
         "sha256": "d51257199f384cdb3f0e8086d95989899b7a316bb6511b62249d349b47e36447",
         "url": "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/torch_deepseek-ai_deepseek-v3_1-terminus_golden/1/d51257199f384cdb3f0e8086d95989899b7a316bb6511b62249d349b47e36447/torch_deepseek-ai_deepseek-v3_1-terminus_golden.tar.gz",
-    },
-    {
-        "name": "vllm_deepseek-r1-nvfp4_golden.tar.gz",
-        "sha256": "9b19a48a9bba02fe76bda80402950c1ae13c5e0f93444b08c2c6499f4b3247e7",
-        "url": "https://modular-bazel-artifacts-public.s3.amazonaws.com/artifacts/vllm_deepseek-r1-nvfp4_golden/9/9b19a48a9bba02fe76bda80402950c1ae13c5e0f93444b08c2c6499f4b3247e7/vllm_deepseek-r1-nvfp4_golden.tar.gz",
     },
     {
         "name": "torch_gemma3-1b_golden.tar.gz",

@@ -10,29 +10,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Shared pipeline interfaces for minimal Cascade tests."""
-
-import asyncio
-
-from max.experimental.cascade.core import Runtime, Worker
-
-
-class CascadePipeline:
-    """Abstract base class for cascade-served pipelines."""
-
-    def _get_workers(self) -> dict[str, Worker]:
-        """Return worker-valued pipeline attributes keyed by attribute name."""
-        return {
-            name: value
-            for name, value in self.__dict__.items()
-            if isinstance(value, Worker)
-        }
-
-    async def deploy(self, runtime: Runtime) -> None:
-        """Deploy worker attributes in place and replace them with proxies."""
-        workers = self._get_workers()
-        deployed = await asyncio.gather(
-            *(runtime.deploy(worker) for worker in workers.values())
-        )
-        for name, proxy in zip(workers, deployed, strict=True):
-            setattr(self, name, proxy)
+"""Concrete cascade pipeline implementations and dispatch."""

@@ -13,12 +13,12 @@
 from std.pathlib import Path
 from std.sys import size_of
 
-from layout import Layout, LayoutTensor
+from layout import IntTuple, Layout, LayoutTensor
 from layout.swizzle import Swizzle
 
 
 def print_svg[
-    tensor_list_origin: ImmutOrigin,
+    tensor_list_origin: ImmOrigin,
     dtype: DType,
     layout: Layout,
     layout_int_type: DType,
@@ -53,7 +53,7 @@ def print_svg[
 
 
 def _print_svg_impl[
-    tensor_list_origin: ImmutOrigin,
+    tensor_list_origin: ImmOrigin,
     dtype: DType,
     layout: Layout,
     layout_int_type: DType,

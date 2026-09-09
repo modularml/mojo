@@ -31,14 +31,33 @@ fi
 readonly clang="$clang_root/bin/clang++"
 readonly dsymutil="$clang_root/bin/dsymutil"
 
-"$clang" "$@"
+ifs_input=""
+ifs_output=""
+dsym_path=""
+binary_path=""
+linker_args=()
+for arg in "$@"; do
+  case "$arg" in
+    --modular-ifs-input=*) ifs_input="${arg#*=}" ;;
+    --modular-ifs-output=*) ifs_output="${arg#*=}" ;;
+    --modular-dsym-path=*) dsym_path="${arg#*=}" ;;
+    --modular-binary-path=*) binary_path="${arg#*=}" ;;
+    *) linker_args+=("$arg") ;;
+  esac
+done
 
-readonly dsym_path="${MODULAR_DSYM_PATH:-}"
+"$clang" "${linker_args[@]}"
+
 if [[ -n "$dsym_path" ]]; then
-  "$dsymutil" -o "$dsym_path" "$MODULAR_BINARY_PATH"
+  "$dsymutil" -o "$dsym_path" "$binary_path"
 fi
 
 if [[ "${BUILD_IFS:-}" == "yes" ]]; then
+  if [[ -z "$ifs_input" || -z "$ifs_output" ]]; then
+    echo "error: interface library input and output paths are required" >&2
+    exit 1
+  fi
+
   if [[ $OSTYPE == darwin* ]]; then
     ifs_platform=mac
   elif [[ $(uname -m) == "x86_64" ]]; then
@@ -50,8 +69,8 @@ if [[ "${BUILD_IFS:-}" == "yes" ]]; then
   ifs_root="$PWD/external/+http_archive+llvm-ifs/tools/$ifs_platform"
 
   if [[ "${MACOS:-}" == "true" ]]; then
-    "$ifs_root/llvm-readtapi.stripped" -arch arm64 -extract "$IFS_INPUT" -o "$IFS_OUTPUT"
+    "$ifs_root/llvm-readtapi.stripped" -arch arm64 -extract "$ifs_input" -o "$ifs_output"
   else
-    "$ifs_root/llvm-ifs.stripped" "$IFS_INPUT" --output-elf="$IFS_OUTPUT"
+    "$ifs_root/llvm-ifs.stripped" "$ifs_input" --output-elf="$ifs_output"
   fi
 fi

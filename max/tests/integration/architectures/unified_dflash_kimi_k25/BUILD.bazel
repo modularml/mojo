@@ -1,0 +1,39 @@
+load(
+    "//bazel:api.bzl",
+    "modular_py_test",
+)
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "test_model_config",
+    size = "medium",
+    srcs = ["test_model_config.py"],
+    deps = [
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/deepseekV3",
+        "//max/python/max/pipelines/architectures/dflash_kimi_k25",
+        "//max/python/max/pipelines/architectures/unified_dflash_kimi_k25",
+        "//max/python/max/pipelines/architectures/unified_dflash_llama3",
+        "//max/python/max/pipelines/lib",
+    ],
+)
+
+modular_py_test(
+    name = "test_vision_wiring",
+    size = "large",
+    srcs = ["test_vision_wiring.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/architectures/unified_dflash_kimi_k25",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+    ],
+)

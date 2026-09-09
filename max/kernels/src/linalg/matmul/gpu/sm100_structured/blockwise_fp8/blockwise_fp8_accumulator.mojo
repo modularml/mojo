@@ -26,13 +26,14 @@ requires per-K-iteration scaling in CUDA cores:
 from std.math import gcd
 from std.math.uutils import umod, ufloordiv
 
-from std.gpu import WARP_SIZE, lane_id, warp_id as get_warp_id
-from std.gpu.memory import AddressSpace
-from std.gpu.sync import syncwarp
+from max.gpu import WARP_SIZE, lane_id, warp_id as get_warp_id
+from max.gpu.sync import syncwarp
 from layout import (
     Coord,
     Idx,
+    DefaultEngine,
     TensorLayout,
+    TensorEngine,
     TileTensor,
     row_major,
     stack_allocation,
@@ -64,7 +65,15 @@ def get_accumulator_dims[
 ]() -> IndexList[2]:
     """Compute register accumulator dimensions for blockwise FP8.
 
-    Returns (num_stages, num_elements) for the register tile shape.
+    Parameters:
+        c_smem_dim1: N-direction width of each SMEM accumulator stage in
+            elements.
+        block_tile_shape: Block tile dimensions as `(BM, BN, BK)`.
+        mma_shape: MMA operation dimensions as `(MMA_M, MMA_N, MMA_K)`.
+        cta_group: Number of CTAs cooperating per MMA (1 or 2).
+
+    Returns:
+        `(num_stages, num_elements)` describing the register tile shape.
     """
     comptime BM = block_tile_shape[0]
     comptime BN = block_tile_shape[1]
@@ -96,7 +105,13 @@ def is_lower_fragment_required[
     cta_group: Int,
     block_tile_shape: IndexList[3],
 ]() -> Bool:
-    """Determine if lower TMEM fragment is needed based on config."""
+    """Determine if lower TMEM fragment is needed based on config.
+
+    Parameters:
+        cta_group: Number of CTAs cooperating per MMA (1 or 2).
+        block_tile_shape: Block tile dimensions as `(BM, BN, BK)`; only
+            `BM` (index 0) is consulted.
+    """
     return not (cta_group == 1 and block_tile_shape[0] == 64)
 
 
@@ -148,8 +163,8 @@ struct BlockwiseFP8Accumulator[
     comptime RegTileType = TileTensor[
         Self.accum_type,
         Self.AccumLayout,
-        MutExternalOrigin,
-        address_space=AddressSpace.GENERIC,
+        MutUntrackedOrigin,
+        address_space=.GENERIC,
     ]
 
     # Fragment load parameters (match TmemFragments defaults)
@@ -195,13 +210,19 @@ struct BlockwiseFP8Accumulator[
         # Type parameters
         b_scales_dtype: DType,
         b_scales_layout: TensorLayout,
+        b_scales_engine: TensorEngine,
         a_scales_dtype: DType,
         # A-scales tile dimensions
         a_scales_dim0: Int,
         a_scales_dim1: Int,
     ](
         mut self,
-        b_scales: TileTensor[b_scales_dtype, b_scales_layout, ImmutAnyOrigin],
+        b_scales: TileTensor[
+            b_scales_dtype,
+            b_scales_layout,
+            ImmutAnyOrigin,
+            Engine=b_scales_engine,
+        ],
         a_scales_tiles: SMemTileArray2DRowMajor[
             a_scales_dtype,
             a_scales_dim0,
@@ -223,13 +244,38 @@ struct BlockwiseFP8Accumulator[
         accumulates into register tiles.
 
         Called within `with epi_ctx.per_k_stage(input_pipeline) as epi_stage:`.
+
+        Parameters:
+            num_pipeline_stages: Depth of the A-scales SMEM tile pipeline.
+            opc: Output pipeline configuration; supplies `cta_group`.
+            num_input_stages: Number of input stages in the epilogue K-stage.
+            b_scales_dtype: Element type of the B-scales tensor; must be
+                `float32`.
+            b_scales_layout: Memory layout of the B-scales tensor.
+            b_scales_engine: Engine of the B-scales tensor.
+            a_scales_dtype: Element type of the A-scales SMEM tiles; must
+                be `float32`.
+            a_scales_dim0: Row count of each A-scales SMEM tile.
+            a_scales_dim1: Column count of each A-scales SMEM tile.
+
+        Args:
+            b_scales: B-scale factors loaded from global memory, indexed
+                by N-block and K-iteration.
+            a_scales_tiles: Pipeline of A-scale factor tiles in SMEM,
+                indexed by input stage.
+            epi_stage: Epilogue K-stage handle providing the TMEM offset
+                and input-pipeline signaling.
+            work_tile_coord: `(bm, bn)` coordinates of this tile in the
+                M-N problem grid.
+            k_iter: Current K-direction iteration index.
+            problem_shape: `(M, N, K)` dimensions of the full matmul
+                problem.
         """
         # Type aliases for readability
         comptime a_scales_type = a_scales_dtype
 
         comptime assert (
-            a_scales_dtype == b_scales_dtype
-            and Self.accum_type == DType.float32
+            a_scales_dtype == b_scales_dtype and Self.accum_type == .float32
         ), "Only support float32 for a_scales, b_scales, and accum_type"
 
         var M = problem_shape[0]
@@ -334,16 +380,12 @@ struct BlockwiseFP8Accumulator[
         var lower_sfa1_smem = Scalar[Self.accum_type]()
 
         comptime if Self.is_lower_required:
-            lower_sfa0_smem = rebind[Scalar[Self.accum_type]](
-                a_scales_smem[0, staged_c_row + top_frag_lower_coord[0]].cast[
-                    Self.accum_type
-                ]()
-            )
-            lower_sfa1_smem = rebind[Scalar[Self.accum_type]](
-                a_scales_smem[
-                    0, staged_c_row + bottom_frag_lower_coord[0]
-                ].cast[Self.accum_type]()
-            )
+            lower_sfa0_smem = a_scales_smem[
+                0, staged_c_row + top_frag_lower_coord[0]
+            ].cast[Self.accum_type]()
+            lower_sfa1_smem = a_scales_smem[
+                0, staged_c_row + bottom_frag_lower_coord[0]
+            ].cast[Self.accum_type]()
 
         # Signal input pipeline before TMEM loop
         syncwarp()
@@ -382,31 +424,17 @@ struct BlockwiseFP8Accumulator[
                     var upper_scale = upper_a_scale * b_scale
                     var lower_scale = lower_a_scale * b_scale
 
-                    self.upper[stage, offset] += rebind[
-                        Scalar[Self.accum_type]
-                    ](frags.upper[offset]) * rebind[Scalar[Self.accum_type]](
-                        upper_scale
+                    self.upper[stage, offset] += (
+                        frags.upper[offset] * upper_scale
                     )
-                    self.upper[stage, offset + 1] += rebind[
-                        Scalar[Self.accum_type]
-                    ](frags.upper[offset + 1]) * rebind[
-                        Scalar[Self.accum_type]
-                    ](
-                        upper_scale
+                    self.upper[stage, offset + 1] += (
+                        frags.upper[offset + 1] * upper_scale
                     )
 
                     comptime if Self.is_lower_required:
-                        self.lower[stage, offset] += rebind[
-                            Scalar[Self.accum_type]
-                        ](frags.lower[offset]) * rebind[
-                            Scalar[Self.accum_type]
-                        ](
-                            lower_scale
+                        self.lower[stage, offset] += (
+                            frags.lower[offset] * lower_scale
                         )
-                        self.lower[stage, offset + 1] += rebind[
-                            Scalar[Self.accum_type]
-                        ](frags.lower[offset + 1]) * rebind[
-                            Scalar[Self.accum_type]
-                        ](
-                            lower_scale
+                        self.lower[stage, offset + 1] += (
+                            frags.lower[offset + 1] * lower_scale
                         )

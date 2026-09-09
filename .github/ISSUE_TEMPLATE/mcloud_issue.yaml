@@ -1,0 +1,51 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+name: Modular Cloud bug or feature request
+description: Report a bug or suggest a feature for Modular Cloud
+title: "[MCloud] "
+labels:
+  - "mcloud,Needs Triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to help us improve Modular Cloud!
+
+        Please provide a descriptive title above and fill in the following fields.
+
+  - type: dropdown
+    id: RequestType
+    attributes:
+      label: Is this a bug or a feature request?
+      options:
+        - Bug
+        - Feature request
+    validations:
+      required: true
+
+  - type: textarea
+    id: Description
+    attributes:
+      label: Please describe the bug or feature request.
+      description: If it's a bug, please include any necessary reproduction details such as the browser you're using.
+    validations:
+      required: true
+
+  - type: textarea
+    id: Motivation
+    attributes:
+      label: Please describe any motivation that would help prioritize this further.
+      description: "Example: How large is your inference need, or how impactful would this be for your organization."
+    validations:
+      required: false

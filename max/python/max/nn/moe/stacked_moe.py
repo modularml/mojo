@@ -218,39 +218,27 @@ class StackedMoE(Module, Shardable):
 
     .. code-block:: python
 
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.graph import DeviceRef
+        from max.nn.moe import MoEGate, StackedMoE
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
         # Basic usage (Llama4/Qwen3VL style)
         moe = StackedMoE(
-            devices=[device],
+            devices=[device_ref],
             hidden_dim=4096,
             num_experts=8,
             num_experts_per_token=2,
             moe_dim=14336,
-            gate_cls=MyGate,
+            gate_cls=MoEGate,
         )
 
-        # With FP8 quantization
-        moe = StackedMoE(
-            devices=[device],
-            hidden_dim=4096,
-            num_experts=8,
-            num_experts_per_token=2,
-            moe_dim=14336,
-            gate_cls=MyGate,
-            quant_config=quant_config,
-        )
-
-        # GptOss style with interleaved format and bias
-        moe = StackedMoE(
-            devices=[device],
-            hidden_dim=4096,
-            num_experts=8,
-            num_experts_per_token=2,
-            moe_dim=14336,
-            gate_cls=GptOssMoEGate,
-            gate_up_format=GateUpFormat.INTERLEAVED,
-            gated_activation_fn=my_custom_activation,
-            has_bias=True,
-        )
+    Pass ``gate_up_format=GateUpFormat.INTERLEAVED``, a custom
+    ``gated_activation_fn``, ``has_bias=True``, or a ``quant_config`` to match
+    other architectures (for example, GptOss style with interleaved format and
+    bias, or FP8 quantization).
 
     Args:
         devices: A list of devices to use for the MoE.
@@ -381,18 +369,27 @@ class StackedMoE(Module, Shardable):
         # FP8 scales (only for non-MXFP4 float8)
         if self.quant_config and self.quant_config.format != QuantFormat.MXFP4:
             block_size = self.quant_config.weight_scale.block_size
-            assert block_size is not None, "FP8 MoE requires block scaling"
+            if self.quant_config.weight_scale.is_rowwise:
+                # Per-output-channel (rowwise) scales, e.g. compressed-tensors
+                # FP8-dynamic: one scale per expert output channel. Stored in
+                # the same [E, out_features, 1] layout the matmul transposes to
+                # a per-N scale. ``gate_up`` output is the concatenated
+                # 2 * moe_dim; ``down`` output is hidden_dim.
+                gate_up_scale_shape = [self.num_experts, 2 * self.moe_dim, 1]
+                down_scale_shape = [self.num_experts, self.hidden_dim, 1]
+            else:
+                assert block_size is not None, "FP8 MoE requires block scaling"
 
-            gate_up_scale_shape = [
-                self.num_experts,
-                ceildiv(self.hidden_dim, block_size[0]),
-                ceildiv(2 * self.moe_dim, block_size[1]),
-            ]
-            down_scale_shape = [
-                self.num_experts,
-                ceildiv(self.moe_dim, block_size[0]),
-                ceildiv(self.hidden_dim, block_size[1]),
-            ]
+                gate_up_scale_shape = [
+                    self.num_experts,
+                    ceildiv(self.hidden_dim, block_size[0]),
+                    ceildiv(2 * self.moe_dim, block_size[1]),
+                ]
+                down_scale_shape = [
+                    self.num_experts,
+                    ceildiv(self.moe_dim, block_size[0]),
+                    ceildiv(self.hidden_dim, block_size[1]),
+                ]
 
             self._gate_up_scale = Weight(
                 name="experts.gate_up_proj_scale",
@@ -649,7 +646,7 @@ class StackedMoE(Module, Shardable):
             self.gate_up_proj_transposed,
             routing.expert_start_indices,
             routing.expert_ids,
-            routing.expert_usage_stats.to(DeviceRef.CPU()),
+            routing.expert_usage_stats,
         )
 
         gated_output = self._apply_gated_activation(gate_up_output, routing)
@@ -659,7 +656,7 @@ class StackedMoE(Module, Shardable):
             self.down_proj_transposed,
             routing.expert_start_indices,
             routing.expert_ids,
-            routing.expert_usage_stats.to(DeviceRef.CPU()),
+            routing.expert_usage_stats,
         )
 
         if self.has_bias:

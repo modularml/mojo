@@ -14,7 +14,6 @@
 # Adapted from https://github.com/bazel-contrib/rules_pydeps/blob/1c3eae19c4cd4b854e91a6ea48e21666b08d7ecc/pydeps/private/py/python_module.py
 
 from pathlib import Path
-from typing import Any
 
 from typing_extensions import override
 
@@ -70,7 +69,7 @@ class PythonModule:
         return self._module.split(".")[0]
 
     @override
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, PythonModule) and self._module == other._module
 
     @override

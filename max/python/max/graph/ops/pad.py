@@ -44,33 +44,49 @@ def pad(
 ) -> TensorValue:
     """Pads a tensor along every dimension.
 
-    Adds padding to the input tensor using the specified padding values and
-    mode.
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("pad_example") as graph:
+            x = ops.constant([[1, 2], [3, 4]], DType.int32, device=device)
+
+            # Add a dim before and after dim `0` and a dim before and after dim ``1``
+            graph.output(ops.pad(x, [1, 1, 1, 1]))
+
+            # [[0, 0, 0, 0], [0, 1, 2, 0], [0, 3, 4, 0], [0, 0, 0, 0]]
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
-        input: The input tensor to pad.
-        paddings: Sequence of padding values. For a tensor with rank N,
-            paddings must contain 2*N non-negative integers in the order
-            ``[pad_before_dim0, pad_after_dim0, pad_before_dim1,
-            pad_after_dim1, ...]``.
-        mode: The padding mode.  Supported values:
+        input: The tensor to pad.
+        paddings: The amount to pad. For a tensor of rank ``N``, pass ``2*N``
+            non-negative integers in the order ``[before_dim0, after_dim0,
+            before_dim1, after_dim1, ...]``.
+        mode: How to fill the padded cells. Supported values:
 
-            * ``"constant"`` - fill padded cells with ``value``.
-            * ``"reflect"``  - reflect values about the content-region
-              edges (excludes the boundary element, equivalent to
-              ``numpy.pad`` with ``mode='reflect'``).
-            * ``"edge"``     - repeat the nearest boundary element
-              (equivalent to ``numpy.pad`` with ``mode='edge'``).
-        value: The constant fill value (only used when ``mode='constant'``).
-            Defaults to 0.
+            * ``"constant"``: fill using ``value``.
+            * ``"reflect"``: reflect the content across each edge, excluding
+              the boundary element (like ``numpy.pad`` with ``mode='reflect'``).
+            * ``"edge"``: repeat the nearest boundary element (like
+              ``numpy.pad`` with ``mode='edge'``).
+
+            Defaults to ``"constant"``.
+        value: The fill value for ``mode="constant"``. Defaults to ``0``.
 
     Returns:
-        A symbolic tensor with the same dtype as ``input``, padded along
-        each dimension according to ``paddings``.
+        A ``TensorValue`` representing the padded input, with the same dtype as
+        ``input``.
 
     Raises:
-        ValueError: If ``mode`` is not one of the supported values, or if
-            any padding value is negative.
+        ValueError: If ``mode`` is unsupported, or any padding value is
+            negative.
+        AssertionError: If the number of padding values isn't twice the input
+            rank.
     """
     input = TensorValue(input)
     paddings = list(paddings)

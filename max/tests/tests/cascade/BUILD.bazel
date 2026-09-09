@@ -1,25 +1,33 @@
-load("//bazel:api.bzl", "modular_py_library", "modular_py_test", "requirement")
+load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
 
-# Shared dummy pipelines used only by tests in this directory.
-modular_py_library(
-    name = "test_helpers",
-    testonly = True,
-    srcs = [
-        "dummy_imgen.py",
-        "dummy_textgen.py",
+modular_py_test(
+    name = "test_native_backends",
+    size = "small",
+    srcs = ["test_native_backends.py"],
+    # aiohttp transitively provides multidict + frozenlist, which the test
+    # probes by name; it does not import aiohttp itself, hence ignore_extra_deps.
+    ignore_extra_deps = [
+        requirement("aiohttp"),
     ],
     deps = [
+        requirement("aiohttp"),
+    ],
+)
+
+modular_py_test(
+    name = "test_local_runtime",
+    size = "small",
+    srcs = ["test_local_runtime.py"],
+    deps = [
         "//max/python/max/experimental/cascade",
-        requirement("numpy"),
-        requirement("pillow"),
-        requirement("scipy"),
+        "//max/python/max/experimental/cascade/core",
+        requirement("pytest-asyncio"),
     ],
 )
 
@@ -29,6 +37,7 @@ modular_py_test(
     srcs = ["test_contexts.py"],
     deps = [
         "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/core",
         requirement("pytest-asyncio"),
     ],
 )
@@ -38,8 +47,263 @@ modular_py_test(
     size = "small",
     srcs = ["test_dummy_textgen.py"],
     deps = [
-        ":test_helpers",
         "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/pipelines",
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_echo_textgen",
+    size = "small",
+    srcs = ["test_echo_textgen.py"],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/pipelines",
+        requirement("numpy"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_chat_completions",
+    size = "small",
+    srcs = ["test_chat_completions.py"],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/experimental/cascade/serve",
+        requirement("fastapi"),
+        requirement("httpx"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_chat_parser",
+    size = "medium",
+    srcs = ["test_chat_parser.py"],
+    deps = [
+        "//max/python/max/experimental/cascade/interfaces",
+        "//max/python/max/experimental/cascade/pipelines",
+    ],
+)
+
+modular_py_test(
+    name = "test_real_tool_parsers",
+    size = "medium",
+    srcs = ["test_real_tool_parsers.py"],
+    # Importing the Kimi/MiniMax tool parsers pulls max.pipelines.lib, which
+    # alone can blow the 300s budget on shared BuildBuddy macOS workers (times
+    # out in pytest collection)
+    # However we can't disable this on mac-os because mac-os is our primary developer platform for this code.
+    # TODO - find a different way to fix the BB macOS runner
+    deps = [
+        "//max/python/max/experimental/cascade/interfaces",
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/architectures/laguna",
+        "//max/python/max/pipelines/architectures/minimax_m2",
+    ],
+)
+
+modular_py_test(
+    name = "test_cascade_tool_calling",
+    size = "small",
+    srcs = ["test_cascade_tool_calling.py"],
+    # Import-bound: the cascade + fastapi/httpx import graph alone outruns the
+    # 300s "small" budget on the shared BuildBuddy macOS workers, timing out
+    # during pytest collection before a single test body runs. Skip the CI job
+    # rather than the platform, so it keeps running locally on a Mac.
+    tags = ["skip-ci-macos"],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/experimental/cascade/serve",
+        requirement("fastapi"),
+        requirement("httpx"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_open_responses",
+    size = "small",
+    srcs = ["test_open_responses.py"],
+    # Import-bound; see test_cascade_tool_calling above.
+    tags = ["skip-ci-macos"],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/experimental/cascade/serve",
+        requirement("fastapi"),
+        requirement("httpx"),
+        requirement("pillow"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_http_framing",
+    size = "small",
+    srcs = ["test_http_framing.py"],
+    deps = [
+        "//max/python/max/experimental/cascade/http_runtime",
+        requirement("aiohttp"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_runtimes",
+    # Spins up ~40 parametrized cases, each booting gRPC/HTTP worker
+    # subprocesses; ~48s in isolation blows the 60s "small" budget under
+    # parallel contention.
+    size = "medium",
+    srcs = ["test_runtimes.py"],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/grpc_runtime",
+        "//max/python/max/experimental/cascade/http_runtime",
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/serve:process_control",
+        requirement("pydantic"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_context_config",
+    size = "small",
+    srcs = ["test_context_config.py"],
+    # Import-bound; see test_cascade_tool_calling above. This one also pulls
+    # both runtime backends (gRPC and HTTP), so its collection is the slowest
+    # of the three.
+    tags = ["skip-ci-macos"],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/deployment:context_config",
+        "//max/python/max/experimental/cascade/deployment:routing",
+        "//max/python/max/experimental/cascade/grpc_runtime",
+        "//max/python/max/experimental/cascade/http_runtime",
+        "//max/python/max/experimental/cascade/pipelines",
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_routing",
+    size = "small",
+    srcs = ["test_routing.py"],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/deployment:routing",
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_max_tokenizer",
+    size = "medium",
+    srcs = ["test_max_tokenizer.py"],
+    tags = [
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/workers",
+        "//max/python/max/pipelines/lib",
+        requirement("numpy"),
+        requirement("pytest-asyncio"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_max_tokenizer_decode_stream",
+    size = "small",
+    srcs = ["test_max_tokenizer_decode_stream.py"],
+    deps = [
+        "//max/python/max/experimental/cascade/workers",
+        requirement("numpy"),
+        requirement("pytest-asyncio"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_all_pipelines",
+    size = "medium",
+    srcs = ["test_all_pipelines.py"],
+    # Config construction must not reach the hub: these cases build a config
+    # for a placeholder repo. Linux CI passes HF_HUB_OFFLINE=1 for the whole
+    # invocation (ci/default/test.sh); the macOS lane does not, so pin it here.
+    env = {"HF_HUB_OFFLINE": "1"},
+    tags = ["skip-external-ci"],
+    # TODO(SERVSYS-1284): importing max.pipelines.lib alone blows the 300s
+    # budget on the shared BuildBuddy macOS workers (times out in pytest
+    # collection);
+    # However we can't disable this on mac-os because mac-os is our primary
+    # developer platform for this code.
+    # TODO - find a different way to make the BB macOS runner pretend to be green.
+    deps = [
+        # all_pipelines brings every architecture (llama3 resolves SmolLM at
+        # runtime); pipelines provides the CommonTextGenPipeline class.
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/experimental/cascade/pipelines:all_pipelines",
+        "//max/python/max/experimental/cascade/workers",
+        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_test(
+    name = "test_arch_import_layering",
+    size = "medium",
+    srcs = ["test_arch_import_layering.py"],
+    # The architecture module is imported dynamically (importlib, inside the
+    # test) so the static scanner can't see the dependency.
+    ignore_extra_deps = [
+        "//max/python/max/pipelines/architectures/llama3",
+    ],
+    # Importing the Llama architecture pulls max.pipelines.lib, which alone can
+    # blow the 300s budget on the shared BuildBuddy macOS workers (times out in
+    # pytest collection);
+    # However we can't disable this on mac-os because mac-os is our primary
+    # developer platform for this code.
+    # TODO - find a different way to make the BB macOS runner pretend to be green.
+    deps = [
+        "//max/python/max/pipelines/architectures/llama3",
+    ],
+)
+
+modular_py_test(
+    name = "test_max_model_worker_integration",
+    size = "large",
+    srcs = ["test_max_model_worker_integration.py"],
+    tags = [
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/experimental/cascade",
+        "//max/python/max/experimental/cascade/core",
+        # all_pipelines brings every architecture (llama3 resolves SmolLM at
+        # runtime); pipelines provides the CommonTextGenPipeline class.
+        "//max/python/max/experimental/cascade/pipelines",
+        "//max/python/max/experimental/cascade/pipelines:all_pipelines",
+        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/lib",
+        requirement("numpy"),
         requirement("pytest-asyncio"),
     ],
 )
@@ -49,9 +313,8 @@ modular_py_test(
     size = "small",
     srcs = ["test_dummy_imgen.py"],
     deps = [
-        ":test_helpers",
         "//max/python/max/experimental/cascade",
-        requirement("numpy"),
+        "//max/python/max/experimental/cascade/pipelines",
         requirement("pillow"),
         requirement("pytest-asyncio"),
     ],

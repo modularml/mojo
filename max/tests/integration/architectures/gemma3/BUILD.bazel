@@ -8,7 +8,6 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -43,7 +42,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/gemma3",
         "//max/python/max/pipelines/kv_cache",
         "//max/tests/integration/test_common:context_utils",
         requirement("numpy"),

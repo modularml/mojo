@@ -22,6 +22,7 @@ from max.nn.activation import activation_function_from_name
 from max.nn.kernels import rope_ragged_with_position_ids
 from max.nn.layer import Module
 from max.nn.linear import Linear
+from max.nn.quant_config import QuantConfig
 
 
 def get_timestep_embedding(
@@ -138,24 +139,32 @@ class TimestepEmbedding(Module):
         sample_proj_bias: bool = True,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ):
         super().__init__()
+        # Under FP8 the weight is float8_e4m3fn with per-tensor scales; the
+        # bias stays bfloat16 via ``quant_config.bias_dtype``.
+        weight_dtype = (
+            DType.float8_e4m3fn if quant_config is not None else dtype
+        )
         self.linear_1 = Linear(
             in_dim=in_channels,
             out_dim=time_embed_dim,
-            dtype=dtype,
+            dtype=weight_dtype,
             device=device,
             has_bias=sample_proj_bias,
+            quant_config=quant_config,
         )
         self.cond_proj: Linear | None
         if cond_proj_dim is not None:
             self.cond_proj = Linear(
                 in_dim=cond_proj_dim,
                 out_dim=in_channels,
-                dtype=dtype,
+                dtype=weight_dtype,
                 device=device,
                 has_bias=False,
+                quant_config=quant_config,
             )
         else:
             self.cond_proj = None
@@ -164,9 +173,10 @@ class TimestepEmbedding(Module):
         self.linear_2 = Linear(
             in_dim=time_embed_dim,
             out_dim=time_embed_dim_out,
-            dtype=dtype,
+            dtype=weight_dtype,
             device=device,
             has_bias=sample_proj_bias,
+            quant_config=quant_config,
         )
         self.post_act: Callable[[TensorValue], TensorValue] | None
         if post_act_fn is not None:

@@ -17,7 +17,7 @@ from linalg.fp4_utils import (
     cast_fp_to_fp4e2m1,
     cast_f4e2m1x2_to_fp16x2,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.math import nan, inf
 from std.sys import bit_width_of
 
@@ -31,7 +31,7 @@ def test_simd_f32_to_e2m1():
     print("== test_simd_f32_to_e2m1")
 
     comptime size = 32
-    var f32_simd = SIMD[DType.float32, size](
+    var f32_simd = SIMD[.float32, size](
         0.0,
         0.23,
         0.26,
@@ -46,8 +46,8 @@ def test_simd_f32_to_e2m1():
         3.51,
         5.0,
         5.01,
-        nan[DType.float32](),
-        inf[DType.float32](),
+        nan[.float32](),
+        inf[.float32](),
         -0.0,
         -0.23,
         -0.26,
@@ -62,8 +62,8 @@ def test_simd_f32_to_e2m1():
         -3.51,
         -5.0,
         -5.01,
-        -nan[DType.float32](),
-        -inf[DType.float32](),
+        -nan[.float32](),
+        -inf[.float32](),
     )
 
     var e2m1_simd = cast_fp_to_fp4e2m1(f32_simd)
@@ -77,7 +77,7 @@ def test_simd_f32_to_e2m1():
 
 def test_simd_f32_to_e2m1_ptx_kernel[
     size: Int,
-](x: SIMD[DType.float32, size]):
+](x: SIMD[.float32, size]):
     comptime FP4_E2M1_WIDTH = 4
     comptime FP4_E2M1_MASK = pow(2, FP4_E2M1_WIDTH) - 1
 
@@ -105,7 +105,7 @@ def test_simd_f32_to_e2m1_ptx_path(ctx: DeviceContext) raises:
     print("== test_simd_f32_to_e2m1_ptx_path")
 
     comptime size = 32
-    var f32_simd = SIMD[DType.float32, size](
+    var f32_simd = SIMD[.float32, size](
         0.0,
         0.23,
         0.26,
@@ -120,8 +120,8 @@ def test_simd_f32_to_e2m1_ptx_path(ctx: DeviceContext) raises:
         3.51,
         5.0,
         5.01,
-        nan[DType.float32](),
-        inf[DType.float32](),
+        nan[.float32](),
+        inf[.float32](),
         -0.0,
         -0.23,
         -0.26,
@@ -136,8 +136,8 @@ def test_simd_f32_to_e2m1_ptx_path(ctx: DeviceContext) raises:
         -3.51,
         -5.0,
         -5.01,
-        -nan[DType.float32](),
-        -inf[DType.float32](),
+        -nan[.float32](),
+        -inf[.float32](),
     )
 
     comptime kernel = test_simd_f32_to_e2m1_ptx_kernel[size,]
@@ -147,7 +147,7 @@ def test_simd_f32_to_e2m1_ptx_path(ctx: DeviceContext) raises:
 
 def test_simd_f4e2m1x2_to_fp16x2_ptx_kernel[
     size: Int,
-](x: SIMD[DType.uint8, size]):
+](x: SIMD[.uint8, size]):
     comptime for i in range(size // 4):
         for j in range(4):
             var x_casted = cast_f4e2m1x2_to_fp16x2(x[i * 4 + j])
@@ -164,7 +164,7 @@ def test_simd_f4e2m1x2_to_fp16x2(ctx: DeviceContext) raises:
     print("== test_simd_f4e2m1x2_to_fp16x2")
 
     comptime size = 16
-    var e4m21_simd = SIMD[DType.uint8, size](
+    var e4m21_simd = SIMD[.uint8, size](
         0x00,
         0x01,
         0x10,

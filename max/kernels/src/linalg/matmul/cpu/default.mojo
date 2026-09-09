@@ -11,6 +11,13 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Provides the generic CPU matmul microkernel used as the fallback path.
+
+Defines `Inner_matmul_default`, a scalar FMA-based implementation of the
+`InnerMatmulKernel` trait selected when no architecture-specific kernel
+(VNNI, NEON, I8MM) applies.
+"""
+
 from std.sys import prefetch
 from std.sys.info import align_of
 from std.sys.intrinsics import PrefetchOptions
@@ -28,6 +35,14 @@ from .impl import InnerMatmulKernel
 # implements the default microkernel.
 @fieldwise_init
 struct Inner_matmul_default(InnerMatmulKernel, Movable):
+    """Generic CPU matmul microkernel using scalar FMA accumulation.
+
+    Implements `InnerMatmulKernel` for the fallback path used when no
+    architecture-specific kernel (VNNI, NEON, I8MM) applies. Accumulates
+    partial products from a packed B tile into a local SIMD register buffer
+    and writes the result back to the C matrix with optional boundary checks.
+    """
+
     @always_inline
     def _accumulate[
         simd_size: Int, kernel_rows: Int, kernel_cols: Int
@@ -45,10 +60,10 @@ struct Inner_matmul_default(InnerMatmulKernel, Movable):
         local accumulation buffer while processing a single column of A.
 
         Args:
-            a: TODO.
-            b_packed: TODO.
+            a: Input A matrix tile being processed.
+            b_packed: Packed B matrix tile in cache-friendly layout.
             c_local: Pre-allocated local buffer for c partial sums.
-            global_offset: TODO.
+            global_offset: Global (M, N, K) coordinate offset for this tile.
             tile_n_k_idx: Index tuple with (n, k) coordinates within the current
                 processing tile to index the packed B matrix.
         """
@@ -109,6 +124,26 @@ struct Inner_matmul_default(InnerMatmulKernel, Movable):
     ):
         """Utility function on the inner loop. Run the inner kernel on the whole
         (kernel_rows, TileN, TileK) tile.
+
+        Parameters:
+            kernel_rows: Number of rows in the microkernel tile along the M
+                dimension.
+            kernel_cols: Number of columns in the microkernel tile along the N
+                dimension.
+            simd_size: SIMD vector width used for packed B loads and
+                accumulation.
+
+        Args:
+            c: Output C matrix tile receiving the accumulated products.
+            a: Input A matrix tile in row-major (non-transposed) layout.
+            b_packed: Packed B matrix tile in cache-friendly rank-3 layout.
+            global_offset: Global (M, N, K) coordinate offset of this tile
+                within the full matrices.
+            global_bound: Global (M, N, K) extent of the full matrices used
+                for boundary checks.
+            tile_n_k: Tile extents in the (N, K) dimensions to iterate over.
+            skip_boundary_check: Whether to skip out-of-bounds checks on C
+                loads and stores.
         """
         comptime assert b_packed.flat_rank == 3, "b_packed must be rank 3"
 

@@ -91,6 +91,7 @@ Output content
    :toctree: generated
    :template: autosummary/class.rst
 
+   OutputAudioContent
    OutputContent
    OutputImageContent
    OutputTextContent
@@ -157,6 +158,7 @@ Usage and tokens
    :toctree: generated
    :template: autosummary/class.rst
 
+   AudioGenerationDetails
    Error
    IncludeEnum
    IncompleteDetails

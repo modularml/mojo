@@ -1,12 +1,10 @@
-load("//bazel:api.bzl", "modular_cc_library", "modular_cc_test", "requirement")
-load(":mef.bzl", "mef")
+load("//bazel:api.bzl", "mef", "modular_cc_library", "modular_cc_test", "requirement")
 
 # gazelle:default_features layering_check,parse_headers
 
 package(
     default_visibility = [
         "//:__pkg__",
-        "//SDK/integration-test:__subpackages__",
         "//max/tests:__subpackages__",
         "//oss/modular/max/tests:__subpackages__",
     ],
@@ -42,6 +40,19 @@ mef(
 mef(
     name = "mutable_buffer",
     src = "gen_mutable_buffer_mef.py",
+    deps = [
+        requirement("click"),
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+    ],
+)
+
+mef(
+    name = "mutable_buffer_gpu",
+    src = "gen_mutable_buffer_mef_gpu.py",
+    target_compatible_with = ["//:has_gpu"],
     deps = [
         requirement("click"),
         "//max/python/max/driver",
@@ -180,14 +191,19 @@ modular_cc_test(
 modular_cc_test(
     name = "DeviceGPUTest",
     srcs = ["DeviceGPUTest.cpp"],
-    data = [":vector_add_gpu.mef"],
+    data = [
+        ":mutable_buffer_gpu.mef",
+        ":vector_add_gpu.mef",
+    ],
     env = {
+        "MUTATE_MEF_PATH": "$(rootpath :mutable_buffer_gpu.mef)",
         "TEST_MEF_PATH": "$(rootpath :vector_add_gpu.mef)",
     },
     # TODO(GEX-3548): ExecuteModelWithGPUTensors produces zeros instead of the
-    # expected vector-add result on Apple GPU (Metal) workers.
+    # expected vector-add result on Apple GPU (Metal) workers and AMD MI355 GPUs.
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
+        "//:mi355_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     tags = ["gpu"],

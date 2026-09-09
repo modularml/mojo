@@ -1,0 +1,182 @@
+//===----------------------------------------------------------------------===//
+// Copyright (c) 2026, Modular Inc. All rights reserved.
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions:
+// https://llvm.org/LICENSE.txt
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//===----------------------------------------------------------------------===//
+//
+// This file is intended to be #include'd multiple times to extract information
+// about tokens for various clients in the lexer.
+//
+//===----------------------------------------------------------------------===//
+
+#if !defined(TOK_MARKER) && !defined(TOK_IDENTIFIER) &&                        \
+    !defined(TOK_LITERAL) && !defined(TOK_PUNCTUATION) &&                      \
+    !defined(TOK_KEYWORD)
+#error Must define one of the TOK_ macros.
+#endif
+
+#ifndef TOK_MARKER
+#define TOK_MARKER(X)
+#endif
+#ifndef TOK_IDENTIFIER
+#define TOK_IDENTIFIER(NAME)
+#endif
+#ifndef TOK_LITERAL
+#define TOK_LITERAL(NAME)
+#endif
+#ifndef TOK_PUNCTUATION
+#define TOK_PUNCTUATION(NAME, SPELLING)
+#endif
+#ifndef TOK_KEYWORD
+#define TOK_KEYWORD(SPELLING)
+#endif
+
+// Markers
+TOK_MARKER(eof)
+TOK_MARKER(error)
+
+// Identifiers.
+TOK_IDENTIFIER(identifier)         // foo
+TOK_IDENTIFIER(escaped_identifier) // `!foo`
+
+// Literals
+TOK_LITERAL(integer)   // 42, 0x42, 0o42, 0b101010
+TOK_LITERAL(float_num) // 1.0
+TOK_LITERAL(string)    // "Hello"
+TOK_LITERAL(t_string)  // t"Hello {world}!"
+
+// Punctuation.
+// See cpython/3.X/Parser/token.c
+TOK_PUNCTUATION(percent, "%")
+TOK_PUNCTUATION(amp, "&")
+TOK_PUNCTUATION(l_paren, "(")
+TOK_PUNCTUATION(r_paren, ")")
+TOK_PUNCTUATION(star, "*")
+TOK_PUNCTUATION(plus, "+")
+TOK_PUNCTUATION(comma, ",")
+TOK_PUNCTUATION(minus, "-")
+TOK_PUNCTUATION(dot, ".")
+TOK_PUNCTUATION(slash, "/")
+TOK_PUNCTUATION(colon, ":")
+TOK_PUNCTUATION(semi, ";")
+TOK_PUNCTUATION(less, "<")
+TOK_PUNCTUATION(equal, "=")
+TOK_PUNCTUATION(greater, ">")
+TOK_PUNCTUATION(at, "@")
+TOK_PUNCTUATION(l_square, "[")
+TOK_PUNCTUATION(r_square, "]")
+TOK_PUNCTUATION(caret, "^")
+TOK_PUNCTUATION(l_brace, "{")
+TOK_PUNCTUATION(pipe, "|")
+TOK_PUNCTUATION(r_brace, "}")
+TOK_PUNCTUATION(tilde, "~")
+TOK_PUNCTUATION(underscore, "_")
+TOK_PUNCTUATION(exclaim_equal, "!=")
+TOK_PUNCTUATION(percent_equal, "%=")
+TOK_PUNCTUATION(amp_equal, "&=")
+TOK_PUNCTUATION(star_star, "**")
+TOK_PUNCTUATION(star_equal, "*=")
+TOK_PUNCTUATION(plus_equal, "+=")
+TOK_PUNCTUATION(minus_equal, "-=")
+TOK_PUNCTUATION(minus_greater, "->")
+TOK_PUNCTUATION(slash_slash, "//")
+TOK_PUNCTUATION(slash_equal, "/=")
+TOK_PUNCTUATION(colon_equal, ":=")
+TOK_PUNCTUATION(less_less, "<<")
+TOK_PUNCTUATION(less_equal, "<=")
+TOK_PUNCTUATION(less_greater, "<>")
+TOK_PUNCTUATION(equal_equal, "==")
+TOK_PUNCTUATION(greater_equal, ">=")
+TOK_PUNCTUATION(right_right, ">>")
+TOK_PUNCTUATION(at_equal, "@=")
+TOK_PUNCTUATION(caret_equal, "^=")
+TOK_PUNCTUATION(pipe_equal, "|=")
+TOK_PUNCTUATION(star_star_equal, "**=")
+TOK_PUNCTUATION(dot_dot_dot, "...")
+TOK_PUNCTUATION(slash_slash_equal, "//=")
+TOK_PUNCTUATION(less_less_equal, "<<=")
+TOK_PUNCTUATION(right_right_equal, ">>=")
+
+// Keywords.  These turn "foo" into Token::kw_foo enums.
+// See reserved_keywords at cpython/3.X/Parser/parser.c
+
+// NOTE: Please key these alphabetized to make it easier to find something in
+// this list and to cater to OCD.
+TOK_KEYWORD(_)
+TOK_KEYWORD(and)
+TOK_KEYWORD(as)
+TOK_KEYWORD(assert)
+TOK_KEYWORD(async)
+TOK_KEYWORD(await)
+TOK_KEYWORD(break)
+TOK_KEYWORD(case)
+TOK_KEYWORD(class)
+TOK_KEYWORD(comptime)
+TOK_KEYWORD(continue)
+TOK_KEYWORD(def)
+TOK_KEYWORD(del)
+TOK_KEYWORD(elif)
+TOK_KEYWORD(else)
+TOK_KEYWORD(except)
+TOK_KEYWORD(fn) // Mojo extension.
+TOK_KEYWORD(False)
+TOK_KEYWORD(finally)
+TOK_KEYWORD(for)
+TOK_KEYWORD(from)
+TOK_KEYWORD(global)
+TOK_KEYWORD(if)
+TOK_KEYWORD(import)
+TOK_KEYWORD(in)
+TOK_KEYWORD(is)
+TOK_KEYWORD(lambda)
+TOK_KEYWORD(match)
+TOK_KEYWORD(None)
+TOK_KEYWORD(nonlocal)
+TOK_KEYWORD(not )
+TOK_KEYWORD(or)
+TOK_KEYWORD(pass)
+TOK_KEYWORD(raise)
+TOK_KEYWORD(ref) // Mojo extension.
+TOK_KEYWORD(return)
+TOK_KEYWORD(Self)   // Mojo extension.
+TOK_KEYWORD(struct) // Mojo extension.
+TOK_KEYWORD(trait)  // Mojo extension.
+TOK_KEYWORD(True)
+TOK_KEYWORD(try)
+TOK_KEYWORD(var) // Mojo extension.
+TOK_KEYWORD(while)
+TOK_KEYWORD(with)
+TOK_KEYWORD(yield)
+TOK_KEYWORD(__extension)  // Mojo extension extension.
+TOK_KEYWORD(__generator_type) // Mojo extension: generator type literal.
+TOK_KEYWORD(__get_address_as_uninit_lvalue)
+TOK_KEYWORD(__get_mvalue_as_litref)
+TOK_KEYWORD(__get_litref_as_mvalue)
+TOK_KEYWORD(__get_address_as_owned_value)
+TOK_KEYWORD(__mlir_region)
+TOK_KEYWORD(origin_of)
+TOK_KEYWORD(type_of)
+TOK_KEYWORD(conforms_to)
+TOK_KEYWORD(__functions_in_module)
+TOK_KEYWORD(__get_current_function_name)
+TOK_KEYWORD(__struct_field_ref)
+TOK_KEYWORD(__is_run_in_comptime_interpreter)
+TOK_KEYWORD(__match) // Experimental match statement (pattern matching).
+
+#ifndef MODULAR_PRODUCTION
+TOK_KEYWORD(__mojo_crash) // Crashes the compiler. Not shipped to users.
+#endif // MODULAR_PRODUCTION
+
+#undef TOK_MARKER
+#undef TOK_IDENTIFIER
+#undef TOK_LITERAL
+#undef TOK_PUNCTUATION
+#undef TOK_KEYWORD
+#undef TOK_SOFT_KEYWORD

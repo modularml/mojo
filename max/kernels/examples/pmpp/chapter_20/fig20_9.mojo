@@ -13,17 +13,17 @@
 
 from std.math import exp, sqrt
 from std.random import rand
-from std.collections import InlineArray
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim, barrier
-from std.gpu.memory import AddressSpace
-from std.gpu.host import DeviceContext
-from std.memory import stack_allocation
-from std.gpu.primitives.warp import (
+from std.collections import Array
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
+from max.gpu.primitives.warp import (
     shuffle_idx,
     lane_group_max,
     lane_group_sum,
 )
-from std.gpu.primitives.id import (
+from max.gpu.primitives.id import (
     lane_id,
     warp_id,
 )
@@ -46,38 +46,40 @@ comptime d_size = D_MODEL // WARP_SIZE  # 4
 
 
 def flashattention_forward_kernel(
-    Q: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    K: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    V: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    N: Int,
+    Q: UnsafePointer[Float32, MutAnyOrigin],
+    K: UnsafePointer[Float32, MutAnyOrigin],
+    V: UnsafePointer[Float32, MutAnyOrigin],
+    N_dev: Int32,
     scaling: Float32,
-    out_D: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    out_O: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    out_D: UnsafePointer[Float32, MutAnyOrigin],
+    out_O: UnsafePointer[Float32, MutAnyOrigin],
 ):
+    # Int is not device-passable; widen the fixed-width arg.
+    var N = Int(N_dev)
     var T_r = N // B_r
     var T_c = N // B_c
 
-    var KT_j = stack_allocation[
+    var KT_j = unsafe_stack_allocation[
         B_c * D_MODEL,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
-    var S_i = stack_allocation[
+    var S_i = unsafe_stack_allocation[
         B_r * B_c,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
-    var V_j = stack_allocation[
+    var V_j = unsafe_stack_allocation[
         B_c * D_MODEL,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
 
     # Per-thread register storage (like CUDA)
-    var O_i = InlineArray[Float32, B_r_warp * d_size](fill=0.0)  # 2 * 4 = 8
-    var D_i = InlineArray[Float32, B_r_warp](fill=0.0)  # 2
-    var m_i = InlineArray[Float32, B_r_warp](fill=0.0)  # 2
-    var Q_i = InlineArray[Float32, B_r_warp * d_size](
+    var O_i = Array[Float32, B_r_warp * d_size](fill=0.0)  # 2 * 4 = 8
+    var D_i = Array[Float32, B_r_warp](fill=0.0)  # 2
+    var m_i = Array[Float32, B_r_warp](fill=0.0)  # 2
+    var Q_i = Array[Float32, B_r_warp * d_size](
         fill=0.0
     )  # 2 * 4 = 8 (Q in registers!)
 
@@ -225,10 +227,10 @@ def flashattention_forward_kernel(
 
 
 def cpu_attention(
-    h_Q: UnsafePointer[Float32, MutAnyOrigin],
-    h_K: UnsafePointer[Float32, MutAnyOrigin],
-    h_V: UnsafePointer[Float32, MutAnyOrigin],
-    h_O: UnsafePointer[Float32, MutAnyOrigin],
+    h_Q: UnsafePointer[mut=False, Float32, _],
+    h_K: UnsafePointer[mut=False, Float32, _],
+    h_V: UnsafePointer[mut=False, Float32, _],
+    h_O: UnsafePointer[mut=True, Float32, _],
     N: Int,
     D: Int,
 ):
@@ -293,11 +295,11 @@ def main() raises:
         h_K[k] -= 0.5
         h_V[k] -= 0.5
 
-    var d_Q = device.enqueue_create_buffer[DType.float32](size_mat)
-    var d_K = device.enqueue_create_buffer[DType.float32](size_mat)
-    var d_V = device.enqueue_create_buffer[DType.float32](size_mat)
-    var d_O = device.enqueue_create_buffer[DType.float32](size_mat)
-    var d_D_out = device.enqueue_create_buffer[DType.float32](N)
+    var d_Q = device.enqueue_create_buffer[.float32](size_mat)
+    var d_K = device.enqueue_create_buffer[.float32](size_mat)
+    var d_V = device.enqueue_create_buffer[.float32](size_mat)
+    var d_O = device.enqueue_create_buffer[.float32](size_mat)
+    var d_D_out = device.enqueue_create_buffer[.float32](N)
 
     device.enqueue_copy(d_Q, h_Q)
     device.enqueue_copy(d_K, h_K)
@@ -312,7 +314,7 @@ def main() raises:
         d_Q,
         d_K,
         d_V,
-        N,
+        Int32(N),
         scaling,
         d_D_out,
         d_O,

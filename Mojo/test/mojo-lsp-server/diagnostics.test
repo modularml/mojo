@@ -1,0 +1,36 @@
+// RUN: mojo-lsp-server -mojo-test < %s | FileCheck -strict-whitespace %s
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":123,"rootPath":"mojo","capabilities":{},"trace":"off"}}
+// -----
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{
+  "uri":"test:///foo.mojo",
+  "languageId":"mojo",
+  "version":1,
+  "text":"def foo() -> Int:\n  var _i = 10"
+}}}
+// CHECK: "method": "textDocument/publishDiagnostics",
+// CHECK-NEXT: "params": {
+// CHECK-NEXT:     "diagnostics": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "category": "Parse Error",
+// CHECK-NEXT:         "message": "return expected at end of function with results",
+// CHECK-NEXT:         "range": {
+// CHECK-NEXT:           "end": {
+// CHECK-NEXT:             "character": 7,
+// CHECK-NEXT:             "line": 0
+// CHECK-NEXT:           },
+// CHECK-NEXT:           "start": {
+// CHECK-NEXT:             "character": 4,
+// CHECK-NEXT:             "line": 0
+// CHECK-NEXT:           }
+// CHECK-NEXT:         },
+// CHECK-NEXT:         "severity": 1,
+// CHECK-NEXT:         "source": "mojo"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
+// CHECK-NEXT:     "uri": "test:///foo.mojo",
+// CHECK-NEXT:     "version": 1
+// CHECK-NEXT:   }
+// -----
+{"jsonrpc":"2.0","id":3,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

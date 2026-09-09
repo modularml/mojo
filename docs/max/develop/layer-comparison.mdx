@@ -1,0 +1,329 @@
+---
+title: Layer comparison
+description: Localize the first layer where a MAX model diverges from its PyTorch
+  reference by comparing intermediate tensor outputs.
+---
+
+When a MAX model runs but fails validation, compare its intermediate tensor
+outputs against a trusted reference implementation (typically the Transformers
+implementation on PyTorch).
+
+This guide shows you how to debug validation failures by localizing the first
+point where your MAX model diverges from the reference model. You'll learn how
+to:
+
+1. Run the MAX model and the reference model with the same input.
+2. Capture tensor outputs for intermediate layers.
+3. Compare pairs of tensors in execution order.
+4. Find the first layer whose output differs beyond your expected tolerance.
+5. Narrow down the underlying implementation issue.
+
+You can also use the
+[`debug-model`](/develop/model-bringup-skills/#debug-output-divergences)
+skill to automate this process. In addition to layer comparison, the skill
+inspects the serving loop, which this page doesn't cover.
+
+:::tip
+
+This page includes generic code snippets you can adapt for your MAX model and
+reference model. For a fully runnable example, see the
+[script](https://github.com/modular/modular/tree/main/docs/code/develop/layer-comparison)
+we used to generate the output in this page.
+
+:::
+
+:::note
+
+If you plan to
+[contribute your model to MAX](https://github.com/modular/modular/blob/main/max/docs/contributing-models.md),
+use the in-repo
+[accuracy debugging](http://github.com/modular/modular/blob/main/max/docs/accuracy-debugging.md)
+tools to achieve the outcomes described in this page.
+
+:::
+
+## Requirements
+
+Before you begin the debugging process, make sure you have:
+
+- A MAX model implementation that runs.
+- A trusted PyTorch reference model.
+- A small prompt or test input that reproduces the validation failure.
+- Familiarity with the MAX
+  [`Graph`](/api/python/generated/max.graph.Graph/) and
+  [`Module`](/api/python/generated/max.nn.Module/) APIs.
+
+During debugging, ensure the MAX model and the reference model receive the same
+token IDs, position information, attention mask, and sequence length. If the
+inputs differ, tensors can diverge for reasons unrelated to the model
+implementation. Also, if your model doesn't load or compile, resolve those
+issues before you use layer comparison to debug. Learn more in the
+[Model debugging overview](/develop/debugging/).
+
+## Capture MAX layer outputs
+
+To compare the intermediate tensors of your MAX model and reference model, you
+need to run both models and save the tensors they produce. Start by saving
+tensors from a MAX model run, which takes two steps:
+
+1. Add print operations to the model with the
+   [`PrintHook`](/api/python/generated/max.nn.hooks.PrintHook/) class.
+   `PrintHook` adds a
+   [`print()`](/api/python/graph.ops/#max.graph.ops.print) operation to
+   every model layer, so you don't have to add it manually. Instantiate
+   `PrintHook` before you construct the graph so the print ops become part of
+   the graph.
+2. Capture the printed tensors by configuring the debug options on an
+   [`InferenceSession`](/api/python/generated/max.engine.InferenceSession/)
+   to export them to `.max` files.
+
+The following example demonstrates how to save printed tensors from a MAX model
+run:
+
+```python title="layer-comparison.py"
+from max.engine import InferenceSession, PrintStyle
+from max.graph import Graph
+from max.nn.hooks import PrintHook
+
+# Instantiate your model and load its weights.
+model = myModule(...)
+model.load_state_dict(state_dict)
+
+# Instantiate the hook and name the layers before you construct the graph.
+hook = PrintHook()
+hook.name_layers(model)
+
+# Construct the graph.
+graph = Graph(
+    "my_model",
+    forward=model,
+    input_types=[...],
+)
+
+# Configure an InferenceSession to export printed tensors.
+session = InferenceSession()
+session.set_debug_print_options(
+    style=PrintStyle.BINARY_MAX_CHECKPOINT,
+    output_directory="max_tensors",
+)
+
+# Compile the model, bind its weights, then run it on your input.
+compiled = session.compile(graph)
+runnable_model = session.init(compiled, weights_registry=model.state_dict())
+runnable_model.execute(input_ids)
+```
+
+:::note
+
+To capture tensor outputs from *inside* a layer, add `print()` calls manually in
+the corresponding MAX module's `__call__()` method rather than use the
+`PrintHook`.
+
+:::
+
+This script prints a line for each tensor to confirm that MAX exported the
+tensor:
+
+```output
+Writing debug binary tensor 1x4x8xf32 of 128 bytes to 'max_tensors/model.embed_tokens-output.max'
+Writing debug binary tensor 1x4x8xf32 of 128 bytes to 'max_tensors/model.layers.layers.0-output.max'
+...
+Printed 14 tensors for step 0.
+```
+
+## Capture PyTorch layer outputs
+
+Next, export the intermediate tensors from a run of your reference model. The
+comparison script in the next section matches tensors by name, so save every
+reference layer's output under its matching MAX export name. The following
+example does this for a PyTorch model:
+
+1. Defines a map of MAX export names to PyTorch submodule paths.
+2. Creates a forward hook that saves each PyTorch layer's output tensor under
+   its MAX export name.
+3. Runs the PyTorch model and writes all captured tensors to a single
+   `reference_tensors.pt` file.
+
+```python title="layer-comparison.py"
+import torch
+
+reference_tensors = {}
+
+layer_map = {
+    # Keys are MAX export names and values are PyTorch submodule paths.
+    "model.embed_tokens-output": "model.embed_tokens",
+    "model.layers.layers.0-output": "model.layers.0",
+    "model.layers.layers.1-output": "model.layers.1",
+    "model.norm-output": "model.norm",
+}
+
+def make_hook(name):
+    def hook(_module, _inputs, output):
+        if isinstance(output, tuple):
+            output = output[0]
+        if isinstance(output, torch.Tensor):
+            reference_tensors[name] = output.detach().cpu()
+    return hook
+
+handles = []
+try:
+    for max_name, torch_name in layer_map.items():
+        module = reference_model.get_submodule(torch_name)
+        handles.append(module.register_forward_hook(make_hook(max_name)))
+
+    with torch.no_grad():
+        reference_model(input_ids=input_ids)
+
+    torch.save(reference_tensors, "reference_tensors.pt")
+finally:
+    for handle in handles:
+        handle.remove()
+```
+
+## Find the divergent layer
+
+After you capture both sets of tensors, compare them layer by layer. The
+following example loads each exported MAX tensor with
+[`load_max_buffer()`](/api/python/generated/max.driver.load_max_buffer/),
+pairs it with the PyTorch tensor of the same name, and reports three comparison
+metrics per layer:
+
+- **Cosine similarity**: how closely the two tensors point in the same
+  direction, independent of magnitude. A value near 1.0 means the outputs agree.
+- **Maximum absolute difference**: the largest element-wise gap in raw units.
+- **Maximum relative difference**: the largest element-wise gap scaled by the
+  reference magnitude.
+
+```python title="layer-comparison.py"
+from dataclasses import dataclass
+from pathlib import Path
+
+import torch
+from max.driver import load_max_buffer
+
+MAX_TENSOR_DIR = Path("max_tensors")
+REFERENCE_TENSORS = "reference_tensors.pt"
+EPS = 1e-10  # Guards the relative-difference denominator against divide-by-zero
+
+@dataclass
+class LayerComparison:
+    name: str
+    cosine_similarity: float
+    max_abs_diff: float
+    max_rel_diff: float
+
+# Cast to float32 so small differences aren't obscured by rounding
+def load_max_tensor(name: str) -> torch.Tensor:
+    buffer = load_max_buffer(MAX_TENSOR_DIR / f"{name}.max")
+    return torch.from_dlpack(buffer).cpu().to(torch.float32)
+
+def compare_layer(name: str, reference: torch.Tensor) -> LayerComparison:
+    reference = reference.cpu().to(torch.float32)
+    max_tensor = load_max_tensor(name)
+
+    if max_tensor.shape != reference.shape:
+        if max_tensor.numel() != reference.numel():
+            raise ValueError(
+                f"{name}: shape mismatch, MAX={tuple(max_tensor.shape)}, "
+                f"reference={tuple(reference.shape)}"
+            )
+        max_tensor = max_tensor.reshape(reference.shape)
+
+    abs_diff = (max_tensor - reference).abs()
+    rel_diff = abs_diff / reference.abs().clamp_min(EPS)
+
+    cosine_similarity = torch.nn.functional.cosine_similarity(
+        max_tensor.flatten(),
+        reference.flatten(),
+        dim=0,
+    ).item()
+
+    return LayerComparison(
+        name=name,
+        cosine_similarity=cosine_similarity,
+        max_abs_diff=abs_diff.max().item(),
+        max_rel_diff=rel_diff.max().item(),
+    )
+
+def print_report(results: list[LayerComparison]) -> None:
+    header = f"{'layer':<32}{'cosine':>12}{'max_abs':>14}{'max_rel':>14}"
+    print(header)
+    print("-" * len(header))
+    for result in results:
+        print(
+            f"{result.name:<32}{result.cosine_similarity:>12.6f}"
+            f"{result.max_abs_diff:>14.3e}{result.max_rel_diff:>14.3e}"
+        )
+
+# Load the reference tensors.
+reference_tensors = torch.load(REFERENCE_TENSORS, weights_only=True)
+
+# Calculate and print the results.
+results = [
+    compare_layer(name, tensor)
+    for name, tensor in reference_tensors.items()
+]
+print_report(results)
+```
+
+The script prints one row per layer in execution order. When the two
+implementations agree, every row shows a cosine similarity of `1.0` and
+near-zero differences. When a layer diverges, that layer and the layers after it
+show the error.
+
+In the following example report, layer 1 and the final normalization diverge.
+You can see this because the maximum relative difference jumps from about
+`1.6e-07` to `0.97`:
+
+```output
+layer                                 cosine       max_abs       max_rel
+------------------------------------------------------------------------
+model.embed_tokens-output           1.000000     0.000e+00     0.000e+00
+model.layers.layers.0-output        1.000000     2.384e-07     1.584e-07
+model.layers.layers.1-output        0.999432     1.929e-01     9.652e-01
+model.norm-output                   0.998458     1.465e-01     8.371e-01
+```
+
+In the
+[model](https://github.com/modular/modular/tree/main/docs/code/develop/layer-comparison)
+used to produce this example output, the layers diverge because the model uses a
+different activation function than the reference at that layer. In the next
+section, learn more about using the layer to identify the root cause of the
+divergence.
+
+## Identify the root cause
+
+Use the layer or operation where divergence first appears to guide your
+investigation. The following table lists likely causes to check based on where
+the divergence happens.
+
+| If divergence first appears at... | Inspect...                                                                                                                                                               |
+|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Token embedding                   | Tokenizer output, `input_ids`, vocabulary mapping, and embedding weights.                                                                                                |
+| Attention projection              | The `q_proj`, `k_proj`, `v_proj`, and `o_proj` modules and the corresponding MAX attention layer. Check weight layout, transpose rules, head reshaping, and GQA mapping. |
+| RoPE                              | The MAX RoPE implementation and the reference model's RoPE code. Check RoPE base, scaling config, `position_ids`, and dimension interleaving.                            |
+| Attention softmax                 | Attention masks, attention scale, KV cache contents, and the tensors passed into the attention score and softmax computation.                                            |
+| MLP projection                    | Gate, up, and down projection weights, plus the activation function each implementation uses.                                                                            |
+| Normalization                     | RMSNorm or LayerNorm configuration, including epsilon, weight shape, and accumulation dtype.                                                                             |
+
+After you identify the root cause and fix the issue, rerun the layer comparison
+to confirm the model layer outputs no longer diverge.
+
+## Remove print operations
+
+Print operations in a graph can prevent compiler optimization, so remove the
+hook with `hook.remove()` when you finish debugging. If you added individual
+`print()` ops inside your modules, remove those as well. To learn more about the
+graph compiler, see the [Graph overview](/develop/graph/).
+
+## Next steps
+
+Once you've localized the divergent layer and corrected your model:
+
+- [Repeat logit comparison](/develop/logit-comparison/) to validate that
+  your model produces the expected logits.
+- Automate layer comparison with the
+  [`debug-model`](https://github.com/modular/skills/blob/main/debug-model/SKILL.md)
+  skill.
+- [Run benchmarks](/serve/benchmark/) to measure model performance with
+  `max benchmark`.

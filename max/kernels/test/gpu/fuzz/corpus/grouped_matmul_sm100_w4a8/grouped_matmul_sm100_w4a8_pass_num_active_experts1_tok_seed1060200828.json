@@ -1,0 +1,11 @@
+{
+  "target": "grouped_matmul_sm100_w4a8",
+  "spec": {
+    "num_active_experts": 1,
+    "tok_seed": 1060200828
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "",
+  "findings": []
+}

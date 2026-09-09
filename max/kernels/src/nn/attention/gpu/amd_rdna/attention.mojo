@@ -23,8 +23,8 @@ from std.math import ceildiv, recip
 from std.math.uutils import umod, ufloordiv
 from std.math.constants import log2e
 from std.algorithm.functional import unswitch
-from std.gpu import block_idx, lane_id, thread_idx
-from std.memory import stack_allocation
+from max.gpu import block_idx, lane_id, thread_idx
+from std.memory import unsafe_stack_allocation
 from std.sys import align_of, simd_width_of
 from std.utils import IndexList
 from std.utils.numerics import get_accum_type, min_or_neg_inf
@@ -87,12 +87,7 @@ def _mask_apply_rdna[
     scale: Float32,
     mask: mask_t,
     p_reg_tile: TileTensor[
-        mut=True,
-        accum_type,
-        _,
-        _,
-        address_space=AddressSpace.LOCAL,
-        linear_idx_type=_,
+        mut=True, accum_type, _, _, address_space=.LOCAL, linear_idx_type=_
     ],
     not_last_iter: Bool,
     cache_start_pos: UInt32 = 0,
@@ -148,7 +143,7 @@ def _mask_apply_rdna[
                         + group_idx if token_gen else block_idx.x
                     )
                     p_reg_vectorized[mma_id, 0][j] = mask.mask(
-                        IndexList[4, element_type=DType.uint32](
+                        IndexList[4, element_type=.uint32](
                             block_idx.z,
                             q_head_idx,
                             Int(score_seq_with_start_pos),
@@ -203,6 +198,31 @@ struct AttentionRDNA[
     cache_depth: Int = config.depth,
     output_depth: Int = config.depth,
 ]:
+    """RDNA Wave32 multi-head attention tile driver for prefill and decode.
+
+    Holds the Q/K/V register and shared-memory buffers, online-softmax state,
+    and output accumulator, and exposes the per-iteration mask, softmax, and
+    store hooks that the prefill and decode kernels in `mha.mojo` invoke.
+
+    Parameters:
+        output_type: The `DType` of the output tensor (inferred).
+        q_type: The `DType` of the query tensor (inferred).
+        k_t: The `MHAOperand` type of the key operand (inferred).
+        v_t: The `MHAOperand` type of the value operand (inferred).
+        mask_t: The `MHAMask` type applied to attention scores (inferred).
+        config: The MHA configuration holding tile, warp, and head counts.
+        group: Number of query heads sharing each KV head in GQA.
+        sink: Whether to initialize the softmax with attention sink
+            weights.
+        token_gen: Whether the kernel runs in decode (token generation)
+            mode rather than prefill (defaults to `False`).
+        q_depth: Head dimension of the query (defaults to `config.depth`).
+        cache_depth: Head dimension of each KV cache entry (defaults to
+            `config.depth`).
+        output_depth: Head dimension of the output projection (defaults
+            to `config.depth`).
+    """
+
     comptime attention_config = MHAAttentionConfigRDNA[
         Self.token_gen, Self.config, Self.group
     ]
@@ -331,17 +351,15 @@ struct AttentionRDNA[
     var softmax: Self.SoftmaxType
 
     var k_smem_ptr: UnsafePointer[
-        Scalar[Self.k_t.dtype],
-        MutExternalOrigin,
-        address_space=AddressSpace.SHARED,
+        Scalar[Self.k_t.dtype], MutUntrackedOrigin, address_space=.SHARED
     ]
     var v_smem_ptr: UnsafePointer[
-        Scalar[Self.v_t.dtype],
-        MutExternalOrigin,
-        address_space=AddressSpace.SHARED,
+        Scalar[Self.v_t.dtype], MutUntrackedOrigin, address_space=.SHARED
     ]
 
     var q_buffer: Self.QRegisterBufferType
+
+    @__allow_legacy_any_origin_fields
     var output_tile: TileTensor[
         Self.output_type, Self.OutputTileLayout, MutAnyOrigin
     ]
@@ -452,19 +470,21 @@ struct AttentionRDNA[
     ) -> TileMaskStatus:
         comptime if Self.token_gen:
             return self.mask.status(
-                IndexList[2, element_type=DType.uint32](
+                UInt32(self.batch_idx),
+                IndexList[2, element_type=.uint32](
                     Int(self.num_keys - 1),
                     Int(kv_tile_start_row),
                 ),
-                IndexList[2, element_type=DType.uint32](1, Self.BN),
+                IndexList[2, element_type=.uint32](1, Self.BN),
             )
         else:
             return self.mask.status(
-                IndexList[2, element_type=DType.uint32](
+                UInt32(self.batch_idx),
+                IndexList[2, element_type=.uint32](
                     Int(self.mask_block_row + UInt32(self.start_pos)),
                     Int(kv_tile_start_row + UInt32(self.cache_start_pos)),
                 ),
-                IndexList[2, element_type=DType.uint32](Self.BM, Self.BN),
+                IndexList[2, element_type=.uint32](Self.BM, Self.BN),
             )
 
     @always_inline
@@ -496,8 +516,7 @@ struct AttentionRDNA[
         not_last_iter: Bool,
     ):
         @always_inline
-        @parameter
-        def _mask_apply_impl[masked: Bool]():
+        def _mask_apply_impl[masked: Bool]() {imm}:
             _mask_apply_rdna[
                 masked=masked,
                 accum_type=Self.accum_type,
@@ -527,8 +546,8 @@ struct AttentionRDNA[
 
         comptime if not Self.token_gen or Self.mask_t.check_mask_during_decoding:
             var mask_status = self.mask_status(kv_tile_start_row)
-            unswitch[_mask_apply_impl](
-                mask_status == TileMaskStatus.PARTIAL_MASK
+            unswitch(
+                mask_status == TileMaskStatus.PARTIAL_MASK, _mask_apply_impl
             )
         else:
             _mask_apply_impl[masked=True]()
@@ -558,35 +577,39 @@ struct AttentionRDNA[
         self.out_reg_buffer.zero()
 
         # SMEM allocations.
-        self.k_smem_ptr = stack_allocation[
+        self.k_smem_ptr = unsafe_stack_allocation[
             Self._k_smem_size,
             Self.k_t.dtype,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
             alignment=Self._smem_alignment,
         ]()
-        self.v_smem_ptr = stack_allocation[
+        self.v_smem_ptr = unsafe_stack_allocation[
             Self._v_smem_size,
             Self.v_t.dtype,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
             alignment=Self._smem_alignment,
         ]()
 
         # P buffer: dedicated SMEM for prefill (BM*BK), borrows decode-mode
         # P SMEM region (BM*BN) otherwise.
         comptime if not Self.token_gen:
-            var p_ptr = stack_allocation[
+            var p_ptr = unsafe_stack_allocation[
                 Self.BM * Self.BK,
                 Self.q_type,
-                address_space=AddressSpace.SHARED,
+                address_space=.SHARED,
             ]()
-            self.p_reg_buffer = Self.PRegisterBufferType(p_ptr)
+            self.p_reg_buffer = Self.PRegisterBufferType(
+                p_ptr.as_unsafe_any_origin()
+            )
         else:
-            var p_ptr = stack_allocation[
+            var p_ptr = unsafe_stack_allocation[
                 Self._p_smem_size,
                 Self.q_type,
-                address_space=AddressSpace.SHARED,
+                address_space=.SHARED,
             ]()
-            self.p_reg_buffer = Self.PRegisterBufferType(p_ptr)
+            self.p_reg_buffer = Self.PRegisterBufferType(
+                p_ptr.as_unsafe_any_origin()
+            )
 
         # Q tile: pre-offset and wrapped as TileTensor with Scalar rows.
         var valid_rows: UInt32 = UInt32(Self.group) if Self.token_gen else min(
@@ -670,8 +693,7 @@ struct AttentionRDNA[
         var warp_scratch = TileTensor[
             Self.accum_type,
             type_of(Self._warp_scratch_layout),
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
         ](
             self.k_smem_ptr.bitcast[Scalar[Self.accum_type]](),
             Self._warp_scratch_layout,
@@ -747,7 +769,12 @@ struct AttentionRDNA[
 
     @always_inline
     def copy_fragment_to_smem[chunk_idx: Int](self):
-        """Copy one chunk of P to shared memory."""
+        """Copy one chunk of P to shared memory.
+
+        Parameters:
+            chunk_idx: The compile-time index of the P fragment chunk to
+                copy.
+        """
         self.p_reg_buffer.copy_to_shared[chunk_idx]()
 
     @always_inline

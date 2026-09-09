@@ -1,0 +1,304 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_library(
+    name = "eval_common",
+    testonly = True,
+    srcs = ["eval_common.py"],
+    imports = ["."],
+    deps = [
+        requirement("openai"),
+        requirement("tqdm"),
+    ],
+)
+
+modular_py_binary(
+    name = "aime_eval",
+    testonly = True,
+    srcs = ["aime_eval.py"],
+    imports = ["."],
+    main = "aime_eval.py",
+    deps = [
+        ":eval_common",
+        requirement("click"),
+        requirement("datasets"),
+    ],
+)
+
+modular_py_binary(
+    name = "gpqa_eval",
+    testonly = True,
+    srcs = ["gpqa_eval.py"],
+    imports = ["."],
+    main = "gpqa_eval.py",
+    deps = [
+        ":eval_common",
+        requirement("click"),
+        requirement("datasets"),
+    ],
+)
+
+modular_py_binary(
+    name = "hle_eval",
+    testonly = True,
+    srcs = ["hle_eval.py"],
+    # cais/hle carries an image column; loading it decodes via Pillow at
+    # runtime even though nothing here imports it statically.
+    ignore_extra_deps = [
+        requirement("pillow"),
+    ],
+    imports = ["."],
+    main = "hle_eval.py",
+    deps = [
+        ":eval_common",
+        requirement("click"),
+        requirement("datasets"),
+        requirement("pillow"),
+    ],
+)
+
+modular_py_binary(
+    name = "aa_lcr_eval",
+    testonly = True,
+    srcs = ["aa_lcr_eval.py"],
+    imports = ["."],
+    main = "aa_lcr_eval.py",
+    deps = [
+        ":eval_common",
+        requirement("click"),
+        requirement("datasets"),
+        # The long-context documents are downloaded as a separate zip file.
+        requirement("huggingface-hub"),
+    ],
+)
+
+modular_py_binary(
+    name = "aa_omniscience_eval",
+    testonly = True,
+    srcs = ["aa_omniscience_eval.py"],
+    imports = ["."],
+    main = "aa_omniscience_eval.py",
+    deps = [
+        ":eval_common",
+        requirement("click"),
+        requirement("datasets"),
+    ],
+)
+
+modular_py_binary(
+    name = "scicode_eval",
+    testonly = True,
+    srcs = ["scicode_eval.py"],
+    imports = ["."],
+    main = "scicode_eval.py",
+    # scicode + h5py are NOT deps here: the generated code's tests run in a
+    # separate interpreter (--test-python) that has them installed.
+    deps = [
+        ":eval_common",
+        requirement("click"),
+        requirement("datasets"),
+    ],
+)
+
+# One-command local runner: provisions the scicode/h5py harness venv +
+# test_data.h5, then runs scicode_eval with --test-python/--test-data injected.
+#   ./bazelw run //max/tests/integration/accuracy/model_evals:scicode_eval_local -- \
+#     --base-url http://localhost:8000 --model MiniMaxAI/MiniMax-M3-MXFP8 --sample-size 2
+sh_binary(
+    name = "scicode_eval_local",
+    testonly = True,
+    srcs = ["run_scicode_local.sh"],
+    data = [":scicode_eval"],
+    tags = ["manual"],
+)
+
+# One command to run all five non-agentic text evals in sequence against a
+# running server (each writes its own default out-dir).
+sh_binary(
+    name = "text_evals_local",
+    testonly = True,
+    srcs = ["run_text_evals.sh"],
+    data = [
+        ":aa_lcr_eval",
+        ":aa_omniscience_eval",
+        ":aime_eval",
+        ":gpqa_eval",
+        ":hle_eval",
+    ],
+    tags = ["manual"],
+)
+
+modular_py_library(
+    name = "omnidocbench_prep",
+    testonly = True,
+    srcs = ["omnidocbench_prep.py"],
+    imports = ["."],
+    deps = [
+        requirement("huggingface-hub"),
+    ],
+)
+
+# One-command local runner: provisions the pinned third-party OmniDocBench
+# harness (checkout + Python 3.11 venv + dataset + LaTeX deps), points it at an
+# endpoint, runs inference and scores. Unlike the other evals this is a shell
+# runner because the scorer is a third-party subprocess with its own interpreter.
+#   ./bazelw run //max/tests/integration/accuracy/model_evals:omnidocbench_eval_local -- \
+#     --limit 4 --workers 4
+sh_binary(
+    name = "omnidocbench_eval_local",
+    testonly = True,
+    srcs = ["run_omnidocbench_local.sh"],
+    # The library target, not the raw source: a file may belong to only one
+    # rule, and omnidocbench_prep.py is already this package's py_library.
+    data = [":omnidocbench_prep"],
+    tags = ["manual"],
+)
+
+modular_py_binary(
+    name = "mmmu_pro_eval",
+    testonly = True,
+    srcs = ["mmmu_pro_eval.py"],
+    imports = ["."],
+    main = "mmmu_pro_eval.py",
+    deps = [
+        ":eval_common",
+        requirement("click"),
+        requirement("datasets"),
+        # Images are base64-encoded via Pillow (imported directly).
+        requirement("pillow"),
+    ],
+)
+
+# Suite-level score consolidation for the full-accuracy-eval orchestrator.
+# Stdlib-only: the CI collector job runs it with a bare python3, no bazel.
+modular_py_binary(
+    name = "collect_scores",
+    testonly = True,
+    srcs = ["collect_scores.py"],
+    imports = ["."],
+    main = "collect_scores.py",
+)
+
+# Normalization for the OpenRouter AutoExacto harnesses. A library, not a
+# binary: the shell runners execute it with the third-party harness venv's
+# interpreter (see the stdlib-only note in the module), and a file may belong to
+# only one rule.
+modular_py_library(
+    name = "exacto_report",
+    testonly = True,
+    srcs = ["exacto_report.py"],
+    imports = ["."],
+)
+
+# One-command GPQA-Diamond run at OpenRouter AutoExacto parity. A shell runner
+# because openbench is a third-party harness with its own pinned dependency
+# tree, the same reason omnidocbench_eval_local is one.
+#   ./bazelw run //max/tests/integration/accuracy/model_evals:exacto_gpqa_local -- \
+#     --url http://localhost:8000 --limit 4 --epochs 1
+sh_binary(
+    name = "exacto_gpqa_local",
+    testonly = True,
+    srcs = ["run_exacto_gpqa_local.sh"],
+    data = [":exacto_report"],
+    tags = ["manual"],
+)
+
+# One-command tau2-bench airline run, the agentic half of the AutoExacto gate.
+#   ./bazelw run //max/tests/integration/accuracy/model_evals:exacto_taubench_local -- \
+#     --num-tasks 2 --max-concurrency 2
+sh_binary(
+    name = "exacto_taubench_local",
+    testonly = True,
+    srcs = ["run_exacto_taubench_local.sh"],
+    data = [":exacto_report"],
+    tags = ["manual"],
+)
+
+# Job-summary renderer for the AutoExacto gate. Stdlib-only: the CI summary
+# step runs it with a bare python3, no bazel.
+modular_py_binary(
+    name = "exacto_summary",
+    testonly = True,
+    srcs = ["exacto_summary.py"],
+    imports = ["."],
+    main = "exacto_summary.py",
+)
+
+modular_py_test(
+    name = "test_exacto_summary",
+    size = "small",
+    srcs = ["test_exacto_summary.py"],
+    deps = [
+        ":exacto_summary",
+    ],
+)
+
+modular_py_test(
+    name = "test_exacto_report",
+    size = "small",
+    srcs = ["test_exacto_report.py"],
+    deps = [
+        ":exacto_report",
+    ],
+)
+
+modular_py_test(
+    name = "test_collect_scores",
+    size = "small",
+    srcs = ["test_collect_scores.py"],
+    deps = [
+        ":collect_scores",
+    ],
+)
+
+modular_py_test(
+    name = "test_eval_common",
+    size = "small",
+    srcs = ["test_eval_common.py"],
+    deps = [
+        ":eval_common",
+    ],
+)
+
+# Logit-shift GPQA stop/accuracy gate. Stdlib + click only.
+# gpqa_logit_gate.py lives only on the binary so find_duplicate_srcs
+# does not flag it against the library.
+modular_py_library(
+    name = "gpqa_logit_gate_lib",
+    testonly = True,
+    srcs = [
+        "calibration/__init__.py",
+        "calibration/gpqa_gate.py",
+    ],
+    data = ["calibration/data/gpqa_gate_hist.json"],
+    imports = ["."],
+)
+
+modular_py_binary(
+    name = "gpqa_logit_gate",
+    testonly = True,
+    srcs = ["calibration/gpqa_logit_gate.py"],
+    imports = ["."],
+    main = "calibration/gpqa_logit_gate.py",
+    tags = ["manual"],
+    deps = [
+        ":gpqa_logit_gate_lib",
+        requirement("click"),
+    ],
+)
+
+modular_py_test(
+    name = "test_gpqa_logit_gate",
+    size = "medium",
+    srcs = ["calibration/test_gpqa_logit_gate.py"],
+    deps = [
+        ":gpqa_logit_gate",
+        ":gpqa_logit_gate_lib",
+    ],
+)

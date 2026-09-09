@@ -33,6 +33,13 @@ from max.nn.kernels import (
     store_k_scale_cache_ragged,
 )
 from max.nn.kv_cache import PagedCacheValues
+from max.nn.quant_config import (
+    InputScaleSpec,
+    QuantFormat,
+    ScaleGranularity,
+    ScaleOrigin,
+    WeightScaleSpec,
+)
 
 from .transforms import HadamardTransform
 
@@ -68,6 +75,33 @@ def act_quant(
     return x, x_scales
 
 
+def _indexer_act_quant_config(quant_config: QuantConfig) -> QuantConfig:
+    """Return the quant config used for dynamic FP8 activation quant in the indexer.
+
+    Full FP8 checkpoints reuse the model quant config. Mixed-precision paths
+    (for example NVFP4 MoE with bf16 MLA) still dynamic-quantize indexer
+    activations with block size 128.
+    """
+    if quant_config.format == QuantFormat.BLOCKSCALED_FP8:
+        return quant_config
+    return QuantConfig(
+        input_scale=InputScaleSpec(
+            granularity=ScaleGranularity.BLOCK,
+            origin=ScaleOrigin.DYNAMIC,
+            dtype=DType.float32,
+            block_size=(1, 128),
+        ),
+        weight_scale=WeightScaleSpec(
+            granularity=ScaleGranularity.BLOCK,
+            dtype=DType.float32,
+            block_size=(128, 128),
+        ),
+        mlp_quantized_layers=set(),
+        attn_quantized_layers=set(),
+        format=QuantFormat.BLOCKSCALED_FP8,
+    )
+
+
 class Indexer(Module):
     def __init__(
         self,
@@ -78,8 +112,9 @@ class Indexer(Module):
         index_topk: int,
         q_lora_rank: int,
         devices: Sequence[DeviceRef],
-        activation_quant_config: QuantConfig,
-        weight_quant_config: QuantConfig | None = None,
+        quant_config: QuantConfig,
+        k_norm_dtype: DType = DType.float32,
+        rope_interleaved: bool = False,
     ):
         super().__init__()
         self.dim: int = dim
@@ -87,34 +122,39 @@ class Indexer(Module):
         self.n_local_heads: int = index_n_heads // len(devices)
         self.head_dim: int = index_head_dim
         self.rope_head_dim: int = qk_rope_head_dim
+        self.rope_interleaved: bool = rope_interleaved
+        # The rotation covers the leading half of each head, so a non-zero
+        # rope width must be exactly half of ``index_head_dim``.
+        if qk_rope_head_dim != 0 and qk_rope_head_dim * 2 != index_head_dim:
+            raise ValueError(
+                "indexer rope width must be 0 or half of index_head_dim; got"
+                f" qk_rope_head_dim={qk_rope_head_dim} with"
+                f" index_head_dim={index_head_dim}"
+            )
         self.index_topk: int = index_topk
         self.q_lora_rank: int = q_lora_rank
         self.softmax_scale = self.head_dim**-0.5
-        self.quant_config = activation_quant_config
+        self.quant_config = _indexer_act_quant_config(quant_config)
 
+        indexer_weights_fp8 = quant_config.format == QuantFormat.BLOCKSCALED_FP8
         weight_dtype = (
-            DType.float8_e4m3fn
-            if weight_quant_config is not None
-            else DType.bfloat16
+            DType.float8_e4m3fn if indexer_weights_fp8 else DType.bfloat16
         )
+        linear_quant_config = quant_config if indexer_weights_fp8 else None
 
         self.wq_b = Linear(
             in_dim=self.q_lora_rank,
             out_dim=self.n_heads * self.head_dim,
             dtype=weight_dtype,
             device=devices[0],
-            quant_config=weight_quant_config,
+            quant_config=linear_quant_config,
         )  # lora up projection
         self.wk = Linear(
             in_dim=self.dim,
             out_dim=self.head_dim,
             dtype=weight_dtype,
             device=devices[0],
-            quant_config=weight_quant_config,
-        )
-        # Checkpoint bf16 when indexer weights are not quantized (modelopt ignore).
-        k_norm_dtype = (
-            DType.bfloat16 if weight_quant_config is None else DType.float32
+            quant_config=linear_quant_config,
         )
         self.k_norm = LayerNorm(
             dims=self.head_dim, dtype=k_norm_dtype, devices=devices
@@ -158,37 +198,33 @@ class Indexer(Module):
         # qr comes projected to lora rank and pre-normed; q_lora_rank -> self.n_heads * self.head_dim
         q = self.wq_b(qr)
         q = q.reshape((-1, self.n_heads, self.head_dim))
-        assert self.rope_head_dim == self.head_dim - self.rope_head_dim
-        q_pe, q_nope = ops.chunk(q, chunks=2, axis=-1)
-
-        q_pe = rope_ragged(
-            q_pe,
-            input_row_offsets,
-            indexer_k_collection.cache_lengths,
-            freqs_cis,
-            interleaved=False,
-        )
-        q = ops.concat([q_pe, q_nope], axis=-1)
+        if self.rope_head_dim:
+            q_pe, q_nope = ops.chunk(q, chunks=2, axis=-1)
+            q_pe = rope_ragged(
+                q_pe,
+                input_row_offsets,
+                indexer_k_collection.cache_lengths,
+                freqs_cis,
+                interleaved=self.rope_interleaved,
+            )
+            q = ops.concat([q_pe, q_nope], axis=-1)
 
         k = self.wk(x)  # dim -> head_dim
         k = self.k_norm(k)
 
-        assert self.rope_head_dim == self.head_dim - self.rope_head_dim
-        k_pe, k_nope = ops.chunk(k, chunks=2, axis=-1)
-        k_pe = ops.squeeze(
-            rope_ragged(
-                ops.unsqueeze(k_pe, axis=-2),
-                input_row_offsets,
-                indexer_k_collection.cache_lengths,
-                freqs_cis,
-                interleaved=False,
-            ),
-            axis=-2,
-        )
-        k = ops.concat([k_pe, k_nope], axis=-1)
-
-        q = self.hadamard_transform(q)
-        k = self.hadamard_transform(k)
+        if self.rope_head_dim:
+            k_pe, k_nope = ops.chunk(k, chunks=2, axis=-1)
+            k_pe = ops.squeeze(
+                rope_ragged(
+                    ops.unsqueeze(k_pe, axis=-2),
+                    input_row_offsets,
+                    indexer_k_collection.cache_lengths,
+                    freqs_cis,
+                    interleaved=self.rope_interleaved,
+                ),
+                axis=-2,
+            )
+            k = ops.concat([k_pe, k_nope], axis=-1)
 
         q_fp8, q_scale = act_quant(q, self.quant_config)
         k_fp8, k_scale = act_quant(k, self.quant_config)

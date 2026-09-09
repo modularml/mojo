@@ -1,0 +1,83 @@
+[
+    {
+        "description": "validation of IRIs",
+        "schema": { "format": "iri" },
+        "tests": [
+            {
+                "description": "all string formats ignore integers",
+                "data": 12,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore floats",
+                "data": 13.7,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore objects",
+                "data": {},
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore arrays",
+                "data": [],
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore booleans",
+                "data": false,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore nulls",
+                "data": null,
+                "valid": true
+            },
+            {
+                "description": "a valid IRI with anchor tag",
+                "data": "http://ƒøø.ßår/?∂éœ=πîx#πîüx",
+                "valid": true
+            },
+            {
+                "description": "a valid IRI with anchor tag and parentheses",
+                "data": "http://ƒøø.com/blah_(wîkïpédiå)_blah#ßité-1",
+                "valid": true
+            },
+            {
+                "description": "a valid IRI with URL-encoded stuff",
+                "data": "http://ƒøø.ßår/?q=Test%20URL-encoded%20stuff",
+                "valid": true
+            },
+            {
+                "description": "a valid IRI with many special characters",
+                "data": "http://-.~_!$&'()*+,;=:%40:80%2f::::::@example.com",
+                "valid": true
+            },
+            {
+                "description": "a valid IRI based on IPv6",
+                "data": "http://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]",
+                "valid": true
+            },
+            {
+                "description": "an IPv6 address without enclosing brackets is invalid",
+                "data": "http://2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+                "valid": false
+            },
+            {
+                "description": "an invalid relative IRI Reference",
+                "data": "/abc",
+                "valid": false
+            },
+            {
+                "description": "an invalid IRI",
+                "data": "\\\\WINDOWS\\filëßåré",
+                "valid": false
+            },
+            {
+                "description": "an invalid IRI though valid IRI reference",
+                "data": "âππ",
+                "valid": false
+            }
+        ]
+    }
+]

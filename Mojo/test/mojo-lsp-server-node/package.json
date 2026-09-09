@@ -1,0 +1,15 @@
+{
+  "name": "mojo-lsp-server-tests",
+  "private": true,
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.0.10",
+    "mocha": "^11.7.1",
+    "typescript": "5.8.3",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-protocol": "^3.17.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  }
+}

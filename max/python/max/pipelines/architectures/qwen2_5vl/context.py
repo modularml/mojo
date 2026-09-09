@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from max.pipelines.core.context import TextAndVisionContext
+from max.pipelines.context.context import TextAndVisionContext
 
 
 @dataclass(kw_only=True, slots=True)

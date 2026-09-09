@@ -1,0 +1,119 @@
+//===----------------------------------------------------------------------===//
+// Copyright (c) 2026, Modular Inc. All rights reserved.
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions:
+// https://llvm.org/LICENSE.txt
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//===----------------------------------------------------------------------===//
+
+#ifndef DECLARE_FLOAT
+#error "FloatTypes.def must be used with DECLARE_FLOAT macro"
+#endif // DECLARE_FLOAT
+
+// Format is DECLARE_FLOAT(SHORT_NAME, LONG_NAME, M_TYPE, MLIR_TYPE, CXX_TYPE,
+//                         APFLOAT_SEMANTICS, ...)
+
+// The Float4 types.
+
+DECLARE_FLOAT(f4e2m1fn,                   // SHORT_NAME
+              float4_e2m1fn,              // LONG_NAME
+              M_FLOAT4_E2M1FN,            // M_TYPE
+              mlir::Float4E2M1FNType,     // MLIR_TYPE
+              M::Float4::float4_e2m1fn_t, // CXX_TYPE
+              APFloat::Float4E2M1FN)      // APFLOAT_SEMANTICS
+
+// The Float6 types (OCP MX). Both are finite-only: no inf, no NaN.
+
+DECLARE_FLOAT(f6e2m3fn,                   // SHORT_NAME
+              float6_e2m3fn,              // LONG_NAME
+              M_FLOAT6_E2M3FN,            // M_TYPE
+              mlir::Float6E2M3FNType,     // MLIR_TYPE
+              M::Float6::float6_e2m3fn_t, // CXX_TYPE
+              APFloat::Float6E2M3FN)      // APFLOAT_SEMANTICS
+
+DECLARE_FLOAT(f6e3m2fn,                   // SHORT_NAME
+              float6_e3m2fn,              // LONG_NAME
+              M_FLOAT6_E3M2FN,            // M_TYPE
+              mlir::Float6E3M2FNType,     // MLIR_TYPE
+              M::Float6::float6_e3m2fn_t, // CXX_TYPE
+              APFloat::Float6E3M2FN)      // APFLOAT_SEMANTICS
+
+// The Float8 types.
+
+DECLARE_FLOAT(f8e8m0fnu,                   // SHORT_NAME
+              float8_e8m0fnu,              // LONG_NAME
+              M_FLOAT8_E8M0FNU,            // M_TYPE
+              mlir::Float8E8M0FNUType,     // MLIR_TYPE
+              M::Float8::float8_e8m0fnu_t, // CXX_TYPE
+              APFloat::Float8E8M0FNU)      // APFLOAT_SEMANTICS
+
+DECLARE_FLOAT(f8e3m4,                   // SHORT_NAME
+              float8_e3m4,              // LONG_NAME
+              M_FLOAT8_E3M4,            // M_TYPE
+              mlir::Float8E3M4Type,     // MLIR_TYPE
+              M::Float8::float8_e3m4_t, // CXX_TYPE
+              APFloat::Float8E3M4)      // APFLOAT_SEMANTICS
+
+DECLARE_FLOAT(f8e4m3fn,                   // SHORT_NAME
+              float8_e4m3fn,              // LONG_NAME
+              M_FLOAT8_E4M3FN,            // M_TYPE
+              mlir::Float8E4M3FNType,     // MLIR_TYPE
+              M::Float8::float8_e4m3fn_t, // CXX_TYPE
+              APFloat::Float8E4M3FN)      // APFLOAT_SEMANTICS
+
+DECLARE_FLOAT(f8e4m3fnuz,                   // SHORT_NAME
+              float8_e4m3fnuz,              // LONG_NAME
+              M_FLOAT8_E4M3FNUZ,            // M_TYPE
+              mlir::Float8E4M3FNUZType,     // MLIR_TYPE
+              M::Float8::float8_e4m3fnuz_t, // CXX_TYPE
+              APFloat::Float8E4M3FNUZ)      // APFLOAT_SEMANTICS
+
+DECLARE_FLOAT(f8e5m2,                   // SHORT_NAME
+              float8_e5m2,              // LONG_NAME
+              M_FLOAT8_E5M2,            // M_TYPE
+              mlir::Float8E5M2Type,     // MLIR_TYPE
+              M::Float8::float8_e5m2_t, // CXX_TYPE
+              APFloat::Float8E5M2)      // APFLOAT_SEMANTICS
+
+DECLARE_FLOAT(f8e5m2fnuz,                   // SHORT_NAME
+              float8_e5m2fnuz,              // LONG_NAME
+              M_FLOAT8_E5M2FNUZ,            // M_TYPE
+              mlir::Float8E5M2FNUZType,     // MLIR_TYPE
+              M::Float8::float8_e5m2fnuz_t, // CXX_TYPE
+              APFloat::Float8E5M2FNUZ)      // APFLOAT_SEMANTICS
+
+// The Float16 types.
+DECLARE_FLOAT(f16,                   // SHORT_NAME
+              float16,               // LONG_NAME
+              M_FLOAT16,             // M_TYPE
+              mlir::Float16Type,     // MLIR_TYPE
+              M::Float16::float16_t, // CXX_TYPE
+              APFloat::IEEEhalf)     // APFLOAT_SEMANTICS
+
+DECLARE_FLOAT(bf16,                  // SHORT_NAME
+              bfloat16,              // LONG_NAME
+              M_BFLOAT16,            // M_TYPE
+              mlir::BFloat16Type,    // MLIR_TYPE
+              M::BFloat::bfloat16_t, // CXX_TYPE
+              APFloat::BFloat)       // APFLOAT_SEMANTICS
+
+// The Float32 type.
+DECLARE_FLOAT(f32,                 // SHORT_NAME
+              float32,             // LONG_NAME
+              M_FLOAT32,           // M_TYPE
+              mlir::Float32Type,   // MLIR_TYPE
+              float,               // CXX_TYPE
+              APFloat::IEEEsingle) // APFLOAT_SEMANTICS
+
+// The Float64 type.
+DECLARE_FLOAT(f64,                 // SHORT_NAME
+              float64,             // LONG_NAME
+              M_FLOAT64,           // M_TYPE
+              mlir::Float64Type,   // MLIR_TYPE
+              double,              // CXX_TYPE
+              APFloat::IEEEdouble) // APFLOAT_SEMANTICS

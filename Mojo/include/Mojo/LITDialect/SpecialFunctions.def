@@ -1,0 +1,116 @@
+//===----------------------------------------------------------------------===//
+// Copyright (c) 2026, Modular Inc. All rights reserved.
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions:
+// https://llvm.org/LICENSE.txt
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//===----------------------------------------------------------------------===//
+//
+// This file is intended to be #include'd multiple times to extract information
+// about special functions.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SF
+#error "must define SF macro before including this header"
+#endif
+
+// SF should be defined like this:
+//     SF(ENUM, NAME, NUMOPERANDS, EXPRNODE, FLAGS)
+//
+// Where:
+//   ENUM is the SpecialFunctionKind:: enumerator.
+//   NAME is the spelling of the special function method.
+//   MINOPERANDS is the minimum number of operands required.
+//   MAXOPERANDS is the maximum number of operands required (-1 if variadic).
+//   EXPRNODE is the normal ExprNode::Kind this corresponds to.
+//   FLAGS are various flags used to customize type checking behavior.
+//
+// The ordering of functions below is treated as significant, and is used for
+// prioritization in various situations, such as the relative ordering of
+// methods in documentation.
+
+SF(kNew,      "__new__"     , 0, -1, kInvalid, kImplicitlyStaticMethod|kSelfResult)
+
+// These are memory style initializer that set up 'self' by assigning into it.
+SF(kInit,     "__init__"    , 0, -1, kInvalid, kInitializer)
+SF(kCopyCtor, "__init__(*, copy)", 1, 1, kInvalid, kInitializer | kCannotRaise)
+SF(kMoveCtor, "__init__(*, deinit move)", 1, 1, kInvalid, kInitializer | kCannotRaise)
+SF(kDeinit, "__deinit__", 1, 1, kInvalid, kNoneResult | kCannotRaise | kInstMethod)
+
+SF(kBool,    "__bool__"  ,  1, 1, kInvalid, kInstMethod)
+SF(kMLIRI1,  "__mlir_i1__", 1, 1, kInvalid, kInstMethod)
+SF(kAwait,   "__await__" ,  1, 1, kAwait,   0)
+
+SF(kGetItem, "__getitem__", 0, -1, kInvalid, 0)
+SF(kSetItem, "__setitem__", 0, -1, kInvalid, 0)
+
+// Unary arithmetic operators.
+SF(kNeg,     "__neg__"   , 1, 1, kNeg,    kInstMethod)
+SF(kPos,     "__pos__"   , 1, 1, kPos,    kInstMethod)
+SF(kInvert,  "__invert__", 1, 1, kInvert, kInstMethod)
+
+// Normal comparison operators.
+SF(kCmpLT, "__lt__", 2, 2, kCmpLT, kInstMethod)
+SF(kCmpLE, "__le__", 2, 2, kCmpLE, kInstMethod)
+SF(kCmpEQ, "__eq__", 2, 2, kCmpEQ, kInstMethod)
+SF(kCmpNE, "__ne__", 2, 2, kCmpNE, kInstMethod)
+SF(kCmpGT, "__gt__", 2, 2, kCmpGT, kInstMethod)
+SF(kCmpGE, "__ge__", 2, 2, kCmpGE, kInstMethod)
+
+// Mojo extension: Reflect `is` and `is not` into named members.
+SF(kCmpIs,    "__is__",    2, 2, kCmpIs, kInstMethod)
+SF(kCmpIsNot, "__isnot__", 2, 2, kCmpIsNot, kInstMethod)
+
+SF(kCmpIn, "__contains__", 2, 2, kCmpIn, kInstMethod)
+
+// Normal arithmetic operators.
+SF(kAdd     , "__add__"     , 2, 2, kAdd,      kInstMethod)
+SF(kSub     , "__sub__"     , 2, 2, kSub,      kInstMethod)
+SF(kMul     , "__mul__"     , 2, 2, kMul,      kInstMethod)
+SF(kMatmul  , "__matmul__"  , 2, 2, kMatMul,   kInstMethod)
+SF(kTrueDiv , "__truediv__" , 2, 2, kTrueDiv,  kInstMethod)
+SF(kFloorDiv, "__floordiv__", 2, 2, kFloorDiv, kInstMethod)
+SF(kMod     , "__mod__"     , 2, 2, kMod,      kInstMethod)
+SF(kPow     , "__pow__"     , 2, 3, kPow,    kInstMethod)
+SF(kLShift  , "__lshift__"  , 2, 2, kLShift, kInstMethod)
+SF(kRShift  , "__rshift__"  , 2, 2, kRShift, kInstMethod)
+SF(kAnd     , "__and__"     , 2, 2, kAnd,    kInstMethod)
+SF(kOr      , "__or__"      , 2, 2, kOr,     kInstMethod)
+SF(kXor     , "__xor__"     , 2, 2, kXor,    kInstMethod)
+
+// Reversed arithmetic operators.
+SF(kRAdd     , "__radd__"     , 2, 2, kAdd,      kInstMethod|kReversedOperator)
+SF(kRSub     , "__rsub__"     , 2, 2, kSub,      kInstMethod|kReversedOperator)
+SF(kRMul     , "__rmul__"     , 2, 2, kMul,      kInstMethod|kReversedOperator)
+SF(kRMatmul  , "__rmatmul__"  , 2, 2, kMatMul,   kInstMethod|kReversedOperator)
+SF(kRTrueDiv , "__rtruediv__" , 2, 2, kTrueDiv,  kInstMethod|kReversedOperator)
+SF(kRFloorDiv, "__rfloordiv__", 2, 2, kFloorDiv, kInstMethod|kReversedOperator)
+SF(kRMod     , "__rmod__"     , 2, 2, kMod,      kInstMethod|kReversedOperator)
+SF(kRPow     , "__rpow__"     , 2, 2, kPow,      kInstMethod|kReversedOperator)
+SF(kRLShift  , "__rlshift__"  , 2, 2, kLShift,   kInstMethod|kReversedOperator)
+SF(kRRShift  , "__rrshift__"  , 2, 2, kRShift,   kInstMethod|kReversedOperator)
+SF(kRAnd     , "__rand__"     , 2, 2, kAnd,      kInstMethod|kReversedOperator)
+SF(kROr      , "__ror__"      , 2, 2, kOr,       kInstMethod|kReversedOperator)
+SF(kRXor     , "__rxor__"     , 2, 2, kXor,      kInstMethod|kReversedOperator)
+
+// In place operators like +=
+SF(kIAdd     , "__iadd__"     , 2, 2, kIAdd,      kNoneResult)
+SF(kISub     , "__isub__"     , 2, 2, kISub,      kNoneResult)
+SF(kIMul     , "__imul__"     , 2, 2, kIMul,      kNoneResult)
+SF(kIMatmul  , "__imatmul__"  , 2, 2, kIMatMul,   kNoneResult)
+SF(kITrueDiv , "__itruediv__" , 2, 2, kITrueDiv,  kNoneResult)
+SF(kIFloorDiv, "__ifloordiv__", 2, 2, kIFloorDiv, kNoneResult)
+SF(kIMod     , "__imod__"     , 2, 2, kIMod,      kNoneResult)
+SF(kIPow     , "__ipow__"     , 2, 3, kIPow,      kNoneResult)
+SF(kILShift  , "__ilshift__"  , 2, 2, kILShift,   kNoneResult)
+SF(kIRShift  , "__irshift__"  , 2, 2, kIRShift,   kNoneResult)
+SF(kIAnd     , "__iand__"     , 2, 2, kIAnd,      kNoneResult)
+SF(kIXor     , "__ixor__"     , 2, 2, kIXor,      kNoneResult)
+SF(kIOr      , "__ior__"      , 2, 2, kIOr,       kNoneResult)
+#undef SF

@@ -30,7 +30,6 @@ import math
 
 import pytest
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from max.driver import Accelerator, Buffer, accelerator_count
 from max.dtype import DType
@@ -46,6 +45,7 @@ from max.nn.quant_config import (
     ScaleOrigin,
     WeightScaleSpec,
 )
+from torch import nn
 
 
 def _skip_if_no_gpu() -> None:

@@ -1,0 +1,264 @@
+load("@rules_multirun//:defs.bzl", "multirun")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("//bazel:api.bzl", "install_docs", "modular_py_binary", "pkg_filegroup", "pkg_files", "strip_prefix")
+
+# gazelle:default_visibility //visibility:private
+
+package(default_visibility = ["//visibility:private"])
+
+# -----------------------------------------------------------------------------
+# Targets cheat sheet
+#
+# Names mirror paths under modular-fe/docsite/ after install-docs and
+# install-releases:
+#
+#   docsite (_pkg_tar_)              -> pre-post-process inputs to :docsite_docs_archive
+#   docsite_docs_archive             -> docs.tar (post-processed docs drop); alias :docs
+#                                     installed under modular-fe/docsite/docsSrc/
+#   docsite_releases_archive         -> releases.tar (releases drop); alias :releases
+#                                     installed under modular-fe/docsite/releases/
+#   docsite_releases_nightly_gen     -> generated nightly.md (from max/nightly-changelog.md)
+#   docsite_releases_nightly_md      -> pkg wrapper placing nightly.md at releases.tar root
+#   docsite_releases_pack            -> version-controlled releases/** (v*.md, index.md)
+#
+# releases/ is intentionally omitted from :docsite; it ships only via releases.tar.
+# nightly.md is generated at build time (see write-nightly-release.py); do not commit it.
+#
+# Stable CI labels (aliases): :docs, :releases
+#
+# CI / artifacts:
+#   ./bazelw build --config=ci -- //oss/modular/docs:docs //oss/modular/docs:releases
+# Outputs under bazel-bin/oss/modular/docs/docs.tar and releases.tar.
+#
+# Local dev (requires modular-fe cloned under .derived/modular-fe/; rsyncs from those tars):
+#   ./bazelw run //oss/modular/docs:install
+# Or run separately:
+#   ./bazelw run //oss/modular/docs:install-docs
+#   ./bazelw run //oss/modular/docs:install-releases
+# -----------------------------------------------------------------------------
+
+install_docs(
+    name = "install-docs",
+    dest_subdir = "docsite/docsSrc",
+    tags = ["manual"],
+    target = ":docs",
+)
+
+install_docs(
+    name = "install-releases",
+    dest_subdir = "docsite/releases",
+    tags = ["manual"],
+    target = ":releases",
+)
+
+multirun(
+    name = "install",
+    buffer_output = True,
+    commands = [
+        ":install-docs",
+        ":install-releases",
+    ],
+    jobs = 1,
+    tags = ["manual"],
+)
+
+genrule(
+    name = "docsite_docs_archive",
+    srcs = [":docsite"],
+    outs = ["docs.tar"],
+    cmd = """
+  set -eu
+  mkdir -p docsite
+  tar -xf $(location :docsite) -C docsite
+  chmod -R +w docsite
+  $(location :post-process-docs) docsite
+  ( cd docsite && tar -cf ../$@ . )
+  """,
+    tags = ["manual"],
+    tools = [":post-process-docs"],
+)
+
+# releases.tar = static pages under releases/ (stripped prefix) plus generated nightly.md.
+genrule(
+    name = "docsite_releases_nightly_gen",
+    outs = ["nightly.md"],
+    cmd = "$(location :write-nightly-release) $@",
+    tags = ["manual"],
+    tools = [":write-nightly-release"],
+)
+
+pkg_files(
+    name = "docsite_releases_nightly_md",
+    srcs = [":docsite_releases_nightly_gen"],
+    renames = {
+        "//oss/modular/docs:docsite_releases_nightly_gen": "nightly.md",
+    },
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "docsite_releases_pack",
+    srcs = glob(["releases/**"]),
+    strip_prefix = strip_prefix.from_pkg("releases"),
+    tags = ["manual"],
+)
+
+pkg_tar(
+    name = "docsite_releases_archive",
+    srcs = [
+        ":docsite_releases_nightly_md",
+        ":docsite_releases_pack",
+    ],
+    out = "releases.tar",
+    allow_duplicates_with_different_content = False,
+    tags = ["manual"],
+)
+
+# Pre-post-process docs inputs. releases/ is packaged separately in releases.tar.
+pkg_tar(
+    name = "docsite",
+    srcs = [
+        ":_redirects.json",
+        ":includes",
+        ":max-docs",
+        ":max-kernels-public-docs",
+        ":max-mojo-public-docs",
+        ":requirements.js",
+        ":sidebars.json",
+        ":static",
+    ],
+    allow_duplicates_with_different_content = False,
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "includes",
+    srcs = glob(["_includes/**"]),
+    strip_prefix = strip_prefix.from_pkg(""),
+    tags = ["manual"],
+)
+
+pkg_filegroup(
+    name = "max-docs",
+    srcs = [
+        ":max",
+        ":max-c-api-docs",
+        ":max-cli-docs",
+        ":max-python-api-docs",
+        "//max/python/max/serve/schemas:docs-schema",
+    ],
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "static",
+    srcs = glob(["static/**"]),
+    strip_prefix = strip_prefix.from_pkg(""),
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "max-c-api-docs",
+    srcs = [
+        "//max/internal/include/max/API/max/c/docs",
+    ],
+    prefix = "api/c",
+    renames = {
+        "//max/internal/include/max/API/max/c/docs": "",
+    },
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "max-python-api-docs",
+    srcs = [
+        "//max/python/docs:python-api-docs",
+    ],
+    prefix = "api/python",
+    renames = {
+        "//max/python/docs:python-api-docs": "",
+    },
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "max-cli-docs",
+    srcs = [
+        "//max/python/docs:cli-docs",
+    ],
+    renames = {
+        "//max/python/docs:cli-docs": "",
+    },
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "max",
+    srcs = glob(
+        ["max/**"],
+    ),
+    strip_prefix = strip_prefix.from_pkg("max"),
+    tags = ["manual"],
+)
+
+pkg_filegroup(
+    name = "max-kernels-public-docs",
+    srcs = ["//max/kernels/src:docs"],
+    tags = ["manual"],
+)
+
+pkg_filegroup(
+    name = "max-mojo-public-docs",
+    srcs = [
+        "//max/mojo/max:category.docs",
+        "//max/mojo/max:docs",
+    ],
+    tags = ["manual"],
+)
+
+modular_py_binary(
+    name = "generate-models-table",
+    srcs = ["generate-models-table.py"],
+    visibility = [
+        "//:__pkg__",
+        "//bazel/lint:__pkg__",
+    ],
+)
+
+modular_py_binary(
+    name = "generate-arch-docs",
+    srcs = ["generate-arch-docs.py"],
+    visibility = [
+        "//:__pkg__",
+        "//bazel/lint:__pkg__",
+    ],
+)
+
+modular_py_binary(
+    name = "post-process-docs",
+    srcs = [
+        ":post-process-docs.py",
+    ],
+    tags = ["manual"],
+)
+
+modular_py_binary(
+    name = "write-nightly-release",
+    srcs = [
+        ":write-nightly-release.py",
+    ],
+    data = ["max/nightly-changelog.md"],
+    tags = ["manual"],
+)
+
+alias(
+    name = "docs",
+    actual = ":docsite_docs_archive",
+    tags = ["manual"],
+)
+
+alias(
+    name = "releases",
+    actual = ":docsite_releases_archive",
+    tags = ["manual"],
+)

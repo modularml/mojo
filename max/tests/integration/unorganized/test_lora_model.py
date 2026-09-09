@@ -23,7 +23,7 @@ import numpy.typing as npt
 import pytest
 from max.driver import Buffer
 from max.dtype import DType
-from max.pipelines.lib.lora import LoRAModel
+from max.pipelines.lora.lora import LoRAModel
 from safetensors.numpy import save_file
 
 LoRAWeights = dict[str, npt.NDArray[Any]]
@@ -235,8 +235,7 @@ def test_qkv_weights_are_combined(
     assert "layers.0.self_attn.v_proj.lora_A.weight" not in model.lora_A
 
     assert "layers.0.self_attn.qkv_lora.lora_A.weight" in model.lora_A
-    assert "layers.0.self_attn.qkv_lora.lora_B_q.weight" in model.lora_B
-    assert "layers.0.self_attn.qkv_lora.lora_B_kv.weight" in model.lora_B
+    assert "layers.0.self_attn.qkv_lora.lora_B.weight" in model.lora_B
 
 
 def test_combined_lora_a_shape(
@@ -262,10 +261,10 @@ def test_combined_lora_a_shape(
     assert tuple(weight.shape) == expected_shape
 
 
-def test_combined_lora_b_q_shape(
+def test_combined_lora_b_shape(
     temp_lora_adapter: Callable[..., str],
 ) -> None:
-    """Test that combined LoRA B_q has correct shape [q_out_features, max_rank]."""
+    """Test the fused LoRA B shape [q_out + 2*kv_out, max_rank] (Q | K | V)."""
     adapter_path = temp_lora_adapter()
 
     model = LoRAModel(
@@ -278,33 +277,13 @@ def test_combined_lora_b_q_shape(
         head_dim=TEST_HEAD_DIM,
     )
 
-    combined_b_q = model.lora_B["layers.0.self_attn.qkv_lora.lora_B_q.weight"]
-    weight = Buffer.from_dlpack(combined_b_q.data)
+    combined_b = model.lora_B["layers.0.self_attn.qkv_lora.lora_B.weight"]
+    weight = Buffer.from_dlpack(combined_b.data)
 
-    expected_shape = (TEST_Q_OUT_FEATURES, TEST_MAX_RANK)
-    assert tuple(weight.shape) == expected_shape
-
-
-def test_combined_lora_b_kv_shape(
-    temp_lora_adapter: Callable[..., str],
-) -> None:
-    """Test that combined LoRA B_kv has correct shape [2, kv_out_features, max_rank]."""
-    adapter_path = temp_lora_adapter()
-
-    model = LoRAModel(
-        name="test_lora",
-        path=adapter_path,
-        base_dtype=DType.float32,
-        max_lora_rank=TEST_MAX_RANK,
-        n_heads=TEST_N_HEADS,
-        n_kv_heads=TEST_N_KV_HEADS,
-        head_dim=TEST_HEAD_DIM,
+    expected_shape = (
+        TEST_Q_OUT_FEATURES + 2 * TEST_KV_OUT_FEATURES,
+        TEST_MAX_RANK,
     )
-
-    combined_b_kv = model.lora_B["layers.0.self_attn.qkv_lora.lora_B_kv.weight"]
-    weight = Buffer.from_dlpack(combined_b_kv.data)
-
-    expected_shape = (2, TEST_KV_OUT_FEATURES, TEST_MAX_RANK)
     assert tuple(weight.shape) == expected_shape
 
 
@@ -332,7 +311,7 @@ def test_missing_k_projection(
     )
 
     assert "layers.0.self_attn.qkv_lora.lora_A.weight" in model.lora_A
-    assert "layers.0.self_attn.qkv_lora.lora_B_kv.weight" in model.lora_B
+    assert "layers.0.self_attn.qkv_lora.lora_B.weight" in model.lora_B
 
     combined_a = model.lora_A["layers.0.self_attn.qkv_lora.lora_A.weight"]
     weight_a = Buffer.from_dlpack(combined_a.data).to_numpy()
@@ -344,6 +323,14 @@ def test_missing_k_projection(
     v_portion = weight_a[2 * TEST_MAX_RANK :, :]
     assert not np.allclose(q_portion, 0.0)
     assert not np.allclose(v_portion, 0.0)
+
+    # Fused B is [q_out | k_out | v_out] along axis 0; the K region is zeroed.
+    combined_b = model.lora_B["layers.0.self_attn.qkv_lora.lora_B.weight"]
+    weight_b = Buffer.from_dlpack(combined_b.data).to_numpy()
+    k_region_b = weight_b[
+        TEST_Q_OUT_FEATURES : TEST_Q_OUT_FEATURES + TEST_KV_OUT_FEATURES, :
+    ]
+    assert np.allclose(k_region_b, 0.0)
 
 
 def test_missing_v_projection(
@@ -370,13 +357,16 @@ def test_missing_v_projection(
     v_portion = weight_a[2 * TEST_MAX_RANK :, :]
     assert np.allclose(v_portion, 0.0)
 
-    combined_b_kv = model.lora_B["layers.0.self_attn.qkv_lora.lora_B_kv.weight"]
-    weight_b_kv = Buffer.from_dlpack(combined_b_kv.data).to_numpy()
+    combined_b = model.lora_B["layers.0.self_attn.qkv_lora.lora_B.weight"]
+    weight_b = Buffer.from_dlpack(combined_b.data).to_numpy()
 
-    v_portion_b = weight_b_kv[1, :, :]
+    # Fused B is [q_out | k_out | v_out] along axis 0.
+    v_portion_b = weight_b[TEST_Q_OUT_FEATURES + TEST_KV_OUT_FEATURES :, :]
     assert np.allclose(v_portion_b, 0.0)
 
-    k_portion_b = weight_b_kv[0, :, :]
+    k_portion_b = weight_b[
+        TEST_Q_OUT_FEATURES : TEST_Q_OUT_FEATURES + TEST_KV_OUT_FEATURES, :
+    ]
     assert not np.allclose(k_portion_b, 0.0)
 
 
@@ -520,11 +510,12 @@ def test_lora_b_is_scaled(temp_lora_adapter: Callable[..., str]) -> None:
         head_dim=TEST_HEAD_DIM,
     )
 
-    combined_b_q = model.lora_B["layers.0.self_attn.qkv_lora.lora_B_q.weight"]
-    actual_b = Buffer.from_dlpack(combined_b_q.data).to_numpy()
+    combined_b = model.lora_B["layers.0.self_attn.qkv_lora.lora_B.weight"]
+    actual_b = Buffer.from_dlpack(combined_b.data).to_numpy()
 
     expected_scaled = original_b_weight * scale
-    actual_non_padded = actual_b[:, :rank]
+    # Q region is the first q_out_features rows of the fused B.
+    actual_non_padded = actual_b[:TEST_Q_OUT_FEATURES, :rank]
 
     assert np.allclose(actual_non_padded, expected_scaled, rtol=1e-5)
 
@@ -588,11 +579,7 @@ def test_multiple_layers(temp_lora_adapter: Callable[..., str]) -> None:
             in model.lora_A
         )
         assert (
-            f"layers.{layer_idx}.self_attn.qkv_lora.lora_B_q.weight"
-            in model.lora_B
-        )
-        assert (
-            f"layers.{layer_idx}.self_attn.qkv_lora.lora_B_kv.weight"
+            f"layers.{layer_idx}.self_attn.qkv_lora.lora_B.weight"
             in model.lora_B
         )
 

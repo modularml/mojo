@@ -1,6 +1,0 @@
-# pixi environments
-.pixi
-*.egg-info
-
-# Magic environments
-.magic

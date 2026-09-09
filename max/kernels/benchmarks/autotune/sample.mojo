@@ -31,26 +31,27 @@ from std.time import sleep
 def bench_func[
     dtype: DType, M: Int, N: Int, K: Int, stages: Int
 ](mut m: Bench, mode: Mode, pe_rank: Int) raises:
-    @parameter
     @always_inline
     def bench_iter(mut b: Bencher):
-        @parameter
         @always_inline
         def call_fn():
             sleep(0.01)
 
-        b.iter[call_fn]()
+        b.iter(call_fn)
 
     var name = String(
         "gemm/dtype=", dtype, "/m=", M, "/n=", N, "/k=", N, "/stages=", stages
     )
 
     if Mode.BENCHMARK == mode:
-        m.bench_function[bench_iter](
-            BenchId(name, input_id=String("1st-metric (pe_rank=", pe_rank, ")"))
+        m.bench_function(
+            bench_iter,
+            BenchId(
+                name, input_id=String("1st-metric (pe_rank=", pe_rank, ")")
+            ),
         )
         # TODO: enable the following line after adding support for multi-output to kplot and kprofile.
-        # m.bench_function[bench_iter](BenchId(name, input_id=String("2nd-metric (pe_rank=",pe_rank,")")))
+        # m.bench_function(bench_iter, BenchId(name, input_id=String("2nd-metric (pe_rank=",pe_rank,")")))
     if Mode.VERIFY == mode:
         print("verifying dummy results...PASS")
     if Mode.RUN == mode:
@@ -58,7 +59,7 @@ def bench_func[
 
 
 def main() raises:
-    comptime dtype = get_defined_dtype["dtype", DType.float16]()
+    comptime dtype = get_defined_dtype["dtype", .float16]()
     comptime shape_int_list = get_defined_shape["shape", "1024x1024x1024"]()
     comptime shape = int_list_to_tuple[shape_int_list]()
     comptime stages = get_defined_int["stages", 0]()

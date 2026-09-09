@@ -35,26 +35,50 @@ def range(
     dtype: DType,
     device: Device | DeviceRef,
 ) -> TensorValue:
-    """Creates a sequence of numbers from start to stop (exclusive) with step.
+    """Creates a sequence of evenly spaced values from ``start`` to ``stop``.
 
-    All arguments are mandatory and must have the same element type.
+    The sequence begins at ``start`` and increments by ``step``, stopping
+    before ``stop`` (the upper bound is exclusive).
 
-    Note the following restrictions on input values:
-    1. ``step`` must be non-zero.
-    2. ``stop - start`` must be zero or have the same sign as ``step``.
+    ``stop - start`` must be zero or have the same sign as ``step``.
+    Also, graph compilation fails when ``stop - start`` isn't evenly
+    divisible by ``step``. For example, ``range(0, 5, 2)`` should produce
+    three values, ``[0, 2, 4]``, but shape inference declares an output length
+    of 2. The generated values therefore don't fit the declared output shape.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("range_example") as graph:
+            graph.output(ops.range(0, 5, 1, dtype=DType.float32, device=device))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+        # result holds [0.0, 1.0, 2.0, 3.0, 4.0].
 
     Args:
-        start: The start of the range to generate.
-        stop: The range will be generated up to, but not including, this value.
-        step: The step size for the range.
-        out_dim: The expected output dimensions returned by the range op.
-          These will be assert at graph execution time to be correct.
-        device: Device of the result tensor.
-        dtype: Data type of the result tensor. If not specified, defaults to
-          float32 for numeric inputs or infers from tensor inputs.
+        start: The first value in the sequence. Must be a scalar value.
+        stop: The exclusive upper bound. The sequence stops before this value. Must be a scalar value.
+        step: The spacing between consecutive values. Must be non-zero. Defaults to ``1``.
+        out_dim: The expected length of the output. Required when dynamic
+            scalar :class:`~max.graph.TensorValue` inputs prevent static length
+            inference. When omitted, it's computed from scalar literals.
+        dtype: The element type of the result tensor.
+        device: The device the result tensor lives on.
 
     Returns:
-        A symbolic tensor value containing the defined range of values.
+        A ``TensorValue`` representing the generated sequence.
+
+    Raises:
+        ValueError: If ``out_dim`` is omitted for dynamic scalar inputs, if
+            any input isn't scalar, or if any input isn't on the CPU.
+        RuntimeError: During graph compilation if a statically known interval
+            isn't evenly divisible by ``step``, causing the inferred output
+            length to disagree with the number of generated values.
     """
     device = DeviceRef.from_device(device)
 

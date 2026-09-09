@@ -30,8 +30,8 @@ comptime c_type = DType.float32
 
 def gemm_naive(
     c: TileTensor[mut=True, ...],
-    a: TileTensor[...],
-    b: TileTensor[...],
+    a: TileTensor,
+    b: TileTensor,
     m: Int,
     n: Int,
     k: Int,
@@ -138,8 +138,8 @@ def test_matmul() raises:
 
 def bmm_naive(
     c: TileTensor[mut=True, ...],
-    a: TileTensor[...],
-    b: TileTensor[...],
+    a: TileTensor,
+    b: TileTensor,
     batches: Int,
     m: Int,
     n: Int,

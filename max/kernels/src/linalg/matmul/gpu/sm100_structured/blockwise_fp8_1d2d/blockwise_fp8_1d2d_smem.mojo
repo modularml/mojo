@@ -24,8 +24,6 @@ standard BlockwiseFP8Smem:
 Tile storage is shared via BlockwiseFP8TileCore from blockwise_fp8_smem.mojo.
 """
 
-from std.gpu.memory import AddressSpace
-
 from ..blockwise_fp8.blockwise_fp8_smem import BlockwiseFP8TileCore
 from ..structured_kernels.config import MatmulConfig
 from structured_kernels.pipeline_storage import SmemPipelineBundleNoClc
@@ -44,6 +42,14 @@ struct BlockwiseFP8_1D2DSmem[
 
     Thin wrapper over BlockwiseFP8TileCore + SmemPipelineBundleNoClc.
     Uses 3-warp specialization (Load, MMA, Epilogue) without a scheduler warp.
+
+    Parameters:
+        a_type: Element type of the A input matrix.
+        b_type: Element type of the B input matrix.
+        c_type: Element type of the C output matrix.
+        a_scales_type: Element type of the A blockwise scales.
+        transpose_b: Whether B is accessed transposed.
+        config: Matmul tile shapes, MMA shapes, and pipeline stage counts.
     """
 
     # ========== Core (tile storage + constants) ==========

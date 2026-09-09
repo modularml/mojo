@@ -97,8 +97,8 @@ def convert_idefics3_vision_model_state_dict(
 
     for checkpoint_name, weight in state_dict.items():
         if checkpoint_name.startswith(
-            "model.connector."
-        ) or checkpoint_name.startswith("model.vision_model."):
+            ("model.connector.", "model.vision_model.")
+        ):
             vision_model_name = checkpoint_name
             for before, after in IDEFICS3_VISION_MODEL_MAPPING.items():
                 vision_model_name = vision_model_name.replace(before, after)

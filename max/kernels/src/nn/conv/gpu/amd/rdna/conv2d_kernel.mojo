@@ -18,22 +18,22 @@ normally from a pre-transposed [N, K] layout.
 
 For common VAE decoder shapes (C_in=128/256/512), C_in is always a multiple of
 BLOCK_K, so consecutive K positions within a tile share the same (r,s) filter
-position. This enables vectorized 8-wide loads from the NHWC input — the same
+position. This enables vectorized 8-wide loads from the NHWC input: the same
 load width as the standard matmul kernel's A-tile loader.
 """
 
-from std.gpu import (
+from max.gpu import (
     WARP_SIZE,
-    barrier,
     block_idx,
     thread_idx,
     lane_id,
     warp_id,
 )
-from std.gpu.compute.mma import mma as _mma_intrinsic
-from layout import TensorLayout, TileTensor
+from max.gpu.sync import barrier
+from max.gpu.compute.mma import mma as _mma_intrinsic
+from layout import TensorEngine, TensorLayout, TileTensor
 from std.math import ceildiv
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.utils import Index, IndexList
 from std.utils.numerics import get_accum_type
 
@@ -64,10 +64,8 @@ def _load_im2col_a_tile[
     SMEM_STRIDE: Int,
     NUM_THREADS: Int,
 ](
-    smem: UnsafePointer[
-        Scalar[dtype], MutAnyOrigin, address_space=AddressSpace.SHARED
-    ],
-    input_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    smem: UnsafePointer[mut=True, Scalar[dtype], _, address_space=.SHARED],
+    input_ptr: UnsafePointer[mut=False, Scalar[dtype], _],
     block_m_offset: Int,
     k_offset: Int,
     M: Int,
@@ -91,7 +89,7 @@ def _load_im2col_a_tile[
     """
     comptime VECTOR_WIDTH = min(BLOCK_K, 8)
     comptime total_vectors = BLOCK_M * BLOCK_K // VECTOR_WIDTH
-    comptime vecs_per_thread = (total_vectors + NUM_THREADS - 1) // NUM_THREADS
+    comptime vecs_per_thread = ceildiv(total_vectors, NUM_THREADS)
 
     var HWC_in = H_in * W_in * C_in
     var WC_in = W_in * C_in
@@ -147,11 +145,10 @@ def _load_b_tile_to_smem[
     BLOCK_K: Int,
     SMEM_STRIDE: Int,
     NUM_THREADS: Int,
+    tile_engine: TensorEngine,
 ](
-    smem: UnsafePointer[
-        Scalar[dtype], MutAnyOrigin, address_space=AddressSpace.SHARED
-    ],
-    tile: TileTensor[dtype, tile_layout, MutAnyOrigin],
+    smem: UnsafePointer[mut=True, Scalar[dtype], _, address_space=.SHARED],
+    tile: TileTensor[mut=True, dtype, tile_layout, _, Engine=tile_engine],
     block_n_offset: Int,
     k_offset: Int,
     max_n: Int,
@@ -164,7 +161,7 @@ def _load_b_tile_to_smem[
     """
     comptime VECTOR_WIDTH = min(BLOCK_K, 8)
     comptime total_vectors = BLOCK_N * BLOCK_K // VECTOR_WIDTH
-    comptime vecs_per_thread = (total_vectors + NUM_THREADS - 1) // NUM_THREADS
+    comptime vecs_per_thread = ceildiv(total_vectors, NUM_THREADS)
 
     comptime for i in range(vecs_per_thread):
         var vec_idx = i * NUM_THREADS + tid
@@ -191,12 +188,15 @@ def _load_b_tile_to_smem[
 # =========================================================================
 
 
+@__name(t"rdna_conv2d_{out_type}_{in_type}_{filter_type}")
 def conv2d_kernel_rdna[
     out_type: DType,
     in_type: DType,
     filter_type: DType,
     out_layout: TensorLayout,
     filter_nk_layout: TensorLayout,
+    out_engine: TensorEngine,
+    filter_nk_engine: TensorEngine,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
     s_type: DType = get_accum_type[out_type](),
     BLOCK_K: Int = 32,
@@ -207,23 +207,25 @@ def conv2d_kernel_rdna[
     WARP_TILE_M: Int = 1,
     WARP_TILE_N: Int = 4,
 ](
-    output: TileTensor[out_type, out_layout, MutAnyOrigin],
+    output: TileTensor[out_type, out_layout, MutAnyOrigin, Engine=out_engine],
     input_ptr: UnsafePointer[Scalar[in_type], ImmutAnyOrigin],
-    filter_nk: TileTensor[filter_type, filter_nk_layout, MutAnyOrigin],
+    filter_nk: TileTensor[
+        filter_type, filter_nk_layout, MutAnyOrigin, Engine=filter_nk_engine
+    ],
     # GEMM dimensions
-    M: Int,
-    N: Int,
-    K: Int,
+    M: Int32,
+    N: Int32,
+    K: Int32,
     # Conv geometry
-    HW_out: Int,
-    W_out: Int,
-    H_in: Int,
-    W_in: Int,
-    C_in: Int,
-    R: Int,
-    S: Int,
-    pad_h: Int,
-    pad_w: Int,
+    HW_out: Int32,
+    W_out: Int32,
+    H_in: Int32,
+    W_in: Int32,
+    C_in: Int32,
+    R: Int32,
+    S: Int32,
+    pad_h: Int32,
+    pad_w: Int32,
 ):
     """Conv2D implicit GEMM kernel for RDNA 3+ GPUs.
 
@@ -239,7 +241,61 @@ def conv2d_kernel_rdna[
     Constraints (enforced by the dispatch layer):
     - stride = (1, 1) and dilation = (1, 1)
     - K % BLOCK_K == 0 and C_in % BLOCK_K == 0
+
+    Parameters:
+        out_type: `DType` of the output tensor.
+        in_type: `DType` of the input activation tensor.
+        filter_type: `DType` of the filter tensor.
+        out_layout: `TensorLayout` of the output `TileTensor`.
+        filter_nk_layout: `TensorLayout` of the pre-transposed [N, K] filter
+            `TileTensor`.
+        out_engine: `TensorEngine` of the output `TileTensor`.
+        filter_nk_engine: `TensorEngine` of the pre-transposed [N, K] filter
+            `TileTensor`.
+        elementwise_lambda_fn: Optional fused epilogue lambda applied per
+            output element (defaults to `None`).
+        s_type: `DType` used for the accumulator (defaults to the accumulator
+            type for `out_type`).
+        BLOCK_K: Tile size along the K reduction dimension (defaults to 32).
+        BLOCK_M: Tile size along the M output-row dimension (defaults to 128).
+        BLOCK_N: Tile size along the N output-column dimension (defaults to
+            128).
+        WARPS_M: Number of warps tiling the M dimension (defaults to 8).
+        WARPS_N: Number of warps tiling the N dimension (defaults to 2).
+        WARP_TILE_M: MMA tiles per warp along M (defaults to 1).
+        WARP_TILE_N: MMA tiles per warp along N (defaults to 4).
+
+    Args:
+        output: Output `TileTensor` of shape [M, N] in row-major, mapping to
+            NHWC output.
+        input_ptr: Pointer to the NHWC input activation tensor of `in_type`.
+        filter_nk: Filter `TileTensor` pre-transposed to [N, K] = [C_out,
+            R*S*C_in] layout.
+        M: Number of output rows; equals batch * H_out * W_out.
+        N: Number of output columns; equals C_out.
+        K: Reduction dimension length; equals R * S * C_in.
+        HW_out: Product of output spatial dimensions H_out * W_out.
+        W_out: Output spatial width.
+        H_in: Input spatial height.
+        W_in: Input spatial width.
+        C_in: Number of input channels.
+        R: Filter height.
+        S: Filter width.
+        pad_h: Zero padding applied to the input height.
+        pad_w: Zero padding applied to the input width.
     """
+    var _M = Int(M)
+    var _N = Int(N)
+    var _K = Int(K)
+    var _HW_out = Int(HW_out)
+    var _W_out = Int(W_out)
+    var _H_in = Int(H_in)
+    var _W_in = Int(W_in)
+    var _C_in = Int(C_in)
+    var _R = Int(R)
+    var _S = Int(S)
+    var _pad_h = Int(pad_h)
+    var _pad_w = Int(pad_w)
     comptime assert output.flat_rank == 2, "output must have flat_rank == 2"
     comptime assert filter_nk.flat_rank == 2, "filter must have flat_rank == 2"
     comptime assert BLOCK_K % MMA_K == 0
@@ -253,7 +309,7 @@ def conv2d_kernel_rdna[
     comptime NUM_C_TILES = WARP_TILE_M * WARP_TILE_N
 
     # Block coordinates with swizzle for L2 locality
-    var grid_dim = IndexList[2](ceildiv(N, BLOCK_N), ceildiv(M, BLOCK_M))
+    var grid_dim = IndexList[2](ceildiv(_N, BLOCK_N), ceildiv(_M, BLOCK_M))
     var swizzled = block_swizzle(
         IndexList[2](block_idx.x, block_idx.y), grid_dim
     )
@@ -271,53 +327,53 @@ def conv2d_kernel_rdna[
     var effective_lane = lid % 16
 
     # Pre-compute conv geometry values used in im2col loader
-    var SC = S * C_in
+    var SC = _S * _C_in
 
     # Double-buffered shared memory
-    var a_smem_0 = stack_allocation[
+    var a_smem_0 = unsafe_stack_allocation[
         BLOCK_M * SMEM_STRIDE,
         in_type,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var a_smem_1 = stack_allocation[
+    var a_smem_1 = unsafe_stack_allocation[
         BLOCK_M * SMEM_STRIDE,
         in_type,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var b_smem_0 = stack_allocation[
+    var b_smem_0 = unsafe_stack_allocation[
         BLOCK_N * SMEM_STRIDE,
         filter_type,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var b_smem_1 = stack_allocation[
+    var b_smem_1 = unsafe_stack_allocation[
         BLOCK_N * SMEM_STRIDE,
         filter_type,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # Initialize C accumulators
-    var c_accum = InlineArray[SIMD[s_type, CD_FRAG_SIZE], NUM_C_TILES](
+    var c_accum = Array[SIMD[s_type, CD_FRAG_SIZE], NUM_C_TILES](
         fill=SIMD[s_type, CD_FRAG_SIZE](0)
     )
 
-    var num_k_tiles = K // BLOCK_K
+    var num_k_tiles = _K // BLOCK_K
 
-    # --- Load first K-tile into buffer 0 ---
+    # --- Load first _K-tile into buffer 0 ---
     _load_im2col_a_tile[in_type, BLOCK_M, BLOCK_K, SMEM_STRIDE, NUM_THREADS](
         a_smem_0,
         input_ptr,
         block_m_offset,
         0,
-        M,
-        HW_out,
-        W_out,
-        H_in,
-        W_in,
-        C_in,
-        S,
+        _M,
+        _HW_out,
+        _W_out,
+        _H_in,
+        _W_in,
+        _C_in,
+        _S,
         SC,
-        pad_h,
-        pad_w,
+        _pad_h,
+        _pad_w,
         tid,
     )
     _load_b_tile_to_smem[
@@ -327,10 +383,11 @@ def conv2d_kernel_rdna[
         BLOCK_K,
         SMEM_STRIDE,
         NUM_THREADS,
-    ](b_smem_0, filter_nk, block_n_offset, 0, N, tid)
+        tile_engine=filter_nk_engine,
+    ](b_smem_0, filter_nk, block_n_offset, 0, _N, tid)
     barrier()
 
-    # --- Main K-dimension loop with double buffering ---
+    # --- Main _K-dimension loop with double buffering ---
     for k_tile in range(num_k_tiles):
         var a_cur = a_smem_0 if k_tile % 2 == 0 else a_smem_1
         var b_cur = b_smem_0 if k_tile % 2 == 0 else b_smem_1
@@ -339,7 +396,7 @@ def conv2d_kernel_rdna[
 
         # --- COMPUTE: WMMA on current buffer ---
         comptime for k_inner in range(K_ITERS):
-            var a_frag = InlineArray[SIMD[in_type, AB_FRAG_SIZE], WARP_TILE_M](
+            var a_frag = Array[SIMD[in_type, AB_FRAG_SIZE], WARP_TILE_M](
                 fill=SIMD[in_type, AB_FRAG_SIZE](0)
             )
             comptime for wm in range(WARP_TILE_M):
@@ -351,9 +408,9 @@ def conv2d_kernel_rdna[
                     a_row * SMEM_STRIDE + k_base
                 )
 
-            var b_frag = InlineArray[
-                SIMD[filter_type, AB_FRAG_SIZE], WARP_TILE_N
-            ](fill=SIMD[filter_type, AB_FRAG_SIZE](0))
+            var b_frag = Array[SIMD[filter_type, AB_FRAG_SIZE], WARP_TILE_N](
+                fill=SIMD[filter_type, AB_FRAG_SIZE](0)
+            )
             comptime for wn in range(WARP_TILE_N):
                 var b_row = (
                     warp_n * WARP_TILE_N * MMA_N + wn * MMA_N + effective_lane
@@ -373,7 +430,7 @@ def conv2d_kernel_rdna[
                         c_accum[c_idx],
                     )
 
-        # --- PREFETCH: load next K-tile ---
+        # --- PREFETCH: load next _K-tile ---
         if k_tile + 1 < num_k_tiles:
             var next_k_offset = (k_tile + 1) * BLOCK_K
             _load_im2col_a_tile[
@@ -383,16 +440,16 @@ def conv2d_kernel_rdna[
                 input_ptr,
                 block_m_offset,
                 next_k_offset,
-                M,
-                HW_out,
-                W_out,
-                H_in,
-                W_in,
-                C_in,
-                S,
+                _M,
+                _HW_out,
+                _W_out,
+                _H_in,
+                _W_in,
+                _C_in,
+                _S,
                 SC,
-                pad_h,
-                pad_w,
+                _pad_h,
+                _pad_w,
                 tid,
             )
             _load_b_tile_to_smem[
@@ -402,7 +459,8 @@ def conv2d_kernel_rdna[
                 BLOCK_K,
                 SMEM_STRIDE,
                 NUM_THREADS,
-            ](b_next, filter_nk, block_n_offset, next_k_offset, N, tid)
+                tile_engine=filter_nk_engine,
+            ](b_next, filter_nk, block_n_offset, next_k_offset, _N, tid)
 
         barrier()
 
@@ -428,7 +486,7 @@ def conv2d_kernel_rdna[
                     + lane_col
                 )
 
-                if global_row < M and global_col < N:
+                if global_row < _M and global_col < _N:
                     comptime if elementwise_lambda_fn:
                         comptime elementwise_lambda = (
                             elementwise_lambda_fn.value()

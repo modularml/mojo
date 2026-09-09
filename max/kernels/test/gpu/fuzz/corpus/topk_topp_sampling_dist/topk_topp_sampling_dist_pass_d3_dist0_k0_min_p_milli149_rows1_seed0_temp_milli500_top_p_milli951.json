@@ -1,0 +1,17 @@
+{
+  "target": "topk_topp_sampling_dist",
+  "spec": {
+    "rows": 1,
+    "d": 3,
+    "k": 0,
+    "top_p_milli": 951,
+    "temp_milli": 500,
+    "min_p_milli": 149,
+    "dist": 0,
+    "seed": 0
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "min-p masks weight while top-p passes at the first trial: the emitted row must renormalize by the masked kept mass, not the unmasked budget z (the live finding this fuzz target caught; fixed in the same change)",
+  "findings": []
+}

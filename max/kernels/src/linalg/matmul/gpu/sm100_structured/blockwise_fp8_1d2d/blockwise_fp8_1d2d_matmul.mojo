@@ -32,8 +32,8 @@ Usage:
 
 from std.sys import size_of
 
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.info import B200
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.host.info import B200
 from layout import TileTensor, flatten_leading
 from structured_kernels.tile_types import create_tma_tile
 
@@ -64,13 +64,17 @@ def grouped_matmul_1d2d_blockwise_fp8[
     num_active_experts: Int,
     ctx: DeviceContext,
 ) raises:
-    comptime a_type = config.a_type
-    comptime b_type = config.b_type
-    comptime c_type = config.c_type
-    """Launch grouped 1D-1D blockwise FP8 matmul kernel.
+    """Launch grouped 1D-2D blockwise FP8 matmul kernel for MoE layers.
 
     This function sets up TMA descriptors and launches the kernel with the
-    proper configuration for 1D-1D tensor layout with blockwise FP8 scaling.
+    proper configuration for 1D-2D tensor layout with blockwise FP8 scaling.
+
+    Parameters:
+        a_scales_type: `DType` of the A scaling factors (inferred).
+        b_scales_type: `DType` of the B scaling factors (inferred).
+        transpose_b: Whether B is transposed (inferred). Must be `True`.
+        config: `MatmulConfig` controlling MMA shape, CTA group, cluster
+            shape, and swizzle modes for the kernel.
 
     Args:
         c_device: Output tensor (total_tokens, N).
@@ -84,9 +88,12 @@ def grouped_matmul_1d2d_blockwise_fp8[
         num_active_experts: Number of active experts.
         ctx: Device context.
     """
+    comptime a_type = config.a_type
+    comptime b_type = config.b_type
+    comptime c_type = config.c_type
     comptime assert transpose_b, "Only support transposed B"
     comptime assert (
-        a_type == b_type and a_type == DType.float8_e4m3fn
+        a_type == b_type and a_type == .float8_e4m3fn
     ), "Only support float8_e4m3fn"
     comptime assert (
         a_scales_type == b_scales_type
@@ -151,6 +158,11 @@ def grouped_matmul_1d2d_blockwise_fp8[
             Int32(config.cluster_shape[1]),
             Int32(config.cluster_shape[2]),
         ),
+        b_scales_engine=type_of(b_scales_2d).Engine,
+        c_device_engine=type_of(c_device).Engine,
+        offsets_engine=type_of(a_offsets).Engine,
+        expert_ids_engine=type_of(expert_ids).Engine,
+        expert_scales_engine=type_of(expert_scales).Engine,
     ]
     comptime kernel = KernelType.run
 
@@ -199,7 +211,7 @@ def grouped_matmul_1d2d_blockwise_fp8[
         expert_ids,
         expert_scales,
         c_device,
-        num_active_experts,
+        Int32(num_active_experts),
         UInt32(K),
         grid_dim=grid_dim,
         block_dim=(32 * (load_warps + mma_warps + epilogue_warps)),
@@ -230,6 +242,25 @@ def grouped_matmul_dynamic_scaled_fp8_1d2d[
     """Compatibility wrapper that matches the existing dispatch API.
 
     Creates the default config and calls the new structured kernel.
+
+    Parameters:
+        a_scales_type: `DType` of the A scaling factors (inferred).
+        b_scales_type: `DType` of the B scaling factors (inferred).
+        transpose_b: Whether B is transposed (defaults to `True`).
+
+    Args:
+        c: Output tensor of shape `(total_tokens, N)`.
+        a: Input A tensor of shape `(total_tokens, K)`.
+        b: Weight tensor B of shape `(num_experts, N, K)`.
+        a_scales: Scaling factors for A of shape `(K//128, total_tokens)`,
+            FP32.
+        b_scales: Scaling factors for B of shape
+            `(num_experts, N//128, K//128)`, FP32.
+        a_offsets: Per-expert offsets of length `num_active_experts + 1`.
+        expert_ids: Active expert IDs of length `num_active_experts`.
+        expert_scales: Per-expert output scaling of length `num_experts`.
+        num_active_experts: Number of active experts.
+        ctx: Device context for kernel launch.
     """
     comptime umma_shape: IndexList[3] = Index(64, 64, 32)
     # A-scales: 1 x BM floats per pipeline stage

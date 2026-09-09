@@ -15,27 +15,27 @@
 Per half, four mini-iters of `(LOAD, FRAG, MMA)` with **cross-stage
 MMA fragment rotation** in mini-iters 3-4: those frag-loads read the
 cross SMEM stage to pre-load the *next* half's leading-quadrant
-fragments while this half's last MMAs are still computing — a
+fragments while this half's last MMAs are still computing, a
 register-rotation trick that hides LDS-load latency between halves
 (saves one frag-load worth of LDS latency on each half's first MMA).
 
 Three load-bearing structural choices vs the default ping-pong-shaped
 matmul schedule:
 
-1. **Mini-iter declaration order** — body is `(LOAD, FRAG, MMA) * 4` per
+1. **Mini-iter declaration order**: body is `(LOAD, FRAG, MMA) * 4` per
    K-partition (12 ops × 2 partitions = 24). After
    `_construct_mma_blocks` packs into MMA-centered blocks, each block
    holds exactly 1 frag + 1 global + 1 MMA, matching `_run_iter`'s
    mini-iter shape.
 
-2. **Cross-stage MMA fragment rotation** — minis 3-4 emit
+2. **Cross-stage MMA fragment rotation**: minis 3-4 emit
    `MMA_LOAD_A[stage=os, sub=0]` and `MMA_LOAD_B[stage=os, sub=0]`,
    reading from the cross stage. Same-partition MMAs no longer touch
    A_quad[0]/B_quad[0] after mini-iter 2, so the cross-stage frag
    harmlessly overwrites them with data the *next* partition's leading
    MMA will consume.
 
-3. **`SchedulingStrategy.IDENTITY` and no `double_buffer_reorder`** —
+3. **`SchedulingStrategy.IDENTITY` and no `double_buffer_reorder`**:
    the body order is the final order. The framework's
    `mma_block_interleave_list` matches frags to MMAs by `subtile`
    ignoring `stage`; running it on a cross-stage body would place a
@@ -44,7 +44,7 @@ matmul schedule:
 
 The framework's default `double_buffer_edge_rules` include `Phase 1`
 (`FRAGMENT_LOAD → COMPUTE`, `same_half=True`, `use_config_match=True`).
-Cross-stage rotation is a *cross-half* register flow — half 0's mini-3-4
+Cross-stage rotation is a *cross-half* register flow: half 0's mini-3-4
 frags feed half 1's MMA(0,*), and half 1's feed next-iter half 0's
 MMA(0,*). `derive_edges` overrides the default to append the
 cross-half rules so wait derivation knows to drain frag lgkm at the
@@ -157,14 +157,14 @@ struct MiniIterSpec(Copyable, Movable):
     """One mini-iter of the 4-wave body: (DRAM prefetch, frag-load, MMA)."""
 
     var load_tag: Int
-    """`LOAD_A` or `LOAD_B` — channel-A vs channel-B prefetch."""
+    """`LOAD_A` or `LOAD_B`: channel-A vs channel-B prefetch."""
     var load_channel: Int
     """0 (A) or 1 (B). Redundant with `load_tag` but needed by the
     framework's edge derivation."""
     var load_subtile: Int
     """Which sub-tile of the source SMEM half this prefetch writes (0 or 1)."""
     var frag_tag: Int
-    """`MMA_LOAD_A` or `MMA_LOAD_B` — register frag-load."""
+    """`MMA_LOAD_A` or `MMA_LOAD_B`: register frag-load."""
     var frag_channel: Int
     """0 (A) or 1 (B) for the frag-load."""
     var frag_subtile: Int
@@ -240,7 +240,7 @@ comptime FOUR_WAVE_MINI_ITERS = [
 ]
 """4-wave's 4 mini-iters per K-partition.
 
-Same shape across both partitions — only the SMEM stage flips.
+Same shape across both partitions; only the SMEM stage flips.
 Mini-3/4's frag-loads read from the cross stage to pre-load the
 next partition's leading quadrants (A_quad[0] / B_quad[0]) while
 this partition's last MMAs still issue.
@@ -406,7 +406,7 @@ struct Pipeline4Wave[geometry: KernelGeometry](PipelineSchedule):
     def build_body(self) -> List[OpDesc]:
         """Annotates logical ops with target cost model.
 
-        Skips `double_buffer_reorder` — the body is already in mini-iter
+        Skips `double_buffer_reorder`: the body is already in mini-iter
         order and `mma_block_interleave_list` would break cross-stage
         frag placement (it matches frags to MMAs by `subtile` only,
         ignoring the frag's `stage` field, so it cannot distinguish a
@@ -427,7 +427,7 @@ struct Pipeline4Wave[geometry: KernelGeometry](PipelineSchedule):
         we explicitly emit two same-stage sub=0 frag-loads here. The
         framework pairs each with a partial `wait_vm` drain (and a
         barrier) so each fires after exactly the prefetch it depends
-        on completes — the remaining 6 prefetches stay in flight.
+        on completes; the remaining 6 prefetches stay in flight.
 
         Returns:
             A 2-element list of A/B sub=0 frag-load `OpDesc`s.
@@ -503,7 +503,7 @@ struct Pipeline4Wave[geometry: KernelGeometry](PipelineSchedule):
         Wait values, frag/load assignments, and barrier flags come
         from `program.blocks[i]` (populated by
         `_construct_mma_blocks` + auto-wait derivation). The schedule's
-        only contribution is choosing the helper — the per-block ops
+        only contribution is choosing the helper: the per-block ops
         are entirely framework-derived.
 
         Args:

@@ -2,12 +2,24 @@
   {{ s | replace('"', '\\"') }}
 {%- endmacro %}
 
-{% macro stability_marker(decl, header=False) -%}
+{% macro stability_marker(decl, header=False, standalone=False) -%}
 {% if decl.showStabilityMarker -%}
-{%- if decl.isStable -%}
-<div class="mojo-stability-side{% if header %} mojo-stability-header{% endif %}" title="Stable since {{ decl.sinceVersion }}">{{ decl.sinceVersion }}</div>
-{%- else -%}
-<div class="mojo-stability-side{% if header %} mojo-stability-header{% endif %}" title="Unstable or experimental API">Unstable</div>
-{%- endif -%}
+{%- set title = ("Stable since " ~ decl.sinceVersion) if decl.isStable else "Unstable or experimental API" -%}
+{# A standalone marker heads its page and has room to spell itself out; one #}
+{# sharing a row with a signature or a heading shows just the version. #}
+{%- set label = (title if standalone else decl.sinceVersion) if decl.isStable else "Unstable" -%}
+{%- set classes = "mojo-stability-side" ~ (" mojo-stability-header" if header else "") -%}
+{% if stability_doc_url %}
+{# A Markdown link, not a raw <a href>: the docs site adds the version prefix #}
+{# (/nightly/...) by rewriting Markdown links, and leaves raw HTML untouched. #}
+{# The blank lines are what let CommonMark parse the link inside the div. #}
+<div class="{{ classes }}" title="{{ title }}">
+
+[{{ label }}]({{ stability_doc_url }})
+
+</div>
+{%- else %}
+<div class="{{ classes }}" title="{{ title }}">{{ label }}</div>
+{%- endif %}
 {%- endif %}
 {%- endmacro %}

@@ -30,32 +30,50 @@ def hann_window(
     periodic: bool = True,
     dtype: DType = DType.float32,
 ) -> TensorValue:
-    """Calculate a Hann window for a given length.
+    """Computes a Hann window of a given length.
 
-    Hann window function:
+    For a symmetric window of ``N`` points where ``N > 1``, the value at index
+    ``n`` is:
 
-    .. math::
+    .. code-block:: text
 
-        H[n] = 1/2 [1 - cos(2 * pi * n / (N - 1))]
+        w[n] = 0.5 * (1 - cos(2 * pi * n / (N - 1)))
 
-    where N is window_length.
+    When ``N`` is 0, the result is an empty tensor, and when ``N`` is 1, the
+    result is ``[1]``. A periodic window instead computes ``N + 1`` points and
+    drops the last one, which makes it suitable for spectral analysis.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("hann_window_example") as graph:
+            graph.output(ops.hann_window(4, device, periodic=True))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+        # result holds [0.0, 0.5, 1.0, 0.5].
 
     Args:
-        window_length: The length of the window.
-        device: The device to run the operation on.
-        periodic: bool
-            flag determines whether the returned window trims off the last
-            duplicate value from the symmetric window and is ready to be used
-            as a periodic window with functions like stft().
-            hann_window(L, periodic=True) == hann_window(L + 1, periodic=False)[:-1])
-        dtype: The desired data type of the output tensor.
+        window_length: The number of points in the window.
+        device: The device the window lives on.
+        periodic: Whether to return a periodic window. When ``True``, computes
+            a symmetric window of ``window_length + 1`` points and drops the
+            last point, so that
+            ``hann_window(L, periodic=True)`` equals
+            ``hann_window(L + 1, periodic=False)[:-1]``. Defaults to ``True``.
+        dtype: The output tensor's data type. Defaults to ``float32``.
 
     Returns:
-        A 1-D tensor of size (window_length,) containing the window.
+        A 1-D ``TensorValue`` of shape ``(window_length,)`` representing the
+        window.
 
     Raises:
-        ValueError: If window_length is negative.
-        TypeError: If window_length is not an integer.
+        ValueError: If ``window_length`` is negative.
+        TypeError: If ``window_length`` isn't an integer.
     """
     if not isinstance(window_length, int):
         raise TypeError(

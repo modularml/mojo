@@ -1,0 +1,28 @@
+load("//bazel:api.bzl", "pkg_filegroup", "pkg_files")
+
+# gazelle:default_visibility //utils:__subpackages__
+
+package(default_visibility = ["//utils:__subpackages__"])
+
+pkg_filegroup(
+    name = "jupyter-mojo",
+    srcs = [
+        ":jupyter-manage-kernel",
+        ":jupyter-mojo-kernel",
+    ],
+)
+
+pkg_files(
+    name = "jupyter-manage-kernel",
+    srcs = [
+        "manage_kernel.py",
+    ],
+)
+
+pkg_files(
+    name = "jupyter-mojo-kernel",
+    srcs = glob([
+        "kernel/*",
+    ]),
+    prefix = "kernel",
+)

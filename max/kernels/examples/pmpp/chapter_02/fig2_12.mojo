@@ -15,15 +15,15 @@
 # Demonstrates how to calculate grid and block dimensions
 
 from std.math import ceildiv
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 
 # ========================== KERNEL CODE ==========================
 
 
 def vec_add(
-    a: UnsafePointer[Float32, MutExternalOrigin],
-    b: UnsafePointer[Float32, MutExternalOrigin],
-    c: UnsafePointer[Float32, MutExternalOrigin],
+    a: UnsafePointer[Float32, MutUntrackedOrigin],
+    b: UnsafePointer[Float32, MutUntrackedOrigin],
+    c: UnsafePointer[Float32, MutUntrackedOrigin],
     n: Int,
     ctx: DeviceContext,
 ) raises:

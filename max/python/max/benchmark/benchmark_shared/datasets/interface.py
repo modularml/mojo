@@ -207,7 +207,6 @@ class BenchmarkDataset(ABC):
             ValueError: If the dataset is unknown, not supported, or if both modes are specified
             NotImplementedError: If the dataset doesn't support the requested mode
         """
-        pass
 
     @abstractmethod
     def sample_requests(
@@ -244,4 +243,3 @@ class BenchmarkDataset(ABC):
             ValueError: If the dataset cannot be loaded or parameters are invalid
             NotImplementedError: If required parameters are missing for this dataset type
         """
-        pass

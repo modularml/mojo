@@ -26,9 +26,11 @@ from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
+from max.pipelines.context.exceptions import InputError
+from max.pipelines.context.outputs import GenerationOutput
 from max.pipelines.modeling.types import OpenResponsesRequest
-from max.pipelines.modeling.types.generation import GenerationOutput
 from max.pipelines.request.open_responses import (
+    OutputAudioContent,
     OutputContent,
     OutputImageContent,
     OutputVideoContent,
@@ -96,24 +98,34 @@ async def create_response(
 
     # Get the first chunk from the handler (raises StopAsyncIteration if empty)
     generator = request.app.state.handler.next(open_responses_request)
-    final_output = await anext(generator)
-    logger.debug(
-        "Received chunk - is_done=%s, status=%s",
-        final_output.is_done,
-        final_output.final_status,
-    )
+    try:
+        final_output = await anext(generator)
+        logger.debug(
+            "Received chunk - is_done=%s, status=%s",
+            final_output.is_done,
+            final_output.final_status,
+        )
 
-    # Continue consuming chunks until we get is_done=True
-    if not final_output.is_done:
-        async for chunk in generator:
-            logger.debug(
-                "Received chunk - is_done=%s, status=%s",
-                chunk.is_done,
-                chunk.final_status,
-            )
-            final_output = chunk
-            if chunk.is_done:
-                break
+        # Continue consuming chunks until we get is_done=True
+        if not final_output.is_done:
+            async for chunk in generator:
+                logger.debug(
+                    "Received chunk - is_done=%s, status=%s",
+                    chunk.is_done,
+                    chunk.final_status,
+                )
+                final_output = chunk
+                if chunk.is_done:
+                    break
+    except InputError as e:
+        logger.warning(
+            "Input validation error in request %s: %s",
+            open_responses_request.request_id.value,
+            str(e),
+        )
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST, detail=str(e)
+        ) from e
 
     try:
         final_output = await _persist_generated_media(
@@ -174,6 +186,22 @@ async def get_generated_video_content(
     )
 
 
+@router.get("/audio/{audio_id}/content", name="get_generated_audio_content")
+async def get_generated_audio_content(
+    request: Request, audio_id: str
+) -> FileResponse:
+    asset = _require_asset(
+        _get_media_store(request).get_audio(audio_id),
+        kind="audio",
+        asset_id=audio_id,
+    )
+    return FileResponse(
+        path=asset.path,
+        media_type=asset.media_type,
+        filename=asset.filename,
+    )
+
+
 async def _persist_generated_media(
     request: Request,
     open_responses_request: OpenResponsesRequest,
@@ -182,6 +210,34 @@ async def _persist_generated_media(
     media_store = getattr(request.app.state, "media_store", None)
     if not isinstance(media_store, GeneratedMediaStore):
         return final_output
+
+    # A waveform cannot be JSON, so audio always leaves as a URL: this route
+    # has no field a client could use to ask for it inline, and /v1/audio/speech
+    # is the endpoint that hands back the bytes themselves.
+    audio_output: list[OutputContent] = []
+    persisted_audio = False
+    for content in final_output.output:
+        if not isinstance(content, OutputAudioContent):
+            audio_output.append(content)
+            continue
+
+        audio_asset = await media_store.save_audio_content(content)
+        audio_output.append(
+            content.model_copy(
+                update={
+                    "audio_url": str(
+                        request.url_for(
+                            "get_generated_audio_content",
+                            audio_id=audio_asset.asset_id,
+                        )
+                    ),
+                    "samples": None,
+                }
+            )
+        )
+        persisted_audio = True
+    if persisted_audio:
+        return final_output.model_copy(update={"output": audio_output})
 
     video_options = open_responses_request.body.provider_options.video
     if (

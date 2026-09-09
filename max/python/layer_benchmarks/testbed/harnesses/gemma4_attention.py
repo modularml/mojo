@@ -44,11 +44,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import torch
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from max.driver import DLPackArray
 from max.dtype import DType
 from max.graph import DeviceRef, Graph, TensorType
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.rotary_embedding import Llama3RotaryEmbedding
 from max.pipelines.architectures.gemma4.layers.attention import Gemma4Attention
 
@@ -106,7 +107,7 @@ class Gemma4AttentionHarness(
         is_sliding = p.is_sliding
         attention_k_eq_v = p.attention_k_eq_v
 
-        kv_params = KVCacheParams(
+        kv_params = MHAKVCacheParams(
             dtype=DType.bfloat16,
             n_kv_heads=n_kv_heads,
             head_dim=head_dim,
@@ -199,7 +200,7 @@ class Gemma4AttentionHarness(
         input_row_offsets_type = TensorType(
             DType.uint32, shape=["input_row_offsets_len"], device=device_ref
         )
-        flattened_kv_types = kv_params.get_symbolic_inputs().flatten()
+        flattened_kv_types = kv_params.flattened_kv_inputs()
 
         with Graph(
             "Gemma4Attention",
@@ -210,11 +211,9 @@ class Gemma4AttentionHarness(
             ),
         ) as graph:
             inputs, input_row_offsets, *kv_cache = graph.inputs
-            kv_collection = (
-                kv_params.get_symbolic_inputs()
-                .unflatten(iter(kv_cache))
-                .inputs[0]
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(kv_cache)
+            ).inputs[0]
             graph.output(
                 layer(
                     inputs.tensor,

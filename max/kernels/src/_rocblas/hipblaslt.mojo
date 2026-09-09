@@ -13,12 +13,12 @@
 
 from std.os import abort
 from std.pathlib import Path
-from std.ffi import _CPointer, _find_dylib
+from std.ffi import _find_dylib
 from std.ffi import _get_dylib_function as _ffi_get_dylib_function
 from std.ffi import _Global, OwnedDLHandle
-
-from std.gpu.host._amdgpu_hip import hipStream_t
 from std.utils import StaticTuple
+
+from max.gpu.host._amdgpu_hip import hipStream_t
 
 comptime hipblasLtHandle_t = Optional[OpaquePointer[MutAnyOrigin]]
 comptime hipblasLtMatmulDesc_t = Optional[OpaquePointer[MutAnyOrigin]]
@@ -437,9 +437,9 @@ def hipblasLtMatmul(
     _b: OpaquePointer[_],
     _bdesc: hipblasLtMatrixLayout_t,
     beta: OpaquePointer[_],
-    _c: _CPointer[NoneType, _],
+    _c: OptionalPointer[NoneType, _],
     _cdesc: hipblasLtMatrixLayout_t,
-    _d: _CPointer[NoneType, _],
+    _d: OptionalPointer[NoneType, _],
     _ddesc: hipblasLtMatrixLayout_t,
     algo: UnsafePointer[hipblasLtMatmulAlgo_t, _],
     workspace: OpaquePointer[_],
@@ -499,24 +499,24 @@ def _check_hipblas_error(status: Status) raises:
 
 @always_inline
 def _convert_to_hip_datatype[dtype: DType]() -> hipDataType_t:
-    comptime if dtype == DType.float32:
+    comptime if dtype == .float32:
         return hipDataType_t.R_32F
-    elif dtype == DType.float16:
+    elif dtype == .float16:
         return hipDataType_t.R_16F
-    elif dtype == DType.float8_e4m3fn:
+    elif dtype == .float8_e4m3fn:
         return hipDataType_t.R_8F_E4M3
-    elif dtype == DType.float8_e5m2:
+    elif dtype == .float8_e5m2:
         return hipDataType_t.R_8F_E5M2
-    elif dtype == DType.float8_e4m3fnuz:
+    elif dtype == .float8_e4m3fnuz:
         return hipDataType_t.R_8F_E4M3_FNUZ
-    elif dtype == DType.float8_e5m2fnuz:
+    elif dtype == .float8_e5m2fnuz:
         return hipDataType_t.R_8F_E5M2_FNUZ
     # TODO (KERN-2238): uint8 is a proxy data type for two Float4-E2M1 values for now.
     # Replace this with float4-e2m1fn when GENAI-337 is fixed.
-    elif dtype == DType.uint8:
+    elif dtype == .uint8:
         return hipDataType_t.R_4F_E2M1
     else:
-        comptime assert dtype == DType.bfloat16, (
+        comptime assert dtype == .bfloat16, (
             "Only support FP32, FP16, BF16, E4M3(FNUZ), E5M2(FNUZ), and E2M1x2"
             " (UInt8). Please extend it if more dtypes are needed."
         )

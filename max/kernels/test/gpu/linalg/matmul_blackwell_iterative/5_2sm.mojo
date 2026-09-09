@@ -11,6 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from std.builtin._closure import __ownership_keepalive
 from std.hashlib import default_comp_time_hasher
 from std.math import align_up
 from std.math.uutils import umod, ufloordiv, udivmod
@@ -18,28 +19,29 @@ from std.memory import bitcast
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import barrier
-from std.gpu.primitives.cluster import (
+from max.gpu.sync import barrier
+from max.gpu.primitives.cluster import (
     block_rank_in_cluster,
     cluster_sync,
     elect_one_sync,
 )
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_id_in_cluster, block_idx, lane_id, thread_idx, warp_id
-from std.gpu.memory import fence_async_view_proxy, external_memory
-from std.gpu.compute.mma import st_matrix
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.compute.arch.tcgen05 import *
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import block_id_in_cluster, block_idx, lane_id, thread_idx, warp_id
+from max.gpu.memory import fence_async_view_proxy, external_memory
+from max.gpu.compute.mma import st_matrix
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.compute.arch.tcgen05 import *
 from internal_utils import assert_almost_equal
 from layout import (
     IntTuple,
     Layout,
     LayoutTensor,
+    LTToTTLayout,
     RuntimeLayout,
     RuntimeTuple,
+    TileTensor,
     UNKNOWN_VALUE,
-    lt_to_tt,
 )
 from layout._utils import ManagedLayoutTensor
 from layout.swizzle import make_swizzle
@@ -98,8 +100,9 @@ def kernel_5[
     a_tma_op: TMATensorTile[a_type, a_tma_rank, a_tile_shape, a_desc_shape],
     b_tma_op: TMATensorTile[b_type, b_tma_rank, b_tile_shape, b_desc_shape],
     c_tma_op: TMATensorTile[c_type, c_tma_rank, c_tile_shape, c_desc_shape],
-    num_iters: Int,
+    num_iters_dev: Int32,
 ):
+    var num_iters = Int(num_iters_dev)
     comptime BM = block_tile_shape[0]
     comptime BN = block_tile_shape[1]
     comptime BK = block_tile_shape[2]
@@ -140,28 +143,26 @@ def kernel_5[
     comptime sub_a_smem_tile_t = LayoutTensor[
         a_type,
         sub_a_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        _,
+        address_space=.SHARED,
         alignment=128,
     ]
     comptime sub_b_smem_tile_t = LayoutTensor[
         b_type,
         sub_b_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        _,
+        address_space=.SHARED,
         alignment=128,
     ]
     comptime c_smem_tile_t = LayoutTensor[
         c_type,
         c_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        _,
+        address_space=.SHARED,
         alignment=128,
     ]
 
-    var smem = external_memory[
-        UInt8, address_space=AddressSpace.SHARED, alignment=8
-    ]()
+    var smem = external_memory[UInt8, address_space=.SHARED, alignment=8]()
 
     comptime a_smem_bytes = a_smem_layout.size() * size_of[a_type]()
     comptime b_smem_bytes = b_smem_layout.size() * size_of[b_type]()
@@ -177,21 +178,8 @@ def kernel_5[
         Int64
     ]()
 
-    var a_smem_tile = LayoutTensor[
-        a_type,
-        a_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
-        alignment=128,
-    ](a_smem)
-
-    var b_smem_tile = LayoutTensor[
-        b_type,
-        b_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
-        alignment=128,
-    ](b_smem)
+    var a_smem_tile = TileTensor(a_smem, LTToTTLayout[a_smem_layout]())
+    var b_smem_tile = TileTensor(b_smem, LTToTTLayout[b_smem_layout]())
 
     comptime accum_type = get_accum_type[a_type]()
 
@@ -208,8 +196,8 @@ def kernel_5[
     # Shared memory pointer to hold tensor memory address
     var ptr_tmem_addr = (mma_mbar_ptr + 2).bitcast[UInt32]()
 
-    tma_mbar = tma_mbar_ptr.bitcast[SharedMemBarrier]()
-    mma_mbar = mma_mbar_ptr.bitcast[SharedMemBarrier]()
+    var tma_mbar = tma_mbar_ptr.bitcast[SharedMemBarrier]()
+    var mma_mbar = mma_mbar_ptr.bitcast[SharedMemBarrier]()
 
     var elect_one_warp = warp_id() == 0
     var elect_one_thread = elect_one_sync()
@@ -234,7 +222,7 @@ def kernel_5[
     var tma_phase: UInt32 = 0
     var mma_phase: UInt32 = 0
 
-    tmem_addr = ptr_tmem_addr[0]
+    var tmem_addr = ptr_tmem_addr[0]
 
     var rank_m = block_id_in_cluster.x
     var rank_n = block_id_in_cluster.y
@@ -261,11 +249,6 @@ def kernel_5[
     b_multicast_mask <<= UInt16(peer_cta_coord[0])
     b_multicast_mask <<= UInt16(rank_n * CLUSTER_M)
 
-    var a_mma_mask = a_multicast_mask >> UInt16(peer_cta_coord[0])
-    var b_mma_mask = b_multicast_mask >> UInt16(peer_cta_coord[0])
-    var c_mma_mask: UInt16 = (a_mma_mask | a_mma_mask << 1) | (
-        b_mma_mask | b_mma_mask << 1
-    )
     var mma_op = MmaOpSM100_SS[
         c_type,
         a_type,
@@ -302,8 +285,8 @@ def kernel_5[
                 comptime b_offset = b_smem_layout(IntTuple(0, k))
                 comptime assert ((a_offset * size_of[a_type]()) % 128) == 0
                 comptime assert ((b_offset * size_of[b_type]()) % 128) == 0
-                sub_a_smem_tile = sub_a_smem_tile_t(a_smem + a_offset)
-                sub_b_smem_tile = sub_b_smem_tile_t(b_smem + b_offset)
+                var sub_a_smem_tile = sub_a_smem_tile_t(a_smem + a_offset)
+                var sub_b_smem_tile = sub_b_smem_tile_t(b_smem + b_offset)
 
                 var a_smem_slice = type_of(sub_a_smem_tile)(
                     sub_a_smem_tile.ptr + peer_cta_coord[2] * a_tma_load_size
@@ -331,8 +314,8 @@ def kernel_5[
 
             if elect_one_warp and elect_one_thread:
                 mma_op.mma(
-                    lt_to_tt(a_smem_tile),
-                    lt_to_tt(b_smem_tile),
+                    a_smem_tile,
+                    b_smem_tile,
                     tmem_addr,
                     init_c=(i == 0),  # Initialize C on first iteration
                 )
@@ -374,12 +357,12 @@ def kernel_5[
     var c_coord_y = ufloordiv(warp_id(), 2) if MMA_M == 128 else 0
 
     # 32 x BN
-    c_warp_tile = c_smem_tile.tile[C_WBM, C_WBN](c_coord_x, c_coord_y)
+    var _c_warp_tile = c_smem_tile.tile[C_WBM, C_WBN](c_coord_x, c_coord_y)
 
     var st_matrix_rt_layout = RuntimeLayout[
         st_matrix_n_layout[c_type, TMA_BN, num_m_mmas, 1](),
-        element_type=DType.int32,
-        linear_idx_type=DType.int32,
+        element_type=.int32,
+        linear_idx_type=.int32,
     ]()
 
     comptime st_matrix_swizzle = make_swizzle[c_type, c_swizzle]()
@@ -405,27 +388,23 @@ def kernel_5[
         var lower = c_smem_warp_tile.tile[16, TMA_BN](1, 0)
 
         comptime for i in range(TMA_BN // 16):
-            var d_reg_upper = SIMD[DType.bfloat16, 8]()
-            var d_reg_lower = SIMD[DType.bfloat16, 8]()
+            var d_reg_upper = SIMD[.bfloat16, 8]()
+            var d_reg_lower = SIMD[.bfloat16, 8]()
 
             comptime for _ei in range(4):
                 comptime _src_offset = (
                     i + tma_n * (TMA_BN // 16)
                 ) * 8 + 2 * _ei
-                var upper_pair = SIMD[DType.float32, 2](
-                    rebind[Scalar[DType.float32]](c_frag_upper[_src_offset]),
-                    rebind[Scalar[DType.float32]](
-                        c_frag_upper[_src_offset + 1]
-                    ),
+                var upper_pair = SIMD[.float32, 2](
+                    rebind[Float32](c_frag_upper[_src_offset]),
+                    rebind[Float32](c_frag_upper[_src_offset + 1]),
                 )
-                var lower_pair = SIMD[DType.float32, 2](
-                    rebind[Scalar[DType.float32]](c_frag_lower[_src_offset]),
-                    rebind[Scalar[DType.float32]](
-                        c_frag_lower[_src_offset + 1]
-                    ),
+                var lower_pair = SIMD[.float32, 2](
+                    rebind[Float32](c_frag_lower[_src_offset]),
+                    rebind[Float32](c_frag_lower[_src_offset + 1]),
                 )
-                var upper_casted = upper_pair.cast[DType.bfloat16]()
-                var lower_casted = lower_pair.cast[DType.bfloat16]()
+                var upper_casted = upper_pair.cast[.bfloat16]()
+                var lower_casted = lower_pair.cast[.bfloat16]()
                 d_reg_upper[2 * _ei] = upper_casted[0]
                 d_reg_upper[2 * _ei + 1] = upper_casted[1]
                 d_reg_lower[2 * _ei] = lower_casted[0]
@@ -442,8 +421,8 @@ def kernel_5[
                 )
             ](lane_id(), i, 0, 0)
 
-            var d_reg_upper_packed = bitcast[DType.float32, 4](d_reg_upper)
-            var d_reg_lower_packed = bitcast[DType.float32, 4](d_reg_lower)
+            var d_reg_upper_packed = bitcast[.float32, 4](d_reg_upper)
+            var d_reg_lower_packed = bitcast[.float32, 4](d_reg_lower)
 
             st_matrix[simd_width=4](
                 upper.ptr
@@ -472,8 +451,7 @@ def kernel_5[
         var c_tma_tile = LayoutTensor[
             c_type,
             Layout.row_major(c_tile_shape[0], c_tile_shape[1]),
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
             alignment=128,
         ](c_smem_offset)
 
@@ -524,11 +502,11 @@ def blackwell_kernel_5[
     comptime MMA_N = umma_shape[1]
     comptime MMA_K = umma_shape[2]
 
-    a_tma_op = create_tensor_tile[
+    var a_tma_op = create_tensor_tile[
         Index(Int32(BM) // cluster_shape[1], 64), swizzle_mode=a_swizzle
     ](ctx, a)
 
-    b_tma_op = create_tensor_tile[
+    var b_tma_op = create_tensor_tile[
         Index(
             Int32(BN) // (cluster_shape[0] // Int32(cta_group)), 64
         ) if transpose_b else Index(
@@ -538,7 +516,7 @@ def blackwell_kernel_5[
     ](ctx, b)
 
     # TODO: 64 satisfies 128B swizzle, we need set TMA_BN according to swizzle mode
-    c_tma_op = create_tma_tile[BM, 64, swizzle_mode=c_swizzle](ctx, c)
+    var c_tma_op = create_tma_tile[BM, 64, swizzle_mode=c_swizzle](ctx, c)
 
     comptime smem_size = (
         BM * BK * size_of[a_type]()
@@ -573,7 +551,7 @@ def blackwell_kernel_5[
         a_tma_op,
         b_tma_op,
         c_tma_op,
-        K // BK,
+        Int32(K // BK),
         grid_dim=(
             align_up(M // BM, Int(cluster_shape[0])),
             align_up(N // BN // cta_group, Int(cluster_shape[1])),
@@ -696,8 +674,7 @@ def test_blackwell_kernel_5[
         comptime num_warmup = 20
 
         @always_inline
-        @parameter
-        def run_kernel(ctx: DeviceContext) raises:
+        def run_kernel(ctx: DeviceContext) raises {imm}:
             blackwell_kernel_5[
                 transpose_b=transpose_b,
                 umma_shape=mma_shape,
@@ -721,7 +698,7 @@ def test_blackwell_kernel_5[
         print("finished warmup")
 
         var nstime = (
-            Float64(ctx.execution_time[run_kernel](num_runs)) / num_runs
+            Float64(ctx.execution_time(run_kernel, num_runs)) / num_runs
         )
         var sectime = nstime * 1e-9
         var TFlop = 2.0 * Float64(M) * Float64(N) * Float64(K) * 1e-12
@@ -754,6 +731,10 @@ def test_blackwell_kernel_5[
             atol=0.0001,
             rtol=rtol,
         )
+
+    # `a_device_lt` / `b_device_lt` are raw pointer views, so past the copies
+    # above nothing else refers to the buffers backing them.
+    __ownership_keepalive(a_device, b_device)
 
     print("\n=== TEST PASSED ===")
 
@@ -801,9 +782,9 @@ def benchmark_blackwell_matmul(ctx: DeviceContext) raises:
             "]",
         )
         test_blackwell_kernel_5[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             block_tile_shape,
             umma_shape,
             cluster_shape=StaticTuple[Int32, 3](2, 1, 1),
@@ -829,9 +810,9 @@ def main() raises:
         comptime umma_shape = Index(256, 256, 16)
 
         test_blackwell_kernel_5[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             block_tile_shape,
             umma_shape,
             cluster_shape=StaticTuple[Int32, 3](2, 1, 1),

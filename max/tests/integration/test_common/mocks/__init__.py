@@ -15,25 +15,29 @@
 from collections.abc import Generator
 from contextlib import contextmanager
 
-import hf_repo_lock
 from max.driver import DeviceSpec, scan_available_devices
-from max.pipelines.core import TextContext
-from max.pipelines.lib import TextGenerationPipeline, generate_local_model_path
+from max.pipelines.context import TextContext
+from max.pipelines.lib import (
+    MemoryPlan,
+    TextGenerationPipeline,
+    generate_local_model_path,
+)
 
 from .pipeline_config import (
     DummyMAXModelConfig,
     DummyPipelineConfig,
-    mock_estimate_memory_footprint,
+    mock_hf_repo_access,
     mock_huggingface_config,
     mock_huggingface_hub_repo_exists_with_retry,
     mock_pipeline_config_hf_dependencies,
     mock_pipeline_config_resolve,
+    mock_plan_from_sizes,
+    patched_hf_construction,
 )
-from .pipeline_model import MockPipelineModel
+from .pipeline_model import MOCK_MODEL_MAX_SEQ_LEN, MockPipelineModel
 from .tokenizer import MockTextTokenizer
 
 REPO_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
-REVISION = hf_repo_lock.revision_for_hf_repo(REPO_ID)
 
 
 @contextmanager
@@ -54,11 +58,8 @@ def retrieve_mock_text_generation_pipeline(
     if not device_specs:
         device_specs = scan_available_devices()
 
-    assert isinstance(REVISION, str), (
-        "REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     mock_config = DummyPipelineConfig(
-        model_path=generate_local_model_path(REPO_ID, REVISION),
+        model_path=generate_local_model_path(REPO_ID),
         max_length=max_length,
         max_batch_size=None,
         device_specs=device_specs,
@@ -79,9 +80,20 @@ def retrieve_mock_text_generation_pipeline(
         pipeline: TextGenerationPipeline[TextContext] = TextGenerationPipeline(
             pipeline_config=mock_config,
             pipeline_model=MockPipelineModel,
-            eos_token_id=eos_token,
             weight_adapters={},
             tokenizer=tokenizer,
+            # Plans are always populated with the model's effective bound;
+            # mirror the mock model's clamp when the caller sets no length.
+            memory_plan=MemoryPlan(
+                planned_max_batch_size=mock_config.runtime.max_batch_size or 1,
+                footprint=0,
+                planned_max_length=(
+                    max_length
+                    if max_length is not None
+                    else MOCK_MODEL_MAX_SEQ_LEN
+                ),
+                device_specs=tuple(device_specs),
+            ),
         )
 
         yield tokenizer, pipeline
@@ -93,10 +105,12 @@ __all__ = [
     "DummyMAXModelConfig",
     "DummyPipelineConfig",
     "MockTextTokenizer",
-    "mock_estimate_memory_footprint",
+    "mock_hf_repo_access",
     "mock_huggingface_config",
     "mock_huggingface_hub_repo_exists_with_retry",
     "mock_pipeline_config_hf_dependencies",
     "mock_pipeline_config_resolve",
+    "mock_plan_from_sizes",
+    "patched_hf_construction",
     "retrieve_mock_text_generation_pipeline",
 ]

@@ -16,24 +16,12 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.types import TextGenerationContext
-from testbed.harnesses.olmo2_attention import (
-    Olmo2AttentionHarness,
-    Olmo2AttentionStaticParams,
-)
+from layer_mefs import create_runner
+from max.pipelines.context import TextContext
+from testbed.harnesses.olmo2_attention import Olmo2AttentionStaticParams
 from testbed.harnesses.ragged_attention_harness import AttentionDynamicParams
-from testbed.runner import LayerTestRunner, create_session
-
-# OLMo-2-7B-like config
-_STATIC_PARAMS = Olmo2AttentionStaticParams(
-    hidden_size=4096,
-    n_heads=32,
-    n_kv_heads=8,
-    head_dim=128,
-    max_seq_len=4096,
-    rope_theta=500000.0,
-    rms_norm_eps=1e-5,
-)
+from testbed.runner import LayerTestRunner
+from testbed.specs import OLMO2_ATTENTION
 
 _SMOKE_SHAPES = [
     AttentionDynamicParams(batch_size=1, seq_len=8192, ctx_len=8192),
@@ -45,19 +33,16 @@ _SMOKE_SHAPES = [
 def runner() -> LayerTestRunner[
     Olmo2AttentionStaticParams,
     AttentionDynamicParams,
-    list[TextGenerationContext],
+    list[TextContext],
 ]:
-    session, device = create_session()
-    return LayerTestRunner(
-        Olmo2AttentionHarness(_STATIC_PARAMS, session, device)
-    )
+    return create_runner(OLMO2_ATTENTION)
 
 
 def test_benchmark_smoke(
     runner: LayerTestRunner[
         Olmo2AttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     results = runner.benchmark(_SMOKE_SHAPES, iterations=1, warmup=1)
@@ -69,7 +54,7 @@ def test_correctness(
     runner: LayerTestRunner[
         Olmo2AttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     # Correctness only works for prefill (ctx_len=0), batch_size=1.

@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -13,11 +12,15 @@ modular_py_test(
     srcs = glob(
         [
             "*.py",
+            "audio_generation/*.py",
             "pixel_generation/*.py",
             "text_generation/*.py",
         ],
     ),
     deps = [
+        "//max/python/max:_core",
+        "//max/python/max/pipelines/audio",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/pipelines/request",
         "//max/python/max/serve:queue",

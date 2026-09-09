@@ -1,0 +1,53 @@
+load("//bazel:api.bzl", "modular_nanobind_extension", "modular_py_test")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_nanobind_extension(
+    name = "init_bindings",
+    testonly = True,
+    srcs = ["InitBindings.cpp"],
+    deps = [
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+    ],
+)
+
+modular_py_test(
+    name = "test_signal_handler_python",
+    srcs = ["test_signal_handler_python.py"],
+    data = [
+        "test_script.py",
+        ":init_bindings",
+    ],
+    env = {
+        "PYTHONPATH": "Init/integration-test/python",
+    },
+)
+
+modular_py_test(
+    name = "test_signal_handler_python_gil",
+    srcs = ["test_signal_handler_python_gil.py"],
+    data = [
+        "test_script_gil.py",
+        ":init_bindings",
+    ],
+    env = {
+        "PYTHONPATH": "Init/integration-test/python",
+    },
+)
+
+test_suite(
+    name = "signal_handler_tests",
+    tests = [
+        ":test_signal_handler_python",
+        ":test_signal_handler_python_gil",
+    ],
+)

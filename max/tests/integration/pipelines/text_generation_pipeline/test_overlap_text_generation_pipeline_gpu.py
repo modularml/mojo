@@ -22,7 +22,13 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 from max.config import ConfigFileModel
-from max.driver import Accelerator, Buffer, DevicePinnedBuffer, DeviceSpec
+from max.driver import (
+    Accelerator,
+    Buffer,
+    DevicePinnedBuffer,
+    DeviceSpec,
+    Usage,
+)
 from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import (
@@ -34,11 +40,17 @@ from max.graph import (
     TensorType,
     ops,
 )
-from max.nn import KVCacheInputs, kernels
-from max.nn.kv_cache import KVCacheParams
-from max.pipelines.core import TextContext
-from max.pipelines.core.context import FUTURE_TOKEN
+from max.nn import kernels
+from max.nn.kv_cache import KVCacheInputsInterface, KVCacheParams
+from max.pipelines.context import (
+    EOSTracker,
+    SamplingParams,
+    TextContext,
+    TokenBuffer,
+)
+from max.pipelines.context.context import FUTURE_TOKEN
 from max.pipelines.lib import (
+    MemoryPlan,
     ModelInputs,
     ModelOutputs,
     OverlapTextGenerationPipeline,
@@ -51,7 +63,6 @@ from max.pipelines.lib.pipeline_variants import overlap_text_generation
 from max.pipelines.modeling.types import (
     RequestID,
     TextGenerationInputs,
-    TokenBuffer,
 )
 
 GPU_SECONDS = 0.5
@@ -121,7 +132,7 @@ def draw_span_rows(
     tick_line = [" "] * width
     label_line = [" "] * width
 
-    for val in range(0, max_tick + 1):
+    for val in range(max_tick + 1):
         pos = scale(float(val))
         tick_line[pos] = "|"
 
@@ -141,6 +152,8 @@ class FakeSamplingConfig(ConfigFileModel):
     in_dtype: DType = DType.float32
     out_dtype: DType = DType.float32
     enable_structured_output: bool = False
+    structured_output_backend: str | None = None
+    sample_on_host: bool = False
     enable_min_tokens: bool = False
 
 
@@ -280,7 +293,10 @@ class FakePipelineModel(PipelineModelWithKVCache[TextContext]):
         )
         self.device = Accelerator()
         self.kv_cache_config = MagicMock()
-        self.max_seq_len = 9999
+        # max_seq_len is a read-only view of the plan on the base class.
+        self.memory_plan = MemoryPlan(
+            planned_max_batch_size=1, footprint=0, planned_max_length=9999
+        )
         print(f"Building graph for device {self.device}")
         t0 = time.time()
         self.model = build_graph(device_ref=DeviceRef.from_device(self.device))
@@ -290,7 +306,7 @@ class FakePipelineModel(PipelineModelWithKVCache[TextContext]):
     def prepare_initial_token_inputs(
         self,
         replica_batches: Sequence[Sequence[TextContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
+        kv_cache_inputs: KVCacheInputsInterface[Buffer, Buffer] | None = None,
         return_n_logits: int = 1,
     ) -> ModelInputs:
         del kv_cache_inputs, return_n_logits  # Unused args
@@ -362,12 +378,21 @@ FakePipelineModel.__abstractmethods__ = frozenset()
 
 
 def create_context(
-    isl: int = 64, osl: int = 64, offset: int = 0
+    isl: int = 64,
+    osl: int = 64,
+    offset: int = 0,
+    temperature: float = 1.0,
+    eos_token_ids: set[int] | None = None,
 ) -> TextContext:
+    kwargs: dict[str, Any] = {}
+    if eos_token_ids is not None:
+        kwargs["eos_tracker"] = EOSTracker(eos_token_ids=eos_token_ids)
     return TextContext(
         request_id=RequestID(),
         max_length=isl + osl,
         tokens=TokenBuffer(np.arange(isl) + offset),
+        sampling_params=SamplingParams(temperature=temperature),
+        **kwargs,
     )
 
 
@@ -385,6 +410,8 @@ def monkeypatch_weight_and_kvcache_loading(
 def create_overlap_pipeline(
     enable_overlap_scheduler: bool,
     disable_overlap: bool = False,
+    pipeline_role: str = "prefill_and_decode",
+    speculative: FakeSpeculativeConfig | None = None,
 ) -> OverlapTextGenerationPipeline[Any]:
     sampling_config = FakeSamplingConfig(enable_penalties=False)
     model_config = FakeModelConfig(
@@ -395,18 +422,25 @@ def create_overlap_pipeline(
     )
     runtime = FakeRuntimeConfig(
         enable_overlap_scheduler=enable_overlap_scheduler,
+        pipeline_role=pipeline_role,
     )
     pipeline_config = FakePipelineConfig(
         model=model_config,
         sampling=sampling_config,
         runtime=runtime,
+        speculative=speculative,
     )
     pipeline = OverlapTextGenerationPipeline(
         pipeline_config=cast(PipelineConfig, pipeline_config),
         pipeline_model=cast(type[PipelineModel[Any]], FakePipelineModel),
-        eos_token_id=9999,
         weight_adapters=MagicMock(),
-        tokenizer=MagicMock(),
+        tokenizer=MagicMock(spec=[]),
+        memory_plan=MemoryPlan(
+            planned_max_batch_size=runtime.max_batch_size or 1,
+            footprint=0,
+            planned_max_length=None,
+            device_specs=tuple(model_config.device_specs),
+        ),
         disable_overlap=disable_overlap,
     )
     return pipeline
@@ -414,7 +448,6 @@ def create_overlap_pipeline(
 
 def fake_cpu_pre_or_post_processing() -> None:
     time.sleep(CPU_SECONDS)
-    return
 
 
 def prime_host_buffer_cache() -> None:
@@ -422,7 +455,7 @@ def prime_host_buffer_cache() -> None:
         shape=[1024 * 1024],
         dtype=DType.int8,
         device=Accelerator(),
-        pinned=True,
+        usage=Usage.STAGING,
     )
     del t
 
@@ -469,7 +502,7 @@ def test_overlap_execution(
 
     num_trials = 3
     for _trial in range(num_trials):
-        _ = pipeline.execute(TextGenerationInputs(batches=[[]], num_steps=1))
+        _ = pipeline.execute(TextGenerationInputs(batches=[[]]))
 
         req_a = create_context(isl=17, osl=1, offset=100)
         req_b = create_context(isl=42, osl=4, offset=200)
@@ -501,7 +534,7 @@ def test_overlap_execution(
 
             span_start = time.time()
             inputs = TextGenerationInputs(
-                batches=[list(active_requests.values())], num_steps=1
+                batches=[list(active_requests.values())]
             )
             outputs = pipeline.execute(inputs)
             span_end = time.time()
@@ -573,7 +606,7 @@ def test_overlap_execution_with_preemption(
     def create_inputs(
         context: TextContext,
     ) -> TextGenerationInputs[TextContext]:
-        return TextGenerationInputs(batches=[[context]], num_steps=1)
+        return TextGenerationInputs(batches=[[context]])
 
     out = pipeline.execute(create_inputs(context))
     assert req_id not in out
@@ -611,7 +644,7 @@ def test_disable_overlap_returns_outputs_immediately(
     def create_inputs(
         contexts: list[TextContext],
     ) -> TextGenerationInputs[TextContext]:
-        return TextGenerationInputs(batches=[contexts], num_steps=1)
+        return TextGenerationInputs(batches=[contexts])
 
     # --- Single request, multiple generation steps ---
     req_a = create_context(isl=17, osl=3, offset=100)
@@ -636,3 +669,57 @@ def test_disable_overlap_returns_outputs_immediately(
     out = pipeline.execute(create_inputs([]))
     assert not pipeline.has_pending_outputs()
     assert len(out) == 0
+
+
+def test_overlap_reuses_generated_tokens_pinned_buffer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The per-step generated-token D2H pinned buffer is allocated once and
+    reused across overlap decode steps (no page-locking allocation per step),
+    while producing the same tokens as the deterministic fake model.
+
+    Guards the ``_sample_logits`` optimization: a single persistent buffer is
+    safe only because the previous batch's copy is read (in
+    ``sync_and_process_outputs``) strictly before the next batch's copy is
+    written. If that ordering broke, the token sequences below would corrupt.
+    """
+    monkeypatch_weight_and_kvcache_loading(monkeypatch)
+    prime_host_buffer_cache()
+
+    pipeline = create_overlap_pipeline(enable_overlap_scheduler=True)
+
+    # Two requests of different output lengths so the decode batch shrinks
+    # (2 -> 1) mid-run, exercising the ``[:batch_size]`` slice of the reused
+    # buffer without reallocation.
+    req_a = create_context(isl=17, osl=1, offset=100)
+    req_b = create_context(isl=42, osl=3, offset=200)
+    active = {req_a.request_id: req_a, req_b.request_id: req_b}
+    generated: dict[RequestID, list[int]] = {
+        req_a.request_id: [],
+        req_b.request_id: [],
+    }
+
+    seen_buffer_ids: set[int] = set()
+    while active:
+        inputs = TextGenerationInputs(batches=[list(active.values())])
+        outputs = pipeline.execute(inputs)
+
+        # After a decode step samples, the persistent buffer must exist and be
+        # sized for the max batch size, not the current (possibly smaller) one.
+        buf = pipeline._pinned_generated_tokens_host
+        assert buf is not None
+        assert int(buf.shape[0]) == pipeline.max_batch_size
+        seen_buffer_ids.add(id(buf))
+
+        for req_id, output in outputs.items():
+            if req_id in active:
+                generated[req_id].extend(output.tokens)
+                if output.is_done:
+                    del active[req_id]
+
+    # Deterministic fake model emits last_token + 1 each step.
+    assert generated[req_a.request_id] == [117]
+    assert generated[req_b.request_id] == [242, 243, 244]
+
+    # The buffer object was reused across every decode step (allocated once).
+    assert len(seen_buffer_ids) == 1

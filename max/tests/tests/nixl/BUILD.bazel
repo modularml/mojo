@@ -1,23 +1,66 @@
-load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("//bazel:api.bzl", "modular_py_library", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
 
+# Shared conftest helper for NIXL-using test suites: importing max._core
+# resolves the per-GPU-vendor plugin directory (Support/NixlPluginDir.h) and
+# sets NIXL_PLUGIN_DIR; this adds the test policy on top — loud failure when
+# a GPU host resolves no flavor, plus preloading the GPU runtime libraries
+# the UCX plugin needs at dlopen time.
+modular_py_library(
+    name = "nixl_plugin_env",
+    srcs = ["nixl_plugin_env.py"],
+    imports = ["."],
+    visibility = [
+        "//:__pkg__",
+        "//max/examples:__subpackages__",
+        "//max/tests:__subpackages__",
+        "//oss/modular/max/tests:__subpackages__",
+    ],
+    deps = ["//max/python/max:_core"],
+)
+
+# Needs no GPU and no RDMA hardware, so unlike the suite below it runs on any
+# Linux worker. Paths come through args so the external-repo runfiles layout
+# stays Bazel's to compute.
+sh_test(
+    name = "ucx_symbol_versions_test",
+    srcs = ["ucx_symbol_versions_test.sh"],
+    args = [
+        "$(rootpath @llvm-project//llvm:llvm-readelf)",
+        "$(rootpath @nixl_upstream//:cpu-verbs/libplugin_UCX.so)",
+    ],
+    data = [
+        "@llvm-project//llvm:llvm-readelf",
+        "@nixl_upstream//:cpu-verbs/libplugin_UCX.so",
+    ],
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
 modular_py_test(
     name = "tests",
-    srcs = glob(["*_gpu.py"]),
+    srcs = glob(["*_gpu.py"]) + ["conftest.py"],
+    # Vendor-selected NIXL plugins in the runfiles tree; the conftest
+    # resolves NIXL_PLUGIN_DIR through max._core.
+    data = ["//max/python/max/pipelines/kv_cache:nixl_host_plugins"],
     gpu_constraints = [
         "//:has_gpu",
-        "//:nvidia_gpu",
     ],
     tags = [
         "gpu",
     ],
+    # NVIDIA or AMD, never Apple: Apple GPUs only exist on the macOS
+    # platform, and NIXL/UCX is Linux-only.
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
     deps = [
+        ":nixl_plugin_env",
         "//max/python/max:_core",
         "//max/python/max/driver",
         requirement("numpy"),

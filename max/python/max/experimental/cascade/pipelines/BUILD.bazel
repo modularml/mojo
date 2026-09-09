@@ -1,12 +1,50 @@
 load("//bazel:api.bzl", "modular_py_library", "requirement")
+load("//max/python/max/pipelines/architectures:all_arches.bzl", "ALL_ARCHITECTURES")
 
 package(default_visibility = ["//max:consumers"])
 
+# Concrete cascade pipeline implementations (CommonTextGenPipeline) and the
+# in-process dummy fixtures. Depends only on cascade infra -- not on the
+# architecture registry -- so an architecture can reference a pipeline class
+# via SupportedArchitecture.cascade_pipeline_factory without a dependency cycle.
 modular_py_library(
     name = "pipelines",
-    srcs = glob(["*.py"]),
+    srcs = [
+        "__init__.py",
+        "chat_parser.py",
+        "common_textgen.py",
+        "dummy_imgen.py",
+        "dummy_textgen.py",
+        "echo_textgen.py",
+        "echo_tool_parser.py",
+        "text_echo.py",
+    ],
     deps = [
+        requirement("numpy"),
+        requirement("pillow"),
         requirement("pydantic"),
+        requirement("scipy"),
         "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/interfaces",
+        "//max/python/max/experimental/cascade/workers",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+    ],
+)
+
+# Top-level dispatcher: resolves any registered architecture and builds its
+# cascade pipeline. register_all_models() imports each architecture module
+# lazily (see max/python/max/pipelines/architectures/__init__.py), so depend on
+# every architecture to land them in the runfiles, and ignore them as extra
+# deps since none are imported statically.
+modular_py_library(
+    name = "all_pipelines",
+    srcs = ["all_pipelines.py"],
+    ignore_extra_deps = ALL_ARCHITECTURES,
+    deps = ALL_ARCHITECTURES + [
+        ":pipelines",
+        "//max/python/max/experimental/cascade/interfaces",
+        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/lib",
     ],
 )

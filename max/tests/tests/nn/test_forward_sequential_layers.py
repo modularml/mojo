@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 from max.dtype import DType
 from max.graph import (
+    BufferType,
     DeviceRef,
     Graph,
     TensorType,
@@ -28,11 +29,14 @@ from max.graph import (
     Value,
     ops,
 )
+from max.nn.kv_cache import KVCacheInputsPerDevice, PagedCacheValues
 from max.nn.layer import Module
 from max.nn.transformer import forward_sequential_layers
 
 TENSOR_T = TensorType(DType.float32, (1, 8), DeviceRef.CPU())
 IDX_T = TensorType(DType.uint32, (), DeviceRef.CPU())
+KV_BLOCKS_T = BufferType(DType.float32, (2, 4), DeviceRef.CPU())
+KV_1D_T = TensorType(DType.int64, (2,), DeviceRef.CPU())
 
 
 class _IdentityLayer(Module):
@@ -237,3 +241,83 @@ def test_mixed_scalar_and_list_args(use_subgraphs: bool) -> None:
                 assert layer.call_count == 1
                 assert isinstance(layer.received_idx, TensorValue)
                 assert layer.received_idx.type == IDX_T
+
+
+class _KVCollectionLayer(Module):
+    """Layer receiving hidden states plus a ``list[PagedCacheValues]``."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+        self.received_kv: list[PagedCacheValues] | None = None
+
+    def __call__(
+        self, xs: list[TensorValue], kv_collections: list[PagedCacheValues]
+    ) -> list[TensorValue]:
+        self.call_count += 1
+        self.received_kv = kv_collections
+        assert isinstance(kv_collections, list)
+        for kv in kv_collections:
+            assert isinstance(kv, KVCacheInputsPerDevice), (
+                f"expected reconstructed PagedCacheValues, got {type(kv)}"
+            )
+        return xs
+
+
+@pytest.mark.parametrize("use_subgraphs", [False, True])
+def test_structured_kv_collection_input(use_subgraphs: bool) -> None:
+    """A ``list[PagedCacheValues]`` element crosses the subgraph boundary and
+    is reconstructed as structured ``PagedCacheValues`` before the block runs."""
+    with Graph(
+        "test",
+        input_types=[
+            TENSOR_T,
+            KV_BLOCKS_T,
+            KV_1D_T,
+            KV_1D_T,
+            KV_1D_T,
+            KV_1D_T,
+        ],
+    ) as main_graph:
+        h0 = main_graph.inputs[0].tensor
+        kv_collections = [
+            PagedCacheValues(
+                kv_blocks=main_graph.inputs[1].buffer,
+                cache_lengths=main_graph.inputs[2].tensor,
+                lookup_table=main_graph.inputs[3].tensor,
+                max_prompt_length=main_graph.inputs[4].tensor,
+                max_cache_length=main_graph.inputs[5].tensor,
+            )
+        ]
+
+        layers = [_KVCollectionLayer() for _ in range(2)]
+
+        def inputs_for_layer(idx: int, h: list[TensorValue]) -> list[Any]:
+            return [h, kv_collections]
+
+        result = forward_sequential_layers(
+            layers,
+            inputs_for_layer=inputs_for_layer,
+            weight_prefix_for_layer=lambda i: f"layers.{i}.",
+            subgraph_layer_groups=[[0, 1]] if use_subgraphs else None,
+            initial_hidden_states=[h0],
+        )
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].type == TENSOR_T
+
+        # The representative layer (layer 0) always runs at graph-build time and
+        # must have received a reconstructed structured PagedCacheValues.
+        assert layers[0].call_count == 1
+        assert layers[0].received_kv is not None
+        assert isinstance(layers[0].received_kv[0], KVCacheInputsPerDevice)
+
+        if use_subgraphs:
+            # Subgraph built once from layer 0, invoked once per layer.
+            assert layers[1].call_count == 0
+            assert str(main_graph).count("callee = @transformer_block_0") == 2
+        else:
+            assert layers[1].call_count == 1
+            # Direct path forwards the exact same collection object.
+            assert layers[1].received_kv is kv_collections

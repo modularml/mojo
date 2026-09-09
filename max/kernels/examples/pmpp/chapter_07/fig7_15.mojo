@@ -17,21 +17,21 @@
 
 from std.random import random_float64
 from std.math import ceildiv
-from std.gpu import barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
 from std.itertools import product
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 
 # ========================== KERNEL CODE ==========================
 
 
 def convolution_cached_tiled_2D_const_mem_kernel(
-    N: UnsafePointer[Float32, MutAnyOrigin],
-    F: UnsafePointer[Float32, MutAnyOrigin],
+    N: UnsafePointer[Float32, ImmutAnyOrigin],
+    F: UnsafePointer[Float32, ImmutAnyOrigin],
     P: UnsafePointer[Float32, MutAnyOrigin],
-    width: Int,
-    height: Int,
+    width_dev: Int32,
+    height_dev: Int32,
 ):
     """Cached tiled 2D convolution kernel using shared memory as a cache.
 
@@ -39,9 +39,12 @@ def convolution_cached_tiled_2D_const_mem_kernel(
         N: Input array (device).
         F: Filter array in constant/global memory (device).
         P: Output array (device).
-        width: Input width.
-        height: Input height.
+        width_dev: Input width.
+        height_dev: Input height.
     """
+    # `Int` is not device-passable; widen the fixed-width args.
+    var width = Int(width_dev)
+    var height = Int(height_dev)
     comptime TILE_DIM = 32
     comptime FILTER_RADIUS = 2
     comptime FILTER_WIDTH = 2 * FILTER_RADIUS + 1
@@ -50,10 +53,10 @@ def convolution_cached_tiled_2D_const_mem_kernel(
     var row = block_idx.y * TILE_DIM + thread_idx.y
 
     # Allocate shared memory for input tile (core only, no halo)
-    var N_s = stack_allocation[
+    var N_s = unsafe_stack_allocation[
         TILE_DIM * TILE_DIM,
         Float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # Load input tile into shared memory
@@ -105,9 +108,9 @@ def convolution_cached_tiled_2D_const_mem_kernel(
 
 
 def convolution_cached_tiled_2d_const_mem(
-    h_in: UnsafePointer[Float32, MutAnyOrigin],
-    h_filter: UnsafePointer[Float32, MutAnyOrigin],
-    h_out: UnsafePointer[Float32, MutAnyOrigin],
+    h_in: UnsafePointer[mut=False, Float32, _],
+    h_filter: UnsafePointer[mut=False, Float32, _],
+    h_out: UnsafePointer[mut=True, Float32, _],
     width: Int,
     height: Int,
     ctx: DeviceContext,
@@ -148,8 +151,8 @@ def convolution_cached_tiled_2d_const_mem(
         d_in,
         d_filter,
         d_out,
-        width,
-        height,
+        Int32(width),
+        Int32(height),
         grid_dim=(grid_dim_x, grid_dim_y, 1),
         block_dim=(TILE_DIM, TILE_DIM, 1),
     )
@@ -163,11 +166,11 @@ def convolution_cached_tiled_2d_const_mem(
 
 
 def cpu_2d_conv(
-    inarr: UnsafePointer[Float32, MutAnyOrigin],
-    outarr: UnsafePointer[Float32, MutAnyOrigin],
+    inarr: UnsafePointer[mut=False, Float32, _],
+    outarr: UnsafePointer[mut=True, Float32, _],
     width: Int,
     height: Int,
-    h_filter: UnsafePointer[Float32, MutAnyOrigin],
+    h_filter: UnsafePointer[mut=False, Float32, _],
     filter_width: Int,
     r: Int,
 ):
@@ -212,9 +215,9 @@ def main() raises:
 
     # Initialize input and filter with random values
     for i in range(in_elements):
-        h_in[i] = random_float64().cast[DType.float32]()
+        h_in[i] = random_float64().cast[.float32]()
     for i in range(filter_elements):
-        h_filter[i] = random_float64().cast[DType.float32]()
+        h_filter[i] = random_float64().cast[.float32]()
 
     # Run GPU convolution
     with DeviceContext() as ctx:

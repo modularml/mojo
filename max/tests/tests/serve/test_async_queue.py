@@ -15,7 +15,6 @@ import time
 from unittest import mock
 
 import pytest
-from max.serve.config import MetricLevel, Settings
 from max.serve.telemetry.asyncio_controller import (
     AsyncioTelemetryController,
     NotStarted,
@@ -33,19 +32,19 @@ async def test_basic_usage() -> None:
     # Getting a client for a non-started controller should not work
     # we need to be able to serialize clients & still connect
     with pytest.raises(NotStarted):
-        atc.Client(Settings())  # type: ignore
+        atc.Client()
 
     assert not spy2.commit.called
 
     # Consumer is running.  call() works
     async with atc:
-        client = atc.Client(Settings().metric_level)
-        client.send_measurement(spy, level=MetricLevel.BASIC)
+        client = atc.Client()
+        client.send_measurement(spy)
     assert spy.commit.called
 
     # Consumer is stopped.  call() doesn't work
     with pytest.raises(NotStarted):
-        atc.Client(Settings()).send_measurement(spy2, level=MetricLevel.BASIC)  # type: ignore
+        atc.Client().send_measurement(spy2)
     assert not spy2.commit.called
 
 
@@ -53,12 +52,9 @@ async def test_basic_usage() -> None:
 async def test_fast() -> None:
     """Queuing a metric measurement should be fast"""
     async with AsyncioTelemetryController() as atc:
-        client = atc.Client(Settings().metric_level)
+        client = atc.Client()
         start = time.perf_counter()
-        client.send_measurement(
-            MaxMeasurement("maxserve.request_count", 1),
-            level=MetricLevel.BASIC,
-        )
+        client.send_measurement(MaxMeasurement("maxserve.request_count", 1))
         duration = time.perf_counter() - start
         assert duration < 1e-3
 
@@ -68,9 +64,9 @@ async def test_shutdown() -> None:
     spy = mock.Mock(spec=MaxMeasurement)
     N = 10
     async with AsyncioTelemetryController() as atc:
-        client = atc.Client(Settings().metric_level)
+        client = atc.Client()
         for i in range(N):  # noqa: B007
-            client.send_measurement(spy, level=MetricLevel.BASIC)
+            client.send_measurement(spy)
         # we haven't waited long enough for everything to run
         assert spy.commit.call_count < N
     # shutdown should burn through the queue

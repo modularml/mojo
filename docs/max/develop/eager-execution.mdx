@@ -3,8 +3,8 @@ title: Eager execution
 description: Use the eager API to create tensors, apply operations, inspect intermediate values, and run a forward pass.
 ---
 
-The [`max.experimental`](/max/api/python/experimental/) API abstracts the MAX
-framework's [graph](/max/develop/graph/) foundation so you can write and run
+The [`max.experimental`](/api/python/experimental/) API abstracts the MAX
+framework's [graph](/develop/graph/) foundation so you can write and run
 models using PyTorch-like programming patterns. In other words, this API lets
 you execute models eagerly, without thinking about graph compilation. The
 fastest way to learn the API is to walk through the steps of building a small
@@ -12,20 +12,20 @@ forward pass.
 
 :::note
 
-The [`max.experimental`](/max/api/python/experimental/) API is still under
-active development. Use the stable [`max.graph`](/max/api/python/graph) and
-[`max.nn`](/max/api/python/nn) APIs to create production-ready models. Learn
-more in [Graph overview](/max/develop/graph/).
+The [`max.experimental`](/api/python/experimental/) API is still under
+active development. Use the stable [`max.graph`](/api/python/graph) and
+[`max.nn`](/api/python/nn) APIs to create production-ready models. Learn
+more in [Graph overview](/develop/graph/).
 
 :::
 
 ## Create a tensor
 
-A [`Tensor`](/max/api/python/generated/max.experimental.tensor.Tensor/) is the
+A [`Tensor`](/api/python/generated/max.experimental.tensor.Tensor/) is the
 fundamental data structure for eager execution. This example creates a `Tensor`
 with hard-coded data:
 
-{/* @sync: _examples/index/eager_simple.py */}
+{/* @sync: ../../code/develop/index/eager_simple.py */}
 
 ```python
 from max.driver import CPU
@@ -49,7 +49,7 @@ complex computation.
 
 Here's how to perform arithmetic operations using Python operators:
 
-{/* @sync: _examples/index/arithmetic_ops.py */}
+{/* @sync: ../../code/develop/index/arithmetic_ops.py */}
 
 ```python
 from max.experimental.tensor import Tensor
@@ -65,10 +65,10 @@ print(d)
 ```
 
 Here are some
-[`max.experimental.functional`](/max/api/python/experimental.functional) APIs
+[`max.experimental.functional`](/api/python/experimental.functional) APIs
 in use:
 
-{/* @sync: _examples/index/functional_api.py */}
+{/* @sync: ../../code/develop/index/functional_api.py */}
 
 ```python
 from max.experimental import functional as F
@@ -93,7 +93,7 @@ intermediate values at any point in your code. Use this capability to verify
 that intermediate computations match your expectations as you build up a
 forward pass.
 
-{/* @sync: _examples/index/when_to_use_eager.py */}
+{/* @sync: ../../code/develop/index/when_to_use_eager.py */}
 
 ```python
 from max.experimental import functional as F
@@ -133,29 +133,28 @@ A forward pass strings together everything you've seen so far into the shape of
 a single neural network layer. Here's a realistic example with random weights,
 a matmul, an activation, and a reduction.
 
-{/* @sync: _examples/index/eager_workflow.py */}
+{/* @sync: ../../code/develop/index/eager_workflow.py */}
 
 ```python
-from max.experimental import functional as F
-from max.experimental import random
 from max.driver import CPU
 from max.dtype import DType
+from max.experimental import functional as F
 from max.experimental.tensor import Tensor
 
 # Create input data
 x = Tensor([[1.0, 2.0], [3.0, 4.0]], dtype=DType.float32, device=CPU())
 
 # Create random weights
-w = random.gaussian(
+w = F.gaussian(
     [2, 2], mean=0.0, std=0.1, dtype=DType.float32, device=CPU()
 )
 
-# Run forward pass
+# Forward pass - each operation executes as you write it
 z = x @ w  # Matrix multiply
 h = F.relu(z)  # Activation
 out = h.mean()  # Reduce to scalar
 
-# Inspect results
+# Inspect intermediate results anytime
 print(f"Input shape: {x.shape}")
 print(f"After matmul: {z.shape}")
 print(f"Output: {out}")
@@ -171,9 +170,9 @@ errors appear at the line that caused them.
 Now that you know how to write a small forward pass, explore more deeply about
 the building blocks you'll use day-to-day:
 
-- [Tensor fundamentals](/max/develop/tensors): Learn what tensors are,
+- [Tensor fundamentals](/develop/tensors): Learn what tensors are,
   how to create them, and how to inspect their attributes.
-- [Basic operations](/max/develop/basic-ops): Apply arithmetic operators,
+- [Basic operations](/develop/basic-ops): Apply arithmetic operators,
   reductions, and the functional API to tensors.
-- [Data types](/max/develop/dtypes): Specify how each element in a tensor is
+- [Data types](/develop/dtypes): Specify how each element in a tensor is
   represented in memory.

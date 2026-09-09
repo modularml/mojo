@@ -12,9 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
 from max.pipelines.lib import SupportedArchitecture
 from max.pipelines.modeling.types import InputModality, PipelineTask
 
+from .batch_processor import Qwen3VLMoeBatchProcessor
 from .context import Qwen3VLTextAndVisionContext
 from .model import Qwen3VLModel
 from .model_config import Qwen3VLConfig
@@ -30,22 +32,24 @@ qwen3vl_moe_arch = SupportedArchitecture(
     default_weights_format=WeightsFormat.safetensors,
     multi_gpu_supported=True,
     input_modalities={InputModality.TEXT, InputModality.IMAGE},
-    default_encoding="bfloat16",
-    supported_encodings={
-        "float32",
-        "bfloat16",
-        "float8_e4m3fn",
-    },
+    default_encoding=Qwen3VLConfig.DEFAULT_ENCODING,
+    supported_encodings=Qwen3VLConfig.SUPPORTED_ENCODINGS,
     weight_adapters={
         WeightsFormat.safetensors: convert_qwen3vl_model_state_dict,
     },
     pipeline_model=Qwen3VLModel,
+    batching=Qwen3VLMoeBatchProcessor,
     tokenizer=Qwen3VLTokenizer,
     context_type=Qwen3VLTextAndVisionContext,
     required_arguments={
         "enable_chunked_prefill": False,
     },
     config=Qwen3VLConfig,
+    memory_planner=PagedMemoryPlanner.with_activation_reservation(
+        10 * 1024**3, always_signal_buffers=True
+    ),
+    supports_overlap_scheduler=False,
+    supports_device_graph_capture=False,
 )
 
 # Register the same architecture under Qwen's non-MoE name for models like Qwen3-VL-4B-Instruct
@@ -57,20 +61,22 @@ qwen3vl_arch = SupportedArchitecture(
     default_weights_format=WeightsFormat.safetensors,
     multi_gpu_supported=True,
     input_modalities={InputModality.TEXT, InputModality.IMAGE},
-    default_encoding="bfloat16",
-    supported_encodings={
-        "float32",
-        "bfloat16",
-        "float8_e4m3fn",
-    },
+    default_encoding=Qwen3VLConfig.DEFAULT_ENCODING,
+    supported_encodings=Qwen3VLConfig.SUPPORTED_ENCODINGS,
     weight_adapters={
         WeightsFormat.safetensors: convert_qwen3vl_model_state_dict,
     },
     pipeline_model=Qwen3VLModel,
+    batching=Qwen3VLMoeBatchProcessor,
     tokenizer=Qwen3VLTokenizer,
     context_type=Qwen3VLTextAndVisionContext,
     required_arguments={
         "enable_chunked_prefill": False,
     },
     config=Qwen3VLConfig,
+    memory_planner=PagedMemoryPlanner.with_activation_reservation(
+        10 * 1024**3, always_signal_buffers=True
+    ),
+    supports_overlap_scheduler=False,
+    supports_device_graph_capture=False,
 )

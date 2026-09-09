@@ -12,11 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import SupportedArchitecture, TextTokenizer
 from max.pipelines.modeling.types import PipelineTask
 
 from . import weight_adapters
+from .batch_processor import UnifiedEagleLlama3BatchProcessor
 from .model import UnifiedEagleLlama3Model
 from .model_config import UnifiedEagleLlama3Config
 
@@ -25,15 +26,11 @@ unified_eagle_llama3_arch = SupportedArchitecture(
     example_repo_ids=[
         "meta-llama/Llama-3.2-3B-Instruct",
     ],
-    default_encoding="bfloat16",
-    supported_encodings={
-        "bfloat16",
-        "float32",
-    },
+    default_encoding=UnifiedEagleLlama3Config.DEFAULT_ENCODING,
+    supported_encodings=UnifiedEagleLlama3Config.SUPPORTED_ENCODINGS,
     pipeline_model=UnifiedEagleLlama3Model,
     context_type=TextContext,
     tokenizer=TextTokenizer,
-    rope_type="normal",
     default_weights_format=WeightsFormat.safetensors,
     multi_gpu_supported=False,
     weight_adapters={
@@ -42,4 +39,5 @@ unified_eagle_llama3_arch = SupportedArchitecture(
     },
     task=PipelineTask.TEXT_GENERATION,
     config=UnifiedEagleLlama3Config,
+    batching=UnifiedEagleLlama3BatchProcessor,
 )

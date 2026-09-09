@@ -1,0 +1,23 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# In the REPL, LLDB cannot navigate Variant's struct fields because the
+# variadic type parameter `*Ts: Movable` prevents getIfStructDecl from finding
+# the struct declaration in parserContext for the JIT-compiled type. The
+# formatter is invoked (the type name shows correctly) but the summary is
+# empty. The discriminant-based summary works in the debugger (non-REPL) and
+# is covered by StdlibTypesTest.testVariant.
+
+from std.utils import Variant
+
+# CHECK: (Variant[Int, String]) v =
+var v = Variant[Int, String](42)
+
+# CHECK: (Variant[Int, String]) v2 =
+var v2 = Variant[Int, String](String("hello"))

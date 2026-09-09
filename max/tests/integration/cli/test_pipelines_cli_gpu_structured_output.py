@@ -12,14 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 
 import logging
+import os
 
-import hf_repo_lock
 import pytest
-from max.entrypoints import pipelines
+from _cli_pipeline_flags import pipeline_flags
+from max._entrypoints import pipelines
 from test_common.graph_utils import is_h100_h200
-
-REPO_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
-REVISION = hf_repo_lock.revision_for_hf_repo(REPO_ID)
 
 logger = logging.getLogger("max.pipelines")
 
@@ -28,36 +26,32 @@ logger = logging.getLogger("max.pipelines")
 def test_pipelines_cli__smollm_bfloat16_with_structured_output_enabled(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert isinstance(REVISION, str), (
-        "REVISION must be a string and present in hf-repo-lock.tsv"
-    )
-    local_model_path = REPO_ID
+    # Bazel hands the artifacts directory over in the environment; the pipeline
+    # is told about it explicitly.
+    precompiled = os.environ.get("PRECOMPILED_MEFS_DIR")
+    reuse_flags = ["--precompiled-mefs", precompiled] if precompiled else []
 
     with pytest.raises(SystemExit):
         pipelines.main(
             [
                 "generate",
-                "--model-path",
-                local_model_path,
                 "--prompt",
                 "Why is the sky blue",
-                "--trust-remote-code",
-                "--device-memory-utilization=0.1",
-                "--quantization-encoding=bfloat16",
-                "--devices=gpu",
-                "--huggingface-model-revision",
-                REVISION,
-                "--huggingface-weight-revision",
-                REVISION,
-                # Enabling structured output server-wide without a JSON schema
-                # must not change the outputs of the base chat experience.
-                "--enable-structured-output",
                 "--top-k=1",
+                *reuse_flags,
+                *pipeline_flags("smollm-structured-output"),
             ]
         )
     captured = capsys.readouterr()
-    assert len(captured.out) > 0
+    # `generate` prints this summary only after it has produced tokens. Checking
+    # for it first means a run that exits early cannot satisfy the content check
+    # below off the back of the prompt being echoed.
+    assert "Output size:" in captured.out, (
+        f"the CLI produced no generation:\n{(captured.out + captured.err)[-4000:]}"
+    )
+    # Deliberately excludes "blue": it appears in the prompt, so it cannot
+    # distinguish a real answer from an echo.
     assert any(
         word in captured.out.lower()
-        for word in ["light", "scatter", "atmosphere", "blue"]
-    )
+        for word in ["light", "scatter", "atmosphere", "wavelength"]
+    ), captured.out

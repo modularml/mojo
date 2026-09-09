@@ -1,0 +1,23 @@
+load("//bazel:api.bzl", "modular_py_test")
+
+# gazelle:default_visibility //visibility:private
+
+package(default_visibility = ["//visibility:private"])
+
+modular_py_test(
+    name = "test_paths",
+    size = "small",
+    srcs = ["test_paths.py"],
+    deps = [
+        "@mojo//:python",
+    ],
+)
+
+modular_py_test(
+    name = "test_importer",
+    size = "small",
+    srcs = ["test_importer.py"],
+    deps = [
+        "@mojo//:python",
+    ],
+)

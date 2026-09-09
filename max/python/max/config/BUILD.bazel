@@ -5,6 +5,7 @@ package(default_visibility = ["//max:consumers"])
 modular_py_library(
     name = "config",
     srcs = glob(["**/*.py"]),
+    test_docstring_examples = True,
     deps = [
         requirement("pydantic"),
         requirement("pyyaml"),

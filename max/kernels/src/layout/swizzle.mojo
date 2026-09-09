@@ -37,9 +37,9 @@ from std.sys import simd_width_of, size_of
 from std.math.uutils import udivmod
 
 from std.bit import log2_floor
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 
-from .int_tuple import flatten
+from .int_tuple import flatten, IntTuple
 from .layout import Layout
 
 # ===-----------------------------------------------------------------------===#
@@ -233,40 +233,6 @@ from .layout import Layout
 
 
 @always_inline
-def shiftr(a: Int, s: Int) -> Int:
-    """Shift right or left based on sign of shift amount.
-
-    Performs a right shift if `s` is positive, or a left shift if
-    `s` is negative.
-
-    Args:
-        a: The integer value to shift.
-        s: The shift amount. Positive for right, negative for left.
-
-    Returns:
-        The shifted integer value.
-    """
-    return a >> s if s > 0 else a << -s
-
-
-@always_inline
-def shiftl(a: Int, s: Int) -> Int:
-    """Shift left or right based on sign of shift amount.
-
-    Performs a left shift if `s` is positive, or a right shift if
-    `s` is negative.
-
-    Args:
-        a: The integer value to shift.
-        s: The shift amount. Positive for left, negative for right.
-
-    Returns:
-        The shifted integer value.
-    """
-    return a << s if s > 0 else a >> -s
-
-
-@always_inline
 def shiftr(a: Scalar, s: Scalar[a.dtype]) -> Scalar[a.dtype]:
     """Shift right/left based on sign of shift for scalars.
 
@@ -305,9 +271,7 @@ def shiftl(a: Scalar, s: Scalar[a.dtype]) -> Scalar[a.dtype]:
 # ===-----------------------------------------------------------------------===#
 
 
-struct Swizzle(
-    Copyable, ImplicitlyDestructible, TrivialRegisterPassable, Writable
-):
+struct Swizzle(Copyable, Deinitable, TrivialRegisterPassable, Writable):
     """Swizzle functor for memory access pattern optimization.
 
     Implements a swizzling pattern to reduce bank conflicts in shared
@@ -596,16 +560,6 @@ struct ComposedLayout[offset: Optional[Int] = 0](Copyable):
         self.layout_b = layout_b
 
     @always_inline
-    def __init__(out self, *, copy: Self):
-        """Copy constructor for ComposedLayout.
-
-        Args:
-            copy: The ComposedLayout to copy from.
-        """
-        self.layout_a = copy.layout_a.copy()
-        self.layout_b = copy.layout_b
-
-    @always_inline
     def __call__(self, idx: IntTuple) -> Int:
         """Apply composed layout to an index.
 
@@ -687,6 +641,7 @@ def eval_composed[
     comptime shape_a = flatten(composed_layout.layout_a.shape)
     comptime stride_a = flatten(composed_layout.layout_a.stride)
 
+    var coord_i: Int
     comptime for i in range(len(stride_a)):
         comptime s = shape_a[i].value()
         comptime st = stride_a[i].value()

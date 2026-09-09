@@ -30,9 +30,13 @@ from max.experimental.nn.linear import Linear
 from max.experimental.nn.norm import RMSNorm
 from max.experimental.nn.sequential import ModuleList
 from max.experimental.tensor import Tensor
-from max.graph import TensorValue, ops
+from max.graph import ops
 from max.nn.kernels import scatter_nd_skip_oob_indices as _scatter_nd
-from max.nn.kv_cache import KVCacheParamInterface, PagedCacheValues
+from max.nn.kv_cache import (
+    KVCacheInputs,
+    KVCacheParamInterface,
+    PagedCacheValues,
+)
 from max.nn.transformer import ReturnLogits
 
 from ...llama3_modulev3.layers.mlp import LlamaStackedMLP
@@ -233,7 +237,7 @@ class Idefics3TextModel(
             logits = self._compute_logits(self.norm(last_tokens))
             offsets = ops.range(
                 0,
-                TensorValue(last_indices.shape[0]) + return_n_logits[0],
+                last_indices.shape[0] + return_n_logits[0],
                 return_n_logits[0],
                 out_dim="logit_offsets",
                 device=h.device,
@@ -282,11 +286,11 @@ class Idefics3Language(Module[..., tuple[Tensor, ...]]):
         image_token_indices: Tensor,
         *variadic_args,
     ) -> tuple[Tensor, ...]:
-        kv_collections = (
-            self.kv_params.get_symbolic_inputs()
-            .unflatten(iter(variadic_args))
-            .inputs
+        symbolic_inputs = self.kv_params.unflatten_kv_inputs(
+            iter(variadic_args)
         )
+        assert isinstance(symbolic_inputs, KVCacheInputs)
+        kv_collections = symbolic_inputs.inputs
 
         return self.language_model(
             tokens,

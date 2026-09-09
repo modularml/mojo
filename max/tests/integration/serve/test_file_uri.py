@@ -22,25 +22,17 @@ import pytest
 from async_asgi_testclient import TestClient
 from fastapi import FastAPI
 from max.driver import DeviceSpec
-from max.pipelines import PipelineConfig
-from max.pipelines.lib import KVCacheConfig, MAXModelConfig
-from max.pipelines.lib.model_manifest import ModelManifest
-from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
+from max.pipelines import PipelineArgs
+from max.pipelines.lib import KVCacheConfig, PipelineRuntimeConfig
 from PIL import Image
 
-pipeline_config = PipelineConfig(
-    models=ModelManifest(
-        {
-            "main": MAXModelConfig(
-                model_path="OpenGVLab/InternVL3-1B-Instruct",
-                device_specs=[DeviceSpec.accelerator()],
-                quantization_encoding="bfloat16",
-                trust_remote_code=True,
-                max_length=512,
-                kv_cache=KVCacheConfig(),
-            )
-        }
-    ),
+pipeline_config = PipelineArgs(
+    model_path="OpenGVLab/InternVL3-1B-Instruct",
+    device_specs=[DeviceSpec.accelerator()],
+    quantization_encoding="bfloat16",
+    trust_remote_code=True,
+    max_length=512,
+    kv_cache=KVCacheConfig(),
     runtime=PipelineRuntimeConfig(max_batch_size=1),
 )
 
@@ -164,6 +156,6 @@ async def test_file_uri_security_check(app: FastAPI, tmp_path: Path) -> None:
             assert response.status_code == 400  # ValueError becomes 400
             error = response.json()
             # The API returns a generic "Value error." for security reasons
-            assert error["detail"] == "Value error."
+            assert error["error"]["message"] == "Value error."
     finally:
         os.unlink(outside_path)

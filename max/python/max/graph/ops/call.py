@@ -55,22 +55,76 @@ def call(graph: Graph, *args: Value[Any], prefix: str = "") -> list[Value[Any]]:
                 graph.output(*result)
 
         Call a shared subgraph for each layer of a model, resolving
-        different weights at each call site with ``prefix``:
+        different weights at each call site with ``prefix``. Build the
+        subgraph once from the first layer, then call it once per layer,
+        passing the matching weight prefix so each call resolves that
+        layer's weights:
 
         .. code-block:: python
 
-            # Build the subgraph once from the first layer.
-            subgraph = self.layers[0].build_subgraph(
-                "transformer_block",
-                input_types=input_types,
-                weight_prefix="layers.0.",
-            )
+            import numpy as np
+            from max.driver import CPU
+            from max.dtype import DType
+            from max.engine import InferenceSession
+            from max.graph import DeviceRef, Graph, TensorType, ops
+            from max.nn import LayerList, Linear, Module
 
-            # Invoke it once per layer with layer-specific weights.
-            for idx in range(num_layers):
-                outputs = ops.call(
-                    subgraph, *h, prefix=f"layers.{idx}."
+            class Model(Module):
+                def __init__(self):
+                    super().__init__()
+                    self.layers = LayerList([
+                        Linear(2, 2, DType.float32, DeviceRef.CPU()),
+                        Linear(2, 2, DType.float32, DeviceRef.CPU()),
+                    ])
+
+                def __call__(self, x):
+                    return x
+
+            # Two layers with distinct weights: layer 0 doubles its input,
+            # layer 1 negates its input.
+            weights = {
+                "layers.0.weight": np.array(
+                    [[2.0, 0.0], [0.0, 2.0]], dtype=np.float32
+                ),
+                "layers.1.weight": np.array(
+                    [[-1.0, 0.0], [0.0, -1.0]], dtype=np.float32
+                ),
+            }
+
+            model = Model()
+            # load_state_dict assigns each weight its fully-qualified name,
+            # which build_subgraph strips with weight_prefix to create
+            # placeholder weights.
+            model.load_state_dict(weights)
+
+            input_type = TensorType(DType.float32, [1, 2], DeviceRef.CPU())
+            with Graph("shared_block", input_types=[input_type]) as graph:
+                x = graph.inputs[0].tensor
+
+                # Build the subgraph once from the first layer.
+                subgraph = model.layers[0].build_subgraph(
+                    "linear_block",
+                    inputs=[x],
+                    weight_prefix="layers.0.",
                 )
+
+                # Call it once per layer, resolving that layer's weights.
+                out0 = ops.call(subgraph, x, prefix="layers.0.")
+                out1 = ops.call(subgraph, out0[0].tensor, prefix="layers.1.")
+                graph.output(out1[0].tensor)
+
+            session = InferenceSession(devices=[CPU()])
+            compiled = session.load(graph, weights_registry=weights)
+
+            result = compiled.execute(
+                np.array([[3.0, 5.0]], dtype=np.float32)
+            )[0].to_numpy()
+            # Layer 0 doubles, then layer 1 negates: 3 -> 6 -> -6, 5 -> 10 -> -10.
+            # result: [[-6. -10.]]
+
+        .. invisible-code-block: python
+
+            np.testing.assert_allclose(result, [[-6.0, -10.0]])
 
     Args:
         graph: The subgraph to call.

@@ -262,15 +262,6 @@ class _PartialPassthrough:
             result.to_numpy(), np.full((2, 3), 16.0), rtol=1e-4
         )
 
-    def test_partial_partial_raises(self) -> None:
-        """P x P raises ValueError."""
-        a_np = np.ones((2, 4), dtype=np.float32)
-        a = self.partial_fn(a_np, self.MESH_1D, (Partial(),))
-        b_np = np.ones((4, 3), dtype=np.float32)
-        b = self.partial_fn(b_np, self.MESH_1D, (Partial(),))
-        with pytest.raises((ValueError, NotImplementedError)):
-            matmul(a, b)
-
 
 # ── Batched Matmul ───────────────────────────────────────────────────
 
@@ -458,19 +449,6 @@ class _Errors:
     MESH_2: ClassVar[DeviceMesh]
     partial_fn: ClassVar[Callable[..., Tensor]]
 
-    def test_sharded1_replicated_raises(self) -> None:
-        """MESH_1D: S(1) x R raises (unsupported)."""
-        lhs = transfer_to(
-            full([2, 8], 1.0, dtype=_F32, device=self.MESH_1D.devices[0]),
-            PlacementMapping(self.MESH_1D, (Sharded(1),)),
-        )
-        rhs = transfer_to(
-            full([8, 4], 1.0, dtype=_F32, device=self.MESH_1D.devices[0]),
-            PlacementMapping(self.MESH_1D, (Replicated(),)),
-        )
-        with pytest.raises(NotImplementedError, match="unsupported"):
-            matmul(lhs, rhs)
-
 
 # ── Combined base class ─────────────────────────────────────────────
 
@@ -503,23 +481,6 @@ class _LayerNorm:
         assert result.placements == (Sharded(0),)
         assert list(result.shape) == [4, 8]
 
-    def test_layer_norm_hidden_sharded_raises(self) -> None:
-        """layer_norm with hidden dim sharded raises."""
-        x = transfer_to(
-            Tensor(np.ones((4, 8), dtype=np.float32)),
-            PlacementMapping(self.MESH_2, (Sharded(1),)),
-        )
-        w = transfer_to(
-            Tensor(np.ones(8, dtype=np.float32)),
-            PlacementMapping(self.MESH_2, (Replicated(),)),
-        )
-        b = transfer_to(
-            Tensor(np.zeros(8, dtype=np.float32)),
-            PlacementMapping(self.MESH_2, (Replicated(),)),
-        )
-        with pytest.raises(ValueError, match="sharded axis"):
-            layer_norm(x, w, b, 1e-5)
-
     def test_layer_norm_partial_auto_reduces(self) -> None:
         """layer_norm on Partial input auto-reduces before normalizing.
 
@@ -540,8 +501,6 @@ class _LayerNorm:
             Tensor(b_np), PlacementMapping(self.MESH_2, (Replicated(),))
         )
         result = layer_norm(x, w, b, epsilon=1e-5)
-        # After auto-reduce, Partial → Replicated, then layer_norm
-        # preserves Replicated.
         assert result.placements == (Replicated(),)
 
         # Verify numerics: the result should match layer_norm on the
@@ -565,5 +524,3 @@ class MatmulTests(
     _LayerNorm,
 ):
     """Aggregates all matmul/linalg test classes for thin subclassing."""
-
-    pass

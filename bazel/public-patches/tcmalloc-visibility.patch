@@ -1,0 +1,21 @@
+diff --git a/tcmalloc/BUILD b/tcmalloc/BUILD
+index 55e7fc7f..0d720a04 100644
+--- a/tcmalloc/BUILD
++++ b/tcmalloc/BUILD
+@@ -120,7 +120,6 @@ cc_library(
+ 
+ cc_library(
+     name = "tcmalloc_internal_methods_only",
+-    testonly = True,
+     srcs = [
+         "tcmalloc.cc",
+     ],
+@@ -131,7 +130,7 @@ cc_library(
+         "-DTCMALLOC_INTERNAL_METHODS_ONLY",
+     ],
+     linkstatic = 1,
+-    visibility = ["//tcmalloc:__subpackages__"],
++    visibility = ["//visibility:public"],
+     deps = tcmalloc_deps + [
+         ":alloc_at_least",
+         ":common_8k_pages",

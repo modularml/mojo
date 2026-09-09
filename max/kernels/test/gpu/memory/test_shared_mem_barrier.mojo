@@ -11,20 +11,20 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
 from layout.tma_async import SharedMemBarrier
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 
 
 # CHECK-LABEL: test_shared_mem_barrier
 # CHECK-NOT: ld.local
 # CHECK-NOT: st.local
 def test_shared_mem_barrier():
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         10,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 

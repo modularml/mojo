@@ -1,0 +1,28 @@
+// RUN: mojo precompile %S/test_package -o - | kgen-opt -mlir-print-debuginfo | FileCheck %s
+// RUN: not mojo precompile %S/test_package_with_main -o - 2>&1 | FileCheck %s --check-prefix=MAIN_IN_PACKAGE
+
+// MAIN_IN_PACKAGE: 'main()' is not supported within packages
+
+// CHECK: lit.package @test_package
+// CHECK-SAME: dependencies = #kgen<link.dependencies[@std]>
+
+// CHECK: lit.package @inner1
+// CHECK:   lit.file_module @myfile
+// CHECK:     lit.struct.decl @Struct
+// CHECK:       lit.fn @"parametric{{.*}}<{{.*}}>
+// CHECK-NEXT:    kgen.param.constant
+// CHECK-NEXT:    lit.return
+// CHECK:       lit.fn @"foo{{.*}}"{{.*}}sourceName = {{.*}}
+// CHECK:         lit.end_fn
+
+// CHECK: lit.struct.decl @ParametricStruct<{{.*}}: !Int>
+// CHECK:       lit.fn @"foo(
+// CHECK-NEXT:    kgen.param.constant
+// CHECK-NEXT:    lit.return
+
+// CHECK: lit.package @inner2
+// CHECK:   lit.file_module @myfile2
+// CHECK:     lit.fn export @"bar()"{{.*}}linkageName = #kgen.linkage_name<"bar" : !kgen.string, false>{{.*}}sourceName = {{.*}}
+// CHECK: lit.end_fn
+
+// CHECK-DAG: !subroutine{{[0-9]+}} =

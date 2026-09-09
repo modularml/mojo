@@ -1,0 +1,28 @@
+load("//bazel:api.bzl", "mojo_library")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS")
+
+package(default_visibility = ["//max:consumers"])
+
+# Raw sources for the LSP parse-smoke test.
+filegroup(
+    name = "srcs",
+    srcs = glob(["*.mojo"]),
+    visibility = ["//Mojo/test/mojo-lsp-server/parse-tree:__pkg__"],
+)
+
+# Mojo-importable `Range` context manager (MXTOOLS-190). Consumers do
+# `from profiling_range import Range, is_enabled` after taking a dep on
+# `//max:profiling_range`. Bridges to KGEN_CompilerRT_Range* in
+# Mojo/lib/CompilerRT/RangeBridge.cpp through `external_call` (no build-time
+# dep on KGEN). Lives under //max so KGEN stays buildable and testable without
+# the MAX/Kernels trees. The package is named `profiling_range` to avoid
+# shadowing Mojo's built-in `range()` iterator.
+mojo_library(
+    name = "profiling_range",
+    srcs = glob(["*.mojo"]),
+    docs_base_path = "kernels",
+    ignore_deprecated = IGNORED_POINTER_DEPRECATIONS,
+    deps = [
+        "@mojo//:std",
+    ],
+)

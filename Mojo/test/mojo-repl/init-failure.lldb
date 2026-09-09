@@ -1,0 +1,15 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, failable values must be considered only initialized upon success.
+def testFn() raises -> String:
+  return "Hello"
+
+var example = testFn()
+# CHECK: Hello
+print(example)
+

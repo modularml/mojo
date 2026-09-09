@@ -1,0 +1,15 @@
+{
+  "target": "attn_res_mix",
+  "spec": {
+    "tokens": 64,
+    "hidden": 8192,
+    "cands": 2,
+    "dist": 1,
+    "pdl": 1,
+    "dt": 0
+  },
+  "verdict": "PASS",
+  "oracle": "memcheck",
+  "detail": "top of the hidden range under the sanitizer, PDL producer in front",
+  "findings": []
+}

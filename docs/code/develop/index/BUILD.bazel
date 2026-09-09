@@ -1,0 +1,139 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_run_binary_test", "requirement")
+
+package(default_visibility = ["//visibility:private"])
+
+# eager_simple.py
+modular_py_binary(
+    name = "eager_simple",
+    srcs = ["eager_simple.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/driver",
+    ],
+)
+
+modular_run_binary_test(
+    name = "eager_simple_test",
+    size = "large",
+    binary = "eager_simple",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# graph_simple.py
+modular_py_binary(
+    name = "graph_simple",
+    srcs = ["graph_simple.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        requirement("numpy"),
+    ],
+)
+
+modular_run_binary_test(
+    name = "graph_simple_test",
+    size = "large",
+    binary = "graph_simple",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# arithmetic_ops.py
+modular_py_binary(
+    name = "arithmetic_ops",
+    srcs = ["arithmetic_ops.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+    ],
+)
+
+modular_run_binary_test(
+    name = "arithmetic_ops_test",
+    size = "large",
+    binary = "arithmetic_ops",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# functional_api.py
+modular_py_binary(
+    name = "functional_api",
+    srcs = ["functional_api.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/driver",
+    ],
+)
+
+modular_run_binary_test(
+    name = "functional_api_test",
+    size = "large",
+    binary = "functional_api",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# when_to_use_eager.py
+modular_py_binary(
+    name = "when_to_use_eager",
+    srcs = ["when_to_use_eager.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+    ],
+)
+
+modular_run_binary_test(
+    name = "when_to_use_eager_test",
+    size = "large",
+    binary = "when_to_use_eager",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# eager_workflow.py
+modular_py_binary(
+    name = "eager_workflow",
+    srcs = ["eager_workflow.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:tensor",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+    ],
+)
+
+modular_run_binary_test(
+    name = "eager_workflow_test",
+    size = "large",
+    binary = "eager_workflow",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

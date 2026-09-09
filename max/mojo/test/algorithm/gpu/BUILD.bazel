@@ -1,0 +1,27 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+# FIXME: MOCO-3587 — Metal compiler crash on test_reduce
+_APPLE_GPU_INCOMPATIBLE_TESTS = [
+    "test_reduce.mojo",
+]
+
+[
+    mojo_test(
+        name = src + ".test",
+        size = "large",
+        srcs = [src],
+        tags = ["gpu"],
+        target_compatible_with = ["//:has_gpu"] + (select({
+            "//:apple_gpu": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }) if src in _APPLE_GPU_INCOMPATIBLE_TESTS else []),
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(["*.mojo"])
+]

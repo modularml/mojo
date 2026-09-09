@@ -11,17 +11,18 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import std.gpu.primitives.warp as warp
-from std.gpu import global_idx, grid_dim
-from std.gpu.globals import WARP_SIZE
-from std.gpu.host import DeviceContext
+import max.gpu.primitives.warp as warp
+from max.gpu import global_idx, grid_dim
+from max.gpu.globals import WARP_SIZE
+from max.gpu.host import DeviceContext
 from std.testing import assert_equal
 
 
 def kernel(
-    output: UnsafePointer[Float32, MutAnyOrigin],
-    size: Int,
+    output: MutPointer[Float32, MutAnyOrigin],
+    size_dev: Int32,
 ):
+    var size = Int(size_dev)
     var global_tid = global_idx.x
     if global_tid >= size:
         return
@@ -36,17 +37,17 @@ def kernel(
 def test_grid_dim(ctx: DeviceContext) raises:
     comptime block_size = WARP_SIZE
     comptime buffer_size = block_size
-    var output_host = ctx.enqueue_create_host_buffer[DType.float32](buffer_size)
+    var output_host = ctx.enqueue_create_host_buffer[.float32](buffer_size)
     for i in range(buffer_size):
         output_host[i] = -1.0
 
-    var output_buffer = ctx.enqueue_create_buffer[DType.float32](buffer_size)
+    var output_buffer = ctx.enqueue_create_buffer[.float32](buffer_size)
 
     ctx.enqueue_copy(output_buffer, output_host)
 
     ctx.enqueue_function[kernel](
         output_buffer,
-        buffer_size,
+        Int32(buffer_size),
         grid_dim=(20, 15, 10),
         block_dim=20,
     )

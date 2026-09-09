@@ -20,7 +20,7 @@ GPU kernel output to it.
 """
 
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Coord, Idx, TileTensor, row_major
 from nn.tpool_patch_merger import (
     tpool_patch_merger,
@@ -32,9 +32,9 @@ from std.testing import assert_almost_equal
 def cpu_reference_one_video[
     dtype: DType,
 ](
-    x: UnsafePointer[Scalar[dtype], _],
+    x: Pointer[Scalar[dtype], _],
     in_offset: Int,
-    out_base: UnsafePointer[mut=True, Scalar[dtype], _],
+    out_base: MutPointer[Scalar[dtype], _],
     t: Int,
     h: Int,
     w: Int,
@@ -93,7 +93,7 @@ def test_tpool_patch_merger(ctx: DeviceContext) raises:
 
     # Host buffers for input and grid_thws
     var x_host = ctx.enqueue_create_host_buffer[dtype](total_in * D)
-    var bounds_host = ctx.enqueue_create_host_buffer[DType.int64](n_videos * 3)
+    var bounds_host = ctx.enqueue_create_host_buffer[.int64](n_videos * 3)
     ctx.synchronize()
 
     seed(42)
@@ -109,7 +109,7 @@ def test_tpool_patch_merger(ctx: DeviceContext) raises:
     # Device buffers
     var x_dev = ctx.enqueue_create_buffer[dtype](total_in * D)
     var out_dev = ctx.enqueue_create_buffer[dtype](total_out * D)
-    var bounds = ctx.enqueue_create_buffer[DType.int64](n_videos * 3)
+    var bounds = ctx.enqueue_create_buffer[.int64](n_videos * 3)
     ctx.enqueue_copy(x_dev, x_host)
     ctx.enqueue_copy(bounds, bounds_host)
     ctx.enqueue_memset(out_dev, 0)
@@ -132,7 +132,7 @@ def test_tpool_patch_merger(ctx: DeviceContext) raises:
     cpu_reference_one_video[dtype](
         x_host.as_span().unsafe_ptr(),
         len0,
-        ref_host.as_span().unsafe_ptr() + out0_rows * D,
+        ref_host.as_span().unsafe_ptr().unsafe_offset(out0_rows * D),
         t1,
         h1,
         w1,
@@ -142,7 +142,7 @@ def test_tpool_patch_merger(ctx: DeviceContext) raises:
     )
 
     # GPU kernel: contiguous output
-    var x_tile = TileTensor[mut=False](
+    var x_tile = TileTensor[mut=False, Engine=_](
         x_dev,
         row_major(Coord(total_in, D)),
     )
@@ -150,7 +150,7 @@ def test_tpool_patch_merger(ctx: DeviceContext) raises:
         out_dev,
         row_major(Coord(total_out, D)),
     )
-    var bounds_tensor = TileTensor[mut=False](
+    var bounds_tensor = TileTensor[mut=False, Engine=_](
         bounds,
         row_major(Coord(n_videos, Idx[3])),
     )

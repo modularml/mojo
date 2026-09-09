@@ -128,12 +128,8 @@ class AutoencoderKLWanModel(ComponentModel):
             weights_obj: Any = self.weights
 
             for key, value in weights_obj.items():
-                is_decoder = key.startswith("decoder.") or key.startswith(
-                    "post_quant_conv."
-                )
-                is_encoder = key.startswith("encoder.") or key.startswith(
-                    "quant_conv."
-                )
+                is_decoder = key.startswith(("decoder.", "post_quant_conv."))
+                is_encoder = key.startswith(("encoder.", "quant_conv."))
                 if not (is_decoder or is_encoder):
                     continue
 

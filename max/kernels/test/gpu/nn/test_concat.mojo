@@ -12,16 +12,17 @@
 # ===----------------------------------------------------------------------=== #
 
 from std.collections import Optional
+from std.math import ceildiv
 from std.sys import size_of
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceBuffer, DeviceContext
 from layout import Coord, TileTensor, row_major
 from nn.concat import (
     _concat_gpu,
     _concat_inner_most_single_dim,
     elementwise_epilogue_type,
 )
-from std.testing import assert_true
+from std.testing import assert_equal, assert_true
 
 from std.utils import IndexList, StaticTuple
 
@@ -119,11 +120,11 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
 
     comptime B_SIZE = 32
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(output_dyn)
     def epilogue_plus_one[
-        c_type: DType, _rank: Int, width: SIMDSize, *, alignment: Int
+        c_type: DType, _rank: Int, width: SIMDLength, *, alignment: Int
     ](indices: IndexList[_rank], val: SIMD[c_type, width]):
         var coord = Coord(indices)
         comptime assert output_dyn.flat_rank >= coord.flat_rank
@@ -135,8 +136,10 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
     comptime kernel = _concat_inner_most_single_dim[
         OutputLayoutType=output_dyn.LayoutType,
         output_origin=MutAnyOrigin,
+        OutputEngine=output_dyn.Engine,
         InputLayoutType=input_0_dyn.LayoutType,
         input_origin=ImmutAnyOrigin,
+        InputEngine=input_0_dyn.Engine,
         dtype=dtype,
         num_inputs=4,
         block_size=B_SIZE,
@@ -146,31 +149,32 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
     ]
 
     @always_inline
-    @__copy_capture(
-        output_dyn,
-        input_0_dyn,
-        input_1_dyn,
-        input_2_dyn,
-        input_3_dyn,
-    )
-    @parameter
-    def run_concat_inner_most_single_dim(ctx: DeviceContext) raises:
+    def run_concat_inner_most_single_dim(
+        ctx: DeviceContext,
+    ) raises {
+        var output_dyn,
+        var input_0_dyn,
+        var input_1_dyn,
+        var input_2_dyn,
+        var input_3_dyn,
+        imm,
+    }:
         ctx.enqueue_function[kernel](
-            output_dyn.as_any_origin(),
+            output_dyn.as_unsafe_any_origin(),
             StaticTuple[
                 TileTensor[dtype, input_0_dyn.LayoutType, ImmutAnyOrigin],
                 4,
             ](
-                input_0_dyn.as_any_origin().as_immut(),
-                input_1_dyn.as_any_origin().as_immut(),
-                input_2_dyn.as_any_origin().as_immut(),
-                input_3_dyn.as_any_origin().as_immut(),
+                input_0_dyn.as_unsafe_any_origin().as_immut(),
+                input_1_dyn.as_unsafe_any_origin().as_immut(),
+                input_2_dyn.as_unsafe_any_origin().as_immut(),
+                input_3_dyn.as_unsafe_any_origin().as_immut(),
             ),
             grid_dim=(d0 * d1 * d2 * d3 * d4 // B_SIZE),
             block_dim=(B_SIZE),
         )
 
-    var nstime_kernel = ctx.execution_time[run_concat_inner_most_single_dim](1)
+    var nstime_kernel = ctx.execution_time(run_concat_inner_most_single_dim, 1)
     print(
         "concat_inner_most_single_dim time = ",
         Float64(nstime_kernel) * 1e-6,
@@ -190,7 +194,7 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
     ctx.enqueue_copy(output_host_buffer, output_device_buffer)
     ctx.synchronize()
 
-    def validate_results() raises {read}:
+    def validate_results() raises {imm}:
         for i in range(d0):
             for j in range(d1):
                 for k in range(d2):
@@ -217,41 +221,40 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
                             assert_true(False, msg="❌ Test failed!")
                             return
 
-        print("✅ Test passed!")
-
     validate_results()
 
     @always_inline
-    @__copy_capture(
-        output_dyn,
-        input_0_dyn,
-        input_1_dyn,
-        input_2_dyn,
-        input_3_dyn,
-    )
-    @parameter
-    def run_concat_gpu(ctx: DeviceContext) raises:
+    def run_concat_gpu(
+        ctx: DeviceContext,
+    ) raises {
+        var output_dyn,
+        var input_0_dyn,
+        var input_1_dyn,
+        var input_2_dyn,
+        var input_3_dyn,
+        imm,
+    }:
         # uses default stream
         _concat_gpu[
             epilogue_fn=Optional[elementwise_epilogue_type](
                 epilogue_plus_one
             ) if test_epilogue else None
         ](
-            output_dyn.as_any_origin(),
+            output_dyn.as_unsafe_any_origin(),
             4,
             StaticTuple[
                 TileTensor[dtype, input_0_dyn.LayoutType, ImmutAnyOrigin],
                 4,
             ](
-                input_0_dyn.as_any_origin().as_immut(),
-                input_1_dyn.as_any_origin().as_immut(),
-                input_2_dyn.as_any_origin().as_immut(),
-                input_3_dyn.as_any_origin().as_immut(),
+                input_0_dyn.as_unsafe_any_origin().as_immut(),
+                input_1_dyn.as_unsafe_any_origin().as_immut(),
+                input_2_dyn.as_unsafe_any_origin().as_immut(),
+                input_3_dyn.as_unsafe_any_origin().as_immut(),
             ),
             ctx,
         )
 
-    var nstime = ctx.execution_time[run_concat_gpu](1)
+    var nstime = ctx.execution_time(run_concat_gpu, 1)
     print("concat_gpu time = ", Float64(nstime) * 1e-6, " ms")
     print(
         "transfer rate = ",
@@ -274,7 +277,152 @@ def test_concat_4_inputs_rank5[test_epilogue: Bool](ctx: DeviceContext) raises:
     _ = output_device_buffer
 
 
+def test_inner_most_single_dim_static_vs_dynamic(ctx: DeviceContext) raises:
+    """Static-divisor fold numerical-equivalence check.
+
+    Runs `_concat_inner_most_single_dim` twice on identical inputs: once with a
+    fully static output layout (`row_major[...]()`, all `ComptimeInt` dims, so
+    the per-thread row -> n-D `divmod` strength-reduces to magic-multiply +
+    shift) and once with the dynamic `Coord(IndexList)` output layout (runtime
+    `IDIV`). The two device outputs must be bit-identical: the fold only changes
+    which instructions the compiler emits, not the arithmetic result.
+    """
+    comptime rank = 5
+    comptime dtype = DType.float32
+
+    # rank-5 with non-trivial outer dims so dims 1..rank-2 actually decompose
+    # (rank==2 would hit the fast path and never divide).
+    comptime d0 = 2
+    comptime d1 = 7
+    comptime d2 = 5
+    comptime d3 = 9
+    comptime d4 = 1
+    comptime num_inputs = 4
+
+    comptime input_layout = row_major[d0, d1, d2, d3, d4]()
+    comptime static_output_layout = row_major[d0, d1, d2, d3, num_inputs]()
+    comptime n_rows = d0 * d1 * d2 * d3 * d4
+    comptime n_out = d0 * d1 * d2 * d3 * num_inputs
+    comptime B_SIZE = 32
+
+    # One reused host staging buffer; each input gets a disjoint value range
+    # (base offset `n * n_rows`) so per-input values stay distinguishable in the
+    # concatenated output.
+    var input_host = ctx.enqueue_create_host_buffer[dtype](n_rows)
+    ctx.synchronize()
+
+    var in_dev = List[DeviceBuffer[dtype]]()
+    for n in range(num_inputs):
+        var b = ctx.enqueue_create_buffer[dtype](n_rows)
+        for i in range(n_rows):
+            input_host[i] = Float32(n * n_rows + i)
+        ctx.enqueue_copy(b, input_host)
+        in_dev.append(b)
+    ctx.synchronize()
+
+    # Two output device buffers, identical contents target.
+    var out_static_dev = ctx.enqueue_create_buffer[dtype](n_out)
+    var out_dynamic_dev = ctx.enqueue_create_buffer[dtype](n_out)
+
+    # Static-layout tensors (fold fires).
+    comptime StaticInLayout = type_of(input_layout)
+    var out_static = TileTensor(out_static_dev, static_output_layout)
+    # Name the input tile type so the kernel's `InputEngine` param matches the
+    # `DeviceBuffer` constructor's storage exactly (the tuple elements are built
+    # from the same expression); the tuple can't be indexed at comptime.
+    comptime StaticInTile = type_of(
+        TileTensor(in_dev[0], input_layout).as_unsafe_any_origin().as_immut()
+    )
+    var ins_static = StaticTuple[StaticInTile, num_inputs]()
+
+    comptime for n in range(num_inputs):
+        ins_static[n] = (
+            TileTensor(in_dev[n], input_layout)
+            .as_unsafe_any_origin()
+            .as_immut()
+        )
+
+    comptime kernel_static = _concat_inner_most_single_dim[
+        OutputLayoutType=out_static.LayoutType,
+        output_origin=MutAnyOrigin,
+        OutputEngine=out_static.Engine,
+        InputLayoutType=StaticInLayout,
+        input_origin=ImmutAnyOrigin,
+        InputEngine=StaticInTile.Engine,
+        dtype=dtype,
+        num_inputs=num_inputs,
+        block_size=B_SIZE,
+        epilogue_fn=None,
+    ]
+    ctx.enqueue_function[kernel_static](
+        out_static.as_unsafe_any_origin(),
+        ins_static,
+        grid_dim=(ceildiv(n_rows, B_SIZE)),
+        block_dim=(B_SIZE),
+    )
+
+    # Dynamic-layout tensors (runtime divide).
+    var dyn_in_shape = IndexList[rank](d0, d1, d2, d3, d4)
+    var dyn_out_shape = IndexList[rank](d0, d1, d2, d3, num_inputs)
+    var out_dynamic = TileTensor(
+        out_dynamic_dev, row_major(Coord(dyn_out_shape))
+    )
+    comptime DynInLayout = type_of(row_major(Coord(dyn_in_shape)))
+    comptime DynInTile = type_of(
+        TileTensor(in_dev[0], row_major(Coord(dyn_in_shape)))
+        .as_unsafe_any_origin()
+        .as_immut()
+    )
+    var ins_dynamic = StaticTuple[
+        TileTensor[dtype, DynInLayout, ImmutAnyOrigin], num_inputs
+    ]()
+
+    comptime for n in range(num_inputs):
+        ins_dynamic[n] = (
+            TileTensor(in_dev[n], row_major(Coord(dyn_in_shape)))
+            .as_unsafe_any_origin()
+            .as_immut()
+        )
+
+    comptime kernel_dynamic = _concat_inner_most_single_dim[
+        OutputLayoutType=out_dynamic.LayoutType,
+        output_origin=MutAnyOrigin,
+        OutputEngine=out_dynamic.Engine,
+        InputLayoutType=DynInLayout,
+        input_origin=ImmutAnyOrigin,
+        InputEngine=DynInTile.Engine,
+        dtype=dtype,
+        num_inputs=num_inputs,
+        block_size=B_SIZE,
+        epilogue_fn=None,
+    ]
+    ctx.enqueue_function[kernel_dynamic](
+        out_dynamic.as_unsafe_any_origin(),
+        ins_dynamic,
+        grid_dim=(ceildiv(n_rows, B_SIZE)),
+        block_dim=(B_SIZE),
+    )
+
+    var host_static = ctx.enqueue_create_host_buffer[dtype](n_out)
+    var host_dynamic = ctx.enqueue_create_host_buffer[dtype](n_out)
+    ctx.enqueue_copy(host_static, out_static_dev)
+    ctx.enqueue_copy(host_dynamic, out_dynamic_dev)
+    ctx.synchronize()
+
+    for i in range(n_out):
+        assert_equal(
+            host_static[i],
+            host_dynamic[i],
+            msg="static-fold output diverged from dynamic-divide output",
+        )
+
+    _ = in_dev^
+    _ = out_static_dev
+    _ = out_dynamic_dev
+
+
 def main() raises:
     with DeviceContext() as ctx:
         test_concat_4_inputs_rank5[True](ctx)
         test_concat_4_inputs_rank5[False](ctx)
+        test_inner_most_single_dim_static_vs_dynamic(ctx)

@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -11,9 +10,12 @@ modular_py_test(
     name = "test_overlap_text_generation_pipeline",
     srcs = ["test_overlap_text_generation_pipeline.py"],
     deps = [
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/kv_cache",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/support",
+        requirement("llguidance"),
         requirement("numpy"),
     ],
 )
@@ -37,7 +39,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         requirement("numpy"),
@@ -56,7 +58,7 @@ modular_py_test(
         "//max/python/max/driver",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         requirement("numpy"),
@@ -76,7 +78,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/kv_cache",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/serve/scheduler",
@@ -103,7 +105,6 @@ modular_py_test(
     deps = [
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
-        "//max/tests/integration:hf_repo_lock",
         requirement("numpy"),
         requirement("pytest-asyncio"),
     ],

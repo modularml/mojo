@@ -14,7 +14,7 @@
 
 from std.sys.info import _accelerator_arch
 from internal_utils import TuningConfig, Table
-from std.gpu.host.info import GPUInfo
+from max.gpu.host.info import GPUInfo
 
 comptime KB = 1 << 10
 comptime MB = 1 << 20
@@ -22,16 +22,51 @@ comptime GB = 1 << 30
 
 
 trait CommTuningConfig(TuningConfig):
+    """Tuning-table entry for a multi-GPU communication collective.
+
+    Extends `TuningConfig` with the four dimensions that drive kernel-launch
+    selection: SM version, GPU count, total data size, and thread-block count.
+    Implement this trait to supply custom tuning tables to
+    `dispatch_select_comm_config`.
+    """
+
     def get_num_blocks(self) -> Int:
+        """Returns the number of thread blocks to launch for this configuration.
+
+        Returns:
+            The thread-block count, which must not exceed 512
+            (`MAX_NUM_BLOCKS_UPPER_BOUND`).
+        """
         ...
 
     def get_num_bytes(self) -> Int:
+        """Returns the maximum input size in bytes covered by this entry.
+
+        `dispatch_select_comm_config` selects the first entry whose
+        `get_num_bytes()` is at least the actual transfer size.
+
+        Returns:
+            The upper-bound byte count for this tuning entry, or -1 for the
+            default (catch-all) entry.
+        """
         ...
 
     def get_sm_version(self) -> StaticString:
+        """Returns the SM version string this entry targets.
+
+        Returns:
+            A string such as `"sm_90a"` or `"sm_100a"`, or `"default"` for
+            the architecture-agnostic fallback entry.
+        """
         ...
 
     def get_ngpus(self) -> Int:
+        """Returns the GPU count this entry targets.
+
+        Returns:
+            The number of participating GPUs, or -1 for the default
+            (catch-all) entry.
+        """
         ...
 
 
@@ -89,6 +124,16 @@ def dispatch_select_comm_config[
     Falls back to the arch-specific default (ngpus=-1, num_bytes=-1,
     matching sm_version), or if none exists, to the global default
     (ngpus=-1, num_bytes=-1, sm_version="default").
+
+    Parameters:
+        TuningTableType: The tuning-config entry type, constrained to
+            `CommTuningConfig`.
+        ngpus: Number of participating GPUs to select a config for.
+        sm_version: Target SM version string to match, such as `"sm_90a"`.
+        tuning_table: Compile-time table of tuning configs to search.
+
+    Args:
+        num_bytes: Actual transfer size in bytes to select a config for.
     """
 
     # Validate that every entry has num_blocks <= 512 (MAX_NUM_BLOCKS_UPPER_BOUND
@@ -96,38 +141,37 @@ def dispatch_select_comm_config[
     # Signal.peer_counter with block_idx.x; those arrays are statically sized
     # to MAX_NUM_BLOCKS_UPPER_BOUND, so an entry exceeding 512 would silently
     # corrupt barrier state.
-    @parameter
-    def _entry_exceeds_block_bound(x: tuning_table.type) -> Bool:
+    def _entry_exceeds_block_bound(x: tuning_table.type) {} -> Bool:
         return x.get_num_blocks() > 512
 
-    comptime _over_limit = tuning_table.query_index[
-        _entry_exceeds_block_bound
-    ]()
+    comptime _over_limit = tuning_table.query_index(
+        rule=_entry_exceeds_block_bound
+    )
     comptime assert (
         len(_over_limit) == 0
     ), "tuning_table entry has num_blocks > MAX_NUM_BLOCKS_UPPER_BOUND (512)"
 
     # get default entry: prefer arch-specific, fall back to global default
-    @parameter
-    def rule_eq_arch_default(x: tuning_table.type) -> Bool:
+    def rule_eq_arch_default(x: tuning_table.type) {} -> Bool:
         return (
             x.get_ngpus() == -1
             and x.get_num_bytes() == -1
             and x.get_sm_version() == sm_version
         )
 
-    @parameter
-    def rule_eq_global_default(x: tuning_table.type) -> Bool:
+    def rule_eq_global_default(x: tuning_table.type) {} -> Bool:
         return (
             x.get_ngpus() == -1
             and x.get_num_bytes() == -1
             and x.get_sm_version() == "default"
         )
 
-    comptime arch_default_idx = tuning_table.query_index[rule_eq_arch_default]()
-    comptime global_default_idx = tuning_table.query_index[
-        rule_eq_global_default
-    ]()
+    comptime arch_default_idx = tuning_table.query_index(
+        rule=rule_eq_arch_default
+    )
+    comptime global_default_idx = tuning_table.query_index(
+        rule=rule_eq_global_default
+    )
     comptime default_idx = arch_default_idx if len(
         arch_default_idx
     ) > 0 else global_default_idx
@@ -139,35 +183,29 @@ def dispatch_select_comm_config[
     comptime default_entry = tuning_table.configs[default_idx[0]]
 
     # narrowing the search space to matching sm_version and ngpus
-    @parameter
-    def rule_eq_arch_ngpus(x: tuning_table.type) -> Bool:
+    def rule_eq_arch_ngpus(x: tuning_table.type) {} -> Bool:
         return x.get_sm_version() == sm_version and x.get_ngpus() == ngpus
 
-    comptime search_domain = tuning_table.query_index[rule_eq_arch_ngpus]()
+    comptime search_domain = tuning_table.query_index(rule=rule_eq_arch_ngpus)
 
     comptime if not search_domain:
         return default_entry
 
     # get all static num_bytes values in table within the search space
-    @parameter
-    def rule_get_num_bytes(x: tuning_table.type) -> Int:
-        return x.get_num_bytes()
-
     comptime all_num_bytes_values = tuning_table.query_values[
-        Int, rule_get_num_bytes, search_domain
-    ]()
+        Int, domain=search_domain
+    ](rule=lambda (x: tuning_table.type) -> Int: x.get_num_bytes())
 
     comptime for nb in all_num_bytes_values:
 
-        @parameter
-        def rule_eq_nb(x: tuning_table.type) -> Bool:
+        def rule_eq_nb(x: tuning_table.type) {} -> Bool:
             return x.get_num_bytes() == nb
 
         # Find the fist config x with input 'num_bytes <= x.num_bytes'
         if num_bytes <= nb:
-            comptime idx_list = tuning_table.query_index[
-                rule_eq_nb, domain=search_domain
-            ]()
+            comptime idx_list = tuning_table.query_index[domain=search_domain](
+                rule=rule_eq_nb
+            )
 
             comptime if idx_list:
                 comptime entry = tuning_table.configs[idx_list[0]]
@@ -179,5 +217,15 @@ def dispatch_select_comm_config[
 
 
 def get_sm_version() -> StaticString:
+    """Returns the SM version string for the current compile target.
+
+    Queries the GPU info for the default accelerator architecture and returns
+    its version identifier (e.g. `"sm_90a"` for Hopper, `"sm_100a"` for
+    Blackwell). The result is a comptime constant derived from
+    `GPUInfo.from_name`.
+
+    Returns:
+        The SM version string for the target GPU architecture.
+    """
     comptime default_device_info = GPUInfo.from_name[_accelerator_arch()]()
     return default_device_info.version

@@ -28,7 +28,6 @@ class VisionArenaBenchmarkDataset(LocalBenchmarkDataset):
 
         VisionArena datasets are loaded directly in sample_requests, not as a separate fetch step.
         """
-        pass
 
     def sample_requests(
         self,

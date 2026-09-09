@@ -14,8 +14,8 @@ from std.math import align_up
 from std.sys import argv, size_of
 import std.itertools
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.memory import alloc
 from internal_utils import assert_almost_equal
 from std.random import rand
@@ -43,7 +43,7 @@ from linalg.fp4_utils import (
 )
 from std.random import random_ui64
 from std.builtin.simd import _convert_f32_to_float8_ue8m0
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 
 
 def simple_init() -> Bool:
@@ -173,8 +173,8 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
                     comptime assert b_host.flat_rank == 3
                     b_host[b, n, k] = random_ui64(0, 1).cast[b_type]()
     else:
-        rand(a_host.ptr, a_host.num_elements())
-        rand(b_host.ptr, b_host.num_elements())
+        rand(a_host._storage, a_host.num_elements())
+        rand(b_host._storage, b_host.num_elements())
 
     # NOTE: It is very important that we set unused scales to 0.0 otherwise we will hit accuracy issues
     for batch_idx in range(Int(batch.value())):
@@ -187,7 +187,7 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
                 if row_idx < Int(m.value()) and col_idx < Int(k.value()):
                     var scale_value = _convert_f32_to_float8_ue8m0[
                         scales_dtype
-                    ]((1 << random_ui64(0, 3)).cast[DType.float32]())
+                    ]((1 << random_ui64(0, 3)).cast[.float32]())
                     set_batched_scale_factor[SF_VECTOR_SIZE=SF_VECTOR_SIZE](
                         a_scales_host,
                         batch_idx,
@@ -214,7 +214,7 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
                 if row_idx < Int(n.value()) and col_idx < Int(k.value()):
                     var scale_value = _convert_f32_to_float8_ue8m0[
                         scales_dtype
-                    ]((1 << random_ui64(0, 3)).cast[DType.float32]())
+                    ]((1 << random_ui64(0, 3)).cast[.float32]())
                     set_batched_scale_factor[SF_VECTOR_SIZE=SF_VECTOR_SIZE](
                         b_scales_host,
                         batch_idx,
@@ -265,7 +265,7 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
         ctx,
     )
 
-    comptime assert a_type != DType.float8_e4m3fn or transpose_b, (
+    comptime assert a_type != .float8_e4m3fn or transpose_b, (
         "Testing is only supported for transposed_b==True when"
         " a_type==float8_e4m3fn. Add the non-transposed case if needed."
     )
@@ -304,17 +304,21 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
     var b_scales_batch_stride = b_scales_5d_shape.product()
 
     for b in range(Int(batch.value())):
-        var a_2d = TileTensor(a_tensor.ptr + b * a_batch_stride, a_2d_shape)
-        var b_2d = TileTensor(b_tensor.ptr + b * b_batch_stride, b_2d_shape)
+        var a_2d = TileTensor(
+            a_tensor._storage + b * a_batch_stride, a_2d_shape
+        )
+        var b_2d = TileTensor(
+            b_tensor._storage + b * b_batch_stride, b_2d_shape
+        )
         var c_ref_2d = TileTensor(
-            c_ref_tensor.ptr + b * c_batch_stride, c_2d_shape
+            c_ref_tensor._storage + b * c_batch_stride, c_2d_shape
         )
         var a_scales_5d = TileTensor(
-            a_scales_tensor.ptr + b * a_scales_batch_stride,
+            a_scales_tensor._storage + b * a_scales_batch_stride,
             a_scales_5d_shape,
         )
         var b_scales_5d = TileTensor(
-            b_scales_tensor.ptr + b * b_scales_batch_stride,
+            b_scales_tensor._storage + b * b_scales_batch_stride,
             b_scales_5d_shape,
         )
 
@@ -335,8 +339,8 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
     ctx.synchronize()
 
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=1e-2,
         rtol=1e-2,

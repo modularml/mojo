@@ -19,10 +19,16 @@ actual video files or torch.
 
 from __future__ import annotations
 
+import contextlib
 import io
+from fractions import Fraction
+from types import SimpleNamespace
+from typing import IO
 
+import av
 import numpy as np
 import pytest
+from max.pipelines.architectures.gemma4 import video_processor as vp_module
 from max.pipelines.architectures.gemma4.video_processor import (
     Gemma4VideoProcessor,
     VideoMetadata,
@@ -36,13 +42,14 @@ MAX_PATCHES = VIDEO_SOFT_TOKENS * POOLING_K**2  # 630
 
 
 def _make_synthetic_video_bytes(
-    width: int = 320, height: int = 240, num_frames: int = 8
+    width: int = 320,
+    height: int = 240,
+    num_frames: int = 8,
+    container_format: str = "mp4",
 ) -> bytes:
     """Create a synthetic video as raw bytes using PyAV."""
-    import av
-
     buf = io.BytesIO()
-    container = av.open(buf, mode="w", format="mp4")
+    container = av.open(buf, mode="w", format=container_format)
     stream = container.add_stream("libx264", rate=24)
     assert isinstance(stream, av.VideoStream)
     stream.width = width
@@ -182,6 +189,95 @@ class TestGemma4VideoProcessor:
         assert len(position_ids) == 2
         assert len(num_soft) == 2
         assert len(metadata) == 2
+
+
+class TestBoundedDecode:
+    """The decode keeps only sampled frames, never the whole clip.
+
+    Regression tests for the decode-all-frames-then-sample implementation,
+    whose peak memory was the entire video as uncompressed PIL rasters.
+    """
+
+    @pytest.fixture
+    def processor(self) -> Gemma4VideoProcessor:
+        return Gemma4VideoProcessor(
+            patch_size=PATCH_SIZE,
+            max_soft_tokens=VIDEO_SOFT_TOKENS,
+            pooling_kernel_size=POOLING_K,
+            num_frames=4,
+        )
+
+    def test_samples_expected_indices(
+        self, processor: Gemma4VideoProcessor
+    ) -> None:
+        """Timestamps identify which source frames were kept."""
+        video_bytes = _make_synthetic_video_bytes(
+            width=320, height=240, num_frames=8
+        )
+        pixel_values, _, _, metadata = processor([video_bytes])
+
+        meta = metadata[0]
+        assert meta.fps is not None
+        sampled = [round(t * meta.fps) for t in meta.timestamps]
+        assert sampled == [0, 2, 4, 7]
+        assert pixel_values[0].shape[0] == 4
+
+        # Source frames are constant-fill with brightness increasing per
+        # index, so the kept frames' means must strictly increase — catches
+        # off-by-one in which frames the streaming decode retained.
+        means = pixel_values[0].mean(axis=(1, 2))
+        assert np.all(np.diff(means) > 0)
+
+    def test_no_declared_frame_count(
+        self, processor: Gemma4VideoProcessor
+    ) -> None:
+        """A container without a frame count uses the counting-decode fallback."""
+        video_bytes = _make_synthetic_video_bytes(
+            width=320, height=240, num_frames=8, container_format="mpegts"
+        )
+        # Premise: MPEG-TS carries no frame count. If PyAV starts reporting
+        # one, this test no longer exercises the fallback — update it.
+        with av.open(io.BytesIO(video_bytes)) as container:
+            assert container.streams.video[0].frames == 0
+
+        pixel_values, _, _, metadata = processor([video_bytes])
+        assert pixel_values[0].shape[0] == 4
+        assert len(metadata[0].timestamps) == 4
+
+    def test_wrong_declared_frame_count(
+        self,
+        processor: Gemma4VideoProcessor,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A lying container header falls back to the actual decoded count."""
+        real_open = vp_module.open_video_container
+        # The first open is the metadata probe; hand it a synthetic container
+        # declaring 1000 frames. Later opens (the decode passes) get the
+        # real container.
+        lying_probe = SimpleNamespace(
+            streams=SimpleNamespace(
+                video=[
+                    SimpleNamespace(average_rate=Fraction(24, 1), frames=1000)
+                ]
+            )
+        )
+        probe = iter([contextlib.nullcontext(lying_probe)])
+
+        def fake_open(source: str | IO[bytes]) -> object:
+            return next(probe, None) or real_open(source)
+
+        monkeypatch.setattr(vp_module, "open_video_container", fake_open)
+        video_bytes = _make_synthetic_video_bytes(
+            width=320, height=240, num_frames=8
+        )
+        pixel_values, _, _, metadata = processor([video_bytes])
+
+        meta = metadata[0]
+        assert meta.fps is not None
+        # Indices must come from the true count (8), not the declared 1000.
+        sampled = [round(t * meta.fps) for t in meta.timestamps]
+        assert sampled == [0, 2, 4, 7]
+        assert pixel_values[0].shape[0] == 4
 
 
 class TestVideoMetadata:

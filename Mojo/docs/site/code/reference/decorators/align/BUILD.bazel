@@ -1,0 +1,25 @@
+load("//bazel:api.bzl", "modular_run_binary_test", "mojo_binary")
+
+package(default_visibility = ["//oss/modular/docs:__subpackages__"])
+
+MOJO_SRCS = glob(["*.mojo"])
+
+[
+    mojo_binary(
+        name = src.split(".")[0],
+        srcs = [src],
+        deps = [
+            "@mojo//:std",
+        ],
+    )
+    for src in MOJO_SRCS
+]
+
+[
+    modular_run_binary_test(
+        name = src.split(".")[0] + "_test",
+        size = "small",
+        binary = src.split(".")[0],
+    )
+    for src in MOJO_SRCS
+]

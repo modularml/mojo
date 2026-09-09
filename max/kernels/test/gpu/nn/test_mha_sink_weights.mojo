@@ -22,8 +22,8 @@ head_dim=64.
 from std.math import isclose
 from std.random import rand
 
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -212,7 +212,7 @@ def test[
                 ]()
                 var actual = flash_output_ptr[
                     d + depth * (h + s * num_heads)
-                ].cast[DType.float64]()
+                ].cast[.float64]()
                 count += 1
                 if not isclose(actual, expect, atol=1e-5, rtol=rtol):
                     mismatches += 1

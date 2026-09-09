@@ -12,11 +12,13 @@
 # ===----------------------------------------------------------------------=== #
 """Modality-specific provider options."""
 
+from .audio import AudioProviderOptions
 from .common import GeneratedMediaResponseFormat, PixelProviderOptionsBase
 from .image import ImageProviderOptions
 from .video import VideoProviderOptions
 
 __all__ = [
+    "AudioProviderOptions",
     "GeneratedMediaResponseFormat",
     "ImageProviderOptions",
     "PixelProviderOptionsBase",

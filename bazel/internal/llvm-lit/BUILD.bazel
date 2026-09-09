@@ -41,6 +41,10 @@ modular_versioned_expand_template(
         "//:modular_config_production": {"@ENABLE_ASSERTIONS@": "False"},
         "//conditions:default": {"@ENABLE_ASSERTIONS@": "True"},
     }) | select({
+        "//:modular_config_default": {"@MODULAR_PRODUCTION@": "True"},
+        "//:modular_config_production": {"@MODULAR_PRODUCTION@": "True"},
+        "//conditions:default": {"@MODULAR_PRODUCTION@": "False"},
+    }) | select({
         "//:linux_aarch64": {"@TARGET_TRIPLE@": "aarch64-unknown-linux-gnu"},
         "//:linux_x86_64": {"@TARGET_TRIPLE@": "x86_64-unknown-linux-gnu"},
         "@platforms//os:macos": {"@TARGET_TRIPLE@": "arm64-apple-macosx"},

@@ -15,20 +15,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.nn.kv_cache import (
     KVCacheParamInterface,
+    spec_decode_cache_slack,
 )
+from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.lib.config.model_config import _select_quantization_encoding
 from max.pipelines.lib.interfaces.arch_config import (
-    ArchConfigWithDecoderSubconfigKVParams,
-    ArchConfigWithKVAndVisionCache,
+    ArchConfigWithKVCache,
+    ArchConfigWithStoredKVParams,
+    ArchConfigWithVisionCache,
+    ArchVLConfigWithTextSubconfig,
 )
 from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
-from max.pipelines.lib.utils import upper_bounded_default
-from max.pipelines.modeling.config_enums import supported_encoding_dtype
+from max.pipelines.modeling.config_enums import (
+    SupportedEncoding,
+    supported_encoding_dtype,
+)
 from transformers import AutoConfig
 from typing_extensions import Self, override
 
@@ -58,14 +66,102 @@ def _extract_eagle_aux_layer_ids(
     return list(raw) or None
 
 
-@dataclass(kw_only=True)
-class KimiK2_5TextConfig(DeepseekV3Config):
+class _KimiK2_5VisionCacheConfig:
+    """Vision-cache facts shared by both registered Kimi K2.5 arch configs."""
+
+    @classmethod
+    def estimate_vision_cache_entry_bytes(
+        cls,
+        huggingface_config: AutoConfig,
+    ) -> int:
+        """Estimates per-entry bytes for the Kimi K2.5 vision encoder cache.
+
+        Max tokens per image = pos_emb_height * pos_emb_width / merge_sq,
+        multiplied by the text hidden size and 2 bytes (bfloat16).
+
+        Args:
+            huggingface_config: HuggingFace model configuration.
+
+        Returns:
+            Estimated bytes per vision cache entry.
+
+        Raises:
+            ValueError: If required vision or text config fields are absent or
+                invalid.
+        """
+        vision_config = getattr(huggingface_config, "vision_config", None)
+        if vision_config is None:
+            raise ValueError(
+                "KimiK2.5 requires a vision_config in the HuggingFace config"
+            )
+        text_config = getattr(huggingface_config, "text_config", None)
+        if text_config is None:
+            raise ValueError(
+                "KimiK2.5 requires a text_config in the HuggingFace config"
+            )
+        hidden = getattr(text_config, "hidden_size", 0)
+        if hidden <= 0:
+            raise ValueError(
+                "KimiK2.5 text_config.hidden_size must be positive"
+            )
+        merge_kernel_size = getattr(vision_config, "merge_kernel_size", [2, 2])
+        merge_sq = 1
+        for k in (
+            merge_kernel_size
+            if isinstance(merge_kernel_size, (list, tuple))
+            else [merge_kernel_size]
+        ):
+            merge_sq *= k
+        pos_h = getattr(vision_config, "init_pos_emb_height", 0)
+        pos_w = getattr(vision_config, "init_pos_emb_width", 0)
+        if pos_h <= 0 or pos_w <= 0:
+            raise ValueError(
+                "KimiK2.5 vision_config must provide "
+                "init_pos_emb_height and init_pos_emb_width"
+            )
+        max_tokens = (pos_h * pos_w) // merge_sq
+        spec = cls.get_vision_cache_row_spec(huggingface_config)
+        assert spec is not None
+        row_hidden, dtype = spec
+        return max_tokens * row_hidden * dtype.size_in_bytes
+
+    @classmethod
+    def get_vision_cache_row_spec(
+        cls,
+        huggingface_config: AutoConfig,
+    ) -> tuple[int, DType] | None:
+        """One embedding row per merged vision token: text hidden, bfloat16."""
+        text_config = getattr(huggingface_config, "text_config", None)
+        if text_config is None:
+            raise ValueError(
+                "KimiK2.5 requires a text_config in the HuggingFace config"
+            )
+        hidden = getattr(text_config, "hidden_size", 0)
+        if hidden <= 0:
+            raise ValueError(
+                "KimiK2.5 text_config.hidden_size must be positive"
+            )
+        return (hidden, DType.bfloat16)
+
+
+class KimiK2_5TextConfig(
+    _KimiK2_5VisionCacheConfig, DeepseekV3Config, ArchConfigWithVisionCache
+):
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "bfloat16",
+        "float8_e4m3fn",
+        "float4_e2m1fnx2",
+    }
+
     @override
     @classmethod
     def initialize(
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a DeepseekV3Config instance from pipeline configuration.
 
@@ -91,11 +187,13 @@ class KimiK2_5TextConfig(DeepseekV3Config):
                 "Please ensure the model repository contains a valid config.json file."
             )
         kv_cache_config = model_config.kv_cache
-        quantization_encoding = model_config.quantization_encoding
-        if quantization_encoding is None:
-            raise ValueError("quantization_encoding must not be None")
+        quantization_encoding = _select_quantization_encoding(
+            model_config, cls.DEFAULT_ENCODING
+        )
         dtype = supported_encoding_dtype(quantization_encoding)
-        cache_dtype = model_config.kv_cache.cache_dtype
+        cache_dtype = cache_dtype_for_encoding(
+            quantization_encoding, model_config.kv_cache.kv_cache_format
+        )
 
         device_refs = [
             DeviceRef(spec.device_type, spec.id)
@@ -108,11 +206,6 @@ class KimiK2_5TextConfig(DeepseekV3Config):
             devices=device_refs,
             kv_cache_config=kv_cache_config,
             cache_dtype=cache_dtype,
-        )
-
-        max_seq_len = upper_bounded_default(
-            upper_bound=config.max_position_embeddings,
-            default=model_config.max_length,
         )
 
         eagle_aux_hidden_state_layer_ids = _extract_eagle_aux_layer_ids(
@@ -148,7 +241,8 @@ class KimiK2_5TextConfig(DeepseekV3Config):
             first_k_dense_replace=config.first_k_dense_replace,
             norm_topk_prob=config.norm_topk_prob,
             hidden_act=config.hidden_act,
-            max_position_embeddings=config.max_position_embeddings,
+            max_position_embeddings=config.max_position_embeddings
+            + spec_decode_cache_slack(kv_params),
             max_seq_len=max_seq_len,
             rms_norm_eps=config.rms_norm_eps,
             tie_word_embeddings=config.tie_word_embeddings,
@@ -159,27 +253,25 @@ class KimiK2_5TextConfig(DeepseekV3Config):
             attention_bias=config.attention_bias,
             attention_dropout=config.attention_dropout,
             eagle_aux_hidden_state_layer_ids=eagle_aux_hidden_state_layer_ids,
+            quantization_encoding=quantization_encoding,
         )
 
     @classmethod
     def calculate_max_seq_len(
         cls,
-        pipeline_config: PipelineConfig,
         huggingface_config: AutoConfig,
+        model_config: MAXModelConfig,
     ) -> int:
-        """Calculates the maximum sequence length for the Kimi K2.5 language model."""
-        try:
-            return upper_bounded_default(
-                upper_bound=huggingface_config.max_position_embeddings,
-                default=pipeline_config.model.max_length,
-            )
-        except ValueError as e:
-            raise ValueError(
-                "Unable to infer max_length for Kimi K2.5, the provided "
-                f"max_length ({pipeline_config.model.max_length}) exceeds the "
-                f"model's max_position_embeddings "
-                f"({huggingface_config.max_position_embeddings})."
-            ) from e
+        # DeepseekV3Config does not inherit ArchConfigWithStoredKVParams, so the
+        # VLM mixin cannot delegate max_seq_len to this class directly.
+        #
+        # Reached two ways: the mixin passes the already-unwrapped text config,
+        # while a direct arch registration (arch.py) passes the top-level one,
+        # which on a VL checkpoint carries the text params under text_config.
+        return ArchConfigWithStoredKVParams.calculate_max_seq_len(
+            getattr(huggingface_config, "text_config", huggingface_config),
+            model_config,
+        )
 
 
 @dataclass
@@ -329,15 +421,28 @@ class VisionConfig:
 
 @dataclass(kw_only=True)
 class KimiK2_5Config(
-    ArchConfigWithDecoderSubconfigKVParams, ArchConfigWithKVAndVisionCache
+    _KimiK2_5VisionCacheConfig,
+    ArchVLConfigWithTextSubconfig,
+    ArchConfigWithKVCache,
+    ArchConfigWithVisionCache,
 ):
     """Configuration for Kimi-K2.5 models."""
+
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "bfloat16",
+        "float8_e4m3fn",
+        "float4_e2m1fnx2",
+    }
 
     devices: list[DeviceRef]
     """Devices that the Kimi-K2.5 model is parallelized over."""
 
     dtype: DType
     """DType of the Kimi-K2.5 model weights."""
+
+    quantization_encoding: SupportedEncoding | None = None
+    """The resolved weight encoding the model runs with."""
 
     bos_token_id: int
     """ID of the beginning-of-sequence (BOS) token."""
@@ -374,52 +479,6 @@ class KimiK2_5Config(
         """Returns the KV cache parameters from the embedded LLM config."""
         return self.llm_config.get_kv_params()
 
-    def get_max_seq_len(self) -> int:
-        """Returns the maximum sequence length from the embedded LLM config."""
-        return self.llm_config.get_max_seq_len()
-
-    @staticmethod
-    def estimate_vision_cache_entry_bytes(
-        huggingface_config: AutoConfig,
-    ) -> int:
-        """Estimate per-entry bytes for the vision encoder cache.
-
-        Max tokens per image = pos_emb_height * pos_emb_width / merge_sq,
-        multiplied by the text hidden size and 2 bytes (bfloat16).
-        """
-        vision_config = getattr(huggingface_config, "vision_config", None)
-        if vision_config is None:
-            raise ValueError(
-                "KimiK2.5 requires a vision_config in the HuggingFace config"
-            )
-        text_config = getattr(huggingface_config, "text_config", None)
-        if text_config is None:
-            raise ValueError(
-                "KimiK2.5 requires a text_config in the HuggingFace config"
-            )
-        hidden = getattr(text_config, "hidden_size", 0)
-        if hidden <= 0:
-            raise ValueError(
-                "KimiK2.5 text_config.hidden_size must be positive"
-            )
-        merge_kernel_size = getattr(vision_config, "merge_kernel_size", [2, 2])
-        merge_sq = 1
-        for k in (
-            merge_kernel_size
-            if isinstance(merge_kernel_size, (list, tuple))
-            else [merge_kernel_size]
-        ):
-            merge_sq *= k
-        pos_h = getattr(vision_config, "init_pos_emb_height", 0)
-        pos_w = getattr(vision_config, "init_pos_emb_width", 0)
-        if pos_h <= 0 or pos_w <= 0:
-            raise ValueError(
-                "KimiK2.5 vision_config must provide "
-                "init_pos_emb_height and init_pos_emb_width"
-            )
-        max_tokens = (pos_h * pos_w) // merge_sq
-        return max_tokens * hidden * 2
-
     @staticmethod
     def get_num_layers(huggingface_config: AutoConfig) -> int:
         # Delegate to KimiK2_5TextConfig for language model parameters.
@@ -428,25 +487,14 @@ class KimiK2_5Config(
         )
         return KimiK2_5TextConfig.get_num_layers(llm_config)
 
-    @staticmethod
-    def calculate_max_seq_len(
-        pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        # Delegate to KimiK2_5TextConfig for language model parameters.
-        llm_config = getattr(
-            huggingface_config, "text_config", huggingface_config
-        )
-        return KimiK2_5TextConfig.calculate_max_seq_len(
-            pipeline_config=pipeline_config,
-            huggingface_config=llm_config,
-        )
-
     @override
     @classmethod
     def initialize(
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a Qwen3VLConfig instance from pipeline configuration.
 
@@ -464,7 +512,9 @@ class KimiK2_5Config(
                 "but config could not be loaded. "
                 "Please ensure the model repository contains a valid config.json file."
             )
-        return cls.initialize_from_config(pipeline_config, huggingface_config)
+        return cls.initialize_from_config(
+            pipeline_config, huggingface_config, max_seq_len=max_seq_len
+        )
 
     @classmethod
     def initialize_from_config(
@@ -472,6 +522,8 @@ class KimiK2_5Config(
         pipeline_config: PipelineConfig,
         huggingface_config: AutoConfig,
         llm_config: KimiK2_5TextConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a KimiK2_5Config from pipeline and HuggingFace configs.
 
@@ -493,9 +545,9 @@ class KimiK2_5Config(
             raise ValueError("vision_config not found in huggingface_config")
 
         # Get quantization encoding for dtype
-        quantization_encoding = pipeline_config.model.quantization_encoding
-        if quantization_encoding is None:
-            raise ValueError("quantization_encoding must not be None")
+        quantization_encoding = _select_quantization_encoding(
+            pipeline_config.model, cls.DEFAULT_ENCODING
+        )
         dtype = supported_encoding_dtype(quantization_encoding)
 
         # Create VisionConfig from the vision config
@@ -536,7 +588,9 @@ class KimiK2_5Config(
             )
 
         if llm_config is None:
-            llm_config = KimiK2_5TextConfig.initialize(pipeline_config)
+            llm_config = KimiK2_5TextConfig.initialize(
+                pipeline_config, max_seq_len=max_seq_len
+            )
 
         return cls(
             dtype=dtype,
@@ -561,4 +615,5 @@ class KimiK2_5Config(
             vision_config=vision_config,
             # Composed language model configuration
             llm_config=llm_config,
+            quantization_encoding=quantization_encoding,
         )

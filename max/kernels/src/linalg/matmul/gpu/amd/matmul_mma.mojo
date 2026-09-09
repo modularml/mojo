@@ -24,8 +24,8 @@ Data-movement primitives (TileLoaderLDS, _load_from_lds, load_lds_fragment)
 live in structured_kernels.amd_tile_io.
 """
 
-from std.gpu.compute.mma import mma as gpu_mma
-from std.gpu import lane_id, WARP_SIZE
+from max.gpu.compute.mma import mma as gpu_mma
+from max.gpu import lane_id, WARP_SIZE
 from std.utils import IndexList
 from layout import TensorLayout, TileTensor
 from layout.swizzle import Swizzle
@@ -113,31 +113,31 @@ struct QuadrantMmaOp[
     var _a_reg: TileTensor[
         Self.in_type,
         type_of(Self._a_reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     var _b_reg: TileTensor[
         Self.in_type,
         type_of(Self._b_reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     var _c_reg: TileTensor[
         Self.out_type,
         type_of(Self._c_reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
 
     @always_inline
     def __init__(out self):
-        self._a_reg = stack_allocation[Self.in_type, AddressSpace.LOCAL](
+        self._a_reg = stack_allocation[Self.in_type, address_space=.LOCAL](
             Self._a_reg_layout
         )
-        self._b_reg = stack_allocation[Self.in_type, AddressSpace.LOCAL](
+        self._b_reg = stack_allocation[Self.in_type, address_space=.LOCAL](
             Self._b_reg_layout
         )
-        self._c_reg = stack_allocation[Self.out_type, AddressSpace.LOCAL](
+        self._c_reg = stack_allocation[Self.out_type, address_space=.LOCAL](
             Self._c_reg_layout
         )
         comptime num_c_elems = (
@@ -158,6 +158,14 @@ struct QuadrantMmaOp[
 
         Tiles a_reg as [quad_m, reg_cols](which, 0) to get the register
         sub-tile for this quadrant, then loads via load_lds_fragment.
+
+        Parameters:
+            which: Quadrant index selecting which half of the A register
+                tile to fill.
+
+        Args:
+            smem_tile: SMEM sub-tile for this A quadrant of shape
+                `quad_WM x BK`.
         """
         comptime assert type_of(smem_tile).static_shape[0] == Self.quad_WM
         comptime assert type_of(smem_tile).static_shape[1] == Self.BK
@@ -170,7 +178,16 @@ struct QuadrantMmaOp[
     def load_b_quadrant[
         which: Int
     ](self, smem_tile: SMemTile[Self.in_type, _, _],):
-        """Load B quadrant `which` from SMEM sub-tile to registers."""
+        """Load B quadrant `which` from SMEM sub-tile to registers.
+
+        Parameters:
+            which: Quadrant index selecting which half of the B register
+                tile to fill.
+
+        Args:
+            smem_tile: SMEM sub-tile for this B quadrant of shape
+                `quad_WN x BK`.
+        """
         comptime assert type_of(smem_tile).static_shape[0] == Self.quad_WN
         comptime assert type_of(smem_tile).static_shape[1] == Self.BK
 
@@ -184,6 +201,12 @@ struct QuadrantMmaOp[
 
         Slices A/B/C register tiles to the quadrant and delegates to
         TiledMma for stateless computation.
+
+        Parameters:
+            which_a: Quadrant index along M selecting the A and C
+                row half.
+            which_b: Quadrant index along N selecting the B and C
+                column half.
         """
         comptime reg_cols = Self.num_k_mmas * Self._mma_frag_width
         comptime c_quad_cols = Self.quad_n * Self.c_frag_size
@@ -203,8 +226,8 @@ struct QuadrantMmaOp[
     ) -> TileTensor[
         Self.out_type,
         type_of(Self._c_reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]:
         """Return the accumulator register tile."""
         return self._c_reg
@@ -225,7 +248,7 @@ struct TiledMma[
 
     Direct TileTensor port of TiledTensorCore.mma. Iterates group_size
     k-steps, indexes A/B register tiles per step, and calls gpu_mma.
-    No register ownership, no SMEM loading — pure computation.
+    No register ownership, no SMEM loading: pure computation.
 
     Parameters:
         out_type: Accumulator data type (typically float32).
@@ -247,17 +270,10 @@ struct TiledMma[
         b_layout: TensorLayout,
         c_layout: TensorLayout,
     ](
-        a_reg: TileTensor[
-            Self.in_type, a_layout, _, address_space=AddressSpace.LOCAL
-        ],
-        b_reg: TileTensor[
-            Self.in_type, b_layout, _, address_space=AddressSpace.LOCAL
-        ],
+        a_reg: TileTensor[Self.in_type, a_layout, _, address_space=.LOCAL],
+        b_reg: TileTensor[Self.in_type, b_layout, _, address_space=.LOCAL],
         c_reg: TileTensor[
-            Self.out_type,
-            c_layout,
-            MutExternalOrigin,
-            address_space=AddressSpace.LOCAL,
+            Self.out_type, c_layout, MutUntrackedOrigin, address_space=.LOCAL
         ],
     ):
         """Execute group_size MMA operations across the K dimension.
@@ -366,31 +382,31 @@ struct MmaOp[
     var _a_reg: TileTensor[
         Self.in_type,
         type_of(Self._a_reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     var _b_reg: TileTensor[
         Self.in_type,
         type_of(Self._b_reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     var _c_reg: TileTensor[
         Self.out_type,
         type_of(Self._c_reg_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
 
     @always_inline
     def __init__(out self):
-        self._a_reg = stack_allocation[Self.in_type, AddressSpace.LOCAL](
+        self._a_reg = stack_allocation[Self.in_type, address_space=.LOCAL](
             Self._a_reg_layout
         )
-        self._b_reg = stack_allocation[Self.in_type, AddressSpace.LOCAL](
+        self._b_reg = stack_allocation[Self.in_type, address_space=.LOCAL](
             Self._b_reg_layout
         )
-        self._c_reg = stack_allocation[Self.out_type, AddressSpace.LOCAL](
+        self._c_reg = stack_allocation[Self.out_type, address_space=.LOCAL](
             Self._c_reg_layout
         )
         comptime num_c_elems = (
@@ -416,8 +432,17 @@ struct MmaOp[
         Expects block-local warp tiles of shape WM x k_tile_size (or
         WN x k_tile_size), where each k-tile block is contiguous in
         SMEM (blocked_product layout). Uses direct distribute with
-        swizzle — correct because each block starts at a
+        swizzle: correct because each block starts at a
         swizzle-aligned offset.
+
+        Parameters:
+            k_tile_idx: Index of the k-tile to load into registers.
+
+        Args:
+            a_smem_warp: Block-local SMEM warp tile for A of shape
+                `WM x k_tile_size`.
+            b_smem_warp: Block-local SMEM warp tile for B of shape
+                `WN x k_tile_size`.
         """
         comptime assert type_of(a_smem_warp).static_shape[0] == Self.WM
         comptime assert type_of(b_smem_warp).static_shape[0] == Self.WN
@@ -456,6 +481,9 @@ struct MmaOp[
 
         Slices A/B registers for this k-tile and delegates to
         TiledMma.mma for stateless computation.
+
+        Parameters:
+            k_tile_idx: Index of the k-tile to compute MMA for.
         """
         var a_slice = self._a_reg.tile[Self.num_m_mmas, Self.simd_width](
             k_tile_idx, 0

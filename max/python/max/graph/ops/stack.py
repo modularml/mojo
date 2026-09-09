@@ -46,24 +46,41 @@ def _check_stack_axis_in_bounds(axis: int, rank: int) -> None:
 
 
 def stack(values: Iterable[TensorValueLike], axis: int = 0) -> TensorValue:
-    """Stacks a list of tensors along a new axis.
+    """Stacks tensors along a new axis.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("stack_example") as graph:
+            a = ops.constant([[1, 2], [3, 4]], DType.int32, device=device)
+            b = ops.constant([[5, 6], [7, 8]], DType.int32, device=device)
+
+            # Stack the two (2, 2) tensors into one (2, 2, 2) tensor
+            graph.output(ops.stack([a, b], axis=0))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
-        values: A list of symbolic tensor values. Each tensor must have the same
-            dtype and rank, and must have the same dimension size for each
-            dimension.
-        axis: The axis to concatenate along. If negative, indexes relative
-            to the end of the tensor shape *plus 1*. For instance,
-            ``stack(vs, -1)`` will create and stack along a new axis as the
-            last dimension, aad ``stack(vs, -2)`` will create and stack along a new
-            dimension which is inserted immediately before the last dimension.
+        values: The tensors to stack. Each must have the same dtype, rank,
+            and shape.
+        axis: The position of the new axis. Negative values count from the end,
+            where ``-1`` inserts the new axis as the last dimension. Defaults
+            to ``0``.
 
     Returns:
-        A new symbolic tensor representing the result of the stack. It will
-        have rank ``n+1`` where ``n`` is the rank of each input tensor. Its size
-        on each dimension other than ``axis`` will be the same as each input tensors',
-        with the new axis inserted. Along the new dimension it will have size
-        ``len(values)``.
+        A ``TensorValue`` representing the stacked inputs. It has one more dimension than
+        the inputs, and the new dimension has size ``len(values)``.
+
+    Raises:
+        ValueError: If no tensors are provided, if the inputs don't all have
+            the same rank, if they don't all have the same dtype, or if they
+            aren't all on the same device.
+        IndexError: If ``axis`` is out of range for the new tensor's rank.
     """
     values_coerced = [TensorValue(v) for v in values]
     if len(values_coerced) == 0:

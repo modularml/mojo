@@ -41,15 +41,72 @@ Each Python module has one flat RST file (for example, `nn.rst`,
   `nn.kernels.rst`, `experimental.functional.rst`): documents all public
   members automatically without explicit listing.
 
+`index.rst` lists all module pages in its toctree. Module pages that have
+submodules list them in a "Submodules" toctree at the bottom.
+
 **Deduplication rule**: when a parent module re-exports members from a
 submodule, don't list that member more than once. Decide whether to include
 it in the parent module or submodule RST file based on which file offers the
 best-matching semantic group of members.
 
-`index.rst` lists all module pages in its toctree. Module pages that have
-submodules list them in a "Submodules" toctree at the bottom.
+**Public source modules only.** A name in `__all__` is not enough to document
+it. Before adding any symbol to an RST autosummary table, trace it to the
+**source file where it is defined** (follow imports from the package
+`__init__.py` until you reach the defining module, not just the re-export).
+Do **not** add a symbol when it is defined in a `.py` file whose module name
+starts with `_` (a private implementation module). Examples:
 
-## Adding a new module page
+- `profiler/oneshot/_runner.py` → do not document `OneShotCapture`
+- `profiler/oneshot/_backend.py` → do not document `detect_backend` when only
+  re-exported from that private module
+
+A symbol re-exported through a public `__init__.py` still must not appear in
+the docs when the definition lives in one of those `_`-prefixed `.py` modules.
+
+**Exception — `max._core*` stub modules.** Nanobind APIs shipped through
+`max._core` and `max._core_types` are documented from their `.pyi` stub
+files (for example `max/_core/driver.pyi`, `max/_core/engine.pyi`). Those
+stub modules do not use a leading `_` on the module filename, so symbols
+defined there *are* part of the public reference surface.
+
+**Prose lives at the symbol level.** The RST file is an index: front matter,
+`automodule` / `currentmodule` directives, section headings, and
+`autosummary` listings. Module introductions, class summaries, parameter
+tables, and any descriptive prose belong in the Python source as docstrings.
+For example, instead of writing an intro paragraph for a module inside its
+RST file, put it in the module-level docstring at the top of the `.py` file,
+and Sphinx autodoc will render it in the same place on the generated page.
+
+## Adding a symbol to an existing RST file
+
+When you want a new API to appear in the documentation (and it's not
+automatically generated):
+
+1. Open the RST file named after the symbol's module (for `max.nn.Foo`,
+   that's `nn.rst`).
+2. Find the `.. autosummary::` block whose section heading best matches the
+   symbol's role (for example, "Linear layers", "Normalization"). If no
+   section fits, add a new heading and a new `.. autosummary::` block; copy
+   the directives from a neighboring section (`:nosignatures:`,
+   `:toctree: generated`, `:template: autosummary/class.rst` for classes
+   and type aliases, `function.rst` for functions, `data.rst` for
+   module-level data).
+3. Add the symbol's bare name on its own line under the directive. Keep
+   entries alphabetical within a section.
+4. Trace the symbol to its **defining source file** (see **Public source
+   modules only** above). Skip the symbol when it is defined in a `_`-prefixed
+   `.py` module, even if it appears in `__all__` or is re-exported from a
+   public package. Symbols defined in `max._core*` / `max._core_types*` `.pyi`
+   stubs are the exception and may be documented.
+5. Confirm the symbol is exported through `__all__` or re-exported by a
+   parent `__init__.py`. Names that aren't publicly scoped won't render.
+6. Rebuild and verify: `./bazelw build //max/python/docs:python-api-docs`.
+
+When an API is removed, delete the matching line from the RST file. If that
+empties a section, remove the heading and the empty `.. autosummary::`
+directive with it.
+
+## Adding a new RST file for a module
 
 1. Create `{module}.rst` with `.. automodule::` and `.. autosummary::` sections
    (copy an existing file like `nn.rst` as a starting point).
@@ -94,6 +151,11 @@ packages are in scope and which are excluded.
 - **Stale `__all__` entries**: if a name is in `__all__` but not actually
   imported, autosummary will fail with "failed to import." Check the module's
   imports before adding members to an RST file.
+- **Private `_`-prefixed `.py` modules**: do not list symbols defined in
+  implementation files such as `_collector.py` or `_runner.py`, even if a
+  public `__init__.py` re-exports them. Always verify the defining source
+  file, not just the export path. Nanobind APIs in `max._core*` `.pyi` stubs
+  (for example `driver.pyi`) are not subject to this rule.
 - **Type aliases**: Python `Union` types and `TypeAlias` objects have read-only
   `__doc__` attributes, so custom docstrings don't render. Use the `class.rst`
   template for these; autodoc will show the expanded type signature.

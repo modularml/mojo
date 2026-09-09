@@ -25,7 +25,7 @@ from std.math import ceildiv
 from std.memory import bitcast
 from std.random import random_float64, random_ui64
 from std.sys.info import _accelerator_arch
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 import linalg.matmul.vendor.blas as vendor_blas
 from layout import Idx, Layout, LayoutTensor, TileTensor, row_major
 from linalg.fp4_utils import E2M1_TO_FLOAT32
@@ -37,7 +37,7 @@ def _e8m0_to_float32(bits: UInt8) -> Float32:
     if bits == UInt8(0):
         return Float32(0.0)
     var f32_bits = UInt32(bits) << UInt32(23)
-    return bitcast[DType.float32](f32_bits)
+    return bitcast[.float32](f32_bits)
 
 
 def test_mxfp4_matmul[
@@ -56,15 +56,15 @@ def test_mxfp4_matmul[
     print("  M=", M, " N=", N, " K=", K)
 
     # Device buffers for MXFP4 inputs
-    var a_device = ctx.enqueue_create_buffer[DType.bfloat16](M * K)
-    var b_packed_device = ctx.enqueue_create_buffer[DType.uint8](N * packed_K)
-    var b_scales_device = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](
+    var a_device = ctx.enqueue_create_buffer[.bfloat16](M * K)
+    var b_packed_device = ctx.enqueue_create_buffer[.uint8](N * packed_K)
+    var b_scales_device = ctx.enqueue_create_buffer[.float8_e8m0fnu](
         N * scale_K
     )
     # Fill A with random BF16 on host, upload
     with a_device.map_to_host() as ha:
         for i in range(M * K):
-            ha[i] = random_float64(-0.5, 0.5).cast[DType.bfloat16]()
+            ha[i] = random_float64(-0.5, 0.5).cast[.bfloat16]()
 
     # Fill B_packed with random uint8, upload
     with b_packed_device.map_to_host() as hbp:
@@ -72,13 +72,9 @@ def test_mxfp4_matmul[
             hbp[i] = UInt8(random_ui64(0, 255))
 
     # Fill scales with random exponents [125..129] -> scales [0.25..4.0]
-    var bs_hbuf = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
-        N * scale_K
-    )
+    var bs_hbuf = ctx.enqueue_create_host_buffer[.float8_e8m0fnu](N * scale_K)
     for i in range(N * scale_K):
-        bs_hbuf[i] = rebind[Scalar[DType.float8_e8m0fnu]](
-            UInt8(random_ui64(125, 129))
-        )
+        bs_hbuf[i] = bitcast[.float8_e8m0fnu](UInt8(random_ui64(125, 129)))
     ctx.enqueue_copy(b_scales_device, bs_hbuf)
     ctx.synchronize()
 
@@ -105,7 +101,7 @@ def test_mxfp4_matmul[
     ctx.synchronize()
 
     # Step 2: Run our kernel on the shared FP8 data
-    var c_device = ctx.enqueue_create_buffer[DType.bfloat16](M * N)
+    var c_device = ctx.enqueue_create_buffer[.bfloat16](M * N)
     var c_tt = TileTensor(c_device, row_major((M, Idx[N])))
 
     from linalg.matmul.gpu import _matmul_gpu
@@ -114,10 +110,8 @@ def test_mxfp4_matmul[
     ctx.synchronize()
 
     # Step 3: Run vendor BLAS on the same shared FP8 data
-    var c_ref_device = ctx.enqueue_create_buffer[DType.bfloat16](M * N)
-    var c_ref_lt = LayoutTensor[DType.bfloat16, Layout.row_major(M, N)](
-        c_ref_device
-    )
+    var c_ref_device = ctx.enqueue_create_buffer[.bfloat16](M * N)
+    var c_ref_lt = LayoutTensor[.bfloat16, Layout.row_major(M, N)](c_ref_device)
 
     vendor_blas.matmul(
         ctx,
@@ -130,8 +124,8 @@ def test_mxfp4_matmul[
     ctx.synchronize()
 
     # Step 4: Compare
-    var c_host = ctx.enqueue_create_host_buffer[DType.bfloat16](M * N)
-    var c_ref_host = ctx.enqueue_create_host_buffer[DType.bfloat16](M * N)
+    var c_host = ctx.enqueue_create_host_buffer[.bfloat16](M * N)
+    var c_ref_host = ctx.enqueue_create_host_buffer[.bfloat16](M * N)
     ctx.enqueue_copy(c_host, c_device)
     ctx.enqueue_copy(c_ref_host, c_ref_device)
     ctx.synchronize()
@@ -143,8 +137,8 @@ def test_mxfp4_matmul[
     var max_rel_err = Float32(0.0)
 
     for i in range(M * N):
-        var got = c_host[i].cast[DType.float32]()
-        var expected = c_ref_host[i].cast[DType.float32]()
+        var got = c_host[i].cast[.float32]()
+        var expected = c_ref_host[i].cast[.float32]()
         var magnitude = max(abs(got), abs(expected))
         if magnitude < Float32(1.0):
             continue
@@ -194,25 +188,21 @@ def test_mxfp4_matmul_e2e[
 
     print("  E2E M=", M, " N=", N, " K=", K)
 
-    var a_device = ctx.enqueue_create_buffer[DType.bfloat16](M * K)
-    var b_packed_device = ctx.enqueue_create_buffer[DType.uint8](N * packed_K)
-    var b_scales_device = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](
+    var a_device = ctx.enqueue_create_buffer[.bfloat16](M * K)
+    var b_packed_device = ctx.enqueue_create_buffer[.uint8](N * packed_K)
+    var b_scales_device = ctx.enqueue_create_buffer[.float8_e8m0fnu](
         N * scale_K
     )
 
     with a_device.map_to_host() as ha:
         for i in range(M * K):
-            ha[i] = random_float64(-0.5, 0.5).cast[DType.bfloat16]()
+            ha[i] = random_float64(-0.5, 0.5).cast[.bfloat16]()
     with b_packed_device.map_to_host() as hbp:
         for i in range(N * packed_K):
             hbp[i] = UInt8(random_ui64(0, 255))
-    var bs_hbuf = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
-        N * scale_K
-    )
+    var bs_hbuf = ctx.enqueue_create_host_buffer[.float8_e8m0fnu](N * scale_K)
     for i in range(N * scale_K):
-        bs_hbuf[i] = rebind[Scalar[DType.float8_e8m0fnu]](
-            UInt8(random_ui64(125, 129))
-        )
+        bs_hbuf[i] = bitcast[.float8_e8m0fnu](UInt8(random_ui64(125, 129)))
 
     ctx.enqueue_copy(b_scales_device, bs_hbuf)
     ctx.synchronize()
@@ -240,10 +230,8 @@ def test_mxfp4_matmul_e2e[
     _cast_bf16_to_fp8(ctx, a_fp8_tt, a_tt, M, K)
     ctx.synchronize()
 
-    var c_ref_device = ctx.enqueue_create_buffer[DType.bfloat16](M * N)
-    var c_ref_lt = LayoutTensor[DType.bfloat16, Layout.row_major(M, N)](
-        c_ref_device
-    )
+    var c_ref_device = ctx.enqueue_create_buffer[.bfloat16](M * N)
+    var c_ref_lt = LayoutTensor[.bfloat16, Layout.row_major(M, N)](c_ref_device)
 
     vendor_blas.matmul(
         ctx,
@@ -256,7 +244,7 @@ def test_mxfp4_matmul_e2e[
     ctx.synchronize()
 
     # Kernel under test: mxfp4_dequant_matmul_amd (dequants internally)
-    var c_device = ctx.enqueue_create_buffer[DType.bfloat16](M * N)
+    var c_device = ctx.enqueue_create_buffer[.bfloat16](M * N)
     var c_tt = TileTensor(c_device, row_major((M, Idx[N])))
 
     comptime if "gfx" in _accelerator_arch():
@@ -275,8 +263,8 @@ def test_mxfp4_matmul_e2e[
     ctx.synchronize()
 
     # Compare mxfp4_dequant_matmul_amd vs vendor BLAS reference
-    var c_host = ctx.enqueue_create_host_buffer[DType.bfloat16](M * N)
-    var c_ref_host = ctx.enqueue_create_host_buffer[DType.bfloat16](M * N)
+    var c_host = ctx.enqueue_create_host_buffer[.bfloat16](M * N)
+    var c_ref_host = ctx.enqueue_create_host_buffer[.bfloat16](M * N)
     ctx.enqueue_copy(c_host, c_device)
     ctx.enqueue_copy(c_ref_host, c_ref_device)
     ctx.synchronize()
@@ -285,8 +273,8 @@ def test_mxfp4_matmul_e2e[
     var num_mismatches = 0
 
     for i in range(M * N):
-        var got = c_host[i].cast[DType.float32]()
-        var expected = c_ref_host[i].cast[DType.float32]()
+        var got = c_host[i].cast[.float32]()
+        var expected = c_ref_host[i].cast[.float32]()
 
         var magnitude = max(abs(got), abs(expected))
         if magnitude < Float32(1.0):
@@ -329,10 +317,8 @@ def test_dequant_only[N: Int, K: Int](ctx: DeviceContext) raises:
 
     print("  Dequant-only: N=", N, " K=", K)
 
-    var b_packed_host = ctx.enqueue_create_host_buffer[DType.uint8](
-        N * packed_K
-    )
-    var b_scales_host = ctx.enqueue_create_host_buffer[DType.uint8](N * scale_K)
+    var b_packed_host = ctx.enqueue_create_host_buffer[.uint8](N * packed_K)
+    var b_scales_host = ctx.enqueue_create_host_buffer[.uint8](N * scale_K)
 
     for i in range(N * packed_K):
         b_packed_host[i] = UInt8(random_ui64(0, 255))
@@ -340,18 +326,16 @@ def test_dequant_only[N: Int, K: Int](ctx: DeviceContext) raises:
         b_scales_host[i] = UInt8(random_ui64(125, 129))
 
     # Upload to GPU
-    var bp_device = ctx.enqueue_create_buffer[DType.uint8](N * packed_K)
-    var bs_device = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](N * scale_K)
-    var out_device = ctx.enqueue_create_buffer[DType.bfloat16](N * K)
+    var bp_device = ctx.enqueue_create_buffer[.uint8](N * packed_K)
+    var bs_device = ctx.enqueue_create_buffer[.float8_e8m0fnu](N * scale_K)
+    var out_device = ctx.enqueue_create_buffer[.bfloat16](N * K)
 
-    var bp_hbuf = ctx.enqueue_create_host_buffer[DType.uint8](N * packed_K)
-    var bs_hbuf = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
-        N * scale_K
-    )
+    var bp_hbuf = ctx.enqueue_create_host_buffer[.uint8](N * packed_K)
+    var bs_hbuf = ctx.enqueue_create_host_buffer[.float8_e8m0fnu](N * scale_K)
     for i in range(N * packed_K):
         bp_hbuf[i] = b_packed_host[i]
     for i in range(N * scale_K):
-        bs_hbuf[i] = rebind[Scalar[DType.float8_e8m0fnu]](b_scales_host[i])
+        bs_hbuf[i] = bitcast[.float8_e8m0fnu](b_scales_host[i])
     ctx.enqueue_copy(bp_device, bp_hbuf)
     ctx.enqueue_copy(bs_device, bs_hbuf)
     ctx.synchronize()
@@ -365,14 +349,14 @@ def test_dequant_only[N: Int, K: Int](ctx: DeviceContext) raises:
     dequant_mxfp4(ctx, out_tt, bp_tt, bs_tt, num_rows=N, num_cols=K)
     ctx.synchronize()
 
-    var out_hbuf = ctx.enqueue_create_host_buffer[DType.bfloat16](N * K)
+    var out_hbuf = ctx.enqueue_create_host_buffer[.bfloat16](N * K)
     ctx.enqueue_copy(out_hbuf, out_device)
     ctx.synchronize()
 
     var mismatches = 0
     for row in range(N):
         for col in range(K):
-            var got = out_hbuf[row * K + col].cast[DType.float32]()
+            var got = out_hbuf[row * K + col].cast[.float32]()
             var packed_col = col // 2
             var packed_byte = b_packed_host[row * packed_K + packed_col]
             var nibble_shift = UInt8((col % 2) * 4)
@@ -412,10 +396,10 @@ def test_fp8_kernel_vs_blas[
     print("  FP8 kernel-vs-BLAS: M=", M, " N=", N, " K=", K)
 
     # A: random BF16 activations cast to FP8
-    var a_bf16 = ctx.enqueue_create_buffer[DType.bfloat16](M * K)
+    var a_bf16 = ctx.enqueue_create_buffer[.bfloat16](M * K)
     with a_bf16.map_to_host() as ha:
         for i in range(M * K):
-            ha[i] = random_float64(-0.5, 0.5).cast[DType.bfloat16]()
+            ha[i] = random_float64(-0.5, 0.5).cast[.bfloat16]()
 
     var a_fp8 = ctx.enqueue_create_buffer[fp8_type](M * K)
     var a_bf16_tt = TileTensor(a_bf16, row_major((M, Idx[K])))
@@ -423,18 +407,14 @@ def test_fp8_kernel_vs_blas[
     _cast_bf16_to_fp8(ctx, a_fp8_tt, a_bf16_tt, M, K)
 
     # B: MXFP4 packed weights dequanted to FP8
-    var b_packed = ctx.enqueue_create_buffer[DType.uint8](N * packed_K)
-    var b_scales = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](N * scale_K)
+    var b_packed = ctx.enqueue_create_buffer[.uint8](N * packed_K)
+    var b_scales = ctx.enqueue_create_buffer[.float8_e8m0fnu](N * scale_K)
     with b_packed.map_to_host() as hbp:
         for i in range(N * packed_K):
             hbp[i] = UInt8(random_ui64(0, 255))
-    var bs_hbuf = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
-        N * scale_K
-    )
+    var bs_hbuf = ctx.enqueue_create_host_buffer[.float8_e8m0fnu](N * scale_K)
     for i in range(N * scale_K):
-        bs_hbuf[i] = rebind[Scalar[DType.float8_e8m0fnu]](
-            UInt8(random_ui64(125, 129))
-        )
+        bs_hbuf[i] = bitcast[.float8_e8m0fnu](UInt8(random_ui64(125, 129)))
     ctx.enqueue_copy(b_scales, bs_hbuf)
     ctx.synchronize()
 
@@ -453,7 +433,7 @@ def test_fp8_kernel_vs_blas[
     ctx.synchronize()
 
     # Path 1: our kernel
-    var c_kernel = ctx.enqueue_create_buffer[DType.bfloat16](M * N)
+    var c_kernel = ctx.enqueue_create_buffer[.bfloat16](M * N)
     var c_kernel_tt = TileTensor(c_kernel, row_major((M, Idx[N])))
     from linalg.matmul.gpu import _matmul_gpu
 
@@ -461,8 +441,8 @@ def test_fp8_kernel_vs_blas[
     ctx.synchronize()
 
     # Path 2: vendor BLAS
-    var c_blas = ctx.enqueue_create_buffer[DType.bfloat16](M * N)
-    var c_blas_lt = LayoutTensor[DType.bfloat16, Layout.row_major(M, N)](c_blas)
+    var c_blas = ctx.enqueue_create_buffer[.bfloat16](M * N)
+    var c_blas_lt = LayoutTensor[.bfloat16, Layout.row_major(M, N)](c_blas)
     vendor_blas.matmul(
         ctx,
         c_blas_lt,
@@ -473,8 +453,8 @@ def test_fp8_kernel_vs_blas[
     )
     ctx.synchronize()
 
-    var c_k_host = ctx.enqueue_create_host_buffer[DType.bfloat16](M * N)
-    var c_b_host = ctx.enqueue_create_host_buffer[DType.bfloat16](M * N)
+    var c_k_host = ctx.enqueue_create_host_buffer[.bfloat16](M * N)
+    var c_b_host = ctx.enqueue_create_host_buffer[.bfloat16](M * N)
     ctx.enqueue_copy(c_k_host, c_kernel)
     ctx.enqueue_copy(c_b_host, c_blas)
     ctx.synchronize()
@@ -483,8 +463,8 @@ def test_fp8_kernel_vs_blas[
     var num_mismatches = 0
 
     for i in range(M * N):
-        var got = c_k_host[i].cast[DType.float32]()
-        var expected = c_b_host[i].cast[DType.float32]()
+        var got = c_k_host[i].cast[.float32]()
+        var expected = c_b_host[i].cast[.float32]()
 
         var magnitude = max(abs(got), abs(expected))
         if magnitude < Float32(1.0):

@@ -148,13 +148,13 @@ class PDLResultList:
 
 class PDLModule:
     @overload
-    def __init__(self, module: max._mlir._mlir_libs._mlir.ir.Module) -> None:
-        """Create a PDL module from the given module."""
-
-    @overload
     def __init__(
         self, module: max._mlir._mlir_libs._mlir.ir.Module
     ) -> None: ...
+    @overload
+    def __init__(self, module: max._mlir._mlir_libs._mlir.ir.Module) -> None:
+        """Create a PDL module from the given module."""
+
     def freeze(self) -> FrozenRewritePatternSet: ...
     def register_rewrite_function(
         self, arg0: str, arg1: Callable, /
@@ -231,8 +231,7 @@ class ConversionConfig:
     @build_materializations.setter
     def build_materializations(self, arg: bool, /) -> None: ...
 
-class FrozenRewritePatternSet:
-    pass
+class FrozenRewritePatternSet: ...
 
 @overload
 def apply_patterns_and_fold_greedily(

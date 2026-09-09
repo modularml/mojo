@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "lit_tests", "mojo_filecheck_test", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -43,13 +44,14 @@ _EXTRA_CONSTRAINTS = {
         name = src + ".test",
         size = "large",
         srcs = [src],
-        copts = _EXTRA_COPTS.get(src, []),
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS + _EXTRA_COPTS.get(src, []),
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []) + select({
             "//:b200_gpu": ["@platforms//:incompatible"],
             "//conditions:default": [],
         }),
         deps = [
+            "//max:max_mojo",
             "@mojo//:std",
         ],
     )
@@ -61,10 +63,14 @@ _EXTRA_CONSTRAINTS = {
         name = src + ".test",
         size = "large",
         srcs = [src],
-        copts = _EXTRA_COPTS.get(src, []),
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS + _EXTRA_COPTS.get(src, []),
+        exec_properties = {
+            "test.resources:gpu-memory": "1",
+        },
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []),
         deps = [
+            "//max:max_mojo",
             "@mojo//:std",
         ],
     )
@@ -80,6 +86,7 @@ lit_tests(
     srcs = _LIT_TESTS,
     gpu_constraints = ["//:has_gpu"],
     mojo_deps = [
+        "//max:max_mojo",
         "@mojo//:std",
     ],
     tags = ["gpu"],

@@ -11,14 +11,14 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import compiler
+import extensibility
 from extensibility import OutputTensor
 
 
-@compiler.register("fails_to_elaborate")
+@extensibility.register("fails_to_elaborate")
 struct FailsToElaborate:
     @staticmethod
     def execute(
-        output: OutputTensor[dtype=DType.int32, rank=1, ...],
+        output: OutputTensor[dtype=.int32, rank=1, ...],
     ):
         comptime assert False, "oops"

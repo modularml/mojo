@@ -181,6 +181,34 @@ def _reducescatter_axis_graph(
         return graph
 
 
+def _grouped_reducescatter_axis0_graph(
+    signals: Signals, shapes: list[tuple[int, int]], group_size: int
+) -> Graph:
+    """Build a grouped reducescatter graph that scatters rows."""
+    devices = signals.devices
+    num_devices = len(devices)
+
+    input_types = [
+        TensorType(dtype=DType.float32, shape=list(shape), device=devices[i])
+        for i, shape in enumerate(shapes)
+    ]
+    all_input_types = input_types + list(signals.input_types())
+
+    with Graph(
+        "grouped_reducescatter_axis0",
+        input_types=all_input_types,
+    ) as graph:
+        tensor_inputs = [graph.inputs[i].tensor for i in range(num_devices)]
+        reducescatter_outputs = ops.reducescatter.sum(
+            tensor_inputs,
+            [inp.buffer for inp in graph.inputs[num_devices:]],
+            axis=0,
+            group_size=group_size,
+        )
+        graph.output(*reducescatter_outputs)
+        return graph
+
+
 @pytest.mark.parametrize("num_gpus", [2, 4, 8])
 def test_reducescatter_axis0_execution(num_gpus: int) -> None:
     """Tests reducescatter with scatter on axis 0 (rows)."""
@@ -265,6 +293,69 @@ def test_reducescatter_axis1_execution(num_gpus: int) -> None:
         col_start = dev_idx * expected_cols
         expected = reduced[:, col_start : col_start + expected_cols]
         assert np.allclose(expected, result)
+
+
+def test_grouped_reducescatter_axis0_execution() -> None:
+    """Tests grouped reduce-scatter with different per-group row counts."""
+    num_gpus = 4
+    group_size = 2
+    if (available_gpus := accelerator_count()) < num_gpus:
+        pytest.skip(
+            f"skipping {num_gpus=} test since only {available_gpus} available"
+        )
+
+    H = 256
+    shapes = [(5, H), (5, H), (3, H), (3, H)]
+    graph_devices = [DeviceRef.GPU(id) for id in range(num_gpus)]
+    signals = Signals(devices=graph_devices)
+    graph = _grouped_reducescatter_axis0_graph(
+        signals, shapes=shapes, group_size=group_size
+    )
+
+    host = CPU()
+    devices: list[Device] = [Accelerator(i) for i in range(num_gpus)]
+    session = InferenceSession(devices=[host] + devices)
+    compiled = session.load(graph)
+
+    inputs = []
+    reduced_by_group: list[np.ndarray] = []
+    for group_start in range(0, num_gpus, group_size):
+        group_rows = shapes[group_start][0]
+        base = np.repeat(
+            np.arange(1, group_rows + 1, dtype=np.float32).reshape(
+                group_rows, 1
+            ),
+            H,
+            axis=1,
+        )
+        group_inputs = []
+        for local_idx in range(group_size):
+            dev_idx = group_start + local_idx
+            group_inputs.append(base * (dev_idx + 1))
+            inputs.append(
+                Buffer.from_numpy(group_inputs[-1]).to(devices[dev_idx])
+            )
+        reduced_by_group.append(np.sum(group_inputs, axis=0))
+
+    outputs = compiled.execute(*inputs, *signals.buffers())
+
+    for group_idx, group_start in enumerate(range(0, num_gpus, group_size)):
+        group_rows = shapes[group_start][0]
+        chunk_sizes = [
+            (group_rows + (group_size - local_idx - 1)) // group_size
+            for local_idx in range(group_size)
+        ]
+        row = 0
+        for local_idx, rows in enumerate(chunk_sizes):
+            dev_idx = group_start + local_idx
+            out_tensor = outputs[dev_idx]
+            assert isinstance(out_tensor, Buffer)
+            assert out_tensor.device == devices[dev_idx]
+            result = out_tensor.to(host).to_numpy()
+            assert result.shape == (rows, H)
+            expected = reduced_by_group[group_idx][row : row + rows]
+            assert np.allclose(expected, result)
+            row += rows
 
 
 @pytest.mark.parametrize("num_gpus", [2, 4, 8])

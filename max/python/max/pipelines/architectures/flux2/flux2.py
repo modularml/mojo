@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from dataclasses import dataclass, field
+
 from max.dtype import DType
 from max.graph import (
     BufferValue,
@@ -176,7 +178,7 @@ class Flux2TransformerBlock(Module):
         mlp_ratio: float = 3.0,
         eps: float = 1e-6,
         bias: bool = False,
-        quant: Flux2BlockQuant = Flux2BlockQuant(),
+        quant: Flux2BlockQuant = Flux2BlockQuant(),  # noqa: B008
     ) -> None:
         """Initialize Flux2TransformerBlock.
 
@@ -625,6 +627,43 @@ class Flux2SingleTransformerBlock(Module):
         return hidden_states
 
 
+@dataclass
+class Flux2TransformerPreamble:
+    """Intermediate state produced by :meth:`Flux2Transformer2DModel.forward_preamble`.
+
+    Bundles the per-device streams and the shared conditioning tensors that
+    every block stack and the postamble consume, so the transformer forward
+    can be decomposed into (preamble, first-block, remaining-blocks,
+    postamble) seams for First-Block-Cache without threading a dozen
+    positional args through each seam.
+    """
+
+    hidden_states_d: list[TensorValue]
+    """Per-device image latent streams after ``x_embedder`` (dim=inner_dim)."""
+    encoder_hidden_states_d: list[TensorValue]
+    """Per-device text streams after ``context_embedder`` (dim=inner_dim)."""
+    temb: TensorValue
+    """Timestep+guidance embedding, conditioning for modulation + norm_out."""
+    double_stream_mod_img: tuple[
+        tuple[TensorValue, TensorValue, TensorValue],
+        tuple[TensorValue, TensorValue, TensorValue],
+    ]
+    """Image-side (shift, scale, gate) modulation for double-stream blocks."""
+    double_stream_mod_txt: tuple[
+        tuple[TensorValue, TensorValue, TensorValue],
+        tuple[TensorValue, TensorValue, TensorValue],
+    ]
+    """Text-side (shift, scale, gate) modulation for double-stream blocks."""
+    single_stream_mod: tuple[TensorValue, TensorValue, TensorValue]
+    """Modulation for single-stream blocks."""
+    image_rotary_emb: tuple[TensorValue, TensorValue]
+    """Shared rope (cos, sin) over concatenated (txt, img) ids."""
+    num_txt_tokens: Dim
+    """Text token count, used by the postamble to slice off the text half."""
+    signal_buffers: list[BufferValue] = field(default_factory=list)
+    """Per-device allreduce scratch (empty on single device)."""
+
+
 class Flux2Transformer2DModel(Module):
     def __init__(self, config: Flux2Config) -> None:
         """Initialize Flux2Transformer2DModel.
@@ -822,6 +861,46 @@ class Flux2Transformer2DModel(Module):
         Returns:
             Denoised output of shape [B, H*W, patch_size^2 * out_channels].
         """
+        preamble = self.forward_preamble(
+            hidden_states,
+            encoder_hidden_states,
+            timestep,
+            img_ids,
+            guidance,
+            txt_ids,
+            signal_buffers=signal_buffers,
+        )
+        state_after_first = self.run_first_block(preamble)
+        hidden_states_d = self.run_remaining_blocks(preamble, state_after_first)
+        output = self.forward_postamble(preamble, hidden_states_d)
+        return (output,)
+
+    # -- First-block-cache seams ---------------------------------------------
+    #
+    # The single fused ``__call__`` above is decomposed into four reusable
+    # pieces so the executor's First-Block-Cache (FBCache) path can compute
+    # the block-0 residual, then conditionally skip the remaining blocks +
+    # postamble via ``ops.cond``.  The standard forward calls all four in
+    # sequence, so the numerics are byte-identical to the pre-refactor path.
+
+    def forward_preamble(
+        self,
+        hidden_states: TensorValue,
+        encoder_hidden_states: TensorValue,
+        timestep: TensorValue,
+        img_ids: TensorValue,
+        guidance: TensorValue,
+        txt_ids: TensorValue,
+        *,
+        signal_buffers: list[BufferValue] | None = None,
+    ) -> Flux2TransformerPreamble:
+        """Embed inputs and prepare per-device streams before block 0.
+
+        Runs the timestep/guidance embedder, the three modulation heads,
+        the ``x_embedder``/``context_embedder`` projections, and rope, then
+        replicates the image and text streams across devices.  Returns
+        everything the block stacks and the postamble need.
+        """
         if signal_buffers is None:
             signal_buffers = []
         if img_ids.rank == 3:
@@ -862,14 +941,56 @@ class Flux2Transformer2DModel(Module):
         encoder_hidden_states_d: list[TensorValue] = [
             encoder_hidden_states.to(dev) for dev in self.devices
         ]
-        for block in self.transformer_blocks:
+        return Flux2TransformerPreamble(
+            hidden_states_d=hidden_states_d,
+            encoder_hidden_states_d=encoder_hidden_states_d,
+            temb=temb,
+            double_stream_mod_img=double_stream_mod_img,
+            double_stream_mod_txt=double_stream_mod_txt,
+            single_stream_mod=single_stream_mod,
+            image_rotary_emb=image_rotary_emb,
+            num_txt_tokens=num_txt_tokens,
+            signal_buffers=list(signal_buffers),
+        )
+
+    def run_first_block(
+        self, preamble: Flux2TransformerPreamble
+    ) -> tuple[list[TensorValue], list[TensorValue]]:
+        """Run double-stream block 0.
+
+        Returns the ``(encoder_hidden_states_d, hidden_states_d)`` streams
+        after block 0.  The FBCache residual is derived from the image
+        stream (``hidden_states_d``) delta across this block.
+        """
+        return self.transformer_blocks[0](
+            hidden_states=preamble.hidden_states_d,
+            encoder_hidden_states=preamble.encoder_hidden_states_d,
+            temb_mod_params_img=preamble.double_stream_mod_img,
+            temb_mod_params_txt=preamble.double_stream_mod_txt,
+            signal_buffers=preamble.signal_buffers,
+            image_rotary_emb=preamble.image_rotary_emb,
+        )
+
+    def run_remaining_blocks(
+        self,
+        preamble: Flux2TransformerPreamble,
+        state_after_first: tuple[list[TensorValue], list[TensorValue]],
+    ) -> list[TensorValue]:
+        """Run double-stream blocks 1..N and all single-stream blocks.
+
+        Consumes the streams produced by :meth:`run_first_block` and
+        returns the concatenated per-device hidden states, ready for the
+        postamble.
+        """
+        encoder_hidden_states_d, hidden_states_d = state_after_first
+        for block in list(self.transformer_blocks)[1:]:
             encoder_hidden_states_d, hidden_states_d = block(
                 hidden_states=hidden_states_d,
                 encoder_hidden_states=encoder_hidden_states_d,
-                temb_mod_params_img=double_stream_mod_img,
-                temb_mod_params_txt=double_stream_mod_txt,
-                signal_buffers=signal_buffers,
-                image_rotary_emb=image_rotary_emb,
+                temb_mod_params_img=preamble.double_stream_mod_img,
+                temb_mod_params_txt=preamble.double_stream_mod_txt,
+                signal_buffers=preamble.signal_buffers,
+                image_rotary_emb=preamble.image_rotary_emb,
             )
 
         hidden_states_d = [
@@ -881,17 +1002,28 @@ class Flux2Transformer2DModel(Module):
             single_out = single_block(
                 hidden_states=hidden_states_d,
                 encoder_hidden_states=None,
-                temb_mod_params=single_stream_mod,
-                signal_buffers=signal_buffers,
-                image_rotary_emb=image_rotary_emb,
+                temb_mod_params=preamble.single_stream_mod,
+                signal_buffers=preamble.signal_buffers,
+                image_rotary_emb=preamble.image_rotary_emb,
                 split_hidden_states=False,
             )
             if isinstance(single_out, tuple):
                 raise ValueError("Expected concatenated hidden states")
             hidden_states_d = single_out
+        return hidden_states_d
 
+    def forward_postamble(
+        self,
+        preamble: Flux2TransformerPreamble,
+        hidden_states_d: list[TensorValue],
+    ) -> TensorValue:
+        """Final norm + projection into the ``noise_pred`` output.
+
+        Collapses the per-device streams onto ``devices[0]``, slices off
+        the text tokens, applies ``norm_out`` (adaptive layer norm on
+        ``temb``), then ``proj_out``.
+        """
         hidden_states = hidden_states_d[0]
-        hidden_states = hidden_states[:, num_txt_tokens:, :]
-        hidden_states = self.norm_out(hidden_states, temb)
-        output = self.proj_out(hidden_states)
-        return (output,)
+        hidden_states = hidden_states[:, preamble.num_txt_tokens :, :]
+        hidden_states = self.norm_out(hidden_states, preamble.temb)
+        return self.proj_out(hidden_states)

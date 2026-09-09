@@ -21,9 +21,9 @@ from unittest.mock import MagicMock
 
 import torch
 from max.driver import DeviceSpec, load_devices, scan_available_devices
-from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph.weights import SafetensorWeights, WeightsAdapter
+from max.pipelines.lib import MemoryPlan
 from test_common.mocks import DummyPipelineConfig
 from transformers import PretrainedConfig
 from transformers.models.llama.configuration_llama import LlamaConfig
@@ -75,18 +75,15 @@ def make_pipeline_config_factory(
         device_specs: list[DeviceSpec],
         max_batch_size: int = 1,
     ) -> DummyPipelineConfig:
-        pipeline_config = DummyPipelineConfig(
+        return DummyPipelineConfig(
             model_path=repo_id,
             max_batch_size=max_batch_size,
             max_length=hf_config.max_position_embeddings,
             quantization_encoding="bfloat16",
             device_specs=device_specs,
+            weight_path=[Path("fake.safetensors")],
+            huggingface_config=hf_config,
         )
-        pipeline_config.model.kv_cache._available_cache_memory = 1024**4
-        pipeline_config.model.kv_cache._cache_dtype = DType.bfloat16
-        pipeline_config.model._huggingface_config = hf_config
-        pipeline_config.model.weight_path = [Path("fake.safetensors")]
-        return pipeline_config
 
     return _make
 
@@ -121,4 +118,12 @@ def assert_load_model_succeeds(
         kv_cache_config=pipeline_config.model.kv_cache,
         weights=weights,
         adapter=adapter,
+        # The factory pins max_length to the checkpoint bound, so the
+        # planned value equals what the arch policies derived before plans
+        # became required.
+        memory_plan=MemoryPlan(
+            planned_max_batch_size=1,
+            footprint=0,
+            planned_max_length=pipeline_config.model.max_length,
+        ),
     )

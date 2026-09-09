@@ -329,7 +329,7 @@ def main(
         pipelines_program = [
             _must_rlocation_str(
                 runfiles,
-                "_main/max/python/max/entrypoints/pipelines",
+                "_main/max/python/max/_entrypoints/pipelines",
             )
         ]
     else:
@@ -337,7 +337,7 @@ def main(
         pipelines_program = [
             "/opt/venv/bin/python",
             "-m",
-            "max.entrypoints.pipelines",
+            "max._entrypoints.pipelines",
         ]
 
     if override_lm_eval is not None:

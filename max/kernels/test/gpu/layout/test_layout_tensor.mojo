@@ -34,7 +34,7 @@ def test_runtime_and_compile_time_dim_and_stride[
 ](m: MType, k: KType) raises:
     var shape = Coord(k, m)
     var tt = TileTensor(
-        UnsafePointer[Float32, MutAnyOrigin].unsafe_dangling(), row_major(shape)
+        MutPointer[Float32, MutAnyOrigin].unsafe_dangling(), row_major(shape)
     )
     var tensor = tt.to_layout_tensor()
 
@@ -59,7 +59,7 @@ def test_nested_layout_shape() raises:
     comptime base_layout = Layout.row_major(32, 32)
     comptime smem_layout = blocked_product(base_layout, tiler_layout)
 
-    var tensor = LayoutTensor[DType.float32, smem_layout, MutAnyOrigin](None)
+    var tensor = LayoutTensor[.float32, smem_layout, MutAnyOrigin](None)
 
     # Shape should be (64, 128) because:
     # - First dimension: 32 * 2 = 64
@@ -77,10 +77,10 @@ def test_nested_layout_shape() raises:
     # Test case 2: Ensure non-nested layouts still work (regression test)
     comptime simple_layout = Layout.row_major(16, 32)
     comptime simple_shape0 = LayoutTensor[
-        DType.float32, simple_layout, MutAnyOrigin
+        .float32, simple_layout, MutAnyOrigin
     ].shape[0]()
     comptime simple_shape1 = LayoutTensor[
-        DType.float32, simple_layout, MutAnyOrigin
+        .float32, simple_layout, MutAnyOrigin
     ].shape[1]()
 
     assert_equal(simple_shape0, 16, "Non-nested shape[0] should still work")
@@ -95,7 +95,7 @@ def _create_tensor_2x2[
         dtype,
         Layout.row_major(2, 2),
         MutAnyOrigin,
-        address_space=AddressSpace.GENERIC,
+        address_space=.GENERIC,
     ].stack_allocation()
 
 
@@ -118,10 +118,10 @@ def test_transpose_arithmetic() raises:
     transpose operation properly maintains stride information for arithmetic.
     """
     # Test with arange values: a = [[0, 1], [2, 3]]
-    var a = _create_tensor_2x2[DType.float32]()
+    var a = _create_tensor_2x2[.float32]()
     arange(a)
 
-    var b = _create_tensor_2x2[DType.float32]()
+    var b = _create_tensor_2x2[.float32]()
     _copy_transpose(a, b)
 
     # After transpose, a.transpose() = [[0, 2], [1, 3]] = b
@@ -147,11 +147,11 @@ def test_transpose_arithmetic() raises:
     assert_equal(mul_result[1, 1], 9.0)  # 3 * 3
 
     # Test division with non-zero values: c = [[2, 4], [6, 8]]
-    var c = _create_tensor_2x2[DType.float32]()
+    var c = _create_tensor_2x2[.float32]()
     for i, j in product(range(2), range(2)):
         c[i, j] = Float32((i * 2 + j + 1) * 2)
 
-    var d = _create_tensor_2x2[DType.float32]()
+    var d = _create_tensor_2x2[.float32]()
     _copy_transpose(c, d)
 
     # c.transpose() / d should be all ones
@@ -168,15 +168,15 @@ def test_different_layouts_arithmetic() raises:
     This verifies that tensors with different memory layouts can still
     perform arithmetic operations correctly based on their logical indices.
     """
-    var a = _create_tensor_2x2[DType.float32]()
+    var a = _create_tensor_2x2[.float32]()
     arange(a)
 
     # Create column-major tensor with same logical values
     var b = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout.col_major(2, 2),
         MutAnyOrigin,
-        address_space=AddressSpace.GENERIC,
+        address_space=.GENERIC,
     ].stack_allocation()
     for i, j in product(range(2), range(2)):
         b[i, j] = a[i, j]
@@ -190,25 +190,23 @@ def test_different_layouts_arithmetic() raises:
 
 
 def test_flatten() raises:
-    var stack = InlineArray[Int8, 16]()
-    var tensor = LayoutTensor[DType.int8, Layout.row_major(4, 4)](
-        stack
-    ).flatten()
+    var stack = Array[Int8, 16](fill=0)
+    var tensor = LayoutTensor[.int8, Layout.row_major(4, 4)](stack).flatten()
     assert_equal(tensor.size(), 16)
     assert_equal(tensor.rank, 1)
     assert_equal(tensor.stride[0](), 1)
 
 
 def test_get_shape() raises:
-    var stack = InlineArray[Int8, 16]()
-    var tensor = LayoutTensor[DType.int8, Layout.row_major(4, 4)](stack)
+    var stack = Array[Int8, 16](fill=0)
+    var tensor = LayoutTensor[.int8, Layout.row_major(4, 4)](stack)
     assert_equal(4, tensor.get_shape()[0])
     assert_equal(4, tensor.get_shape()[1])
 
 
 def test_reshape() raises:
-    var stack = InlineArray[Int8, 16]()
-    var tensor = LayoutTensor[DType.int8, Layout(16)](stack).reshape[
+    var stack = Array[Int8, 16](fill=0)
+    var tensor = LayoutTensor[.int8, Layout(16)](stack).reshape[
         Layout.row_major[2]()
     ](RuntimeLayout[Layout.row_major[2]()].row_major(IndexList[2](4, 4)))
     assert_equal(tensor.size(), 16)
@@ -220,13 +218,11 @@ def test_aligned_load() raises:
     """Tests aligned_load with both index types."""
     # Use a 4x7 tensor so we can load 4 elements starting at columns 0,1,2,3
     # without going out of bounds (column 3 + width 4 = 7)
-    var storage = InlineArray[Float32, 4 * 7](uninitialized=True)
+    var storage = Array[Float32, 4 * 7](fill=0.0)
     var tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout([4, 7]),
-    ](
-        storage
-    ).fill(0.0)
+    ](storage)
 
     tensor.store[4](0, 0, 1.0)  # Store 4 elements starting at column 0
     tensor.store[4](0, 1, 2.0)  # Store 4 elements starting at column 1
@@ -260,3 +256,6 @@ def main() raises:
     test_transpose_arithmetic()
     test_different_layouts_arithmetic()
     test_aligned_load()
+    test_flatten()
+    test_get_shape()
+    test_reshape()

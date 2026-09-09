@@ -1,15 +1,17 @@
 TuningConfigSM90(
-        M=[@M],
-        N=[@N],
-        K=[@K],
-        mma_shape=IndexList[3](64, [@TUNE_WGMMA_N], mma_k),
-        block_tile_shape=Index(64*[@TUNE_NUM_CONSUMER], [@TUNE_WGMMA_N], BK),
-        cluster_shape=Index([@TUNE_CLUSTER_DIM_X], [@TUNE_CLUSTER_DIM_Y], 1),
-        num_pipeline_stages=[@TUNE_NUM_PIPELINE_STAGES],
-        num_consumer=[@TUNE_NUM_CONSUMER],
-        partitioned_multicast=[@TUNE_PARTITIONED_MULTICAST],
-        grid_shape=Index([@TUNE_GRID_DIM_X], H100.sm_count//[@TUNE_GRID_DIM_X]),
-        schedule=MatmulSchedule([@TUNE_SCHEDULE_TYPE]),
-        splits=OptionalReg[Int]([@TUNE_SPLITS]) if [@TUNE_IS_SPLITK] else None,
-        raster_order=OptionalReg[RasterOrder](RasterOrder.AlongM) if [@TUNE_IS_SPLITK] else None,
-    )
+    M=[@M],
+    N=[@N],
+    K=[@K],
+    mma_shape=IndexList[3](64, [@TUNE_WGMMA_N], mma_k),
+    block_tile_shape=Index(64 * [@TUNE_NUM_CONSUMER], [@TUNE_WGMMA_N], BK),
+    cluster_shape=Index([@TUNE_CLUSTER_DIM_X], [@TUNE_CLUSTER_DIM_Y], 1),
+    num_pipeline_stages=[@TUNE_NUM_PIPELINE_STAGES],
+    num_consumer=[@TUNE_NUM_CONSUMER],
+    partitioned_multicast=[@TUNE_PARTITIONED_MULTICAST],
+    grid_shape=Index([@TUNE_GRID_DIM_X], H100.sm_count // [@TUNE_GRID_DIM_X]),
+    schedule=MatmulSchedule([@TUNE_SCHEDULE_TYPE]),
+    splits=OptionalReg[Int]([@TUNE_SPLITS]) if [@TUNE_IS_SPLITK] else None,
+    raster_order=OptionalReg[RasterOrder](
+        RasterOrder.AlongM
+    ) if [@TUNE_IS_SPLITK] else None,
+)

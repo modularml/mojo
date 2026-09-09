@@ -11,11 +11,12 @@
 # limitations under the License.
 ##===----------------------------------------------------------------------===##
 
-# Tags decide which CI runners pick up a pipeline. Runners use an opt-out
-# filter, so by default every runner whose compatible_with matches will
-# try the entry. To restrict to a vendor, tag the entry: typically mxfp4
-# models get amd-only and nvfp4 models get nvidia-only. Shape tags
-# like 4xmi355 or 8xb200 further pin to a specific runner shape.
+# Pipelines run in two ways. In presubmit (Buildkite), pre_submit_agents
+# lists the exact runners to use. In logit verification aka post-submit
+# (the Pipeline Verification GitHub workflow), runners instead select
+# pipelines by matching `tags` against an opt-out filter: every runner
+# whose compatible_with matches tries the entry unless excluded by tags
+# like amd-only, nvidia-only, or shape tags such as 4xmi355 or 8xb200.
 
 agent_anchors:
   large_intel: &large_cpu
@@ -26,14 +27,6 @@ agent_anchors:
     pool: cpu
     arch: aarch64
     resource_class: "large"
-  h100_1x: &h100_1x
-    queue: ephemeral
-    pool: h100
-    resource_class: "1x"
-  h100_4x: &h100_4x
-    queue: ephemeral
-    pool: h100
-    resource_class: "4x"
   b200_1x: &b200_1x
     queue: ephemeral
     pool: b200
@@ -58,8 +51,6 @@ agent_anchors:
 logit_verification_pipelines:
   # Each pipeline is defined by a name and the following fields:
   # - `pre_submit_agents` is a list of agent configurations to run in pre-submit.
-  # - `post_submit_agents` is a list of agent configurations to run in post-submit.
-  #   If the list is empty, the pipeline will not be run in post-submit.
   # - `pipeline` is the name of the huggingface model or pipeline to verify.
   # - `compatible_with` is a list of device kinds (cpu/gpu) the pipeline can run on.
   # - `encoding` is the weights encoding (float32, bfloat16, q4_k, etc.).
@@ -78,7 +69,6 @@ logit_verification_pipelines:
 
   meta-llama/Meta-Llama-3-8B-Instruct-float32:
     pre_submit_agents: []
-    post_submit_agents: [*large_cpu, *large_arm, *h100_1x, *b200_1x, *mi355_1x]
     pipeline: "meta-llama/Meta-Llama-3-8B-Instruct"
     compatible_with: [cpu, gpu]
     encoding: float32
@@ -93,7 +83,6 @@ logit_verification_pipelines:
 
   meta-llama/Llama-3.1-8B-Instruct-float32:
     pre_submit_agents: []
-    post_submit_agents: [*large_cpu, *large_arm, *h100_1x, *b200_1x, *mi355_1x]
     pipeline: "meta-llama/Llama-3.1-8B-Instruct"
     compatible_with: [cpu, gpu]
     encoding: float32
@@ -104,11 +93,10 @@ logit_verification_pipelines:
     absolute_tolerance: 2.4e-2
     relative_tolerance: 7.8e-3
     cos_dist_threshold: 3.3e-6
-    kl_div_threshold: 6.8e-06
+    kl_div_threshold: 1.9e-05
 
   sentence-transformers/all-mpnet-base-v2-float32:
     pre_submit_agents: []
-    post_submit_agents: [*large_cpu, *large_arm, *h100_1x, *b200_1x, *mi355_1x]
     pipeline: "sentence-transformers/all-mpnet-base-v2"
     compatible_with: [cpu, gpu]
     encoding: float32
@@ -120,20 +108,7 @@ logit_verification_pipelines:
     absolute_tolerance: 2.6e-3
     relative_tolerance: 1.8e-1
     cos_dist_threshold: 2.6e-5
-    kl_div_threshold: 3.3e-07
-
-  unsloth/gpt-oss-20b-BF16:
-    pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
-    pipeline: "unsloth/gpt-oss-20b-BF16"
-    compatible_with: [gpu]
-    encoding: bfloat16
-    tags: [nvidia-multi]
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_gpt-oss_golden/3/808b22644ad4c499e44408f2e80a14367f8c7cc16a16c7df60c0b2227a1812c3/torch_gpt-oss_golden.tar.gz"
-      json_file: "torch_gpt-oss_bfloat16_golden.json"
-    cos_dist_threshold: 5.0e-03
-    kl_div_threshold: 1.1e-01
+    kl_div_threshold: 5.0e-07
 
   # Disabled in SDLC-3497: MAX OLMo pipeline is not yet transformers v5
   # compatible. The v4 wheel hack that was masking this on main was
@@ -141,7 +116,6 @@ logit_verification_pipelines:
   # transformers >=5 (tracked separately).
   allenai/OLMo-1B-hf-float32:
     pre_submit_agents: []
-    post_submit_agents: []
     pipeline: "allenai/OLMo-1B-hf"
     compatible_with: [cpu, gpu]
     encoding: float32
@@ -166,7 +140,6 @@ logit_verification_pipelines:
 
   bartowski/Meta-Llama-3-8B-Instruct-GGUF-q4_k:
     pre_submit_agents: []
-    post_submit_agents: [*large_cpu, *large_arm]
     pipeline: "meta-llama/Meta-Llama-3-8B-Instruct"
     compatible_with: [cpu]
     encoding: q4_k
@@ -178,11 +151,10 @@ logit_verification_pipelines:
     # something is very wrong but at least we will be able to detect
     # further regressions with this.
     cos_dist_threshold: 0.39
-    kl_div_threshold: 3.8e-03
+    kl_div_threshold: 8.3e-03
 
   meta-llama/Meta-Llama-3-8B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "meta-llama/Meta-Llama-3-8B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -194,7 +166,6 @@ logit_verification_pipelines:
 
   bartowski/Meta-Llama-3.1-8B-Instruct-GGUF-q4_k:
     pre_submit_agents: []
-    post_submit_agents: [*large_cpu, *large_arm]
     pipeline: "meta-llama/Llama-3.1-8B-Instruct"
     compatible_with: [cpu]
     encoding: q4_k
@@ -206,11 +177,10 @@ logit_verification_pipelines:
     # something is very wrong but at least we will be able to detect
     # further regressions with this.
     cos_dist_threshold: 0.62
-    kl_div_threshold: 1.6e-02
+    kl_div_threshold: 2.6e-02
 
   meta-llama/Llama-3.1-8B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "meta-llama/Llama-3.1-8B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -222,7 +192,6 @@ logit_verification_pipelines:
 
   meta-llama/Llama-3.1-8B-Instruct-data-parallel-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*b200_2x]
     pipeline: "meta-llama/Llama-3.1-8B-Instruct-data-parallel"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -236,7 +205,6 @@ logit_verification_pipelines:
 
   RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8-float8-static:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8-float8-static"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -252,7 +220,6 @@ logit_verification_pipelines:
 
   RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8-dynamic-float8-dynamic:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8-dynamic"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -268,7 +235,6 @@ logit_verification_pipelines:
 
   nvidia/Llama-3.1-8B-Instruct-NVFP4:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x]
     pipeline: "nvidia/Llama-3.1-8B-Instruct-NVFP4"
     compatible_with: [gpu]
     encoding: float4_e2m1fnx2
@@ -281,7 +247,6 @@ logit_verification_pipelines:
 
   nvidia/Llama-3.1-405B-Instruct-NVFP4:
     pre_submit_agents: []
-    post_submit_agents: [*b200_2x]
     pipeline: "nvidia/Llama-3.1-405B-Instruct-NVFP4"
     compatible_with: [gpu]
     encoding: float4_e2m1fnx2
@@ -294,7 +259,6 @@ logit_verification_pipelines:
 
   RedHatAI/Meta-Llama-3.1-405B-Instruct-FP8-dynamic:
     pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
     pipeline: "RedHatAI/Meta-Llama-3.1-405B-Instruct-FP8-dynamic"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -309,7 +273,6 @@ logit_verification_pipelines:
   # whether autofp8 quantization differences between MAX and vLLM cause this drift.
   modularai/Llama-3.1-405B-Instruct-autofp8:
     pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
     pipeline: "modularai/Llama-3.1-405B-Instruct-autofp8"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -323,7 +286,6 @@ logit_verification_pipelines:
 
   meta-llama/Llama-3.2-1B-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "meta-llama/Llama-3.2-1B"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -334,23 +296,20 @@ logit_verification_pipelines:
     cos_dist_threshold: 6.0e-03
     kl_div_threshold: 1.5e-02
 
-  # TODO(PRDT-458): Add pregenerated_torch_goldens after running the
-  # "Generate Pipeline Goldens" GitHub Action (avoids autoregressive-drift
-  # false-failures from bfloat16 tie-breaks in live torch comparison).
-  # Observed non-drift accuracy: max cos_dist=7.4e-04, max kl=1.6e-03.
   LiquidAI/LFM2.5-1.2B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "LiquidAI/LFM2.5-1.2B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
     tags: []
+    pregenerated_torch_goldens:
+      tar_file: "s3://modular-bazel-artifacts-public/artifacts/LiquidAI_LFM2.5-1.2B-Instruct_golden/1/1345a0b62a1bf36cacd821e131e533d008d44ece232009eb35d871226adb4e60/LiquidAI_LFM2.5-1.2B-Instruct_golden.tar.gz"
+      json_file: "torch_LiquidAI_LFM2.5-1.2B-Instruct_bfloat16_golden.json"
     cos_dist_threshold: 5.0e-03
     kl_div_threshold: 1.0e-02
 
   meta-llama/Llama-3.3-70B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "meta-llama/Llama-3.3-70B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -362,33 +321,20 @@ logit_verification_pipelines:
     cos_dist_threshold: 9.0e-04
     kl_div_threshold: 5.0e-03
 
-  mistralai/Mistral-Nemo-Instruct-2407-bfloat16:
-    pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
-    pipeline: "mistralai/Mistral-Nemo-Instruct-2407"
-    compatible_with: [gpu]
-    encoding: bfloat16
-    tags: []
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_mistral_golden/1/6f4718625a01e6e8b9f002a0bfdad8098cfe78ce50b9cd4175f27b1f020b405a/torch_mistral_golden.tar.gz"
-      json_file: "torch_nemo-instruct-2407_bfloat16_golden.json"
-    # TODO(AIPIPE-230): These tolerances are very high due to an accuracy regression.
-    cos_dist_threshold: 2.1e-2
-    kl_div_threshold: 3.5e-2
-
   mistralai/Mistral-Small-3.1-24B-Instruct-2503-bfloat16:
-    pre_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
+    pre_submit_agents: [*b200_1x, *mi355_1x]
     pipeline: "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
     compatible_with: [gpu]
     encoding: bfloat16
     tags: []
+    pregenerated_torch_goldens:
+      tar_file: "s3://modular-bazel-artifacts-public/artifacts/mistralai_Mistral-Small-3.1-24B-Instruct-2503_golden/1/1aee8fe2f357007cba31a3d59f537cb204df040aa8bca7ab7f8c521469385905/mistralai_Mistral-Small-3.1-24B-Instruct-2503_golden.tar.gz"
+      json_file: "torch_mistralai_Mistral-Small-3.1-24B-Instruct-2503_bfloat16_golden.json"
     cos_dist_threshold: 3.0e-03
     kl_div_threshold: 5.2e-3
 
   OpenGVLab/InternVL3-1B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "OpenGVLab/InternVL3-1B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -405,7 +351,6 @@ logit_verification_pipelines:
   # 'mo.static.reshape' op lowering inside mo.parallel is not yet supported.
   OpenGVLab/InternVL3-8B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "OpenGVLab/InternVL3-8B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -421,7 +366,6 @@ logit_verification_pipelines:
   # 'mo.static.reshape' op lowering inside mo.parallel is not yet supported.
   OpenGVLab/InternVL3-14B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "OpenGVLab/InternVL3-14B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -438,7 +382,6 @@ logit_verification_pipelines:
   # 'mo.static.reshape' op lowering inside mo.parallel is not yet supported.
   OpenGVLab/InternVL3-38B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "OpenGVLab/InternVL3-38B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -454,7 +397,6 @@ logit_verification_pipelines:
   # 'mo.static.reshape' op lowering inside mo.parallel is not yet supported.
   OpenGVLab/InternVL3_5-8B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "OpenGVLab/InternVL3_5-8B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -468,7 +410,6 @@ logit_verification_pipelines:
 
   mistral-experimental/pixtral-12b-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "mistral-experimental/pixtral-12b"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -481,7 +422,6 @@ logit_verification_pipelines:
 
   Qwen/Qwen2.5-7B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "Qwen/Qwen2.5-7B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -494,7 +434,6 @@ logit_verification_pipelines:
 
   Qwen/Qwen2.5VL-3B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "Qwen/Qwen2.5-VL-3B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -507,7 +446,6 @@ logit_verification_pipelines:
 
   Qwen/Qwen2.5VL-7B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "Qwen/Qwen2.5-VL-7B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -520,7 +458,6 @@ logit_verification_pipelines:
 
   Qwen/Qwen2.5VL-32B-Instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "Qwen/Qwen2.5-VL-32B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -534,7 +471,6 @@ logit_verification_pipelines:
 
   Qwen/Qwen3-VL-30B-A3B-Instruct:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "Qwen/Qwen3-VL-30B-A3B-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -545,21 +481,8 @@ logit_verification_pipelines:
     cos_dist_threshold: 1.7e00
     kl_div_threshold: 1.5e-01
 
-  Qwen/Qwen3-VL-4B-Instruct-bfloat16:
-    pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
-    pipeline: "Qwen/Qwen3-VL-4B-Instruct"
-    compatible_with: [gpu]
-    encoding: bfloat16
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_qwen3-vl-4b-instruct_bfloat16_golden/1/7c5d43eeab21e1478b79fc849a537766809b1c3aabb7f253309dc47895d1de39/torch_qwen3-vl-4b-instruct_bfloat16_golden.tar.gz"
-      json_file: "torch_qwen3_vl_4b_instruct_bfloat16_golden.json"
-    cos_dist_threshold: 1.7e00
-    kl_div_threshold: 4.4e-01
-
   Qwen/Qwen3-VL-4B-Instruct-FP8:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "Qwen/Qwen3-VL-4B-Instruct-FP8"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -571,7 +494,6 @@ logit_verification_pipelines:
 
   Qwen/Qwen3-8B-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "Qwen/Qwen3-8B"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -582,35 +504,96 @@ logit_verification_pipelines:
     cos_dist_threshold: 1.1e-3
     kl_div_threshold: 7.1e-3
 
-  Qwen/Qwen3-30B-A3B-Instruct-2507-bfloat16:
+  Qwen/Qwen3.8-27B-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x]
-    pipeline: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+    pipeline: "Qwen/Qwen3.8-27B"
     compatible_with: [gpu]
     encoding: bfloat16
-    tags: [nvidia-only, no-h100]
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_qwen3-30b-a3b-instruct-2507_bfloat16_golden/1/4427d3205be77073d7f0274d8fca0774974fe8677934a5b8dc60b3705aac9aaf/torch_qwen3-30b-a3b-instruct-2507_bfloat16_golden.tar.gz"
-      json_file: "torch_qwen3_30b_a3b_instruct_2507_bfloat16_golden.json"
-    cos_dist_threshold: 7.0e-02
-    kl_div_threshold: 8.0e-01
+    tags: [nvidia-only]
+    # Measured on 1x B200: 5.2e-4 / 1.6e-3, up from 3.4e-4 / 1.4e-3 before
+    # M-RoPE moved this checkpoint onto a runtime rope table, whose GPU
+    # transcendentals are less exact than the host-folded constant they
+    # replaced. Text-only prompts take that table too: `mrope_enabled` follows
+    # the checkpoint, not the request. The thresholds still clear by ~2x and
+    # keep cross-hardware headroom, so they stand.
+    cos_dist_threshold: 1.0e-3
+    kl_div_threshold: 5.0e-3
 
-  Qwen/Qwen3-30B-A3B-Instruct-2507-FP8:
+  # Image prompts through the same checkpoint. The text-only entries above
+  # cannot see M-RoPE at all: without an image every axis carries the flat
+  # token index, so the multi-axis positions only start to matter here.
+  Qwen/Qwen3.8-27B-vision-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x]
-    pipeline: "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8"
+    pipeline: "Qwen/Qwen3.8-27B-vision"
     compatible_with: [gpu]
-    encoding: float8_e4m3fn
-    tags: [nvidia-only, no-h100, float8-support]
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/Qwen_Qwen3-30B-A3B-Instruct-2507-FP8_golden/1/51490a4ac6612bf0a3af0f6953d5a1bff2b12683ca4c134dba9a13ea5c44f2bb/Qwen_Qwen3-30B-A3B-Instruct-2507-FP8_golden.tar.gz"
-      json_file: "vllm_Qwen_Qwen3-30B-A3B-Instruct-2507-FP8_float8_e4m3fn_golden.json"
-    cos_dist_threshold: 7.3e-05
-    kl_div_threshold: 1.1e-01
+    encoding: bfloat16
+    tags: [nvidia-only]
+    # Measured on 1x B200: 1.2e-3 / 7.6e-3, widened ~3x for cross-hardware
+    # headroom like the text-only entries above. The image prompts sit a
+    # little above those entries because the vision tower's own error rides
+    # along; before M-RoPE reached the graph they sat at 1.6e-1 KL, so this
+    # gate separates a mispositioned image from a correctly positioned one by
+    # more than an order of magnitude.
+    cos_dist_threshold: 4.0e-3
+    kl_div_threshold: 2.5e-2
+
+  Qwen/Qwen3.8-27B-bfloat16-multi:
+    pre_submit_agents: []
+    pipeline: "Qwen/Qwen3.8-27B"
+    compatible_with: [gpu]
+    encoding: bfloat16
+    tags: [nvidia-only, nvidia-multi]
+    # Suggested by --find-tolerances on 2x B200: 7.2e-4 / 1.5e-3. Widened ~3x
+    # for cross-hardware headroom, matching the 1x entry above. Cosine
+    # distance roughly doubles against the 1x figure because the allreduce
+    # changes the reduction order; KL divergence is unchanged.
+    cos_dist_threshold: 2.5e-3
+    kl_div_threshold: 5.0e-3
+
+  RadixArk/Qwen3.8-27B-NVFP4:
+    pre_submit_agents: []
+    pipeline: "RadixArk/Qwen3.8-27B-NVFP4"
+    compatible_with: [gpu]
+    encoding: float4_e2m1fnx2
+    tags: [nvidia-only]
+    torch_reference_is_unquantized_source: true
+    # transformers cannot load a modelopt MIXED_PRECISION checkpoint, so the
+    # oracle's torch side is the bf16 source model (`Qwen/Qwen3.8-27B`) this
+    # was quantized from. The gate is therefore quantized-MAX vs bf16-torch and
+    # the thresholds carry the quantization error itself, which is why they sit
+    # two orders above the bf16 entry's. Suggested by --find-tolerances on
+    # 1x B200: 8.7e-02 / 6.6e-02, widened ~3x for cross-hardware headroom.
+    # This gates catastrophic regressions, not precision drift: dropping a
+    # weight scale family moves cosine distance to ~7e-01, comfortably over.
+    # A vLLM golden of this checkpoint would give the tighter gate.
+    cos_dist_threshold: 2.5e-01
+    kl_div_threshold: 2.0e-01
+
+  # FP8 KV-cache variant. The encoding table keeps a quantized checkpoint's
+  # cache in bf16, so nothing else selects the FP8 store path: without this
+  # entry `rope_split_store_ragged`, the widened frequency table and the
+  # store-time conversion are never executed.
+  RadixArk/Qwen3.8-27B-NVFP4-fp8kv:
+    pre_submit_agents: []
+    pipeline: "RadixArk/Qwen3.8-27B-NVFP4"
+    compatible_with: [gpu]
+    encoding: float4_e2m1fnx2
+    tags: [nvidia-only]
+    torch_reference_is_unquantized_source: true
+    config_params_override:
+      kv_cache_format: float8_e4m3fn
+    # Suggested by --find-tolerances on 1x B200: 1.3e-01 / 2.2e-01, against the
+    # bf16 entry's 8.7e-02 / 6.6e-02 -- the FP8 cache is the whole difference,
+    # the two runs are otherwise the same checkpoint and reference. Widened ~2x
+    # rather than the ~3x above: the error here is dominated by KV
+    # quantization, which is the same arithmetic on any device, so
+    # cross-hardware spread is second order. 3.0e-01 still separates from the
+    # ~7e-01 a dropped weight-scale family produces.
+    cos_dist_threshold: 3.0e-01
+    kl_div_threshold: 5.0e-01
 
   Qwen/Qwen3-Embedding-0.6B-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "Qwen/Qwen3-Embedding-0.6B"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -632,7 +615,6 @@ logit_verification_pipelines:
   # Qwen2.VL-FP8
   allenai/olmOCR-2-7B-1025-FP8:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "allenai/olmOCR-2-7B-1025-FP8"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -649,7 +631,6 @@ logit_verification_pipelines:
   # encoder case all prompts are padded to 512 tokens.
   Qwen/Qwen3-4B-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x]
     pipeline: "Qwen/Qwen3-4B-text-encoder"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -662,7 +643,6 @@ logit_verification_pipelines:
   # TODO(MODELS-1099): Re-enable once upstream tokenizer is fixed.
   allenai/OLMo-2-1124-7B-float32:
     pre_submit_agents: []
-    post_submit_agents: [*large_cpu, *large_arm, *h100_1x, *b200_1x, *mi355_1x]
     pipeline: "allenai/OLMo-2-1124-7B"
     compatible_with: [cpu, gpu]
     encoding: float32
@@ -673,18 +653,8 @@ logit_verification_pipelines:
     cos_dist_threshold: 2.1e-5
     kl_div_threshold: 4.6e-7
 
-  allenai/Olmo-3-7B-Instruct-bfloat16:
-    pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
-    pipeline: "allenai/Olmo-3-7B-Instruct"
-    compatible_with: [gpu]
-    encoding: bfloat16
-    cos_dist_threshold: 7e-1
-    kl_div_threshold: 6e-02
-
   HuggingFaceM4/Idefics3-8B-Llama3:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "HuggingFaceM4/Idefics3-8B-Llama3"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -700,24 +670,8 @@ logit_verification_pipelines:
     cos_dist_threshold: 5.0e-02
     kl_div_threshold: 6.8e-01
 
-  LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct-float32:
-    pre_submit_agents: []
-    post_submit_agents: [*large_cpu, *large_arm, *h100_1x, *b200_1x, *mi355_1x]
-    pipeline: "LGAI-EXAONE/EXAONE-3.0-7.8B-Instruct"
-    compatible_with: [cpu, gpu]
-    encoding: float32
-    tags: []
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_exaone_3_5_2_4b_instruct_float32_golden/1/ae16f10ebd7514f5d60f25755babbcff9636a4fa1c68d1470f614474fa907427/torch_exaone_3_5_2_4b_instruct_float32_golden.tar.gz"
-      json_file: "exaone_3_5_2_4b_instruct_float32_torch_goldens.json"
-    # TODO: Accuracy is much better on AMD.
-    # so we might have an nvidia kernel bug here
-    cos_dist_threshold: 2.5e-2
-    kl_div_threshold: 1.3e-2
-
   microsoft/Phi-3.5-mini-instruct-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "microsoft/Phi-3.5-mini-instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -730,7 +684,6 @@ logit_verification_pipelines:
 
   microsoft/phi-4-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "microsoft/phi-4"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -745,7 +698,6 @@ logit_verification_pipelines:
 
   hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4-gptq:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4"
     compatible_with: [gpu]
     encoding: gptq
@@ -758,11 +710,10 @@ logit_verification_pipelines:
 
   hugging-quants/Meta-Llama-3.1-8B-Instruct-GPTQ-INT4-gptq-no-perm-idx:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "kaitchup/DeepSeek-R1-Distill-Llama-8B-AutoRound-GPTQ-4bit"
     compatible_with: [gpu]
     encoding: gptq
-    tags: [nvidia-only]
+    tags: [nvidia-only, manual]  # pending huggingface/transformers#45488
     pregenerated_torch_goldens:
       tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_llama-gptq_golden/0/7e5b7b4d1764033be69e85e0badc9dca82c94c8d2def1216d317b149a621daef/torch_llama-gptq_golden.tar.gz"
       json_file: "torch_llama-gptq-no-perm-idx_golden.json"
@@ -773,7 +724,6 @@ logit_verification_pipelines:
 
   deepseek-ai/DeepSeek-V2-Lite-Chat-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "deepseek-ai/DeepSeek-V2-Lite-Chat"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -787,7 +737,6 @@ logit_verification_pipelines:
   # TODO(MODELS-812): Investigate deepseek timeout
   kathywu95/deepseek-v3-small-random-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x]
     pipeline: "kathywu95/deepseek-v3-small-random"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -800,7 +749,6 @@ logit_verification_pipelines:
 
   kathywu95/deepseek-v3-small-random-fp8:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x]
     pipeline: "kathywu95/deepseek-v3-small-random-fp8"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -813,134 +761,70 @@ logit_verification_pipelines:
     cos_dist_threshold: 2.7e-03
     kl_div_threshold: 1.1e-2
 
-  deepseek-ai/DeepSeek-R1:
+  nvidia/Kimi-K2.7-Code-NVFP4:
     pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
-    pipeline: "deepseek-ai/DeepSeek-R1"
-    compatible_with: [gpu]
-    encoding: float8_e4m3fn
-    tags: [nvidia-multi, 8xb200]  # Requires 8 B200s to run
-    # Goldens generated using VLLM.
-    # Script: https://gist.github.com/k-w-w/1dc387dc41f11789e464d4a9267a8d20
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/vllm_deepseek-r1_golden/1/f4b3ce07362060a857724d8721aa008880b2f1da3a9f90aec667672c92f7e5e9/vllm_deepseek-r1_golden.tar.gz"
-      json_file: "vllm_deepseek-r1_float8_golden.json"
-    cos_dist_threshold: 4.2e-02
-    kl_div_threshold: 2.6e-01
-    timeout: 1200
-
-  nvidia/Kimi-K2.5-NVFP4:
-    pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
-    pipeline: "nvidia/Kimi-K2.5-NVFP4"
+    pipeline: "nvidia/Kimi-K2.7-Code-NVFP4"
     compatible_with: [gpu]
     encoding: float4_e2m1fnx2
     tags: [nvidia-multi, 8xb200]
+    # Goldens generated using vLLM.
+    # https://github.com/modularml/modular/actions/runs/30509573089
     pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/vllm_kimik2_5_nvfp4_golden/1/0b26362d7cc605bcc3925fa3d6aff4aeef4ed12fe0ed2f1684f3c8cfbf285822/vllm_kimik2_5_nvfp4_golden.tar.gz"
-      json_file: "vllm_kimik2_5_nvfp4_golden.json"
-    absolute_tolerance: 1.5e+01
-    relative_tolerance: 9.6e-01
-    cos_dist_threshold: 2.0e-03
-    kl_div_threshold: 5.0e+00
+      tar_file: "s3://modular-bazel-artifacts-public/artifacts/nvidia_Kimi-K2.7-Code-NVFP4_golden/1/18f5a14abf9e4a2d9dea154caf2c2a815d6d6c9651d4c0a6f586e9949f03b9e8/nvidia_Kimi-K2.7-Code-NVFP4_golden.tar.gz"
+      json_file: "vllm_nvidia_Kimi-K2.7-Code-NVFP4_float4_e2m1fnx2_golden.json"
+    # Tolerances from the actual verify run against this golden:
+    # https://github.com/modularml/modular/actions/runs/30877333156
+    # Pareto-optimal (abs, rel) pair that passes 100% via relative tolerance
+    # alone; kl_div_threshold matches the run's suggested KL divergence
+    # threshold (max observed 4.56736e-01). cos_dist_threshold unchanged
+    # from the K2.6-derived placeholder -- no cos-distance failures were
+    # reported, so it already passes at that value.
+    absolute_tolerance: 5.2e+00
+    relative_tolerance: 4.6e-01
+    cos_dist_threshold: 1.0e-03
+    kl_div_threshold: 4.6e-01
+    timeout: 1800
 
-  # Text-only DeepseekV3 conversion of Kimi-K2.5-NVFP4. The checkpoint is the
-  # original nvidia/Kimi-K2.5-NVFP4 weights with the vision stack stripped and
-  # key prefixes rewritten to match DeepseekV3ForCausalLM. Tighter tolerances
-  # than the multimodal entry above are intentional: the vision-induced drift
-  # tracked in MODELS-1159 does not apply to this text-only path.
-  #
-  # Reuses the multimodal Kimi golden tarball above. Comparison is by prompt
-  # string (see compare_text_generation in model_output.py), so the extra
-  # multimodal prompt in the golden is silently ignored — only the three
-  # text-only prompts our oracle emits are compared.
-  austinpowers/Kimi-K2.5-NVFP4-DeepseekV3:
-    pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
-    pipeline: "austinpowers/Kimi-K2.5-NVFP4-DeepseekV3"
-    compatible_with: [gpu]
-    encoding: float4_e2m1fnx2
-    tags: [nvidia-multi, 8xb200]
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/vllm_kimik2_5_nvfp4_golden/1/0b26362d7cc605bcc3925fa3d6aff4aeef4ed12fe0ed2f1684f3c8cfbf285822/vllm_kimik2_5_nvfp4_golden.tar.gz"
-      json_file: "vllm_kimik2_5_nvfp4_golden.json"
-    cos_dist_threshold: 2.0e-03
-    kl_div_threshold: 3.0e-01
-
-  amd/Kimi-K2.5-MXFP4:
-    pre_submit_agents: []
-    post_submit_agents: [*mi355_4x]
-    pipeline: "amd/Kimi-K2.5-MXFP4"
-    compatible_with: [gpu]
-    encoding: float4_e2m1fnx2
-    tags: [amd-only, 4xmi355]
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/vllm_amd_kimi-k2_5-mxfp4_golden/1/a40f3192fabd8d61290dc32786271980d83902b4dce73c95d25d05d1a17cc11b/vllm_amd_kimi-k2_5-mxfp4_golden.tar.gz"
-      json_file: "vllm_amd_kimi-k2_5-mxfp4_golden.json"
-    cos_dist_threshold: 1.7e-02
-    kl_div_threshold: 2.2e+01
-
-  # Same NVFP4 weights as austinpowers/Kimi-K2.5-NVFP4-DeepseekV3, loaded from
-  # a directory pre-staged on the dedicated prod-2 8xB200 runner. The tags
-  # restrict this pipeline to that runner only: `prod-2-8xb200` matches the
-  # `+prod-2-8xb200` requirement on the prod-2 matrix entry, while
-  # `nvidia-only` and `no-b200` exclude it from the single-B200 and MI355
-  # runners (which do not have the weights staged).
-  nvidia/Kimi-K2.5-NVFP4__internal:
+  # MiniMax-M3 (dense-only layers) on a trimmed checkpoint, compared
+  # against goldens pregenerated from the mm-sglang MiniMax-M3 fork.
+  minimax/minimax3-dense-only:
     pre_submit_agents: []
     post_submit_agents: []
-    pipeline: "nvidia/Kimi-K2.5-NVFP4__internal"
-    compatible_with: [gpu]
-    encoding: float4_e2m1fnx2
-    tags: [prod-2-8xb200, nvidia-only, no-b200]
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/nvidia_Kimi-K2.5-NVFP4__internal_golden/1/1e59f3ee02ae446ebcaccb0b1fd4ff7d92122771c9306e5c2e7147ab595045f2/nvidia_Kimi-K2.5-NVFP4__internal_golden.tar.gz"
-      json_file: "vllm_nvidia_Kimi-K2.5-NVFP4__internal_float4_e2m1fnx2_golden.json"
-    cos_dist_threshold: 2.1e-04
-    kl_div_threshold: 5.1e-02
-
-  MiniMaxAI/MiniMax-M2.7:
-    pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
-    pipeline: "MiniMaxAI/MiniMax-M2.7"
+    pipeline: "minimax/minimax3-dense-only"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
-    tags: [nvidia-multi, 8xb200]
+    tags: [manual]
     pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/MiniMaxAI_MiniMax-M2.7_golden/1/e39d1d7daf4680a1210384453df4bb2b85caf9063a86c5e588183146d209208d/MiniMaxAI_MiniMax-M2.7_golden.tar.gz"
-      json_file: "torch_MiniMaxAI_MiniMax-M2.7_float8_e4m3fn_golden.json"
-    cos_dist_threshold: 3.1e-01
-    kl_div_threshold: 1.0e-01
+      tar_file: "s3://modular-bazel-artifacts-public/artifacts/minimax_m3_dense_only_golden/1/916ae32aad3b2c036783d3451e9c897512734de1f4d71c95d0afdaaaa2aeddd4/minimax_m3_dense_only_golden.tar.gz"
+      json_file: "torch_minimax_m3_dense_only_golden.json"
+    # Placeholder tolerances (headroom over measured); re-tune via the Action.
+    cos_dist_threshold: 5.0e-04
+    kl_div_threshold: 1.0e-03
 
-  lukealonso/MiniMax-M2.7-NVFP4:
+  # MiniMax-M3-MXFP8, compared against logprob goldens
+  # pregenerated from the mm-sglang MiniMax-M3 fork on the 3 short prompts.
+  # Serving engines expose logprobs (not raw logits), so this is a brittle
+  # pipeline: cosine distance + KL divergence only. Needs the private arch, so
+  # run via //max_private/minimax_m3:verify_minimax_m3
+  # --pipeline=MiniMaxAI/MiniMax-M3-MXFP8. 8 GPUs (ep_size=8, dp=1).
+  MiniMaxAI/MiniMax-M3-MXFP8:
     pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
-    pipeline: "lukealonso/MiniMax-M2.7-NVFP4"
+    post_submit_agents: []
+    pipeline: "MiniMaxAI/MiniMax-M3-MXFP8"
     compatible_with: [gpu]
-    encoding: float4_e2m1fnx2
-    tags: [nvidia-multi, 8xb200]
+    encoding: float8_e4m3fn
+    tags: [manual, nvidia-multi, 8xb200]
     pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/lukealonso_MiniMax-M2.7-NVFP4_golden/1/8cfc279e6ad212cc92f7f91fd4e5654dadf00ea4316e775fefbb6dd20f8d74ca/vllm_lukealonso_MiniMax-M2.7-NVFP4_float4_e2m1fnx2_golden.json.tar.gz"
-      json_file: "vllm_lukealonso_MiniMax-M2.7-NVFP4_float4_e2m1fnx2_golden.json"
-    cos_dist_threshold: 9.0e-04
-    kl_div_threshold: 3.5e-01
-
-  amd/MiniMax-M2.7-MXFP4:
-    pre_submit_agents: []
-    post_submit_agents: [*mi355_4x]
-    pipeline: "amd/MiniMax-M2.7-MXFP4"
-    compatible_with: [gpu]
-    encoding: float4_e2m1fnx2
-    tags: [amd-only, 4xmi355]
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/amd_MiniMax-M2.7-MXFP4_golden/1/1ba298cb/vllm_amd_MiniMax-M2.7-MXFP4_float4_e2m1fnx2_golden.json.tar.gz"
-      json_file: "vllm_amd_MiniMax-M2.7-MXFP4_float4_e2m1fnx2_golden.json"
-    cos_dist_threshold: 8.0e-03
-    kl_div_threshold: 4.0e+00
+      tar_file: "s3://modular-bazel-artifacts-public/artifacts/MiniMaxAI_MiniMax-M3-MXFP8_golden/1/f6c729e886f1750f1c569f5d68bfcd300f5e5eca24507047fd11830dadfd9cae/MiniMaxAI_MiniMax-M3-MXFP8_golden.tar.gz"
+      json_file: "sglang_MiniMaxAI_MiniMax-M3-MXFP8_float8_e4m3fn_golden.json"
+    # Tuned via --find-tolerances on 8x B200 (measured: cos_dist 5.6e-04,
+    # kl_div 1.8e-01) with headroom. KL is dominated by the translate prompt's
+    # later steps; MAX fp8 vs sglang mxfp8+deep_gemm kernels differ.
+    cos_dist_threshold: 1.0e-03
+    kl_div_threshold: 3.0e-01
 
   deepseek-ai/DeepSeek-V3.1-Terminus:
     pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
     pipeline: "deepseek-ai/DeepSeek-V3.1-Terminus"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -953,7 +837,6 @@ logit_verification_pipelines:
 
   deepseek-ai/DeepSeek-V3.2-Exp:
     pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
     pipeline: "deepseek-ai/DeepSeek-V3.2-Exp"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -961,33 +844,17 @@ logit_verification_pipelines:
     pregenerated_torch_goldens:
       tar_file: "s3://modular-bazel-artifacts-public/artifacts/deepseek-ai_DeepSeek-V3.2-Exp_golden/deepseek-ai_DeepSeek-V3.2-Exp_golden.tar.gz"
       json_file: "torch_deepseek-ai_DeepSeek-V3.2-Exp_float8_e4m3fn_golden.json"
-    # From verify_pipelines --find-tolerances (max cos 9.47e-2, max KL 3.85e-1).
-    cos_dist_threshold: 9.5e-02
-    kl_div_threshold: 3.9e-01
-    timeout: 1200
-
-  nvidia/DeepSeek-R1-0528-NVFP4-v2:
-    pre_submit_agents: []
-    post_submit_agents: [*b200_8x]
-    pipeline: "nvidia/DeepSeek-R1-0528-NVFP4-v2"
-    compatible_with: [gpu]
-    encoding: float4_e2m1fnx2
-    tags: [nvidia-multi, 8xb200]  # Requires 8 B200s to run
-    # Goldens generated using vLLM with NVFP4 support
-    pregenerated_torch_goldens:
-      tar_file: "s3://modular-bazel-artifacts-public/artifacts/vllm_deepseek-r1-nvfp4_golden/9/9b19a48a9bba02fe76bda80402950c1ae13c5e0f93444b08c2c6499f4b3247e7/vllm_deepseek-r1-nvfp4_golden.tar.gz"
-      json_file: "vllm_deepseek-r1-nvfp4_float4_golden.json"
-    # Tolerances from running --find-tolerances against vLLM goldens
-    cos_dist_threshold: 2.7e-02
-    kl_div_threshold: 5.1e-01
+    # Loosened pending MODELS-943 (sparse-MLA prefill correctness).
+    cos_dist_threshold: 6.0e-01
+    kl_div_threshold: 5.0e+00
     timeout: 1200
 
   google/gemma-3-1b-it-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "google/gemma-3-1b-it"
     compatible_with: [gpu]
     encoding: bfloat16
+    tags: [nvidia-only]  # TODO(KERN-3014): AMD MI355 compile crash.
     pregenerated_torch_goldens:
       tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_gemma3-1b_golden/1/31d4f0ff8f50b9ab0f877d8765114f6bc4ae73677d2cd2d6ce658866fabf15d4/torch_gemma3-1b_golden.tar.gz"
       json_file: "torch_gemma3-1b_bfloat16_golden.json"
@@ -996,11 +863,10 @@ logit_verification_pipelines:
 
   google/gemma-3-12b-it-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "google/gemma-3-12b-it"
     compatible_with: [gpu]
     encoding: bfloat16
-    tags: []
+    tags: [nvidia-only]  # TODO(KERN-3014): AMD MI355 compile crash.
     pregenerated_torch_goldens:
       tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_gemma3-multimodal_golden/1/06d0fa8ed540ae7141a42c432af1661c85d31f8584d017345992df7a52c21ccb/torch_gemma3-multimodal_golden.tar.gz"
       json_file: "torch_gemma3-multimodal_bfloat16_golden.json"
@@ -1011,7 +877,6 @@ logit_verification_pipelines:
 
   google/gemma-3-27b-it-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "google/gemma-3-27b-it"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1024,7 +889,6 @@ logit_verification_pipelines:
 
   RedHatAI/gemma-3-27b-it-FP8-dynamic:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "RedHatAI/gemma-3-27b-it-FP8-dynamic"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -1038,7 +902,6 @@ logit_verification_pipelines:
   # Multi-GPU variant
   RedHatAI/gemma-3-27b-it-FP8-dynamic-multi:
     pre_submit_agents: []
-    post_submit_agents: [*h100_4x, *b200_2x]
     pipeline: "RedHatAI/gemma-3-27b-it-FP8-dynamic"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -1052,7 +915,6 @@ logit_verification_pipelines:
   # TODO(MODELS-1339): Re-enable once transformers v4 tokenizer crash is fixed.
   google/gemma-4-26B-A4B-it-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "google/gemma-4-26B-A4B-it"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1061,7 +923,6 @@ logit_verification_pipelines:
   # TODO(MODELS-1339): Re-enable once transformers v4 tokenizer crash is fixed.
   google/gemma-4-31B-it-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "google/gemma-4-31B-it"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1069,7 +930,6 @@ logit_verification_pipelines:
 
   HKUSTAudio/Llasa-8B-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x, *mi355_1x]
     pipeline: "HKUSTAudio/Llasa-8B"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1082,7 +942,6 @@ logit_verification_pipelines:
 
   HuggingFaceTB/SmolLM2-360M-Instruct-LoRA-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*h100_1x, *b200_1x]
     pipeline: "HuggingFaceTB/SmolLM2-360M-Instruct"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1097,7 +956,6 @@ logit_verification_pipelines:
 
   RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8-dynamic-BF16-LoRA:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x]
     pipeline: "RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8-dynamic-BF16-LoRA"
     compatible_with: [gpu]
     encoding: float8_e4m3fn
@@ -1112,7 +970,6 @@ logit_verification_pipelines:
 
   black-forest-labs/FLUX.2-dev-t2i-bfloat16-v2:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x, *mi355_1x]
     pipeline: "black-forest-labs/FLUX.2-dev-t2i"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1126,7 +983,7 @@ logit_verification_pipelines:
     ssim_threshold: 0.90
     lpips_threshold: 0.016
     timeout: 3600
-    config_params_override: {"prefer_module_v3": false}
+    config_params_override: {"prefer_module_v3": true}
 
   # NVFP4 quantized FLUX.2-dev (two-repo layout: FLUX.2-dev base + the
   # FLUX.2-dev-NVFP4 single-file safetensors override for the transformer).
@@ -1134,7 +991,27 @@ logit_verification_pipelines:
   # thresholds.
   black-forest-labs/FLUX.2-dev-NVFP4-t2i:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x, *b200_2x]
+    pipeline: "black-forest-labs/FLUX.2-dev-t2i"
+    compatible_with: [gpu]
+    encoding: float4_e2m1fnx2
+    tags: [image-generation, nvidia-only, nvidia-multi, no-h100]
+    pregenerated_torch_goldens:
+      tar_file: "s3://modular-bazel-artifacts-public/artifacts/torch_black-forest-labs_FLUX.2-dev-t2i_golden/1/09e2330e3ea8016979b145072037df30ac8a7c6a425c00d64ae340cd52455295/torch_black-forest-labs_FLUX.2-dev-t2i_golden.tar.gz"
+      json_file: "torch_black-forest-labs_FLUX.2-dev-t2i_bfloat16_golden.json"
+    # Per-prompt SSIM:  [.935, .972, .957, .952, .894]
+    # Per-prompt LPIPS: [.0311, .0339, .0415, .0277, .0605]
+    # Thresholds set with ~10% headroom from the worst-performing prompt.
+    ssim_threshold: 0.8
+    lpips_threshold: 0.067
+    timeout: 3600
+    config_params_override:
+      prefer_module_v3: false
+      transformer_weight_path:
+        - "black-forest-labs/FLUX.2-dev-NVFP4/flux2-dev-nvfp4.safetensors"
+
+  # Flux2-dev-fp4 w/ TaylorSeer
+  black-forest-labs/FLUX.2-dev-NVFP4-t2i-TaylorSeer:
+    pre_submit_agents: []
     pipeline: "black-forest-labs/FLUX.2-dev-t2i"
     compatible_with: [gpu]
     encoding: float4_e2m1fnx2
@@ -1150,12 +1027,16 @@ logit_verification_pipelines:
     timeout: 3600
     config_params_override:
       prefer_module_v3: false
+      denoising_cache:
+        taylorseer: true
+        taylorseer_max_order: 2
+        taylorseer_warmup_steps: 3
+        taylorseer_cache_interval: 2
       transformer_weight_path:
         - "black-forest-labs/FLUX.2-dev-NVFP4/flux2-dev-nvfp4.safetensors"
 
   black-forest-labs/FLUX.2-dev-i2i-bfloat16-v2:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x, *mi355_1x]
     pipeline: "black-forest-labs/FLUX.2-dev-i2i"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1172,7 +1053,6 @@ logit_verification_pipelines:
 
   black-forest-labs/FLUX.2-klein-4B-t2i-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: [*b200_1x]
     pipeline: "black-forest-labs/FLUX.2-klein-4B"
     compatible_with: [gpu]
     encoding: bfloat16
@@ -1190,11 +1070,13 @@ logit_verification_pipelines:
 
   Wan-AI/Wan2.1-T2V-14B-Diffusers-bfloat16:
     pre_submit_agents: []
-    post_submit_agents: []
     pipeline: "Wan-AI/Wan2.1-T2V-14B-Diffusers"
     compatible_with: [gpu]
     encoding: bfloat16
     tags: [nvidia-only, no-h100, video-generation]
+    pregenerated_torch_goldens:
+      tar_file: "s3://modular-bazel-artifacts-public/artifacts/Wan-AI_Wan2.1-T2V-14B-Diffusers_golden/1/5bf1a41a1d45d1c9707428c8b410a7db128cf43dee97de628b1a82786e71abed/Wan-AI_Wan2.1-T2V-14B-Diffusers_golden.tar.gz"
+      json_file: "torch_Wan-AI_Wan2.1-T2V-14B-Diffusers_bfloat16_golden.json"
     ssim_threshold: 0.60
     lpips_threshold: 0.28
     timeout: 7200

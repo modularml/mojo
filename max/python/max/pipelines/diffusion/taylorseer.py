@@ -36,7 +36,8 @@ from max.graph import DeviceRef, Graph, TensorType, TensorValue, ops
 from max.nn.layer import Module
 
 if TYPE_CHECKING:
-    from .cache import DenoisingCacheConfig, DenoisingCacheState
+    from .cache import DenoisingCacheState
+    from .config import DenoisingCacheConfig
 
 
 @dataclass
@@ -302,16 +303,12 @@ def run_denoising_step(
     """
     # 1. TaylorSeer scheduling decision
     skip_transformer = False
-    warmup_steps = cache_config.taylorseer_warmup_steps
-    cache_interval = cache_config.taylorseer_cache_interval
     if cache_config.taylorseer:
         assert taylorseer is not None
-        assert warmup_steps is not None
-        assert cache_interval is not None
         skip_transformer = taylorseer.should_skip(
             step,
-            warmup_steps,
-            cache_interval,
+            cache_config.taylorseer_warmup_steps,
+            cache_config.taylorseer_cache_interval,
         )
 
     # 2. Compute TaylorSeer step delta

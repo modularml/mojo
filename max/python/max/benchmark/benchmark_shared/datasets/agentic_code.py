@@ -19,9 +19,9 @@ from collections.abc import Sequence
 from typing import Any, Literal
 
 import msgspec
-from huggingface_hub import hf_hub_download
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
+from ._hf_download import hf_hub_download_with_retry
 from ._tokenizer_pool import TokenizerPool
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
@@ -104,7 +104,7 @@ class AgenticCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
     """
 
     def fetch(self) -> None:
-        self.dataset_path = hf_hub_download(
+        self.dataset_path = hf_hub_download_with_retry(
             repo_id="novita/agentic_code_dataset_22",
             filename="e22_sessions_openai.json",
             repo_type="dataset",

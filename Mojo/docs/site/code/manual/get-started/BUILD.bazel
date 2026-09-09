@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "modular_run_binary_test", "mojo_binary")
+
+package(default_visibility = ["//oss/modular/docs:__subpackages__"])
+
+# Assertions over the tutorial's code examples.
+mojo_binary(
+    name = "tests",
+    testonly = True,
+    srcs = [
+        "grid.mojo",
+        "tests.mojo",
+    ],
+    deps = [
+        "@mojo//:std",
+    ],
+)
+
+modular_run_binary_test(
+    name = "tests_test",
+    size = "small",
+    binary = "tests",
+)

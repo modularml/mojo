@@ -1,7 +1,7 @@
-# MAX AI kernels
+# MAX accelerator library
 
 This directory contains low-level, high-performance compute kernels written in
-[Mojo](https://www.modular.com/mojo), designed to serve as building blocks for
+[Mojo](https://mojolang.org/), designed to serve as building blocks for
 numerical, machine learning, and other performance-critical workloads.
 
 This library includes production-grade kernel implementations for various CPUs

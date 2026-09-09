@@ -13,18 +13,30 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from unittest.mock import NonCallableMock
 
-from max.graph.quantization import QuantizationEncoding
 from max.pipelines.architectures.llama3.weight_adapters import (
     convert_gguf_state_dict,
 )
+from max.pipelines.modeling.config_enums import SupportedEncoding
+
+
+@dataclass
+class _WeightRepoStub:
+    # ``_select_quantization_encoding`` iterates this only when no
+    # ``weight_path`` is set; an empty tuple means no float cast candidates,
+    # so the given ``quantization_encoding`` passes through unchanged.
+    supported_encodings: tuple[SupportedEncoding, ...] = ()
 
 
 @dataclass
 class _ModelConfigStub:
-    graph_quantization_encoding: QuantizationEncoding | None
+    quantization_encoding: SupportedEncoding | None
+    weight_path: list[str] = field(default_factory=list)
+    huggingface_weight_repo: _WeightRepoStub = field(
+        default_factory=_WeightRepoStub
+    )
 
 
 @dataclass
@@ -47,8 +59,10 @@ def test_convert_gguf_state_dict_non_quantized_uses_stacked_linear_keys() -> (
         "blk.0.attn_v.weight": _weight_mock(),
         "rope_freqs.weight": _weight_mock(),
     }
+    # A non-quantized encoding resolves to no ``QuantizationEncoding``, so the
+    # adapter uses the unfused stacked-linear mapping.
     pipeline_config = _PipelineConfigStub(
-        model=_ModelConfigStub(graph_quantization_encoding=None)
+        model=_ModelConfigStub(quantization_encoding="bfloat16")
     )
 
     converted = convert_gguf_state_dict(
@@ -69,9 +83,7 @@ def test_convert_gguf_state_dict_quantized_keeps_legacy_qkv_keys() -> None:
         "blk.0.attn_v.weight": _weight_mock(),
     }
     pipeline_config = _PipelineConfigStub(
-        model=_ModelConfigStub(
-            graph_quantization_encoding=QuantizationEncoding.Q4_K
-        )
+        model=_ModelConfigStub(quantization_encoding="q4_k")
     )
 
     converted = convert_gguf_state_dict(

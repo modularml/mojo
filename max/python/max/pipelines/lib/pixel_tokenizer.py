@@ -27,18 +27,14 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 import PIL.Image
-from max.pipelines.core import PixelContext
+from max.pipelines.context import PixelContext, TokenBuffer
+from max.pipelines.context.exceptions import PromptTooLongError
+from max.pipelines.context.outputs import GenerationOutput
 from max.pipelines.diffusion.schedulers import SchedulerFactory
-from max.pipelines.modeling.types import (
-    PipelineTokenizer,
-    TokenBuffer,
-)
-from max.pipelines.modeling.types.generation import GenerationOutput
+from max.pipelines.lib.request_text import retrieve_input_text
+from max.pipelines.modeling.types import PipelineTokenizer
 from max.pipelines.request import OpenResponsesRequest
-from max.pipelines.request.open_responses import (
-    InputImageContent,
-    InputTextContent,
-)
+from max.pipelines.request.open_responses import InputImageContent
 from max.pipelines.request.provider_options import (
     ImageProviderOptions,
     PixelProviderOptionsBase,
@@ -46,7 +42,6 @@ from max.pipelines.request.provider_options import (
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 if TYPE_CHECKING:
-    import PIL.Image
     from max.pipelines.lib.config import PipelineConfig
 
 logger = logging.getLogger("max.pipelines")
@@ -146,8 +141,11 @@ class PipelineClassName(str, Enum):
     FLUX2 = "Flux2Pipeline"
     FLUX2_KLEIN = "Flux2KleinPipeline"
     ZIMAGE = "ZImagePipeline"
+    IDEOGRAM4 = "Ideogram4Pipeline"
     WAN = "WanPipeline"
     WAN_I2V = "WanImageToVideoPipeline"
+    QWEN_IMAGE_EDIT = "QwenImageEditPipeline"
+    QWEN_IMAGE_EDIT_PLUS = "QwenImageEditPlusPipeline"
 
     @classmethod
     def from_class_name(cls, class_name: str) -> PipelineClassName:
@@ -542,9 +540,10 @@ class PixelGenerationTokenizer(
         )
 
     @property
-    def eos(self) -> int:
-        """Returns the end-of-sequence token ID."""
-        return self.delegate.eos_token_id
+    def eos_token_ids(self) -> set[int]:
+        """Returns the end-of-sequence token IDs."""
+        eos = self.delegate.eos_token_id
+        return {eos} if eos is not None else set()
 
     @property
     def expects_content_wrapping(self) -> bool:
@@ -576,11 +575,10 @@ class PixelGenerationTokenizer(
                 add_special_tokens=add_special_tokens,
             )
             if max_sequence_length and len(raw_ids) > max_sequence_length:
-                raise ValueError(
-                    f"Prompt is too long for this model's text"
-                    f" encoder: {len(raw_ids)} tokens exceeds"
-                    f" the maximum of {max_sequence_length}"
-                    " tokens. Please shorten your prompt."
+                raise PromptTooLongError(
+                    len(raw_ids),
+                    max_sequence_length,
+                    limit_description="text encoder's maximum sequence length",
                 )
 
             return delegate(
@@ -632,9 +630,10 @@ class PixelGenerationTokenizer(
             max_sequence_length is not None
             and input_ids_array.shape[1] > max_sequence_length
         ):
-            raise ValueError(
-                "Input string is larger than tokenizer's max length "
-                f"({input_ids_array.shape[1]} > {max_sequence_length})."
+            raise PromptTooLongError(
+                input_ids_array.shape[1],
+                max_sequence_length,
+                limit_description="text encoder's maximum sequence length",
             )
 
         encoded_prompt = input_ids_array[0].astype(np.int64, copy=False)
@@ -676,11 +675,6 @@ class PixelGenerationTokenizer(
     def _retrieve_prompt(request: OpenResponsesRequest) -> str:
         """Retrieve the text prompt from an OpenResponsesRequest.
 
-        Supports three input formats:
-        1. input is a string - use directly as prompt
-        2. input is a list of messages where first message content is a string - use as prompt
-        3. input is a list of messages where first message content is a list - extract InputTextContent.text
-
         Args:
             request: The OpenResponsesRequest to extract the prompt from.
 
@@ -690,43 +684,7 @@ class PixelGenerationTokenizer(
         Raises:
             ValueError: If no valid prompt can be extracted from the request.
         """
-        # Case 1: input is a string
-        if isinstance(request.body.input, str):
-            return request.body.input
-
-        # Cases 2 & 3: input is a list of messages
-        if isinstance(request.body.input, list):
-            if not request.body.input:
-                raise ValueError("Input message list cannot be empty.")
-
-            first_message = request.body.input[0]
-
-            # Case 2: message.content is a string
-            if isinstance(first_message.content, str):
-                return first_message.content
-
-            # Case 3: message.content is a list
-            if isinstance(first_message.content, list):
-                # Extract text from all InputTextContent items
-                text_parts = [
-                    item.text
-                    for item in first_message.content
-                    if isinstance(item, InputTextContent)
-                ]
-                if not text_parts:
-                    raise ValueError(
-                        "No text content found in message. Please include at least one "
-                        "InputTextContent item with a text prompt."
-                    )
-                return " ".join(text_parts)
-
-            raise ValueError(
-                f"Unexpected message content type: {type(first_message.content).__name__}"
-            )
-
-        raise ValueError(
-            f"Input must be a string or list of messages, got {type(request.body.input).__name__}"
-        )
+        return retrieve_input_text(request)
 
     @staticmethod
     def _retrieve_image(

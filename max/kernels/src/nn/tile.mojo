@@ -10,9 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements the ONNX Tile operator, which replicates a tensor a specified number of times along each axis."""
 
 from layout import TileTensor
-from std.memory import memcpy
+from std.memory import unsafe_memcpy
 
 from std.utils import IndexList
 
@@ -28,11 +29,9 @@ from std.utils import IndexList
 def tile[
     dtype: DType, type_repeats: DType
 ](
-    input: TileTensor[dtype, address_space=AddressSpace.GENERIC, ...],
-    repeats: TileTensor[type_repeats, address_space=AddressSpace.GENERIC, ...],
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
+    input: TileTensor[dtype, address_space=.GENERIC, ...],
+    repeats: TileTensor[type_repeats, address_space=.GENERIC, ...],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
 ) raises:
     """
     Implements the `Tile` operator from the ONNX spec. This behaves like Numpy
@@ -58,7 +57,7 @@ def tile[
     ), "Currently only inputs of up to three dimensions are supported."
 
     comptime assert (
-        repeats.flat_rank == 1 and type_repeats == DType.int64
+        repeats.flat_rank == 1 and type_repeats == .int64
     ), "Rank of repeats tensor needs to be one-dimensional and of int64 type."
 
     if input.rank != Int(repeats.dim(0)):
@@ -143,7 +142,7 @@ def tile[
                     var dst_ptr = output.ptr + (
                         output_src_index + rep * output_src_stride
                     )
-                    memcpy(dest=dst_ptr, src=src_ptr, count=count)
+                    unsafe_memcpy(dest=dst_ptr, src=src_ptr, count=count)
 
     # Handles tiling across the second lowest dimension (if tensor rank >= 2).
     # Continuing with the example above, this will handle the 'X's, which
@@ -153,7 +152,7 @@ def tile[
     #            [4, 5, 6, 4, 5, 6],
     #            [1, 2, 3, 1, 2, 3],
     #            [4, 5, 6, 4, 5, 6]]
-    # Moving from the inner to the outermost dimension, we can memcpy to
+    # Moving from the inner to the outermost dimension, we can unsafe_memcpy to
     # replicate contiguous memory areas (representing a dimension to be tiled).
     comptime if input.rank >= 2:
         var src_index_stride = num_rows_input * num_cols_input * repeat_cols
@@ -179,7 +178,16 @@ def tile[
                     var dst_ptr = output.ptr + (
                         src_index + (rep + 1) * src_index_stride
                     )
-                    memcpy(dest=dst_ptr, src=src_ptr, count=count)
+                    # dst_ptr and src_ptr are non-overlapping slices of the
+                    # same `output` buffer (shared origin). Opt out of
+                    # exclusivity with an unsafe any-origin:
+                    # unsafe_memcpy's non-overlap
+                    # is a caller contract the checker can't prove.
+                    unsafe_memcpy(
+                        dest=dst_ptr,
+                        src=src_ptr.as_unsafe_any_origin(),
+                        count=count,
+                    )
 
     # Handles tiling across the third dimension from the end (if tensor rank >= 3)
     comptime if input.rank >= 3:
@@ -206,7 +214,16 @@ def tile[
                 var dst_ptr = output.ptr + (
                     src_index + (rep + 1) * src_index_stride
                 )
-                memcpy(dest=dst_ptr, src=src_ptr, count=count)
+                # dst_ptr and src_ptr are non-overlapping slices of the
+                # same `output` buffer (shared origin). Opt out of
+                # exclusivity with an unsafe any-origin:
+                # unsafe_memcpy's non-overlap
+                # is a caller contract the checker can't prove.
+                unsafe_memcpy(
+                    dest=dst_ptr,
+                    src=src_ptr.as_unsafe_any_origin(),
+                    count=count,
+                )
 
     # Handles tiling across the fourth dimension from the end (if tensor rank == 4)
     comptime if input.rank == 4:
@@ -226,7 +243,16 @@ def tile[
             var dst_ptr = output.ptr + (
                 src_index + (rep + 1) * src_index_stride
             )
-            memcpy(dest=dst_ptr, src=src_ptr, count=count)
+            # dst_ptr and src_ptr are non-overlapping slices of the
+            # same `output` buffer (shared origin). Opt out of
+            # exclusivity with an unsafe any-origin:
+            # unsafe_memcpy's non-overlap
+            # is a caller contract the checker can't prove.
+            unsafe_memcpy(
+                dest=dst_ptr,
+                src=src_ptr.as_unsafe_any_origin(),
+                count=count,
+            )
 
 
 @always_inline

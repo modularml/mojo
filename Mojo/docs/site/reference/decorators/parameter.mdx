@@ -1,0 +1,52 @@
+---
+title: '@__parameter'
+description: Declares a legacy closure (deprecated).
+codeTitle: true
+---
+
+:::caution Deprecated
+The `@__parameter` decorator is deprecated and will be removed in a future
+release. Use the current [closure](/docs/manual/functions/closures/) syntax
+instead. The previous spelling `@parameter` is still accepted with a
+deprecation warning.
+:::
+
+You can add `@__parameter` on a nested function to create a legacy
+capturing closure. This means you can create a closure function that captures
+values from the outer scope (regardless of whether they are variables or
+parameters), and then use that closure as a parameter. For example:
+
+```mojo
+def use_closure[func: def(Int) capturing[_] -> Int](num: Int) -> Int:
+    return func(num)
+
+
+def create_closure():
+    var x = 1
+
+    @__parameter
+    def add(i: Int) -> Int:
+        return x + i
+
+    var y = use_closure[add](2)
+    print(y)
+
+
+def main():
+    create_closure()
+```
+
+```output
+3
+```
+
+Note the `[_]` in the function type:
+
+```mojo
+def use_closure[func: def(Int) capturing[_] -> Int](num: Int) -> Int:
+```
+
+This origin specifier represents the set of origins for the values that the
+legacy closure captures. This allows the compiler to correctly extend the
+lifetimes of those values. For more information on lifetimes and origins, see
+[Lifetimes, origins and references](/docs/manual/values/lifetimes/).

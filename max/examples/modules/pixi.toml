@@ -12,5 +12,5 @@ test = { depends-on = ["modules"] }
 
 [dependencies]
 python = ">=3.9,<3.14"
-modular = "*"
+max = "*"
 numpy = "*"

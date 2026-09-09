@@ -13,7 +13,7 @@
 
 from std.io.io import _printf
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 
 
 # CHECK-LABEL: == test_gpu_printf
@@ -24,7 +24,8 @@ def test_gpu_printf() raises:
     # Test that stdlib _printf works on GPU
     #
 
-    def do_print(x: Int, y: Float64):
+    def do_print(x_dev: Int32, y: Float64):
+        var x = Int(x_dev)
         # CHECK: printf printed 98 123.456!
         _printf["printf printed %ld %g!\n"](x, y)
         # CHECK: printf printed more 0 1 2 3 4 5 6 7 8 9
@@ -35,7 +36,7 @@ def test_gpu_printf() raises:
     with DeviceContext() as ctx:
         comptime kernel = do_print
         ctx.enqueue_function[kernel](
-            Int(98), Float64(123.456), grid_dim=1, block_dim=1
+            Int32(98), Float64(123.456), grid_dim=1, block_dim=1
         )
         # Ensure queued function finished before proceeding.
         ctx.synchronize()

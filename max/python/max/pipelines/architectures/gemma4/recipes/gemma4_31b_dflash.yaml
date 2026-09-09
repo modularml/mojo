@@ -1,0 +1,39 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+model:
+  model_path: google/gemma-4-31B-it
+  device_specs: [0]
+  max_length: 8192
+  kv_cache:
+    device_memory_utilization: 0.75
+
+draft_model:
+  model_path: z-lab/gemma-4-31B-it-DFlash
+  device_specs: [0]
+  quantization_encoding: bfloat16
+
+# The DFlash checkpoint's block_size 16 counts the anchor slot plus 15
+# drafted tokens; the drafter is only defined at its trained block size, so
+# num_speculative_tokens must match (the pipeline pins it either way).
+speculative:
+  speculative_method: dflash
+  num_speculative_tokens: 15
+
+# model_type gemma4 reserves a vision encoder cache by default; this pair
+# serves text-only. max_batch_size bounds the capture ladder: unbounded it
+# resolves to a default whose per-batch-size capture pools do not fit next
+# to the bf16 target weights on one 180 GB device.
+runtime:
+  vision_cache_utilization: 0
+  device_graph_capture: true
+  max_batch_size: 64

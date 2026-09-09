@@ -50,6 +50,7 @@ class KimiK2_5MoEDecoder(DeepseekV3):
         data_parallel_splits: TensorValue,
         batch_context_lengths: list[TensorValue],
         ep_inputs: list[Value[Any]] | None = None,
+        eplb_counter_buffers_per_layer: list[list[BufferValue]] | None = None,
     ) -> tuple[TensorValue, ...]:
         h = self.embed_tokens(tokens, signal_buffers)
 
@@ -81,10 +82,12 @@ class KimiK2_5MoEDecoder(DeepseekV3):
             data_parallel_splits,
             batch_context_lengths,
             ep_inputs,
+            eplb_counter_buffers_per_layer,
         )
 
     def input_types(
-        self, kv_params: KVCacheParamInterface
+        self,
+        kv_params: KVCacheParamInterface,
     ) -> tuple[TensorType | BufferType, ...]:
         all_input_types: tuple[TensorType | BufferType, ...] = (
             super().input_types(kv_params)

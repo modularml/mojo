@@ -1,0 +1,60 @@
+load("//bazel:api.bzl", "driver_option_tablegen", "modular_cc_binary")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+driver_option_tablegen(
+    name = "Hi",
+    srcs = glob(["Hi/*.td"]),
+    include_prefix = ".",
+    includes = ["."],
+    td_file = "Hi/HiOptions.td",
+    deps = [
+        "//Support:DriverCommandTdFiles",
+    ],
+)
+
+driver_option_tablegen(
+    name = "Bye",
+    srcs = glob(["Bye/*.td"]),
+    include_prefix = ".",
+    includes = ["."],
+    td_file = "Bye/ByeOptions.td",
+    deps = [
+        "//Support:DriverCommandTdFiles",
+    ],
+)
+
+driver_option_tablegen(
+    name = "Options",
+    srcs = glob(["*.td"]),
+    include_prefix = ".",
+    td_file = "DriverOptions.td",
+    deps = [
+        ":Bye.td_library",
+        ":Hi.td_library",
+        "//Support:DriverCommandTdFiles",
+    ],
+)
+
+modular_cc_binary(
+    name = "greeter-cli",
+    srcs = glob([
+        "**/*.cpp",
+        "**/*.h",
+    ]),
+    deps = [
+        ":Bye.inc_files",
+        ":Hi.inc_files",
+        ":Options.inc_files",
+        "//Support:Base",
+        "//Support:Driver",
+        "@llvm-project//llvm:Option",
+        "@llvm-project//llvm:Support",
+    ],
+)

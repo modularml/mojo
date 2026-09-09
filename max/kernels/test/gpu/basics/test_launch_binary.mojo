@@ -12,17 +12,18 @@
 # ===----------------------------------------------------------------------=== #
 """This test showcases how one can launch a precompiled device binary from Mojo."""
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
-from std.gpu.host.device_context import DeviceExternalFunction
-from std.gpu.host.compile import _compile_code
+from max.gpu import global_idx
 from std.testing import assert_equal
+
+from max.gpu.host import DeviceContext
+from max.gpu.host.device_context import DeviceExternalFunction
+from max.gpu.host.compile import _compile_code
 
 
 def vec_func(
-    in0: UnsafePointer[Float32, ImmutAnyOrigin],
-    in1: UnsafePointer[Float32, ImmutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
+    in0: ImmPointer[Float32, ImmutAnyOrigin],
+    in1: ImmPointer[Float32, ImmutAnyOrigin],
+    output: MutPointer[Float32, MutAnyOrigin],
     len: Int,
 ):
     var tid = global_idx.x
@@ -32,9 +33,9 @@ def vec_func(
 def test_vec_add(ctx: DeviceContext) raises:
     comptime length = 1024
 
-    var in0_device = ctx.enqueue_create_buffer[DType.float32](length)
-    var in1_device = ctx.enqueue_create_buffer[DType.float32](length)
-    var out_device = ctx.enqueue_create_buffer[DType.float32](length)
+    var in0_device = ctx.enqueue_create_buffer[.float32](length)
+    var in1_device = ctx.enqueue_create_buffer[.float32](length)
+    var out_device = ctx.enqueue_create_buffer[.float32](length)
 
     with in0_device.map_to_host() as in0_host, in1_device.map_to_host() as in1_host, out_device.map_to_host() as out_host:
         for i in range(length):

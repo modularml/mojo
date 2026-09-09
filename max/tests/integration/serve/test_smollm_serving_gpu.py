@@ -18,11 +18,10 @@ from typing import Any
 
 import pytest
 from async_asgi_testclient import TestClient
+from fastapi import FastAPI
 from max.driver import DeviceSpec
-from max.pipelines import PipelineConfig
-from max.pipelines.lib import KVCacheConfig, MAXModelConfig
-from max.pipelines.lib.model_manifest import ModelManifest
-from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
+from max.pipelines import PipelineArgs
+from max.pipelines.lib import KVCacheConfig, PipelineRuntimeConfig
 from max.serve.mocks.mock_api_requests import simple_openai_request
 from max.serve.schemas.openai import (
     CreateChatCompletionResponse,
@@ -37,24 +36,18 @@ MAX_READ_SIZE = 10 * 1024
 @pytest.mark.parametrize(
     "pipeline_config",
     [
-        PipelineConfig(
-            models=ModelManifest(
-                {
-                    "main": MAXModelConfig(
-                        model_path="HuggingFaceTB/SmolLM2-135M",
-                        device_specs=[DeviceSpec.accelerator()],
-                        quantization_encoding="bfloat16",
-                        kv_cache=KVCacheConfig(),
-                        max_length=512,
-                    )
-                }
-            ),
+        PipelineArgs(
+            model_path="HuggingFaceTB/SmolLM2-135M",
+            device_specs=[DeviceSpec.accelerator()],
+            quantization_encoding="bfloat16",
+            kv_cache=KVCacheConfig(),
+            max_length=512,
             runtime=PipelineRuntimeConfig(max_batch_size=16),
         )
     ],
     indirect=True,
 )
-async def test_smollm_serve_gpu(app: FastAPI) -> None:  # type: ignore
+async def test_smollm_serve_gpu(app: FastAPI) -> None:
     # Arbitrary - just demonstrate we can submit multiple async
     # requests and collect the results later
     N_REQUESTS = 3
@@ -89,18 +82,12 @@ async def test_smollm_serve_gpu(app: FastAPI) -> None:  # type: ignore
 @pytest.mark.parametrize(
     "pipeline_config",
     [
-        PipelineConfig(
-            models=ModelManifest(
-                {
-                    "main": MAXModelConfig(
-                        model_path="HuggingFaceTB/SmolLM2-135M",
-                        device_specs=[DeviceSpec.accelerator()],
-                        quantization_encoding="bfloat16",
-                        kv_cache=KVCacheConfig(),
-                        max_length=512,
-                    )
-                }
-            ),
+        PipelineArgs(
+            model_path="HuggingFaceTB/SmolLM2-135M",
+            device_specs=[DeviceSpec.accelerator()],
+            quantization_encoding="bfloat16",
+            kv_cache=KVCacheConfig(),
+            max_length=512,
             runtime=PipelineRuntimeConfig(max_batch_size=16),
         )
     ],
@@ -117,7 +104,7 @@ async def test_smollm_serve_gpu(app: FastAPI) -> None:  # type: ignore
     ],
 )
 async def test_smollm_serve_gpu_nonchat_completions(
-    app: FastAPI,  # type: ignore
+    app: FastAPI,
     prompt: str | list[str] | list[int] | list[list[int]],
     expected_choices: int,
 ) -> None:
@@ -137,25 +124,19 @@ async def test_smollm_serve_gpu_nonchat_completions(
 @pytest.mark.parametrize(
     "pipeline_config",
     [
-        PipelineConfig(
-            models=ModelManifest(
-                {
-                    "main": MAXModelConfig(
-                        model_path="HuggingFaceTB/SmolLM2-135M",
-                        device_specs=[DeviceSpec.accelerator()],
-                        quantization_encoding="bfloat16",
-                        kv_cache=KVCacheConfig(),
-                        max_length=512,
-                    )
-                }
-            ),
+        PipelineArgs(
+            model_path="HuggingFaceTB/SmolLM2-135M",
+            device_specs=[DeviceSpec.accelerator()],
+            quantization_encoding="bfloat16",
+            kv_cache=KVCacheConfig(),
+            max_length=512,
             runtime=PipelineRuntimeConfig(max_batch_size=16),
         )
     ],
     indirect=True,
 )
 @pytest.mark.asyncio
-async def test_tinyllama_serve_gpu_stream(app: FastAPI) -> None:  # type: ignore
+async def test_tinyllama_serve_gpu_stream(app: FastAPI) -> None:
     NUM_TASKS = 16
 
     def openai_completion_request(content: str) -> dict[str, Any]:

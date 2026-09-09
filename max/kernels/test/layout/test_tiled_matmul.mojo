@@ -13,7 +13,9 @@
 
 from std.sys import simd_width_of
 
-from std.algorithm import sync_parallelize, vectorize
+from std.algorithm import vectorize
+
+from max.algorithm import sync_parallelize
 from layout import *
 from layout._fillers import arange
 from layout._utils import ManagedLayoutTensor
@@ -88,7 +90,7 @@ struct MMA_Vec(TiledOp):
         for var m in range(M):
             for var n in range(N):
 
-                def dot[width: Int](k: Int) {read}:
+                def dot[width: Int](k: Int) {imm}:
                     dst.store[width](
                         m,
                         n,
@@ -184,8 +186,7 @@ def gemm_l1_cache[
     #     l1_lhs_cache.append(LayoutTensor[dtype, L1.m, L1.k]())
     #     l1_rhs_cache.append(LayoutTensor[dtype, L1.n, L1.k]())
 
-    @parameter
-    def process_raw(m_1: Int):
+    def process_raw(m_1: Int) {imm}:
         # Cache the current lhs tile and reuse it for all rhs tiles in the column
         var l1_lhs_cache = LayoutTensor[
             dst.dtype, Layout(IntTuple(L1.m, L1.k)), MutAnyOrigin
@@ -222,7 +223,7 @@ def gemm_l1_cache[
                             # Execute mma.op - rhs_l2_tile is already transposed
                             mma.op(dst_l2_tile, lhs_l2_tile, rhs_l2_tile)
 
-    sync_parallelize[process_raw](l1_size.m)
+    sync_parallelize(process_raw, l1_size.m)
 
     # Make sure Mojo won't throw away our caches
     # _ = len(l1_lhs_cache)
@@ -235,9 +236,9 @@ def test_tiled_matmul[use_l1_cache: Bool]() raises:
     else:
         print("=== test_tiled_matmul_l2_cache")
 
-    var dst = ManagedLayoutTensor[DType.float32, Layout(IntTuple(8, 8))]()
-    var rhs = ManagedLayoutTensor[DType.float32, Layout(IntTuple(8, 8))]()
-    var lhs = ManagedLayoutTensor[DType.float32, Layout(IntTuple(8, 8))]()
+    var dst = ManagedLayoutTensor[.float32, Layout(IntTuple(8, 8))]()
+    var rhs = ManagedLayoutTensor[.float32, Layout(IntTuple(8, 8))]()
+    var lhs = ManagedLayoutTensor[.float32, Layout(IntTuple(8, 8))]()
 
     _ = dst.tensor().fill(0)
     arange(rhs.tensor())

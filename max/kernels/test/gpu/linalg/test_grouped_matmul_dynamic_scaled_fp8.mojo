@@ -22,7 +22,7 @@ grouped_matmul_sm100_blockwise_scaled_fp8 in
 test_grouped_matmul_sm100_blockwise_fp8.mojo.
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     Idx,
@@ -98,10 +98,10 @@ def test_grouped_matmul_dynamic_scaled_fp8_zero_edge_case[
     )
 
     # Create offsets and expert_ids
-    var a_offsets_host_ptr = ctx.enqueue_create_host_buffer[DType.uint32](
+    var a_offsets_host_ptr = ctx.enqueue_create_host_buffer[.uint32](
         num_offsets
     )
-    var expert_ids_host_ptr = ctx.enqueue_create_host_buffer[DType.int32](
+    var expert_ids_host_ptr = ctx.enqueue_create_host_buffer[.int32](
         num_expert_ids
     )
 
@@ -120,10 +120,10 @@ def test_grouped_matmul_dynamic_scaled_fp8_zero_edge_case[
         num_experts * (N // BLOCK_SCALE_K) * (K // BLOCK_SCALE_K)
     )
 
-    var a_scales_host_ptr = ctx.enqueue_create_host_buffer[DType.float32](
+    var a_scales_host_ptr = ctx.enqueue_create_host_buffer[.float32](
         a_scales_size
     )
-    var b_scales_host_ptr = ctx.enqueue_create_host_buffer[DType.float32](
+    var b_scales_host_ptr = ctx.enqueue_create_host_buffer[.float32](
         b_scales_size
     )
 
@@ -146,16 +146,16 @@ def test_grouped_matmul_dynamic_scaled_fp8_zero_edge_case[
     var a_device_buffer = ctx.enqueue_create_buffer[in_type](a_size)
     var b_device_buffer = ctx.enqueue_create_buffer[in_type](b_size)
     var c_device_buffer = ctx.enqueue_create_buffer[out_type](c_size)
-    var a_offsets_device_buffer = ctx.enqueue_create_buffer[DType.uint32](
+    var a_offsets_device_buffer = ctx.enqueue_create_buffer[.uint32](
         num_offsets
     )
-    var expert_ids_device_buffer = ctx.enqueue_create_buffer[DType.int32](
+    var expert_ids_device_buffer = ctx.enqueue_create_buffer[.int32](
         num_expert_ids
     )
-    var a_scales_device_buffer = ctx.enqueue_create_buffer[DType.float32](
+    var a_scales_device_buffer = ctx.enqueue_create_buffer[.float32](
         a_scales_size
     )
-    var b_scales_device_buffer = ctx.enqueue_create_buffer[DType.float32](
+    var b_scales_device_buffer = ctx.enqueue_create_buffer[.float32](
         b_scales_size
     )
 

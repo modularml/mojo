@@ -11,9 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.sys import align_of
-from std.gpu import WARP_SIZE
-from std.gpu.compute.mma import mma
+"""Provides AMD GPU building blocks for structured matrix multiply-accumulate kernels.
+
+Defines thread roles, pipeline-stage shared memory layouts, workgroup and warp
+barriers, and the MMA configuration and tile operator used to drive AMD tensor
+core matrix multiplication.
+"""
+
+from std.sys import align_of, simd_width_of
+from max.gpu import WARP_SIZE
+from max.gpu.compute.mma import mma
 from std.itertools import product
 from layout import Layout, LayoutTensor
 from layout.layout import blocked_product
@@ -25,10 +32,13 @@ from std.atomic import Atomic, Ordering
 from std.sys._assembly import inlined_assembly
 from std.utils import IndexList, StaticTuple
 
-comptime _workgroup_atomic = Atomic[DType.int32, scope="workgroup"]
+comptime _workgroup_atomic = Atomic[Int32, scope="workgroup"]
 
 
 trait Enum(TrivialRegisterPassable):
+    """Defines a comparable enum-like trait exposing an integer value and equality.
+    """
+
     @always_inline
     def value(self) -> Int:
         ...
@@ -52,6 +62,12 @@ trait Enum(TrivialRegisterPassable):
 
 @fieldwise_init
 struct ThreadRole(Enum, Writable):
+    """Represents the role a thread plays in a producer-consumer pipeline.
+
+    Defines whether a thread produces data, consumes data, or performs both
+    roles during software-pipelined matrix multiply execution.
+    """
+
     var _value: Int
 
     @always_inline
@@ -67,9 +83,22 @@ struct ThreadRole(Enum, Writable):
         writer.write(String(self))
 
 
-@parameter
+@__parameter
 @always_inline
 def pipeline_layout[layout: Layout, pipeline_stages: Int]() -> Layout:
+    """Builds a 2D layout extended with a pipeline-stage dimension.
+
+    Combines the given 2D layout with a row-major stage dimension of length
+    `pipeline_stages` so that each stage owns a full copy of the tile layout.
+
+    Parameters:
+        layout: The base 2D tile layout to replicate per stage.
+        pipeline_stages: Number of pipeline stages in the buffer.
+
+    Returns:
+        A layout suitable for staging multiple copies of the tile in shared memory.
+    """
+
     comptime assert layout.rank() == 2
     return blocked_product(
         materialize[layout](),
@@ -89,7 +118,18 @@ struct SMemBuffer[
     WN: Int,
 ](TrivialRegisterPassable):
 
-    """Manages shared memory and returns 2D tile slices of the buffer."""
+    """Manages shared memory and returns 2D tile slices of the buffer.
+
+    Parameters:
+        dtype: Element data type stored in the shared memory buffer.
+        layout: 2D layout of a single pipeline stage's tile in shared memory.
+        pipeline_stages: Number of pipeline stages buffered in shared memory.
+        BM: Block tile height in rows; must equal the row extent of `layout`.
+        BN: Block tile width in columns; must equal the column extent of
+            `layout`.
+        WM: Warp tile height in rows; must evenly divide `BM`.
+        WN: Warp tile width in columns; must evenly divide `BN`.
+    """
 
     comptime SMemTile = SMemTile[
         Self.dtype,
@@ -100,6 +140,7 @@ struct SMemBuffer[
     comptime BlockTileType = Self.SMemTile.TileType[Self.BM, Self.BN]
     comptime WarpTileType = Self.BlockTileType.TileType[Self.WM, Self.WN]
 
+    @__allow_legacy_any_origin_fields
     var buffer: Self.SMemTile
 
     @always_inline
@@ -123,6 +164,12 @@ struct SMemBuffer[
 
 
 struct AMDSharedMemoryBarrier(TrivialRegisterPassable):
+    """Implements a workgroup-level shared memory barrier for AMD GPUs.
+
+    Tracks an atomic counter in shared memory that producers increment and
+    consumers wait on to coordinate software-pipelined tile loads.
+    """
+
     var __repr: Int32
 
     @always_inline
@@ -133,18 +180,14 @@ struct AMDSharedMemoryBarrier(TrivialRegisterPassable):
     def value[
         origin: MutOrigin
     ](ref[AddressSpace.SHARED, origin] self) -> Int32:
-        var bar = UnsafePointer(to=self.__repr).address_space_cast[
-            AddressSpace.SHARED
-        ]()
+        var bar = UnsafePointer(to=self.__repr).address_space_cast[.SHARED]()
         return _workgroup_atomic.load[ordering=Ordering.ACQUIRE](bar)
 
     @always_inline
     def increment[
         origin: MutOrigin
     ](ref[AddressSpace.SHARED, origin] self, warp_id: Int):
-        var bar = UnsafePointer(to=self.__repr).address_space_cast[
-            AddressSpace.SHARED
-        ]()
+        var bar = UnsafePointer(to=self.__repr).address_space_cast[.SHARED]()
         _workgroup_atomic.store[ordering=Ordering.RELEASE](
             bar, _workgroup_atomic.load[ordering=Ordering.ACQUIRE](bar) + 1
         )
@@ -160,6 +203,15 @@ struct AMDSharedMemoryBarrier(TrivialRegisterPassable):
 
 
 struct AMDWarpSharedMemoryBarrier[size: Int](TrivialRegisterPassable):
+    """Implements a per-warp shared memory barrier for AMD GPUs.
+
+    Maintains a per-warp counter tuple so that each warp can independently track
+    progress, and consumers wait on the summed value across all warps.
+
+    Parameters:
+        size: Number of warps tracked by the barrier.
+    """
+
     var __repr: StaticTuple[Int32, Self.size]
 
     @always_inline
@@ -177,11 +229,7 @@ struct AMDWarpSharedMemoryBarrier[size: Int](TrivialRegisterPassable):
     @always_inline
     def increment(ref[AddressSpace.SHARED, MutAnyOrigin] self, warp_id: Int):
         var bar = rebind[
-            UnsafePointer[
-                Scalar[DType.int32],
-                MutAnyOrigin,
-                address_space=AddressSpace.SHARED,
-            ]
+            UnsafePointer[Int32, MutAnyOrigin, address_space=.SHARED]
         ](Pointer(to=self.__repr))
         bar[warp_id] += 1
 
@@ -199,6 +247,19 @@ struct MMAConfig[
     mma_shape: IndexList[3],
     transpose_b: Bool = True,
 ](TrivialRegisterPassable):
+    """Configures matrix multiply-accumulate parameters for AMD tensor cores.
+
+    Computes the register and K-group sizing derived from the MMA shape and
+    input type so that callers can query the adjusted K dimension used per
+    tensor core load for operands A and B.
+
+    Parameters:
+        InType: Data type of the input operands.
+        OutType: Data type of the accumulator output.
+        mma_shape: The [M, N, K] shape of a single MMA operation.
+        transpose_b: Whether matrix B is loaded transposed.
+    """
+
     comptime mma = TensorCore[
         Self.OutType,
         Self.InType,
@@ -278,7 +339,7 @@ struct AmdTileOperator[
     ) // Self.mma_shape[1]
 
     comptime _out_frag_rows = Self.num_m_mmas * Self.num_n_mmas
-    comptime _out_frag_cols = Self.tensor_core.c_reg_type.size
+    comptime _out_frag_cols = Self.tensor_core.c_reg_type.length
 
     comptime _out_layout = Layout.row_major(
         Self._out_frag_rows, Self._out_frag_cols
@@ -321,7 +382,7 @@ struct AmdTileOperator[
         Self._out_layout,
         MutAnyOrigin,
         alignment=Self._type_alignment,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ]
 
     comptime OutRegTileFragmentType = Self.OutRegTile.TileType[
@@ -329,8 +390,13 @@ struct AmdTileOperator[
     ]
 
     # Register storage for matrix data
+    @__allow_legacy_any_origin_fields
     var _a_reg_tile: Self.ARegTile
+
+    @__allow_legacy_any_origin_fields
     var _b_reg_tile: Self.BRegTile
+
+    @__allow_legacy_any_origin_fields
     var out_reg_tile: Self.OutRegTile
 
     @always_inline
@@ -361,7 +427,12 @@ struct AmdTileOperator[
     def a_reg_tile(
         self, k_tile_idx: Int
     ) -> Self.ARegTile.TileType[Self.num_m_mmas, Self.simd_width]:
-        """Get A register tile for a specific K tile."""
+        """Get A register tile for a specific K tile.
+
+        Args:
+            k_tile_idx: Index along the K dimension selecting which K-tile
+                slice of the A register buffer to return.
+        """
         return self._a_reg_tile.tile[Self.num_m_mmas, Self.simd_width](
             k_tile_idx, 0
         )
@@ -370,7 +441,12 @@ struct AmdTileOperator[
     def b_reg_tile(
         self, k_tile_idx: Int
     ) -> Self.BRegTile.TileType[Self.num_n_mmas, Self.simd_width]:
-        """Get B register tile for a specific K tile."""
+        """Get B register tile for a specific K tile.
+
+        Args:
+            k_tile_idx: Index along the K dimension selecting which K-tile
+                slice of the B register buffer to return.
+        """
         return self._b_reg_tile.tile[Self.num_n_mmas, Self.simd_width](
             k_tile_idx, 0
         )

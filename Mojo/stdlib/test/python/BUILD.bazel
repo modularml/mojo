@@ -1,0 +1,60 @@
+load("@module_versions//:config.bzl", "DEFAULT_PYTHON_VERSION", "PYTHON_VERSIONS_DOTTED")
+load("//bazel:api.bzl", "mojo_test", "requirement")
+
+package(default_visibility = ["//visibility:private"])
+
+_NUMPY_TESTS = [
+    "test_numpy.mojo",
+    "test_python_to_mojo.mojo",
+]
+
+[
+    mojo_test(
+        name = src + "{}.test".format("" if version == DEFAULT_PYTHON_VERSION else "_" + version),
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        data = [
+            "custom_indexable.py",
+            "custom_operators.py",
+            "my_module.py",
+        ],
+        python_version = version.replace("_", "."),
+        target_compatible_with = select({
+            "//:asan": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
+        deps = [
+            "@mojo//:std",
+        ],
+    )
+    for src in glob(
+        ["**/*.mojo"],
+        exclude = _NUMPY_TESTS,
+    )
+    for version in PYTHON_VERSIONS_DOTTED
+]
+
+[
+    mojo_test(
+        name = src + "{}.test".format("" if version == DEFAULT_PYTHON_VERSION else "_" + version),
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        python_version = version.replace("_", "."),
+        target_compatible_with = select({
+            "//:asan": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
+        deps = [
+            "@mojo//:std",
+            requirement("numpy"),
+        ],
+    )
+    for src in _NUMPY_TESTS
+    for version in PYTHON_VERSIONS_DOTTED
+]

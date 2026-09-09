@@ -31,39 +31,22 @@ import re
 import uuid
 from typing import Any
 
-from llguidance import LLMatcher
+from max.pipelines.architectures.kimik2_5.tokenizer import (
+    TOOL_CALL_ARGUMENT_BEGIN,
+    TOOL_CALL_BEGIN,
+    TOOL_CALL_END,
+    TOOL_CALLS_SECTION_BEGIN,
+    TOOL_CALLS_SECTION_END,
+)
+from max.pipelines.context.exceptions import InputError
+from max.pipelines.lib.pipeline_variants.structured_output_backend import (
+    build_xgrammar_tool_grammar,
+)
 from max.pipelines.lib.tool_parsing import (
     StructuralTagToolParser,
-    names_from_tools,
     register,
 )
-from max.pipelines.modeling.types import ParsedToolCall
-
-# Structural tags used by Kimi K2.5
-TOOL_CALLS_SECTION_BEGIN = "<|tool_calls_section_begin|>"
-TOOL_CALLS_SECTION_END = "<|tool_calls_section_end|>"
-TOOL_CALL_BEGIN = "<|tool_call_begin|>"
-TOOL_CALL_END = "<|tool_call_end|>"
-TOOL_CALL_ARGUMENT_BEGIN = "<|tool_call_argument_begin|>"
-
-# Bounds on the constrained-decoding grammar quantifiers. Without these,
-# a model can spin emitting digits in the call index or an unbounded
-# number of back-to-back calls, holding a GPU slot until ``max_tokens``.
-# The argument body is intentionally unbounded — tool arguments can be
-# arbitrarily large (e.g. code blobs, embedded documents, search-result
-# payloads being re-emitted) and a fixed cap would silently drop them.
-# The ``max_tokens`` ceiling is the only meaningful upper bound there.
-_MAX_TOOL_CALL_INDEX_DIGITS = 8  # up to 99_999_999 tool calls per turn
-_MAX_TOOL_CALLS_PER_SECTION = 64
-_MAX_TOOL_CALL_SECTIONS = 1
-
-# JSON string pattern for the tool-call body regex. Matches a complete
-# JSON string including proper escape-sequence handling: any character
-# except quote/backslash, or a backslash followed by any character.
-# This allows ``<`` inside strings (e.g. ``"if (x < y)"`` or HTML/XML)
-# while still rejecting ``<`` outside strings where it signals the
-# closing structural tag ``<|tool_call_end|>``.
-_JSON_STRING_PATTERN = r'"(?:[^"\\]|\\.)*"'
+from max.pipelines.modeling.types import ParsedToolCall, PipelineTokenizer
 
 # Regex for one ``<|tool_call_begin|>...<|tool_call_end|>`` body. The
 # function id and arguments are captured; the call markers are anchored.
@@ -176,80 +159,46 @@ class KimiToolParser(StructuralTagToolParser):
         tool_name, tool_id = _parse_function_id(header)
         return tool_id, tool_name
 
-    # ----- Constrained decoding grammar (Kimi-specific) -----------------
-
-    @staticmethod
-    def _build_tool_call_regex(tool_names: list[str] | None = None) -> str:
-        """Builds the regex pattern for Kimi tool calls.
-
-        The count-style fields (call index digits, calls per section,
-        sections per response, function-name fallback length) are
-        bounded so a model cannot hold a GPU slot until ``max_tokens``
-        by spinning inside them; see the ``_MAX_TOOL_CALL_*`` constants
-        for the limits and rationale. The argument body quantifier is
-        intentionally unbounded — real tool arguments can be
-        arbitrarily large (code blobs, embedded documents, search-
-        result payloads being re-emitted), and ``max_tokens`` is the
-        only meaningful upper bound there. Real argument validation
-        still happens at parse time; the regex only enforces structural
-        framing.
-
-        The body pattern is JSON-string-aware: ``<`` is allowed inside
-        quoted strings (e.g. ``"if (x < y)"`` or HTML/XML content) but
-        rejected outside strings where it would signal the start of a
-        structural tag like ``<|tool_call_end|>``. This enables tool
-        arguments containing code comparisons, markup, or git diffs
-        without triggering premature tag detection.
-
-        With ``_MAX_TOOL_CALL_SECTIONS == 1`` the outer ``{1,1}``
-        quantifier is a structural no-op kept for readability. Bumping
-        it re-enables multiple back-to-back sections (Kimi emits these
-        when interleaving thinking with batches of calls).
-        """
-        if tool_names is not None:
-            escaped_names = [re.escape(name) for name in tool_names]
-            func_name_pattern = "(" + "|".join(escaped_names) + ")"
-        else:
-            # Fallback for the no-menu case: cap the name length so a
-            # spinning model can't pad the identifier forever.
-            func_name_pattern = r"[a-zA-Z0-9_-]{1,128}"
-
-        single_section = (
-            rf"{re.escape(TOOL_CALLS_SECTION_BEGIN)}"
-            r"("
-            rf"{re.escape(TOOL_CALL_BEGIN)}"
-            rf"functions\.{func_name_pattern}:[0-9]{{1,{_MAX_TOOL_CALL_INDEX_DIGITS}}}"
-            rf"{re.escape(TOOL_CALL_ARGUMENT_BEGIN)}"
-            rf"\{{(?:[^\"<]|{_JSON_STRING_PATTERN})*\}}"
-            rf"{re.escape(TOOL_CALL_END)}"
-            rf"){{1,{_MAX_TOOL_CALLS_PER_SECTION}}}"
-            rf"{re.escape(TOOL_CALLS_SECTION_END)}"
-        )
-        return rf"({single_section}){{1,{_MAX_TOOL_CALL_SECTIONS}}}"
+    XGRAMMAR_FORMAT = "kimi"
 
     @staticmethod
     def generate_tool_call_grammar(
         response_format_schema: dict[str, Any] | None = None,
         tools: list[dict[str, Any]] | None = None,
+        tokenizer: PipelineTokenizer[Any, Any, Any] | None = None,
+        backend: str = "xgrammar",
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> str:
-        """Generates a grammar for constrained decoding of Kimi tool calls.
+        """Generates a constrained-decoding grammar for Kimi tool calls.
 
-        When ``response_format_schema`` is provided, returns a combined
-        Lark grammar that accepts either tool calls or JSON content
-        matching the schema (the model's first tokens select the branch).
+        Returns a serialized xgrammar ``StructuralTag`` that frames the Kimi
+        tool-call envelope and constrains each call's arguments to that
+        tool's JSON schema. When ``response_format_schema`` is provided, the
+        grammar also accepts a JSON response matching the schema (the model's
+        first tokens select the branch).
+
+        Args:
+            response_format_schema: Optional JSON schema dict. When provided,
+                the grammar also accepts a JSON response matching the schema.
+            tools: Optional list of OpenAI-style tool dicts.
+            tokenizer: Unused (the xgrammar tag references literal markers).
+            backend: Structured-output backend; must be ``"xgrammar"``.
+            tool_choice: ``"auto"``, ``"required"``, or a named choice.
+            **kwargs: Ignored; accepts future kwargs.
+
+        Returns:
+            The StructuralTag serialized as a JSON string.
         """
-        tool_names = names_from_tools(tools)
-        tool_call_regex = KimiToolParser._build_tool_call_regex(tool_names)
-
-        if response_format_schema is None:
-            return LLMatcher.grammar_from_regex(tool_call_regex)
-
-        schema_str = json.dumps(response_format_schema)
-        combined_grammar = f"""
-start: tool_calls | json_response
-tool_calls: TOOL_CALL_PATTERN
-TOOL_CALL_PATTERN: /{tool_call_regex}/
-json_response: %json {schema_str}
-"""
-        return combined_grammar
+        if backend != "xgrammar":
+            raise InputError(
+                "Kimi constrained tool calling requires the xgrammar "
+                "backend; run with --structured-output-backend=xgrammar."
+            )
+        normalized_choice = tool_choice if tool_choice is not None else "auto"
+        return build_xgrammar_tool_grammar(
+            KimiToolParser.XGRAMMAR_FORMAT,
+            tools or [],
+            normalized_choice,
+            response_format_schema=response_format_schema,
+        )

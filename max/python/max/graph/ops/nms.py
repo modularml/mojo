@@ -32,31 +32,63 @@ def non_maximum_suppression(
     """Filters boxes with high intersection-over-union (IoU).
 
     Applies greedy non-maximum suppression independently per (batch, class)
-    pair.  For each pair the algorithm:
+    pair. For each pair, the algorithm:
 
     1. Discards boxes whose score is at or below ``score_threshold``.
-    2. Sorts remaining boxes by score in descending order.
+    2. Sorts the remaining boxes by score in descending order.
     3. Greedily selects boxes, suppressing any later candidate whose IoU with
        an already-selected box exceeds ``iou_threshold``.
     4. Stops after ``max_output_boxes_per_class`` selections per pair.
 
-    Boxes use ``[y1, x1, y2, x2]`` corner format.  Coordinates may be
-    normalised or absolute; the op handles both.
+    Boxes use ``(y1, x1, y2, x2)`` corner format. Coordinates may be normalized
+    or absolute, since the op handles both.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType, ops
+
+        device = DeviceRef.CPU()
+        box_type = TensorType(DType.float32, [1, 3, 4], device=device)
+        score_type = TensorType(DType.float32, [1, 1, 3], device=device)
+        with Graph(
+            "nms", input_types=[box_type, score_type]
+        ) as graph:
+            boxes, scores = graph.inputs
+            # Each output row is (batch_index, class_index, box_index), with a
+            # data-dependent number of rows.
+            selected = ops.non_maximum_suppression(
+                boxes.tensor,
+                scores.tensor,
+                max_output_boxes_per_class=ops.constant(
+                    2, DType.int64, device=device
+                ),
+                iou_threshold=ops.constant(0.5, DType.float32, device=device),
+                score_threshold=ops.constant(
+                    0.0, DType.float32, device=device
+                ),
+            )
+            graph.output(selected)
 
     Args:
-        boxes: Input boxes tensor of shape ``[batch, num_boxes, 4]`` (float).
-        scores: Per-class scores of shape ``[batch, num_classes, num_boxes]``
-            (float, same dtype as ``boxes``).
-        max_output_boxes_per_class: Scalar int64 tensor — maximum number of
-            boxes to select per (batch, class) pair.
-        iou_threshold: Scalar float tensor — IoU suppression threshold.
-        score_threshold: Scalar float tensor — minimum score to consider.
-        out_dim: Name for the dynamic output dimension (number of selected
-            boxes).  Defaults to ``"num_selected"``.
+        boxes: The input boxes tensor of shape
+            ``(batch_size, num_boxes, 4)``, with a float dtype.
+        scores: The per-class scores of shape
+            ``(batch_size, num_classes, num_boxes)``, with the same dtype as
+            ``boxes``.
+        max_output_boxes_per_class: A scalar ``int64`` tensor giving the
+            maximum number of boxes to select per (batch, class) pair.
+        iou_threshold: A scalar float tensor giving the IoU suppression
+            threshold.
+        score_threshold: A scalar float tensor giving the minimum score to
+            consider.
+        out_dim: The name for the dynamic output dimension, which is the number
+            of selected boxes. Defaults to ``"num_selected"``.
 
     Returns:
-        An int64 tensor of shape ``[out_dim, 3]`` where each row is
-        ``[batch_index, class_index, box_index]``.
+        A ``TensorValue`` representing the selected boxes, with shape
+        ``(out_dim, 3)`` and ``int64`` dtype. Each row is
+        ``(batch_index, class_index, box_index)``.
     """
     boxes = TensorValue(boxes)
     scores = TensorValue(scores)

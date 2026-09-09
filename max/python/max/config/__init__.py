@@ -503,9 +503,9 @@ def resolve_max_config_inheritance(
         # Merge base config with current config (current takes precedence)
         return deep_merge_max_configs(base_config_dict, config_dict)
 
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, ValueError):
         # Re-raise FileNotFoundError and ValueError exceptions (these are intentional validation errors)
-        raise e
+        raise
     except Exception as e:
         logger.warning(f"Failed to load base configuration '{depends_on}': {e}")
         return config_dict
@@ -715,18 +715,32 @@ class MAXConfig:
             FileNotFoundError: If the config file does not exist.
             ValueError: If the configuration is invalid.
 
+        Define a config subclass, then load its values from a YAML file:
+
         .. code-block:: python
 
-            config = KVCacheConfig.from_config_file("kv_cache.yaml")
+            from dataclasses import dataclass
+            from pathlib import Path
+            from tempfile import TemporaryDirectory
 
-            # Comprehensive config file (auto-detects section)
-            kv_config = KVCacheConfig.from_config_file("pipeline.yaml")
-            sampling_config = SamplingConfig.from_config_file("pipeline.yaml")
+            from max.config import MAXConfig
 
-            # Custom section name
-            config = KVCacheConfig.from_config_file(
-                "config.yaml", "my_cache_section"
-            )
+            @dataclass
+            class MyCacheConfig(MAXConfig):
+                page_size: int = 128
+
+                @staticmethod
+                def help() -> dict[str, str]:
+                    return {"page_size": "Number of tokens per KV cache page."}
+
+            with TemporaryDirectory() as tmp_dir:
+                config_path = Path(tmp_dir) / "my_cache.yaml"
+                config_path.write_text("page_size: 256")
+                config = MyCacheConfig.from_config_file(config_path)
+
+        .. invisible-code-block: python
+
+            assert config.page_size == 256
         """
         config_path = Path(config_path)
 
@@ -945,22 +959,32 @@ class MAXConfig:
             - Groups arguments by field metadata for better organization.
             - Maintains compatibility with standard ``argparse`` usage.
 
+        Build a parser from a config instance and parse a list of arguments,
+        restricting a field to a set of valid choices:
+
         .. code-block:: python
 
-            config = KVCacheConfig.from_config_file("kv_cache.yaml")
-            parser = config.cli_arg_parsers()
-            args = parser.parse_args()
+            from dataclasses import dataclass
 
-            # With choices for validation
-            choices = {"backend": ["modular", "vllm"],
-                       "dataset_name": ["sharegpt", "random"]}
-            parser = config.cli_arg_parsers(choices_provider=choices)
+            from max.config import MAXConfig
+
+            @dataclass
+            class MyServerConfig(MAXConfig):
+                backend: str = "modular"
+
+                @staticmethod
+                def help() -> dict[str, str]:
+                    return {"backend": "Serving backend to use."}
+
+            config = MyServerConfig()
+            parser = config.cli_arg_parsers(
+                choices_provider={"backend": ["modular", "vllm"]},
+            )
             args = parser.parse_args(["--backend", "vllm"])
 
-            # With required parameters
-            required = {"model", "dataset_name"}
-            parser = config.cli_arg_parsers(required_params=required)
-            args = parser.parse_args()
+        .. invisible-code-block: python
+
+            assert args.backend == "vllm"
         """
 
         # Create parser

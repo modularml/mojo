@@ -28,7 +28,7 @@ Compile-time configuration:
 from std.sys import align_of, get_defined_int
 
 from layout import Coord, TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.utils import IndexList
 import linalg.matmul.vendor.blas as vendor_blas
 from std.testing import assert_equal
@@ -56,8 +56,8 @@ def test_4wave_split_k[
 
     var device_a = ctx.enqueue_create_buffer[in_dtype](M * K)
     var device_b = ctx.enqueue_create_buffer[in_dtype](N * K)
-    var device_c = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var device_c_ref = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var device_c = ctx.enqueue_create_buffer[.float32](M * N)
+    var device_c_ref = ctx.enqueue_create_buffer[.float32](M * N)
 
     with device_a.map_to_host() as host_a, device_b.map_to_host() as host_b:
         for i in range(M * K):
@@ -162,7 +162,9 @@ def test_4wave_split_k_epilogue[
     var a_tt = TileTensor(device_a, row_major[M, K]())
     var b_tt = TileTensor(device_b, row_major[N, K]())
     var c_tt = TileTensor(device_c, row_major[M, N]())
-    var out_tt = TileTensor(device_out, row_major[M, N]())
+    # Capture the raw pointer: `@__copy_capture` byte-copies, so a
+    # `DeviceBuffer`-backed tile would reach the device as a host reference.
+    var out_tt = TileTensor(device_out.unsafe_ptr(), row_major[M, N]())
 
     ctx.enqueue_memset(device_c_ref, 0)
     var c_ref_tt = TileTensor(device_c_ref, row_major[M, N]())
@@ -177,12 +179,12 @@ def test_4wave_split_k_epilogue[
 
     ctx.enqueue_memset(device_out, 0)
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(out_tt)
     def epilogue_fn[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = align_of[SIMD[_dtype, width]](),
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> None:

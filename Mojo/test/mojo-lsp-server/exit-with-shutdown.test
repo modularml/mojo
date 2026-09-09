@@ -1,0 +1,6 @@
+// RUN: mojo-lsp-server -mojo-test < %s
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":123,"rootPath":"mojo","capabilities":{},"trace":"off"}}
+// -----
+{"jsonrpc":"2.0","id":3,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

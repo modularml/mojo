@@ -73,6 +73,20 @@ _HARDCODED_FINFO: dict[DType, _FInfoData] = {
         min=-6.0,
         tiny=1.0,
     ),
+    DType.float6_e2m3fn: _FInfoData(
+        bits=6,
+        eps=2**-3,  # 0.125
+        max=7.5,
+        min=-7.5,
+        tiny=1.0,
+    ),
+    DType.float6_e3m2fn: _FInfoData(
+        bits=6,
+        eps=2**-2,  # 0.25
+        max=28.0,
+        min=-28.0,
+        tiny=2**-2,  # 0.25
+    ),
 }
 
 

@@ -68,5 +68,5 @@ def test_dot_at_b[dtype: DType, M: Int, N: Int]() raises:
 
 
 def main() raises:
-    test_dot_at_b[DType.float32, 16, 16]()
-    test_dot_at_b[DType.float16, 32, 32]()
+    test_dot_at_b[.float32, 16, 16]()
+    test_dot_at_b[.float16, 32, 32]()

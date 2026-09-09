@@ -14,6 +14,7 @@
 
 import shlex
 import subprocess
+import sys
 
 _IGNORED_TARGETS = {
     "@@//max/kernels/benchmarks:nn/bench_gather_reduce.mojo.test",  # Disabled
@@ -54,7 +55,7 @@ def _cquery_tests(config: str, tag: str | None) -> set[str]:
 
     print(shlex.join(command))
     result = subprocess.check_output(command).decode()
-    targets = set(x.strip() for x in result.splitlines() if x.strip())
+    targets = {x.strip() for x in result.splitlines() if x.strip()}
 
     if not targets:
         raise SystemExit(
@@ -68,23 +69,22 @@ def _cquery_tests(config: str, tag: str | None) -> set[str]:
 
 
 def _main() -> None:
-    all_tests = set(
+    all_tests = {
         x.strip() if x.startswith("@") else f"@@{x.strip()}"
         for x in subprocess.check_output(
             ["bazel", "query", "tests(//...) - attr(tags, manual, //...)"]
         )
         .decode()
         .splitlines()
-    )
+    }
 
     cpu_tests = _cquery_tests("remote-intel", None)
     macos_tests = _cquery_tests("remote-macos", None)
-    h100_tests = _cquery_tests("remote-h100", "gpu")
     b200_tests = _cquery_tests("remote-b200", "gpu")
     mi355_tests = _cquery_tests("remote-mi355", "gpu")
 
     missing_on_ci = all_tests - (
-        cpu_tests | h100_tests | mi355_tests | macos_tests | b200_tests
+        cpu_tests | mi355_tests | macos_tests | b200_tests
     )
     missing_on_ci = {
         test for test in missing_on_ci if not _should_ignore_target(test)
@@ -93,7 +93,7 @@ def _main() -> None:
         print("error: these tests do not run on known CI configurations:")
         for test in sorted(missing_on_ci):
             print(f"  {test}")
-        exit(1)
+        sys.exit(1)
     else:
         print("All tests should be run on CI")
 

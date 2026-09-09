@@ -1,0 +1,85 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# Will test a simple multiline function call
+# CHECK: 12
+print(12
+)
+
+# Will test a trait with multiline declaration
+trait TestTrait:
+  pass
+
+# Will test a struct with multiline declaration
+struct Foo[
+    *Ts: TrivialRegisterPassable
+    ](TestTrait):
+  def __init__(out self):
+    pass
+  def foo(self):
+    print("called foo")
+
+# CHECK: called foo
+Foo[Int]().foo()
+
+# Will test a struct with trait and a multiline declaration
+struct \
+  Bar(RegisterPassable):
+  def __init__(out self):
+    return
+  def bar(self):
+    print("called bar")
+
+# Will test variable persistence by using `bar` in a later expression
+var bar = Bar()
+
+# CHECK: called bar
+bar.bar()
+
+# Will test a multiline declaration for a function
+def foo(x
+: Int
+) -> Int       :
+  print(x * x)
+  return x - 1
+
+# CHECK: 176400
+foo(420)
+
+# Will test a function with a decorator
+@always_inline
+def zaz():
+  print("zaz")
+
+# CHECK: zaz
+zaz()
+
+# Will test a multiline alias with imports and a function that uses this alias
+
+from std.memory import (
+  Pointer
+)
+
+from max.gpu.host import DeviceContext
+
+comptime unary_fn_type = __mlir_type[
+    `(`,
+    Pointer[Int, MutAnyOrigin],
+    `, `,
+    Pointer[Int, MutAnyOrigin],
+    `, `,
+    DeviceContext,
+    `) -> `,
+    NoneType,
+]
+
+# CHECK-NOT: error
+def using_alias(callback: unary_fn_type):
+  pass

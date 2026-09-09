@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -17,9 +18,11 @@ _USES_ATOMICS = [
         name = src.removesuffix(".mojo") + ".test",
         size = "medium",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"],
         deps = [
+            "//max:max_mojo",
             "@mojo//:std",
         ],
     )
@@ -34,12 +37,14 @@ _USES_ATOMICS = [
         name = src.removesuffix(".mojo") + ".test",
         size = "medium",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + select({
             "//:apple_gpu": ["@platforms//:incompatible"],
             "//conditions:default": [],
         }),
         deps = [
+            "//max:max_mojo",
             "@mojo//:std",
         ],
     )
@@ -51,6 +56,7 @@ _USES_ATOMICS = [
         name = src.removesuffix(".mojo") + ".test",
         size = "small",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         deps = [
             "@mojo//:std",
         ],

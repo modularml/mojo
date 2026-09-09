@@ -11,29 +11,29 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
-from std.gpu import thread_idx
-from std.gpu.memory import external_memory
-from std.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import thread_idx
+from max.gpu.memory import external_memory
+from max.gpu.sync import barrier
 from std.testing import assert_equal
 
 
 def test_external_shared_mem(ctx: DeviceContext) raises:
     print("== test_external_shared_mem")
 
-    def dynamic_smem_kernel(data: UnsafePointer[Float32, MutAnyOrigin]):
+    def dynamic_smem_kernel(data: MutPointer[Float32, MutAnyOrigin]):
         var dynamic_sram = external_memory[
-            Float32, address_space=AddressSpace.SHARED, alignment=4
+            Float32, address_space=.SHARED, alignment=4
         ]()
         dynamic_sram[thread_idx.x] = Float32(thread_idx.x)
         barrier()
         data[thread_idx.x] = dynamic_sram[thread_idx.x]
 
-    var res_host_ptr = ctx.enqueue_create_host_buffer[DType.float32](16)
+    var res_host_ptr = ctx.enqueue_create_host_buffer[.float32](16)
     ctx.synchronize()
     for i in range(16):
         res_host_ptr[i] = Float32(0)
-    var res_device = ctx.enqueue_create_buffer[DType.float32](16)
+    var res_device = ctx.enqueue_create_buffer[.float32](16)
 
     ctx.enqueue_copy(res_device, res_host_ptr)
 

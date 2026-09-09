@@ -14,20 +14,10 @@ modular_py_library(
         # Diffusers config files are loaded, but the package itself is not imported
         requirement("diffusers"),
     ],
-    ignore_unresolved_imports = [
-        # Conditional imports at runtime in speculative_decoding/base.py, architectures already depends on lib
-        "max.pipelines.architectures.deepseekV3_nextn.model.maybe_build_deepseekv3_nextn_kwargs",
-        # Conditional import in pixel_generation.py behind MODULAR_FLUX2_USE_EXECUTOR env var
-        "max.pipelines.architectures.flux2.flux2_executor",
-        "max.pipelines.architectures.flux2.flux2_executor.Flux2Executor",
-        # Lazy imports in _parse_dkv_cache_hint; kv_cache already depends on pipelines
-        "max.pipelines.kv_cache.connectors.dkv.connector",
-        "max.pipelines.kv_cache.connectors.dkv.connector.DKVExternalBlockMetadata",
-        "max.pipelines.kv_cache.connectors.dkv.client_api_pb2",
-        "max.pipelines.kv_cache.paged_kv_cache.transfer_engine",
-    ],
+    test_docstring_examples = True,
     deps = [
         "//max/python/max:_core",
+        "//max/python/max/_xgrammar",
         "//max/python/max/config",
         "//max/python/max/driver",
         "//max/python/max/dtype",
@@ -36,15 +26,17 @@ modular_py_library(
         "//max/python/max/experimental/nn",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/audio",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/diffusion",
         "//max/python/max/pipelines/kv_cache",
+        "//max/python/max/pipelines/lora",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/pipelines/request",
+        "//max/python/max/pipelines/sampling",
         "//max/python/max/pipelines/speculative",
+        "//max/python/max/pipelines/weights",
         "//max/python/max/profiler",
-        "//max/python/max/serve/telemetry",
-        "//max/python/max/serve/worker_interface",
         "//max/python/max/support",
         requirement("hf-transfer"),
         requirement("huggingface-hub"),

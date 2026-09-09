@@ -15,22 +15,10 @@ mojo_shared_library(
     ],
 )
 
-filegroup(
-    name = "_mojo_srcs",
-    srcs = ["kv_cache_ops.mojo"],
-)
-
 modular_py_library(
     name = "_kv_cache_ops",
     srcs = ["__init__.py"],
-    data = select({
-        "@platforms//os:macos": [
-            ":_mojo_srcs",
-            "//max:nn",
-            "@mojo//:std",
-        ],
-        "//conditions:default": [":kv_cache_ops"],
-    }),
+    data = [":kv_cache_ops"],
     ignore_unresolved_imports = [
         # mojo.importer populates these symbols from the native extension.
         ".kv_cache_ops.mha_decode_num_partitions",

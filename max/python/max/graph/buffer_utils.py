@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import numpy as np
 from max._core.engine import Model
 from max.driver import Buffer, Device, DLPackArray
 from max.dtype import DType
@@ -86,6 +87,20 @@ def cast_tensor_to(
     """
     if tensor.dtype == new_dtype:
         return tensor
+
+    # The graph compiler rejects f16 graphs on aarch64 host targets (see
+    # ValidateDevicesPass), so on host devices hop f16 through numpy, which
+    # supports float16 natively, and graph-cast only the f32 leg if needed.
+    if tensor.device.is_host and DType.float16 in (tensor.dtype, new_dtype):
+        if tensor.dtype == DType.float16:
+            f32 = Buffer.from_numpy(
+                np.from_dlpack(tensor).astype(np.float32)
+            ).to(tensor.device)
+            return cast_tensor_to(f32, new_dtype, session=session)
+        f32 = cast_tensor_to(tensor, DType.float32, session=session)
+        return Buffer.from_numpy(np.from_dlpack(f32).astype(np.float16)).to(
+            tensor.device
+        )
 
     sess = _get_or_create_session(tensor.device, session)
     model = _get_or_create_cast_model(

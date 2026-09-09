@@ -48,7 +48,7 @@ from max.nn.kernels import (
     flare_mla_decode_ragged_scaled,
 )
 from max.nn.kv_cache import (
-    KVCacheParams,
+    MLAKVCacheParams,
     PagedCacheValues,
 )
 
@@ -177,9 +177,12 @@ def calculate_mla_memory_bytes(
     q_bytes_per_element = _bytes_per_element(q_dtype)
 
     # Output is always bf16 for FP8 inputs, otherwise same as input dtype
-    if dtype in [torch.float8_e4m3fn, torch.float8_e5m2]:
-        output_bytes_per_element = 2
-    elif dtype in [torch.bfloat16, torch.float16]:
+    if dtype in [
+        torch.float8_e4m3fn,
+        torch.float8_e5m2,
+        torch.bfloat16,
+        torch.float16,
+    ]:
         output_bytes_per_element = 2
     else:
         output_bytes_per_element = 4
@@ -476,14 +479,12 @@ def bench_max(
         if per_token_scale_rope_aware
         else (kv_lora_rank + qk_rope_head_dim)
     )
-    kv_params = KVCacheParams(
+    kv_params = MLAKVCacheParams(
         dtype=max_kv_dtype,
-        n_kv_heads=num_kv_heads,
         head_dim=kv_cache_head_dim,
         num_layers=1,  # Benchmarking a single layer
         page_size=page_size,
         devices=[DeviceRef.GPU()],
-        is_mla=True,
         num_q_heads=num_q_heads,
     )
 
@@ -580,9 +581,12 @@ def bench_max(
         (batch_size,), cache_len, dtype=torch.uint32, device="cuda"
     )
 
-    # For decode: max_seq_length=q_len_per_request, max_cache_length=cache_len
-    max_lengths_torch = torch.tensor(
-        [[q_len_per_request, cache_len]], dtype=torch.uint32, device="cpu"
+    # For decode: max_prompt_length=q_len_per_request, max_cache_length=cache_len
+    max_prompt_length_torch = torch.tensor(
+        [q_len_per_request], dtype=torch.uint32, device="cpu"
+    )
+    max_cache_length_torch = torch.tensor(
+        [cache_len], dtype=torch.uint32, device="cpu"
     )
 
     # Convert torch tensors to MAX types
@@ -596,7 +600,8 @@ def bench_max(
         paged_blocks_max = Buffer.from_dlpack(paged_blocks_torch)
     lut_max = Buffer.from_dlpack(lut_torch)
     cache_lengths_max = Buffer.from_dlpack(cache_lengths_torch)
-    max_lengths_max = Buffer.from_dlpack(max_lengths_torch)
+    max_prompt_length_max = Buffer.from_dlpack(max_prompt_length_torch)
+    max_cache_length_max = Buffer.from_dlpack(max_cache_length_torch)
 
     # Define input types
     # Query for MLA decode: [total_tokens, num_q_heads, qk_head_dim]
@@ -638,9 +643,14 @@ def bench_max(
         device=DeviceRef.GPU(),
     )
 
-    max_lengths_type = TensorType(
+    max_prompt_length_type = TensorType(
         DType.uint32,
-        shape=[1, 2],
+        shape=[1],
+        device=DeviceRef.CPU(),
+    )
+    max_cache_length_type = TensorType(
+        DType.uint32,
+        shape=[1],
         device=DeviceRef.CPU(),
     )
 
@@ -675,7 +685,8 @@ def bench_max(
                 blocks_type,
                 cache_lengths_type,
                 lookup_table_type,
-                max_lengths_type,
+                max_prompt_length_type,
+                max_cache_length_type,
                 kv_scales_type,
                 q_scales_type,
                 scalar_args_type,
@@ -687,7 +698,8 @@ def bench_max(
                 blocks,
                 cache_lengths,
                 lookup_table,
-                max_lengths,
+                max_prompt_length,
+                max_cache_length,
                 kv_scales_graph,
                 q_scales_graph,
                 scalar_args,
@@ -699,7 +711,8 @@ def bench_max(
                 blocks.buffer,
                 cache_lengths.tensor,
                 lookup_table.tensor,
-                max_lengths.tensor,
+                max_prompt_length.tensor,
+                max_cache_length.tensor,
             )
 
             result = flare_mla_decode_ragged_scaled(
@@ -728,7 +741,8 @@ def bench_max(
                 blocks_type,
                 cache_lengths_type,
                 lookup_table_type,
-                max_lengths_type,
+                max_prompt_length_type,
+                max_cache_length_type,
                 scalar_args_type,
             ],
         ) as graph:
@@ -738,7 +752,8 @@ def bench_max(
                 blocks,
                 cache_lengths,
                 lookup_table,
-                max_lengths,
+                max_prompt_length,
+                max_cache_length,
                 scalar_args,
             ) = graph.inputs
 
@@ -748,7 +763,8 @@ def bench_max(
                 blocks.buffer,
                 cache_lengths.tensor,
                 lookup_table.tensor,
-                max_lengths.tensor,
+                max_prompt_length.tensor,
+                max_cache_length.tensor,
             )
 
             result = flare_mla_decode_ragged(
@@ -854,7 +870,7 @@ def bench_max(
     # Use the canonical Mojo dispatch heuristic via mla_dispatch_args_scalar
     # instead of duplicating the logic in Python.
     # The kernel reads these from device memory, so we must place them on GPU
-    # (matching the production path in AttentionDispatchResolver).
+    # (matching the production path in MLAKVCacheParams.resolve_attn_key).
     device = Accelerator()
     scalar_args_gpu = Buffer.from_numpy(
         np.array(
@@ -878,7 +894,8 @@ def bench_max(
                 paged_blocks_max,
                 cache_lengths_max,
                 lut_max,
-                max_lengths_max,
+                max_prompt_length_max,
+                max_cache_length_max,
                 kv_scales_max,
                 q_scales_max,
                 scalar_args_gpu,
@@ -890,7 +907,8 @@ def bench_max(
                 paged_blocks_max,
                 cache_lengths_max,
                 lut_max,
-                max_lengths_max,
+                max_prompt_length_max,
+                max_cache_length_max,
                 scalar_args_gpu,
             )[0]
         return output

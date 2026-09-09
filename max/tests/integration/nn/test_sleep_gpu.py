@@ -35,7 +35,8 @@ def build_sleep_graph(device: Device) -> Model:
 
 
 def time_sleep_kernel_with_buffer(
-    seconds_buffer: Buffer, device: Device = Accelerator()
+    seconds_buffer: Buffer,
+    device: Device = Accelerator(),  # noqa: B008
 ) -> float:
     model = build_sleep_graph(device=device)
 
@@ -48,7 +49,7 @@ def time_sleep_kernel_with_buffer(
     return actual_seconds
 
 
-def time_sleep_kernel(seconds: float, device: Device = Accelerator()) -> float:
+def time_sleep_kernel(seconds: float, device: Device = Accelerator()) -> float:  # noqa: B008
     seconds_buffer = Buffer(shape=[1], dtype=DType.float64)
     seconds_buffer[0] = seconds
     return time_sleep_kernel_with_buffer(seconds_buffer, device)

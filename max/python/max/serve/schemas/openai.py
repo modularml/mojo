@@ -20,30 +20,36 @@ relying on pydantic's ``extra='allow'`` keeps the surface explicit so a
 typo in field handling code is a static error rather than a silent extra.
 
 Request models are derived from the SDK's ``TypedDict`` "params" types via
-``create_model_from_typeddict``, then subclassed to add MAX-only sampling /
+``_model_from_typeddict``, then subclassed to add MAX-only sampling /
 routing extensions and to give a few fields stricter pydantic shapes
 (messages, tools, response_format, tool_choice). They use ``extra='forbid'``
 to match OpenAI's behavior on unknown request fields - misspelled or
 unsupported fields surface as 4xx errors instead of being silently dropped.
 """
 
+# ruff: noqa: F401 disable unused-import, we re-export on purpose
+
 from __future__ import annotations
 
-import collections.abc
-from typing import Any, Literal, Optional, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Literal,
+    get_type_hints,
+)
 
+# isort: off
 from openai.types import (
-    CompletionUsage as CompletionUsage,
-    CreateEmbeddingResponse as CreateEmbeddingResponse,
-    Embedding as Embedding,
-    Model as Model,
+    CompletionUsage,
+    CreateEmbeddingResponse,
+    Embedding,
+    Model,
 )
 from openai.types.chat import (
     ChatCompletion as _OpenAIChatCompletion,
     ChatCompletionChunk as _OpenAIChatCompletionChunk,
     ChatCompletionMessage as _OpenAIChatCompletionMessage,
     ChatCompletionMessageFunctionToolCall as ChatCompletionMessageToolCall,
-    ChatCompletionTokenLogprob as ChatCompletionTokenLogprob,
+    ChatCompletionTokenLogprob,
 )
 from openai.types.chat.chat_completion import (
     Choice as _OpenAIChatCompletionChoice,
@@ -56,9 +62,7 @@ from openai.types.chat.chat_completion_chunk import (
 from openai.types.chat.chat_completion_message_function_tool_call import (
     Function as ChatCompletionMessageToolCallFunction,
 )
-from openai.types.chat.chat_completion_token_logprob import (
-    TopLogprob as TopLogprob,
-)
+from openai.types.chat.chat_completion_token_logprob import TopLogprob
 from openai.types.chat.completion_create_params import (
     CompletionCreateParamsBase as _OpenAIChatCompletionParams,
 )
@@ -71,12 +75,31 @@ from openai.types.completion_create_params import (
     CompletionCreateParamsBase as _OpenAITextCompletionParams,
 )
 from openai.types.completion_usage import (
-    PromptTokensDetails as PromptTokensDetails,
+    CompletionTokensDetails,
+    PromptTokensDetails,
+)
+from openai.types.audio.speech_create_params import (
+    SpeechCreateParams as _OpenAISpeechParams,
 )
 from openai.types.embedding_create_params import (
     EmbeddingCreateParams as _OpenAIEmbeddingParams,
 )
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from openai.types.shared_params.response_format_json_object import (
+    ResponseFormatJSONObject,
+)
+from openai.types.shared_params.response_format_text import (
+    ResponseFormatText,
+)
+
+# isort: on
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    create_model,
+    model_validator,
+)
+from typing_extensions import NotRequired, TypedDict
 
 # ---------------------------------------------------------------------------
 # Response models.
@@ -92,15 +115,29 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 
 class ChatCompletionResponseMessage(_OpenAIChatCompletionMessage):
-    """OpenAI assistant message extended with MAX ``reasoning`` text."""
+    """OpenAI assistant message extended with MAX reasoning text.
+
+    Reasoning-capable models emit their chain-of-thought under one of two
+    fields, selected by the ``emit_reasoning_content`` runtime flag:
+    ``reasoning`` (the OpenAI Responses API naming, the default) or
+    ``reasoning_content`` (the alias used by vLLM, SGLang, and the DeepSeek
+    API). Exactly one is populated per response; the other stays ``None``.
+    """
 
     reasoning: str | None = None
+    reasoning_content: str | None = None
 
 
 class ChatCompletionStreamResponseDelta(_OpenAIChoiceDelta):
-    """OpenAI stream delta extended with MAX ``reasoning`` text."""
+    """OpenAI stream delta extended with MAX reasoning text.
+
+    Mirrors :class:`ChatCompletionResponseMessage`: each delta carries the
+    reasoning fragment under ``reasoning`` or ``reasoning_content`` (selected
+    by the ``emit_reasoning_content`` runtime flag), never both.
+    """
 
     reasoning: str | None = None
+    reasoning_content: str | None = None
 
 
 class ChatCompletionResponseChoice(_OpenAIChatCompletionChoice):
@@ -134,9 +171,15 @@ class CreateChatCompletionStreamResponse(_OpenAIChatCompletionChunk):
 # ---------------------------------------------------------------------------
 
 
+class MaxModel(Model):
+    """OpenAI model card extended with MAX-specific fields."""
+
+    max_model_len: int | None = None
+
+
 class ListModelsResponse(BaseModel):
     object: Literal["list"]
-    data: list[Model]
+    data: list[MaxModel]
 
 
 class Error(BaseModel):
@@ -174,12 +217,78 @@ _FORBID_EXTRA = ConfigDict(
 )
 
 
+# TypedDicts for tool-call objects inside chat messages. These match
+# OpenAI's spec: ``function.name`` and ``function.arguments`` are both
+# Required[str].
+class _ToolCallFunction(TypedDict):
+    name: str
+    arguments: str
+
+
+class _ToolCallParam(TypedDict):
+    function: _ToolCallFunction
+    id: NotRequired[str]
+    type: NotRequired[str]
+
+
+# Multi-modal content part; image_url/video_url are dicts to accept non-string
+# vendor hints (e.g. max_long_side_pixel int, video fps float).
+class _ContentPart(TypedDict):
+    type: str
+    text: NotRequired[str]
+    image_url: NotRequired[dict[str, Any]]
+    video_url: NotRequired[dict[str, Any]]
+
+
+# MAX chat message schema. Vendor extensions like ``reasoning_content``
+# are first-class fields so pydantic type-checks them at request
+# validation time.
+class ChatCompletionMessageParam(TypedDict):
+    # ``root`` is a vendor role; parsed for all models but gated at the route to
+    # those that declare it (``extra_chat_roles``), others get a 400.
+    role: Literal[
+        "developer", "system", "user", "assistant", "tool", "function", "root"
+    ]
+    content: NotRequired[str | list[_ContentPart] | None]
+    name: NotRequired[str]
+    tool_call_id: NotRequired[str]
+    tool_calls: NotRequired[list[_ToolCallParam]]
+    function_call: NotRequired[_ToolCallFunction]
+    refusal: NotRequired[str | None]
+    audio: NotRequired[dict[str, str] | None]
+
+    # MAX vendor extensions.
+    reasoning_content: NotRequired[str | None]
+
+
+ChatCompletionMessageParam.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore[attr-defined]
+
+
+# Response-format ``json_schema`` arm, forked from OpenAI's to widen
+# ``schema``: a boolean is a valid JSON Schema (``true`` = any value,
+# ``false`` = none) and the route de-sugars it to the equivalent object
+# schema. Declaring the boolean here (not just coercing in a validator)
+# keeps the generated OpenAPI schema accurate about what is accepted. The
+# ``text``/``json_object`` arms are reused from the SDK unchanged.
+class JSONSchema(TypedDict, total=False):
+    name: str
+    description: str
+    schema: dict[str, object] | bool
+    strict: bool | None
+
+
+class ResponseFormatJSONSchema(TypedDict, total=False):
+    type: Literal["json_schema"]
+    json_schema: JSONSchema
+
+
+ResponseFormat = (
+    ResponseFormatText | ResponseFormatJSONObject | ResponseFormatJSONSchema
+)
+
+
 def _model_from_typeddict(name: str, td: type) -> type[BaseModel]:
     """Builds a pydantic ``BaseModel`` mirroring an OpenAI ``TypedDict``.
-
-    Normalizes ``Iterable[X]`` to ``list[X]`` so the resulting field is a
-    concrete sequence (pydantic stores ``Iterable`` as a one-shot validator
-    iterator that breaks subscripting and re-iteration).
 
     All fields default to ``None`` because OpenAI marks only a few fields
     (e.g. ``model``, ``messages``, ``input``) as ``Required[...]``; we
@@ -194,19 +303,28 @@ def _model_from_typeddict(name: str, td: type) -> type[BaseModel]:
     ``Optional`` themselves.
     """
     fields: dict[str, Any] = {}
+    # ``get_type_hints`` (without ``include_extras=True``) already strips
+    # Required/NotRequired qualifiers, which is what we want here since the
+    # top-level pydantic field is declared with a ``None`` default
+    # regardless.
     for field_name, annotation in get_type_hints(td).items():
-        # Strip Required/NotRequired qualifiers (valid in TypedDict definitions
-        # but rejected by Pydantic's create_model on Python 3.10).
-        if getattr(get_origin(annotation), "_name", "") in (
-            "Required",
-            "NotRequired",
-        ):
-            (annotation,) = get_args(annotation)
-        if get_origin(annotation) is collections.abc.Iterable:
-            (inner,) = get_args(annotation)
-            annotation = list[inner]  # type: ignore[valid-type]
-        fields[field_name] = (Optional[annotation], None)
+        fields[field_name] = (annotation | None, None)
     return create_model(name, __config__=_FORBID_EXTRA, **fields)
+
+
+class ReasoningConfig(BaseModel):
+    """OpenRouter's ``reasoning`` object (OpenAI only has ``reasoning_effort``).
+
+    Only ``enabled`` is used (mapped to ``enable_thinking`` in the route);
+    the rest are accepted but ignored for now.
+    """
+
+    model_config = _FORBID_EXTRA
+
+    enabled: bool | None = None
+    effort: str | None = None
+    max_tokens: int | None = None
+    exclude: bool | None = None
 
 
 class _MaxRequestExtensions(BaseModel):
@@ -225,6 +343,10 @@ class _MaxRequestExtensions(BaseModel):
     repetition_penalty: float | None = None
     thinking_temperature: float | None = None
 
+    # MiniMax M3 only: ``False`` folds reasoning into ``content`` wrapped in
+    # ``<think>...</think>``; ``True`` (default) keeps it in the ``reasoning`` field.
+    reasoning_split: bool = True
+
     # Generation control.
     min_tokens: int | None = None
     stop_token_ids: list[int] | None = None
@@ -233,6 +355,21 @@ class _MaxRequestExtensions(BaseModel):
     # Routing / cache hints used by disaggregated serving.
     target_endpoint: str | None = None
     dkv_cache_hint: dict[str, Any] | None = None
+    # Per-request prefix-cache isolation for multi-tenant deployments.
+    cache_salt: str | None = Field(
+        default=None,
+        max_length=512,
+        description=(
+            "Per-request salt that isolates this prompt's prefix-cache "
+            "entries from other requests. Combined with "
+            "kv_cache_hash_seed via XOR. Works under any "
+            "kv_cache_hash_algo: a cryptographic guarantee under "
+            "sha256/sha256_64, best-effort under ahash64."
+        ),
+    )
+
+    # OpenRouter reasoning object; mapped to enable_thinking in the route.
+    reasoning: ReasoningConfig | None = None
 
 
 # ---- Auto-generated request bases from OpenAI's TypedDict params ----------
@@ -251,10 +388,14 @@ _TextCompletionParamsBase = _model_from_typeddict(
 _EmbeddingParamsBase = _model_from_typeddict(
     "_EmbeddingParamsBase", _OpenAIEmbeddingParams
 )
+_SpeechParamsBase = _model_from_typeddict(
+    "_SpeechParamsBase", _OpenAISpeechParams
+)
 
 
 class CreateChatCompletionRequest(
-    _MaxRequestExtensions, _ChatCompletionParamsBase  # type: ignore[misc,valid-type]
+    _MaxRequestExtensions,
+    _ChatCompletionParamsBase,  # type: ignore[misc,valid-type]
 ):
     """OpenAI chat completion request, extended with MAX fields.
 
@@ -264,13 +405,20 @@ class CreateChatCompletionRequest(
     """
 
     # Required fields - re-declare so they have no default. Each message
-    # is an OpenAI ``ChatCompletionMessageParam`` TypedDict at the JSON
-    # level; we type as ``dict[str, Any]`` here because pydantic mangles
-    # the SDK's ``Iterable[ContentPart]`` typing inside the union (it
-    # stores a one-shot ``ValidatorIterator``). The route reads role and
-    # content via dict access.
+    # is validated against :class:`ChatCompletionMessageParam`, our
+    # explicit cross-section of the OpenAI message shapes plus MAX
+    # vendor extensions (``reasoning_content``). Pydantic emits plain
+    # dicts so the route reads fields via dict access.
     model: str
-    messages: list[dict[str, Any]] = Field(min_length=1)
+    messages: list[ChatCompletionMessageParam] = Field(min_length=1)
+
+    max_tokens: int | None = None
+    max_completion_tokens: int | None = None
+
+    # Re-typed from the SDK union so the ``json_schema`` arm advertises a
+    # boolean ``schema`` (a valid JSON Schema). Pydantic emits a plain dict;
+    # the route reads it via dict access.
+    response_format: ResponseFormat | None = None
 
     # ``stream`` lives on the OpenAI streaming/non-streaming subclasses, not
     # on ``CompletionCreateParamsBase`` - declare it explicitly here.
@@ -286,9 +434,99 @@ class CreateChatCompletionRequest(
     # If both are provided, ``prompt_tokens`` takes precedence.
     prompt_tokens: list[int] | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _translate_thinking_to_standard(cls, data: Any) -> Any:
+        # A vendor ``thinking`` control ({"type": enabled|disabled|adaptive})
+        # is translated to the standard ``enable_thinking``/``thinking``
+        # chat-template booleans. ``adaptive`` leaves them unset: templates
+        # default to adaptive when no reasoning flag is given, so the two
+        # render identically. Client-set ``chat_template_kwargs`` win.
+        if not isinstance(data, dict):
+            return data
+        thinking = data.get("thinking")
+        if thinking is None:
+            return data
+        if not isinstance(thinking, dict) or set(thinking) - {"type"}:
+            raise ValueError("`thinking` must be an object with a `type` field")
+        mode = thinking.get("type")
+        if mode not in ("enabled", "disabled", "adaptive"):
+            raise ValueError(
+                "`thinking.type` must be one of 'enabled', 'disabled', "
+                f"'adaptive'; got {mode!r}"
+            )
+        data = dict(data)
+        data.pop("thinking")
+        if mode != "adaptive":
+            enabled = mode == "enabled"
+            kwargs = dict(data.get("chat_template_kwargs") or {})
+            kwargs.setdefault("enable_thinking", enabled)
+            kwargs.setdefault("thinking", enabled)
+            data["chat_template_kwargs"] = kwargs
+        return data
+
+    @model_validator(mode="after")
+    def _reconcile_max_completion_tokens(self) -> CreateChatCompletionRequest:
+        # Accept both token-limit fields; ``max_completion_tokens`` wins.
+        if (
+            self.max_completion_tokens is not None
+            and self.max_tokens is not None
+            and self.max_tokens != self.max_completion_tokens
+        ):
+            self.max_tokens = self.max_completion_tokens
+        return self
+
+    @property
+    def resolved_chat_template_kwargs(self) -> dict[str, Any] | None:
+        """The kwargs to render the chat template with.
+
+        ``chat_template_kwargs`` is the only channel that reaches the Jinja
+        template, so OpenAI's top-level ``reasoning_effort`` and OpenRouter's
+        ``reasoning`` object are folded into it here (OpenRouter sends both).
+
+        The effort is taken from ``chat_template_kwargs`` first, then the
+        top-level field, then the ``reasoning`` object; whichever wins also
+        decides whether the model thinks at all, unless the client set the
+        toggle itself. Templates disagree on the name of that toggle, so both
+        ``enable_thinking`` and ``thinking`` are set.
+
+        Returns:
+            The chat-template kwargs, or ``None`` when the request carries
+            none at all.
+        """
+        kwargs = dict(self.chat_template_kwargs or {})
+        effort = (
+            kwargs.get("reasoning_effort")
+            or self.reasoning_effort
+            or (self.reasoning.effort if self.reasoning is not None else None)
+        )
+        if self.reasoning is None and effort is None:
+            return self.chat_template_kwargs
+
+        if self.reasoning is not None and self.reasoning.enabled is not None:
+            enable_thinking = self.reasoning.enabled
+        else:
+            # ``none`` is OpenAI's "don't reason" effort, and a bare
+            # ``reasoning`` object carrying neither field asks for no
+            # reasoning either.
+            enable_thinking = effort is not None and effort != "none"
+
+        # Client may set either spelling of the thinking toggle, here we merge
+        # both.
+        for key in ("enable_thinking", "thinking"):
+            if key in kwargs:
+                enable_thinking = bool(kwargs[key])
+                break
+        kwargs["enable_thinking"] = enable_thinking
+        kwargs["thinking"] = enable_thinking
+        if effort is not None:
+            kwargs["reasoning_effort"] = effort
+        return kwargs
+
 
 class CreateCompletionRequest(
-    _MaxRequestExtensions, _TextCompletionParamsBase  # type: ignore[misc,valid-type]
+    _MaxRequestExtensions,
+    _TextCompletionParamsBase,  # type: ignore[misc,valid-type]
 ):
     """OpenAI legacy text completion request, extended with MAX fields."""
 
@@ -304,33 +542,51 @@ class CreateEmbeddingRequest(_EmbeddingParamsBase):  # type: ignore[misc,valid-t
     input: str | list[str] | list[int] | list[list[int]]
 
 
-# ---------------------------------------------------------------------------
-# MAX-only request/response types not part of the OpenAI spec.
-# ---------------------------------------------------------------------------
+class CreateSpeechRequest(_SpeechParamsBase):  # type: ignore[misc,valid-type]
+    """OpenAI speech request, extended for generative audio models.
 
+    ``input`` is the text the audio renders, which for a model that sings is
+    its lyrics, and ``instructions`` -- OpenAI's field for describing how the
+    audio should sound -- carries the style prompt such a model conditions on.
 
-class CreateAudioGenerationRequest(BaseModel):
-    """Audio generation request used by ``/v1/audio/speech``.
-
-    Note: this is a MAX-specific shape, not the OpenAI ``/v1/audio/speech``
-    schema. We may align with the OpenAI spec in a follow-up.
+    ``voice`` is required by OpenAI and has no meaning for a model with no
+    voice catalog, so it is optional here and ignored. The MAX extensions
+    below are the generation controls an audio model has and a text-to-speech
+    model does not; each one left unset keeps the model's own default.
     """
-
-    model_config = _FORBID_EXTRA
 
     model: str
     input: str
-    audio_prompt_tokens: list[int]
-    audio_prompt_transcription: str
-    instructions: str | None = None
-    response_format: Literal["wav", "mp3", "pcm"] | None = None
-    speed: float | None = None
-    min_tokens: int = 0
+
+    voice: str | None = None
+
+    audio_duration: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Upper bound on the generated audio, in seconds.",
+    )
+    steps: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Denoising steps, for models whose audio comes from a diffusion "
+            "or flow-matching stage."
+        ),
+    )
+    guidance_scale: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Classifier-free guidance scale.",
+    )
+    seed: int | None = Field(
+        default=None,
+        description="Seed for the sampling and noise draws.",
+    )
 
 
-class CreateAudioGenerationResponse(BaseModel):
-    audio_data: bytes
-    metadata: dict[str, Any]
+# ---------------------------------------------------------------------------
+# MAX-only request/response types not part of the OpenAI spec.
+# ---------------------------------------------------------------------------
 
 
 class LoadLoraRequest(BaseModel):

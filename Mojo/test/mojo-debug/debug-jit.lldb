@@ -1,0 +1,21 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %debug -X -b -X -o -X 'b jit.mojo:16' -X -o -X 'run' '%S/Inputs/jit.mojo' | FileCheck %s
+# TODO(MOTO-1007): Remove this once we have a fix for asan.
+# UNSUPPORTED: asan
+
+# COM: Here we test debugging of a source file passed by relative path.
+# RUN: mkdir -p debug-jit/Inputs
+# RUN: cp '%S/Inputs/jit.mojo' debug-jit/Inputs/jit.mojo
+# RUN: %debug -X -b -X -o -X 'b jit.mojo:16' -X -o -X run  'debug-jit/Inputs/jit.mojo' | FileCheck %s
+
+# CHECK-NOT: hello
+# CHECK: Process {{.*}} stopped
+# CHECK: stop reason = breakpoint 1.1
+# CHECK: JIT(0x{{.*}})`{{.*}}jitbp{{.*}} at jit.mojo:16:
+# CHECK: -> 16        print("hello\n")
+

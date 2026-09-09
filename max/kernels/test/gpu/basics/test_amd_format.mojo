@@ -15,30 +15,25 @@ from std.os import abort
 
 from std.builtin._format_float import _write_float
 from std.builtin.simd import Float8_e4m3fn, Float8_e5m2
-from std.gpu.host import DeviceContext
-from std.memory import memcmp, memcpy
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_memcmp, unsafe_memcpy
 
 
 struct Buffer[capacity: Int](Defaultable, Writer):
-    var data: InlineArray[UInt8, Self.capacity]
+    var data: Array[UInt8, Self.capacity]
     var pos: Int
 
     def __init__(out self):
-        self.data = InlineArray[UInt8, Self.capacity](fill=0)
+        self.data = Array[UInt8, Self.capacity](fill=0)
         self.pos = 0
 
     def write_string(mut self, string: StringSlice):
-        len_bytes = string.byte_length()
-        # If empty then return
-        if len_bytes == 0:
-            return
-        # Continue writing to buffer
-        memcpy(
-            dest=self.data.unsafe_ptr() + self.pos,
-            src=string.unsafe_ptr(),
-            count=len_bytes,
-        )
-        self.pos += len_bytes
+        var data_ptr: Pointer[
+            UInt8, origin_of(self.data)
+        ] = self.data.unsafe_ptr()
+        for i, byte in enumerate(string.bytes()):
+            (data_ptr + self.pos)[i] = byte
+        self.pos += string.byte_length()
 
 
 def check_float[
@@ -46,11 +41,9 @@ def check_float[
 ](f8: Scalar[dtype]) where dtype.is_floating_point():
     var f8_str = Buffer[expected.byte_length()]()
     _write_float(f8_str, f8)
-    var res = memcmp(
-        expected.unsafe_ptr(), f8_str.data.unsafe_ptr(), expected.byte_length()
-    )
-    if res != 0:
-        abort()
+    for i, byte in enumerate(expected.bytes()):
+        if byte != f8_str.data[i]:
+            abort()
 
 
 def check_8e5m2[expected: StaticString](f8: Float8_e5m2):
@@ -98,3 +91,4 @@ def main() raises:
         print("== test_format_float8_e4m3fn")
         comptime kernel_1 = test_format_float8_e4m3fn
         ctx.enqueue_function[kernel_1](grid_dim=1, block_dim=1)
+        ctx.synchronize()

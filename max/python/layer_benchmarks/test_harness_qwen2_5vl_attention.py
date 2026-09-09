@@ -16,24 +16,12 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.types import TextGenerationContext
-from testbed.harnesses.qwen2_5vl_attention import (
-    Qwen25VLAttentionHarness,
-    Qwen25VLAttentionStaticParams,
-)
+from layer_mefs import create_runner
+from max.pipelines.context import TextContext
+from testbed.harnesses.qwen2_5vl_attention import Qwen25VLAttentionStaticParams
 from testbed.harnesses.ragged_attention_harness import AttentionDynamicParams
-from testbed.runner import LayerTestRunner, create_session
-
-# Qwen2.5-VL 3B config values.
-_STATIC_PARAMS = Qwen25VLAttentionStaticParams(
-    hidden_size=2048,
-    n_heads=16,
-    n_kv_heads=2,
-    head_dim=128,
-    max_seq_len=1024,
-    rope_theta=1000000.0,
-    mrope_section=[16, 24, 24],
-)
+from testbed.runner import LayerTestRunner
+from testbed.specs import QWEN2_5VL_ATTENTION
 
 _SMOKE_SHAPES = [
     AttentionDynamicParams(batch_size=1, seq_len=11),
@@ -46,19 +34,16 @@ _SMOKE_SHAPES = [
 def runner() -> LayerTestRunner[
     Qwen25VLAttentionStaticParams,
     AttentionDynamicParams,
-    list[TextGenerationContext],
+    list[TextContext],
 ]:
-    session, device = create_session()
-    return LayerTestRunner(
-        Qwen25VLAttentionHarness(_STATIC_PARAMS, session, device)
-    )
+    return create_runner(QWEN2_5VL_ATTENTION)
 
 
 def test_benchmark_smoke(
     runner: LayerTestRunner[
         Qwen25VLAttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     results = runner.benchmark(_SMOKE_SHAPES, iterations=1, warmup=1)

@@ -1,0 +1,27 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# TODO(MOTO-1007): Remove this once we have a fix for asan.
+# UNSUPPORTED: asan
+# `frame variable` triggers a null-ptr UBSAN violation inside LLDB's own
+# DataExtractor::Checksum (ValueObjectPrinter path) on Linux aarch64.
+# The formatter is covered by C++ unit tests under UBSAN (StdlibTypesTest).
+# UNSUPPORTED: ubsan
+
+# RUN: %debug \
+# RUN:   -X -b \
+# RUN:   -X -o -X 'b dict.mojo:20' \
+# RUN:   -X -o -X 'b dict.mojo:23' \
+# RUN:   -X -o -X 'run' \
+# RUN:   -X -o -X 'frame variable d' \
+# RUN:   -X -o -X 'continue' \
+# RUN:   -X -o -X 'frame variable d_empty' \
+# RUN:   '%S/Inputs/dict.mojo' | FileCheck %s
+
+# CHECK: d = (size 3)
+# CHECK: key = "one"
+# CHECK-NEXT: value = 1
+
+# CHECK: d_empty = (size 0)

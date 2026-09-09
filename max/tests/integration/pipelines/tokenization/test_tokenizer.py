@@ -13,10 +13,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import pickle
 from unittest.mock import MagicMock, NonCallableMock
 
-import hf_repo_lock
 import numpy as np
 import pytest
 import requests
@@ -27,28 +27,29 @@ from max.pipelines import (
     TextAndVisionTokenizer,
     TextTokenizer,
 )
-from max.pipelines.core import (
+from max.pipelines.context import (
+    SamplingParams,
     TextAndVisionContext,
     TextContext,
+    TextGenerationResponseFormat,
+    TokenBuffer,
     validate_only_one_image,
 )
 from max.pipelines.lib import KVCacheConfig, MAXModelConfig, SamplingConfig
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
+from max.pipelines.lib.tokenizer import replace_unpaired_surrogates
 from max.pipelines.modeling.types import (
     ImageContentPart,
     MessageContent,
     RequestID,
-    SamplingParams,
     TextContentPart,
     TextGenerationRequest,
     TextGenerationRequestFunction,
     TextGenerationRequestMessage,
     TextGenerationRequestTool,
-    TextGenerationResponseFormat,
-    TokenBuffer,
 )
-from test_common.mocks import mock_estimate_memory_footprint
+from test_common.mocks import mock_plan_from_sizes
 from transformers import AutoConfig
 
 
@@ -69,7 +70,6 @@ def _create_mock_pipeline_config(model_path: str) -> MagicMock:
 
 
 LLAMA_3_1_HF_REPO_ID = "meta-llama/Llama-3.1-8B-Instruct"
-LLAMA_3_1_HF_REVISION = hf_repo_lock.revision_for_hf_repo(LLAMA_3_1_HF_REPO_ID)
 
 
 def convert_image_url_to_base64(image_url: str) -> bytes | None:
@@ -206,7 +206,7 @@ def test_tokenizer__truncates_to_max_length(
         model_name=llama_3_1_8b_instruct_local_path,
         prompt="Longer message with lots of text with more words than max length for sure.",
     )
-    with pytest.raises(ValueError, match="max length"):
+    with pytest.raises(ValueError, match="maximum context length"):
         _ = asyncio.run(tokenizer.new_context(long_request))
 
 
@@ -226,6 +226,159 @@ def test_tokenizer__with_prompt_as_list_of_int(
     )
     context = asyncio.run(tokenizer.new_context(request))
     assert np.array_equal(context.tokens.all, np.array([0, 1, 2, 3, 4, 5]))
+
+
+# Built via ``json.loads`` to mirror the real request path: a client may send
+# an emoji whose UTF-16 surrogate pair was split by truncation, which the JSON
+# parser accepts as a lone surrogate. ``\ude00`` is a lone low surrogate,
+# ``\ud800`` a lone high surrogate; ``\ud83d\ude00`` is the escaped
+# surrogate pair the JSON parser reconstitutes into the single
+# grinning-face emoji (U+1F600) -- the same decode path a real request
+# takes. See CENG-790.
+_LONE_LOW = json.loads(r'"\ude00"')
+_LONE_HIGH = json.loads(r'"\ud800"')
+_CONSECUTIVE_LONE = json.loads(r'"\ud800\ud800"')
+_MIXED = json.loads(r'"hi \ude00 there"')
+_VALID_PAIR = json.loads(r'"\ud83d\ude00"')
+
+
+def test_replace_unpaired_surrogates() -> None:
+    # Each unpaired surrogate collapses to U+FFFD; surrounding text survives.
+    assert replace_unpaired_surrogates(_LONE_LOW) == "\ufffd"
+    assert replace_unpaired_surrogates(_LONE_HIGH) == "\ufffd"
+    assert replace_unpaired_surrogates(_CONSECUTIVE_LONE) == "\ufffd\ufffd"
+    assert replace_unpaired_surrogates(_MIXED) == "hi \ufffd there"
+
+    # Well-formed text is returned unchanged, including a reconstituted pair.
+    for well_formed in ("", "hello", "héllo 世界", _VALID_PAIR):
+        assert replace_unpaired_surrogates(well_formed) == well_formed
+
+    # The result is always encodable as UTF-8 (the property the tokenizer needs).
+    for text in (_LONE_LOW, _LONE_HIGH, _CONSECUTIVE_LONE, _MIXED):
+        replace_unpaired_surrogates(text).encode("utf-8")
+
+
+@pytest.mark.asyncio
+async def test_tokenizer_encode_handles_lone_surrogates(
+    smollm_135m_local_path: str,
+) -> None:
+    pipeline_config = _create_mock_pipeline_config(smollm_135m_local_path)
+    tokenizer = TextTokenizer(
+        smollm_135m_local_path, pipeline_config=pipeline_config
+    )
+
+    # Guard the premise: the underlying fast tokenizer rejects a lone surrogate
+    # with the opaque TypeError this fix exists to prevent.
+    assert tokenizer.delegate.is_fast
+    with pytest.raises(TypeError):
+        tokenizer.delegate.encode(_LONE_LOW)
+
+    # The wrapper normalizes first, so encoding succeeds for every variant.
+    for text in (_LONE_LOW, _LONE_HIGH, _CONSECUTIVE_LONE, _MIXED):
+        encoded = await tokenizer.encode(text, add_special_tokens=False)
+        assert len(encoded) > 0
+
+    # Well-formed input is unaffected: a valid pair encodes identically to the
+    # emoji string it represents.
+    assert np.array_equal(
+        await tokenizer.encode(_VALID_PAIR, add_special_tokens=False),
+        await tokenizer.encode("\U0001f600", add_special_tokens=False),
+    )
+
+
+@pytest.mark.asyncio
+async def test_tokenizer_new_context_handles_lone_surrogate(
+    smollm_135m_local_path: str,
+) -> None:
+    pipeline_config = _create_mock_pipeline_config(smollm_135m_local_path)
+    tokenizer = TextTokenizer(
+        smollm_135m_local_path, pipeline_config=pipeline_config
+    )
+    request = TextGenerationRequest(
+        request_id=RequestID(),
+        model_name=smollm_135m_local_path,
+        prompt=_MIXED,
+    )
+    context = await tokenizer.new_context(request)
+    assert len(context.tokens) > 0
+
+
+def test_tokenizer__propagates_cache_salt(
+    llama_3_1_8b_instruct_local_path: str,
+) -> None:
+    """`tokenizer.new_context` must forward `request.cache_salt` to
+    `context.cache_salt` (Step 6.5 plumbing). Without this the
+    multi-tenant prefix-cache isolation feature is silently inert."""
+
+    pipeline_config = _create_mock_pipeline_config(
+        llama_3_1_8b_instruct_local_path
+    )
+    tokenizer = TextTokenizer(
+        llama_3_1_8b_instruct_local_path,
+        pipeline_config=pipeline_config,
+    )
+
+    request_with_salt = TextGenerationRequest(
+        request_id=RequestID(),
+        model_name=llama_3_1_8b_instruct_local_path,
+        prompt="Hello world!",
+        cache_salt="tenant-abc",
+    )
+
+    context_with_salt = asyncio.run(tokenizer.new_context(request_with_salt))
+    assert context_with_salt.cache_salt == "tenant-abc"
+
+    request_without_salt = TextGenerationRequest(
+        request_id=RequestID(),
+        model_name=llama_3_1_8b_instruct_local_path,
+        prompt="Hello world!",
+    )
+
+    context_without_salt = asyncio.run(
+        tokenizer.new_context(request_without_salt)
+    )
+    assert context_without_salt.cache_salt is None
+
+
+def test_tokenizer__propagates_dkv_cache_hint(
+    llama_3_1_8b_instruct_local_path: str,
+) -> None:
+    """`tokenizer.new_context` must re-serialize `request.dkv_cache_hint` onto
+    `context.dkv_cache_hint`. The dKV connector parses those bytes to route a
+    load at its peers, so dropping them here silently disables remote reads."""
+
+    pipeline_config = _create_mock_pipeline_config(
+        llama_3_1_8b_instruct_local_path
+    )
+    tokenizer = TextTokenizer(
+        llama_3_1_8b_instruct_local_path,
+        pipeline_config=pipeline_config,
+    )
+    hint = {"version": 2, "instances": [{"instance_name": "dkv-peer"}]}
+
+    context = asyncio.run(
+        tokenizer.new_context(
+            TextGenerationRequest(
+                request_id=RequestID(),
+                model_name=llama_3_1_8b_instruct_local_path,
+                prompt="Hello world!",
+                dkv_cache_hint=hint,
+            )
+        )
+    )
+    assert context.dkv_cache_hint is not None
+    assert json.loads(context.dkv_cache_hint) == hint
+
+    context_without_hint = asyncio.run(
+        tokenizer.new_context(
+            TextGenerationRequest(
+                request_id=RequestID(),
+                model_name=llama_3_1_8b_instruct_local_path,
+                prompt="Hello world!",
+            )
+        )
+    )
+    assert context_without_hint.dkv_cache_hint is None
 
 
 def test_tokenizer__with_context_validation(
@@ -341,7 +494,7 @@ async def test_tokenizer__encode_and_decode(
 
 
 @pytest.mark.skip("TODO: Fix this flaky test")
-@mock_estimate_memory_footprint
+@mock_plan_from_sizes
 def test_text_tokenizer_with_constrained_decoding(
     modular_ai_llama_3_1_local_path: str,
 ) -> None:
@@ -517,7 +670,7 @@ def test_tokenizer_stores_eos_token_ids(
         model_path=modular_ai_llama_3_1_local_path,
         pipeline_config=pipeline_config,
     )
-    assert tokenizer._default_eos_token_ids == {tokenizer.eos, 123456}
+    assert tokenizer.eos_token_ids == {tokenizer.delegate.eos_token_id, 123456}
 
     # Test list of eos token ids
     assert pipeline_config.model.huggingface_config is not None
@@ -526,7 +679,11 @@ def test_tokenizer_stores_eos_token_ids(
         model_path=modular_ai_llama_3_1_local_path,
         pipeline_config=pipeline_config,
     )
-    assert tokenizer._default_eos_token_ids == {tokenizer.eos, 123, 456}
+    assert tokenizer.eos_token_ids == {
+        tokenizer.delegate.eos_token_id,
+        123,
+        456,
+    }
 
 
 def test_text_and_vision_tokenizer_stores_eos_token_ids(
@@ -555,7 +712,7 @@ def test_text_and_vision_tokenizer_stores_eos_token_ids(
         model_path=model_path,
         pipeline_config=pipeline_config,
     )
-    assert tokenizer._default_eos_token_ids == gemma_3_eos_token_ids
+    assert tokenizer.eos_token_ids == gemma_3_eos_token_ids
 
 
 @pytest.mark.asyncio
@@ -742,6 +899,41 @@ ASSISTANT: {% endif %}"""
         f"Custom: {generated_prompt}\n"
         f"Default: {default_prompt}"
     )
+
+
+@pytest.mark.asyncio
+async def test_custom_prompt_template_beats_tokenizer_override() -> None:
+    """A tokenizer that renders its own format must not defeat --chat-template.
+
+    ``trust_remote_code`` tokenizers (e.g. Kimi's ``TikTokenTokenizer``)
+    override ``apply_chat_template`` with a format hardcoded in Python and
+    never read the ``chat_template`` attribute, which silently discarded the
+    override.
+    """
+    model_name = "HuggingFaceTB/SmolLM2-135M-Instruct"
+    custom_template = (
+        "{% for message in messages %}{{ message['content'] }}{% endfor %}"
+    )
+
+    pipeline_config = _create_mock_pipeline_config(model_name)
+    tokenizer = TextTokenizer(
+        model_path=model_name,
+        pipeline_config=pipeline_config,
+        trust_remote_code=True,
+        chat_template=custom_template,
+    )
+    tokenizer.delegate.apply_chat_template = lambda *args, **kwargs: (
+        "HARDCODED FORMAT"
+    )
+
+    prompt = tokenizer.apply_chat_template(
+        messages=[
+            TextGenerationRequestMessage(role="user", content="Hello there")
+        ],
+        tools=None,
+    )
+
+    assert prompt == "Hello there"
 
 
 @pytest.mark.asyncio

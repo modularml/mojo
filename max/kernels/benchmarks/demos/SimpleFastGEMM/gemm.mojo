@@ -14,6 +14,7 @@
 # Meant to be run on an AVX512 system
 
 from std.math import align_up
+from std.memory import dealloc
 from std.sys import align_of, prefetch, simd_width_of
 from std.sys.intrinsics import PrefetchOptions
 
@@ -25,7 +26,7 @@ from linalg.utils import (
 
 
 from layout import TileTensor, Coord, Idx, row_major
-from internal_utils import ScalarArray
+from layout.tensor_engine import DefaultEngine
 
 comptime dtype = DType.float32
 comptime simd_size = simd_width_of[dtype]()
@@ -42,7 +43,7 @@ comptime NR = kernel_shape.simd_cols * simd_size
 comptime prefetch_distance = get_matmul_prefetch_b_distance_k()
 
 
-def print_mat(a_ptr: UnsafePointer[Scalar[dtype], _], m: Int, n: Int):
+def print_mat(a_ptr: ImmPointer[Scalar[dtype], _], m: Int, n: Int):
     var a = TileTensor(a_ptr, row_major(m, n))
     for i in range(m):
         for j in range(n):
@@ -51,9 +52,9 @@ def print_mat(a_ptr: UnsafePointer[Scalar[dtype], _], m: Int, n: Int):
 
 
 def gemm_naive(
-    a: TileTensor[dtype, element_size=1, ...],
-    b: TileTensor[dtype, element_size=1, ...],
-    c: TileTensor[mut=True, dtype, element_size=1, ...],
+    a: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
+    b: TileTensor[dtype, Engine=DefaultEngine[element_width=1], ...],
+    c: TileTensor[mut=True, dtype, Engine=DefaultEngine[element_width=1], ...],
     m: Int,
     n: Int,
     k: Int,
@@ -69,9 +70,9 @@ def gemm_naive(
 
 
 def kernel(
-    a_ptr: UnsafePointer[Scalar[dtype], _],
-    b_ptr: UnsafePointer[Scalar[dtype], _],
-    c_ptr: UnsafePointer[mut=True, Scalar[dtype], _],
+    a_ptr: ImmPointer[Scalar[dtype], _],
+    b_ptr: ImmPointer[Scalar[dtype], _],
+    c_ptr: MutPointer[Scalar[dtype], _],
     n: Int,
     k: Int,
     kc: Int,
@@ -80,7 +81,7 @@ def kernel(
     var b = TileTensor(b_ptr, row_major(k * NR))
     var c = TileTensor(c_ptr, row_major(MR * n))
 
-    var c_stack = InlineArray[Scalar[dtype], align_up(MR * NR, alignment)](
+    var c_stack = Array[Scalar[dtype], align_up(MR * NR, alignment)](
         uninitialized=True
     )
     var c_local = TileTensor(c_stack, row_major[MR * NR]())
@@ -119,8 +120,8 @@ def kernel(
 
 
 def pack_B(
-    b_ptr: UnsafePointer[Scalar[dtype], _],
-    b2_ptr: UnsafePointer[mut=True, Scalar[dtype], _],
+    b_ptr: ImmPointer[Scalar[dtype], _],
+    b2_ptr: MutPointer[Scalar[dtype], _],
     k: Int,
     n: Int,
     kc: Int,
@@ -135,8 +136,8 @@ def pack_B(
 
 
 def prepack_B(
-    b_ptr: UnsafePointer[Scalar[dtype], _],
-    b2_ptr: UnsafePointer[mut=True, Scalar[dtype], _],
+    b_ptr: ImmPointer[Scalar[dtype], _],
+    b2_ptr: MutPointer[Scalar[dtype], _],
     k: Int,
     n: Int,
     kc: Int,
@@ -148,9 +149,9 @@ def prepack_B(
 
 
 def gemm(
-    a_ptr: UnsafePointer[Scalar[dtype], _],
-    b_ptr: UnsafePointer[Scalar[dtype], _],
-    c_ptr: UnsafePointer[mut=True, Scalar[dtype], _],
+    a_ptr: ImmPointer[Scalar[dtype], _],
+    b_ptr: ImmPointer[Scalar[dtype], _],
+    c_ptr: MutPointer[Scalar[dtype], _],
     m: Int,
     n: Int,
     k: Int,
@@ -193,23 +194,31 @@ def main() raises:
     print("x", end="")
     print(k)
 
-    var a_ptr = ScalarArray[dtype](count=m * k, alignment=alignment)
+    var a_alloc = (
+        alloc[Scalar[dtype]].aligned[alignment](count=m * k).into_managed()
+    )
+    var b_alloc = (
+        alloc[Scalar[dtype]].aligned[alignment](count=k * n).into_managed()
+    )
+    var b2_alloc = (
+        alloc[Scalar[dtype]].aligned[alignment](count=k * n).into_managed()
+    )
+    var c_alloc = (
+        alloc[Scalar[dtype]].aligned[alignment](count=m * n).into_managed()
+    )
+    var c2_alloc = (
+        alloc[Scalar[dtype]].aligned[alignment](count=m * n).into_managed()
+    )
 
-    var b_ptr = ScalarArray[dtype](count=k * n, alignment=alignment)
-    var b2_ptr = ScalarArray[dtype](count=k * n, alignment=alignment)
+    var a = TileTensor(a_alloc.unsafe_ptr(), row_major(m * k))
+    var b = TileTensor(b_alloc.unsafe_ptr(), row_major(k * n))
+    var b2 = TileTensor(b2_alloc.unsafe_ptr(), row_major(k * n))
+    var c = TileTensor(c_alloc.unsafe_ptr(), row_major(m * n))
+    var c2 = TileTensor(c2_alloc.unsafe_ptr(), row_major(m * n))
 
-    var c_ptr = ScalarArray[dtype](count=m * n, alignment=alignment)
-    var c2_ptr = ScalarArray[dtype](count=m * n, alignment=alignment)
-
-    var a = TileTensor(a_ptr.unsafe_ptr(), row_major(m * k))
-    var b = TileTensor(b_ptr.unsafe_ptr(), row_major(k * n))
-    var b2 = TileTensor(b2_ptr.unsafe_ptr(), row_major(k * n))
-    var c = TileTensor(c_ptr.unsafe_ptr(), row_major(m * n))
-    var c2 = TileTensor(c2_ptr.unsafe_ptr(), row_major(m * n))
-
-    var am = TileTensor(a_ptr.unsafe_ptr(), row_major(m, k))
-    var bm = TileTensor(b_ptr.unsafe_ptr(), row_major(k, n))
-    var cm = TileTensor(c_ptr.unsafe_ptr(), row_major(m, n))
+    var am = TileTensor(a_alloc.unsafe_ptr(), row_major(m, k))
+    var bm = TileTensor(b_alloc.unsafe_ptr(), row_major(k, n))
+    var cm = TileTensor(c_alloc.unsafe_ptr(), row_major(m, n))
 
     for i in range(m * k):
         a[i] = Scalar[dtype](i)
@@ -233,12 +242,11 @@ def main() raises:
     print(m * n, end="")
     print(" errors")
 
-    @parameter
-    def bench_gemm():
+    def bench_gemm() {var}:
         gemm(a.ptr, b2.ptr, c2.ptr, m, n, k, mc, nc, kc)
 
     var num_warmup: Int = 1
-    var time = std.benchmark.run[func3=bench_gemm](num_warmup).mean()
+    var time = std.benchmark.run(bench_gemm, num_warmup).mean()
     var flops = 2.0 * Float64(m) * Float64(n) * Float64(k) / time / 1e9
     print(time, end="")
     print(" seconds")
@@ -250,4 +258,8 @@ def main() raises:
     print(rpeak, end="")
     print(" measured/peak FLOPS assuming 2.9 GHz")
 
-    _ = (a_ptr^, b_ptr^, b2_ptr^, c_ptr^, c2_ptr^)
+    dealloc(a_alloc^)
+    dealloc(b_alloc^)
+    dealloc(b2_alloc^)
+    dealloc(c_alloc^)
+    dealloc(c2_alloc^)

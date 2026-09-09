@@ -1,0 +1,240 @@
+<!-- title: Mojo Basics -->
+<!-- subtitle: Syntax essentials: the core you reach for first -->
+<!-- layout: landscape -->
+<!-- Compiler verified: 2026-08-17, Mojo 1.0.0 (ed45d567) -->
+<!-- Last updated: 2026-08-17 (1.0.0 audit) -->
+
+<style>
+  .sheet table.bt td:first-child{white-space:nowrap;}
+</style>
+
+<section class="panel">
+      <h2>Hello, Mojo</h2>
+      <div class="body">
+<pre class="code">def main():
+    print("Hello, Mojo!")</pre>
+        <p class="note">Run it: <b>mojo hello.mojo</b>. Every program starts at <b>main()</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Comments &amp; docstrings</h2>
+      <div class="body">
+<pre class="code"># Line comment
+
+def greet():
+    """Docstring: what greet does."""
+    print("hi")</pre>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>var owns, ref refers</h2>
+      <div class="body">
+<pre class="code">var count = 0 # owned, inferred Int
+var name: String = "Mojo"
+count = count + 1 # var is mutable
+
+var data: List[Int] = [1, 2, 3]
+ref view = data[0] # ref to an element, no copy
+view = 99 # writes through to data
+
+comptime PI = 3.14159 # compile-time const</pre>
+        <p class="note"><b>var</b> declares an owned value, mutable by default. <b>ref</b> is a
+          reference to a value it doesn't own. Mutable changes update the original value.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Built-in types</h2>
+      <div class="body">
+<pre class="code">Float32 == Scalar[DType.float32]
+        == SIMD[DType.float32, 1]</pre>
+        <table class="bt">
+          <tr><td>Int</td><td>machine-word integer; default index type</td></tr>
+          <tr><td>UInt</td><td>machine-word</td></tr>
+          <tr><td>Int8 … Int64</td><td>sized integers</td></tr>
+          <tr><td>Float64</td><td>default floating point (also Float32, Float16, and special-purpose 8-bit FP8 and 4-bit FP4 floats)</td></tr>
+          <tr><td>Bool</td><td>True / False</td></tr>
+          <tr><td>String</td><td>UTF-8, supports Unicode graphemes</td></tr>
+          <tr><td>List[T]</td><td>growable, homogeneous sequence</td></tr>
+          <tr><td>SIMD[dt, n]</td><td>n-wide numeric vector</td></tr>
+        </table>
+        <p class="note">Numeric types are <b>SIMD</b> vectors under the hood: scaling to vector
+          math is built in.</p>
+        <p class="note">No implicit numeric conversion: cast explicitly with <b>Float64(n)</b>, <b>Int(x)</b>, <b>String(v)</b>. Use <b>.cast</b> for SIMD vectors.</p>
+        <p class="note">Types are <b>PascalCase</b> (<b>Int</b>); names are <b>lower_snake_case</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Operators</h2>
+      <div class="body">
+        <table class="ops">
+          <tr><td>+ - * /</td><td>add, subtract, multiply, divide</td></tr>
+          <tr><td>//&nbsp;&nbsp;%</td><td>floor divide, modulo</td></tr>
+          <tr><td>**</td><td>power (2 ** 10), also pow(2, 10)</td></tr>
+          <tr><td>== !=</td><td>equal, not equal</td></tr>
+          <tr><td>&lt; &lt;= &gt; &gt;=</td><td>comparisons (chainable)</td></tr>
+          <tr><td class="k">and or not</td><td>logical, short-circuit</td></tr>
+          <tr><td>+= -=</td><td>compound assign (*=, /=, …)</td></tr>
+        </table>
+<pre class="code">a &lt; b &lt; c # chains to (a &lt; b) and (b &lt; c)</pre>
+      </div>
+    </section>
+
+    <section class="panel colbreak">
+      <h2>Strings &amp; printing</h2>
+      <div class="body">
+<pre class="code">var who = "Mojo"
+print("Hi, " + who) # concatenation
+print(t"Hi, {who}!") # interpolation
+print(1, 2, 3, end=": ") # keyword args
+
+var s = String(t"x = {1 + 1}") # to String
+var raw = r"C:\path" # raw string</pre>
+        <p class="note"><b>print</b> takes a t-string directly; cast with <b>String(...)</b> to use one elsewhere. Triple quotes make multi-line strings.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Control flow</h2>
+      <div class="body">
+<pre class="code">if x &gt; 0:
+    print("positive")
+elif x == 0:
+    print("zero")
+else:
+    print("negative")
+
+# ternary
+var kind = "even" if x % 2 == 0 else "odd"</pre>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Loops</h2>
+      <div class="body">
+<pre class="code">for i in range(5): # 0 1 2 3 4
+    print(i)
+
+for item in [10, 20, 30]: # iterate an array
+    if item == 20:
+        continue # skip to next
+    if item == 30:
+        break # stop the loop
+    print(item)
+
+while n &gt; 0: # loop while true
+    print(n)
+    n -= 1</pre>
+        <p class="note">Repeat n times with <b>for _ in range(n)</b> (<b>_</b> discards the value).</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Functions</h2>
+      <div class="body">
+<pre class="code">def add(a: Int, b: Int) -> Int:
+    return a + b
+
+def greet(name: String = "world"): # default
+    print(t"Hi, {name}")
+
+def risky() raises: # may raise
+    raise Error("boom")
+
+def nothing():
+    pass # do-nothing body</pre>
+        <p class="note">No <code>-&gt;</code> means the function returns <b>None</b>. <code>def</code> can raise only if marked <b>raises</b>, so callers can see it coming.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Imports</h2>
+      <div class="body">
+<pre class="code">from std.math import sqrt # one name
+from std.math import sqrt as root # aliased</pre>
+<p class="note">Built-ins like <b>Int</b>, <b>String</b>, <b>List</b>, and <b>print</b> are in
+  the Mojo prelude, no import needed.</p>
+      </div>
+    </section>
+
+    <section class="panel colbreak">
+      <h2>Lists</h2>
+      <div class="body">
+<pre class="code">var xs: List[Int] = [1, 2, 3]
+xs.append(4)
+print(xs[0]) # 1
+print(len(xs)) # 4</pre>
+        <p class="note">Always annotate <b>List[T]</b>: a bare bracket literal infers a fixed-size
+          <b>Array</b>, which has no <b>append</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Structs</h2>
+      <div class="body">
+<pre class="code">@fieldwise_init # synthesizes __init__
+struct Point:
+    var x: Int
+    var y: Int
+
+struct Counter:
+    var n: Int
+    def __init__(out self): # builds self
+        self.n = 0
+    def bump(mut self): # modifies self
+        self.n += 1
+
+def main():
+    var p = Point(3, 4)
+    print(p.x, p.y) # 3 4</pre>
+        <p class="note">Every instance method takes <b>self</b> as its first argument. The <b>out</b> convention returns the initialized <b>self</b> without a return arrow. Structs also support <b>comptime</b> constants and static methods (<b>@staticmethod</b>).</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Errors</h2>
+      <div class="body">
+<pre class="code">def risky() raises:
+    raise Error("boom")
+
+def main():
+    try:
+        risky()
+    except e:
+        print("caught:", e)</pre>
+        <p class="note">Mark a raising function <b>raises</b>; <b>raise</b> signals, <b>try</b>/<b>except</b> catches. <b>except e</b> binds the error.</p>
+      </div>
+    </section>
+
+    <section class="panel py">
+      <h2>Coming from Python</h2>
+      <div class="body">
+        <ul>
+          <li>Every value has a fixed type. No implicit numeric conversion: write
+            <code>Float64(n)</code>, <code>Int(x)</code>.</li>
+          <li>Assignment copies the value; it is not a shared reference.</li>
+          <li>String interpolation is <code>t"…"</code>, not <code>f"…"</code>.</li>
+          <li>Declare with <b>var</b> (and <b>ref</b>) rather than a bare <code>x = 5</code>.</li>
+          <li>No <b>match</b> yet: use <code>if/elif/else</code>.</li>
+          <li>A <code>def</code> with no <code>-&gt;</code> returns <b>None</b>, same as Python.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel py">
+      <h2>Coming from C++ / Rust</h2>
+      <div class="body">
+        <ul>
+          <li>Python-style syntax: indentation and <code>def</code>, no braces, semicolons, or headers.</li>
+          <li>Value semantics with moves: <code>^</code> transfers ownership (like
+            <code>std::move</code> or a Rust move); <code>__deinit__</code> gives RAII cleanup.</li>
+          <li>Behavior comes from <b>traits</b>, not class inheritance or templates (like Rust
+            traits or C++20 concepts).</li>
+          <li>No <code>?:</code> ternary or Elvis operator: write <code>a if cond else b</code>.</li>
+          <li>No <b>switch</b> yet: use <code>if/elif/else</code>.</li>
+        </ul>
+      </div>
+    </section>

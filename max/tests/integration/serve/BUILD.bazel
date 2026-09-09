@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -28,7 +27,7 @@ modular_py_test(
     }),  # FIXME: MOCO-2411
     deps = [
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/serve",
@@ -40,6 +39,24 @@ modular_py_test(
         requirement("httpx"),
         requirement("pytest-asyncio"),
         requirement("sse-starlette"),
+    ],
+)
+
+modular_py_test(
+    name = "test_stream_chunk_coalescing",
+    size = "small",
+    srcs = [
+        "test_stream_chunk_coalescing.py",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    deps = [
+        "//max/python/max/pipelines/context",
+        "//max/python/max/serve:config",
+        "//max/python/max/serve/pipelines",
+        requirement("pytest-asyncio"),
     ],
 )
 
@@ -60,6 +77,23 @@ modular_py_test(
     env = {
         "PIPELINES_TESTDATA": "max/tests/integration/architectures/llama3/testdata",
     },
+    ignore_extra_deps = [
+        # Imported via string lookup
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+        "//max/python/max/pipelines/architectures/mpnet",
+        # pydeps can't attribute this import to opentelemetry-proto: the
+        # opentelemetry.* namespace is shared across many separate wheels
+        # (api, sdk, exporter-otlp-proto-http, proto, ...), and its
+        # heuristic attributes opentelemetry.proto.* to one of the
+        # already-present sibling wheels instead.
+        requirement("opentelemetry-proto"),
+    ],
+    ignore_unresolved_imports = [
+        # pydeps matches on the full dotted path including the imported
+        # symbol, not just the module.
+        "opentelemetry.proto.collector.metrics.v1.metrics_service_pb2.ExportMetricsServiceRequest",
+    ],
     tags = [
         "no-sandbox",
         "requires-network",
@@ -74,7 +108,10 @@ modular_py_test(
     deps = [
         "//max/python/max/driver",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+        "//max/python/max/pipelines/architectures/mpnet",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/serve",
@@ -82,10 +119,10 @@ modular_py_test(
         "//max/python/max/serve/pipelines",
         "//max/python/max/serve/schemas",
         "//max/python/max/serve/telemetry",
-        "//max/tests/integration:hf_repo_lock",
         "//max/tests/integration/test_common:test_data",
         requirement("async-asgi-testclient"),
         requirement("fastapi"),
+        requirement("opentelemetry-proto"),
         requirement("pytest-asyncio"),
         requirement("requests"),
         requirement("sse-starlette"),
@@ -102,7 +139,7 @@ modular_py_test(
     ],
     exec_properties = {
         # Ensure the test has at least 16GB of GPU memory available.
-        "test.resources:gpu-memory": "16",
+        "test.resources:gpu-memory": "19",
     },
     gpu_constraints = [
         "//:has_gpu",
@@ -154,6 +191,11 @@ modular_py_test(
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
+    ignore_extra_deps = [
+        # SmolLM (Llama arch) is loaded via registry string lookup.
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+    ],
     tags = [
         "gpu",
         "no-sandbox",
@@ -164,7 +206,9 @@ modular_py_test(
     deps = [
         "//max/python/max/driver",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/serve",
@@ -182,16 +226,65 @@ modular_py_test(
 )
 
 modular_py_test(
+    name = "test_batch_determinism_gpu",
+    size = "enormous",
+    srcs = [
+        "__init__.py",
+        "conftest.py",
+        "test_batch_determinism_gpu.py",
+    ],
+    exec_properties = {
+        # Ensure the test has at least 23GB of GPU memory available.
+        "test.resources:gpu-memory": "23",
+    },
+    gpu_constraints = [
+        "//:has_gpu",
+        "//:nvidia_gpu",
+    ] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    ignore_extra_deps = [
+        # SmolLM (Llama arch) is loaded via registry string lookup.
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+    ],
+    tags = [
+        "gpu",
+        "no-sandbox",
+        "requires-network",
+        # Manual until the determinism CI lane is wired (test plan Slice 4).
+        "manual",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/llama3",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/serve",
+        "//max/python/max/serve:config",
+        "//max/python/max/serve/pipelines",
+        "//max/python/max/serve/telemetry",
+        requirement("async-asgi-testclient"),
+        requirement("pytest-asyncio"),
+        requirement("sse-starlette"),
+        requirement("fastapi"),
+    ],
+)
+
+modular_py_test(
     name = "test_warm_cache_target",
     size = "large",
     srcs = [
         "test_warm_cache_target.py",
     ],
     data = [
-        "//max/python/max/entrypoints:pipelines",
+        "//max/python/max/_entrypoints:pipelines",
     ],
     tags = [
-        "AITLIB-293",
         "manual",
         "no-pydeps",  # TODO: Fix and re-enable
         "no-sandbox",
@@ -203,34 +296,7 @@ modular_py_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
-        "//max/python/max/entrypoints",
-    ],
-)
-
-modular_py_test(
-    name = "test_fp8_kv_toy_model",
-    size = "large",
-    srcs = [
-        "test_fp8_kv_toy_model.py",
-    ],
-    exec_properties = {
-        # FP8 MHA kernels require SM100 (B200). Minimal memory footprint.
-        "test.resources:gpu-memory": "4",
-    },
-    tags = [
-        "gpu",
-    ],
-    target_compatible_with = ["//:b200_gpu"],
-    deps = [
-        "//max/python/max/driver",
-        "//max/python/max/dtype",
-        "//max/python/max/engine",
-        "//max/python/max/graph",
-        "//max/python/max/nn",
-        "//max/python/max/pipelines/core",
-        "//max/python/max/pipelines/kv_cache",
-        "//max/python/max/pipelines/modeling",
-        requirement("numpy"),
+        "//max/python/max/_entrypoints",
     ],
 )
 
@@ -240,19 +306,21 @@ modular_py_test(
     srcs = [
         "test_max_serve_e2e.py",
     ],
+    ignore_extra_deps = [
+        # Imported at runtime via string lookup
+        "//max/python/max/pipelines/architectures/llama3",
+    ],
     tags = [
+        "no-sandbox",
         "requires-network",
     ],
-    # TODO(GEX-3155): Times out on remote macOS CI (~374s due to model compilation)
-    target_compatible_with = select({
-        "@platforms//os:macos": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
+    # Note this test is a critical part of local max serve debugging workflow
+    # and should not be disabled on mac os. Please fix Mac CI runners instead.
     deps = [
+        "//max/python/max/_entrypoints",
         "//max/python/max/driver",
-        "//max/python/max/entrypoints",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/architectures/llama3",
         "//max/python/max/serve:config",
         requirement("httpx"),
         requirement("pytest-asyncio"),

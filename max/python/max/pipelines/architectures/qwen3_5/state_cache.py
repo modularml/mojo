@@ -75,9 +75,22 @@ class GatedDeltaNetStateCache:
         key_head_dim: int,
         value_head_dim: int,
         max_slots: int,
-        device: Device,
+        devices: list[Device],
         dtype: DType = DType.float32,
     ) -> None:
+        """Allocates one pool set per device.
+
+        Args:
+            num_layers: Number of linear-attention layers.
+            conv_dim: Conv width **per device** (the tensor-parallel shard).
+            conv_kernel_size: Causal conv kernel size; the window is one less.
+            num_v_heads: Value heads **per device**.
+            key_head_dim: Key head dimension.
+            value_head_dim: Value head dimension.
+            max_slots: Concurrent requests the pool can hold.
+            devices: Devices the value heads are split across.
+            dtype: Pool storage dtype.
+        """
         self._num_layers = num_layers
         self._conv_dim = conv_dim
         self._conv_kernel = conv_kernel_size - 1  # K-1 (state window size)
@@ -85,38 +98,34 @@ class GatedDeltaNetStateCache:
         self._key_head_dim = key_head_dim
         self._value_head_dim = value_head_dim
         self._max_slots = max_slots
-        self._device = device
+        self._devices = devices
         self._dtype = dtype
 
-        # Pre-allocate GPU state pools (zero-initialised).
-        # conv_pool[l]: [max_slots, conv_dim, K-1]
-        # rec_pool[l]:  [max_slots, num_v_heads, key_head_dim, val_head_dim]
+        conv_shape = [max_slots, conv_dim, conv_kernel_size - 1]
+        rec_shape = [max_slots, num_v_heads, key_head_dim, value_head_dim]
+
+        # Pre-allocate GPU state pools (zero-initialised), device-major so the
+        # flat `conv_pools` / `rec_pools` views match the graph input order.
         self._conv_pool: list[Buffer] = [
-            Buffer.zeros(
-                [max_slots, conv_dim, conv_kernel_size - 1],
-                dtype,
-                device,
-            )
+            Buffer.zeros(conv_shape, dtype, device)
+            for device in devices
             for _ in range(num_layers)
         ]
         self._rec_pool: list[Buffer] = [
-            Buffer.zeros(
-                [max_slots, num_v_heads, key_head_dim, value_head_dim],
-                dtype,
-                device,
-            )
+            Buffer.zeros(rec_shape, dtype, device)
+            for device in devices
             for _ in range(num_layers)
         ]
 
         # Pre-allocated zero buffers used to wipe a slot on claim().
-        self._zero_conv = Buffer.zeros(
-            [1, conv_dim, conv_kernel_size - 1], dtype, device
-        )
-        self._zero_rec = Buffer.zeros(
-            [1, num_v_heads, key_head_dim, value_head_dim],
-            dtype,
-            device,
-        )
+        self._zero_conv = [
+            Buffer.zeros([1, *conv_shape[1:]], dtype, device)
+            for device in devices
+        ]
+        self._zero_rec = [
+            Buffer.zeros([1, *rec_shape[1:]], dtype, device)
+            for device in devices
+        ]
 
         self._free_slots: set[int] = set(range(max_slots))
         self._request_to_slot: dict[RequestID, int] = {}
@@ -124,10 +133,16 @@ class GatedDeltaNetStateCache:
         # Reusable host-pinned staging buffer for the per-step slot_idx H2D.
         # Sized at max_slots since batch_size is bounded by the number of
         # claimable slots; allocated once here so slot_idx_for() doesn't
-        # allocate on the per-step path.
-        self._pinned_slot_idx = DevicePinnedBuffer(
-            shape=(max_slots,), dtype=DType.uint32, device=device
-        )
+        # allocate on the per-step path. Pinned memory requires an
+        # accelerator; on host devices (CPU tests) a plain Buffer suffices.
+        self._pinned_slot_idx: list[Buffer] = [
+            Buffer.zeros([max_slots], DType.uint32, device)
+            if device.is_host
+            else DevicePinnedBuffer(
+                shape=(max_slots,), dtype=DType.uint32, device=device
+            )
+            for device in devices
+        ]
 
         elem_bytes = dtype.size_in_bytes
         conv_bytes = (
@@ -145,11 +160,13 @@ class GatedDeltaNetStateCache:
             * value_head_dim
             * elem_bytes
         )
+        self._bytes_per_slot = (conv_bytes + rec_bytes) // max_slots
         logger.info(
             f"GatedDeltaNet state pool: {max_slots} slots x {num_layers} layers"
             f" — conv {to_human_readable_bytes(conv_bytes)}"
             f" + rec {to_human_readable_bytes(rec_bytes)}"
-            f" = {to_human_readable_bytes(conv_bytes + rec_bytes)} on {device}"
+            f" = {to_human_readable_bytes(conv_bytes + rec_bytes)}"
+            f" on each of {devices}"
         )
 
     @property
@@ -163,18 +180,28 @@ class GatedDeltaNetStateCache:
         return len(self._request_to_slot)
 
     @property
+    def bytes_per_slot(self) -> int:
+        """Bytes one slot occupies on one device, across every layer.
+
+        Under tensor parallelism the recorded dimensions are already
+        per-device shard widths, so this is ``1 / num_devices`` of what a
+        request costs in total.
+        """
+        return self._bytes_per_slot
+
+    @property
     def max_slots(self) -> int:
         """Maximum number of concurrent requests supported."""
         return self._max_slots
 
     @property
     def conv_pools(self) -> list[Buffer]:
-        """Per-layer conv pool buffers, shape ``[max_slots, conv_dim, K-1]``."""
+        """Device-major conv pools, shape ``[max_slots, conv_dim, K-1]``."""
         return self._conv_pool
 
     @property
     def rec_pools(self) -> list[Buffer]:
-        """Per-layer recurrent pool buffers, shape ``[max_slots, ...]``."""
+        """Device-major recurrent pools, shape ``[max_slots, ...]``."""
         return self._rec_pool
 
     def claim(self, request_id: RequestID) -> int:
@@ -202,11 +229,25 @@ class GatedDeltaNetStateCache:
             )
         slot = self._free_slots.pop()
         self._request_to_slot[request_id] = slot
-        # Zero the slot rows in both pools via GPU-to-GPU copy.
-        for l in range(self._num_layers):
-            self._conv_pool[l][slot, :, :].inplace_copy_from(self._zero_conv)
-            self._rec_pool[l][slot, :, :, :].inplace_copy_from(self._zero_rec)
+        self.zero_slot(slot)
         return slot
+
+    def zero_slot(self, slot: int) -> None:
+        """Wipes one slot's rows in every device's pools via GPU-to-GPU copy.
+
+        Split out of :meth:`claim` so a caller that owns slot allocation
+        itself -- a tensor-parallel model holding one of these per device --
+        can reuse the buffers without also inheriting the bookkeeping.
+        """
+        for d in range(len(self._devices)):
+            for l in range(self._num_layers):
+                i = d * self._num_layers + l
+                self._conv_pool[i][slot, :, :].inplace_copy_from(
+                    self._zero_conv[d]
+                )
+                self._rec_pool[i][slot, :, :, :].inplace_copy_from(
+                    self._zero_rec[d]
+                )
 
     def release(self, request_id: RequestID) -> None:
         """Free a slot, making it available for future requests.
@@ -224,49 +265,55 @@ class GatedDeltaNetStateCache:
         return request_id in self._request_to_slot
 
     def slot_idx_for(
-        self, request_ids: list[RequestID], prealloc: Buffer
-    ) -> Buffer:
-        """Populate ``prealloc[:B]`` with this batch's slot indices.
+        self, request_ids: list[RequestID], preallocs: list[Buffer]
+    ) -> list[Buffer]:
+        """Populate each device's ``prealloc[:B]`` with the batch's slots.
 
-        Writes the slot for each request into the front of a caller-owned
-        device buffer using a host-pinned staging buffer + ``inplace_copy_from``,
-        so no fresh device buffer is allocated on the per-step path. The
-        returned slice is what graph callers should pass as the ``slot_idx``
-        kernel input.
+        Writes the slot for each request into the front of caller-owned
+        device buffers using host-pinned staging + ``inplace_copy_from``, so
+        no fresh device buffer is allocated on the per-step path. Every device
+        gets the same indices — the pools are split by head, not by request.
 
         Args:
             request_ids: Ordered list of request IDs forming the batch.
-            prealloc: Device-resident uint32 buffer of shape ``[max_slots]``
-                (or larger), allocated once at model load time.
+            preallocs: One device-resident uint32 buffer of shape
+                ``[max_slots]`` (or larger) per device, allocated once at
+                model load time.
 
         Returns:
-            View into ``prealloc[:len(request_ids)]`` containing the slot
-            indices for this batch.
+            One view into ``prealloc[:len(request_ids)]`` per device.
 
         Raises:
-            ValueError: If ``request_ids`` is empty or larger than
+            ValueError: If ``request_ids`` is empty or larger than a
                 ``prealloc``.
             KeyError: If any request ID has no claimed slot.
         """
         batch_size = len(request_ids)
         if batch_size == 0:
             raise ValueError("request_ids must not be empty")
-        if batch_size > prealloc.shape[0]:
-            raise ValueError(
-                f"slot_idx_for: batch_size {batch_size} exceeds prealloc "
-                f"capacity {prealloc.shape[0]}"
-            )
+        for prealloc in preallocs:
+            if batch_size > prealloc.shape[0]:
+                raise ValueError(
+                    f"slot_idx_for: batch_size {batch_size} exceeds prealloc "
+                    f"capacity {prealloc.shape[0]}"
+                )
         for rid in request_ids:
             if rid not in self._request_to_slot:
                 raise KeyError(
                     f"Request {rid} not found in GatedDeltaNet state cache. "
                     "Call claim() before slot_idx_for()."
                 )
-        self._pinned_slot_idx.to_numpy()[:batch_size] = np.fromiter(
+        slots = np.fromiter(
             (self._request_to_slot[rid] for rid in request_ids),
             dtype=np.uint32,
             count=batch_size,
         )
-        view = prealloc[:batch_size]
-        view.inplace_copy_from(self._pinned_slot_idx[:batch_size])
-        return view
+        views = []
+        for prealloc, pinned in zip(
+            preallocs, self._pinned_slot_idx, strict=True
+        ):
+            pinned.to_numpy()[:batch_size] = slots
+            view = prealloc[:batch_size]
+            view.inplace_copy_from(pinned[:batch_size])
+            views.append(view)
+        return views

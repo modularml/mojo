@@ -24,9 +24,9 @@ import io
 from dataclasses import dataclass, field
 from fractions import Fraction
 
-import av
 import numpy as np
 import numpy.typing as npt
+from max.pipelines.context import open_video_container
 from PIL import Image
 
 from .processing_utils import (
@@ -57,6 +57,29 @@ def _sample_frame_indices(total_frames: int, num_frames: int) -> list[int]:
         return list(range(total_frames))
     indices = np.linspace(0, total_frames - 1, num_frames, dtype=int).tolist()
     return indices
+
+
+def _decode_frames_at(
+    video_bytes: bytes, indices: list[int]
+) -> tuple[dict[int, Image.Image], int]:
+    """Decodes one pass, keeping only the frames at ``indices``.
+
+    Frames outside ``indices`` are dropped as they stream, so peak memory is
+    the kept frames plus one in-flight frame rather than the whole clip.
+
+    Returns:
+        A ``(kept, actual_total)`` tuple: the kept frames by index, and how
+        many frames the decode actually produced.
+    """
+    wanted = set(indices)
+    kept: dict[int, Image.Image] = {}
+    actual = 0
+    with open_video_container(io.BytesIO(video_bytes)) as container:
+        for idx, frame in enumerate(container.decode(video=0)):
+            if idx in wanted:
+                kept[idx] = frame.to_image().convert("RGB")
+            actual = idx + 1
+    return kept, actual
 
 
 class Gemma4VideoProcessor:
@@ -128,40 +151,55 @@ class Gemma4VideoProcessor:
             pooling_kernel_size=self.pooling_kernel_size,
         )
 
+    def _frame_indices(self, total_frames: int) -> list[int]:
+        if self.do_sample_frames:
+            return _sample_frame_indices(total_frames, self.num_frames)
+        return list(range(total_frames))
+
     def _decode_video(
         self, video_bytes: bytes
     ) -> tuple[list[Image.Image], VideoMetadata]:
         """Decode video bytes into uniformly-sampled PIL frames + metadata.
 
+        Sampling indices are chosen up front (from the container-declared
+        frame count, or a counting decode when the header omits it) so only
+        the sampled frames are ever materialized as PIL images. Decoding the
+        whole clip first peaks at the full video as uncompressed rasters --
+        ~100 GB for a 10-minute 1080p clip -- in the API server process.
+
         Returns:
             A tuple of (sampled_frames, metadata) where metadata contains
             the source fps and per-frame timestamps in seconds.
         """
-        container = av.open(io.BytesIO(video_bytes))
-        assert isinstance(container, av.container.InputContainer)
+        with open_video_container(io.BytesIO(video_bytes)) as container:
+            stream = container.streams.video[0]
+            avg_rate: Fraction | None = stream.average_rate
+            fps = float(avg_rate) if avg_rate else None
+            total_frames = stream.frames or 0
 
-        stream = container.streams.video[0]
-        avg_rate: Fraction | None = stream.average_rate
-        fps = float(avg_rate) if avg_rate else None
-
-        all_frames: list[Image.Image] = []
-        for frame in container.decode(video=0):
-            all_frames.append(frame.to_image().convert("RGB"))
-        container.close()
-
-        if not all_frames:
+        if total_frames <= 0:
+            # The header omits a frame count; count with a decode that
+            # retains nothing.
+            with open_video_container(io.BytesIO(video_bytes)) as container:
+                total_frames = sum(1 for _ in container.decode(video=0))
+        if total_frames <= 0:
             raise ValueError("Video contains no decodable frames.")
 
-        if self.do_sample_frames:
-            indices = _sample_frame_indices(len(all_frames), self.num_frames)
-        else:
-            indices = list(range(len(all_frames)))
+        indices = self._frame_indices(total_frames)
+        kept, actual_total = _decode_frames_at(video_bytes, indices)
+        if actual_total != total_frames:
+            # The container header lied about the frame count; resample from
+            # the count the decode actually produced.
+            if actual_total <= 0:
+                raise ValueError("Video contains no decodable frames.")
+            indices = self._frame_indices(actual_total)
+            kept, _ = _decode_frames_at(video_bytes, indices)
 
         effective_fps = fps or 24.0
         timestamps = [idx / effective_fps for idx in indices]
 
         return (
-            [all_frames[i] for i in indices],
+            [kept[i] for i in indices],
             VideoMetadata(fps=fps, timestamps=timestamps),
         )
 

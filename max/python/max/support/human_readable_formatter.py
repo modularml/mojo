@@ -14,7 +14,7 @@
 """Private helper function for formatting various quantities into human readable strings."""
 
 
-def to_human_readable_bytes(bytes: int | float) -> str:
+def to_human_readable_bytes(bytes: float) -> str:
     """Convert bytes to human readable memory size."""
     KiB = 1024
     MiB = KiB * 1024
@@ -30,7 +30,7 @@ def to_human_readable_bytes(bytes: int | float) -> str:
     return f"{bytes / KiB:.2f} KiB"
 
 
-def to_human_readable_latency(s: int | float) -> str:
+def to_human_readable_latency(s: float) -> str:
     """Converts seconds to human readable latency."""
     if s >= 1:
         return f"{s:.2f}s"

@@ -1,0 +1,3 @@
+# Per-run fuzz logs (JSONL). The curated regression corpus/ is tracked; these
+# transient run logs are not.
+.fuzzruns/

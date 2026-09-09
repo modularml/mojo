@@ -182,20 +182,20 @@ def test_micro_kernel[
 
 
 @export
-def kernel_export_dynamic(m: Int, n: Int, k: Int) abi("C") raises:
-    test_micro_kernel[DType.float32, DType.float32, DType.float32](m, n, k)
+def kernel_export_dynamic(m: Int, n: Int, k: Int) abi("Mojo") raises:
+    test_micro_kernel[.float32, DType.float32, DType.float32](m, n, k)
 
 
 def main() raises:
-    test_micro_kernel[DType.float32, DType.float32, DType.float32](M, N, K)
-    test_micro_kernel[DType.uint8, DType.int8, DType.int32](M, N, K)
+    test_micro_kernel[.float32, DType.float32, DType.float32](M, N, K)
+    test_micro_kernel[.uint8, DType.int8, DType.int32](M, N, K)
     test_micro_kernel[
         DType.uint8, DType.int8, DType.int32, saturated_vnni=True
     ](M, N, K)
 
-    test_micro_kernel[DType.bfloat16, DType.bfloat16, DType.bfloat16](M, N, K)
-    test_micro_kernel[DType.bfloat16, DType.bfloat16, DType.float32](M, N, K)
+    test_micro_kernel[.bfloat16, DType.bfloat16, DType.bfloat16](M, N, K)
+    test_micro_kernel[.bfloat16, DType.bfloat16, DType.float32](M, N, K)
 
     # Test int8 x int8 -> int8 to ensure it doesn't dispatch to i8mm (which
     # requires 32-bit output). Use smaller k to fit in int8 range.
-    test_micro_kernel[DType.int8, DType.int8, DType.int8](M, N, 100)
+    test_micro_kernel[.int8, DType.int8, DType.int8](M, N, 100)

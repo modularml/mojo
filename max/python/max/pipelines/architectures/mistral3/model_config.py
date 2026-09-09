@@ -15,9 +15,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
 from max.pipelines.architectures.mistral.model_config import MistralConfig
 from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.modeling.config_enums import SupportedEncoding
+from transformers import AutoConfig
 from typing_extensions import Self, override
 
 
@@ -25,12 +28,30 @@ from typing_extensions import Self, override
 class Mistral3Config(MistralConfig):
     """Configuration for Mistral3 models."""
 
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {"bfloat16"}
+
+    @override
+    @classmethod
+    def calculate_max_seq_len(
+        cls,
+        huggingface_config: AutoConfig,
+        model_config: MAXModelConfig,
+    ) -> int:
+        """Bounds against the text config's ``max_position_embeddings``."""
+        huggingface_config = getattr(
+            huggingface_config, "text_config", huggingface_config
+        )
+        return super().calculate_max_seq_len(huggingface_config, model_config)
+
     @override
     @classmethod
     def initialize(
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a MistralConfig instance from pipeline configuration.
 
@@ -52,5 +73,7 @@ class Mistral3Config(MistralConfig):
                 "Please ensure the model repository contains a valid config.json file."
             )
         return cls.initialize_from_config(
-            pipeline_config, huggingface_config.text_config
+            pipeline_config,
+            huggingface_config.text_config,
+            max_seq_len=max_seq_len,
         )

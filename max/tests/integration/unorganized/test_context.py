@@ -17,24 +17,20 @@ from typing import Any
 
 import numpy as np
 import pytest
-from max.pipelines.core import (
-    PixelContext,
-    SpecDecodingState,
-    TextAndVisionContext,
-    TextContext,
-    TTSContext,
-)
-from max.pipelines.core.context import FUTURE_TOKEN
-from max.pipelines.modeling.types import (
+from max.pipelines.context import (
     EOSTracker,
     GenerationStatus,
     ImageMetadata,
-    PixelGenerationContext,
-    RequestID,
+    PixelContext,
     SamplingParams,
-    TextGenerationContext,
+    SpecDecodingState,
+    TextAndVisionContext,
+    TextContext,
     TokenBuffer,
-    VLMTextGenerationContext,
+)
+from max.pipelines.context.context import FUTURE_TOKEN
+from max.pipelines.modeling.types import (
+    RequestID,
     msgpack_numpy_decoder,
     msgpack_numpy_encoder,
 )
@@ -492,6 +488,26 @@ def test_context_serializable() -> None:
     assert dataclass_equal(msgpack_decoded, original_context)
 
 
+def test_dkv_cache_hint_survives_serialization() -> None:
+    # The hint is carried, never read, so the only thing MAX owes it is that
+    # the bytes reaching the model worker are the bytes that arrived on the
+    # request (CLIN-1630). Its predecessor needed a tagged msgspec struct to
+    # cross this boundary; raw bytes need nothing, and this pins that.
+    hint = b'{"version":2,"instances":[{"instance_name":"dkv-peer"}]}'
+    original_context = TextContext(
+        request_id=RequestID(),
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
+        dkv_cache_hint=hint,
+    )
+
+    serialize = msgpack_numpy_encoder()
+    deserialize = msgpack_numpy_decoder(TextContext)
+    decoded = deserialize(serialize(original_context))
+
+    assert decoded.dkv_cache_hint == hint
+
+
 def test_context_tuple_serializable() -> None:
     # Test that we can encode a tuple of (str, TextContext) with Pickle
     original_context = TextContext(
@@ -605,65 +621,6 @@ def test_text_and_vision_context_tuple_serializable() -> None:
     assert dataclass_equal(msgpack_decoded[1], original_tuple[1])
 
 
-def test_tts_context_msgpack_serialization_and_speech_tokens() -> None:
-    """Tests that TTSContext can be serialized/deserialized with msgpack and that _speech_tokens can be written to after deserialization."""
-    # Create a TTSContext with some audio prompt tokens
-    audio_prompt_tokens = np.array([100, 101, 102, 103], dtype=np.int32)
-    original_context = TTSContext(
-        max_length=50,
-        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
-        audio_prompt_tokens=audio_prompt_tokens,
-        sampling_params=SamplingParams(temperature=0.8),
-    )
-
-    # Add some initial speech tokens to the context
-    initial_speech_tokens = np.array([200, 201, 202], dtype=np.int32)
-    original_context.update_speech_tokens(initial_speech_tokens)
-
-    # Verify initial state
-    assert np.array_equal(
-        original_context.audio_prompt_tokens, audio_prompt_tokens
-    )
-    assert np.array_equal(original_context.speech_tokens, initial_speech_tokens)
-    assert original_context._speech_token_end_idx == 3
-    assert original_context.block_counter == 1
-
-    # Test that we can encode TTSContext with MsgPack
-    serialize = msgpack_numpy_encoder()
-    deserialize = msgpack_numpy_decoder(TTSContext)
-    msgpack_encoded = serialize(original_context)
-    msgpack_decoded = deserialize(msgpack_encoded)
-
-    # Verify the deserialized context matches the original
-    assert isinstance(msgpack_decoded, TTSContext)
-    assert dataclass_equal(msgpack_decoded, original_context)
-    assert np.array_equal(
-        msgpack_decoded.audio_prompt_tokens, audio_prompt_tokens
-    )
-    assert np.array_equal(msgpack_decoded.speech_tokens, initial_speech_tokens)
-    assert msgpack_decoded._speech_token_end_idx == 3
-    assert msgpack_decoded.block_counter == 1
-
-    # Test writing to the _speech_tokens array after deserialization
-    new_speech_tokens = np.array([300, 301, 302, 303], dtype=np.int32)
-    msgpack_decoded.update_speech_tokens(new_speech_tokens)
-
-    # Verify that the new speech tokens were added correctly
-    expected_combined_tokens = np.concatenate(
-        [initial_speech_tokens, new_speech_tokens]
-    )
-    assert np.array_equal(
-        msgpack_decoded.speech_tokens, expected_combined_tokens
-    )
-    assert msgpack_decoded._speech_token_end_idx == 7
-    assert msgpack_decoded.block_counter == 2
-
-    # Verify that the original context was not affected
-    assert np.array_equal(original_context.speech_tokens, initial_speech_tokens)
-    assert original_context._speech_token_end_idx == 3
-    assert original_context.block_counter == 1
-
-
 def test_text_context_update_with_future_token() -> None:
     context = TextContext(
         max_length=50,
@@ -694,15 +651,73 @@ def test_text_context_update_with_future_token() -> None:
 
     assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 5, FUTURE_TOKEN]
     assert context.status == GenerationStatus.ACTIVE
-    with pytest.raises(
-        ValueError,
-        match=r"Attempted to create generation output while future token is not yet realized",
-    ):
-        context.to_generation_output()
+    # The unrealized placeholder is held back from the output; only the
+    # realized prefix streams. (Previously this raised; the consumed window
+    # is now clamped to the realized prefix so an in-flight forward's
+    # placeholder can never leak into a response.)
+    output = context.to_generation_output()
+    assert output.tokens == [5]
+    assert FUTURE_TOKEN not in output.tokens
 
     context.realize_future_token(42)
     assert context.tokens.all.tolist() == [0, 1, 2, 3, 4, 5, 42]
     assert context.status == GenerationStatus.END_OF_SEQUENCE
+    assert context.to_generation_output().tokens == [42]
+
+
+def test_text_context_future_token_skipped_during_chunked_prefill() -> None:
+    """Chunked-prefill continuations must not write a future-token placeholder.
+
+    The overlap pipeline calls ``update_with_future_token`` on every context in
+    the batch each step, including requests still in (chunked) prefill. For an
+    actively-chunked context, ``advance_token_buffer`` advances the chunk and
+    early-returns WITHOUT writing a ``FUTURE_TOKEN``, so a later chunked step
+    must not raise "Cannot have multiple future tokens."
+    """
+    context = TextContext(
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int64)),
+        eos_tracker=EOSTracker(eos_token_ids={42}),
+    )
+
+    context.tokens.chunk(4)
+    assert context.tokens.actively_chunked
+    context.update_with_future_token()
+    assert context.tokens.generated_length == 0
+    assert FUTURE_TOKEN not in context.tokens.all.tolist()
+
+    context.tokens.chunk(2)
+    assert context.tokens.actively_chunked
+    context.update_with_future_token()
+    assert context.tokens.generated_length == 0
+    assert FUTURE_TOKEN not in context.tokens.all.tolist()
+
+    assert not context.tokens.actively_chunked
+    context.update_with_future_token()
+    assert context.tokens.all.tolist()[-1] == FUTURE_TOKEN
+
+    context.realize_future_token(9)
+    assert context.tokens.all.tolist()[-1] == 9
+
+
+def test_text_context_last_realized_token() -> None:
+    """last_realized_token skips an unrealized overlap placeholder."""
+    context = TextContext(
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2, 3, 4], dtype=np.int64)),
+        eos_tracker=EOSTracker(eos_token_ids={42}),
+    )
+    assert context.last_realized_token == 4
+
+    context.update(5)
+    assert context.last_realized_token == 5
+
+    context.update_with_future_token()
+    assert context.tokens.all.tolist()[-1] == FUTURE_TOKEN
+    assert context.last_realized_token == 5
+
+    context.realize_future_token(6)
+    assert context.last_realized_token == 6
 
 
 def test_text_context_update_with_preemption_and_future_token() -> None:
@@ -721,6 +736,61 @@ def test_text_context_update_with_preemption_and_future_token() -> None:
     context.reset()
     assert context.tokens.all.tolist() == [0, 1, 2, 3, 4]
     assert context.tokens.generated_length == 0
+
+
+def test_text_context_to_generation_output_validates_vocab_size() -> None:
+    """Generated tokens must be non-negative and within vocab when vocab_size is set."""
+    request_id = RequestID()
+
+    context = TextContext(
+        request_id=request_id,
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2], dtype=np.int64)),
+        eos_tracker=EOSTracker(),
+        vocab_size=100,
+    )
+    context.update(42)
+    output = context.to_generation_output()
+    assert output.tokens == [42]
+    assert output.request_id == request_id
+
+    negative_context = TextContext(
+        request_id=request_id,
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2], dtype=np.int64)),
+        eos_tracker=EOSTracker(),
+        vocab_size=100,
+    )
+    negative_context.update(-1)
+    with pytest.raises(
+        RuntimeError,
+        match=r"Generated negative token_id=-1",
+    ):
+        negative_context.to_generation_output()
+
+    oob_context = TextContext(
+        request_id=request_id,
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2], dtype=np.int64)),
+        eos_tracker=EOSTracker(),
+        vocab_size=10,
+    )
+    oob_context.update(10)
+    with pytest.raises(
+        RuntimeError,
+        match=r"Generated out-of-vocabulary token_id=10.*\(valid range: \[0, 10\)\)",
+    ):
+        oob_context.to_generation_output()
+
+    unset_vocab_context = TextContext(
+        request_id=request_id,
+        max_length=50,
+        tokens=TokenBuffer(np.array([0, 1, 2], dtype=np.int64)),
+        eos_tracker=EOSTracker(),
+    )
+    unset_vocab_context.update(999)
+    output = unset_vocab_context.to_generation_output()
+    assert output.tokens == [999]
 
 
 def test_vision_context_reset() -> None:
@@ -969,6 +1039,37 @@ def test_text_and_vision_context_happy_case() -> None:
     assert len(ctx.next_images) == 0
 
 
+def test_text_and_vision_context_adjacent_images_allowed() -> None:
+    # Image ranges are half-open [start_idx, end_idx), so two images whose
+    # token runs touch (next.start_idx == prev.end_idx) do not overlap. Chat
+    # templates that emit no separator token between consecutive images
+    # produce exactly such touching ranges, and they must be accepted.
+    # fmt: off
+    #                                  |<-img0->|<-img1->|
+    #                   0   1   2   3   4   5   6   7   8   9
+    tokens = np.array([51, 52, 53, 54, 98, 98, 98, 98, 59, 60])
+    # fmt: on
+    ctx = TextAndVisionContext(
+        max_length=50,
+        tokens=TokenBuffer(tokens),
+        images=[
+            ImageMetadata(
+                start_idx=4,
+                end_idx=6,
+                pixel_values=np.array([99]),
+            ),
+            ImageMetadata(
+                start_idx=6,
+                end_idx=8,
+                pixel_values=np.array([99]),
+            ),
+        ],
+        vision_token_ids=[98],
+    )
+    assert len(ctx.images) == 2
+    assert ctx.needs_vision_encoding is True
+
+
 def test_text_and_vision_context_sad_case() -> None:
     # fmt: off
     #                                      |<-- img0 --->|                         |<--- img1 -->|
@@ -986,9 +1087,9 @@ def test_text_and_vision_context_sad_case() -> None:
                     end_idx=9,
                     pixel_values=np.array([99]),
                 ),
-                # This overlaps with img0
+                # This overlaps with img0 (starts at 8, before img0 ends at 9).
                 ImageMetadata(
-                    start_idx=9,
+                    start_idx=8,
                     end_idx=19,
                     pixel_values=np.array([99]),
                 ),
@@ -1079,19 +1180,17 @@ def does_not_raise_due_to_check_in_property_method() -> None:
     exception.
     """
 
-    ctx = TTSContext(
+    ctx = TextContext(
         max_length=10,
         tokens=TokenBuffer(np.array([0, 1, 2, 3], dtype=np.int64)),
     )
 
-    # Protocol structural checks should NOT trigger the method body!
-    # (TextGenerationContext, VLMTextGenerationContext, and PixelGenerationContext are Protocols)
-    _ = isinstance(ctx, TextGenerationContext)
-    # The original bug report indicated that MAX threw a ValueError in call to
-    # isinstance(ctx, VLMTextGenerationContext) so we are validating this case here.
-    # See GENAI-318 for details.
-    _ = isinstance(ctx, VLMTextGenerationContext)
-    _ = isinstance(ctx, PixelGenerationContext)
+    # isinstance checks against concrete context classes should not raise.
+    # The original bug report (GENAI-318) indicated that isinstance on VLM
+    # contexts threw a ValueError; validate the concrete-class equivalents.
+    assert isinstance(ctx, TextContext)
+    _ = isinstance(ctx, TextAndVisionContext)
+    _ = isinstance(ctx, PixelContext)
 
 
 def test_context__spec_decoding_state_lazy_init() -> None:
@@ -1208,3 +1307,61 @@ def test_pixel_context_tuple_serializable() -> None:
 
     assert msgpack_decoded[0] == original_tuple[0]
     assert dataclass_equal(msgpack_decoded[1], original_tuple[1])
+
+
+_VISION_TOKEN_ID = 98
+
+
+def _windowed_vision_context(
+    image_spans: list[tuple[int, int]],
+    seq_len: int,
+) -> TextAndVisionContext:
+    """Build a TextAndVisionContext with ``(start, end)`` images."""
+    tokens = np.ones(seq_len, dtype=np.int64)
+    images = []
+    for start, end in image_spans:
+        tokens[start:end] = _VISION_TOKEN_ID
+        images.append(
+            ImageMetadata(
+                start_idx=start,
+                end_idx=end,
+                pixel_values=np.zeros((2, 3), dtype=np.float32),
+            )
+        )
+    return TextAndVisionContext(
+        tokens=TokenBuffer(tokens),
+        max_length=4096,
+        vision_token_ids=[_VISION_TOKEN_ID],
+        images=images,
+    )
+
+
+def test_next_images_in_window_drops_images_ahead_of_window() -> None:
+    context = _windowed_vision_context([(4, 8), (12, 16), (20, 24)], seq_len=30)
+    # Nothing processed yet, full window: all three images unencoded.
+    assert len(context.next_images_in_window) == 3
+
+    # Chunk the active window to [0, 16): the third image (start_idx=20) is
+    # ahead of the window and must be dropped from the tail.
+    context.tokens.chunk(16)
+    windowed = context.next_images_in_window
+    assert [img.start_idx for img in windowed] == [4, 12]
+
+    # next_images_in_window is a prefix of next_images (drops only the tail).
+    assert [img.start_idx for img in windowed] == [
+        img.start_idx for img in context.next_images[: len(windowed)]
+    ]
+
+
+def test_next_images_in_window_includes_bisected_images_whole() -> None:
+    context = _windowed_vision_context([(4, 8), (12, 16), (20, 24)], seq_len=30)
+    # The chunk boundary bisects the second image (12..16): it overlaps the
+    # window, so it is included whole (the encoder cannot split an image).
+    context.tokens.chunk(14)
+    assert [img.start_idx for img in context.next_images_in_window] == [4, 12]
+
+    # A processed prefix that bisects the second image: it still overlaps the
+    # window [14, 30), so it stays; the fully-behind first image is dropped.
+    behind = _windowed_vision_context([(4, 8), (12, 16), (20, 24)], seq_len=30)
+    behind.tokens.skip_processing(14)
+    assert [img.start_idx for img in behind.next_images_in_window] == [12, 20]

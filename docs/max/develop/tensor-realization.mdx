@@ -4,7 +4,7 @@ description: Understand how MAX realizes tensors so you can reason about eager p
 ---
 
 In MAX, you can read the value of any
-[`Tensor`](/max/api/python/generated/max.experimental.tensor.Tensor/) at any
+[`Tensor`](/api/python/generated/max.experimental.tensor.Tensor/) at any
 point in your code. This page explains the realization mechanics that make that
 possible.
 
@@ -45,7 +45,7 @@ together at the function boundary. The next section covers how that works.
 
 MAX previously used a fully lazy execution model where tensors were only
 realized when their values were read. You can still use this model with the
-[`lazy()`](/max/api/python/experimental.functional/#max.experimental.functional.lazy)
+[`lazy()`](/api/python/experimental.functional/#max.experimental.functional.lazy)
 context manager, but we recommend you use the default eager pattern.
 
 :::
@@ -57,7 +57,7 @@ they execute as a single graph that the graph compiler can fuse and optimize as
 a unit.
 
 You can manually define a fusion region with
-[`F.functional()`](/max/api/python/experimental.functional). Apply it as a
+[`F.functional()`](/api/python/experimental.functional). Apply it as a
 decorator on a method or call it directly to wrap a graph op. This example
 shows how to use the decorator form on a module's `forward()` method:
 
@@ -77,8 +77,8 @@ class MyLayer(Module):
 ```
 
 Built-in layers like
-[`Linear`](/max/api/python/generated/max.experimental.nn.Linear/) and
-[`RotaryEmbedding`](/max/api/python/generated/max.experimental.nn.RotaryEmbedding/)
+[`Linear`](/api/python/generated/max.experimental.nn.Linear/) and
+[`RotaryEmbedding`](/api/python/generated/max.experimental.nn.rope.RotaryEmbedding/)
 already apply `F.functional` to their `forward()` methods, which is why they
 perform well. Because of this, you don't typically need to use `F.functional`
 yourself.
@@ -88,9 +88,9 @@ yourself.
 You just learned how MAX supports eager execution under the hood. For more
 advanced topics, see:
 
-- [Graph overview](/max/develop/graph): Drop down to the explicit graph API
+- [Graph overview](/develop/graph): Drop down to the explicit graph API
   and build models without the realization context layer.
-- [Build custom ops](/max/develop/build-custom-ops): Extend MAX with your own
+- [Build custom ops](/develop/build-custom-ops): Extend MAX with your own
   ops.
-- [Trace execution](/max/develop/debugging-tracing): Inspect when
+- [Trace execution](/develop/debugging-tracing): Inspect when
   realization happens at runtime.

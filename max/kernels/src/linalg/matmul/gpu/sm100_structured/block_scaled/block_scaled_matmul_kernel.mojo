@@ -43,25 +43,25 @@ from std.math import ceildiv
 from std.memory import Pointer
 from std.sys import size_of
 
-from std.gpu import WARP_SIZE
-from std.gpu.primitives.cluster import (
+from max.gpu import WARP_SIZE
+from max.gpu.primitives.cluster import (
     cluster_sync,
     elect_one_sync,
 )
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.memory import (
     external_memory,
     fence_mbarrier_init,
 )
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.primitives.grid_controls import (
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.primitives.grid_controls import (
     launch_dependent_grids,
     PDLLevel,
     wait_on_dependent_grids,
 )
-from std.gpu.sync import syncwarp
-from std.gpu.compute.arch.tcgen05 import *
+from max.gpu.sync import syncwarp
+from max.gpu.compute.arch.tcgen05 import *
+from layout import Layout
 from layout.tensor_core_async import (
     tile_layout_k_major_typed,
     tile_layout_mn_major_typed,
@@ -155,6 +155,25 @@ struct BlackwellBlockScaledMatmulKernel[
 
     This struct provides the structured interface while internally using
     the proven legacy kernel logic.
+
+    Parameters:
+        a_type: Element type of the A (left-hand side) matrix.
+        b_type: Element type of the B (right-hand side) matrix.
+        c_type: Element type of the C (output) matrix.
+        sfa_dtype: Element type of the A matrix block scaling factors.
+        sfb_dtype: Element type of the B matrix block scaling factors.
+        transpose_b: Whether the B matrix is stored transposed (K-major).
+            Must be `True` for block-scaled kernels.
+        config: Tile shapes, swizzle modes, pipeline depths, and CTA
+            group configuration for the kernel.
+        cluster_shape: CTA cluster dimensions `(M, N, batch)` for LLVM
+            cluster metadata (defaults to `(1, 1, 1)`).
+        elementwise_compute_lambda_fn: Optional fused elementwise compute
+            lambda applied during the epilogue (defaults to `None`).
+        pdl_level: Programmatic dependency launch level controlling
+            inter-grid synchronization (defaults to `PDLLevel.OFF`).
+        max_profiled_tiles_per_SM: Maximum number of tiles to profile per
+            SM; `0` disables profiling (defaults to `0`).
     """
 
     # ========== Derived Constants (from config) ==========
@@ -544,6 +563,9 @@ struct BlackwellBlockScaledMatmulKernel[
         This method uses the structured ProducerStage pattern from
         matmul_kernels.mojo, with tiles and barrier encapsulated in the stage.
 
+        Parameters:
+            tiles_origin: Memory origin for the producer tiles (inferred).
+
         Args:
             a_tma_op: TMA descriptor for A matrix.
             b_tma_op: TMA descriptor for B matrix.
@@ -592,11 +614,11 @@ struct BlackwellBlockScaledMatmulKernel[
 
                 # Peer CTA slice using TileTensor pattern (ptr + layout)
                 var a_peer_tile = type_of(a_tile)(
-                    a_tile.ptr + peer_m_rank * Self.a_tma_load_size,
+                    a_tile._storage + peer_m_rank * Self.a_tma_load_size,
                     a_tile.layout,
                 )
                 var b_peer_tile = type_of(b_tile)(
-                    b_tile.ptr + peer_rank_m * Self.b_tma_load_size,
+                    b_tile._storage + peer_rank_m * Self.b_tma_load_size,
                     b_tile.layout,
                 )
 
@@ -670,6 +692,9 @@ struct BlackwellBlockScaledMatmulKernel[
 
         This method uses the structured ConsumerStage pattern from
         matmul_kernels.mojo, with tiles and barrier encapsulated in the stage.
+
+        Parameters:
+            tiles_origin: Memory origin for the consumer tiles (inferred).
 
         Args:
             tiles: ConsumerStage context with encapsulated tile access.
@@ -798,7 +823,28 @@ struct BlackwellBlockScaledMatmulKernel[
         clc_empty: Self.SmemType.Pipelines.ClcBarriers,
         tmem_dealloc: Self.SmemType.Pipelines.TmemDealloc,
     ):
-        """Initialize barriers and prefetch TMA descriptors."""
+        """Initialize barriers and prefetch TMA descriptors.
+
+        Args:
+            ctx: Kernel context with election variables, CTA coordinates,
+                and multicast masks.
+            a_tma_op: TMA descriptor for the A matrix.
+            b_tma_op: TMA descriptor for the B matrix.
+            c_tma_op: TMA descriptor for the C output matrix.
+            sfa_tma_op: TMA descriptor for the A scaling factors.
+            sfb_tma_op: TMA descriptor for the B scaling factors.
+            input_barriers: Input pipeline mbarrier array for TMA load
+                synchronization.
+            accum_barriers: Accumulator pipeline mbarrier array for
+                MMA-to-epilogue handoff.
+            clc_throttle: CLC throttle barriers for scheduler rate
+                limiting.
+            clc_full: CLC barriers signaling ready (full) work tiles.
+            clc_empty: CLC barriers signaling consumed (empty) work
+                tiles.
+            tmem_dealloc: TMEM deallocation barrier for epilogue-to-MMA
+                TMEM recycling.
+        """
         if ctx.elect_one_warp and ctx.elect_one_thread:
             a_tma_op.prefetch_descriptor()
             b_tma_op.prefetch_descriptor()
@@ -867,13 +913,25 @@ struct BlackwellBlockScaledMatmulKernel[
         mnk: StaticTuple[UInt32, 3],
         workspace: Span[UInt64, MutAnyOrigin],
     ):
-        """Kernel entry point - ported from legacy kernel."""
+        """Kernel entry point - ported from legacy kernel.
+
+        Args:
+            a_tma_op: TMA descriptor for the A matrix.
+            b_tma_op: TMA descriptor for the B matrix.
+            c_tma_op: TMA descriptor for the C output matrix.
+            sfa_tma_op: TMA descriptor for the A scaling factors.
+            sfb_tma_op: TMA descriptor for the B scaling factors.
+            alpha: Scalar scaling factor applied to the accumulators.
+            cluster_dim: CTA cluster dimensions `(M, N, batch)` for scheduling.
+            mnk: Problem dimensions `(M, N, K)` in elements.
+            workspace: Span for profiler per-tile profiling data.
+        """
         Self.validate_config()
 
         # ===== Shared Memory Setup (structured pattern with typed accessors) =====
         ref smem = external_memory[
-            Scalar[DType.uint8],
-            address_space=AddressSpace.SHARED,
+            UInt8,
+            address_space=.SHARED,
             alignment=128,
         ]().bitcast[Self.SmemType]()[]
 

@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -21,10 +20,22 @@ modular_py_test(
         # cpu_count workers.
         "MAX_BENCHMARK_MAX_TOKENIZER_THREADS": "2",
     },
+    # TODO(MXTOOLS-443): This glob fans out into 20 py_test targets, each
+    # paying a full `transformers` import. Scheduled together on a contended
+    # macOS worker they starve each other and time out at the 1200s cap, still
+    # inside pytest collection.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//max/python/max/benchmark:benchmark_serving_lib",
         "//max/python/max/benchmark/benchmark_shared",
+        "//max/python/max/benchmark/benchmark_shared:model_csv",
+        "//max/python/max/benchmark/benchmark_shared:percentile_metrics",
         "//max/python/max/profiler",
+        requirement("aiohttp"),
+        requirement("huggingface-hub"),
         requirement("msgspec"),
         requirement("numpy"),
         requirement("pillow"),
@@ -56,7 +67,6 @@ modular_py_test(
     deps = [
         "//max/python/max/benchmark/benchmark_shared",
         "//max/python/max/pipelines/lib",
-        "//max/tests/integration:hf_repo_lock",
         requirement("transformers"),
     ],
 )

@@ -15,7 +15,6 @@
 
 import warnings
 
-import hf_repo_lock
 from max.benchmark.benchmark_shared.datasets import BenchmarkDataset
 from max.benchmark.benchmark_shared.datasets._tokenizer_pool import (
     TokenizerPool,
@@ -24,8 +23,6 @@ from max.pipelines.lib import generate_local_model_path
 from transformers import AutoTokenizer
 
 REPO_ID = "HuggingFaceTB/SmolLM-135M"
-REPO_REVISION = hf_repo_lock.revision_for_hf_repo(REPO_ID)
-
 # Minimum average match rate for system prompt token consistency across requests.
 # Set to 0.90 to accommodate tokenization boundary effects when repeating base
 # prompts to different target lengths. Rates of 90-96% are expected and indicate
@@ -67,11 +64,8 @@ def test_random_replacement_token_with_smollm_tokenizer() -> None:
     This is a replicated logic in random dataset that picks a replacement for
     special tokens using candidates: plain space, U+0120 (BPE), U+2581 (SentencePiece).
     """
-    assert isinstance(REPO_REVISION, str), (
-        "REPO_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(REPO_ID, REPO_REVISION)
+        model_path = generate_local_model_path(REPO_ID)
     except FileNotFoundError as e:
         warnings.warn(f"Failed to generate local model path: {str(e)}")
         warnings.warn(
@@ -108,11 +102,8 @@ def test_random_dataset_sys_prompt_ratio_matches_requested() -> None:
     cause minor token alignment mismatches (typically 90-96% consistency). This is
     expected behavior and still indicates high consistency.
     """
-    assert isinstance(REPO_REVISION, str), (
-        "REPO_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(REPO_ID, REPO_REVISION)
+        model_path = generate_local_model_path(REPO_ID)
     except FileNotFoundError as e:
         warnings.warn(f"Failed to generate local model path: {str(e)}")
         warnings.warn(
@@ -162,9 +153,8 @@ def test_random_dataset_sys_prompt_ratio_matches_requested() -> None:
 
 def test_synthetic_placeholder_token_count() -> None:
     """Synthetic placeholder for prefix turns should tokenize to ~output_len."""
-    assert isinstance(REPO_REVISION, str)
     try:
-        model_path = generate_local_model_path(REPO_ID, REPO_REVISION)
+        model_path = generate_local_model_path(REPO_ID)
     except FileNotFoundError:
         model_path = REPO_ID
 

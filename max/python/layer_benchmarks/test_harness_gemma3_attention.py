@@ -16,28 +16,12 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.types import TextGenerationContext
-from testbed.harnesses.gemma3_attention import (
-    Gemma3AttentionHarness,
-    Gemma3AttentionStaticParams,
-)
+from layer_mefs import create_runner
+from max.pipelines.context import TextContext
+from testbed.harnesses.gemma3_attention import Gemma3AttentionStaticParams
 from testbed.harnesses.ragged_attention_harness import AttentionDynamicParams
-from testbed.runner import LayerTestRunner, create_session
-
-# google/gemma-3-1b-it config
-_STATIC_PARAMS = Gemma3AttentionStaticParams(
-    hidden_size=2304,
-    n_heads=8,
-    n_kv_heads=4,
-    head_dim=256,
-    max_seq_len=32768,
-    rope_theta=1000000.0,
-    qk_norm_eps=1e-6,
-    sliding_window_pattern=6,
-    local_window_size=1024,
-    # layer_idx=5 => (5+1) % 6 == 0 => global/causal attention (no sliding).
-    layer_idx=5,
-)
+from testbed.runner import LayerTestRunner
+from testbed.specs import GEMMA3_ATTENTION
 
 _SMOKE_SHAPES = [
     AttentionDynamicParams(batch_size=1, seq_len=8192, ctx_len=8192),
@@ -49,19 +33,16 @@ _SMOKE_SHAPES = [
 def runner() -> LayerTestRunner[
     Gemma3AttentionStaticParams,
     AttentionDynamicParams,
-    list[TextGenerationContext],
+    list[TextContext],
 ]:
-    session, device = create_session()
-    return LayerTestRunner(
-        Gemma3AttentionHarness(_STATIC_PARAMS, session, device)
-    )
+    return create_runner(GEMMA3_ATTENTION)
 
 
 def test_benchmark_smoke(
     runner: LayerTestRunner[
         Gemma3AttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     results = runner.benchmark(_SMOKE_SHAPES, iterations=1, warmup=1)
@@ -73,7 +54,7 @@ def test_correctness(
     runner: LayerTestRunner[
         Gemma3AttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     # Correctness only works for prefill (ctx_len=0), batch_size=1.

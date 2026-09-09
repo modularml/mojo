@@ -26,32 +26,52 @@ def concat(
     original_vals: Iterable[TensorValueLike],
     axis: int = 0,
 ) -> TensorValue:
-    """Concatenates a list of symbolic tensors along an axis.
+    """Concatenates tensors along an axis.
 
     .. code-block:: python
 
-        a = ops.constant([[1, 2], [3, 4]], DType.int32, device=device)
-        b = ops.constant([[5, 6], [7, 8]], DType.int32, device=device)
-        vertical = ops.concat([a, b], axis=0)
-        # vertical has shape (4, 2):
-        # [[1, 2], [3, 4], [5, 6], [7, 8]]
-        horizontal = ops.concat([a, b], axis=1)
-        # horizontal has shape (2, 4):
-        # [[1, 2, 5, 6], [3, 4, 7, 8]]
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("concat_example") as graph:
+            a = ops.constant([[1, 2], [3, 4]], DType.int32, device=device)
+            b = ops.constant([[5, 6], [7, 8]], DType.int32, device=device)
+            graph.output(
+                ops.concat([a, b], axis=0),  # [[1, 2], [3, 4], [5, 6], [7, 8]]
+                ops.concat([a, b], axis=1),  # [[1, 2, 5, 6], [3, 4, 7, 8]]
+            )
+
+        model = InferenceSession().load(graph)
+        vertical, horizontal = model.execute()
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.array_equal(
+            vertical.to_numpy(), [[1, 2], [3, 4], [5, 6], [7, 8]]
+        )
+        assert np.array_equal(
+            horizontal.to_numpy(), [[1, 2, 5, 6], [3, 4, 7, 8]]
+        )
 
     Args:
-        original_vals: The list of symbolic tensor values to concatenate.
-            All input tensors must have the same rank and the same size in all
-            dimensions except the concatenation axis.
-        axis: The dimension along which to concatenate. Negative values
-            index relative to the end of the tensor shape. For instance,
-            ``concat(vs, -1)`` concatenates along the last dimension.
+        original_vals: The symbolic tensors to concatenate. They must have the same rank
+            and size on every dimension except ``axis``.
+        axis: The axis to concatenate along. Negative values count from the end.
             Defaults to ``0``.
 
     Returns:
-        A symbolic tensor with the same rank, dtype, and device as the inputs,
-        whose size along ``axis`` is the sum of the inputs' sizes along that
-        axis. Every other dimension matches the inputs.
+        A ``TensorValue`` representing the concatenated inputs. Its size along ``axis`` is
+        the sum of the inputs' sizes and every other axis is unchanged.
+
+    Raises:
+        ValueError: If no tensors are provided, if the inputs don't all have
+            the same rank, if they differ in size on any dimension other
+            than ``axis``, or if they aren't all on the same device.
+        IndexError: If ``axis`` is out of range.
     """
     vals = [TensorValue(v) for v in original_vals]
 

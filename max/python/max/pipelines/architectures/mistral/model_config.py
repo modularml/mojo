@@ -16,25 +16,37 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import ClassVar
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams
 from max.nn.transformer import ReturnLogits
+from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.lib.config.model_config import _select_quantization_encoding
 from max.pipelines.lib.interfaces.arch_config import (
     ArchConfigWithKVCache,
     ArchConfigWithStoredKVParams,
 )
 from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
-from max.pipelines.modeling.config_enums import supported_encoding_dtype
+from max.pipelines.modeling.config_enums import (
+    SupportedEncoding,
+    supported_encoding_dtype,
+)
 from transformers import AutoConfig
 from typing_extensions import Self, override
 
 
 @dataclass(kw_only=True)
-class MistralConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
+class MistralConfig(
+    ArchConfigWithStoredKVParams,
+    ArchConfigWithKVCache,
+):
     """Configuration for Mistral models."""
+
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {"bfloat16"}
 
     # Required fields
     hidden_size: int
@@ -57,18 +69,10 @@ class MistralConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
     return_logits: ReturnLogits = ReturnLogits.LAST_TOKEN
     """Whether to return the last token, all logits, or a variable number of logits."""
 
+    quantization_encoding: SupportedEncoding | None = None
+
     def get_max_seq_len(self) -> int:
         return self.max_seq_len
-
-    @staticmethod
-    def calculate_max_seq_len(
-        pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        """Calculates the maximum sequence length for the model."""
-        max_seq_len = pipeline_config.model.max_length
-        if max_seq_len:
-            return max_seq_len
-        return huggingface_config.max_position_embeddings
 
     @override
     @classmethod
@@ -76,6 +80,8 @@ class MistralConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a MistralConfig instance from pipeline configuration.
 
@@ -96,18 +102,27 @@ class MistralConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
                 "but config could not be loaded. "
                 "Please ensure the model repository contains a valid config.json file."
             )
-        return cls.initialize_from_config(pipeline_config, huggingface_config)
+        return cls.initialize_from_config(
+            pipeline_config, huggingface_config, max_seq_len=max_seq_len
+        )
 
     @classmethod
     def initialize_from_config(
-        cls, pipeline_config: PipelineConfig, huggingface_config: AutoConfig
+        cls,
+        pipeline_config: PipelineConfig,
+        huggingface_config: AutoConfig,
+        *,
+        max_seq_len: int,
     ) -> Self:
         kv_cache_config = pipeline_config.model.kv_cache
-        quantization_encoding = pipeline_config.model.quantization_encoding
-        if quantization_encoding is None:
-            raise ValueError("quantization_encoding must not be None")
+        quantization_encoding = _select_quantization_encoding(
+            pipeline_config.model, cls.DEFAULT_ENCODING
+        )
         dtype = supported_encoding_dtype(quantization_encoding)
-        cache_dtype = pipeline_config.model.kv_cache.cache_dtype
+        cache_dtype = cache_dtype_for_encoding(
+            quantization_encoding,
+            pipeline_config.model.kv_cache.kv_cache_format,
+        )
 
         device_refs = [
             DeviceRef(spec.device_type, spec.id)
@@ -122,6 +137,7 @@ class MistralConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             cache_dtype=cache_dtype,
         )
 
+        assert isinstance(kv_params, MHAKVCacheParams)
         return cls(
             hidden_size=huggingface_config.hidden_size,
             num_attention_heads=huggingface_config.num_attention_heads,
@@ -130,13 +146,12 @@ class MistralConfig(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             head_dim=huggingface_config.head_dim,
             vocab_size=huggingface_config.vocab_size,
             rope_theta=get_rope_theta(huggingface_config),
-            max_seq_len=cls.calculate_max_seq_len(
-                pipeline_config, huggingface_config
-            ),
+            max_seq_len=max_seq_len,
             rms_norm_eps=huggingface_config.rms_norm_eps,
             feed_forward_length=huggingface_config.intermediate_size,
             dtype=dtype,
             kv_params=kv_params,
             attention_multiplier=math.sqrt(1 / kv_params.head_dim),
             devices=device_refs,
+            quantization_encoding=quantization_encoding,
         )

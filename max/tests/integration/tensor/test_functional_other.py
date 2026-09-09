@@ -23,6 +23,7 @@ import pytest
 from max.driver import CPU, Accelerator, accelerator_count
 from max.dtype import DType
 from max.experimental import functional as F
+from max.experimental.nn.module import Module, module_dataclass
 from max.experimental.tensor import Tensor
 from max.graph import DeviceRef, TensorType, ops
 
@@ -216,6 +217,55 @@ def test_cond_no_results() -> None:
     assert len(results) == 0
 
 
+@pytest.mark.unique_shard
+def test_while_loop_tensor_only_surface() -> None:
+    """``F.while_loop`` exposes a Tensor-only surface (MXF-486 / MXF-435).
+
+    The ``predicate`` and ``body`` callbacks receive and return ``Tensor``,
+    never ``TensorValue``. This exercises both crossings inside
+    ``_while_loop_graph``: the inbound ``TensorValue -> Tensor`` wrap before
+    the callbacks run, and the outbound ``Tensor -> TensorValue`` coercion
+    afterwards. Regression test: the ActionSet dispatcher cutover (#86904)
+    dropped the inbound wrap, so a callback written to the documented Tensor
+    contract (``x < 10``) raised ``AttributeError`` at graph-construction
+    time. The ``isinstance`` assertions pin the inbound crossing directly.
+    """
+    x = Tensor.full([], 0, dtype=DType.int32, device=DEVICE)
+
+    def predicate(x: Tensor) -> Tensor:
+        assert isinstance(x, Tensor)
+        # ``ops.while_loop`` requires the predicate result on CPU.
+        return (x < 10).to(CPU())
+
+    def body(x: Tensor) -> Tensor:
+        assert isinstance(x, Tensor)
+        return x + 1
+
+    (result,) = F.while_loop(x, predicate, body)
+    assert isinstance(result, Tensor)
+    result_cpu = result.to(CPU())
+    np.testing.assert_equal(np.from_dlpack(result_cpu), 10)
+
+
+@pytest.mark.unique_shard
+def test_while_loop_multiple_args_tensor_only_surface() -> None:
+    """``F.while_loop`` Tensor-only surface holds for multi-arg callbacks too."""
+    x = Tensor.full([], 0, dtype=DType.int32, device=DEVICE)
+    y = Tensor.full([], 0, dtype=DType.int32, device=DEVICE)
+
+    def predicate(x: Tensor, y: Tensor) -> Tensor:
+        assert isinstance(x, Tensor) and isinstance(y, Tensor)
+        return (x < 10).to(CPU())
+
+    def body(x: Tensor, y: Tensor) -> list[Tensor]:
+        assert isinstance(x, Tensor) and isinstance(y, Tensor)
+        return [x + 1, y + 2]
+
+    x_out, y_out = F.while_loop((x, y), predicate, body)
+    np.testing.assert_equal(np.from_dlpack(x_out.to(CPU())), 10)
+    np.testing.assert_equal(np.from_dlpack(y_out.to(CPU())), 20)
+
+
 def test_constant() -> None:
     device_ref = DeviceRef.from_device(DEVICE)
     result = F.constant(1.0, DType.float32, device_ref)
@@ -367,6 +417,32 @@ def test_permute() -> None:
     tensor_3d = Tensor.ones([2, 3, 4], dtype=DType.float32, device=DEVICE)
     result = F.permute(tensor_3d, [2, 0, 1])
     assert result.real
+
+
+def test_print(capfd: pytest.CaptureFixture[str]) -> None:
+    # A realized (eager) tensor has concrete storage and no graph value, so
+    # `F.print` echoes its value directly to stdout.
+    tensor = Tensor.ones([2, 2], dtype=DType.float32, device=DEVICE)
+    assert tensor.real
+    F.print(tensor, "eager_tensor")
+    assert "Tensor eager_tensor=" in capfd.readouterr().out
+
+
+def test_print_symbolic(capfd: pytest.CaptureFixture[str]) -> None:
+    # A symbolic (graph) tensor has no concrete storage, so `F.print` records a
+    # print op that fires when the compiled graph runs.
+    @module_dataclass
+    class PrintModule(Module[[Tensor], Tensor]):
+        def forward(self, x: Tensor) -> Tensor:
+            F.print(x, "graph_tensor")
+            return x
+
+    input_type = TensorType(
+        DType.float32, [2, 2], device=DeviceRef.from_device(DEVICE)
+    )
+    compiled = PrintModule().compile(input_type)
+    compiled(Tensor.ones([2, 2], dtype=DType.float32, device=DEVICE))
+    assert "graph_tensor" in capfd.readouterr().out
 
 
 def test_arange() -> None:

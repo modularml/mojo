@@ -36,13 +36,16 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from graph_error_messages_scenario import Scenario
 from max.driver import Accelerator, Buffer, accelerator_count
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
+from test_common import graph_error_messages_scenario
+from test_common.graph_error_messages_scenario import Scenario
 
-_SCENARIO_SCRIPT = Path(__file__).parent / "graph_error_messages_scenario.py"
+# Locate the scenario script via its module file rather than a hardcoded
+# sibling path: it lives in test_common, not next to this test.
+_SCENARIO_SCRIPT = Path(graph_error_messages_scenario.__file__)
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +243,7 @@ def test_fused_build_error() -> None:
         "\n"
         "error: 'mo.gather' op [MO_TO_MOGG] Found at least one incompatible "
         "input/output type for a JIT-able operation which is not supported. "
-        "Operand types: <type>, <type>, <type>. "
+        "Operand types: <type>, <type>. "
         "Results Types: <type>\n"
     )
     assert canonicalized == expected

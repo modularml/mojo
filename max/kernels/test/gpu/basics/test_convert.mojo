@@ -11,22 +11,22 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext, get_gpu_target
-from std.gpu.host.compile import _compile_code
+from max.gpu.host import DeviceContext, get_gpu_target
+from max.gpu.host.compile import _compile_code
 from std.testing import *
 
 
 def test_convert_asm() raises:
-    @parameter
+    @__parameter
     def my_cast[
         frm: DType, to: DType
-    ](output: UnsafePointer[Scalar[to], MutAnyOrigin], x: Scalar[frm]):
+    ](output: MutPointer[Scalar[to], MutAnyOrigin], x: Scalar[frm]):
         output[] = x.cast[to]()
 
     assert_true(
         "cvt.rn.f16.f32"
         in _compile_code[
-            my_cast[DType.float32, DType.float16],
+            my_cast[.float32, DType.float16],
             emission_kind="asm",
             target=get_gpu_target["sm_80"](),
         ]()
@@ -35,7 +35,7 @@ def test_convert_asm() raises:
     assert_true(
         "v_cvt_f16_f32_e32"
         in _compile_code[
-            my_cast[DType.float32, DType.float16],
+            my_cast[.float32, DType.float16],
             emission_kind="asm",
             target=get_gpu_target["mi355x"](),
         ]()
@@ -44,7 +44,7 @@ def test_convert_asm() raises:
     assert_true(
         "cvt.f32.f16"
         in _compile_code[
-            my_cast[DType.float16, DType.float32],
+            my_cast[.float16, DType.float32],
             emission_kind="asm",
             target=get_gpu_target["sm_80"](),
         ]()
@@ -53,7 +53,7 @@ def test_convert_asm() raises:
     assert_true(
         "v_cvt_f32_f16_e32"
         in _compile_code[
-            my_cast[DType.float16, DType.float32],
+            my_cast[.float16, DType.float32],
             emission_kind="asm",
             target=get_gpu_target["mi355x"](),
         ]()
@@ -62,7 +62,7 @@ def test_convert_asm() raises:
 
 def convert_kernel[
     src_type: DType, dst_type: DType, size: Int
-](dst_ptr: UnsafePointer[Scalar[dst_type], MutAnyOrigin]):
+](dst_ptr: MutPointer[Scalar[dst_type], MutAnyOrigin]):
     comptime for i in range(0, size, 2):
         var src_vec = SIMD[src_type, 2](
             Scalar[src_type](i), Scalar[src_type](i + 1)
@@ -93,4 +93,4 @@ def main() raises:
     with DeviceContext() as ctx:
         test_convert_asm()
         # Only support 2xFP32 -> 2xBF16 conversion via ptx.
-        test_convert[DType.float32, DType.bfloat16](ctx)
+        test_convert[.float32, DType.bfloat16](ctx)

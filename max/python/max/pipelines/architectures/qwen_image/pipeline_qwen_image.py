@@ -30,10 +30,9 @@ from max.driver import CPU, Buffer, Device
 from max.dtype import DType
 from max.graph import TensorType, TensorValue, ops
 from max.graph.ops import shape_to_tensor
-from max.pipelines.core import PixelContext
+from max.pipelines.context import PixelContext, TokenBuffer
 from max.pipelines.diffusion.interface import DiffusionPipeline, max_compile
 from max.pipelines.lib.bfloat16_utils import float32_to_bfloat16_as_uint16
-from max.pipelines.modeling.types import TokenBuffer
 from max.profiler import Tracer, traced
 
 from ..autoencoders.autoencoder_kl_qwen_image import AutoencoderKLQwenImageModel
@@ -159,7 +158,7 @@ class QwenImagePipeline(DiffusionPipeline):
         self._compile_cfg_fastpath_helpers()
         self.cache: QwenImageCache = QwenImageCache()
 
-    def prepare_inputs(self, context: PixelContext) -> QwenImageModelInputs:  # type: ignore[override]
+    def prepare_inputs(self, context: PixelContext) -> QwenImageModelInputs:
         """Convert a PixelContext into QwenImageModelInputs."""
         return QwenImageModelInputs.from_context(context)
 

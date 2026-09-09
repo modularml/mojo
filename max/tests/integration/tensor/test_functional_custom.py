@@ -18,19 +18,21 @@ They don't otherwise make any attempt at coverage, edge cases, or correctness.
 
 import os
 from pathlib import Path
-from unittest import mock
 
 import pytest
 from max.driver import CPU, Accelerator, accelerator_count
 from max.dtype import DType
-from max.engine import Model
 from max.experimental import functional as F
-from max.experimental import realization_context as rc
+from max.experimental.executor import (
+    InterpreterExecutor,
+    JitExecutor,
+    set_default_executor,
+)
 from max.experimental.tensor import Tensor
-from max.graph import Graph
 from max.nn import kernels
 
 DEVICE = Accelerator() if accelerator_count() else CPU()
+
 
 moe_create_indices = F.functional(kernels.moe_create_indices)
 scatter_set_constant = F.functional(kernels.scatter_set_constant)
@@ -54,15 +56,27 @@ def test_custom() -> None:
     DEVICE.is_host, reason="scatter_set_constant only supports GPU devices"
 )
 def test_inplace_custom() -> None:
+    # Prior allocate-then-free perturbs the heap next to the buffers below;
+    # the mutation must still land at exactly the requested coordinate.
+    junk = Tensor.ones([4])
+    del junk
+
     values = Tensor.zeros([2, 2])
-    indices = Tensor.ones([1, 1], dtype=DType.int32)
+    # Each indices row is a (row, col) coordinate into values.
+    indices = Tensor([[1, 0]], dtype=DType.int32, device=DEVICE)
     scatter_set_constant(values, indices, 5.0)
     assert values[1, 0].item() == 5.0
     assert values.real
     scatter_set_constant(values, indices, 4.0)
-    assert not values.real
     assert values[1, 0].item() == 4.0
     assert values.real
+
+
+def test_inplace_custom_invalid_indices_shape() -> None:
+    values = Tensor.zeros([2, 2])
+    indices = Tensor.ones([1, 1], dtype=DType.int32)
+    with pytest.raises(ValueError, match=r"\[num_indices, 2\]"):
+        scatter_set_constant(values, indices, 5.0)
 
 
 def test_custom_with_custom_extensions(
@@ -127,88 +141,59 @@ def test_custom_with_string_path(kernel_verification_ops_path: Path) -> None:
 def test_custom_extensions_cached_across_calls(
     kernel_verification_ops_path: Path,
 ) -> None:
-    """Test that repeated identical custom op calls reuse a cached Model."""
-    rc._EAGER_MODEL_CACHE.clear()
-
+    """Repeated identical custom op calls compile once."""
+    # Realized out here so only the custom op's graph reaches the executor
+    # under test: the JIT submits every graph it executes, tensor creation
+    # included.
     x = Tensor.ones([65], dtype=DType.float32, device=CPU())
     y = Tensor.ones([65], dtype=DType.float32, device=CPU())
+    assert x.real and y.real
 
-    load_count = 0
-    original_load = rc._session().load
+    executor = JitExecutor(interpreter=InterpreterExecutor())
+    with set_default_executor(executor):
+        for _ in range(2):
+            (result,) = F.custom(
+                "my_add",
+                device=CPU(),
+                values=[x, y],
+                out_types=[x.type],
+                custom_extensions=kernel_verification_ops_path,
+            )
+            assert result.real
 
-    def counting_load(graph: Graph) -> Model:
-        nonlocal load_count
-        load_count += 1
-        return original_load(graph)
-
-    with mock.patch.object(
-        type(rc._session()), "load", side_effect=counting_load
-    ):
-        result1 = F.custom(
-            "my_add",
-            device=CPU(),
-            values=[x, y],
-            out_types=[x.type],
-            custom_extensions=kernel_verification_ops_path,
-        )
-        assert result1[0].real
-
-        result2 = F.custom(
-            "my_add",
-            device=CPU(),
-            values=[x, y],
-            out_types=[x.type],
-            custom_extensions=kernel_verification_ops_path,
-        )
-        assert result2[0].real
-
-    assert load_count == 1, (
-        f"Expected 1 compilation but got {load_count} — cache miss"
+    assert len(executor.cache) == 1, (
+        f"Expected 1 compilation but got {len(executor.cache)} — cache miss"
     )
 
 
 def test_custom_extensions_cache_miss_on_different_shapes(
     kernel_verification_ops_path: Path,
 ) -> None:
-    """Test that different input shapes produce cache misses."""
-    rc._EAGER_MODEL_CACHE.clear()
-
-    x1 = Tensor.ones([65], dtype=DType.float32, device=CPU())
-    y1 = Tensor.ones([65], dtype=DType.float32, device=CPU())
-    x2 = Tensor.ones([66], dtype=DType.float32, device=CPU())
-    y2 = Tensor.ones([66], dtype=DType.float32, device=CPU())
-
-    load_count = 0
-    original_load = rc._session().load
-
-    def counting_load(graph: Graph) -> Model:
-        nonlocal load_count
-        load_count += 1
-        return original_load(graph)
-
-    with mock.patch.object(
-        type(rc._session()), "load", side_effect=counting_load
-    ):
-        result1 = F.custom(
-            "my_add",
-            device=CPU(),
-            values=[x1, y1],
-            out_types=[x1.type],
-            custom_extensions=kernel_verification_ops_path,
+    """Different input shapes are distinct graphs, so each compiles."""
+    inputs = [
+        (
+            Tensor.ones([size], dtype=DType.float32, device=CPU()),
+            Tensor.ones([size], dtype=DType.float32, device=CPU()),
         )
-        assert result1[0].real
+        for size in (65, 66)
+    ]
+    assert all(x.real and y.real for x, y in inputs)
 
-        result2 = F.custom(
-            "my_add",
-            device=CPU(),
-            values=[x2, y2],
-            out_types=[x2.type],
-            custom_extensions=kernel_verification_ops_path,
-        )
-        assert result2[0].real
+    executor = JitExecutor(interpreter=InterpreterExecutor())
+    with set_default_executor(executor):
+        for x, y in inputs:
+            (result,) = F.custom(
+                "my_add",
+                device=CPU(),
+                values=[x, y],
+                out_types=[x.type],
+                custom_extensions=kernel_verification_ops_path,
+            )
+            assert result.real
 
-    assert load_count == 2, (
-        f"Expected 2 compilations for different shapes but got {load_count}"
+    assert len(executor.cache) == 2, (
+        "Expected 2 compilations for different shapes but got"
+        f" {len(executor.cache)}"
     )
 
 

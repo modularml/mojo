@@ -16,16 +16,26 @@ from __future__ import annotations
 from unittest.mock import MagicMock, NonCallableMock
 
 from max.driver import DeviceSpec
-from max.dtype import DType
-from max.pipelines.architectures.deepseekV3 import deepseekV3_arch
+from max.pipelines.architectures.deepseekV3.memory_planner import (
+    DeepseekV3MemoryPlanner,
+)
+from max.pipelines.kv_cache.memory_planner import ModelConfigWithKVCache
 from max.pipelines.lib import (
     PipelineConfig,
-    PipelineModel,
     PipelineRole,
     SupportedEncoding,
 )
 
 MAX_SEND_TOKENS_PER_RANK = 128
+
+
+def _make_planner() -> DeepseekV3MemoryPlanner:
+    """Create a DeepseekV3MemoryPlanner with a minimal mock KV config."""
+    config = MagicMock(spec=ModelConfigWithKVCache)
+    config.get_kv_params.return_value = MagicMock()
+    return DeepseekV3MemoryPlanner(config)
+
+
 NUM_RANKS = 8
 GRAPH_CAPTURE_HEADROOM_BYTES_PER_DEVICE = 8 * 1024**3
 
@@ -38,7 +48,7 @@ def mock_pipeline_config(
     pipeline_config.model = MagicMock()
     pipeline_config.runtime = MagicMock()
     pipeline_config.model.quantization_encoding = quantization_encoding
-    pipeline_config.model.kv_cache.cache_dtype = DType.bfloat16
+    pipeline_config.model.kv_cache.kv_cache_format = None
     pipeline_config.model.data_parallel_degree = NUM_RANKS
     pipeline_config.model.device_specs = [
         NonCallableMock(spec=DeviceSpec) for _ in range(NUM_RANKS)
@@ -79,13 +89,12 @@ def mock_huggingface_config() -> MagicMock:
 
 
 def test_deepseekv3_memory_estimation() -> None:
-    deepseek_model = deepseekV3_arch.pipeline_model
-    assert issubclass(deepseek_model, PipelineModel)
+    planner = _make_planner()
     pipeline_config = mock_pipeline_config("decode_only")
     huggingface_config = mock_huggingface_config()
     assert huggingface_config is not None
 
-    memory_estimated = deepseek_model.estimate_activation_memory(
+    memory_estimated = planner.estimate_activation_memory(
         pipeline_config, huggingface_config
     )
 
@@ -104,46 +113,44 @@ def test_deepseekv3_memory_estimation() -> None:
 
 
 def test_deepseekv3_memory_estimation_exact() -> None:
-    deepseek_model = deepseekV3_arch.pipeline_model
-    assert issubclass(deepseek_model, PipelineModel)
+    planner = _make_planner()
     huggingface_config = mock_huggingface_config()
     assert huggingface_config is not None
 
     # For DecodeOnly, we only need to consider moe_activation_memory
     pipeline_config = mock_pipeline_config("decode_only")
-    mem = deepseek_model.estimate_activation_memory(
+    mem = planner.estimate_activation_memory(
         pipeline_config, huggingface_config
     )
     assert mem == 5225054208
 
     # For PrefillAndDecode, we also need to consider mla_activation_memory
     pipeline_config = mock_pipeline_config("prefill_and_decode")
-    mem = deepseek_model.estimate_activation_memory(
+    mem = planner.estimate_activation_memory(
         pipeline_config, huggingface_config
     )
     assert mem == 551759642624
 
     # Also check model with different quantization encoding
     pipeline_config = mock_pipeline_config("decode_only", "float4_e2m1fnx2")
-    mem = deepseek_model.estimate_activation_memory(
+    mem = planner.estimate_activation_memory(
         pipeline_config, huggingface_config
     )
     assert mem == 4399759360
 
 
 def test_deepseekv3_memory_estimation_adds_graph_capture_headroom() -> None:
-    deepseek_model = deepseekV3_arch.pipeline_model
-    assert issubclass(deepseek_model, PipelineModel)
+    planner = _make_planner()
     huggingface_config = mock_huggingface_config()
     assert huggingface_config is not None
 
     pipeline_config = mock_pipeline_config("decode_only")
-    baseline = deepseek_model.estimate_activation_memory(
+    baseline = planner.estimate_activation_memory(
         pipeline_config, huggingface_config
     )
 
     pipeline_config.runtime.device_graph_capture = True
-    with_headroom = deepseek_model.estimate_activation_memory(
+    with_headroom = planner.estimate_activation_memory(
         pipeline_config, huggingface_config
     )
 
@@ -199,23 +206,19 @@ def test_deepseekv3_estimate_weights_size_no_expert_parallelism() -> None:
     This is a regression test for a bug where ep_size=1 with multiple GPUs
     would cause a ZeroDivisionError (n_nodes = 1 // 8 = 0).
     """
-    deepseek_model = deepseekV3_arch.pipeline_model
-    assert issubclass(deepseek_model, PipelineModel)
-
+    planner = _make_planner()
     # EP=1 (no expert parallelism), 8 GPUs, DP=1
     pipeline_config = mock_weights_pipeline_config(
         n_gpus=8, ep_size=1, dp_degree=1
     )
 
     # This should not raise ZeroDivisionError
-    mem = deepseek_model.estimate_weights_size(pipeline_config)
+    mem = planner.estimate_weights_size(pipeline_config)
     assert mem > 0
 
 
 def test_deepseekv3_estimate_weights_size_dp_ep_exact() -> None:
-    deepseek_model = deepseekV3_arch.pipeline_model
-    assert issubclass(deepseek_model, PipelineModel)
-
+    planner = _make_planner()
     # EP=8, 8 GPUs, DP=8
     pipeline_config = mock_weights_pipeline_config(
         n_gpus=8, ep_size=8, dp_degree=8
@@ -223,20 +226,18 @@ def test_deepseekv3_estimate_weights_size_dp_ep_exact() -> None:
 
     # The result is quite large because the mock weights size is larger
     # than the actual weights size.
-    mem = deepseek_model.estimate_weights_size(pipeline_config)
+    mem = planner.estimate_weights_size(pipeline_config)
     assert mem == 1124551261664
 
 
 def test_deepseekv3_estimate_weights_size_tp_ep_exact() -> None:
-    deepseek_model = deepseekV3_arch.pipeline_model
-    assert issubclass(deepseek_model, PipelineModel)
-
+    planner = _make_planner()
     # EP=8, 8 GPUs, TP attention (DP=1)
     pipeline_config = mock_weights_pipeline_config(
         n_gpus=8, ep_size=8, dp_degree=1
     )
 
-    mem = deepseek_model.estimate_weights_size(pipeline_config)
+    mem = planner.estimate_weights_size(pipeline_config)
     assert mem == 754209345468
 
 
@@ -250,27 +251,26 @@ def test_deepseekv3_estimate_weights_size_routing_experts_scaling() -> None:
     - EP=1: routing_experts_memory = routing_experts_size (full copy)
     - EP=n_gpus*n_nodes: routing_experts_memory = routing_experts_size / n_nodes
     """
-    deepseek_model = deepseekV3_arch.pipeline_model
-    assert issubclass(deepseek_model, PipelineModel)
+    planner = _make_planner()
     routing_experts_size = compute_routing_experts_size()
     n_gpus = 8
 
     # Convert to int since the memory estimation involves some float arithmetic.
     # EP=1: no expert parallelism
     mem_ep1 = int(
-        deepseek_model.estimate_weights_size(
+        planner.estimate_weights_size(
             mock_weights_pipeline_config(n_gpus=n_gpus, ep_size=1, dp_degree=1)
         )
     )
     # EP=8: single node with full EP (n_nodes=1)
     mem_ep8 = int(
-        deepseek_model.estimate_weights_size(
+        planner.estimate_weights_size(
             mock_weights_pipeline_config(n_gpus=n_gpus, ep_size=8, dp_degree=1)
         )
     )
     # EP=16: two nodes (n_nodes=2)
     mem_ep16 = int(
-        deepseek_model.estimate_weights_size(
+        planner.estimate_weights_size(
             mock_weights_pipeline_config(n_gpus=n_gpus, ep_size=16, dp_degree=1)
         )
     )

@@ -41,7 +41,7 @@ def test_runtime_layout_const() raises:
     ]()
 
     var layout_r = RuntimeLayout[
-        layout, element_type=DType.uint32, linear_idx_type=DType.uint32
+        layout, element_type=.uint32, linear_idx_type=.uint32
     ](shape_runtime, stride_runtime)
 
     assert_equal(String(materialize[layout_r.layout]()), "((-1, 8):(8, 1))")
@@ -52,10 +52,10 @@ def test_static_and_dynamic_size() raises:
     print("== test_static_and_dynamic_size")
     comptime d_layout = Layout(IntTuple(UNKNOWN_VALUE, 4), IntTuple(4, 1))
     var layout = RuntimeLayout[
-        d_layout, element_type=DType.uint32, linear_idx_type=DType.uint32
+        d_layout, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[d_layout.shape, element_type=DType.uint32](4, 8),
-        RuntimeTuple[d_layout.stride, element_type=DType.uint32](4, 8),
+        RuntimeTuple[d_layout.shape, element_type=.uint32](4, 8),
+        RuntimeTuple[d_layout.stride, element_type=.uint32](4, 8),
     )
     assert_equal(layout.size(), 32)
 
@@ -73,10 +73,10 @@ def test_tiled_layout_indexing() raises:
     comptime d_layout = Layout(d_tuple, d_tuple)
 
     var layout = RuntimeLayout[
-        d_layout, element_type=DType.uint32, linear_idx_type=DType.uint32
+        d_layout, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[d_layout.shape, element_type=DType.uint32](2, 2, 2, 2),
-        RuntimeTuple[d_layout.stride, element_type=DType.uint32](1, 8, 2, 4),
+        RuntimeTuple[d_layout.shape, element_type=.uint32](2, 2, 2, 2),
+        RuntimeTuple[d_layout.stride, element_type=.uint32](1, 8, 2, 4),
     )
 
     for ii in range(2):
@@ -106,10 +106,10 @@ def test_tiled_layout_indexing_linear_idx() raises:
     comptime d_layout = Layout(d_tuple, d_tuple)
 
     var layout = RuntimeLayout[
-        d_layout, element_type=DType.uint32, linear_idx_type=DType.uint32
+        d_layout, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[d_layout.shape, element_type=DType.uint32](2, 2, 2, 2),
-        RuntimeTuple[d_layout.stride, element_type=DType.uint32](1, 8, 2, 4),
+        RuntimeTuple[d_layout.shape, element_type=.uint32](2, 2, 2, 2),
+        RuntimeTuple[d_layout.stride, element_type=.uint32](1, 8, 2, 4),
     )
 
     for i in range(16):
@@ -127,10 +127,10 @@ def test_sublayout_indexing() raises:
     print("== test_sublayout_indexing")
     comptime layout_t = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
     comptime layout = RuntimeLayout[
-        layout_t, element_type=DType.uint32, linear_idx_type=DType.uint32
+        layout_t, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[layout_t.shape, element_type=DType.uint32](8, 4),
-        RuntimeTuple[layout_t.stride, element_type=DType.uint32](4, 1),
+        RuntimeTuple[layout_t.shape, element_type=.uint32](8, 4),
+        RuntimeTuple[layout_t.stride, element_type=.uint32](4, 1),
     )
     assert_equal(String(layout.sublayout[0]()), "(8:4)")
     assert_equal(String(layout.sublayout[1]()), "(4:1)")
@@ -140,10 +140,10 @@ def test_coalesce() raises:
     print("== test_coalesce")
     comptime layout_t = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
     var layout = RuntimeLayout[
-        layout_t, element_type=DType.uint32, linear_idx_type=DType.uint32
+        layout_t, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[layout_t.shape, element_type=DType.uint32](8, 1),
-        RuntimeTuple[layout_t.stride, element_type=DType.uint32](1, 1),
+        RuntimeTuple[layout_t.shape, element_type=.uint32](8, 1),
+        RuntimeTuple[layout_t.stride, element_type=.uint32](1, 1),
     )
     assert_equal(String(coalesce(layout)), "((8, 1):(1, 1))")
     assert_equal(
@@ -155,10 +155,10 @@ def test_coalesce() raises:
         IntTuple(UNKNOWN_VALUE, 8, 1, 1),
     )
     var layout_2 = RuntimeLayout[
-        layout_t_2, element_type=DType.uint32, linear_idx_type=DType.uint32
+        layout_t_2, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[layout_t_2.shape, element_type=DType.uint32](32, 16, 8, 1),
-        RuntimeTuple[layout_t_2.stride, element_type=DType.uint32](16, 8, 1, 1),
+        RuntimeTuple[layout_t_2.shape, element_type=.uint32](32, 16, 8, 1),
+        RuntimeTuple[layout_t_2.stride, element_type=.uint32](16, 8, 1, 1),
     )
 
     assert_equal(String(coalesce(layout_2)), "((32, 16, 8):(16, 8, 1))")
@@ -172,16 +172,16 @@ def test_make_layout() raises:
     print("== test_make_layout")
     comptime layout_t = Layout.row_major(UNKNOWN_VALUE, UNKNOWN_VALUE)
     var l_a = RuntimeLayout[
-        layout_t, element_type=DType.uint32, linear_idx_type=DType.uint32
+        layout_t, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[layout_t.shape, element_type=DType.uint32](2, 2),
-        RuntimeTuple[layout_t.stride, element_type=DType.uint32](2, 1),
+        RuntimeTuple[layout_t.shape, element_type=.uint32](2, 2),
+        RuntimeTuple[layout_t.stride, element_type=.uint32](2, 1),
     )
     var l_b = RuntimeLayout[
-        layout_t, element_type=DType.uint32, linear_idx_type=DType.uint32
+        layout_t, element_type=.uint32, linear_idx_type=.uint32
     ](
-        RuntimeTuple[layout_t.shape, element_type=DType.uint32](4, 4),
-        RuntimeTuple[layout_t.stride, element_type=DType.uint32](4, 1),
+        RuntimeTuple[layout_t.shape, element_type=.uint32](4, 4),
+        RuntimeTuple[layout_t.stride, element_type=.uint32](4, 1),
     )
     assert_equal(
         String(make_layout(l_a, l_b)), "(((2, 2), (4, 4)):((2, 1), (4, 1)))"
@@ -193,7 +193,7 @@ def test_large_layout_linear_index() raises:
     # Shape size exceeds Int32 max but stays within UInt32 max.
     # This ensures the runtime layout uses Int64 for linear indexing.
     comptime large_layout = Layout.row_major(65536, 57344)
-    comptime tensor_type = LayoutTensor[DType.uint8, large_layout, _]
+    comptime tensor_type = LayoutTensor[.uint8, large_layout, _]
 
     var shape = tensor_type.RuntimeLayoutType.ShapeType(65536, 57344)
     var stride = tensor_type.RuntimeLayoutType.StrideType(57344, 1)

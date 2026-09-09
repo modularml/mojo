@@ -19,10 +19,10 @@ These tests verify:
 4. K-tile count is correct for each group
 """
 
-from std.gpu import block_idx, grid_dim, thread_idx
+from max.gpu import block_idx, grid_dim, thread_idx
 from std.iter import zip
 from std.itertools import count
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Layout, LayoutTensor, row_major as new_row_major
 from layout._utils import ManagedLayoutTensor
 
@@ -47,33 +47,32 @@ def test_scheduler_kernel[
     max_tiles: Int,
 ](
     problem_sizes: LayoutTensor[
-        DType.int32, Layout.row_major(max_groups, 4), MutAnyOrigin
+        .int32, Layout.row_major(max_groups, 4), MutAnyOrigin
     ],
     num_groups: Int32,
     # Outputs: record visited tiles
     visited_group: LayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
+        .int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
     ],
     visited_m: LayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
+        .int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
     ],
     visited_n: LayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
+        .int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
     ],
     visited_k_tiles: LayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
+        .int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
     ],
     visited_changed: LayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
+        .int32, Layout.row_major(max_tiles, 1), MutAnyOrigin
     ],
-    tile_count: LayoutTensor[DType.int32, Layout.row_major(1, 1), MutAnyOrigin],
+    tile_count: LayoutTensor[.int32, Layout.row_major(1, 1), MutAnyOrigin],
 ):
     """Kernel that iterates over all tiles and records their coordinates."""
     # Convert LayoutTensor to TileTensor for the scheduler
-    from std.memory import UnsafePointer as NewPtr
 
     var problem_sizes_tt = _ProblemSizesTile[max_groups](
-        ptr=NewPtr[Scalar[DType.int32], MutAnyOrigin](
+        ptr=MutPointer[Int32, MutAnyOrigin](
             unsafe_from_address=Int(problem_sizes.ptr)
         ),
         layout=new_row_major[max_groups, 4](),
@@ -115,7 +114,7 @@ def test_single_group(ctx: DeviceContext) raises:
 
     # Create problem sizes: 1 group, 64x64x128
     var problem_sizes = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_groups, 4)
+        .int32, Layout.row_major(max_groups, 4)
     ](ctx)
     var ps = problem_sizes.tensor[update=False]()
     ps[0, 0] = 64  # M
@@ -125,23 +124,21 @@ def test_single_group(ctx: DeviceContext) raises:
 
     # Create output tensors
     var visited_group = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
+        .int32, Layout.row_major(max_tiles, 1)
     ](ctx)
-    var visited_m = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var visited_n = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var visited_k_tiles = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var visited_changed = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var tile_count = ManagedLayoutTensor[DType.int32, Layout.row_major(1, 1)](
+    var visited_m = ManagedLayoutTensor[.int32, Layout.row_major(max_tiles, 1)](
         ctx
     )
+    var visited_n = ManagedLayoutTensor[.int32, Layout.row_major(max_tiles, 1)](
+        ctx
+    )
+    var visited_k_tiles = ManagedLayoutTensor[
+        .int32, Layout.row_major(max_tiles, 1)
+    ](ctx)
+    var visited_changed = ManagedLayoutTensor[
+        .int32, Layout.row_major(max_tiles, 1)
+    ](ctx)
+    var tile_count = ManagedLayoutTensor[.int32, Layout.row_major(1, 1)](ctx)
 
     ctx.synchronize()
 
@@ -219,7 +216,7 @@ def test_two_groups(ctx: DeviceContext) raises:
 
     # Create problem sizes: 2 groups
     var problem_sizes = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_groups, 4)
+        .int32, Layout.row_major(max_groups, 4)
     ](ctx)
     var ps = problem_sizes.tensor[update=False]()
     # Group 0: 32x32x64 -> 2x2=4 tiles, k_tiles=2
@@ -235,23 +232,21 @@ def test_two_groups(ctx: DeviceContext) raises:
 
     # Create output tensors
     var visited_group = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
+        .int32, Layout.row_major(max_tiles, 1)
     ](ctx)
-    var visited_m = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var visited_n = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var visited_k_tiles = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var visited_changed = ManagedLayoutTensor[
-        DType.int32, Layout.row_major(max_tiles, 1)
-    ](ctx)
-    var tile_count = ManagedLayoutTensor[DType.int32, Layout.row_major(1, 1)](
+    var visited_m = ManagedLayoutTensor[.int32, Layout.row_major(max_tiles, 1)](
         ctx
     )
+    var visited_n = ManagedLayoutTensor[.int32, Layout.row_major(max_tiles, 1)](
+        ctx
+    )
+    var visited_k_tiles = ManagedLayoutTensor[
+        .int32, Layout.row_major(max_tiles, 1)
+    ](ctx)
+    var visited_changed = ManagedLayoutTensor[
+        .int32, Layout.row_major(max_tiles, 1)
+    ](ctx)
+    var tile_count = ManagedLayoutTensor[.int32, Layout.row_major(1, 1)](ctx)
 
     ctx.synchronize()
 

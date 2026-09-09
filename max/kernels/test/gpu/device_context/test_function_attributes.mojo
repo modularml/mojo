@@ -11,14 +11,15 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.host.func_attribute import Attribute
+from max.gpu import thread_idx
 from std.testing import assert_equal
+
+from max.gpu.host import DeviceContext
+from max.gpu.host.func_attribute import Attribute
 
 
 def test_function_attributes() raises:
-    def kernel(x: UnsafePointer[Int, MutAnyOrigin]):
+    def kernel(x: MutPointer[Int, MutAnyOrigin]):
         x[0] = thread_idx.x
 
     with DeviceContext() as ctx:

@@ -15,7 +15,6 @@
 
 import io
 
-import hf_repo_lock
 import pytest
 from max.pipelines.architectures.idefics3.tokenizer import Idefics3Tokenizer
 from max.pipelines.modeling.types import (
@@ -29,7 +28,6 @@ from PIL import Image
 from test_common.mocks import DummyPipelineConfig
 
 IDEFICS3_REPO_ID = "HuggingFaceM4/Idefics3-8B-Llama3"
-IDEFICS3_REVISION = hf_repo_lock.revision_for_hf_repo(IDEFICS3_REPO_ID)
 
 
 @pytest.mark.asyncio
@@ -48,7 +46,6 @@ async def test_idefics3_tokenizer_image_token_indices() -> None:
     tokenizer = Idefics3Tokenizer(
         IDEFICS3_REPO_ID,
         pipeline_config=pipeline_config,
-        revision=IDEFICS3_REVISION,
     )
     assert tokenizer.vision_token_ids == [128257]
     assert tokenizer.enable_prefix_caching is True

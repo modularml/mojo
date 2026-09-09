@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "lit_tests")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+lit_tests(
+    name = "test",
+    srcs = glob(["**/*.test"]),
+    data = glob([
+        "**/*.txt",
+    ]),
+    tools = [
+        "//Cache/tools/cache-mgr",
+    ],
+)

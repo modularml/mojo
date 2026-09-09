@@ -412,6 +412,99 @@ def moe_weights_mxfp4() -> dict[str, torch.Tensor]:
     return moe_weights
 
 
+@pytest.fixture
+def moe_weights_mxfp8() -> dict[str, torch.Tensor]:
+    """Generate MXFP8 weights on GPU for NVIDIA EP tests."""
+    torch.manual_seed(42)
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+    fp8_dtype = torch.float8_e4m3fn
+    scale_dtype = torch.float8_e8m0fnu
+    fp8_max = torch.finfo(fp8_dtype).max
+    fp8_min = torch.finfo(fp8_dtype).min
+    weights_multiplier = 100
+    scale_generator = torch.Generator(device="cpu")
+    scale_generator.manual_seed(2026)
+
+    def _add_mxfp8_proj(
+        moe_weights: dict[str, torch.Tensor],
+        prefix: str,
+        out_dim: int,
+        in_dim: int,
+    ) -> None:
+        weight = (
+            torch.randn(
+                out_dim,
+                in_dim,
+                dtype=torch.bfloat16,
+                device=device,
+            )
+            * weights_multiplier
+        ).clamp(fp8_min, fp8_max)
+        scale_bits = torch.randint(
+            109,
+            117,
+            (out_dim, in_dim // 32),
+            dtype=torch.uint8,
+            device="cpu",
+            generator=scale_generator,
+        )
+        moe_weights[f"{prefix}.weight"] = weight.to(fp8_dtype)
+        moe_weights[f"{prefix}.weight_scale"] = scale_bits.view(scale_dtype).to(
+            device
+        )
+
+    moe_weights = {}
+
+    moe_weights["gate.gate_score.weight"] = (
+        torch.randn(
+            NUM_EXPERTS, HIDDEN_DIM, dtype=torch.bfloat16, device=device
+        )
+        * 1e-3
+    )
+
+    for expert_idx in range(NUM_EXPERTS):
+        _add_mxfp8_proj(
+            moe_weights,
+            f"experts.{expert_idx}.gate_proj",
+            MOE_DIM,
+            HIDDEN_DIM,
+        )
+        _add_mxfp8_proj(
+            moe_weights,
+            f"experts.{expert_idx}.up_proj",
+            MOE_DIM,
+            HIDDEN_DIM,
+        )
+        _add_mxfp8_proj(
+            moe_weights,
+            f"experts.{expert_idx}.down_proj",
+            HIDDEN_DIM,
+            MOE_DIM,
+        )
+
+    _add_mxfp8_proj(
+        moe_weights,
+        "shared_experts.gate_proj",
+        MOE_DIM,
+        HIDDEN_DIM,
+    )
+    _add_mxfp8_proj(
+        moe_weights,
+        "shared_experts.up_proj",
+        MOE_DIM,
+        HIDDEN_DIM,
+    )
+    _add_mxfp8_proj(
+        moe_weights,
+        "shared_experts.down_proj",
+        HIDDEN_DIM,
+        MOE_DIM,
+    )
+
+    return moe_weights
+
+
 @pytest.fixture(scope="module")
 def moe_weights() -> dict[str, torch.Tensor]:
     """Generate random BF16 weights on GPU for fast random number generation."""

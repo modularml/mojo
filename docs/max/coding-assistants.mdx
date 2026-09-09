@@ -8,11 +8,22 @@ This page describes how you can accelerate your MAX development with
 popular AI coding assistants (Cursor, Claude Code, GitHub Copilot, Windsurf,
 and others). Mojo language documentation is hosted separately at
 [mojolang.org](https://mojolang.org); use
-[mojolang.org/llms.txt](https://mojolang.org/llms.txt) for Mojo-specific AI
-context. This page covers resources available on docs.modular.com:
+[Mojo AI skills](https://mojolang.org/docs/tools/skills/) for Mojo-specific
+context. This page covers resources available on max.modular.com:
+
+- **MAX skills**: Reusable AI agent skills that follow the Agent Skills
+  Standard, equipping coding agents with standard workflows to build MAX
+  projects, [bring up new model
+  architectures](/develop/model-bringup-skills/), and profile and benchmark
+  model performance.
 
 - **Documentation files** (`llms.txt`): Raw text files that AI tools use for
 website navigation hints and direct access to up-to-date API documentation.
+
+- **Docs MCP server**: A hosted [Model Context
+  Protocol](https://modelcontextprotocol.io) server that gives your assistant
+  live, queryable access to the docs: search, API symbol lookup, code
+  examples, and import validation.
 
 - **Project context files** (`CLAUDE.md` and `AGENTS.md`): Markdown files in
   your
@@ -20,8 +31,40 @@ project that provide AI assistants with build commands, coding conventions,
 and project structure.
 
 - **Cursor project rules** (`.cursor/rules/`): Modular-specific rules that
-activate based on the files you're editing, providing consistent guidance for
-MAX development (and Mojo when using rules from the Modular repository).
+  activate based on the files you're editing, providing consistent guidance for
+  MAX development (and Mojo when using rules from the Modular repository).
+
+## Install MAX skills {#skills}
+
+MAX skills are AI agent skills that capture best practices and step-by-step
+workflows for working with MAX. They allow AI coding agents to become fluent
+in developing new MAX projects, from model bring-up to benchmarking.
+
+The skills follow the [Agent Skills
+Standard](https://agentskills.io/specification), so any AI coding agent can
+use them.
+
+Add the Modular plugin marketplace to Claude Code and install the skills
+plugin:
+
+```text
+/plugin marketplace add modular/skills
+/plugin install skills@modular
+```
+
+The `skills` plugin installs both the MAX and Mojo skills. If you want only
+the MAX-specific skills, install `max-skills@modular` instead; for only the
+Mojo skills, install `mojo-skills@modular`.
+
+With Codex and other agents, install the skills with
+[Node.js](https://nodejs.org/en/download):
+
+```sh
+npx skills add modular/skills
+```
+
+For details on available skills, installation, and usage examples, see the
+[Modular Skills repository](https://github.com/modular/skills).
 
 ## Giving our docs to your AI assistant
 
@@ -35,29 +78,27 @@ that are optimized for different use cases:
   development, deployment, and inference guides
 - <a href="/llms-python.txt"><code>llms-python.txt</code></a> for MAX Python
   APIs, pipelines, or graph construction
-- <a href="/llms-kernels.txt"><code>llms-kernels.txt</code></a> for MAX AI
-  kernels API reference (top-level package indexes)
+- <a href="/llms-accelerator-api.txt"><code>llms-accelerator-api.txt</code></a>
+  for MAX accelerator library API reference (top-level package indexes)
 - <a href="/llms-c-api.txt"><code>llms-c-api.txt</code></a> for MAX C API
   reference
-- <a href="/llms-glossary.txt"><code>llms-glossary.txt</code></a> for glossary
-  terms
 - <a href="https://mojolang.org/llms.txt"><code>mojolang.org/llms.txt</code></a>
   for Mojo language documentation (hosted on
-  [mojolang.org](https://mojolang.org), not docs.modular.com)
+  [mojolang.org](https://mojolang.org), not max.modular.com)
 
 If you're in Cursor, use the `@` syntax in the chat window to reference
 documentation directly. For example, to insert the MAX Python API documentation,
 add this to your chat:
 
 ```text
-@docs.modular.com/llms-python.txt
+@max.modular.com/llms-python.txt
 ```
 
 :::tip Cursor tip
 
 To make the docs a permanent knowledge resource, type `@docs.new` in the chat
 and hit <kbd>Enter</kbd> (select **Add new doc**), then paste the `llms.txt`
-URL such as `docs.modular.com/llms-python.txt`. Edit the name and click
+URL such as `max.modular.com/llms-python.txt`. Edit the name and click
 **Confirm**. Read more about the [Cursor @Docs
 command](https://cursor.com/docs/context/mentions#docs).
 
@@ -67,11 +108,50 @@ For all other tools (Claude Code, Copilot, Windsurf, and others), just
 tell the AI to fetch the documentation:
 
 ```text
-Read https://docs.modular.com/llms-python.txt for MAX Python API documentation
+Read https://max.modular.com/llms-python.txt for MAX Python API documentation
 ```
 
 For more details, see the section below about [our `llms.txt`
 files](#modular-llmstxt-files).
+
+## Connect to the docs MCP server
+
+Connect the docs MCP server to give your AI assistant live access to MAX's
+documentation. Your assistant can search all of MAX's tutorials, API
+references, and code examples while it plans, writes, and debugs your code, so
+its answers stay grounded in the current documentation instead of its
+training data.
+
+Your assistant can usually set up the MCP server itself with a prompt like
+this:
+
+```text
+Add the MAX docs MCP server at https://mcp.modular.com/mcp/ and verify it
+by searching the docs.
+```
+
+Or configure it manually in your tool's settings.
+
+With Claude Code, add the server from the command line:
+
+```sh
+claude mcp add --transport http max-docs https://mcp.modular.com/mcp/
+```
+
+With Cursor, add the server to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "max-docs": {
+      "url": "https://mcp.modular.com/mcp/"
+    }
+  }
+}
+```
+
+Any other client that supports MCP's streamable HTTP transport connects with
+the same URL. The server indexes both the nightly and stable documentation.
 
 ## Working in the Modular repository
 
@@ -122,9 +202,8 @@ standard, providing LLM-friendly documentation files:
 | <a href="/llms.txt" target="_blank">llms.txt</a>                                  | Compact index linking to segment files | Starting point for all agents |
 | <a href="/llms-max-guides.txt" target="_blank">llms-max-guides.txt</a>            | MAX guides (develop, serve, deploy)    | Application development       |
 | <a href="/llms-python.txt" target="_blank">llms-python.txt</a>                    | MAX Python API indexes                 | Python-based MAX development  |
-| <a href="/llms-kernels.txt" target="_blank">llms-kernels.txt</a>                  | MAX AI kernels API (package indexes)   | Kernel and GPU development    |
+| <a href="/llms-accelerator-api.txt" target="_blank">llms-accelerator-api.txt</a>  | MAX accelerator library API indexes    | Kernel and GPU development    |
 | <a href="/llms-c-api.txt" target="_blank">llms-c-api.txt</a>                      | MAX C API reference                    | C API integration             |
-| <a href="/llms-glossary.txt" target="_blank">llms-glossary.txt</a>                | Glossary terms (full content)          | Terminology lookup            |
 | <a href="https://mojolang.org/llms.txt" target="_blank">mojolang.org/llms.txt</a> | Mojo language docs (external)          | Mojo development              |
 
 ### Modular Cursor rules

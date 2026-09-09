@@ -1,8 +1,8 @@
-load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
+load("//max/tests/integration/test_common:mef_precompile.bzl", "precompiled_mefs")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -16,6 +16,10 @@ modular_py_test(
             "test_encoder.py",  # MODELS-1411
             "test_vision_processor.py",
             "test_vision_transformer_eval.py",
+            # Own binary/test targets below (compile on CPU, run on GPU).
+            "_transformer_graphs.py",
+            "precompile_transformer.py",
+            "test_transformer.py",
         ],
     ),
     exec_properties = {
@@ -35,7 +39,84 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)
+
+# Shared graph construction for the CPU/GPU split: the producer compiles this
+# graph, the consumer initializes + executes it, so both import one module.
+modular_py_library(
+    name = "transformer_graphs",
+    srcs = ["_transformer_graphs.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+    ],
+)
+
+# CPU producer: compiles the vision transformer graph to a MEF under virtual
+# devices (no GPU). Run only as a build action by the precompiled_mefs macro.
+modular_py_binary(
+    name = "precompile_transformer_bin",
+    testonly = True,
+    srcs = ["precompile_transformer.py"],
+    imports = ["."],
+    main = "precompile_transformer.py",
+    tags = ["manual"],
+    deps = [
+        ":transformer_graphs",
+        "//max/python/max/graph",
+        "//max/tests/integration/test_common:mef_precompile",
+    ],
+)
+
+# One CPU build action. Every dimension the test's cases vary over is symbolic,
+# so the three cases share a single compiled graph.
+precompiled_mefs(
+    name = "transformer_mefs",
+    producer = ":precompile_transformer_bin",
+    specs = ["kimik2_5_transformer"],
+    target_compatible_with = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# GPU consumer: initializes the CPU-precompiled MEF and compares against the
+# torch reference. No graph compilation happens here -- that moved to the CPU
+# build action.
+modular_py_test(
+    name = "test_transformer",
+    size = "medium",
+    srcs = [
+        "conftest.py",
+        "test_transformer.py",
+    ],
+    data = [":transformer_mefs"],
+    env = {
+        "KIMIK2_5_TRANSFORMER_MEF_RLOCATIONS": "$(rlocationpaths :transformer_mefs)",
+    },
+    exec_properties = {
+        "test.resources:gpu-memory": "4",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    imports = ["."],
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        ":transformer_graphs",
+        "//max/python/max/driver",
+        "//max/python/max/engine",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/tests/integration/test_common:mef_precompile",
         requirement("numpy"),
         requirement("torch"),
     ],
@@ -58,7 +139,7 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/kimik2_5",
         requirement("numpy"),
         requirement("torch"),
     ],
@@ -72,8 +153,8 @@ modular_py_test(
         "requires-network",
     ],
     deps = [
-        "//max/python/max/pipelines/architectures",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/context",
         requirement("av"),
         requirement("numpy"),
         requirement("pillow"),
@@ -106,8 +187,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
-        "//max/tests/integration:hf_repo_lock",
+        "//max/python/max/pipelines/architectures/kimik2_5",
         requirement("datasets"),
         requirement("huggingface-hub"),
         requirement("numpy"),

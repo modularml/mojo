@@ -8,10 +8,19 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
+
+modular_py_test(
+    name = "test_model_config",
+    srcs = ["test_model_config.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/flux2",
+    ],
+)
 
 modular_py_test(
     name = "benchmark_text_encoder",
@@ -39,7 +48,8 @@ modular_py_test(
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/mistral3",
+        "//max/python/max/pipelines/architectures/qwen3",
         "//max/python/max/profiler",
         requirement("numpy"),
         requirement("pytest-benchmark"),

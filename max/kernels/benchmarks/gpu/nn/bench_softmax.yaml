@@ -21,7 +21,9 @@ params:
   shape: 32x128256
 - dtype: bfloat16
   shape: 128x128256
-
+- dtype: bfloat16
+  shape: 8x4096x1024x24
+  
 # Attention softmax shapes (seq_len dimension)
 - dtype: bfloat16
   shape: 32x512
@@ -49,3 +51,32 @@ params:
   shape: 256x4096
 - dtype: float32
   shape: 32x128256
+
+# Low-batch, large-vocabulary shapes (LLM decode-sampling case)
+# Tests split-row optimization from PR #87842
+- dtype: bfloat16
+  shape: 2x128256
+- dtype: bfloat16
+  shape: 4x128256
+- dtype: bfloat16
+  shape: 8x128256
+- dtype: bfloat16
+  shape: 16x128256
+
+# Additional vocabulary sizes
+- dtype: bfloat16
+  shape: 1x32000
+- dtype: bfloat16
+  shape: 32x32000
+- dtype: bfloat16
+  shape: 1x64000
+- dtype: bfloat16
+  shape: 32x64000
+- dtype: bfloat16
+  shape: 512x4096
+
+# float32 variants
+- dtype: float32
+  shape: 1x128256
+- dtype: float32
+  shape: 1024x4096

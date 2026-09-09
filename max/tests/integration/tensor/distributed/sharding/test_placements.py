@@ -37,8 +37,9 @@ class TestReplicated:
     def test_equality(self) -> None:
         assert Replicated() == Replicated()
 
-    def test_singleton(self) -> None:
-        assert Replicated() is Replicated()
+    def test_value_equality(self) -> None:
+        assert Replicated() == Replicated()
+        assert hash(Replicated()) == hash(Replicated())
 
     def test_not_equal_to_other_types(self) -> None:
         assert Replicated() != Sharded(axis=0)
@@ -85,9 +86,10 @@ class TestPartial:
         assert Partial() == Partial(reduce_op=ReduceOp.SUM)
         assert Partial(ReduceOp.SUM) != Partial(ReduceOp.AVG)
 
-    def test_cached(self) -> None:
-        assert Partial() is Partial()
-        assert Partial(ReduceOp.AVG) is Partial(ReduceOp.AVG)
+    def test_value_equality(self) -> None:
+        assert Partial() == Partial()
+        assert Partial(ReduceOp.AVG) == Partial(ReduceOp.AVG)
+        assert hash(Partial()) == hash(Partial())
 
     def test_reduce_op_readonly(self) -> None:
         p = Partial()

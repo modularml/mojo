@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -10,6 +9,7 @@ package(default_visibility = [
 _QUANTIZED_TESTS = [
     "test_ep_moe_fp4.py",
     "test_ep_moe_fp8.py",
+    "test_ep_moe_mxfp8.py",
 ]
 
 _COMMON_ENV = select({
@@ -76,7 +76,7 @@ modular_py_test(
     srcs = _QUANTIZED_TESTS + ["conftest.py"],
     env = _COMMON_ENV,
     exec_properties = {
-        "test.resources:gpu-memory": "12",
+        "test.resources:gpu-memory": "11",
     },
     gpu_constraints = [
         "//:has_multi_gpu",
@@ -85,6 +85,9 @@ modular_py_test(
     mojo_deps = [
         "//max:shmem",
     ],
+    per_test_shard_count = {
+        "test_ep_moe_fp4.py": 2,
+    },
     tags = [
         "gpu",
         "requires-network",

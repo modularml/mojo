@@ -12,18 +12,18 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextAndVisionContext
-from max.pipelines.core.context_validators import (
+from max.pipelines.architectures.pixtral.tokenizer import PixtralTokenizer
+from max.pipelines.context import TextAndVisionContext
+from max.pipelines.context.context_validators import (
     validate_only_one_image,
     validate_requires_vision_context,
 )
-from max.pipelines.lib import (
-    SupportedArchitecture,
-    TextAndVisionTokenizer,
-)
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
+from max.pipelines.lib import SupportedArchitecture
 from max.pipelines.modeling.types import InputModality, PipelineTask
 
 from . import weight_adapters
+from .batch_processor import PixtralModuleV3BatchProcessor
 from .model import PixtralModel
 from .model_config import PixtralConfig
 
@@ -32,10 +32,10 @@ pixtral_modulev3_arch = SupportedArchitecture(
     task=PipelineTask.TEXT_GENERATION,
     input_modalities={InputModality.TEXT, InputModality.IMAGE},
     example_repo_ids=["mistral-experimental/pixtral-12b"],
-    default_encoding="bfloat16",
-    supported_encodings={"bfloat16"},
+    default_encoding=PixtralConfig.DEFAULT_ENCODING,
+    supported_encodings=PixtralConfig.SUPPORTED_ENCODINGS,
     pipeline_model=PixtralModel,
-    tokenizer=TextAndVisionTokenizer,
+    tokenizer=PixtralTokenizer,
     context_type=TextAndVisionContext,
     default_weights_format=WeightsFormat.safetensors,
     weight_adapters={
@@ -50,4 +50,8 @@ pixtral_modulev3_arch = SupportedArchitecture(
         validate_only_one_image,
     ],
     config=PixtralConfig,
+    batching=PixtralModuleV3BatchProcessor,
+    memory_planner=PagedMemoryPlanner,
+    supports_overlap_scheduler=False,
+    supports_device_graph_capture=False,
 )

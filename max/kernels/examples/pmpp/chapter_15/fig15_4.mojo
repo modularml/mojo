@@ -18,7 +18,7 @@ comptime tN = 4
 
 
 @always_inline
-def clear(C_r: SIMD[DType.float32, tM * tN]) -> SIMD[DType.float32, tM * tN]:
+def clear(C_r: SIMD[.float32, tM * tN]) -> SIMD[.float32, tM * tN]:
     """Clear accumulator array (initialize to zero).
 
     Args:
@@ -27,7 +27,7 @@ def clear(C_r: SIMD[DType.float32, tM * tN]) -> SIMD[DType.float32, tM * tN]:
     Returns:
         Cleared SIMD vector (all zeros).
     """
-    return SIMD[DType.float32, tM * tN](0.0)
+    return SIMD[.float32, tM * tN](0.0)
 
 
 def main():
@@ -35,7 +35,7 @@ def main():
     print("This is a helper function used in matrix multiplication kernels.")
 
     # Test the function
-    var test_array = SIMD[DType.float32, tM * tN](5.0)
+    var test_array = SIMD[.float32, tM * tN](5.0)
     print("Before clear: sum =", test_array.reduce_add())
 
     test_array = clear(test_array)

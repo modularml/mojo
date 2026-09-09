@@ -34,32 +34,33 @@ def avg_pool2d(
     ceil_mode: bool = False,
     count_boundary: bool = True,
 ) -> TensorValue:
-    """Perform a 2D average pooling operation on the input tensor.
+    """Applies 2D average pooling.
 
-    Applies a 2D average pooling operation to the input tensor with layout
-    ``[N, H, W, C]``. The pooling operation slides a window of size
-    ``kernel_size`` over the spatial dimensions and computes the average
-    value within each window.
+    Slides a window of size ``kernel_size`` over the spatial dimensions
+    and replaces each window with its average value.
 
     Args:
-        input: The input tensor with shape ``[N, H, W, C]``.
-        kernel_size: The height and width of the sliding window.
-        stride: The stride of the sliding window. Can be a single integer
-            applied to both spatial dimensions or a tuple ``(stride_h,
-            stride_w)``. Defaults to 1.
-        dilation: The spacing between kernel elements. Can be a single
-            integer or a tuple ``(dilation_h, dilation_w)``. Defaults to 1.
-        padding: Zero-padding added to both sides of each spatial dimension.
-            Can be a single integer or a tuple ``(pad_h, pad_w)``.
-            Defaults to 0.
-        ceil_mode: If ``True``, uses ceil instead of floor when computing
-            the output spatial shape. Defaults to ``False``.
-        count_boundary: If ``True``, includes padding elements in the
+        input: The input tensor in channels-last (NHWC) layout,
+            ``(batch_size, height, width, channels)``.
+        kernel_size: A tuple ``(kernel_h, kernel_w)`` giving the height
+            and width of the sliding window.
+        stride: The stride of the sliding window. Either a single ``int``
+            applied to both spatial dimensions, or a tuple
+            ``(stride_h, stride_w)``. Defaults to ``1``.
+        dilation: The spacing between kernel elements. Either a single
+            ``int`` applied to both spatial dimensions, or a tuple
+            ``(dilation_h, dilation_w)``. Defaults to ``1``.
+        padding: Zero-padding added to both sides of each spatial
+            dimension. Either a single ``int`` applied to both spatial
+            dimensions, or a tuple ``(pad_h, pad_w)``. Defaults to ``0``.
+        ceil_mode: When ``True``, uses ceil instead of floor when
+            computing the output spatial shape. Defaults to ``False``.
+        count_boundary: When ``True``, includes padding elements in the
             divisor when computing the average. Defaults to ``True``.
 
     Returns:
-        A symbolic tensor with the average pooling applied, with shape
-        ``[N, H_out, W_out, C]``.
+        A ``TensorValue`` representing the averaged values, with shape
+        ``(batch_size, height_out, width_out, channels)``.
     """
     input = TensorValue(input)
 
@@ -92,30 +93,34 @@ def max_pool2d(
     padding: int | tuple[int, int] = 0,
     ceil_mode: bool = False,
 ) -> TensorValue:
-    """Perform a 2D max pooling operation on the input tensor.
+    """Applies 2D max pooling to a tensor.
 
-    Applies a 2D max pooling operation to the input tensor with layout
-    ``[N, H, W, C]``. The pooling operation slides a window of size
-    ``kernel_size`` over the spatial dimensions and selects the maximum
-    value within each window.
+    Slides a window of size ``kernel_size`` over the spatial dimensions
+    and replaces each window with its maximum value.
 
     Args:
-        input: The input tensor with shape ``[N, H, W, C]``.
-        kernel_size: The height and width of the sliding window.
-        stride: The stride of the sliding window. Can be a single integer
-            applied to both spatial dimensions or a tuple ``(stride_h,
-            stride_w)``. Defaults to 1.
-        dilation: The spacing between kernel elements. Can be a single
-            integer or a tuple ``(dilation_h, dilation_w)``. Defaults to 1.
-        padding: Zero-padding added to both sides of each spatial dimension.
-            Can be a single integer or a tuple ``(pad_h, pad_w)``.
-            Defaults to 0.
-        ceil_mode: If ``True``, uses ceil instead of floor when computing
-            the output spatial shape. Defaults to ``False``.
+        input: The input tensor in channels-last (NHWC) layout,
+            ``(batch_size, height, width, channels)``.
+        kernel_size: A tuple ``(kernel_h, kernel_w)`` giving the height
+            and width of the sliding window.
+        stride: The stride of the sliding window. Either a single ``int``
+            applied to both spatial dimensions, or a tuple
+            ``(stride_h, stride_w)``. Defaults to ``1``.
+        dilation: The spacing between kernel elements. Either a single
+            ``int`` applied to both spatial dimensions, or a tuple
+            ``(dilation_h, dilation_w)``. Defaults to ``1``.
+        padding: Padding added to both sides of each spatial dimension.
+            Out-of-bounds positions are excluded from the maximum
+            (equivalently, they use the dtype's minimum value or negative
+            infinity), so padding cannot win over negative input values.
+            Either a single ``int`` applied to both spatial dimensions, or
+            a tuple ``(pad_h, pad_w)``. Defaults to ``0``.
+        ceil_mode: When ``True``, uses ceil instead of floor when
+            computing the output spatial shape. Defaults to ``False``.
 
     Returns:
-        A symbolic tensor with the max pooling applied, with shape
-        ``[N, H_out, W_out, C]``.
+        A ``TensorValue`` representing the max-pooled values, with shape
+        ``(batch_size, height_out, width_out, channels)``.
     """
     input = TensorValue(input)
 
@@ -149,32 +154,34 @@ def roi_align(
     aligned: bool = False,
     mode: str = "AVG",
 ) -> TensorValue:
-    """Perform ROI Align pooling on the input tensor.
+    """Applies ROI-align pooling.
 
-    Extracts fixed-size feature maps from regions of interest (ROIs) in the
-    input tensor using bilinear interpolation. The input is expected in NHWC
-    layout.
+    Extracts fixed-size feature maps from regions of interest (ROIs) using
+    bilinear interpolation.
 
     Args:
-        input: The input tensor with shape ``[N, H, W, C]``.
-        rois: Regions of interest with shape ``[M, 5]``, where each row is
-            ``[batch_index, x1, y1, x2, y2]``.
-        output_height: Height of each output feature map.
-        output_width: Width of each output feature map.
-        spatial_scale: Multiplicative factor mapping ROI coordinates to
+        input: The input tensor in channels-last (NHWC) layout,
+            ``(batch_size, height, width, channels)``.
+        rois: The regions of interest with shape ``(num_rois, 5)``, where each
+            row is ``(batch_index, x1, y1, x2, y2)``.
+        output_height: The height of each output feature map.
+        output_width: The width of each output feature map.
+        spatial_scale: The multiplicative factor mapping ROI coordinates to
             input spatial coordinates. Defaults to ``1.0``.
-        sampling_ratio: Number of sampling points per bin in each direction.
-            ``0`` means adaptive (``ceil(bin_size)``). Defaults to ``0.0``.
-        aligned: If ``True``, applies a half-pixel offset to ROI
+        sampling_ratio: The number of sampling points per bin in each
+            direction. ``0`` means adaptive (``ceil(bin_size)``). Defaults to
+            ``0.0``.
+        aligned: When ``True``, applies a half-pixel offset to ROI
             coordinates for more precise alignment. Defaults to ``False``.
-        mode: Pooling mode, either ``"AVG"`` or ``"MAX"``.
-            Defaults to ``"AVG"``.
+        mode: The pooling mode, either ``"AVG"`` or ``"MAX"``. Defaults to
+            ``"AVG"``.
 
     Returns:
-        A symbolic tensor with shape ``[M, output_height, output_width, C]``.
+        A ``TensorValue`` representing the pooled values, with shape
+        ``(num_rois, output_height, output_width, channels)``.
 
     Raises:
-        ValueError: If ``input`` is not rank 4, ``rois`` is not rank 2 with
+        ValueError: If ``input`` isn't rank 4, ``rois`` isn't rank 2 with
             5 columns, or ``mode`` is invalid.
     """
     input = TensorValue(input)

@@ -1,0 +1,66 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("//bazel:api.bzl", "lit_tests", "modular_cc_binary", "modular_shared_library")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_shared_library(
+    name = "binary_id_shared_library",
+    srcs = ["binary_id_shared_library.cpp"],
+    hdrs = ["binary_id_shared_library.h"],
+    includes = [],
+    deps = [
+        "//Support:BinaryID",
+        "//Support:SymbolExport",
+    ],
+)
+
+modular_cc_binary(
+    name = "binary_id_binary",
+    srcs = ["binary_id_binary.cpp"],
+    deps = [
+        ":binary_id_shared_library",
+        "//Support:BinaryID",
+    ],
+)
+
+sh_test(
+    name = "binary_id_test",
+    srcs = ["binary_id_test.sh"],
+    data = [
+        ":binary_id_binary",
+        ":binary_id_shared_library",
+        "@llvm-project//llvm:llvm-readobj",
+    ],
+)
+
+lit_tests(
+    name = "test",
+    srcs = glob([
+        "**/*.mlir",
+        "**/*.td",
+    ]),
+    custom_substitutions = {
+        "%driver-tblgen": "$(rlocationpath //Support/tools/driver-tblgen) -I $(dirname $(dirname $(dirname ../../../../$(location //Support:include/Support/Driver/DriverCommand.td)))) -I $(dirname $(dirname $(dirname ../../../../../$(rlocationpath @llvm-project//llvm:include/llvm/Option/OptParser.td))))",
+        "%modular-crashpad-handler": "$(rlocationpath @crashpad//:modular-crashpad-handler)",
+    },
+    data = [
+        "//Support:DriverCommandTdFiles",
+        "//Support:include/Support/Driver/DriverCommand.td",
+        "@llvm-project//llvm:include/llvm/Option/OptParser.td",
+    ],
+    tools = [
+        "//Support/tools/build-info",
+        "//Support/tools/driver-tblgen",
+        "//Support/tools/support-dialect-opt",
+        "//Support/tools/system-info",
+        "@crashpad//:modular-crashpad-handler",
+    ],
+)

@@ -11,11 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import barrier, thread_idx, lane_id, warp_id, WARP_SIZE
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
-from std.gpu.primitives.warp import shuffle_down
+from max.gpu import thread_idx, lane_id, warp_id, WARP_SIZE
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
+from max.gpu.primitives.warp import shuffle_down
 from std.random import random_float64
 from std.math import abs
 from std.bit import log2_floor
@@ -47,7 +47,7 @@ def warp_reduce(val: Float32) -> Float32:
 
 
 def two_stage_warp_level_sum_reduction_kernel(
-    input: UnsafePointer[Float32, MutAnyOrigin],
+    input: UnsafePointer[Float32, ImmutAnyOrigin],
     output: UnsafePointer[Float32, MutAnyOrigin],
 ):
     """Two-stage warp-level sum reduction kernel.
@@ -63,10 +63,10 @@ def two_stage_warp_level_sum_reduction_kernel(
     partial_sum = warp_reduce(partial_sum)
 
     # Allocate shared memory for partial sums from each warp
-    var partial_sums_s = stack_allocation[
+    var partial_sums_s = unsafe_stack_allocation[
         BLOCK_DIM // WARP_SIZE,
         Float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # Store warp results to shared memory
@@ -86,8 +86,8 @@ def two_stage_warp_level_sum_reduction_kernel(
 
 # ========================== TEST CODE ==========================
 def cpu_sum(
-    input: UnsafePointer[Float32, MutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
+    input: UnsafePointer[mut=False, Float32, _],
+    output: UnsafePointer[mut=True, Float32, _],
     N: Int,
 ):
     """CPU reference sum implementation.
@@ -114,7 +114,7 @@ def main() raises:
 
     # Initialize input with random values
     for i in range(N):
-        h_input[i] = random_float64().cast[DType.float32]()
+        h_input[i] = random_float64().cast[.float32]()
 
     print(
         (
@@ -128,8 +128,8 @@ def main() raises:
 
     with DeviceContext() as ctx:
         # Device memory allocation
-        var d_input = ctx.enqueue_create_buffer[DType.float32](N)
-        var d_output = ctx.enqueue_create_buffer[DType.float32](1)
+        var d_input = ctx.enqueue_create_buffer[.float32](N)
+        var d_output = ctx.enqueue_create_buffer[.float32](1)
 
         # Copy data to device
         ctx.enqueue_copy(d_input, h_input)

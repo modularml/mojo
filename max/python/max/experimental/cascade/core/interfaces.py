@@ -22,11 +22,14 @@ from collections.abc import (
     Awaitable,
     Callable,
     Coroutine,
-    Generator,
     Mapping,
     Sequence,
 )
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import (
+    AbstractAsyncContextManager,
+    AsyncExitStack,
+    asynccontextmanager,
+)
 from dataclasses import dataclass, field
 from typing import (
     Any,
@@ -35,6 +38,13 @@ from typing import (
     ParamSpec,
     TypeVar,
     cast,
+)
+
+from max.experimental.cascade.core.pipeline_method import _get_pipeline_context
+from max.experimental.cascade.core.result import Result, ResultIter
+from max.experimental.cascade.core.type_hints import (
+    return_type,
+    stream_elem_type,
 )
 
 T = TypeVar("T")
@@ -65,17 +75,22 @@ WorkerType = TypeVar("WorkerType", bound=Worker)
 # to enable efficient grpc connection sharing
 
 
-class Runtime(ABC):
-    """Transport-agnostic runtime for worker execution and result delivery."""
+class Runtime(AsyncExitStack, ABC):
+    """Transport-agnostic runtime for worker execution and result delivery.
 
-    @abstractmethod
-    def open(self) -> AbstractAsyncContextManager[Runtime]:
-        """Required lifecycle cleanup context manager."""
-        ...
+    Concrete runtimes are async context managers, sharing the
+    :py:class:`AsyncExitStack` lifecycle so any custom setup/teardown a
+    subclass needs (connection pools, task groups, subprocess handles,
+    ...) plugs in by pushing onto the stack in an overridden
+    ``__aenter__``. Exit tears registered resources down in reverse
+    order. There is no separate ``open()`` method -- runtimes follow the
+    same shape as :py:mod:`asyncio` and standard-library context
+    managers.
+    """
 
     @abstractmethod
     async def deploy_worker(self, worker: Worker) -> str:
-        """Wire primitive: register an worker and return its stable id.
+        """Wire primitive: register a worker and return its stable id.
 
         This is the primitive that differs between local and remote runtimes.
         Most callers want :py:meth:`deploy` instead, which wraps the returned
@@ -84,7 +99,7 @@ class Runtime(ABC):
         ...
 
     async def deploy(self, worker: WorkerType) -> WorkerType:
-        """Register an worker and return a client-side :py:class:`Proxy`.
+        """Register a worker and return a client-side :py:class:`Proxy`.
 
         The runtime returns a :py:class:`Proxy` that is observationally
         equivalent to ``worker`` (same public method surface, same awaited
@@ -100,22 +115,40 @@ class Runtime(ABC):
     @abstractmethod
     def call_method(
         self,
-        actid: str,
+        worker_id: str,
         func: str,
-        args: Sequence[Any],
-        kwargs: Mapping[str, Any],
-    ) -> str:
-        """Launch an worker method asynchronously and bind it to a result id."""
+        args: Sequence[object],
+        kwargs: Mapping[str, object],
+    ) -> AbstractAsyncContextManager[str]:
+        """Launch a worker method asynchronously.
+
+        Returns an async context manager that yields the ``result_id`` bound
+        to the call. The id stays valid for the lifetime of the ``async
+        with`` block; exiting cancels the in-flight task and releases the
+        result buffer. The context is normally entered via
+        :py:meth:`AsyncExitStack.enter_async_context` on the pipeline-scope
+        stack returned by :py:func:`_get_pipeline_context`, so the call
+        lifetime tracks the surrounding request.
+        """
         ...
 
     @abstractmethod
-    def get_result(self, resid: str) -> Awaitable[T]:
-        """Await a single result future (may throw exception if call failed)."""
+    def get_result(self, resid: str) -> Awaitable[object]:
+        """Await a single result.
+
+        Raises whatever exception the call raised.
+        """
         ...
 
     @abstractmethod
-    def next_result(self, resid: str) -> Awaitable[T]:
-        """Await a single result future (may throw exception or StopAsyncIteration)."""
+    def stream_result(self, resid: str) -> AsyncIterator[object]:
+        """Bind a streaming result and iterate inline.
+
+        Single-consumer: the first call (across :py:meth:`stream_result` and
+        :py:meth:`stream_next`) binds the stream; subsequent attempts on the
+        same ``resid`` raise. Used for lightweight inline streams (e.g. token
+        streams) where backpressure rides on the underlying transport.
+        """
         ...
 
     @abstractmethod
@@ -124,48 +157,14 @@ class Runtime(ABC):
         ...
 
 
-# ---------------------------------------------------------------------------
-# ``Proxy`` and its result handles live below ``Runtime`` so the cross-class
-# references resolve top-down, avoiding the cross-module circular import we
-# hit when this lived in its own file.
-# ---------------------------------------------------------------------------
-
-
-@dataclass(slots=True, frozen=True)
-class Result(Generic[T]):
-    """Awaitable handle to a single result produced by a ``Runtime``."""
-
-    runtime: Runtime
-    result_id: str
-
-    def __await__(self) -> Generator[Any, None, T]:
-        return self.runtime.get_result(self.result_id).__await__()
-
-
-@dataclass(slots=True, frozen=True)
-class ResultIter(Generic[T]):
-    """Async-iterable handle to a streamed result from a ``Runtime``."""
-
-    runtime: Runtime
-    result_id: str
-
-    def __aiter__(self) -> AsyncIterator[T]:
-        return self
-
-    async def __anext__(self) -> T:
-        # ``Runtime.next_result`` already raises ``StopAsyncIteration``
-        # at end-of-stream, which terminates iteration cleanly.
-        return await self.runtime.next_result(self.result_id)
-
-
 class Proxy(Generic[T]):
     """Client-side handle to a deployed :py:class:`Worker`.
 
     Inspects ``type(worker)`` at construction time and attaches one bound
-    method per non-underscore worker method. Each generated method calls
-    ``runtime.call_method`` and wraps the returned ``result_id`` in a
-    :py:class:`Result` (or :py:class:`ResultIter` for async-generator
-    methods).
+    method per non-underscore worker method. Each generated method picks a
+    fresh ``result_id``, hands it to ``runtime.call_method`` for binding,
+    and returns it wrapped in a :py:class:`Result` (or :py:class:`ResultIter`
+    for async-generator methods).
     """
 
     runtime: Runtime
@@ -177,6 +176,7 @@ class Proxy(Generic[T]):
         self.runtime = runtime
         self.worker_id = worker_id
         worker_class = type(worker)
+        self._cls_name = worker_class.__name__
         for name in dir(worker_class):
             if name.startswith("_"):
                 continue
@@ -188,24 +188,23 @@ class Proxy(Generic[T]):
             else:
                 setattr(self, name, self._bind_call(name, method))
 
-    # ``method`` is the unbound class method, so its first parameter is ``self``;
-    # we strip it via ``Concatenate[WorkerType, P]`` (a phantom TypeVar that
-    # mypy unifies with the concrete worker subclass per call) and produce a
-    # wrapper whose parameter list is ``P`` and whose return type tracks the
-    # worker method's.
     def _bind_call(
         self,
         name: str,
         method: Callable[Concatenate[WorkerType, P], Coroutine[Any, Any, R]],
-    ) -> Callable[P, Result[R]]:
+    ) -> Callable[P, Coroutine[Any, Any, Result[R]]]:
         """Build a wrapper for a coroutine worker method."""
         runtime = self.runtime
         worker_id = self.worker_id
+        ret_type = return_type(method)
 
         @functools.wraps(method)
-        def call(*args: P.args, **kwargs: P.kwargs) -> Result[R]:
-            rid = runtime.call_method(worker_id, name, args, kwargs)
-            return Result(runtime, rid)
+        async def call(*args: P.args, **kwargs: P.kwargs) -> Result[R]:
+            context = _get_pipeline_context()
+            result_id = await context.enter_async_context(
+                runtime.call_method(worker_id, name, args, kwargs)
+            )
+            return Result(result_id, runtime, ret_type)
 
         return call
 
@@ -213,14 +212,20 @@ class Proxy(Generic[T]):
         self,
         name: str,
         method: Callable[Concatenate[WorkerType, P], AsyncIterator[R]],
-    ) -> Callable[P, ResultIter[R]]:
+    ) -> Callable[P, Coroutine[Any, Any, ResultIter[R]]]:
         """Build a wrapper for an async-generator worker method."""
         runtime = self.runtime
         worker_id = self.worker_id
+        elem_type = stream_elem_type(method)
 
         @functools.wraps(method)
-        def call_stream(*args: P.args, **kwargs: P.kwargs) -> ResultIter[R]:
-            rid = runtime.call_method(worker_id, name, args, kwargs)
-            return ResultIter(runtime, rid)
+        async def call_stream(
+            *args: P.args, **kwargs: P.kwargs
+        ) -> ResultIter[R]:
+            context = _get_pipeline_context()
+            result_id = await context.enter_async_context(
+                runtime.call_method(worker_id, name, args, kwargs)
+            )
+            return ResultIter(result_id, runtime, elem_type)
 
         return call_stream

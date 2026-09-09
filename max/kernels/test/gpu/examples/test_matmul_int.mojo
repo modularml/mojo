@@ -14,11 +14,12 @@
 from std.math import ceildiv
 from std.math.uutils import udivmod
 
-from std.gpu import AddressSpace, barrier, block_idx, global_idx, thread_idx
-from std.gpu.host import DeviceContext
+from max.gpu import block_idx, global_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
 from std.memory import (
-    memset_zero,
-    stack_allocation,
+    unsafe_memset_zero,
+    unsafe_stack_allocation,
 )
 from layout import Coord, Idx, TileTensor, row_major
 
@@ -28,13 +29,17 @@ comptime TILE_SZ_RATIO = TILE_SZ_A // TILE_SZ_B
 
 
 def matmul(
-    a_ptr: UnsafePointer[Scalar[DType.int], MutAnyOrigin],
-    b_ptr: UnsafePointer[Scalar[DType.int], MutAnyOrigin],
-    c_ptr: UnsafePointer[Scalar[DType.int], MutAnyOrigin],
-    m: Int,
-    n: Int,
-    k: Int,
+    a_ptr: MutPointer[Int, MutAnyOrigin],
+    b_ptr: MutPointer[Int, MutAnyOrigin],
+    c_ptr: MutPointer[Int, MutAnyOrigin],
+    m_dev: Int32,
+    n_dev: Int32,
+    k_dev: Int32,
 ):
+    # `Int` is not device-passable; widen the fixed-width args.
+    var m = Int(m_dev)
+    var n = Int(n_dev)
+    var k = Int(k_dev)
     var a = TileTensor(a_ptr, row_major(Coord(m, k)))
     var b = TileTensor(b_ptr, row_major(Coord(k, n)))
     var c = TileTensor(c_ptr, row_major(Coord(m, n)))
@@ -49,10 +54,10 @@ def matmul(
     # NOTE: A and C are column major, B is row major.
 
     # Allocate B array into shared memory for tiling.
-    var b_shared = stack_allocation[
+    var b_shared = unsafe_stack_allocation[
         TILE_SZ_RATIO * TILE_SZ_B,
         DType.int,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # Thread indexing offsets.
@@ -60,9 +65,9 @@ def matmul(
     var col = block_idx.y * TILE_SZ_B
 
     # Privatization of the C matrix.
-    var c_reg = stack_allocation[TILE_SZ_B, DType.int]()
+    var c_reg = unsafe_stack_allocation[TILE_SZ_B, DType.int]()
 
-    memset_zero(c_reg, TILE_SZ_B)
+    unsafe_memset_zero(c_reg, TILE_SZ_B)
 
     # Loop over each input tile.
     for tile_idx in range((k - 1) // TILE_SZ_RATIO + 1):
@@ -70,7 +75,7 @@ def matmul(
 
         # Load the B matrix into shared memory.
         var b_val = Int(b[tile_idx * TILE_SZ_RATIO + i, col + j])
-        b_shared[i * TILE_SZ_B + j] = Scalar[DType.int](b_val)
+        b_shared[i * TILE_SZ_B + j] = Int(b_val)
 
         barrier()
 
@@ -86,8 +91,7 @@ def matmul(
             # Compute the output element for each thread.
             for out_idx in range(TILE_SZ_B):
                 c_reg[out_idx] += (
-                    Scalar[DType.int](a_reg)
-                    * b_shared[idx * TILE_SZ_RATIO + out_idx]
+                    Int(a_reg) * b_shared[idx * TILE_SZ_RATIO + out_idx]
                 )
         barrier()
 
@@ -104,9 +108,9 @@ def run_matmul(ctx: DeviceContext) raises:
     comptime n = 512
     comptime k = 512
 
-    var a_host_ptr = alloc[Scalar[DType.int]](m * k)
-    var b_host_ptr = alloc[Scalar[DType.int]](k * n)
-    var c_host_ptr = alloc[Scalar[DType.int]](m * n)
+    var a_host_ptr = alloc[Int](m * k)
+    var b_host_ptr = alloc[Int](k * n)
+    var c_host_ptr = alloc[Int](m * n)
 
     var a_host = TileTensor(a_host_ptr, row_major[m, k]())
     var b_host = TileTensor(b_host_ptr, row_major[k, n]())
@@ -124,9 +128,9 @@ def run_matmul(ctx: DeviceContext) raises:
         for j in range(n):
             c_host[i, j] = 0
 
-    var a_device = ctx.enqueue_create_buffer[DType.int](m * k)
-    var b_device = ctx.enqueue_create_buffer[DType.int](k * n)
-    var c_device = ctx.enqueue_create_buffer[DType.int](m * n)
+    var a_device = ctx.enqueue_create_buffer[.int](m * k)
+    var b_device = ctx.enqueue_create_buffer[.int](k * n)
+    var c_device = ctx.enqueue_create_buffer[.int](m * n)
 
     ctx.enqueue_copy(a_device, a_host_ptr)
     ctx.enqueue_copy(b_device, b_host_ptr)
@@ -135,9 +139,9 @@ def run_matmul(ctx: DeviceContext) raises:
         a_device,
         b_device,
         c_device,
-        m,
-        n,
-        k,
+        Int32(m),
+        Int32(n),
+        Int32(k),
         grid_dim=(ceildiv(m, TILE_SZ_A), ceildiv(n, TILE_SZ_B)),
         block_dim=(TILE_SZ_A, 1),
     )

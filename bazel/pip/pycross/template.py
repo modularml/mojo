@@ -24,24 +24,18 @@ load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("@@rules_pycross+//pycross:defs.bzl", "pycross_wheel_build", "pycross_wheel_library")
 
 _TESTONLY_DEPS = [
-    "einx",
-    "frozendict",
     "hypothesis",
-    "librosa",
     "lm-eval",
     "mteb",
     "peft",
     "pygame-ce",
-    "reference_residual_fsq",
     "sentence-transformers",
     "sglang",
-    "soxr",
     "timm",
     "torchmetrics",
     "torchvision",
     "vllm",
     "xgrammar",
-    "zhconv",
 ]
 
 PINS = {{
@@ -62,7 +56,7 @@ def targets():
     native.alias(
         name = "torch@multiple",
         actual = select({{
-            "@@//:use_sglang_setting": ":torch@2.9.1+cu128",
+            "@@//:use_sglang_setting": ":torch@2.11.0+cu128",
             "@@//:use_vllm_setting": ":torch@2.11.0+cu128",
             "@@//:amd_gpu": ":torch@2.10.0+rocm7.2.3.lw.git1a270074",
             "@@//:nvidia_gpu": ":torch@2.10.0+cu128",
@@ -74,7 +68,7 @@ def targets():
     native.alias(
         name = "torchaudio@multiple",
         actual = select({{
-            "@@//:use_sglang_setting": ":torchaudio@2.9.1+cu128",
+            "@@//:use_sglang_setting": ":torchaudio@2.11.0+cu128",
             "@@//:use_vllm_setting": ":torchaudio@2.11.0+cu128",
             "@@//:amd_gpu": ":torchaudio@2.10.0+rocm7.2.3.git5047768f",
             "@@//:nvidia_gpu": ":torchaudio@2.10.0+cu128",
@@ -88,7 +82,7 @@ def targets():
         name = "torchvision@multiple",
         testonly = True,
         actual = select({{
-            "@@//:use_sglang_setting": ":torchvision@0.24.1+cu128",
+            "@@//:use_sglang_setting": ":torchvision@0.26.0+cu128",
             "@@//:use_vllm_setting": ":torchvision@0.26.0+cu128",
             "@@//:amd_gpu": ":torchvision@0.25.0+rocm7.2.3.git82df5f59",
             "@@//:nvidia_gpu": ":torchvision@0.25.0+cu128",
@@ -102,7 +96,6 @@ def targets():
         name = "triton@multiple",
         testonly = True,
         actual = select({{
-            "@@//:use_sglang_setting": ":triton@3.5.1",
             "@@//:amd_gpu": ":triton@3.6.0+rocm7.2.3.git4ed88892",
             "//conditions:default": ":triton@3.6.0",
         }}),
@@ -113,16 +106,26 @@ def targets():
         testonly = True,
         actual = select({{
             "@@//:use_sglang_setting": ":llguidance@0.7.30",
-            "//conditions:default": ":llguidance@1.3.0",
+            "@@//:use_vllm_setting": ":llguidance@1.7.5",
+            "//conditions:default": ":llguidance@1.7.5",
         }}),
     )
 
     native.alias(
         name = "transformers@multiple",
         actual = select({{
-            "@@//:use_sglang_setting": ":transformers@5.3.0",
+            "@@//:use_sglang_setting": ":transformers@5.6.0",
             "@@//:use_vllm_setting": ":transformers@5.8.0",
-            "//conditions:default": ":transformers@5.2.0",
+            "//conditions:default": ":transformers@5.12.1",
+        }}),
+    )
+
+    native.alias(
+        name = "fastapi@multiple",
+        actual = select({{
+            # vllm 0.24.0 caps fastapi below what the default group resolves to
+            "@@//:use_vllm_setting": ":fastapi@0.136.3",
+            "//conditions:default": ":fastapi@0.139.2",
         }}),
     )
 
@@ -160,6 +163,16 @@ def targets():
     )
 
     native.alias(
+        name = "nvidia-cudnn-frontend@multiple",
+        testonly = True,
+        actual = select({{
+            # vllm 0.24.0 pins a newer version than the default group
+            "@@//:use_vllm_setting": ":nvidia-cudnn-frontend@1.26.0",
+            "//conditions:default": ":nvidia-cudnn-frontend@1.16.0",
+        }}),
+    )
+
+    native.alias(
         name = "nvidia-nccl-cu12@multiple",
         testonly = True,
         actual = select({{
@@ -173,8 +186,6 @@ def targets():
         name = "nvidia-nvshmem-cu12@multiple",
         testonly = True,
         actual = select({{
-            # Uses torch 2.9.1, which uses this version
-            "@@//:use_sglang_setting": ":nvidia-nvshmem-cu12@3.3.20",
             "//conditions:default": ":nvidia-nvshmem-cu12@3.4.5",
         }}),
     )
@@ -182,14 +193,42 @@ def targets():
     native.alias(
         name = "sglang@multiple",
         testonly = True,
-        actual = ":sglang@0.5.10.post1",
+        actual = ":sglang@0.5.12.post1",
         target_compatible_with = ["@@//:nvidia_gpu"],
+    )
+
+    native.alias(
+        name = "quack-kernels@multiple",
+        testonly = True,
+        target_compatible_with = select({{
+            "@@//:use_sglang_setting": [],
+            "@@//:use_vllm_setting": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }}),
+        actual = select({{
+            "@@//:use_sglang_setting": ":quack-kernels@0.6.1",
+            "@@//:use_vllm_setting": ":quack-kernels@0.3.3",
+        }}),
+    )
+
+    native.alias(
+        name = "tokenspeed-mla@multiple",
+        testonly = True,
+        target_compatible_with = select({{
+            "@@//:use_sglang_setting": [],
+            "@@//:use_vllm_setting": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }}),
+        actual = select({{
+            "@@//:use_sglang_setting": ":tokenspeed-mla@0.1.1",
+            "@@//:use_vllm_setting": ":tokenspeed-mla@0.1.2",
+        }}),
     )
 
     native.alias(
         name = "vllm@multiple",
         testonly = True,
-        actual = ":vllm@0.20.0",
+        actual = ":vllm@0.24.0",
         target_compatible_with = ["@@//:nvidia_gpu"],
     )
 

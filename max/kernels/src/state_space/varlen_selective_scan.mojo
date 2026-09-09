@@ -13,18 +13,18 @@
 
 """Variable-length selective scan kernels for Mamba SSM architecture."""
 
-from std.gpu import (
+from max.gpu import (
     block_dim,
     block_idx,
     thread_idx,
 )
-from layout import TensorLayout, TileTensor
+from layout import DefaultEngine, TensorLayout, TensorEngine, TileTensor
 from std.utils.index import IndexList
-from std.algorithm import sync_parallelize
-from std.gpu.host import DeviceContext
+from max.algorithm import sync_parallelize
+from max.gpu.host import DeviceContext
 import std.math
 from std.math import exp2
-from state_space.causal_conv1d import silu
+from nn.activations import silu
 from state_space.selective_scan import softplus
 
 # LOG2E constant for converting exp to exp2 (faster on GPU)
@@ -52,29 +52,36 @@ def varlen_selective_state_update_gpu[
     output_LT: TensorLayout,
     dt_bias_LT: TensorLayout,
     state_batch_indices_LT: TensorLayout,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
     # Grid dimensions
-    total_threads: Int,  # batch * nheads * dim / BLOCK_SIZE_M
-    batch: Int,
-    nheads: Int,
-    dim: Int,
-    nheads_ngroups_ratio: Int,
+    total_threads: Int32,  # batch * nheads * dim / BLOCK_SIZE_M
+    batch: Int32,
+    nheads: Int32,
+    dim: Int32,
+    nheads_ngroups_ratio: Int32,
     pad_slot_id: Int32,
     dt_softplus: Int8,
     has_state_batch_indices: Int8,
     # Tensors
-    state: TileTensor[kernel_dtype, state_LT, MutExternalOrigin],
-    x: TileTensor[kernel_dtype, x_LT, MutExternalOrigin],
-    dt: TileTensor[kernel_dtype, dt_LT, MutExternalOrigin],
-    A: TileTensor[kernel_dtype, A_LT, MutExternalOrigin],
-    B: TileTensor[kernel_dtype, B_LT, MutExternalOrigin],
-    C: TileTensor[kernel_dtype, C_LT, MutExternalOrigin],
-    D: TileTensor[kernel_dtype, D_LT, MutExternalOrigin],
-    z: TileTensor[kernel_dtype, z_LT, MutExternalOrigin],
-    output: TileTensor[kernel_dtype, output_LT, MutExternalOrigin],
-    dt_bias: TileTensor[kernel_dtype, dt_bias_LT, MutExternalOrigin],
+    state: TileTensor[
+        kernel_dtype, state_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    x: TileTensor[kernel_dtype, x_LT, MutUntrackedOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_LT, MutUntrackedOrigin, Engine=Engine],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Engine=Engine],
+    output: TileTensor[
+        kernel_dtype, output_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    dt_bias: TileTensor[
+        kernel_dtype, dt_bias_LT, MutUntrackedOrigin, Engine=Engine
+    ],
     state_batch_indices: TileTensor[
-        DType.int32, state_batch_indices_LT, MutExternalOrigin
+        .int32, state_batch_indices_LT, MutUntrackedOrigin, Engine=Engine
     ],
     state_strides: Strides4D,  # (batch, nheads, dim, dstate)
     x_strides: Strides3D,  # (batch, nheads, dim)
@@ -88,16 +95,21 @@ def varlen_selective_state_update_gpu[
     out_strides: Strides3D,  # (batch, nheads, dim)
 ):
     """GPU kernel for selective state update with multi-head support."""
+    var _total_threads = Int(total_threads)
+    var _batch = Int(batch)
+    var _nheads = Int(nheads)
+    var _dim = Int(dim)
+    var _nheads_ngroups_ratio = Int(nheads_ngroups_ratio)
     comptime BLOCK_SIZE_M = 4  # Process 4 dims per thread
 
     var pid_m = block_idx.x  # Dim block index
     var pid_b = block_idx.y  # Batch index
     var pid_h = block_idx.z  # Head index
 
-    if pid_b >= batch or pid_h >= nheads:
+    if pid_b >= _batch or pid_h >= _nheads:
         return
 
-    # Determine state batch index
+    # Determine state _batch index
     var state_batch_idx = Int32(pid_b)
     if Bool(Int(has_state_batch_indices) != 0):
         state_batch_idx = state_batch_indices.raw_load(pid_b)
@@ -110,12 +122,12 @@ def varlen_selective_state_update_gpu[
     var has_z = Int(z.dim[0]()) > 0
     var dt_softplus_bool = Bool(Int(dt_softplus) != 0)
 
-    var group_id = pid_h // nheads_ngroups_ratio
+    var group_id = pid_h // _nheads_ngroups_ratio
 
     # Process BLOCK_SIZE_M dims per thread
     comptime for local_m in range(BLOCK_SIZE_M):
         var m = pid_m * BLOCK_SIZE_M + local_m
-        if m >= dim:
+        if m >= _dim:
             continue
 
         # Load x value
@@ -141,7 +153,7 @@ def varlen_selective_state_update_gpu[
             )
             var bias_val = Scalar[kernel_dtype](
                 dt_bias.raw_load(dt_bias_offset)
-            ).cast[DType.float32]()
+            ).cast[.float32]()
             dt_val += bias_val
 
         # Apply softplus if requested
@@ -185,7 +197,7 @@ def varlen_selective_state_update_gpu[
             )
             var state_val = Scalar[kernel_dtype](
                 state.raw_load(state_offset)
-            ).cast[DType.float32]()
+            ).cast[.float32]()
 
             # Update state: state = state * dA + dB * x
             state_val = state_val * dA + dB * x_val
@@ -252,39 +264,44 @@ def varlen_selective_scan_fwd_gpu[
     query_start_loc_LT: TensorLayout,
     cache_indices_LT: TensorLayout,
     has_initial_state_LT: TensorLayout,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](
-    dim: Int,
-    ngroups: Int,
-    batch: Int,
+    dim: Int32,
+    ngroups: Int32,
+    batch: Int32,
     pad_slot_id: Int32,
     delta_softplus: Int8,
     # Tensors - varlen format: (dim, total_length) for u, delta, z, out
-    u: TileTensor[kernel_dtype, u_LT, MutExternalOrigin],
-    delta: TileTensor[kernel_dtype, delta_LT, MutExternalOrigin],
-    A: TileTensor[kernel_dtype, A_LT, MutExternalOrigin],
+    u: TileTensor[kernel_dtype, u_LT, MutUntrackedOrigin, Engine=Engine],
+    delta: TileTensor[
+        kernel_dtype, delta_LT, MutUntrackedOrigin, Engine=Engine
+    ],
+    A: TileTensor[kernel_dtype, A_LT, MutUntrackedOrigin, Engine=Engine],
     B: TileTensor[
-        kernel_dtype, B_LT, MutExternalOrigin
+        kernel_dtype, B_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (ngroups, dstate, total_length)
     C: TileTensor[
-        kernel_dtype, C_LT, MutExternalOrigin
+        kernel_dtype, C_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (ngroups, dstate, total_length)
-    D: TileTensor[kernel_dtype, D_LT, MutExternalOrigin],
-    z: TileTensor[kernel_dtype, z_LT, MutExternalOrigin],
-    delta_bias: TileTensor[kernel_dtype, delta_bias_LT, MutExternalOrigin],
+    D: TileTensor[kernel_dtype, D_LT, MutUntrackedOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_LT, MutUntrackedOrigin, Engine=Engine],
+    delta_bias: TileTensor[
+        kernel_dtype, delta_bias_LT, MutUntrackedOrigin, Engine=Engine
+    ],
     ssm_states: TileTensor[
-        kernel_dtype, ssm_states_LT, MutExternalOrigin
+        kernel_dtype, ssm_states_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch, dim, dstate)
     output: TileTensor[
-        kernel_dtype, output_LT, MutExternalOrigin
+        kernel_dtype, output_LT, MutUntrackedOrigin, Engine=Engine
     ],  # Output written here (or to z if z is present)
     query_start_loc: TileTensor[
-        DType.int32, query_start_loc_LT, MutExternalOrigin
+        .int32, query_start_loc_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch + 1,)
     cache_indices: TileTensor[
-        DType.int32, cache_indices_LT, MutExternalOrigin
+        .int32, cache_indices_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch,)
     has_initial_state: TileTensor[
-        DType.bool, has_initial_state_LT, MutExternalOrigin
+        .bool, has_initial_state_LT, MutUntrackedOrigin, Engine=Engine
     ],  # (batch,)
     u_strides: Strides2D,  # (dim, total_length)
     delta_strides: Strides2D,  # (dim, total_length)
@@ -298,11 +315,14 @@ def varlen_selective_scan_fwd_gpu[
     out_strides: Strides2D,  # (dim, total_length)
 ):
     """GPU kernel for variable-length selective scan."""
-    # 2D grid: block_idx.x for dim, block_idx.y for batch
+    var _dim = Int(dim)
+    var _ngroups = Int(ngroups)
+    var _batch = Int(batch)
+    # 2D grid: block_idx.x for _dim, block_idx.y for _batch
     var d = block_dim.x * block_idx.x + thread_idx.x
     var b = block_idx.y
 
-    if d >= dim or b >= batch:
+    if d >= _dim or b >= _batch:
         return
 
     var has_D = Int(D.dim[0]()) > 0
@@ -327,35 +347,34 @@ def varlen_selective_scan_fwd_gpu[
         if cache_idx == Int(pad_slot_id):
             return
 
-    # Pre-load D and delta_bias for this dim
+    # Pre-load D and delta_bias for this _dim
     var D_val = Float32(0.0)
     if has_D:
         var D_offset = UInt32(d * D_strides[0])
-        D_val = Scalar[kernel_dtype](D.raw_load(D_offset)).cast[DType.float32]()
+        D_val = Scalar[kernel_dtype](D.raw_load(D_offset)).cast[.float32]()
 
     var delta_bias_val = Float32(0.0)
     if has_delta_bias:
         var bias_offset = UInt32(d * delta_bias_strides[0])
         delta_bias_val = Scalar[kernel_dtype](
             delta_bias.raw_load(bias_offset)
-        ).cast[DType.float32]()
+        ).cast[.float32]()
 
-    # Pre-load A values for this dim and pre-multiply by LOG2E for faster exp2
-    var A_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+    # Pre-load A values for this _dim and pre-multiply by LOG2E for faster exp2
+    var A_vals = SIMD[.float32, MAX_DSTATE](0.0)
 
     comptime for n in range(DSTATE):
         var A_offset = UInt32(d * A_strides[0] + n * A_strides[1])
         A_vals[n] = (
-            Scalar[kernel_dtype](A.raw_load(A_offset)).cast[DType.float32]()
-            * LOG2E
+            Scalar[kernel_dtype](A.raw_load(A_offset)).cast[.float32]() * LOG2E
         )
 
-    # Determine group for this dim
-    var group_size = dim // ngroups
+    # Determine group for this _dim
+    var group_size = _dim // _ngroups
     var group_id = d // group_size
 
     # Initialize state - either from cache or zeros
-    var state = SIMD[DType.float32, MAX_DSTATE](0.0)
+    var state = SIMD[.float32, MAX_DSTATE](0.0)
 
     # Load initial state if requested
     var use_initial_state = False
@@ -372,7 +391,7 @@ def varlen_selective_scan_fwd_gpu[
             )
             state[n] = Scalar[kernel_dtype](
                 ssm_states.raw_load(state_offset)
-            ).cast[DType.float32]()
+            ).cast[.float32]()
 
     # Process sequence
     for t in range(seq_len):
@@ -403,8 +422,8 @@ def varlen_selective_scan_fwd_gpu[
         var delta_u = delta_val * u_val
 
         # Load B and C values for this timestep
-        var B_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
-        var C_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+        var B_vals = SIMD[.float32, MAX_DSTATE](0.0)
+        var C_vals = SIMD[.float32, MAX_DSTATE](0.0)
 
         comptime for n in range(DSTATE):
             var B_offset = UInt32(
@@ -484,16 +503,16 @@ def varlen_selective_state_update_cpu[
     has_state_batch_indices: Int8,
     # Tensors
     state: TileTensor[mut=True, kernel_dtype, ...],
-    x: TileTensor[kernel_dtype, ...],
-    dt: TileTensor[kernel_dtype, ...],
-    A: TileTensor[kernel_dtype, ...],
-    B: TileTensor[kernel_dtype, ...],
-    C: TileTensor[kernel_dtype, ...],
-    D: TileTensor[kernel_dtype, ...],
-    z: TileTensor[kernel_dtype, ...],
+    x: TileTensor[mut=False, kernel_dtype, ...],
+    dt: TileTensor[mut=False, kernel_dtype, ...],
+    A: TileTensor[mut=False, kernel_dtype, ...],
+    B: TileTensor[mut=False, kernel_dtype, ...],
+    C: TileTensor[mut=False, kernel_dtype, ...],
+    D: TileTensor[mut=False, kernel_dtype, ...],
+    z: TileTensor[mut=False, kernel_dtype, ...],
     output: TileTensor[mut=True, kernel_dtype, ...],
-    dt_bias: TileTensor[kernel_dtype, ...],
-    state_batch_indices: TileTensor[DType.int32, ...],
+    dt_bias: TileTensor[mut=False, kernel_dtype, ...],
+    state_batch_indices: TileTensor[mut=False, .int32, ...],
     # All strides (same as GPU version)
     state_strides: Strides4D,
     x_strides: Strides3D,
@@ -514,8 +533,7 @@ def varlen_selective_state_update_cpu[
     var dt_softplus_bool = Bool(Int(dt_softplus) != 0)
     var has_state_batch_indices_bool = Bool(Int(has_state_batch_indices) != 0)
 
-    @parameter
-    def worker(idx: Int):
+    def worker(idx: Int) {imm}:
         var b, remaining = divmod(idx, nheads * dim)
         var h, m = divmod(remaining, dim)
 
@@ -551,7 +569,7 @@ def varlen_selective_state_update_cpu[
             )
             var bias_val = Scalar[kernel_dtype](
                 dt_bias.raw_load(dt_bias_offset)
-            ).cast[DType.float32]()
+            ).cast[.float32]()
             dt_val += bias_val
 
         # Apply softplus if requested
@@ -593,7 +611,7 @@ def varlen_selective_state_update_cpu[
             )
             var state_val = Scalar[kernel_dtype](
                 state.raw_load(state_offset)
-            ).cast[DType.float32]()
+            ).cast[.float32]()
 
             # Update state
             state_val = state_val * dA + dB * x_val
@@ -641,7 +659,7 @@ def varlen_selective_state_update_cpu[
             out_offset, Scalar[kernel_dtype](out_val.cast[kernel_dtype]())
         )
 
-    sync_parallelize[worker](batch * nheads * dim, ctx)
+    sync_parallelize(worker, batch * nheads * dim, ctx)
 
 
 def varlen_selective_scan_fwd_cpu[
@@ -654,19 +672,19 @@ def varlen_selective_scan_fwd_cpu[
     pad_slot_id: Int32,
     delta_softplus: Int8,
     # Tensors
-    u: TileTensor[kernel_dtype, ...],
-    delta: TileTensor[kernel_dtype, ...],
-    A: TileTensor[kernel_dtype, ...],
-    B: TileTensor[kernel_dtype, ...],
-    C: TileTensor[kernel_dtype, ...],
-    D: TileTensor[kernel_dtype, ...],
+    u: TileTensor[mut=False, kernel_dtype, ...],
+    delta: TileTensor[mut=False, kernel_dtype, ...],
+    A: TileTensor[mut=False, kernel_dtype, ...],
+    B: TileTensor[mut=False, kernel_dtype, ...],
+    C: TileTensor[mut=False, kernel_dtype, ...],
+    D: TileTensor[mut=False, kernel_dtype, ...],
     z: TileTensor[mut=True, kernel_dtype, ...],
-    delta_bias: TileTensor[kernel_dtype, ...],
+    delta_bias: TileTensor[mut=False, kernel_dtype, ...],
     ssm_states: TileTensor[mut=True, kernel_dtype, ...],
     output: TileTensor[mut=True, kernel_dtype, ...],
-    query_start_loc: TileTensor[DType.int32, ...],
-    cache_indices: TileTensor[DType.int32, ...],
-    has_initial_state: TileTensor[DType.bool, ...],
+    query_start_loc: TileTensor[mut=False, .int32, ...],
+    cache_indices: TileTensor[mut=False, .int32, ...],
+    has_initial_state: TileTensor[mut=False, .bool, ...],
     # Strides (same as GPU version)
     u_strides: Strides2D,
     delta_strides: Strides2D,
@@ -689,8 +707,7 @@ def varlen_selective_scan_fwd_cpu[
     var delta_softplus_bool = Bool(Int(delta_softplus) != 0)
     var group_size = dim // ngroups
 
-    @parameter
-    def worker(d: Int):
+    def worker(d: Int) {imm}:
         # Pre-load D and delta_bias for this dim
         var D_val = Float32(0.0)
         if has_D:
@@ -704,15 +721,15 @@ def varlen_selective_scan_fwd_cpu[
             var bias_offset = UInt32(d * delta_bias_strides[0])
             delta_bias_val = Scalar[kernel_dtype](
                 delta_bias.raw_load(bias_offset)
-            ).cast[DType.float32]()
+            ).cast[.float32]()
 
         # Pre-load A values for this dim and pre-multiply by LOG2E for faster exp2
-        var A_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+        var A_vals = SIMD[.float32, MAX_DSTATE](0.0)
 
         comptime for n in range(DSTATE):
             var A_offset = UInt32(d * A_strides[0] + n * A_strides[1])
             A_vals[n] = (
-                Scalar[kernel_dtype](A.raw_load(A_offset)).cast[DType.float32]()
+                Scalar[kernel_dtype](A.raw_load(A_offset)).cast[.float32]()
                 * LOG2E
             )
 
@@ -734,7 +751,7 @@ def varlen_selective_scan_fwd_cpu[
                     continue
 
             # Initialize state
-            var state = SIMD[DType.float32, MAX_DSTATE](0.0)
+            var state = SIMD[.float32, MAX_DSTATE](0.0)
 
             var use_initial_state = False
             if has_initial_state_tensor:
@@ -750,7 +767,7 @@ def varlen_selective_scan_fwd_cpu[
                     )
                     state[n] = Scalar[kernel_dtype](
                         ssm_states.raw_load(state_offset)
-                    ).cast[DType.float32]()
+                    ).cast[.float32]()
 
             # Process sequence
             for t in range(seq_len):
@@ -771,7 +788,7 @@ def varlen_selective_scan_fwd_cpu[
                 )
                 var delta_val = Scalar[kernel_dtype](
                     delta.raw_load(delta_offset)
-                ).cast[DType.float32]()
+                ).cast[.float32]()
 
                 if has_delta_bias:
                     delta_val += delta_bias_val
@@ -781,8 +798,8 @@ def varlen_selective_scan_fwd_cpu[
 
                 var delta_u = delta_val * u_val
 
-                var B_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
-                var C_vals = SIMD[DType.float32, MAX_DSTATE](0.0)
+                var B_vals = SIMD[.float32, MAX_DSTATE](0.0)
+                var C_vals = SIMD[.float32, MAX_DSTATE](0.0)
 
                 comptime for n in range(DSTATE):
                     var B_offset = UInt32(
@@ -844,4 +861,4 @@ def varlen_selective_scan_fwd_cpu[
                     Scalar[kernel_dtype](state[n].cast[kernel_dtype]()),
                 )
 
-    sync_parallelize[worker](dim, ctx)
+    sync_parallelize(worker, dim, ctx)

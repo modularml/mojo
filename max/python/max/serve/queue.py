@@ -25,6 +25,8 @@ from typing import (
 )
 
 __all__ = [
+    "MAXAsyncPullQueue",
+    "MAXAsyncPushQueue",
     "MAXPullQueue",
     "MAXPushQueue",
     "drain_queue",
@@ -89,6 +91,42 @@ class MAXPullQueue(Protocol, Generic[_PullItemType]):
         Raises:
             queue.Empty: If the queue is empty and no item can be retrieved.
         """
+        ...
+
+
+@runtime_checkable
+class MAXAsyncPushQueue(Protocol, Generic[_PushItemType]):
+    """Protocol for an async push queue that supports both blocking and non-blocking put."""
+
+    async def put(self, item: _PushItemType) -> None:
+        """Send an item, awaiting until the queue is ready to accept it."""
+        ...
+
+    def put_nowait(self, item: _PushItemType) -> None:
+        """Attempt to put an item without blocking; raises immediately on failure."""
+        ...
+
+    async def writable(self, timeout_s: float | None = 0.0) -> bool:
+        """Whether ``put`` can currently accept an item without blocking.
+
+        A point-in-time check when ``timeout_s`` is 0: ``False`` means the queue
+        is full (the consumer has stopped draining) or has no consumer connected
+        yet. A positive ``timeout_s`` waits up to that long for the queue to
+        become writable; ``None`` blocks indefinitely.
+        """
+        ...
+
+
+@runtime_checkable
+class MAXAsyncPullQueue(Protocol, Generic[_PullItemType]):
+    """Protocol for an async pull queue that supports both blocking and non-blocking get."""
+
+    async def get(self) -> _PullItemType:
+        """Receive an item, awaiting until one is available."""
+        ...
+
+    def get_nowait(self) -> _PullItemType:
+        """Remove and return an item without blocking; raises queue.Empty if unavailable."""
         ...
 
 

@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Dataset evaluation test for Kimi K2.5 vision transformer.
+"""Dataset evaluation test for Kimi K2.7 vision transformer.
 
 Loads real HuggingFace model weights and real ImageNet-1k images, then
 compares the full 27-layer MAX vision transformer output against a
@@ -30,10 +30,8 @@ import logging
 import os
 from dataclasses import dataclass
 
-import hf_repo_lock
 import pytest
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from conftest import TorchEncoder, TorchPatchEmbed, TorchPatchMergerMLP
 from datasets import load_dataset
@@ -58,6 +56,7 @@ from max.pipelines.architectures.kimik2_5.weight_adapters import (
     KIMIK2_5_VISION_MAPPING,
 )
 from safetensors.torch import load_file
+from torch import nn
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +65,7 @@ MAX_DTYPE = DType.bfloat16
 RTOL = 2e-2
 ATOL = 4 * torch.finfo(TORCH_DTYPE).eps
 
-HF_REPO_ID = "nvidia/Kimi-K2.5-NVFP4"
-HF_REVISION = hf_repo_lock.revision_for_hf_repo(HF_REPO_ID)
+HF_REPO_ID = "nvidia/Kimi-K2.7-Code-NVFP4"
 
 NUM_EVAL_IMAGES = 5
 
@@ -215,12 +213,7 @@ def vision_config() -> _VisionConfig:
     """Loads vision transformer config from the HuggingFace config.json."""
     if os.environ.get("HF_HUB_OFFLINE", "0") == "1":
         pytest.skip("HF Hub offline mode is enabled")
-    assert HF_REVISION is not None, (
-        f"{HF_REPO_ID} must be present in hf-repo-lock.tsv"
-    )
-    config_path = hf_hub_download(
-        HF_REPO_ID, "config.json", revision=HF_REVISION
-    )
+    config_path = hf_hub_download(HF_REPO_ID, "config.json")
     with open(config_path) as f:
         vc = json.load(f)["vision_config"]
     return _VisionConfig(
@@ -249,14 +242,9 @@ def vision_tower_hf_weights() -> dict[str, torch.Tensor]:
     contain ``vision_tower.*``, ``mm_projector.*``, or
     ``multi_modal_projector.*`` keys, then downloads only those shards.
     """
-    assert HF_REVISION is not None, (
-        f"{HF_REPO_ID} must be present in hf-repo-lock.tsv"
-    )
-
     index_path = hf_hub_download(
         HF_REPO_ID,
         "model.safetensors.index.json",
-        revision=HF_REVISION,
     )
     with open(index_path) as f:
         index = json.load(f)
@@ -272,7 +260,6 @@ def vision_tower_hf_weights() -> dict[str, torch.Tensor]:
         shard_path = hf_hub_download(
             HF_REPO_ID,
             shard_name,
-            revision=HF_REVISION,
         )
         shard_weights = load_file(shard_path)
         for key, tensor in shard_weights.items():

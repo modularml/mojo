@@ -32,7 +32,7 @@ class Qwen2Config(Llama3Config):
         state_dict: dict[str, WeightData],
         return_logits: ReturnLogits,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
-        norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm",
+        norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm",
         attention_bias: bool = False,
     ) -> None:
         super().finalize(

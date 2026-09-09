@@ -11,11 +11,20 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""
+Provides warp-level profiling infrastructure for Blackwell warp-specialized matmul kernels.
+
+Defines a workspace manager that allocates per-SM recording buffers and a profile warp
+helper that captures start and end timestamps around a scoped region and writes a single
+timeline entry to the workspace.
+"""
+
 
 from std.time.time import global_perf_counter_ns
-from std.gpu import WARP_SIZE, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu import sm_id
+from max.gpu import WARP_SIZE, block_idx, thread_idx
+from max.gpu.host import DeviceContext
+from max.gpu.host.info import B200
+from max.gpu import sm_id
 
 
 comptime MatmulWarpSpecializationWorkSpaceManager[
@@ -39,16 +48,20 @@ struct BlackwellWarpProfilingWorkspaceManager[
     max_entries_per_warp: UInt32,
 ](TrivialRegisterPassable):
     """
-    This struct manages the profiling workspace. The workspaces consists of equal sized chunks, the total number of
-    which is equal to the total number of active SMs. Each SM chunk consists of sequences of entries, with a maximum
-    number of entries per warp role.
+    Profiling workspace for warp-role timelines on each SM.
 
-    Template Parameters:
-        load_warps: Number of warps specialized for load operations
-        mma_warps: Number of warps specialized for matrix multiply-accumulate operations
-        scheduler_warps: Number of warps specialized for scheduling operations
-        epilogue_warps: Number of warps specialized for epilogue operations
-        max_entries_per_warp: Maximum number of entries per warp (common across all warp roles)
+    Each SM owns a fixed-size chunk of timestamp entries, capped per warp role.
+
+    Parameters:
+        load_warps: Number of warps specialized for load operations.
+        mma_warps: Number of warps specialized for matrix
+            multiply-accumulate operations.
+        scheduler_warps: Number of warps specialized for scheduling
+            operations.
+        epilogue_warps: Number of warps specialized for epilogue
+            operations.
+        max_entries_per_warp: Maximum number of entries per warp (common
+            across all warp roles).
     """
 
     # load, scheduler, mma, epilogue
@@ -66,7 +79,7 @@ struct BlackwellWarpProfilingWorkspaceManager[
     comptime entries_per_sm = Self.total_warp_roles * Self.max_entries_per_warp
 
     @staticmethod
-    @parameter
+    @__parameter
     def _get_warp_count[warp_role: UInt32]() -> UInt32:
         comptime if warp_role == 0:
             return Self.load_warps
@@ -78,7 +91,7 @@ struct BlackwellWarpProfilingWorkspaceManager[
             return Self.epilogue_warps
 
     @staticmethod
-    @parameter
+    @__parameter
     def _calculate_entries_before_role[warp_role: UInt32]() -> UInt32:
         return warp_role * Self.max_entries_per_warp
 
@@ -99,7 +112,7 @@ struct BlackwellWarpProfilingWorkspaceManager[
         )
 
     @staticmethod
-    @parameter
+    @__parameter
     def _calculate_buffer_length() -> UInt32:
         return (
             UInt32(Self.sm_count) * Self.entries_per_sm * Self.total_data_points
@@ -111,21 +124,21 @@ struct BlackwellWarpProfilingWorkspaceManager[
         ctx: DeviceContext,
     ) raises -> Span[UInt64, MutAnyOrigin]:
         var length = Int(Self._calculate_buffer_length())
-        var device_buffer = ctx.enqueue_create_buffer[DType.uint64](length)
+        var device_buffer = ctx.enqueue_create_buffer[.uint64](length)
         device_buffer.enqueue_fill(0)
         return Span[UInt64, MutAnyOrigin](
-            ptr=device_buffer.unsafe_ptr(),
+            unsafe_ptr=device_buffer.unsafe_ptr().as_unsafe_any_origin(),
             length=length,
         )
 
     @staticmethod
     @always_inline
     def write_to_workspace[
-        warp_role: UInt32
+        workspace_origin: MutOrigin, //, warp_role: UInt32
     ](
         sm_idx: UInt32,
         entry_idx: UInt32,
-        workspace: Span[UInt64, MutAnyOrigin],
+        workspace: Span[UInt64, workspace_origin],
         timeline: Tuple[UInt64, UInt64],
     ):
         comptime total_threads = UInt32(WARP_SIZE) * Self._get_warp_count[
@@ -151,7 +164,7 @@ struct BlackwellWarpProfilingWorkspaceManager[
         filename: StaticString,
     ) raises:
         var length = Int(Self._calculate_buffer_length())
-        var host_buffer = ctx.enqueue_create_host_buffer[DType.uint64](length)
+        var host_buffer = ctx.enqueue_create_host_buffer[.uint64](length)
         ctx.enqueue_copy(host_buffer, workspace)
         ctx.synchronize()
 
@@ -176,6 +189,7 @@ struct BlackwellWarpProfilingWorkspaceManager[
 
 
 struct BlackwellProfileWarp[
+    workspace_origin: MutOrigin,
     load_warps: UInt32,
     mma_warps: UInt32,
     scheduler_warps: UInt32,
@@ -191,15 +205,35 @@ struct BlackwellProfileWarp[
     ],
     warp_role: UInt32 = 0,
 ](ImplicitlyCopyable):
-    """
-    This struct calculates execution time for a warp/s,
+    """Calculates execution time for a warp/s,
     and writes a single entry to the workspace.
+
+    Parameters:
+        workspace_origin: Memory origin of the profiling workspace buffer
+            (inferred).
+        load_warps: Number of warps specialized for load operations
+            (inferred).
+        mma_warps: Number of warps specialized for matrix multiply-accumulate
+            operations (inferred).
+        scheduler_warps: Number of warps specialized for scheduling
+            operations (inferred).
+        epilogue_warps: Number of warps specialized for epilogue operations
+            (inferred).
+        max_entries_per_warp: Maximum number of timeline entries recorded per
+            warp role (inferred). Profiling is enabled when this value is
+            greater than zero.
+        WorkspaceManager: Workspace manager responsible for allocating the
+            profiling buffer and writing timeline entries (defaults to
+            `BlackwellWarpProfilingWorkspaceManager` parameterized by the
+            warp counts).
+        warp_role: Role of this warp, where 0 is load, 1 is scheduler, 2 is
+            mma, and 3 is epilogue (defaults to 0).
     """
 
     comptime enable_profiling = Self.max_entries_per_warp > 0
 
     var timeline: Tuple[UInt64, UInt64]
-    var workspace: Span[UInt64, MutAnyOrigin]
+    var workspace: Span[UInt64, Self.workspace_origin]
 
     # which entry is going to be written to the workspace for this warp
     var entry_idx: UInt32
@@ -207,7 +241,7 @@ struct BlackwellProfileWarp[
     @always_inline
     def __init__(
         out self,
-        workspace: Span[UInt64, MutAnyOrigin],
+        workspace: Span[UInt64, Self.workspace_origin],
         entry_idx: UInt32,
     ):
         self.timeline = (0, 0)

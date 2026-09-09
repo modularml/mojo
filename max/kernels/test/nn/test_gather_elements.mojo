@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from layout import TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from nn.gather_scatter import gather_elements
 from std.testing import assert_equal
 
@@ -23,13 +23,13 @@ def main() raises:
     def test_gather_ax1(ctx: DeviceContext) raises:
         print("== test_gather_ax1")
 
-        var data_stack: InlineArray[Float32, 4] = [Float32(1), 2, 3, 4]
+        var data_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var data = TileTensor(data_stack, row_major[2, 2]())
 
-        var indices_stack: InlineArray[Int32, 4] = [Int32(0), 0, 1, 0]
+        var indices_stack: Array[Int32, 4] = [Int32(0), 0, 1, 0]
         var indices = TileTensor(indices_stack, row_major[2, 2]())
 
-        var output_stack = InlineArray[Float32, 4](uninitialized=True)
+        var output_stack = Array[Float32, 4](fill={})
         var output = TileTensor(output_stack, row_major[2, 2]())
 
         gather_elements(data, indices, 1, output, ctx)
@@ -46,7 +46,7 @@ def main() raises:
     def test_gather_ax0(ctx: DeviceContext) raises:
         print("== test_gather_ax0")
 
-        var data_stack: InlineArray[Float32, 9] = [
+        var data_stack: Array[Float32, 9] = [
             Float32(1),
             2,
             3,
@@ -59,10 +59,10 @@ def main() raises:
         ]
         var data = TileTensor(data_stack, row_major[3, 3]())
 
-        var indices_stack: InlineArray[Int32, 6] = [Int32(1), 2, 0, 2, 0, 0]
+        var indices_stack: Array[Int32, 6] = [Int32(1), 2, 0, 2, 0, 0]
         var indices = TileTensor(indices_stack, row_major[2, 3]())
 
-        var output_stack = InlineArray[Float32, 6](uninitialized=True)
+        var output_stack = Array[Float32, 6](fill={})
         var output = TileTensor(output_stack, row_major[2, 3]())
 
         gather_elements(data, indices, 0, output, ctx)
@@ -81,7 +81,7 @@ def main() raises:
     def test_gather_neg_indices(ctx: DeviceContext) raises:
         print("== test_gather_neg_indices")
 
-        var data_stack: InlineArray[Float32, 9] = [
+        var data_stack: Array[Float32, 9] = [
             Float32(1),
             2,
             3,
@@ -94,10 +94,10 @@ def main() raises:
         ]
         var data = TileTensor(data_stack, row_major[3, 3]())
 
-        var indices_stack: InlineArray[Int32, 6] = [Int32(-1), -2, 0, -2, 0, 0]
+        var indices_stack: Array[Int32, 6] = [Int32(-1), -2, 0, -2, 0, 0]
         var indices = TileTensor(indices_stack, row_major[2, 3]())
 
-        var output_stack = InlineArray[Float32, 6](uninitialized=True)
+        var output_stack = Array[Float32, 6](fill={})
         var output = TileTensor(output_stack, row_major[2, 3]())
 
         gather_elements(data, indices, 0, output, ctx)

@@ -15,13 +15,14 @@ name: bench_decode_subgraph
 file: $BUILD_WORKSPACE_DIRECTORY/max/kernels/benchmarks/misc/comparison/bench_blackwell_decode.py
 
 deepseek-v2-commons: &deepseek-v2-commons
-  $num_heads: 16
-  $num_kv_heads: 1
+  $num_heads: 12
+  $num_kv_heads: 12
   $head_dim: 128
-  engine: ["flashinfer", "modular_max"]
+  # TODO: modular_max fails on B200 with graph compilation error; disabled until fixed
+  engine: ["flashinfer"]
   model: "deepseek-v2"
 
 params:
 - <<: *deepseek-v2-commons
-  $batch_size: "[2**i for i in range(0, 8)]"
-  $cache_len: "[2**i for i in [11]]"
+  $batch_size: "[1]"
+  $cache_len: "[2048, 4096]"

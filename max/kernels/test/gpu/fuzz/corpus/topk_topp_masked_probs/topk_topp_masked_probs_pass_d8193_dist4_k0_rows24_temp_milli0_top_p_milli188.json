@@ -1,0 +1,15 @@
+{
+  "target": "topk_topp_masked_probs",
+  "spec": {
+    "rows": 24,
+    "d": 8193,
+    "k": 0,
+    "top_p_milli": 188,
+    "temp_milli": 0,
+    "dist": 4
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "one past the per-CTA chunk boundary (block_size * vec = 8192) with a greedy temperature and an all-equal fill: every weight ties at 1, so the tie-tolerant predicate keeps every token and the row stays uniform",
+  "findings": []
+}

@@ -16,7 +16,7 @@ Dequantizes MXFP4 weights to FP8, then uses the SM90 warp-specialized FP8 GEMM.
 Activations (BF16) are cast to FP8 on-the-fly.
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.sys.info import _accelerator_arch
 from layout import Coord, Idx, TileTensor, row_major
 
@@ -49,11 +49,11 @@ def mxfp4_matmul_sm90(
     comptime b_type = b_packed.dtype
     comptime b_scales_type = b_scales.dtype
 
-    comptime assert c_type == DType.bfloat16, "output must be bfloat16"
-    comptime assert a_type == DType.bfloat16, "activations must be bfloat16"
-    comptime assert b_type == DType.uint8, "weights must be uint8 (packed FP4)"
+    comptime assert c_type == .bfloat16, "output must be bfloat16"
+    comptime assert a_type == .bfloat16, "activations must be bfloat16"
+    comptime assert b_type == .uint8, "weights must be uint8 (packed FP4)"
     comptime assert (
-        b_scales_type == DType.float8_e8m0fnu
+        b_scales_type == .float8_e8m0fnu
     ), "scales must be float8_e8m0fnu"
 
     var M = Int(c.dim[0]())

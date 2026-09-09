@@ -10,7 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Tests for Kimi K2.5 vision transformer."""
+"""Tests for Kimi K2.5 vision transformer.
+
+The graph is compiled to a MEF by a CPU-only build action
+(``:transformer_mefs`` via ``mef_precompile.bzl``); this test does NOT compile.
+It initializes that MEF and compares its output against the torch reference.
+"""
 
 from __future__ import annotations
 
@@ -19,40 +24,33 @@ import math
 
 import pytest
 import torch
-import torch.nn as nn
+from _transformer_graphs import (
+    DECODER_HIDDEN_SIZE,
+    HIDDEN_DIM,
+    IN_CHANNELS,
+    INIT_POS_EMB_HEIGHT,
+    INIT_POS_EMB_TIME,
+    INIT_POS_EMB_WIDTH,
+    MERGE_KERNEL_SIZE,
+    MLP_DIM,
+    NUM_HEADS,
+    PATCH_SIZE,
+    ROPE_MAX_HEIGHT,
+    ROPE_MAX_WIDTH,
+    ROPE_THETA,
+    TRANSFORMER_SPEC,
+    VT_NUM_LAYERS,
+)
 from conftest import TorchEncoder, TorchPatchEmbed, TorchPatchMergerMLP
 from max.driver import Accelerator, Buffer
-from max.dtype import DType
 from max.engine import InferenceSession
-from max.graph import DeviceRef, Graph, TensorType, TensorValue
 from max.pipelines.architectures.kimik2_5.layers.vision.data_processing import (
     compute_position_ids,
 )
-from max.pipelines.architectures.kimik2_5.layers.vision.transformer import (
-    Transformer,
-)
-from max.pipelines.architectures.kimik2_5.model_config import VisionConfig
+from test_common.mef_precompile import init_from_mef, mefs_from_env
+from torch import nn
 
 TORCH_DTYPE = torch.bfloat16
-MAX_DTYPE = DType.bfloat16
-
-NUM_HEADS = 16
-HIDDEN_DIM = 1152
-HEAD_DIM = HIDDEN_DIM // NUM_HEADS
-MLP_DIM = 4304
-
-ROPE_MAX_HEIGHT = 512
-ROPE_MAX_WIDTH = 512
-ROPE_THETA = 10000.0
-
-PATCH_SIZE = 14
-IN_CHANNELS = 3
-INIT_POS_EMB_HEIGHT = 64
-INIT_POS_EMB_WIDTH = 64
-INIT_POS_EMB_TIME = 4
-MERGE_KERNEL_SIZE = (2, 2)
-DECODER_HIDDEN_SIZE = 7168
-VT_NUM_LAYERS = 2
 
 
 def _generate_tensor(shape: tuple[int, ...]) -> torch.Tensor:
@@ -212,93 +210,26 @@ def _remap_transformer_keys_for_torch(
     return remapped
 
 
-def _build_and_run_transformer(
+def _run_transformer(
     state_dict: dict[str, torch.Tensor],
-    num_layers: int,
     pixel_values: torch.Tensor,
     grid_thws: torch.Tensor,
     input_row_offsets: torch.Tensor,
     max_seq_len: torch.Tensor,
     position_ids: torch.Tensor,
 ) -> Buffer:
-    """Build a MAX graph with Transformer, execute, return output."""
+    """Initialize the precompiled Transformer MEF, execute, return output."""
+    mef_path = mefs_from_env("KIMIK2_5_TRANSFORMER_MEF_RLOCATIONS")[
+        f"{TRANSFORMER_SPEC}.mef"
+    ]
+    assert mef_path.is_file(), f"precompiled MEF missing: {mef_path}"
+
     device = Accelerator(0)
-    device_ref = DeviceRef.from_device(device)
-
-    vision_config = VisionConfig(
-        dtype=MAX_DTYPE,
-        devices=[device_ref],
-        init_pos_emb_height=INIT_POS_EMB_HEIGHT,
-        init_pos_emb_time=INIT_POS_EMB_TIME,
-        init_pos_emb_width=INIT_POS_EMB_WIDTH,
-        merge_kernel_size=list(MERGE_KERNEL_SIZE),
-        mm_hidden_size=HIDDEN_DIM,
-        patch_size=PATCH_SIZE,
-        projector_ln_eps=1e-5,
-        text_hidden_size=DECODER_HIDDEN_SIZE,
-        vt_hidden_size=HIDDEN_DIM,
-        vt_intermediate_size=MLP_DIM,
-        vt_num_attention_heads=NUM_HEADS,
-        vt_num_hidden_layers=num_layers,
-        in_channels=IN_CHANNELS,
-        rope_max_height=ROPE_MAX_HEIGHT,
-        rope_max_width=ROPE_MAX_WIDTH,
-        rope_theta=ROPE_THETA,
-    )
-    vision_tower = Transformer(vision_config)
-    vision_tower.load_state_dict(state_dict)
-
     session = InferenceSession(devices=[device])
 
-    with Graph(
-        "kimik2_5_transformer_test",
-        input_types=[
-            TensorType(
-                MAX_DTYPE,
-                ["n_patches", IN_CHANNELS, PATCH_SIZE, PATCH_SIZE],
-                device=DeviceRef.GPU(),
-            ),
-            TensorType(
-                DType.int64,
-                ["n_videos", 3],
-                device=DeviceRef.GPU(),
-            ),
-            TensorType(
-                DType.uint32,
-                ["num_seqs"],
-                device=DeviceRef.GPU(),
-            ),
-            TensorType(DType.uint32, [1], device=DeviceRef.CPU()),
-            TensorType(
-                DType.int64,
-                ["n_patches"],
-                device=DeviceRef.GPU(),
-            ),
-        ],
-    ) as graph:
-        (
-            pixel_values_in,
-            grid_thws_in,
-            input_row_offsets_in,
-            max_seq_len_in,
-            position_ids_in,
-        ) = graph.inputs
-        assert isinstance(pixel_values_in, TensorValue)
-        assert isinstance(grid_thws_in, TensorValue)
-        assert isinstance(input_row_offsets_in, TensorValue)
-        assert isinstance(max_seq_len_in, TensorValue)
-        assert isinstance(position_ids_in, TensorValue)
-        outs = vision_tower(
-            [pixel_values_in],
-            [grid_thws_in],
-            [input_row_offsets_in],
-            [max_seq_len_in],
-            [position_ids_in],
-            [],
-        )
-        graph.output(outs[0])
-
-    compiled = session.load(graph, weights_registry=vision_tower.state_dict())
+    # The state dict keys are the fully-qualified weight names the graph was
+    # built with, so they bind directly as the weights registry.
+    compiled = init_from_mef(session, mef_path, state_dict)
     (result,) = compiled.execute(
         Buffer.from_dlpack(pixel_values).to(device),
         Buffer.from_dlpack(grid_thws).to(device),
@@ -343,9 +274,8 @@ def test_transformer(
 
     max_seq_len = torch.tensor([max(seq_lens)], dtype=torch.uint32)
 
-    max_output = _build_and_run_transformer(
+    max_output = _run_transformer(
         state_dict,
-        VT_NUM_LAYERS,
         pixel_values,
         torch.tensor(grid_thws, dtype=torch.int64),
         input_row_offsets,

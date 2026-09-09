@@ -1,0 +1,62 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Test the PythonObject formatter
+
+from std.python import Python
+
+# CHECK: (PythonObject) none_obj = None
+var py = Python.import_module("builtins")
+var none_obj = py.None
+
+# CHECK: (PythonObject) int_obj = <class 'int'> = 42
+var int_obj = py.int(42)
+
+# CHECK: (PythonObject) neg_int_obj = <class 'int'> = -7
+var neg_int_obj = py.int(-7)
+
+# CHECK: (PythonObject) zero_obj = <class 'int'> = 0
+var zero_obj = py.int(0)
+
+# An int that doesn't fit in a single 30-bit digit forces decodeSmallInt to
+# return false and the caller to use the address fallback. Without this case
+# the digitCount != 1 branch is uncovered.
+# CHECK: (PythonObject) big_int_obj = <class 'int'> = 0x{{[0-9a-f]+}}
+var big_int_obj = py.int(1 << 60)
+
+# %.17g gives the shortest decimal that round-trips through IEEE-754; for
+# 3.14 (which isn't exactly representable) this is the 17-sig-fig form.
+# CHECK: (PythonObject) float_obj = <class 'float'> = 3.14{{[0-9]*}}
+var float_obj = py.float(3.14)
+
+# CHECK: (PythonObject) bool_true = <class 'bool'> = True
+var bool_true = py.bool(1)
+
+# CHECK: (PythonObject) bool_false = <class 'bool'> = False
+var bool_false = py.bool(0)
+
+# CHECK: (PythonObject) str_obj = <class 'str'> = 0x{{[0-9a-f]+}}
+var str_obj = py.str("hello")
+
+# CHECK: (PythonObject) list_obj = <class 'list'> = 0 items
+var list_obj = py.list()
+
+# CHECK: (PythonObject) tuple_obj = <class 'tuple'> = 0 items
+var tuple_obj = py.tuple()
+
+# CHECK: (PythonObject) dict_obj = <class 'dict'> = 0 items
+var dict_obj = py.dict()
+
+# Exercise a custom-metaclass chain. socket.AF_INET is an IntEnum member,
+# so its ob_type chain is: member → AddressFamily → EnumMeta → type → type
+# (four hops before PyType_Type's self-reference fix-point, vs. three for
+# default-metaclass objects). The layout detector has to walk up to the
+# fix-point instead of checking a fixed depth.
+# CHECK: (PythonObject) af_inet = <class 'AddressFamily'> = 0x{{[0-9a-f]+}}
+var af_inet = Python.import_module("socket").AF_INET
+
+# CHECK-NOT: <unreadable 0x

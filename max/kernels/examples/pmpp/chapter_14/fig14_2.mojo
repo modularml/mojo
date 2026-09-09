@@ -13,27 +13,31 @@
 
 """Figure 14.2: Parallel odd-even sort kernel implementation in Mojo."""
 
-from std.gpu import block_idx, thread_idx
-from std.gpu.host import DeviceContext
+from max.gpu import block_idx, thread_idx
+from max.gpu.host import DeviceContext
 from std.random import random_ui64
 
 
 def sort_kernel(
     data: UnsafePointer[UInt32, MutAnyOrigin],
     hasChanged: UnsafePointer[UInt32, MutAnyOrigin],
-    N: Int,
-    isOddStep: Int,
-    block_dim_x: Int,
+    N_dev: Int32,
+    isOddStep_dev: Int32,
+    block_dim_x_dev: Int32,
 ):
     """Parallel odd-even sort kernel.
 
     Args:
         data: Array to sort.
         hasChanged: Flag to indicate if any swaps were made.
-        N: Size of array.
-        isOddStep: 1 for odd phase, 0 for even phase.
-        block_dim_x: Block dimension.
+        N_dev: Size of array.
+        isOddStep_dev: 1 for odd phase, 0 for even phase.
+        block_dim_x_dev: Block dimension.
     """
+    # `Int` is not device-passable; widen the fixed-width args.
+    var N = Int(N_dev)
+    var isOddStep = Int(isOddStep_dev)
+    var block_dim_x = Int(block_dim_x_dev)
     var i = 2 * (block_idx.x * block_dim_x + thread_idx.x) + (
         1 if isOddStep == 1 else 0
     )
@@ -46,7 +50,7 @@ def sort_kernel(
             hasChanged[0] = 1
 
 
-def cpu_odd_even_sort(data: UnsafePointer[UInt32, MutAnyOrigin], N: Int):
+def cpu_odd_even_sort(data: UnsafePointer[mut=True, UInt32, _], N: Int):
     """CPU reference implementation of odd-even sort.
 
     Args:
@@ -114,8 +118,8 @@ def main() raises:
     var ctx = DeviceContext()
 
     # Allocate device memory
-    var d_data = ctx.enqueue_create_buffer[DType.uint32](N)
-    var d_hasChanged = ctx.enqueue_create_buffer[DType.uint32](1)
+    var d_data = ctx.enqueue_create_buffer[.uint32](N)
+    var d_hasChanged = ctx.enqueue_create_buffer[.uint32](1)
 
     # Copy to device
     ctx.enqueue_copy(d_data, h_data)
@@ -151,9 +155,9 @@ def main() raises:
         ctx.enqueue_function[sort_kernel](
             d_data,
             d_hasChanged,
-            N,
-            1,
-            threads_per_block,
+            Int32(N),
+            Int32(1),
+            Int32(threads_per_block),
             grid_dim=(num_blocks, 1, 1),
             block_dim=(threads_per_block, 1, 1),
         )
@@ -162,9 +166,9 @@ def main() raises:
         ctx.enqueue_function[sort_kernel](
             d_data,
             d_hasChanged,
-            N,
-            0,
-            threads_per_block,
+            Int32(N),
+            Int32(0),
+            Int32(threads_per_block),
             grid_dim=(num_blocks, 1, 1),
             block_dim=(threads_per_block, 1, 1),
         )

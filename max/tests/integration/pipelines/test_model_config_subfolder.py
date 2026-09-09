@@ -14,21 +14,46 @@
 """Tests for MAXModelConfig subfolder support."""
 
 import os
-import struct
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+from huggingface_hub import constants as hf_hub_constants
 from max.graph.weights import WeightsFormat
 from max.pipelines.lib import (
     MAXModelConfig,
     PipelineConfig,
 )
+from max.pipelines.lib.config.model_config import _build_model_config
 from max.pipelines.lib.model_manifest import ModelManifest
-from max.pipelines.modeling.weights.hf_utils import HuggingFaceRepo
+from max.pipelines.weights.hf_utils import HuggingFaceRepo
+from pydantic import ConfigDict, ValidationError
+from test_common.fake_weights import write_fake_safetensors
 from test_common.mocks import (
     mock_pipeline_config_resolve,
 )
+
+
+@pytest.fixture(autouse=True)
+def _skip_repo_access_check() -> Iterator[None]:
+    """These tests use placeholder repos. ``MAXModelConfig.__init__`` now runs
+    HF network calls at construction (the repo access check, and the
+    ``file_exists`` probe that gates eager config loading); no-op them so
+    construction stays offline. ``load_huggingface_config`` is intentionally
+    left unpatched: with the probe returning ``False`` the eager load is
+    skipped, and the tests that assert on config loading patch it themselves."""
+    with (
+        patch("max.pipelines.lib.config.model_config.validate_hf_repo_access"),
+        patch("max.pipelines.weights.hf_utils.validate_hf_repo_access"),
+        patch(
+            "max.pipelines.weights.hf_utils.generate_local_model_path",
+            side_effect=lambda repo_id, revision=None: f"/fake/cache/{repo_id}",
+        ),
+        patch("huggingface_hub.file_exists", return_value=False),
+    ):
+        yield
 
 
 class TestMAXModelConfigSubfolder:
@@ -39,7 +64,11 @@ class TestMAXModelConfigSubfolder:
         """Test that subfolder defaults to None."""
         config = PipelineConfig(
             models=ModelManifest(
-                {"main": MAXModelConfig(model_path="test/model")}
+                {
+                    "main": _build_model_config(
+                        MAXModelConfig, model_path="test/model"
+                    )
+                }
             )
         )
         assert config.model.subfolder is None
@@ -50,8 +79,8 @@ class TestMAXModelConfigSubfolder:
         config = PipelineConfig(
             models=ModelManifest(
                 {
-                    "main": MAXModelConfig(
-                        model_path="test/model", subfolder="vae"
+                    "main": _build_model_config(
+                        MAXModelConfig, model_path="test/model", subfolder="vae"
                     )
                 }
             )
@@ -61,7 +90,8 @@ class TestMAXModelConfigSubfolder:
     @mock_pipeline_config_resolve
     def test_subfolder_passed_to_huggingface_weight_repo(self) -> None:
         """Test that subfolder is propagated to the HuggingFaceRepo for weights."""
-        model_config = MAXModelConfig(
+        model_config = _build_model_config(
+            MAXModelConfig,
             model_path="/tmp/fake-local-model",
             subfolder="text_encoder",
         )
@@ -74,7 +104,9 @@ class TestMAXModelConfigSubfolder:
     @mock_pipeline_config_resolve
     def test_subfolder_none_does_not_set_on_repo(self) -> None:
         """Test that subfolder=None results in None on HuggingFaceRepo."""
-        model_config = MAXModelConfig(model_path="/tmp/fake-local-model")
+        model_config = _build_model_config(
+            MAXModelConfig, model_path="/tmp/fake-local-model"
+        )
         with patch("os.path.exists", return_value=True):
             repo = model_config.huggingface_weight_repo
             assert repo.subfolder is None
@@ -83,7 +115,8 @@ class TestMAXModelConfigSubfolder:
     def test_subfolder_passed_to_huggingface_config_loading(self) -> None:
         """Test that subfolder is on the repo passed to AutoConfig loading."""
         mock_auto_config = Mock()
-        model_config = MAXModelConfig(
+        model_config = _build_model_config(
+            MAXModelConfig,
             model_path="test/model",
             subfolder="vae",
         )
@@ -106,7 +139,9 @@ class TestMAXModelConfigSubfolder:
     def test_subfolder_none_passed_to_huggingface_config_loading(self) -> None:
         """Test that subfolder=None is on the repo passed to AutoConfig loading."""
         mock_auto_config = Mock()
-        model_config = MAXModelConfig(model_path="test/model")
+        model_config = _build_model_config(
+            MAXModelConfig, model_path="test/model"
+        )
         with (
             patch("os.path.exists", return_value=True),
             patch(
@@ -178,13 +213,13 @@ class TestHuggingFaceRepoSubfolderWeightDiscovery:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a BF16 safetensors file at root.
             root_weight = os.path.join(tmpdir, "model.safetensors")
-            _write_fake_safetensors(root_weight, dtype="BF16")
+            write_fake_safetensors(root_weight, dtype="BF16")
 
             # Create an F32 safetensors file inside subfolder.
             vae_dir = os.path.join(tmpdir, "vae")
             os.makedirs(vae_dir)
             subfolder_weight = os.path.join(vae_dir, "model.safetensors")
-            _write_fake_safetensors(subfolder_weight, dtype="F32")
+            write_fake_safetensors(subfolder_weight, dtype="F32")
 
             # Without subfolder: reads first file found (local repos assume
             # one encoding per repo).
@@ -202,106 +237,155 @@ class TestMAXModelConfigSubfolderWeightPathPrefixing:
     @mock_pipeline_config_resolve
     def test_subfolder_prepended_to_weight_path(self) -> None:
         """Test that user-provided weight_path gets subfolder prefix."""
-        config = MAXModelConfig(
-            model_path="org/model",
-            subfolder="vae",
-            weight_path=[Path("model.safetensors")],
-        )
-        # Call resolve with mocked dependencies.
-        with (
-            patch(
-                "max.pipelines.lib.config.model_config.WeightPathParser.parse",
-                return_value=([Path("model.safetensors")], None),
-            ),
-            patch(
-                "max.pipelines.lib.config.model_config.devices_exist",
-                return_value=True,
-            ),
-            patch(
-                "max.pipelines.lib.config.model_config.validate_hf_repo_access",
-            ),
+        # Subfolder prepending happens during construction; wrap it in the
+        # WeightPathParser mock to avoid touching the filesystem/network.
+        with patch(
+            "max.pipelines.lib.config.model_config.WeightPathParser.parse",
+            return_value=([Path("model.safetensors")], None),
         ):
-            config.resolve()
-            assert config.weight_path == [Path("vae/model.safetensors")]
+            config = _build_model_config(
+                MAXModelConfig,
+                model_path="org/model",
+                subfolder="vae",
+                weight_path=[Path("model.safetensors")],
+            )
+        assert config.weight_path == [Path("vae/model.safetensors")]
 
-    @mock_pipeline_config_resolve
     def test_subfolder_not_double_prepended(self) -> None:
         """Test that paths already containing subfolder are not double-prefixed."""
-        config = MAXModelConfig(
-            model_path="org/model",
-            subfolder="vae",
-            weight_path=[Path("vae/model.safetensors")],
-        )
-        with (
-            patch(
-                "max.pipelines.lib.config.model_config.WeightPathParser.parse",
-                return_value=([Path("vae/model.safetensors")], None),
-            ),
-            patch(
-                "max.pipelines.lib.config.model_config.devices_exist",
-                return_value=True,
-            ),
-            patch(
-                "max.pipelines.lib.config.model_config.validate_hf_repo_access",
-            ),
+        with patch(
+            "max.pipelines.lib.config.model_config.WeightPathParser.parse",
+            return_value=([Path("vae/model.safetensors")], None),
         ):
-            config.resolve()
-            assert config.weight_path == [Path("vae/model.safetensors")]
+            config = _build_model_config(
+                MAXModelConfig,
+                model_path="org/model",
+                subfolder="vae",
+                weight_path=[Path("vae/model.safetensors")],
+            )
+        assert config.weight_path == [Path("vae/model.safetensors")]
 
-    @mock_pipeline_config_resolve
     def test_subfolder_skips_absolute_paths(self) -> None:
         """Test that absolute paths are not prefixed with subfolder."""
         with tempfile.NamedTemporaryFile(suffix=".safetensors") as tmp:
             abs_path = Path(tmp.name)
-            config = MAXModelConfig(
-                model_path="org/model",
-                subfolder="vae",
-                weight_path=[abs_path],
-            )
-            with (
-                patch(
-                    "max.pipelines.lib.config.model_config.WeightPathParser.parse",
-                    return_value=([abs_path], None),
-                ),
-                patch(
-                    "max.pipelines.lib.config.model_config.devices_exist",
-                    return_value=True,
-                ),
+            with patch(
+                "max.pipelines.lib.config.model_config.WeightPathParser.parse",
+                return_value=([abs_path], None),
             ):
-                config.resolve()
-                assert config.weight_path == [abs_path]
+                config = _build_model_config(
+                    MAXModelConfig,
+                    model_path="org/model",
+                    subfolder="vae",
+                    weight_path=[abs_path],
+                )
+            assert config.weight_path == [abs_path]
 
-    @mock_pipeline_config_resolve
     def test_no_subfolder_leaves_weight_path_unchanged(self) -> None:
         """Test that without subfolder, weight_path is not modified."""
-        config = MAXModelConfig(
-            model_path="org/model",
-            weight_path=[Path("model.safetensors")],
-        )
-        with (
-            patch(
-                "max.pipelines.lib.config.model_config.WeightPathParser.parse",
-                return_value=([Path("model.safetensors")], None),
-            ),
-            patch(
-                "max.pipelines.lib.config.model_config.devices_exist",
-                return_value=True,
-            ),
-            patch(
-                "max.pipelines.lib.config.model_config.validate_hf_repo_access",
-            ),
+        with patch(
+            "max.pipelines.lib.config.model_config.WeightPathParser.parse",
+            return_value=([Path("model.safetensors")], None),
         ):
-            config.resolve()
-            assert config.weight_path == [Path("model.safetensors")]
+            config = _build_model_config(
+                MAXModelConfig,
+                model_path="org/model",
+                weight_path=[Path("model.safetensors")],
+            )
+        assert config.weight_path == [Path("model.safetensors")]
 
 
-def _write_fake_safetensors(path: str, dtype: str = "BF16") -> None:
-    """Write a minimal safetensors file with a single tensor of the given dtype."""
-    import json
+class TestExternalWeightRepoRevision:
+    """An external weights repo must not inherit the base model's revision."""
 
-    header = {"weight": {"dtype": dtype, "shape": [1], "data_offsets": [0, 2]}}
-    header_bytes = json.dumps(header).encode("utf-8")
-    with open(path, "wb") as f:
-        f.write(struct.pack("<Q", len(header_bytes)))
-        f.write(header_bytes)
-        f.write(b"\x00\x00")  # 2 bytes of fake tensor data
+    @staticmethod
+    def _external_config(model_rev: str, weight_rev: str) -> MAXModelConfig:
+        # Parse returns a repo id distinct from model_path, so weights come
+        # from an external repo. Mocking the parser keeps construction off the
+        # network.
+        with patch(
+            "max.pipelines.lib.config.model_config.WeightPathParser.parse",
+            return_value=([Path("w.safetensors")], "org/quant-repo"),
+        ):
+            return _build_model_config(
+                MAXModelConfig,
+                model_path="org/base-model",
+                weight_path=[Path("org/quant-repo/w.safetensors")],
+                huggingface_model_revision=model_rev,
+                huggingface_weight_revision=weight_rev,
+            )
+
+    def test_mirrored_model_revision_dropped_for_external_repo(self) -> None:
+        """A weight revision copied from the model revision is dropped."""
+        config = self._external_config("deadbeef", "deadbeef")
+        assert config.huggingface_weight_repo_id == "org/quant-repo"
+        with patch("os.path.exists", return_value=True):
+            repo = config.huggingface_weight_repo
+        assert repo.revision == hf_hub_constants.DEFAULT_REVISION
+
+    def test_independent_weight_revision_respected_for_external_repo(
+        self,
+    ) -> None:
+        """A weight revision that differs from the model revision is kept."""
+        config = self._external_config("deadbeef", "cafef00d")
+        with patch("os.path.exists", return_value=True):
+            repo = config.huggingface_weight_repo
+        assert repo.revision == "cafef00d"
+
+    def test_same_repo_keeps_weight_revision(self) -> None:
+        """Non-external weights keep the configured revision."""
+        with patch(
+            "max.pipelines.lib.config.model_config.WeightPathParser.parse",
+            return_value=([Path("model.safetensors")], None),
+        ):
+            config = _build_model_config(
+                MAXModelConfig,
+                model_path="org/model",
+                weight_path=[Path("model.safetensors")],
+                huggingface_weight_revision="rev123",
+            )
+        with patch("os.path.exists", return_value=True):
+            repo = config.huggingface_weight_repo
+        assert repo.revision == "rev123"
+
+    def test_external_repo_download_uses_repo_revision(self) -> None:
+        """The download runs at the repo handle's revision, not the raw field.
+
+        Regression test for the nvfp4/fp8 serving 404: the download must use
+        the (reset) ``huggingface_weight_repo.revision`` rather than the base
+        model's ``huggingface_weight_revision``.
+        """
+        config = self._external_config("deadbeef", "deadbeef")
+        with (
+            patch("max.pipelines.weights.hf_utils.validate_hf_repo_access"),
+            patch(
+                "max.pipelines.lib.config.model_config.download_weight_files",
+                return_value=[Path("/tmp/w.safetensors")],
+            ) as mock_download,
+        ):
+            config.resolved_weight_paths([Path("w.safetensors")])
+        assert (
+            mock_download.call_args.kwargs["revision"]
+            == hf_hub_constants.DEFAULT_REVISION
+        )
+
+
+def test_create_survives_a_frozen_subclass() -> None:
+    """Pins that the ``create`` factory works under ``frozen=True``: the
+    resolved paths arrive through construction and a copy, never through
+    field assignment, and the object stays frozen after."""
+
+    class _FrozenModelConfig(MAXModelConfig):
+        model_config = ConfigDict(frozen=True)
+
+    config = _build_model_config(
+        _FrozenModelConfig,
+        model_path="test/model",
+        weight_path=[Path("model.safetensors")],
+    )
+    assert config.model_path == "test/model"
+    assert config.weight_path == [Path("model.safetensors")]
+    with pytest.raises(ValidationError):
+        # setattr, because the linter rejects a literal assignment to a
+        # frozen field; the illegal write is the point of the test.
+        setattr(config, "model_path", "other/model")  # noqa: B010

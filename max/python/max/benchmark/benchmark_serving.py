@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ import subprocess
 import sys
 import time
 from collections.abc import (
+    Callable,
     Generator,
     Iterator,
     Mapping,
@@ -38,10 +40,10 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import numpy as np
+import psutil
 import yaml
 from cyclopts import App, Parameter
 from cyclopts.config import Env
-from tqdm.asyncio import tqdm
 from transformers import PreTrainedTokenizerBase
 
 if TYPE_CHECKING:
@@ -53,6 +55,7 @@ from max.benchmark.benchmark_shared.config import (
     CACHE_RESET_ENDPOINT_MAP,
     PIXEL_GENERATION_ENDPOINTS,
     PIXEL_GENERATION_TASKS,
+    VIDEO_GENERATION_TASKS,
     Backend,
     BenchmarkTask,
     Endpoint,
@@ -73,8 +76,7 @@ from max.benchmark.benchmark_shared.lora_benchmark_manager import (
     LoRABenchmarkManager,
 )
 from max.benchmark.benchmark_shared.metrics import (
-    PixelGenerationBenchmarkResult,
-    TextGenerationBenchmarkResult,
+    BenchmarkResult,
     calculate_spec_decode_stats,
 )
 from max.benchmark.benchmark_shared.multi_turn import (
@@ -86,10 +88,10 @@ from max.benchmark.benchmark_shared.multi_turn import (
 from max.benchmark.benchmark_shared.request import (
     BaseRequestFuncOutput,
     PixelGenerationRequestFuncOutput,
-    ProgressBarRequestDriver,
     RequestDriver,
     RequestFuncOutput,
     get_request_driver_class,
+    progressbar_request_driver,
 )
 from max.benchmark.benchmark_shared.server_metrics import (
     collect_benchmark_metrics,
@@ -114,8 +116,10 @@ from max.benchmark.benchmark_shared.single_turn import (
 )
 from max.benchmark.benchmark_shared.utils import (
     argmedian,
+    fetch_server_max_model_len,
     get_tokenizer,
     is_castable_to_int,
+    openai_bearer_auth_headers,
     print_section,
     resolve_revision,
     set_ulimit,
@@ -142,6 +146,25 @@ BENCHMARK_SERVING_ARGPARSER_DESCRIPTION = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _expand_pids(pids: list[int]) -> list[int]:
+    """Returns pids plus all their descendants."""
+    ppid_to_children: dict[int, list[int]] = {}
+    for proc in psutil.process_iter(["pid", "ppid"]):
+        ppid_to_children.setdefault(proc.info["ppid"], []).append(
+            proc.info["pid"]
+        )
+
+    result: set[int] = set()
+    queue = list(pids)
+    while queue:
+        pid = queue.pop()
+        if pid in result:
+            continue
+        result.add(pid)
+        queue.extend(ppid_to_children.get(pid, []))
+    return list(result)
 
 
 def parse_response_format(arg: str) -> ResponseFormat:
@@ -222,26 +245,13 @@ def under_nsys_tracing(
         subprocess.run(stop_cmd, check=True)
 
 
-def create_benchmark_pbar(disable_tqdm: bool, samples: Samples) -> tqdm | None:
-    """Create a progress bar for benchmark runs.
-
-    Args:
-        disable_tqdm: Whether to disable the progress bar.
-        samples: Samples that will be benchmarked with.
-
-    Returns:
-        A tqdm progress bar instance or None if disabled.
-    """
-    if disable_tqdm:
-        return None
-
+def _benchmark_request_total(samples: Samples) -> int:
+    """Return the number of requests a benchmark run will issue for *samples*."""
     if isinstance(samples, RequestSamples):
         # single-turn chat scenario
-        return tqdm(total=len(samples.requests))
-    else:
-        # multi-turn chat scenario
-        num_qa_turns = [session.num_turns for session in samples.chat_sessions]
-        return tqdm(total=sum(num_qa_turns))
+        return len(samples.requests)
+    # multi-turn chat scenario
+    return sum(session.num_turns for session in samples.chat_sessions)
 
 
 def _resolve_skip_counts(
@@ -313,9 +323,7 @@ async def benchmark(
     session: BenchmarkSession,
     max_concurrency: int | None,
     request_rate: float,
-) -> tuple[
-    TextGenerationBenchmarkResult | PixelGenerationBenchmarkResult, bool
-]:
+) -> tuple[BenchmarkResult, bool]:
     """Run a single benchmark invocation.
 
     ``session.orig_skip_first`` / ``session.orig_skip_last`` are the
@@ -394,10 +402,18 @@ async def benchmark(
     request_driver_class: type[RequestDriver] = get_request_driver_class(
         session.api_url, task=session.benchmark_task
     )
+    if args.extra_body and session.benchmark_task != "text-generation":
+        logger.warning(
+            "extra_body is ignored for %s; it only applies to "
+            "text-generation requests.",
+            session.benchmark_task,
+        )
     # Create a request driver instance without pbar for test prompt
     # (pbar will be set later for the actual benchmark runs)
     test_request_driver: RequestDriver = request_driver_class(
-        tokenizer=session.tokenizer
+        tokenizer=session.tokenizer,
+        extra_body=args.extra_body,
+        backend=args.backend,
     )
 
     if args.warm_shared_prefix:
@@ -410,6 +426,7 @@ async def benchmark(
             run_prefix=run_prefix,
             run_prefix_len=run_prefix_len,
             max_concurrency=args.warmup_concurrency,
+            disable_tqdm=args.disable_tqdm,
         )
 
     if not args.skip_test_prompt:
@@ -444,7 +461,11 @@ async def benchmark(
     logger.info(f"Burstiness factor: {args.burstiness} ({distribution})")
     logger.info(f"Maximum request concurrency: {max_concurrency}")
 
-    base_driver = request_driver_class(tokenizer=session.tokenizer)
+    base_driver = request_driver_class(
+        tokenizer=session.tokenizer,
+        extra_body=args.extra_body,
+        backend=args.backend,
+    )
 
     # Warm up the initial-slot sessions before starting the timer.
     # pick_warmup_population assigns each picked session a random
@@ -467,6 +488,9 @@ async def benchmark(
                 warmup_oversample_factor=args.warmup_oversample_factor,
                 main_pool_target=args.num_chat_sessions or len(chat_sessions),
                 rng=np.random.default_rng(args.seed),
+                delay_biased=args.warmup_delay_biased,
+                est_ttft_ms=args.warmup_delay_estimated_ttft_ms,
+                est_tpot_ms=args.warmup_delay_estimated_tpot_ms,
             )
             if report is not None:
                 log_warmup_sampling_report(report)
@@ -489,6 +513,7 @@ async def benchmark(
             sampling=args.sampling,
             disable_tqdm=args.disable_tqdm,
             max_concurrency=args.warmup_concurrency,
+            use_session_id_as_cache_salt=args.use_session_id_as_cache_salt,
         )
 
     # Capture baseline server metrics after priming so priming requests
@@ -533,9 +558,12 @@ async def benchmark(
         cpu_collector = None
         if args.collect_cpu_stats:
             try:
-                pids = collect_pids_for_port(
-                    int(urlparse(session.api_url).port or 8000)
-                )
+                if args.server_pids:
+                    pids = _expand_pids(args.server_pids)
+                else:
+                    pids = collect_pids_for_port(
+                        int(urlparse(session.api_url).port or 8000)
+                    )
                 cpu_collector = benchmark_stack.enter_context(
                     CPUMetricsCollector(pids)
                 )
@@ -552,13 +580,13 @@ async def benchmark(
             )
 
         # Create pbar for actual benchmark runs
-        request_driver = base_driver
-        pbar = create_benchmark_pbar(
-            disable_tqdm=args.disable_tqdm, samples=session.samples
+        request_driver = benchmark_stack.enter_context(
+            progressbar_request_driver(
+                base_driver,
+                _benchmark_request_total(session.samples),
+                disable_tqdm=args.disable_tqdm,
+            )
         )
-        if pbar is not None:
-            benchmark_stack.callback(pbar.close)
-            request_driver = ProgressBarRequestDriver(request_driver, pbar)
 
         # Marker consumed by utils/benchmarking/serving/analyze_batch_logs.py
         # to slice the batch log by concurrency and exclude warmup/test-prompt
@@ -635,9 +663,13 @@ async def benchmark(
                 lora_manager=session.lora_manager,
                 warmup_delay_ms=args.chat_warmup_delay_ms,
                 sampling=args.sampling,
-                randomize_session_start=args.randomize_session_start,
                 run_prefix=run_prefix,
                 run_prefix_len=run_prefix_len,
+                request_rate=request_rate,
+                burstiness=args.burstiness,
+                est_ttft_ms=args.warmup_delay_estimated_ttft_ms,
+                est_tpot_ms=args.warmup_delay_estimated_tpot_ms,
+                use_session_id_as_cache_salt=args.use_session_id_as_cache_salt,
             )
             all_outputs = [
                 out for outs in outputs_by_session.values() for out in outs
@@ -659,6 +691,7 @@ async def benchmark(
                 warmup_delay_ms=args.chat_warmup_delay_ms,
                 max_concurrency=max_concurrency,
                 sampling=args.sampling,
+                use_session_id_as_cache_salt=args.use_session_id_as_cache_salt,
             )
             all_outputs = [
                 out for outs in outputs_by_session.values() for out in outs
@@ -680,9 +713,13 @@ async def benchmark(
                 warmup_delay_ms=args.chat_warmup_delay_ms,
                 max_concurrency=max_concurrency,
                 sampling=args.sampling,
-                randomize_session_start=args.randomize_session_start,
                 run_prefix=run_prefix,
                 run_prefix_len=run_prefix_len,
+                request_rate=request_rate,
+                burstiness=args.burstiness,
+                est_ttft_ms=args.warmup_delay_estimated_ttft_ms,
+                est_tpot_ms=args.warmup_delay_estimated_tpot_ms,
+                use_session_id_as_cache_salt=args.use_session_id_as_cache_salt,
             )
             all_outputs = [
                 out for outs in outputs_by_session.values() for out in outs
@@ -765,7 +802,7 @@ async def benchmark(
 
     achieved_request_rate = 0.0
 
-    result: PixelGenerationBenchmarkResult | TextGenerationBenchmarkResult
+    result: BenchmarkResult
     if session.benchmark_task in PIXEL_GENERATION_TASKS:
         result = build_pixel_generation_result(
             outputs=all_outputs,
@@ -790,6 +827,8 @@ async def benchmark(
             collect_gpu_stats=args.collect_gpu_stats,
             metrics_by_endpoint=endpoint_metrics,
             spec_decode_stats=spec_decode_stats,
+            kv_block_size=args.kv_block_size,
+            record_request_text=args.record_request_text,
         )
         if outputs_by_session is not None:
             text_result.session_server_stats = {
@@ -810,13 +849,12 @@ async def benchmark(
         result.lora_metrics = session.lora_manager.metrics
 
     print_benchmark_summary(
-        metrics=result.metrics,
+        metrics=result,
         request_rate=request_rate,
         max_concurrency=max_concurrency,
         achieved_request_rate=achieved_request_rate,
         collect_gpu_stats=args.collect_gpu_stats,
         collect_cpu_stats=args.collect_cpu_stats,
-        spec_decode_stats=spec_decode_stats,
         lora_manager=session.lora_manager,
     )
 
@@ -847,11 +885,11 @@ def validate_task_and_endpoint(
     elif benchmark_task in PIXEL_GENERATION_TASKS:
         if (
             endpoint in ("/v1/videos/sync", "/v1/videos")
-            and benchmark_task != "text-to-video"
+            and benchmark_task not in VIDEO_GENERATION_TASKS
         ):
             raise ValueError(
-                f"--endpoint {endpoint} is only valid for"
-                f" --benchmark-task text-to-video, got {benchmark_task!r}"
+                f"--endpoint {endpoint} is only valid for video tasks"
+                f" {VIDEO_GENERATION_TASKS}, got {benchmark_task!r}"
             )
         if endpoint not in PIXEL_GENERATION_ENDPOINTS:
             raise ValueError(
@@ -901,9 +939,19 @@ def _apply_workload_to_config(
 
 
 def flush_prefix_cache(
-    backend: Backend, host: str, port: int, dry_run: bool
+    backend: Backend,
+    host: str,
+    port: int,
+    dry_run: bool,
+    base_url: str | None = None,
 ) -> None:
-    """Flush the serving engine's prefix cache via HTTP POST."""
+    """Flush the serving engine's prefix cache via HTTP POST.
+
+    When ``base_url`` is set (a remote endpoint, e.g. ``--base-url``), it
+    replaces the ``http://<host>:<port>`` prefix and the request carries an
+    ``Authorization: Bearer $OPENAI_API_KEY`` header, matching the auth the
+    benchmark requests themselves send.
+    """
     if backend not in CACHE_RESET_ENDPOINT_MAP:
         raise ValueError(
             f"Cannot flush prefix cache for {backend} backend: this backend"
@@ -911,11 +959,16 @@ def flush_prefix_cache(
         )
     import requests as _http_requests  # lazy - avoid hard dep for non-sweep use
 
-    api_url = f"http://{host}:{port}{CACHE_RESET_ENDPOINT_MAP[backend]}"
+    headers: Mapping[str, str] | None = None
+    if base_url is not None:
+        api_url = f"{base_url.rstrip('/')}{CACHE_RESET_ENDPOINT_MAP[backend]}"
+        headers = openai_bearer_auth_headers()
+    else:
+        api_url = f"http://{host}:{port}{CACHE_RESET_ENDPOINT_MAP[backend]}"
     if dry_run:
         logger.info(f"Dry-run flush: POST {api_url}")
         return
-    response = _http_requests.post(api_url)
+    response = _http_requests.post(api_url, headers=headers)
     if response.status_code == 400:
         logger.warning(
             f"Prefix caching is not enabled on backend {backend} at {api_url};"
@@ -966,9 +1019,7 @@ class BenchmarkRunResult:
     max_concurrency: int | None
     request_rate: float
     num_prompts: int
-    result: (
-        TextGenerationBenchmarkResult | PixelGenerationBenchmarkResult | None
-    ) = None
+    result: BenchmarkResult | None = None
 
 
 @dataclass
@@ -1085,10 +1136,69 @@ def _apply_dynamic_num_prompts(
     return use_dynamic_num_prompts
 
 
+def _resolve_seed(args: ServingBenchmarkConfig) -> None:
+    """Draw and record a random seed when one was not pinned.
+
+    ``args.seed`` defaults to a fixed value so scheduled and repeated runs are
+    reproducible. A caller can opt into a fresh draw with ``--seed none`` (which
+    sets ``args.seed`` to ``None``); this resolves that draw to a concrete value
+    *before* the workload is sampled, so the run stays reproducible from the
+    recorded seed.
+    """
+    if args.seed is None:
+        args.seed = int(np.random.default_rng().integers(0, 10000))
+        logger.info("Drew a fresh random seed=%d", args.seed)
+    else:
+        logger.info("Using pinned seed=%d", args.seed)
+
+
+def _seed_for_concurrency(seed: int | None, max_concurrency: int | None) -> int:
+    """Derive a per-concurrency-level seed from the base seed.
+
+    Each concurrency level gets its own request sample instead of replaying
+    the same requests as every other level, while staying reproducible from
+    the single base seed.
+    """
+    digest = hashlib.sha256(f"{seed}:{max_concurrency}".encode()).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
+def _sample_for_seed(
+    args: ServingBenchmarkConfig,
+    benchmark_task: BenchmarkTask,
+    tokenizer: PreTrainedTokenizerBase | None,
+    chat: bool,
+    seed: int | None,
+) -> Samples:
+    """Draw one deterministic workload sample from ``seed``."""
+    random.seed(seed)
+    np.random.seed(seed)
+    samples = sample_requests(
+        args=args,
+        benchmark_task=benchmark_task,
+        tokenizer=tokenizer,
+        chat=chat,
+    )
+
+    # Inject response_format into all sampled requests if specified
+    if args.response_format is not None:
+        response_format = parse_response_format(args.response_format)
+        if isinstance(samples, RequestSamples):
+            for request in samples.requests:
+                request.response_format = response_format
+            logger.info(
+                f"Injected response_format into {len(samples.requests)} requests"
+            )
+        else:
+            logger.warning(
+                "response_format is only supported for single-turn benchmarks, "
+                "ignoring for multi-turn chat sessions"
+            )
+    return samples
+
+
 def _build_session(args: ServingBenchmarkConfig) -> BenchmarkSession:
     assert args.model is not None
-    random.seed(args.seed)
-    np.random.seed(args.seed)
     set_ulimit()
     model_id = args.model
     tokenizer_id = args.tokenizer if args.tokenizer is not None else args.model
@@ -1133,35 +1243,33 @@ def _build_session(args: ServingBenchmarkConfig) -> BenchmarkSession:
     tokenizer: PreTrainedTokenizerBase | None = None
 
     if benchmark_task == "text-generation":
+        model_max_length = args.model_max_length
+        if model_max_length is None and not args.dry_run:
+            # Best-effort: when the server is already up (e.g. benchmarking a
+            # running deployment), adopt its real context limit so the
+            # context-length guards derived from tokenizer.model_max_length
+            # bind even when the tokenizer reports the HF unbounded sentinel.
+            model_max_length = fetch_server_max_model_len(
+                base_url, model_id, timeout_s=2.0
+            )
+            if model_max_length is not None:
+                logger.info(
+                    "Using server-reported max_model_len=%d from %s/v1/models",
+                    model_max_length,
+                    base_url,
+                )
         logger.info(f"getting tokenizer. api url: {api_url}")
         tokenizer = get_tokenizer(
             tokenizer_id,
-            revision=resolve_revision(tokenizer_id),
-            model_max_length=args.model_max_length,
+            # An explicit revision wins: ``resolve_revision`` asks the Hub and
+            # returns None for a repo it cannot see, which loads ``main``.
+            revision=args.tokenizer_revision or resolve_revision(tokenizer_id),
+            local_files_only=args.tokenizer_local_files_only,
+            model_max_length=model_max_length,
             trust_remote_code=args.trust_remote_code,
         )
 
-    samples = sample_requests(
-        args=args,
-        benchmark_task=benchmark_task,
-        tokenizer=tokenizer,
-        chat=chat,
-    )
-
-    # Inject response_format into all sampled requests if specified
-    if args.response_format is not None:
-        response_format = parse_response_format(args.response_format)
-        if isinstance(samples, RequestSamples):
-            for request in samples.requests:
-                request.response_format = response_format
-            logger.info(
-                f"Injected response_format into {len(samples.requests)} requests"
-            )
-        else:
-            logger.warning(
-                "response_format is only supported for single-turn benchmarks, "
-                "ignoring for multi-turn chat sessions"
-            )
+    samples = _sample_for_seed(args, benchmark_task, tokenizer, chat, args.seed)
 
     lora_manager = None
     if args.lora_paths:
@@ -1173,9 +1281,7 @@ def _build_session(args: ServingBenchmarkConfig) -> BenchmarkSession:
         lora_manager = LoRABenchmarkManager(
             lora_paths=args.lora_paths,
             num_requests=num_requests,
-            traffic_ratios=args.per_lora_traffic_ratio
-            if args.per_lora_traffic_ratio
-            else None,
+            traffic_ratios=args.per_lora_traffic_ratio or None,
             uniform_ratio=args.lora_uniform_traffic_ratio,
             seed=args.seed,
             max_concurrent_lora_ops=args.max_concurrent_lora_ops,
@@ -1186,9 +1292,7 @@ def _build_session(args: ServingBenchmarkConfig) -> BenchmarkSession:
     trace_path = None
     if args.trace:
         assert_nvidia_gpu()
-        trace_path = (
-            args.trace_file if args.trace_file else get_default_trace_path()
-        )
+        trace_path = args.trace_file or get_default_trace_path()
         logger.info(f"Tracing enabled, output: {trace_path}")
 
     return BenchmarkSession(
@@ -1234,6 +1338,9 @@ def _run_dry_run_sweep(
                 warmup_oversample_factor=args.warmup_oversample_factor,
                 main_pool_target=args.num_chat_sessions or 0,
                 rng=rng,
+                delay_biased=args.warmup_delay_biased,
+                est_ttft_ms=args.warmup_delay_estimated_ttft_ms,
+                est_tpot_ms=args.warmup_delay_estimated_tpot_ms,
             )
             if report is not None:
                 log_warmup_sampling_report(report)
@@ -1272,20 +1379,32 @@ def _run_benchmark_sweep(
                 f" * {mc} = {args.num_prompts}"
             )
 
+        # Each concurrency level draws its own sample, derived from the base
+        # seed, so levels are reproducible individually without replaying
+        # the exact same requests at every level.
+        mc_seed = _seed_for_concurrency(args.seed, mc)
+        session.samples = _sample_for_seed(
+            args,
+            session.benchmark_task,
+            session.tokenizer,
+            session.endpoint == "/v1/chat/completions",
+            mc_seed,
+        )
+
         for rr in args.request_rate:
-            iteration_results: list[
-                TextGenerationBenchmarkResult | PixelGenerationBenchmarkResult
-            ] = []
+            iteration_results: list[BenchmarkResult] = []
             validation_passed = True
             for _iteration in range(args.num_iters):
                 if args.flush_prefix_cache:
                     flush_prefix_cache(
-                        args.backend, args.host, args.port, args.dry_run
+                        args.backend,
+                        args.host,
+                        args.port,
+                        args.dry_run,
+                        base_url=args.base_url,
                     )
 
-                if args.seed is None:
-                    args.seed = int(np.random.randint(0, 10000))
-                logger.info("mc=%s seed=%d", mc, args.seed)
+                logger.info("mc=%s seed=%d", mc, mc_seed)
 
                 result, ok = asyncio.run(benchmark(args, session, mc, rr))
                 iteration_results.append(result)
@@ -1298,7 +1417,7 @@ def _run_benchmark_sweep(
                     [
                         agg.request_throughput
                         for r in iteration_results
-                        if (agg := r.metrics.aggregates) is not None
+                        if (agg := r.aggregates) is not None
                     ]
                 )
                 idx = argmedian(throughputs)
@@ -1338,6 +1457,8 @@ def _run_benchmark_sweep(
 
 def main_with_parsed_args(
     args: ServingBenchmarkConfig,
+    *,
+    server_liveness: Callable[[], bool] | None = None,
 ) -> Iterator[BenchmarkRunResult]:
     logging.basicConfig(
         format="%(asctime)s.%(msecs)03d %(levelname)s: %(name)s: %(message)s",
@@ -1352,6 +1473,7 @@ def main_with_parsed_args(
 
     _load_workload_yaml(args)
     _apply_run_length_defaults(args)
+    _resolve_seed(args)
 
     use_dynamic_num_prompts = _apply_dynamic_num_prompts(
         args, args.max_concurrency
@@ -1375,7 +1497,29 @@ def main_with_parsed_args(
         args.port,
         timeout_s=args.server_ready_timeout_s,
         backend=args.backend,
+        liveness_check=server_liveness,
+        base_url=args.base_url,
     )
+
+    # The server may not have been up during session build (it is launched
+    # concurrently with dataset sampling). Now that it is ready, adopt its
+    # context limit when it is tighter than the tokenizer's, so the
+    # multi-turn max_chat_len guards bind to the real bound.
+    if args.model_max_length is None and session.tokenizer is not None:
+        max_model_len = fetch_server_max_model_len(
+            session.base_url, session.model_id
+        )
+        if (
+            max_model_len is not None
+            and max_model_len < session.tokenizer.model_max_length
+        ):
+            logger.info(
+                "Clamping tokenizer model_max_length %d to server-reported"
+                " max_model_len %d",
+                session.tokenizer.model_max_length,
+                max_model_len,
+            )
+            session.tokenizer.model_max_length = max_model_len
 
     yield from _run_benchmark_sweep(args, session, use_dynamic_num_prompts)
 
@@ -1443,7 +1587,7 @@ def parse_args(
     def _capture(
         config: Annotated[
             ServingBenchmarkConfig, Parameter(name="*")
-        ] = ServingBenchmarkConfig(),
+        ] = ServingBenchmarkConfig(),  # noqa: B008
     ) -> None:
         parsed_configs.append(config)
 

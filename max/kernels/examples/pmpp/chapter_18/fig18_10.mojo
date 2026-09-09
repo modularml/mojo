@@ -18,8 +18,8 @@ It checks if the source vertex of the edge was visited in the previous level
 and if so, marks the destination vertex as visited at the current level.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
-from std.gpu.host import DeviceContext
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu.host import DeviceContext
 from std.atomic import Atomic
 from std.collections import List
 
@@ -37,12 +37,14 @@ comptime BLOCK_SIZE = 256
 def bfs_kernel(
     coo_src: UnsafePointer[UInt32, MutAnyOrigin],
     coo_dst: UnsafePointer[UInt32, MutAnyOrigin],
-    num_edges: Int,
+    num_edges_dev: Int32,
     level: UnsafePointer[UInt32, MutAnyOrigin],
     new_vertex_visited: UnsafePointer[UInt32, MutAnyOrigin],
     curr_level: UInt32,
 ):
     """BFS kernel: edge-centric traversal using COO graph."""
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var num_edges = Int(num_edges_dev)
     var edge = block_idx.x * block_dim.x + thread_idx.x
 
     if edge < num_edges:
@@ -80,10 +82,10 @@ def main() raises:
     var start_vertex = 0
     h_level[start_vertex] = 0
 
-    var d_coo_src = ctx.enqueue_create_buffer[DType.uint32](num_edges)
-    var d_coo_dst = ctx.enqueue_create_buffer[DType.uint32](num_edges)
-    var d_level = ctx.enqueue_create_buffer[DType.uint32](NUM_VERTICES)
-    var d_new_vertex_visited = ctx.enqueue_create_buffer[DType.uint32](1)
+    var d_coo_src = ctx.enqueue_create_buffer[.uint32](num_edges)
+    var d_coo_dst = ctx.enqueue_create_buffer[.uint32](num_edges)
+    var d_level = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES)
+    var d_new_vertex_visited = ctx.enqueue_create_buffer[.uint32](1)
 
     var h_coo_src = alloc[UInt32](num_edges)
     var h_coo_dst = alloc[UInt32](num_edges)
@@ -107,7 +109,7 @@ def main() raises:
         ctx.enqueue_function[bfs_kernel](
             d_coo_src,
             d_coo_dst,
-            num_edges,
+            Int32(num_edges),
             d_level,
             d_new_vertex_visited,
             curr_level,

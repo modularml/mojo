@@ -11,17 +11,23 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Tensor-based operations with built-in SPMD sharding support.
+"""Distributed functional ops with explicit per-op SPMD dispatch.
 
-Functional ops accept and return :class:`~max.experimental.tensor.Tensor`
-objects and dispatch transparently per-shard when their inputs are
-distributed across devices.
+Usage::
 
-.. note::
+    from max.experimental import functional as F
 
-   Most functions on this page wrap a corresponding op in :mod:`max.graph.ops`.
-   When this is true, the **source** link on the function takes you to the graph
-   op's source where the actual implementation lives.
+    y = F.matmul(a, b)
+    z = F.add(x, y)
+    w = F.transfer_to(z, new_mapping)
+
+Layout:
+
+- :mod:`.spmd_ops` -- ``per_shard_dispatch`` engine and per-op functions.
+- :mod:`.collective_ops` -- collectives and ``transfer_to``.
+- :mod:`.creation_ops` -- ``full`` / ``ones`` / ``zeros`` and friends.
+- :func:`custom` / :func:`inplace_custom` live here because they
+  combine graph ops with extension loading.
 """
 
 from __future__ import annotations
@@ -34,18 +40,21 @@ from typing import Any, TypeVar
 from max._mlir_context import MLIRThreadPoolExecutor
 from max.driver import Device
 from max.dtype import DType
+from max.experimental.realization_context import (
+    ensure_context,
+    in_graph_context,
+    lazy,
+)
 from max.experimental.tensor import Tensor
 from max.graph import DeviceRef, Graph, TensorType, Type, ops
 
-# ── Collective ops ───────────────────────────────────────────────────────
 from .collective_ops import (
     allgather,
     allreduce_sum,
+    distributed_broadcast,
     reduce_scatter,
     transfer_to,
 )
-
-# ── Creation + random ops ────────────────────────────────────────────────
 from .creation_ops import (
     arange,
     constant,
@@ -65,15 +74,12 @@ from .creation_ops import (
     zeros,
     zeros_like,
 )
-
-# ── Shape ops ────────────────────────────────────────────────────────────
-from .shape_ops import broadcast_to, reshape
-
-# ── SPMD op engine + all registered ops ──────────────────────────────────
+from .print import print
 from .spmd_ops import (
     abs,
     acos,
     add,
+    any_distributed,
     argmax,
     argmin,
     argsort,
@@ -82,9 +88,11 @@ from .spmd_ops import (
     avg_pool2d,
     band_part,
     bottom_k,
+    broadcast_to,
     buffer_store,
     buffer_store_slice,
     cast,
+    ceil,
     chunk,
     clamp,
     clip,
@@ -105,6 +113,7 @@ from .spmd_ops import (
     exp,
     flatten,
     floor,
+    floor_div,
     fold,
     functional,
     gather,
@@ -124,6 +133,7 @@ from .spmd_ops import (
     logical_or,
     logical_xor,
     logsoftmax,
+    map_tensors,
     masked_scatter,
     matmul,
     max,
@@ -138,6 +148,7 @@ from .spmd_ops import (
     not_equal,
     outer,
     pad,
+    per_shard_dispatch,
     permute,
     pow,
     prod,
@@ -145,6 +156,7 @@ from .spmd_ops import (
     rebind,
     relu,
     repeat_interleave,
+    reshape,
     resize,
     resize_bicubic,
     resize_linear,
@@ -168,14 +180,15 @@ from .spmd_ops import (
     slice_tensor,
     softmax,
     split,
-    spmd_dispatch,
     sqrt,
     squeeze,
     stack,
     sub,
     sum,
     tanh,
+    tensor_to_layout,
     tile,
+    to_tensors,
     top_k,
     transpose,
     trunc,
@@ -184,27 +197,165 @@ from .spmd_ops import (
     while_loop,
 )
 
-# Also re-export scatter from spmd_ops (the per-element scatter op,
-# NOT the collective scatter).  The spmd_ops version shadows the
-# collective one in this namespace — matching prior behavior.
+# Per-element scatter (not the collective scatter); shadows the collective one here.
 from .spmd_ops import scatter as scatter
 
-# ── Utils ────────────────────────────────────────────────────────────────
-from .utils import (
-    ensure_context,
-    in_graph_context,
-    lazy,
-    tensor_to_layout,
-)
+__all__ = [
+    "abs",
+    "acos",
+    "add",
+    "allgather",
+    "allreduce_sum",
+    "any_distributed",
+    "arange",
+    "argmax",
+    "argmin",
+    "argsort",
+    "as_interleaved_complex",
+    "atanh",
+    "avg_pool2d",
+    "band_part",
+    "bottom_k",
+    "broadcast_to",
+    "buffer_store",
+    "buffer_store_slice",
+    "cast",
+    "ceil",
+    "chunk",
+    "clamp",
+    "clip",
+    "complex_mul",
+    "concat",
+    "cond",
+    "constant",
+    "constant_external",
+    "conv2d",
+    "conv2d_transpose",
+    "conv3d",
+    "cos",
+    "cumsum",
+    "custom",
+    "dequantize",
+    "distributed_broadcast",
+    "div",
+    "elementwise_max",
+    "elementwise_min",
+    "ensure_context",
+    "equal",
+    "erf",
+    "exp",
+    "flatten",
+    "floor",
+    "floor_div",
+    "fold",
+    "full",
+    "full_like",
+    "functional",
+    "gather",
+    "gather_nd",
+    "gaussian",
+    "gaussian_like",
+    "gelu",
+    "greater",
+    "greater_equal",
+    "group_norm",
+    "hann_window",
+    "in_graph_context",
+    "inplace_custom",
+    "irfft",
+    "is_inf",
+    "is_nan",
+    "layer_norm",
+    "lazy",
+    "log",
+    "log1p",
+    "logical_and",
+    "logical_not",
+    "logical_or",
+    "logical_xor",
+    "logsoftmax",
+    "map_tensors",
+    "masked_scatter",
+    "matmul",
+    "max",
+    "max_pool2d",
+    "mean",
+    "min",
+    "mod",
+    "mul",
+    "negate",
+    "non_maximum_suppression",
+    "nonzero",
+    "normal",
+    "normal_like",
+    "not_equal",
+    "ones",
+    "ones_like",
+    "outer",
+    "pad",
+    "per_shard_dispatch",
+    "permute",
+    "pow",
+    "print",
+    "prod",
+    "qmatmul",
+    "range",
+    "rebind",
+    "reduce_scatter",
+    "relu",
+    "repeat_interleave",
+    "reshape",
+    "resize",
+    "resize_bicubic",
+    "resize_linear",
+    "resize_nearest",
+    "rms_norm",
+    "roi_align",
+    "round",
+    "rsqrt",
+    "scatter",
+    "scatter_add",
+    "scatter_max",
+    "scatter_min",
+    "scatter_mul",
+    "scatter_nd",
+    "scatter_nd_add",
+    "scatter_nd_max",
+    "scatter_nd_min",
+    "scatter_nd_mul",
+    "sigmoid",
+    "silu",
+    "sin",
+    "slice_tensor",
+    "softmax",
+    "split",
+    "sqrt",
+    "squeeze",
+    "stack",
+    "sub",
+    "sum",
+    "tanh",
+    "tensor_to_layout",
+    "tile",
+    "to_tensors",
+    "top_k",
+    "transfer_to",
+    "transpose",
+    "trunc",
+    "uniform",
+    "uniform_like",
+    "unsqueeze",
+    "where",
+    "while_loop",
+    "zeros",
+    "zeros_like",
+]
 
 _Result = TypeVar("_Result")
 
 
-# ── Async helpers (used by tensor._sync_realize, realization_context) ────
-
-
 def _in_running_loop() -> bool:
-    """Check whether the caller is inside a running asyncio event loop."""
+    """Returns ``True`` when called inside a running asyncio event loop."""
     try:
         asyncio.get_running_loop()
     except RuntimeError:
@@ -213,11 +364,10 @@ def _in_running_loop() -> bool:
 
 
 def _run(coro: Coroutine[Any, Any, _Result]) -> _Result:
-    """Run a coroutine synchronously, handling nested event loops.
+    """Runs ``coro`` synchronously, even from inside an event loop.
 
-    If not inside an event loop, uses ``asyncio.run()``. If already inside
-    an event loop (e.g., in Jupyter), runs the coroutine in a separate
-    thread to avoid blocking.
+    Outside an event loop, uses ``asyncio.run``. Inside one (for
+    example in Jupyter), runs the coroutine on a worker thread.
     """
     if not _in_running_loop():
         return asyncio.run(coro)
@@ -228,13 +378,10 @@ def _run(coro: Coroutine[Any, Any, _Result]) -> _Result:
     return fut.result()
 
 
-# ── Custom ops ──────────────────────────────────────────────────────────
-
-
 def _load_custom_extensions(
     custom_extensions: str | Path | Sequence[str | Path] | None,
 ) -> None:
-    """Load custom extensions into the current graph if not already loaded."""
+    """Loads custom-kernel extensions into the current graph."""
     if custom_extensions is None:
         return
     graph = Graph.current

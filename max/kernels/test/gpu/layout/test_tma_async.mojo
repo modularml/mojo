@@ -14,11 +14,11 @@
 from std.math import align_up, ceildiv
 from std.sys import size_of
 
-from std.gpu import barrier
-from std.gpu.host import DeviceContext
-from std.gpu import block_idx, thread_idx
-from std.gpu.memory import ReduceOp, fence_async_view_proxy
-from std.gpu.sync import cp_async_bulk_commit_group, cp_async_bulk_wait_group
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import block_idx, thread_idx
+from max.gpu.memory import ReduceOp, fence_async_view_proxy
+from max.gpu.sync import cp_async_bulk_commit_group, cp_async_bulk_wait_group
 from layout import Layout, LayoutTensor
 from layout._fillers import arange, random
 from layout._utils import ManagedLayoutTensor
@@ -31,11 +31,11 @@ from layout.tma_async import (
     create_tma_tile,
     RaggedTensorMap,
 )
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_equal
 
 from std.utils.index import Index, IndexList
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout.swizzle import make_swizzle
 
 
@@ -65,7 +65,7 @@ def tma_ragged_store_kernel[
         dtype,
         Layout.row_major(shared_m, shared_n),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
@@ -122,18 +122,18 @@ def test_tma_load_kernel[
     ]()
 
     comptime __tile_layout = Layout.row_major(tileM, tileN)
-    tile = LayoutTensor[
+    var tile = LayoutTensor[
         dtype,
         __tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
@@ -149,7 +149,7 @@ def test_tma_load_kernel[
     barrier()
     mbar[0].wait()
 
-    dst_tile = dst.tile[tileM, tileN](block_idx.y, block_idx.x)
+    var dst_tile = dst.tile[tileM, tileN](block_idx.y, block_idx.x)
     copy_sram_to_dram[thread_layout](dst_tile, tile)
 
 
@@ -175,18 +175,18 @@ def test_tma_multiple_loads_kernel[
     comptime num_iters = ceildiv(N, tileN)
 
     comptime __tile_layout = Layout.row_major(tileM, tileN)
-    tile = LayoutTensor[
+    var tile = LayoutTensor[
         dtype,
         __tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
@@ -208,7 +208,7 @@ def test_tma_multiple_loads_kernel[
         mbar[0].wait(phase)
         phase ^= 1
 
-        dst_tile = dst.tile[tileM, tileN](block_idx.y, i)
+        var dst_tile = dst.tile[tileM, tileN](block_idx.y, i)
         copy_sram_to_dram[thread_layout](dst_tile, tile)
 
 
@@ -331,7 +331,7 @@ def test_tma_load_row_major[
         dtype, Layout.row_major(M_roundup, N_roundup)
     ](ctx)
 
-    comptime if dtype == DType.float8_e4m3fn:
+    comptime if dtype == .float8_e4m3fn:
         random(src.tensor())
     else:
         arange(src.tensor(), 0)
@@ -371,8 +371,8 @@ def test_tma_load_row_major[
             block_dim=(tileM * tileN),
         )
 
-    src_host = src.tensor()
-    dst_host = dst.tensor()
+    var src_host = src.tensor()
+    var dst_host = dst.tensor()
 
     # Check M x N keep the same value and others in M_roundup x N_roundup
     # are set to zeros.
@@ -380,11 +380,11 @@ def test_tma_load_row_major[
         for n in range(N_roundup):
             if m < M and n < N:
                 assert_equal(
-                    src_host[m, n].cast[DType.float32](),
-                    dst_host[m, n].cast[DType.float32](),
+                    src_host[m, n].cast[.float32](),
+                    dst_host[m, n].cast[.float32](),
                 )
             else:
-                assert_equal(dst_host[m, n].cast[DType.float32](), 0.0)
+                assert_equal(dst_host[m, n].cast[.float32](), 0.0)
     ctx.synchronize()
     _ = src^
     _ = dst^
@@ -407,15 +407,15 @@ def test_tma_async_store_kernel[
     comptime tileM = tile_shape_param[0]
     comptime tileN = tile_shape_param[1]
     comptime __tile_layout = Layout.row_major(tileM, tileN)
-    tile = LayoutTensor[
+    var tile = LayoutTensor[
         dtype,
         __tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation[]()
 
-    src_tile = src.tile[tileM, tileN](block_idx.y, block_idx.x)
+    var src_tile = src.tile[tileM, tileN](block_idx.y, block_idx.x)
     copy_dram_to_sram[thread_layout](tile, src_tile)
 
     barrier()
@@ -442,11 +442,11 @@ def test_tma_async_multiple_store_kernel[
     comptime tileM = tile_shape_param[0]
     comptime tileN = tile_shape_param[1]
     comptime __tile_layout = Layout.row_major(tileM, tileN)
-    tile = LayoutTensor[
+    var tile = LayoutTensor[
         dtype,
         __tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation[]()
 
@@ -454,7 +454,7 @@ def test_tma_async_multiple_store_kernel[
     comptime num_iters = ceildiv(N, tileN)
 
     for i in range(num_iters):
-        src_tile = src.tile[tileM, tileN](block_idx.y, i)
+        var src_tile = src.tile[tileM, tileN](block_idx.y, i)
         copy_dram_to_sram[thread_layout](tile, src_tile)
 
         barrier()
@@ -483,8 +483,8 @@ def test_tma_async_store[
     comptime dst_M = dst_layout.shape[0].value()
     comptime dst_N = dst_layout.shape[1].value()
 
-    var src = ManagedLayoutTensor[DType.float32, src_layout](ctx)
-    var dst = ManagedLayoutTensor[DType.float32, dst_layout](ctx)
+    var src = ManagedLayoutTensor[.float32, src_layout](ctx)
+    var dst = ManagedLayoutTensor[.float32, dst_layout](ctx)
     arange(src.tensor(), 1)
     arange(dst.tensor(), 100001)
     var tma_tensor = create_tma_tile[tileM, tileN](ctx, dst.device_tensor())
@@ -525,15 +525,15 @@ def test_tma_async_store[
         )
     ctx.synchronize()
 
-    src_host = src.tensor()
-    dst_host = dst.tensor()
+    var src_host = src.tensor()
+    var dst_host = dst.tensor()
 
     # Check M x N keep the same value
     for m in range(dst_M):
         for n in range(dst_N):
             assert_equal(
-                src_host[m, n].cast[DType.float32](),
-                dst_host[m, n].cast[DType.float32](),
+                src_host[m, n].cast[.float32](),
+                dst_host[m, n].cast[.float32](),
             )
 
     ctx.synchronize()
@@ -555,15 +555,15 @@ def test_tma_async_reduce_kernel[
     comptime tileM = tile_shape_param[0]
     comptime tileN = tile_shape_param[1]
     comptime __tile_layout = Layout.row_major(tileM, tileN)
-    tile = LayoutTensor[
+    var tile = LayoutTensor[
         dtype,
         __tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation[]()
 
-    src_tile = src.tile[tileM, tileN](block_idx.y, block_idx.x)
+    var src_tile = src.tile[tileM, tileN](block_idx.y, block_idx.x)
     copy_dram_to_sram[thread_layout](tile, src_tile)
 
     barrier()
@@ -592,11 +592,11 @@ def test_tma_async_multiple_reduce_kernel[
     comptime tileM = tile_shape_param[0]
     comptime tileN = tile_shape_param[1]
     comptime __tile_layout = Layout.row_major(tileM, tileN)
-    tile = LayoutTensor[
+    var tile = LayoutTensor[
         dtype,
         __tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation[]()
 
@@ -604,7 +604,7 @@ def test_tma_async_multiple_reduce_kernel[
     comptime num_iters = ceildiv(N, tileN)
 
     for i in range(num_iters):
-        src_tile = src.tile[tileM, tileN](block_idx.y, i)
+        var src_tile = src.tile[tileM, tileN](block_idx.y, i)
         copy_dram_to_sram[thread_layout](tile, src_tile)
 
         barrier()
@@ -632,8 +632,8 @@ def test_tma_async_reduce[
     comptime dst_M = dst_layout.shape[0].value()
     comptime dst_N = dst_layout.shape[1].value()
 
-    var src = ManagedLayoutTensor[DType.float32, src_layout](ctx)
-    var dst = ManagedLayoutTensor[DType.float32, dst_layout](ctx)
+    var src = ManagedLayoutTensor[.float32, src_layout](ctx)
+    var dst = ManagedLayoutTensor[.float32, dst_layout](ctx)
     arange(src.tensor(), 1)
     arange(dst.tensor(), 3546)
     var tma_tensor = create_tma_tile[tileM, tileN](ctx, dst.device_tensor())
@@ -675,18 +675,18 @@ def test_tma_async_reduce[
         )
     ctx.synchronize()
 
-    src_host = src.tensor()
-    dst_host = dst.tensor()
+    var src_host = src.tensor()
+    var dst_host = dst.tensor()
 
     # Check M x N keep the same value and others in M_roundup x N_roundup
     for m in range(dst_M):
         for n in range(dst_N):
             assert_equal(
-                src_host[m, n].cast[DType.float32]()
+                src_host[m, n].cast[.float32]()
                 + 3546
                 + Float32(m * dst_N)
                 + Float32(n),
-                dst_host[m, n].cast[DType.float32](),
+                dst_host[m, n].cast[.float32](),
             )
 
     ctx.synchronize()
@@ -723,29 +723,29 @@ def test_tma_loads_two_buffers_kernel[
     comptime num_iters = ceildiv(N, tileN)
 
     comptime __a_tile_layout = Layout.row_major(tileM, tileN)
-    a_tile = LayoutTensor[
+    var a_tile = LayoutTensor[
         dtype,
         __a_tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
     comptime __b_tile_layout = Layout.row_major(
         b_tile_shape[0], b_tile_shape[1]
     )
-    b_tile = LayoutTensor[
+    var b_tile = LayoutTensor[
         dtype,
         __b_tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
@@ -774,8 +774,8 @@ def test_tma_loads_two_buffers_kernel[
         mbar[0].wait(phase)
         phase ^= 1
 
-        a_dst_tile = a_dst.tile[tileM, tileN](block_idx.y, i)
-        b_dst_tile = b_dst.tile[tileM, tileN](block_idx.y, i)
+        var a_dst_tile = a_dst.tile[tileM, tileN](block_idx.y, i)
+        var b_dst_tile = b_dst.tile[tileM, tileN](block_idx.y, i)
         copy_sram_to_dram[a_thread_layout](a_dst_tile, a_tile)
         copy_sram_to_dram[b_thread_layout](b_dst_tile, b_tile)
 
@@ -790,15 +790,15 @@ def test_tma_load_two_buffers_row_major[
     comptime M_roundup = align_up(M, tileM)
     comptime N_roundup = align_up(N, tileN)
 
-    var a_src = ManagedLayoutTensor[DType.float32, src_layout](ctx)
-    var b_src = ManagedLayoutTensor[DType.float32, src_layout](ctx)
+    var a_src = ManagedLayoutTensor[.float32, src_layout](ctx)
+    var b_src = ManagedLayoutTensor[.float32, src_layout](ctx)
 
     var a_dst = ManagedLayoutTensor[
-        DType.float32, Layout.row_major(M_roundup, N_roundup)
+        .float32, Layout.row_major(M_roundup, N_roundup)
     ](ctx)
 
     var b_dst = ManagedLayoutTensor[
-        DType.float32, Layout.row_major(M_roundup, N_roundup)
+        .float32, Layout.row_major(M_roundup, N_roundup)
     ](ctx)
 
     arange(a_src.tensor(), 1)
@@ -831,11 +831,11 @@ def test_tma_load_two_buffers_row_major[
         block_dim=(tileM * tileN),
     )
 
-    a_src_host = a_src.tensor()
-    a_dst_host = a_dst.tensor()
+    var a_src_host = a_src.tensor()
+    var a_dst_host = a_dst.tensor()
 
-    b_src_host = b_src.tensor()
-    b_dst_host = b_dst.tensor()
+    var b_src_host = b_src.tensor()
+    var b_dst_host = b_dst.tensor()
 
     # Check M x N keep the same value and others in M_roundup x N_roundup
     # are set to zeros.
@@ -843,18 +843,18 @@ def test_tma_load_two_buffers_row_major[
         for n in range(N_roundup):
             if m < M and n < N:
                 assert_equal(
-                    a_src_host[m, n].cast[DType.float32](),
-                    a_dst_host[m, n].cast[DType.float32](),
+                    a_src_host[m, n].cast[.float32](),
+                    a_dst_host[m, n].cast[.float32](),
                 )
 
                 assert_equal(
-                    b_src_host[m, n].cast[DType.float32](),
-                    b_dst_host[m, n].cast[DType.float32](),
+                    b_src_host[m, n].cast[.float32](),
+                    b_dst_host[m, n].cast[.float32](),
                 )
 
             else:
-                assert_equal(a_dst_host[m, n].cast[DType.float32](), 0.0)
-                assert_equal(b_dst_host[m, n].cast[DType.float32](), 0.0)
+                assert_equal(a_dst_host[m, n].cast[.float32](), 0.0)
+                assert_equal(b_dst_host[m, n].cast[.float32](), 0.0)
     ctx.synchronize()
     _ = a_src^
     _ = a_dst^
@@ -904,29 +904,29 @@ def test_tma_loads_and_store_two_buffers_kernel[
     comptime num_iters = ceildiv(N, tileN)
 
     comptime __a_tile_layout = Layout.row_major(tileM, tileN)
-    a_tile = LayoutTensor[
+    var a_tile = LayoutTensor[
         dtype,
         __a_tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
     comptime __b_tile_layout = Layout.row_major(
         b_tile_shape[0], b_tile_shape[1]
     )
-    b_tile = LayoutTensor[
+    var b_tile = LayoutTensor[
         dtype,
         __b_tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
@@ -975,10 +975,10 @@ def test_tma_load_and_store_two_buffers_row_major[
     comptime dst_M = dst_layout.shape[0].value()
     comptime dst_N = dst_layout.shape[1].value()
 
-    var a_src = ManagedLayoutTensor[DType.float32, src_layout](ctx)
-    var b_src = ManagedLayoutTensor[DType.float32, src_layout](ctx)
-    var a_dst = ManagedLayoutTensor[DType.float32, dst_layout](ctx)
-    var b_dst = ManagedLayoutTensor[DType.float32, dst_layout](ctx)
+    var a_src = ManagedLayoutTensor[.float32, src_layout](ctx)
+    var b_src = ManagedLayoutTensor[.float32, src_layout](ctx)
+    var a_dst = ManagedLayoutTensor[.float32, dst_layout](ctx)
+    var b_dst = ManagedLayoutTensor[.float32, dst_layout](ctx)
 
     # Initialize destinations to known values.
     comptime a_dst_value = 1.5
@@ -1029,32 +1029,28 @@ def test_tma_load_and_store_two_buffers_row_major[
         block_dim=(tileM * tileN),
     )
 
-    a_src_host = a_src.tensor()
+    var a_src_host = a_src.tensor()
     a_dst_host = a_dst.tensor()
 
-    b_src_host = b_src.tensor()
+    var b_src_host = b_src.tensor()
     b_dst_host = b_dst.tensor()
 
     for m in range(dst_M):
         for n in range(dst_N):
             if m < M and n < N:
                 assert_equal(
-                    a_src_host[m, n].cast[DType.float32](),
-                    a_dst_host[m, n].cast[DType.float32](),
+                    a_src_host[m, n].cast[.float32](),
+                    a_dst_host[m, n].cast[.float32](),
                 )
 
                 assert_equal(
-                    b_src_host[m, n].cast[DType.float32](),
-                    b_dst_host[m, n].cast[DType.float32](),
+                    b_src_host[m, n].cast[.float32](),
+                    b_dst_host[m, n].cast[.float32](),
                 )
 
             else:
-                assert_equal(
-                    a_dst_host[m, n].cast[DType.float32](), a_dst_value
-                )
-                assert_equal(
-                    b_dst_host[m, n].cast[DType.float32](), b_dst_value
-                )
+                assert_equal(a_dst_host[m, n].cast[.float32](), a_dst_value)
+                assert_equal(b_dst_host[m, n].cast[.float32](), b_dst_value)
 
     ctx.synchronize()
     _ = a_src^

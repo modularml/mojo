@@ -36,15 +36,17 @@ Ring Buffer Configuration:
 - Can be changed to SplitCounterSync in the RingBuffer type aliases for reduced contention
 - The trait-based design allows easy experimentation with different sync strategies
 """
-from std.gpu import (
+from std.sys import simd_width_of
+from max.gpu import (
     WARP_SIZE,
     MAX_THREADS_PER_BLOCK_METADATA,
-    barrier,
     block_idx,
     thread_idx,
     warp_id,
 )
-from std.gpu.intrinsics import inlined_assembly
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.intrinsics import inlined_assembly
 from layout import Layout, LayoutTensor, TileTensor
 from layout.layout import blocked_product
 from layout.layout_tensor import ThreadScope, copy_local_to_shared
@@ -59,11 +61,11 @@ from .structured import AmdTileOperator, ThreadRole
 
 # Type aliases for cleaner code
 comptime GlobalTensor[dtype: DType, layout: Layout] = LayoutTensor[
-    dtype, layout, MutAnyOrigin, address_space=AddressSpace.GLOBAL
+    dtype, layout, MutAnyOrigin, address_space=.GLOBAL
 ]
 
 
-@parameter
+@__parameter
 def validate_config[
     BM: Int,
     BN: Int,
@@ -78,6 +80,22 @@ def validate_config[
     consumer: Int,
 ]():
     """Validates the configuration parameters for the matrix multiplication kernel.
+
+    Parameters:
+        BM: Block tile size along the M dimension, must be divisible by `WM`.
+        BN: Block tile size along the N dimension, must be divisible by `WN`.
+        BK: Block tile size along the K dimension.
+        WM: Warp tile size along the M dimension.
+        WN: Warp tile size along the N dimension.
+        WK: Warp tile size along the K dimension.
+        m_warps: Number of warps covering the M dimension of the block,
+            must be divisible by `producer_a`.
+        n_warps: Number of warps covering the N dimension of the block,
+            must be divisible by `producer_b`.
+        producer_a: Number of warps assigned to loading matrix A tiles.
+        producer_b: Number of warps assigned to loading matrix B tiles.
+        consumer: Number of warps assigned to computing the matmul, must be
+            a power of two and at least `producer_a` and `producer_b`.
     """
     comptime assert (
         BM % WM == 0 and BN % WN == 0
@@ -112,7 +130,12 @@ def determine_thread_role[
     producer_a_warps: Int,
     producer_b_warps: Int,
 ]() -> Tuple[ThreadRole, Int]:
-    """Returns (role, consumer_warp_id within role group)."""
+    """Returns (role, consumer_warp_id within role group).
+
+    Parameters:
+        producer_a_warps: Number of warps assigned to loading matrix A tiles.
+        producer_b_warps: Number of warps assigned to loading matrix B tiles.
+    """
     var warp_id = warp_id()
     comptime producer_thread_count = (
         producer_a_warps + producer_b_warps
@@ -127,10 +150,23 @@ def determine_thread_role[
         return (ThreadRole.CONSUMER, 2)
 
 
-@parameter
+@__parameter
 def smem_tile_layout[
     k_tile_size: Int, block_rows: Int, block_cols: Int
 ]() -> Layout:
+    """Builds the shared memory layout for a matrix tile used by the warp-specialized kernel.
+
+    The layout tiles `block_rows` x `block_cols` shared memory into horizontally
+    repeated `block_rows` x `k_tile_size` blocks, where `block_cols` must be a
+    multiple of `k_tile_size`.
+
+    Parameters:
+        k_tile_size: Width of a single K tile that forms the base block layout
+            column extent.
+        block_rows: Number of rows in the shared memory tile.
+        block_cols: Number of columns in the shared memory tile, must be a
+            multiple of `k_tile_size`.
+    """
     # Shared memory layout
     #
     # - base_layout: Layout.row_major(block_rows, k_tile_size) -> block_rows x k_tile_size tiles
@@ -148,11 +184,11 @@ def smem_tile_layout[
     # ┌─────────────────────────────────────────────────────────────────────────┐
     # │         Block 0 (64x32)             │         Block 1 (64x32)           │
     # ├─────────────────────────────────────┼───────────────────────────────────┤
-    # │   0    1    2  ...   30   31        │ 2048 2049 2050 ... 2078 2079      │
-    # │  32   33   34  ...   62   63        │ 2080 2081 2082 ... 2110 2111      │
-    # │  64   65   66  ...   94   95        │ 2112 2113 2114 ... 2142 2143      │
-    # │  96   97   98  ...  126  127        │ 2144 2145 2146 ... 2174 2175      │
-    # │ ...                                 │  ...                              │
+    # │   0    1    2  ...  30   31        │ 2048 2049 2050 ... 2078 2079      │
+    # │  32   33   34  ...  62   63        │ 2080 2081 2082 ... 2110 2111      │
+    # │  64   65   66  ...  94   95        │ 2112 2113 2114 ... 2142 2143      │
+    # │  96   97   98  ... 126  127        │ 2144 2145 2146 ... 2174 2175      │
+    # │ ...                                │  ...                             │
     # │2016 2017 2018  ... 2046 2047        │ 4064 4065 4066 ... 4094 4095      │
     # └─────────────────────────────────────────────────────────────────────────┘
     # stride between blocks = block_rows x k_tile_size = 64 x 32 = 2048
@@ -171,10 +207,24 @@ def smem_tile_layout[
     )
 
 
-@parameter
+@__parameter
 def get_producer_warp_thread_layout[
     k_tile_size: Int, simd_width: Int, block_rows: Int, block_cols: Int
 ]() -> Layout:
+    """Computes the thread-to-element layout used by a producer warp when loading a tile.
+
+    Arranges the warp's threads into inner blocks that each cover one
+    `k_tile_size`-wide row, then tiles those inner blocks across the warp to
+    cover the full `block_rows` x `block_cols` tile.
+
+    Parameters:
+        k_tile_size: Width of a single K tile loaded by one row of inner
+            blocks.
+        simd_width: SIMD vector width of the matrix element type, used to
+            size inner-block columns.
+        block_rows: Number of rows in the block tile to load.
+        block_cols: Number of columns in the block tile to load.
+    """
     # TODO: Document the logic behind this layout
     # Define a layout that corresponds to the below pattern:
     #
@@ -224,6 +274,8 @@ def get_producer_warp_thread_layout[
 
 @always_inline
 def lgkm_wait():
+    """Emits an `s_waitcnt lgkmcnt(0)` instruction to wait for outstanding shared memory loads.
+    """
     inlined_assembly[
         "s_waitcnt lgkmcnt(0)",
         NoneType,
@@ -254,6 +306,35 @@ def run_producer[
     block_idx_dim: Int,
 ):
     """Generic producer function for loading matrix tiles from global to shared memory.
+
+    Parameters:
+        dtype: Element type of the matrix being loaded.
+        layout: Memory layout of the matrix in global memory.
+        block_rows: Number of rows in a block tile (`BM` for matrix A, `BN`
+            for matrix B).
+        block_cols: Number of columns in a block tile (`BK`).
+        warp_rows: Number of rows per warp tile (`WM` for matrix A, `WN` for
+            matrix B).
+        warp_cols: Number of columns per warp tile (`WK`).
+        producer_warps: Number of warps assigned to producing this matrix.
+        pipeline_stages: Number of pipeline stages in the ring buffer used
+            to overlap loads and compute.
+        k_tile_size: Width of a single K tile loaded per inner-block row.
+        simd_width: SIMD vector width of the matrix element type.
+        warps_processed_per_producer: Number of warp tiles each producer
+            warp iterates over.
+        tile_count: Total number of K tiles to load along the K dimension.
+        swizzle: Optional swizzle pattern applied to shared memory to avoid
+            bank conflicts.
+
+    Args:
+        matrix: Global memory tensor of the matrix to load tiles from.
+        ring_buffer: Ring buffer coordinating producer-consumer
+            synchronization across pipeline stages.
+        warp_id: Warp identifier of this producer warp within its producer
+            group.
+        block_idx_dim: Block index along the matrix's leading dimension,
+            selecting which block of tiles this block loads.
     """
 
     comptime thread_layout = get_producer_warp_thread_layout[
@@ -268,7 +349,7 @@ def run_producer[
         dtype,
         Layout.row_major(elements_loaded_per_thread // simd_width, simd_width),
         MutAnyOrigin,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ].stack_allocation()
     var reg_tile_frag = reg_frag.vectorize[1, simd_width]()
 
@@ -343,19 +424,50 @@ def warp_specialized_matmul_kernel[
     consumer_warps: Int,
     pipeline_stages: Int,
 ](
-    a: LayoutTensor[
-        in_type, a_layout, MutAnyOrigin, address_space=AddressSpace.GLOBAL
-    ],
-    b: LayoutTensor[
-        in_type, b_layout, MutAnyOrigin, address_space=AddressSpace.GLOBAL
-    ],
+    a: LayoutTensor[in_type, a_layout, MutAnyOrigin, address_space=.GLOBAL],
+    b: LayoutTensor[in_type, b_layout, MutAnyOrigin, address_space=.GLOBAL],
     c: LayoutTensor[
         out_type,
         c_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.GLOBAL,
+        address_space=.GLOBAL,
     ],
 ):
+    """Runs the warp-specialized matrix multiplication kernel on an AMD GPU.
+
+    Splits the block's warps into A producers, B producers, and consumers,
+    coordinating tile movement through ring buffers with pipeline stages.
+    Producers load `BM` x `BK` and `BN` x `BK` tiles from global memory into
+    shared memory, while consumers accumulate the matrix multiply-accumulate
+    results and write them back to global memory.
+
+    Parameters:
+        in_type: Element type of the input matrices `a` and `b`.
+        out_type: Element type of the output matrix `c`.
+        a_layout: Memory layout of input matrix `a` in global memory.
+        b_layout: Memory layout of input matrix `b` in global memory.
+        c_layout: Memory layout of output matrix `c` in global memory.
+        BM: Block tile size along the M dimension, must be divisible by
+            `WM`.
+        BN: Block tile size along the N dimension, must be divisible by
+            `WN`.
+        BK: Block tile size along the K dimension.
+        WM: Warp tile size along the M dimension.
+        WN: Warp tile size along the N dimension.
+        WK: Warp tile size along the K dimension.
+        a_producer_warps: Number of warps assigned to loading matrix A
+            tiles.
+        b_producer_warps: Number of warps assigned to loading matrix B
+            tiles.
+        consumer_warps: Number of warps assigned to computing the matmul.
+        pipeline_stages: Number of ring buffer stages used to overlap loads
+            and compute.
+
+    Args:
+        a: Input matrix A as a global memory tensor of shape `M` x `K`.
+        b: Input matrix B as a global memory tensor of shape `K` x `N`.
+        c: Output matrix C as a global memory tensor of shape `M` x `N`.
+    """
     comptime K = a.shape[1]()
 
     # NOTE: hardcoded MMA for now, but in theory this pipeline will work with any MMA
@@ -508,7 +620,7 @@ def warp_specialized_matmul_kernel[
             swizzle=swizzle,
         ]()
 
-        @parameter
+        @__parameter
         def compute_indices(consumer_iteration: Int) -> Tuple[Int, Int]:
             """Computes warp tile indices for this consumer iteration."""
             var warp_tile_idx = (
@@ -583,11 +695,40 @@ def warp_specialized_matmul[
     consumer_warps: Int,
     pipeline_stages: Int = 1,
 ](
-    a_tt: TileTensor[DType.bfloat16, ...],
-    b_tt: TileTensor[DType.bfloat16, ...],
-    c_tt: TileTensor[DType.float32, ...],
+    a_tt: TileTensor[.bfloat16, ...],
+    b_tt: TileTensor[.bfloat16, ...],
+    c_tt: TileTensor[.float32, ...],
     ctx: DeviceContext,
 ) raises:
+    """Enqueues the warp-specialized matrix multiplication kernel onto the device.
+
+    Converts the input and output `TileTensor` arguments to global address-space
+    layout tensors and launches the kernel with a grid of `M // BM` by `N // BN`
+    blocks and one warp per producer and consumer warp.
+
+    Parameters:
+        M: Number of rows of the output matrix, sets the grid height `M // BM`.
+        N: Number of columns of the output matrix, sets the grid width
+            `N // BN`.
+        K: Contraction dimension of the matmul.
+        BM: Block tile size along the M dimension.
+        BN: Block tile size along the N dimension.
+        BK: Block tile size along the K dimension.
+        WM: Warp tile size along the M dimension.
+        WN: Warp tile size along the N dimension.
+        WK: Warp tile size along the K dimension.
+        a_producer_warps: Number of warps assigned to loading matrix A tiles.
+        b_producer_warps: Number of warps assigned to loading matrix B tiles.
+        consumer_warps: Number of warps assigned to computing the matmul.
+        pipeline_stages: Number of ring buffer stages used to overlap loads and
+            compute (defaults to 1).
+
+    Args:
+        a_tt: Input matrix A as a `TileTensor` of shape `M` x `K`.
+        b_tt: Input matrix B as a `TileTensor` of shape `K` x `N`.
+        c_tt: Output matrix C as a `TileTensor` of shape `M` x `N`.
+        ctx: Device context used to enqueue the kernel.
+    """
     var a_device_tensor = a_tt.to_layout_tensor()
     var b_device_tensor = b_tt.to_layout_tensor()
     var c_device_tensor = c_tt.to_layout_tensor()
@@ -610,15 +751,9 @@ def warp_specialized_matmul[
         pipeline_stages=pipeline_stages,
     ]
 
-    var global_c_device_tensor = c_device_tensor.address_space_cast[
-        AddressSpace.GLOBAL
-    ]()
-    var global_a_device_tensor = a_device_tensor.address_space_cast[
-        AddressSpace.GLOBAL
-    ]()
-    var global_b_device_tensor = b_device_tensor.address_space_cast[
-        AddressSpace.GLOBAL
-    ]()
+    var global_c_device_tensor = c_device_tensor.address_space_cast[.GLOBAL]()
+    var global_a_device_tensor = a_device_tensor.address_space_cast[.GLOBAL]()
+    var global_b_device_tensor = b_device_tensor.address_space_cast[.GLOBAL]()
 
     ctx.enqueue_function[kernel](
         global_a_device_tensor,

@@ -1,0 +1,80 @@
+diff --git a/tcmalloc/allocation_sampling.h b/tcmalloc/allocation_sampling.h
+index cfba7452..3950d367 100644
+--- a/tcmalloc/allocation_sampling.h
++++ b/tcmalloc/allocation_sampling.h
+@@ -52,7 +52,7 @@ std::unique_ptr<const ProfileBase> DumpFragmentationProfile(Static& state);
+ std::unique_ptr<const ProfileBase> DumpHeapProfile(Static& state);
+
+ extern "C" ABSL_CONST_INIT thread_local Sampler tcmalloc_sampler
+-    ABSL_ATTRIBUTE_INITIAL_EXEC;
++    __attribute__((tls_model("local-dynamic")));
+
+ // Compiler needs to see definition of this variable to generate more
+ // efficient code for -fPIE/PIC. If the compiler does not see the definition
+@@ -62,7 +62,7 @@ extern "C" ABSL_CONST_INIT thread_local Sampler tcmalloc_sampler
+ // So we provide a weak definition here, but the actual definition is in
+ // percpu_rseq_asm.S.
+ ABSL_CONST_INIT ABSL_ATTRIBUTE_WEAK thread_local Sampler tcmalloc_sampler
+-    ABSL_ATTRIBUTE_INITIAL_EXEC;
++    __attribute__((tls_model("local-dynamic")));
+
+ inline Sampler& GetThreadSampler() {
+   static_assert(sizeof(Sampler) == TCMALLOC_SAMPLER_SIZE,
+diff --git a/tcmalloc/internal/percpu.cc b/tcmalloc/internal/percpu.cc
+index 8320f7f1..0d4e65c5 100644
+--- a/tcmalloc/internal/percpu.cc
++++ b/tcmalloc/internal/percpu.cc
+@@ -65,7 +65,7 @@ ABSL_CONST_INIT static absl::once_flag init_per_cpu_once;
+ ABSL_CONST_INIT static std::atomic<bool> using_upstream_fence{false};
+ #endif  // TCMALLOC_INTERNAL_PERCPU_USE_RSEQ
+
+-extern "C" thread_local char tcmalloc_sampler ABSL_ATTRIBUTE_INITIAL_EXEC;
++extern "C" thread_local char tcmalloc_sampler __attribute__((tls_model("local-dynamic")));
+
+ ABSL_CONST_INIT RseqVcpuMode vcpu_mode = RseqVcpuMode::kNone;
+
+diff --git a/tcmalloc/internal/percpu.h b/tcmalloc/internal/percpu.h
+index 11a1fcd7..6add3b9e 100644
+--- a/tcmalloc/internal/percpu.h
++++ b/tcmalloc/internal/percpu.h
+@@ -158,11 +158,11 @@ inline constexpr int kCpuIdInitialized = 0;
+
+ // Top 4 bytes of this variable overlap with __rseq_abi.cpu_id_start.
+ extern "C" ABSL_CONST_INIT thread_local volatile uintptr_t tcmalloc_slabs
+-    ABSL_ATTRIBUTE_INITIAL_EXEC;
++    __attribute__((tls_model("local-dynamic")));
+ extern "C" ABSL_CONST_INIT thread_local volatile kernel_rseq __rseq_abi
+-    ABSL_ATTRIBUTE_INITIAL_EXEC;
++    __attribute__((tls_model("local-dynamic")));
+ extern "C" ABSL_CONST_INIT thread_local volatile int tcmalloc_cached_vcpu
+-    ABSL_ATTRIBUTE_INITIAL_EXEC;
++    __attribute__((tls_model("local-dynamic")));
+
+ // Provide weak definitions here to enable more efficient codegen.
+ // If compiler sees only extern declaration when generating accesses,
+diff --git a/tcmalloc/thread_cache.cc b/tcmalloc/thread_cache.cc
+index 029931da..db8ed51b 100644
+--- a/tcmalloc/thread_cache.cc
++++ b/tcmalloc/thread_cache.cc
+@@ -44,7 +44,7 @@ ThreadCache* ThreadCache::thread_heaps_ = nullptr;
+ int ThreadCache::thread_heap_count_ = 0;
+ ThreadCache* ThreadCache::next_memory_steal_ = nullptr;
+ ABSL_CONST_INIT thread_local ThreadCache* ThreadCache::thread_local_data_
+-    ABSL_ATTRIBUTE_INITIAL_EXEC = nullptr;
++    __attribute__((tls_model("local-dynamic"))) = nullptr;
+ ABSL_CONST_INIT bool ThreadCache::tsd_inited_ = false;
+ pthread_key_t ThreadCache::heap_key_;
+ ABSL_CONST_INIT absl::base_internal::SpinLock ThreadCache::threadcache_lock_(
+diff --git a/tcmalloc/thread_cache.h b/tcmalloc/thread_cache.h
+index d10e0a58..170a3af3 100644
+--- a/tcmalloc/thread_cache.h
++++ b/tcmalloc/thread_cache.h
+@@ -163,7 +163,7 @@ class ABSL_CACHELINE_ALIGNED ThreadCache {
+   // Since using dlopen on a malloc replacement is asking for trouble in any
+   // case, that's a good tradeoff for us.
+   ABSL_CONST_INIT static thread_local ThreadCache* thread_local_data_
+-      ABSL_ATTRIBUTE_INITIAL_EXEC;
++      __attribute__((tls_model("local-dynamic")));
+
+   // Thread-specific key.  Initialization here is somewhat tricky
+   // because some Linux startup code invokes malloc() before it

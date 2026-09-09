@@ -1,5 +1,5 @@
 # ===----------------------------------------------------------------------=== #
-# Copyright (c) 2025, Modular Inc. All rights reserved.
+# Copyright (c) 2026, Modular Inc. All rights reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions:
 # https://llvm.org/LICENSE.txt
@@ -32,7 +32,7 @@ from max.pipelines.modeling.base.component_model import ComponentModel
 from max.pipelines.modeling.dataprocessing.causal_attention_mask import (
     causal_attention_mask_with_token_mask,
 )
-from max.pipelines.modeling.weights.weight_loading import (
+from max.pipelines.weights.weight_loading import (
     auto_cast_weights_from_env,
 )
 

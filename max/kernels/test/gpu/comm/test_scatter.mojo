@@ -31,15 +31,15 @@ Uses the example from KERN-2435: DP=4, TP=2, 8 GPUs distributing row_offsets.
 """
 
 from layout import Idx, TileTensor, row_major
-from std.collections import InlineArray
+from std.collections import Array
 from std.math import ceildiv
 from std.sys import size_of
-from std.gpu.host import DeviceBuffer, DeviceContext
+from max.gpu.host import DeviceBuffer, DeviceContext
 from std.testing import assert_true
 
 from comm import Signal, MAX_GPUS
 from comm.scatter import scatter
-from comm.sync import enable_p2p
+from comm.sync import enable_p2p, init_signal_buffer
 
 comptime dtype = DType.uint32
 
@@ -80,7 +80,7 @@ def _test_pull[
     comptime InputTileType = TileTensor[
         dtype, type_of(row_major(Int(0))), ImmutAnyOrigin
     ]
-    var tt_input_bufs = InlineArray[InputTileType, dp_size](uninitialized=True)
+    var tt_input_bufs = Array[InputTileType, dp_size](uninitialized=True)
 
     for dp in range(dp_size):
         var n = len(expected[dp])
@@ -97,26 +97,30 @@ def _test_pull[
     comptime OutputTileType = TileTensor[
         dtype, type_of(row_major(Int(0))), MutAnyOrigin
     ]
-    var out_tiles = InlineArray[OutputTileType, ngpus](uninitialized=True)
+    var out_tiles = Array[OutputTileType, ngpus](uninitialized=True)
     for i in range(ngpus):
         var replica = i // tp_size
         var n = len(expected[replica])
         var out_buf = ctxs[i].enqueue_create_buffer[dtype](n)
         ctxs[i].enqueue_memset(out_buf, 0)
         ctxs[i].synchronize()
-        out_tiles[i] = OutputTileType(out_buf.unsafe_ptr(), row_major(n))
+        out_tiles[i] = OutputTileType(
+            out_buf.unsafe_ptr().as_unsafe_any_origin(), row_major(n)
+        )
         output_devbufs.append(out_buf)
 
     # Signal buffers.
-    var signal_bufs = List[DeviceBuffer[DType.uint8]]()
-    var rank_sigs = InlineArray[UnsafePointer[Signal, MutAnyOrigin], MAX_GPUS](
+    var signal_bufs = List[DeviceBuffer[.uint8]]()
+    var rank_sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
         uninitialized=True
     )
     for i in range(ngpus):
-        var sig_buf = ctxs[i].create_buffer_sync[DType.uint8](size_of[Signal]())
-        ctxs[i].enqueue_memset[DType.uint8](sig_buf, 0)
+        var sig_buf = ctxs[i].create_buffer_sync[.uint8](size_of[Signal]())
+        init_signal_buffer(sig_buf, ctxs[i])
         ctxs[i].synchronize()
-        rank_sigs[i] = sig_buf.unsafe_ptr().bitcast[Signal]()
+        rank_sigs[i] = (
+            sig_buf.unsafe_ptr().bitcast[Signal]().as_unsafe_any_origin()
+        )
         signal_bufs.append(sig_buf)
 
     # Launch scatter.
@@ -165,7 +169,7 @@ def _test_pull[
 
 def _test_dp2() raises:
     """2 GPUs, DP=2."""
-    var expected = List[List[Scalar[DType.uint32]]]()
+    var expected = List[List[UInt32]]()
     expected.append([0, 5, 12])  # Replica A
     expected.append([0, 8, 16])  # Replica B
     _test_pull[ngpus=2, dp_size=2](expected)
@@ -173,7 +177,7 @@ def _test_dp2() raises:
 
 def _test_dp4[ngpus: Int]() raises:
     """DP=4 with configurable ngpus (KERN-2435 data)."""
-    var expected = List[List[Scalar[DType.uint32]]]()
+    var expected = List[List[UInt32]]()
     expected.append([0, 5, 12])  # Replica A
     expected.append([0, 8, 16])  # Replica B
     expected.append([0, 7, 12])  # Replica C
@@ -183,7 +187,7 @@ def _test_dp4[ngpus: Int]() raises:
 
 def _test_dp2_fewer_elems_gpu0() raises:
     """2 GPUs, DP=2: GPU-0's replica gets fewer elements than GPU-1's."""
-    var expected = List[List[Scalar[DType.uint32]]]()
+    var expected = List[List[UInt32]]()
     expected.append([42])  # Replica A (1 element)
     expected.append([10, 20, 30])  # Replica B (3 elements)
     _test_pull[ngpus=2, dp_size=2](expected)
@@ -191,7 +195,7 @@ def _test_dp2_fewer_elems_gpu0() raises:
 
 def _test_dp2_single_elem() raises:
     """2 GPUs, DP=2: each GPU gets exactly 1 element."""
-    var expected = List[List[Scalar[DType.uint32]]]()
+    var expected = List[List[UInt32]]()
     expected.append([7])  # Replica A
     expected.append([99])  # Replica B
     _test_pull[ngpus=2, dp_size=2](expected)
@@ -201,12 +205,12 @@ def _test_dp4_large_chunks() raises:
     """8 GPUs, DP=4: large chunks that require multiple thread blocks."""
     comptime NUM_ELEMS = 16384
 
-    var expected = List[List[Scalar[DType.uint32]]]()
+    var expected = List[List[UInt32]]()
     for dp in range(4):
-        var chunk = List[Scalar[DType.uint32]](capacity=NUM_ELEMS)
+        var chunk = List[UInt32](capacity=NUM_ELEMS)
         var offset = dp * NUM_ELEMS
         for i in range(NUM_ELEMS):
-            chunk.append(Scalar[DType.uint32](offset + i))
+            chunk.append(UInt32(offset + i))
         expected.append(chunk^)
     _test_pull[ngpus=8, dp_size=4](expected)
 

@@ -16,7 +16,13 @@ from __future__ import annotations
 import numpy as np
 from max.graph.weights import WeightData, Weights
 from max.pipelines.lib import PipelineConfig
+from max.pipelines.lib.config.model_config import (
+    _select_dtype_cast,
+)
+from max.pipelines.modeling.config_enums import supported_encoding_dtype
 from transformers import AutoConfig
+
+from .model_config import MambaConfig
 
 # Maps from Safetensor to MAX weight names.
 # Note: Replacements are applied in order, so order matters for overlapping patterns
@@ -93,19 +99,16 @@ def convert_safetensor_state_dict(
 
         new_state_dict[max_name] = weight_data
 
-    model_config = pipeline_config.model
+    # TODO(MXF-517): this should be resolved by the ArchConfig, not the adapter.
+    cast_from, cast_to = _select_dtype_cast(
+        pipeline_config.model, MambaConfig.DEFAULT_ENCODING
+    )
 
-    if model_config._applied_dtype_cast_from:
-        cast_from = model_config._applied_dtype_cast_from
-        cast_to = model_config._applied_dtype_cast_to
+    if cast_from:
         assert cast_to, (
-            "Invalid configuration: _applied_dtype_cast_to is not set but _applied_dtype_cast_from is set. "
+            "Invalid configuration: applied_dtype_cast_to is not set but applied_dtype_cast_from is set. "
             "This should not happen."
         )
-        from max.pipelines.modeling.config_enums import (
-            supported_encoding_dtype,
-        )
-
         for key, weight_data in new_state_dict.items():
             if weight_data.dtype == supported_encoding_dtype(cast_from):
                 new_state_dict[key] = weight_data.astype(

@@ -1,0 +1,77 @@
+// RUN: mojo-lsp-server -mojo-test < %s | FileCheck -strict-whitespace %s
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":123,"rootPath":"lit","capabilities":{},"trace":"off"}}
+// -----
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{
+  "uri":"test:///foo.mojo",
+  "languageId":"mojo",
+  "version":1,
+  "text":"from std.builtin.simd import Int\ndef foo():\n Int()\n"
+}}}
+// -----
+{"jsonrpc":"2.0","id":1,"method":"textDocument/codeAction","params":{
+  "textDocument":{
+    "uri":"file:///foo.mojo"
+  },
+  "range":{
+    "start":{"line":0,"character":8}, "end":{"line":0,"character":10}
+  },
+  "context":{
+    "diagnostics":[{
+      "range":{"start":{"line":2,"character":1}, "end":{"line":2,"character":6}},
+      "message":"'Int' value is unused; assign to '_' to discard the result",
+      "severity":2,
+      "source":"mojo"
+    }],
+    "only":["quickfix"],
+    "triggerKind":1
+  }
+}}
+// CHECK-LABEL: "id": 1
+// CHECK-NEXT:  "jsonrpc": "2.0",
+// CHECK-NEXT:  "result": [
+// CHECK-NEXT:    {
+// CHECK-NEXT:      "diagnostics": [
+// CHECK-NEXT:        {
+// CHECK-NEXT:          "message": "'Int' value is unused; assign to '_' to discard the result",
+// CHECK-NEXT:          "range": {
+// CHECK-NEXT:            "end": {
+// CHECK-NEXT:              "character": 6,
+// CHECK-NEXT:              "line": 2
+// CHECK-NEXT:            },
+// CHECK-NEXT:            "start": {
+// CHECK-NEXT:              "character": 1,
+// CHECK-NEXT:              "line": 2
+// CHECK-NEXT:            }
+// CHECK-NEXT:          },
+// CHECK-NEXT:          "severity": 2,
+// CHECK-NEXT:          "source": "mojo"
+// CHECK-NEXT:        }
+// CHECK-NEXT:      ],
+// CHECK-NEXT:      "edit": {
+// CHECK-NEXT:        "changes": {
+// CHECK-NEXT:          "test:///foo.mojo": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "newText": "_ = ",
+// CHECK-NEXT:              "range": {
+// CHECK-NEXT:                "end": {
+// CHECK-NEXT:                  "character": 1,
+// CHECK-NEXT:                  "line": 2
+// CHECK-NEXT:                },
+// CHECK-NEXT:                "start": {
+// CHECK-NEXT:                  "character": 1,
+// CHECK-NEXT:                  "line": 2
+// CHECK-NEXT:                }
+// CHECK-NEXT:              }
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        }
+// CHECK-NEXT:      },
+// CHECK-NEXT:      "isPreferred": true,
+// CHECK-NEXT:      "kind": "quickfix",
+// CHECK-NEXT:      "title": "'Int' value is unused; assign to '_' to discard the result"
+// CHECK-NEXT:    }
+// CHECK-NEXT:  ]
+// -----
+{"jsonrpc":"2.0","id":10,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

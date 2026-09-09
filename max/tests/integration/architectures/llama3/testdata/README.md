@@ -53,7 +53,7 @@ each encoding/model pair to the test data folder.
 
 `special_tokens_map.json`, `tokenizer_config.json` and `tokenizer.json` are
 copied from the
-[meta-llama/Meta-Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct)
+[meta-llama/Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct)
 HuggingFace model.
 
 ## Running the tests

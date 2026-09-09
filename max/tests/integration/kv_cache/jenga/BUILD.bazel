@@ -1,0 +1,27 @@
+load("//bazel:api.bzl", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "jenga_tests",
+    srcs = glob(["*.py"]),
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/python/max/pipelines/kv_cache:kv_connector",
+        "//max/python/max/pipelines/request",
+        requirement("numpy"),
+    ],
+)

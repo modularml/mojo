@@ -112,8 +112,7 @@ When the framework doesn't fit:
 3. Add custom storage fields to SMEM struct
 """
 
-from std.gpu.memory import AddressSpace
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import Layout
 from layout.tma_async import SharedMemBarrier
 from layout.tensor_core_async import tile_layout_k_major_typed
@@ -534,7 +533,7 @@ struct InputPipelineStorage[
     # separate in SMEM. This is the extensibility point for future.
     #
     # TODO: When Payload types define Storage, add:
-    # var payload: Payload.Storage[num_stages]
+    # var payload: Payload.Engine[num_stages]
 
     @always_inline
     def create_pipeline(

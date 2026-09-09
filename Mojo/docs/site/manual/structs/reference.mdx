@@ -1,0 +1,374 @@
+---
+title: Self-referential structs
+sidebar_position: 3
+description: >
+  Mojo structs can't directly contain themselves. Learn how to use
+  pointers to build linked lists, trees, and other self-referential
+  data structures.
+---
+
+<!-- markdownlint-disable MD033 -->
+
+Some data structures don't fit well with value semantics. Lists, trees,
+and graphs all need nodes that point to each other. You can't build these by
+nesting one value inside another, because the type would keep growing forever.
+
+In Mojo, you build these shapes with pointers, heap allocation, and manual
+cleanup. The idea may feel new at first, but the pattern stays simple once you
+see it in small steps.
+
+## Avoid direct self-reference
+
+Mojo doesn't let you build a type that stores another instance of itself, even
+when nested within an [`Optional`](/docs/std/collections/optional/Optional/):
+
+```mojo
+struct Node:
+    var value: String
+    var next: Optional[Node]  # ERROR: Recursive reference
+
+    # ...
+```
+
+Each `struct` has a fixed layout. If `Node` held another `Node` directly, the
+compiler wouldn't know how much space to reserve. Optional fields don't help,
+because the outer value still needs room for the inner one.
+
+Pointers solve this problem. Pointers have a fixed size, and they let values
+point at each other without blowing up the type.
+
+## Adding self-referential pointers
+
+The following code shows how to set up a node that can point to its own type.
+This sample gives you a node type with a value slot and a single link
+to the next node:
+
+```mojo
+struct Node[T: ImplicitlyCopyable & Writable & Deinitable](
+    Movable
+):
+    comptime NodePointer = Pointer[Self, MutUntrackedOrigin]
+
+
+    var value: Optional[Self.T] # The `Node`'s value
+    var next: Optional[Self.NodePointer] # Pointer to the next `Node`
+
+
+    # Uses an `Optional` value to allow 'empty' Node construction
+    # that can be moved into newly allocated memory
+    def __init__(out self, value: Optional[Self.T] = None):
+        self.value = value
+        self.next = {}
+```
+
+The code defines a type-specific `NodePointer` type alias built on
+[`Pointer`](/docs/std/memory/pointer/Pointer/).
+
+[`MutUntrackedOrigin`](/docs/manual/values/lifetimes/)
+lets the pointer represent dynamically-allocated memory that the lifetime
+checker doesn't track. You need to both allocate and deallocate memory as
+needed.
+
+The `next` field is an `Optional[Self.NodePointer]` because a node may or may
+not link to another node. `Pointer` is non-nullable, so `Optional` provides the
+null state. `Optional[Pointer]` has the same memory layout as a raw pointer, so
+there's no overhead. For more on this pattern, see
+[Working with nullability](/docs/manual/pointers/using-pointers/#working-with-nullability).
+
+The optional `value` lets you create "empty" nodes, enabling you to move
+new `Node` memory allocations into place.
+
+## Building nodes
+
+Here's the key pattern you can use in many reference structures:
+
+1. Allocate space.
+1. Construct a value-holding node.
+1. Write it into the allocated memory.
+1. Return the pointer.
+
+And here's an example of that pattern:
+
+```mojo
+@staticmethod
+def make_node(value: Self.T) -> Self.NodePointer:
+    var node_ptr = alloc[Self]({count = 1}).unsafe_leak()
+    node_ptr.unsafe_write(Self(value))
+    return node_ptr
+```
+
+In this case, constructing the node (`Self(value)`) is simple enough
+that it's inline with the
+[`unsafe_write()`](/docs/std/memory/pointer/Pointer/#unsafe_write) call.
+
+This "allocate space, initialize, and write" approach creates safe
+pointer-based structures in Mojo.
+
+[`alloc()`](/docs/std/memory/alloc/alloc/) returns an
+[`Allocation`](/docs/std/memory/alloc/Allocation/), an owning handle that the
+compiler requires you to release before it goes out of scope. That's the right
+default, but a node has to outlive the function that allocates it, so
+`make_node()` calls
+[`unsafe_leak()`](/docs/std/memory/alloc/Allocation/#unsafe_leak) to take the
+raw pointer out of the handle. Leaking transfers responsibility for the memory
+to you — see
+[More memory allocation patterns](/docs/manual/pointers/using-pointers/#more-memory-allocation-patterns)
+for when to prefer each approach.
+
+## Freeing nodes
+
+Releasing a node takes two steps:
+destroy the value stored in the memory, then release the memory itself.
+Because `make_node()` returns a raw pointer, you need to pair the
+leaked pointer back up with the layout you allocated it with to get an
+`Allocation` that [`dealloc()`](/docs/std/memory/alloc/dealloc/) can consume:
+
+```mojo
+@staticmethod
+def free_node(var node_ptr: Self.NodePointer):
+    node_ptr.unsafe_deinit_pointee()
+    dealloc(
+        ThinAllocation(unsafe_owned_ptr=node_ptr).unsafe_with_layout(
+            {count = 1}
+        )
+    )
+```
+
+The two steps are separate because `dealloc()` releases memory without running
+deinitializers on whatever the memory holds. Skipping
+[`unsafe_deinit_pointee()`](/docs/std/memory/pointer/Pointer/#unsafe_deinit_pointee)
+would leak whatever the node's value owns, which in this case is a
+[`String`](/docs/std/collections/string/string/String/)'s heap buffer.
+
+Every place that removes a node calls this one method, so the pairing of
+`make_node()` and `free_node()` stays easy to audit.
+
+## Linking nodes
+
+To link nodes, create a new node and set your `next` pointer to point at it.
+This example shows how to `append()` a new node using a supplied value.
+If a `next` node already exists, the code frees it before appending
+the new node.
+
+```mojo
+def append(mut self, value: Self.T):
+    # Free chain if replacing `next`
+    if self.next:
+        var next_ptr = self.next.value()
+        next_ptr[].free_chain()
+        Self.free_node(next_ptr)
+
+    self.next = Self.make_node(value)
+```
+
+## Walking the list
+
+To walk the list, follow the chain until you reach the end.
+Recursive code makes this easy to read. This example prints
+the value stored at each node:
+
+```mojo
+@staticmethod
+def print_list(node: Optional[Self.NodePointer]):
+    if not node:
+        print("Empty list")
+        return
+
+    var node_ptr = node.value()
+
+    var current_value: Optional[Self.T] = node_ptr[].value
+    if current_value:
+        print(current_value.value(), end=" ")
+
+    if node_ptr[].next:
+        Self.print_list(node_ptr[].next)
+    else:
+        print()
+```
+
+The pattern is simple: check the value, print it if it exists,
+then move to the next link.
+
+:::note
+This example uses a static method, but you can also implement
+it as an instance method.
+:::
+
+## Cleaning up
+
+Because you allocate each node yourself, you're also responsible
+for freeing it. This cleanup walks the chain and frees each node
+after destroying its pointee:
+
+```mojo
+def free_chain(self):
+    var current = self.next
+    while current:
+        var current_ptr = current.value()
+        var next_node = current_ptr[].next
+        Self.free_node(current_ptr)
+        current = next_node
+```
+
+Note that the loop reads `current_ptr[].next` *before* freeing the node. Once
+`free_node()` returns, the pointer dangles and reading through it would be a
+use-after-free.
+
+The "head" node stays allocated unless you explicitly free it yourself:
+
+```mojo
+list_head[].free_chain()
+ListNode.free_node(list_head)
+```
+
+### Deinitializers
+
+When you build real Mojo data structures, you usually want a safe API that
+hides raw pointers from users. In a complete linked-list type (rather than
+a small demo of linkable nodes) the parent list handles node allocation and
+freeing. Because it owns the nodes, it also performs cleanup in its
+[deinitializer](/docs/manual/lifecycle/death/).
+
+Here's a small example that shows how to deinitialize `self`:
+
+```mojo
+struct LinkedList[T: ImplicitlyCopyable & Writable & Deinitable]:
+    comptime _Node = Node[T]
+
+    var _head: Optional[Self._Node.NodePointer]
+
+    def __deinit__(deinit self):
+        """Clean up the list by freeing all nodes.
+
+        Notes:
+            Time complexity: O(n) in len(self).
+
+        See Also:
+            "Choose the form of the Destructor!"
+            -- Gozer, "Ghostbusters" (1984).
+        """
+        var curr = self._head
+        while curr:
+            var curr_ptr = curr.value()
+            var next = curr_ptr[].next
+            Self._Node.free_node(curr_ptr)
+            curr = next
+```
+
+:::note Putting it together
+
+<details>
+  <summary>View full sample code</summary>
+
+```mojo
+from std.memory import ThinAllocation, dealloc
+
+comptime Element = String  # Adapt for your type
+comptime ListNode = Node[Element]  # Constructing a LinkedList
+
+
+struct Node[T: ImplicitlyCopyable & Writable & Deinitable](Movable):
+    comptime NodePointer = Pointer[Self, MutUntrackedOrigin]
+
+    var value: Optional[Self.T]  # The `Node`'s value
+    var next: Optional[Self.NodePointer]  # Pointer to the next `Node`
+
+    # Uses an `Optional` value to allow 'empty' Node construction
+    # that can be moved into newly allocated memory
+    def __init__(out self, value: Optional[Self.T] = None):
+        self.value = value
+        self.next = {}
+
+    # Constructs a `Node` with a `value` with heap allocation and
+    # returns a pointer to the new `Node`.
+    @staticmethod
+    def make_node(value: Self.T) -> Self.NodePointer:
+        var node_ptr = alloc[Self]({count = 1}).unsafe_leak()
+        node_ptr.unsafe_write(Self(value))
+        return node_ptr
+
+    # Destroys the pointee, then releases the `Node`'s heap allocation by
+    # pairing the leaked pointer back up with the layout it was allocated with.
+    @staticmethod
+    def free_node(var node_ptr: Self.NodePointer):
+        node_ptr.unsafe_deinit_pointee()
+        dealloc(
+            ThinAllocation(unsafe_owned_ptr=node_ptr).unsafe_with_layout(
+                {count = 1}
+            )
+        )
+
+    # Constructs a `Node` with allocated memory, assigns a value, appends
+    # the pointer to `self.next`. Replaces any existing `next`.
+    def append(mut self, value: Self.T):
+        # Free chain if replacing `next`
+        if self.next:
+            var next_ptr = self.next.value()
+            next_ptr[].free_chain()
+            Self.free_node(next_ptr)
+
+        self.next = Self.make_node(value)
+
+    # Prints the list starting at this pointer's pointee
+    @staticmethod
+    def print_list(node: Optional[Self.NodePointer]):
+        if not node:
+            print("Empty list")
+            return
+
+        var node_ptr = node.value()
+
+        var current_value: Optional[Self.T] = node_ptr[].value
+        if current_value:
+            print(current_value.value(), end=" ")
+
+        if node_ptr[].next:
+            Self.print_list(node_ptr[].next)
+        else:
+            print()
+
+    # Releases all successively allocated `Node` pointees. Does not release self.
+    def free_chain(self):
+        var current = self.next
+        while current:
+            var current_ptr = current.value()
+            var next_node = current_ptr[].next
+            Self.free_node(current_ptr)
+            current = next_node
+
+
+def main():
+    var values: List[Element] = ["one", "one", "two", "three", "five", "eight"]
+    var list_head = ListNode.make_node(values[0])
+
+    var current = list_head
+    for idx in range(1, len(values), 1):
+        current[].append(values[idx])
+        current = current[].next.value()
+
+    ListNode.print_list(list_head)
+
+    # Demonstrates cleanup. In short-lived programs, the OS reclaims memory
+    # at exit
+    list_head[].free_chain()
+    ListNode.free_node(list_head)
+```
+
+Output:
+
+```output
+one one two three five eight
+```
+
+</details>
+:::
+
+## What next?
+
+- Learn more about **pointers and memory safety** in Mojo's
+  [using pointers](/docs/manual/pointers/using-pointers/)
+  and [lifetime and origin rules](/docs/manual/values/lifetimes/) guides.
+- Learn more about how to **manage cleanup** in the Mojo
+  [deinitializer](/docs/manual/lifecycle/death/) documentation.
+
+<!-- markdownlint-enable MD033 -->

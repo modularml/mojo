@@ -1,0 +1,70 @@
+diff --git a/tcmalloc/internal/numa.cc b/tcmalloc/internal/numa.cc
+index 91a2b01..0adb2c7 100644
+--- a/tcmalloc/internal/numa.cc
++++ b/tcmalloc/internal/numa.cc
+@@ -44,6 +44,13 @@ namespace tcmalloc_internal {
+ // implementation may be overridden by the one in want_numa_aware.cc.
+ ABSL_ATTRIBUTE_WEAK bool default_want_numa_aware() { return false; }
+ 
++// glibc 2.35+ automatically registers rseq at thread startup using its own
++// internal pthread struct. When it does so, __rseq_size is set to a non-zero
++// value. Declare it here at namespace scope (weak, so it links even on systems
++// without glibc 2.35+). Used in InitNumaTopology below.
++// See https://github.com/google/tcmalloc/issues/144
++extern "C" unsigned int __rseq_size __attribute__((weak));
++
+ int OpenSysfsCpulist(size_t node) {
+   char path[PATH_MAX];
+   snprintf(path, sizeof(path), "/sys/devices/system/node/node%zu/cpulist",
+@@ -66,9 +73,23 @@ bool InitNumaTopology(size_t cpu_to_scaled_partition[kMaxCpus],
+   partition_to_nodes[NodeToPartition(0, num_partitions)] |= 1 << 0;
+ 
+   // We rely on rseq to quickly obtain a CPU ID & lookup the appropriate
+-  // partition in NumaTopology::GetCurrentPartition(). If rseq is unavailable,
+-  // disable NUMA awareness.
+-  if (!subtle::percpu::IsFast()) return false;
++  // partition in NumaTopology::GetCurrentPartition(). If rseq is
++  // unavailable and glibc has not pre-registered rseq, disable NUMA
++  // awareness.
++  //
++  // glibc 2.35+ automatically registers rseq using its own internal
++  // pthread struct, which prevents TCMalloc from registering __rseq_abi
++  // and causes IsFast() to return false. When glibc has done this
++  // (__rseq_size > 0), we still allow NUMA topology initialization;
++  // GetCurrentPartition() falls back to sched_getcpu() via GetRealCpu().
++  // See https://github.com/google/tcmalloc/issues/144
++  const bool glibc_rseq_active =
++      (&__rseq_size != nullptr) && (__rseq_size > 0);
++  if (!subtle::percpu::IsFast() && !glibc_rseq_active) return false;
++
++  // If we can't see the number of CPUs, perhaps we're in a restricted
++  // sandbox, then skip NUMA topology initialization.
++  if (!NumCPUsMaybe().has_value()) return false;
+ 
+   // Honor default_want_numa_aware() to allow compile time configuration of
+   // whether to enable NUMA awareness by default, and allow the user to
+diff --git a/tcmalloc/internal/numa.h b/tcmalloc/internal/numa.h
+index a91219e..497451a 100644
+--- a/tcmalloc/internal/numa.h
++++ b/tcmalloc/internal/numa.h
+@@ -229,7 +229,10 @@ template <size_t NumPartitions, size_t ScaleBy>
+ inline size_t NumaTopology<NumPartitions, ScaleBy>::GetCurrentPartition()
+     const {
+   if constexpr (NumPartitions == 1) return 0;
+-  const int cpu = subtle::percpu::GetRealCpuUnsafe();
++  // Use GetRealCpu() rather than GetRealCpuUnsafe() so that when glibc
++  // 2.35+ has pre-registered rseq (making IsFast() false), we fall back
++  // to sched_getcpu() instead of reading an unregistered __rseq_abi.
++  const int cpu = subtle::percpu::GetRealCpu();
+   return gated_cpu_to_scaled_partition_[cpu + kNumaCpuFudge] / ScaleBy;
+ }
+ 
+@@ -237,7 +240,7 @@ template <size_t NumPartitions, size_t ScaleBy>
+ inline size_t NumaTopology<NumPartitions, ScaleBy>::GetCurrentScaledPartition()
+     const {
+   if constexpr (NumPartitions == 1) return 0;
+-  const int cpu = subtle::percpu::GetRealCpuUnsafe();
++  const int cpu = subtle::percpu::GetRealCpu();
+   return gated_cpu_to_scaled_partition_[cpu + kNumaCpuFudge];
+ }
+ 

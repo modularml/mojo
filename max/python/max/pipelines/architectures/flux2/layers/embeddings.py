@@ -272,7 +272,7 @@ class TimestepEmbedding(Module):
         sample_proj_bias: bool = True,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.GPU(),
+        device: DeviceRef = DeviceRef.GPU(),  # noqa: B008
     ) -> None:
         """Initialize TimestepEmbedding MLP.
 

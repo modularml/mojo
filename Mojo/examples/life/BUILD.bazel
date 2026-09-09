@@ -1,0 +1,68 @@
+load("//bazel:api.bzl", "mojo_binary", "mojo_test", "requirement")
+
+package(default_visibility = ["//visibility:private"])
+
+mojo_binary(
+    name = "lifev1",
+    testonly = True,
+    srcs = [
+        "gridv1.mojo",
+        "lifev1.mojo",
+    ],
+    deps = [
+        "@mojo//:std",
+        requirement("pygame-ce"),
+    ],
+)
+
+mojo_binary(
+    name = "lifev2",
+    testonly = True,
+    srcs = [
+        "gridv2.mojo",
+        "lifev2.mojo",
+    ],
+    deps = [
+        "@mojo//:std",
+        requirement("pygame-ce"),
+    ],
+)
+
+mojo_binary(
+    name = "benchmark",
+    testonly = True,
+    srcs = [
+        "benchmark.mojo",
+        "gridv1.mojo",
+        "gridv2.mojo",
+    ],
+    deps = [
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_gridv1",
+    size = "small",
+    srcs = [
+        "gridv1.mojo",
+        "test/test_gridv1.mojo",
+    ],
+    main = "test/test_gridv1.mojo",
+    deps = [
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_gridv2",
+    size = "small",
+    srcs = [
+        "gridv2.mojo",
+        "test/test_gridv2.mojo",
+    ],
+    main = "test/test_gridv2.mojo",
+    deps = [
+        "@mojo//:std",
+    ],
+)

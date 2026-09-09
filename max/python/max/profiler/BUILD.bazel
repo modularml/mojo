@@ -5,6 +5,7 @@ package(default_visibility = ["//max:consumers"])
 modular_py_library(
     name = "profiler",
     srcs = glob(["**/*.py"]),
+    test_docstring_examples = True,
     deps = [
         "//max/python/max:_core",
         requirement("msgspec"),

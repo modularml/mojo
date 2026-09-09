@@ -29,10 +29,8 @@ from max.nn.embedding import Embedding
 from max.nn.kv_cache import KVCacheParamInterface
 from max.nn.layer import Module
 from max.nn.linear import MLP, GPTQLinear, Linear
-from max.nn.lora import AttentionWithRopeAndLoRA
 from max.nn.norm import ConstantLayerNorm, RMSNorm
 from max.nn.transformer import Transformer, TransformerBlock
-from max.pipelines.lib.lora import LoRAManager
 
 from .model_config import Llama3Config, create_rope_embedding
 
@@ -149,17 +147,6 @@ class Llama3(Transformer):
                 quantization_encoding=config.model_quantization_encoding,
                 scale=config.attention_multiplier,
             )
-        elif config.lora_config is not None:
-            attention_cls = functools.partial(
-                AttentionWithRopeAndLoRA,
-                stacked_qkv=config.stacked_qkv,
-                scale=config.attention_multiplier,
-                clip_qkv=config.clip_qkv,
-                has_bias=config.attention_bias,
-                max_num_loras=config.lora_config.max_num_loras,
-                max_lora_rank=config.lora_config.max_lora_rank,
-                quant_config=config.quant_config,
-            )
         else:
             attention_cls = functools.partial(
                 AttentionWithRope,
@@ -242,7 +229,6 @@ class Llama3(Transformer):
     def input_types(
         self,
         kv_params: KVCacheParamInterface,
-        lora_manager: LoRAManager | None,
         needs_hidden_state_input: bool = False,
     ) -> tuple[TensorType | BufferType, ...]:
         # TODO: Move input symbol computation from the manager classes.
@@ -264,31 +250,6 @@ class Llama3(Transformer):
         input_row_offsets_type = TensorType(
             DType.uint32, shape=["input_row_offsets_len"], device=device_ref
         )
-        if lora_manager is not None:
-            (
-                lora_ids,
-                lora_ranks,
-                lora_grouped_offsets,
-                num_active_loras,
-                lora_end_idx,
-                batch_seq_len,
-                lora_ids_kv,
-                lora_grouped_offsets_kv,
-            ) = lora_manager.get_symbolic_inputs(device_ref)
-            return (
-                tokens_type,
-                input_row_offsets_type,
-                return_n_logits_type,
-                lora_ids,
-                lora_ranks,
-                lora_grouped_offsets,
-                num_active_loras,
-                lora_end_idx,
-                batch_seq_len,
-                lora_ids_kv,
-                lora_grouped_offsets_kv,
-                *kv_inputs.flatten(),
-            )
         # hidden state input is for EAGLE-like spec decoding draft models
         if needs_hidden_state_input:
             hidden_states_type = TensorType(

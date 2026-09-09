@@ -25,19 +25,19 @@ All 128 threads participate, processing o_cols physical columns per phase.
 """
 
 from std.sys import size_of
-from std.gpu.compute.arch.tcgen05 import (
+from max.gpu.compute.arch.tcgen05 import (
     tcgen05_ld,
     tcgen05_st,
     tcgen05_store_wait,
     tcgen05_fence_before,
     tcgen05_fence_after,
 )
-from std.gpu.primitives.warp import _vote_nvidia_helper
-from std.gpu.sync import umma_arrive_leader_cta
+from max.gpu.primitives.warp import _vote_nvidia_helper
+from max.gpu.sync import umma_arrive_leader_cta
 from linalg.matmul.gpu.sm100_structured.structured_kernels.tmem import (
     TmemAddress,
 )
-from std.gpu import thread_idx
+from max.gpu import thread_idx
 from nn.attention.gpu.nvidia.sm100.attention_utils import (
     SharedMemPointer,
     mul_ftz,
@@ -56,10 +56,30 @@ def depth512_correction[
     page_size: Int,
 ](
     smem: Depth512AttentionSMem[config=config],
+    tmem_addr: UInt32,
+    seq_id: UInt32,
     score_row: UInt32,
     num_keys: UInt32,
     mask: MaskType,
 ):
+    """Rescales the O accumulator in TMEM when the per-row softmax maximum changes.
+
+    Parameters:
+        MaskType: Attention mask type used to compute the per-iteration loop count.
+        qkv_dtype: The data type of the query, key, and value tensors.
+        config: The depth-512 SM100 attention configuration holding tile
+            sizes, TMEM layout, and pipeline stage counts.
+        page_size: KV cache page size in tokens passed to the mask iteration
+            counter.
+
+    Args:
+        smem: Shared-memory scratch holding the correction factor and mbarriers.
+        tmem_addr: Base TMEM address for this CTA's accumulators.
+        seq_id: Sequence identifier forwarded to the mask iteration counter.
+        score_row: Starting row offset forwarded to the mask iteration counter.
+        num_keys: Number of valid keys forwarded to the mask iteration counter.
+        mask: Attention mask used to compute the per-iteration loop count.
+    """
     comptime accum_type = DType.float32
     comptime assert size_of[accum_type]() == 4
     comptime BM = config.BM
@@ -87,22 +107,26 @@ def depth512_correction[
     var row: UInt32 = tid % 128
     var m_row = row % UInt32(BM)
 
-    var tmem_addr: UInt32 = smem.tmem_addr_ptr()[]
+    # `tmem_addr` passed in by register (read once post-`cluster_sync` in the
+    # kernel prologue); do NOT re-read `smem.tmem_addr_ptr()` here.
     var o_tmem = TmemAddress(tmem_addr + UInt32(config.TMEM_O))
     var o_hi_tmem = TmemAddress(tmem_addr + UInt32(config.TMEM_O_hi))
 
     var correction_smem = smem.correction_smem() + m_row
 
-    pipeline_c = mbars.consumer_c()
-    pipeline_o_lo = mbars.consumer_o_lo()
-    pipeline_o_hi = mbars.consumer_o_hi()
+    var pipeline_c = mbars.consumer_c()
+    var pipeline_o_lo = mbars.consumer_o_lo()
+    var pipeline_o_hi = mbars.consumer_o_hi()
 
     var iter_count: UInt32 = (
-        mask.total_iters[PairBM_mask, BN, page_size](score_row, num_keys) - 1
+        mask.total_iters[PairBM_mask, BN, page_size](
+            seq_id, score_row, num_keys
+        )
+        - 1
     )
 
     # ---- Double-buffer constants for the TMEM rescale loop -------------------
-    # Each phase processes o_cols columns.  Follows the FA4 pattern:
+    # Each phase processes o_cols columns. Follows the FA4 pattern:
     # alternate between o_b0 and o_b1 loads so masking overlaps TMEM access.
     comptime batch_size = 16 if o_cols % 16 == 0 else 8
     comptime assert o_cols % batch_size == 0
@@ -113,12 +137,12 @@ def depth512_correction[
 
     # ---- Rescale helper (inlined for O_lo and O_hi) --------------------------
 
-    @parameter
+    @__parameter
     @always_inline
-    def rescale_o(o_tmem: TmemAddress, c_pair: SIMD[DType.float32, 2]):
+    def rescale_o(o_tmem: TmemAddress, c_pair: SIMD[.float32, 2]):
         """Double-buffered TMEM load/scale/store over o_cols columns."""
-        var o_b0: InlineArray[Scalar[accum_type], batch_size]
-        var o_b1: InlineArray[Scalar[accum_type], batch_size]
+        var o_b0: Array[Scalar[accum_type], batch_size]
+        var o_b1: Array[Scalar[accum_type], batch_size]
         o_b0 = tcgen05_ld[
             datapaths=32,
             bits=32,
@@ -140,15 +164,15 @@ def depth512_correction[
                 pack=False,
                 width=batch_size,
             ]((o_tmem + b1_offset).addr)
-            var o_b0_scaled = InlineArray[Scalar[accum_type], batch_size](
+            var o_b0_scaled = Array[Scalar[accum_type], batch_size](
                 uninitialized=True
             )
 
             comptime for _i in range(0, batch_size, 2):
                 var pair = mul_ftz(
-                    SIMD[DType.float32, 2](
-                        rebind[Scalar[DType.float32]](o_b0[_i]),
-                        rebind[Scalar[DType.float32]](o_b0[_i + 1]),
+                    SIMD[.float32, 2](
+                        o_b0[_i],
+                        o_b0[_i + 1],
                     ),
                     c_pair,
                 )
@@ -170,15 +194,15 @@ def depth512_correction[
                     pack=False,
                     width=batch_size,
                 ]((o_tmem + b0_offset1).addr)
-            var o_b1_scaled = InlineArray[Scalar[accum_type], batch_size](
+            var o_b1_scaled = Array[Scalar[accum_type], batch_size](
                 uninitialized=True
             )
 
             comptime for _i in range(0, batch_size, 2):
                 var pair = mul_ftz(
-                    SIMD[DType.float32, 2](
-                        rebind[Scalar[DType.float32]](o_b1[_i]),
-                        rebind[Scalar[DType.float32]](o_b1[_i + 1]),
+                    SIMD[.float32, 2](
+                        o_b1[_i],
+                        o_b1[_i + 1],
                     ),
                     c_pair,
                 )
@@ -193,15 +217,15 @@ def depth512_correction[
 
         comptime if load_remainder > 0:
             comptime offset = 2 * batch_size * load_iters
-            var o_b0_scaled_rem = InlineArray[
-                Scalar[accum_type], load_remainder
-            ](uninitialized=True)
+            var o_b0_scaled_rem = Array[Scalar[accum_type], load_remainder](
+                uninitialized=True
+            )
 
             comptime for _i in range(0, load_remainder, 2):
                 var pair = mul_ftz(
-                    SIMD[DType.float32, 2](
-                        rebind[Scalar[DType.float32]](o_b0[_i]),
-                        rebind[Scalar[DType.float32]](o_b0[_i + 1]),
+                    SIMD[.float32, 2](
+                        o_b0[_i],
+                        o_b0[_i + 1],
                     ),
                     c_pair,
                 )
@@ -225,14 +249,14 @@ def depth512_correction[
         pipeline_c.wait()
         var c_scalar: Scalar[accum_type] = correction_smem[0]
 
-        change = _vote_nvidia_helper(c_scalar < 1.0) != 0
+        var change = _vote_nvidia_helper(c_scalar < 1.0) != 0
 
         comptime if config.split_o:
             # Phase 1: rescale O_lo (all 128 threads, o_cols cols each).
             pipeline_o_lo.wait()
             if change:
                 tcgen05_fence_after()
-                var c_pair = SIMD[DType.float32, 2](c_scalar, c_scalar)
+                var c_pair = SIMD[.float32, 2](c_scalar, c_scalar)
                 rescale_o(o_tmem, c_pair)
                 umma_arrive_leader_cta(pipeline_o_lo.consumer_mbar())
                 pipeline_o_lo.step()
@@ -253,7 +277,7 @@ def depth512_correction[
             pipeline_o_lo.wait()
             if change:
                 tcgen05_fence_after()
-                var c_pair = SIMD[DType.float32, 2](c_scalar, c_scalar)
+                var c_pair = SIMD[.float32, 2](c_scalar, c_scalar)
                 rescale_o(o_tmem, c_pair)
 
             umma_arrive_leader_cta(pipeline_o_lo.consumer_mbar())

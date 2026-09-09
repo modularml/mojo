@@ -143,7 +143,6 @@ def run_repository(repo_name: str) -> None:
     repo_path = os.path.join(ROOT, repo_name)
     run_script_path = (Path(repo_path) / "run.sh").resolve()
     subprocess.run(["magic", "run", "bash", run_script_path], cwd=repo_path)
-    return
 
 
 def main() -> None:

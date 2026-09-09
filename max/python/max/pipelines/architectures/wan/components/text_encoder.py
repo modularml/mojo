@@ -24,6 +24,9 @@ from max.engine import InferenceSession, Model
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.graph.weights import load_weights
 from max.pipelines.lib.compiled_component import CompiledComponent
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.profiler import traced
 
@@ -43,9 +46,14 @@ class TextEncoder(CompiledComponent):
 
     _model: Model
 
-    # Diffusers pads tokens to 512 but trims final embeddings to 226
-    # for cross-attention.
-    embed_seq_len: int = 226
+    # Wan-AI's reference implementation pads tokens to 512 and feeds the
+    # full 512-length context to cross-attention. The broader DiT inference
+    # ecosystem follows the same convention:
+    # - diffusers WanPipeline.__call__ default:
+    #   https://github.com/huggingface/diffusers/blob/v0.38.0/src/diffusers/pipelines/wan/pipeline_wan.py#L403
+    # - cache-dit hardcoded 512:
+    #   https://github.com/vipshop/cache-dit/blob/v1.3.9/src/cache_dit/distributed/transformers/wan.py#L80
+    embed_seq_len: int = 512
 
     @traced(message="TextEncoder.__init__")
     def __init__(
@@ -57,7 +65,10 @@ class TextEncoder(CompiledComponent):
 
         config = manifest["text_encoder"]
         config_dict = config.huggingface_config.to_dict()
-        encoding = config.quantization_encoding or "bfloat16"
+        resolved_encoding, resolved_weight_path = (
+            _resolve_component_encoding_and_weights(config)
+        )
+        encoding = resolved_encoding or "bfloat16"
         devices = load_devices(config.device_specs)
 
         umt5_config = UMT5Config.generate(config_dict, encoding, devices)
@@ -68,7 +79,7 @@ class TextEncoder(CompiledComponent):
         self._device = devices[0]
 
         # Load weights.
-        paths = config.resolved_weight_paths()
+        paths = config.resolved_weight_paths(resolved_weight_path)
         weights = load_weights(paths)
         state_dict = _prepare_state_dict(weights, target_dtype=dtype)
 
@@ -86,7 +97,7 @@ class TextEncoder(CompiledComponent):
         input_types = [
             TensorType(DType.int64, ["batch", "seq_len"], device=self._device),
         ]
-        embed_len = self.embed_seq_len  # 226
+        embed_len = self.embed_seq_len
         with Graph("umt5_encoder", input_types=input_types) as graph:
             input_ids = graph.inputs[0].tensor
 
@@ -126,7 +137,7 @@ class TextEncoder(CompiledComponent):
             token_ids: Token IDs, shape ``(batch, seq)`` or ``(seq,)``
                 int64 on device.
             num_videos_per_prompt: Number of videos per prompt for batching.
-            max_sequence_length: Must equal ``embed_seq_len`` (226) or
+            max_sequence_length: Must equal ``embed_seq_len`` (512) or
                 ``None``. Compiled into the graph at init time.
 
         Returns:
@@ -152,7 +163,7 @@ class TextEncoder(CompiledComponent):
 
         # Repeat for num_videos_per_prompt (rare, typically 1).
         if num_videos_per_prompt > 1:
-            # Small tensor (1, 226, hidden_dim) in bf16 — acceptable D2H/H2D.
+            # Small tensor (1, embed_seq_len, hidden_dim) in bf16 — acceptable D2H/H2D.
             result_np = np.from_dlpack(result.to(CPU()))
             repeated = np.ascontiguousarray(
                 np.repeat(result_np, num_videos_per_prompt, axis=0)

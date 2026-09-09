@@ -30,7 +30,7 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType
 from max.nn.attention.multi_latent_attention import LatentAttentionWithRope
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MLAKVCacheParams
 from max.nn.rotary_embedding import RotaryEmbedding
 from max.pipelines.kv_cache import PagedKVCacheManager
 from test_common.context_utils import create_text_context
@@ -366,14 +366,12 @@ def _generate_mla_max_outputs(
         interleaved=False,
     )
 
-    kv_params = KVCacheParams(
+    kv_params = MLAKVCacheParams(
         dtype=kv_dtype,
-        n_kv_heads=1,
         head_dim=_mla_kv_head_dim(config),
         num_layers=config.num_hidden_layers,
         devices=[DeviceRef.GPU()],
         page_size=128,
-        is_mla=True,
         num_q_heads=config.num_attention_heads,
     )
 
@@ -421,7 +419,7 @@ def _generate_mla_max_outputs(
             input_types=(
                 hidden_state_type,
                 input_row_offsets_type,
-                *kv_params.get_symbolic_inputs().flatten(),
+                *kv_params.flattened_kv_inputs(),
             ),
         ) as graph:
             hidden_states = graph.inputs[0].tensor
@@ -449,7 +447,7 @@ def _generate_mla_max_outputs(
     batch = []
     for _ in range(batch_size):
         context = create_text_context(np.empty(prompt_lens[0]))
-        kv_manager.claim(context.request_id, replica_idx=0)
+        kv_manager.claim(context)
         batch.append(context)
     input_row_offsets = Buffer(DType.uint32, [batch_size + 1])
     running_sum = 0
@@ -462,7 +460,7 @@ def _generate_mla_max_outputs(
         all_outputs = []
         for tok_idx in range(total_tokens):
             for ctx in batch:
-                kv_manager.alloc(ctx, replica_idx=0, num_steps=1)
+                kv_manager.alloc(ctx)
             kv_inputs = kv_manager.runtime_inputs([batch])
             input_tensor_device = (
                 Buffer.from_numpy(
@@ -478,13 +476,14 @@ def _generate_mla_max_outputs(
             )
             for ctx in batch:
                 ctx.update(42)
-            kv_manager.step([batch])
+            for ctx in batch:
+                kv_manager.step(ctx)
             torch_output = from_dlpack(max_output[0]).to(torch.bfloat16)
             all_outputs.append(torch_output[:, None, :].to("cpu"))
         return torch.concat(all_outputs, dim=1)
 
     for ctx in batch:
-        kv_manager.alloc(ctx, replica_idx=0, num_steps=1)
+        kv_manager.alloc(ctx)
     kv_inputs = kv_manager.runtime_inputs([batch])
     input_tensor_device = (
         Buffer.from_numpy(input_tensor[0, :, :].view(torch.float16).numpy())

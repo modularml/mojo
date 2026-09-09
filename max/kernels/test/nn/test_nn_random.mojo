@@ -21,10 +21,10 @@ def test_random_normal():
     seed(0)
 
     comptime out_shape = row_major[2, 2]()
-    var output_stack = InlineArray[Float32, 4](uninitialized=True)
-    var output = TileTensor(output_stack, out_shape).fill(0)
+    var output_stack = Array[Float32, 4](fill=0)
+    var output = TileTensor(output_stack, out_shape)
 
-    random_normal[DType.float32, 0.0, 1.0](output)
+    random_normal[.float32, 0.0, 1.0](output)
     # CHECK-LABEL: == test_random_normal
     print("== test_random_normal")
 

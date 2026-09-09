@@ -34,8 +34,8 @@ For full validation, run the comprehensive tests in CI.
 from std.sys import size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.memory import alloc
 from internal_utils import assert_almost_equal
 from std.random import rand
@@ -142,8 +142,8 @@ def test_blackwell_matmul[
     var c_ref_tensor = TileTensor(c_device_ref, c_shape)
 
     # Initialize with random data
-    rand(a_host.ptr, a_host.num_elements())
-    rand(b_host.ptr, b_host.num_elements())
+    rand(a_host._storage, a_host.num_elements())
+    rand(b_host._storage, b_host.num_elements())
 
     # Copy to device
     ctx.enqueue_copy(a_device, a_host_ptr)
@@ -192,8 +192,8 @@ def test_blackwell_matmul[
 
     comptime rtol = 1e-2
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=0.0001,
         rtol=rtol,
@@ -225,7 +225,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(64, 32, BK),
             mma_shape=Index(64, 32, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
@@ -239,7 +239,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(128, 64, BK),
             mma_shape=Index(128, 64, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -254,7 +254,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(128, 64, BK),
             mma_shape=Index(256, 128, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -269,7 +269,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(128, 64, BK),
             mma_shape=Index(128, 64, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -284,7 +284,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(64, 32, BK),
             mma_shape=Index(64, 32, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](4, 2, 1),
@@ -299,7 +299,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(64, 32, BK),
             mma_shape=Index(128, 64, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -314,7 +314,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(128, 128, BK),
             mma_shape=Index(128, 128, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
@@ -328,7 +328,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(64, 64, BK),
             mma_shape=Index(64, 64, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](1, 1, 1),
@@ -342,7 +342,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(64, 32, BK),
             mma_shape=Index(64, 32, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](8, 2, 1),
@@ -357,7 +357,7 @@ def main() raises:
         test_blackwell_matmul[
             dtype,
             dtype,
-            DType.bfloat16,
+            .bfloat16,
             block_tile_shape=Index(128, 64, BK),
             mma_shape=Index(256, 128, MMA_K),
             cluster_shape=StaticTuple[Int32, 3](4, 4, 1),

@@ -24,6 +24,7 @@ class MHAMaskVariant(str, Enum):
     NULL_MASK = 2
     CHUNKED_CAUSAL_MASK = 3
     SLIDING_WINDOW_CAUSAL_MASK = 4
+    SLIDING_WINDOW_NONCAUSAL_MASK = 5
 
 
 class AttentionMaskVariant(str, Enum):
@@ -34,3 +35,4 @@ class AttentionMaskVariant(str, Enum):
     TENSOR_MASK = "tensor_mask"
     CHUNKED_CAUSAL_MASK = "chunked_causal"
     SLIDING_WINDOW_CAUSAL_MASK = "sliding_window_causal"
+    SLIDING_WINDOW_NONCAUSAL_MASK = "sliding_window_noncausal"

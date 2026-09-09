@@ -1,0 +1,36 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+# ===----------------------------------------------------------------------=== #
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "http_runtime",
+    srcs = [
+        "__init__.py",
+        "client.py",
+        "server.py",
+        "subproc.py",
+    ],
+    deps = [
+        requirement("aiohttp"),
+        requirement("cyclopts"),
+        requirement("fastapi"),
+        requirement("numpy"),
+        requirement("prometheus-client"),
+        requirement("uvicorn"),
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/serve:process_control",
+    ],
+)
+
+modular_py_binary(
+    name = "http_worker",
+    srcs = ["__main__.py"],
+    main = "__main__.py",
+    deps = [":http_runtime"],
+)

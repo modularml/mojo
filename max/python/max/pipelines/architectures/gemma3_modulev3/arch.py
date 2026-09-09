@@ -13,11 +13,13 @@
 
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
 from max.pipelines.lib import SupportedArchitecture, TextTokenizer
 from max.pipelines.modeling.types import PipelineTask
 
 from . import weight_adapters
+from .batch_processor import Gemma3ModuleV3BatchProcessor
 from .model import Gemma3Model
 from .model_config import Gemma3Config
 
@@ -31,19 +33,20 @@ gemma3_modulev3_arch = SupportedArchitecture(
         # We have a different architecture for >=4B models. See gemma3multimodal
         # for more information.
     ],
-    default_encoding="bfloat16",
-    supported_encodings={
-        "bfloat16",
-    },
+    default_encoding=Gemma3Config.DEFAULT_ENCODING,
+    supported_encodings=Gemma3Config.SUPPORTED_ENCODINGS,
     pipeline_model=Gemma3Model,
     task=PipelineTask.TEXT_GENERATION,
     tokenizer=TextTokenizer,
     context_type=TextContext,
     default_weights_format=WeightsFormat.safetensors,
     multi_gpu_supported=True,
-    rope_type="normal",
     weight_adapters={
         WeightsFormat.safetensors: weight_adapters.convert_safetensor_state_dict,
     },
     config=Gemma3Config,
+    batching=Gemma3ModuleV3BatchProcessor,
+    memory_planner=PagedMemoryPlanner,
+    supports_overlap_scheduler=False,
+    supports_device_graph_capture=False,
 )

@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import thread_idx
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
-from std.gpu.memory import external_memory
+from max.gpu import thread_idx
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
+from max.gpu.memory import external_memory
 
 
 # CHECK-LABEL: test_array_offset
@@ -22,10 +22,8 @@ def test_array_offset():
     print("== test_array_offset")
 
     def kernel(
-        output: UnsafePointer[Float32, MutAnyOrigin],
-        p: UnsafePointer[
-            Float32, ImmutAnyOrigin, address_space=AddressSpace.SHARED
-        ],
+        output: MutPointer[Float32, MutAnyOrigin],
+        p: ImmPointer[Float32, ImmutAnyOrigin, address_space=.SHARED],
         idx: Int,
     ):
         output[] = p[idx]
@@ -38,7 +36,7 @@ def test_array_offset():
 def test_case_thread_id_nvidia():
     print("== test_case_thread_id_nvidia")
 
-    def kernel(output: UnsafePointer[Int32, MutAnyOrigin]):
+    def kernel(output: MutPointer[Int32, MutAnyOrigin]):
         output[] = Int32(thread_idx.x + thread_idx.x + thread_idx.x)
 
     # CHECK-COUNT-1: call i32 @llvm.nvvm.read.ptx.sreg.tid.x()
@@ -53,7 +51,7 @@ def test_case_thread_id_nvidia():
 def test_case_thread_id_mi355x():
     print("== test_case_thread_id_mi355x")
 
-    def kernel(output: UnsafePointer[Int32, MutAnyOrigin]):
+    def kernel(output: MutPointer[Int32, MutAnyOrigin]):
         output[] = Int32(thread_idx.x + thread_idx.x + thread_idx.x)
 
     # CHECK-COUNT-1: call i32 @llvm.amdgcn.workitem.id.x()
@@ -70,15 +68,15 @@ def test_dynamic_shared_mem():
 
     # CHECK: @extern_ptr_syml = external dso_local addrspace(3) global [0 x float], align 4
     # CHECK: @extern_ptr_syml_0 = external dso_local addrspace(3) global [0 x float], align 4
-    def kernel(output: UnsafePointer[Float32, MutAnyOrigin]):
+    def kernel(output: MutPointer[Float32, MutAnyOrigin]):
         # CHECK: %2 = load float, ptr addrspace(3) @extern_ptr_syml, align 4
         # CHECK: %3 = load float, ptr addrspace(3) getelementptr inbounds nuw (i8, ptr addrspace(3) @extern_ptr_syml_0, i{{[0-9]+}}  4), align 4
         # CHECK: fadd contract float %2, %3
         var dynamic_sram_ptr_1 = external_memory[
-            Float32, address_space=AddressSpace.SHARED, alignment=4
+            Float32, address_space=.SHARED, alignment=4
         ]()
         var dynamic_sram_ptr_2 = external_memory[
-            Float32, address_space=AddressSpace.SHARED, alignment=4
+            Float32, address_space=.SHARED, alignment=4
         ]()
         output[] = dynamic_sram_ptr_1[0] + dynamic_sram_ptr_2[1]
 

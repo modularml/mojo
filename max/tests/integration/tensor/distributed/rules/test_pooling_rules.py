@@ -15,19 +15,18 @@
 
 from __future__ import annotations
 
-import pytest
 from max.dtype import DType
-from max.experimental.sharding import DeviceMapping
-from max.experimental.sharding.rules.pooling import pool_rule
-from max.experimental.sharding.types import TensorLayout
+from max.experimental.sharding import DeviceMapping, TensorLayout
+from max.experimental.sharding.rules import pool_rule
+from max.graph import Shape
 
-from rules._fixtures import MESH_1D, M, R, S
+from rules._fixtures import MESH_1D, M, R, S, pick
 
 
 def _layout(
     mapping: DeviceMapping, shape: tuple[int, ...], dtype: DType = DType.float32
 ) -> TensorLayout:
-    return TensorLayout(dtype, shape, mapping)
+    return TensorLayout(dtype, Shape(shape), mapping)
 
 
 class TestPoolRule:
@@ -35,25 +34,27 @@ class TestPoolRule:
 
     def test_replicated(self) -> None:
         layout = _layout(M(MESH_1D, R), (1, 8, 8, 3))
-        _, (out,) = pool_rule(layout)
+        _, (out,) = pick(pool_rule, layout)
         assert out.to_placements() == (R,)
 
     def test_batch_sharded(self) -> None:
         layout = _layout(M(MESH_1D, S(0)), (4, 8, 8, 3))
-        _, (out,) = pool_rule(layout)
+        _, (out,) = pick(pool_rule, layout)
         assert out.to_placements() == (S(0),)
 
     def test_channel_sharded(self) -> None:
         layout = _layout(M(MESH_1D, S(3)), (1, 8, 8, 16))
-        _, (out,) = pool_rule(layout)
+        _, (out,) = pick(pool_rule, layout)
         assert out.to_placements() == (S(3),)
 
-    def test_spatial_h_sharded_raises(self) -> None:
+    def test_spatial_h_sharded_falls_back(self) -> None:
+        """Spatial H-sharded input: spatial axes excluded from catalogue, falls back to R."""
         layout = _layout(M(MESH_1D, S(1)), (1, 8, 8, 3))
-        with pytest.raises(ValueError, match="spatially-sharded"):
-            pool_rule(layout)
+        _, (out,) = pick(pool_rule, layout)
+        assert out.to_placements() == (R,)
 
-    def test_spatial_w_sharded_raises(self) -> None:
+    def test_spatial_w_sharded_falls_back(self) -> None:
+        """Spatial W-sharded input: spatial axes excluded from catalogue, falls back to R."""
         layout = _layout(M(MESH_1D, S(2)), (1, 8, 8, 3))
-        with pytest.raises(ValueError, match="spatially-sharded"):
-            pool_rule(layout)
+        _, (out,) = pick(pool_rule, layout)
+        assert out.to_placements() == (R,)

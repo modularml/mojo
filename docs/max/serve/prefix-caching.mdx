@@ -10,7 +10,7 @@ cache if they share the same prefix. This eliminates redundant computations and
 improves performance for workloads with repeated prefixes.
 
 Prefix caching is enabled by default when serving a model with the [`max
-serve`](/max/cli/serve) CLI command. It can be disabled using the
+serve`](/cli/serve) CLI command. It can be disabled using the
 `--no-enable-prefix-caching` flag.
 
 ## When to use prefix caching
@@ -45,13 +45,25 @@ not provide additional benefit in the following cases:
 
 Prefix caching works by storing the key-value (KV) cache for a prefix and
 applying it to future prompts that include the same prefix, reducing redundant
-computation. By default, the following flags are applied:
+computation. It's built on
+[PagedAttention](https://handbook.modular.com/inference-optimization/pagedattention/),
+which MAX uses by default to manage the KV cache. The following flags control
+prefix caching behavior:
 
-- `--cache-strategy` : Prefix caching requires PagedAttention. To use
-  PagedAttention, the cache strategy must be `paged`.
-- `--enable-prefix-caching`: Enables prefix caching.
-- `--kv-cache-page-size`: PagedAttention currently requires a page size that is
-  a multiple of 128.
+- `--enable-prefix-caching`: enables prefix caching. This is on by default, so
+  you only need it to re-enable caching after disabling it. Use
+  `--no-enable-prefix-caching` to disable it.
+- `--kv-cache-page-size`: sets the number of tokens per page in the paged KV
+  cache. PagedAttention requires a page size that is a multiple of 128.
+- `--enable-dp-cross-replica-prefix-copy`: when serving with data parallelism
+  (`--data-parallel-degree` greater than 1), lets MAX serve a prefix-cache hit
+  that lives on another replica's GPU by copying it device-to-device onto the
+  requesting replica. This is on by default. When disabled, cross-replica
+  reuse is served only from the shared host or disk tier, or recomputed.
+
+Prefix caching is not compatible with [LoRA
+adapters](/serve/lora-adapters). Disable it with
+`--no-enable-prefix-caching` when serving LoRA adapters.
 
 Prefix caching with PagedAttention works on both CPU and GPU. To deploy a model
 with prefix caching using the `max` CLI, you can use the flag `--devices cpu`
@@ -61,7 +73,7 @@ the model or config default.
 ## Quickstart
 
 Prefix caching is enabled by default when serving a model with MAX. To install
-the `max` CLI, see the [installation guide](/max/packages#install).
+the `max` CLI, see the [installation guide](/packages#install).
 
 The following command serves Gemma 3 with prefix caching enabled. The default
 KV cache page size for Gemma 3 is `256`.
@@ -75,7 +87,8 @@ max serve --model google/gemma-3-27b-it
 MAX does not support prefix caching for multimodal models.
 
 If you explicitly enable prefix caching for an incompatible model, you will see
-a log similar to the following:
+a log similar to the following (referencing
+[`KVCacheConfig`](/api/python/generated/max.pipelines.kv_cache.KVCacheConfig/)):
 
 ```text
 WARNING: Architecture 'MllamaForConditionalGeneration' requires \
@@ -97,13 +110,12 @@ max serve --model google/gemma-3-27b-it --no-enable-prefix-caching
 
 ### Enable prefix caching
 
-You can optionally explicitly enable prefix caching when serving your model
-with the [`max` CLI](/max/cli/serve). The following command represents
-the default MAX behavior:
+You can explicitly enable prefix caching when serving your model with the
+[`max` CLI](/cli/serve). The following command represents the default MAX
+behavior:
 
 ```bash
 max serve --model google/gemma-3-27b-it \
-    --cache-strategy paged \
     --enable-prefix-caching \
     --kv-cache-page-size 256
 ```
@@ -117,14 +129,13 @@ MAX also includes a benchmarking script that allows you to evaluate throughput,
 latency, and GPU utilization metrics. You can use this script to track
 performance gains from prefix caching. For more detailed instructions on
 benchmarking, see the
-[`max benchmark` docs](/max/cli/benchmark).
+[`max benchmark` docs](/cli/benchmark).
 
-import MDXListing from '@site/src/components/Listing/MDXListing';
-
-export const docs = [
-  '../../serve/speculative-decoding.mdx',
-  '../../deploy/benchmark.mdx',
-  '../../deploy/local-to-cloud.mdx',
-];
-
-<MDXListing mdxList={docs} />
+- [Speculative decoding](/serve/speculative-decoding): Use speculative
+  decoding to accelerate LLM inference.
+- [Benchmark MAX on NVIDIA or AMD GPUs](/serve/benchmark): Learn how to
+  use our benchmarking script to measure the performance of MAX.
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.
+- [Read the LLM Inference Handbook](https://handbook.modular.com/inference-optimization/prefix-caching/):
+  Learn more about prefix caching.

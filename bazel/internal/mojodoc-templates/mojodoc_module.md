@@ -94,21 +94,13 @@ description: {% if decl.summary
 
 {% for param in alias.parameters -%}
 *   ​<b>{{ param.name }}</b> ({% if param.traits -%}
-        {%- for trait in param.traits -%}
-            {# Trait names should never contain backticks, so no double backticks here. #}
-            {%- if trait.path -%}
-                [`{{ trait.type }}`]({{ api_href(trait.path) }})
-            {%- else -%}
-                `{{ trait.type }}`
-            {%- endif -%}
-            {%- if not loop.last %} & {% endif -%}
+        {# Trait names should never contain backticks, so no double backticks here. #}
+        {%- for trait in param.traits
+            %}{{ api_link(trait.type, trait.path) }}{%
+            if not loop.last %} & {% endif -%}
         {%- endfor -%}
     {%- else -%}
-        {%- if param.path -%}
-            [``{{ param.type | pad_backticks }}``]({{ api_href(param.path) }})
-        {%- else -%}
-            ``{{ param.type | pad_backticks }}``
-        {%- endif -%}
+        {{ api_link(param.type, param.path, padding=True) }}
     {%- endif %}): {{ param.description }}
 {% endfor %}
 {% endif %}

@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -6,6 +7,7 @@ package(default_visibility = ["//max:consumers"])
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         deps = [
             "//max:internal_utils",
             "//max:kv_cache",

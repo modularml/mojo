@@ -1,0 +1,38 @@
+diff --git a/client/pthread_create_linux.cc b/client/pthread_create_linux.cc
+index acbf57d5..40beb68a 100644
+--- a/client/pthread_create_linux.cc
++++ b/client/pthread_create_linux.cc
+@@ -49,8 +49,18 @@ __attribute__((visibility("default"))) int pthread_create(
+     void* arg) {
+   static const crashpad::NoCfiIcall<decltype(pthread_create)*>
+       next_pthread_create([]() {
+-        const auto next_pthread_create = dlsym(RTLD_NEXT, "pthread_create");
++        auto next_pthread_create = dlsym(RTLD_NEXT, "pthread_create");
++        if (next_pthread_create)
++          return next_pthread_create;
++
++        // Work around failure to dlsym("pthread_create") with RTLD_NEXT with
++        // RTLD_DEEPBIND: explicitly open and symlink `pthread_create` from
++        // libpthread.so.0.
++        void *libpthread_handle = dlopen("libpthread.so.0", RTLD_LAZY | RTLD_NOLOAD);
++        CHECK(libpthread_handle) << "dlopen: " << dlerror();
++
++        next_pthread_create = dlsym(libpthread_handle, "pthread_create");
+         CHECK(next_pthread_create) << "dlsym: " << dlerror();
+         return next_pthread_create;
+       }());
+ 
+diff --git a/third_party/mini_chromium/mini_chromium/base/atomicops_internals_portable.h b/third_party/mini_chromium/mini_chromium/base/atomicops_internals_portable.h
+index b8b93cf..10e3768 100644
+--- a/third_party/mini_chromium/mini_chromium/base/atomicops_internals_portable.h
++++ b/third_party/mini_chromium/mini_chromium/base/atomicops_internals_portable.h
+@@ -54,9 +54,3 @@ inline void MemoryBarrier() {
+-#if defined(__GLIBCXX__)
+-  // Work around libstdc++ bug 51038 where atomic_thread_fence was declared but
+-  // not defined, leading to the linker complaining about undefined references.
+-  __atomic_thread_fence(std::memory_order_seq_cst);
+-#else
+   std::atomic_thread_fence(std::memory_order_seq_cst);
+-#endif
+ }
+ 

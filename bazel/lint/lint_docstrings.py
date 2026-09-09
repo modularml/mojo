@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -33,6 +32,7 @@ This linter enforces the following rules from docs/internal/PythonDocstringStyle
 from __future__ import annotations
 
 import ast
+import os
 import re
 import sys
 from collections.abc import Iterator
@@ -312,11 +312,16 @@ def get_python_files() -> list[Path]:
     When FAST=0, every tracked Python file is always returned. Both paths
     exclude files matched by :func:`should_skip_file`.
     """
-    changed = get_changed_files()
-    if not is_fast() or _linter_changed(changed):
+    if not is_fast():
+        # FAST=0: Always return all files, no need to call get_changed_files()
         all_files = get_all_files()
     else:
-        all_files = changed
+        # FAST=1: Only check changed files, unless linter itself changed
+        changed = get_changed_files()
+        if _linter_changed(changed):
+            all_files = get_all_files()
+        else:
+            all_files = changed
     return [Path(f) for f in all_files if Path(f).suffix == ".py"]
 
 
@@ -329,7 +334,7 @@ def should_skip_file(filepath: Path) -> bool:
         return True
 
     # Skip generated files
-    if path_str.endswith("_pb2.py") or path_str.endswith("_pb2.pyi"):
+    if path_str.endswith(("_pb2.py", "_pb2.pyi")):
         return True
 
     # Skip virtual environments and derived directories
@@ -363,4 +368,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if path := os.getenv("BUILD_WORKSPACE_DIRECTORY"):
+        os.chdir(path)
     sys.exit(main())

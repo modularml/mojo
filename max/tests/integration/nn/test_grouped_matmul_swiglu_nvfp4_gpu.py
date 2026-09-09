@@ -45,9 +45,9 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.comm.ep.ep_kernels import fused_silu_quantized
 from max.nn.kernels import (
-    _grouped_matmul_swiglu_nvfp4,
     block_scales_interleave,
     grouped_matmul_block_scaled,
+    grouped_matmul_blocked_swiglu,
 )
 from max.nn.quant_config import (
     InputScaleSpec,
@@ -258,7 +258,7 @@ def test_grouped_matmul_swiglu_nvfp4_equiv() -> None:
             ops.constant(1.0, DType.float32, device=device_ref)
             / raw_input_scales_t
         )
-        packed_b, sf_b = _grouped_matmul_swiglu_nvfp4(
+        packed_b, sf_b = grouped_matmul_blocked_swiglu(
             hidden_t,
             w_b_t,
             a_scales_t,
@@ -266,9 +266,9 @@ def test_grouped_matmul_swiglu_nvfp4_equiv() -> None:
             expert_start_t,
             a_scale_offsets_t,
             expert_ids_t,
-            expert_scales_t,
-            inv_input_scales,
             usage_stats_t,
+            expert_scales=expert_scales_t,
+            c_input_scales=inv_input_scales,
         )
 
         graph.output(packed_a, sf_a, packed_b, sf_b)

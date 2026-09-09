@@ -1,0 +1,369 @@
+---
+title: Lambda expressions
+description: >
+  Lambda expressions are small anonymous functions that let you write
+  immediate custom behavior for use in other statements and functions.
+---
+
+A **lambda function** is a small, anonymous function. Like a named
+function, it accepts arguments, returns a value, and can capture values
+from the surrounding scope. The difference is that you can write a lambda
+exactly where it's used instead of giving it a separate declaration.
+
+Lambdas are most useful when an algorithm stays the same but one small
+piece of its behavior changes. A transformation needs to know how to
+convert values. A sort needs to know how to compare them. A validator
+needs to decide whether a value satisfies a rule. A callback needs to know
+what to do when another part of the program invokes it.
+
+You could write a separate named function for each of these needs, but
+when the behavior is short and used in only one place, a lambda keeps it
+next to the algorithm that uses it. The algorithm stays easy to read,
+and the behavior doesn't need a permanent name.
+
+## Creating a lambda
+
+A lambda expression looks like a function declaration without a name:
+
+```mojo
+lambda (x: Int) -> Int: x + 1
+```
+
+The body is always a single expression. When you call the lambda, the
+expression is evaluated and its result returned:
+
+```mojo
+var inc = lambda (x: Int) -> Int: x + 1
+
+print(inc(4))  # 5
+```
+
+They're the same behavior you'd expect from a named function with less ceremony:
+
+```mojo
+def inc(x: Int) -> Int:
+    return x + 1
+
+print(inc(4))  # 5
+```
+
+### Inline lambdas
+
+A lambda doesn't have to be assigned to a variable. You can write it
+directly as an argument when a function needs a small piece of custom
+behavior:
+
+```mojo
+transform(
+    lambda (x: Int) -> Int: x + 1,
+    values
+)
+```
+
+Inline lambdas work best when behavior is short and obvious. As they grow,
+assigning them to a local variable often makes the surrounding code easier
+to read.
+
+When passing lambdas to other functions, you bind the lambda as an
+argument. This allows the function to call it wherever that behavior is
+needed. It can also pass the lambda to other functions or use it in
+recursive calls. For example, a search algorithm can carry a lambda through
+recursion to provide lightweight, customizable pattern matching.
+
+### Using lambdas for side effects
+
+You can use lambdas to call a function for each element in a collection
+without producing a result. This is useful for side effects, such as
+updating state. Lambda return types are optional. When omitted, they
+default to None:
+
+```mojo
+# `histogram`, defined in a later example, is a dictionary of counts
+var collector = lambda (n: Int) {mut histogram}: increment(histogram, n)
+apply(collector, counts)
+```
+
+## Higher-order functions
+
+Higher-order functions separate algorithms from custom logic supplied by
+the caller. When you scaffold an algorithm, you can delegate the parts that
+change to the caller. Lambda expressions are the perfect way to define that
+behavior.
+
+Imagine you're converting a collection of values to a new type. The
+algorithm knows how to visit every element, build a new collection, and
+return the result. It doesn't know how each value should be converted.
+Using a lambda lets you customize behavior at the callsite without
+changing the transformation function. You choose any effect so long
+as the shape of the lambda matches:
+
+```mojo
+# Convert an Int to c_int
+lambda (value: Int) -> c_int: c_int(value)
+
+# Double an Int value
+lambda (value: Int) -> Int: value * 2
+```
+
+All higher-order functions in Mojo share one thing in common: they accept
+functions as arguments, not parameters, using infer-only typing.
+
+### Bubble sort
+
+Lambdas make it easy to wrap a comparator. Consider this bubble sort
+implementation. `F` describes the shape of a user-supplied comparison
+function:
+
+```mojo
+def bubble_sort[
+    T: ImplicitlyCopyable & Deinitable, F: def(T, T) -> Bool, //
+](compare_fn: F, mut values: List[T]):
+    for end in reversed(range(len(values))):
+        for i in range(end):
+            if compare_fn(values[i], values[i + 1]):
+                values[i], values[i + 1] = values[i + 1], values[i]
+```
+
+You can define a free function to compare values, and pass them to
+`bubble_sort`:
+
+```mojo
+def ascending(x: Int, y: Int) -> Bool:
+    return x > y
+
+def main():
+    var values: List[Int] = [3, 1, 4, 1, 5, 9]
+    bubble_sort(ascending, values)  # [1, 1, 3, 4, 5, 9]
+```
+
+Or, you can write the comparison inline with a lambda:
+
+```mojo
+bubble_sort(lambda (a: Int, b: Int) -> Bool: a > b, values)
+```
+
+It's the same result, with no function declaration. This is a key lambda
+feature. You can write behavior without giving it a name or exposing it
+through a permanent API, and your algorithm can use it immediately.
+
+Flip the comparison from greater-than to less-than to sort in the opposite
+order.
+
+## Thin lambdas and parameters
+
+A thin lambda carries no state. That means, it won't capture values from
+the surrounding scope and it doesn't declare a compile-time parameter list
+with unbound values. It's just a one-expression function written in-line.
+
+Consider this transformation function. It uses a thin function pointer
+parameter to transform each element of a list:
+
+```mojo
+def inplace_transform[
+    T: ImplicitlyCopyable & Deinitable, //, f: def(T) thin -> T
+](mut list: List[T]):
+    for index in range(len(list)):
+        list[index] = f(list[index])
+```
+
+Notice how the function pointer is passed as a parameter and declared with
+the `thin` effect.
+
+You can call `inplace_transform` with a simple algorithm to double each
+value:
+
+```mojo
+def main():
+    var numbers: List[Int] = [1, 2, 3, 4, 5]
+    inplace_transform[lambda (x: Int) -> Int: x * 2](numbers)
+    print(t"transformed numbers: {numbers}")  # [2, 4, 6, 8, 10]
+```
+
+This example works because the lambda doesn't capture state, so it isn't
+a *closure*. Contrast this with the next example, which won't compile:
+
+```mojo
+var factor = 3
+inplace_transform[lambda (x: Int) -> Int: x ** factor](numbers)
+```
+
+`factor` is declared in the same scope as the lambda, and the lambda
+captures it. This one thing makes the lambda a closure and can't be used at
+compile-time as the function pointer parameter needed by
+`inplace_transform()`.
+
+## Lambdas and closures
+
+Lambdas that capture values from the surrounding scope are closures.
+Instead of passing values into the lambda, the closure retrieves them
+from the surrounding context, allowing you to write more concise code.
+
+You specify the convention used to capture and manipulate values in the
+lambda expression. When not specified, this defaults to immutable
+references (`imm`). You can read more about closure conventions in the
+[Mojo language
+reference](/docs/reference/closure-declarations/#capture-conventions).
+
+There are two ways to use lambda closures: direct calls, and runtime
+arguments.
+
+### Using closures with direct calls
+
+In this example, the lambda closure captures `x` and `y` from the
+surrounding scope. The lambda is called immediately, and the result is
+returned. Updating the values of `x` and `y` and calling the lambda again
+returns a new result:
+
+```mojo
+var x, y = 3.0, 4.5
+var magnitude = (
+    lambda -> Float64: (x**2 + y**2) ** 0.5
+)
+var distance = magnitude()
+print(t"distance of ({x}, {y}): {distance}")  # 5.408326913175031
+
+x, y = -2.5, 1.5
+distance = magnitude()
+print(t"distance of ({x}, {y}): {distance}")  # 2.9154759474226504
+```
+
+### Runtime arguments
+
+Runtime arguments can accept both thin lambdas and closures. Here's a
+`transform()` function that uses a runtime argument, with an infer-only
+function type:
+
+```mojo
+def transform[
+    T: Copyable, U: Copyable,
+    F: def(T) -> U, //
+](f: F, list: List[T]) -> List[U]:
+    return [f(item) for item in list]
+```
+
+In the preceding section, the following lambda closure wouldn't compile
+because it was passed at compile-time to a parameter, which doesn't accept
+closures. `transform()` uses a runtime function argument. Now, the code
+compiles and runs:
+
+```mojo
+var numbers: List[Int] = [2, 4, 6, 8, 10]
+
+var factor = 3
+var transformed = transform(lambda (x: Int) -> Int: x**factor, numbers)
+print(t"transformed numbers: {transformed}")  # [8, 64, 216, 512, 1000]
+
+factor = 2
+transformed = transform(lambda (x: Int) -> Int: x**factor, numbers)
+print(t"transformed numbers: {transformed}")  # [4, 16, 36, 64, 100]
+```
+
+## Capturing and mutating state
+
+A closure can update the values it captures without mentioning those values
+in its own code. This next example showcases lambdas to create a histogram
+of word lengths.
+
+The code starts with an `apply()` function. It calls a function for each
+member of a list. As you can see from its function type (`F`), it takes
+lambdas that don't return a value. The lambda is called for its side
+effects, not for the value of its expression:
+
+```mojo
+def apply[T: Copyable, F: def(T) -> None, //](f: F, i: List[T]):
+    for item in i:
+        f(item)
+```
+
+In this example, a closure will update a captured histogram dictionary. It
+does this by calling `increment[]()`. This function updates a dictionary by
+increasing the value for a given key by one:
+
+```mojo
+def increment[
+    Key: ImplicitlyCopyable & Hashable & Equatable & Deinitable
+](mut d: Dict[Key, Int], key: Key):
+    d[key] = d.get(key, 0) + 1
+```
+
+This example is given a string of words. It removes punctuation and splits
+the string into a word list. Then, it counts the length of each word using
+a lambda:
+
+```mojo
+var words = String(
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
+    "Sed fringilla nons sapien quis pharetra."
+).replace(",", "").replace(".", "")
+var word_list = [String(w) for w in words.split(" ")]
+print(t"word_list: {word_list}")
+
+# Count each word
+var counter = lambda (x: String) -> Int: x.count_codepoints()
+var counts = transform(counter, word_list)
+print(t"Initial counts: {counts}")
+# [5, 5, 5, 3, 4, 11, 10, 4, 3, 9, 4, 6, 4, 8]
+```
+
+To build the histogram, the next lambda captures the histogram dictionary
+and uses `increment[]()` to update the count for each word length:
+
+```mojo
+# Create a histogram of the counts
+var histogram: Dict[Int, Int] = {}
+var collector = lambda (n: Int) {mut histogram}: increment(histogram, n)
+apply(collector, counts)
+print(t"Histogram: {histogram}")
+# {5: 3, 3: 2, 4: 4, 11: 1, 10: 1, 9: 1, 6: 1, 8: 1}
+```
+
+The `mut` capture establishes that the lambda can mutate the captured
+variable. `apply()` calls this lambda for each word length, updating
+the histogram dictionary as it goes.
+
+A final lambda transforms each count into stars. It's the kind of
+effortless transformation that makes lambdas so useful:
+
+```mojo
+var stars = lambda (n: Int) -> String: "*" * n
+for key in histogram.keys():
+    print(t"{key}: {stars(histogram.get(key, 0))}")
+```
+
+## Lambdas and FFI interop
+
+Thin lambdas work well with C FFI. This final example uses a lambda to sort
+a list of integers using the C standard library `qsort()` function. The
+lambda is passed as the comparator to `qsort()` to sort the list in
+ascending order:
+
+```mojo
+from std.ffi import external_call, c_int, c_size_t
+from std.sys import size_of
+
+def main():
+    var values: List[Int] = [5, 3, 11, 10, 9, 6, 4]
+
+    # Transform is defined earlier on this page
+    var c_values: List[c_int] = transform(
+        lambda (v: Int) -> c_int: c_int(v), values
+    )
+
+    external_call["qsort", NoneType](
+        c_values.unsafe_ptr(),  # values are passed as an opaque pointer
+        c_size_t(len(c_values)),
+        c_size_t(size_of[c_int]()),
+        lambda (
+            a: MutOpaquePointer[MutUntrackedOrigin],
+            b: MutOpaquePointer[MutUntrackedOrigin],
+        ) abi("C") -> c_int: a.unsafe_bitcast[c_int]()[]
+        - b.unsafe_bitcast[c_int]()[]
+    )
+    # Bitcasting retrieves the `c_int` values from the opaque pointer
+
+    print(t"Sorted keys: {c_values}")  # [3, 4, 5, 6, 9, 10, 11]
+```
+
+Don't miss first lambda call shown in this example. It converts a list
+of integers to a list of `c_int` values with `transform()` before passing
+them to "qsort".

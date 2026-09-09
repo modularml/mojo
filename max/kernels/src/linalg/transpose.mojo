@@ -16,11 +16,19 @@ from std.math import ceildiv
 from std.sys.info import simd_width_of, size_of
 from std.sys.intrinsics import strided_load, strided_store
 
-from std.algorithm import parallel_memcpy, sync_parallelize, tile, vectorize
-from std.gpu.host import DeviceContext
+from std.algorithm import (
+    tile,
+    vectorize,
+)
+
+from max.algorithm import (
+    sync_parallelize,
+    unsafe_parallel_memcpy,
+)
+from max.gpu.host import DeviceContext
 from layout import TileTensor
-from std.memory import memcpy
-from std.runtime.asyncrt import parallelism_level
+from std.memory import unsafe_memcpy
+from max.runtime.asyncrt import parallelism_level
 
 from std.utils.index import IndexList, StaticTuple
 
@@ -75,13 +83,13 @@ def _transpose_inplace_8x8[
     var row6 = bufloat0.raw_load[width=8](48)
     var row7 = bufloat0.raw_load[width=8](56)
 
-    @parameter
+    @__parameter
     def _apply_permute_0(
         vec: SIMD[dtype, 8], other: SIMD[dtype, 8]
     ) -> SIMD[dtype, 8]:
         return vec.shuffle[0, 8, 1, 9, 4, 12, 5, 13](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_1(
         vec: SIMD[dtype, 8], other: SIMD[dtype, 8]
     ) -> SIMD[dtype, 8]:
@@ -96,13 +104,13 @@ def _transpose_inplace_8x8[
     var k6 = _apply_permute_0(row6, row7)
     var k7 = _apply_permute_1(row6, row7)
 
-    @parameter
+    @__parameter
     def _apply_permute_2(
         vec: SIMD[dtype, 8], other: SIMD[dtype, 8]
     ) -> SIMD[dtype, 8]:
         return vec.shuffle[0, 1, 8, 9, 4, 5, 12, 13](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_3(
         vec: SIMD[dtype, 8], other: SIMD[dtype, 8]
     ) -> SIMD[dtype, 8]:
@@ -117,13 +125,13 @@ def _transpose_inplace_8x8[
     var k570 = _apply_permute_2(k5, k7)
     var k571 = _apply_permute_3(k5, k7)
 
-    @parameter
+    @__parameter
     def _apply_permute_4(
         vec: SIMD[dtype, 8], other: SIMD[dtype, 8]
     ) -> SIMD[dtype, 8]:
         return vec.shuffle[0, 1, 2, 3, 8, 9, 10, 11](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_5(
         vec: SIMD[dtype, 8], other: SIMD[dtype, 8]
     ) -> SIMD[dtype, 8]:
@@ -157,7 +165,7 @@ def _transpose_inplace_16x16[
     comptime assert cols == 16
     comptime assert bufloat0.flat_rank == 2
 
-    @parameter
+    @__parameter
     def _apply_permute_0(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -165,7 +173,7 @@ def _transpose_inplace_16x16[
             0, 16, 1, 17, 4, 20, 5, 21, 8, 24, 9, 25, 12, 28, 13, 29
         ](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_1(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -173,7 +181,7 @@ def _transpose_inplace_16x16[
             2, 18, 3, 19, 6, 22, 7, 23, 10, 26, 11, 27, 14, 30, 15, 31
         ](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_2(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -181,7 +189,7 @@ def _transpose_inplace_16x16[
             0, 1, 16, 17, 4, 5, 20, 21, 8, 9, 24, 25, 12, 13, 28, 29
         ](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_3(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -189,7 +197,7 @@ def _transpose_inplace_16x16[
             2, 3, 18, 19, 6, 7, 22, 23, 10, 11, 26, 27, 14, 15, 30, 31
         ](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_4(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -197,7 +205,7 @@ def _transpose_inplace_16x16[
             0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 19, 24, 25, 26, 27
         ](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_5(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -205,7 +213,7 @@ def _transpose_inplace_16x16[
             4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31
         ](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_6(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -213,7 +221,7 @@ def _transpose_inplace_16x16[
             0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 19, 24, 25, 26, 27
         ](other)
 
-    @parameter
+    @__parameter
     def _apply_permute_7(
         vec: SIMD[dtype, 16], other: SIMD[dtype, 16]
     ) -> SIMD[dtype, 16]:
@@ -344,6 +352,19 @@ def transpose_inplace[
     cols: Int,
     dtype: DType,
 ](buf: TileTensor[mut=True, dtype, ...]):
+    """Transposes a square `rows` x `cols` tile in place.
+
+    Dispatches to a specialized SIMD shuffle kernel for 4x4, 8x8, and 16x16
+    tiles, falling back to an element-swap loop for other sizes.
+
+    Parameters:
+        rows: Number of rows in the tile, equal to `cols`.
+        cols: Number of columns in the tile, equal to `rows`.
+        dtype: Element type of the tile.
+
+    Args:
+        buf: The mutable square tile to transpose in place.
+    """
     comptime assert buf.flat_rank == 2
     comptime assert rows == cols
     comptime assert rows == buf.static_shape[0]
@@ -365,7 +386,7 @@ def _permute_data[
 ](
     input: UnsafePointer[mut=False, Scalar[dtype], _],
     output: UnsafePointer[mut=True, Scalar[dtype], _],
-    perms: UnsafePointer[mut=False, Scalar[DType.int], _],
+    perms: UnsafePointer[mut=False, Int, _],
 ):
     """
     Ensures that output[i] = input[perms[i]] for i ∈ [0, size)
@@ -379,7 +400,10 @@ def _permute_data[
 
 def _fill_strides[
     dtype: DType,
-](buf: TileTensor[dtype, ...], strides: TileTensor[mut=True, DType.int, ...],):
+](
+    buf: TileTensor[mut=False, dtype, ...],
+    strides: TileTensor[mut=True, .int, ...],
+):
     """
     Fill `strides`, which will be an array of strides indexed by axis, assuming
     `buf` contains contiguous buf.
@@ -514,7 +538,7 @@ def _simplify_transpose_perms[
 @always_inline
 def _convert_transpose_perms_to_static_int_tuple[
     rank: Int
-](perms: UnsafePointer[mut=False, Scalar[DType.int], _]) -> IndexList[rank]:
+](perms: UnsafePointer[mut=False, Int, _]) -> IndexList[rank]:
     var simplified_perms = IndexList[rank]()
     # TODO: unroll
     for j in range(rank):
@@ -558,13 +582,9 @@ def _process_tile[
 def _transpose_2d_serial_tiled[
     rank: Int, dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     simplified_input_shape: IndexList[rank],
     simplified_rank: Int,
     offset: Int,
@@ -583,16 +603,16 @@ def _transpose_2d_serial_tiled[
     var N = simplified_input_shape[simplified_rank - 2]
     var M = simplified_input_shape[simplified_rank - 1]
 
-    @parameter
-    @__copy_capture(N, M)
     @always_inline
-    def process_tile[tile_size_m: Int, tile_size_n: Int](m: Int, n: Int):
+    def process_tile[
+        tile_size_m: Int, tile_size_n: Int
+    ](m: Int, n: Int) {var N, var M, imm}:
         _process_tile[tile_size_m, tile_size_n, dtype](
             m, n, M, N, output.ptr + offset, input.ptr + offset
         )
 
     comptime tile_size = simd_width if simd_width <= 16 else 1
-    tile[process_tile, [tile_size, 1], [tile_size, 1]](0, 0, M, N)
+    tile[[tile_size, 1], [tile_size, 1]](0, 0, M, N, process_tile)
 
 
 @always_inline
@@ -621,13 +641,9 @@ def _should_run_parallel(
 def _transpose_2d_parallel_tiled[
     rank: Int, dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     simplified_input_shape: IndexList[rank],
     simplified_rank: Int,
     offset: Int,
@@ -663,10 +679,10 @@ def _transpose_2d_parallel_tiled[
 
     var work_block_size = ceildiv(work, num_tasks)
 
-    @parameter
-    @__copy_capture(work_block_size, m_tiles, N, M)
     @always_inline
-    def _parallel_tile(thread_id: Int):
+    def _parallel_tile(
+        thread_id: Int,
+    ) {var work_block_size, var m_tiles, var N, var M, imm}:
         var n_tile_begin = work_block_size * thread_id
         var n_tile_end = min(work_block_size * (thread_id + 1), work)
 
@@ -683,24 +699,39 @@ def _transpose_2d_parallel_tiled[
                     input.ptr + offset,
                 )
 
-    sync_parallelize[_parallel_tile](num_tasks, ctx)
+    sync_parallelize(_parallel_tile, num_tasks, ctx)
 
 
 def transpose_2d[
     rank: Int, dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     simplified_input_shape: IndexList[rank],
     simplified_rank: Int,
     offset: Int,
     ctx: Optional[DeviceContext] = None,
 ):
+    """Transposes the inner two dimensions of a simplified rank-2 tensor.
+
+    Selects a serial tiled implementation or a parallel tiled implementation
+    based on the problem size and available parallelism.
+
+    Parameters:
+        rank: Number of dimensions in the `simplified_input_shape` array
+            (inferred).
+        dtype: Element type of the `input` and `output` buffers (inferred).
+
+    Args:
+        output: The output buffer with the inner two dimensions swapped.
+        input: The input buffer.
+        perms: Permutation of the input axes.
+        simplified_input_shape: Shape of the tensor after simplification.
+        simplified_rank: Effective rank after simplification.
+        offset: Flat offset added to both input and output pointers.
+        ctx: The context to execute the work on.
+    """
     comptime if rank < 2:
         return
 
@@ -764,7 +795,7 @@ def _transpose_4d_swap_middle_helper[
                     #   output[l, n, m, k] = input[l, m, n, k]
                     var in_off = l * M * N * K + m * N * K + n * K
                     var out_off = l * M * N * K + n * M * K + m * K
-                    memcpy(
+                    unsafe_memcpy(
                         dest=dst_ptr + out_off,
                         src=src_ptr + in_off,
                         count=K,
@@ -777,10 +808,8 @@ def _transpose_4d_swap_middle_helper[
 
         var work_block_size = ceildiv(work, num_tasks)
 
-        @parameter
-        @__copy_capture(work, work_block_size)
         @always_inline
-        def _parallel_copy(thread_id: Int):
+        def _parallel_copy(thread_id: Int) {var work, var work_block_size, imm}:
             var begin = work_block_size * thread_id
             var end = min(work_block_size * (thread_id + 1), work)
             for block_idx in range(begin, end):
@@ -789,29 +818,43 @@ def _transpose_4d_swap_middle_helper[
 
                 var in_off = l * M * N * K + m * N * K + n * K
                 var out_off = l * M * N * K + n * M * K + m * K
-                memcpy(
+                unsafe_memcpy(
                     dest=dst_ptr + out_off,
                     src=src_ptr + in_off,
                     count=K,
                 )
 
-        sync_parallelize[_parallel_copy](num_tasks, ctx)
+        sync_parallelize(_parallel_copy, num_tasks, ctx)
 
 
 def transpose_4d_swap_middle[
     rank: Int, dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     simplified_input_shape: IndexList[rank],
     simplified_rank: Int,
     ctx: Optional[DeviceContext] = None,
 ):
+    """Transposes the middle two axes of a rank-4 tensor.
+
+    Maps an `LxMxNxK` input to an `LxNxMxK` output by swapping the `M` and `N`
+    axes while copying contiguous `K`-sized slices.
+
+    Parameters:
+        rank: Number of dimensions in the `simplified_input_shape` array
+            (inferred).
+        dtype: Element type of the `input` and `output` buffers (inferred).
+
+    Args:
+        output: The output buffer with the middle two axes swapped.
+        input: The input buffer.
+        perms: Permutation of the input axes.
+        simplified_input_shape: Shape of the tensor after simplification.
+        simplified_rank: Effective rank after simplification.
+        ctx: The context to execute the work on.
+    """
     comptime if rank < 4:
         return
     # The input tile is LxMxNxK, the output tile is LxNxMxK.
@@ -829,16 +872,29 @@ def transpose_4d_swap_middle[
 def transpose_3d_swap_outer[
     rank: Int, dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     simplified_input_shape: IndexList[rank],
     simplified_rank: Int,
 ):
+    """Transposes the outer two axes of a rank-3 tensor.
+
+    Maps an `MxNxK` input to an `NxMxK` output by delegating to the rank-4
+    middle-swap helper with an implicit outer dimension of size 1.
+
+    Parameters:
+        rank: Number of dimensions in the `simplified_input_shape` array
+            (inferred).
+        dtype: Element type of the `input` and `output` buffers (inferred).
+
+    Args:
+        output: The output buffer with the outer two axes swapped.
+        input: The input buffer.
+        perms: Permutation of the input axes.
+        simplified_input_shape: Shape of the tensor after simplification.
+        simplified_rank: Effective rank after simplification.
+    """
     comptime if rank < 3:
         return
     # The input tile is MxNxK, the output tile is NxMxK.
@@ -857,16 +913,30 @@ def transpose_3d_swap_outer[
 def transpose_3d_swap_inner[
     rank: Int, dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     simplified_input_shape: IndexList[rank],
     simplified_rank: Int,
 ):
+    """Transposes the inner two axes of a batched rank-3 tensor.
+
+    Iterates over the leading axis and applies the serial tiled 2D transpose
+    to each `MxN` slice, advancing the flat offset by the slice size each
+    iteration.
+
+    Parameters:
+        rank: Number of dimensions in the `simplified_input_shape` array
+            (inferred).
+        dtype: Element type of the `input` and `output` buffers (inferred).
+
+    Args:
+        output: The output buffer with the inner two axes swapped.
+        input: The input buffer.
+        perms: Permutation of the input axes.
+        simplified_input_shape: Shape of the tensor after simplification.
+        simplified_rank: Effective rank after simplification.
+    """
     comptime if rank < 3:
         return
     # simplified perms must be 0, 2, 1
@@ -891,14 +961,23 @@ def transpose_3d_swap_inner[
 def transpose_trivial_memcpy[
     dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
     ctx: Optional[DeviceContext] = None,
 ):
+    """Copies the input buffer to the output buffer as a trivial transpose.
+
+    Uses a single `memcpy` for small transfers and a parallel `memcpy` for
+    larger ones.
+
+    Parameters:
+        dtype: Element type of the `input` and `output` buffers (inferred).
+
+    Args:
+        output: The output buffer.
+        input: The input buffer.
+        ctx: The context to execute the work on.
+    """
     var src_ptr = input.ptr
     var dst_ptr = output.ptr
 
@@ -909,14 +988,14 @@ def transpose_trivial_memcpy[
     var total_size = Int(output.num_elements())
 
     if total_size <= min_work_for_parallel:
-        memcpy(dest=dst_ptr, src=src_ptr, count=total_size)
+        unsafe_memcpy(dest=dst_ptr, src=src_ptr, count=total_size)
 
     else:
         var work_units = ceildiv(total_size, min_work_per_task)
         var num_tasks = min(work_units, parallelism_level(ctx))
         var work_block_size = ceildiv(work_units, num_tasks)
 
-        parallel_memcpy(
+        unsafe_parallel_memcpy(
             dest=dst_ptr,
             src=src_ptr,
             count=total_size,
@@ -936,8 +1015,8 @@ def _copy_with_strides[
     output_shape: IndexList[rank],
     output_bytecount: Int,
     input_ptr: UnsafePointer[mut=False, Scalar[dtype], _],
-    input_strides: UnsafePointer[mut=False, Scalar[DType.int], _],
-    output_strides: UnsafePointer[mut=False, Scalar[DType.int], _],
+    input_strides: UnsafePointer[mut=False, Int, _],
+    output_strides: UnsafePointer[mut=False, Int, _],
     input_offset: Int,
     output_offset: Int,
     ctx: Optional[DeviceContext] = None,
@@ -969,7 +1048,7 @@ def _copy_with_strides[
         var src_ptr = input_ptr + input_offset
         var dst_ptr = output_ptr + output_offset
         if input_axis_stride == 1 and output_axis_stride == 1:
-            memcpy(dest=dst_ptr, src=src_ptr, count=axis_dim)
+            unsafe_memcpy(dest=dst_ptr, src=src_ptr, count=axis_dim)
         else:
 
             @always_inline
@@ -1030,15 +1109,16 @@ def _copy_with_strides[
         var work_block_size = ceildiv(work, num_tasks)
 
         @always_inline
-        @__copy_capture(
-            work_block_size,
-            work,
-            next_axis,
-            input_axis_stride,
-            output_axis_stride,
-        )
-        @parameter
-        def _parallel_copy(thread_id: Int) raises:
+        def _parallel_copy(
+            thread_id: Int,
+        ) raises {
+            var work_block_size,
+            var work,
+            var next_axis,
+            var input_axis_stride,
+            var output_axis_stride,
+            imm,
+        }:
             var next_input_offset = (
                 thread_id * work_block_size * input_axis_stride + input_offset
             )
@@ -1067,26 +1147,35 @@ def _copy_with_strides[
 
         # TODO: transpose_strided is using stack allocated structures and
         # so depends on us being synchronous. We need a better way to do this.
-        sync_parallelize[_parallel_copy](num_tasks, ctx)
+        sync_parallelize(_parallel_copy, num_tasks, ctx)
 
 
 def transpose_strided[
     rank: Int,
     dtype: DType,
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     ctx: Optional[DeviceContext] = None,
 ) raises:
+    """Transposes a tensor with arbitrary strides via a generic strided copy.
+
+    Computes row-major strides for the input, permutes them according to
+    `perms`, and recursively copies data into the row-major output buffer.
+
+    Parameters:
+        rank: Number of dimensions in the tensor shape.
+        dtype: Element type of the `input` and `output` buffers.
+
+    Args:
+        output: The output buffer.
+        input: The input buffer.
+        perms: Permutation of the input axes.
+        ctx: The context to execute the work on.
+    """
     # Compute row-major strides for input.
-    var input_strides_arr = InlineArray[Scalar[DType.int], rank](
-        uninitialized=True
-    )
+    var input_strides_arr = Array[Int, rank](uninitialized=True)
     input_strides_arr[rank - 1] = 1
     comptime for idx in range(rank - 1):
         comptime axis = rank - idx - 2
@@ -1095,9 +1184,7 @@ def transpose_strided[
         ](Int(input.dim[axis + 1]()))
 
     # Permute input strides.
-    var permuted_strides_arr = InlineArray[Scalar[DType.int], rank](
-        uninitialized=True
-    )
+    var permuted_strides_arr = Array[Int, rank](uninitialized=True)
     _permute_data[rank, DType.int](
         input_strides_arr.unsafe_ptr(),
         permuted_strides_arr.unsafe_ptr(),
@@ -1105,9 +1192,7 @@ def transpose_strided[
     )
 
     # Compute row-major strides for output.
-    var output_strides_arr = InlineArray[Scalar[DType.int], rank](
-        uninitialized=True
-    )
+    var output_strides_arr = Array[Int, rank](uninitialized=True)
     output_strides_arr[rank - 1] = 1
     comptime for idx in range(rank - 1):
         comptime axis = rank - idx - 2
@@ -1148,13 +1233,9 @@ def transpose_strided[
 def transpose[
     dtype: DType, //
 ](
-    output: TileTensor[
-        mut=True, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    input: TileTensor[
-        mut=False, dtype, address_space=AddressSpace.GENERIC, ...
-    ],
-    perms: UnsafePointer[Scalar[DType.int], _],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    perms: UnsafePointer[Int, _],
     ctx: Optional[DeviceContext] = None,
 ) raises:
     """
@@ -1210,7 +1291,7 @@ def transpose[
     )
 
     if simplified_rank == 1:
-        # memcpy
+        # unsafe_memcpy
         return transpose_trivial_memcpy(output, input, ctx)
     # TODO: Re-enable once #15947 is fixed.
     # elif simplified_rank == 2:

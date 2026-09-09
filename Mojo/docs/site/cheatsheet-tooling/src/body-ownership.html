@@ -1,0 +1,249 @@
+<!-- title: Mojo Ownership -->
+<!-- subtitle: Who owns a value, and how it passes between functions -->
+<!-- width: 1440 -->
+<!-- Compiler verified: 2026-08-17, Mojo 1.0.0 (ed45d567) -->
+<!-- Last updated: 2026-08-17 (1.0.0 audit) -->
+
+<style>
+  .cols{column-count:1 !important;}
+  .m3{display:flex;gap:16px;align-items:flex-start;}
+  .m3 > .spine{flex:1 1 0;min-width:0;}
+  .m3 > .wild{flex:0 0 456px;min-width:0;}
+  .srow{display:flex;gap:16px;align-items:flex-start;}
+  .srow > .scol{flex:1;min-width:0;}
+</style>
+
+<div class="m3">
+  <div class="spine">
+
+    <section class="panel">
+      <h2>The model</h2>
+      <div class="body">
+        <p class="lead">Value ownership is fundamental to Mojo. Every value has exactly one owner,
+          and how values move between owners runs through the whole language.</p>
+        <p>You encounter ownership in two situations: <b>variables</b> and <b>function calls</b>.</p>
+        <p>Variables can own or reference a value. <b>Argument conventions</b> describe how a
+          function uses a value: read-only, reference, mutable, owned, produced, or consumed.</p>
+      </div>
+    </section>
+
+    <div class="srow">
+      <div class="scol">
+
+        <section class="panel">
+          <h2>var owns, ref refers</h2>
+          <div class="body">
+<pre class="code">var data: List[Int] = [1, 2, 3] # owns the list
+ref view = data[0] # a 2nd name, no copy
+view = 9 # writes through to data
+print(data) # [9, 2, 3]</pre>
+            <p class="note"><b>var</b> always means "I own this." <b>ref</b> means "this is a view
+              into someone else's value." A struct's <b>var</b> field owns its value and a struct
+              type owns its fields.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Var assignment</h2>
+          <div class="body">
+            <p class="note" style="margin-top:0">A <b>var</b> assignment uses the right-hand
+              side's policy: it determines whether the value is materialized, constructed, copied,
+              or transferred. A call or expression returning a value constructs; one returning a
+              reference copies out the referenced value.</p>
+            <table class="dec">
+              <tr><th>You write</th><th>The var takes ownership of</th></tr>
+              <tr><td>5.0 / "Hello" / [1, 2, 3] (a literal)</td><td>a materialized literal</td></tr>
+              <tr><td>SomeType()</td><td>a freshly constructed value</td></tr>
+              <tr><td>some_value (ImplicitlyCopyable)</td><td>an implicit copy</td></tr>
+              <tr><td>some_value.copy() (Copyable)</td><td>an explicit copy</td></tr>
+              <tr><td>some_value^ (Movable)</td><td>the source's value, transferred</td></tr>
+              <tr><td>some_ref</td><td>a copy of the referenced value</td></tr>
+            </table>
+            <p class="note">A copy doesn't change a value's ownership. Only <b>^</b> moves the
+              value to a new owner.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Argument conventions on self</h2>
+          <div class="body">
+            <table>
+              <tr><td>self</td><td>imm (immutable)</td></tr>
+              <tr><td class="k">mut self</td><td>modify the instance</td></tr>
+              <tr><td class="k">out self</td><td>build it (in __init__())</td></tr>
+              <tr><td class="k">deinit self</td><td>destroy the instance</td></tr>
+              <tr><td class="k">ref self</td><td>parametric mutability</td></tr>
+            </table>
+          </div>
+        </section>
+
+      </div>
+      <div class="scol">
+
+        <section class="panel">
+          <h2>Transfer ownership with ^</h2>
+          <div class="body">
+<pre class="code">def exclaim(var s: String):
+    s += "!"
+    print(s)
+
+var g = "Hello"
+exclaim(g) # copy: g still usable
+exclaim(g^) # transfer: g uninitialized
+# print(g) # error: used after transfer</pre>
+            <p class="note">The <b>var</b> argument takes ownership of the original only with
+              <b>^</b>; a plain call implicitly copies (<b>String</b> is <b>ImplicitlyCopyable</b>),
+              so <b>g</b> stays usable. Either value, the copy or the transferred original, ends its
+              lifetime after the <b>print</b> (its last use). The same <b>^</b> drains a
+              collection in a loop: <b>for var x in items^</b> moves each element out.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Call sites: passing values</h2>
+          <div class="body">
+            <table class="dec">
+              <tr><th>You write</th><th>Into a var arg</th></tr>
+              <tr><td>f(x)</td><td>implicit copy (<b>ImplicitlyCopyable</b> only)</td></tr>
+              <tr><td>f(x.copy())</td><td>explicit copy</td></tr>
+              <tr><td>f(x^)</td><td>transfer; x uninitialized after</td></tr>
+            </table>
+            <p class="note">A borrowing argument (<b>imm</b>, <b>mut</b>, <b>ref</b>) has no <b>^</b> lever:
+              you write <b>f(x)</b>, and it views the value in place.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Origins on references</h2>
+          <div class="body">
+<pre class="code">def first[T: Movable](ref xs: List[T]) -> ref[xs[0]] T:
+    return xs[0]
+
+ref x = first(xs) # len(xs) known to be > 0</pre>
+            <p class="note">A <b>ref</b> return carries an <b>origin</b> so the compiler tracks
+              where it points, whether it stays valid, and whether access is mutable. Values are
+              destroyed at last use; a live <b>ref</b> keeps the value it refers to alive.</p>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <section class="panel">
+      <h2>Argument conventions: the decision table</h2>
+      <div class="body">
+        <table class="dec">
+          <tr>
+            <th>Convention</th><th>Owns it?</th><th>Mutable?</th>
+            <th>Caller keeps it?</th><th>Reach for it when</th>
+          </tr>
+          <tr><td>(imm)</td><td class="no">no</td><td class="no">no</td><td class="yes">yes</td>
+            <td>reading a value without changing it (the default)</td></tr>
+          <tr><td>mut</td><td class="no">no</td><td class="yes">yes</td><td class="yes">yes</td>
+            <td>changing the caller's value in place</td></tr>
+          <tr><td>var</td><td class="yes">yes (own copy)</td><td class="yes">yes</td>
+            <td class="mid">yes, unless ^</td>
+            <td>you need a local, mutable copy</td></tr>
+          <tr><td>out</td><td class="yes">becomes the value</td><td class="yes">yes</td>
+            <td class="mid">it is the result</td>
+            <td>returning by name instead of -&gt;</td></tr>
+          <tr><td>deinit</td><td class="yes">yes (consumes)</td><td class="yes">yes</td>
+            <td class="no">no</td>
+            <td>destructors and the source of a move</td></tr>
+          <tr><td>ref</td><td class="no">no (refers)</td><td class="mid">parametric</td>
+            <td class="yes">yes</td>
+            <td>returning or holding a reference with an origin</td></tr>
+        </table>
+        <p class="note">A convention sits before the argument name: <b>def f(mut x: Int)</b>. With
+          no convention, an argument is a read-only borrow: a view into a value you don't own.
+          <b>mut</b> makes it a writable view.</p>
+      </div>
+    </section>
+
+  </div>
+  <div class="wild">
+
+    <section class="panel">
+      <h2>Literals</h2>
+      <div class="body">
+<pre class="code">var i = 5 # Int, machine width (default)
+var i32: Int32 = 5 # SIMD[DType.int32, 1]</pre>
+        <p class="note">Literals are produced by the lexer, not built by a constructor. Each
+          compile-time type (<b>IntLiteral</b>, <b>FloatLiteral</b>, <b>StringLiteral</b>)
+          materializes into a runtime value. By default, integer literals are <b>Int</b>, floats are
+          <b>Float64</b>, and strings are <b>String</b>. Use type annotations for specific types like
+          <b>Byte</b> (<b>UInt8</b>), <b>Int16</b>, or <b>BFloat16</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Trivial values</h2>
+      <div class="body">
+        <p class="note" style="margin-top:0">Trivial register types (<b>Int</b>, <b>Float64</b>,
+          <b>SIMD</b>) are <b>ImplicitlyCopyable</b> with no destructor. A copy is a register copy;
+          <b>^</b> is a no-op (the compiler warns transfer has no effect); there's nothing to
+          destroy. The rules still apply, they just compile to register moves or nothing.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Mutability</h2>
+      <div class="body">
+        <p class="note" style="margin-top:0">Values aren't mutable or immutable. Access is.</p>
+        <table>
+          <tr><td class="k">var</td><td>always mutable</td></tr>
+          <tr><td class="k">ref</td><td>inherits the mutability of what it refers to</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Lifecycle methods</h2>
+      <div class="body">
+        <table>
+          <tr><td>__init__(out self, …)</td><td>construct</td></tr>
+          <tr><td>__init__(out self, *, copy: Self)</td><td>copy</td></tr>
+          <tr><td>__init__(out self, *, deinit move: Self)</td><td>move</td></tr>
+          <tr><td>__deinit__(deinit self)</td><td>destroy</td></tr>
+        </table>
+        <p class="note">Copy, move, and destructors can't raise. The var assignment table shows
+          which one each assignment runs.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Non-owning views</h2>
+      <div class="body">
+<pre class="code">var data: List[String] = ["a", "b", "c", "d", "e"]
+var s = data[1:3] # a Span view, no copy: [b, c]
+s[0] = "X" # writes through: data is [a, X, c, d, e]
+
+var text = "Hello, World!"
+var hi = text[codepoint=0:5] # a StringSpan view: "Hello"</pre>
+        <p class="note">A view is a non-owning window into a buffer someone else owns. <b>Span</b>
+          views contiguous elements; <b>StringSpan</b> views UTF-8 text. Like <b>ref</b>, a view
+          carries an origin, so the compiler keeps the source alive and tracks whether the view
+          stays valid.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Returns: handing a value out</h2>
+      <div class="body">
+        <table class="dec">
+          <tr><th>You write</th><th>What it does</th></tr>
+          <tr><td>return x</td><td>copy out (when <b>ImplicitlyCopyable</b>)</td></tr>
+          <tr><td>return x.copy()</td><td>copy out</td></tr>
+          <tr><td>return x^</td><td>transfer out</td></tr>
+          <tr><td>-&gt; T</td><td>return a value</td></tr>
+          <tr><td>-&gt; ref[origin] T</td><td>return a reference</td></tr>
+        </table>
+        <p class="note">Like a var assignment, <b>return x</b> copies; when <b>x</b> is at its
+          last use the compiler moves it instead (you own it, so it can be moved).</p>
+        <p class="note">No <b>-&gt; T^</b>: the <b>^</b> goes on the returned value in
+          <b>return x^</b>, not on the return type.</p>
+      </div>
+    </section>
+
+  </div>
+</div>

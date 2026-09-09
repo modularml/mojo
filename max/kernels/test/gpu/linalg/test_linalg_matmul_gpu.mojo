@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from linalg.matmul import matmul
 from layout import TileTensor, CoordLike, Coord, Idx, row_major
 from linalg.matmul.gpu import _matmul_gpu
@@ -88,14 +88,14 @@ def matmul_test_case[
     _linspace_fill(mat_a_host)
     _linspace_fill(mat_b_host)
 
-    ctx.enqueue_copy(mat_a_dev, mat_a_host.ptr)
-    ctx.enqueue_copy(mat_b_dev, mat_b_host.ptr)
+    ctx.enqueue_copy(mat_a_dev, mat_a_host._storage)
+    ctx.enqueue_copy(mat_b_dev, mat_b_host._storage)
 
     _matmul_gpu[use_tensor_core=True](
         mat_c_tensor, mat_a_tensor, mat_b_tensor, ctx
     )
 
-    ctx.enqueue_copy(mat_c_host.ptr, mat_c_dev)
+    ctx.enqueue_copy(mat_c_host._storage, mat_c_dev)
     ctx.synchronize()
 
     # FIXME: We should run a reference gpu matmul, the reference should also
@@ -114,10 +114,10 @@ def matmul_test_case[
 def create_matmul_test_case[
     MType: CoordLike, NType: CoordLike, KType: CoordLike, //, dtype: DType
 ](ctx: DeviceContext, m: MType, n: NType, k: KType) raises:
-    matmul_test_case[DType.float32,](Coord(m, n), Coord(m, k), Coord(k, n), ctx)
+    matmul_test_case[.float32,](Coord(m, n), Coord(m, k), Coord(k, n), ctx)
 
 
 def main() raises:
     with DeviceContext() as ctx:
-        create_matmul_test_case[DType.float32](ctx, Int(8), Idx[8], Idx[4])
-        create_matmul_test_case[DType.float32](ctx, Int(16), Idx[16], Idx[8])
+        create_matmul_test_case[.float32](ctx, Int(8), Idx[8], Idx[4])
+        create_matmul_test_case[.float32](ctx, Int(16), Idx[16], Idx[8])

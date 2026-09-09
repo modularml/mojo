@@ -52,8 +52,8 @@ from max.graph import (
     ops,
 )
 from max.nn.comm.allreduce import Signals
-from max.nn.kv_cache import KVCacheParams, MultiKVCacheParams
-from max.nn.transformer import ReturnLogits
+from max.nn.kv_cache import MHAKVCacheParams, MultiKVCacheParams
+from max.nn.transformer import ReturnHiddenStates, ReturnLogits
 from max.pipelines.architectures.gemma4.batch_vision_inputs import (
     create_empty_embeddings,
     create_empty_indices,
@@ -86,7 +86,7 @@ def _make_kv_params(
     )
     global_layers = sum(1 for t in TEXT_LAYER_TYPES if t == "full_attention")
 
-    sliding_kv = KVCacheParams(
+    sliding_kv = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=TEXT_NUM_KEY_VALUE_HEADS,
         head_dim=TEXT_HEAD_DIM,
@@ -94,7 +94,7 @@ def _make_kv_params(
         devices=devices,
         page_size=128,
     )
-    global_kv = KVCacheParams(
+    global_kv = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=TEXT_NUM_GLOBAL_KEY_VALUE_HEADS,
         head_dim=TEXT_GLOBAL_HEAD_DIM,
@@ -102,7 +102,9 @@ def _make_kv_params(
         devices=devices,
         page_size=128,
     )
-    return MultiKVCacheParams.from_params(sliding_kv, global_kv)
+    return MultiKVCacheParams.from_params(
+        {"sliding_attention": sliding_kv, "full_attention": global_kv}
+    )
 
 
 def _make_text_config(
@@ -120,7 +122,7 @@ def _make_text_config(
         layer_types = TEXT_LAYER_TYPES[:num_hidden_layers]
 
     # Text config uses the sliding-window KVCacheParams (inherited field).
-    text_kv = KVCacheParams(
+    text_kv = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=TEXT_NUM_KEY_VALUE_HEADS,
         head_dim=TEXT_HEAD_DIM,
@@ -315,10 +317,10 @@ def test_state_dict_has_four_norms_per_layer() -> None:
 
 
 def test_layer_kv_index_length() -> None:
-    """_layer_kv_index should have one entry per layer."""
+    """_layer_kv_key should have one entry per layer."""
     config = _make_model_config([DeviceRef.GPU()])
     model = Gemma4TextModel(config)
-    assert len(model._layer_kv_index) == TEXT_NUM_HIDDEN_LAYERS
+    assert len(model._layer_kv_key) == TEXT_NUM_HIDDEN_LAYERS
 
 
 @pytest.mark.parametrize(
@@ -327,11 +329,11 @@ def test_layer_kv_index_length() -> None:
     ids=["layer_0_sliding", "layer_1_sliding", "layer_4_sliding"],
 )
 def test_sliding_layers_map_to_kv_index_0(layer_idx: int) -> None:
-    """Sliding attention layers should map to KV index 0."""
+    """Sliding attention layers should map to the sliding cache key."""
     config = _make_model_config([DeviceRef.GPU()])
     model = Gemma4TextModel(config)
     assert TEXT_LAYER_TYPES[layer_idx] == "sliding_attention"
-    assert model._layer_kv_index[layer_idx] == 0
+    assert model._layer_kv_key[layer_idx] == "sliding_attention"
 
 
 @pytest.mark.parametrize(
@@ -340,33 +342,33 @@ def test_sliding_layers_map_to_kv_index_0(layer_idx: int) -> None:
     ids=["layer_5_full", "layer_11_full", "layer_59_full"],
 )
 def test_full_attention_layers_map_to_kv_index_1(layer_idx: int) -> None:
-    """Full attention layers should map to KV index 1."""
+    """Full attention layers should map to the full-attention cache key."""
     config = _make_model_config([DeviceRef.GPU()])
     model = Gemma4TextModel(config)
     assert TEXT_LAYER_TYPES[layer_idx] == "full_attention"
-    assert model._layer_kv_index[layer_idx] == 1
+    assert model._layer_kv_key[layer_idx] == "full_attention"
 
 
 def test_layer_kv_index_matches_layer_types() -> None:
-    """Every layer_kv_index entry should match its layer type."""
+    """Every _layer_kv_key entry should match its layer type."""
     config = _make_model_config([DeviceRef.GPU()])
     model = Gemma4TextModel(config)
-    for i, (kv_idx, layer_type) in enumerate(
-        zip(model._layer_kv_index, TEXT_LAYER_TYPES, strict=True)
+    for i, (kv_key, layer_type) in enumerate(
+        zip(model._layer_kv_key, TEXT_LAYER_TYPES, strict=True)
     ):
-        expected = 0 if layer_type == "sliding_attention" else 1
-        assert kv_idx == expected, (
-            f"Layer {i}: expected KV index {expected} for {layer_type}, "
-            f"got {kv_idx}"
+        assert kv_key == layer_type, (
+            f"Layer {i}: expected KV key {layer_type}, got {kv_key}"
         )
 
 
 def test_kv_index_counts_match_layer_type_counts() -> None:
-    """The number of sliding/global KV indices should match the layer type counts."""
+    """The number of sliding/global KV keys should match the layer type counts."""
     config = _make_model_config([DeviceRef.GPU()])
     model = Gemma4TextModel(config)
-    sliding_count = sum(1 for idx in model._layer_kv_index if idx == 0)
-    global_count = sum(1 for idx in model._layer_kv_index if idx == 1)
+    sliding_count = sum(
+        1 for k in model._layer_kv_key if k == "sliding_attention"
+    )
+    global_count = sum(1 for k in model._layer_kv_key if k == "full_attention")
 
     expected_sliding = sum(
         1 for t in TEXT_LAYER_TYPES if t == "sliding_attention"
@@ -552,7 +554,7 @@ def _make_small_model_config(
     )
     global_layers = sum(1 for t in _EXEC_LAYER_TYPES if t == "full_attention")
 
-    sliding_kv = KVCacheParams(
+    sliding_kv = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=_EXEC_N_KV_HEADS,
         head_dim=_EXEC_HEAD_DIM,
@@ -560,7 +562,7 @@ def _make_small_model_config(
         devices=devices,
         page_size=128,
     )
-    global_kv = KVCacheParams(
+    global_kv = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=_EXEC_N_GLOBAL_KV_HEADS,
         head_dim=_EXEC_GLOBAL_HEAD_DIM,
@@ -568,9 +570,11 @@ def _make_small_model_config(
         devices=devices,
         page_size=128,
     )
-    kv_params = MultiKVCacheParams.from_params(sliding_kv, global_kv)
+    kv_params = MultiKVCacheParams.from_params(
+        {"sliding_attention": sliding_kv, "full_attention": global_kv}
+    )
 
-    text_kv = KVCacheParams(
+    text_kv = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=_EXEC_N_KV_HEADS,
         head_dim=_EXEC_HEAD_DIM,
@@ -720,7 +724,11 @@ def test_text_model_execution_matches_torch(seq_len: int) -> None:
     with torch.no_grad():
         torch_hidden = torch_model(tokens)
     embed_w = shared_weights["embed_tokens.weight"].to(TORCH_DTYPE)
-    torch_logits = (torch_hidden @ embed_w.T).float()
+    torch_logits = torch_hidden @ embed_w.T
+    # Match the model's final logit softcapping (cap * tanh(logits / cap)),
+    # applied in the compute dtype as DistributedLogitsPostprocessMixin does.
+    cap = TEXT_FINAL_LOGIT_SOFTCAPPING
+    torch_logits = (torch.tanh(torch_logits / cap) * cap).float()
 
     # -- Build and run MAX graph --
     signals = Signals([device_ref])
@@ -748,7 +756,11 @@ def test_text_model_execution_matches_torch(seq_len: int) -> None:
             return_n_logits=return_n_logits_in,
             input_row_offsets=[row_offsets_in],
             image_embeddings=[
-                ops.constant(create_empty_embeddings([device], _EXEC_HIDDEN)[0])
+                ops.constant(
+                    create_empty_embeddings(
+                        [device], _EXEC_HIDDEN, DType.bfloat16
+                    )[0]
+                )
             ],
             image_token_indices=[
                 ops.constant(create_empty_indices([device])[0])
@@ -777,3 +789,123 @@ def test_text_model_execution_matches_torch(seq_len: int) -> None:
         rtol=0.02,
         atol=0.07,
     )
+
+
+def test_text_model_selected_layer_hidden_states() -> None:
+    """SELECTED_LAYERS returns per-layer post-block taps at target_layer_ids.
+
+    Spec-decode drafters (DFlash/DSpark) condition on the target's hidden
+    states at a fixed set of layers, fusing the per-layer taps themselves
+    (see ``fuse_captured_hidden_states``). Verifies both the per-tap shape
+    ``[seq, hidden]`` and, against the torch reference with per-layer
+    forward hooks, that the captures come from the right layers in order.
+    """
+    device = Accelerator(0)
+    device_ref = DeviceRef.GPU()
+    seq_len = 4
+    target_layer_ids = [1, 3, 5]
+
+    config = _make_small_model_config([device_ref])
+    config.text_config.return_hidden_states = ReturnHiddenStates.SELECTED_LAYERS
+    config.text_config.target_layer_ids = target_layer_ids
+    max_model = Gemma4TextModel(config)
+    _stub_attention_shards(max_model)
+
+    torch_model = TorchGemma4TextModel(
+        vocab_size=_EXEC_VOCAB,
+        hidden_size=_EXEC_HIDDEN,
+        num_hidden_layers=_EXEC_NUM_LAYERS,
+        intermediate_size=_EXEC_INTERMEDIATE,
+        hidden_activation=TEXT_HIDDEN_ACTIVATION,
+        rms_norm_eps=TEXT_RMS_NORM_EPS,
+        layer_types=_EXEC_LAYER_TYPES,
+        attn_factory=_torch_identity_attn_factory,
+    )
+
+    shared_weights = _build_shared_weights(max_model)
+    max_model.load_state_dict(shared_weights)
+    torch_model.load_state_dict(shared_weights, strict=False)
+
+    torch.manual_seed(99)
+    tokens = torch.randint(0, _EXEC_VOCAB, (seq_len,), dtype=torch.int64)
+
+    # Capture each tapped layer's post-block output (torch layers return a
+    # tuple whose first element is the hidden state).
+    captured: dict[int, torch.Tensor] = {}
+
+    def _make_hook(layer_id: int) -> Any:
+        def _hook(module: torch.nn.Module, args: Any, output: Any) -> None:
+            captured[layer_id] = output[0].detach()
+
+        return _hook
+
+    for layer_id in target_layer_ids:
+        torch_model.layers[layer_id].register_forward_hook(_make_hook(layer_id))
+    torch_model = torch_model.to(TORCH_DTYPE)
+    with torch.no_grad():
+        torch_model(tokens)
+    torch_taps = torch.cat(
+        [captured[i] for i in target_layer_ids], dim=-1
+    ).float()
+
+    signals = Signals([device_ref])
+    session = InferenceSession(devices=[device])
+    with Graph(
+        "test_text_model_selected_layers",
+        input_types=[
+            TensorType(DType.int64, [seq_len], device=device_ref),
+            TensorType(DType.uint32, [2], device=device_ref),
+            TensorType(DType.uint32, [1], device=DeviceRef.CPU()),
+            *signals.input_types(),
+        ],
+    ) as graph:
+        tokens_in, row_offsets_in, return_n_logits_in, signal_buf = graph.inputs
+        assert isinstance(tokens_in, TensorValue)
+        assert isinstance(row_offsets_in, TensorValue)
+        assert isinstance(return_n_logits_in, TensorValue)
+        assert isinstance(signal_buf, BufferValue)
+
+        results = max_model(
+            tokens_in,
+            signal_buffers=[signal_buf],
+            sliding_kv_collections=[None],  # type: ignore[list-item]
+            global_kv_collections=[None],  # type: ignore[list-item]
+            return_n_logits=return_n_logits_in,
+            input_row_offsets=[row_offsets_in],
+            image_embeddings=[
+                ops.constant(
+                    create_empty_embeddings(
+                        [device], _EXEC_HIDDEN, DType.bfloat16
+                    )[0]
+                )
+            ],
+            image_token_indices=[
+                ops.constant(create_empty_indices([device])[0])
+            ],
+        )
+        # LAST_TOKEN logits + SELECTED_LAYERS returns
+        # (last_logits, *per_layer_taps), one tap per target layer.
+        graph.output(*results[1:])
+
+    compiled = session.load(graph, weights_registry=max_model.state_dict())
+
+    tokens_gpu = Buffer.from_dlpack(tokens).to(device)
+    row_offsets = torch.tensor([0, seq_len], dtype=torch.uint32)
+    row_offsets_gpu = Buffer.from_dlpack(row_offsets).to(device)
+    return_n_logits = torch.tensor([1], dtype=torch.uint32)
+    result_bufs = compiled.execute(
+        tokens_gpu, row_offsets_gpu, return_n_logits, *signals.buffers()
+    )
+    assert len(result_bufs) == len(target_layer_ids), (
+        f"Expected {len(target_layer_ids)} taps, got {len(result_bufs)}"
+    )
+    tap_tensors: list[torch.Tensor] = []
+    for result_buf in result_bufs:
+        assert isinstance(result_buf, Buffer)
+        tap = torch.from_dlpack(result_buf).cpu().float()
+        assert tap.shape == (seq_len, _EXEC_HIDDEN), (
+            f"Unexpected tap shape {tuple(tap.shape)}"
+        )
+        tap_tensors.append(tap)
+    max_taps = torch.cat(tap_tensors, dim=-1)
+    torch.testing.assert_close(torch_taps, max_taps, rtol=0.02, atol=0.5)

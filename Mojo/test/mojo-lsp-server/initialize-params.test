@@ -1,0 +1,36 @@
+// RUN: mojo-lsp-server -mojo-test < %s | FileCheck -strict-whitespace %s
+// Test initialize request parameters with rootUri
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":123,"rootUri":"test:///workspace","capabilities":{},"trace":"off"}}
+//      CHECK:  "id": 0,
+// CHECK-NEXT:  "jsonrpc": "2.0",
+// CHECK-NEXT:  "result": {
+// CHECK-NEXT:    "capabilities": {
+// CHECK-NEXT:      "codeActionProvider": true,
+// CHECK-NEXT:      "completionProvider":
+// CHECK:           "definitionProvider": true,
+// CHECK:           "hoverProvider": true,
+// CHECK:           "notebookDocumentSync":
+// CHECK:             "notebookSelector":
+// CHECK:               "cells":
+// CHECK:                 "language": "mojo"
+// CHECK:               "notebook":
+// CHECK:                 "notebookType": "jupyter-notebook",
+// CHECK:                 "scheme": "file"
+// CHECK:           "textDocumentSync": {
+// CHECK-NEXT:        "change": 2,
+// CHECK-NEXT:        "openClose": true,
+// CHECK-NEXT:        "save": true
+// CHECK-NEXT:      }
+// CHECK-NEXT:    },
+// CHECK-NEXT:    "serverInfo": {
+// CHECK-NEXT:      "name": "mojo-lsp-server",
+// CHECK-NEXT:      "version": "{{.*}}"
+// CHECK-NEXT:    }
+// CHECK-NEXT:  }
+// -----
+{"jsonrpc":"2.0","id":3,"method":"shutdown"}
+//      CHECK:  "id": 3,
+// CHECK-NEXT:  "jsonrpc": "2.0",
+// CHECK-NEXT:  "result": null
+// -----
+{"jsonrpc":"2.0","method":"exit"}

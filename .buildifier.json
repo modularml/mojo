@@ -1,0 +1,3 @@
+{
+  "addTables": "bazel/lint/buildifier-tables-add.json"
+}

@@ -50,7 +50,7 @@ kdiff = "kdiff:main"
 
 
 [project.urls]
-Documentation = "https://docs.modular.com"
+Documentation = "https://max.modular.com"
 
 
 [tool.setuptools]

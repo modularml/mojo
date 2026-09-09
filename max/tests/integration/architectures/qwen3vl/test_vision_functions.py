@@ -69,7 +69,7 @@ def get_rope_index_torch(
         )
         image_index, video_index = 0, 0
         attention_mask = attention_mask.to(total_input_ids.device)
-        for i, input_ids in enumerate(total_input_ids):
+        for i, input_ids in enumerate(total_input_ids):  # noqa: PLR1704 (FIXME)
             input_ids = input_ids[attention_mask[i] == 1]
             image_nums, video_nums = 0, 0
             vision_start_indices = torch.argwhere(
@@ -386,7 +386,7 @@ def get_seqlens_torch(
     cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
 
     # Calculate max sequence length
-    max_seqlen = max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
+    max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
 
     return cu_seqlens, max_seqlen
 

@@ -113,16 +113,20 @@ def test_compile_config_dump_asm(
 
     graph = Graph(
         "addition",
-        forward=lambda x: ops.custom(
-            name="add_one_custom",
-            device=DeviceRef.CPU(),
-            values=[x],
-            out_types=[
-                TensorType(
-                    dtype=x.dtype, shape=x.tensor.shape, device=DeviceRef.CPU()
-                )
-            ],
-        )[0].tensor,
+        forward=lambda x: (
+            ops.custom(
+                name="add_one_custom",
+                device=DeviceRef.CPU(),
+                values=[x],
+                out_types=[
+                    TensorType(
+                        dtype=x.dtype,
+                        shape=x.tensor.shape,
+                        device=DeviceRef.CPU(),
+                    )
+                ],
+            )[0].tensor
+        ),
         input_types=[
             TensorType(dtype, shape=[rows, columns], device=DeviceRef.CPU()),
         ],

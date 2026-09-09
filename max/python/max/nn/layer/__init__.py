@@ -12,9 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 
 from .layer import (
+    FlattenableGraphInput,
     Layer,
     Module,
     Shardable,
+    SubgraphInput,
+    _flatten_graph_inputs,
     add_layer_hook,
     clear_hooks,
     recursive_named_layers,

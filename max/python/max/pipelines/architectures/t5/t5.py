@@ -92,8 +92,8 @@ class T5DenseActDense(Module[..., Tensor]):
             config.d_model,
             bias=False,
         )
-        self.act_fn = (
-            lambda x: 0.5
+        self.act_fn = lambda x: (
+            0.5
             * x
             * (
                 1.0
@@ -144,8 +144,8 @@ class T5DenseGatedActDense(Module[..., Tensor]):
             config.d_model,
             bias=False,
         )
-        self.act_fn = (
-            lambda x: 0.5
+        self.act_fn = lambda x: (
+            0.5
             * x
             * (
                 1.0

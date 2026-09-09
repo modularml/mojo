@@ -11,6 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Implements the ARM NEON lane-FMA microkernel for CPU matmul.
+
+Defines `Inner_matmul_neon`, a struct conforming to the `InnerMatmulKernel`
+trait that accumulates partial products using vectorized lane-broadcast FMA
+against a packed B matrix. The dispatcher selects this kernel on ARM NEON
+hardware for operand types that take neither the integer dot-product
+(`dotprod`) nor the `i8mm` path, which in practice means floating-point
+operands.
+"""
+
 from std.math import fma
 
 from layout import Coord, Idx, TileTensor
@@ -26,6 +36,14 @@ from .impl import InnerMatmulKernel
 # implements the Neon microkernel.
 @fieldwise_init
 struct Inner_matmul_neon(InnerMatmulKernel, Movable):
+    """ARM NEON lane-FMA microkernel for CPU matmul.
+
+    Implements `InnerMatmulKernel` using vectorized lane-broadcast FMA to
+    accumulate partial products. Loads `simd_size` elements of A, broadcasts
+    each lane across all kernel rows, and computes dot products against packed
+    B columns. Handles tail elements in the K dimension with scalar cleanup.
+    """
+
     @always_inline
     def _accumulate_lane[
         simd_size: Int,
@@ -46,10 +64,10 @@ struct Inner_matmul_neon(InnerMatmulKernel, Movable):
         local accumulation buffer while processing a single column of A.
 
         Args:
-            a: TODO.
-            b_packed: TODO.
+            a: Input A matrix tile being processed.
+            b_packed: Packed B matrix tile in cache-friendly layout.
             c_local: Pre-allocated local buffer for c partial sums.
-            global_offset: TODO.
+            global_offset: Global (M, N, K) coordinate offset for this tile.
             tile_n_k_idx: Index tuple with (n, k) coordinates within the current
                 processing tile to index the packed B matrix.
         """
@@ -65,16 +83,15 @@ struct Inner_matmul_neon(InnerMatmulKernel, Movable):
             Coord(n_outer_idx, tile_n_k_idx[1], Idx[0])
         )
 
-        var a_vals = InlineArray[SIMD[c_local.dtype, a_col_size], kernel_rows](
-            uninitialized=True
+        var a_vals = Array[_, kernel_rows](
+            fill_with_unrolled=lambda [row: Int]() -> SIMD[
+                c_local.dtype, a_col_size
+            ]: a.load[width=a_col_size](
+                Coord(global_offset.M + row, global_k)
+            ).cast[
+                c_local.dtype
+            ]()
         )
-
-        comptime for row in range(kernel_rows):
-            var global_m = global_offset.M + row
-            var a_val = a.load[width=a_col_size](
-                Coord(global_m, global_k)
-            ).cast[c_local.dtype]()
-            a_vals[row] = a_val
 
         comptime for lane in range(a_col_size):
             comptime for col in range(kernel_cols // simd_size):
@@ -111,6 +128,28 @@ struct Inner_matmul_neon(InnerMatmulKernel, Movable):
     ):
         """Utility function on the inner loop. Run the inner kernel on the whole
         (kernel_rows, TileN, TileK) tile.
+
+        Parameters:
+            kernel_rows: Number of rows in the M-dimension tile processed per
+                invocation.
+            kernel_cols: Number of columns in the N-dimension tile processed
+                per invocation; must be a multiple of `simd_size`.
+            simd_size: SIMD vector width used for lane-broadcast FMA on packed
+                B elements.
+
+        Args:
+            c: Output C matrix tile accumulating the partial products.
+            a: Input A matrix tile read in row-major order.
+            b_packed: Packed B matrix tile in cache-friendly layout; must be
+                rank 3.
+            global_offset: Global (M, N, K) coordinate offset of this tile
+                within the whole matmul problem space.
+            global_bound: Global (M, N, K) extent of the full matmul problem
+                space, used for boundary clipping on the C store.
+            tile_n_k: (n, k) extents of the tile to process in the N and K
+                dimensions.
+            skip_boundary_check: Whether the tile lies fully within
+                `global_bound` so boundary clipping can be skipped.
         """
         comptime assert b_packed.flat_rank == 3, "b_packed must be rank 3"
 

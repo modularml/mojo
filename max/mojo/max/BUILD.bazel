@@ -1,0 +1,40 @@
+load("//bazel:api.bzl", "mojo_library", "pkg_files")
+
+package(default_visibility = ["//max:consumers"])
+
+# Also the base of the HAL overlay in //max/internal/driver/src:max_srcs_hal,
+# which the `//max:max_mojo` alias selects under --config=hal-device-context.
+filegroup(
+    name = "max_srcs",
+    srcs = glob(["**/*.mojo"]),
+    visibility = ["//visibility:public"],
+)
+
+mojo_library(
+    name = "max",
+    srcs = [":max_srcs"],
+    docs_base_path = "mojo",
+    deps = [
+        "//MLRT:Driver/DeviceContext",
+        "@mojo//:std",
+    ],
+)
+
+pkg_files(
+    name = "docs",
+    srcs = [":max.docs"],
+    prefix = "api/mojo",
+    renames = {
+        ":max.docs": "max",
+    },
+    tags = ["manual"],
+)
+
+# Renders `max` first and pre-expanded, so its subpackages read as children
+# rather than as siblings of the other top-level packages.
+pkg_files(
+    name = "category.docs",
+    srcs = ["_category_.json"],
+    prefix = "api/mojo/max",
+    tags = ["manual"],
+)

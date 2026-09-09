@@ -48,6 +48,11 @@ class Mistral3TextEncoderConfig(MAXModelConfigBase):
     dtype: DType = DType.bfloat16
     device: DeviceRef = Field(default_factory=DeviceRef.GPU)
     hidden_state_layers: list[int] = Field(default_factory=lambda: [10, 20, 30])
+    output_seq_len: int | None = None
+    """When set, the forward output is left-padded with zeros to this many
+    tokens.  Required when the downstream transformer expects a static
+    text sequence length (e.g. FLUX.2 trained the joint-attention with
+    a padded ``512``-token text stream)."""
 
     @property
     def attention_multiplier(self) -> float:
@@ -78,6 +83,18 @@ class Mistral3TextEncoderConfig(MAXModelConfigBase):
             mapped_key = _HF_KEY_MAP.get(key, key)
             if mapped_key in cls.model_fields:
                 init_dict[mapped_key] = value
+
+        # transformers v5 moved `rope_theta` from top-level into a nested
+        # `rope_parameters` dict. So if rope_theta isn't set by the above, scan
+        # for it in the sub-dict.
+        if "rope_theta" not in init_dict:
+            rope_params = text_config.get("rope_parameters")
+            if rope_params and "rope_theta" in rope_params:
+                init_dict["rope_theta"] = rope_params["rope_theta"]
+
+        assert "rope_theta" in init_dict, (
+            "Failed to parse rope_theta from text_config"
+        )
 
         # Compute head_dim if not provided
         if "head_dim" not in init_dict:

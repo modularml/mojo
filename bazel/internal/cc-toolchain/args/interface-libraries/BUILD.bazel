@@ -34,8 +34,8 @@ cc_feature(
     name = "build_interface_libraries",
     args = [
         ":enabled_env",
-        ":input_env",
-        ":output_env",
+        ":input_arg",
+        ":output_arg",
     ],
     overrides = "@rules_cc//cc/toolchains/features/legacy:build_interface_libraries",
 )
@@ -56,18 +56,18 @@ cc_args(
 )
 
 cc_args(
-    name = "input_env",
+    name = "input_arg",
     actions = ["@rules_cc//cc/toolchains/actions:dynamic_library_link_actions"],
-    env = {"IFS_INPUT": "{interface_library_input_path}"},
+    args = ["--modular-ifs-input={interface_library_input_path}"],
     format = {"interface_library_input_path": "@rules_cc//cc/toolchains/variables:interface_library_input_path"},
     requires_any_of = [":supports_interface_shared_libraries"],
     requires_not_none = "@rules_cc//cc/toolchains/variables:interface_library_input_path",
 )
 
 cc_args(
-    name = "output_env",
+    name = "output_arg",
     actions = ["@rules_cc//cc/toolchains/actions:dynamic_library_link_actions"],
-    env = {"IFS_OUTPUT": "{interface_library_output_path}"},
+    args = ["--modular-ifs-output={interface_library_output_path}"],
     format = {"interface_library_output_path": "@rules_cc//cc/toolchains/variables:interface_library_output_path"},
     requires_any_of = [":supports_interface_shared_libraries"],
     requires_not_none = "@rules_cc//cc/toolchains/variables:interface_library_output_path",

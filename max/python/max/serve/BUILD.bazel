@@ -22,7 +22,7 @@ modular_py_library(
 
 modular_py_library(
     name = "exceptions",
-    srcs = ["exceptions.py"],
+    srcs = ["_exceptions.py"],
 )
 
 modular_py_library(
@@ -47,22 +47,24 @@ modular_py_library(
             "process_control.py",
             "config.py",
             "debug.py",
-            "exceptions.py",
+            "_exceptions.py",
             "queue.py",
             "scheduler_result.py",
         ],
     ),
     deps = [
         ":config",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/serve/media",
         "//max/python/max/serve/pipelines",
         "//max/python/max/serve/recordreplay",
         "//max/python/max/serve/router",
+        "//max/python/max/serve/schemas",
         "//max/python/max/serve/telemetry",
         "//max/python/max/serve/worker_interface",
+        requirement("asgiref"),
         requirement("fastapi"),
         requirement("prometheus-client"),
         requirement("uvicorn"),

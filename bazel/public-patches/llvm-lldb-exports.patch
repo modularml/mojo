@@ -1,0 +1,385 @@
+diff --git a/lldb/include/lldb/API/SBDefines.h b/lldb/include/lldb/API/SBDefines.h
+index 5fcc685050c0..17ffc9b3a34b 100644
+--- a/lldb/include/lldb/API/SBDefines.h
++++ b/lldb/include/lldb/API/SBDefines.h
+@@ -25,7 +25,7 @@
+ #define LLDB_API __declspec(dllimport)
+ #endif
+ #else // defined (_WIN32)
+-#define LLDB_API
++#define LLDB_API __attribute__((visibility("default")))
+ #endif
+ #endif
+ 
+diff --git a/lldb/include/lldb/Core/DumpDataExtractor.h b/lldb/include/lldb/Core/DumpDataExtractor.h
+index 08501b512a2b..082c9a49b499 100644
+--- a/lldb/include/lldb/Core/DumpDataExtractor.h
++++ b/lldb/include/lldb/Core/DumpDataExtractor.h
+@@ -87,7 +87,7 @@ class Stream;
+ ///
+ /// \return
+ ///     The offset at which dumping ended.
+-lldb::offset_t
++lldb::offset_t LLDB_PRIVATE_EXPORT
+ DumpDataExtractor(const DataExtractor &DE, Stream *s, lldb::offset_t offset,
+                   lldb::Format item_format, size_t item_byte_size,
+                   size_t item_count, size_t num_per_line, uint64_t base_addr,
+diff --git a/lldb/include/lldb/DataFormatters/FormattersHelpers.h b/lldb/include/lldb/DataFormatters/FormattersHelpers.h
+index 6a47cf37eac6..d0ce26b03d00 100644
+--- a/lldb/include/lldb/DataFormatters/FormattersHelpers.h
++++ b/lldb/include/lldb/DataFormatters/FormattersHelpers.h
+@@ -36,13 +36,13 @@ void AddOneLineSummary(TypeCategoryImpl::SharedPointer category_sp,
+                        bool regex = false);
+ 
+ /// Add a summary that is implemented by a C++ callback.
+-void AddCXXSummary(TypeCategoryImpl::SharedPointer category_sp,
++void LLDB_PRIVATE_EXPORT AddCXXSummary(TypeCategoryImpl::SharedPointer category_sp,
+                    CXXFunctionSummaryFormat::Callback funct,
+                    const char *description, llvm::StringRef type_name,
+                    TypeSummaryImpl::Flags flags, bool regex = false);
+ 
+ /// Add a synthetic that is implemented by a C++ callback.
+-void AddCXXSynthetic(TypeCategoryImpl::SharedPointer category_sp,
++void LLDB_PRIVATE_EXPORT AddCXXSynthetic(TypeCategoryImpl::SharedPointer category_sp,
+                      CXXSyntheticChildren::CreateFrontEndCallback generator,
+                      const char *description, llvm::StringRef type_name,
+                      ScriptedSyntheticChildren::Flags flags,
+@@ -53,7 +53,7 @@ void AddFilter(TypeCategoryImpl::SharedPointer category_sp,
+                llvm::StringRef type_name,
+                ScriptedSyntheticChildren::Flags flags, bool regex = false);
+ 
+-std::optional<size_t> ExtractIndexFromString(const char *item_name);
++std::optional<size_t> LLDB_PRIVATE_EXPORT ExtractIndexFromString(const char *item_name);
+ 
+ /// Prints the summary for the pointer value of a C++
+ /// std::unique_ptr/std::shared_ptr/std::weak_ptr.
+diff --git a/lldb/include/lldb/Expression/ExpressionTypeSystemHelper.h b/lldb/include/lldb/Expression/ExpressionTypeSystemHelper.h
+index 72b9ccbf7dd0..47d50a584144 100644
+--- a/lldb/include/lldb/Expression/ExpressionTypeSystemHelper.h
++++ b/lldb/include/lldb/Expression/ExpressionTypeSystemHelper.h
+@@ -23,7 +23,7 @@ namespace lldb_private {
+ /// can cast it back to the requisite specific type.
+ ///
+ 
+-class ExpressionTypeSystemHelper
++class __attribute__((visibility("default"))) ExpressionTypeSystemHelper
+     : public llvm::RTTIExtends<ExpressionTypeSystemHelper, llvm::RTTIRoot> {
+ public:
+   /// LLVM RTTI support
+diff --git a/lldb/include/lldb/Host/MainLoopBase.h b/lldb/include/lldb/Host/MainLoopBase.h
+index c64e6988bfb2..9dd5234e0615 100644
+--- a/lldb/include/lldb/Host/MainLoopBase.h
++++ b/lldb/include/lldb/Host/MainLoopBase.h
+@@ -38,7 +38,7 @@ namespace lldb_private {
+ // any concurrent accesses must be protected  externally. However, it is
+ // perfectly legitimate to have more than one instance of this class running on
+ // separate threads, or even a single thread.
+-class MainLoopBase {
++class __attribute__((visibility("default"))) MainLoopBase {
+ private:
+   class ReadHandle;
+ 
+diff --git a/lldb/include/lldb/Host/macosx/HostInfoMacOSX.h b/lldb/include/lldb/Host/macosx/HostInfoMacOSX.h
+index 6c2cabbf55c7..bc1500dfe577 100644
+--- a/lldb/include/lldb/Host/macosx/HostInfoMacOSX.h
++++ b/lldb/include/lldb/Host/macosx/HostInfoMacOSX.h
+@@ -20,7 +20,7 @@ namespace lldb_private {
+ 
+ class ArchSpec;
+ 
+-class HostInfoMacOSX : public HostInfoPosix {
++class __attribute__((visibility("default"))) HostInfoMacOSX : public HostInfoPosix {
+   friend class HostInfoBase;
+ 
+ public:
+diff --git a/lldb/include/lldb/Host/posix/MainLoopPosix.h b/lldb/include/lldb/Host/posix/MainLoopPosix.h
+index 92cdbe9d87ec..2904787dd04d 100644
+--- a/lldb/include/lldb/Host/posix/MainLoopPosix.h
++++ b/lldb/include/lldb/Host/posix/MainLoopPosix.h
+@@ -24,7 +24,7 @@ namespace lldb_private {
+ // readability using ppoll, kqueue, or pselect. In addition to the common base,
+ // this class provides the ability to invoke a given handler when a signal is
+ // received.
+-class MainLoopPosix : public MainLoopBase {
++class __attribute__((visibility("default"))) MainLoopPosix : public MainLoopBase {
+ private:
+   class SignalHandle;
+ 
+diff --git a/lldb/include/lldb/Interpreter/CommandObject.h b/lldb/include/lldb/Interpreter/CommandObject.h
+index 925377159d74..5d4c9c25000c 100644
+--- a/lldb/include/lldb/Interpreter/CommandObject.h
++++ b/lldb/include/lldb/Interpreter/CommandObject.h
+@@ -67,7 +67,8 @@ FindLongestCommandWord(std::map<std::string, ValueType, std::less<>> &dict) {
+   return max_len;
+ }
+ 
+-class CommandObject : public std::enable_shared_from_this<CommandObject> {
++class __attribute__((visibility("default"))) CommandObject
++    : public std::enable_shared_from_this<CommandObject> {
+ public:
+   typedef llvm::StringRef(ArgumentHelpCallbackFunction)();
+ 
+diff --git a/lldb/include/lldb/Utility/ConstString.h b/lldb/include/lldb/Utility/ConstString.h
+index 1bfefec9638a..587284161bd1 100644
+--- a/lldb/include/lldb/Utility/ConstString.h
++++ b/lldb/include/lldb/Utility/ConstString.h
+@@ -9,6 +9,7 @@
+ #ifndef LLDB_UTILITY_CONSTSTRING_H
+ #define LLDB_UTILITY_CONSTSTRING_H
+ 
++#include "lldb/lldb-forward.h"
+ #include "llvm/ADT/DenseMapInfo.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/Support/FormatVariadic.h"
+@@ -416,7 +417,7 @@ static_assert(sizeof(ConstString) <= sizeof(const char *),
+               "High-volume object, size of object must be increased with care");
+ 
+ /// Stream the string value \a str to the stream \a s
+-Stream &operator<<(Stream &s, ConstString str);
++Stream & LLDB_PRIVATE_EXPORT operator<<(Stream &s, ConstString str);
+ 
+ } // namespace lldb_private
+ 
+diff --git a/lldb/include/lldb/Utility/ErrorMessages.h b/lldb/include/lldb/Utility/ErrorMessages.h
+index 3476cf29f099..4bd2c8aef07d 100644
+--- a/lldb/include/lldb/Utility/ErrorMessages.h
++++ b/lldb/include/lldb/Utility/ErrorMessages.h
+@@ -16,7 +16,8 @@
+ namespace lldb_private {
+ 
+ /// Produce a human-readable rendition of an ExpressionResults value.
+-std::string toString(lldb::ExpressionResults e);
++__attribute__((visibility("default"))) std::string
++toString(lldb::ExpressionResults e);
+ 
+ } // namespace lldb_private
+ #endif
+diff --git a/lldb/include/lldb/Utility/FileSpec.h b/lldb/include/lldb/Utility/FileSpec.h
+index c5e5151590f0..833e8f7b283f 100644
+--- a/lldb/include/lldb/Utility/FileSpec.h
++++ b/lldb/include/lldb/Utility/FileSpec.h
+@@ -53,7 +53,7 @@ namespace lldb_private {
+ /// are already split up, it makes it easy for us to compare only the
+ /// basenames of a lot of file specifications without having to split up the
+ /// file path each time to get to the basename.
+-class FileSpec {
++class __attribute__((visibility("default"))) FileSpec {
+ public:
+   using Style = llvm::sys::path::Style;
+
+diff --git a/lldb/include/lldb/Utility/LLDBAssert.h b/lldb/include/lldb/Utility/LLDBAssert.h
+index e76dac46b94f..c7bec7ce023a 100644
+--- a/lldb/include/lldb/Utility/LLDBAssert.h
++++ b/lldb/include/lldb/Utility/LLDBAssert.h
+@@ -30,7 +30,7 @@
+   do {                                                                         \
+     static std::once_flag _once_flag;                                          \
+     lldb_private::_lldb_assert(static_cast<bool>(x), #x, __FUNCTION__,         \
+-                               __FILE__,  __LINE__, _once_flag);               \
++                               __FILE__, __LINE__, _once_flag);                \
+   } while (0)
+ #endif
+ #endif
+@@ -39,9 +39,11 @@ namespace lldb_private {
+ 
+ /// Don't use _lldb_assert directly. Use the lldbassert macro instead so that
+ /// LLDB asserts become regular asserts in NDEBUG builds.
+-void _lldb_assert(bool expression, const char *expr_text, const char *func,
+-                  const char *file, unsigned int line,
+-                  std::once_flag &once_flag);
++void __attribute__((visibility("default")))
++_lldb_assert(bool expression, const char *expr_text,
++                                      const char *func, const char *file,
++                                      unsigned int line,
++                                      std::once_flag &once_flag);
+ 
+ /// The default LLDB assert callback, which prints to stderr.
+ typedef void (*LLDBAssertCallback)(llvm::StringRef message,
+diff --git a/lldb/include/lldb/Utility/LLDBLog.h b/lldb/include/lldb/Utility/LLDBLog.h
+index 250e895fbce8..8912f045afa0 100644
+--- a/lldb/include/lldb/Utility/LLDBLog.h
++++ b/lldb/include/lldb/Utility/LLDBLog.h
+@@ -62,7 +62,8 @@ public:
+   static void Terminate();
+ };
+ 
+-template <> Log::Channel &LogChannelFor<LLDBLog>();
++template <>
++Log::Channel &__attribute__((visibility("default"))) LogChannelFor<LLDBLog>();
+ } // namespace lldb_private
+ 
+ #endif // LLDB_UTILITY_LLDBLOG_H
+diff --git a/lldb/include/lldb/Utility/StringList.h b/lldb/include/lldb/Utility/StringList.h
+index bb3e18ba3c2d..1b8e0de1dd98 100644
+--- a/lldb/include/lldb/Utility/StringList.h
++++ b/lldb/include/lldb/Utility/StringList.h
+@@ -9,6 +9,8 @@
+ #ifndef LLDB_UTILITY_STRINGLIST_H
+ #define LLDB_UTILITY_STRINGLIST_H
+ 
++#include "lldb/lldb-forward.h"
++
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/ADT/Twine.h"
+ 
+diff --git a/lldb/include/lldb/lldb-forward.h b/lldb/include/lldb/lldb-forward.h
+index 67888f7d32ed..01ca34ebfcc5 100644
+--- a/lldb/include/lldb/lldb-forward.h
++++ b/lldb/include/lldb/lldb-forward.h
+@@ -14,6 +14,107 @@
+ // lldb forward declarations
+ namespace lldb_private {
+ 
++#define LLDB_PRIVATE_EXPORT __attribute__((visibility("default")))
++
++class LLDB_PRIVATE_EXPORT Address;
++class LLDB_PRIVATE_EXPORT AddressRange;
++class LLDB_PRIVATE_EXPORT ArchSpec;
++class LLDB_PRIVATE_EXPORT Args;
++class LLDB_PRIVATE_EXPORT Block;
++class LLDB_PRIVATE_EXPORT Breakpoint;
++class LLDB_PRIVATE_EXPORT BreakpointResolverName;
++class LLDB_PRIVATE_EXPORT Broadcaster;
++class LLDB_PRIVATE_EXPORT CommandInterpreter;
++class LLDB_PRIVATE_EXPORT CommandReturnObject;
++class LLDB_PRIVATE_EXPORT CompileUnit;
++class LLDB_PRIVATE_EXPORT CompilerType;
++class LLDB_PRIVATE_EXPORT CompletionResult;
++class LLDB_PRIVATE_EXPORT ConstString;
++class LLDB_PRIVATE_EXPORT DWARFExpression;
++class LLDB_PRIVATE_EXPORT DataBufferHeap;
++class LLDB_PRIVATE_EXPORT DataVisualization;
++class LLDB_PRIVATE_EXPORT DataExtractor;
++class LLDB_PRIVATE_EXPORT Debugger;
++class LLDB_PRIVATE_EXPORT Diagnostic;
++class LLDB_PRIVATE_EXPORT DiagnosticManager;
++class LLDB_PRIVATE_EXPORT DumpValueObjectOptions;
++class LLDB_PRIVATE_EXPORT DumpDataExtractor;
++class LLDB_PRIVATE_EXPORT Event;
++class LLDB_PRIVATE_EXPORT EventDataBytes;
++class LLDB_PRIVATE_EXPORT ExecutionContext;
++class LLDB_PRIVATE_EXPORT ExecutionContextRef;
++class LLDB_PRIVATE_EXPORT ExpressionTypeSystemHelper;
++class LLDB_PRIVATE_EXPORT ExpressionVariable;
++class LLDB_PRIVATE_EXPORT FileSpec;
++class LLDB_PRIVATE_EXPORT FileSpecList;
++class LLDB_PRIVATE_EXPORT FileSystem;
++namespace FormatEntity {
++struct LLDB_PRIVATE_EXPORT Entry;
++} // namespace FormatEntity
++namespace formatters {
++class LLDB_PRIVATE_EXPORT StringPrinter;
++} // namespace formatters
++class LLDB_PRIVATE_EXPORT Function;
++class LLDB_PRIVATE_EXPORT HostInfoBase;
++class LLDB_PRIVATE_EXPORT HostInfoPosix;
++class LLDB_PRIVATE_EXPORT IOHandlerDelegate;
++class LLDB_PRIVATE_EXPORT IRMemoryMap;
++class LLDB_PRIVATE_EXPORT Language;
++class LLDB_PRIVATE_EXPORT LanguageRuntime;
++class LLDB_PRIVATE_EXPORT LanguageSet;
++class LLDB_PRIVATE_EXPORT Listener;
++class LLDB_PRIVATE_EXPORT Log;
++class LLDB_PRIVATE_EXPORT LogMessage;
++class LLDB_PRIVATE_EXPORT Mangled;
++class LLDB_PRIVATE_EXPORT Materializer;
++class LLDB_PRIVATE_EXPORT Module;
++class LLDB_PRIVATE_EXPORT ModuleChild;
++class LLDB_PRIVATE_EXPORT ModuleList;
++class LLDB_PRIVATE_EXPORT PersistentExpressionState;
++class LLDB_PRIVATE_EXPORT PluginManager;
++class LLDB_PRIVATE_EXPORT Process;
++class LLDB_PRIVATE_EXPORT ProcessLaunchInfo;
++class LLDB_PRIVATE_EXPORT ProcessInfo;
++class LLDB_PRIVATE_EXPORT REPL;
++class LLDB_PRIVATE_EXPORT Section;
++class LLDB_PRIVATE_EXPORT SectionList;
++class LLDB_PRIVATE_EXPORT StackFrame;
++class LLDB_PRIVATE_EXPORT Status;
++class LLDB_PRIVATE_EXPORT Stream;
++class LLDB_PRIVATE_EXPORT StreamFile;
++class LLDB_PRIVATE_EXPORT StreamString;
++class LLDB_PRIVATE_EXPORT StringList;
++class LLDB_PRIVATE_EXPORT Symbol;
++class LLDB_PRIVATE_EXPORT SymbolContext;
++class LLDB_PRIVATE_EXPORT SymbolContextList;
++class LLDB_PRIVATE_EXPORT SyntheticChildrenFrontEnd;
++class LLDB_PRIVATE_EXPORT Target;
++class LLDB_PRIVATE_EXPORT TargetList;
++class LLDB_PRIVATE_EXPORT TargetProperties;
++class LLDB_PRIVATE_EXPORT Thread;
++class LLDB_PRIVATE_EXPORT ThreadList;
++class LLDB_PRIVATE_EXPORT ThreadPlan;
++class LLDB_PRIVATE_EXPORT ThreadPlanCallFunction;
++class LLDB_PRIVATE_EXPORT ThreadPlanCallUserExpression;
++class LLDB_PRIVATE_EXPORT Type;
++class LLDB_PRIVATE_EXPORT TypeSummaryOptions;
++class LLDB_PRIVATE_EXPORT TypeSystem;
++class LLDB_PRIVATE_EXPORT UserExpression;
++class LLDB_PRIVATE_EXPORT Value;
++class LLDB_PRIVATE_EXPORT ValueObject;
++class LLDB_PRIVATE_EXPORT ValueObjectConstResult;
++namespace plugin {
++namespace dwarf {
++class LLDB_PRIVATE_EXPORT DWARFBaseDIE;
++class LLDB_PRIVATE_EXPORT SymbolFileDWARF;
++class LLDB_PRIVATE_EXPORT DWARFASTParser;
++class LLDB_PRIVATE_EXPORT DWARFAttributes;
++class LLDB_PRIVATE_EXPORT DWARFDIE;
++class LLDB_PRIVATE_EXPORT DWARFFormValue;
++class LLDB_PRIVATE_EXPORT DWARFUnit;
++} // namespace dwarf
++} // namespace plugin
++
+ class ABI;
+ class ASTResultSynthesizer;
+ class ASTStructExtractor;
+diff --git a/lldb/source/Plugins/SymbolFile/DWARF/DWARFBaseDIE.h b/lldb/source/Plugins/SymbolFile/DWARF/DWARFBaseDIE.h
+index 9736b80ac375..48d680c3a527 100644
+--- a/lldb/source/Plugins/SymbolFile/DWARF/DWARFBaseDIE.h
++++ b/lldb/source/Plugins/SymbolFile/DWARF/DWARFBaseDIE.h
+@@ -132,8 +132,8 @@ protected:
+   DWARFDebugInfoEntry *m_die = nullptr;
+ };
+ 
+-bool operator==(const DWARFBaseDIE &lhs, const DWARFBaseDIE &rhs);
+-bool operator!=(const DWARFBaseDIE &lhs, const DWARFBaseDIE &rhs);
++bool LLDB_PRIVATE_EXPORT operator==(const DWARFBaseDIE &lhs, const DWARFBaseDIE &rhs);
++bool LLDB_PRIVATE_EXPORT operator!=(const DWARFBaseDIE &lhs, const DWARFBaseDIE &rhs);
+ } // namespace dwarf
+ } // namespace lldb_private::plugin
+ 
+diff --git a/lldb/source/Plugins/SymbolFile/DWARF/DWARFDefines.h b/lldb/source/Plugins/SymbolFile/DWARF/DWARFDefines.h
+index 6e33371c3485..29219d35c5d8 100644
+--- a/lldb/source/Plugins/SymbolFile/DWARF/DWARFDefines.h
++++ b/lldb/source/Plugins/SymbolFile/DWARF/DWARFDefines.h
+@@ -9,13 +9,14 @@
+ #ifndef LLDB_SOURCE_PLUGINS_SYMBOLFILE_DWARF_DWARFDEFINES_H
+ #define LLDB_SOURCE_PLUGINS_SYMBOLFILE_DWARF_DWARFDEFINES_H
+ 
++#include "lldb/lldb-forward.h"
+ #include "lldb/Core/dwarf.h"
+ #include <cstdint>
+ 
+ namespace lldb_private::plugin {
+ namespace dwarf {
+ 
+-llvm::StringRef DW_TAG_value_to_name(dw_tag_t tag);
++llvm::StringRef LLDB_PRIVATE_EXPORT DW_TAG_value_to_name(dw_tag_t tag);
+ 
+ } // namespace dwarf
+ } // namespace lldb_private::plugin
+diff --git a/lldb/source/Plugins/SymbolFile/DWARF/LogChannelDWARF.h b/lldb/source/Plugins/SymbolFile/DWARF/LogChannelDWARF.h
+index 7f254a1162bd..790403586faf 100644
+--- a/lldb/source/Plugins/SymbolFile/DWARF/LogChannelDWARF.h
++++ b/lldb/source/Plugins/SymbolFile/DWARF/LogChannelDWARF.h
+@@ -31,7 +31,8 @@ public:
+   static void Terminate();
+ };
+ 
+-template <> Log::Channel &LogChannelFor<DWARFLog>();
++template <>
++Log::Channel &__attribute__((visibility("default"))) LogChannelFor<DWARFLog>();
+ } // namespace lldb_private
+ 
+ #endif // LLDB_SOURCE_PLUGINS_SYMBOLFILE_DWARF_LOGCHANNELDWARF_H

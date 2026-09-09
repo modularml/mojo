@@ -16,12 +16,12 @@ from std.python.bindings import PythonModuleBuilder
 from std.python._cpython import GILAcquired, GILReleased
 from std.os import abort
 import std.math
-from std.algorithm.functional import parallelize
+from max.algorithm.functional import parallelize
 from std.sys.info import num_physical_cores
 
 
 @export
-def PyInit_mojo_module() -> PythonObject:
+def PyInit_mojo_module() abi("C") -> PythonObject:
     try:
         var m = PythonModuleBuilder("mojo_module")
         m.def_function[plus_one]("plus_one")
@@ -43,8 +43,7 @@ def parallel_wrapper(array: PythonObject) raises -> PythonObject:
     var num_cores = num_physical_cores()
     var chunk_size, remainder = divmod(array_len, num_cores)
 
-    @parameter
-    def calc_max(i: Int) -> None:
+    def calc_max(i: Int) {imm} -> None:
         ref cpython = Python().cpython()
         # Each worker needs to hold the GIL to access python objects.
         # It is more efficient to only use Mojo native data structures in worker threads.
@@ -73,7 +72,7 @@ def parallel_wrapper(array: PythonObject) raises -> PythonObject:
     comptime if do_parallelize:
         # Save the current thread state to avoid holding the GIL for the parallel loop.
         with GILReleased(Python(cpython)):
-            parallelize[calc_max](num_cores)
+            parallelize(calc_max, num_cores)
     else:
         for i in range(0, num_cores):
             calc_max(i)

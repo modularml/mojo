@@ -28,10 +28,13 @@ import numpy.typing as npt
 from max.driver import CPU, Buffer, Device
 from max.dtype import DType
 from max.graph import TensorType, TensorValue, ops
-from max.pipelines.core import PixelContext
+from max.pipelines.context import PixelContext, TokenBuffer
 from max.pipelines.diffusion.interface import DiffusionPipeline, max_compile
 from max.pipelines.lib.bfloat16_utils import float32_to_bfloat16_as_uint16
-from max.pipelines.modeling.types import TokenBuffer
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+    _select_quantization_encoding,
+)
 from max.profiler import Tracer, traced
 
 from ..autoencoders.autoencoder_kl_qwen_image import AutoencoderKLQwenImageModel
@@ -39,6 +42,7 @@ from ..qwen2_5vl.encoder import (
     Qwen25VLEncoderModel,
     Qwen25VLMultimodalEncoderModel,
 )
+from ..qwen_image.arch import QwenImageArchConfig
 from .model import QwenImageEditTransformerModel
 
 
@@ -168,8 +172,11 @@ class QwenImageEditPipeline(DiffusionPipeline):
         te_config = self.pipeline_config.models.get("text_encoder")
         if te_config is not None:
             self._prompt_encoder_config = te_config.huggingface_config.to_dict()
+            _, te_weight_path = _resolve_component_encoding_and_weights(
+                te_config
+            )
             self._prompt_encoder_weight_paths = (
-                self._get_component_weight_paths(te_config)
+                self._get_component_weight_paths(te_config, te_weight_path)
             )
 
     def _compile_runtime_helpers(self) -> None:
@@ -421,7 +428,9 @@ class QwenImageEditPipeline(DiffusionPipeline):
             subfolder="tokenizer",
         )
 
-        encoding = first_config.quantization_encoding or "bfloat16"
+        encoding = _select_quantization_encoding(
+            first_config, QwenImageArchConfig.DEFAULT_ENCODING
+        )
         self.prompt_encoder = Qwen25VLMultimodalEncoderModel(
             text_encoder=self.text_encoder,
             config=self._prompt_encoder_config,
@@ -532,7 +541,7 @@ class QwenImageEditPipeline(DiffusionPipeline):
             )
         return self.cache.text_ids[cache_key]
 
-    def prepare_inputs(self, context: PixelContext) -> QwenImageEditModelInputs:  # type: ignore[override]
+    def prepare_inputs(self, context: PixelContext) -> QwenImageEditModelInputs:
         """Convert a PixelContext into QwenImageEditModelInputs."""
         return QwenImageEditModelInputs.from_context(context)
 

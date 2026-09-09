@@ -30,14 +30,19 @@ from .functional_kernels import (
     flash_attention_ragged,
     rope_split_store_ragged,
 )
+from .linear import QKVLinear
 from .rotary_embedding import RotaryEmbedding
 
 
 class AttentionWithRope(Module[..., Tensor]):
     """Implementation of attention that uses Rotary Position Embedding (RoPE).
 
-    This is a ModuleV3 port of the legacy AttentionWithRope class. It supports
-    both separate and stacked QKV projections, optional clip_qkv clamping, and
+    This is a ModuleV3 port of the legacy AttentionWithRope class. The Q/K/V
+    projection is a fused
+    :class:`~max.experimental.nn.common_layers.linear.QKVLinear` ``qkv_proj``
+    submodule that handles both checkpoint layouts: separate q/k/v weights (the
+    default, name-transparent) and a pre-fused ``qkv_proj`` weight
+    (``stacked_qkv=True``). It also supports optional ``clip_qkv`` clamping and
     optional QK normalization via RMSNorm.
     """
 
@@ -69,7 +74,8 @@ class AttentionWithRope(Module[..., Tensor]):
             layer_idx: The layer number associated with this Attention block.
             scale: Optional attention scale; defaults to sqrt(1/head_dim).
             has_bias: Whether Q/K/V have bias (stacked_qkv forbids bias).
-            stacked_qkv: Whether Q/K/V weights are stacked in a single weight.
+            stacked_qkv: Whether the checkpoint stores Q/K/V as a single fused
+                ``qkv_proj`` weight (vs separate q/k/v weights).
             clip_qkv: If provided, clamp Q/K/V weights to
                 ``[-clip_qkv, clip_qkv]``.
             use_qk_norm: Whether to use RMSNorm on Q/K.
@@ -105,28 +111,13 @@ class AttentionWithRope(Module[..., Tensor]):
         kv_weight_dim = self.kv_params.head_dim * num_key_value_heads
         self.q_weight_dim = q_weight_dim
 
-        if stacked_qkv:
-            self.qkv_proj = Linear(
-                in_dim=hidden_size,
-                out_dim=q_weight_dim + 2 * kv_weight_dim,
-                bias=False,
-            )
-        else:
-            self.q_proj = Linear(
-                in_dim=hidden_size,
-                out_dim=q_weight_dim,
-                bias=has_bias,
-            )
-            self.k_proj = Linear(
-                in_dim=hidden_size,
-                out_dim=kv_weight_dim,
-                bias=has_bias,
-            )
-            self.v_proj = Linear(
-                in_dim=hidden_size,
-                out_dim=kv_weight_dim,
-                bias=has_bias,
-            )
+        self.qkv_proj = QKVLinear(
+            in_dim=hidden_size,
+            q_dim=q_weight_dim,
+            kv_dim=kv_weight_dim,
+            bias=has_bias,
+            stacked=stacked_qkv,
+        )
 
         self.o_proj = Linear(
             in_dim=q_weight_dim,
@@ -140,32 +131,19 @@ class AttentionWithRope(Module[..., Tensor]):
 
     @property
     def wqkv(self) -> Tensor:
-        """The concatenation of q, k, and v weight vectors."""
-        if self.stacked_qkv:
-            return self.qkv_proj.weight
-        else:
-            wq: Tensor = self.q_proj.weight
-            wk: Tensor = self.k_proj.weight
-            wv: Tensor = self.v_proj.weight
-            if self.clip_qkv:
-                wq = F.clip(wq, -self.clip_qkv, self.clip_qkv)
-                wk = F.clip(wk, -self.clip_qkv, self.clip_qkv)
-                wv = F.clip(wv, -self.clip_qkv, self.clip_qkv)
-            return F.concat([wq, wk, wv], axis=0)
+        """The fused q||k||v projection weight (clamped if ``clip_qkv``)."""
+        weight = self.qkv_proj.fused_weight
+        if self.clip_qkv:
+            weight = F.clip(weight, -self.clip_qkv, self.clip_qkv)
+        return weight
 
     @property
     def wqkv_bias(self) -> Tensor | None:
-        """The concatenation of q, k, and v bias weight vectors."""
+        """The fused q||k||v projection bias, or ``None`` when unused."""
         if not self.has_bias:
             return None
-        assert not self.stacked_qkv
-
-        assert self.q_proj.bias is not None
-        assert self.k_proj.bias is not None
-        assert self.v_proj.bias is not None
-        return F.concat(
-            [self.q_proj.bias, self.k_proj.bias, self.v_proj.bias], axis=0
-        )
+        bias = self.qkv_proj.fused_bias
+        return bias if isinstance(bias, Tensor) else None
 
     def forward(
         self,
@@ -178,11 +156,15 @@ class AttentionWithRope(Module[..., Tensor]):
 
         layer_idx = F.constant(self.layer_idx, DType.uint32, device=CPU())
 
-        # QKV matmul: graph-level weight concat, then a single matmul.
-        wqkv = self.wqkv
-        qkv = x @ wqkv.T
-        if self.wqkv_bias is not None:
-            qkv = qkv + self.wqkv_bias
+        # clip_qkv clamps the fused weight; clamp commutes with the q||k||v row
+        # concat, so this equals clamping q/k/v separately.
+        if self.clip_qkv:
+            weight = F.clip(
+                self.qkv_proj.fused_weight, -self.clip_qkv, self.clip_qkv
+            )
+            qkv = x @ weight.T + self.qkv_proj.fused_bias
+        else:
+            qkv = self.qkv_proj(x)
 
         if self.use_qk_norm:
             head_dim = self.kv_params.head_dim

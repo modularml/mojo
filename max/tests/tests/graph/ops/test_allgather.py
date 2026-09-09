@@ -334,6 +334,88 @@ def test_allgather_nonzero_dim_uneven() -> None:
         graph.output(*outputs)
 
 
+def test_allgather_grouped_uneven_shapes() -> None:
+    """Test grouped allgather with different per-group concat sizes."""
+    num_gpus = 8
+    group_size = 4
+    devices = [DeviceRef.GPU(id=i) for i in range(num_gpus)]
+    signals = Signals(devices)
+    input_shapes = [[5, 128]] * group_size + [[3, 128]] * group_size
+    expected_shapes = [Shape((20, 128))] * group_size + [
+        Shape((12, 128))
+    ] * group_size
+
+    with Graph(
+        "grouped_allgather",
+        input_types=[
+            TensorType(dtype=DType.float32, shape=shape, device=device)
+            for shape, device in zip(input_shapes, devices, strict=True)
+        ]
+        + list(signals.input_types()),
+    ) as graph:
+        outputs = ops.allgather(
+            inputs=(v.tensor for v in graph.inputs[:num_gpus]),
+            signal_buffers=(v.buffer for v in graph.inputs[num_gpus:]),
+            axis=0,
+            group_size=group_size,
+        )
+        graph.output(*outputs)
+        for output, device, expected_shape in zip(
+            outputs, devices, expected_shapes, strict=True
+        ):
+            assert output.device == device
+            assert output.shape == expected_shape
+            assert output.dtype == DType.float32
+
+
+def test_allgather_group_size_must_divide_inputs() -> None:
+    """Test grouped allgather requires complete contiguous groups."""
+    num_gpus = 6
+    devices = [DeviceRef.GPU(id=i) for i in range(num_gpus)]
+    signals = Signals(devices)
+
+    with pytest.raises(
+        ValueError,
+        match=r"group_size to evenly divide the number of input tensors",
+    ):
+        with Graph(
+            "grouped_allgather",
+            input_types=[
+                TensorType(dtype=DType.float32, shape=[6, 16], device=device)
+                for device in devices
+            ]
+            + list(signals.input_types()),
+        ) as graph:
+            ops.allgather(
+                inputs=(v.tensor for v in graph.inputs[:num_gpus]),
+                signal_buffers=(v.buffer for v in graph.inputs[num_gpus:]),
+                axis=0,
+                group_size=4,
+            )
+
+
+def test_allgather_group_size_one_is_noop() -> None:
+    """Tests that singleton allgather groups return the original tensors."""
+    devices = [DeviceRef.GPU(id=0), DeviceRef.GPU(id=1)]
+    signals = Signals(devices)
+
+    with Graph(
+        "allgather_group_size_one",
+        input_types=[
+            TensorType(dtype=DType.float32, shape=[6, 5], device=device)
+            for device in devices
+        ]
+        + list(signals.input_types()),
+    ) as graph:
+        outputs = ops.allgather(
+            inputs=(v.tensor for v in graph.inputs[: len(devices)]),
+            signal_buffers=(v.buffer for v in graph.inputs[len(devices) :]),
+            group_size=1,
+        )
+        assert outputs[0]._mlir_value == graph.inputs[0]._mlir_value
+        assert outputs[1]._mlir_value == graph.inputs[1]._mlir_value
+
+
 def test_allgather_noop() -> None:
     """Tests that allgather is a noop if the number of inputs is 0 or 1."""
     devices = [DeviceRef.GPU(id=0)]

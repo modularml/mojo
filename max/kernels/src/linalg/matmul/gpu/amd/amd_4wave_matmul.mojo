@@ -30,7 +30,7 @@ Body is driven by the framework schedule (`Pipeline4Wave` in
 `minimal_barriers` + `omit_mma_set_prio`. The schedule consumes the
 logical 24-op cross-stage-rotation body and derives wait counts /
 barriers from `KernelGeometry`. Supports FP8 (E4M3FN), BF16, and FP16
-through a single body — MMA shape and BK select on dtype.
+through a single body: MMA shape and BK select on dtype.
 """
 
 from std.bit import log2_floor
@@ -38,22 +38,22 @@ from std.math import ceildiv
 from std.sys import align_of, size_of, llvm_intrinsic
 from std.sys.intrinsics import readfirstlane
 from std.utils import Index, IndexList, StaticTuple
-from std.collections import InlineArray
+from std.collections import Array
 from std.utils.numerics import get_accum_type
 
-from std.gpu import (
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,
     block_idx,
     lane_id,
     warp_id,
 )
-from std.gpu.host import DeviceContext
-from std.gpu.host.info import MI355X
-from std.gpu.intrinsics import AMDBufferResource
-from std.gpu.sync import schedule_barrier, s_waitcnt
+from max.gpu.host import DeviceContext
+from max.gpu.host.info import MI355X
+from max.gpu.intrinsics import AMDBufferResource
+from max.gpu.sync import schedule_barrier, s_waitcnt
 
-from layout import TensorLayout, TileTensor
+from layout import TensorLayout, TensorEngine, TileTensor
 from layout.swizzle import Swizzle
 from layout.tile_layout import row_major
 from layout.tile_tensor import stack_allocation
@@ -103,7 +103,7 @@ def _xcd_wgm_swizzle(
     Mirrors `4_wave.cu` lines 117-136 / 353-372 in HipKittens.
 
     The swizzle's L2 reuse only pays off when the WG count is large
-    enough that each CU runs multiple WGs in one kernel launch — i.e.
+    enough that each CU runs multiple WGs in one kernel launch: i.e.
     `num_wgs > num_CUs`. For our decode/prefill shapes (typically
     32-1024 WGs vs 304 CUs), the swizzle math would just add overhead
     without any L2 benefit. We gate on `num_wgs > 4 * num_CUs` to
@@ -146,7 +146,7 @@ def _xcd_wgm_swizzle(
 struct MatmulKernelConfig(ImplicitlyCopyable, Movable, Writable):
     """Block/warp/MMA shape configuration for 4-wave kernels.
 
-    Shared by `AMD4WaveMatmul`'s matmul and conv2d entry points — both
+    Shared by `AMD4WaveMatmul`'s matmul and conv2d entry points: both
     use the same 4-warp 2×2 quadrant layout and the same MFMA shape
     selection, so the per-call surface only needs the workgroup /
     warp / MMA tile shapes.
@@ -414,7 +414,7 @@ struct AMD4WaveMatmul[
 
     Line-by-line port of HipKittens FP8_4wave's `matmul_device_1024`
     (BM=64) and `matmul_device_2048` (BM=128). No declarative pipeline
-    framework — explicit waits, explicit barriers, explicit register
+    framework: explicit waits, explicit barriers, explicit register
     rotation matching the source's k+2 prefetch pattern.
 
     Parameters:
@@ -481,9 +481,9 @@ struct AMD4WaveMatmul[
     # Half-tile dimensions: each SMEM tile covers one M-subtile (or N-subtile)
     # of the WG-level BM x BK (or BN x BK) block.
     comptime half_BM = Self.BM // 2
-    """Half of `BM` — one M-subtile per SMEM stage."""
+    """Half of `BM`: one M-subtile per SMEM stage."""
     comptime half_BN = Self.BN // 2
-    """Half of `BN` — one N-subtile per SMEM stage."""
+    """Half of `BN`: one N-subtile per SMEM stage."""
     comptime mma_tile_m = Self.WM // 2
     """Per-quadrant M-tile size consumed by an MMA load."""
     comptime mma_tile_n = Self.WN // 2
@@ -689,7 +689,7 @@ struct AMD4WaveMatmul[
     def is_valid_config() -> Bool:
         """Returns whether the kernel's tile shapes are a viable config.
 
-        Pure predicate — does not raise. Use this from autotune drivers
+        Pure predicate, does not raise. Use this from autotune drivers
         and dispatcher fallbacks to filter out impossible (BM, BN, BK,
         dtype) combinations before instantiating the kernel. The full
         per-check set is in `validate_config`; this is its non-throwing
@@ -764,23 +764,29 @@ struct AMD4WaveMatmul[
             " 64 KB"
         )
 
-    @__llvm_metadata(`rocdl.waves_per_eu`=SIMDSize(1))
+    @__llvm_metadata(`rocdl.waves_per_eu`=SIMDLength(1))
     @__llvm_metadata(
         MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](
             Int32(Self.config.num_threads())
         )
+    )
+    @__name(
+        t"amd_4wave_matmul_{Self.a_type}_{Self.b_type}_{Self.c_type}_BM{Self.BM}_BN{Self.BN}_BK{Self.BK}_WM{Self.WM}_WN{Self.WN}_SK{num_splits}"
     )
     @staticmethod
     def run[
         a_layout: TensorLayout,
         b_layout: TensorLayout,
         c_layout: TensorLayout,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
+        c_engine: TensorEngine,
         *,
         num_splits: Int = 1,
     ](
-        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin],
-        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin],
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin],
+        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
     ):
         """Runs the 4-wave GEMM kernel for one workgroup tile.
 
@@ -794,6 +800,9 @@ struct AMD4WaveMatmul[
             a_layout: Logical layout of `a`.
             b_layout: Logical layout of `b`.
             c_layout: Logical layout of `c`.
+            a_engine: Engine of `a`.
+            b_engine: Engine of `b`.
+            c_engine: Engine of `c`.
             num_splits: Split-K factor (1 means no split).
 
         Args:
@@ -862,30 +871,30 @@ struct AMD4WaveMatmul[
 
         # === SMEM: 2 stages x 2 M-subtiles for A, 2 stages x 2 N-subtiles for B
         comptime a_half_layout = row_major[half_BM, BK]()
-        var a_s0_g0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s0_g0 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s0_g1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s0_g1 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s1_g0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s1_g0 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s1_g1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s1_g1 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
 
         comptime b_half_layout = row_major[half_BN, BK]()
-        var b_s0_h0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s0_h0 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s0_h1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s0_h1 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s1_h0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s1_h0 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s1_h1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s1_h1 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
 
@@ -980,19 +989,23 @@ struct AMD4WaveMatmul[
         )
 
         @always_inline
-        @parameter
+        @__parameter
         def load_a[stage: Int, which: Int](k: Int):
             a_loader.load_tile(
-                a_load_tiles[stage][which],
+                rebind[type_of(a_load_tiles[0][0])](
+                    rebind[type_of(a_load_tiles[0])](a_load_tiles[stage])[which]
+                ),
                 m_offset=which * half_BM,
                 k_offset=k,
             )
 
         @always_inline
-        @parameter
+        @__parameter
         def load_b[stage: Int, which: Int](k: Int):
             b_loader.load_tile(
-                b_load_tiles[stage][which],
+                rebind[type_of(b_load_tiles[0][0])](
+                    rebind[type_of(b_load_tiles[0])](b_load_tiles[stage])[which]
+                ),
                 m_offset=which * half_BN,
                 k_offset=k,
             )
@@ -1010,7 +1023,7 @@ struct AMD4WaveMatmul[
         # ====================================================
         # Body: framework-driven via Pipeline4Wave.
         # ====================================================
-        @parameter
+        @__parameter
         @always_inline
         def _emit_framework_body():
             # `Pipeline4Wave.__init__` forces IDENTITY +
@@ -1069,7 +1082,7 @@ struct AMD4WaveMatmul[
                 sched_config, target
             )
 
-            @parameter
+            @__parameter
             @always_inline
             def _bind[entry: ScheduleEntry](k_base: Int):
                 # Framework-level infrastructure tags (BARRIER / WAIT_* /
@@ -1097,11 +1110,19 @@ struct AMD4WaveMatmul[
                         load_b[entry.op.stage, entry.op.subtile](k)
                     elif entry.op.tag == MMA_LOAD_A:
                         mma_op.load_a_quadrant[entry.op.subtile](
-                            a_mma_tiles[entry.op.stage][entry.op.subtile]
+                            rebind[type_of(a_mma_tiles[0][0])](
+                                rebind[type_of(a_mma_tiles[0])](
+                                    a_mma_tiles[entry.op.stage]
+                                )[entry.op.subtile]
+                            )
                         )
                     elif entry.op.tag == MMA_LOAD_B:
                         mma_op.load_b_quadrant[entry.op.subtile](
-                            b_mma_tiles[entry.op.stage][entry.op.subtile]
+                            rebind[type_of(b_mma_tiles[0][0])](
+                                rebind[type_of(b_mma_tiles[0])](
+                                    b_mma_tiles[entry.op.stage]
+                                )[entry.op.subtile]
+                            )
                         )
                     elif entry.op.tag == MMA:
                         mma_op.mma_quadrant[entry.op.stage, entry.op.subtile]()
@@ -1118,36 +1139,29 @@ struct AMD4WaveMatmul[
             comptime for i in range(len(schedule.prologue)):
                 _bind[schedule.prologue[i]](0)
 
-            # `num_K_iters == 1` race fix: when `K_per_split == 2*BK`,
-            # the main loop below runs zero times and the framework
-            # epilogue follows the prologue immediately. The prologue's
-            # `partial_prologue_drain` only paired the first 2
-            # prefetches with bootstrap-frag drains; 6 prefetches
-            # remain in flight. The framework's per-block emit places
-            # the frag-load BEFORE the per-block `wait_vm[0]`, so the
-            # first epilogue block's `ds_read` would race with those
-            # in-flight `buffer_load_lds → LDS` writes (the LDS may
-            # not yet be cross-warp visible). Mirror the handwritten
-            # body's top-of-iter sync (`wait_vm(0) + wait_lgkm(0) +
-            # s_barrier`) to drain the prefetches before any epilogue
-            # `ds_read` fires. Empirically this only manifests at FP8
-            # BM=64 (1 MFMA / quadrant block, ~16 cycles of latency
-            # cushion is too small); BF16/FP16 and FP8 BM=128 have
-            # enough per-block MMA cycles for the race to land
-            # innocuously, but the drain is correct for all of them
-            # and adds one `wait_vm + barrier` cost only at this
-            # narrow corner.
-            comptime _num_K_iters_static = K_per_split // (2 * BK)
-            comptime if _num_K_iters_static == 1:
-                s_waitcnt[vmcnt=UInt32(0)]()
-                s_waitcnt[lgkmcnt=UInt32(0)]()
-                s_barrier()
-
             # Main loop: step 2*BK because each schedule iter unrolls 2
             # source K-iters (matches ping-pong's stepping).
             for k in range(BK * 2, K_per_split, BK * 2):
                 comptime for i in range(len(schedule.kernel)):
                     _bind[schedule.kernel[i]](k)
+
+            # The schedule leaves several buffer_load_lds prefetches in flight
+            # into the LDS double-buffer at the main-loop-to-epilogue boundary,
+            # counting on MMA-cycle latency to hide them before the epilogue's
+            # ds_read. Two cases erase that cushion: split-K launches
+            # grid_dim.z = num_splits extra workgroups so occupancy is high and
+            # per-workgroup latency hiding collapses, and K_per_split == 2*BK
+            # leaves no main loop so the prologue's partial drain runs straight
+            # into the epilogue with prefetches still in flight. Either way the
+            # epilogue can read LDS slots before the writes land, corrupting a
+            # few ULPs as run-to-run non-determinism. Drain VMEM and LDS once
+            # here; the num_splits == 1 loop case keeps the cushion and compiles
+            # this away.
+            comptime _num_K_iters_static = K_per_split // (2 * BK)
+            comptime if _num_K_iters_static == 1 or num_splits > 1:
+                s_waitcnt[vmcnt=UInt32(0)]()
+                s_waitcnt[lgkmcnt=UInt32(0)]()
+                s_barrier()
 
             # Epilogue.
             comptime for i in range(len(schedule.epilogue)):
@@ -1223,11 +1237,14 @@ struct AMD4WaveMatmul[
                         )
                         c_writer.store(v, m=m_dram, n=n_global)
 
-    @__llvm_metadata(`rocdl.waves_per_eu`=SIMDSize(1))
+    @__llvm_metadata(`rocdl.waves_per_eu`=SIMDLength(1))
     @__llvm_metadata(
         MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](
             Int32(Self.config.num_threads())
         )
+    )
+    @__name(
+        t"amd_4wave_conv2d_{Self.a_type}_{Self.b_type}_{Self.c_type}_BM{Self.BM}_BN{Self.BN}_BK{Self.BK}_WM{Self.WM}_WN{Self.WN}_res{has_residual}"
     )
     @staticmethod
     def run_conv2d[
@@ -1252,14 +1269,14 @@ struct AMD4WaveMatmul[
         b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin],
         c: TileTensor[Self.c_type, c_layout, MutAnyOrigin],
         source_ptr: UnsafePointer[Scalar[Self.c_type], ImmutAnyOrigin],
-        source_row_stride: Int,
+        source_row_stride: Int32,
         beta: Float32,
     ):
         """Runs the 4-wave kernel as a 2D convolution via implicit-GEMM.
 
         Sibling of `run()` (the matmul entry point); both share the
         4-warp 2x2 quadrant layout, the same MFMA shapes, and the same
-        software-pipeline schedule — only the A-operand loader differs.
+        software-pipeline schedule; only the A-operand loader differs.
         `run()` uses `TileLoaderLDS` (linear MK source); this method
         uses `TileLoaderLDSIm2col`, which materializes the A operand
         from a 4D NHWC input via in-line im2col addressing.
@@ -1269,7 +1286,7 @@ struct AMD4WaveMatmul[
         `[M, C_out]`-aliased view of an NHWC residual buffer) into VGPRs
         at the start of the epilogue. By the time the FMA-and-store
         loop runs, all 32 per-lane residual loads are in flight in
-        parallel — replacing the per-store
+        parallel, replacing the per-store
         `global_load → wait → store` staircase that costs ~24% on
         memory-bound shapes. The launcher passes the residual pointer,
         row stride, and `beta` scale; the kernel applies
@@ -1307,6 +1324,7 @@ struct AMD4WaveMatmul[
             beta: Residual scale. Unused when `has_residual=False`.
         """
         Self.validate_config()
+        var _source_row_stride = Int(source_row_stride)
 
         comptime BM = Self.BM
         comptime BN = Self.BN
@@ -1396,30 +1414,30 @@ struct AMD4WaveMatmul[
 
         # === SMEM: 2 stages x 2 M-subtiles for A, 2 stages x 2 N-subtiles for B
         comptime a_half_layout = row_major[half_BM, BK]()
-        var a_s0_g0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s0_g0 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s0_g1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s0_g1 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s1_g0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s1_g0 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
-        var a_s1_g1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var a_s1_g1 = stack_allocation[Self.in_type, address_space=.SHARED](
             a_half_layout
         )
 
         comptime b_half_layout = row_major[half_BN, BK]()
-        var b_s0_h0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s0_h0 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s0_h1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s0_h1 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s1_h0 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s1_h0 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
-        var b_s1_h1 = stack_allocation[Self.in_type, AddressSpace.SHARED](
+        var b_s1_h1 = stack_allocation[Self.in_type, address_space=.SHARED](
             b_half_layout
         )
 
@@ -1592,22 +1610,26 @@ struct AMD4WaveMatmul[
         )
 
         @always_inline
-        @parameter
+        @__parameter
         def load_a[stage: Int, which: Int](k: Int):
             # `m_anchor=pid_m*BM` baked into the loader at construction;
             # callsite only carries the within-block `which*half_BM`
             # offset — same shape as the matmul's load_a / load_b.
             a_loader.load_tile(
-                a_load_tiles[stage][which],
+                rebind[type_of(a_load_tiles[0][0])](
+                    rebind[type_of(a_load_tiles[0])](a_load_tiles[stage])[which]
+                ),
                 m_offset=which * half_BM,
                 k_offset=k,
             )
 
         @always_inline
-        @parameter
+        @__parameter
         def load_b[stage: Int, which: Int](k: Int):
             b_loader.load_tile(
-                b_load_tiles[stage][which],
+                rebind[type_of(b_load_tiles[0][0])](
+                    rebind[type_of(b_load_tiles[0])](b_load_tiles[stage])[which]
+                ),
                 m_offset=which * half_BN,
                 k_offset=k,
             )
@@ -1625,7 +1647,7 @@ struct AMD4WaveMatmul[
         # ====================================================
         # Body: framework-driven via Pipeline4Wave.
         # ====================================================
-        @parameter
+        @__parameter
         @always_inline
         def _emit_framework_body():
             # `Pipeline4Wave.__init__` forces IDENTITY +
@@ -1670,7 +1692,7 @@ struct AMD4WaveMatmul[
                 sched_config, target
             )
 
-            @parameter
+            @__parameter
             @always_inline
             def _bind[entry: ScheduleEntry](k_base: Int):
                 # Framework-level infrastructure tags (BARRIER / WAIT_* /
@@ -1698,11 +1720,19 @@ struct AMD4WaveMatmul[
                         load_b[entry.op.stage, entry.op.subtile](k)
                     elif entry.op.tag == MMA_LOAD_A:
                         mma_op.load_a_quadrant[entry.op.subtile](
-                            a_mma_tiles[entry.op.stage][entry.op.subtile]
+                            rebind[type_of(a_mma_tiles[0][0])](
+                                rebind[type_of(a_mma_tiles[0])](
+                                    a_mma_tiles[entry.op.stage]
+                                )[entry.op.subtile]
+                            )
                         )
                     elif entry.op.tag == MMA_LOAD_B:
                         mma_op.load_b_quadrant[entry.op.subtile](
-                            b_mma_tiles[entry.op.stage][entry.op.subtile]
+                            rebind[type_of(b_mma_tiles[0][0])](
+                                rebind[type_of(b_mma_tiles[0])](
+                                    b_mma_tiles[entry.op.stage]
+                                )[entry.op.subtile]
+                            )
                         )
                     elif entry.op.tag == MMA:
                         mma_op.mma_quadrant[entry.op.stage, entry.op.subtile]()
@@ -1785,14 +1815,14 @@ struct AMD4WaveMatmul[
         # of total kernel time). A single `s_waitcnt vmcnt(0)` drains
         # the cluster before the first `v_pk_fma_f32` in the epilogue.
         #
-        # Storage: per-lane `InlineArray` of
+        # Storage: per-lane `Array` of
         # `SIMD[c_type, c_frag_size]` × num_m_mmas × num_n_mmas. For
         # BM=BN=128 / MMA=16x16 / c_frag_size=4 that's 16 slots × 4 bf16
         # = 16 dwords per lane (well under the 196-Dword VGPR headroom
         # at 316 baseline). OOB blocks waste a few HBM reads — SRD
         # bounds clamping returns 0, so it's harmless.
         comptime n_slots = num_m_mmas * num_n_mmas
-        var prefetched = InlineArray[SIMD[Self.c_type, c_frag_size], n_slots](
+        var prefetched = Array[SIMD[Self.c_type, c_frag_size], n_slots](
             uninitialized=True
         )
         var lane_group, thread_m = divmod(Int(_lane_id), MMA_M)
@@ -1803,13 +1833,13 @@ struct AMD4WaveMatmul[
             # The `load` API likewise takes its `vector_offset` argument
             # in elements and multiplies by `size_of[dtype]()` to derive
             # the buffer byte offset — see `AMDBufferResource.load` in
-            # `std.gpu.intrinsics`. Both sides must agree: passing a
+            # `max.gpu.intrinsics`. Both sides must agree: passing a
             # byte-scaled `num_records` paired with a byte-scaled
             # `vector_offset` doubles the effective stride (the bug
             # this fix replaces), making workgroups with
             # `pid_m >= num_pid_m/2` read OOB → SRD-clamped to 0.
             # Keep both expressed in elements.
-            var src_size_elem = M * source_row_stride
+            var src_size_elem = M * _source_row_stride
             var src_bc = AMDBufferResource(
                 readfirstlane(source_ptr), readfirstlane(src_size_elem)
             )
@@ -1833,7 +1863,7 @@ struct AMD4WaveMatmul[
                         + lane_group * c_frag_size
                     )
                     var elem_off = Int32(
-                        m_logical * source_row_stride + n_global
+                        m_logical * _source_row_stride + n_global
                     )
                     prefetched[m_mma * num_n_mmas + n_mma] = src_bc.load[
                         Self.c_type, c_frag_size
@@ -1900,10 +1930,8 @@ struct AMD4WaveMatmul[
                         comptime if has_residual:
                             var skip = prefetched[
                                 m_mma * num_n_mmas + n_mma
-                            ].cast[DType.float32]()
-                            var fused_f32 = (
-                                v.cast[DType.float32]() + beta * skip
-                            )
+                            ].cast[.float32]()
+                            var fused_f32 = v.cast[.float32]() + beta * skip
                             v = fused_f32.cast[Self.c_type]()
                         c_writer.store(v, m=m_dram, n=n_global)
 
@@ -1935,7 +1963,7 @@ def structured_4wave_matmul[
 
     Production callers go through a higher-level dispatcher (e.g.
     `AMDMatmul`) that knows the shape, dtype, and which other kernels
-    are available — it should set `block_{m,n,k}_override` explicitly
+    are available; it should set `block_{m,n,k}_override` explicitly
     based on its own policy. The internal auto-pick below is a
     convenience default for direct/ad-hoc/benchmark callers; do not
     rely on it from a production dispatcher.
@@ -1943,7 +1971,7 @@ def structured_4wave_matmul[
     Recommended tile shapes (measured on MI355X, bf16 N=K=8192):
 
       M = 1         : use a dedicated GEMV kernel (`linalg/gemv.mojo`),
-                      not 4-wave — single-row matvec has its own
+                      not 4-wave; single-row matvec has its own
                       hardware-aligned dispatch.
       2 ≤ M ≤  64   : use `amd_4wave_split_k_matmul` with
                       `num_splits=4` and BK=128 (the plain kernel
@@ -1996,9 +2024,7 @@ def structured_4wave_matmul[
     """
     comptime assert a_type == b_type, "A and B must have the same type"
     comptime assert (
-        a_type.is_float8()
-        or a_type == DType.bfloat16
-        or a_type == DType.float16
+        a_type.is_float8() or a_type == .bfloat16 or a_type == .float16
     ), "4-wave supports float8_e4m3fn, bfloat16, or float16"
 
     # MMA K-dim selection: FP8 uses MFMA 16x16x128; bf16/fp16 use MFMA
@@ -2027,7 +2053,7 @@ def structured_4wave_matmul[
     var M = Int(c.dim[0]())
 
     @always_inline
-    @parameter
+    @__parameter
     def run_kernel[config: MatmulKernelConfig]() raises:
         comptime kernel = AMD4WaveMatmul[
             a_type,
@@ -2037,12 +2063,16 @@ def structured_4wave_matmul[
             enable_swizzle,
             elementwise_lambda_fn=elementwise_lambda_fn,
         ].run[
-            a.LayoutType,
-            b.LayoutType,
-            c.LayoutType,
+            type_of(a).LayoutType,
+            type_of(b).LayoutType,
+            type_of(c).LayoutType,
+            type_of(a).Engine,
+            type_of(b).Engine,
+            type_of(c).Engine,
         ]
 
         var num_blocks_n = ceildiv(N, config.block_shape[1])
+
         var num_blocks_m = ceildiv(M, config.block_shape[0])
         comptime if dump_asm_path != "":
             ctx.enqueue_function[kernel, dump_asm=dump_asm_path](

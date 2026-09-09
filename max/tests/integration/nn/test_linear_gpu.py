@@ -13,12 +13,12 @@
 import numpy as np
 import pytest
 import torch
-import torch.nn as nn
 from max.driver import Buffer
 from max.dtype import DType
 from max.engine.api import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType
 from max.nn import Linear
+from torch import nn
 
 ACCURACY_RTOL = 1e-3
 ACCURACY_ATOL = 2e-3

@@ -27,7 +27,7 @@ Shape sources:
 """
 
 from std.benchmark import keep
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.random import rand
 from std.sys import get_defined_dtype
 from std.time import perf_counter_ns
@@ -55,8 +55,8 @@ def _host_im2col_general[
     stride_w: Int,
     K_padded: Int,
 ](
-    input_host_ptr: UnsafePointer[Scalar[a_type], ImmutAnyOrigin],
-    im2col_host_ptr: UnsafePointer[Scalar[a_type], MutAnyOrigin],
+    input_host_ptr: ImmPointer[Scalar[a_type], ImmutAnyOrigin],
+    im2col_host_ptr: MutPointer[Scalar[a_type], MutAnyOrigin],
 ):
     for n in range(N):
         for ho in range(H_out):
@@ -168,7 +168,7 @@ def _bench_one[
     # conv-vs-matmul ratio compares apples-to-apples (the conv path
     # also routes through the framework body for all dtypes). Use
     # `structured_4wave_matmul` for all dtypes.
-    @parameter
+    @__parameter
     @always_inline
     def _ref_matmul() raises:
         structured_4wave_matmul(im2col_2d, filter, output, ctx)
@@ -420,7 +420,7 @@ def _run_suite[a_type: DType, c_type: DType](ctx: DeviceContext) raises:
 def main() raises:
     # Pick the input dtype via `-D DTYPE=<dtype>`. Output dtype mirrors
     # the matmul: FP8 → BF16, BF16 → BF16, FP16 → FP16. Default = FP8.
-    comptime a_type = get_defined_dtype["DTYPE", DType.float8_e4m3fn]()
+    comptime a_type = get_defined_dtype["DTYPE", .float8_e4m3fn]()
     comptime c_type = (
         DType.bfloat16 if a_type == DType.float8_e4m3fn else a_type
     )

@@ -30,24 +30,52 @@ def broadcast_to(
     shape: TensorValue | ShapeLike,
     out_dims: Iterable[DimLike] | None = None,
 ) -> TensorValue:
-    """Broadcasts a symbolic tensor.
+    """Broadcasts a tensor to a target shape.
 
-    Broadcasts the input tensor to the specified shape.
-    Dimensions in the input must be one or match the target dimension.
+    Each input dimension must either equal the corresponding target
+    dimension or be ``1`` (which is then stretched to match). This
+    follows NumPy broadcasting semantics and is equivalent to PyTorch's
+    :func:`torch.broadcast_to`.
+
+    .. code-block:: python
+
+        import numpy as np
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("broadcast_to", input_types=[]) as graph:
+            x = ops.constant(
+                np.ones((3, 1), dtype=np.float32), DType.float32, device=device
+            )
+            result = ops.broadcast_to(x, [3, 4])
+            # result has shape (3, 4)
+
+            # Add a new leading dimension
+            result = ops.broadcast_to(x, [2, 3, 4])
+            # result has shape (2, 3, 4)
+
+    .. invisible-code-block: python
+
+            assert result.type.shape == [2, 3, 4]
 
     Args:
-        x: The input symbolic tensor to broadcast.
-            This tensor may not contain any dynamic dimensions.
-        shape: The new shape as a list of dimensions.
-            Dynamic dimensions are not allowed.
-        out_dims: Output dims used only for tensor-valued `shape`.
+        x: The input symbolic tensor to broadcast. Must not contain any
+            dynamic dimensions.
+        shape: The target shape. Either a static shape (no dynamic
+            dimensions) or a :class:`~max.graph.TensorValue` giving the
+            shape at runtime.
+        out_dims: The explicit output dimensions. Required when ``shape``
+            is a :class:`~max.graph.TensorValue` (used to declare the
+            symbolic output type); ignored otherwise.
 
     Returns:
-        A symbolic tensor with the same elements as the original tensor, but
-        in a new shape. Its symbolic shape is the same as :code:`shape`.
+        A ``TensorValue`` with the same elements as the input but with the
+        target shape.
 
     Raises:
-        ValueError: if a tensor-valued shape is passed without out_dims.
+        ValueError: If ``shape`` is a :class:`~max.graph.TensorValue` and
+            ``out_dims`` is :obj:`None`.
     """
     x = TensorValue(x)
 

@@ -5,6 +5,7 @@ package(default_visibility = ["//max:consumers"])
 modular_py_library(
     name = "engine",
     srcs = glob(["**/*.py"]),
+    test_docstring_examples = True,
     deps = [
         "//max/python/max:_core",
         "//max/python/max/driver",

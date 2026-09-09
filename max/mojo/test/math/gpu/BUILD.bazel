@@ -1,0 +1,44 @@
+load("//bazel:api.bzl", "lit_tests", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+_LIT_TESTS = [
+    "test_sin_cos_f64.mojo",
+    "test_sqrt_f64.mojo",
+]
+
+[
+    mojo_test(
+        name = src + ".test",
+        size = "large",
+        srcs = [src],
+        tags = ["gpu"],
+        target_compatible_with = ["//:has_gpu"] + select({
+            "@platforms//os:macos": ["@platforms//:incompatible"],  # FIXME MOCO-2509
+            "//conditions:default": [],
+        }),
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(
+        ["*.mojo"],
+        exclude = _LIT_TESTS,
+    )
+]
+
+lit_tests(
+    name = "lit_tests",
+    srcs = _LIT_TESTS,
+    mojo_deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

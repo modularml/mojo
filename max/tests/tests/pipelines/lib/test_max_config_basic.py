@@ -114,7 +114,7 @@ class TestMAXConfigFileLoading:
             "version": "1.0",
             "kv_cache_config": {
                 "kv_cache_page_size": 256,
-                "kv_connector": "local",
+                "kv_connector_config": {"type": "tiered"},
             },
             "profiling_config": {
                 "gpu_profiling": "on",
@@ -133,7 +133,7 @@ class TestMAXConfigFileLoading:
                 config_file=f.name, section_name="kv_cache_config"
             )
             assert kv_config.kv_cache_page_size == 256
-            assert kv_config.kv_connector == KVConnectorType.local
+            assert kv_config.kv_connector_config.type == KVConnectorType.tiered
 
             # Test ProfilingConfig enum loading.
             profiling_config = ProfilingConfig(
@@ -255,6 +255,35 @@ class TestProfilingConfigEnv:
         monkeypatch.setenv("MODULAR_ENABLE_PROFILING", "bad-value")
         config = ProfilingConfig(gpu_profiling="on")
         assert config.gpu_profiling == "on"
+
+
+class TestFrozenLeafConfigs:
+    """LoRAConfig and ProfilingConfig are immutable after construction."""
+
+    def test_lora_config_rejects_field_assignment(self) -> None:
+        config = LoRAConfig()
+        with pytest.raises(ValidationError):
+            config.enable_lora = True  # type: ignore[misc]
+
+    def test_profiling_config_rejects_field_assignment(self) -> None:
+        config = ProfilingConfig()
+        with pytest.raises(ValidationError):
+            config.gpu_profiling = "on"  # type: ignore[misc]
+
+    def test_lora_config_model_copy_update(self) -> None:
+        config = LoRAConfig()
+        updated = config.model_copy(update={"max_lora_rank": 32})
+        assert updated.max_lora_rank == 32
+        assert config.max_lora_rank == 16
+
+    def test_profiling_config_model_copy_update(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("MODULAR_ENABLE_PROFILING", raising=False)
+        config = ProfilingConfig()
+        updated = config.model_copy(update={"gpu_profiling": "detailed"})
+        assert updated.gpu_profiling == "detailed"
+        assert config.gpu_profiling == "off"
 
 
 class _StrictModel(MAXBaseModel):

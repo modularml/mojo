@@ -41,7 +41,7 @@ class Idefics3VisionEmbeddings(Module):
         self,
         config: Idefics3VisionConfig,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.GPU(),
+        device: DeviceRef = DeviceRef.GPU(),  # noqa: B008
     ) -> None:
         """Initialize the Idefics3 vision embeddings.
 

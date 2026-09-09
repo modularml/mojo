@@ -17,20 +17,20 @@ allocator poison + MOJO_STDLIB_SIMD_UNINIT_CHECK detection pipeline
 works correctly.
 """
 
-import compiler
+import extensibility
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from extensibility import InputTensor, OutputTensor
 
 
-@compiler.register("read_uninit_output")
+@extensibility.register("read_uninit_output")
 struct ReadUninitOutput:
     """Reads from the output tensor before writing to it.
 
     The execute method runs on CPU.  When the op is assigned to GPU, the
     output tensor is allocated in device memory, which the debug
     allocator fills with the largest-finite poison pattern.  Reading via
-    unsafe_ptr().load() triggers _check_not_poison on the CPU side.
+    unsafe_ptr().unsafe_load() triggers _check_not_poison on the CPU side.
     """
 
     @staticmethod
@@ -44,7 +44,7 @@ struct ReadUninitOutput:
         # Read from the output BEFORE writing — this is uninitialized.
         # On GPU, the debug allocator has poisoned this with the
         # largest-finite bit pattern.
-        var uninit = output.unsafe_ptr().load()
+        var uninit = output.unsafe_ptr().unsafe_load()
 
         # Write to prevent dead-code elimination.
         output[0] = x[0] + uninit

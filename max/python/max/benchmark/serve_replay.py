@@ -25,7 +25,7 @@ import httpx
 
 
 def do_serve(args: Sequence[str]) -> None:
-    from max.entrypoints.pipelines import main
+    from max._entrypoints.pipelines import main
 
     # We call "main" instead of "cli_serve" because it does some extra
     # initialization that it would be best not to duplicate here.
@@ -35,7 +35,7 @@ def do_serve(args: Sequence[str]) -> None:
 
 
 def do_replay(args: Sequence[str]) -> None:
-    from max.entrypoints.replay_recording import main
+    from max._entrypoints.replay_recording import main
 
     ctx = main.make_context("max-replay-recording", list(args))
     with ctx:
@@ -61,7 +61,7 @@ def wait_for_up(
     url: str,
     process: multiprocessing.process.BaseProcess,
     *,
-    timeout: int | float | None = 600,
+    timeout: float | None = 600,
 ) -> None:
     start_time = time.time()
     with httpx.Client() as client:

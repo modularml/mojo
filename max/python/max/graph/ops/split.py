@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from max._core.dialects import kgen, mo
+from max._core.dialects import builtin, kgen, mo
 from max.dtype import DType
 
 from ..dim import Dim, DimLike
@@ -31,20 +31,41 @@ from .validation import assert_valid_axis
 def split(
     x: TensorValueLike, split_sizes: Sequence[DimLike], axis: int = 0
 ) -> list[TensorValue]:
-    """Splits the input tensor into multiple tensors along a given dimension.
+    """Splits a tensor into several tensors along an axis.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("split_example") as graph:
+            x = ops.constant([1, 2, 3, 4, 5], DType.int32, device=device)
+
+            # Split into a size-2 tensor and a size-3 tensor
+            parts = ops.split(x, [2, 3], axis=0)  # Splits into [1, 2] and [3, 4, 5]
+            graph.output(*parts)
+
+        model = InferenceSession().load(graph)
+        first, second = model.execute()
 
     Args:
-        x: The input symbolic tensor to split.
-        split_sizes: Sizes of each output tensor. Must add up to the split
-            dimension `axis`.
-        axis: Dimension to split the input tensor. Must have a statically
-            known dimension size.
+        x: The tensor to split.
+        split_sizes: The size of each output tensor along ``axis``. Unless
+            empty, must sum to the size of ``x`` along ``axis``.
+        axis: The axis to split along. Must have a known size.
 
     Returns:
-        A list of tensors with the same length as `split_sizes`, where each
-        tensor has the same shape as the input except along the split dimension
-        `axis`, where the size is given by the corresponding element in
-        `split_sizes`.
+        A list of ``TensorValue`` objects, one per entry in ``split_sizes``. Each has the same
+        shape as ``x`` except along ``axis``, where its size is the matching
+        entry in ``split_sizes``. If ``split_sizes`` is empty, returns an empty
+        list.
+
+    Raises:
+        IndexError: If ``axis`` is out of range for the rank of ``x``.
+        ValueError: If ``split_sizes`` doesn't sum to the size of ``x`` along
+            ``axis``, or if any size is negative.
     """
     if not split_sizes:
         return []  # op will assert on empty splits
@@ -78,7 +99,7 @@ def split(
         results=result_types,
         input=x,
         split_sizes=constant(sizes, DType.int64, DeviceRef.CPU()),
-        axis=constant(axis, DType.int64, DeviceRef.CPU()),
+        axis=builtin.IntegerAttr(builtin.IndexType(), axis),
         output_param_decls=kgen.ParamDeclArrayAttr([]),
     )
     return [out.tensor for out in outputs]

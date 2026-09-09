@@ -27,14 +27,18 @@ from max.experimental.torch import torch_dtype_to_max
 from max.graph import DeviceRef, Graph, Shape, TensorType, ops
 from max.graph.weights import WeightData
 from max.nn import AttentionWithRope, Linear, RotaryEmbedding
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
+from max.nn.kv_cache import (
+    KVCacheParams,
+    MHAKVCacheParams,
+    PagedCacheValues,
+)
 from max.nn.quant_config import QuantConfig
 from max.pipelines.architectures.llama3.model_config import (
     create_rope_embedding,
 )
+from max.pipelines.context import TextContext
 from max.pipelines.kv_cache import PagedKVCacheManager
-from max.pipelines.lib.quant import parse_quant_config
-from max.pipelines.modeling.types import TextGenerationContext
+from max.pipelines.weights.quant import parse_quant_config
 from test_common.context_utils import create_text_context
 from test_common.graph_utils import is_h100_h200
 from torch.utils.dlpack import from_dlpack
@@ -208,7 +212,7 @@ def generate_max_outputs_fp4(
     if quant_config is None:
         raise ValueError("Failed to parse quant config for FP4")
 
-    kv_params = KVCacheParams(
+    kv_params = MHAKVCacheParams(
         dtype=cache_dtype,
         n_kv_heads=config.num_key_value_heads,
         head_dim=config.head_dim,
@@ -232,7 +236,7 @@ def generate_max_outputs_fp4(
     input_row_offsets_type = TensorType(
         DType.uint32, shape=["input_row_offsets_len"], device=device_ref
     )
-    flattened_kv_types = kv_params.get_symbolic_inputs().flatten()
+    flattened_kv_types = kv_params.flattened_kv_inputs()
 
     session = InferenceSession(devices=[Accelerator()])
 
@@ -254,9 +258,9 @@ def generate_max_outputs_fp4(
         ),
     ) as graph:
         inputs, input_row_offsets, *kv_cache = graph.inputs
-        kv_collection: PagedCacheValues = (
-            kv_params.get_symbolic_inputs().unflatten(iter(kv_cache)).inputs[0]
-        )
+        kv_collection: PagedCacheValues = kv_params.unflatten_kv_inputs(
+            iter(kv_cache)
+        ).inputs[0]
 
         # Create layer_idx constant
         layer_idx = ops.constant(0, DType.uint32, device=DeviceRef.CPU())
@@ -276,10 +280,10 @@ def generate_max_outputs_fp4(
 
     # Set up KV cache for execution (single replica: replica_idx=0)
     batch = [create_text_context(np.empty(input_seq_len))]
-    kv_manager.claim(batch[0].request_id, replica_idx=0)
-    kv_manager.alloc(batch[0], replica_idx=0)
-    kv_runtime_inputs = kv_manager.runtime_inputs(
-        cast(list[list[TextGenerationContext]], [batch])
+    kv_manager.claim(batch[0])
+    kv_manager.alloc(batch[0])
+    kv_runtime_inputs = kv_manager.runtime_inputs_for_leaf(
+        cast(list[list[TextContext]], [batch])
     ).inputs[0]
     assert kv_runtime_inputs.attention_dispatch_metadata is not None
 
@@ -293,7 +297,8 @@ def generate_max_outputs_fp4(
         kv_runtime_inputs.kv_blocks.to(device),
         kv_runtime_inputs.cache_lengths.to(device),
         kv_runtime_inputs.lookup_table.to(device),
-        kv_runtime_inputs.max_lengths,
+        kv_runtime_inputs.max_prompt_length,
+        kv_runtime_inputs.max_cache_length,
         kv_runtime_inputs.attention_dispatch_metadata,
     )[0]
     return from_dlpack(out).to(torch.bfloat16)

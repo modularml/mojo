@@ -48,6 +48,31 @@ modular_py_test(
     ],
 )
 
+modular_py_test(
+    name = "test_v3",
+    srcs = ["test_capi_v3.py"],
+    data = [
+        ":example",
+    ],
+    env = {
+        "GRAPH_EXECUTOR": "$(location :example)",
+    },
+    tags = ["gpu"],
+    # TODO(GEX-3548): vector-add MEF produces zeros instead of expected sums
+    # on Apple GPU (Metal) workers.
+    target_compatible_with = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+    ],
+)
+
 modular_cc_binary(
     name = "weights_example",
     testonly = True,
@@ -66,6 +91,34 @@ modular_py_test(
     ],
     env = {
         "WEIGHTS_EXECUTOR": "$(location :weights_example)",
+    },
+    deps = [
+        requirement("numpy"),
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+    ],
+)
+
+modular_cc_binary(
+    name = "safetensors_example",
+    testonly = True,
+    srcs = ["safetensors_example.c"],
+    deps = [
+        "//max:CAPI.headers",
+        "//max/internal:max",
+    ],
+)
+
+modular_py_test(
+    name = "test_safetensors",
+    srcs = ["test_safetensors_capi.py"],
+    data = [
+        ":safetensors_example",
+    ],
+    env = {
+        "SAFETENSORS_EXECUTOR": "$(location :safetensors_example)",
     },
     deps = [
         requirement("numpy"),

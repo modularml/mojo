@@ -1,0 +1,57 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+defaults: &defaults
+  N: 384
+  K: 7168
+  TILE_N: 2
+  KERNEL_KIND: GEMV_SPLIT_K
+  UNROLL_FACTOR: 1
+  TILE_K: 128
+  SWAP_AB: false
+params:
+- <<: *defaults
+  M: 2
+  M_END: 5
+  TILE_M: 1
+  NUM_THREADS: 256
+- <<: *defaults
+  M: 5
+  M_END: 9
+  TILE_M: 2
+  NUM_THREADS: 128
+  UNROLL_FACTOR: 2
+- <<: *defaults
+  M: 9
+  M_END: 13
+  TILE_M: 2
+  NUM_THREADS: 128
+  UNROLL_FACTOR: 2
+- <<: *defaults
+  M: 13
+  M_END: 17
+  TILE_M: 2
+  NUM_THREADS: 128
+- <<: *defaults
+  M: 17
+  M_END: 25
+  TILE_M: 4
+  NUM_THREADS: 128
+  UNROLL_FACTOR: 2
+- <<: *defaults
+  M: 25
+  M_END: 33
+  TILE_M: 16
+  TILE_N: 8
+  NUM_THREADS: 256
+  KERNEL_KIND: GEMM_MMA_CPASYNC
+  TILE_K: 256

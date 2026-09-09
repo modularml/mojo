@@ -25,11 +25,10 @@ from std.testing import assert_false
 comptime alignment = 64
 
 
-@parameter
-def bench_run[
-    func: def() raises capturing[_] -> None
-]() raises -> std.benchmark.Report:
-    return std.benchmark.run[func](2, 1_000_000, 1, 3)
+def bench_run(
+    func: Some[ImplicitlyCopyable & (def() raises)],
+) raises -> std.benchmark.Report:
+    return std.benchmark.run(func, 2, 1_000_000, 1, 3)
 
 
 def test_gemv() raises:
@@ -50,16 +49,18 @@ def test_gemv() raises:
     comptime k = 11008
 
     var lhs_storage = alloc[Scalar[type],](m * k, alignment=alignment)
-    var lhs = TileTensor(lhs_storage.as_any_origin(), row_major[m, k]())
+    var lhs = TileTensor(lhs_storage.as_unsafe_any_origin(), row_major[m, k]())
 
     var rhs_storage = alloc[Scalar[type],](k, alignment=alignment)
-    var rhs = TileTensor(rhs_storage.as_any_origin(), row_major[k]())
+    var rhs = TileTensor(rhs_storage.as_unsafe_any_origin(), row_major[k]())
 
     var out_storage = alloc[Scalar[type],](m, alignment=alignment)
-    var out = TileTensor(out_storage.as_any_origin(), row_major[m]())
+    var out = TileTensor(out_storage.as_unsafe_any_origin(), row_major[m]())
 
     var ref_out_storage = alloc[Scalar[type]](m, alignment=alignment)
-    var ref_out = TileTensor(ref_out_storage.as_any_origin(), row_major[m]())
+    var ref_out = TileTensor(
+        ref_out_storage.as_unsafe_any_origin(), row_major[m]()
+    )
 
     rand[type](lhs_storage, m * k)
     rand[type](rhs_storage, k)
@@ -104,12 +105,10 @@ def test_gemv() raises:
 
     # Serial Gemv
     @always_inline
-    @__copy_capture(out, rhs, lhs)
-    @parameter
-    def bench_fn_serial() raises:
+    def bench_fn_serial() raises {var}:
         gemv[parallelize=False](out, lhs, rhs)
 
-    var serial_perf = bench_run[bench_fn_serial]()
+    var serial_perf = bench_run(bench_fn_serial)
     std.benchmark.keep(out[10])
     var serial_bandwidth = (
         Float64(bytes_per_iteration) / serial_perf.mean()
@@ -125,16 +124,18 @@ def test_gemv() raises:
 
     # Parallel Gemv
     @always_inline
-    @__copy_capture(out, rhs, lhs)
-    @parameter
-    def bench_fn_parallel() raises:
+    def bench_fn_parallel() raises {var}:
         gemv[parallelize=True](out, lhs, rhs)
 
-    var par_perf = bench_run[bench_fn_parallel]()
+    var par_perf = bench_run(bench_fn_parallel)
     std.benchmark.keep(out[10])
 
-    var rhs_mat = TileTensor(rhs_storage.as_any_origin(), row_major[k, 1]())
-    var out_mat = TileTensor(out_storage.as_any_origin(), row_major[m, 1]())
+    var rhs_mat = TileTensor(
+        rhs_storage.as_unsafe_any_origin(), row_major[k, 1]()
+    )
+    var out_mat = TileTensor(
+        out_storage.as_unsafe_any_origin(), row_major[m, 1]()
+    )
 
     # Compute speedup and bandwidth stats
     var par_bandwidth = (
@@ -156,14 +157,12 @@ def test_gemv() raises:
     print("--> Mean Runtime Speedup: ", speedup)
 
     @always_inline
-    @__copy_capture(out_mat, rhs_mat, lhs)
-    @parameter
-    def bench_fn_matmul() raises:
+    def bench_fn_matmul() raises {var}:
         matmul(out_mat, lhs, rhs_mat)
 
     bench_fn_matmul()
 
-    var matmul_perf = bench_run[bench_fn_matmul]()
+    var matmul_perf = bench_run(bench_fn_matmul)
     std.benchmark.keep(out[10])
     matmul_perf.print()
     print("Matmul GEMV GFLOP/s", 1e-9 * ((2 * m * k) / matmul_perf.mean()))

@@ -20,18 +20,34 @@ from .custom import custom
 
 
 def argsort(x: StrongTensorValueLike, ascending: bool = True) -> TensorValue:
-    """Returns the indices that would sort a tensor.
+    """Returns the indices that would sort a rank-1 tensor.
 
-    This function returns the indices that would sort the input tensor along
-    its first dimension. The returned indices are of type ``int64``.
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("argsort") as graph:
+            x = ops.constant([3.0, 1.0, 2.0], DType.float32, device=device)
+            # Ascending order visits 1, 2, 3, so the indices are [1, 2, 0].
+            graph.output(ops.argsort(x, ascending=True))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
-        x: Input tensor to be sorted.
-        ascending: If True (default), sort in ascending order. If False, sort in
-            descending order.
+        x: The input tensor to sort. Must be rank 1.
+        ascending: Whether to sort in ascending order. If ``False``, sorts in
+            descending order. Defaults to ``True``.
 
     Returns:
-        A tensor of indices of the same shape as the input tensor.
+        A ``TensorValue`` representing the sorting indices, with the same shape
+        as ``x`` and ``int64`` dtype.
+
+    Raises:
+        ValueError: If ``x`` is not rank 1.
     """
     x = TensorValue(x)
     if x.rank != 1:

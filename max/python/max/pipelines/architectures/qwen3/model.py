@@ -14,37 +14,28 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
 import numpy as np
 from max._core.engine import Model
-from max.driver import Buffer, DevicePinnedBuffer, is_virtual_device_mode
+from max.driver import Buffer, is_virtual_device_mode
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import Graph
-from max.graph.weights import Weights, WeightsAdapter
 from max.nn.comm.ep import EPCommInitializer, EPConfig
 from max.nn.comm.ep.ep_config import calculate_ep_max_tokens_per_rank
 from max.nn.comm.ep.ep_manager import EPBatchManager
-from max.nn.kv_cache import KVCacheInputs
-from max.pipelines.core import TextContext
-from max.pipelines.lib import (
-    CompilationTimer,
-    ModelInputs,
+from max.pipelines.lib.config.model_config import (
+    _select_quantization_encoding,
 )
 from max.pipelines.lib.interfaces import AlwaysSignalBuffersMixin
-from max.pipelines.lib.quant import parse_quant_config
-from max.pipelines.lib.utils import (
-    compute_data_parallel_splits,
-    parse_state_dict_from_weights,
-)
 from max.pipelines.modeling.config_enums import supported_encoding_dtype
-from max.support.algorithm import flatten2d
+from max.pipelines.weights.quant import parse_quant_config
 from typing_extensions import override
 
 from ..llama3.model import Llama3Inputs, LlamaModelBase
+from .batch_processor import Qwen3BatchProcessor
 from .model_config import Qwen3Config
 from .qwen3 import Qwen3
 
@@ -98,9 +89,12 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
     """
 
     model_config_cls: ClassVar[type[Any]] = Qwen3Config
+    batch_processor_cls: ClassVar[type[Qwen3BatchProcessor]] = (
+        Qwen3BatchProcessor
+    )
 
     model: Model
-    norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm"
+    norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm"
     attention_bias: bool = False
     state_dict: dict[str, Any]
 
@@ -136,12 +130,10 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
             data_parallel_degree=data_parallel_degree,
         )
 
-        encoding = self.pipeline_config.model.quantization_encoding
-        dispatch_dtype = (
-            supported_encoding_dtype(encoding)
-            if encoding is not None
-            else DType.bfloat16
+        encoding = _select_quantization_encoding(
+            self.pipeline_config.model, Qwen3Config.DEFAULT_ENCODING
         )
+        dispatch_dtype = supported_encoding_dtype(encoding)
 
         dispatch_quant_config = None
         if dispatch_dtype != DType.bfloat16 and state_dict is not None:
@@ -162,46 +154,11 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
         )
 
     @override
-    def load_model(self, session: InferenceSession) -> Model:
-        assert self.pipeline_config.runtime.max_batch_size, (
-            "Expected max_batch_size to be set"
-        )
-
-        dp = self.pipeline_config.model.data_parallel_degree
-        max_batch_size = self.pipeline_config.runtime.max_batch_size
-        if dp > 1:
-            max_batch_size *= dp
-
-        self._input_row_offsets_prealloc: Buffer | None = None
-        if not is_virtual_device_mode():
-            self._input_row_offsets_prealloc = Buffer.from_numpy(
-                np.arange(max_batch_size + 1, dtype=np.uint32)
-            ).to(self.devices[0])
-
-        self._host_input_row_offsets_prealloc: Buffer | None = None
-        if dp > 1 and not is_virtual_device_mode():
-            self._host_input_row_offsets_prealloc = Buffer.from_numpy(
-                np.arange(max_batch_size + 1, dtype=np.uint32)
-            )
-
-        with CompilationTimer("model") as timer:
-            graph = self._build_graph(self.weights, self.adapter, session)
-            timer.mark_build_complete()
-            model = session.load(graph, weights_registry=self.state_dict)
-
-        return model
-
-    def _build_graph(
-        self,
-        weights: Weights,
-        adapter: WeightsAdapter | None = None,
-        session: InferenceSession | None = None,
-    ) -> Graph:
-        state_dict = parse_state_dict_from_weights(
-            self.pipeline_config, weights, adapter
-        )
+    def _create_model_config(self, state_dict: dict[str, Any]) -> Qwen3Config:
         model_config = Qwen3Config.initialize_from_config(
-            self.pipeline_config, self.huggingface_config
+            self.pipeline_config,
+            self.huggingface_config,
+            max_seq_len=self.max_seq_len,
         )
         model_config.finalize(
             huggingface_config=self.huggingface_config,
@@ -210,28 +167,43 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
             norm_method=self.norm_method,
             attention_bias=self.attention_bias,
         )
-
         # Set up EP config
-        ep_config = self._create_ep_config(state_dict)
-        model_config.ep_config = ep_config
+        model_config.ep_config = self._create_ep_config(state_dict)
+        return model_config
 
+    @override
+    def _init_distributed_runtime(
+        self,
+        session: InferenceSession,
+        model_config: Qwen3Config,
+    ) -> None:
+        self.ep_comm_initializer = None
+        ep_config = model_config.ep_config
+        if ep_config is None:
+            return
+        if is_virtual_device_mode():
+            return
         # Create EP infrastructure
-        ep_manager: EPBatchManager | None = None
-        self.ep_comm_initializer: EPCommInitializer | None = None
+        self.ep_comm_initializer = EPCommInitializer(ep_config)
+        self.ep_comm_initializer.ep_init(session)
+        ep_config.node_id = self.ep_comm_initializer.config.node_id
 
+    @override
+    def _build_graph_for_compile(
+        self,
+        session: InferenceSession,
+        state_dict: dict[str, Any],
+        model_config: Qwen3Config,
+    ) -> tuple[Graph, dict[str, Any]]:
+        del session
+        ep_config = model_config.ep_config
+        # Create EP batch manager for graph buffer wiring (runtime init is above).
+        ep_manager: EPBatchManager | None = None
         if ep_config is not None:
             ep_manager = EPBatchManager(ep_config)
 
-            if not is_virtual_device_mode():
-                self.ep_comm_initializer = EPCommInitializer(ep_config)
-                if session is not None:
-                    self.ep_comm_initializer.ep_init(session)
-                    ep_config.node_id = self.ep_comm_initializer.config.node_id
-
         dp = model_config.data_parallel_degree
-        use_dp = dp > 1
-
-        if use_dp:
+        if dp > 1:
             logger.info(
                 "Qwen3: data_parallel_degree=%d, ep_size=%s. Using "
                 "DP-attention + EP-MoE strategy.",
@@ -240,7 +212,6 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
             )
 
         nn_model = Qwen3(model_config, ep_manager=ep_manager)
-
         graph_inputs = nn_model.input_types(self.kv_params)
 
         nn_model.load_state_dict(
@@ -253,10 +224,10 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
                 )
             ),
         )
-
-        self.state_dict = nn_model.state_dict()
+        weights_registry = nn_model.state_dict()
 
         num_devices = len(self.devices)
+        use_dp = dp > 1
 
         with Graph("qwen3", input_types=graph_inputs) as graph:
             if use_dp:
@@ -275,9 +246,7 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
                     next(variadic_args_iter).buffer for _ in range(num_devices)
                 ]
 
-                kv_input_count = len(
-                    self.kv_params.get_symbolic_inputs().flatten()
-                )
+                kv_input_count = len(self.kv_params.flattened_kv_inputs())
                 kv_cache_inputs = [
                     next(variadic_args_iter) for _ in range(kv_input_count)
                 ]
@@ -317,122 +286,4 @@ class Qwen3Model(AlwaysSignalBuffersMixin, LlamaModelBase):
                 )
 
             graph.output(*outputs)
-            return graph
-
-    @override
-    def prepare_initial_token_inputs(
-        self,
-        replica_batches: Sequence[Sequence[TextContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
-        return_n_logits: int = 1,
-    ) -> Llama3Inputs | Qwen3Inputs:
-        dp = self.pipeline_config.model.data_parallel_degree
-        if dp <= 1:
-            return super().prepare_initial_token_inputs(
-                replica_batches, kv_cache_inputs, return_n_logits
-            )
-
-        if len(replica_batches) != dp:
-            raise ValueError(
-                "Number of replica batches must match data parallel degree"
-            )
-
-        context_batch = flatten2d(replica_batches)
-        device0 = self.devices[0]
-        pinned = not device0.is_host
-
-        # Build tokens
-        num_tokens = sum(ctx.tokens.active_length for ctx in context_batch)
-        host_tokens: Buffer
-        if pinned:
-            host_tokens = DevicePinnedBuffer(
-                shape=(num_tokens,), dtype=DType.int64, device=device0
-            )
-        else:
-            host_tokens = Buffer(
-                shape=(num_tokens,), dtype=DType.int64, device=device0
-            )
-
-        if context_batch:
-            np.concatenate(
-                [ctx.tokens.active for ctx in context_batch],
-                out=host_tokens.to_numpy(),
-            )
-        tokens = host_tokens.to(device0)
-
-        # Build input_row_offsets
-        batch_size = len(context_batch)
-        input_row_offsets_np = np.cumsum(
-            [0] + [ctx.tokens.active_length for ctx in context_batch],
-            dtype=np.uint32,
-        )
-
-        host_input_row_offsets = Buffer.from_numpy(input_row_offsets_np.copy())
-
-        pinned_offsets: Buffer
-        if pinned:
-            pinned_offsets = DevicePinnedBuffer(
-                shape=(batch_size + 1,), dtype=DType.uint32, device=device0
-            )
-        else:
-            pinned_offsets = Buffer(
-                shape=(batch_size + 1,), dtype=DType.uint32, device=device0
-            )
-        pinned_offsets.to_numpy()[:] = input_row_offsets_np
-        device_input_row_offsets = pinned_offsets.to(device0)
-
-        return_n_logits_tensor = Buffer.from_numpy(
-            np.array([return_n_logits], dtype=np.int64)
-        )
-
-        data_parallel_splits = Buffer.from_numpy(
-            compute_data_parallel_splits(replica_batches)
-        )
-
-        ep_inputs = (
-            ()
-            if self.ep_comm_initializer is None
-            else tuple(self.ep_comm_initializer.model_inputs())
-        )
-
-        return Qwen3Inputs(
-            tokens=tokens,
-            input_row_offsets=device_input_row_offsets,
-            return_n_logits=return_n_logits_tensor,
-            host_input_row_offsets=host_input_row_offsets,
-            data_parallel_splits=data_parallel_splits,
-            signal_buffers=self.signal_buffers,
-            kv_cache_inputs=kv_cache_inputs,
-            ep_inputs=ep_inputs,
-        )
-
-    @override
-    def prepare_next_token_inputs(
-        self,
-        next_tokens: Buffer,
-        prev_model_inputs: ModelInputs,
-    ) -> Llama3Inputs | Qwen3Inputs:
-        if isinstance(prev_model_inputs, Qwen3Inputs):
-            assert self._input_row_offsets_prealloc is not None
-            row_offsets_size = prev_model_inputs.input_row_offsets.shape[0]
-            next_row_offsets = self._input_row_offsets_prealloc[
-                :row_offsets_size
-            ]
-
-            assert self._host_input_row_offsets_prealloc is not None
-            next_host_offsets = self._host_input_row_offsets_prealloc[
-                :row_offsets_size
-            ]
-
-            return Qwen3Inputs(
-                tokens=next_tokens,
-                input_row_offsets=next_row_offsets,
-                return_n_logits=prev_model_inputs.return_n_logits,
-                host_input_row_offsets=next_host_offsets,
-                data_parallel_splits=prev_model_inputs.data_parallel_splits,
-                signal_buffers=self.signal_buffers,
-                kv_cache_inputs=prev_model_inputs.kv_cache_inputs,
-                ep_inputs=prev_model_inputs.ep_inputs,
-            )
-
-        return super().prepare_next_token_inputs(next_tokens, prev_model_inputs)
+            return graph, weights_registry

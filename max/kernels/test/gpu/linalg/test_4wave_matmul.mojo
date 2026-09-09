@@ -25,7 +25,7 @@ defaults to M=128 N=512 K=512.
 from std.sys import get_defined_int, get_defined_string
 
 from layout import Idx, Coord, TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 import linalg.matmul.vendor.blas as vendor_blas
 from std.testing import assert_equal
 from std.random import random_float64, seed
@@ -58,8 +58,8 @@ def test_4wave_matmul[
     seed(seed_value)
     var device_a = ctx.enqueue_create_buffer[dtype](M * K)
     var device_b = ctx.enqueue_create_buffer[dtype](N * K)
-    var device_c = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var device_c_ref = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var device_c = ctx.enqueue_create_buffer[.float32](M * N)
+    var device_c_ref = ctx.enqueue_create_buffer[.float32](M * N)
 
     with device_a.map_to_host() as host_a, device_b.map_to_host() as host_b:
         for i in range(M * K):
@@ -106,7 +106,7 @@ def test_4wave_matmul[
         # cells — well below fp16's achievable precision for
         # cancelling sums, which caused sporadic CI failures.
         comptime rel_tol = Float32(0.01) if dtype.is_float8() else (
-            Float32(1.6e-2) if dtype == DType.bfloat16 else Float32(1e-3)
+            Float32(1.6e-2) if dtype == .bfloat16 else Float32(1e-3)
         )
         comptime abs_tol = Float32(0.01) if dtype.is_float8() else Float32(1e-5)
         for i in range(M * N):
@@ -198,10 +198,10 @@ def main() raises:
             # specializations compile into one binary; one BUILD target
             # runs all three.
             print("-- dtype=float8_e4m3fn --")
-            run_dtype_sweep[DType.float8_e4m3fn](ctx, seed_value)
+            run_dtype_sweep[.float8_e4m3fn](ctx, seed_value)
             print("-- dtype=bfloat16 --")
-            run_dtype_sweep[DType.bfloat16](ctx, seed_value)
+            run_dtype_sweep[.bfloat16](ctx, seed_value)
             print("-- dtype=float16 --")
-            run_dtype_sweep[DType.float16](ctx, seed_value)
+            run_dtype_sweep[.float16](ctx, seed_value)
 
         print("==== AMD 4-wave tests passed ====")

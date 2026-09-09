@@ -14,7 +14,6 @@
 """LoRA adapter generation and management utilities for benchmarking."""
 
 import asyncio
-import enum
 import json
 import logging
 import os
@@ -29,13 +28,6 @@ from .metrics import LoRAMetrics
 from .request import async_request_lora_load, async_request_lora_unload
 
 logger = logging.getLogger(__name__)
-
-
-class LoRAOutputFormat(str, enum.Enum):
-    """Output format for LoRA adapter configurations."""
-
-    PATH = "path"  # Returns just paths
-    NAME_PATH = "name_path"  # Returns 'name=path' format for TTS benchmarks
 
 
 # TODO: make lora_configs a dataclass type than a dict[str, str]

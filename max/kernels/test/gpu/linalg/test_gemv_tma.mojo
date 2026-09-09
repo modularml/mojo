@@ -17,12 +17,12 @@ from std.random import rand
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import WARP_SIZE, barrier, block_idx, lane_id, thread_idx, warp_id
-from std.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import TMADescriptor, create_tma_descriptor
-from std.gpu.primitives import warp
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu import WARP_SIZE, block_idx, lane_id, thread_idx, warp_id
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import TMADescriptor, create_tma_descriptor
+from max.gpu.primitives import warp
+from max.gpu.memory import (
     cp_async_bulk_tensor_shared_cluster_global,
     external_memory,
 )
@@ -67,10 +67,14 @@ def gemv_tma_kernel[
     c: LayoutTensor[dtype, c_layout, MutAnyOrigin],
     a: LayoutTensor[dtype, a_layout, MutAnyOrigin],
     b: LayoutTensor[dtype, b_layout, MutAnyOrigin],
-    M: Int,
-    N: Int,
-    K: Int,
+    M_dev: Int32,
+    N_dev: Int32,
+    K_dev: Int32,
 ):
+    # `Int` is not device-passable; widen the fixed-width args.
+    var M = Int(M_dev)
+    var N = Int(N_dev)
+    var K = Int(K_dev)
     var bidx = block_idx.x
     var block_row = bidx * BLOCK_SIZE_M
 
@@ -83,19 +87,15 @@ def gemv_tma_kernel[
 
     comptime b_smem_layout = Layout.row_major(BLOCK_SIZE_K)
 
-    var descriptor_a_ptr = UnsafePointer(to=descriptor_a).bitcast[NoneType]()
-    var descriptor_b_ptr = UnsafePointer(to=descriptor_b).bitcast[NoneType]()
+    var descriptor_a_ptr = Pointer(to=descriptor_a).bitcast[NoneType]()
+    var descriptor_b_ptr = Pointer(to=descriptor_b).bitcast[NoneType]()
 
     var a_smem_base = rebind[
-        UnsafePointer[
-            Scalar[dtype],
-            address_space=AddressSpace.SHARED,
-            ExternalOrigin[mut=True],
-        ]
+        MutPointer[Scalar[dtype], address_space=.SHARED, MutUntrackedOrigin]
     ](
         external_memory[
             Scalar[dtype],
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
             alignment=128,
             name="tmem_A_dynamic_shared_memory",
         ]()
@@ -112,24 +112,22 @@ def gemv_tma_kernel[
     var a_smem = LayoutTensorIter[
         dtype,
         a_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
         circular=False,
     ](
-        a_smem_base,
+        a_smem_base.as_unsafe_any_origin(),
         a_size * NUM_PIPELINE_STAGES,
     )
 
     var b_smem = LayoutTensorIter[
         dtype,
         b_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
         circular=False,
     ](
-        b_smem_base,
+        b_smem_base.as_unsafe_any_origin(),
         b_size * NUM_PIPELINE_STAGES,
     )
 
@@ -138,7 +136,7 @@ def gemv_tma_kernel[
     ]()
 
     # Initialize dot products for all rows before column processing.
-    var dot_products = InlineArray[Scalar[accum_type], ROWS_PER_WARP](fill=0)
+    var dot_products = Array[Scalar[accum_type], ROWS_PER_WARP](fill=0)
 
     if thread_idx.x == 0:
         comptime for i in range(NUM_PIPELINE_STAGES):
@@ -170,7 +168,7 @@ def gemv_tma_kernel[
             ](
                 a_smem.next(stage)[].ptr,
                 descriptor_a_ptr,
-                UnsafePointer(to=tma_mbar[stage]),
+                Pointer(to=tma_mbar[stage]),
                 Index(col_offset, block_row),
             )
             cp_async_bulk_tensor_shared_cluster_global[
@@ -180,7 +178,7 @@ def gemv_tma_kernel[
             ](
                 b_smem.next(stage)[].ptr,
                 descriptor_b_ptr,
-                UnsafePointer(to=tma_mbar[stage]),
+                Pointer(to=tma_mbar[stage]),
                 Index(col_offset),
             )
             producer_phase.step()
@@ -290,9 +288,9 @@ def gemv_tma[
         c,
         a,
         b,
-        M,
-        N,
-        K,
+        Int32(M),
+        Int32(N),
+        Int32(K),
         grid_dim=(ceildiv(M, BLOCK_SIZE_M)),
         block_dim=(THREAD_NUM),
         shared_mem_bytes=smem_use,
@@ -340,9 +338,9 @@ def test_gemv_tma[
     var c_device = ctx.enqueue_create_buffer[dtype](c_size)
     var c_device_ref = ctx.enqueue_create_buffer[dtype](c_size)
 
-    var a_tt = TileTensor(a_device, row_major(a_shape)).as_any_origin()
-    var b_tt = TileTensor(b_device, row_major(b_shape)).as_any_origin()
-    var c_tt = TileTensor(c_device, row_major(c_shape)).as_any_origin()
+    var a_tt = TileTensor(a_device, row_major(a_shape)).as_unsafe_any_origin()
+    var b_tt = TileTensor(b_device, row_major(b_shape)).as_unsafe_any_origin()
+    var c_tt = TileTensor(c_device, row_major(c_shape)).as_unsafe_any_origin()
 
     ctx.enqueue_copy(a_device, a_host_ptr)
     ctx.enqueue_copy(b_device, b_host_ptr)
@@ -370,8 +368,7 @@ def test_gemv_tma[
         comptime num_warmup = 10
 
         @always_inline
-        @parameter
-        def run_func(ctx: DeviceContext) raises:
+        def run_func(ctx: DeviceContext) raises {imm}:
             gemv_tma(
                 c_device,
                 c_tt,
@@ -389,7 +386,7 @@ def test_gemv_tma[
             run_func(ctx)
         ctx.synchronize()
 
-        var nstime = Float64(ctx.execution_time[run_func](num_runs)) / Float64(
+        var nstime = Float64(ctx.execution_time(run_func, num_runs)) / Float64(
             num_runs
         )
         var sectime = nstime * 1e-9
@@ -435,16 +432,16 @@ def test_gemv_tma[
 def main() raises:
     with DeviceContext() as ctx:
         var benchmark = is_benchmark()
-        test_gemv_tma[DType.bfloat16](
+        test_gemv_tma[.bfloat16](
             ctx, Idx[256], Idx[1], Idx[256], benchmark=benchmark
         )
-        test_gemv_tma[DType.bfloat16](
+        test_gemv_tma[.bfloat16](
             ctx, Idx[4096], Idx[1], Idx[4096], benchmark=benchmark
         )
 
-        test_gemv_tma[DType.float32](
+        test_gemv_tma[.float32](
             ctx, Idx[256], Idx[1], Idx[256], benchmark=benchmark
         )
-        test_gemv_tma[DType.float32](
+        test_gemv_tma[.float32](
             ctx, Idx[4096], Idx[1], Idx[4096], benchmark=benchmark
         )

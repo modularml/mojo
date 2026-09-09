@@ -365,7 +365,14 @@ def test_video_content_part_dict_validation() -> None:
     )
     assert msg.number_of_videos == 1
     dumped = msg.model_dump()
-    assert dumped["content"][1] == {"type": "video"}
+    # The optional per-video sampling/sizing hints default to None when unset.
+    assert dumped["content"][1] == {
+        "type": "video",
+        "fps": None,
+        "max_frames": None,
+        "detail": None,
+        "max_long_side_pixel": None,
+    }
 
 
 def test_video_url_content_type_rejected() -> None:

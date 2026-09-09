@@ -24,7 +24,7 @@ Test matrix covering NVIDIA CuTe DSL constraints:
 
 from std.math import ceildiv
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.testing import testing
 
 from std.utils.static_tuple import StaticTuple

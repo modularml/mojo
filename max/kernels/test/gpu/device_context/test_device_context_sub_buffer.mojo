@@ -11,18 +11,20 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 from std.testing import assert_equal
 
 
 def vec_func(
-    in0: UnsafePointer[Float32, ImmutAnyOrigin],
-    in1: UnsafePointer[Float32, ImmutAnyOrigin],
-    output: UnsafePointer[Float32, MutAnyOrigin],
-    len: Int,
-    supplement: Int,
+    in0: ImmPointer[Float32, ImmutAnyOrigin],
+    in1: ImmPointer[Float32, ImmutAnyOrigin],
+    output: MutPointer[Float32, MutAnyOrigin],
+    len_dev: Int32,
+    supplement_dev: Int32,
 ):
+    var len = Int(len_dev)
+    var supplement = Int(supplement_dev)
     var tid = global_idx.x
     if tid >= len:
         return
@@ -33,19 +35,19 @@ def test(ctx: DeviceContext) raises:
     comptime length = 1024
 
     # Allocate the input buffers as sub buffers of a bigger one
-    var in_host = ctx.enqueue_create_host_buffer[DType.float32](2 * length)
-    var out_host = ctx.enqueue_create_host_buffer[DType.float32](length)
+    var in_host = ctx.enqueue_create_host_buffer[.float32](2 * length)
+    var out_host = ctx.enqueue_create_host_buffer[.float32](length)
     ctx.synchronize()
 
     for i in range(length):
         in_host[i] = Float32(i)
         in_host[i + length] = 2
 
-    var in_device = ctx.enqueue_create_buffer[DType.float32](2 * length)
-    var in0_device = in_device.create_sub_buffer[DType.float32](0, length)
-    var in1_device = in_device.create_sub_buffer[DType.float32](length, length)
+    var in_device = ctx.enqueue_create_buffer[.float32](2 * length)
+    var in0_device = in_device.create_sub_buffer[.float32](0, length)
+    var in1_device = in_device.create_sub_buffer[.float32](length, length)
 
-    var out_device = ctx.enqueue_create_buffer[DType.float32](length)
+    var out_device = ctx.enqueue_create_buffer[.float32](length)
 
     ctx.enqueue_copy(in_device, in_host)
 
@@ -56,8 +58,8 @@ def test(ctx: DeviceContext) raises:
         in0_device,
         in1_device,
         out_device,
-        length,
-        supplement,
+        Int32(length),
+        Int32(supplement),
         grid_dim=(length // block_dim),
         block_dim=(block_dim),
     )

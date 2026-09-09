@@ -1,0 +1,72 @@
+# Inkling integration tests.
+
+load(
+    "//bazel:api.bzl",
+    "modular_py_library",
+    "modular_py_test",
+    "requirement",
+)
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "test_reasoning",
+    srcs = ["test_reasoning.py"],
+    deps = [
+        "//max/python/max/pipelines/architectures/inkling",
+        requirement("numpy"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+modular_py_library(
+    name = "grammar_harness",
+    testonly = True,
+    srcs = ["_grammar_harness.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max:_core",
+        "//max/python/max/pipelines/architectures/inkling",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_tool_parser",
+    srcs = ["test_tool_parser.py"],
+    deps = [
+        ":grammar_harness",
+        "//max/python/max/pipelines/architectures/inkling",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/modeling",
+    ],
+)
+
+modular_py_test(
+    name = "test_moe_gate",
+    srcs = ["test_moe_gate.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "1",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
+        "//conditions:default": [],
+    }),
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/inkling",
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)

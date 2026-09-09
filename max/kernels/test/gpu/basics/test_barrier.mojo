@@ -11,21 +11,23 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import std.gpu.primitives.warp as warp
-from std.gpu import barrier, global_idx
-from std.gpu.globals import WARP_SIZE
-from std.gpu.host import DeviceContext
+import max.gpu.primitives.warp as warp
+from max.gpu import global_idx
+from max.gpu.sync import barrier
+from max.gpu.globals import WARP_SIZE
+from max.gpu.host import DeviceContext
 from std.testing import assert_equal
 
 
 def kernel[
     dtype: DType
 ](
-    input: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    output: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    shared_data: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    size: Int,
+    input: ImmPointer[Scalar[dtype], ImmutAnyOrigin],
+    output: MutPointer[Scalar[dtype], MutAnyOrigin],
+    shared_data: MutPointer[Scalar[dtype], MutAnyOrigin],
+    size_dev: Int32,
 ):
+    var size = Int(size_dev)
     var global_tid = global_idx.x
     if global_tid >= size:
         return
@@ -63,7 +65,7 @@ def test_barrier[dtype: DType](ctx: DeviceContext) raises:
         input_buffer,
         output_buffer,
         shared_buffer,
-        buffer_size,
+        Int32(buffer_size),
         grid_dim=1,
         block_dim=block_size,
     )
@@ -82,4 +84,4 @@ def test_barrier[dtype: DType](ctx: DeviceContext) raises:
 
 def main() raises:
     with DeviceContext() as ctx:
-        test_barrier[DType.float32](ctx)
+        test_barrier[.float32](ctx)

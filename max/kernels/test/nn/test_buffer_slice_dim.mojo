@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.algorithm import elementwise
-from std.gpu.host import DeviceContext
+from max.algorithm import elementwise
+from max.gpu.host import DeviceContext
 from layout import Coord, TileTensor, coord_to_index_list, row_major
 from nn.slice import slice_dim_as_view
 
@@ -21,28 +21,28 @@ from std.utils.index import IndexList
 
 
 def print_elements[dtype: DType](tensor: TileTensor[dtype, ...]) raises:
-    var shape = coord_to_index_list(tensor.layout.shape_coord())
+    var shape = tensor.layout.shape_coord()
     var stride = coord_to_index_list(tensor.layout.stride_coord())
-    print("New shape:", shape)
+    print("New shape:", coord_to_index_list(shape))
     print("New strides:", stride)
 
     @always_inline
-    @parameter
     def print_elements_lambda[
-        simd_width: Int, rank: Int, alignment: Int = 1
-    ](coords: IndexList[rank]):
-        var index = rebind[IndexList[tensor.rank]](coords)
-        var idx = tensor.layout(Coord(index))
+        simd_width: Int, alignment: Int = 1
+    ](coords: Coord) {var}:
+        var idx = tensor.layout(coords)
         print(tensor.raw_load(idx))
 
-    elementwise[print_elements_lambda, 1](shape, DeviceContext(api="cpu"))
+    elementwise[1](print_elements_lambda, shape, DeviceContext(api="cpu"))
 
 
 # slice_dim
 def test_slice_dim[
     dtype: DType, numelems: Int, outer_rank: Int, dim: Int
 ](dims: IndexList[outer_rank], start: Int, stop: Int, step: Int) raises:
-    var memory1 = InlineArray[Scalar[dtype], numelems](uninitialized=True)
+    var memory1 = Array[Scalar[dtype], numelems](
+        fill_with=lambda (i: Int) -> Scalar[dtype]: Scalar[dtype](i)
+    )
     var in_tensor = TileTensor(
         memory1,
         row_major(Coord(dims)),
@@ -52,9 +52,6 @@ def test_slice_dim[
     var stride = coord_to_index_list(in_tensor.layout.stride_coord())
     print("In shape:", shape)
     print("In strides:", stride)
-
-    for i in range(numelems):
-        in_tensor.raw_store(i, Scalar[dtype](i))
 
     # Perform the slice even if we are testing the copy so we get the target size.
     var sliced = slice_dim_as_view[dtype, dim](
@@ -85,7 +82,7 @@ def test_slice_dim_basic() raises:
     # CHECK-NEXT: 15.0
 
     # print(torch.arange(0, 16).reshape(4, 4)[2:4:1, :].flatten())
-    test_slice_dim[DType.float32, 16, 2, 0](IndexList[2](4, 4), 2, 4, 1)
+    test_slice_dim[.float32, 16, 2, 0](IndexList[2](4, 4), 2, 4, 1)
 
     # CHECK-NEXT: In shape: (4, 4)
     # CHECK-NEXT: In strides: (4, 1)
@@ -101,7 +98,7 @@ def test_slice_dim_basic() raises:
     # CHECK-NEXT: 15.0
 
     # print(torch.arange(0, 16).reshape(4, 4)[:, 2:4:1].flatten())
-    test_slice_dim[DType.float32, 16, 2, 1](IndexList[2](4, 4), 2, 4, 1)
+    test_slice_dim[.float32, 16, 2, 1](IndexList[2](4, 4), 2, 4, 1)
 
 
 def main() raises:

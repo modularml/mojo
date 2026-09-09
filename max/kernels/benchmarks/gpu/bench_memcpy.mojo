@@ -15,7 +15,8 @@ from std.math import iota
 from std.os import abort
 from std.sys import size_of
 
-from std.algorithm.functional import parallelize_over_rows
+from max.algorithm.functional import parallelize_over_rows
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -23,7 +24,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext, HostBuffer
+from max.gpu.host import DeviceContext, HostBuffer
 from internal_utils import arg_parse, human_readable_size
 from std.testing import assert_almost_equal, assert_true
 
@@ -103,7 +104,7 @@ def bench_memcpy(
     context: DeviceContext,
 ) raises:
     comptime dtype = DType.float32
-    length_in_elements = length_in_bytes // size_of[dtype]()
+    var length_in_elements = length_in_bytes // size_of[dtype]()
     var mem_host: HostBuffer[dtype] = context.enqueue_create_host_buffer[dtype](
         length_in_elements
     ) if config.pinned_memory else DeviceContext(
@@ -124,12 +125,10 @@ def bench_memcpy(
         length_in_elements if config.direction == Config.DToD else 0
     )
 
-    @parameter
     @always_inline
-    def bench_func(mut b: Bencher):
-        @parameter
+    def bench_func(mut b: Bencher) {imm}:
         @always_inline
-        def kernel_launch(ctx: DeviceContext) raises:
+        def kernel_launch(ctx: DeviceContext) raises {imm}:
             if config.direction == Config.DToH:
                 context.enqueue_copy(mem_host, mem_device)
             elif config.direction == Config.HToD:
@@ -139,17 +138,18 @@ def bench_memcpy(
             else:
                 raise Error("Unexpected transfer direction")
 
-        b.iter_custom[kernel_launch](context)
+        bencher_iter_custom(b, kernel_launch, context)
 
     # For D2D transfers, we're reading the entire buffer into gpu cache/sharedmem,
     # then writing it back to a new address in vram. This means we're really
     # moving the tensor in/out of vram twice (one read + one write), and therefore
     # we need to double the size in order to calculate the correct bandwidth.
-    transferred_size_in_bytes = length_in_bytes
+    var transferred_size_in_bytes = length_in_bytes
     if config.direction == Config.DToD:
         transferred_size_in_bytes *= 2
 
-    b.bench_function[bench_func](
+    b.bench_function(
+        bench_func,
         BenchId(
             String(t"memcpy_{config}"),
             input_id="length=" + human_readable_size(length_in_bytes),
@@ -173,7 +173,7 @@ def bench_p2p(
     ctx2: DeviceContext,
 ) raises:
     comptime dtype = DType.float32
-    length_in_elements = length_in_bytes // size_of[dtype]()
+    var length_in_elements = length_in_bytes // size_of[dtype]()
 
     # Create host buffers for verification
     var host_ptr = List(length=length_in_elements, fill=Scalar[dtype](0))
@@ -189,23 +189,22 @@ def bench_p2p(
     ctx1.enqueue_copy(src_buf, host_ptr)
     ctx1.synchronize()
 
-    @parameter
     @always_inline
-    def bench_func(mut b: Bencher):
-        @parameter
+    def bench_func(mut b: Bencher) {imm}:
         @always_inline
-        def kernel_launch(ctx: DeviceContext) raises:
+        def kernel_launch(ctx: DeviceContext) raises {imm}:
             ctx2.enqueue_copy(dst_buf, src_buf)
 
-        b.iter_custom[kernel_launch](ctx1)
+        bencher_iter_custom(b, kernel_launch, ctx1)
 
     # Create list of throughput measures
-    var measures = [
+    var measures: List = [
         # Raw bandwidth (considering only one transfer)
         ThroughputMeasure(BenchMetric.bytes, length_in_bytes),
     ]
 
-    b.bench_function[bench_func](
+    b.bench_function(
+        bench_func,
         BenchId(
             "memcpy_p2p",
             input_id="length=" + human_readable_size(length_in_bytes),
@@ -218,8 +217,7 @@ def bench_p2p(
     ctx2.synchronize()
 
     # Parallel verification
-    @parameter
-    def verify_chunk(start: Int, end: Int):
+    def verify_chunk(start: Int, end: Int) {imm}:
         for i in range(start, end):
             try:
                 assert_almost_equal(host_ptr[i], Float32(i))
@@ -232,7 +230,7 @@ def bench_p2p(
     var shape = IndexList[1](
         length_in_elements,
     )
-    parallelize_over_rows[verify_chunk](shape, 0, 256)
+    parallelize_over_rows(verify_chunk, shape, 0, 256)
 
     # Cleanup
     _ = src_buf

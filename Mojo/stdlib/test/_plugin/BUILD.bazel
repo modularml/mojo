@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//visibility:private"])
+
+mojo_test(
+    name = "test_selector.mojo.test",
+    srcs = ["test_selector.mojo"],
+    deps = [
+        "@mojo//:std",
+        "@mojo//:test_utils",
+    ],
+)
+
+mojo_test(
+    name = "test_gpu_target_plugin.mojo.test",
+    srcs = ["test_gpu_target_plugin.mojo"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+        "@mojo//:test_utils",
+    ],
+)

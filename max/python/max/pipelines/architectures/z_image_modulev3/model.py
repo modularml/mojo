@@ -25,7 +25,7 @@ from max.pipelines.modeling.base.component_model import ComponentModel
 from max.profiler import traced
 
 if TYPE_CHECKING:
-    from max.pipelines.diffusion.cache import DenoisingCacheConfig
+    from max.pipelines.diffusion.config import DenoisingCacheConfig
 
 from .model_config import ZImageConfig
 from .weight_adapters import convert_z_image_transformer_state_dict

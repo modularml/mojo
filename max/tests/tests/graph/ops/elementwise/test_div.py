@@ -122,8 +122,8 @@ def build_models(lhs_dtype: DType, rhs_dtype: DType) -> Graph:
 
 def run_models(
     model: Any,
-    lhs_val: int | float,
-    rhs_val: int | float,
+    lhs_val: float,
+    rhs_val: float,
     lhs_dtype: DType,
     rhs_dtype: DType,
     cpu: Device,

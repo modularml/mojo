@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_filecheck_test", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -25,11 +26,13 @@ _OTHER_TESTS = [
 ]
 
 _EXTRA_CONSTRAINTS = {
+    "test_apple_edge_masked_load.mojo": ["//:apple_gpu"],
 }
 
 mojo_filecheck_test(
     name = "test_shared_mem_barrier.mojo.test",
     srcs = ["test_shared_mem_barrier.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     enable_assertions = False,
     tags = ["gpu"],
     target_compatible_with = ["//:has_gpu"],
@@ -45,6 +48,7 @@ mojo_filecheck_test(
     mojo_filecheck_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"],
         deps = [
@@ -61,6 +65,7 @@ mojo_filecheck_test(
 mojo_filecheck_test(
     name = "test_sharedmem_async_cp.mojo.test",
     srcs = ["test_sharedmem_async_cp.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = [
         "gpu",
         "manual",
@@ -77,6 +82,10 @@ mojo_filecheck_test(
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+        exec_properties = {
+            "test.resources:gpu-memory": "1",
+        },
         tags = ["gpu"],
         target_compatible_with = ["//:nvidia_gpu"],
         deps = [
@@ -97,6 +106,7 @@ mojo_filecheck_test(
 mojo_test(
     name = "test_buffer_io.mojo.test",
     srcs = ["test_buffer_io.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = ["gpu"],
     target_compatible_with = ["//:amd_gpu"],
     deps = [
@@ -109,26 +119,40 @@ mojo_test(
 mojo_test(
     name = "test_ldmatrix_fp8.mojo.test",
     srcs = ["test_ldmatrix_fp8.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = ["gpu"],
     target_compatible_with = ["//:h100_gpu"],
     deps = [
         "//max:layout",
         "//max:linalg",
+        "//max:max_mojo",
         "@mojo//:std",
     ],
 )
+
+_B200_GPU_MEMORY = {
+    "test_tcgen05.mojo": "2",
+}
+
+_B200_EXTRA_DEPS = {
+    "test_tcgen05.mojo": ["//max:max_mojo"],
+}
 
 [
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+        exec_properties = {
+            "test.resources:gpu-memory": _B200_GPU_MEMORY.get(src, "1"),
+        },
         tags = ["gpu"],
         target_compatible_with = ["//:b200_gpu"],
         deps = [
             "//max:layout",
             "//max:linalg",
             "@mojo//:std",
-        ],
+        ] + _B200_EXTRA_DEPS.get(src, []),
     )
     for src in [
         "test_cp_async_bulk.mojo",
@@ -139,6 +163,8 @@ mojo_test(
 mojo_test(
     name = "test_tma_gather4.mojo.test",
     srcs = ["test_tma_gather4.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+    exec_properties = {"test.resources:gpu-memory": "1"},
     tags = ["gpu"],
     target_compatible_with = ["//:b200_gpu"],
     deps = [
@@ -153,6 +179,7 @@ mojo_test(
 mojo_test(
     name = "test_tma_block_reduce.mojo.test",
     srcs = ["test_tma_block_reduce.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = ["gpu"],
     target_compatible_with = select({
         "//:h100_gpu": [],
@@ -169,6 +196,7 @@ mojo_test(
 mojo_filecheck_test(
     name = "test_tma.mojo.test",
     srcs = ["test_tma.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = ["gpu"],
     target_compatible_with = ["//:h100_gpu"],
     deps = [
@@ -178,10 +206,18 @@ mojo_filecheck_test(
     ],
 )
 
+_GLOB_GPU_MEMORY = {
+    "test_external_memory_callee_patterns.mojo": "1",
+}
+
 [
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+        exec_properties = {
+            "test.resources:gpu-memory": _GLOB_GPU_MEMORY.get(src, "1"),
+        },
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []),
         deps = [
@@ -195,9 +231,3 @@ mojo_filecheck_test(
         exclude = _FILECHECK_TESTS + _OTHER_TESTS,
     )
 ]
-
-filegroup(
-    name = "test-sources",
-    srcs = glob(["**/*.mojo"]),
-    visibility = ["//utils/debugging/gpu-build-benchmarking:__subpackages__"],
-)

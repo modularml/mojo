@@ -24,11 +24,11 @@ def writeTile(
     ldc: Int,
     maxRow: Int,
     maxCol: Int,
-    C_r: SIMD[DType.float32, tM * tN],
+    C_r: SIMD[.float32, tM * tN],
 ):
     """Write tile using SIMD vector stores for coalesced writes.
 
-    Each row is tN=4 elements wide, perfect for SIMD[DType.float32, 4] vector stores.
+    Each row is tN=4 elements wide, perfect for SIMD[.float32, 4] vector stores.
     This version uses vectorized stores when possible for better memory coalescing.
 
     Args:
@@ -41,7 +41,7 @@ def writeTile(
     for row in range(tM):
         if row < maxRow:
             # Pack the row into a SIMD vector
-            var data = SIMD[DType.float32, 4](
+            var data = SIMD[.float32, 4](
                 C_r[row * tN + 0],
                 C_r[row * tN + 1],
                 C_r[row * tN + 2],

@@ -2,58 +2,27 @@ load("//bazel:api.bzl", "modular_py_library", "requirement")
 
 package(default_visibility = ["//max:consumers"])
 
-filegroup(
-    name = "recipe_configs",
-    srcs = glob(["**/recipes/**/*.yaml"]),
-)
-
 modular_py_library(
     name = "architectures",
-    srcs = glob(["**/*.py"]),
-    data = [":recipe_configs"],
+    srcs = glob(["*.py"]),
     ignore_extra_deps = [
         # Hooks added for convenience for when we want to print the model layers
         "//max/python/max/nn/hooks",
-        # Kimi K2.5: used at runtime by HF custom tokenizer, not a direct import
-        requirement("tiktoken"),
     ],
     ignore_unresolved_imports = [
-        # Comes from vendored qwen_vl_utils package, we cannot use this since it isn't in conda-forge
-        "decord",
         # Private tool parsers are imported at runtime, not directly
         "tool_parsers",
+        # Private Kimi K3 arch is imported at runtime, not directly
+        "kimi_k3",
+        # Private MiniMax-M3 arch is imported at runtime, not directly
+        "minimax_m3",
+        # Private unified MiniMax-M3 + MTP arch is imported at runtime
+        "minimax_m3_mtp",
     ],
     deps = [
-        requirement("av"),  # For Kimi2.5 video reader
-        requirement("huggingface-hub"),  # For Mistral, should we be circumventing the cache here?
-        requirement("llguidance"),
-        requirement("numpy"),
-        requirement("pillow"),
-        requirement("pydantic"),
-        requirement("requests"),
-        requirement("tiktoken"),  # Required by HF custom tokenizer for Kimi K2.5
-        # TODO: These are required for the llama3.1 model. Remove them if
-        # possible.
-        requirement("transformers"),
-        requirement("typing-extensions"),
-        "//max/python/max:_core",
-        "//max/python/max/driver",
-        "//max/python/max:tensor",
-        "//max/python/max/pipelines/diffusion",
-        "//max/python/max/pipelines/modeling",
-        "//max/python/max/dtype",
-        "//max/python/max/engine",
-        "//max/python/max/graph",
-        "//max/python/max/pipelines/kv_cache",
+        requirement("transformers"),  # Used in hf_config_shims.py
         "//max/python/max/pipelines/lib",
-        "//max/python/max/pipelines/core",
-        "//max/python/max/pipelines/request",
-        "//max/python/max/pipelines/speculative",
-        "//max/python/max/experimental/nn",
-        "//max/python/max/nn",
         # Hooks added for convenience for when we want to print the model layers
         "//max/python/max/nn/hooks",
-        "//max/python/max/profiler",
-        "//max/python/max/support",
     ],
 )

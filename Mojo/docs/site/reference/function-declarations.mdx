@@ -1,0 +1,1077 @@
+---
+title: Mojo function declarations reference
+sidebar_label: Function declarations
+sidebar_position: 7
+description: >
+  Reference for Mojo function declaration syntax. Covers
+  signatures, argument conventions, markers, variadic
+  arguments, effects, return types, and special methods.
+---
+
+{/* VERIFIED: TokenKinds.def, Signatures.h, Signatures.cpp,
+     ParserStmts.cpp, ParserBase.h, ParserBase.cpp, ASTDecl.h,
+     ASTDecl.cpp, ExprNode.h, OverloadFitness.h, OverloadFitness.cpp,
+     OverloadSet.h, OverloadSet.cpp, ParamInf.h, ParamInf.cpp,
+     DeclResolution.cpp (return-type-only redefinition diagnostic).
+     Consulted: ExprNodes.h, ExprNodes.cpp, ParserExprs.cpp,
+     ASTType.h, MojoDiags.h */}
+
+{/* NOT VERIFIED:
+"Copy initializers can't raise" — likely enforced via trait/IR; no specific
+error string surfaced.
+"out arguments can't have defaults" — doc claim at line 365; no specific
+compiler error found, but plausible.
+"Copy ctor copy argument must use the default convention" — specific
+convention claim; didn't trace.
+"Import + local def with the same name" — verified by experiment to
+produce `invalid redefinition of '<name>': cannot overload with this
+non-function definition`, not silent shadowing as the existing manual
+claims. Reference text was corrected accordingly. The aliased-import
+workaround was also confirmed to compile.
+*/}
+
+A *function declaration* introduces a named, callable unit
+of code. Every function in Mojo starts with the `def`
+keyword:
+
+```mojo
+def greet(name: String) -> String:
+    return "Hello, " + name
+```
+
+The simplest function has a name, empty parentheses, and
+a body:
+
+```mojo
+def do_nothing():
+    pass
+```
+
+## Function names
+
+Function names must be valid identifiers. Backtick-escaped
+identifiers allow keywords as function names:
+
+```mojo
+def `import`():
+    print("In `import`")
+
+def main():
+    `import`() # In `import`
+```
+
+## Function signatures
+
+{/* VERIFIED: From ParserStmts.cpp, Signatures.h */}
+
+```text
+def name(argument-list) -> ReturnType:
+    body
+
+def name[parameter-list](argument-list) -> ReturnType:
+    body
+
+def name(argument-list) raises -> ReturnType:
+    body
+
+def name[parameter-list](argument-list)
+    -> ReturnType where constraint:
+    body
+
+def name[parameter-list](argument-list) raises
+    -> ReturnType where constraint:
+    body
+```
+
+A signature can include a name, a parameter list, an
+argument list, effects, a return type, and a `where` clause.
+Only the parentheses and the colon are required.
+
+*Arguments* are runtime values in parentheses. *Parameters*
+are compile-time values in square brackets. In other
+languages these are both called "parameters". Mojo
+distinguishes them to avoid confusion:
+
+```mojo
+# T must be both `Comparable` (to test with `<` and `>`) and
+# `ImplicitlyCopyable` or you won't be able to return
+def clamp[T: Comparable & ImplicitlyCopyable](
+    val: T, lo: T, hi: T,
+) -> T:
+    if val < lo:
+        return lo
+    if val > hi:
+        return hi
+    return val
+```
+
+## Markers
+
+Three markers divide parameter and argument lists into
+zones that control how callers pass values:
+
+| Marker | Arguments       | Parameters      |
+|--------|-----------------|-----------------|
+| `//`   | No              | Infer-only      |
+| `/`    | Positional-only | Positional-only |
+| `*`    | Keyword-only    | Keyword-only    |
+
+Markers must appear in this order: `//`, then `/`, then `*`.
+Each can appear once. `/` can't be first in the list, and
+`*` can't be last.
+
+:::note
+Mojo markers follow Python's convention from PEP 570 and
+PEP 3102.
+:::
+
+### Infer-only marker (`//`, parameters only)
+
+`//` separates infer-only parameters from named parameters. The
+compiler deduces infer-only parameters from call-site arguments:
+
+```mojo
+def inferred_type[T: Writable, //](value: T):
+    print(t"Value is {value}. Type is {reflect[T].name()}.")
+
+def main():
+    inferred_type(5)       # Value is 5. Type is SIMD[DType.int, 1].
+    inferred_type("Hello") # Value is Hello. Type is String.
+```
+
+Infer-only parameters can't be specified positionally:
+
+```mojo
+# Error because 'inferred_type' got 1 positional parameter
+# but expected none.
+inferred_type[Int](5)
+```
+
+Keyword syntax bypasses this restriction:
+
+```mojo
+inferred_type[T=Int](5) # OK: Value is 5. Type is Int.
+
+# Error because value passed to 'value' cannot be converted from
+# 'StringLiteral["Hello"]' to 'Int'
+inferred_type[T=Int]("Hello")
+```
+
+Inference isn't limited to infer-only parameters. With enough
+context, the compiler can infer named parameters too:
+
+```mojo
+def add[T: Intable](a: T, b: T) -> Int:
+    return Int(a) + Int(b)
+
+def main():
+    print(t"Sum is {add[Int](1, 2)}.")         # Explicit T
+    print(t"Sum is {add(1, 2)}.")              # Inferred T
+    print(t"Sum is {add[Float64](4.5, 1.2)}.") # Explicit
+    print(t"Sum is {add(4.5, 1.2)}.")          # Inferred
+```
+
+### Positional-only marker (`/`)
+
+Everything before `/` is positional-only. Callers must pass
+these values by position, not by name:
+
+```mojo
+def div(a: Int, b: Int, /):
+    return a // b
+
+div(10, 3)       # OK
+div(a=10, b=3)   # Error
+```
+
+### Keyword-only marker (`*`)
+
+Everything after `*` is keyword-only. Callers must pass
+values by name, whether parameters or arguments:
+
+```mojo
+def configure(*, verbose: Bool, retries: Int):
+    # ...
+
+configure(verbose=True, retries=3)  # OK
+configure(True, 3)                  # Error
+```
+
+A `*args` variadic argument has the same effect on arguments
+that follow it:
+
+```mojo
+def sum(*values: Int, name: String) -> Int:
+    print(name, end=": ")
+    var total = 0
+    for value in values:
+        total += value
+    return total
+
+def main():
+    print(sum(1, 2, 3, name="total"))  # total: 6
+    # print(sum(1, 2, 3, "subtotal"))
+        # Error because missing required keyword argument
+```
+
+## Default values
+
+Arguments can have default values. Once a default appears,
+every following positional argument must also have one:
+
+```mojo
+def connect(
+    host: String = "www.modular.com", port: Int = 80,
+):
+    print(t"Connecting to {host}:{port}")
+
+def main():
+    connect()             # Connecting to www.modular.com:80
+    connect(port=8080)    # Connecting to www.modular.com:8080
+```
+
+```mojo
+def my_function(x: Int, y: Int = 0, z: Int = 0) -> Int:
+    return x + y + z
+
+# Error because required positional argument follows optional
+# positional argument
+# def wrong(x: Int, y: Int = 0, z: Int):
+#     return x + y + z
+```
+
+Keyword-only arguments are exempt from the ordering rule.
+They can mix required and optional freely:
+
+```mojo
+def configure(*, retries: Int = 3, verbose: Bool):
+    pass
+```
+
+Parameters also support defaults.
+
+## Function constraints
+
+A `where` clause constrains compile-time parameters. It
+appears at the end of the declaration, after the return type
+(or after the argument list if there's no return type):
+
+```mojo
+comptime LESS_THAN: Int32 = -1
+comptime EQUAL: Int32 = 0
+comptime GREATER_THAN: Int32 = 1
+
+def compare[T: AnyType](
+    x: T, y: T,
+) -> Int32 where conforms_to(T, Comparable):
+    if x < y:
+        return LESS_THAN
+    elif x > y:
+        return GREATER_THAN
+    else:
+        return EQUAL
+
+def main():
+    print(compare(5, 10))  # -1 (LESS_THAN)
+    print(compare(7, 7))   # 0 (EQUAL)
+    print(compare("Z", "A")) # 1 (GREATER_THAN)
+```
+
+`where` clauses can express complex constraints, such as limiting
+SIMD vector sizes to certain powers of 2:
+
+```mojo
+def process[
+    n: Int,
+](data: SIMD[.float32, n]) -> Float32 where (
+    n == 1 or n == 2 or n == 4 or n == 8 or n == 16 or n == 32
+):
+    var sum: Float32 = 0.0
+    for i in range(n):
+        sum += data[i]
+    return sum
+
+
+def main():
+    var data = SIMD[.float32, 16](255.0)
+    var sum = process[n=16](data)
+    print(t"Sum: {sum}")  # Sum: 4080.0
+```
+
+`where` clauses belong at the end of a declaration:
+
+```mojo
+# Correct: the `where` clause follows the signature.
+def correct[n: Int]() where n > 0:
+    pass
+```
+
+A `where` clause inside a parameter list is invalid. Add it to the end of
+the declaration:
+
+```mojo
+# Wrong: `where` is not allowed inside a parameter list.
+def wrong[n: Int where n > 0]():
+    pass
+```
+
+A `where` clause in an argument list is invalid:
+
+```mojo
+# Wrong: `where` clauses can only be used with compile-time parameters.
+def wrong(x: Int where x > 0):
+    pass
+```
+
+A [`thin`](#thin) function *type* can carry its own trailing `where` clauses,
+constraining the parameters that type declares. See
+[Constrained function types](#constrained-function-types).
+
+## Argument conventions
+
+An *argument convention* controls how an argument value passes to a function. It
+appears before the argument name.
+
+### `mut`
+
+The caller's value is passed by mutable reference. Changes
+inside the function are visible to the caller:
+
+```mojo
+def double_it(mut x: Int):
+    x *= 2
+```
+
+`mut` arguments can't have default values:
+
+```mojo
+# Error because 'mut' arguments may not have defaults
+def wrong(mut x: Int = 0):
+    pass
+```
+
+### `var`
+
+The function receives an owned copy. If the caller transfers
+ownership with `^`, the original becomes inaccessible.
+Otherwise the value is copied and the caller keeps access:
+
+```mojo
+def consume(var s: String):
+    s += "!"
+    print(s)
+
+def main():
+    var greeting = "Hello"
+    consume(greeting)   # Hello! (copied)
+    print(greeting)     # Hello
+
+    consume(greeting^)  # Hello! (moved)
+    # print(greeting)   # Error because uninitialized after move
+```
+
+### `out`
+
+An `out` argument is the function's return slot. Only one
+`out` argument is allowed. It replaces the `->` return type:
+
+```mojo
+def make_int(out result: Int):
+    result = 42
+
+def main():
+    var x = make_int()
+    print(x)  # 42
+```
+
+A function can't use both `out` and `-> Type`:
+
+```mojo
+# Error because function cannot have both an 'out' argument
+#        and an explicit result type
+def wrong(out result: Int) -> Int:
+    result = 0
+```
+
+### `deinit`
+
+The function takes ownership and destroys the value. Required
+for `self` in `__deinit__()` and the argument in move initializers:
+
+```mojo
+struct Resource:
+    var handle: Int
+
+    def __deinit__(deinit self):
+        _release(self.handle)
+```
+
+### `ref`
+
+Passes a reference with an explicit *origin* specifier. The
+origin tracks where the reference came from:
+
+```mojo
+def get_first[T: Copyable](ref data: List[T]) -> ref[data[0]] T:
+    return data[0]
+
+def main():
+    var data: List[String] = ["one", "two", "three"]
+    ref first = get_first(data)  # mutable because `data` is mutable
+    print(first)  # one
+    first = "Первый"
+    print(data)  # ['Первый', 'two', 'three']
+```
+
+### Default convention
+
+Without a convention, the argument is an immutable read-only reference. The
+caller keeps ownership:
+
+```mojo
+def length[T: Copyable](s: List[T]) -> Int:
+    return len(s)
+```
+
+## Variadic arguments
+
+Variadic arguments accept a varying number of values ("indefinite
+arity"). Functions like print use variadic arguments to accept any
+number of values.
+
+### Homogeneous variadics
+
+`*` before the argument name accepts any number of positional
+arguments of the same type (homogeneous arguments):
+
+```mojo
+def sum_all(*values: Int) -> Int:
+    var total = 0
+    for v in values:
+        total += v
+    return total
+```
+
+### Variadic packs
+
+`*` before both the name *and* the type annotation creates a
+*variadic pack* that accepts arguments of different types (heterogeneous
+arguments):
+
+```mojo
+def print_all[*Ts: Writable](*args: *Ts):
+    comptime for idx in range(args.__len__()):
+        print(args[idx], end=" ")
+    print()
+
+def main():
+    print_all("Hello", 42, 3.14)  # Hello 42 3.14
+```
+
+:::note Why not `len(args)`?
+`args` has a `VariadicPack` type, and `VariadicPack.__len__()` is a
+`@staticmethod`, so `args.__len__()` is the same as
+`type_of(args).__len__()`. The compiler can evaluate it at compile time.
+
+`len(args)` doesn't work because `args` is a dynamic value, so
+`len(args)` is a dynamic expression. You can't use a dynamic value
+to drive a `comptime for`.
+:::
+
+### Variadic restrictions
+
+A function can have at most one `*args`. Variadic arguments
+can't have default values:
+
+```mojo
+# Error because variadic arguments may not have defaults
+def wrong(*args: Int = 0):
+    pass
+```
+
+`out` arguments can't be variadic:
+
+```mojo
+def wrong(out *results: Int):
+    pass
+```
+
+## Function effects
+
+Effects appear after the closing parenthesis and before `->`.
+
+### `raises` {#raises}
+
+Declares that the function can raise an error. An optional
+error type can follow `raises`:
+
+```mojo
+def parse(text: String) raises -> Int:
+    # ...
+
+def parse_strict(text: String) raises SomeError -> Int:
+    # ...
+```
+
+A function can specify at most one error type after `raises`.
+
+### `thin` {#thin}
+
+Used only in function *types*, `thin` indicates a function pointer type
+(not a closure) and ensures the function value doesn't capture values from
+its defining scope. Don't use `thin` in function declarations.
+
+```mojo
+def map[
+    T: Copyable, U: Copyable
+](f: def(T) thin -> U, input: List[T]) -> List[U]:  # Used as type
+    var result: List[U] = []
+    for item in input:
+        result.append(f(item))
+    return result^
+
+# `square` doesn't capture values. It can be passed to a thin type
+def square(x: Int) -> Int:
+    return x * x
+
+def main():
+    var nums: List[Int] = [1, 2, 3]
+    var squares = map(square, nums)
+    print(squares)  # Output: [1, 4, 9]
+```
+
+#### Constrained function types {#constrained-function-types}
+
+A `thin` function type that declares parameters can constrain them with
+trailing `where` clauses, written after the result type. The constraint is part
+of the type: callers must prove it holds for the parameters they bind.
+
+```mojo
+comptime Kernel = def[w: Int](Int) thin -> None where (
+    w > 0, "width must be positive"
+)
+
+def apply[F: Kernel](x: Int):
+    F[4](x)     # ok
+    F[0](x)     # error: violated constraint
+```
+
+Constraints are contravariant. A function satisfies the type when its own
+`where` clause is implied by the type's, or when it has none — the type
+promises its callers more than the function demands. A function that demands
+more than the type promises is rejected.
+
+Only `thin` function types accept a `where` clause. The clause binds to the
+innermost function type, so a declaration-level `where` that follows a
+function-type result needs that result parenthesized:
+
+```mojo
+# The `where` clause constrains the returned function type.
+def inner_constraint[n: Int]() -> def() thin -> None where n > 0: ...
+
+# The `where` clause constrains `outer_constraint` itself.
+def outer_constraint[n: Int]() -> (def() thin -> None) where n > 0: ...
+```
+
+### `abi("C")` {#abi-c}
+
+Declares that a function uses the C calling convention. Because C has no
+closure mechanism, `abi("C")` normally appears together with `thin` in
+function types:
+
+```mojo
+# `add` is compiled with the C calling convention, so it can be called
+# from C or stored in a C-ABI function pointer.
+def add(a: Int32, b: Int32) abi("C") -> Int32:
+    return a + b
+
+def main():
+    var fp: def(Int32, Int32) thin abi("C") -> Int32 = add
+    print(fp(1, 2))  # 3
+```
+
+:::caution
+Don't combine non-Mojo `abi()` effects with raising functions.
+Raising functions change calling conventions in non-obvious ways.
+
+The Mojo compiler:
+
+- accepts `def (String) abi("Mojo") raises`
+- rejects `def (String) abi("C") raises`
+
+`abi("Mojo")` is already the default. You don't need to specify it.
+
+:::
+
+## Return type
+
+`->` introduces the return type. It appears after any
+effects:
+
+```mojo
+def square(x: Int) -> Int:
+    return x * x
+```
+
+Without `->`, the function returns `None`.
+
+## Special methods
+
+Certain method names have enforced signatures. The compiler
+checks argument count, conventions, and return types.
+
+### Initializers
+
+An initializer must have an `out self` result:
+
+```mojo
+struct Point:
+    var x: Int
+    var y: Int
+
+    def __init__(out self, x: Int, y: Int):
+        self.x = x
+        self.y = y
+```
+
+Without `out self`, the compiler rejects the method:
+
+```mojo
+# Error because __init__ method must return Self type
+#        with 'out' argument
+def __init__(self):
+    pass
+```
+
+### Copy initializers
+
+A copy initializer uses a single keyword-only argument named `copy`:
+
+```mojo
+def __init__(out self, *, copy: Self):
+    self.x = copy.x
+    self.y = copy.y
+```
+
+Copy a value with `Type.__init__(copy=value)`, `Type(copy=value)`, or
+`value.copy()`:
+
+- The `copy` argument must use the default convention of a readable
+  immutable reference.
+- Copy initializers can't raise.
+- Trivial types can't define a copy initializer.
+- Conforming to `Copyable` or `ImplicitlyCopyable` automatically generates
+  a copy initializer if one isn't already defined.
+- If the type isn't compatible with copying, the compiler rejects the
+  conformance.
+
+Don't confuse copying with casting. `Type(value)` casts in Mojo.
+`Type(copy=value)` and `value.copy()` copy.
+
+Prefer the explicit `.copy()` call over the `copy` keyword argument form
+for idiomatic Mojo style.
+
+### Move initializers
+
+A move initializer uses a single keyword-only argument named `move`:
+
+```mojo
+def __init__(out self, *, deinit move: Self):
+    self.x = move.x
+    self.y = move.y
+```
+
+Call `Type.__init__(move=value)` or `Type(move=value)`:
+
+- The `move` argument must use the `deinit` convention.
+- Move initializers can't raise.
+- `RegisterPassable` types can't define a move initializer.
+  They're always movable by copying a register.
+
+### Deinitializers
+
+A deinitializer takes `deinit self`:
+
+```mojo
+def __deinit__(deinit self):
+    _release(self.handle)
+```
+
+- Deinitializers can't raise.
+- Trivial types can't define a deinitializer.
+
+You can call `value.__deinit__()` explicitly but the compiler calls it
+automatically at the value's last use, via ASAP destruction. Prefer
+custom deinitializers for [explicit
+destruction](/docs/manual/lifecycle/death/#explicitly-destroyed-types).
+
+## Nested functions
+
+Functions can be defined inside other functions. Nested
+functions can capture values from the enclosing scope as *closures*:
+
+```mojo
+def outer(x: Int) -> Int:
+    def inner() {imm} -> Int:  # Read-only references (`imm`) to outer scope
+        return x + 1
+    return inner()
+```
+
+The compiler resolves nested function bodies immediately so captures bind
+correctly.
+
+## Static methods
+
+`@staticmethod` makes a struct method callable without an
+instance. Static methods don't take `self`:
+
+```mojo
+struct MathUtils:
+    comptime pi: Float64 = 3.141592653589793
+
+    @staticmethod
+    def square(x: Int) -> Int:
+        return x * x
+
+def main():
+    print(MathUtils.square(5))  # 25
+    print(MathUtils.pi)         # 3.141592653589793
+```
+
+## Function overloads {#function-overloads}
+
+{/* VERIFIED: OverloadFitness::isBetter in OverloadFitness.cpp,
+     filterForBestCandidates in OverloadSet.cpp, ParamInf.cpp.
+     "Cannot overload on return type only" diagnostic:
+     DeclResolution.cpp around the `redefinition of function` emit.
+     Raises-only redefinition behavior: verified by experiment to
+     emit `redefinition of function '<name>' with identical
+     signature` from the same DeclResolution.cpp path; `raises` is
+     not part of the signature for overload-set purposes. */}
+
+A *function overload* is one of two or more function declarations
+that share a name but differ in their signature. The compiler picks
+one of them at each call site. This is *static dispatch*: there's no
+runtime lookup. The choice is fixed when the call is type-checked.
+
+An *overload set* is the collection of overloads the compiler
+considers at a call site. It contains the declarations that share
+the same name in the same scope.
+
+Use overloads to give one operation more than one shape: different
+argument types, different argument counts, different keyword names,
+different `self` conventions, or different compile-time parameter
+signatures.
+
+```mojo
+def add(x: Int, y: Int) -> Int:
+    return x + y
+
+def add(x: String, y: String) -> String:
+    return x + y
+
+def main():
+    print(add(1, 2))           # 3
+    print(add("Hi, ", "Mojo")) # Hi, Mojo
+```
+
+### Where overload sets form
+
+Each scope builds its own overload set:
+
+- *Module scope.* Declarations with the same name in the same module
+  form one overload set.
+- *Struct scope.* Methods on a struct (including `@staticmethod`)
+  form one overload set per method name.
+- *Trait scope.* Required and provided methods on a trait form one
+  overload set per method name.
+
+An overload set can't be extended across scopes. An import brings the name
+in as a non-function reference: you can't add another overload to it from
+your own module, and you can't redefine it. A local declaration that
+collides with an import produces an error.
+
+To avoid the error, use an alias:
+
+```mojo
+from some_package import add as imported_add
+
+def add(x: Float64, y: Float64) -> Float64:
+    return x + y
+
+# `add` resolves to the local definition.
+# `imported_add` resolves to the imported one.
+```
+
+### What the compiler considers
+
+Overload resolution looks at:
+
+- The number, position, and keyword of each argument.
+- The type of each argument and each compile-time parameter.
+- The argument conventions on each argument.
+- Whether the candidate is an instance method or `@staticmethod`.
+- Whether a deinitializer is `@implicit`.
+
+Overload resolution doesn't look at the return type or any other
+context surrounding the call.
+
+### Resolution rules
+
+The compiler discards every candidate whose signature can't be
+satisfied by the call. It then compares the remaining candidates
+pairwise.
+
+It applies the following rules in order until one wins. The
+compiler selects that candidate.
+
+1. Pick the candidate that uses fewer implicit conversions
+   between arguments and parameters. An empty match against an
+   `*args` argument counts as an implicit conversion, so an
+   exact match beats it.
+
+2. Pick the candidate that doesn't bind non-empty variadic
+   arguments. A signature without `*args` beats one whose
+   `*args` argument receives at least one value.
+
+3. Pick the candidate with fewer mismatched argument
+   conventions.
+
+4. Pick the candidate with a shorter parameter list. A function
+   with no compile-time parameters beats one that declares a
+   parameter. The parameter list also counts implicit parameters
+   synthesized from argument types (for example, the unbound
+   parameters of a `SIMD[...]` argument become implicit parameters
+   on the function).
+
+After fitness comparisons, the compiler applies two
+tiebreakers:
+
+5. Pick the candidate that is an instance method over a
+   `@staticmethod` with the same name.
+
+6. Pick the candidate that is a non-implicit deinitializer
+   over an implicit one.
+
+If two candidates are equally good after these steps, the call
+is ambiguous. The compiler rejects it.
+
+:::note
+Rule 4 means a concrete function wins over a parameterized one.
+`def foo(a: Int)` beats `def foo[T: AnyType](a: T)` for a call with
+an `Int` argument, even though both signatures match.
+:::
+
+### Overloading parameters
+
+Functions can overload on compile-time parameters as well as on
+arguments:
+
+```mojo
+def take_param[a: Int, b: Int]():
+    print("take_param[a: Int, b: Int]")
+
+def take_param[a: Int, b: String]():
+    print("take_param[a: Int, b: String]")
+
+def main():
+    take_param[1, 2]()       # take_param[a: Int, b: Int]
+    take_param[1, "hi"]()    # take_param[a: Int, b: String]
+```
+
+### Overloading the `self` convention
+
+A method can be overloaded by its `self` convention. The default call site
+uses an immutable reference for `self`, so `ref self` wins. To reach the
+`var self` overload, the caller transfers with `^` at the call site:
+
+```mojo
+@fieldwise_init
+struct Counter(Copyable):
+    var n: Int
+
+    def which(ref self) -> Int:
+        return 1
+
+    # Constrain `var self` to types where `^` actually transfers.
+    # For `TrivialRegisterPassable` types, `^` is a no-op. This
+    # overload would otherwise be silently unreachable.
+    def which(var self) -> Int where not conforms_to(
+        Self, TrivialRegisterPassable
+    ):
+        return 2
+
+def main():
+    var c1 = Counter(0)
+    print(c1.which())     # 1: default call uses an immutable self reference
+    var c2 = Counter(0)
+    print((c2^).which())  # 2: caller transfers self
+```
+
+:::caution Sharp edge
+For `TrivialRegisterPassable` types, the transfer operator `^` is a no-op.
+When using a trivial register type like `Int`, `Float64`, or similar,
+`(c^).which()` becomes `c.which()`. The compiler will warn you but won't
+reject your code.
+
+The compile-time conformance check in the `where` clause above makes a
+non-trivial constraint explicit. It filters the `var self` overload out for
+trivial register types instead of leaving it silently unreachable.
+:::
+
+### Instance methods beat static methods
+
+When both an instance method and a `@staticmethod` have the same
+name, a method-call expression picks the instance method (rule 5):
+
+```mojo
+struct StaticOverload:
+    def __init__(out self):
+        pass
+
+    def foo(mut self):
+        print("instance method")
+
+    @staticmethod
+    def foo():
+        print("static method")
+
+def main():
+    var a = StaticOverload()
+    a.foo()  # instance method
+```
+
+To call the static method explicitly, use the type name:
+
+```mojo
+StaticOverload.foo()  # static method
+```
+
+### Variadic candidates lose ties
+
+A signature without `*args` beats a variadic signature when both
+match the call, because the variadic version costs one implicit
+conversion for the empty pack (rule 1) or, with values supplied,
+loses on rule 2:
+
+```mojo
+def take(x: Int):
+    print("take(x: Int)")
+
+def take(*xs: Int):
+    print("take(*xs: Int)")
+
+def main():
+    take(1)        # take(x: Int)
+    take(1, 2, 3)  # take(*xs: Int): the only match.
+```
+
+### Ambiguous calls
+
+When two candidates are equally good, the call fails:
+
+```mojo
+struct MyString:
+    @implicit
+    def __init__(out self, s: String):
+        pass
+
+struct YourString:
+    @implicit
+    def __init__(out self, s: String):
+        pass
+
+def foo(name: MyString):
+    print("MyString")
+
+def foo(name: YourString):
+    print("YourString")
+
+def main():
+    # Error because the call is ambiguous: both overloads need exactly
+    # one implicit conversion from `String`
+    foo("Hello")
+```
+
+Resolve ambiguity by casting at the call site:
+
+```mojo
+def main():
+    foo(MyString("Hello"))   # MyString
+    foo(YourString("Hello")) # YourString
+```
+
+Literals can trigger the same kind of ambiguity. An `IntLiteral`
+converts to both `Int` and `Float64` at equal cost, so a call like
+`take_param[1, 2]()` against the two overloads below is ambiguous:
+
+```mojo
+def take_param[a: Int, b: Int]():
+    pass
+
+def take_param[a: Int, b: Float64]():
+    pass
+
+def main():
+    # Error because `IntLiteral` converts to both `Int` and `Float64`
+    # at equal cost; the compiler can't pick a winner
+    take_param[1, 2]()
+```
+
+To resolve, remove the ambiguity or remove the overload by renaming one
+version.
+
+### Return types don't disambiguate
+
+Two overloads that differ only in their return type are
+indistinguishable to overload resolution:
+
+```mojo
+def parse(s: String) -> Int:
+    return 0
+
+# Error because `parse` cannot overload on return type only;
+# the differing return type doesn't form a new overload
+def parse(s: String) -> Float64:
+    return 0.0
+```
+
+Use different argument types, an extra parameter, or a different
+function name instead.
+
+### `raises` doesn't disambiguate
+
+Two functions that differ only in whether they `raises` have the
+same signature for overload-set purposes. The compiler rejects the
+second declaration:
+
+```mojo
+def maybe_raise(x: Int) -> Int:
+    return x
+
+# Error because `maybe_raise` already has this signature;
+# `raises` isn't part of the signature for overload purposes
+def maybe_raise(x: Int) raises -> Int:
+    raise Error("nope")
+```
+
+If both behaviors are needed, give them distinct names or make the
+raising version take a different argument shape.
+
+### Best practices
+
+- Use overloads when each version implements the same
+  operation on a different shape of input. Don't overload to mean
+  different things under the same name.
+- Don't rely on two implicit initializers being reachable from the
+  same source type. Cast at the call site or make one initializer
+  non-implicit.
+- Prefer overloading on argument *type* over overloading on
+  convention. Convention-based overloads work, but they're easy to
+  misread.
+- When an overload set should accept many types, write one
+  parameterized function constrained with `where` instead of many
+  near-duplicates. The compiler picks the concrete signature when
+  both are present (rule 4).
+- Don't define a function with the same name as one you imported.
+  The compiler rejects it. Import under an alias when you need both names.

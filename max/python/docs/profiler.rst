@@ -47,4 +47,3 @@ Configuration
 
    is_profiling_enabled
    set_gpu_profiling_state
-

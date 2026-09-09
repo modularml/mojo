@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 import os
+from collections.abc import Generator
 from pathlib import Path
 
 import max.driver as md
@@ -28,6 +29,23 @@ settings.register_profile("graph_tests", deadline=None)
 settings.load_profile("graph_tests")
 
 
+@pytest.fixture(autouse=True)
+def clean_up_gpus() -> Generator[None, None, None]:
+    """Call synchronize after each test on all accelerators.
+
+    GPU failures for a particular device can spill over to later tests,
+    incorrectly reporting the source of the error. This fixture synchronizes
+    all accelerators after each test, which will propagate any pending errors
+    up to the Python level.
+    """
+
+    yield
+
+    for i in range(md.accelerator_count()):
+        accelerator = md.Accelerator(i)
+        accelerator.synchronize()
+
+
 @pytest.fixture(scope="module")
 def session() -> InferenceSession:
     devices: list[md.Device] = []
@@ -37,6 +55,16 @@ def session() -> InferenceSession:
     devices.append(md.CPU())
 
     return InferenceSession(devices=devices)
+
+
+@pytest.fixture
+def adv_fusion_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enables the new MAP-dialect fusion system for the graph this test compiles.
+
+    ``MAX_GC_USE_ADV_FUSION`` is presence-only (the value is ignored); "1"
+    matches the convention used by every RUN line in the MLIR test suite.
+    """
+    monkeypatch.setenv("MAX_GC_USE_ADV_FUSION", "1")
 
 
 @pytest.fixture

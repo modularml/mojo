@@ -26,9 +26,8 @@ via `-D page_size=N` and mask kind via `-D mask_kind={0=causal,
 multiple LUT permutations (different "used" block sets).
 """
 
-from std.collections import Set
 from std.math import ceildiv, rsqrt
-from std.random import random_ui64, seed
+from std.random import seed
 from std.sys.defines import get_defined_int
 from std.utils import IndexList
 from std.utils.numerics import max_or_inf
@@ -36,13 +35,13 @@ from std.utils.numerics import max_or_inf
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
 from layout._fillers import random
 from layout._utils import ManagedLayoutTensor
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 
 from kv_cache.types import (
     KVCacheStaticParams,
     PagedKVCacheCollection,
 )
-from kv_cache_test_utils import assert_no_nan_inf, padded_lut_cols
+from kv_cache_test_utils import assert_no_nan_inf, padded_lut_cols, randperm
 from nn.attention.gpu.mha import flash_attention
 from nn.attention.mha_mask import CausalMask, MHAMask, SlidingWindowCausalMask
 
@@ -104,11 +103,11 @@ def execute_oob_canary[
     var q_ragged_rt = RuntimeLayout[q_ragged_layout].row_major(q_ragged_shape)
     var output_rt = RuntimeLayout[output_layout].row_major(output_shape)
 
-    var input_row_offsets = ManagedLayoutTensor[
-        DType.uint32, row_offsets_layout
-    ](row_offsets_rt, ctx)
+    var input_row_offsets = ManagedLayoutTensor[.uint32, row_offsets_layout](
+        row_offsets_rt, ctx
+    )
     var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_lengths_layout
+        .uint32, cache_lengths_layout
     ](cache_lengths_rt, ctx)
     var q_ragged = ManagedLayoutTensor[dtype, q_ragged_layout](q_ragged_rt, ctx)
     var test_output = ManagedLayoutTensor[dtype, output_layout](output_rt, ctx)
@@ -159,7 +158,7 @@ def execute_oob_canary[
     var kv_block_paged = ManagedLayoutTensor[dtype, kv_block_6d_layout](
         kv_block_paged_rt, ctx
     )
-    var paged_lut = ManagedLayoutTensor[DType.uint32, paged_lut_layout](
+    var paged_lut = ManagedLayoutTensor[.uint32, paged_lut_layout](
         paged_lut_rt, ctx
     )
 
@@ -171,47 +170,54 @@ def execute_oob_canary[
     )
     random(kv_block_paged_tensor)
 
-    # Build paged LUT and track which blocks are referenced. Reserve the
-    # last block as a sentinel: never assigned to a real sequence (so it
-    # is left out of `used_blocks` and falls into the `+inf`-poisoning
-    # loop below). Trailing LUT padding entries point at the sentinel
-    # so any spurious read into them deterministically hits a poisoned
+    # Build paged LUT, reserving the last block as a sentinel: it is never
+    # assigned to a real sequence, so it stays unreferenced and falls into the
+    # `+inf`-poisoning loop below. Trailing LUT padding entries point at the
+    # sentinel so any spurious read into them deterministically hits a poisoned
     # block.
     var sentinel_block_idx = num_paged_blocks - 1
     var paged_lut_tensor = paged_lut.tensor[update=False]()
-    var used_blocks = Set[Int]()
     var lut_padded_cols = padded_lut_cols(
         ceildiv(max_full_context_length, page_size)
     )
+
+    # Sample distinct real blocks from the non-sentinel population
+    # `[0, num_paged_blocks - 1)` via a random permutation, handing them out
+    # in iteration order. After the assignment loop `page_pos` counts the
+    # blocks we assigned, so the ones we did NOT assign are exactly the
+    # permutation tail `block_perm[page_pos:]`. The canary fill below walks
+    # that tail (plus the reserved sentinel, which sits outside the sampled
+    # population), with no membership `Set` and no per-block `in` probe.
+    var block_perm = randperm(num_paged_blocks - 1)
+
+    var page_pos = 0
     for bs in range(batch_size):
         var seq_len = cache_lengths[bs] + valid_lengths[bs]
         var num_real_pages = ceildiv(seq_len, page_size)
         for block_idx in range(0, num_real_pages):
-            # Upper bound is `num_paged_blocks - 2` (inclusive) so the
-            # sentinel at `num_paged_blocks - 1` is never selected.
-            var randval = Int(random_ui64(0, UInt64(num_paged_blocks - 2)))
-            while randval in used_blocks:
-                randval = Int(random_ui64(0, UInt64(num_paged_blocks - 2)))
-            used_blocks.add(randval)
-            paged_lut_tensor[bs, block_idx] = UInt32(randval)
+            paged_lut_tensor[bs, block_idx] = UInt32(block_perm[page_pos])
+            page_pos += 1
         # Fill the trailing LUT padding with the poisoned sentinel.
         for col in range(num_real_pages, lut_padded_cols):
             paged_lut_tensor[bs, col] = UInt32(sentinel_block_idx)
 
-    # Canary fill: every block NOT in `used_blocks` is filled with +inf.
-    # A correct kernel never reads from these blocks (or reads through a
-    # mask that zeros them out). A buggy kernel that reads here picks up
-    # `+inf`, which flows through softmax to NaN at the output.
+    # Canary fill: every block we did NOT assign is filled with +inf. A
+    # correct kernel never reads from these blocks (or reads through a mask
+    # that zeros them out). A buggy kernel that reads here picks up `+inf`,
+    # which flows through softmax to NaN at the output. The unassigned blocks
+    # are the permutation tail plus the reserved sentinel.
     var inf_val = max_or_inf[dtype]()
     comptime block_size_elements_const = (
         2 * page_size * kv_params.num_heads * kv_params.head_size
     )
     var block_size_elements = num_layers * block_size_elements_const
-    for block_idx in range(num_paged_blocks):
-        if Int(block_idx) not in used_blocks:
-            var offset = block_idx * block_size_elements
-            for i in range(block_size_elements):
-                kv_block_paged_host.ptr[offset + i] = inf_val
+    for i in range(page_pos, len(block_perm)):
+        var offset = block_perm[i] * block_size_elements
+        for j in range(block_size_elements):
+            kv_block_paged_host.ptr[offset + j] = inf_val
+    var sentinel_offset = sentinel_block_idx * block_size_elements
+    for j in range(block_size_elements):
+        kv_block_paged_host.ptr[sentinel_offset + j] = inf_val
 
     var cache_lengths_lt = cache_lengths_managed.device_tensor()
     var kv_block_paged_lt = kv_block_paged.device_tensor()
@@ -254,8 +260,8 @@ def run_canary_suite[
     """
     # Local prefill (small CE).
     print("OOB canary local CE bs=1")
-    var ce_lens = [11]
-    var ce_caches = [0]
+    var ce_lens: List = [11]
+    var ce_caches: List = [0]
     execute_oob_canary[
         32,
         DType.bfloat16,
@@ -264,21 +270,20 @@ def run_canary_suite[
 
     # Local prefill (bs=4) — exercises multi-batch LUT randomization.
     print("OOB canary local CE bs=4")
-    var ce_lens_bs4 = [11, 11, 11, 11]
-    var ce_caches_bs4 = [0, 0, 0, 0]
+    var ce_lens_bs4: List = [11, 11, 11, 11]
+    var ce_caches_bs4: List = [0, 0, 0, 0]
     execute_oob_canary[
         32,
         DType.bfloat16,
         KVCacheStaticParams(num_heads=16, head_size=256),
     ](ce_lens_bs4, ce_caches_bs4, 2, 0, local_mask, "local_ce_bs4", ctx)
 
-    # Local decode with non-trivial cache_len: most of the cache is in
-    # `used_blocks`, so canary blocks are scarce — but this is exactly
-    # the gemma4 production decode shape and the failure mode under
-    # KERN-2861.
+    # Local decode with non-trivial cache_len: most blocks are assigned to the
+    # cache, so unassigned canary blocks are scarce — but this is exactly the
+    # gemma4 production decode shape and the failure mode under KERN-2861.
     print("OOB canary local TG bs=1 cache_len=512")
-    var tg_lens = [1]
-    var tg_caches = [512]
+    var tg_lens: List = [1]
+    var tg_caches: List = [512]
     execute_oob_canary[
         32,
         DType.bfloat16,

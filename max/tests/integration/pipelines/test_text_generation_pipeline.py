@@ -14,18 +14,24 @@
 
 import asyncio
 import logging
+from typing import Any, cast
 from unittest.mock import MagicMock
 
-import hf_repo_lock
 import numpy as np
 from max.driver import DeviceSpec
-from max.pipelines.core import TextContext
+from max.pipelines.context import (
+    ImageMetadata,
+    SamplingParams,
+    TextContext,
+)
 from max.pipelines.lib import generate_local_model_path
 from max.pipelines.lib.pipeline_variants import text_generation
+from max.pipelines.lib.vision_encoder_cache import (
+    VideoEncoderMetrics,
+    VisionEncoderMetrics,
+)
 from max.pipelines.modeling.types import (
-    ImageMetadata,
     RequestID,
-    SamplingParams,
     TextGenerationInputs,
     TextGenerationRequest,
 )
@@ -37,8 +43,6 @@ from test_common.mocks import (
 )
 
 REPO_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
-REVISION = hf_repo_lock.revision_for_hf_repo(REPO_ID)
-
 logger = logging.getLogger("max.pipelines")
 
 
@@ -46,14 +50,11 @@ def test_mock_text_tokenizer() -> None:
     tokenizer = MockTextTokenizer()
     test_prompt = "This is a test prompt"
 
-    assert isinstance(REVISION, str), (
-        "REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(REPO_ID, REVISION)
+        model_path = generate_local_model_path(REPO_ID)
     except FileNotFoundError:
         logger.warning(
-            f"Model path does not exist: {REPO_ID}@{REVISION}, falling back to repo_id: {REPO_ID} as config to PipelineConfig"
+            f"Model path does not exist: {REPO_ID}, falling back to repo_id: {REPO_ID} as config to PipelineConfig"
         )
         model_path = REPO_ID
 
@@ -89,6 +90,38 @@ def test_text_generation_image_metadata() -> None:
     assert image_metadata.image_hash is not None
 
 
+def test_batch_vision_metrics_falls_back_to_pooled_pipeline_model() -> None:
+    """A pipeline model that owns its cache internally (no ``_encoder_cache``,
+    e.g. MiniMax-M3) still surfaces vision/video metrics via
+    ``SupportsPooledVisionMetrics`` (CLIN-1638)."""
+    vision_sentinel = VisionEncoderMetrics(num_images_total=1)
+    video_sentinel = VideoEncoderMetrics(num_clips_total=1)
+
+    class _FakePooledMetricsModel:
+        def pop_vision_metrics(self) -> VisionEncoderMetrics | None:
+            return vision_sentinel
+
+        def pop_video_metrics(self) -> VideoEncoderMetrics | None:
+            return video_sentinel
+
+    pipeline = cast(Any, object.__new__(text_generation.TextGenerationPipeline))
+    pipeline._encoder_cache = None
+    pipeline._pipeline_model = _FakePooledMetricsModel()
+
+    assert pipeline.batch_vision_metrics() is vision_sentinel
+    assert pipeline.batch_video_metrics() is video_sentinel
+
+
+def test_batch_vision_metrics_none_without_protocol_or_cache() -> None:
+    """Text-only models (no cache, no pooled-metrics protocol) get None."""
+    pipeline = cast(Any, object.__new__(text_generation.TextGenerationPipeline))
+    pipeline._encoder_cache = None
+    pipeline._pipeline_model = object()
+
+    assert pipeline.batch_vision_metrics() is None
+    assert pipeline.batch_video_metrics() is None
+
+
 def test_text_generation_pipeline(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(
         text_generation, "load_weights", MagicMock(return_value=None)
@@ -97,21 +130,15 @@ def test_text_generation_pipeline(monkeypatch: MonkeyPatch) -> None:
         text_generation, "weights_format", MagicMock(return_value=None)
     )
     monkeypatch.setattr(text_generation, "load_kv_manager", MagicMock())
-    monkeypatch.setattr(
-        text_generation, "IncrementCacheLengthsProcessor", MagicMock()
-    )
 
     max_length = 512
     eos_token = 998
 
-    assert isinstance(REVISION, str), (
-        "REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(REPO_ID, REVISION)
+        model_path = generate_local_model_path(REPO_ID)
     except FileNotFoundError:
         logger.warning(
-            f"Model path does not exist: {REPO_ID}@{REVISION}, falling back to repo_id: {REPO_ID} as config to PipelineConfig"
+            f"Model path does not exist: {REPO_ID}, falling back to repo_id: {REPO_ID} as config to PipelineConfig"
         )
         model_path = REPO_ID
 
@@ -153,7 +180,7 @@ def test_text_generation_pipeline(monkeypatch: MonkeyPatch) -> None:
         while True:
             # This will generate a list[dict[request_id, TextGenerationOutput]] for each step
             inputs: TextGenerationInputs[TextContext] = TextGenerationInputs(
-                batches=[list(context_batch.values())], num_steps=1
+                batches=[list(context_batch.values())]
             )
             output = pipeline.execute(inputs)
             assert len(output) == len(context_batch)

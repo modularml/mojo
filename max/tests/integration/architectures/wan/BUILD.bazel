@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -12,11 +11,13 @@ modular_py_test(
     srcs = ["test_wan_internals.py"],
     deps = [
         "//max/python/max/driver",
+        "//max/python/max/dtype",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/architectures",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/architectures/wan",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/request",
         requirement("numpy"),
     ],
 )

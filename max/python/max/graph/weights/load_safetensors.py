@@ -16,7 +16,8 @@
 from __future__ import annotations
 
 import difflib
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from os import PathLike
 
 from max._core.safetensors import SafeTensor, safe_open
@@ -40,30 +41,68 @@ class SafetensorWeights(Weights):
 
     .. code-block:: python
 
+        import json
+        import struct
+        import tempfile
         from pathlib import Path
-        from max.graph.weights import SafetensorWeights
+
+        import numpy as np
         from max.dtype import DType
+        from max.graph import DeviceRef
+        from max.graph.weights import SafetensorWeights
 
-        # Load weights from safetensors files
-        weight_files = [Path("model.safetensors")]
-        weights = SafetensorWeights(weight_files)
+        def write_safetensors(path, tensors):
+            header, buffers, offset = {}, [], 0
+            for name, arr in tensors.items():
+                arr = np.ascontiguousarray(arr)
+                header[name] = {
+                    "dtype": "F32",
+                    "shape": list(arr.shape),
+                    "data_offsets": [offset, offset + arr.nbytes],
+                }
+                buffers.append(arr.tobytes())
+                offset += arr.nbytes
+            blob = json.dumps(header).encode()
+            with open(path, "wb") as f:
+                f.write(struct.pack("<Q", len(blob)))
+                f.write(blob)
+                for b in buffers:
+                    f.write(b)
 
-        # Check if a weight exists
-        if weights.model.embeddings.weight.exists():
-            # Allocate the embedding weight
-            embedding_weight = weights.model.embeddings.weight.allocate(
-                dtype=DType.float32,
-                device=DeviceRef.CPU()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "model.safetensors"
+            write_safetensors(
+                path,
+                {
+                    "model.embeddings.weight": np.ones(
+                        (4, 4), dtype=np.float32
+                    ),
+                    "transformer.layers.0.attention.weight": np.ones(
+                        (4, 4), dtype=np.float32
+                    ),
+                },
             )
 
-        # Access weights with hierarchical naming
-        attn_weight = weights.transformer.layers[0].attention.weight.allocate(
-            dtype=DType.float16
-        )
+            weights = SafetensorWeights([path])
+
+            if weights.model.embeddings.weight.exists():
+                embedding_weight = weights.model.embeddings.weight.allocate(
+                    dtype=DType.float32,
+                    device=DeviceRef.CPU(),
+                )
+
+            attn_weight = weights.transformer.layers[0].attention.weight.allocate(
+                dtype=DType.float32,
+                device=DeviceRef.CPU(),
+            )
+
+    .. invisible-code-block: python
+
+        assert attn_weight.shape == [4, 4]
     """
 
     _filepaths: Sequence[PathLike[str]]
-    _tensors: Set[str]
+    _tensors: AbstractSet[str]
     _tensors_to_file_idx: Mapping[str, int]
     _allocated: dict[str, DLPackArray]
     _st_weight_map: dict[str, Buffer]
@@ -76,7 +115,7 @@ class SafetensorWeights(Weights):
         self,
         filepaths: Sequence[PathLike[str]],
         *,
-        tensors: Set[str] | None = None,
+        tensors: AbstractSet[str] | None = None,
         tensors_to_file_idx: Mapping[str, int] | None = None,
         prefix: str = "",
         allocated: dict[str, DLPackArray] | None = None,
@@ -179,6 +218,18 @@ class SafetensorWeights(Weights):
             Shape(tensor.shape),
         )
 
+    def close(self) -> None:
+        """Releases the checkpoint file mappings and cached tensors.
+
+        Drops the file handles and cached tensors (shared with prefix
+        clones), letting the mappings unmap once nothing else references
+        them. Only call after the weights are on their execution device;
+        later reads through this object raise.
+        """
+        self._st_file_handles.clear()
+        self._st_weight_map.clear()
+        self._allocated.clear()
+
     def exists(self) -> bool:
         """Returns True if a tensor exists for the current name."""
         return self.name in self._tensors_to_file_idx
@@ -188,7 +239,7 @@ class SafetensorWeights(Weights):
         dtype: DType | None = None,
         shape: ShapeLike | None = None,
         quantization_encoding: QuantizationEncoding | None = None,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> Weight:
         """Creates a Weight that can be added to a graph."""
         if quantization_encoding is not None:

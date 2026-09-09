@@ -18,11 +18,11 @@ Information can be accessed synchronously or collected in the background for
 later retrieval.
 """
 
-from ._bgrec import BackgroundRecorder as BackgroundRecorder
-from ._multi import GPUDiagContext as GPUDiagContext
-from ._types import HARDWARE_THROTTLE_REASONS as HARDWARE_THROTTLE_REASONS
-from ._types import ClockStats as ClockStats
-from ._types import GPUStats as GPUStats
-from ._types import MemoryStats as MemoryStats
-from ._types import ThrottleReason as ThrottleReason
-from ._types import UtilizationStats as UtilizationStats
+from .bgrec import BackgroundRecorder as BackgroundRecorder
+from .multi import GPUDiagContext as GPUDiagContext
+from .types import HARDWARE_THROTTLE_REASONS as HARDWARE_THROTTLE_REASONS
+from .types import ClockStats as ClockStats
+from .types import GPUStats as GPUStats
+from .types import MemoryStats as MemoryStats
+from .types import ThrottleReason as ThrottleReason
+from .types import UtilizationStats as UtilizationStats

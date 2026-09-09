@@ -13,12 +13,12 @@
 
 from std.sys import size_of
 
-from std.gpu import barrier
-from std.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
-from std.gpu.host import DeviceContext, Dim
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import cluster_idx, thread_idx
-from std.gpu.memory import fence_mbarrier_init
+from max.gpu.sync import barrier
+from max.gpu.primitives.cluster import block_rank_in_cluster, cluster_sync
+from max.gpu.host import DeviceContext, Dim
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import cluster_idx, thread_idx
+from max.gpu.memory import fence_mbarrier_init
 from layout import Layout, LayoutTensor
 from layout._fillers import arange, random
 from layout._utils import ManagedLayoutTensor
@@ -29,7 +29,7 @@ from layout.tma_async import (
     _idx_product,
     create_tensor_tile,
 )
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_equal
 
 from std.utils.index import Index, IndexList
@@ -65,20 +65,20 @@ def tma_swizzle_multicast_load_kernel[
     comptime CLUSTER_SIZE = CLUSTER_M * CLUSTER_N
     var tma_multicast_mask = (1 << CLUSTER_SIZE) - 1
 
-    tile = LayoutTensor[
+    var tile = LayoutTensor[
         dtype,
         cluster_tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
     barrier()
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
     if thread_idx.x == 0:
@@ -118,7 +118,7 @@ def tma_swizzle_multicast_load_kernel[
     fence_mbarrier_init()
 
     if block_rank == 0 and thread_idx.x == 0:
-        dst_tile = dst.tile[cluster_tileM, cluster_tileN](
+        var dst_tile = dst.tile[cluster_tileM, cluster_tileN](
             cluster_idx.y, cluster_idx.x
         )
         dst_tile.copy_from(tile)
@@ -142,7 +142,7 @@ def test_tma_multicast_swizzle[
     var src = ManagedLayoutTensor[dtype, layout](ctx)
     var dst = ManagedLayoutTensor[dtype, layout](ctx)  # FIX THIS
 
-    comptime if dtype == DType.float8_e4m3fn:
+    comptime if dtype == .float8_e4m3fn:
         random(src.tensor())
         random(dst.tensor())
     else:
@@ -193,19 +193,19 @@ def test_tma_multicast_swizzle[
     comptime descN = type_of(tma_tensor).desc_shape[1]
     comptime desc_tile_size = descM * descN
 
-    desc_tile = LayoutTensor[
+    var desc_tile = LayoutTensor[
         dtype, Layout.row_major(descM, descN), MutAnyOrigin
     ].stack_allocation()
 
-    src_host = src.tensor()
-    dst_host = dst.tensor()
+    var src_host = src.tensor()
+    var dst_host = dst.tensor()
 
     comptime swizzle = make_swizzle[dtype, swizzle_mode]()
 
-    dest_tile = LayoutTensor[
+    var dest_tile = LayoutTensor[
         dtype, Layout.row_major(tileM, tileN), MutAnyOrigin
     ].stack_allocation()
-    src_tile = LayoutTensor[
+    var src_tile = LayoutTensor[
         dtype, Layout.row_major(tileM, tileN), MutAnyOrigin
     ].stack_allocation()
 
@@ -218,17 +218,17 @@ def test_tma_multicast_swizzle[
                 src_host.tile[tileM, tileN](dest_tile_m, dest_tile_n)
             )
 
-            dst_tile_ptr = dest_tile.ptr
+            var dst_tile_ptr = dest_tile.ptr
             for desc_tile_m in range(tileM // descM):
                 for desc_tile_n in range(tileN // descN):
                     desc_tile.copy_from(
                         src_tile.tile[descM, descN](desc_tile_m, desc_tile_n)
                     )
                     for i in range(desc_tile_size):
-                        desc_idx = swizzle(i)
+                        var desc_idx = swizzle(i)
                         assert_equal(
-                            desc_tile.ptr[desc_idx].cast[DType.float64](),
-                            dst_tile_ptr[i].cast[DType.float64](),
+                            desc_tile.ptr[desc_idx].cast[.float64](),
+                            dst_tile_ptr[i].cast[.float64](),
                         )
                     dst_tile_ptr += desc_tile_size
 

@@ -14,8 +14,8 @@ from std.math import align_up
 from std.sys import argv, size_of
 import std.itertools
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.memory import alloc
 
 from internal_utils import assert_almost_equal
@@ -43,7 +43,7 @@ from linalg.fp4_utils import (
     set_scale_factor,
 )
 from std.random import random_ui64
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 
 
 def simple_init() -> Bool:
@@ -176,8 +176,8 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
                 comptime assert b_host.flat_rank == 2
                 b_host[n, k] = random_ui64(0, 1).cast[b_type]()
     else:
-        rand(a_host.ptr, a_host.num_elements())
-        rand(b_host.ptr, b_host.num_elements())
+        rand(a_host._storage, a_host.num_elements())
+        rand(b_host._storage, b_host.num_elements())
 
     # NOTE: It is very important that we set unused scales to 0.0 otherwise we will hit accuracy issues
     for idx0 in range(align_up(Int(m.value()), SF_MN_GROUP_SIZE)):
@@ -189,7 +189,7 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
             if idx0 < Int(m.value()) and idx1 < Int(k.value()):
                 var scale_value = (
                     (1 << random_ui64(0, 3))
-                    .cast[DType.float32]()
+                    .cast[.float32]()
                     .cast[scales_dtype]()
                 )
                 set_scale_factor[SF_VECTOR_SIZE=SF_VECTOR_SIZE](
@@ -209,7 +209,7 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
             if idx0 < Int(n.value()) and idx1 < Int(k.value()):
                 var scale_value = (
                     (1 << random_ui64(0, 3))
-                    .cast[DType.float32]()
+                    .cast[.float32]()
                     .cast[scales_dtype]()
                 )
                 set_scale_factor[SF_VECTOR_SIZE=SF_VECTOR_SIZE](
@@ -253,18 +253,18 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
         ctx,
     )
 
-    comptime assert a_type != DType.float8_e4m3fn or transpose_b, (
+    comptime assert a_type != .float8_e4m3fn or transpose_b, (
         "Testing is only supported for transposed_b==True when"
         " a_type==float8_e4m3fn. Add the non-transposed case if needed."
     )
 
     vendor_blas.matmul(
         ctx,
-        c_ref_tensor_lt.as_any_origin(),
+        c_ref_tensor_lt.as_unsafe_any_origin(),
         a_lt,
         b_lt,
-        a_scales=a_scales_lt.get_immutable().as_any_origin(),
-        b_scales=b_scales_lt.get_immutable().as_any_origin(),
+        a_scales=a_scales_lt.as_imm().as_unsafe_any_origin(),
+        b_scales=b_scales_lt.as_imm().as_unsafe_any_origin(),
         transpose_b=transpose_b,
         c_row_major=True,
     )
@@ -276,8 +276,8 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
     ctx.synchronize()
 
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=1e-2,
         rtol=1e-2,

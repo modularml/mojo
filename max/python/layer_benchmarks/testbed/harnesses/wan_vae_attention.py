@@ -26,8 +26,9 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-import torch
-import torch.nn.functional as F
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
+import torch.nn.functional as F  # type: ignore[import-not-found]
 from max.driver import Accelerator, Buffer, DLPackArray
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType

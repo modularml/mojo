@@ -1,0 +1,108 @@
+[
+    {
+        "description": "validation of e-mail addresses",
+        "schema": { "format": "email" },
+        "tests": [
+            {
+                "description": "all string formats ignore integers",
+                "data": 12,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore floats",
+                "data": 13.7,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore objects",
+                "data": {},
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore arrays",
+                "data": [],
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore booleans",
+                "data": false,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore nulls",
+                "data": null,
+                "valid": true
+            },
+            {
+                "description": "a valid e-mail address",
+                "data": "joe.bloggs@example.com",
+                "valid": true
+            },
+            {
+                "description": "an invalid e-mail address",
+                "data": "2962",
+                "valid": false
+            },
+            {
+                "description": "tilde in local part is valid",
+                "data": "te~st@example.com",
+                "valid": true
+            },
+            {
+                "description": "tilde before local part is valid",
+                "data": "~test@example.com",
+                "valid": true
+            },
+            {
+                "description": "tilde after local part is valid",
+                "data": "test~@example.com",
+                "valid": true
+            },
+            {
+                "description": "dot before local part is not valid",
+                "data": ".test@example.com",
+                "valid": false
+            },
+            {
+                "description": "dot after local part is not valid",
+                "data": "test.@example.com",
+                "valid": false
+            },
+            {
+                "description": "two separated dots inside local part are valid",
+                "data": "te.s.t@example.com",
+                "valid": true
+            },
+            {
+                "description": "two subsequent dots inside local part are not valid",
+                "data": "te..st@example.com",
+                "valid": false
+            },
+            {
+                "description": "two email addresses is not valid",
+                "data": "user1@oceania.org, user2@oceania.org",
+                "valid": false
+            },
+            {
+                "description": "full \"From\" header is invalid",
+                "data": "\"Winston Smith\" <winston.smith@recdep.minitrue> (Records Department)",
+                "valid": false
+            },
+            {
+                "description": "local part is required",
+                "data": "@example.com",
+                "valid": false
+            },
+            {
+                "description": "domain is required",
+                "data": "joe.bloggs@",
+                "valid": false
+            },
+            {
+                "description": "unquoted space in local part is invalid",
+                "data": "joe bloggs@example.com",
+                "valid": false
+            }
+        ]
+    }
+]

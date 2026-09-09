@@ -1,0 +1,63 @@
+---
+title: Mojo language reference
+sidebar_label: Mojo language reference
+description: Reference for the syntax, keywords, decorators, and more
+---
+
+import ListingCard from '@site/src/components/Listing/ListingCard';
+import ListingCards from '@site/src/components/Listing/ListingCards';
+
+The Mojo language reference provides a concise guide for Mojo's syntax,
+organized by grammar construct and designed for quick lookup when you need the
+exact rules or form of a language element.
+
+<ListingCards>
+  <ListingCard title="Mojo cheat sheets"
+    url="/docs/reference/cheat-sheets"
+    description="Quick reference cards for Mojo's syntax and keywords" />
+  <ListingCard title="Identifiers and keywords"
+    url="/docs/reference/keywords"
+    description="Naming rules, reserved words, escaped identifiers, and argument conventions" />
+  <ListingCard title="Literals"
+    url="/docs/reference/literals"
+    description="Integer, floating-point, string, t-string, boolean, None, and Self literals" />
+  <ListingCard title="Numeric types"
+    url="/docs/reference/numeric-types"
+    description="`SIMD`, `DType`, `Scalar`, `Int`, integers, floating-point, `Byte`, and conversions" />
+  <ListingCard title="Operators"
+    url="/docs/reference/operators"
+    description="Operator precedence, associativity, and implementing operators for custom types" />
+  <ListingCard title="Expressions"
+    url="/docs/reference/expressions"
+    description="Tuples, collection displays, member access, calls, subscripts, ternary conditionals, and comprehensions" />
+  <ListingCard title="Simple statements"
+    url="/docs/reference/simple-statements"
+    description="Imports, assignments, return, raise, break, continue, and compile-time declarations" />
+  <ListingCard title="Compound statements"
+    url="/docs/reference/compound-statements"
+    description="`if` statements, loops, error handling with `try`/`except`, context managers, and compile-time control flow" />
+  <ListingCard title="Function declarations"
+    url="/docs/reference/function-declarations"
+    description="Signatures, parameters, arguments, default values, constraints, effects, and special methods" />
+  <ListingCard title="Struct declarations"
+    url="/docs/reference/struct-declarations"
+    description="Fields, methods, initializers, deinitializers, and trait conformance for structs" />
+  <ListingCard title="Trait declarations"
+    url="/docs/reference/trait-declarations"
+    description="Required and provided methods, associated types, trait inheritance, trait composition, and conformance" />
+  <ListingCard title="Closure declarations"
+    url="/docs/reference/closure-declarations"
+    description="Capture lists, capture conventions, move capture, parametric closures, and effects" />
+  <ListingCard title="Lambda expressions"
+    url="/docs/reference/lambda-expressions"
+    description="Anonymous single-expression functions, elided capture lists, and thin function values" />
+  <ListingCard title="Inline MLIR"
+    url="/docs/reference/inline-mlir"
+    description="Built-ins for calling MLIR operations the language doesn't expose natively" />
+  <ListingCard title="Docstrings"
+    url="/docs/reference/docstrings"
+    description="Sections, placement, formatting, code examples, and compiler checks" />
+  <ListingCard title="Decorators"
+    url="/docs/reference/decorators"
+    description="Modify or extend the behavior of structs, functions, and other declarations at compile time" />
+</ListingCards>

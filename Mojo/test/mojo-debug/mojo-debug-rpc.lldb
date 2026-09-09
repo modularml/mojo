@@ -1,0 +1,79 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# COM: Check that we can't use the RPC mode when using explicitly the CLI mode.
+# RUN: not env %debug --vscode 2>&1 | FileCheck %s --check-prefix=CHECK-NO-CLI-RPC
+# CHECK-NO-CLI-RPC: unexpected option '--vscode'
+
+# COM: Check if the RPC attach command is created properly with pid.
+# RUN: %debug --rpc --pid 123 --dry-run | FileCheck %s --check-prefix=CHECK-PID
+# CHECK-PID:      {
+# CHECK-PID:        "modularConfigMojoSection": "
+# CHECK-PID-NEXT:   "modularHomePath": "
+# CHECK-PID-NEXT:   "mojoDriverPath": "
+# CHECK-PID-NEXT:   "pid": "123",
+# CHECK-PID-NEXT:   "request": "attach",
+# CHECK-PID-NEXT:   "type": "mojo-lldb"
+# CHECK-PID-NEXT: }
+
+# COM: Check if the CLI attach command is created properly with process name.
+# RUN: %debug --vscode --process-name foo --dry-run | FileCheck %s --check-prefix=CHECK-PROC-NAME
+# CHECK-PROC-NAME:     {
+# CHECK-PROC-NAME:        "modularConfigMojoSection": "
+# CHECK-PROC-NAME-NEXT:   "modularHomePath": "
+# CHECK-PROC-NAME-NEXT:   "mojoDriverPath": "
+# CHECK-PROC-NAME-NEXT:   "program": "foo",
+# CHECK-PROC-NAME-NEXT:   "request": "attach",
+# CHECK-PROC-NAME-NEXT:   "type": "mojo-lldb"
+# CHECK-PROC-NAME-NEXT: }
+
+# COM: Check if the RPC launch command is created properly with a binary
+# RUN: %debug --dry-run --vscode --init-command "foo" --init-command "bar" bin.exe --some-arg | FileCheck %s --check-prefix=CHECK-BIN
+# CHECK-BIN:      {
+# CHECK-BIN:   "args": [
+# CHECK-BIN-NEXT:     "--some-arg"
+# CHECK-BIN-NEXT:   ],
+# CHECK-BIN-NEXT:   "cwd": "
+# CHECK-BIN-NEXT:   "debuggerRoot": "
+# CHECK-BIN-NEXT:   "env": [
+# CHECK-BIN:        ]
+# CHECK-BIN:        "initCommands": [
+# CHECK-BIN-NEXT:     "foo"
+# CHECK-BIN-NEXT:     "bar"
+# CHECK-BIN-NEXT:   ]
+# CHECK-BIN:        "modularHomePath": "
+# CHECK-BIN:        "program": "{{.*}}/bin.exe"
+# CHECK-BIN-NEXT:   "request": "launch"
+# CHECK-BIN-NEXT:   "runInTerminal": false
+# CHECK-BIN-NEXT:   "stopOnEntry": false
+# CHECK-BIN-NEXT:   "type": "mojo-lldb"
+# CHECK-BIN-NEXT: }
+
+# COM: Check if the RPC launch command is created properly with a mojo file
+# RUN: %debug --terminal dedicated --dry-run --vscode --debug-level line-tables --stop-on-entry file.mojo --some-arg | FileCheck %s --check-prefix=CHECK-MOJO
+# CHECK-MOJO:       {
+# CHECK-MOJO:   "args": [
+# CHECK-MOJO-NEXT:     "run",
+# CHECK-MOJO-NEXT:     "-O0",
+# CHECK-MOJO-NEXT:     "--debug-level=full",
+# CHECK-MOJO-NEXT:     "--debug-level",
+# CHECK-MOJO-NEXT:     "line-tables",
+# CHECK-MOJO-NEXT:     "file.mojo",
+# CHECK-MOJO-NEXT:     "--some-arg"
+# CHECK-MOJO-NEXT:   ],
+# CHECK-MOJO-NEXT:   "cwd": "
+# CHECK-MOJO-NEXT:   "debuggerRoot": "
+# CHECK-MOJO-NEXT:   "env": [
+# CHECK-MOJO:          "PATH=
+# CHECK-MOJO:        ]
+# CHECK-MOJO:        "modularHomePath": "
+# CHECK-MOJO:        "program": "{{.*}}/mojo
+# CHECK-MOJO-NEXT:   "request": "launch"
+# CHECK-MOJO-NEXT:   "runInTerminal": true
+# CHECK-MOJO-NEXT:   "stopOnEntry": true
+# CHECK-MOJO-NEXT:   "type": "mojo-lldb"
+
+

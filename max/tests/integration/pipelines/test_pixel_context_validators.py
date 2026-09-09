@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from max.pipelines.core import (
+from max.pipelines.context import (
     PixelContext,
+    TokenBuffer,
     validate_flux2_max_pixel_area,
     validate_wan_max_pixel_area,
 )
-from max.pipelines.core.exceptions import InputError
-from max.pipelines.modeling.types import TokenBuffer
+from max.pipelines.context.exceptions import InputError
 
 
 def _make_context(width: int, height: int) -> PixelContext:

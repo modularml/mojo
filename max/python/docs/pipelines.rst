@@ -18,19 +18,23 @@ Submodules
    :maxdepth: 1
 
    pipelines.architectures
-   pipelines.core
+   pipelines.audio
+   pipelines.context
    pipelines.diffusion
    pipelines.kv_cache
    pipelines.lib
    pipelines.lib.interfaces
    pipelines.lib.log_probabilities
    pipelines.lib.registry
+   pipelines.lib.request_text
+   pipelines.logging_utils
    pipelines.modeling.base
    pipelines.modeling.dataprocessing
-   pipelines.modeling.kv_cache_config
    pipelines.modeling.types
-   pipelines.modeling.weights
+   pipelines.weights
+   pipelines.lora
    pipelines.request
+   pipelines.sampling
    pipelines.speculative
 
 Configuration
@@ -41,11 +45,11 @@ Configuration
    :toctree: generated
    :template: autosummary/class.rst
 
-   AudioGenerationConfig
    KVCacheConfig
-   LoRAConfig
    MAXModelConfig
+   PipelineArgs
    PipelineConfig
+   PipelineRuntimeConfig
    ProfilingConfig
    SamplingConfig
    SpeculativeConfig
@@ -60,7 +64,6 @@ Pipelines
 
    EmbeddingsPipeline
    PixelGenerationPipeline
-   SpeechTokenGenerationPipeline
    TextGenerationPipeline
    TextGenerationPipelineInterface
 
@@ -77,19 +80,6 @@ Model interface
    ModelInputs
    ModelOutputs
    PipelineModel
-
-Context
--------
-
-.. autosummary::
-   :nosignatures:
-   :toctree: generated
-   :template: autosummary/class.rst
-
-   PixelContext
-   TextAndVisionContext
-   TextContext
-   TTSContext
 
 Tokenizers
 ----------
@@ -119,13 +109,6 @@ Enums
 
 Utilities
 ---------
-
-.. autosummary::
-   :nosignatures:
-   :toctree: generated
-   :template: autosummary/class.rst
-
-   PrependPromptSpeechTokens
 
 .. autosummary::
    :nosignatures:

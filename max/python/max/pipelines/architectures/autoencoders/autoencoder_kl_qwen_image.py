@@ -103,26 +103,13 @@ class NCHWRMSNorm(Module):
         gamma = self.gamma.cast(x_perm.dtype)
         if x_perm.device:
             gamma = gamma.to(x_perm.device)
-        x_normed = ops.custom(
-            "rms_norm",
-            x_perm.device,
-            [
-                x_perm,
-                gamma,
-                ops.constant(
-                    self.eps, dtype=x_perm.dtype, device=DeviceRef.CPU()
-                ),
-                ops.constant(0.0, dtype=x_perm.dtype, device=DeviceRef.CPU()),
-            ],
-            [
-                TensorType(
-                    dtype=x_perm.dtype,
-                    shape=x_perm.shape,
-                    device=x_perm.device,
-                )
-            ],
-            parameters={"multiply_before_cast": True},
-        )[0].tensor
+        x_normed = ops.rms_norm(
+            x_perm,
+            gamma,
+            self.eps,
+            weight_offset=0.0,
+            multiply_before_cast=True,
+        )
         return ops.permute(x_normed, [0, 3, 1, 2])
 
 

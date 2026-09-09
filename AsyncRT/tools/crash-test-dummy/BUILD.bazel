@@ -1,0 +1,29 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(
+    default_visibility = ["//AsyncRT:__subpackages__"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_binary(
+    name = "crash-test-dummy",
+    srcs = glob(["*.cpp"]),
+    data = [
+        "@crashpad//:modular-crashpad-handler",
+    ],
+    env = {
+        "MODULAR_CRASH_REPORTING_ENABLED": "true",
+        "MODULAR_CRASH_REPORTING_HANDLER_PATH": "$(rootpath @crashpad//:modular-crashpad-handler)",
+        "MODULAR_CRASH_REPORTING_URL": "https://crash-reporting.dev.modular.com",
+    },
+    deps = [
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+        "//Support:Base",
+        "//Support:CrashReporting",
+        "//Support:Globals",
+    ],
+)

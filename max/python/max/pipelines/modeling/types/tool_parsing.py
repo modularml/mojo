@@ -20,8 +20,9 @@ serving layer.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass
@@ -138,4 +139,35 @@ class ToolParser(Protocol):
 
     def reset(self) -> None:
         """Resets internal state for a new streaming session."""
+        ...
+
+    def set_streaming_tool_schemas(
+        self, schemas: Mapping[str, dict[str, Any]]
+    ) -> None:
+        """Provides per-tool parameter schemas for schema-driven arg streaming.
+
+        The router injects each tool's JSON-schema ``parameters`` (keyed by
+        tool name) before streaming begins, letting a parser make schema-driven
+        decisions about how to emit argument bytes incrementally.
+
+        - Override this (schema required) for parsers whose models emit
+          argument values as type-ambiguous tag bodies (XML-style
+          ``<name>value</name>``, where a bare scalar's type is not recoverable
+          from the wire — ``<n>42</n>`` could be the integer ``42`` or the
+          string ``"42"``). The schema decides which parameters stream
+          character-by-character (strings) versus are buffered and typed when
+          the element closes (numbers, booleans, …). This matters only on the
+          streaming path — argument coercion (``coerce_arguments``) runs only
+          on the non-streaming complete parse — so the schema is the sole type
+          signal available at the moment the parser must commit bytes to the
+          wire, and the emitted value must stay a monotonically-growing
+          valid-JSON prefix.
+        - Leave the null implementation (no schema needed) for raw-JSON
+          argument formats: the JSON already carries types and streams
+          incrementally through the base byte-diffing.
+
+        Args:
+            schemas: Mapping of tool name to its JSON-schema ``parameters``
+                object.
+        """
         ...

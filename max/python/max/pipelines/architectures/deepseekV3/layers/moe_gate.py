@@ -79,7 +79,7 @@ class DeepseekV3TopKRouter(MoEGate):
             linear_cls=linear_cls,
         )
 
-        if topk_method not in ["noaux_tc"]:
+        if topk_method != "noaux_tc":
             raise ValueError(f"Invalid topk_method: {topk_method}")
         assert correction_bias_dtype
 
@@ -111,6 +111,11 @@ class DeepseekV3TopKRouter(MoEGate):
             dtype=correction_bias_dtype,
         )
 
+    def compute_scores(self, hidden_states: TensorValue) -> TensorValue:
+        """Sigmoid scores in correction-bias dtype, ready for the router kernel."""
+        logits = self.gate_score(hidden_states)
+        return ops.sigmoid(logits.cast(self.correction_bias_dtype))
+
     def __call__(
         self, hidden_states: TensorValue
     ) -> tuple[TensorValue, TensorValue]:
@@ -125,9 +130,9 @@ class DeepseekV3TopKRouter(MoEGate):
                 - topk_weight: Routing weights for selected experts of shape (seq_len, num_experts_per_token)
         """
         # compute gate score
-        logits = self.gate_score(hidden_states)
-
-        scores = ops.sigmoid(logits.cast(self.correction_bias_dtype))
+        # logits = self.gate_score(hidden_states)
+        scores = self.compute_scores(hidden_states)
+        # scores = ops.sigmoid(logits.cast(self.correction_bias_dtype))
         topk_idx, topk_weight = moe_router_group_limited(
             scores,
             self.e_score_correction_bias,
@@ -140,26 +145,12 @@ class DeepseekV3TopKRouter(MoEGate):
         )
         return topk_idx, topk_weight
 
-    @property
-    def sharding_strategy(self) -> ShardingStrategy | None:
-        """Get the sharding strategy for the module."""
-        return self._sharding_strategy
-
-    @sharding_strategy.setter
-    def sharding_strategy(self, strategy: ShardingStrategy) -> None:
-        """Set the sharding strategy for the module."""
-        if strategy.is_replicate:
-            self._sharding_strategy = strategy
-            self.gate_score.sharding_strategy = ShardingStrategy.replicate(
-                strategy.num_devices
-            )
-            self.e_score_correction_bias.sharding_strategy = (
-                ShardingStrategy.replicate(strategy.num_devices)
-            )
-        else:
-            raise ValueError(
-                "Only replicate sharding strategy is supported for MoEGate."
-            )
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
+        """Replicates the correction bias alongside the base gate weights."""
+        super()._set_sharding_strategy(strategy)
+        self.e_score_correction_bias.sharding_strategy = (
+            ShardingStrategy.replicate(strategy.num_devices)
+        )
 
     def shard(self, devices: Iterable[DeviceRef]) -> Sequence[MoEGate]:
         """Create sharded views of this MoEGate module across multiple devices.

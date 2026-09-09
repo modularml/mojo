@@ -15,6 +15,7 @@
 
 from .cfg_combine import CfgCombineComponent
 from .denoise_compute import DenoiseCompute
+from .denoise_compute_fbcache import DenoiseComputeFBCache
 from .denoise_predict import DenoisePredict
 from .denoiser import Denoiser
 from .image_encoder import ImageEncoder
@@ -24,6 +25,7 @@ from .vae_decoder import VaeDecoder
 __all__ = [
     "CfgCombineComponent",
     "DenoiseCompute",
+    "DenoiseComputeFBCache",
     "DenoisePredict",
     "Denoiser",
     "ImageEncoder",

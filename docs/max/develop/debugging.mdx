@@ -10,7 +10,7 @@ bugs, performance bottlenecks, and hard-to-trace runtime errors. This page
 explains how to configure debugging options.
 
 If you want to enable MAX's debugging defaults right away, you can set the
-[environment variable](/max/environment-variables/) `MODULAR_DEBUG=sensible`
+[environment variable](/environment-variables/) `MODULAR_DEBUG=sensible`
 before running your model:
 
 ```bash
@@ -19,7 +19,7 @@ MODULAR_DEBUG=sensible max serve --model modularai/Llama-3.1-8B-Instruct-GGUF
 
 :::note
 
-See the [`DebugConfig`](/max/api/python/generated/max.engine.DebugConfig/) API
+See the [`DebugConfig`](/api/python/generated/max.engine.DebugConfig/) API
 reference to review all debugging options.
 
 :::
@@ -45,7 +45,7 @@ order-dependent. Environment variables and config files load before any
 processes run, so they're always in effect when needed.
 
 For the timing requirements of each debugging option, see the
-[`DebugConfig`](/max/api/python/generated/max.engine.DebugConfig/) API
+[`DebugConfig`](/api/python/generated/max.engine.DebugConfig/) API
 reference.
 
 ## Configure debugging options
@@ -70,9 +70,9 @@ Environment variable and config file options use kebab-case names
 <!-- rumdl-disable MD013 -->
 The Python API provides the most direct way to enable debugging options. Most
 options live on
-[`InferenceSession.debug`](/max/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.debug)
+[`InferenceSession.debug`](/api/python/generated/max.engine.InferenceSession#max.engine.InferenceSession.debug)
 except for `source_tracebacks`, which lives on
-[`Graph.debug`](/max/api/python/generated/max.graph.Graph#max.graph.Graph.debug) because it's
+[`Graph.debug`](/api/python/generated/max.graph.Graph#max.graph.Graph.debug) because it's
 consumed during graph construction.
 <!-- rumdl-enable MD013 -->
 
@@ -88,12 +88,13 @@ Graph.debug.source_tracebacks = True
 g = Graph("my_model")
 
 
-# Set before session.load() compiles the graph
+# Set before session.compile() compiles the graph
 InferenceSession.debug.nan_check = True
 InferenceSession.debug.op_log_level = "trace"
 
 session = InferenceSession()
-model = session.load(g)
+compiled = session.compile(g)
+model = session.init(compiled)
 
 # Set before calling execute()
 InferenceSession.debug.device_sync_mode = True
@@ -119,7 +120,7 @@ debug option names. For options that take a value, use `=`.
 export MODULAR_DEBUG=nan-check,device-sync-mode,source-tracebacks,assert-level=safe
 ```
 
-See the [Debugging section](/max/environment-variables#debugging) of the
+See the [Debugging section](/environment-variables#debugging) of the
 environment variables reference for every option you can pass to
 `MODULAR_DEBUG`.
 
@@ -127,6 +128,6 @@ environment variables reference for every option you can pass to
 
 Now that you know how to set up debugging in MAX, review the full list of
 debugging options in the
-[`DebugConfig`](/max/api/python/generated/max.engine.DebugConfig/) class.
+[`DebugConfig`](/api/python/generated/max.engine.DebugConfig/) class.
 You'll find detailed specifications for each option (property) including the
 type and accepted values.

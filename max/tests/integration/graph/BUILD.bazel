@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_library", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -19,6 +18,7 @@ _AMD_ONLY_TESTS = [
 # CPU-only tests that don't require GPU
 _CPU_ONLY_TESTS = [
     "test_bf16_cpu_error.py",
+    "test_devices_infos_mapping.py",
     "test_int_indexing.py",
     "test_is_inf.py",
     "test_is_nan.py",
@@ -31,33 +31,24 @@ _CPU_ONLY_TESTS = [
 # Tests with their own targets due to special configurations
 _SEPARATE_TARGET_TESTS = [
     "test_advanced_indexing.py",
+    "test_buffer_create_init.py",
+    "test_buffer_create_init_gpu.py",
     "test_debug_config.py",
     "test_debug_config_integration.py",
+    "test_device_graph_synthesis.py",
     "test_engine_device_graph.py",
     "test_graph_error_messages.py",
     "test_graph_pinned.py",
     "test_graph_telemetry.py",
     "test_load_weights_no_deps.py",
     "test_logits_processor_gpu.py",
+    "test_mega_ffn_nvfp4_fusion_gpu.py",
+    "test_rowwise_reductions.py",
     "test_runtime_source_notes.py",
+    "test_scatter.py",
+    "test_tile_based_fusion.py",
+    "test_typical_llm_snifftest.py",
 ]
-
-modular_py_library(
-    name = "modular_graph_test",
-    testonly = True,
-    srcs = ["modular_graph_test.py"],
-    imports = ["."],
-    deps = [
-        "//max/python/max/driver",
-        "//max/python/max/dtype",
-        "//max/python/max/engine",
-        "//max/python/max/graph",
-        "//max/tests/integration/test_common:graph_utils",
-        requirement("hypothesis"),
-        requirement("torch"),
-        requirement("numpy"),
-    ],
-)
 
 modular_py_test(
     name = "graph",
@@ -65,8 +56,8 @@ modular_py_test(
     srcs = glob(
         ["*.py"],
         exclude = _AMD_ONLY_TESTS + _NVIDIA_ONLY_TESTS + _CPU_ONLY_TESTS + _SEPARATE_TARGET_TESTS + [
-            "graph_error_messages_scenario.py",
-            "modular_graph_test.py",
+            "buffer_create_init_shared.py",
+            "fusion_utils.py",
             "test_nan_check.py",
         ],
     ),
@@ -88,6 +79,9 @@ modular_py_test(
         "CUSTOM_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/test_user_op)",
         "MODULAR_PATH": ".",
         "GRAPH_TESTDATA": "max/tests/tests/graph/testdata",
+    },
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
@@ -113,7 +107,7 @@ modular_py_test(
         "gpu",
     ],
     deps = [
-        ":modular_graph_test",
+        ":fusion_utils",
         "//max/python/max:_core",
         "//max/python/max/driver",
         "//max/python/max/dtype",
@@ -122,12 +116,29 @@ modular_py_test(
         "//max/python/max/mlir",
         "//max/python/max/nn",
         "//max/tests/integration/test_common:graph_utils",
+        "//max/tests/integration/test_common:modular_graph_test",
         requirement("gguf"),
         requirement("hypothesis"),
         requirement("numpy"),
         requirement("pytest-asyncio"),
         requirement("torch"),
         requirement("torchvision"),
+    ],
+)
+
+# Shared by every `test_*_fusion.py` file in the bulk `graph` target above:
+# excluded from its own `srcs` glob (it isn't a test module) and depended on
+# instead, the same pattern `buffer_create_init_shared` uses.
+modular_py_library(
+    name = "fusion_utils",
+    testonly = True,
+    srcs = ["fusion_utils.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        requirement("numpy"),
     ],
 )
 
@@ -151,6 +162,9 @@ modular_py_test(
         "conftest.py",
         "test_advanced_indexing.py",
     ],
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
@@ -171,11 +185,68 @@ modular_py_test(
 )
 
 modular_py_test(
+    name = "test_scatter",
+    srcs = [
+        "conftest.py",
+        "test_scatter.py",
+    ],
+    exec_properties = {
+        "test.resources:gpu-memory": "3",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
+        "//conditions:default": [],
+    }),
+    shard_count = 4,
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        requirement("hypothesis"),
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_typical_llm_snifftest",
+    srcs = [
+        "conftest.py",
+        "test_typical_llm_snifftest.py",
+    ],
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # max.experimental.nn.Module.compile() reaches max.engine.InferenceSession
+    # transitively through its own lazy internals; optional at runtime, like
+    # the experimental package's own ignore_extra_deps for the same target.
+    ignore_unresolved_imports = ["max.engine.InferenceSession"],
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        requirement("hypothesis"),
+    ],
+)
+
+modular_py_test(
     name = "nvidia_tests",
     size = "large",
     srcs = _NVIDIA_ONLY_TESTS + ["conftest.py"],
     exec_properties = {
-        "test.resources:gpu-memory": "2",
+        "test.resources:gpu-memory": "3",
     },
     gpu_constraints = ["//:nvidia_gpu"],
     tags = [
@@ -230,11 +301,102 @@ modular_py_test(
         "external-exclusive",  # Times out if run with too many other tests (only test_matmul_packed)
     ],
     deps = [
-        ":modular_graph_test",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
+        "//max/tests/integration/test_common:modular_graph_test",
+        requirement("hypothesis"),
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)
+
+# Tests for `ops.buffer_create` with an init value (persistent, once-initialized
+# state buffers). The device-adaptive checks live in a shared library so the
+# same logic runs from both the CPU (`test_buffer_create_init`, on remote-intel)
+# and GPU (`test_buffer_create_init_gpu`, on remote-b200) targets, covering the
+# host and device paths of the one-time memset initialization.
+modular_py_library(
+    name = "buffer_create_init_shared",
+    testonly = True,
+    srcs = ["buffer_create_init_shared.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_buffer_create_init",
+    size = "small",
+    srcs = ["test_buffer_create_init.py"],
+    deps = [
+        ":buffer_create_init_shared",
+        "//max/python/max/engine",
+    ],
+)
+
+modular_py_test(
+    name = "test_buffer_create_init_gpu",
+    size = "small",
+    srcs = ["test_buffer_create_init_gpu.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "1",
+    },
+    gpu_constraints = ["//:has_gpu"],
+    # TODO(QUA-841): re-enable once the CI timeout is root-caused.
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    deps = [
+        ":buffer_create_init_shared",
+        "//max/python/max/engine",
+    ],
+)
+
+# Row-wise reduction correctness tests. Each parametrization builds and compiles
+# one symbolic-dimension graph, so the wall time is compile-dominated;
+# shard_count parallelizes those compiles across CI workers (see the "Avoid
+# Per-Test Graph Recompilation" guidance in max/CLAUDE.md). Measured 17m11s
+# unsharded for the ~85 parametrizations on a B200 box (~12.6s each), so 8 shards
+# land near 130s -- enough margin under the 600s `ci-persistent` clamp for a
+# contended worker, which 4 shards (~260s) would not have.
+#
+# Needs a GPU lane: every case is parametrized over CPU and GPU, and the GPU half
+# is the priority -- the cooperative tiers, the cross-thread combine and the
+# split-K path exist only there, and a fault in them can be silent memory
+# corruption rather than a crash. The CPU half pins DeviceRef.CPU() explicitly,
+# so one target on a GPU worker covers both devices with no duplicated compiles.
+# Apple is excluded because `syncwarp` there is execution-only (no shared-memory
+# fence), which the combine's shmem tree relies on.
+modular_py_test(
+    name = "test_rowwise_reductions",
+    size = "large",
+    srcs = [
+        "conftest.py",
+        "test_rowwise_reductions.py",
+    ],
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    shard_count = 8,
+    tags = ["gpu"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/tests/integration/test_common:reduction_graphs",
         requirement("hypothesis"),
         requirement("numpy"),
         requirement("torch"),
@@ -248,6 +410,7 @@ modular_py_test(
     srcs = [
         "conftest.py",
         "test_bf16_cpu_error.py",
+        "test_devices_infos_mapping.py",
         "test_int_indexing.py",
         "test_is_inf.py",
         "test_is_nan.py",
@@ -269,9 +432,42 @@ modular_py_test(
     ],
 )
 
+# End-to-end coverage for the device graph synthesis pathway. Separate from the
+# `graph` target because it needs a GPU, and separate from
+# `test_engine_device_graph` because that covers the record/replay API instead.
+modular_py_test(
+    name = "test_device_graph_synthesis",
+    srcs = [
+        "conftest.py",
+        "test_device_graph_synthesis.py",
+    ],
+    data = [
+        "//max/tests/integration/Inputs/kernel_verification_ops",
+    ],
+    env = {
+        "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        requirement("hypothesis"),
+        requirement("numpy"),
+    ],
+)
+
 modular_py_test(
     name = "test_engine_device_graph",
     srcs = [
+        "conftest.py",
         "test_engine_device_graph.py",
     ],
     gpu_constraints = ["//:has_gpu"] + select({
@@ -287,6 +483,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
+        requirement("hypothesis"),
         requirement("numpy"),
         requirement("torch"),
     ],
@@ -307,6 +504,55 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_mega_ffn_nvfp4_fusion",
+    size = "large",
+    srcs = [
+        "test_mega_ffn_nvfp4_fusion_gpu.py",
+    ],
+    # Disable the MEF compile cache so the `*_fires_in_mo_ir` tests always run
+    # the MO pipeline (and emit the IR dump they grep): the cache key is
+    # structural, so their graph would otherwise be a cache hit off the
+    # compiles-and-runs test's identical graph and skip the pipeline (no dump).
+    env = {"MODULAR_MAX_ENABLE_MODEL_IR_CACHE": "false"},
+    # B200-only: the fused MegaFFN NVFP4 kernel the fusion lowers to is SM100a
+    # (Blackwell) specific. Off SM100 the pattern does not fire and the legs
+    # run as standalone kernels, so there is nothing to exercise.
+    tags = ["gpu"],
+    target_compatible_with = ["//:b200_gpu"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_tile_based_fusion",
+    srcs = [
+        "conftest.py",
+        "test_tile_based_fusion.py",
+    ],
+    # NVIDIA-only: tile-based fusion is not yet validated on AMD/Apple GPUs —
+    # a coverage gate, not a hardware incompatibility (the codegen path emits
+    # generic Mojo via `foreach_fusion_tile` with no NVIDIA-specific branch).
+    # Widen this once the path is validated on other targets.
+    gpu_constraints = ["//:nvidia_gpu"],
+    tags = ["gpu"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        requirement("hypothesis"),
         requirement("numpy"),
     ],
 )
@@ -339,6 +585,9 @@ modular_py_test(
         "conftest.py",
         "test_logits_processor_gpu.py",
     ],
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: SDLC-2743
         "//conditions:default": [],
@@ -351,9 +600,8 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines",
-        "//max/python/max/pipelines/lib",
-        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/sampling",
         requirement("hypothesis"),
         requirement("numpy"),
     ],
@@ -464,20 +712,6 @@ modular_py_test(
     ],
 )
 
-modular_py_library(
-    name = "graph_error_messages_scenario",
-    testonly = True,
-    srcs = ["graph_error_messages_scenario.py"],
-    imports = ["."],
-    deps = [
-        "//max/python/max/driver",
-        "//max/python/max/dtype",
-        "//max/python/max/engine",
-        "//max/python/max/graph",
-        requirement("numpy"),
-    ],
-)
-
 modular_py_test(
     name = "test_graph_error_messages",
     size = "large",
@@ -497,11 +731,11 @@ modular_py_test(
         "no-sandbox",
     ],
     deps = [
-        ":graph_error_messages_scenario",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
+        "//max/tests/integration/test_common:graph_error_messages_scenario",
         requirement("numpy"),
     ],
 )

@@ -1,0 +1,236 @@
+---
+title: Audio generation
+description: Generate music from a style caption and lyrics using the MAX v1/audio/speech endpoint
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import InstallMAX from '../_includes/install-modular.mdx';
+import InstallOpenAI from '../_includes/install-openai.mdx';
+import Requirements from '@site/src/components/Requirements';
+import { requirementsWithGPU } from '../requirements';
+
+With MAX, you can deploy open-source music generation models on your local
+system or in the cloud and send inference requests with our REST API. This page
+explains how to use the [`v1/audio/speech`](/rest-api/create-speech/) endpoint
+to generate a song from a style caption and lyrics.
+
+## Endpoint
+
+MAX serves audio generation on the `v1/audio/speech` endpoint. This endpoint
+currently only supports music generation. It does not support text-to-speech.
+
+:::note
+
+The [`v1/responses`](/rest-api/create-response/) endpoint also supports music
+generation. Use that instead if it better fits your workflow.
+
+:::
+
+### Request fields
+
+The following table lists fields that the speech endpoint accepts.
+
+| Field             | Type    | Default  | Description                                                                                             |
+|-------------------|---------|----------|---------------------------------------------------------------------------------------------------------|
+| `model`           | string  | Required | ID of the model you send the request to.                                                                |
+| `input`           | string  | Required | Lyrics to sing.                                                                                         |
+| `instructions`    | string  | Required | The song description, covering genre, tempo, key, mood, vocal, and arrangement.                         |
+| `audio_duration`  | number  | `60`     | Upper bound on the song's length, in seconds. The model may produce songs shorter than the upper bound. |
+| `steps`           | integer | `30`     | Denoising steps for the flow-matching stage.                                                            |
+| `guidance_scale`  | number  | `1.7`    | Classifier-free guidance. Raise it to follow the caption more literally.                                |
+| `seed`            | integer | `0`      | Seed for the sampling and noise draws. The same seed and prompt reproduce the same song.                |
+| `voice`           | string  | Ignored  | OpenAI's schema and Python SDK require it, but MAX has no voice catalog and ignores it.                 |
+| `response_format` | string  | `wav`    | MAX supports only `wav`.                                                                                |
+
+### Response format
+
+The response body is the audio itself. Its content type is `audio/wav`, and the
+format is 16-bit PCM at the model's own sample rate. Write the bytes to a file
+and play them.
+
+## Write the prompt
+
+### Song description
+
+[MiniMax-Music3](https://huggingface.co/MiniMaxAI/MiniMax-Music3) recognizes
+three song descriptors from its training:
+
+- **Global metadata**: genre, tempo in BPM, key, mood, and production style.
+- **Vocal details**: the singer's range and timbre, delivery, and effects.
+- **Arrangement**: the instruments, and how they enter and leave across the
+  song.
+
+Therefore, your prompt should also use these descriptors. For example:
+
+```text
+Global Metadata: dream pop, 92 BPM, A minor, wistful turning hopeful,
+late-night drive, warm analog production with tape saturation.
+Vocal Details: female lead, airy breathy timbre, intimate delivery, stacked
+harmonies in the chorus, generous plate reverb.
+Arrangement: shimmering electric guitar and analog pad, soft brushed drums,
+round sub bass. Intro is guitar and pad alone, drums enter with the first
+verse, the chorus opens wide with octave guitars, the bridge drops to pad and
+voice, and the outro decays into tape hiss.
+```
+
+### Lyrics and section tags
+
+MiniMax-Music3 accepts lyrics that are organized with certain case-insensitive
+tags.
+
+These include `[intro]`, `[verse]`, `[pre-chorus]`, `[chorus]`,
+`[post-chorus]`, `[bridge]`, `[instrumental]`, `[solo]`, and `[outro]`.
+Each tag needs its own line in the prompt.
+
+Here are some example lyrics you can send with a request:
+
+```text
+[intro]
+
+[verse]
+Headlights paint the empty road
+Radio hums a song I almost know
+
+[chorus]
+Hold the night a little longer
+Every mile makes the morning stronger
+```
+
+## Quickstart
+
+This quickstart shows you how to set up and run MiniMax-Music3 to generate a
+song from a caption and lyrics.
+
+:::caution GPU required
+
+To run MiniMax-Music3, your system must have a [compatible
+GPU](/packages#gpu-compatibility) with sufficient GPU RAM. Music generation is
+GPU-intensive, and a full-length song takes several minutes to render. The
+checkpoint's weights don't all fit on a 24 GB card at once, but MAX loads and
+frees one stage at a time, so a 24 GB card is enough to serve it.
+
+:::
+
+System requirements:
+
+<Requirements requirementsData={requirementsWithGPU}
+url="/max/packages#system-requirements" />
+
+### Set up your environment
+
+Create a Python project to install our APIs and CLI tools:
+
+<InstallMAX folder="audio-generation-quickstart" />
+
+### Serve your model
+
+Use the [`max serve`](/cli/serve) command to start a local model server:
+
+```bash
+max serve \
+  --model MiniMaxAI/MiniMax-Music3
+```
+
+The endpoint is ready when you see this message printed in your terminal:
+
+```output
+Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+For a complete list of `max` CLI commands and options, refer to the
+[MAX CLI reference](/cli).
+
+### Generate a song
+
+The example below sends the song description and lyrics to the server. Then, it
+saves the WAV file that it returns.
+
+Note that the first request after startup also compiles the model, so it takes
+several minutes longer than later requests.
+
+<Tabs>
+<TabItem value="python" label="Python">
+
+You can use OpenAI's Python client to interact with the music generation
+model. First, install the OpenAI SDK:
+
+<InstallOpenAI />
+
+Then, create a client and make a request to the model:
+
+```python title="generate-song.py"
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="EMPTY")
+
+caption = (
+    "Global Metadata: dream pop, 92 BPM, A minor, wistful turning hopeful, "
+    "late-night drive, warm analog production with tape saturation. "
+    "Vocal Details: female lead, airy breathy timbre, intimate delivery, "
+    "stacked harmonies in the chorus, generous plate reverb. "
+    "Arrangement: shimmering electric guitar and analog pad, soft brushed "
+    "drums, round sub bass, chorus opens up with a wide guitar double."
+)
+
+lyrics = """[intro]
+
+[verse]
+Headlights paint the empty road
+Radio hums a song I almost know
+
+[chorus]
+Hold the night a little longer
+Every mile makes the morning stronger"""
+
+response = client.audio.speech.create(
+    model="MiniMaxAI/MiniMax-Music3",
+    input=lyrics,
+    instructions=caption,
+    voice="",  # Required by OpenAI's schema, ignored by MAX.
+    response_format="wav",
+    extra_body={"audio_duration": 30, "seed": 1235},
+)
+
+response.write_to_file("song.wav")
+```
+
+Run the script to generate the song:
+
+```bash
+python generate-song.py
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+Send a request to the `v1/audio/speech` endpoint and write the WAV body
+directly to a file:
+
+```bash
+curl -X POST http://localhost:8000/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -o song.wav \
+  -d '{
+    "model": "MiniMaxAI/MiniMax-Music3",
+    "instructions": "Global Metadata: dream pop, 92 BPM, A minor, wistful turning hopeful, late-night drive, warm analog production with tape saturation. Vocal Details: female lead, airy breathy timbre, intimate delivery, stacked harmonies in the chorus, generous plate reverb. Arrangement: shimmering electric guitar and analog pad, soft brushed drums, round sub bass, chorus opens up with a wide guitar double.",
+    "input": "[intro]\n\n[verse]\nHeadlights paint the empty road\nRadio hums a song I almost know\n\n[chorus]\nHold the night a little longer\nEvery mile makes the morning stronger",
+    "audio_duration": 30,
+    "seed": 1235
+  }'
+```
+
+</TabItem>
+</Tabs>
+
+## Next steps
+
+Now that you can generate music, explore other inference capabilities and
+deployment options.
+
+- [Music generation](https://github.com/modular/modular/tree/main/max/examples/music_generation):
+  Renders a full-length song rather than a short clip.
+- [Image generation](/serve/image-generation): Generate images from text
+  prompts or transform existing images using the MAX v1/responses endpoint.
+- [Video generation](/serve/video-generation): Generate videos from text
+  prompts or animate existing images.

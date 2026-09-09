@@ -30,18 +30,32 @@ from std.collections import OptionalReg
 from std.math import ceildiv, exp2, log2, max, min
 from std.math.constants import log2e
 
-import std.gpu.primitives.warp as warp
-from std.gpu import WARP_SIZE, barrier, block_idx, lane_id, warp_id
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.gpu.primitives.grid_controls import (
+import max.gpu.primitives.warp as warp
+from max.gpu import WARP_SIZE, block_idx, lane_id, warp_id
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.primitives.grid_controls import (
+    PDLLevel,
     wait_on_dependent_grids,
     pdl_launch_attributes,
 )
 from layout import TileTensor
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
+from std.sys import get_defined_bool
 from std.utils.numerics import min_or_neg_inf
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
+
+
+# The kernels below already wait on dependent grids and the decode producer
+# already triggers them, but neither has an effect unless the consumer launch
+# opts in. Opting in makes that whole contract live for the first time, and a
+# rare illegal-address abort at context teardown tracks with it, so the level
+# stays off until the mechanism is settled. Enabling it is a source edit: the
+# define cannot be set through the build, because the package that reads it is
+# precompiled and `mojo precompile` takes no `-D`.
+comptime MLA_DECODE_COMBINE_PDL_LEVEL = PDLLevel.OVERLAP_AT_END if get_defined_bool[
+    "MLA_DECODE_COMBINE_PDL", False
+]() else PDLLevel.OFF
 
 
 # ===----------------------------------------------------------------------=== #
@@ -55,30 +69,58 @@ struct CombineParams[
     warps_per_head: Int = 2,
     has_attn_sink: Bool = False,
 ](Copyable, DevicePassable, TrivialRegisterPassable):
+    """Holds the pointers, strides, and shape metadata for the main split-K combine kernel.
+
+    Carries the per-split partial output and LSE accumulators, the final output
+    tensor, optional ragged row offsets and attention-sink pointer, and the
+    derived strides used by `mla_combine_kernel` to index the split, batch,
+    sequence, and head dimensions.
+
+    Parameters:
+        output_type: The element type of the per-split partial output
+            accumulator and the final combined output tensor.
+        accum_type: The element type of the per-split LSE accumulator values.
+        num_splits: The compile-time number of KV cache splits to combine.
+            Used to unroll the per-split accumulation loop.
+        ragged: Whether batches have variable-length sequences in a packed
+            layout (defaults to `False`). When true,
+            `input_row_offsets_ptr` selects each batch's token range.
+        warps_per_head: Number of warps assigned to each attention head
+            (defaults to 2). Must divide 8; controls vector load width and
+            threads per block.
+        has_attn_sink: Whether to apply attention-sink correction to the
+            global LSE (defaults to `False`). When true, `attn_sink_ptr`
+            must be provided.
+    """
+
     # Invariant: warps_per_head must divide 8 (checked in mla_combine_kernel).
     comptime heads_per_block = 8 // Self.warps_per_head
     comptime num_threads = Self.heads_per_block * Self.warps_per_head * WARP_SIZE
 
+    @__allow_legacy_any_origin_fields
     var out_accum_split_ptr: UnsafePointer[
         Scalar[Self.output_type], origin=MutAnyOrigin
     ]
 
+    @__allow_legacy_any_origin_fields
     var lse_accum_split_ptr: UnsafePointer[
         Scalar[Self.accum_type], origin=MutAnyOrigin
     ]
+
     # Final output tensor
+    @__allow_legacy_any_origin_fields
     var output_ptr: UnsafePointer[Scalar[Self.output_type], origin=MutAnyOrigin]
+
     # Input row offsets for ragged mode (cumulative token counts per batch)
     # In ragged mode: input_row_offsets[i] = start token index for batch i
-    var input_row_offsets_ptr: UnsafePointer[
-        Scalar[DType.uint32], origin=MutAnyOrigin
-    ]
+    @__allow_legacy_any_origin_fields
+    var input_row_offsets_ptr: UnsafePointer[UInt32, origin=MutAnyOrigin]
+
     # Per-head attn_sink values: shape [num_heads_q], float32, nullable.
     # Contains log-sum-exp of non-selected tokens' attention scores (natural log).
     # Only used when has_attn_sink is True at compile time.
-    var attn_sink_ptr: OptionalReg[
-        UnsafePointer[Scalar[DType.float32], origin=MutAnyOrigin]
-    ]
+    @__allow_legacy_any_origin_fields
+    var attn_sink_ptr: OptionalReg[UnsafePointer[Float32, origin=MutAnyOrigin]]
     var batch_size: Int
     var seq_len: Int
     var num_heads: Int
@@ -119,12 +161,8 @@ struct CombineParams[
         output_ptr: UnsafePointer[
             Scalar[Self.output_type], origin=MutAnyOrigin
         ],
-        input_row_offsets_ptr: UnsafePointer[
-            Scalar[DType.uint32], origin=MutAnyOrigin
-        ],
-        attn_sink_ptr: OptionalReg[
-            UnsafePointer[Scalar[DType.float32], origin=MutAnyOrigin]
-        ],
+        input_row_offsets_ptr: UnsafePointer[UInt32, origin=MutAnyOrigin],
+        attn_sink_ptr: OptionalReg[UnsafePointer[Float32, origin=MutAnyOrigin]],
         batch_size: Int,
         seq_len: Int,
         num_heads: Int,
@@ -176,6 +214,38 @@ def mla_combine_kernel[
         has_attn_sink,
     ]
 ):
+    """Combines partial split-K attention outputs into a single decoded result using LSE-based weighting.
+
+    Loads each split's partial output and LSE value, computes a global LSE via
+    warp reduction, derives per-split scale factors as `exp2(lse_i - global_lse)`,
+    and accumulates the weighted sum of partial outputs into the final output
+    tensor. Supports ragged batch layouts and optional attention-sink correction.
+
+    Parameters:
+        output_type: The element type of the per-split partial output
+            accumulator and the final combined output tensor.
+        accum_type: The element type of the per-split LSE accumulator values.
+        head_dim: The dimension of each attention head. Must be divisible by
+            `WARP_SIZE * warps_per_head`.
+        num_splits: The compile-time number of KV cache splits to combine.
+            Used to unroll the per-split accumulation loop.
+        ragged: Whether batches have variable-length sequences in a packed
+            layout (defaults to `False`). When true,
+            `input_row_offsets_ptr` selects each batch's token range.
+        warps_per_head: Number of warps assigned to each attention head
+            (defaults to 2). Must divide 8; controls vector load width and
+            threads per block.
+        has_attn_sink: Whether to apply attention-sink correction to the
+            global LSE (defaults to `False`). When true, `attn_sink_ptr`
+            must be provided.
+
+    Args:
+        params: The `CombineParams` instance carrying the per-split partial
+            output and LSE accumulators, the final output tensor, optional
+            ragged row offsets and attention-sink pointer, and the derived
+            strides used to index the split, batch, sequence, and head
+            dimensions.
+    """
     # PDL: Wait for the MLA decode kernel (dependent kernel) to complete.
     wait_on_dependent_grids()
 
@@ -248,18 +318,16 @@ def mla_combine_kernel[
     )
     var oaccum_base = (
         params.out_accum_split_ptr + out_row * params.out_accum_stride_head
-    ).as_immutable()
+    ).as_imm()
 
     # Prefetch first split's data into registers
-    var datas = InlineArray[SIMD[output_type, vec_size], elems_per_thread](
-        uninitialized=True
-    )
-
-    comptime for i in range(elems_per_thread):
-        var offset = (
+    var datas = Array[_, elems_per_thread](
+        fill_with_unrolled=lambda [i: Int]() -> SIMD[
+            output_type, vec_size
+        ]: oaccum_base.load[width=vec_size](
             head_dim_offset + lane_idx * vec_size + i * (WARP_SIZE * vec_size)
         )
-        datas[i] = oaccum_base.load[width=vec_size](offset)
+    )
 
     # =========================================================================
     # Step 2: Load LSE values and compute global LSE
@@ -276,8 +344,8 @@ def mla_combine_kernel[
     # Load LSE values into registers (multiple per lane for >32 splits)
     # and track whether any split is empty (LSE=-inf) for the fast-path
     # check.
-    var local_lse = InlineArray[Float32, num_lse_per_thread](
-        fill=min_or_neg_inf[DType.float32]()
+    var local_lse = Array[Float32, num_lse_per_thread](
+        fill=min_or_neg_inf[.float32]()
     )
 
     comptime for k in range(num_lse_per_thread):
@@ -298,7 +366,7 @@ def mla_combine_kernel[
     var max_lse = warp.max(thread_max)
 
     # set max_lse to 0 if all LSEs are -inf
-    if max_lse == min_or_neg_inf[DType.float32]():
+    if max_lse == min_or_neg_inf[.float32]():
         max_lse = 0.0
 
     # Compute sum of exp2(lse - max_lse) with thread-local accumulation
@@ -336,7 +404,7 @@ def mla_combine_kernel[
             # No tokens attended (all splits empty): output depends on
             # attn_sink alone. If attn_sink is -inf, output is zero
             # (global_lse = +inf makes all scales 0).
-            if attn_sink_val == min_or_neg_inf[DType.float32]():
+            if attn_sink_val == min_or_neg_inf[.float32]():
                 global_lse = Float32.MAX  # +inf => output = 0
             else:
                 global_lse = attn_sink_log2_val
@@ -352,21 +420,21 @@ def mla_combine_kernel[
     # =========================================================================
     # Step 3: Weighted accumulation with prefetching (compile-time unrolled)
     # =========================================================================
-    var result = InlineArray[SIMD[DType.float32, vec_size], elems_per_thread](
-        fill=SIMD[DType.float32, vec_size](0.0)
+    var result = Array[SIMD[.float32, vec_size], elems_per_thread](
+        fill=SIMD[.float32, vec_size](0.0)
     )
 
     comptime for split_idx in range(num_splits):
         # Broadcast scale from the owning lane via register shuffle (no smem).
         comptime k, src_lane = divmod(split_idx, WARP_SIZE)
         var lse_scale = warp.shuffle_idx(local_lse[k], UInt32(src_lane))
-        var is_valid = SIMD[DType.bool, vec_size](fill=lse_scale != Float32(0))
+        var is_valid = SIMD[.bool, vec_size](fill=lse_scale != Float32(0))
 
         comptime for i in range(elems_per_thread):
-            var data_f32 = datas[i].cast[DType.float32]()
+            var data_f32 = datas[i].cast[.float32]()
             var clean_data = is_valid.select(
                 data_f32,
-                SIMD[DType.float32, vec_size](0),
+                SIMD[.float32, vec_size](0),
             )
             result[i] = result[i] + lse_scale * clean_data
 
@@ -433,28 +501,53 @@ struct SplitParallelCombineParams[
     ragged: Bool = False,
     has_attn_sink: Bool = False,
 ](Copyable, DevicePassable, TrivialRegisterPassable):
+    """Holds the pointers, strides, and shape metadata for the split-parallel combine kernel.
+
+    Carries the per-split partial output and LSE accumulators, the final output
+    tensor, optional ragged row offsets and attention-sink pointer, and the
+    derived strides used by `mla_combine_kernel_split_parallel`. All 8 warps
+    cooperate on a single head, so `heads_per_block` is fixed at 1.
+
+    Parameters:
+        output_type: The element type of the per-split partial output
+            accumulator and the final combined output tensor.
+        accum_type: The element type of the per-split LSE accumulator values.
+        num_splits: The compile-time number of KV cache splits to combine.
+            Used to partition splits across the 8 warps.
+        ragged: Whether batches have variable-length sequences in a packed
+            layout (defaults to `False`). When true,
+            `input_row_offsets_ptr` selects each batch's token range.
+        has_attn_sink: Whether to apply attention-sink correction to the
+            global LSE (defaults to `False`). When true, `attn_sink_ptr`
+            must be provided.
+    """
+
     # All 8 warps work on one head, so heads_per_block = 1.
     comptime num_warps = 8
     comptime heads_per_block = 1
     comptime num_threads = Self.num_warps * WARP_SIZE
 
+    @__allow_legacy_any_origin_fields
     var out_accum_split_ptr: UnsafePointer[
         Scalar[Self.output_type], origin=MutAnyOrigin
     ]
 
+    @__allow_legacy_any_origin_fields
     var lse_accum_split_ptr: UnsafePointer[
         Scalar[Self.accum_type], origin=MutAnyOrigin
     ]
+
     # Final output tensor
+    @__allow_legacy_any_origin_fields
     var output_ptr: UnsafePointer[Scalar[Self.output_type], origin=MutAnyOrigin]
+
     # Input row offsets for ragged mode (cumulative token counts per batch)
-    var input_row_offsets_ptr: UnsafePointer[
-        Scalar[DType.uint32], origin=MutAnyOrigin
-    ]
+    @__allow_legacy_any_origin_fields
+    var input_row_offsets_ptr: UnsafePointer[UInt32, origin=MutAnyOrigin]
+
     # Per-head attn_sink values: shape [num_heads_q], float32, nullable.
-    var attn_sink_ptr: OptionalReg[
-        UnsafePointer[Scalar[DType.float32], origin=MutAnyOrigin]
-    ]
+    @__allow_legacy_any_origin_fields
+    var attn_sink_ptr: OptionalReg[UnsafePointer[Float32, origin=MutAnyOrigin]]
     var batch_size: Int
     var seq_len: Int
     var num_heads: Int
@@ -495,12 +588,8 @@ struct SplitParallelCombineParams[
         output_ptr: UnsafePointer[
             Scalar[Self.output_type], origin=MutAnyOrigin
         ],
-        input_row_offsets_ptr: UnsafePointer[
-            Scalar[DType.uint32], origin=MutAnyOrigin
-        ],
-        attn_sink_ptr: OptionalReg[
-            UnsafePointer[Scalar[DType.float32], origin=MutAnyOrigin]
-        ],
+        input_row_offsets_ptr: UnsafePointer[UInt32, origin=MutAnyOrigin],
+        attn_sink_ptr: OptionalReg[UnsafePointer[Float32, origin=MutAnyOrigin]],
         batch_size: Int,
         seq_len: Int,
         num_heads: Int,
@@ -552,12 +641,34 @@ def mla_combine_kernel_split_parallel[
     Each warp independently accumulates its assigned range of splits using
     online log-sum-exp. After the per-warp loop, partial results are written
     to shared memory and tree-reduced in log2(8)=3 steps.
+
+    Parameters:
+        output_type: The element type of the per-split partial output
+            accumulator and the final combined output tensor.
+        accum_type: The element type of the per-split LSE accumulator values.
+        head_dim: The dimension of each attention head. Must be divisible by
+            `WARP_SIZE`.
+        num_splits: The compile-time number of KV cache splits to combine.
+            Used to partition splits across the 8 warps.
+        ragged: Whether batches have variable-length sequences in a packed
+            layout (defaults to `False`). When true,
+            `input_row_offsets_ptr` selects each batch's token range.
+        has_attn_sink: Whether to apply attention-sink correction to the
+            global LSE (defaults to `False`). When true, `attn_sink_ptr`
+            must be provided.
+
+    Args:
+        params: The `SplitParallelCombineParams` instance carrying the
+            per-split partial output and LSE accumulators, the final output
+            tensor, optional ragged row offsets and attention-sink pointer,
+            and the derived strides used to index the split, batch,
+            sequence, and head dimensions.
     """
     # PDL: Wait for the MLA decode kernel (dependent kernel) to complete.
     wait_on_dependent_grids()
 
     comptime NUM_WARPS = 8
-    comptime NEG_INF = min_or_neg_inf[DType.float32]()
+    comptime NEG_INF = min_or_neg_inf[.float32]()
 
     # Each warp covers the full head_dim.
     # 32 lanes * vec_size * elems_per_thread = head_dim
@@ -590,20 +701,20 @@ def mla_combine_kernel_split_parallel[
     # Shared memory for tree reduction.
     # Layout: smem_result[warp][elem], smem_m[warp], smem_l[warp]
     # =========================================================================
-    var smem_result = stack_allocation[
+    var smem_result = unsafe_stack_allocation[
         NUM_WARPS * head_dim,
         DType.float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var smem_m = stack_allocation[
+    var smem_m = unsafe_stack_allocation[
         NUM_WARPS,
         DType.float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var smem_l = stack_allocation[
+    var smem_l = unsafe_stack_allocation[
         NUM_WARPS,
         DType.float32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # =========================================================================
@@ -623,7 +734,7 @@ def mla_combine_kernel_split_parallel[
     )
     var oaccum_base = (
         params.out_accum_split_ptr + out_row * params.out_accum_stride_head
-    ).as_immutable()
+    ).as_imm()
 
     var lse_base = (
         batch_idx * params.lse_stride_batch
@@ -642,8 +753,8 @@ def mla_combine_kernel_split_parallel[
     #   warp_l = sum_over_seen_splits(exp2(lse_i - warp_m))
     # Final output = result / warp_l
     # =========================================================================
-    var result = InlineArray[SIMD[DType.float32, vec_size], elems_per_thread](
-        fill=SIMD[DType.float32, vec_size](0.0)
+    var result = Array[SIMD[.float32, vec_size], elems_per_thread](
+        fill=SIMD[.float32, vec_size](0.0)
     )
     var warp_m = Float32(NEG_INF)
     var warp_l = Float32(0.0)
@@ -828,24 +939,57 @@ def launch_mla_combine_kernel_split_parallel[
     ragged: Bool = False,
     has_attn_sink: Bool = False,
 ](
-    out_accum_split: TileTensor[
-        output_type, address_space=AddressSpace.GENERIC, ...
-    ],
-    lse_accum_split: TileTensor[
-        accum_type, address_space=AddressSpace.GENERIC, ...
-    ],
-    output: TileTensor[output_type, address_space=AddressSpace.GENERIC, ...],
-    input_row_offsets_ptr: UnsafePointer[
-        Scalar[DType.uint32], origin=MutAnyOrigin
-    ],
-    attn_sink_ptr: OptionalReg[
-        UnsafePointer[Scalar[DType.float32], MutAnyOrigin]
-    ],
+    out_accum_split: TileTensor[output_type, address_space=.GENERIC, ...],
+    lse_accum_split: TileTensor[accum_type, address_space=.GENERIC, ...],
+    output: TileTensor[output_type, address_space=.GENERIC, ...],
+    input_row_offsets_ptr: UnsafePointer[UInt32, origin=MutAnyOrigin],
+    attn_sink_ptr: OptionalReg[UnsafePointer[Float32, MutAnyOrigin]],
     batch_size: Int,
     seq_len: Int,
     num_heads: Int,
     ctx: DeviceContext,
 ) raises:
+    """Launches the split-parallel combine kernel on the device with one CTA per (batch, seq, head).
+
+    Extracts raw device pointers from the input `TileTensor` arguments,
+    constructs a `SplitParallelCombineParams` instance, and enqueues
+    `mla_combine_kernel_split_parallel` with a grid of `(batch_size, seq_len,
+    num_heads)` blocks and PDL launch attributes.
+
+    Parameters:
+        output_type: The element type of the per-split partial output
+            accumulator and the final combined output tensor.
+        accum_type: The element type of the per-split LSE accumulator values.
+        head_dim: The dimension of each attention head. Must be divisible by
+            `WARP_SIZE`.
+        num_splits: The compile-time number of KV cache splits to combine.
+            Used to partition splits across the 8 warps.
+        ragged: Whether batches have variable-length sequences in a packed
+            layout (defaults to `False`). When true,
+            `input_row_offsets_ptr` selects each batch's token range.
+        has_attn_sink: Whether to apply attention-sink correction to the
+            global LSE (defaults to `False`). When true, `attn_sink_ptr`
+            must be provided.
+
+    Args:
+        out_accum_split: The per-split partial output accumulator tensor of
+            shape `[num_splits, batch_size, seq_len, num_heads, head_dim]`.
+        lse_accum_split: The per-split LSE accumulator tensor of shape
+            `[num_splits, batch_size, seq_len, num_heads]`.
+        output: The final combined output tensor of shape `[batch_size,
+            seq_len, num_heads, head_dim]` (or the ragged-packed equivalent).
+        input_row_offsets_ptr: Pointer to cumulative token counts per batch;
+            `input_row_offsets_ptr[i]` is the start token index for batch
+            `i`. Used only in ragged mode.
+        attn_sink_ptr: Optional pointer to per-head attention-sink LSE values
+            of shape `[num_heads]` in natural log. Used only when
+            `has_attn_sink` is true.
+        batch_size: Number of batches in the request.
+        seq_len: Maximum number of query tokens per batch (the padded grid
+            dimension along the sequence axis).
+        num_heads: Number of query attention heads.
+        ctx: The device context used to enqueue the kernel.
+    """
     comptime ParamsType = SplitParallelCombineParams[
         output_type,
         accum_type,
@@ -896,7 +1040,7 @@ def launch_mla_combine_kernel_split_parallel[
         params,
         grid_dim=grid_dim,
         block_dim=block_dim,
-        attributes=pdl_launch_attributes(),
+        attributes=pdl_launch_attributes(MLA_DECODE_COMBINE_PDL_LEVEL),
     )
 
 
@@ -912,24 +1056,60 @@ def launch_mla_combine_kernel[
     warps_per_head: Int = 2,
     has_attn_sink: Bool = False,
 ](
-    out_accum_split: TileTensor[
-        output_type, address_space=AddressSpace.GENERIC, ...
-    ],
-    lse_accum_split: TileTensor[
-        accum_type, address_space=AddressSpace.GENERIC, ...
-    ],
-    output: TileTensor[output_type, address_space=AddressSpace.GENERIC, ...],
-    input_row_offsets_ptr: UnsafePointer[
-        Scalar[DType.uint32], origin=MutAnyOrigin
-    ],
-    attn_sink_ptr: OptionalReg[
-        UnsafePointer[Scalar[DType.float32], MutAnyOrigin]
-    ],
+    out_accum_split: TileTensor[output_type, address_space=.GENERIC, ...],
+    lse_accum_split: TileTensor[accum_type, address_space=.GENERIC, ...],
+    output: TileTensor[output_type, address_space=.GENERIC, ...],
+    input_row_offsets_ptr: UnsafePointer[UInt32, origin=MutAnyOrigin],
+    attn_sink_ptr: OptionalReg[UnsafePointer[Float32, MutAnyOrigin]],
     batch_size: Int,
     seq_len: Int,
     num_heads: Int,
     ctx: DeviceContext,
 ) raises:
+    """Launches the main split-K combine kernel on the device with one CTA per (batch, seq, head-block).
+
+    Extracts raw device pointers from the input `TileTensor` arguments,
+    constructs a `CombineParams` instance, and enqueues `mla_combine_kernel`
+    with a grid of `(batch_size, seq_len, ceildiv(num_heads, heads_per_block))`
+    blocks and PDL launch attributes.
+
+    Parameters:
+        output_type: The element type of the per-split partial output
+            accumulator and the final combined output tensor.
+        accum_type: The element type of the per-split LSE accumulator values.
+        head_dim: The dimension of each attention head. Must be divisible by
+            `WARP_SIZE * warps_per_head`.
+        num_splits: The compile-time number of KV cache splits to combine.
+            Used to unroll the per-split accumulation loop.
+        ragged: Whether batches have variable-length sequences in a packed
+            layout (defaults to `False`). When true,
+            `input_row_offsets_ptr` selects each batch's token range.
+        warps_per_head: Number of warps assigned to each attention head
+            (defaults to 2). Must divide 8; controls vector load width and
+            threads per block.
+        has_attn_sink: Whether to apply attention-sink correction to the
+            global LSE (defaults to `False`). When true, `attn_sink_ptr`
+            must be provided.
+
+    Args:
+        out_accum_split: The per-split partial output accumulator tensor of
+            shape `[num_splits, batch_size, seq_len, num_heads, head_dim]`.
+        lse_accum_split: The per-split LSE accumulator tensor of shape
+            `[num_splits, batch_size, seq_len, num_heads]`.
+        output: The final combined output tensor of shape `[batch_size,
+            seq_len, num_heads, head_dim]` (or the ragged-packed equivalent).
+        input_row_offsets_ptr: Pointer to cumulative token counts per batch;
+            `input_row_offsets_ptr[i]` is the start token index for batch
+            `i`. Used only in ragged mode.
+        attn_sink_ptr: Optional pointer to per-head attention-sink LSE values
+            of shape `[num_heads]` in natural log. Used only when
+            `has_attn_sink` is true.
+        batch_size: Number of batches in the request.
+        seq_len: Maximum number of query tokens per batch (the padded grid
+            dimension along the sequence axis).
+        num_heads: Number of query attention heads.
+        ctx: The device context used to enqueue the kernel.
+    """
     comptime ParamsType = CombineParams[
         output_type,
         accum_type,
@@ -982,7 +1162,7 @@ def launch_mla_combine_kernel[
         params,
         grid_dim=grid_dim,
         block_dim=block_dim,
-        attributes=pdl_launch_attributes(),
+        attributes=pdl_launch_attributes(MLA_DECODE_COMBINE_PDL_LEVEL),
     )
 
 
@@ -999,24 +1179,63 @@ def mla_decode_combine_partial_outputs[
     has_attn_sink: Bool = False,
     split_parallel: Bool = False,
 ](
-    out_accum_split: TileTensor[
-        output_type, address_space=AddressSpace.GENERIC, ...
-    ],
-    lse_accum_split: TileTensor[
-        accum_type, address_space=AddressSpace.GENERIC, ...
-    ],
-    output: TileTensor[output_type, address_space=AddressSpace.GENERIC, ...],
-    input_row_offsets_ptr: UnsafePointer[
-        Scalar[DType.uint32], origin=MutAnyOrigin
-    ],
-    attn_sink_ptr: OptionalReg[
-        UnsafePointer[Scalar[DType.float32], MutAnyOrigin]
-    ],
+    out_accum_split: TileTensor[output_type, address_space=.GENERIC, ...],
+    lse_accum_split: TileTensor[accum_type, address_space=.GENERIC, ...],
+    output: TileTensor[output_type, address_space=.GENERIC, ...],
+    input_row_offsets_ptr: UnsafePointer[UInt32, origin=MutAnyOrigin],
+    attn_sink_ptr: OptionalReg[UnsafePointer[Float32, MutAnyOrigin]],
     batch_size: Int,
     seq_len: Int,
     num_heads: Int,
     ctx: DeviceContext,
 ) raises:
+    """Dispatches split-K partial output combination to either the split-parallel or the main combine kernel.
+
+    Selects `launch_mla_combine_kernel_split_parallel` when `split_parallel` is
+    true, otherwise falls back to `launch_mla_combine_kernel`, forwarding all
+    tensor pointers, shape, and attention-sink parameters unchanged.
+
+    Parameters:
+        output_type: The element type of the per-split partial output
+            accumulator and the final combined output tensor.
+        accum_type: The element type of the per-split LSE accumulator values.
+        head_dim: The dimension of each attention head. Must be divisible by
+            `WARP_SIZE` (and by `WARP_SIZE * warps_per_head` when
+            `split_parallel` is false).
+        num_splits: The compile-time number of KV cache splits to combine.
+            Used to unroll the per-split accumulation loop in the main kernel
+            and to partition splits across warps in the split-parallel kernel.
+        ragged: Whether batches have variable-length sequences in a packed
+            layout (defaults to `False`). When true,
+            `input_row_offsets_ptr` selects each batch's token range.
+        warps_per_head: Number of warps assigned to each attention head
+            (defaults to 2). Must divide 8; controls vector load width and
+            threads per block. Used only when `split_parallel` is false.
+        has_attn_sink: Whether to apply attention-sink correction to the
+            global LSE (defaults to `False`). When true, `attn_sink_ptr`
+            must be provided.
+        split_parallel: Selects the split-parallel combine kernel when true,
+            otherwise the main combine kernel (defaults to `False`).
+
+    Args:
+        out_accum_split: The per-split partial output accumulator tensor of
+            shape `[num_splits, batch_size, seq_len, num_heads, head_dim]`.
+        lse_accum_split: The per-split LSE accumulator tensor of shape
+            `[num_splits, batch_size, seq_len, num_heads]`.
+        output: The final combined output tensor of shape `[batch_size,
+            seq_len, num_heads, head_dim]` (or the ragged-packed equivalent).
+        input_row_offsets_ptr: Pointer to cumulative token counts per batch;
+            `input_row_offsets_ptr[i]` is the start token index for batch
+            `i`. Used only in ragged mode.
+        attn_sink_ptr: Optional pointer to per-head attention-sink LSE values
+            of shape `[num_heads]` in natural log. Used only when
+            `has_attn_sink` is true.
+        batch_size: Number of batches in the request.
+        seq_len: Maximum number of query tokens per batch (the padded grid
+            dimension along the sequence axis).
+        num_heads: Number of query attention heads.
+        ctx: The device context used to enqueue the kernel.
+    """
     comptime if split_parallel:
         launch_mla_combine_kernel_split_parallel[
             output_type,

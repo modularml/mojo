@@ -1,0 +1,7 @@
+
+// RUN: mojo precompile %S/test_package -strip-file-prefix=%S -o - | kgen-opt -mlir-print-debuginfo | FileCheck %s --implicit-check-not='/test_package' --check-prefix=PARENT
+// PARENT-DAG: "test_package/__init__.mojo"
+// PARENT-DAG: "test_package/inner1/__init__.mojo"
+// PARENT-DAG: "test_package/inner1/myfile.mojo"
+// PARENT-DAG: "test_package/inner2/__init__.mojo"
+// PARENT-DAG: "test_package/inner2/myfile2.mojo"

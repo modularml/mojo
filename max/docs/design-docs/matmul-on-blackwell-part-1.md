@@ -134,8 +134,8 @@ Neumann](https://en.wikipedia.org/wiki/Von_Neumann_architecture) architectures,
 is composed of elements that compute (commonly known as Arithmetic Logical
 Units or ALUs), and elements that load/store the data for these computations. A
 GPU will contain several Streaming Multiprocessor
-([SM](https://docs.modular.com/glossary/gpu/streaming-multiprocessor)), [L2
-Cache and global memory](https://docs.modular.com/glossary/gpu/memory) which
+([SM](https://max.modular.com/glossary/gpu/streaming-multiprocessor)), [L2
+Cache and global memory](https://max.modular.com/glossary/gpu/memory) which
 are shared among these SMs, and an interconnect to the host device (CPU).
 
 ![image.png](./img/matmul-on-blackwell-part-1/img04-gpu-arch.jpeg)
@@ -144,9 +144,9 @@ GPU architecture
 ///
 
 Threads on a GPU are grouped into blocks which are called [Thread
-Blocks](https://docs.modular.com/glossary/gpu/thread-block) or Cooperative
+Blocks](https://max.modular.com/glossary/gpu/thread-block) or Cooperative
 Thread Arrays (CTAs). Each of these blocks gets scheduled onto **a single**
-[SM](https://docs.modular.com/glossary/gpu/streaming-multiprocessor). Each SM,
+[SM](https://max.modular.com/glossary/gpu/streaming-multiprocessor). Each SM,
 in turn, access the data via a shared L2 cache which loads data from global
 memory. The threads in each SM have access to two more memory regions:
 
@@ -212,7 +212,7 @@ A detailed description of GPU programming fundamentals is beyond the scope of
 this blog post. There are many resources that explain the GPU programming
 paradigm, and a great resource is
 <https://puzzles.modular.com/introduction.html> and the GPU
-[glossary](https://docs.modular.com/glossary/).
+[glossary](https://max.modular.com/glossary/).
 
 As a result of the massive parallelism afforded to by the GPU, one has to think
 about GPU programming differently. For example, while, in traditional CPU
@@ -242,11 +242,11 @@ If we think about the [Flynn
 taxonomy](https://en.wikipedia.org/wiki/Flynn%27s_taxonomy), this maps into the
 Single Instruction Multiple Threads (SIMT) programming model.
 
-When launching a [kernel](https://docs.modular.com/glossary/gpu/kernel)
+When launching a [kernel](https://max.modular.com/glossary/gpu/kernel)
 (calling the function), you specify the number of threads in each
-[block](https://docs.modular.com/glossary/gpu/thread-block) (also called block
+[block](https://max.modular.com/glossary/gpu/thread-block) (also called block
 size), and how many blocks you want to launch (called the
-[grid](https://docs.modular.com/glossary/gpu/grid) size). Each block gets
+[grid](https://max.modular.com/glossary/gpu/grid) size). Each block gets
 mapped to an SM by the hardware. As a result, threads within the same block can
 share memory and synchronize with each other, but cannot directly communicate
 across blocks- unless they are within the same cluster (discussed later). Note
@@ -519,11 +519,11 @@ Concurrent dot product for every output
 
 The inputs to the matmul function is a LayoutTensor. To learn more about
 LayoutTensor, see [Using
-LayoutTensor](https://docs.modular.com/mojo/manual/layout/tensors/) in the Mojo
+LayoutTensor](https://mojolang.org/docs/manual/layout/tensors/) in the Mojo
 Manual
 
 ```mojo
-fn matmul_kernel[
+def matmul_kernel[
     M: Int, N: Int, K: Int
 ](
     c: LayoutTensor[DType.bfloat16, Layout.row_major(M, N)],

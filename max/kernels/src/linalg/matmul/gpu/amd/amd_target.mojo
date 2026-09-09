@@ -63,9 +63,9 @@ def mi355x_cost_model() -> TargetCostModel:
     VGPR liveness hints (per-quadrant frag, fp8 MFMA 16x16x128, num_k_mmas=2):
       LOAD_*:     0 (buffer_load_lds writes directly to LDS, no persistent
                      register footprint)
-      MMA_LOAD_*: vgpr_def=8 — one quadrant frag is 8 VGPRs (32 fp8 / lane,
+      MMA_LOAD_*: vgpr_def=8: one quadrant frag is 8 VGPRs (32 fp8 / lane,
                      packed 4-per-dword)
-      MMA:        vgpr_def=4 — one MMA writes 4 VGPRs of f32 accumulator
+      MMA:        vgpr_def=4: one MMA writes 4 VGPRs of f32 accumulator
                      (16 elements / 64 lanes / 4 elements per VGPR);
                      accumulator persists across iterations so vgpr_kill=0
     """
@@ -105,7 +105,14 @@ def mi355x_double_buffer(
     vm_per_load_b: Int = 4,
     max_globals: Int = 1,
 ) -> PipelineConfig:
-    """MI355X ping-pong: double buffer, 2 warp groups, 2x2 MMA grid."""
+    """MI355X ping-pong: double buffer, 2 warp groups, 2x2 MMA grid.
+
+    Args:
+        vm_per_load_a: `vmcnt` ops per channel-A global load (defaults to 4).
+        vm_per_load_b: `vmcnt` ops per channel-B global load (defaults to 4).
+        max_globals: Maximum global loads per block, 0 means unlimited
+            (defaults to 1).
+    """
     return PipelineConfig(
         depth=2,
         prefetch=1,
@@ -165,6 +172,12 @@ def mi355x_target(
     Provides both the per-op cost model (latencies, resources, roles)
     and the pipeline structure (depth=2, 2x2 MMA grid, warp groups)
     from a single call.
+
+    Args:
+        vm_per_load_a: `vmcnt` ops per channel-A global load (defaults to 4).
+        vm_per_load_b: `vmcnt` ops per channel-B global load (defaults to 4).
+        max_globals: Maximum global loads per block, 0 means unlimited
+            (defaults to 1).
     """
     return TargetProfile(
         cost_model=mi355x_cost_model(),
@@ -246,7 +259,18 @@ def append_amd_hints(
     config: PipelineConfig,
     hints: AMDScheduleHints,
 ):
-    """Append AMD schedule_group_barrier hints to a kernel entry list."""
+    """Append AMD schedule_group_barrier hints to a kernel entry list.
+
+    Args:
+        ker: The kernel entry list to append `SCHED_GROUP_BARRIER` entries
+            to.
+        body: The body operations used to count fragment loads and split
+            loop-carried vs non-loop-carried frags.
+        config: The pipeline config, read for `loop_carried.selector` to
+            identify the loop-carried fragment load subtile.
+        hints: Hardware expansion factors (MMA grid, tile sizes, store
+            counts) used to compute per-op interleaving ratios.
+    """
     var lc_sel = config.loop_carried.selector
     var num_non_lc_frags = 0
     var num_lc_frags = 0

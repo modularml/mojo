@@ -22,9 +22,9 @@ from std.utils.index import Index
 def winograd_1d_convolution_3[
     dtype: DType, //, filter_len: Int
 ](
-    input: UnsafePointer[Scalar[dtype], _],
-    filter: UnsafePointer[Scalar[dtype], _],
-    output: UnsafePointer[mut=True, Scalar[dtype], _],
+    input: ImmPointer[Scalar[dtype], _],
+    filter: ImmPointer[Scalar[dtype], _],
+    output: MutPointer[Scalar[dtype], _],
     input_len: Int,
 ):
     # TODO: Current implementation requires input_len >= 4

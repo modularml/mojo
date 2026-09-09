@@ -3,6 +3,7 @@ load(
     "//bazel:api.bzl",
     "mojo_binary",
 )
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -26,11 +27,13 @@ _SM100_GPU_BENCHMARKS = [
     mojo_binary(
         name = src.split(".")[0],
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         enable_assertions = False,
         target_compatible_with = ["//:amd_gpu"],
         deps = [
             "//max:internal_utils",
             "//max:layout",
+            "//max:max_mojo",
             "//max:nn",
             "@mojo//:std",
         ],
@@ -51,11 +54,13 @@ _SM100_GPU_BENCHMARKS = [
     mojo_binary(
         name = src.split(".")[0],
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         enable_assertions = False,
         target_compatible_with = ["//:mi355_gpu"],
         deps = [
             "//max:internal_utils",
             "//max:layout",
+            "//max:max_mojo",
             "//max:nn",
             "@mojo//:std",
         ],
@@ -76,11 +81,13 @@ _SM100_GPU_BENCHMARKS = [
     mojo_binary(
         name = src.split(".")[0],
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         enable_assertions = False,
         target_compatible_with = ["//:b200_gpu"],
         deps = [
             "//max:internal_utils",
             "//max:layout",
+            "//max:max_mojo",
             "//max:nn",
             "//max:structured_kernels",
             "@mojo//:std",

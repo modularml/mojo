@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -90,18 +89,59 @@ def discover_categories(dir_names: list[str]) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
+def _lazy_arch_module(elt: ast.expr) -> str | None:
+    """Return the ``module`` field of a ``_LazyArch(name, module, symbol)`` call.
+
+    Returns ``None`` for nodes that are not such a call. The module is the
+    second positional argument or the ``module`` keyword.
+    """
+    if not isinstance(elt, ast.Call):
+        return None
+    if len(elt.args) >= 2 and isinstance(elt.args[1], ast.Constant):
+        value = elt.args[1].value
+        return value if isinstance(value, str) else None
+    for kw in elt.keywords:
+        if kw.arg == "module" and isinstance(kw.value, ast.Constant):
+            value = kw.value.value
+            return value if isinstance(value, str) else None
+    return None
+
+
 def discover_registered_dirs() -> list[str]:
-    """Return sorted directory names of all registered architectures."""
+    """Return sorted directory names of all registered architectures.
+
+    ``_modulev3`` architectures are intentionally excluded from the public
+    API docs. They stay registered and importable, but their internal
+    module-v3 variants are not documented.
+    """
     tree = ast.parse((ARCH_BASE / "__init__.py").read_text())
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.FunctionDef)
             and node.name == "register_all_models"
         ):
+            # Architectures are registered lazily via a `lazy_architectures`
+            # table of ``_LazyArch(name, module, symbol)`` entries. Collect the
+            # module directory names, stripping the leading ``.``.
             modules = set()
-            for stmt in node.body:
-                if isinstance(stmt, ast.ImportFrom) and stmt.module:
-                    modules.add(stmt.module)
+            for stmt in ast.walk(node):
+                if not (
+                    isinstance(stmt, ast.Assign)
+                    and any(
+                        isinstance(t, ast.Name) and t.id == "lazy_architectures"
+                        for t in stmt.targets
+                    )
+                    and isinstance(stmt.value, ast.List)
+                ):
+                    continue
+                for elt in stmt.value.elts:
+                    module = _lazy_arch_module(elt)
+                    if module is None:
+                        continue
+                    module = module.lstrip(".")
+                    if module.endswith("_modulev3"):
+                        continue
+                    modules.add(module)
             return sorted(modules)
     raise RuntimeError("Could not find register_all_models() in __init__.py")
 
@@ -210,7 +250,7 @@ def sync_sidebars_json(
 
     1. Inside the ``max.pipelines`` category, as a child with label
        ``"architectures"``. This is the preferred location.
-    2. As a top-level sibling under ``"Python"`` with label
+    2. As a top-level sibling under ``"Model library (Python)"`` with label
        ``"max.pipelines.architectures"`` (legacy placement).
 
     If neither exists, inserts a nested child under ``max.pipelines``.
@@ -221,32 +261,34 @@ def sync_sidebars_json(
     if not isinstance(data, dict):
         raise RuntimeError("sidebars.json: root value must be a JSON object")
 
-    max_ref = data.get("maxReferenceSidebar")
+    max_ref = data.get("modelDevSidebar")
     if not isinstance(max_ref, list):
         raise RuntimeError(
-            "sidebars.json: maxReferenceSidebar missing or not a list"
+            "sidebars.json: modelDevSidebar missing or not a list"
         )
 
     python_cat: dict[str, object] | None = None
     for entry in max_ref:
         if (
             isinstance(entry, dict)
-            and entry.get("label") == "Python"
+            and entry.get("label") == "Model library (Python)"
             and entry.get("type") == "category"
         ):
             python_cat = entry
             break
     if python_cat is None:
         raise RuntimeError(
-            'sidebars.json: category with label "Python" not found'
+            'sidebars.json: category with label "Model library (Python)" not found'
         )
 
     py_items = python_cat.get("items")
     if not isinstance(py_items, list):
-        raise RuntimeError('sidebars.json: Python category "items" not a list')
+        raise RuntimeError(
+            'sidebars.json: Model library (Python) category "items" not a list'
+        )
 
     new_doc_ids = [
-        f"max/api/python/pipelines.architectures.{d}" for d in sorted(dir_names)
+        f"api/python/pipelines.architectures.{d}" for d in sorted(dir_names)
     ]
 
     arch_cat: dict[str, object] | None = None
@@ -285,7 +327,7 @@ def sync_sidebars_json(
             "label": "architectures",
             "link": {
                 "type": "doc",
-                "id": "max/api/python/pipelines.architectures",
+                "id": "api/python/pipelines.architectures",
             },
             "items": new_doc_ids,
         }
@@ -333,10 +375,13 @@ def main() -> None:
     categories = discover_categories(dir_names)
     stale: list[str] = []
 
+    # Manually re-implementing is_check() from lint_helpers since it's the only use here
+    is_check = args.check or os.getenv("CHECK", "").lower() in ("1", "true")
+
     # Per-architecture RST pages
     for d in dir_names:
         rst_path = DOCS_DIR / f"pipelines.architectures.{d}.rst"
-        sync_file(rst_path, generate_rst(d), args.check, stale)
+        sync_file(rst_path, generate_rst(d), is_check, stale)
 
     # Architectures index RST and sidebars.json
     sync_file(
@@ -345,22 +390,18 @@ def main() -> None:
         args.check,
         stale,
     )
-    sync_sidebars_json(dir_names, args.check, stale)
+    sync_sidebars_json(dir_names, is_check, stale)
 
-    if args.check:
-        if stale:
-            print(
-                "❌ Architecture docs are out-of-date.\n"
-                "Stale files:\n"
-                + "\n".join(f"  - {f}" for f in stale)
-                + "\n\nRun `./bazelw run //oss/modular/docs:generate-arch-docs`"
-                " to regenerate.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        print("✅ Architecture docs are up-to-date.")
-    else:
-        print("✅ Architecture docs generated.")
+    if is_check and stale:
+        print(
+            "❌ Architecture docs are out-of-date.\n"
+            "Stale files:\n"
+            + "\n".join(f"  - {f}" for f in stale)
+            + "\n\nRun `./bazelw run //oss/modular/docs:generate-arch-docs`"
+            " to regenerate.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

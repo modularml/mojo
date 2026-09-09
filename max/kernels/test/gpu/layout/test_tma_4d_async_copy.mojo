@@ -13,10 +13,10 @@
 
 from std.sys import size_of
 
-from std.gpu import barrier
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, grid_dim, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import block_idx, grid_dim, thread_idx
 from layout import IntTuple, Layout, LayoutTensor
 from layout._fillers import arange
 from layout._utils import ManagedLayoutTensor
@@ -27,7 +27,7 @@ from layout.tma_async import (
     _idx_product,
     create_tensor_tile,
 )
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_equal
 
 from std.utils.index import Index, IndexList
@@ -63,26 +63,26 @@ def test_tma_4d_load_kernel[
         dst_dim1 == cta_tile_dim3
     ), "dst and cta should have the same last dimension for these test cases"
 
-    smem_tile = LayoutTensor[
+    var smem_tile = LayoutTensor[
         dtype,
         smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
     comptime cta_tile_size = _idx_product[tile_rank, cta_tile_shape]()
     comptime expected_bytes = cta_tile_size * size_of[dtype]()
 
-    mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
-    idx0, idx1 = divmod(block_idx.z, grid_dim1)
-    idx2 = block_idx.y
-    idx3 = block_idx.x
+    var idx0, idx1 = divmod(block_idx.z, grid_dim1)
+    var idx2 = block_idx.y
+    var idx3 = block_idx.x
 
     if thread_idx.x == 0:
         mbar[0].init()
@@ -115,14 +115,14 @@ def test_tma_4d_load_kernel[
     comptime dst_tile_size = dst_tile_layout.size()
     comptime DstTileType = LayoutTensor[dtype, dst_tile_layout, MutAnyOrigin]
 
-    local_dst_ptr = dst.ptr + idx * cta_tile_size
+    var local_dst_ptr = dst.ptr + idx * cta_tile_size
 
     for i in range(cta_tile_dim0):
-        smem_tile_i = smem_tile.tile[
+        var smem_tile_i = smem_tile.tile[
             1, cta_tile_dim1, cta_tile_dim2, cta_tile_dim3
         ](i)
 
-        dst_tile = DstTileType(local_dst_ptr + i * dst_tile_size)
+        var dst_tile = DstTileType(local_dst_ptr + i * dst_tile_size)
         if thread_idx.x == 0:
             dst_tile.copy_from(smem_tile_i)
 
@@ -156,7 +156,7 @@ def test_tma_4d_load_row_major[
 
     arange(src.tensor(), start=0, step=0.015625)
 
-    tma_tensor = create_tensor_tile[
+    var tma_tensor = create_tensor_tile[
         Index(cta_tile_dim0, cta_tile_dim1, cta_tile_dim2, cta_tile_dim3),
         swizzle_mode=swizzle_mode,
     ](ctx, src.device_tensor())
@@ -187,8 +187,8 @@ def test_tma_4d_load_row_major[
         block_dim=(1),
     )
 
-    src_host = src.tensor()
-    dst_host = dst.tensor()
+    var src_host = src.tensor()
+    var dst_host = dst.tensor()
 
     comptime swizzle = make_swizzle[dtype, swizzle_mode]()
 
@@ -201,7 +201,7 @@ def test_tma_4d_load_row_major[
 
     comptime desc_tile_size = desc_tile_dim1 * desc_tile_dim2 * desc_tile_dim3
 
-    desc_tile = LayoutTensor[
+    var desc_tile = LayoutTensor[
         dtype,
         Layout.row_major(desc_tile_dim1, desc_tile_dim2, desc_tile_dim3),
         MutAnyOrigin,
@@ -231,7 +231,7 @@ def test_tma_4d_load_row_major[
                                     desc_tile.copy_from(src_tile)
 
                                     for i in range(desc_tile_size):
-                                        desc_idx = swizzle(i)
+                                        var desc_idx = swizzle(i)
                                         assert_equal(
                                             desc_tile.ptr[desc_idx], dest_ptr[i]
                                         )

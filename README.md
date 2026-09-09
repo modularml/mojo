@@ -1,7 +1,7 @@
 <!-- rumdl-disable-file MD033 MD041 MD075 -->
 
 <div align="center">
-    <img src="https://modular-assets.s3.amazonaws.com/images/modular_github_logo_bg.png">
+    <img src="https://modular-assets.s3.us-east-1.amazonaws.com/images/modular-banner-github.png">
 
 [About Modular] | [MAX docs] | [Mojo docs] | [Contributing]
 
@@ -9,234 +9,86 @@
 
 ---
 
-🤝 Join our [monthly community meetings][public-com-meet-doc]!
-
 # Modular Platform
 
-> A unified platform for AI development and deployment, including **MAX**🧑‍🚀 and
-**Mojo**🔥.
-
-The Modular Platform is an open and fully-integrated suite of AI libraries
-and tools that accelerates model serving and scales GenAI deployments. It
-abstracts away hardware complexity so you can run the most popular open
-models with industry-leading GPU and CPU performance without any code changes.
-
-<!-- github caches images aggressively, use a query parameter for cache busting  -->
-
-![](https://docs.modular.com/images/modular-container-stack.png?20260513)
+This repo hosts open-source components of the Modular Platform,
+a unified platform for AI development and deployment,
+including the **MAX Framework**🧑‍🚀 and the **Mojo Language**🔥.
 
 ## Get started
 
-You don't need to clone this repo.
-
-You can install Modular using a `pip` or `conda` package manager like
-`uv` or `pixi` and then start an OpenAI-compatible endpoint with a model
-of your choice.
-
 To get started with the Modular Platform and serve a model using the MAX
-framework, see [the quickstart guide](https://docs.modular.com/max/get-started).
+framework, see
+[the MAX quickstart guide](https://max.modular.com/get-started).
 
-> [!NOTE]
-> **Nightly vs. stable releases**
-> If you cloned the repo and want a stable release, run
-  `git checkout max/vX.X` to match the version.
-
-> The `main` branch tracks nightly builds.
->
-> For more information, see [Branches](#branches).
-
-After your model endpoint is up and running, you can start sending the model
-inference requests using
-[our OpenAI-compatible REST API](https://docs.modular.com/max/rest-api/).
-
-Explore all the models you can deploy with Modular in our
-[Model Library](https://www.modular.com/models).
-
-## Deploy our container
-
-The MAX container is our Kubernetes-compatible Docker container for convenient
-deployment, which uses the MAX framework's built-in inference server. We have
-separate containers for NVIDIA and AMD GPU environments, and a unified container
-that works with both.
-
-For example, you can start a container for an NVIDIA GPU with this command:
-
-```sh
-docker run --gpus=1 \
-    -v ~/.cache/huggingface:/root/.cache/huggingface \
-    -p 8000:8000 \
-    modular/max-nvidia-full:latest \
-    --model google/gemma-3-27b-it
-```
-
-For more information, see our [MAX container
-docs](https://docs.modular.com/max/container) or the [Modular Docker Hub
-repository](https://hub.docker.com/u/modular).
-
-## Get started with Mojo
-
-You don't need to clone this repo to get started with Mojo.
-
-To install Mojo and get started learning the language, see the
-[Mojo quickstart](https://mojolang.org/docs/manual/quickstart/). The
-[Mojo site](https://mojolang.org/) also features a comprehensive language guide
-with tutorials, a language reference, and API references.
+To get started with the Mojo language, see
+[the Mojo quickstart guide](https://mojolang.org/docs/manual/quickstart/).
 
 ## About the repo
 
 We're constantly open-sourcing more of the Modular Platform and you can find
-all of it in here. As of May, 2025, this repo includes over 450,000 lines of
-code from over 6000 contributors, providing developers with production-grade
-reference implementations and tools to extend the Modular Platform with new
-algorithms, operations, and hardware targets.
+all of it in here.
 
-It's quite likely **the world's largest repository of open source CPU and GPU
-kernels**!
+The main components include:
 
-Highlights include:
-
-- Mojo standard library: [/mojo/stdlib](mojo/stdlib)
-- MAX GPU and CPU kernels: [/max/kernels](/max/kernels) (Mojo kernels)
+- Mojo compiler: [/Mojo](/Mojo)
+- Mojo standard library: [/Mojo/stdlib](/Mojo/stdlib)
+- MAX accelerator library: [/max/kernels](/max/kernels)
 - MAX inference server: [/max/python/max/serve](/max/python/max/serve)
   (OpenAI-compatible endpoint)
 - MAX model pipelines: [/max/python/max/pipelines](/max/python/max/pipelines)
   (Python-based graphs)
 - Code examples: [/max/examples](/max/examples) +
-  [/mojo/examples](mojo/examples)
-
-### Branches
-
-- The [`main`](https://github.com/modular/modular/tree/main) branch is in sync
-  with the nightly build and subject to new bugs. Use this branch for
-  [contributions](./CONTRIBUTING.md).
-
-- MAX release branches are named `max/vX.X`.
-
-- Mojo release branches are named `mojo/vX.X.X` (Mojo uses the
-  [PEP 440](https://peps.python.org/pep-0440/) version scheme).
-
-- For stable releases prior to MAX 26.3 / Mojo 1.0.0b1, combined MAX/Mojo
-  release branches are named `modular/vX.X`.
+  [/Mojo/examples](/Mojo/examples)
 
 ## Contribute
 
-We accept contributions to the [Mojo standard library](./mojo), [MAX AI
-kernels](./max/kernels), [MAX model
+We accept contributions to the [Mojo standard library](./mojo), [MAX
+accelerator library](./max/kernels), [MAX model
 architectures](/max/python/max/pipelines/architectures), code examples, Mojo
-docs, and more.
+docs, and more. We aren't accepting contributions to the Mojo compiler yet.
 
 First, please read the [Contribution Guide](./CONTRIBUTING.md), and then refer
 to the following documentation about how to develop in the repo:
 
 - [`/max/docs`](/max/docs): Docs for developers working in the MAX framework
   codebase.
-- [`/mojo/stdlib/docs`](/mojo/stdlib/docs): Docs for developers working in the
+- [`/Mojo/docs/stdlib`](/Mojo/docs/stdlib): Docs for developers working in the
   Mojo standard library.
 
 We also welcome your bug reports. If you have a bug, please [file an issue
 here](https://github.com/modular/modular/issues/new/choose).
 
-## News & Announcements
+## License
 
-**[2026/3]** [Modular Platform 26.2][26.2] delivers state-of-the-art image
-generation with over 4x speedup on FLUX.2 models, expanded hardware support for
-NVIDIA B300, Jetson Thor, DGX Spark, and AMD RDNA consumer GPUs, and Mojo
-language upgrades that make it easier to write GPU kernels with AI coding
-agents.
+This repository and its contributions are licensed under the Apache License v2.0
+with LLVM Exceptions. See [LICENSE](LICENSE).
 
-**[2026/2]** We announced that [BentoML is joining Modular][bentoml-joins].
-We are committed to building in the open and will be extending our support
-of open source AI with [Bento's own open project][bentoml-github].
-Read the answers in our [February 2026 AMA][bentoml-joins-ama] to learn more
-about our plans.
+MAX usage and distribution are licensed under the
+[Modular Community License](https://www.modular.com/legal/community).
 
-**[2026/1]** [Modular Platform 26.1][26.1] graduates the MAX Python API out of
-experimental with PyTorch-like eager mode and model.compile() for production,
-stabilizes the MAX LLM Book, and expands Apple silicon GPU support. Mojo gains
-compile-time reflection, linear types, typed errors, and improved error messages
-as it progresses toward 1.0.
+### Third party licenses
 
-**[2025/12]** [The Path to Mojo 1.0][mojo-1.0] was officially announced
-with a planned release in H1 2026 and tons of details on what to expect.
-
-**[2025/12]** We hosted our [Inside the MAX Framework Meetup][dec-meetup]
-reintroducing the MAX framework and taking the community through upcoming
-changes.
-
-**[2025/11]** [Modular Platform 25.7][25.7] provides a fully open MAX Python
-API, expanded hardware support for NVIDIA Grace superchips, improved Mojo GPU
-programming experience, and much more.
-
-**[2025/11]** We met with the community at
-[PyTorch 2025 + the LLVM Developers' Meeting][pytorch-llvm] to solicit
-community input into how the Modular platform can reduce fragmentation and
-provide a unified AI stack.
-
-**[2025/09]** [Modular raises \$250M][250-funding] to scale AI's unified compute
-layer, bringing Modular's total raise to $380M at a $1.6B valuation.
-
-**[2025/09]** [Modular Platform 25.6][25.6] delivers a unified compute layer
-spanning from laptops to datacenter GPUs, with industry-leading throughput on
-NVIDIA Blackwell (B200) and AMD MI355X.
-
-**[2025/08]** [Modular Platform 25.5][25.5] introduces Large Scale Batch
-Inference through a partnership with SF Compute + open source launch of the
-MAX Graph API and more.
-
-**[2025/08]** We hosted our [Los Altos Meetup][la-meetup] featuring talks from
-Chris Lattner on democratizing AI compute and Inworld AI on production voice AI.
-
-**[2025/06]** [AMD partnership announced][amd] — Modular Platform now generally
-available across AMD's MI300 and MI325 GPU portfolio.
-
-**[2025/06]** [Modular Hack Weekend][hack-weekend] brought developers together
-to build custom kernels, model architectures, and PyTorch custom ops with
-Mojo and MAX.
-
-**[2025/05]** Over 100 engineers gathered at AGI House for our first
-[GPU Kernel Hackathon][hackathon], featuring talks from Modular and
-Anthropic engineers.
-
----
+You are entirely responsible for checking and validating the licenses of third
+parties (for example, Hugging Face) for related software and libraries that are
+downloaded.
 
 ## Community & Events
 
-We host regular meetups digitally and around the world. During these meetups
-we share updates from the Modular team, feature community contributions, and
-invite guest speakers to share their expertise, as well as answer community
-questions.
-
-Join us!
+Get help from community members, tune in for a community meeting, or join a
+local meetup.
 
 | Channel               | Link                                            |
 |-----------------------|-------------------------------------------------|
 | 💬 Discord            | [discord.gg/modular][discord]                   |
 | 💬 Forum              | [forum.modular.com][forum]                      |
 | 📅 Meetup Group       | [meetup.com/modular-meetup-group][meetup-group] |
-| 🎥 Community Meetings | [Upcoming community calls][public-com-meet-doc] |
+| 🎦 Community Meetings | [Upcoming community calls][public-com-meet-doc] |
+| 📺 YouTube            | [youtube.com/@modularinc][youtube]              |
 
 **Upcoming events** will be posted on our [Meetup page][meetup-group] and
 [Discord][discord]. Community meeting recordings will be posted on our
 [YouTube][youtube].
-
-## Contact us
-
-If you'd like to chat with the team and other community members, please send a
-message to our [Discord channel](https://discord.gg/modular) and [our
-forum board](https://forum.modular.com/).
-
-## License
-
-This repository and its contributions are licensed under the Apache License v2.0
-with LLVM Exceptions (see the LLVM [License](https://llvm.org/LICENSE.txt)).
-Modular, MAX and Mojo usage and distribution are licensed under the
-[Modular Community License](https://www.modular.com/legal/community).
-
-### Third party licenses
-
-You are entirely responsible for checking and validating the licenses of third
-parties (i.e. Huggingface) for related software and libraries that are
-downloaded.
 
 ## Thanks to our contributors
 
@@ -248,31 +100,13 @@ downloaded.
 
 <!-- Header navigation links -->
 [About Modular]: https://www.modular.com/
-[MAX docs]: https://docs.modular.com/
+[MAX docs]: https://max.modular.com/
 [Contributing]: ./CONTRIBUTING.md
 [Mojo docs]: https://mojolang.org/docs/
-
-<!-- News & Announcements links -->
-[public-com-meet-doc]: https://modul.ar/community-meeting-doc
-[bentoml-github]: https://github.com/bentoml/BentoML
-[bentoml-joins-ama]: https://forum.modular.com/t/modular-has-acquired-bentoml-ask-us-anything/2706/1
-[bentoml-joins]: https://www.modular.com/blog/bentoml-joins-modular
-[26.2]: https://www.modular.com/blog/modular-26-2-state-of-the-art-image-generation-and-upgraded-ai-coding-with-mojo
-[26.1]: https://www.modular.com/blog/modular-26-1-a-big-step-towards-more-programmable-and-portable-ai-infrastructure
-[mojo-1.0]: https://www.modular.com/blog/the-path-to-mojo-1-0
-[dec-meetup]: https://www.youtube.com/live/WK5dVQ8vhbU?si=Fjde8j_50V4bwiAv
-[25.7]: https://www.modular.com/blog/modular-25-7-faster-inference-safer-gpu-programming-and-a-more-unified-developer-experience
-[250-funding]: https://www.modular.com/blog/modular-raises-250m-to-scale-ais-unified-compute-layer
-[pytorch-llvm]: https://www.modular.com/blog/pytorch-and-llvm-in-2025-keeping-up-with-ai-innovation
-[25.6]: https://www.modular.com/blog/modular-25-6-unifying-the-latest-gpus-from-nvidia-amd-and-apple
-[25.5]: https://www.modular.com/blog/modular-platform-25-5
-[la-meetup]: https://lu.ma/modular-aug-meetup
-[amd]: https://www.modular.com/blog/modular-x-amd-unleashing-ai-performance-on-amd-gpus
-[hack-weekend]: https://www.meetup.com/modular-meetup-group/events/308311461/
-[hackathon]: https://www.modular.com/blog/modverse-48
 
 <!-- Community & Events links -->
 [discord]: https://discord.gg/modular
 [forum]: https://forum.modular.com/
 [meetup-group]: https://www.meetup.com/modular-meetup-group/
 [youtube]: https://www.youtube.com/@modularinc
+[public-com-meet-doc]: https://modul.ar/community-meeting-doc

@@ -14,12 +14,12 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.types import (
+from max.pipelines.context import (
     GenerationStatus,
     LogProbabilities,
-    RequestID,
     TextGenerationOutput,
 )
+from max.pipelines.modeling.types import RequestID
 
 
 def _log_probs(i: int) -> LogProbabilities:

@@ -18,9 +18,9 @@ from std.time import (
     time_function,
 )
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
-from std.gpu.intrinsics import *
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
+from max.gpu.intrinsics import *
 from std.testing import *
 
 

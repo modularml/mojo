@@ -24,7 +24,7 @@ def _get_pipelines_binary() -> str:
     """Get the path to the pipelines binary from runfiles."""
     runfiles = python.runfiles.Create()
     assert runfiles is not None, "Unable to find runfiles tree"
-    loc = runfiles.Rlocation("_main/max/python/max/entrypoints/pipelines")
+    loc = runfiles.Rlocation("_main/max/python/max/_entrypoints/pipelines")
     assert loc is not None, "Unable to find pipelines entrypoint"
     return loc
 
@@ -68,7 +68,7 @@ def test_warm_cache_target_cuda() -> None:
 
     # Verify compilation succeeded (warm-cache doesn't print completion message, just exits)
     # Check that we got past initialization
-    assert "Building and compiling model" in result.stderr, (
+    assert "Building, compiling, and initializing model" in result.stderr, (
         "Model compilation did not start"
     )
 
@@ -111,7 +111,7 @@ def test_warm_cache_target_cuda_default() -> None:
     ), "Default sm_80 architecture not used"
 
     # Verify compilation succeeded
-    assert "Building and compiling model" in result.stderr, (
+    assert "Building, compiling, and initializing model" in result.stderr, (
         "Model compilation did not start"
     )
 
@@ -153,7 +153,7 @@ def test_warm_cache_target_hip() -> None:
     )
 
     # Verify compilation succeeded
-    assert "Building and compiling model" in result.stderr, (
+    assert "Building, compiling, and initializing model" in result.stderr, (
         "Model compilation did not start"
     )
 
@@ -198,6 +198,6 @@ def test_warm_cache_target_multiple_gpus() -> None:
     ), "Target compilation message not found"
 
     # Verify compilation succeeded
-    assert "Building and compiling model" in result.stderr, (
+    assert "Building, compiling, and initializing model" in result.stderr, (
         "Model compilation did not start"
     )

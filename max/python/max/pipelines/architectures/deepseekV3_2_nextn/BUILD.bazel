@@ -1,0 +1,23 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "deepseekV3_2_nextn",
+    srcs = glob(["**/*.py"]),
+    ignore_extra_deps = [
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+    ],
+    deps = [
+        requirement("transformers"),
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+        "//max/python/max/pipelines/architectures/deepseekV3",
+        "//max/python/max/pipelines/architectures/deepseekV3_2",
+        "//max/python/max/pipelines/lib",
+    ],
+)

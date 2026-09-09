@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.collections import InlineArray
+from std.collections import Array
 from layout.layout_tensor import LayoutTensorIter
 from layout import *
 from layout._fillers import arange
@@ -533,13 +533,13 @@ def test_blocked_product() raises:
     assert_equal(String(bp0), "(((2, 3), (5, 4)):((5, 10), (1, 30)))")
     var cm_M = 8
     var cm_K = 8
-    core_matrix = Layout.row_major(cm_M, cm_K)
+    var core_matrix = Layout.row_major(cm_M, cm_K)
     var t_M = 2
     var t_K = 3
     var bp1 = blocked_product(core_matrix^, Layout.col_major(t_M, t_K))
     # ((cm_M,         t_M), (cm_K,               t_K)):
     # ((cm_K, cm_M * cm_K), (1,    t_M * cm_M * cm_K))
-    reference_bp1 = Layout(
+    var reference_bp1 = Layout(
         IntTuple(IntTuple(cm_M, t_M), IntTuple(cm_K, t_K)),
         IntTuple(IntTuple(cm_K, cm_M * cm_K), IntTuple(1, t_M * cm_M * cm_K)),
     )
@@ -638,10 +638,10 @@ def test_zipped_divide() raises:
     assert_equal(String(zd0), "(((2, 2), (2, 2)):((4, 1), (8, 2)))")
 
     # Resemble the case for distributing a tile over warp group.
-    tile_layout = Layout(
+    var tile_layout = Layout(
         IntTuple(IntTuple(16, 64), 4), IntTuple(IntTuple(128, 2), 2048)
     )
-    thread_layout = Layout(
+    var thread_layout = Layout(
         IntTuple(IntTuple(8, 4), 4), IntTuple(IntTuple(4, 1), 32)
     )
     assert_equal(
@@ -899,7 +899,7 @@ def test_arange_nested_layout() raises:
     """Test arange function with nested layout structures."""
     # Test nested layout with tile structure similar to GPU shared memory tiles
     var nested_tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(
             IntTuple(IntTuple(16, 8), IntTuple(32, 2)),
             IntTuple(IntTuple(32, 1024), IntTuple(1, 512)),
@@ -911,7 +911,7 @@ def test_arange_nested_layout() raises:
 
     # Test simple 2D layout with row-major for comparison
     var simple_tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout.row_major(4, 4),
         MutAnyOrigin,
     ].stack_allocation()
@@ -929,7 +929,7 @@ def test_arange_nested_layout() raises:
 
     # Test column-major layout
     var col_major_tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout.col_major(4, 4),
         MutAnyOrigin,
     ].stack_allocation()
@@ -947,18 +947,17 @@ def test_layout_tensor_iterator_print() raises:
     """Test case for MSTDL-1984: Tensors generated from LayoutTensorIter won't print.
     """
     comptime buf_size = 16
-    var storage = InlineArray[Int16, buf_size](uninitialized=True)
-    for i in range(buf_size):
-        storage[i] = Int16(i)
+    var storage = Array[Int16, buf_size](
+        fill_with=lambda (i: Int) -> Int16: Int16(i)
+    )
     comptime tile_layout = Layout.row_major(2, 2)
     var iter = LayoutTensorIter[
         DType.int16,
         tile_layout,
-        MutAnyOrigin,
         masked=True,
     ](storage.unsafe_ptr(), buf_size)
 
-    for i in range(ceildiv(buf_size, comptime (tile_layout.size()))):
+    for _i in range(ceildiv(buf_size, comptime (tile_layout.size()))):
         var tile = iter[]
         # CHECK: 0 1
         # CHECK-NEXT: 2 3

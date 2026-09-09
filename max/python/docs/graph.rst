@@ -31,6 +31,18 @@ Graph construction
 
    Graph
    KernelLibrary
+   Module
+
+Custom extensions
+-----------------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated
+   :template: autosummary/function.rst
+
+   default_custom_extensions
+   default_custom_extensions_scope
 
 Graph values
 ------------

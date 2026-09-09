@@ -74,8 +74,8 @@ class _AsciiTokenizer:
 def test_structured_output_pipeline_e2e() -> None:
     """End-to-end: GPU argmax -> D2H -> FSM update -> H2D -> masked argmax."""
     accelerator = Accelerator()
-    if accelerator.api != "cuda":
-        pytest.skip("Requires CUDA accelerator")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("Requires CUDA/HIP accelerator")
 
     gpu_ref = DeviceRef.from_device(accelerator)
     cpu_ref = DeviceRef.CPU()

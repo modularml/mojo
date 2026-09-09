@@ -16,7 +16,7 @@ file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_rms_norm_rope.mojo
 
 params:
 
-# JSC-18 shapes from mo.reduce.rms_norm.RoPE ops (batch=32, heads=12, head_dim=128)
+# JSC-18 shapes from mo.composite.rms_norm_rope ops (batch=32, heads=12, head_dim=128)
 # query: [batch=32, seq=2048, heads=12, head_dim=128]
 - shape: 32x2048x12x128
 # key:   [batch=32, seq=2048+window=4096, heads=12, head_dim=128]

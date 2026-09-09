@@ -11,21 +11,21 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Entry point into _bgrec.recorder_main.
+"""Entry point into ``bgrec.recorder_main``.
 
-This exists because _bgrec itself can't be used as an entry point without
+This exists because ``bgrec`` itself can't be used as an entry point without
 causing this warning:
 
-    <frozen runpy>:128: RuntimeWarning: 'max.profiler.gpu._bgrec' found in
+    <frozen runpy>:128: RuntimeWarning: 'max.profiler.gpu.bgrec' found in
     sys.modules after import of package 'max.profiler.gpu', but prior to
-    execution of 'max.profiler.gpu._bgrec'; this may result in unpredictable
+    execution of 'max.profiler.gpu.bgrec'; this may result in unpredictable
     behaviour
 
-This is because _bgrec is imported by __init__, but we need that, so this
-module exists as an entry point that isn't imported by __init__.
+This is because ``bgrec`` is imported by ``__init__``, but we need that, so
+this module exists as an entry point that isn't imported by ``__init__``.
 """
 
-from ._bgrec import recorder_main
+from .bgrec import recorder_main
 
 if __name__ == "__main__":
     recorder_main()

@@ -1,0 +1,327 @@
+---
+title: Video generation
+description: Generate videos from text prompts or animate existing images using the MAX v1/responses endpoint
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import InstallMAX from '../_includes/install-modular.mdx';
+import InstallOpenAI from '../_includes/install-openai.mdx';
+import Requirements from '@site/src/components/Requirements';
+import { requirementsWithGPU } from '../requirements';
+
+With MAX, you can deploy open-source video generation models on your local
+system or in the cloud and send inference requests with our REST API.
+This page explains how to use the
+[`v1/responses`](/rest-api/create-response/) endpoint to generate
+videos from text prompts or animate existing images.
+
+## Endpoint
+
+The MAX [`v1/responses`](/rest-api/create-response/) endpoint provides a
+unified interface for diverse AI tasks including video generation. It's built on
+[Open Responses](https://huggingface.co/blog/open-responses), an open-source
+initiative to create a standardized, provider-agnostic API specification. The
+examples below show the request and response format. To try it yourself, see the
+[quickstart](#quickstart).
+
+### Text input
+
+For text-to-video generation, set `input` to a plain string describing the
+video you want. The model returns the generated video as base64-encoded mp4
+data in `output[0].content[0].video_data` when `response_format` is
+`b64_json`:
+
+<Tabs>
+<TabItem value="python" label="Python">
+
+```python
+response = client.responses.create(
+    model="Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+    input="A campfire crackles in a forest clearing at night, sparks spiraling upward into a star-filled sky",
+    extra_body={
+        "provider_options": {
+            "video": {
+                "height": 512,
+                "width": 512,
+                "steps": 28,
+                "num_frames": 81,
+                "frames_per_second": 16,
+                "response_format": "b64_json"
+            }
+        }
+    }
+)
+
+video_data = response.output[0].content[0].video_data
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+```bash
+curl -X POST http://localhost:8000/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+    "input": "A campfire crackles in a forest clearing at night, sparks spiraling upward into a star-filled sky",
+    "provider_options": {
+      "video": {
+        "height": 512,
+        "width": 512,
+        "steps": 28,
+        "num_frames": 81,
+        "frames_per_second": 16,
+        "response_format": "b64_json"
+      }
+    }
+  }' | jq -r '.output[0].content[0].video_data' | base64 -d > output.mp4
+```
+
+</TabItem>
+</Tabs>
+
+### Response format
+
+Video output supports two delivery formats, set via
+`provider_options.video.response_format`:
+
+| Value      | Description                                                                                                                                               |
+|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `url`      | **(Default)** The server saves the video to a temporary file and returns a URL at `/v1/videos/{video_id}/content`. Download with a second `GET` request.  |
+| `b64_json` | The server encodes the video as base64 mp4 and returns it inline in `output[0].content[0].video_data`. No second request required.                        |
+
+To download a URL-format response:
+
+```python
+import urllib.request
+
+video_url = response.output[0].content[0].video_url
+urllib.request.urlretrieve(f"http://localhost:8000{video_url}", "output.mp4")
+```
+
+### Provider options
+
+The `provider_options` argument is an extension point in the Open Responses
+spec that lets each API provider expose parameters beyond the standard request
+fields.
+MAX uses it to surface video generation controls such as dimensions, frame
+count, and denoising steps.
+
+The following are some commonly used parameters under `provider_options.video`.
+This is not an exhaustive list. For the complete reference, see
+[`provider_options`](/rest-api/create-response/#POST/v1/responses.body.provider_options).
+
+| Parameter           | Type    | Default       | Description                                                                                                                                  |
+|---------------------|---------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `height`            | integer | model default | Output height in pixels.                                                                                                                     |
+| `width`             | integer | model default | Output width in pixels.                                                                                                                      |
+| `num_frames`        | integer | model default | Number of frames to generate. Total duration equals `num_frames / frames_per_second`.                                                        |
+| `frames_per_second` | integer | `16`          | Frame rate for the output video.                                                                                                             |
+| `steps`             | integer | model default | Number of denoising steps. More steps generally produce higher quality but take longer.                                                      |
+| `guidance_scale`    | number  | `3.5`         | How closely the output follows the prompt. Higher values (7–10) increase prompt adherence; lower values (1–3) allow more creative variation. |
+| `negative_prompt`   | string  | `null`        | Content to avoid in the output.                                                                                                              |
+| `response_format`   | string  | `url`         | Output delivery format: `url` returns a download link; `b64_json` returns the video inline in `output[0].content[0].video_data`.             |
+
+**Duration**: total video length is `num_frames / frames_per_second`. At the
+default 16 fps, 81 frames yields approximately 5 seconds of video.
+
+**Negative prompts**: use `negative_prompt` to steer the model away from
+unwanted content, for example `"blurry, low quality, static, no motion"`. Keep
+the description of what you don't want in this field rather than embedding it
+in the main prompt.
+
+If you encounter memory errors, try reducing output dimensions or the number of
+frames:
+
+```json
+"provider_options": {"video": {"height": 480, "width": 480, "num_frames": 49}}
+```
+
+For advanced parameters including `guidance_scale_2`, `true_cfg_scale`,
+`cfg_normalization`, `cfg_truncation`, and `residual_threshold`, see the
+[`/v1/responses` API reference](/rest-api/create-response/).
+
+## Quickstart
+
+In this quickstart, learn how to set up and run
+[Wan2.2-T2V-A14B-Diffusers](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers)
+for text-to-video generation.
+
+:::caution GPU required
+
+To run Wan2.2-T2V-A14B-Diffusers, your system must have a [compatible
+GPU](/packages#gpu-compatibility) with sufficient GPU RAM. Video generation
+is GPU-intensive and typically takes several minutes per clip on a single GPU.
+
+:::
+
+System requirements:
+
+<Requirements requirementsData={requirementsWithGPU}
+url="/packages#system-requirements" />
+
+### Set up your environment
+
+Create a Python project to install our APIs and CLI tools:
+
+<InstallMAX folder="video-generation-quickstart" />
+
+### Serve your model
+
+First, enable the `v1/responses` endpoint by setting the `MAX_SERVE_API_TYPES`
+[environment variable](/environment-variables):
+
+```bash
+export MAX_SERVE_API_TYPES='["responses"]'
+```
+
+Then, use the [`max serve`](/cli/serve) command to start a local model
+server:
+
+```bash
+max serve \
+  --model Wan-AI/Wan2.2-T2V-A14B-Diffusers
+```
+
+The endpoint is ready when you see this message printed in your terminal:
+
+```output
+Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+For a complete list of `max` CLI commands and options, refer to the
+[MAX CLI reference](/cli).
+
+### Generate a video from text
+
+Send a request to `Wan-AI/Wan2.2-T2V-A14B-Diffusers` and retrieve a
+base64-encoded mp4 in response.
+
+<Tabs>
+<TabItem value="python" label="Python">
+
+You can use OpenAI's Python client to interact with the video generation model.
+First, install the OpenAI SDK:
+
+<InstallOpenAI />
+
+Then, create a client and make a request to the model:
+
+```python title="generate-video.py"
+import base64
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="EMPTY")
+
+response = client.responses.create(
+    model="Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+    input="A campfire crackles in a forest clearing at night, sparks spiraling upward into a star-filled sky",
+    extra_body={
+        "provider_options": {
+            "video": {
+                "height": 512,
+                "width": 512,
+                "steps": 28,
+                "num_frames": 81,
+                "frames_per_second": 16,
+                "response_format": "b64_json"
+            }
+        }
+    }
+)
+
+video_data = response.output[0].content[0].video_data
+with open("output-text-to-video.mp4", "wb") as f:
+    f.write(base64.b64decode(video_data))
+```
+
+Run the script to generate the video:
+
+```bash
+python generate-video.py
+```
+
+The model saves the generated video to `output-text-to-video.mp4` in your
+current directory.
+
+Your output should look similar to the following:
+
+<figure>
+  <video
+    src={require('./images/video-generation/output-text-to-video.mp4').default}
+    autoPlay loop muted playsInline width="400"
+  />
+  <figcaption><b>Figure 1.</b> Text-to-video output: a campfire crackling in a forest clearing at night.</figcaption>
+</figure>
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+Send a request to the `v1/responses` endpoint and decode the base64-encoded
+video data from the response:
+
+```bash
+curl -X POST http://localhost:8000/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+    "input": "A campfire crackles in a forest clearing at night, sparks spiraling upward into a star-filled sky",
+    "provider_options": {
+      "video": {
+        "height": 512,
+        "width": 512,
+        "steps": 28,
+        "num_frames": 81,
+        "frames_per_second": 16,
+        "response_format": "b64_json"
+      }
+    }
+  }' | jq -r '.output[0].content[0].video_data' | base64 -d > output-text-to-video.mp4
+```
+
+Your output should look similar to the following:
+
+<figure>
+  <video
+    src={require('./images/video-generation/output-text-to-video.mp4').default}
+    autoPlay loop muted playsInline width="400"
+  />
+  <figcaption><b>Figure 1.</b> Text-to-video output: a campfire crackling in a forest clearing at night.</figcaption>
+</figure>
+
+</TabItem>
+</Tabs>
+
+## Model modalities
+
+MAX supports the
+[Wan 2.2 Diffusers](https://huggingface.co/collections/Wan-AI/wan22-diffusers)
+model family for video generation. Models in this family differ in what input
+they accept. Choosing the wrong model for your input type causes a runtime
+error, so it's worth understanding the three modalities before serving a model:
+
+- **T2V (text-to-video)**: accepts a text prompt only and generates video from
+  scratch. Examples: `Wan2.2-T2V-*`.
+- **I2V (image-to-video)**: requires a still image plus a text prompt describing
+  the desired motion. Sending a text-only request to an I2V model causes a
+  tensor shape mismatch error at runtime. Examples: `Wan2.2-I2V-*`.
+- **TI2V (text-and-image-to-video)**: accepts either a text prompt alone or a
+  text prompt with an image. Use this modality when you want a single deployment
+  that handles both workflows. Examples: `Wan2.2-TI2V-*`.
+
+For the full list of supported video generation models, see
+[Supported models](/models).
+
+## Next steps
+
+Now that you can generate videos, explore other inference capabilities and
+deployment options.
+
+- [Image generation](/serve/image-generation): Generate images from
+  text prompts or transform existing images using the MAX v1/responses endpoint.
+- [Image and video to text](/serve/image-to-text): Use the MAX chat
+  completions endpoint with image or video input to generate descriptions and
+  answer questions about visual content.
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.

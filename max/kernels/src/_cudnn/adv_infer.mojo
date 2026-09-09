@@ -589,7 +589,7 @@ def cudnnSetSeqDataDescriptor(
 
 def cudnnCreateSeqDataDescriptor(
     seq_data_desc: UnsafePointer[
-        UnsafePointer[cudnnSeqDataStruct, ExternalOrigin[mut=True]], _
+        UnsafePointer[cudnnSeqDataStruct, UntrackedOrigin[mut=True]], _
     ],
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
@@ -609,7 +609,7 @@ def cudnnGetRNNPaddingMode(
 
 
 comptime cudnnAttnDescriptor_t = UnsafePointer[
-    cudnnAttnStruct, ExternalOrigin[mut=True]
+    cudnnAttnStruct, UntrackedOrigin[mut=True]
 ]
 
 comptime cudnnAttnQueryMap_t = Int16

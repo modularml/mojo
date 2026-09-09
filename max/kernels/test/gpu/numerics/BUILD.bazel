@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_filecheck_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -6,6 +7,7 @@ package(default_visibility = ["//max:consumers"])
     mojo_filecheck_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         tags = ["gpu"],
         target_compatible_with = ["//:h100_gpu"],
         deps = [
@@ -22,6 +24,7 @@ package(default_visibility = ["//max:consumers"])
 mojo_filecheck_test(
     name = "test_fp8fnuz_amd.mojo.test",
     srcs = ["test_fp8fnuz_amd.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = [
         "gpu",
         "manual",  # TODO(KERN-1377)
@@ -36,6 +39,7 @@ mojo_filecheck_test(
     mojo_filecheck_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + select({
             "//:h100_gpu": ["//:h100_gpu"],
@@ -55,6 +59,7 @@ mojo_filecheck_test(
 mojo_filecheck_test(
     name = "test_e4m3fn_to_e4m3fnuz_conversion.mojo.test",
     srcs = ["test_e4m3fn_to_e4m3fnuz_conversion.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = ["gpu"],
     target_compatible_with = ["//:amd_gpu"],
     deps = [
@@ -67,6 +72,7 @@ mojo_filecheck_test(
     mojo_filecheck_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         tags = ["gpu"],
         target_compatible_with = ["//:b200_gpu"],
         deps = [

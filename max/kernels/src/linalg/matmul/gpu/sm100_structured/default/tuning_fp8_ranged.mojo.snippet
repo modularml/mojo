@@ -1,0 +1,11 @@
+TuningConfigSM100(
+    M=[@M],
+    M_end=[@M_END],
+    N=[@N],
+    K=[@K],
+    mma_shape=Index([@TUNE_MMA_M], [@TUNE_MMA_N], mma_k),
+    cta_group=[@TUNE_CTA_GROUP],
+    cluster_shape=Index([@TUNE_CLUSTER_DIM_X], [@TUNE_CLUSTER_DIM_Y], 1),
+    block_swizzle_size=[@TUNE_BLOCK_SWIZZLE_SIZE],
+    rasterize_order=RasterOrder([@TUNE_RASTER_ORDER]),
+)

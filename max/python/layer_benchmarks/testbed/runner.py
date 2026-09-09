@@ -15,11 +15,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Generic
+from typing import Generic, TypeAlias
 
-import torch
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from benchmark_utils import (
     BENCHMARK_NVTX_RANGE,
     BenchmarkStats,
@@ -28,8 +29,8 @@ from benchmark_utils import (
     measure_gpu_latency_cuda_graph,
 )
 from max._core.profiler import Trace
-from max.driver import CPU, Accelerator, Buffer
-from max.engine import InferenceSession
+from max.driver import CPU, Accelerator, Buffer, DLPackArray
+from max.engine import InferenceSession, Model
 from max.profiler import set_gpu_profiling_state
 
 from testbed.correctness import CorrectnessResult, compare_outputs
@@ -41,6 +42,16 @@ from testbed.harness import (
     StaticParamsT,
 )
 from testbed.ir_dump import dump_mo_ir
+
+ModelInitializer: TypeAlias = Callable[
+    [InferenceSession, Mapping[str, DLPackArray]], Model
+]
+"""Binds weights onto a model that was compiled elsewhere.
+
+Given the session and the harness's weights registry, returns a model ready to
+execute. Lets a caller substitute a precompiled artifact for the compile the
+harness would otherwise run (see ``docs/internal/CompileOnCpuRunOnGpu.md``).
+"""
 
 
 def create_session(
@@ -61,19 +72,42 @@ class LayerTestRunner(Generic[StaticParamsT, DynamicParamsT, ContextT]):
         harness = AttentionWithRopeHarness(static_params, session, device)
         runner = LayerTestRunner(harness)
         results = runner.benchmark(shapes, iterations=50, warmup=5)
+
+    Args:
+        harness: The layer harness to drive.
+        init_model: Initializes a model compiled elsewhere, in place of the
+            harness's own compile. Pass this to run a graph that was
+            precompiled to a MEF on CPU; ``None`` compiles here.
     """
 
     def __init__(
         self,
         harness: LayerTestHarness[StaticParamsT, DynamicParamsT, ContextT],
+        init_model: ModelInitializer | None = None,
     ) -> None:
         self.harness = harness
+        self._init_model = init_model
         self._bundle: CompiledLayerBundle | None = None
 
     def _ensure_compiled(self) -> CompiledLayerBundle:
         """Compile the layer if not already compiled."""
-        if self._bundle is None:
+        if self._bundle is not None:
+            return self._bundle
+
+        if self._init_model is None:
             self._bundle = self.harness.build_and_compile()
+        else:
+            # The graph itself is already compiled; it's rebuilt only for the
+            # weights registry (and the reference weights a harness stashes
+            # while building), then dropped.
+            _, weights_registry = self.harness.build_graph()
+            self._bundle = CompiledLayerBundle(
+                compiled_model=self._init_model(
+                    self.harness.session, weights_registry
+                ),
+                device=self.harness.device,
+                session=self.harness.session,
+            )
         return self._bundle
 
     @property

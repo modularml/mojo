@@ -17,10 +17,10 @@ need them (`Softmax`, `MaskTileOp`), using TileLayout / `Coord` Layout
 Algebra. Selecting concrete Layout specializations across an `Int` struct
 parameter at the struct field level (rather than a ternary between two
 different `Layout[...]` specializations) avoids the Mojo conditional-type
-unification failure — see `feedback_mojo_conditional_field_type`.
+unification failure: see `feedback_mojo_conditional_field_type`.
 """
 
-from std.gpu import warp_id as get_warp_id
+from max.gpu import warp_id as get_warp_id
 from std.math.uutils import udivmod
 
 
@@ -29,6 +29,10 @@ def get_warp_coords[BN: Int, WN: Int]() -> Tuple[Int, Int]:
     """Return `(warp_row, warp_col)` for the current warp given a BN×WN grid.
 
     Python-style: `var row, col = get_warp_coords[BN, WN]()`.
+
+    Parameters:
+        BN: Block extent along the N dimension of the tile grid.
+        WN: Warp extent along the N dimension of the tile grid.
     """
     comptime num_warps_n = BN // WN
     return udivmod(get_warp_id(), num_warps_n)

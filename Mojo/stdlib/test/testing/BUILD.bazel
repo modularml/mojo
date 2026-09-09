@@ -1,0 +1,54 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//visibility:private"])
+
+_NO_ASAN = [
+    "test_assert_aborts.mojo",
+    "test_assertion.mojo",
+]
+
+_PLATFORM_CONSTRAINTS = {
+    src: select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    })
+    for src in _NO_ASAN
+}
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        target_compatible_with = _PLATFORM_CONSTRAINTS.get(src, []),
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(
+        ["*.mojo"],
+        exclude = ["test_suite_cli.mojo"],
+    )
+]
+
+mojo_test(
+    name = "test_suite_cli.mojo.test",
+    srcs = ["test_suite_cli.mojo"],
+    args = [
+        "--only",
+        "test_passing_1",
+        "test_skipped",
+    ],
+    copts = [
+        "--debug-level",
+        "full",
+    ],
+    deps = [
+        "@mojo//:std",
+        "@mojo//:test_utils",
+    ],
+)

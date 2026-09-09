@@ -9,7 +9,6 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -37,10 +36,34 @@ modular_py_library(
 )
 
 modular_py_test(
+    name = "test_tool_parser",
+    srcs = ["test_tool_parser.py"],
+    deps = [
+        "//max/python/max/_xgrammar",
+        "//max/python/max/pipelines/architectures/glm5_1",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+    ],
+)
+
+modular_py_test(
+    name = "test_tokenizer",
+    srcs = ["test_tokenizer.py"],
+    deps = [
+        "//max/python/max/pipelines/architectures/glm5_1",
+    ],
+)
+
+modular_py_test(
     name = "glm5_1",
     size = "large",
     srcs = glob(
         ["**/test_*.py"],
+        exclude = [
+            "test_tokenizer.py",
+            "test_tool_parser.py",
+        ],
     ) + [
         "conftest.py",
     ],
@@ -67,7 +90,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/deepseekV3_2",
         "//max/python/max/pipelines/kv_cache",
         "//max/tests/integration/test_common:context_utils",
         "//max/tests/integration/test_common:graph_utils",

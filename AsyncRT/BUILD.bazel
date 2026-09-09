@@ -1,0 +1,147 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("//bazel:api.bzl", "modular_cc_library", "modular_shared_library")
+
+# gazelle:default_visibility //AsyncRT:consumers
+# gazelle:default_features layering_check,parse_headers
+
+package(
+    default_visibility = ["//AsyncRT:consumers"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+package_group(
+    name = "consumers",
+    packages = [
+        "//AsyncRT/...",
+        "//Cache/...",
+        "//GraphCompiler/...",
+        "//Init/...",
+        "//MLRT/...",
+        "//Mojo/...",
+        "//Target/...",
+        "//bazel/...",
+        "//max/...",
+        "//utils/...",
+    ],
+)
+
+bool_flag(
+    name = "worker_stats",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "worker_stats_setting",
+    flag_values = {":worker_stats": "true"},
+)
+
+bool_flag(
+    name = "alloc_logging",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "alloc_logging_setting",
+    flag_values = {":alloc_logging": "true"},
+)
+
+modular_cc_library(
+    name = "CompilerSupport",
+    srcs = glob(["lib/CompilerSupport/*.cpp"]),
+    hdrs = glob(["include/AsyncRT/CompilerSupport/*.h"]),
+    includes = ["include"],
+    deps = [
+        ":Runtime",
+        ":Support",
+        "//Support:Base",
+        "//Support:Context",
+        "//Support:MDialect",
+        "//Support:Threading",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_library(
+    name = "Runtime",
+    srcs = glob(["lib/Runtime/*.cpp"]),
+    hdrs = glob([
+        "include/AsyncRT/Runtime/Globals/*.h",
+        "include/AsyncRT/Runtime/*.h",
+    ]) + [
+        "include/AsyncRT/ForwardDecls.h",
+    ],
+    includes = ["include"],
+    local_defines = select({
+        ":worker_stats_setting": ["ASYNCRT_WORKER_STATS=1"],
+        "//conditions:default": ["ASYNCRT_WORKER_STATS=0"],
+    }) + select({
+        ":alloc_logging_setting": ["MODULAR_ALLOC_LOGGING=1"],
+        "//conditions:default": ["MODULAR_ALLOC_LOGGING=0"],
+    }),
+    deps = [
+        ":RuntimeGlobals",
+        ":Support",
+        "//Support:ADT",
+        "//Support:Base",
+        "//Support:ConcurrentAppendingVector",
+        "//Support:Configuration",
+        "//Support:Log",
+        "//Support:MArchTargetMinimal",
+        "//Support:Profiling",
+        "//Support:ProfilingRanges",
+        "//Support:SymbolExport",
+        "//Support:Threading",
+        "//Support:TimeProfiler",
+        "//Support:TypeID",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_shared_library(
+    name = "RuntimeGlobals",
+    srcs = glob(["lib/Runtime/Globals/*.cpp"]),
+    hdrs = glob([
+        "include/AsyncRT/Runtime/Globals/*.h",
+        "include/AsyncRT/Runtime/*.h",
+    ]) + [
+        "include/AsyncRT/ForwardDecls.h",
+    ],
+    includes = ["include"],
+    output_name = "AsyncRTRuntimeGlobals",
+    deps = [
+        ":Support",
+        "//Support:ADT",
+        "//Support:Base",
+        "//Support:BinaryID",
+        "//Support:ConcurrentAppendingVector",
+        "//Support:Configuration",
+        "//Support:MArchTargetMinimal",
+        "//Support:Profiling",
+        "//Support:ProfilingRanges",
+        "//Support:SymbolExport",
+        "//Support:Threading",
+        "//Support:TimeProfiler",
+        "//Support:TypeID",
+        "//bazel/internal:tcmalloc_numa_aware",
+        "//bazel/internal:tcmalloc_want_numa_aware",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "Support",
+    srcs = glob(["lib/Support/*.cpp"]),
+    hdrs = glob(["include/AsyncRT/Support/*.h"]),
+    includes = ["include"],
+    deps = [
+        "//Support:Base",
+        "//Support:MArchTarget",
+        "//Support:MArchTargetMinimal",
+        "//Support:Threading",
+        "@llvm-project//llvm:Support",
+    ],
+)

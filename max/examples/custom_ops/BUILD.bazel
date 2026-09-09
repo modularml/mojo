@@ -95,7 +95,6 @@ mojo_binary(
     srcs = ["benchmarks.mojo"],
     deps = [
         ":kernels",
-        "//max:compiler",
         "//max:extensibility",
         "//max:layout",
         "@mojo//:std",
@@ -107,9 +106,9 @@ mojo_library(
     srcs = [":kernel_sources"],
     validate_missing_docs = False,
     deps = [
-        "//max:compiler",
         "//max:extensibility",
         "//max:layout",
+        "//max:max_mojo",
         "@mojo//:std",
     ],
 )

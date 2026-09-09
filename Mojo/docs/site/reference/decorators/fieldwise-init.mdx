@@ -1,0 +1,121 @@
+---
+title: '@fieldwise_init'
+description: Generates fieldwise initializer for a struct.
+codeTitle: true
+---
+
+You can add the `@fieldwise_init` decorator on a struct to generate the
+field-wise `__init__()` initializer.
+
+For example, consider a simple struct like this:
+
+```mojo
+@fieldwise_init
+struct MyPet:
+    var name: String
+    var age: Int
+```
+
+Mojo sees the `@fieldwise_init` decorator and synthesizes a field-wise
+initializer, the result being as if you had actually written this:
+
+```mojo
+struct MyPet:
+    var name: String
+    var age: Int
+
+    def __init__(out self, var name: String, age: Int):
+        self.name = name^
+        self.age = age
+```
+
+You can synthesize the copy initializer and move initializer by adding the
+`Copyable` trait to your struct. For more information about these
+lifecycle methods, read [Life of a value](/docs/manual/lifecycle/life/).
+
+## Implicit conversion
+
+Implicit conversion lets you pass a value and lets a type build itself, without
+calling the initializer directly. This keeps caller code simple and clean. You
+enable this by marking an initializer as
+[`@implicit`](/docs/reference/decorators/implicit/) or using
+`@fieldwise_init("implicit")` to create one for you.
+
+For example, if `MyStruct` has an initializer that accepts an `Int`, you can
+construct an instance like this:
+
+```mojo
+var an_instance = MyStruct(42)
+```
+
+A function that takes a `MyStruct` will accept that instance, an explicit
+initializer call, or the value that can be converted into one:
+
+```mojo
+some_function(an_instance)      # pass an instance
+some_function(MyStruct(42))     # build one directly
+some_function(42)               # implicit conversion
+```
+
+All three forms create a `MyStruct` for the call. Some may have small
+compile-time or run-time differences.
+
+### Declaring implicit initialization
+
+You can declare implicit initializers in two ways:
+
+- Use `@fieldwise_init("implicit")` to auto-create one, as long as your
+  type has exactly _one_ instance field. This limit applies to the type itself,
+  not just to initializer arguments.
+- Add [`@implicit`](/docs/reference/decorators/implicit/) to an initializer you
+  write. The initializer can accept only one argument.
+
+:::note
+Read more about
+[initializers and implicit conversion](/docs/manual/lifecycle/life/#constructors-and-implicit-conversion).
+:::
+
+### Fieldwise and implicit example
+
+Here is a type that stores an `Int`. It can be created with an integer
+or from any value that can be floored and converted to an integer.
+It uses `@fieldwise_init("implicit")` for integers and creates
+an `@implicit` initializer for other values:
+
+```mojo
+from std.math import Floorable, floor
+
+# Creates an implicit initializer and limits the type to one instance field.
+@fieldwise_init("implicit")
+struct FlooringInt:
+    var floored: Int
+
+    # Allows implicit conversion from types that can be floored and made into an Int.
+    @implicit
+    def __init__[T: Floorable & Intable](out self, value: T):
+        self.floored = Int(floor(value))
+
+def floored(value: FlooringInt) -> Int:
+    return value.floored
+
+def main():
+    print(floored(FlooringInt(42)))  # pass an instance, output: 42
+    print(floored(2))                # pass Int, output: 2
+    print(floored(52.6))             # pass Float64, output: 52
+    var x = BFloat16(192.3)
+    print(floored(x))                # pass BFloat16, output: 192
+    var y: FlooringInt = 180
+    print(y.floored)                 # output 180
+    var z: FlooringInt = 3.14159
+    print(z.floored)                 # output: 3
+```
+
+What you don't see in this example is an initializer for integers.
+Adding `@fieldwise_init("implicit")` lets the compiler build it for
+you. If you wrote this by hand, it might look like this:
+
+```mojo
+@implicit
+def __init__(out self, floored: Int):
+    self.floored = floored
+```

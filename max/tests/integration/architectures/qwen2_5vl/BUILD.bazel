@@ -9,7 +9,6 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -20,6 +19,20 @@ filegroup(
 )
 
 modular_py_test(
+    name = "test_preprocess_cache",
+    srcs = ["test_preprocess_cache.py"],
+    deps = [
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/support",
+        requirement("numpy"),
+        requirement("pillow"),
+    ],
+)
+
+modular_py_test(
     name = "test_image_processor",
     srcs = ["test_image_processor.py"],
     tags = [
@@ -27,7 +40,7 @@ modular_py_test(
         "requires-network",
     ],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
         requirement("numpy"),
         requirement("pillow"),
         requirement("transformers"),
@@ -48,36 +61,37 @@ modular_py_test(
         "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
     },
     exec_properties = {
-        "test.resources:gpu-memory": "2",
+        "test.resources:gpu-memory": "3",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
+    ignore_extra_deps = [
+        requirement("torchvision"),  # needed by qwenvl_utils
+    ],
     imports = ["."],
     tags = [
         "gpu",
         "manual",
-        "no-pydeps",  # TODO: Fix and re-enable
         "requires-network",
     ],
     deps = [
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/engine",
-        "//max/python/max/entrypoints",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
-        "//max/python/max/serve",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
         requirement("numpy"),
         requirement("pillow"),
         requirement("pytest-asyncio"),
         requirement("pytest-mock"),
-        requirement("requests"),
-        requirement("timm"),
         requirement("torch"),
-        requirement("torchvision"),
+        requirement("torchvision"),  # needed by qwenvl_utils
         requirement("transformers"),
         requirement("qwen-vl-utils"),
         requirement("opencv-python"),
@@ -92,7 +106,7 @@ modular_py_test(
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
         requirement("torch"),
         requirement("numpy"),
         requirement("transformers"),
@@ -128,7 +142,7 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
         "//max/python/max/pipelines/lib",
         requirement("transformers"),
     ],
@@ -139,9 +153,9 @@ modular_py_test(
     size = "large",
     srcs = ["test_compute_multimodal_merge_indices.py"],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
-        "//max/python/max/pipelines/modeling",
         requirement("numpy"),
     ],
 )

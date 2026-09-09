@@ -34,6 +34,7 @@ Usage:
 
 from std.sys import get_defined_int
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -41,7 +42,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Coord,
     Idx,
@@ -86,8 +87,8 @@ def bench_blockwise_fp8_1d2d[
     comptime K = expert_shape[1]
 
     # Compute total tokens and max tokens per expert
-    total_num_tokens = 0
-    max_num_tokens_by_expert = 0
+    var total_num_tokens = 0
+    var max_num_tokens_by_expert = 0
     for i in range(len(num_tokens_by_expert)):
         var M = num_tokens_by_expert[i]
         total_num_tokens += M
@@ -117,12 +118,8 @@ def bench_blockwise_fp8_1d2d[
     )
 
     # Host allocations
-    var a_offsets_host_ptr = List(
-        length=num_active_experts + 1, fill=Scalar[DType.uint32](0)
-    )
-    var expert_ids_host_ptr = List(
-        length=num_active_experts, fill=Scalar[DType.int32](0)
-    )
+    var a_offsets_host_ptr = List(length=num_active_experts + 1, fill=UInt32(0))
+    var expert_ids_host_ptr = List(length=num_active_experts, fill=Int32(0))
     var expert_scales_host_ptr = List(length=num_experts, fill=Float32(1.0))
 
     # Setup offsets, expert ids, scales
@@ -136,21 +133,15 @@ def bench_blockwise_fp8_1d2d[
     var a_dev_buf = ctx.enqueue_create_buffer[a_type](a_size)
     var b_dev_buf = ctx.enqueue_create_buffer[b_type](b_size)
     var c_dev_buf = ctx.enqueue_create_buffer[c_type](c_size)
-    var a_offsets_dev_buf = ctx.enqueue_create_buffer[DType.uint32](
+    var a_offsets_dev_buf = ctx.enqueue_create_buffer[.uint32](
         num_active_experts + 1
     )
-    var expert_ids_dev_buf = ctx.enqueue_create_buffer[DType.int32](
+    var expert_ids_dev_buf = ctx.enqueue_create_buffer[.int32](
         num_active_experts
     )
-    var a_scales_dev_buf = ctx.enqueue_create_buffer[DType.float32](
-        a_scales_size
-    )
-    var b_scales_dev_buf = ctx.enqueue_create_buffer[DType.float32](
-        b_scales_size
-    )
-    var expert_scales_dev_buf = ctx.enqueue_create_buffer[DType.float32](
-        num_experts
-    )
+    var a_scales_dev_buf = ctx.enqueue_create_buffer[.float32](a_scales_size)
+    var b_scales_dev_buf = ctx.enqueue_create_buffer[.float32](b_scales_size)
+    var expert_scales_dev_buf = ctx.enqueue_create_buffer[.float32](num_experts)
 
     # Copy offsets and ids to device
     ctx.enqueue_copy(a_offsets_dev_buf, a_offsets_host_ptr)
@@ -179,41 +170,37 @@ def bench_blockwise_fp8_1d2d[
         c_dev_buf.unsafe_ptr().bitcast[Scalar[c_type]](),
         RuntimeLayout[c_layout].row_major(dynamic_c_shape),
     )
-    var a_scales_struct = LayoutTensor[DType.float32, a_scales_layout](
-        a_scales_dev_buf.unsafe_ptr().bitcast[Scalar[DType.float32]](),
+    var a_scales_struct = LayoutTensor[.float32, a_scales_layout](
+        a_scales_dev_buf.unsafe_ptr().bitcast[Float32](),
         RuntimeLayout[a_scales_layout].row_major(dynamic_a_scales_shape),
     )
-    var b_scales_struct = LayoutTensor[DType.float32, b_scales_layout](
-        b_scales_dev_buf.unsafe_ptr().bitcast[Scalar[DType.float32]](),
+    var b_scales_struct = LayoutTensor[.float32, b_scales_layout](
+        b_scales_dev_buf.unsafe_ptr().bitcast[Float32](),
         RuntimeLayout[b_scales_layout].row_major(
             IndexList[3](num_experts, N // BLOCK_SCALE_K, K // BLOCK_SCALE_K)
         ),
     )
     var a_offsets_struct = LayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE)
+        .uint32, Layout.row_major(UNKNOWN_VALUE)
     ](
-        a_offsets_dev_buf.unsafe_ptr().bitcast[Scalar[DType.uint32]](),
+        a_offsets_dev_buf.unsafe_ptr().bitcast[UInt32](),
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(
             IndexList[1](num_active_experts + 1)
         ),
     )
     var expert_ids_struct = LayoutTensor[
-        DType.int32, Layout.row_major(UNKNOWN_VALUE)
+        .int32, Layout.row_major(UNKNOWN_VALUE)
     ](
-        expert_ids_dev_buf.unsafe_ptr().bitcast[Scalar[DType.int32]](),
+        expert_ids_dev_buf.unsafe_ptr().bitcast[Int32](),
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(
             IndexList[1](num_active_experts)
         ),
     )
-    var expert_scales_struct = LayoutTensor[
-        DType.float32, expert_scales_layout
-    ](
-        expert_scales_dev_buf.unsafe_ptr().bitcast[Scalar[DType.float32]](),
+    var expert_scales_struct = LayoutTensor[.float32, expert_scales_layout](
+        expert_scales_dev_buf.unsafe_ptr().bitcast[Float32](),
     )
 
     # TileTensor versions for the structured kernel
-    from std.memory import UnsafePointer as NewPtr
-
     var a_tt = TileTensor(
         a_dev_buf,
         new_row_major(Coord(Int64(total_num_tokens), Idx[K])),
@@ -239,23 +226,21 @@ def bench_blockwise_fp8_1d2d[
         b_scales_dev_buf,
         new_row_major[num_experts, N // BLOCK_SCALE_K, K // BLOCK_SCALE_K](),
     )
-    var a_offsets_tt = TileTensor[DType.uint32, GMEMLayout1D, MutAnyOrigin](
+    var a_offsets_tt = TileTensor[.uint32, GMEMLayout1D, MutAnyOrigin](
         a_offsets_dev_buf,
         GMEMLayout1D(
             Coord(Int64(num_active_experts + 1)),
             Coord(Idx[1]),
         ),
     )
-    var expert_ids_tt = TileTensor[DType.int32, GMEMLayout1D, MutAnyOrigin](
+    var expert_ids_tt = TileTensor[.int32, GMEMLayout1D, MutAnyOrigin](
         expert_ids_dev_buf,
         GMEMLayout1D(
             Coord(Int64(num_active_experts)),
             Coord(Idx[1]),
         ),
     )
-    var expert_scales_tt = TileTensor[
-        DType.float32, GMEMLayout1D, MutAnyOrigin
-    ](
+    var expert_scales_tt = TileTensor[.float32, GMEMLayout1D, MutAnyOrigin](
         expert_scales_dev_buf,
         GMEMLayout1D(
             Coord(Int64(num_experts)),
@@ -283,21 +268,21 @@ def bench_blockwise_fp8_1d2d[
         k_group_size=1,
     )
 
-    @parameter
-    @__copy_capture(
-        a_tt,
-        b_tt,
-        c_tt,
-        a_scales_tt,
-        b_scales_tt,
-        a_offsets_tt,
-        expert_ids_tt,
-    )
     @always_inline
-    def bench_legacy(mut bencher: Bencher):
-        @parameter
+    def bench_legacy(
+        mut bencher: Bencher,
+    ) {
+        var a_tt,
+        var b_tt,
+        var c_tt,
+        var a_scales_tt,
+        var b_scales_tt,
+        var a_offsets_tt,
+        var expert_ids_tt,
+        imm,
+    }:
         @always_inline
-        def kernel_launch(ctx: DeviceContext, iteration: Int) raises:
+        def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_matmul_sm100_blockwise_scaled_fp8_persistent[
                 config=config,
             ](
@@ -313,30 +298,31 @@ def bench_blockwise_fp8_1d2d[
                 ctx,
             )
 
-        bencher.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(bencher, kernel_launch, ctx)
 
-    bench.bench_function[bench_legacy](
+    bench.bench_function(
+        bench_legacy,
         BenchId(run_name_prefix + " legacy"),
         [ThroughputMeasure(BenchMetric.flops, total_flops)],
     )
 
     # ===== Benchmark Structured Kernel =====
-    @parameter
-    @__copy_capture(
-        a_struct,
-        b_struct,
-        c_struct,
-        a_scales_struct,
-        b_scales_struct,
-        a_offsets_struct,
-        expert_ids_struct,
-        expert_scales_struct,
-    )
     @always_inline
-    def bench_structured(mut bencher: Bencher):
-        @parameter
+    def bench_structured(
+        mut bencher: Bencher,
+    ) {
+        var a_tt,
+        var b_tt,
+        var c_tt,
+        var a_scales_tt,
+        var b_scales_tt,
+        var a_offsets_tt,
+        var expert_ids_tt,
+        var expert_scales_tt,
+        imm,
+    }:
         @always_inline
-        def kernel_launch(ctx: DeviceContext, iteration: Int) raises:
+        def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_matmul_dynamic_scaled_fp8_1d2d[
                 a_scales_type=DType.float32,
                 b_scales_type=DType.float32,
@@ -354,9 +340,10 @@ def bench_blockwise_fp8_1d2d[
                 ctx,
             )
 
-        bencher.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(bencher, kernel_launch, ctx)
 
-    bench.bench_function[bench_structured](
+    bench.bench_function(
+        bench_structured,
         BenchId(run_name_prefix + " structured"),
         [ThroughputMeasure(BenchMetric.flops, total_flops)],
     )

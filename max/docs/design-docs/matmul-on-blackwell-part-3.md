@@ -37,7 +37,7 @@ decorator:
 
 ```mojo
 @__llvm_metadata(`nvvm.cluster_dim`=cluster_shape)
-fn blackwell_tma_pair_umma_kernel[
+def blackwell_tma_pair_umma_kernel[
  a_type,
  ...other parameters...,
  cluster_shape
@@ -70,7 +70,7 @@ Figure 3: CTA tile loading
 
 Note the redundancy in the memory loads. This is similar to the redundancy we
 noticed at the beginning of the [blog
-series](./matmul-on-blackwell-pt2.md),
+series](./matmul-on-blackwell-part-2.md),
 but this time the redundancy is occurring at tile granularity instead of
 element granularity.
 
@@ -142,8 +142,7 @@ Mojo we can compute that via:
 ```mojo
 var rank_m = block_id_in_cluster.x
 # CLUSTER_M and CLUSTER_N are cluster dimensions
-@parameter
-for i in range(CLUSTER_N):
+comptime for i in range(CLUSTER_N):
     a_multicast_mask |= 1 << (i * CLUSTER_M)
 a_multicast_mask <<= rank_m
 ```
@@ -217,8 +216,7 @@ if elect_one_cta:
     ...
     if elect_one_thread:
 
-      @parameter
-    for j in range(num_k_mmas):
+    comptime for j in range(num_k_mmas):
         var c_scale = 0 if i == 0 and j == 0 else 1
         alias idx = IntTuple(0, MMA_K * j)
         alias a_offset = a_smem_layout(idx) * sizeof[a_type]()
@@ -238,7 +236,7 @@ if elect_one_cta:
 The `mma` function above will invoke the `tcgen05.mma.cta_group::2` instruction
 when `cta_group` is 2. We also change the arrive function from `mma_arrive`
 ([last
-blog](./matmul-on-blackwell-part2.md))
+blog](./matmul-on-blackwell-part-2.md))
 to `mma_arrive_multicast` , which takes `cta_group` and signals the leader
 CTA’s memory barrier when `cta_group=2`.
 
@@ -500,8 +498,7 @@ operating on smaller tiles.
   # Process 32 columns at a time
     alias stageN = 32
     alias num_stages = MMA_N // stageN
-    @parameter
-    for stage in range(num_stages):
+    comptime for stage in range(num_stages):
     # Load TMEM
     ...
     # Store to shared memory using stmatrix
@@ -511,7 +508,7 @@ operating on smaller tiles.
       ...
             c_tma_op.commit_group()
 
-        @parameter
+        @__parameter
         # Keep one tma store in fly
         if stage < num_stages - 1:
             c_tma_op.wait_group[1]()

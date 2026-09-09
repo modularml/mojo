@@ -15,33 +15,32 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
 from dataclasses import dataclass, fields, replace
-from typing import Any
+from typing import Any, ClassVar
 
-import numpy as np
-from max._core.driver import is_virtual_device_mode
-from max.driver import Buffer, Device
+from max.driver import Buffer
 from max.dtype import DType
-from max.engine import InferenceSession, Model
+from max.engine import InferenceSession
 from max.graph import BufferValue, Graph, TensorValue, Value
-from max.graph.weights import WeightData, Weights, WeightsAdapter, load_weights
-from max.nn.comm.ep import EPCommInitializer
-from max.nn.kv_cache import KVCacheInputs, KVCacheParams, PagedCacheValues
-from max.nn.transformer import ReturnHiddenStates, ReturnLogits
-from max.pipelines.core import TextContext
-from max.pipelines.lib import (
-    CompilationTimer,
-    KVCacheConfig,
-    ModelInputs,
-    PipelineConfig,
+from max.graph.weights import WeightData, load_weights
+from max.nn.kv_cache import (
+    KVCacheParams,
+    MultiKVCacheParams,
 )
-from max.pipelines.lib.interfaces import UnifiedEagleOutputs
+from max.nn.transformer import ReturnHiddenStates
+from max.pipelines.lib.interfaces import (
+    UnifiedSpecDecodeInputs,
+)
+from max.pipelines.lib.pipeline_variants.unified_spec_decode_model import (
+    _UnifiedSpecDecodeModelMixin,
+)
+from max.pipelines.lib.utils import parse_state_dict_from_weights
 from transformers import AutoConfig
 from typing_extensions import override
 
 from ..deepseekV3.model import DeepseekV3Inputs, DeepseekV3Model
 from ..deepseekV3.model_config import DeepseekV3Config
+from .batch_processor import Eagle3DeepseekV3BatchProcessor
 from .unified_eagle import Eagle3DeepseekV3Unified
 from .weight_adapters import convert_eagle3_draft_state_dict
 
@@ -54,7 +53,7 @@ def extract_eagle_aux_layer_ids(
     """Extract ``eagle_aux_hidden_state_layer_ids`` from a HuggingFace config.
 
     The IDs live inside an ``eagle_config`` sub-dict/object that is present on
-    the *draft* checkpoint's config (e.g. ``nvidia/Kimi-K2.5-Thinking-Eagle3``).
+    the *draft* checkpoint's config.
     """
     eagle_config = getattr(hf_config, "eagle_config", None)
     if eagle_config is None:
@@ -64,92 +63,36 @@ def extract_eagle_aux_layer_ids(
         if isinstance(eagle_config, dict)
         else getattr(eagle_config, "eagle_aux_hidden_state_layer_ids", [])
     )
-    return list(raw) or None
+    raw_list = list(raw)
+    if not raw_list:
+        return None
+    if any(i <= 0 for i in raw_list):
+        raise ValueError(
+            "eagle_aux_hidden_state_layer_ids must contain positive ids "
+            "(capturing layer-0's input = raw token embeddings is not yet "
+            f"wired in MAX). Got {raw_list}."
+        )
+    return [i - 1 for i in raw_list]
 
 
 @dataclass
-class Eagle3DeepseekV3Inputs(DeepseekV3Inputs):
-    """Inputs for the Eagle3 + DeepseekV3 unified model."""
+class Eagle3DeepseekV3Inputs(UnifiedSpecDecodeInputs, DeepseekV3Inputs):
+    """Inputs for the Eagle3 + DeepseekV3 unified model.
 
-    draft_tokens: Buffer | None = None
-    draft_kv_blocks: list[Buffer] | None = None
-    seed: Buffer | None = None
-    """Per-execute uint64 [1] seed consumed by the stochastic acceptance
-    sampler (and, when enabled, the synthetic benchmarking sampler)."""
-
-    temperature: Buffer | None = None
-    top_k: Buffer | None = None
-    max_k: Buffer | None = None
-    top_p: Buffer | None = None
-    min_top_p: Buffer | None = None
-    """Per-batch sampling parameters consumed by the stochastic acceptance
-    sampler. ``max_k`` and ``min_top_p`` are 0-d CPU scalars; the rest are
-    ``[batch_size]`` tensors on the primary device."""
-
-    in_thinking_phase: Buffer | None = None
-    """Per-batch ``bool`` flag set by the pipeline for relaxed acceptance
-    during thinking. Not consumed by the eagle3_deepseekV3 graph today, but
-    the field is required to satisfy the ``_UnifiedSpecDecodeInputs`` protocol
-    used by ``OverlapTextGenerationPipeline``."""
-
-    pinned_bitmask: Buffer | None = None
-    """Pinned host bitmask for constrained decoding.
-
-    Shape ``[batch_size, num_speculative_tokens + 1, vocab_size]``.
-    Position i contains the valid-token mask given the FSM state
-    after consuming draft[0:i-1]; position ``num_speculative_tokens``
-    is for the bonus token. ``None`` when structured output is
-    disabled.
+    Target-prefix fields come from :class:`DeepseekV3Inputs`; the spec-decode
+    fields and trailing buffer packing come from
+    :class:`UnifiedSpecDecodeInputs`. The eagle3_deepseekV3 graph does not bind
+    ``in_thinking_phase``.
     """
-
-    wait_payload: Buffer | None = None
-    """CPU ``int64[2]`` payload = ``[flag._unsafe_ptr, 1]`` consumed by
-    the in-graph ``mo.wait_host_value_with_dep`` op. Only set when
-    structured output is enabled."""
-
-    device_bitmask_scratch: Buffer | None = None
-    """Device scratch buffer that receives the in-graph H2D from
-    ``pinned_bitmask``; the acceptance sampler reads from it. Only
-    set when structured output is enabled."""
 
     @property
     def buffers(self) -> tuple[Buffer, ...]:
-        buffers = super().buffers
-        if self.draft_tokens is not None:
-            buffers += (self.draft_tokens,)
-        if self.draft_kv_blocks is not None:
-            buffers += tuple(self.draft_kv_blocks)
-        assert self.seed is not None
-        buffers += (self.seed,)
-        if self.draft_tokens is not None:
-            # Sampling params are only required when the spec-decode path
-            # is active (i.e. draft_tokens was bound).
-            assert self.temperature is not None
-            assert self.top_k is not None
-            assert self.max_k is not None
-            assert self.top_p is not None
-            assert self.min_top_p is not None
-            buffers += (
-                self.temperature,
-                self.top_k,
-                self.max_k,
-                self.top_p,
-                self.min_top_p,
-            )
-            # Constrained-decoding bitmask inputs are only included
-            # when structured output is enabled.
-            if self.pinned_bitmask is not None:
-                assert self.wait_payload is not None
-                assert self.device_bitmask_scratch is not None
-                buffers += (
-                    self.pinned_bitmask,
-                    self.wait_payload,
-                    self.device_bitmask_scratch,
-                )
-        return buffers
+        return super().buffers + self._spec_decode_tail_buffers(
+            include_in_thinking_phase=False
+        )
 
 
-class Eagle3DeepseekV3Model(DeepseekV3Model):
+class Eagle3DeepseekV3Model(_UnifiedSpecDecodeModelMixin, DeepseekV3Model):
     """Eagle3 + DeepseekV3: target + draft in one compiled graph.
 
     Loads target weights from a DeepseekV3-shaped main checkpoint and draft
@@ -157,67 +100,34 @@ class Eagle3DeepseekV3Model(DeepseekV3Model):
     (``pipeline_config.draft_model``).
     """
 
-    def __init__(
-        self,
-        pipeline_config: PipelineConfig,
-        session: InferenceSession,
-        devices: list[Device],
-        kv_cache_config: KVCacheConfig,
-        weights: Weights,
-        adapter: WeightsAdapter | None = None,
-        return_logits: ReturnLogits = ReturnLogits.VARIABLE,
-        return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.SELECTED_LAYERS,
-    ) -> None:
-        super().__init__(
-            pipeline_config,
-            session,
-            devices,
-            kv_cache_config,
-            weights,
-            adapter,
-            return_logits,
-            return_hidden_states,
-        )
-        self._seed_counter = 0
+    batch_processor_cls: ClassVar[type[Eagle3DeepseekV3BatchProcessor]] = (
+        Eagle3DeepseekV3BatchProcessor
+    )
 
-    def _next_seed(self) -> Buffer:
-        """Monotonically advancing uint64 [1] seed, fresh per execute."""
-        self._seed_counter += 1
-        return Buffer.from_numpy(
-            np.array([self._seed_counter], dtype=np.uint64)
-        ).to(self.devices[0])
+    _draft_state_dict: dict[str, Any]
+    _draft_config: DeepseekV3Config
 
     @override
-    def load_model(self, session: InferenceSession) -> Model:
-        max_batch_size = self.pipeline_config.runtime.max_batch_size
-        assert max_batch_size, "Expected max_batch_size to be set"
-
-        dp_size = self.pipeline_config.model.data_parallel_degree
-        max_batch_size *= dp_size
-
-        self._host_input_row_offsets_prealloc = Buffer.from_numpy(
-            np.arange(max_batch_size + 1, dtype=np.uint32)
+    def _load_state_dict(self) -> dict[str, Any]:
+        target_state_dict = parse_state_dict_from_weights(
+            self.pipeline_config, self.weights, self.adapter
         )
-        self._device_input_row_offsets_prealloc = (
-            self._host_input_row_offsets_prealloc.to(self.devices[0])
+
+        assert self.pipeline_config.draft_model is not None
+        draft_model_config = self.pipeline_config.draft_model
+        draft_weight_paths = draft_model_config.resolved_weight_paths()
+        draft_weights = load_weights(draft_weight_paths)
+        self._draft_state_dict = convert_eagle3_draft_state_dict(
+            dict(draft_weights.items()),
         )
-        self._batch_context_lengths_prealloc_cpu = [
-            Buffer.zeros(shape=[1], dtype=DType.int32)
-            for _ in range(len(self.devices))
-        ]
 
-        if self.adapter:
-            target_state_dict = self.adapter(
-                dict(self.weights.items()),
-                huggingface_config=self.huggingface_config,
-                pipeline_config=self.pipeline_config,
-            )
-        else:
-            target_state_dict = {
-                key: value.data() for key, value in self.weights.items()
-            }
+        return target_state_dict
 
-        config = self._create_model_config(target_state_dict)
+    @override
+    def _create_model_config(
+        self, state_dict: dict[str, Any]
+    ) -> DeepseekV3Config:
+        config = DeepseekV3Model._create_model_config(self, state_dict)
 
         # The target HF config doesn't carry eagle_config; propagate from draft.
         if config.eagle_aux_hidden_state_layer_ids is None:
@@ -236,39 +146,35 @@ class Eagle3DeepseekV3Model(DeepseekV3Model):
         if n_devices > 1 and self.pipeline_config.runtime.ep_size != n_devices:
             raise ValueError("Only the EP strategy is supported.")
 
-        self.ep_comm_initializer = None
-        if config.ep_config is not None and not is_virtual_device_mode():
-            self.ep_comm_initializer = EPCommInitializer(config.ep_config)
-            self.ep_comm_initializer.ep_init(session)
-            config.ep_config.node_id = self.ep_comm_initializer.config.node_id
-            if config.ep_config.node_id == -1:
-                raise ValueError(
-                    "EP node ID is not set. Please check if the EP "
-                    "initialization is successful."
-                )
-
-        assert self.pipeline_config.draft_model is not None
-        draft_model_config = self.pipeline_config.draft_model
-        draft_weight_paths = draft_model_config.resolved_weight_paths()
-        draft_weights = load_weights(draft_weight_paths)
-
-        draft_state_dict = convert_eagle3_draft_state_dict(
-            dict(draft_weights.items()),
-        )
-
-        draft_config = self._create_draft_config(config, draft_state_dict)
+        draft_config = self._create_draft_config(config, self._draft_state_dict)
         if draft_config.ep_config is not None and config.ep_config is not None:
             draft_config.ep_config.node_id = config.ep_config.node_id
 
         assert isinstance(self.kv_params, KVCacheParams)
-        self._draft_kv_params = replace(self.kv_params, num_layers=1)
+        target_kv_params = self.kv_params
+        self._draft_kv_params = replace(target_kv_params, num_layers=1)
+        self.kv_params = MultiKVCacheParams.from_params(
+            {"target": target_kv_params, "draft": self._draft_kv_params}
+        )
 
         draft_config.return_hidden_states = ReturnHiddenStates.LAST
+        self._draft_config = draft_config
+        return config
 
+    @override
+    def _build_graph_for_compile(
+        self,
+        session: InferenceSession,
+        state_dict: dict[str, Any],
+        model_config: Any,
+    ) -> tuple[Graph, dict[str, Any]]:
+        del session
+        assert isinstance(model_config, DeepseekV3Config)
         assert self.pipeline_config.speculative is not None
+
         nn_model = Eagle3DeepseekV3Unified(
-            config,
-            draft_config,
+            model_config,
+            self._draft_config,
             speculative_config=self.pipeline_config.speculative,
             enable_structured_output=self.pipeline_config.needs_bitmask_constraints,
         )
@@ -280,15 +186,14 @@ class Eagle3DeepseekV3Model(DeepseekV3Model):
         nn_model.draft.embed_tokens = nn_model.target.embed_tokens
 
         nn_model.target.load_state_dict(
-            target_state_dict, weight_alignment=1, strict=True
+            state_dict, weight_alignment=1, strict=True
         )
-
         nn_model.draft.load_state_dict(
-            draft_state_dict, weight_alignment=1, strict=False
+            self._draft_state_dict, weight_alignment=1, strict=False
         )
 
         draft_expected = set(nn_model.draft.raw_state_dict().keys())
-        draft_provided = set(draft_state_dict.keys())
+        draft_provided = set(self._draft_state_dict.keys())
         shared_prefixes = ("embed_tokens.",)
         missing = {
             k
@@ -298,11 +203,103 @@ class Eagle3DeepseekV3Model(DeepseekV3Model):
         extra = draft_provided - draft_expected
         if missing:
             raise ValueError(
-                f"Draft model has unloaded non-shared weights: {sorted(missing)}"
+                "Draft model has unloaded non-shared weights:"
+                f" {sorted(missing)}"
             )
         if extra:
             logger.warning(f"Draft state_dict has unused keys: {sorted(extra)}")
 
+        weights_registry = self._unified_weights_registry(nn_model)
+
+        assert isinstance(self.kv_params, MultiKVCacheParams)
+        kv_params = self.kv_params
+
+        with Graph(
+            "eagle3_deepseekV3_graph",
+            input_types=nn_model.input_types(kv_params),
+        ) as graph:
+            (
+                tokens,
+                devices_input_row_offsets,
+                host_input_row_offsets,
+                return_n_logits,
+                data_parallel_splits,
+                *variadic_args,
+            ) = graph.inputs
+
+            variadic_args_iter = iter(variadic_args)
+            signal_buffers = [
+                next(variadic_args_iter).buffer
+                for _ in range(len(self.devices))
+            ]
+
+            kv_collections, draft_kv_collections = (
+                kv_params.unflatten_basic_kv_tree(variadic_args_iter)
+            )
+
+            batch_context_lengths = [
+                next(variadic_args_iter).tensor
+                for _ in range(len(self.devices))
+            ]
+
+            target_ep_inputs: list[Value[Any]] | None = None
+            if nn_model.target.ep_manager is not None:
+                n_target_ep = len(nn_model.target.ep_manager.input_types())
+                target_ep_inputs = [
+                    next(variadic_args_iter) for _ in range(n_target_ep)
+                ]
+
+            draft_tokens = next(variadic_args_iter).tensor
+
+            seed = next(variadic_args_iter).tensor
+            temperature = next(variadic_args_iter).tensor
+            top_k = next(variadic_args_iter).tensor
+            max_k = next(variadic_args_iter).tensor
+            top_p = next(variadic_args_iter).tensor
+            min_top_p = next(variadic_args_iter).tensor
+
+            # Optional bitmask triple — present only when
+            # structured output is enabled (matches the
+            # conditional in input_types()).
+            pinned_bitmask_graph: TensorValue | None = None
+            wait_payload_graph: BufferValue | None = None
+            device_bitmask_scratch_graph: BufferValue | None = None
+            if nn_model.enable_structured_output:
+                pinned_bitmask_graph = next(variadic_args_iter).tensor
+                wait_payload_graph = next(variadic_args_iter).buffer
+                device_bitmask_scratch_graph = next(variadic_args_iter).buffer
+
+            outputs = nn_model(
+                tokens=tokens.tensor,
+                input_row_offsets=devices_input_row_offsets.tensor,
+                draft_tokens=draft_tokens.tensor,
+                signal_buffers=signal_buffers,
+                kv_collections=kv_collections,
+                return_n_logits=return_n_logits.tensor,
+                host_input_row_offsets=host_input_row_offsets.tensor,
+                data_parallel_splits=data_parallel_splits.tensor,
+                batch_context_lengths=batch_context_lengths,
+                seed=seed,
+                temperature=temperature,
+                top_k=top_k,
+                max_k=max_k,
+                top_p=top_p,
+                min_top_p=min_top_p,
+                ep_inputs=target_ep_inputs,
+                draft_kv_collections=draft_kv_collections,
+                pinned_bitmask=pinned_bitmask_graph,
+                wait_payload=wait_payload_graph,
+                device_bitmask_scratch=device_bitmask_scratch_graph,
+            )
+            graph.output(*outputs)
+
+        return graph, weights_registry
+
+    def _unified_weights_registry(
+        self, nn_model: Eagle3DeepseekV3Unified
+    ) -> dict[str, Any]:
+        """Build the combined registry with ``draft.*`` prefixes on draft-only weights."""
+        assert nn_model.draft is not None
         # Capture concrete draft weights before renaming; ``state_dict()``
         # resets weight.name back to the module-path key.
         draft_weights_registry = nn_model.draft.state_dict()
@@ -314,179 +311,12 @@ class Eagle3DeepseekV3Model(DeepseekV3Model):
                 continue
             weight.name = f"draft.{name}"
 
-        self.state_dict = dict(nn_model.target.state_dict())
+        weights_registry = dict(nn_model.target.state_dict())
         for k, v in draft_weights_registry.items():
             if k.startswith("embed_tokens."):
                 continue
-            self.state_dict[f"draft.{k}"] = v
-
-        with CompilationTimer("eagle3_deepseekV3_model") as timer:
-            with Graph(
-                "eagle3_deepseekV3_graph",
-                input_types=nn_model.input_types(
-                    self.kv_params, self._draft_kv_params
-                ),
-            ) as graph:
-                (
-                    tokens,
-                    devices_input_row_offsets,
-                    host_input_row_offsets,
-                    return_n_logits,
-                    data_parallel_splits,
-                    *variadic_args,
-                ) = graph.inputs
-
-                variadic_args_iter = iter(variadic_args)
-                signal_buffers = [
-                    next(variadic_args_iter).buffer
-                    for _ in range(len(self.devices))
-                ]
-
-                fetch_types = (
-                    self.kv_params.get_symbolic_inputs().inputs[0].flatten()
-                )
-                len_of_kv_inputs = len(list(fetch_types)) * len(self.devices)
-                kv_caches_per_dev = self._unflatten_kv_inputs(
-                    [next(variadic_args_iter) for _ in range(len_of_kv_inputs)]
-                )
-
-                batch_context_lengths = [
-                    next(variadic_args_iter).tensor
-                    for _ in range(len(self.devices))
-                ]
-
-                target_ep_inputs: list[Value[Any]] | None = None
-                if nn_model.target.ep_manager is not None:
-                    n_target_ep = len(nn_model.target.ep_manager.input_types())
-                    target_ep_inputs = [
-                        next(variadic_args_iter) for _ in range(n_target_ep)
-                    ]
-
-                draft_tokens = next(variadic_args_iter).tensor
-
-                # Draft KV: only kv_blocks per device; cache_lengths reused
-                # from target (same token count, just fewer layers).
-                draft_kv_collections: list[PagedCacheValues] = []
-                for dev_idx in range(len(self.devices)):
-                    draft_kv_blocks = next(variadic_args_iter).buffer
-                    draft_kv_collections.append(
-                        PagedCacheValues(
-                            kv_blocks=draft_kv_blocks,
-                            cache_lengths=kv_caches_per_dev[
-                                dev_idx
-                            ].cache_lengths,
-                            lookup_table=kv_caches_per_dev[
-                                dev_idx
-                            ].lookup_table,
-                            max_lengths=kv_caches_per_dev[dev_idx].max_lengths,
-                            attention_dispatch_metadata=kv_caches_per_dev[
-                                dev_idx
-                            ].attention_dispatch_metadata,
-                            draft_attention_dispatch_metadata=kv_caches_per_dev[
-                                dev_idx
-                            ].draft_attention_dispatch_metadata,
-                        )
-                    )
-
-                seed = next(variadic_args_iter).tensor
-                temperature = next(variadic_args_iter).tensor
-                top_k = next(variadic_args_iter).tensor
-                max_k = next(variadic_args_iter).tensor
-                top_p = next(variadic_args_iter).tensor
-                min_top_p = next(variadic_args_iter).tensor
-
-                # Optional bitmask triple — present only when
-                # structured output is enabled (matches the
-                # conditional in input_types()).
-                pinned_bitmask_graph: TensorValue | None = None
-                wait_payload_graph: BufferValue | None = None
-                device_bitmask_scratch_graph: BufferValue | None = None
-                if nn_model.enable_structured_output:
-                    pinned_bitmask_graph = next(variadic_args_iter).tensor
-                    wait_payload_graph = next(variadic_args_iter).buffer
-                    device_bitmask_scratch_graph = next(
-                        variadic_args_iter
-                    ).buffer
-
-                outputs = nn_model(
-                    tokens=tokens.tensor,
-                    input_row_offsets=devices_input_row_offsets.tensor,
-                    draft_tokens=draft_tokens.tensor,
-                    signal_buffers=signal_buffers,
-                    kv_collections=kv_caches_per_dev,
-                    return_n_logits=return_n_logits.tensor,
-                    host_input_row_offsets=host_input_row_offsets.tensor,
-                    data_parallel_splits=data_parallel_splits.tensor,
-                    batch_context_lengths=batch_context_lengths,
-                    seed=seed,
-                    temperature=temperature,
-                    top_k=top_k,
-                    max_k=max_k,
-                    top_p=top_p,
-                    min_top_p=min_top_p,
-                    ep_inputs=target_ep_inputs,
-                    draft_kv_collections=draft_kv_collections,
-                    pinned_bitmask=pinned_bitmask_graph,
-                    wait_payload=wait_payload_graph,
-                    device_bitmask_scratch=device_bitmask_scratch_graph,
-                )
-                graph.output(*outputs)
-
-            timer.mark_build_complete()
-            model = session.load(graph, weights_registry=self.state_dict)
-
-        return model
-
-    def execute(self, model_inputs: ModelInputs) -> UnifiedEagleOutputs:
-        """Execute and return all graph outputs for speculative decoding."""
-        assert isinstance(model_inputs, Eagle3DeepseekV3Inputs)
-        model_outputs = self.model.execute(*model_inputs.buffers)
-        if len(model_outputs) != 3:
-            raise RuntimeError(
-                f"Eagle3DeepseekV3 graph returned {len(model_outputs)} "
-                "outputs; expected 3 (num_accepted, next_tokens, "
-                "next_draft_tokens)."
-            )
-
-        return UnifiedEagleOutputs(
-            num_accepted_draft_tokens=model_outputs[0],
-            next_tokens=model_outputs[1],
-            next_draft_tokens=model_outputs[2],
-        )
-
-    def prepare_initial_token_inputs(
-        self,
-        replica_batches: Sequence[Sequence[TextContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
-        return_n_logits: int = 1,
-        draft_tokens: Buffer | None = None,
-        draft_kv_cache_buffers: list[Buffer] | None = None,
-        **kwargs,
-    ) -> Eagle3DeepseekV3Inputs:
-        base = DeepseekV3Model.prepare_initial_token_inputs(
-            self, replica_batches, kv_cache_inputs, return_n_logits
-        )
-        return Eagle3DeepseekV3Inputs(
-            tokens=base.tokens,
-            input_row_offsets=base.input_row_offsets,
-            host_input_row_offsets=base.host_input_row_offsets,
-            batch_context_lengths=base.batch_context_lengths,
-            signal_buffers=base.signal_buffers,
-            kv_cache_inputs=base.kv_cache_inputs,
-            return_n_logits=base.return_n_logits,
-            data_parallel_splits=base.data_parallel_splits,
-            ep_inputs=base.ep_inputs,
-            draft_tokens=draft_tokens,
-            draft_kv_blocks=draft_kv_cache_buffers,
-            seed=self._next_seed(),
-        )
-
-    def prepare_next_token_inputs(
-        self,
-        next_tokens: Buffer,
-        prev_model_inputs: ModelInputs,
-    ) -> Eagle3DeepseekV3Inputs:
-        raise NotImplementedError("Eagle does not support Multistep execution")
+            weights_registry[f"draft.{k}"] = v
+        return weights_registry
 
     def _create_draft_config(
         self,
@@ -522,12 +352,12 @@ class Eagle3DeepseekV3Model(DeepseekV3Model):
         # Eagle3 draft has BF16 dense MLP (not quantized, not MoE)
         if (
             draft_config.quant_config is not None
-            and draft_config.quant_config.is_nvfp4
-            and not any("weight_scale_2" in key for key in draft_state_dict)
+            and draft_config.quant_config.is_fp4
+            and not any("weight_scale" in key for key in draft_state_dict)
         ):
             logger.info(
-                "Eagle3 draft weights are BF16 (no weight_scale_2 found); "
-                "disabling NVFP4 config for draft."
+                "Eagle3 draft weights are BF16 (no weight_scale found); "
+                "disabling FP4 config for draft."
             )
             draft_config.quant_config = None
             draft_config.dtype = DType.bfloat16

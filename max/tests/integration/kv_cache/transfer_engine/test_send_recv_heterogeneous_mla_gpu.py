@@ -13,12 +13,11 @@
 
 """Heterogeneous MLA KV transfer: sender (DP=1,TP=2) <-> receiver (DP=2,TP=1).
 
-The sender declares ``replicate_kv_across_tp=True`` (MLA, num_kv_heads=1)
-with TP=2, while the receiver is DP=2/TP=1. At connect() time the engines
-agree on an effective DP=2/TP=1 view via ``resolve_peer_view`` setting
-``flatten_local=True`` on the sender, so each of the sender's TP shards
-is treated as a standalone DP replica. ``initiate_send_transfer`` picks
-sender shard 0.
+The sender is MLA (KV replicated across TP shards) with DP=1/TP=2, while the
+receiver is DP=2/TP=1.  At connect() time the engines agree on an effective
+DP=2/TP=1 view via ``resolve_peer_view`` setting ``flatten_local=True`` on the
+sender, so each of the sender's TP shards is treated as a standalone DP replica.
+``initiate_send_transfer`` picks sender shard 0.
 
 The test validates:
   - Heterogeneous shape negotiation at connect().
@@ -32,6 +31,7 @@ Uses 4 GPUs total (2 for sender, 2 for receiver).
 import multiprocessing as mp
 
 import numpy as np
+from _transfer_engine_helpers import kv_group, kv_memory
 from max.driver import Accelerator
 from max.driver.buffer import Buffer
 from max.pipelines.kv_cache import KVTransferEngine
@@ -62,23 +62,24 @@ def sender_routine(
     total_num_pages: int,
     total_bytes: int,
 ) -> None:
-    """Sender: DP=1, TP=2, MLA (replicate_kv_across_tp=True).
+    """Sender: DP=1, TP=2, MLA (KV replicated across TP shards).
 
     KV is replicated across both TP shards; the engine will pick shard 0
     for actual transfers under flatten_local.
     """
     # KV is logically identical on all shards (MLA); we use distinct
     # page values anyway so the test can detect "wrong shard picked."
-    replica_0_tensors = [
-        paged(total_bytes, page_values=[100, 101], accelerator_idx=0),
-        paged(total_bytes, page_values=[200, 201], accelerator_idx=1),
-    ]
+    shard0 = paged(total_bytes, page_values=[100, 101], accelerator_idx=0)
+    shard1 = paged(total_bytes, page_values=[200, 201], accelerator_idx=1)
+
+    # Replicated MLA group: one group covers all TP shards.
+    replicated_group = kv_group(
+        [shard0, shard1], total_num_pages, replicated=True
+    )
 
     engine = KVTransferEngine(
         "sender_engine",
-        [replica_0_tensors],
-        total_num_pages=total_num_pages,
-        replicate_kv_across_tp=True,
+        [[replicated_group]],
     )
 
     sender_md_queue.put(engine.metadata)
@@ -118,22 +119,26 @@ def receiver_routine(
     total_num_pages: int,
     total_bytes: int,
 ) -> None:
-    """Receiver: DP=2, TP=1, MLA (replicate_kv_across_tp=True).
+    """Receiver: DP=2, TP=1, MLA (KV replicated, TP=1 so no peer shards).
 
     Each of the 2 replicas has a single tensor. Receiver is not the
     flattening side (TP=1), but both sides advertise MLA so connect
     still traverses the resolve_peer_view MLA-heterogeneous branch.
+
+    TP=1 means replicates_kv_across_tp=True but len(values)==1, which does
+    NOT mark its KVCacheMemory replicated (that requires at least 2 shards).
+    We use sharded units here; replicated_per_group is all-False for TP=1
+    receivers.
     """
-    replicas = [
-        [paged(total_bytes, page_values=[99, 99], accelerator_idx=2 + r)]
+    raw_bufs = [
+        paged(total_bytes, page_values=[99, 99], accelerator_idx=2 + r)
         for r in range(2)
     ]
+    replicas = [[kv_memory(buf, total_num_pages)] for buf in raw_bufs]
 
     engine = KVTransferEngine(
         "receiver_engine",
         replicas,
-        total_num_pages=total_num_pages,
-        replicate_kv_across_tp=True,
     )
 
     receiver_md_queue.put(engine.metadata)
@@ -144,12 +149,11 @@ def receiver_routine(
         transfer_req = transfer_queues[dst_replica_idx].get()
         engine.sync_and_release(transfer_req)
 
-    # Sender always picks local shard 0 -> replica_0_tensors[0] (values
-    # [100, 101]). Every receiver replica should now hold those values.
+    # Sender always picks local shard 0 -> shard0 (values [100, 101]).
+    # Every receiver replica should now hold those values.
     page_size = total_bytes // total_num_pages
-    for replica_idx, replica_tensors in enumerate(replicas):
-        shard = replica_tensors[0]
-        result = shard.to_numpy()
+    for replica_idx, buf in enumerate(raw_bufs):
+        result = buf.to_numpy()
         for page_idx, expected in enumerate([100, 101]):
             actual = result[page_idx * page_size : (page_idx + 1) * page_size]
             assert (actual == expected).all(), (

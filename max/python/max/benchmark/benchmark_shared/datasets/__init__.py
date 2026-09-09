@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from .agentic_code import AgenticCodeBenchmarkDataset
+from .artificial_analysis import ArtificialAnalysisBenchmarkDataset
 from .arxiv_summarization import ArxivSummarizationBenchmarkDataset
 from .axolotl import AxolotlBenchmarkDataset
 from .batch_job import BatchJobBenchmarkDataset
@@ -51,6 +52,7 @@ from .vision_arena import VisionArenaBenchmarkDataset
 __all__ = [
     "DATASET_REGISTRY",
     "AgenticCodeBenchmarkDataset",
+    "ArtificialAnalysisBenchmarkDataset",
     "ArxivSummarizationBenchmarkDataset",
     "AxolotlBenchmarkDataset",
     "BaseDistribution",

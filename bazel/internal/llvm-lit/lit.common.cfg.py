@@ -41,7 +41,9 @@ else:
 
 import modular_test_format
 
-config.test_format = modular_test_format.ModularShTest(execute_external)
+config.test_format = modular_test_format.ModularShTest(
+    execute_external, force_execute_external=execute_external
+)
 
 if execute_external:
     config.available_features.add("shell")
@@ -85,13 +87,21 @@ if sys.platform == "darwin":
     if _mac_ver and int(_mac_ver.split(".")[0]) >= 26:
         config.available_features.add("macos-26+")
 
+    # Metal AIR disassembly tests require Xcode's air-objdump utility.
+    if shutil.which("air-objdump") or (
+        shutil.which("xcrun")
+        and os.system(
+            "xcrun -sdk macosx air-objdump --version >/dev/null 2>&1"
+        )
+        == 0
+    ):
+        config.available_features.add("air-objdump")
+
 #---------------------------------------
 # Mojo tools
 #---------------------------------------
 
 mojo_exe = "mojo"
-if shutil.which("mojo-compiler-only"):
-    mojo_exe = "mojo-compiler-only"
 
 def mojo_subst(name, args):
     return ToolSubst(name, mojo_exe, extra_args=args)

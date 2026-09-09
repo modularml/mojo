@@ -25,6 +25,13 @@ import numpy as np
 import numpy.typing as npt
 from max._core.driver import Buffer as Buffer
 from max._core.driver import DevicePinnedBuffer as DevicePinnedBuffer
+from max._core.driver import _batch_inplace_copy
+from max._core.driver import (
+    _unsafe_alloc_fast_pinned_buffer as _unsafe_alloc_fast_pinned_buffer,
+)
+from max._core.driver import (
+    _unsafe_free_fast_pinned_buffer as _unsafe_free_fast_pinned_buffer,
+)
 from max.dtype import DType
 
 from .driver import CPU
@@ -48,6 +55,63 @@ def _contiguous(self: Buffer) -> Buffer:
 
 def _repr(self: Buffer) -> str:
     return f"max.driver.Buffer({self.dtype}, {self.shape}, {self.stream})"
+
+
+# DTypes whose values NumPy can represent faithfully. These allow a fast bulk
+# conversion for display. Other float types (bfloat16, float8_*, float4_*) are
+# read element-wise so their values render as numbers rather than raw bytes.
+_NUMPY_FAITHFUL_DTYPES = frozenset(
+    {
+        DType.bool,
+        DType.int8,
+        DType.int16,
+        DType.int32,
+        DType.int64,
+        DType.uint8,
+        DType.uint16,
+        DType.uint32,
+        DType.uint64,
+        DType.float16,
+        DType.float32,
+        DType.float64,
+    }
+)
+
+
+def _display_numpy(self: Buffer) -> npt.NDArray[Any]:
+    """Returns a host numpy array of the buffer's values for display.
+
+    Faithfully-representable dtypes are converted in bulk via ``to_numpy``.
+    Other float dtypes (such as ``bfloat16`` and the ``float8`` family) are
+    read element-wise so their values are shown as decoded numbers instead of
+    the raw byte contents that ``to_numpy`` would expose.
+    """
+    if self.dtype in _NUMPY_FAITHFUL_DTYPES:
+        return self.to_numpy()
+
+    # Copy to the host once so per-element reads don't trigger a device
+    # transfer for every element.
+    host = self if (self.pinned or self.device.is_host) else self.to(CPU())
+    if host.rank == 0:
+        return np.asarray(host.item())
+    values = [host[idx].item() for idx in host._iterate_indices()]
+    return np.asarray(values).reshape(self.shape)
+
+
+def _str(self: Buffer) -> str:
+    """Returns a human-readable string containing the buffer's data.
+
+    The data is copied to the host if the buffer lives on an accelerator, then
+    formatted like a numpy array (large buffers are summarized with ``...``).
+    The values are followed by the buffer's ``dtype``, ``shape``, and
+    ``device``.
+    """
+    prefix = "Buffer("
+    data = np.array2string(_display_numpy(self), prefix=prefix)
+    return (
+        f"{prefix}{data}, dtype={self.dtype}, shape={self.shape},"
+        f" device={self.device})"
+    )
 
 
 def _view(self: Buffer, dtype: DType, shape: ShapeType | None = None) -> Buffer:
@@ -167,7 +231,7 @@ def _from_dlpack(array: Any, *, copy: bool | None = None) -> Buffer:
                     msg
                     + " Consider passing `copy = True` to `Buffer.from_dlpack`."
                 )
-            raise e
+            raise
 
         return buffer.view(DType.bool) if is_bool else buffer
 
@@ -220,12 +284,66 @@ def _mmap(
 Buffer._iterate_indices = _iterate_indices  # type: ignore[method-assign]
 Buffer.contiguous = _contiguous  # type: ignore[method-assign]
 Buffer.__repr__ = _repr  # type: ignore[method-assign, assignment]
+Buffer.__str__ = _str  # type: ignore[method-assign, assignment]
 Buffer.view = _view  # type: ignore[method-assign]
 Buffer.inplace_copy_from = inplace_copy_from  # type: ignore[method-assign]
 Buffer.from_numpy = _from_numpy  # type: ignore[method-assign]
 Buffer.to_numpy = _to_numpy  # type: ignore[method-assign]
 Buffer.from_dlpack = _from_dlpack  # type: ignore[method-assign]
 Buffer.mmap = _mmap  # type: ignore[method-assign]
+
+
+def batch_inplace_copy(dsts: Sequence[Buffer], srcs: Sequence[Buffer]) -> None:
+    """Copies ``srcs[i]`` into ``dsts[i]`` in as few driver submissions as possible.
+
+    Sources may be host, pinned, same-device or peer memory in any mix.
+    Identity pairs (``dst is src``) are skipped.
+
+    One submission is one stream, and a stream only orders the writes it
+    performs, so destinations are grouped by device and each device's group is
+    submitted on that device's own stream. Callers do not need to group.
+
+    Args:
+        dsts: Destination buffers, in any mix of devices.
+        srcs: Source buffers, paired with ``dsts`` by index.
+
+    Raises:
+        ValueError: If ``dsts``/``srcs`` lengths differ.
+    """
+    if len(dsts) != len(srcs):
+        raise ValueError(
+            "batch_inplace_copy: dsts and srcs must have the same length"
+            f" (got {len(dsts)} dsts, {len(srcs)} srcs)"
+        )
+    _batch_inplace_copy(dsts, srcs)
+
+
+def copy_pinned_to_destinations(
+    source: Buffer, destinations: Sequence[Buffer]
+) -> None:
+    """Copies a host buffer into destination buffers safely.
+
+    Copies ``source`` into each buffer in ``destinations``. When ``source`` is
+    pinned and the destinations span multiple devices, its deferred free is
+    enqueued only on its owning device's stream, so the memory manager could
+    recycle the pinned staging while copies on the other devices' streams are
+    still reading it. Making the owning device's stream wait for the other
+    destination devices' streams closes that window. The cross-stream wait is a
+    no-op for a non-pinned ``source`` or a single device.
+
+    Args:
+        source: The host buffer to copy from (pinned for async H2D copies).
+        destinations: The per-device buffers to copy ``source`` into.
+    """
+    for destination in destinations:
+        destination.inplace_copy_from(source)
+    if not source.pinned:
+        return
+    source_device = source.device
+    source_stream = source_device.default_queue
+    for destination in destinations:
+        if destination.device.id != source_device.id:
+            source_stream.wait_for(destination.device.default_queue)
 
 
 def load_max_buffer(path: PathLike[str]) -> Buffer:

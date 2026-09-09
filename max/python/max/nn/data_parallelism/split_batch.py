@@ -24,17 +24,33 @@ def split_batch(
 ) -> tuple[list[TensorValue], list[TensorValue]]:
     """Split a ragged input batch into data parallel batches.
 
+    The following example splits a ragged batch of 4 requests across two device
+    references, sending the first two requests to device 0 and the last two to
+    device 1 via ``data_parallel_splits = [0, 2, 4]``:
+
     .. code-block:: python
 
-        # Input
-        devices = [device_1, device_2]
-        input = [seq_1, seq_2, seq_3, seq_4]
-        input_row_offsets = [0, offset_1, offset_2, offset_3, offset_4]
-        data_parallel_splits = [0, 2, 4]
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType
+        from max.nn.data_parallelism import split_batch
 
-        # Outputs
-        split_input = [seq_1, seq_2], [seq_3, seq_4]
-        split_offsets = [0, offset_1, offset_2], [0, new_offset_3, new_offset_4]
+        cpu = DeviceRef.CPU()
+        devices = [DeviceRef.CPU(0), DeviceRef.CPU(1)]
+        with Graph(
+            "split_batch_example",
+            input_types=(
+                TensorType(DType.float32, ["total_seq_len", 8], device=cpu),
+                TensorType(DType.uint32, ["offsets_len"], device=cpu),
+                TensorType(DType.int64, [3], device=cpu),
+            ),
+        ) as graph:
+            input, input_row_offsets, data_parallel_splits = (
+                v.tensor for v in graph.inputs
+            )
+            split_input, split_offsets = split_batch(
+                devices, input, input_row_offsets, data_parallel_splits
+            )
+            graph.output(*split_input, *split_offsets)
 
     This method places the outputs on the devices specified in `devices`.
 
@@ -116,17 +132,46 @@ def split_batch_replicated(
     each device. Also see `split_input` for a version of this method that takes
     a single ragged token batch.
 
+    The following example splits a ragged batch of 4 requests that is
+    replicated across two device references. Each device holds a full copy of
+    the input and its row offsets, and ``data_parallel_splits = [0, 2, 4]``
+    assigns the first two requests to device 0 and the last two to device 1:
+
     .. code-block:: python
 
-        # Input
-        devices = [device_1, device_2]
-        input = [seq_1, seq_2, seq_3, seq_4] (replicated for each device)
-        input_row_offsets = [0, offset_1, offset_2, offset_3, offset_4] (replicated for each device)
-        data_parallel_splits = [0, 2, 4]
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType
+        from max.nn.data_parallelism import split_batch_replicated
 
-        # Outputs
-        split_input = [seq_1, seq_2], [seq_3, seq_4]
-        split_offsets = [0, offset_1, offset_2], [0, new_offset_3, new_offset_4]
+        cpu = DeviceRef.CPU()
+        devices = [DeviceRef.CPU(0), DeviceRef.CPU(1)]
+        with Graph(
+            "split_batch_replicated_example",
+            input_types=(
+                TensorType(DType.int64, ["seq_len"], device=devices[0]),
+                TensorType(DType.int64, ["seq_len"], device=devices[1]),
+                TensorType(DType.uint32, ["offsets_len"], device=devices[0]),
+                TensorType(DType.uint32, ["offsets_len"], device=devices[1]),
+                TensorType(DType.uint32, ["offsets_len"], device=cpu),
+                TensorType(DType.int64, [3], device=cpu),
+            ),
+        ) as graph:
+            (
+                input_0,
+                input_1,
+                offsets_0,
+                offsets_1,
+                input_row_offsets_int64,
+                data_parallel_splits,
+            ) = (v.tensor for v in graph.inputs)
+            split_input, split_offsets = split_batch_replicated(
+                devices,
+                [input_0, input_1],
+                [offsets_0, offsets_1],
+                input_row_offsets_int64,
+                data_parallel_splits,
+            )
+            graph.output(*split_input, *split_offsets)
 
     This method places the outputs on the devices specified in `devices`.
 

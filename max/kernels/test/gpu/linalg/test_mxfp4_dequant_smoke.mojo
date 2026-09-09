@@ -18,7 +18,7 @@ for several shapes and scale values. Target runtime: < 30s on H100.
 
 from std.math import ceildiv
 from std.memory import bitcast
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import TileTensor, row_major
 from linalg.mxfp4_dequant import dequant_mxfp4
 from linalg.fp4_utils import E2M1_TO_FLOAT32
@@ -34,15 +34,15 @@ def _e8m0_to_float32(bits: UInt8) -> Float32:
     if bits == UInt8(0):
         return Float32(0.0)
     var f32_bits = UInt32(bits) << UInt32(23)
-    return bitcast[DType.float32](f32_bits)
+    return bitcast[.float32](f32_bits)
 
 
 def _cpu_dequant_mxfp4[
-    out_dtype: DType = DType.bfloat16
+    out_dtype: DType = .bfloat16
 ](
-    expected: UnsafePointer[mut=True, Scalar[out_dtype], _],
-    input_data: UnsafePointer[mut=False, Scalar[DType.uint8], _],
-    scales_data: UnsafePointer[mut=False, Scalar[DType.uint8], _],
+    expected: MutPointer[Scalar[out_dtype], _],
+    input_data: ImmPointer[UInt8, _],
+    scales_data: ImmPointer[UInt8, _],
     num_rows: Int,
     num_cols: Int,
 ):
@@ -69,7 +69,7 @@ def _cpu_dequant_mxfp4[
 def test_mxfp4_dequant[
     num_rows: Int,
     num_cols: Int,
-    out_dtype: DType = DType.bfloat16,
+    out_dtype: DType = .bfloat16,
 ](ctx: DeviceContext, scale_exp: UInt8) raises:
     """Tests MXFP4 dequant kernel for compile-time shape and runtime scale."""
     comptime packed_cols = num_cols // 2
@@ -100,8 +100,8 @@ def test_mxfp4_dequant[
     comptime out_size = num_rows * num_cols
 
     # Allocate and fill host input
-    var in_host = ctx.enqueue_create_host_buffer[DType.uint8](in_size)
-    var scales_host = ctx.enqueue_create_host_buffer[DType.uint8](scales_size)
+    var in_host = ctx.enqueue_create_host_buffer[.uint8](in_size)
+    var scales_host = ctx.enqueue_create_host_buffer[.uint8](scales_size)
     var expected_host = ctx.enqueue_create_host_buffer[out_dtype](out_size)
     for i in range(scales_size):
         scales_host[i] = scale_exp
@@ -122,24 +122,20 @@ def test_mxfp4_dequant[
     )
 
     # Device buffers
-    var in_device = ctx.enqueue_create_buffer[DType.uint8](in_size)
-    var scales_device = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](
-        scales_size
-    )
+    var in_device = ctx.enqueue_create_buffer[.uint8](in_size)
+    var scales_device = ctx.enqueue_create_buffer[.float8_e8m0fnu](scales_size)
     var out_device = ctx.enqueue_create_buffer[out_dtype](out_size)
 
     # Upload input via host buffers
-    var in_host_buf = ctx.enqueue_create_host_buffer[DType.uint8](in_size)
-    var scales_host_buf = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
+    var in_host_buf = ctx.enqueue_create_host_buffer[.uint8](in_size)
+    var scales_host_buf = ctx.enqueue_create_host_buffer[.float8_e8m0fnu](
         scales_size
     )
 
     for i in range(in_size):
         in_host_buf[i] = in_host[i]
     for i in range(scales_size):
-        scales_host_buf[i] = rebind[Scalar[DType.float8_e8m0fnu]](
-            scales_host[i]
-        )
+        scales_host_buf[i] = bitcast[.float8_e8m0fnu](scales_host[i])
 
     ctx.enqueue_copy(in_device, in_host_buf)
     ctx.enqueue_copy(scales_device, scales_host_buf)
@@ -170,8 +166,8 @@ def test_mxfp4_dequant[
     var max_err = Float32(0.0)
     var num_mismatches = 0
     for i in range(out_size):
-        var got = out_host_buf[i].cast[DType.float32]()
-        var exp = expected_host[i].cast[DType.float32]()
+        var got = out_host_buf[i].cast[.float32]()
+        var exp = expected_host[i].cast[.float32]()
         var err = abs(got - exp)
         max_err = max(max_err, err)
         if err > tol:
@@ -229,12 +225,8 @@ def main() raises:
 
         # FP8 output (the path used by mxfp4_matmul_sm90)
         print("-- FP8 output --")
-        test_mxfp4_dequant[64, 64, out_dtype=DType.float8_e4m3fn](
-            ctx, UInt8(127)
-        )
-        test_mxfp4_dequant[128, 512, out_dtype=DType.float8_e4m3fn](
-            ctx, UInt8(127)
-        )
+        test_mxfp4_dequant[64, 64, out_dtype=.float8_e4m3fn](ctx, UInt8(127))
+        test_mxfp4_dequant[128, 512, out_dtype=.float8_e4m3fn](ctx, UInt8(127))
 
         print("======================================")
         print("ALL TESTS PASSED")

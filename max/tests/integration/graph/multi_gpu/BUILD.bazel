@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -14,7 +13,7 @@ modular_py_test(
         ["*.py"],
     ),
     exec_properties = {
-        "test.resources:gpu-memory": "2",
+        "test.resources:gpu-memory": "3",
     },
     gpu_constraints = ["//:has_multi_gpu"],
     tags = ["gpu"],
@@ -25,6 +24,8 @@ modular_py_test(
         "//max/python/max/graph",
         "//max/python/max/nn",
         "//max/python/max/support",
+        requirement("ml-dtypes"),
         requirement("numpy"),
+        requirement("torch"),
     ],
 )

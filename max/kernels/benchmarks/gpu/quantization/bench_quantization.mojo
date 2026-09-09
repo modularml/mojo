@@ -18,6 +18,7 @@ from std.sys import (
     get_defined_bool,
 )
 from std.math import ceildiv
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     BenchConfig,
@@ -26,7 +27,7 @@ from std.benchmark import (
     ThroughputMeasure,
     BenchMetric,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Layout,
     LayoutTensor,
@@ -35,7 +36,7 @@ from layout import (
     lt_to_tt,
 )
 from layout._fillers import random
-from std.gpu.host.info import _is_sm10x_gpu
+from max.gpu.host.info import _is_sm10x_gpu
 
 from std.utils.index import IndexList
 from linalg.fp4_utils import (
@@ -47,7 +48,7 @@ from linalg.fp4_utils import (
     MXFP8_SF_VECTOR_SIZE,
     MXFP8_SF_DTYPE,
 )
-from linalg.fp4_quantization import (
+from linalg.block_scaled_quantization import (
     quantize_dynamic_scaled_fp4fp8,
     quantize_dynamic_scaled_fp4_async,
 )
@@ -122,33 +123,32 @@ def bench_1d1d_quantization[
         random(in_host_tensor)
 
     @always_inline
-    @__copy_capture(input_tensor, output_tensor, scales_tensor)
-    @parameter
-    def bench_fn(mut b: Bencher) raises:
-        @parameter
+    def bench_fn(
+        mut b: Bencher,
+    ) raises {var input_tensor, var output_tensor, var scales_tensor, imm,}:
         @always_inline
-        def kernel_launch(ctx: DeviceContext) raises:
+        def kernel_launch(ctx: DeviceContext) raises {imm}:
             # Run the quantization kernel
             comptime if use_async:
                 quantize_dynamic_scaled_fp4_async[
                     SF_VECTOR_SIZE=SF_VECTOR_SIZE
                 ](
                     ctx,
-                    lt_to_tt(output_tensor).as_any_origin(),
-                    lt_to_tt(scales_tensor).as_any_origin(),
-                    lt_to_tt(input_tensor).as_any_origin(),
+                    lt_to_tt(output_tensor).as_unsafe_any_origin(),
+                    lt_to_tt(scales_tensor).as_unsafe_any_origin(),
+                    lt_to_tt(input_tensor).as_unsafe_any_origin(),
                 )
             else:
                 quantize_dynamic_scaled_fp4fp8[SF_VECTOR_SIZE=SF_VECTOR_SIZE](
                     ctx,
-                    lt_to_tt(output_tensor).as_any_origin(),
-                    lt_to_tt(scales_tensor).as_any_origin(),
-                    lt_to_tt(input_tensor).as_any_origin(),
+                    lt_to_tt(output_tensor).as_unsafe_any_origin(),
+                    lt_to_tt(scales_tensor).as_unsafe_any_origin(),
+                    lt_to_tt(input_tensor).as_unsafe_any_origin(),
                     num_cols=cols,
                     num_cols_padded=cols,
                 )
 
-        b.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(b, kernel_launch, ctx)
 
     var bytes = ThroughputMeasure(
         BenchMetric.bytes,
@@ -162,7 +162,8 @@ def bench_1d1d_quantization[
         * size_of[scales_dtype](),
     )
 
-    b.bench_function[bench_fn](
+    b.bench_function(
+        bench_fn,
         BenchId(
             "1d1d_quantization",
             input_id=String(
@@ -184,7 +185,7 @@ def bench_1d1d_quantization[
 
 
 def main() raises:
-    comptime in_dtype = get_defined_dtype["dtype", DType.bfloat16]()
+    comptime in_dtype = get_defined_dtype["dtype", .bfloat16]()
 
     var rows = Int(arg_parse("M", 1))
     comptime cols = get_defined_int["N", 1024]()

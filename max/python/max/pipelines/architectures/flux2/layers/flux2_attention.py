@@ -296,7 +296,7 @@ class Flux2Attention(Module, Shardable):
         *,
         dtype: DType,
         devices: Sequence[DeviceRef],
-        quant: Flux2BlockQuant = Flux2BlockQuant(),
+        quant: Flux2BlockQuant = Flux2BlockQuant(),  # noqa: B008
     ) -> None:
         """Initialize Flux2Attention.
 

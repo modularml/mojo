@@ -16,6 +16,9 @@ from __future__ import annotations
 
 import pytest
 from max.experimental.cascade import LocalRuntime, Worker, worker_method
+from max.experimental.cascade.core.pipeline_method import (
+    _pipeline_method_scope,
+)
 
 
 class _CPUEchoWorker(Worker):
@@ -30,6 +33,11 @@ class _CPUEchoWorker(Worker):
 
 @pytest.mark.asyncio
 async def test_local_runtime_deploys_worker() -> None:
-    async with LocalRuntime().open() as runtime:
+    async with LocalRuntime() as runtime, _pipeline_method_scope():
         proxy = await runtime.deploy(_CPUEchoWorker("local"))
-        assert await proxy.echo("ok") == "local:ok"
+        # Two awaits: the first gets the ``Result`` handle, the second
+        # resolves it to the value. Pipelines decorated with
+        # ``@pipeline_method`` do the second await automatically when
+        # passing a ``Result`` as an argument to another worker method.
+        echo_handle = await proxy.echo("ok")
+        assert await echo_handle == "local:ok"

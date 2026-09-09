@@ -27,7 +27,7 @@ it leaves less room to optimize across the full computation.
 
 ## Anatomy of a graph
 
-In MAX, a [`Graph`](/max/api/python/generated/max.graph.Graph/) is the data
+In MAX, a [`Graph`](/api/python/generated/max.graph.Graph/) is the data
 structure that contains a model's computation. When operations (ops) run inside
 a graph, MAX records each operation into an intermediate representation (IR)
 that the compiler uses to analyze and optimize the computation. Importantly,
@@ -65,11 +65,11 @@ structure.
 
 ### Explicit graph construction
 
-With [`max.graph`](/max/api/python/graph) and [`max.nn`](/max/api/python/nn),
+With [`max.graph`](/api/python/graph) and [`max.nn`](/api/python/nn),
 you build the graph directly. You open a
-[`Graph`](/max/api/python/generated/max.graph.Graph/) context, declare your
-inputs as [`TensorValue`](/max/api/python/generated/max.graph.TensorValue/)
-objects, apply [ops](/max/api/python/graph.ops/) to those symbolic values, and
+[`Graph`](/api/python/generated/max.graph.Graph/) context, declare your
+inputs as [`TensorValue`](/api/python/generated/max.graph.TensorValue/)
+objects, apply [ops](/api/python/graph.ops/) to those symbolic values, and
 mark the outputs.
 
 This pattern gives you full control over graph topology and is useful when you
@@ -97,7 +97,8 @@ with Graph("relu_graph", input_types=[input_type]) as graph:
 
 # Compile the graph
 session = InferenceSession(devices=[cpu])
-model = session.load(graph)
+compiled = session.compile(graph)
+model = session.init(compiled)
 
 # Run the computation and inspect results
 input_data = np.array([1.0, -2.0, 3.0, -4.0, 5.0], dtype=np.float32)
@@ -107,9 +108,9 @@ print(np.from_dlpack(result[0]))
 
 ### Eager execution
 
-With [`max.experimental`](/max/api/python/experimental), you write code that
+With [`max.experimental`](/api/python/experimental), you write code that
 you can run directly. You define your model computation with operations on
-[`Tensor`](/max/api/python/generated/max.experimental.tensor.Tensor) objects
+[`Tensor`](/api/python/generated/max.experimental.tensor.Tensor) objects
 and execute that computation immediately without explicitly creating a graph:
 
 This pattern is eager because every operation returns a result right away,
@@ -119,8 +120,8 @@ In fact, `max.experimental` stages operations into graphs (the same kind you'd
 build explicitly) and runs each staged graph so you get a result back. Every
 operation you run goes through this staging and realization work, which adds up
 in a production loop. For production deployment, group your ops into a
-[`Module`](/max/api/python/generated/max.experimental.nn.Module) and call
-[`compile()`](/max/api/python/generated/max.experimental.nn.Module#max.experimental.nn.Module.compile)<!-- rumdl-disable-line MD013 -->
+[`Module`](/api/python/generated/max.experimental.nn.Module) and call
+[`compile()`](/api/python/generated/max.experimental.nn.Module#max.experimental.nn.Module.compile)<!-- rumdl-disable-line MD013 -->
 on the module to capture the whole computation as a single optimized graph that
 you can run quickly and repeatedly.
 
@@ -140,24 +141,24 @@ print(y)  # Result is available immediately
 The two patterns use parallel but separate APIs. Review the following table to
 see the API separation:
 
-|                          | Explicit graph construction                                                 | Eager execution                                                                              |
-|--------------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-| **Primary data object**  | [`max.graph.TensorValue`](/max/api/python/generated/max.graph.TensorValue/) | [`max.experimental.tensor.Tensor`](/max/api/python/generated/max.experimental.tensor.Tensor) |
-| **Built-in operations**  | [`max.graph.ops`](/max/api/python/graph/ops)                                | [`max.experimental.functional`](/max/api/python/experimental.functional)                     |
-| **Python operators**     | `+`, `-`, `*`, `/`, `@` on `TensorValue`                                    | `+`, `-`, `*`, `/`, `@` on `Tensor`                                                          |
-| **`Module` abstraction** | [`max.nn.Module`](/max/api/python/generated/max.nn.Module)                  | [`max.experimental.nn.Module`](/max/api/python/generated/max.experimental.nn.Module)         |
+|                          | Explicit graph construction                                             | Eager execution                                                                          |
+|--------------------------|-------------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| **Primary data object**  | [`max.graph.TensorValue`](/api/python/generated/max.graph.TensorValue/) | [`max.experimental.tensor.Tensor`](/api/python/generated/max.experimental.tensor.Tensor) |
+| **Built-in operations**  | [`max.graph.ops`](/api/python/graph.ops/)                               | [`max.experimental.functional`](/api/python/experimental.functional)                     |
+| **Python operators**     | `+`, `-`, `*`, `/`, `@` on `TensorValue`                                | `+`, `-`, `*`, `/`, `@` on `Tensor`                                                      |
+| **`Module` abstraction** | [`max.nn.Module`](/api/python/generated/max.nn.Module)                  | [`max.experimental.nn.Module`](/api/python/generated/max.experimental.nn.Module)         |
 
 ## Next steps
 
 Now that you understand why graphs are foundational to MAX, explore how graphs
 fit into the larger model development workflow:
 
-- [Build a model graph with Module](/max/develop/modules): Learn how to
+- [Build a model graph with Module](/develop/modules): Learn how to
   compose ops into reusable `Module` objects and assemble them into a full
   model graph.
-- [Model bring-up workflow](/max/develop/model-bringup-workflow): See how a
+- [Model bring-up workflow](/develop/model-bringup-workflow): See how a
   model graph fits inside a MAX model architecture package, from
   configuration and weight loading to serving.
-- [Model pipeline](/max/develop/pipelines): Connect your model to an
+- [Model pipeline](/develop/pipelines): Connect your model to an
   inference pipeline that handles tokenization, batching, and request
   routing.

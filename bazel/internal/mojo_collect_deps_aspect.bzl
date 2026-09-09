@@ -1,5 +1,7 @@
 """Traverse dependencies to collect Mojo information."""
 
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_mojo//mojo:providers.bzl", "MojoInfo")
 
 def _collect_mojoinfo_aspect_impl(target, ctx):
@@ -11,6 +13,7 @@ def _collect_mojoinfo_aspect_impl(target, ctx):
 
     transitive_import_paths = []
     transitive_mojodeps = []
+    cc_infos = []
 
     # 2. Iterate over specified attributes (e.g., 'deps', 'data') to find dependencies
     #    The aspect definition below will specify which attributes to traverse.
@@ -21,6 +24,9 @@ def _collect_mojoinfo_aspect_impl(target, ctx):
             if MojoInfo in dep:
                 transitive_import_paths.append(dep[MojoInfo].import_paths)
                 transitive_mojodeps.append(dep[MojoInfo].mojodeps)
+                cc_infos.append(dep[MojoInfo].ccdeps)
+            if CcInfo in dep:
+                cc_infos.append(dep[CcInfo])
 
     # Return a new MojoInfo provider with the aggregated mojodeps.
     # This allows transitive collection.
@@ -28,6 +34,7 @@ def _collect_mojoinfo_aspect_impl(target, ctx):
         MojoInfo(
             import_paths = depset(transitive = transitive_import_paths),
             mojodeps = depset(transitive = transitive_mojodeps),
+            ccdeps = cc_common.merge_cc_infos(cc_infos = cc_infos),
         ),
     ]
 
@@ -47,6 +54,7 @@ def _collect_transitive_mojoinfo_impl(ctx):
     """
     import_paths = []
     mojodeps = []
+    cc_infos = []
 
     # The 'deps_to_scan' attribute has the 'collect_data_metadata_aspect' applied to it.
     # Each target listed in 'deps_to_scan' (and their relevant transitive dependencies
@@ -59,11 +67,13 @@ def _collect_transitive_mojoinfo_impl(ctx):
         if MojoInfo in dep:
             import_paths.append(dep[MojoInfo].import_paths)
             mojodeps.append(dep[MojoInfo].mojodeps)
+            cc_infos.append(dep[MojoInfo].ccdeps)
 
     return [
         MojoInfo(
             import_paths = depset(transitive = import_paths),
             mojodeps = depset(transitive = mojodeps),
+            ccdeps = cc_common.merge_cc_infos(cc_infos = cc_infos),
         ),
     ]
 

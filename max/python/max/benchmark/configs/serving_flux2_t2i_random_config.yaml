@@ -13,7 +13,7 @@
 
 # FLUX.2-dev text-to-image serving benchmark configuration (random dataset)
 # Usage:
-#   ./bazelw run //max/python/max/entrypoints:pipelines -- benchmark \
+#   ./bazelw run //max/python/max/_entrypoints:pipelines -- benchmark \
 #     --config-file max/python/max/benchmark/configs/serving_flux2_t2i_random_config.yaml
 
 name: "Serving Benchmark Configuration - FLUX.2-dev T2I Random"

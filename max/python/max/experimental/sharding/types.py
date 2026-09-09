@@ -32,16 +32,13 @@ from max.graph import (
     BufferType,
     DeviceRef,
     Shape,
-    StaticDim,
-    SymbolicDim,
     TensorType,
 )
 from max.graph.shape import ShapeLike
 
-from .mappings import DeviceMapping, NamedMapping
+from .mappings import DeviceMapping
 from .mesh import DeviceMesh
-from .placements import Placement, Sharded
-from .shapes import sharded_symbolic_dim
+from .placements import Placement, Sharded, local_shard_shape_from_global
 
 T = TypeVar("T", TensorType, BufferType)
 
@@ -87,36 +84,13 @@ class DistributedType(Generic[T], ABC):
     def _local_shard_shape(self, device_idx: int = 0) -> Shape:
         """Computes one device's local shard shape from the global shape.
 
-        Static dims are divided evenly. Symbolic dims emit per-coord
-        distinct names via :func:`sharded_symbolic_dim` so the graph
-        treats each shard as an independent runtime size. Algebraic
-        dims use ``dim // mesh_axis_size``.
+        Delegates to :func:`local_shard_shape_from_global` (which dispatches
+        per placement type) and returns the requested device's shape.
         """
-        dims = list(self.shape)
-        for mesh_axis, placement in enumerate(self.placements):
-            if not isinstance(placement, Sharded):
-                continue
-            tensor_axis = placement.axis
-            dim = dims[tensor_axis]
-            mesh_axis_size = self.mesh.mesh_shape[mesh_axis]
-
-            if isinstance(dim, StaticDim):
-                size = int(dim)
-                if size % mesh_axis_size != 0:
-                    raise ValueError(
-                        f"Static dimension {size} at axis {tensor_axis} is "
-                        f"not evenly divisible by mesh axis "
-                        f"{self.mesh.axis_names[mesh_axis]!r} "
-                        f"(size {mesh_axis_size})."
-                    )
-                dims[tensor_axis] = StaticDim(size // mesh_axis_size)
-            elif isinstance(dim, SymbolicDim):
-                dims[tensor_axis] = sharded_symbolic_dim(
-                    dim, self.mesh, mesh_axis, device_idx
-                )
-            else:
-                dims[tensor_axis] = dim // mesh_axis_size
-        return Shape(dims)
+        shapes = local_shard_shape_from_global(
+            self.shape, self.mesh, self.placements
+        )
+        return shapes[device_idx]
 
     @property
     def rank(self) -> int:
@@ -241,42 +215,13 @@ class TensorLayout(DeviceMapping):
         object.__setattr__(self, "dtype", dtype)
         object.__setattr__(self, "shape", Shape(shape))
         object.__setattr__(self, "mapping", mapping)
+        object.__setattr__(self, "mesh", mapping.mesh)
+        object.__setattr__(self, "placements", mapping.placements)
 
     @property
     def rank(self) -> int:
         """The number of dimensions."""
         return len(self.shape)
-
-    @property
-    def mesh(self) -> DeviceMesh:
-        """The device mesh derived from the mapping."""
-        return self.mapping.mesh
-
-    @property
-    def is_fully_resolved(self) -> bool:
-        """Whether this spec can be used in eager dispatch.
-
-        Returns ``False`` if the spec contains compiler-only annotations
-        (e.g. priorities) that cannot be resolved without a compiler.
-        """
-        return self.mapping.is_fully_resolved
-
-    @property
-    def is_fully_replicated(self) -> bool:
-        """Whether every device holds a complete copy of the tensor.
-
-        Returns ``True`` if no dimension is sharded and there are no
-        pending reductions.
-        """
-        return self.mapping.is_fully_replicated
-
-    def to_placements(self) -> tuple[Placement, ...]:
-        """Converts to mesh-axis-indexed placements for eager dispatch."""
-        return self.mapping.to_placements()
-
-    def to_named_sharding(self, tensor_rank: int) -> NamedMapping:
-        """Converts to tensor-dim-indexed spec for compiler lowering."""
-        return self.mapping.to_named_sharding(tensor_rank)
 
     def __repr__(self) -> str:
         shape_str = ", ".join(str(d) for d in self.shape)

@@ -77,7 +77,7 @@ def get_rope_index_torch(
         )
         image_index, video_index = 0, 0
         attention_mask = attention_mask.to(total_input_ids.device)
-        for i, input_ids in enumerate(total_input_ids):
+        for i, input_ids in enumerate(total_input_ids):  # noqa: PLR1704 (FIXME)
             input_ids = input_ids[attention_mask[i] == 1]
             image_nums, video_nums = 0, 0
             vision_start_indices = torch.argwhere(

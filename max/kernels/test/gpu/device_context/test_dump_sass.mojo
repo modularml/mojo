@@ -14,7 +14,7 @@
 from std.pathlib import Path
 from std.sys._assembly import inlined_assembly
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 
 comptime ptxas_path = Path("/usr/local/cuda/bin/ptxas")
 comptime nvdisasm_path = Path("/usr/local/cuda/bin/nvdisasm")

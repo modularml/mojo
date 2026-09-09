@@ -1,8 +1,11 @@
-load("//bazel:api.bzl", "modular_multi_py_version_test", "modular_py_test", "requirement")
+load("//bazel:api.bzl", "modular_multi_py_version_test", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
+load(
+    "//max/tests/integration/test_common:pipeline_mef_precompile.bzl",
+    "precompiled_pipeline_mefs",
+)
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -22,7 +25,6 @@ modular_py_test(
         ),
     },
     tags = [
-        "manual",  # TODO(MXTOOLS-187): Fails due to lack of CPU memory.
         "no-sandbox",
     ],
     target_compatible_with = select({
@@ -30,7 +32,7 @@ modular_py_test(
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
-        "//max/python/max/entrypoints:pipelines",
+        "//max/python/max/_entrypoints:pipelines",
     ],
 )
 
@@ -38,6 +40,10 @@ modular_py_test(
     name = "test_pipelines_cli_gpu",
     size = "enormous",
     srcs = ["test_pipelines_cli_gpu.py"],
+    data = [":smollm_mefs"],
+    env = {
+        "PRECOMPILED_MEFS_DIR": "$(rootpath :smollm_mefs)",
+    },
     exec_properties = {
         "test.resources:gpu-memory": "5",
     },
@@ -51,19 +57,80 @@ modular_py_test(
         "requires-network",
     ],
     deps = [
-        "//max/python/max/entrypoints:pipelines",
-        "//max/tests/integration:hf_repo_lock",
+        ":cli_pipeline_flags",
+        "//max/python/max/_entrypoints:pipelines",
         "//max/tests/integration/test_common:graph_utils",
         "//max/tests/integration/test_common:lora_utils",
     ],
+)
+
+# The pipeline flags shared by the GPU tests and their CPU precompiler, so the
+# precompiled graphs cannot drift from the ones a GPU run builds.
+modular_py_library(
+    name = "cli_pipeline_flags",
+    testonly = True,
+    srcs = ["_cli_pipeline_flags.py"],
+    imports = ["."],
+)
+
+# Compiles under virtual devices, so it needs no GPU. Run only as a build action
+# by precompiled_pipeline_mefs.
+modular_py_binary(
+    name = "precompile_cli_pipeline_bin",
+    testonly = True,
+    srcs = ["precompile_cli_pipeline.py"],
+    imports = ["."],
+    main = "precompile_cli_pipeline.py",
+    tags = ["manual"],
+    deps = [
+        ":cli_pipeline_flags",
+        "//max/python/max/_entrypoints:pipelines",
+        "//max/python/max/driver",
+        requirement("click"),
+    ],
+)
+
+# Metal has no virtual-device compile-only mode, so these build actions cannot
+# run on the macOS lane -- where their tests are skipped anyway.
+_NO_METAL_VIRTUAL_DEVICE = select({
+    "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
+    "//conditions:default": [],
+})
+
+# Move each configuration's compiles off the GPU worker onto a cacheable CPU
+# build action. The arch comes from the mojo toolchain, so one target serves
+# every GPU lane its test runs on -- but a lane with no accelerator has no arch
+# to compile for, hence the same gate the tests carry.
+precompiled_pipeline_mefs(
+    name = "smollm_mefs",
+    producer = ":precompile_cli_pipeline_bin",
+    producer_args = [
+        "--flag-set",
+        "smollm",
+    ],
+    target_compatible_with = ["//:has_gpu"] + _NO_METAL_VIRTUAL_DEVICE,
+)
+
+precompiled_pipeline_mefs(
+    name = "structured_output_mefs",
+    producer = ":precompile_cli_pipeline_bin",
+    producer_args = [
+        "--flag-set",
+        "smollm-structured-output",
+    ],
+    target_compatible_with = ["//:has_gpu"] + _NO_METAL_VIRTUAL_DEVICE,
 )
 
 modular_py_test(
     name = "test_pipelines_cli_gpu_structured_output",
     size = "enormous",
     srcs = ["test_pipelines_cli_gpu_structured_output.py"],
+    data = [":structured_output_mefs"],
+    env = {
+        "PRECOMPILED_MEFS_DIR": "$(rootpath :structured_output_mefs)",
+    },
     exec_properties = {
-        "test.resources:gpu-memory": "5",
+        "test.resources:gpu-memory": "6",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
@@ -75,8 +142,8 @@ modular_py_test(
         "requires-network",
     ],
     deps = [
-        "//max/python/max/entrypoints:pipelines",
-        "//max/tests/integration:hf_repo_lock",
+        ":cli_pipeline_flags",
+        "//max/python/max/_entrypoints:pipelines",
         "//max/tests/integration/test_common:graph_utils",
     ],
 )
@@ -90,7 +157,22 @@ modular_multi_py_version_test(
         "//conditions:default": [],
     }),
     deps = [
-        "//max/python/max/entrypoints:pipelines",
+        "//max/python/max/_entrypoints:pipelines",
+        requirement("click"),
+    ],
+)
+
+# Similar to above, but for `max benchmark`. Intentionally separate so that the deps are different.
+modular_multi_py_version_test(
+    name = "test_pipelines_cli_benchmark_help",
+    srcs = ["test_pipelines_cli_benchmark_help.py"],
+    # Takes way too long on Mac
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/_entrypoints:benchmark",
         requirement("click"),
     ],
 )
@@ -100,7 +182,7 @@ modular_py_test(
     size = "large",
     srcs = ["test_pipelines_cli_lightweight.py"],
     deps = [
-        "//max/python/max/entrypoints:pipelines",
+        "//max/python/max/_entrypoints:pipelines",
     ],
 )
 
@@ -112,7 +194,7 @@ modular_py_test(
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
-        "//max/python/max/entrypoints:pipelines",
+        "//max/python/max/_entrypoints:pipelines",
     ],
 )
 
@@ -136,8 +218,7 @@ modular_py_test(
         "requires-network",
     ],
     deps = [
-        "//max/python/max/entrypoints:pipelines",
-        "//max/tests/integration:hf_repo_lock",
+        "//max/python/max/_entrypoints:pipelines",
         requirement("transformers"),
         requirement("gguf"),
         requirement("safetensors"),

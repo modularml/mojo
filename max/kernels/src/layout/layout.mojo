@@ -55,6 +55,7 @@ var tiled = blocked_product(layout^, Layout([2, 2]))
 """
 
 import std.sys
+from std.math import ceildiv
 from std.collections.string.string import _calc_initial_buffer_size_int32
 from std.os import abort
 
@@ -178,7 +179,7 @@ def make_ordered_layout(shape: IntTuple, order: IntTuple) -> Layout:
 
 
 @fieldwise_init
-struct _LayoutIter[origin: ImmutOrigin](ImplicitlyCopyable, Iterable, Iterator):
+struct _LayoutIter[origin: ImmOrigin](ImplicitlyCopyable, Iterable, Iterator):
     """Iterator for traversing Layout dimensions.
 
     This internal iterator allows traversing the dimensions of a Layout object,
@@ -186,7 +187,7 @@ struct _LayoutIter[origin: ImmutOrigin](ImplicitlyCopyable, Iterable, Iterator):
     and stride for that dimension.
 
     Parameters:
-        origin: The origin type for the `Layout` pointer, must be `ImmutOrigin`.
+        origin: The origin type for the `Layout` pointer, must be `ImmOrigin`.
 
     Attributes:
         index: Current position in the iteration.
@@ -292,7 +293,7 @@ struct Layout(
 
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
-    ]: Iterator = _LayoutIter[ImmutOrigin(iterable_origin)]
+    ]: Iterator = _LayoutIter[ImmOrigin(iterable_origin)]
     """The iterator type for Layout iteration.
 
     Parameters:
@@ -1157,7 +1158,7 @@ def complement(layout: Layout, size: Int = 1) -> Layout:
         result_shape.replace_entry(i, int_value=UNKNOWN_VALUE)
     else:
         result_shape.replace_entry(
-            i, int_value=(size + current_idx - 1) // current_idx
+            i, int_value=ceildiv(size, current_idx)
         )  # ceil_div
     result_stride.replace_entry(i, int_value=current_idx)
     i += 1
@@ -1284,7 +1285,7 @@ def zip_modes(layout_a: Layout, layout_b: Layout) -> Layout:
     """
     var zipped = Layout()
     for i in range(layout_a.rank()):
-        bi = layout_b[i]
+        var bi = layout_b[i]
         if is_int(bi.shape) and Int(bi.shape) <= 0:
             zipped.append(layout_a[i])
         else:
@@ -1638,7 +1639,7 @@ def format_layout[W: Writer](layout: Layout, mut writer: W):
         writer: The writer to output the formatted layout to.
     """
 
-    @parameter
+    @__parameter
     def _write_divider(column_count: Int, cell_width: Int):
         for _ in range(column_count):
             writer.write("+")
@@ -1739,7 +1740,7 @@ def expand_strides(shape: IntTuple, stride: Int) -> IntTuple:
 
 def expand_modes_alike(
     shape_a: IntTuple, stride_a: IntTuple, shape_b: IntTuple, stride_b: IntTuple
-) -> InlineArray[IntTuple, 3]:
+) -> Array[IntTuple, 3]:
     """Aligns two shape-stride pairs to have the same hierarchical structure.
 
     This function is used to make two layouts compatible for operations by ensuring
@@ -1812,9 +1813,7 @@ def expand_modes_alike(
         ]
 
 
-def expand_modes_alike(
-    layout_a: Layout, layout_b: Layout
-) -> InlineArray[Layout, 2]:
+def expand_modes_alike(layout_a: Layout, layout_b: Layout) -> Array[Layout, 2]:
     """Aligns two layouts to have the same hierarchical structure.
 
     This function tiles both layouts so they mirror each other's structure,
@@ -1967,10 +1966,10 @@ def is_row_major[rank: Int](layout: Layout) -> Bool:
     if flat_stride[flat_rank - 1].value() != 1:
         return False
 
-    correct_stride = flat_shape[flat_rank - 1].value()
+    var correct_stride = flat_shape[flat_rank - 1].value()
 
     for i in reversed(range(flat_rank - 1)):
-        stride_i = flat_stride[i].value()
+        var stride_i = flat_stride[i].value()
         if stride_i != correct_stride:
             return False
         correct_stride *= flat_shape[i].value()

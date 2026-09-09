@@ -1,0 +1,73 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+name: bench_softmax_comparison
+file: $BUILD_WORKSPACE_DIRECTORY/max/kernels/benchmarks/misc/comparison/bench_softmax.py
+
+engines: &engines
+  $engine: ["torch", "modular_max"]
+
+params:
+# Typical LLM vocabulary sizes (logits softmax)
+- <<: *engines
+  shape: 1x128256
+  dtype: bfloat16
+- <<: *engines
+  shape: 32x128256
+  dtype: bfloat16
+- <<: *engines
+  shape: 128x128256
+  dtype: bfloat16
+
+# Attention softmax shapes (seq_len dimension)
+- <<: *engines
+  shape: 32x512
+  dtype: bfloat16
+- <<: *engines
+  shape: 32x2048
+  dtype: bfloat16
+- <<: *engines
+  shape: 32x8192
+  dtype: bfloat16
+
+# Llama-style shapes
+- <<: *engines
+  shape: 256x4096
+  dtype: bfloat16
+- <<: *engines
+  shape: 1024x4096
+  dtype: bfloat16
+
+# Batched attention (batch x heads x seq_len)
+- <<: *engines
+  shape: 4x32x512
+  dtype: bfloat16
+- <<: *engines
+  shape: 4x32x2048
+  dtype: bfloat16
+- <<: *engines
+  shape: 1x32x8192
+  dtype: bfloat16
+
+# KERN-2968 target shape
+- <<: *engines
+  shape: 8x4096x1024x24
+  dtype: bfloat16
+
+# float32 variants
+- <<: *engines
+  shape: 256x4096
+  dtype: float32
+- <<: *engines
+  shape: 32x128256
+  dtype: float32

@@ -13,30 +13,31 @@
 
 import std.time
 
-from std.gpu import memory, sync, thread_idx
-from std.gpu.host import DeviceContext
-from std.memory import stack_allocation
+from max.gpu import memory, sync
+from max.gpu import thread_idx
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 
 
 def copy_via_shared(
-    src: UnsafePointer[Float32, ImmutAnyOrigin],
-    dst: UnsafePointer[Float32, MutAnyOrigin],
+    src: ImmPointer[Float32, ImmutAnyOrigin],
+    dst: MutPointer[Float32, MutAnyOrigin],
 ):
     var thread_id = Int(thread_idx.x)
-    var mem_buff: UnsafePointer[
-        Float32, MutAnyOrigin, address_space=AddressSpace.SHARED
-    ] = stack_allocation[16, Float32, address_space=AddressSpace.SHARED]()
-    var src_global: UnsafePointer[
-        Float32, MutAnyOrigin, address_space=AddressSpace.GLOBAL
-    ] = src.address_space_cast[AddressSpace.GLOBAL]()
+    var mem_buff: MutPointer[
+        Float32, MutAnyOrigin, address_space=.SHARED
+    ] = unsafe_stack_allocation[16, Float32, address_space=.SHARED]()
+    var src_global: MutPointer[
+        Float32, MutAnyOrigin, address_space=.GLOBAL
+    ] = src.address_space_cast[.GLOBAL]()
 
     memory.async_copy[4](
         src_global + thread_id,
         mem_buff + thread_id,
     )
 
-    var m_barrier = stack_allocation[
-        1, DType.int32, address_space=AddressSpace.SHARED
+    var m_barrier = unsafe_stack_allocation[
+        1, DType.int32, address_space=.SHARED
     ]()
     sync.mbarrier_init(m_barrier, 16)
     sync.mbarrier(m_barrier)
@@ -59,8 +60,8 @@ def run_copy_via_shared(ctx: DeviceContext) raises:
         in_data[i] = i + 1
         out_data[i] = 0
 
-    var in_device = ctx.enqueue_create_buffer[DType.float32](16)
-    var out_device = ctx.enqueue_create_buffer[DType.float32](16)
+    var in_device = ctx.enqueue_create_buffer[.float32](16)
+    var out_device = ctx.enqueue_create_buffer[.float32](16)
 
     ctx.enqueue_copy(in_device, in_data)
     ctx.enqueue_copy(out_device, out_data)

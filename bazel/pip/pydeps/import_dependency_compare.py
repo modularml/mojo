@@ -154,7 +154,7 @@ def _get_imports_from_file(path: Path) -> set[PythonModule]:
     imports = set()
     for result in results:
         imports.update(result)
-    return set(PythonModule(imp) for imp in imports)
+    return {PythonModule(imp) for imp in imports}
 
 
 def _is_third_party_import(
@@ -305,11 +305,11 @@ def check_dependencies_against_imports(
             unresolved.add(mod._module)
 
     # Map resolved label to unresolved alias from third_party_deps
-    ignore_extra_deps |= set(
+    ignore_extra_deps |= {
         "@@rules_pycross++lock_file+modular_pip_lock_file_repo//deps:"
         + _third_party_dep_name(dep)
         for dep in ignore_extra_deps
         if dep.startswith("@@rules_pycross")
-    )
+    }
 
     return unresolved, all_deps - used_deps - ignore_extra_deps | no_src_deps

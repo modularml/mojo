@@ -25,8 +25,8 @@ The convolution is mapped to GEMM as implicit im2col:
 
 from std.math import ceildiv
 
-from std.gpu.host.info import B200
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host.info import B200
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.sys import size_of
 from std.utils.index import IndexList
 from std.utils.numerics import get_accum_type
@@ -149,17 +149,32 @@ struct Conv2dProblemShape(Copyable, Movable):
 
     @always_inline
     def num_m_tiles(self, tile_m: Int) -> Int:
-        """Number of tiles in M dimension."""
+        """Number of tiles in M dimension.
+
+        Args:
+            tile_m: Size of one tile along the M dimension, in elements.
+                The M dimension equals `batch * out_height * out_width`.
+        """
         return ceildiv(self.gemm_m(), tile_m)
 
     @always_inline
     def num_n_tiles(self, tile_n: Int) -> Int:
-        """Number of tiles in N dimension."""
+        """Number of tiles in N dimension.
+
+        Args:
+            tile_n: Size of one tile along the N dimension, in elements.
+                The N dimension equals `out_channels`.
+        """
         return ceildiv(self.gemm_n(), tile_n)
 
     @always_inline
     def num_k_tiles(self, tile_k: Int) -> Int:
-        """Number of tiles in K dimension."""
+        """Number of tiles in K dimension.
+
+        Args:
+            tile_k: Size of one tile along the K dimension, in elements.
+                The K dimension equals `in_channels * filter_h * filter_w`.
+        """
         return ceildiv(self.gemm_k(), tile_k)
 
 

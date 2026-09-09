@@ -18,6 +18,7 @@ import json
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -33,7 +34,11 @@ from max.nn.quant_config import (
     ScaleOrigin,
     WeightScaleSpec,
 )
-from max.pipelines.lib.quant import parse_quant_config
+from max.pipelines.weights.quant import (
+    _modelopt_ignore_patterns,
+    _modelopt_shared_experts_quantized_dtype,
+    parse_quant_config,
+)
 from transformers import AutoConfig
 
 # Define a base path for test data.
@@ -799,6 +804,38 @@ def test_parse_float4_from_standalone_hf_quant_config(
     assert quant_config.format == QuantFormat.NVFP4
 
 
+def test_standalone_hf_quant_config_reads_config_snapshot(
+    hf_config_instruct_fbgemm: AutoConfig,
+    tmp_path: Path,
+) -> None:
+    """The hub lookup for hf_quant_config.json must pass the commit sha that
+    config.json was resolved to (recorded by transformers as _commit_hash),
+    so a pinned model revision doesn't silently read the sidecar from main.
+    """
+    hf_quant_config = {
+        "producer": {"name": "modelopt", "version": "0.0"},
+        "quantization": {"quant_algo": "NVFP4"},
+    }
+    sidecar = tmp_path / "hf_quant_config.json"
+    sidecar.write_text(json.dumps(hf_quant_config))
+
+    commit_sha = "0123456789abcdef0123456789abcdef01234567"
+    hf_config = deepcopy(hf_config_instruct_fbgemm)
+    if hasattr(hf_config, "quantization_config"):
+        del hf_config.quantization_config
+    hf_config._name_or_path = "nvidia/DeepSeek-R1-0528-NVFP4-v2"
+    hf_config._commit_hash = commit_sha
+
+    with patch(
+        "huggingface_hub.hf_hub_download", return_value=str(sidecar)
+    ) as mock_download:
+        quant_config = parse_quant_config(hf_config, {}, DType.uint8)
+
+    assert quant_config is not None
+    assert quant_config.format == QuantFormat.NVFP4
+    assert mock_download.call_args.kwargs["revision"] == commit_sha
+
+
 @pytest.fixture
 def hf_config_glm_5_1_nvfp4() -> AutoConfig:
     """Modelopt NVFP4 config with selective ``ignore`` (GLM-5.1-style)."""
@@ -833,6 +870,31 @@ def test_parse_modelopt_nvfp4_respects_ignore_patterns(
     assert quant_config.attn_quantized_layers == set()
     assert quant_config.embedding_output_dtype == DType.bfloat16
     assert quant_config.shared_experts_weight_dtype == DType.bfloat16
+
+
+def test_modelopt_ignore_normalizes_block_sparse_moe_shared_experts() -> None:
+    """``block_sparse_moe.shared_experts`` ignore globs map to ``mlp.shared_experts``."""
+    ignore_patterns = _modelopt_ignore_patterns(
+        {
+            "ignore": [
+                "model.language_model.layers.3.block_sparse_moe.shared_experts*",
+            ]
+        }
+    )
+    assert ignore_patterns == ["layers.3.mlp.shared_experts*"]
+
+    global_ignore = _modelopt_ignore_patterns(
+        {
+            "ignore": [
+                "model.language_model.layers.*.block_sparse_moe.shared_experts*"
+            ]
+        }
+    )
+    assert global_ignore == ["layers.*.mlp.shared_experts*"]
+    assert (
+        _modelopt_shared_experts_quantized_dtype(global_ignore)
+        == DType.bfloat16
+    )
 
 
 def test_parse_float4_skips_gptq_quant_method(

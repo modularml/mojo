@@ -14,10 +14,27 @@ Usage:
     br //max/kernels/benchmarks/misc/comparison:bench_prefill
 """
 
+load("@rules_pycross//pycross:defs.bzl", "pycross_wheel_library")
 load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "requirement")
 load("//max/kernels/benchmarks/misc/blackwell_bench:wheels.bzl", "blackwell_bench_wheel")
 
 package(default_visibility = ["//max:consumers"])
+
+# aiter (AMD AI Tensor Engine for ROCm) — cp313 binary wheel with prebuilt
+# gfx950 kernels; the excluded mha ops JIT-compile at first use via hipcc.
+pycross_wheel_library(
+    name = "aiter",
+    target_compatible_with = [
+        "//:amd_gpu",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    wheel = "@aiter_wheel//file",
+    deps = [
+        requirement("packaging"),
+        requirement("torch"),
+    ],
+)
 
 # All dependencies and imports for baseline benchmarks
 modular_py_library(
@@ -29,11 +46,9 @@ modular_py_library(
         "bench_blackwell_mla_decode.py",
         "bench_blackwell_prefill.py",
     ],
-    # Add nvidia_cutlass_dsl/python_packages to sys.path for cutlass imports.
-    # nvidia-cutlass-dsl uses a .pth file which Bazel doesn't process.
-    # Path is relative from _main/max/kernels/benchmarks/misc/comparison/ in runfiles:
-    imports = ["../../../../../../rules_pycross++lock_file+modular_pip_lock_file_repo/deps/nvidia-cutlass-dsl-libs-base@4.4.1/site-packages/nvidia_cutlass_dsl/python_packages"],
-    tags = ["no-pydeps"],  # The wheels do not behave well with our pydeps enforcer, see import above
+    # cutlass reaches sys.path through the :cutlass-imports dep below, whose
+    # `imports` propagates transitively via PyInfo.
+    tags = ["no-pydeps"],  # The wheels do not behave well with our pydeps enforcer
     deps = [
         blackwell_bench_wheel("flash-attn"),
         blackwell_bench_wheel("flashinfer"),
@@ -51,6 +66,22 @@ modular_py_library(
         "//max/python/max/experimental/torch",
         "//max/python/max/graph",
         "//max/python/max/nn",
+    ],
+)
+
+# Softmax benchmark: MAX vs PyTorch
+modular_py_library(
+    name = "bench_softmax_lib",
+    srcs = ["bench_softmax.py"],
+    tags = ["no-pydeps"],
+    deps = [
+        requirement("torch"),
+        "//max/kernels/benchmarks/autotune:bencher_utils",
+        "//max/kernels/benchmarks/misc/utils:bench_utils",
+        "//max/python/max/driver",
+        "//max/python/max/engine",
+        "//max/python/max/experimental/torch",
+        "//max/python/max/graph",
     ],
 )
 
@@ -138,10 +169,126 @@ modular_py_binary(
     ],
 )
 
+# AMD MHA prefill benchmark: MAX vs aiter (CK v2/v3) vs torch SDPA
+# Run via: bazel run //max/kernels/benchmarks/misc/comparison:bench_amd_mha
+# Or via kbench: kbench bench_amd_mha.yaml
+modular_py_binary(
+    name = "bench_amd_mha",
+    srcs = ["bench_amd_mha.py"],
+    env = {
+        # aiter JIT needs a writable dir. Point to a persistent cache so
+        # JIT-compiled .so files survive across runs (first run is slow).
+        "AITER_JIT_DIR": "$$BUILD_WORKSPACE_DIRECTORY/.derived/aiter_jit_cache",
+        # JIT compilation needs ninja + hipcc at runtime.
+        "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/rocm/bin",
+    },
+    main = "bench_amd_mha.py",
+    tags = [
+        "gpu",
+        "manual",
+        "no-mypy",
+        "no-pydeps",
+    ],
+    target_compatible_with = ["//:amd_gpu"],
+    deps = [
+        ":aiter",
+        requirement("pybind11"),
+        requirement("torch"),
+        "//max/kernels/benchmarks/autotune:bencher_utils",
+        "//max/python/max/driver",
+        "//max/python/max/engine",
+        "//max/python/max/experimental/torch",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+    ],
+)
+
+# AMD MLA benchmark: MAX vs aiter for prefill + decode, BF16 + FP8.
+# Run via: bazel run //max/kernels/benchmarks/misc/comparison:bench_amd_mla
+# Or via kbench: kbench bench_amd_mla_decode.yaml / bench_amd_mla_prefill.yaml
+modular_py_binary(
+    name = "bench_amd_mla",
+    srcs = ["bench_amd_mla.py"],
+    env = {
+        "AITER_JIT_DIR": "$$BUILD_WORKSPACE_DIRECTORY/.derived/aiter_jit_cache",
+        "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/rocm/bin",
+    },
+    main = "bench_amd_mla.py",
+    tags = [
+        "gpu",
+        "manual",
+        "no-mypy",
+        "no-pydeps",
+    ],
+    target_compatible_with = ["//:amd_gpu"],
+    deps = [
+        ":aiter",
+        requirement("pybind11"),
+        requirement("numpy"),
+        requirement("torch"),
+        "//max/kernels/benchmarks/autotune:bencher_utils",
+        "//max/python/max/_kv_cache_ops",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/experimental/torch",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+    ],
+)
+
+# AMD MX block-scaled dense GEMM benchmark: MAX vs aiter (gemm_afp4wfp4
+# Triton kernel; MXFP4 only, see the file docstring).
+# Run via: bazel run //max/kernels/benchmarks/misc/comparison:bench_amd_mx_gemm
+# Or via kbench: kbench bench_amd_mx_gemm.yaml
+modular_py_binary(
+    name = "bench_amd_mx_gemm",
+    srcs = ["bench_amd_mx_gemm.py"],
+    env = {
+        "AITER_JIT_DIR": "$$BUILD_WORKSPACE_DIRECTORY/.derived/aiter_jit_cache",
+        "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/rocm/bin",
+    },
+    main = "bench_amd_mx_gemm.py",
+    tags = [
+        "gpu",
+        "manual",
+        "no-mypy",
+        "no-pydeps",
+    ],
+    target_compatible_with = ["//:amd_gpu"],
+    deps = [
+        ":aiter",
+        requirement("pybind11"),
+        requirement("torch"),
+        "//max/kernels/benchmarks/autotune:bencher_utils",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/weights",
+    ],
+)
+
 modular_py_binary(
     name = "bench_mla_prefill_sparse",
     srcs = ["bench_blackwell_mla_prefill_sparse.py"],
     main = "bench_blackwell_mla_prefill_sparse.py",
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    target_compatible_with = ["//:b200_gpu"],
+    deps = [
+        ":bench_baseline_lib",
+        requirement("torch"),
+    ],
+)
+
+modular_py_binary(
+    name = "bench_mla_prefill_sparse_fp8",
+    srcs = ["bench_blackwell_mla_prefill_sparse_fp8.py"],
+    main = "bench_blackwell_mla_prefill_sparse_fp8.py",
     tags = [
         "gpu",
         "manual",

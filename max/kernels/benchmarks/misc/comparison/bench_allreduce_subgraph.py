@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -33,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import traceback
 from typing import Any
 
 import torch
@@ -50,8 +50,12 @@ try:
     )
 
     _CustomAllreduceClass = CustomAllreduce
-except ImportError:
-    pass
+except (ImportError, RuntimeError):
+    traceback.print_exc()
+    print(
+        "[bench_allreduce_subgraph] sglang CustomAllreduce unavailable,"
+        " falling back to NCCL-only"
+    )
 
 # Fall back to low-level sgl_kernel API if high-level not available
 if _CustomAllreduceClass is None:
@@ -366,7 +370,7 @@ def main() -> None:
         dist.destroy_process_group()
 
     name = "bench_allreduce_subgraph"
-    met_sec, bytes = result if result else [0, 0]
+    met_sec, bytes = result or [0, 0]
     bytes = args.num_bytes
     bytes_per_sec = ThroughputMeasure(Bench.bytes, bytes)
 

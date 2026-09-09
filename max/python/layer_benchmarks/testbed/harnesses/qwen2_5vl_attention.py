@@ -35,25 +35,24 @@ Dynamic params (per shape):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Any, cast
 
 import numpy as np
-import torch
+
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from max.driver import Accelerator, Buffer, DLPackArray
 from max.dtype import DType
 from max.graph import DeviceRef, Graph, TensorType, ops
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.rotary_embedding import Llama3RotaryEmbedding
 from max.pipelines.architectures.qwen2_5vl.nn.decoder import (
     Qwen25VLDecoderAttentionWithRope,
 )
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext, TokenBuffer
 from max.pipelines.kv_cache import PagedKVCacheManager
-from max.pipelines.modeling.types import (
-    RequestID,
-    TextGenerationContext,
-    TokenBuffer,
-)
+from max.pipelines.modeling.types import RequestID
 
 from testbed.harness import CompiledLayerBundle, LayerTestHarness
 from testbed.harnesses.ragged_attention_harness import (
@@ -74,7 +73,7 @@ class Qwen25VLAttentionHarness(
     LayerTestHarness[
         Qwen25VLAttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ]
 ):
     """Harness for Qwen2.5VL decoder attention with mRoPE position_ids.
@@ -102,17 +101,26 @@ class Qwen25VLAttentionHarness(
         device: Accelerator,
     ) -> None:
         super().__init__(static_params, session, device)
-        self._kv_params = KVCacheParams(
+        self._kv_params = MHAKVCacheParams(
             dtype=DType.bfloat16,
             n_kv_heads=static_params.n_kv_heads,
             head_dim=static_params.head_dim,
             num_layers=1,
             devices=[DeviceRef.GPU()],
         )
-        self._kv_manager = PagedKVCacheManager(
+
+    @cached_property
+    def _kv_manager(self) -> PagedKVCacheManager:
+        """The paged KV cache, allocated on first use.
+
+        Deferred because it claims device memory, which building the graph does
+        not need: the CPU precompile step constructs a harness with no GPU
+        attached.
+        """
+        return PagedKVCacheManager(
             params=self._kv_params,
-            total_num_pages=static_params.total_num_pages,
-            session=session,
+            total_num_pages=self.static_params.total_num_pages,
+            session=self.session,
             max_batch_size=128,
         )
 
@@ -189,7 +197,7 @@ class Qwen25VLAttentionHarness(
             [num_sections, "total_seq_len"],
             device=device_ref,
         )
-        flattened_kv_types = kv_params.get_symbolic_inputs().flatten()
+        flattened_kv_types = kv_params.flattened_kv_inputs()
 
         with Graph(
             "Qwen25VLAttention",
@@ -201,11 +209,9 @@ class Qwen25VLAttentionHarness(
             ),
         ) as graph:
             inputs, input_row_offsets, position_ids, *kv_cache = graph.inputs
-            kv_collection = (
-                kv_params.get_symbolic_inputs()
-                .unflatten(iter(kv_cache))
-                .inputs[0]
-            )
+            kv_collection = kv_params.unflatten_kv_inputs(
+                iter(kv_cache)
+            ).inputs[0]
             layer_idx = ops.constant(0, DType.uint32, device=DeviceRef.CPU())
             freqs_cis = rope.freqs_cis.to(device_ref)
             graph.output(
@@ -235,29 +241,28 @@ class Qwen25VLAttentionHarness(
         self,
         bundle: CompiledLayerBundle,
         dynamic_params: AttentionDynamicParams,
-    ) -> tuple[list[Buffer], list[TextGenerationContext]]:
+    ) -> tuple[list[Buffer], list[TextContext]]:
         device = bundle.device
         p = self.static_params
         total_len = dynamic_params.ctx_len + dynamic_params.seq_len
         num_sections = len(p.mrope_section)
 
-        batch: list[TextGenerationContext] = []
+        batch: list[TextContext] = []
         for _ in range(dynamic_params.batch_size):
             ctx = TextContext(
                 request_id=RequestID(),
                 max_length=max(total_len, p.max_seq_len),
                 tokens=TokenBuffer(np.empty(total_len, dtype=np.int64)),
             )
-            self._kv_manager.claim(ctx.request_id, replica_idx=0)
-            self._kv_manager.alloc(ctx, replica_idx=0)
+            self._kv_manager.claim(ctx)
+            self._kv_manager.alloc(ctx)
             if dynamic_params.ctx_len > 0:
                 ctx.tokens.skip_processing(dynamic_params.ctx_len)
             batch.append(ctx)
 
         kv_runtime = self._kv_manager.runtime_inputs(
-            cast(list[list[TextGenerationContext]], [batch])
-        ).inputs[0]
-        assert kv_runtime.attention_dispatch_metadata is not None
+            cast(list[list[TextContext]], [batch])
+        )
 
         total_tokens = dynamic_params.batch_size * dynamic_params.seq_len
         torch_input = torch.randn(
@@ -284,11 +289,7 @@ class Qwen25VLAttentionHarness(
             input_tensor,
             row_offsets,
             position_ids_buf,
-            kv_runtime.kv_blocks.to(device),
-            kv_runtime.cache_lengths.to(device),
-            kv_runtime.lookup_table.to(device),
-            kv_runtime.max_lengths,
-            kv_runtime.attention_dispatch_metadata,
+            *kv_runtime.flatten(),
         ]
 
         return execute_args, batch
@@ -296,10 +297,10 @@ class Qwen25VLAttentionHarness(
     def cleanup_inputs(
         self,
         bundle: CompiledLayerBundle,
-        context: list[TextGenerationContext],
+        context: list[TextContext],
     ) -> None:
         for ctx in context:
-            self._kv_manager.release(ctx.request_id, replica_idx=0)
+            self._kv_manager.release(ctx)
 
     def cuda_graph_eligible(
         self, dynamic_params: AttentionDynamicParams

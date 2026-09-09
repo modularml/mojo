@@ -1,0 +1,30 @@
+load("//bazel:api.bzl", "lit_tests")
+
+package(default_visibility = ["//visibility:private"])
+
+lit_tests(
+    name = "mojo-lsp-server-misc",
+    srcs = glob([
+        "**/*.test",
+        "**/*.mojo",
+    ]),
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    tools = [
+        "//Mojo/tools/mojo-lsp-server",
+        "//Mojo/tools/mojo-lsp-simple-client",
+    ],
+)
+
+# Umbrella target: bt //Mojo/test/mojo-lsp-server runs everything.
+#
+# Note: the parse-tree smoke test is intentionally excluded because its "manual"
+# tag is bypassed when listed in a test_suite, causing it to run in CI where it
+# times out on ARM/sanitizer builds. It runs via the LSP parse-tree nightly.
+test_suite(
+    name = "mojo-lsp-server",
+    tests = [
+        ":mojo-lsp-server-misc",
+    ],
+)

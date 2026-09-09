@@ -19,29 +19,27 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from max.dtype import DType
-from max.graph import (
-    BufferType,
-    BufferValue,
-    DeviceRef,
-    TensorType,
-    TensorValue,
-    Value,
-    ops,
-)
-from max.nn.kv_cache import PagedCacheValues
+from max.graph import BufferType, TensorType, TensorValue, Value, ops
+from max.nn.kv_cache import MultiKVCacheParams, PagedCacheValues
 from max.nn.layer import Module
-from max.nn.sampling.rejection_sampler import (
-    AcceptanceSampler,
+from max.nn.sampling.rejection_sampler import AcceptanceSampler
+from max.nn.transformer.transformer import (
+    captures_by_device,
+    fuse_captured_hidden_states,
 )
+from max.pipelines.speculative.config import MAGIC_DRAFT_TOKEN_ID
 from max.pipelines.speculative.ragged_token_merger import (
     RaggedTokenMerger,
+    _shape_to_scalar,
+)
+from max.pipelines.speculative.spec_input_types import (
+    SpecDecodeInputTypeSpec,
+    build_spec_decode_input_types,
 )
 
 from ..dflash_llama3 import DFlashLlama3
 from ..llama3.llama3 import Llama3
 from .model_config import UnifiedDflashLlama3Config
-
-_MAGIC_DRAFT_TOKEN_ID = 42
 
 
 @dataclass
@@ -51,7 +49,7 @@ class UnifiedDflashLlama3Values:
     draft_tokens: TensorValue
     return_n_logits: TensorValue
     kv_collection: PagedCacheValues
-    draft_kv_blocks: BufferValue
+    draft_kv_collection: PagedCacheValues
     seed: TensorValue
     temperature: TensorValue
     top_k: TensorValue
@@ -89,34 +87,28 @@ class UnifiedDflashLlama3(Module):
         self,
         inputs: Sequence[Value[Any]],
     ) -> UnifiedDflashLlama3Values:
-        (
-            tokens,
-            input_row_offsets,
-            return_n_logits,
-            target_kv_blocks,
-            cache_lengths,
-            lookup_table,
-            max_lengths,
-            dispatch_metadata,
-            draft_dispatch_metadata,
-            draft_tokens,
-            draft_kv_blocks,
-            seed,
-            temperature,
-            top_k,
-            max_k,
-            top_p,
-            min_top_p,
-        ) = inputs
-
-        target_kv_collection = PagedCacheValues(
-            kv_blocks=target_kv_blocks.buffer,
-            cache_lengths=cache_lengths.tensor,
-            lookup_table=lookup_table.tensor,
-            max_lengths=max_lengths.tensor,
-            attention_dispatch_metadata=dispatch_metadata.tensor,
-            draft_attention_dispatch_metadata=draft_dispatch_metadata.tensor,
+        it = iter(inputs)
+        tokens = next(it)
+        input_row_offsets = next(it)
+        return_n_logits = next(it)
+        kv_params = MultiKVCacheParams.from_params(
+            {
+                "target": self.config.target.kv_params,
+                "draft": self.config.draft.kv_params,
+            }
         )
+        target_kv_collections, draft_kv_collections = (
+            kv_params.unflatten_basic_kv_tree(it)
+        )
+        target_kv_collection = target_kv_collections[0]
+        draft_kv_collection = draft_kv_collections[0]
+        draft_tokens = next(it)
+        seed = next(it)
+        temperature = next(it)
+        top_k = next(it)
+        max_k = next(it)
+        top_p = next(it)
+        min_top_p = next(it)
 
         return UnifiedDflashLlama3Values(
             tokens=tokens.tensor,
@@ -124,7 +116,7 @@ class UnifiedDflashLlama3(Module):
             draft_tokens=draft_tokens.tensor,
             return_n_logits=return_n_logits.tensor,
             kv_collection=target_kv_collection,
-            draft_kv_blocks=draft_kv_blocks.buffer,
+            draft_kv_collection=draft_kv_collection,
             seed=seed.tensor,
             temperature=temperature.tensor,
             top_k=top_k.tensor,
@@ -134,56 +126,18 @@ class UnifiedDflashLlama3(Module):
         )
 
     def input_types(self) -> tuple[TensorType | BufferType, ...]:
-        device_ref = self.config.target.devices[0]
-
-        tokens_type = TensorType(
-            DType.int64, shape=["total_seq_len"], device=device_ref
-        )
-        input_row_offsets_type = TensorType(
-            DType.uint32, shape=["input_row_offsets_len"], device=device_ref
-        )
-        draft_tokens_type = TensorType(
-            DType.int64, ["batch_size", "num_steps"], device=device_ref
-        )
-        return_n_logits_type = TensorType(
-            DType.int64, shape=["return_n_logits"], device=DeviceRef.CPU()
-        )
-
-        target_kv_inputs = self.config.target.kv_params.get_symbolic_inputs()
-        assert len(target_kv_inputs.inputs) == 1
-        target_kv_flat = list(target_kv_inputs.inputs[0].flatten())
-
-        draft_kv_inputs = self.config.draft.kv_params.get_symbolic_inputs()
-        assert len(draft_kv_inputs.inputs) == 1
-        draft_kv_blocks = draft_kv_inputs.inputs[0].kv_blocks
-
-        temperature_type = TensorType(
-            DType.float32, shape=["batch_size"], device=device_ref
-        )
-        top_k_type = TensorType(
-            DType.int64, shape=["batch_size"], device=device_ref
-        )
-        max_k_type = TensorType(DType.int64, shape=[], device=DeviceRef.CPU())
-        top_p_type = TensorType(
-            DType.float32, shape=["batch_size"], device=device_ref
-        )
-        min_top_p_type = TensorType(
-            DType.float32, shape=[], device=DeviceRef.CPU()
-        )
-
-        return (
-            tokens_type,
-            input_row_offsets_type,
-            return_n_logits_type,
-            *target_kv_flat,
-            draft_tokens_type,
-            draft_kv_blocks,
-            TensorType(DType.uint64, shape=["batch_size"], device=device_ref),
-            temperature_type,
-            top_k_type,
-            max_k_type,
-            top_p_type,
-            min_top_p_type,
+        """Single-device dflash graph. See
+        :func:`build_spec_decode_input_types` for the canonical ordering.
+        """
+        return build_spec_decode_input_types(
+            SpecDecodeInputTypeSpec(distributed=False),
+            devices=self.config.target.devices,
+            kv_params=MultiKVCacheParams.from_params(
+                {
+                    "target": self.config.target.kv_params,
+                    "draft": self.config.draft.kv_params,
+                }
+            ),
         )
 
     def __call__(
@@ -211,7 +165,9 @@ class UnifiedDflashLlama3(Module):
             merged_offsets,
         )
         target_logits = target_outputs[1]
-        target_hs_concat = target_outputs[3]
+        target_hs_concat = fuse_captured_hidden_states(
+            captures_by_device(target_outputs[3:], 1)
+        )[0]
 
         seed_scalar = inputs.seed[0]
         num_accepted, recovered, bonus = self.acceptance_sampler(
@@ -225,17 +181,13 @@ class UnifiedDflashLlama3(Module):
             min_top_p=inputs.min_top_p,
         )
 
-        num_steps_tensor = ops.shape_to_tensor([inputs.draft_tokens.shape[1]])[
-            0
-        ].cast(DType.uint32)
-        zero_u32_cpu = ops.constant(0, DType.uint32, device=DeviceRef.CPU())
-        is_prefill = (
-            (num_steps_tensor == zero_u32_cpu)
-            .broadcast_to(["batch_size"])
-            .to(device)
+        num_steps_u32 = _shape_to_scalar(
+            inputs.draft_tokens.shape[1], device, dtype=DType.uint32
         )
+        zero = ops.constant(0, DType.uint32, device=device)
+        is_prefill = (num_steps_u32 == zero).broadcast_to(["batch_size"])
         magic_token = ops.constant(
-            _MAGIC_DRAFT_TOKEN_ID, DType.int64, device=device
+            MAGIC_DRAFT_TOKEN_ID, DType.int64, device=device
         )
         num_magic_tokens = ops.squeeze(
             ops.sum(
@@ -246,9 +198,12 @@ class UnifiedDflashLlama3(Module):
             ),
             axis=-1,
         )
-        is_dummy_draft = num_magic_tokens == num_steps_tensor.to(device).cast(
-            DType.int32
-        ).broadcast_to(["batch_size"])
+        num_steps = _shape_to_scalar(
+            inputs.draft_tokens.shape[1], device, dtype=DType.int32
+        )
+        is_dummy_draft = num_magic_tokens == num_steps.broadcast_to(
+            ["batch_size"]
+        )
         num_accepted = ops.where(
             is_prefill | is_dummy_draft,
             ops.constant(0, num_accepted.dtype, device=device).broadcast_to(
@@ -278,17 +233,13 @@ class UnifiedDflashLlama3(Module):
 
         ctx_hidden = self.draft.project_target_hidden(target_hs_concat)
 
-        draft_kv_collection = PagedCacheValues(
-            kv_blocks=inputs.draft_kv_blocks,
+        # The draft leaf already carries draft blocks + lookup_table /
+        # max_prompt_length / max_cache_length / dispatch metadata (mirroring
+        # the target leaf); only cache_lengths is overridden with the pre-step
+        # value.
+        draft_kv_collection = replace(
+            inputs.draft_kv_collection,
             cache_lengths=pre_cache_lengths,
-            lookup_table=inputs.kv_collection.lookup_table,
-            max_lengths=inputs.kv_collection.max_lengths,
-            attention_dispatch_metadata=(
-                inputs.kv_collection.attention_dispatch_metadata
-            ),
-            draft_attention_dispatch_metadata=(
-                inputs.kv_collection.draft_attention_dispatch_metadata
-            ),
         )
 
         self.draft.materialize_kv(

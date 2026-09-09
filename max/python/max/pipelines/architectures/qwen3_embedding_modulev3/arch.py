@@ -13,13 +13,14 @@
 
 from max.graph.weights import WeightsFormat
 from max.pipelines.architectures.llama3_modulev3 import weight_adapters
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import (
     SupportedArchitecture,
     TextTokenizer,
 )
 from max.pipelines.modeling.types import PipelineTask
 
+from .batch_processor import Qwen3EmbeddingModuleV3BatchProcessor
 from .model import Qwen3EmbeddingModel
 from .model_config import Qwen3EmbeddingConfig
 
@@ -31,11 +32,8 @@ qwen3_embedding_modulev3_arch = SupportedArchitecture(
         "Qwen/Qwen3-Embedding-4B",
         "Qwen/Qwen3-Embedding-8B",
     ],
-    default_encoding="bfloat16",
-    supported_encodings={
-        "float32",
-        "bfloat16",
-    },
+    default_encoding=Qwen3EmbeddingConfig.DEFAULT_ENCODING,
+    supported_encodings=Qwen3EmbeddingConfig.SUPPORTED_ENCODINGS,
     pipeline_model=Qwen3EmbeddingModel,
     tokenizer=TextTokenizer,
     context_type=TextContext,
@@ -45,5 +43,6 @@ qwen3_embedding_modulev3_arch = SupportedArchitecture(
         WeightsFormat.gguf: weight_adapters.convert_gguf_state_dict,
     },
     config=Qwen3EmbeddingConfig,
+    batching=Qwen3EmbeddingModuleV3BatchProcessor,
     multi_gpu_supported=False,
 )

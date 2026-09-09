@@ -1,6 +1,6 @@
 # Using the MAX C API to execute a precompiled graph
 
-The [MAX graph API](https://docs.modular.com/max/graph/) provides a powerful
+The [MAX graph API](https://max.modular.com/graph/) provides a powerful
 framework for constructing computational graphs to be run on GPUs, CPUs, and
 more. The process of compilation and execution can be separated. This example
 demonstrates how to construct and compile a graph using the MAX Python API,
@@ -34,6 +34,20 @@ finally executing it on the GPU:
 pixi run test
 ```
 
+## Capturing a MEF with the new `max.experimental` API
+
+`test_capi_v3.py` is the new-API counterpart to `test_capi.py`. It builds the
+same vector-add graph as a `max.experimental.nn.Module`, compiles it with
+`Module.compile()`, and exports the compiled artifact to a MEF file using the
+public `CompiledModel.export_mef()` method. The resulting `graph.mef` is
+consumed by the same `example.c` executor: both APIs name graph inputs
+`input0`/`input1` and the output `output0`, so the C code is unchanged.
+
+`export_mef()` serializes straight from the compiled artifact, so it does not
+require the model to be initialized on a live device. This makes it usable in
+the cross-compilation and virtual-device scenarios that production serving via
+the MAX C API relies on.
+
 ## Loading models with external weights
 
 The `weights_example.c` file demonstrates how to provide model weights at
@@ -47,6 +61,23 @@ then runs the C program. The C program creates a `M_WeightsRegistry` with the
 weight data and passes it to `M_initModel()`.
 
 This example runs on CPU and does not require a GPU.
+
+## Loading weights from a Safetensors file
+
+The `safetensors_example.c` file builds on the weights registry by loading the
+weight data directly from a Safetensors file instead of an in-memory array.
+
+The Python script `test_safetensors_capi.py` builds the same
+`ops.constant_external()` graph, compiles it to a MEF file, and writes a
+`weights.safetensors` file containing the `weight` tensor. The C program loads
+the file with `M_loadSafetensors()`, inspects the tensors it contains, and
+builds a `M_WeightsRegistry` from every tensor in one step with
+`M_newWeightsRegistryFromSafetensors()` before passing it to `M_initModel()`.
+
+The tensor names in the file must match the external weight names in the graph;
+this example performs no name translation. Weights are loaded onto a host
+device, and the runtime copies them to the model's device during
+initialization.
 
 ## Device graph capture and replay
 

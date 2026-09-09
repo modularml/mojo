@@ -20,7 +20,7 @@ Each crash scenario runs in a subprocess because the `intentional_gpu_crash`
 op poisons the CUDA context for the remainder of the process.
 
 Run with:
-    bt-h100 //max/tests/integration/unorganized:test_fusion_error_messages
+    bt-b200 //max/tests/integration/unorganized:test_fusion_error_messages
 """
 
 import json

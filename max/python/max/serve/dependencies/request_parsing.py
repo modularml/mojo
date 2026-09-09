@@ -44,10 +44,31 @@ async def parse_request_generic(
     into typed request objects. It handles common error cases (missing required
     fields, validation errors) and converts them into appropriate HTTP exceptions.
 
+    The ``parser_class`` supplies a ``from_fastapi_request`` classmethod that
+    turns a request into a typed object:
+
     .. code-block:: python
 
-        from max.pipelines.modeling.types import OpenResponsesRequest
-        parsed = await parse_request_generic(request, OpenResponsesRequest)
+        import asyncio
+        from dataclasses import dataclass
+
+        from max.serve.dependencies.request_parsing import parse_request_generic
+
+        @dataclass
+        class EchoRequest:
+            model: str
+
+            @classmethod
+            async def from_fastapi_request(cls, request) -> "EchoRequest":
+                return cls(model="llama")
+
+        parsed = asyncio.run(
+            parse_request_generic(request=None, parser_class=EchoRequest)
+        )
+
+    .. invisible-code-block: python
+
+        assert parsed.model == "llama"
 
     Args:
         request: The incoming FastAPI request object.
@@ -91,22 +112,42 @@ def create_request_parser(
     FastAPI's dependency injection system. The returned dependency automatically
     parses and validates incoming requests, converting errors to HTTP exceptions.
 
+    Wrap the parser in ``Depends`` and attach it to a route so the handler
+    receives an already-parsed, validated request:
+
     .. code-block:: python
 
-        from fastapi import Depends
-        from max.pipelines.modeling.types import OpenResponsesRequest
+        from dataclasses import dataclass
 
-        ParseOpenResponses = Depends(
-            create_request_parser(OpenResponsesRequest)
-        )
+        from fastapi import Depends, FastAPI, Request
 
-        @router.post("/responses")
+        from max.serve.dependencies.request_parsing import create_request_parser
+
+        @dataclass
+        class EchoRequest:
+            model: str
+
+            @classmethod
+            async def from_fastapi_request(cls, request) -> "EchoRequest":
+                return cls(model="llama")
+
+        ParseEchoRequest = Depends(create_request_parser(EchoRequest))
+
+        app = FastAPI()
+
+        @app.post("/responses")
         async def create_response(
             request: Request,
-            open_responses_request: OpenResponsesRequest = ParseOpenResponses,
-        ) -> JSONResponse:
-            # Request is already parsed and validated
-            model = open_responses_request.body.model
+            echo_request: EchoRequest = ParseEchoRequest,
+        ) -> dict:
+            return {"model": echo_request.model}
+
+    .. invisible-code-block: python
+
+        assert any(
+            getattr(route, "path", None) == "/responses"
+            for route in app.routes
+        )
 
     Args:
         parser_class: A class with a ``from_fastapi_request`` classmethod.

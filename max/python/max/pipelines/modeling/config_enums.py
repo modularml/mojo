@@ -40,12 +40,14 @@ PipelineRole = Literal["prefill_and_decode", "prefill_only", "decode_only"]
 
 SupportedEncoding = Literal[
     "float32",
+    "float16",
     "bfloat16",
     "q4_k",
     "q4_0",
     "q6_k",
     "float8_e4m3fn",
     "float4_e2m1fnx2",
+    "float6_e2m3fn",
     "gptq",
 ]
 """All possible encodings which may be supported by a particular model."""
@@ -53,9 +55,11 @@ SupportedEncoding = Literal[
 
 _SUPPORTED_ENCODING_TO_DTYPE: dict[SupportedEncoding, DType] = {
     "float32": DType.float32,
+    "float16": DType.float16,
     "bfloat16": DType.bfloat16,
     "float8_e4m3fn": DType.float8_e4m3fn,
     "float4_e2m1fnx2": DType.uint8,
+    "float6_e2m3fn": DType.uint8,
     "q4_k": DType.uint8,
     "q4_0": DType.uint8,
     "q6_k": DType.uint8,
@@ -66,9 +70,11 @@ _SUPPORTED_ENCODING_TO_QUANTIZATION_ENCODING: dict[
     SupportedEncoding, QuantizationEncoding | None
 ] = {
     "float32": None,
+    "float16": None,
     "bfloat16": None,
     "float8_e4m3fn": None,
     "float4_e2m1fnx2": None,
+    "float6_e2m3fn": None,
     "q4_k": QuantizationEncoding.Q4_K,
     "q4_0": QuantizationEncoding.Q4_0,
     "q6_k": QuantizationEncoding.Q6_K,
@@ -78,9 +84,11 @@ _SUPPORTED_ENCODING_TO_QUANTIZATION_ENCODING: dict[
 # Basic validation for supported devices for each type of encoding.
 _SUPPORTED_DEVICES: dict[SupportedEncoding, tuple[str, ...]] = {
     "float32": ("cpu", "gpu"),
+    "float16": ("gpu",),
     "bfloat16": ("gpu",),
     "float8_e4m3fn": ("gpu",),
     "float4_e2m1fnx2": ("gpu",),
+    "float6_e2m3fn": ("gpu",),
     "q4_k": ("cpu",),
     "q4_0": ("cpu",),
     "q6_k": ("cpu",),
@@ -128,7 +136,10 @@ def parse_supported_encoding_from_file_name(
     if "f32" in name or "fp32" in name or "float32" in name:
         return "float32"
     elif "bf16" in name or "bfloat16" in name:
+        # Check bf16 before f16 so "bf16" doesn't match the float16 patterns.
         return "bfloat16"
+    elif "fp16" in name or "float16" in name:
+        return "float16"
     elif "q4_k_m" in name:
         return "q4_k"
     elif "q4_0" in name:
@@ -140,6 +151,8 @@ def parse_supported_encoding_from_file_name(
     elif "f8" in name or "fp8" in name or "float8" in name:
         # For now, default float8 to e4m3. It is the dtype used for inference.
         return "float8_e4m3fn"
+    elif "fp6" in name or "float6" in name:
+        return "float6_e2m3fn"
     elif "fp4" in name or "f4" in name or "float4" in name or "nvfp4" in name:
         return "float4_e2m1fnx2"
     else:
@@ -165,3 +178,8 @@ def supported_encoding_supported_devices(
 def is_float4_encoding(encoding: SupportedEncoding) -> bool:
     """Returns whether the given encoding is a float4 type."""
     return encoding == "float4_e2m1fnx2"
+
+
+def is_float6_encoding(encoding: SupportedEncoding) -> bool:
+    """Returns whether the given encoding is a float6 type."""
+    return encoding == "float6_e2m3fn"

@@ -11,208 +11,147 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""TensorLayout-based rules for matmul-family ops (matmul, qmatmul).
-
-Per-mesh-axis placement rules for ``[..., M, K] @ [..., K, N]``::
-
-    lhs         rhs         output      pattern
-    R           R           R           trivial
-    S(batch)    S(batch)    S(batch)    batch parallel
-    S(batch)    R           S(batch)    batch sharded
-    R           S(batch)    S(batch)    batch sharded
-    S(M)        R           S(M)        data parallel
-    R           S(N)        S(N)        column tensor parallel
-    S(any)      S(K_rhs)    Partial     row tensor parallel
-    P           R           P           bilinear in lhs (linear keeps P)
-    R           P           P           bilinear in rhs (linear keeps P)
-
-Partial inputs that cannot pass through (e.g. P x S) are suggested for
-resolution to Replicated, triggering all_reduce in the dispatch engine.
-"""
+"""Placement rules for ``matmul`` and ``outer``."""
 
 from __future__ import annotations
 
-import builtins
-from collections.abc import Callable
-
-from max.experimental.sharding.mappings import PlacementMapping
-from max.experimental.sharding.placements import (
-    Partial,
-    Placement,
-    Replicated,
-    Sharded,
-)
+from max.experimental.sharding.placements import Sharded
 from max.experimental.sharding.types import TensorLayout
+from max.graph.dim import Dim, StaticDim
 
-from ._common import RuleSignature
-
-
-def _resolve_per_axis_placements(
-    lhs_p: tuple[Placement, ...],
-    rhs_p: tuple[Placement, ...],
-    mesh_ndim: int,
-    rule: Callable[
-        [Placement, Placement], tuple[Placement, Placement, Placement]
-    ],
-    op_name: str,
-) -> tuple[tuple[Placement, ...], tuple[Placement, ...], tuple[Placement, ...]]:
-    """Applies a per-mesh-axis rule to produce suggested inputs + output placements."""
-    suggested_lhs: list[Placement] = []
-    suggested_rhs: list[Placement] = []
-    out_p: list[Placement] = []
-
-    for ax in range(mesh_ndim):
-        pl = lhs_p[ax] if len(lhs_p) > ax else Replicated()
-        pr = rhs_p[ax] if len(rhs_p) > ax else Replicated()
-        sl, sr, o = rule(pl, pr)
-        suggested_lhs.append(sl)
-        suggested_rhs.append(sr)
-        out_p.append(o)
-
-    return tuple(suggested_lhs), tuple(suggested_rhs), tuple(out_p)
+from ..action import ActionSet, AxisAssignment
+from ..cost import P, R, build_action_set
 
 
-def _is_matrix_dim(axis: int, non_contract: int | None, contract: int) -> bool:
-    return axis in (contract, non_contract)
+def _is_size_one(dim: Dim) -> bool:
+    return isinstance(dim, StaticDim) and dim.dim == 1
 
 
-def _matmul_axis_rule(
-    lhs_non_contract: int | None,
-    lhs_contract: int,
-    rhs_non_contract: int,
-    rhs_contract: int,
-    out_non_contract_lhs: int | None,
-    out_non_contract_rhs: int,
-) -> Callable[[Placement, Placement], tuple[Placement, Placement, Placement]]:
-    """Returns a per-axis rule that produces (suggested_lhs, suggested_rhs, out)."""
+def _shared_batch(lhs: TensorLayout, rhs: TensorLayout) -> list[int]:
+    """Batch axes where BOTH operands are non-broadcast (size > 1).
 
-    def rule(
-        pl: Placement, pr: Placement
-    ) -> tuple[Placement, Placement, Placement]:
-        if isinstance(pl, Replicated) and isinstance(pr, Replicated):
-            return (Replicated(), Replicated(), Replicated())
-
-        if isinstance(pl, Sharded) and not _is_matrix_dim(
-            pl.axis, lhs_non_contract, lhs_contract
-        ):
-            if isinstance(pr, Sharded) and pl.axis == pr.axis:
-                return (pl, pr, Sharded(pl.axis))
-            if isinstance(pr, Replicated):
-                return (pl, pr, Sharded(pl.axis))
-        if isinstance(pr, Sharded) and not _is_matrix_dim(
-            pr.axis, rhs_non_contract, rhs_contract
-        ):
-            if isinstance(pl, Replicated):
-                return (pl, pr, Sharded(pr.axis))
-
-        if (
-            isinstance(pl, Sharded)
-            and lhs_non_contract is not None
-            and pl.axis == lhs_non_contract
-            and isinstance(pr, Replicated)
-        ):
-            out_axis = (
-                out_non_contract_lhs
-                if out_non_contract_lhs is not None
-                else pl.axis
-            )
-            return (pl, pr, Sharded(out_axis))
-
-        if (
-            isinstance(pl, Replicated)
-            and isinstance(pr, Sharded)
-            and pr.axis == rhs_non_contract
-        ):
-            return (pl, pr, Sharded(out_non_contract_rhs))
-
-        if (
-            isinstance(pl, Sharded)
-            and isinstance(pr, Sharded)
-            and pr.axis == rhs_contract
-        ):
-            return (pl, pr, Partial())
-
-        if isinstance(pl, Partial) and isinstance(pr, Replicated):
-            return (pl, pr, Partial(pl.reduce_op))
-        if isinstance(pl, Replicated) and isinstance(pr, Partial):
-            return (pl, pr, Partial(pr.reduce_op))
-
-        if isinstance(pl, Partial) and isinstance(pr, Partial):
-            raise ValueError(
-                "matmul: Partial x Partial is not supported. "
-                "Use resolve_partials() on at least one input first."
-            )
-
-        if isinstance(pl, Partial) and not isinstance(pr, Replicated):
-            return (Replicated(), pr, _output_for_clean(Replicated(), pr))
-        if isinstance(pr, Partial) and not isinstance(pl, Replicated):
-            return (pl, Replicated(), _output_for_clean(pl, Replicated()))
-
-        raise NotImplementedError(
-            f"matmul: unsupported placements: {pl} x {pr}"
-        )
-
-    def _output_for_clean(pl: Placement, pr: Placement) -> Placement:
-        if isinstance(pl, Replicated) and isinstance(pr, Replicated):
-            return Replicated()
-        if isinstance(pl, Replicated) and isinstance(pr, Sharded):
-            if pr.axis == rhs_non_contract:
-                return Sharded(out_non_contract_rhs)
-            return pr
-        if isinstance(pl, Sharded) and isinstance(pr, Replicated):
-            if lhs_non_contract is not None and pl.axis == lhs_non_contract:
-                out_axis = (
-                    out_non_contract_lhs
-                    if out_non_contract_lhs is not None
-                    else pl.axis
-                )
-                return Sharded(out_axis)
-            return pl
-        if isinstance(pl, Sharded) and isinstance(pr, Sharded):
-            if pr.axis == rhs_contract:
-                return Partial()
-        return Replicated()
-
-    return rule
+    Right-aligned: lhs[d] aligns with rhs[d - (lhs.rank - rhs.rank)]
+    when ranks differ, treating leading missing dims as size-1.
+    """
+    n = min(lhs.rank - 2, rhs.rank - 2)
+    return [
+        d
+        for d in range(n)
+        if not _is_size_one(lhs.shape[d]) and not _is_size_one(rhs.shape[d])
+    ]
 
 
-def matmul_rule(lhs: TensorLayout, rhs: TensorLayout) -> RuleSignature:
-    """Placement rule for matmul-family ops."""
-    lhs_p = lhs.mapping.to_placements()
-    rhs_p = rhs.mapping.to_placements()
-    mesh = lhs.mapping.mesh
-    mesh_ndim = mesh.ndim
-
-    lhs_rank = lhs.rank
-    rhs_rank = rhs.rank
-    lhs_contract = lhs_rank - 1
-    lhs_non_contract = lhs_rank - 2 if lhs_rank >= 2 else None
-    rhs_contract = builtins.max(0, rhs_rank - 2)
-    rhs_non_contract = rhs_rank - 1
-
-    out_rank = builtins.max(lhs_rank, rhs_rank)
-    out_non_contract_rhs = out_rank - 1
-    out_non_contract_lhs = out_rank - 2 if out_rank >= 2 else None
-
-    suggested_lhs_p, suggested_rhs_p, out_p = _resolve_per_axis_placements(
-        lhs_p,
-        rhs_p,
-        mesh_ndim,
-        _matmul_axis_rule(
-            lhs_non_contract,
-            lhs_contract,
-            rhs_non_contract,
-            rhs_contract,
-            out_non_contract_lhs,
-            out_non_contract_rhs,
-        ),
-        "matmul",
+def _lhs_batch(lhs: TensorLayout, rhs: TensorLayout) -> list[int]:
+    """Batch axes where lhs is non-broadcast but rhs is broadcast / absent."""
+    n_shared = min(lhs.rank - 2, rhs.rank - 2)
+    out: list[int] = list(range(n_shared, lhs.rank - 2))
+    out.extend(
+        d
+        for d in range(n_shared)
+        if not _is_size_one(lhs.shape[d]) and _is_size_one(rhs.shape[d])
     )
+    return out
 
-    return (
-        (
-            PlacementMapping(mesh, suggested_lhs_p),
-            PlacementMapping(mesh, suggested_rhs_p),
-        ),
-        (PlacementMapping(mesh, out_p),),
+
+def _rhs_batch(lhs: TensorLayout, rhs: TensorLayout) -> list[int]:
+    """Batch axes where rhs is non-broadcast but lhs is broadcast / absent."""
+    n_shared = min(lhs.rank - 2, rhs.rank - 2)
+    out: list[int] = list(range(n_shared, rhs.rank - 2))
+    out.extend(
+        d
+        for d in range(n_shared)
+        if _is_size_one(lhs.shape[d]) and not _is_size_one(rhs.shape[d])
     )
+    return out
+
+
+def _mm_rows(lhs: TensorLayout, rhs: TensorLayout) -> list[AxisAssignment]:
+    """Matrix x matrix (and any batched variant).
+
+    Right-aligned axis indices: M and K on lhs, K and N on rhs, M and N
+    on output. Output rank equals ``max(lhs.rank, rhs.rank)`` for
+    batched cases.
+    """
+    M_lhs, K_lhs = lhs.rank - 2, lhs.rank - 1
+    K_rhs, N_rhs = rhs.rank - 2, rhs.rank - 1
+    out_rank = max(lhs.rank, rhs.rank)
+    M_out, N_out = out_rank - 2, out_rank - 1
+
+    rows: list[AxisAssignment] = [AxisAssignment((R, R), R)]
+    for d in _shared_batch(lhs, rhs):
+        rows.append(AxisAssignment((Sharded(d), Sharded(d)), Sharded(d)))
+    for d in _lhs_batch(lhs, rhs):
+        rows.append(AxisAssignment((Sharded(d), R), Sharded(d)))
+    for d in _rhs_batch(lhs, rhs):
+        rows.append(AxisAssignment((R, Sharded(d)), Sharded(d)))
+    rows.extend(
+        [
+            AxisAssignment((Sharded(M_lhs), R), Sharded(M_out)),
+            AxisAssignment((R, Sharded(N_rhs)), Sharded(N_out)),
+            AxisAssignment((Sharded(K_lhs), Sharded(K_rhs)), P),
+            AxisAssignment((P, R), P),
+            AxisAssignment((R, P), P),
+        ]
+    )
+    return rows
+
+
+def _vv_rows() -> list[AxisAssignment]:
+    """Vector x vector: (K,) @ (K,) -> scalar; both contract on K."""
+    return [
+        AxisAssignment((R, R), R),
+        AxisAssignment((Sharded(0), Sharded(0)), P),
+        AxisAssignment((P, R), P),
+        AxisAssignment((R, P), P),
+    ]
+
+
+def _vm_rows(rhs: TensorLayout) -> list[AxisAssignment]:
+    """Vector x matrix: (K,) @ (..., K, N) -> (..., N)."""
+    rows: list[AxisAssignment] = [AxisAssignment((R, R), R)]
+    for d in range(rhs.rank - 2):
+        rows.append(AxisAssignment((R, Sharded(d)), Sharded(d)))
+    rows.append(
+        AxisAssignment((R, Sharded(rhs.rank - 1)), Sharded(rhs.rank - 2))
+    )
+    rows.append(AxisAssignment((Sharded(0), Sharded(rhs.rank - 2)), P))
+    rows.extend([AxisAssignment((P, R), P), AxisAssignment((R, P), P)])
+    return rows
+
+
+def _mv_rows(lhs: TensorLayout) -> list[AxisAssignment]:
+    """Matrix x vector: (..., M, K) @ (K,) -> (..., M)."""
+    rows: list[AxisAssignment] = [AxisAssignment((R, R), R)]
+    for d in range(lhs.rank - 2):
+        rows.append(AxisAssignment((Sharded(d), R), Sharded(d)))
+    rows.append(
+        AxisAssignment((Sharded(lhs.rank - 2), R), Sharded(lhs.rank - 2))
+    )
+    rows.append(AxisAssignment((Sharded(lhs.rank - 1), Sharded(0)), P))
+    rows.extend([AxisAssignment((P, R), P), AxisAssignment((R, P), P)])
+    return rows
+
+
+def matmul_rule(lhs: TensorLayout, rhs: TensorLayout) -> ActionSet:
+    """Strategies for ``matmul``: vector-vector / vector-matrix / matrix-matrix variants."""
+    if lhs.rank == 1 and rhs.rank == 1:
+        rows = _vv_rows()
+    elif lhs.rank == 1:
+        rows = _vm_rows(rhs)
+    elif rhs.rank == 1:
+        rows = _mv_rows(lhs)
+    else:
+        rows = _mm_rows(lhs, rhs)
+    return build_action_set(rows, layouts=(lhs, rhs))
+
+
+def outer_rule(lhs: TensorLayout, rhs: TensorLayout) -> ActionSet:
+    """Strategies for ``outer``: 1-D x 1-D -> 2-D outer product."""
+    rows = [
+        AxisAssignment((R, R), R),
+        AxisAssignment((Sharded(0), R), Sharded(0)),
+        AxisAssignment((R, Sharded(0)), Sharded(1)),
+        AxisAssignment((P, R), P),
+        AxisAssignment((R, P), P),
+    ]
+    return build_action_set(rows, layouts=(lhs, rhs))

@@ -84,7 +84,7 @@ class Gemma4MultimodalEmbedder(Module):
             ``[seq_len, text_hidden_size]``.
         """
         normed = self.embedding_pre_projection_norm(inputs_embeds)
-        return self.embedding_projection(normed)
+        return self.embedding_projection(normed.cast(self.dtype))
 
     @property
     def sharding_strategy(self) -> ShardingStrategy | None:

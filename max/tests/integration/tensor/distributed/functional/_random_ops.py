@@ -108,5 +108,3 @@ class _Gaussian:
 
 class RandomTests(_Uniform, _Gaussian):
     """Aggregates all random test classes for thin subclassing."""
-
-    pass

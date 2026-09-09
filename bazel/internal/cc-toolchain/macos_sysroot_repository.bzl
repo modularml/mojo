@@ -41,10 +41,20 @@ load("@bazel_skylib//rules/directory:directory.bzl", "directory")
 _INCLUDES = [
     "usr/lib/**",
     "usr/include/**",
+    "System/Library/Frameworks/ApplicationServices.framework/**",
+    "System/Library/Frameworks/CFNetwork.framework/**",
+    "System/Library/Frameworks/ColorSync.framework/**",
     "System/Library/Frameworks/CoreFoundation.framework/**",
+    "System/Library/Frameworks/CoreGraphics.framework/**",
+    "System/Library/Frameworks/CoreServices.framework/**",
+    "System/Library/Frameworks/CoreText.framework/**",
+    "System/Library/Frameworks/DiskArbitration.framework/**",
+    "System/Library/Frameworks/ImageIO.framework/**",
     "System/Library/Frameworks/Foundation.framework/**",
     "System/Library/Frameworks/IOKit.framework/**",
     "System/Library/Frameworks/Metal.framework/**",
+    "System/Library/Frameworks/Security.framework/**",
+    "System/Library/Frameworks/SystemConfiguration.framework/**",
 ]
 
 directory(

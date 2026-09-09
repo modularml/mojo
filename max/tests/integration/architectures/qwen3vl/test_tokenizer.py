@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, NonCallableMock
 
 import numpy as np
 from max.pipelines.architectures.qwen3vl_moe.tokenizer import Qwen3VLTokenizer
-from max.pipelines.lib import KVCacheConfig
+from max.pipelines.lib import KVCacheConfig, PipelineRuntimeConfig
 from max.pipelines.modeling.types import (
     ImageContentPart,
     RequestID,
@@ -48,6 +48,10 @@ def _create_mock_pipeline_config(model_path: str) -> MagicMock:
 
     pipeline_config = MagicMock()
     pipeline_config.model = mock_model_config
+    # A real runtime config, not a MagicMock: the tokenizer sizes its
+    # preprocessed image cache from these budgets, and arithmetic on a
+    # MagicMock raises.
+    pipeline_config.runtime = PipelineRuntimeConfig()
     return pipeline_config
 
 

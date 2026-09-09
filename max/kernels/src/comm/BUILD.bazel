@@ -1,15 +1,26 @@
 load("//bazel:api.bzl", "mojo_library")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS")
 
 package(default_visibility = ["//max:consumers"])
+
+# Raw sources for the LSP parse-smoke test.
+filegroup(
+    name = "srcs",
+    srcs = glob(["**/*.mojo"]),
+    visibility = ["//Mojo/test/mojo-lsp-server/parse-tree:__pkg__"],
+)
 
 mojo_library(
     name = "comm",
     srcs = glob(["**/*.mojo"]),
     docs_base_path = "kernels",
+    ignore_deprecated = IGNORED_POINTER_DEPRECATIONS,
+    use_production_compiler_for_asan = True,
     validate_missing_docs = False,
     deps = [
         "//max:internal_utils",
         "//max:layout",
+        "//max:max_mojo",
         "@mojo//:std",
     ],
 )

@@ -285,6 +285,7 @@ class AttentionWithRope(Module, Shardable):
                     has_bias=self.has_bias,
                     quant_config=self.quant_config,
                     clip_qkv=self.clip_qkv,
+                    mask_variant=self.mask_variant,
                     sliding_window=self.sliding_window,
                 )
 
@@ -336,6 +337,7 @@ class AttentionWithRope(Module, Shardable):
                     has_bias=self.has_bias,
                     quant_config=self.quant_config,
                     clip_qkv=self.clip_qkv,
+                    mask_variant=self.mask_variant,
                     sliding_window=self.sliding_window,
                 )
                 replica.qkv_proj = qkv_proj_replicas[i]
@@ -1086,6 +1088,35 @@ class TensorParallelAttentionWithRope(
             inputs=attn_outputs, signal_buffers=signal_buffers
         )
 
+    def materialize_kv_from_hidden(  # type: ignore[override]
+        self,
+        layer_idx: TensorValue,
+        hiddens: Sequence[TensorValue],
+        kv_collections: Sequence[PagedCacheValues],
+        freqs_cis: Sequence[TensorValue],
+        input_row_offsets: Sequence[TensorValue],
+    ) -> None:
+        n = len(self.devices)
+        if not (
+            len(hiddens)
+            == len(kv_collections)
+            == len(freqs_cis)
+            == len(input_row_offsets)
+            == n
+        ):
+            raise ValueError(
+                "All per-device inputs to materialize_kv_from_hidden must "
+                f"have length equal to the number of devices ({n})."
+            )
+        for i in range(n):
+            self.list_of_attentions[i].materialize_kv_from_hidden(
+                layer_idx=layer_idx,
+                hidden=hiddens[i],
+                kv_collection=kv_collections[i],
+                freqs_cis=freqs_cis[i],
+                input_row_offsets=input_row_offsets[i],
+            )
+
 
 class DataParallelAttentionWithRope(AttentionWithRope):
     """Data-parallel implementation of Attention with RoPE.
@@ -1245,3 +1276,33 @@ class DataParallelAttentionWithRope(AttentionWithRope):
                 )
             )
         return outs
+
+    def materialize_kv_from_hidden(  # type: ignore[override]
+        self,
+        layer_idx: TensorValue,
+        hiddens: Sequence[TensorValue],
+        kv_collections: Sequence[PagedCacheValues],
+        freqs_cis: Sequence[TensorValue],
+        input_row_offsets: Sequence[TensorValue],
+    ) -> None:
+        """Data-parallel KV materialization from external hidden states."""
+        n = len(self.devices)
+        if not (
+            len(hiddens)
+            == len(kv_collections)
+            == len(freqs_cis)
+            == len(input_row_offsets)
+            == n
+        ):
+            raise ValueError(
+                "All per-device inputs to materialize_kv_from_hidden must "
+                f"have length equal to the number of devices ({n})."
+            )
+        for i in range(n):
+            self.replicated_attentions[i].materialize_kv_from_hidden(
+                layer_idx=layer_idx,
+                hidden=hiddens[i],
+                kv_collection=kv_collections[i],
+                freqs_cis=freqs_cis[i],
+                input_row_offsets=input_row_offsets[i],
+            )

@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Pipeline DSL: ScheduleEntry, EntryBuilder, Pipe, pipe, annotate_pipe."""
 
-from std.collections import InlineArray
+from std.collections import Array
 
 from .dependency_graph import LoopBody, OpNode
 from .types import (
@@ -27,20 +27,17 @@ from .types import (
 
 
 struct ScheduleEntry(ImplicitlyCopyable, Movable):
-    """An operation placed at a specific position in the schedule.
-
-    Fields:
-        op: The operation descriptor.
-        time_slot: Ordinal position within the phase (0-indexed).
-        phase: Which phase this entry belongs to (PROLOGUE, KERNEL, EPILOGUE).
-        is_prefetch: If True, this op is only emitted when there is a next
-            iteration (i.e., conditional on `k < K - 2*BK`).
-    """
+    """An operation placed at a specific position in the schedule."""
 
     var op: OpDesc
+    """The operation descriptor."""
     var time_slot: Int
+    """Ordinal position within the phase (0-indexed)."""
     var phase: Phase
+    """Phase this entry belongs to (`PROLOGUE`, `KERNEL`, or `EPILOGUE`)."""
     var is_prefetch: Bool
+    """Whether this op is only emitted when a next iteration exists
+    (conditional on `k < K - 2*BK`)."""
 
     @always_inline
     def __init__(
@@ -69,20 +66,21 @@ struct EntryBuilder[N: Int, phase: Phase]:
     pattern, auto-tracking the write position and phase.
     """
 
-    var entries: InlineArray[ScheduleEntry, Self.N]
+    var entries: Array[ScheduleEntry, Self.N]
     var pos: Int
 
     @always_inline
     def __init__(out self, pos: Int = 0):
-        self.entries = InlineArray[ScheduleEntry, Self.N](uninitialized=True)
+        """Constructs an empty builder at the given write position."""
+        self.entries = Array[ScheduleEntry, Self.N](uninitialized=True)
         self.pos = pos
 
     @always_inline
     def __init__(
-        out self, entries: InlineArray[ScheduleEntry, Self.N], pos: Int = 0
+        out self, var entries: Array[ScheduleEntry, Self.N], pos: Int = 0
     ):
         """Wrap an existing entries array (e.g. from a caller)."""
-        self.entries = entries
+        self.entries = entries^
         self.pos = pos
 
     @always_inline
@@ -114,27 +112,33 @@ struct EntryBuilder[N: Int, phase: Phase]:
 # =============================================================================
 
 
-struct Pipe[N: Int](ImplicitlyCopyable, Movable):
+struct Pipe[N: Int](Copyable, Movable):
     """A compile-time sequence of N pipeline operations.
 
     Build sequences using the >> operator to chain ops into a pipeline:
 
-        pipe(ld()) >> st() >> br() >> frag[0]() >> sb()
+    ```mojo
+    pipe(ld()) >> st() >> br() >> frag[0]() >> sb()
+    ```
 
     Convert to schedule entries for a given phase:
 
-        my_pipe.as_schedule[Phase.PROLOGUE]()
+    ```mojo
+    my_pipe.as_schedule[Phase.PROLOGUE]()
+    ```
 
     Concatenate two pipes:
 
-        pipe_a >> pipe_b   # Pipe[A+B]
+    ```mojo
+    pipe_a >> pipe_b   # Pipe[A+B]
+    ```
     """
 
-    var ops: InlineArray[OpDesc, Self.N]
+    var ops: Array[OpDesc, Self.N]
 
     @always_inline
     def __init__(out self):
-        self.ops = InlineArray[OpDesc, Self.N](uninitialized=True)
+        self.ops = Array[OpDesc, Self.N](uninitialized=True)
 
     @always_inline
     def __rshift__(self, op: OpDesc) -> Pipe[Self.N + 1]:
@@ -156,39 +160,37 @@ struct Pipe[N: Int](ImplicitlyCopyable, Movable):
         return result^
 
     @always_inline
-    def as_schedule[phase: Phase](self) -> InlineArray[ScheduleEntry, Self.N]:
+    def as_schedule[phase: Phase](self) -> Array[ScheduleEntry, Self.N]:
         """Convert to schedule entries with sequential time slots."""
-        var entries = InlineArray[ScheduleEntry, Self.N](uninitialized=True)
-        for i in range(Self.N):
-            entries[i] = ScheduleEntry(
+        return Array[_, Self.N](
+            fill_with=lambda (i: Int) {
+                imm self
+            } -> ScheduleEntry: ScheduleEntry(
                 op=self.ops[i],
                 time_slot=i,
                 phase=phase,
                 is_prefetch=False,
             )
-        return entries^
+        )
 
     @always_inline
     def as_schedule[
         phase: Phase
-    ](self, offset: Int) -> InlineArray[ScheduleEntry, Self.N]:
+    ](self, offset: Int) -> Array[ScheduleEntry, Self.N]:
         """Convert to schedule entries with time slots starting at offset."""
-        var entries = InlineArray[ScheduleEntry, Self.N](uninitialized=True)
-        for i in range(Self.N):
-            entries[i] = ScheduleEntry(
+        return Array[_, Self.N](
+            fill_with=lambda (i: Int) {imm} -> ScheduleEntry: ScheduleEntry(
                 op=self.ops[i],
                 time_slot=offset + i,
                 phase=phase,
                 is_prefetch=False,
             )
-        return entries^
+        )
 
     @always_inline
     def emit_into[
         MaxN: Int, phase: Phase
-    ](
-        self, mut entries: InlineArray[ScheduleEntry, MaxN], offset: Int = 0
-    ) -> Int:
+    ](self, mut entries: Array[ScheduleEntry, MaxN], offset: Int = 0) -> Int:
         """Write ops into a larger schedule array starting at offset.
 
         Returns the new offset (offset + N), allowing chained writes.

@@ -1,15 +1,64 @@
 load(
     "//bazel:api.bzl",
+    "modular_py_binary",
+    "modular_py_library",
     "modular_py_test",
     "requirement",
 )
+load("//max/tests/integration/test_common:mef_precompile.bzl", "CPU_TORCH", "precompiled_mefs")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
+
+filegroup(
+    name = "gemma4_e4b_config",
+    srcs = ["configs/gemma4_e4b/config.json"],
+)
+
+modular_py_test(
+    name = "test_config_init",
+    srcs = ["test_config_init.py"],
+    data = [":gemma4_e4b_config"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/lib",
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_fused_projection_weights",
+    srcs = ["test_fused_projection_weights.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_batch_vision_inputs_cpu",
+    srcs = ["test_batch_vision_inputs.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        requirement("numpy"),
+    ],
+)
 
 modular_py_test(
     name = "tests",
@@ -17,6 +66,10 @@ modular_py_test(
     srcs = glob(
         ["**/test_*.py"],
         exclude = [
+            "test_attention.py",
+            "test_batch_vision_inputs.py",
+            "test_config_init.py",
+            "test_fused_projection_weights.py",
             "test_image_processor.py",
             "test_reasoning.py",
             "test_tokenizer.py",
@@ -25,7 +78,6 @@ modular_py_test(
             "test_vision_rotary_embedding.py",
         ],
     ) + [
-        "_attention_helpers.py",
         "conftest.py",
     ],
     data = [
@@ -40,10 +92,6 @@ modular_py_test(
         "test.resources:gpu-memory": "16",
     },
     gpu_constraints = ["//:has_gpu"],
-    # test_attention.py: 4 tests, 4 shards = one test per shard, compiles run in parallel
-    per_test_shard_count = {
-        "test_attention.py": 4,
-    },
     tags = ["gpu"],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -55,9 +103,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
-        "//max/python/max/pipelines/kv_cache",
-        "//max/tests/integration/test_common:context_utils",
+        "//max/python/max/pipelines/architectures/gemma4",
         requirement("numpy"),
         requirement("torch"),
         requirement("transformers"),
@@ -77,7 +123,7 @@ modular_py_test(
         "requires-network",
     ],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/gemma4",
         requirement("numpy"),
         requirement("pillow"),
         requirement("transformers"),
@@ -88,9 +134,11 @@ modular_py_test(
     name = "test_tokenizer",
     srcs = ["test_tokenizer.py"],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/support",
         requirement("numpy"),
         requirement("pillow"),
         requirement("pytest-asyncio"),
@@ -102,7 +150,7 @@ modular_py_test(
     name = "test_reasoning",
     srcs = ["test_reasoning.py"],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/gemma4",
         requirement("numpy"),
         requirement("pytest-asyncio"),
     ],
@@ -112,9 +160,10 @@ modular_py_test(
     name = "test_tool_parser",
     srcs = ["test_tool_parser.py"],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/_xgrammar",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/modeling",
-        requirement("llguidance"),
     ],
 )
 
@@ -126,7 +175,7 @@ modular_py_test(
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/gemma4",
         requirement("av"),
         requirement("numpy"),
     ],
@@ -146,7 +195,113 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/gemma4",
         requirement("torch"),
+    ],
+)
+
+modular_py_library(
+    name = "attention_helpers",
+    testonly = True,
+    srcs = [
+        "_attention_helpers.py",
+    ],
+    data = [
+        "//max/tests/integration/architectures/gemma4/testdata",
+    ],
+    # Needs to be lazy, see definition of CPU_TORCH
+    ignore_unresolved_imports = [
+        "torch",
+    ],
+    imports = ["."],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/kv_cache",
+        requirement("transformers"),
+    ],
+)
+
+modular_py_binary(
+    name = "precompile_attention_mefs",
+    testonly = True,
+    srcs = ["precompile_attention_mefs.py"],
+    data = [
+        "//max/tests/integration/architectures/gemma4/testdata",
+    ],
+    env = {
+        "PIPELINES_TESTDATA": "max/tests/integration/architectures/gemma4/testdata",
+    },
+    # FIXME: pydeps_test sees CPU_TORCH as two torch deps, so `ignore_extra_deps` needs
+    # both. But we can't add both, because they're mutually incompatible.
+    tags = ["no-pydeps"],
+    deps = [
+        ":attention_helpers",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/tests/integration/test_common:mef_precompile",
+    ] + CPU_TORCH,
+)
+
+precompiled_mefs(
+    name = "attention_mefs",
+    producer = ":precompile_attention_mefs",
+    specs = [
+        "compiled_local_bf16",
+        "compiled_global_bf16",
+    ] + select({
+        "//:b200_gpu": [
+            "compiled_local_native_fp8",
+            "compiled_global_native_fp8",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = ["manual"],
+)
+
+modular_py_test(
+    name = "test_attention",
+    size = "large",
+    srcs = [
+        "conftest.py",
+        "test_attention.py",
+    ],
+    data = [
+        ":attention_mefs",
+        "//max/tests/integration/architectures/gemma4/testdata",
+    ],
+    env = {
+        "PIPELINES_TESTDATA": "max/tests/integration/architectures/gemma4/testdata",
+        "MEF_RLOCATIONS": "$(rlocationpaths :attention_mefs)",
+        "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
+    },
+    exec_properties = {
+        # Increased from 4 to 16 due to MODELS-958
+        "test.resources:gpu-memory": "16",
+    },
+    gpu_constraints = ["//:has_gpu"],
+    tags = ["gpu"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":attention_helpers",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/integration/test_common:context_utils",
+        "//max/tests/integration/test_common:graph_utils",
+        "//max/tests/integration/test_common:mef_precompile",
+        requirement("numpy"),
+        requirement("torch"),
+        requirement("transformers"),
     ],
 )

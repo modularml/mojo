@@ -13,12 +13,10 @@
 """Op implementation for cumsum."""
 
 from max._core.dialects import builtin, kgen, rmo
-from max.dtype import DType
 
 from ..graph import Graph
 from ..type import DeviceRef
 from ..value import TensorValue, TensorValueLike
-from .constant import constant
 from .transfer_to import transfer_to
 from .validation import _check_device_placement
 
@@ -76,7 +74,7 @@ def cumsum(
         rmo.MoCumsumOp,
         result=x.type,
         input=x,
-        axis=constant(axis, DType.int64, DeviceRef.CPU()),
+        axis=builtin.IntegerAttr(index_type, axis),
         exclusive=builtin.IntegerAttr(index_type, int(exclusive)),
         reverse=builtin.IntegerAttr(index_type, int(reverse)),
         output_param_decls=kgen.ParamDeclArrayAttr([]),

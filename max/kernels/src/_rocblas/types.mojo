@@ -17,7 +17,7 @@ from std.os import abort
 
 @fieldwise_init
 struct Handle(Defaultable, Equatable, TrivialRegisterPassable):
-    var _value: OptionalReg[OpaquePointer[MutAnyOrigin]]
+    var _value: OptionalReg[OpaquePointer[MutUntrackedOrigin]]
 
     def __init__(out self):
         self._value = None
@@ -114,13 +114,13 @@ struct DataType(Equatable, TrivialRegisterPassable):
         self._value = Int32(value)
 
     def __init__(out self, dtype: DType) raises:
-        if dtype == DType.float16:
+        if dtype == .float16:
             self = Self.F16_R
-        elif dtype == DType.bfloat16:
+        elif dtype == .bfloat16:
             self = Self.BF16_R
-        elif dtype == DType.float32:
+        elif dtype == .float32:
             self = Self.F32_R
-        elif dtype == DType.float64:
+        elif dtype == .float64:
             self = Self.F64_R
         else:
             raise Error(

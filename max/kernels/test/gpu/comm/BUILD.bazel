@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -10,6 +11,7 @@ mojo_test(
         "test_allreduce.mojo",
         "test_multimem_allreduce.mojo",
     ],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     exec_properties = {
         "test.resources:gpu-memory": "4",
     },
@@ -38,6 +40,7 @@ mojo_test(
         "test_multimem_reducescatter.mojo",
         "test_reducescatter.mojo",
     ],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     exec_properties = {
         "test.resources:gpu-memory": "4",
     },
@@ -58,11 +61,12 @@ mojo_test(
     ],
 )
 
-# Tests requiring higher GPU memory allocation (20GB instead of 4GB)
-HIGH_GPU_MEMORY_TESTS = [
-    "test_p2p_ep_combine.mojo",
-    "test_p2p_ep_dispatch.mojo",
-]
+_GPU_MEMORY = {
+    "test_p2p_ep_combine.mojo": "25",
+    "test_p2p_ep_dispatch.mojo": "25",
+    "test_allreduce_residual_rmsnorm_fp8.mojo": "9",
+    "test_p2p_copy.mojo": "5",
+}
 
 # Tests where assertions push register usage past hardware limits,
 # causing CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES on NVIDIA GPUs.
@@ -72,9 +76,10 @@ DISABLE_ASSERTIONS_TESTS = []
 # Needs multi-GPU constraints, disabled assertions, special env vars,
 # 4GB GPU memory, and extra deps that the standard comm glob doesn't provide.
 mojo_test(
-    name = "test_allreduce_residual_rmsnorm_fp8.mojo.test",
+    name = "test_allreduce_residual_rmsnorm.mojo.test",
     size = "large",
-    srcs = ["test_allreduce_residual_rmsnorm_fp8.mojo"],
+    srcs = ["test_allreduce_residual_rmsnorm.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     enable_assertions = False,  # MSTDL-2301: register pressure
     exec_properties = {
         "test.resources:gpu-memory": "4",
@@ -102,11 +107,10 @@ mojo_test(
         name = src + ".test",
         size = "medium",  # MI355s only need small
         srcs = [src],
-        # NOTE: test_allgather.mojo tests deprecated functionality.
-        copts = ["-Wno-error"] if src == "test_allgather.mojo" else [],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         enable_assertions = src not in DISABLE_ASSERTIONS_TESTS,
         exec_properties = {
-            "test.resources:gpu-memory": "20" if src in HIGH_GPU_MEMORY_TESTS else "4",
+            "test.resources:gpu-memory": _GPU_MEMORY.get(src, "6"),
         },
         main = src,
         tags = ["gpu"],
@@ -118,6 +122,7 @@ mojo_test(
             "//max:internal_utils",
             "//max:kv_cache",
             "//max:linalg",
+            "//max:max_mojo",
             "//max:nn",
             "//max:quantization",
             "//max:shmem",
@@ -129,7 +134,7 @@ mojo_test(
         exclude = [
             "test_multimem_allreduce.mojo",
             "test_multimem_reducescatter.mojo",
-            "test_allreduce_residual_rmsnorm_fp8.mojo",  # Has its own standalone rule above
+            "test_allreduce_residual_rmsnorm.mojo",  # Has its own standalone rule above
         ],
     )
 ]

@@ -18,8 +18,9 @@ This file contains the kernels for Expert Parallelism (EP) communication.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
+from max.driver import accelerator_api
 from max.dtype import DType
 from max.graph import (
     BufferValue,
@@ -32,6 +33,7 @@ from max.graph import (
     Value,
     ops,
 )
+from max.support.math import ceildiv
 
 from ...quant_config import QuantConfig
 from .ep_config import NUM_GROUPS, EPConfig
@@ -39,6 +41,113 @@ from .ep_config import NUM_GROUPS, EPConfig
 # With NVFP4 format, each expert's scales need to be padded to the nearest
 # multiple of NVFP4_MN_GROUP_SIZE.
 NVFP4_MN_GROUP_SIZE = 128
+
+
+def _uses_block_scaled_nv_ep_layout(config: EPConfig) -> bool:
+    quant_config = config.dispatch_quant_config
+    return (
+        quant_config is not None
+        and accelerator_api() == "cuda"
+        and (quant_config.is_nvfp4 or quant_config.is_mxfp8)
+    )
+
+
+def _is_legacy_float8_dispatch(config: EPConfig) -> bool:
+    quant_config = config.dispatch_quant_config
+    return (
+        quant_config is not None
+        and config.dispatch_dtype.is_float8()
+        # MXFP8 is block-scaled, never legacy per-tensor float8. Without this it
+        # would silently take the legacy path on AMD, where
+        # `_uses_block_scaled_nv_ep_layout` is cuda-only.
+        and not quant_config.is_mxfp8
+        and not _uses_block_scaled_nv_ep_layout(config)
+    )
+
+
+def uses_mx_ep_token_format(
+    config: EPConfig, quant_config: QuantConfig | None = None
+) -> bool:
+    """Whether dispatch goes through ``MXTokenFormat``, which serves both MX
+    formats: it takes its element packing from the dispatch dtype (two FP4
+    nibbles per byte, or one E4M3 byte) and the E8M0 scale path is identical.
+
+    On cuda, MXFP8 uses the NVIDIA block-scaled layout instead, so that case is
+    excluded here rather than left to call-site ordering.
+
+    Args:
+        config: Supplies the accelerator layout term, and the format term when
+            ``quant_config`` is omitted.
+        quant_config: Takes the format term from here instead, so a caller whose
+            consumer gate reads its own :obj:`QuantConfig` cannot disagree with
+            the producer about the format.
+    """
+    if quant_config is None:
+        quant_config = config.dispatch_quant_config
+    if quant_config is None:
+        return False
+    return (
+        quant_config.is_mxfp4 or quant_config.is_mxfp6 or quant_config.is_mxfp8
+    ) and not _uses_block_scaled_nv_ep_layout(config)
+
+
+_MX_FORMAT_NAME: Final[dict[DType, str]] = {
+    DType.float8_e4m3fn: "mxfp8",
+    DType.float8_e5m2: "mxfp8_e5m2",
+    DType.float6_e2m3fn: "mxfp6",
+    DType.float6_e3m2fn: "mxfp6_e3m2",
+    DType.float4_e2m1fn: "mxfp4",
+}
+_MX_FORMAT_AUTO: Final[str] = "auto"
+
+
+def _mx_format_name(quant_config: QuantConfig | None) -> str:
+    """Returns the ``MXFormat`` name for this config's element encoding.
+
+    Falls back to ``auto`` when the quantized dtype already identifies the
+    format, which keeps the kernel on its dtype inference.
+    """
+    if quant_config is None or not quant_config.is_mx:
+        return _MX_FORMAT_AUTO
+    return _MX_FORMAT_NAME.get(quant_config.mx_element_dtype, _MX_FORMAT_AUTO)
+
+
+def _add_mx_format_parameter(
+    parameters: dict[str, Any], config: EPConfig
+) -> None:
+    """Names the MX operand format when the packed dtype cannot.
+
+    MXFP4 and MXFP8 are told apart by their quantized dtype, so they leave this
+    unset and the kernel infers as before. MXFP6 travels as ``uint8`` with E8M0
+    scales -- byte for byte the same as MXFP4 -- so it has to be named.
+    """
+    quant_config = config.dispatch_quant_config
+    if quant_config is not None and quant_config.is_mxfp6:
+        parameters["MX_FORMAT"] = _mx_format_name(quant_config)
+
+
+def ep_mxfp4_max_padded_m(config: EPConfig) -> int:
+    """Per-expert ``scale_4d`` slot stride in rows for the MXFP4 A-scale
+    preshuffle fold (= ``align_up(max_recv_tokens_per_expert, 32)``). 0 when the
+    fold is off. Single source of truth shared by the dispatch producer
+    (``ep_wait`` up-proj / ``fused_silu`` down-proj) and the matmul reader
+    (``a_scales_max_padded_m``)."""
+    if not config.mxfp4_a_scales_preshuffled:
+        return 0
+    return ep_mxfp4_down_slot_stride(config)
+
+
+def ep_mxfp4_down_slot_stride(config: EPConfig) -> int:
+    """Raw per-expert ``scale_4d`` slot stride
+    (= ``align_up(max_recv_tokens_per_expert, 32)``) for the LOCAL SwiGLU
+    down-proj A-scale fold (``fused_silu`` writes it, the down matmul reads it).
+    Unconditional and independent of the distributed up-proj fold
+    (``mxfp4_a_scales_preshuffled``), so it engages on the distributed-dispatch
+    path where that fold is off. ``ep_mxfp4_max_padded_m`` returns this gated on
+    that flag; the caller here gates on applicability."""
+    n_ranks = config.n_gpus_per_node * config.n_nodes
+    max_recv_per_expert = config.max_tokens_per_rank * n_ranks
+    return ceildiv(max_recv_per_expert, 32) * 32
 
 
 def _ep_dispatch_output_types(
@@ -56,11 +165,11 @@ def _ep_dispatch_output_types(
         n_local_experts += 1
 
     token_last_dim = config.hidden_size
-    if (
-        config.dispatch_quant_config is not None
-        and config.dispatch_quant_config.is_fp4
-    ):
-        token_last_dim //= 2
+    if config.dispatch_quant_config is not None:
+        if config.dispatch_quant_config.is_fp4:
+            token_last_dim //= 2
+        elif config.dispatch_quant_config.is_mxfp6:
+            token_last_dim = token_last_dim * 3 // 4
 
     output_tokens_type = TensorType(
         dtype=config.dispatch_dtype,
@@ -86,27 +195,14 @@ def _ep_dispatch_output_types(
     if config.dispatch_quant_config is not None:
         quant_config = config.dispatch_quant_config
 
-        if config.dispatch_dtype.is_float8() or quant_config.is_mxfp4:
-            out_scales_type = quant_config.quantized_scales_type(
-                Shape([max_recv_tokens, config.hidden_size]), device_ref
-            )
-            return [
-                output_tokens_type,
-                out_scales_type,
-                expert_start_indices_type,
-                expert_ids_type,
-                src_info_type,
-            ]
-        elif quant_config.is_nvfp4:
-            # NVFP4 format will produce an extra tensor for offsets of the
-            # padded scales.
+        if _uses_block_scaled_nv_ep_layout(config):
+            # NVIDIA block-scaled formats produce padded 5D scale tiles plus
+            # offsets mapping each expert's token rows to those padded tiles.
             scales_offsets_type = TensorType(
                 dtype=DType.uint32,
                 shape=[n_local_experts],
                 device=device_ref,
             )
-            # Also, up to 128 tokens may be padded for scales of each expert. We
-            # need to accommodate this in the output types.
             padded_scales_tokens = (
                 max_recv_tokens + n_local_experts * NVFP4_MN_GROUP_SIZE
             )
@@ -121,6 +217,39 @@ def _ep_dispatch_output_types(
                 expert_ids_type,
                 src_info_type,
             ]
+        elif _is_legacy_float8_dispatch(config):
+            out_scales_type = quant_config.quantized_scales_type(
+                Shape([max_recv_tokens, config.hidden_size]), device_ref
+            )
+            return [
+                output_tokens_type,
+                out_scales_type,
+                expert_start_indices_type,
+                expert_ids_type,
+                src_info_type,
+            ]
+        elif uses_mx_ep_token_format(config):
+            # When the A-scale preshuffle fold is on, the dispatch-wait kernel
+            # writes the activation scale directly into the matmul's per-expert
+            # fixed-stride `scale_4d` slots, so the scales output is slot-sized
+            # (`n_local_experts * max_padded_M` rows; `n_local_experts` already
+            # includes the fused shared expert if present) rather than
+            # `max_recv_tokens` rows.
+            scales_rows = (
+                n_local_experts * ep_mxfp4_max_padded_m(config)
+                if config.mxfp4_a_scales_preshuffled
+                else max_recv_tokens
+            )
+            out_scales_type = quant_config.quantized_scales_type(
+                Shape([scales_rows, config.hidden_size]), device_ref
+            )
+            return [
+                output_tokens_type,
+                out_scales_type,
+                expert_start_indices_type,
+                expert_ids_type,
+                src_info_type,
+            ]
         else:
             raise ValueError(
                 f"Unsupported dispatch dtype: {config.dispatch_dtype}"
@@ -132,6 +261,24 @@ def _ep_dispatch_output_types(
         expert_ids_type,
         src_info_type,
     ]
+
+
+def _add_mxfp4_scale_fusion_parameters(
+    parameters: dict[str, bool | int | str | DType],
+    config: EPConfig,
+) -> None:
+    """Inject the KS224 up-proj scale-fusion op parameters.
+
+    When ``config.mxfp4_a_scales_preshuffled``, the MXFP4 dispatch-wait kernel
+    writes the activation scale directly into the up-proj grouped-matmul's
+    per-expert fixed-stride ``scale_4d`` slot layout (slot stride
+    ``max_padded_M * K_SCALES``), so the standalone preshuffle is dropped. The
+    matmul reader is told the same ``max_padded_M`` (single source of truth, see
+    ``moe_fp8._local_ep_compute``). No-op when the fusion is off.
+    """
+    if config.mxfp4_a_scales_preshuffled:
+        parameters["fuse_a_scale_preshuffle"] = True
+        parameters["max_padded_M"] = ep_mxfp4_max_padded_m(config)
 
 
 def _ep_common_parameters(
@@ -191,13 +338,19 @@ def call_ep_init(
     parameters["combine_dtype"] = config.combine_dtype
 
     if config.dispatch_quant_config is not None:
-        if config.dispatch_quant_config.is_nvfp4:
-            parameters["dispatch_fmt_str"] = "NVFP4"
-            parameters["dispatch_scale_dtype"] = DType.float8_e4m3fn
-        elif config.dispatch_quant_config.is_mxfp4:
-            parameters["dispatch_fmt_str"] = "MXFP4"
+        if _uses_block_scaled_nv_ep_layout(config):
+            parameters["dispatch_fmt_str"] = "BLOCK_SCALED_NV"
+            parameters["dispatch_scale_dtype"] = (
+                DType.float8_e4m3fn
+                if config.dispatch_quant_config.is_nvfp4
+                else DType.float8_e8m0fnu
+            )
+        elif uses_mx_ep_token_format(config):
+            parameters["dispatch_fmt_str"] = (
+                "MXFP6" if config.dispatch_quant_config.is_mxfp6 else "MXFP4"
+            )
             parameters["dispatch_scale_dtype"] = DType.float8_e8m0fnu
-        elif config.dispatch_dtype.is_float8():
+        elif _is_legacy_float8_dispatch(config):
             parameters["dispatch_fmt_str"] = "BlockwiseFP8"
             parameters["dispatch_scale_dtype"] = DType.float32
         else:
@@ -280,19 +433,33 @@ def call_ep_dispatch_async(
 
     if config.dispatch_quant_config is not None:
         quant_config = config.dispatch_quant_config
-        if quant_config.is_nvfp4:
-            if input_scales is None:
+        if _uses_block_scaled_nv_ep_layout(config):
+            if quant_config.is_nvfp4 and input_scales is None:
                 raise ValueError(
                     "input_scales must be provided when using NVFP4 dispatch"
                 )
-            op_name += ".nvfp4"
-            input_vals.append(1.0 / input_scales.to(input_tokens.device))
-        elif quant_config.is_mxfp4:
+            op_name += ".block.scaled.nv"
+            parameters["dispatch_scale_dtype"] = (
+                DType.float8_e4m3fn
+                if quant_config.is_nvfp4
+                else DType.float8_e8m0fnu
+            )
+            if input_scales is not None:
+                input_vals.append(1.0 / input_scales.to(input_tokens.device))
+            else:
+                input_vals.append(
+                    ops.constant(
+                        [1.0], DType.float32, device=input_tokens.device
+                    )
+                )
+        elif uses_mx_ep_token_format(config):
             op_name += ".mxfp4"
             # No output tensor for MOGG to deduce the scale dtype from.
             parameters["dispatch_scale_dtype"] = DType.float8_e8m0fnu
-        elif config.dispatch_dtype.is_float8():
+            _add_mx_format_parameter(parameters, config)
+        elif _is_legacy_float8_dispatch(config):
             parameters["dispatch_fmt_str"] = "BlockwiseFP8"
+            parameters["dispatch_scale_dtype"] = DType.float32
         else:
             raise ValueError(
                 f"Unsupported dispatch dtype: {config.dispatch_dtype}"
@@ -300,6 +467,7 @@ def call_ep_dispatch_async(
 
     elif config.dispatch_dtype == DType.bfloat16:
         parameters["dispatch_fmt_str"] = "BF16"
+        parameters["dispatch_scale_dtype"] = DType.float32
     else:
         raise ValueError(f"Unsupported dispatch dtype: {config.dispatch_dtype}")
 
@@ -378,19 +546,26 @@ def call_ep_dispatch_wait(
     if config.dispatch_quant_config is not None:
         quant_config = config.dispatch_quant_config
 
-        if config.dispatch_dtype.is_float8():
+        if _uses_block_scaled_nv_ep_layout(config):
+            op_name += ".block.scaled.nv"
+            parameters["dispatch_scale_dtype"] = (
+                DType.float8_e4m3fn
+                if quant_config.is_nvfp4
+                else DType.float8_e8m0fnu
+            )
+            if config.fused_shared_expert and quant_config.is_nvfp4:
+                raise ValueError(
+                    "NVFP4 dispatch with fused shared expert is not supported"
+                )
+        elif _is_legacy_float8_dispatch(config):
             op_name += ".fp8"
             parameters["dispatch_scale_granularity"] = str(
                 quant_config.input_scale.granularity
             )
-        elif quant_config.is_nvfp4:
-            op_name += ".nvfp4"
-            if config.fused_shared_expert:
-                raise ValueError(
-                    "NVFP4 dispatch with fused shared expert is not supported"
-                )
-        elif quant_config.is_mxfp4:
+        elif uses_mx_ep_token_format(config):
             op_name += ".mxfp4"
+            _add_mx_format_parameter(parameters, config)
+            _add_mxfp4_scale_fusion_parameters(parameters, config)
         else:
             raise ValueError(
                 f"Unsupported dispatch dtype: {config.dispatch_dtype}"
@@ -621,18 +796,32 @@ def call_ep_dispatch(
     if config.dispatch_quant_config is not None:
         quant_config = config.dispatch_quant_config
 
-        if config.dispatch_dtype.is_float8():
+        if _uses_block_scaled_nv_ep_layout(config):
+            if quant_config.is_nvfp4 and input_scales is None:
+                raise ValueError(
+                    "input_scales must be provided when using NVFP4 dispatch"
+                )
+            op_name += ".block.scaled.nv"
+            parameters["dispatch_scale_dtype"] = (
+                DType.float8_e4m3fn
+                if quant_config.is_nvfp4
+                else DType.float8_e8m0fnu
+            )
+            if input_scales is not None:
+                input_vals.append(1.0 / input_scales.to(device_ref))
+            else:
+                input_vals.append(
+                    ops.constant([1.0], DType.float32, device=device_ref)
+                )
+        elif _is_legacy_float8_dispatch(config):
             op_name += ".fp8"
             parameters["dispatch_scale_granularity"] = str(
                 quant_config.input_scale.granularity
             )
-        elif quant_config.is_nvfp4:
-            if input_scales is None:
-                raise ValueError(
-                    "input_scales must be provided when using NVFP4 dispatch"
-                )
-            op_name += ".nvfp4"
-            input_vals.append(1.0 / input_scales.to(device_ref))
+        elif uses_mx_ep_token_format(config):
+            op_name += ".mxfp4"
+            _add_mx_format_parameter(parameters, config)
+            _add_mxfp4_scale_fusion_parameters(parameters, config)
         else:
             raise ValueError(
                 f"Unsupported dispatch dtype: {config.dispatch_dtype}"
@@ -671,9 +860,12 @@ def call_distributed_ep_dispatch(
     num_devices = len(input_tokens)
 
     quant_config = config.dispatch_quant_config
-    is_nvfp4 = quant_config is not None and quant_config.is_nvfp4
-    is_mxfp4 = quant_config is not None and quant_config.is_mxfp4
-    is_fp8 = quant_config is not None and config.dispatch_dtype.is_float8()
+    uses_nvidia_block_scaled = (
+        quant_config is not None and _uses_block_scaled_nv_ep_layout(config)
+    )
+    # Covers MXFP8 too; otherwise it would silently fall through to bf16.
+    is_mx_token_format = uses_mx_ep_token_format(config)
+    is_fp8 = _is_legacy_float8_dispatch(config)
 
     output_types_per_device: list[list[TensorType]] = []
     for i in range(num_devices):
@@ -681,14 +873,23 @@ def call_distributed_ep_dispatch(
         types = _ep_dispatch_output_types(config, device_ref)
         output_types_per_device.append(types)
 
-    if is_nvfp4:
-        if input_scales is None:
+    if uses_nvidia_block_scaled:
+        assert quant_config is not None
+        if quant_config.is_nvfp4 and input_scales is None:
             raise ValueError("input_scales must be provided for NVFP4 dispatch")
-        inv_scales = [
-            1.0 / input_scales[i].to(atomic_counters[i].device)
-            for i in range(num_devices)
-        ]
-        return ops.distributed_ep.dispatch_nvfp4(
+        if input_scales is not None:
+            inv_scales = [
+                1.0 / input_scales[i].to(atomic_counters[i].device)
+                for i in range(num_devices)
+            ]
+        else:
+            inv_scales = [
+                ops.constant(
+                    [1.0], DType.float32, device=atomic_counters[i].device
+                )
+                for i in range(num_devices)
+            ]
+        return ops.distributed_ep.dispatch_block_scaled_nv(
             input_tokens,
             topk_ids,
             send_buf_ptrs,
@@ -705,7 +906,7 @@ def call_distributed_ep_dispatch(
             n_nodes=config.n_nodes,
             fused_shared_expert=config.fused_shared_expert,
         )
-    elif is_mxfp4:
+    elif is_mx_token_format:
         return ops.distributed_ep.dispatch_mxfp4(
             input_tokens,
             topk_ids,
@@ -721,6 +922,13 @@ def call_distributed_ep_dispatch(
             n_gpus_per_node=config.n_gpus_per_node,
             n_nodes=config.n_nodes,
             fused_shared_expert=config.fused_shared_expert,
+            fuse_a_scale_preshuffle=config.mxfp4_a_scales_preshuffled,
+            max_padded_m=ep_mxfp4_max_padded_m(config),
+            mx_format=(
+                _mx_format_name(quant_config)
+                if quant_config is not None and quant_config.is_mxfp6
+                else _MX_FORMAT_AUTO
+            ),
         )
     elif is_fp8:
         assert quant_config is not None
@@ -964,6 +1172,10 @@ def fused_silu_quantized(
     out_type: DType,
     input_scales: TensorValue | None = None,
     scales_offsets: TensorValue | None = None,
+    max_padded_M: int = 0,
+    clamp_activation: bool = False,
+    swiglu_alpha: float = 0.0,
+    swiglu_limit: float = 0.0,
 ) -> tuple[TensorValue, TensorValue]:
     """Perform fused SILU operation for all the MLPs in the EP MoE module.
 
@@ -985,6 +1197,21 @@ def fused_silu_quantized(
         out_type: Output dtype.
         input_scales: Optional input scales tensor. Needed by NVFP4.
         scales_offsets: Optional scales offsets tensor. Needed by NVFP4.
+        max_padded_M: When > 0 (MXFP4, MXFP6, and MXFP8 EP down-proj
+            fusion), the kernel writes the E8M0 activation scale directly
+            into the grouped-matmul per-expert slot layout.  Must equal
+            ``align_up(max_recv_tokens_per_expert, 32)``.  The output
+            scales tensor will have shape
+            ``[n_local_experts * max_padded_M, K_SCALES]`` instead of
+            ``[max_recv_tokens, K_SCALES]``.
+        clamp_activation: When True (MXFP4 and MXFP8), apply the OAI-clamped SwiGLU
+            activation ``(clamp(up, -L, L) + 1) * min(gate, L) *
+            sigmoid(alpha * min(gate, L))`` instead of plain ``SiLU(gate) *
+            up``.
+        swiglu_alpha: Alpha for the clamped activation (ignored unless
+            ``clamp_activation``).
+        swiglu_limit: Limit ``L`` for the clamped activation (ignored unless
+            ``clamp_activation``).
 
     Returns:
         A tuple containing:
@@ -1032,12 +1259,84 @@ def fused_silu_quantized(
     elif quant_config.is_mxfp4:
         op_name += ".mxfp4"
         hidden_size //= 2  # Two FP4 elements are packed into one uint8 element
+        # mxfp4 op always takes trailing alpha/limit CPU f32 constants
+        # (plain SiLU passes 0.0/0.0).
+        input_vals.append(
+            ops.constant(swiglu_alpha, DType.float32, device=DeviceRef.CPU())
+        )
+        input_vals.append(
+            ops.constant(swiglu_limit, DType.float32, device=DeviceRef.CPU())
+        )
+        if max_padded_M > 0:
+            # KS64 down-proj fusion: write the E8M0 scale directly
+            # into the grouped matmul's per-expert fixed-stride slot layout so
+            # the standalone preshuffle kernel is dropped from the critical path.
+            # Pass `n_local_experts * max_padded_M` rows and the raw hidden dim
+            # (input.shape[1] // 2) to _mxfp4_scales_type so its ceildiv(K,32)
+            # gives K_SCALES = hidden_size // 32 correctly.
+            n_local_experts = row_offsets.shape[0] - 1
+            raw_hidden = input.shape[1] // 2  # half of gate+up concat
+            out_scales_type = quant_config.quantized_scales_type(
+                Shape([n_local_experts * max_padded_M, raw_hidden]),
+                input.device,
+            )
+    elif quant_config.is_mxfp6:
+        op_name += ".mxfp6"
+        hidden_size = hidden_size * 3 // 4
+        input_vals.append(
+            ops.constant(swiglu_alpha, DType.float32, device=DeviceRef.CPU())
+        )
+        input_vals.append(
+            ops.constant(swiglu_limit, DType.float32, device=DeviceRef.CPU())
+        )
+        if max_padded_M > 0:
+            n_local_experts = row_offsets.shape[0] - 1
+            raw_hidden = input.shape[1] // 2
+            out_scales_type = quant_config.quantized_scales_type(
+                Shape([n_local_experts * max_padded_M, raw_hidden]),
+                input.device,
+            )
+    elif quant_config.is_mxfp8:
+        # Must precede the generic float8 branch: MXFP8's out_type IS
+        # float8_e4m3fn, so falling through would select the legacy per-tensor
+        # `.fp8` kernel. No `hidden_size //= 2`: one byte per element.
+        op_name += ".mxfp8"
+        input_vals.append(
+            ops.constant(swiglu_alpha, DType.float32, device=DeviceRef.CPU())
+        )
+        input_vals.append(
+            ops.constant(swiglu_limit, DType.float32, device=DeviceRef.CPU())
+        )
+        if max_padded_M > 0:
+            # Same fold as MXFP4; the E8M0 scale layout is format-independent.
+            n_local_experts = row_offsets.shape[0] - 1
+            raw_hidden = input.shape[1] // 2
+            out_scales_type = quant_config.quantized_scales_type(
+                Shape([n_local_experts * max_padded_M, raw_hidden]),
+                input.device,
+            )
     elif out_type.is_float8():
         op_name += ".fp8"
     else:
         raise ValueError(
             f"Unsupported quantization format: {quant_config.format}"
         )
+
+    parameters: dict[str, bool | int] = {}
+    if quant_config.is_mxfp6:
+        parameters["clamp_activation"] = clamp_activation
+        parameters["FP6_FORMAT"] = (
+            1 if quant_config.mxfp6_format == "e3m2" else 0
+        )
+        if max_padded_M > 0:
+            parameters["fuse_a_scale_preshuffle"] = True
+            parameters["max_padded_M"] = max_padded_M
+    elif quant_config.is_mxfp4 or quant_config.is_mxfp8:
+        # Clamp flag applies even with the scale fold off.
+        parameters["clamp_activation"] = clamp_activation
+        if max_padded_M > 0:
+            parameters["fuse_a_scale_preshuffle"] = True
+            parameters["max_padded_M"] = max_padded_M
 
     result = ops.custom(
         op_name,
@@ -1051,6 +1350,7 @@ def fused_silu_quantized(
             ),
             out_scales_type,
         ],
+        parameters=parameters,
     )
 
     return result[0].tensor, result[1].tensor

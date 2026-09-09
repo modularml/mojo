@@ -1,0 +1,35 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# AMD MHA prefill benchmark: MAX vs aiter (CK v3, triton) vs torch SDPA
+# Run:
+#   kbench bench_amd_mha.yaml
+#   kbench bench_amd_mha.yaml --param engine:"[modular_max, aiter_ck_v3]"
+
+name: bench_amd_mha
+file: $BUILD_WORKSPACE_DIRECTORY/max/kernels/benchmarks/misc/comparison/bench_amd_mha.py
+
+llama-70b-commons: &llama-70b-commons
+  $num_q_heads: 64
+  $num_kv_heads: 8
+  $head_dim: 128
+  $causal: [True]
+  # Available engines: modular_max, aiter, aiter_ck_v3, aiter_ck_v2, aiter_triton_v2, aiter_triton_v3, torch_sdpa
+  $engine: ["modular_max", "aiter"]
+  metadata:
+    model: "llama-70b"
+
+params:
+- <<: *llama-70b-commons
+  $batch_size: [16]
+  $qkv_len: [512, 1024, 2048, 4096]

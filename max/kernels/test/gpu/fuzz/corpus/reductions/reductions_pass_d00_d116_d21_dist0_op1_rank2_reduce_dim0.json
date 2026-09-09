@@ -1,0 +1,16 @@
+{
+  "target": "reductions",
+  "spec": {
+    "rank": 2,
+    "reduce_dim": 0,
+    "d0": 0,
+    "d1": 16,
+    "d2": 1,
+    "op": 1,
+    "dist": 0
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "empty NON-inner axis, max: reaches the cooperative block tier rather than the warp tier every inner-axis empty reduce lands on, and pins the ambiguous monoid's identity (min_finite, not a raise as numpy does).",
+  "findings": []
+}

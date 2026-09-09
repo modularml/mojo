@@ -1,0 +1,39 @@
+load("//bazel:api.bzl", "lit_tests")
+
+package(default_visibility = ["//max:consumers"])
+
+_LIT_TESTS = [
+    "test_apple_mma_8x8_invalid_types.mojo",
+    "test_apple_mma_invalid_types.mojo",
+]
+
+# GPU-executing lit tests: these launch a kernel and FileCheck its stdout, so
+# they need a real GPU. `# REQUIRES:` lines inside each source gate per-vendor
+# (e.g. AMD-GPU), while `gpu_constraints` keeps the Bazel target vendor-agnostic.
+_GPU_LIT_TESTS = [
+    "test_amd_print_multiple_of_8.mojo",
+]
+
+lit_tests(
+    name = "lit_tests",
+    srcs = _LIT_TESTS,
+    mojo_deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+    target_compatible_with = select({
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+lit_tests(
+    name = "gpu_lit_tests",
+    srcs = _GPU_LIT_TESTS,
+    gpu_constraints = ["//:has_gpu"],
+    mojo_deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+    tags = ["gpu"],
+)

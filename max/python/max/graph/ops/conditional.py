@@ -55,19 +55,35 @@ def cond(
 
     .. code-block:: python
 
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, TensorType, ops
+
+        device = DeviceRef.CPU()
+
         def then_fn():
             return ops.constant(1, DType.int32, device=device)
 
         def else_fn():
             return ops.constant(0, DType.int32, device=device)
 
-        pred = ops.constant(True, DType.bool, device=device)
-        result = ops.cond(
-            pred,
-            [TensorType(DType.int32, [], device=device)],
-            then_fn,
-            else_fn,
-        )
+        with Graph("cond_example") as graph:
+            pred = ops.constant(True, DType.bool, device=device)
+            graph.output(
+                *ops.cond(
+                    pred,
+                    [TensorType(DType.int32, [], device=device)],
+                    then_fn,
+                    else_fn,
+                )
+            )
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        assert int(result.to_numpy()) == 1  # pred is True
 
     Args:
         pred: A boolean scalar tensor of type :attr:`~max.dtype.DType.bool`

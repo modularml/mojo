@@ -11,204 +11,143 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""TensorLayout-based rules for miscellaneous ops."""
+"""Placement rules for miscellaneous ops (resize, irfft, qmatmul, scatter_nd, ...)."""
 
 from __future__ import annotations
 
-import builtins
+import dataclasses
+from typing import Any
 
-from max.experimental.sharding.mappings import PlacementMapping
-from max.experimental.sharding.placements import Partial, Placement, Sharded
+from max.experimental.sharding.placements import Sharded
 from max.experimental.sharding.types import TensorLayout
 from max.graph.dim import DimLike
-from max.graph.shape import ShapeLike
 
-from ._common import RuleSignature, resolve_partials_mapping
-
-
-def _reject_axes(
-    placements: tuple[Placement, ...],
-    bad: set[int],
-    op_name: str,
-) -> None:
-    for p in placements:
-        if isinstance(p, Sharded) and p.axis in bad:
-            raise ValueError(
-                f"{op_name}: cannot be sharded along axis {p.axis}."
-            )
+from ..action import ActionSet, AxisAssignment
+from ..cost import P, R, build_action_set, force_replicated_action_set
+from .elementwise import linear_unary_rule
 
 
-def band_part_rule(
-    x: TensorLayout,
-    num_lower: int | None = None,
-    num_upper: int | None = None,
-    exclude: bool = False,
-) -> RuleSignature:
-    """band_part is linear. Rejects sharding on last 2 axes (matrix dims)."""
-    bad = {builtins.max(0, x.rank - 2), x.rank - 1}
-    _reject_axes(x.mapping.to_placements(), bad, "band_part")
-    return (x.mapping, num_lower, num_upper, exclude), (x.mapping,)
+def _block_axes_rows(
+    x: TensorLayout, blocked: set[int]
+) -> list[AxisAssignment]:
+    """Linear-block helper: shard any non-blocked axis; Partial pass-through."""
+    rows: list[AxisAssignment] = [AxisAssignment((R,), R)]
+    for ax in range(x.rank):
+        if ax in blocked:
+            continue
+        rows.append(AxisAssignment((Sharded(ax),), Sharded(ax)))
+    rows.append(AxisAssignment((P,), P))
+    return rows
 
 
-def fold_rule(
-    input: TensorLayout,
-    output_size: tuple[DimLike, DimLike],
-    kernel_size: tuple[DimLike, DimLike],
-    stride: int | tuple[int, int] = 1,
-    dilation: int | tuple[int, int] = 1,
-    padding: int | tuple[int, int] = 0,
-) -> RuleSignature:
-    """Fold is linear. Rejects sharding on axes 1, 2."""
-    _reject_axes(input.mapping.to_placements(), {1, 2}, "fold")
-    return (
-        (input.mapping, output_size, kernel_size, stride, dilation, padding),
-        (input.mapping,),
+def band_part_rule(x: TensorLayout, *extra: Any, **kwargs: Any) -> ActionSet:
+    """Strategies for ``band_part``: sharding only outside the last-two matrix axes."""
+    return build_action_set(
+        _block_axes_rows(x, {max(0, x.rank - 2), x.rank - 1}),
+        layouts=(x,),
+        extras=extra,
     )
 
 
-def as_interleaved_complex_rule(x: TensorLayout) -> RuleSignature:
-    """Rejects sharding on last axis. Non-linear."""
-    s = resolve_partials_mapping(x.mapping)
-    _reject_axes(s.to_placements(), {x.rank - 1}, "as_interleaved_complex")
-    return (s,), (s,)
-
-
-def resize_rule(
-    input: TensorLayout, size: ShapeLike, *extra: object
-) -> RuleSignature:
-    """Resize is linear. Only batch-dim sharding allowed.
-
-    Shared by ``ops.resize``, ``ops.resize_nearest``, ``ops.resize_bicubic``;
-    their trailing args differ, hence ``*extra``.
-    """
-    _reject_axes(
-        input.mapping.to_placements(),
-        set(builtins.range(1, input.rank)),
-        "resize",
+def fold_rule(input: TensorLayout, *extra: Any, **kwargs: Any) -> ActionSet:
+    """Strategies for ``fold``: sharding only outside axes 1 and 2."""
+    return build_action_set(
+        _block_axes_rows(input, {1, 2}), layouts=(input,), extras=extra
     )
-    return (input.mapping, size, *extra), (input.mapping,)
+
+
+def as_interleaved_complex_rule(
+    x: TensorLayout, *extra: Any, **kwargs: Any
+) -> ActionSet:
+    """Strategies for ``as_interleaved_complex``: sharding only outside the last axis."""
+    return build_action_set(
+        _block_axes_rows(x, {x.rank - 1}), layouts=(x,), extras=extra
+    )
+
+
+def irfft_rule(
+    input_tensor: TensorLayout, *extra: Any, **kwargs: Any
+) -> ActionSet:
+    """Strategies for ``irfft``: sharding only outside the last axis."""
+    return build_action_set(
+        _block_axes_rows(input_tensor, {input_tensor.rank - 1}),
+        layouts=(input_tensor,),
+        extras=extra,
+    )
+
+
+def _resize_action_set(
+    input: TensorLayout, extras: tuple[object, ...]
+) -> ActionSet:
+    return build_action_set(
+        _block_axes_rows(input, set(range(1, input.rank))),
+        layouts=(input,),
+        extras=extras,
+    )
+
+
+def resize_rule(input: TensorLayout, *extra: Any, **kwargs: Any) -> ActionSet:
+    """Strategies for ``resize``: sharding only on the batch axis (0)."""
+    return _resize_action_set(input, extras=extra)
 
 
 def resize_linear_rule(
+    input: TensorLayout, *extra: Any, **kwargs: Any
+) -> ActionSet:
+    """Strategies for ``resize_linear``: same batch-only family as ``resize``."""
+    return _resize_action_set(input, extras=extra)
+
+
+def resize_nearest_rule(
+    input: TensorLayout, *extra: Any, **kwargs: Any
+) -> ActionSet:
+    """Strategies for ``resize_nearest``: same batch-only family as ``resize``."""
+    return _resize_action_set(input, extras=extra)
+
+
+def resize_bicubic_rule(
+    input: TensorLayout, *extra: Any, **kwargs: Any
+) -> ActionSet:
+    """Strategies for ``resize_bicubic``: same batch-only family as ``resize``."""
+    return _resize_action_set(input, extras=extra)
+
+
+def dequantize_rule(encoding: Any, quantized: TensorLayout) -> ActionSet:
+    """Linear unary on ``quantized``; ``encoding`` is non-tensor metadata."""
+    return dataclasses.replace(linear_unary_rule(quantized), extras=(encoding,))
+
+
+def qmatmul_rule(
+    encoding: Any, config: Any, lhs: TensorLayout, *rhs: TensorLayout
+) -> ActionSet:
+    """Quantized matmul: every tensor Replicated."""
+    return force_replicated_action_set(lhs, *rhs, extras=(encoding, config))
+
+
+def masked_scatter_rule(
     input: TensorLayout,
-    size: ShapeLike,
-    coordinate_transform_mode: int = 0,
-    antialias: bool = False,
-) -> RuleSignature:
-    """Resize_linear is linear. Only batch-dim sharding allowed."""
-    _reject_axes(
-        input.mapping.to_placements(),
-        set(builtins.range(1, input.rank)),
-        "resize_linear",
-    )
-    return (
-        input.mapping,
-        size,
-        coordinate_transform_mode,
-        antialias,
-    ), (input.mapping,)
+    mask: TensorLayout,
+    updates: TensorLayout,
+    out_dim: DimLike,
+) -> ActionSet:
+    """Forces every input to Replicated (mask uses absolute positions)."""
+    return force_replicated_action_set(input, mask, updates, extras=(out_dim,))
 
 
-def irfft_rule(input_tensor: TensorLayout, *extra: object) -> RuleSignature:
-    """Sharding rule for irfft. Rejects sharding on the last (FFT) axis."""
-    _reject_axes(
-        input_tensor.mapping.to_placements(),
-        {input_tensor.rank - 1},
-        "irfft",
-    )
-    return (input_tensor.mapping, *extra), (input_tensor.mapping,)
+def scatter_nd_rule(
+    input: TensorLayout, updates: TensorLayout, indices: TensorLayout
+) -> ActionSet:
+    """N-D scatter: everything Replicated."""
+    return force_replicated_action_set(input, updates, indices)
 
 
-def reject_distributed_rule(
-    x: TensorLayout, op_name: str = ""
-) -> RuleSignature:
-    """Reject any op that does not support distributed tensors."""
-    mesh = x.mapping.mesh
-    if mesh.num_devices > 1:
-        raise ValueError(f"{op_name}: distributed tensors are not supported.")
-    return (x.mapping,), (x.mapping,)
+def scatter_nd_add_rule(
+    input: TensorLayout, updates: TensorLayout, indices: TensorLayout
+) -> ActionSet:
+    """``scatter_nd_add`` shares its strategy with :func:`scatter_nd_rule`."""
+    return force_replicated_action_set(input, updates, indices)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-#  Control flow rules
-# ═══════════════════════════════════════════════════════════════════════
-
-
-def cond_rule(
-    pred: TensorLayout,
-    out_types: object,
-    then_fn: object,
-    else_fn: object,
-) -> RuleSignature:
-    """cond: predicate must be fully Replicated."""
-    for p in pred.mapping.to_placements():
-        if isinstance(p, Sharded):
-            raise ValueError(
-                "cond: predicate must be Replicated. "
-                "A Sharded predicate would cause different branches "
-                "on different devices."
-            )
-        if isinstance(p, Partial):
-            raise ValueError(
-                "cond: predicate must be Replicated. "
-                "A Partial predicate is undefined."
-            )
-    mesh = pred.mapping.mesh
-    out_m = PlacementMapping(mesh, pred.mapping.to_placements())
-    return (pred.mapping, out_types, then_fn, else_fn), (out_m,)
-
-
-def while_loop_rule(
-    initial_values: object,
-    predicate: object,
-    body: object,
-) -> RuleSignature:
-    """while_loop: rejects distributed initial values (for now)."""
-    if isinstance(initial_values, TensorLayout):
-        if initial_values.mapping.mesh.num_devices > 1:
-            raise ValueError(
-                "while_loop: distributed tensors are not supported as "
-                "initial values."
-            )
-        return (
-            (initial_values.mapping, predicate, body),
-            (initial_values.mapping,),
-        )
-    if isinstance(initial_values, (list, tuple)):
-        suggested = []
-        out_mappings = []
-        for v in initial_values:
-            if isinstance(v, TensorLayout):
-                if v.mapping.mesh.num_devices > 1:
-                    raise ValueError(
-                        "while_loop: distributed tensors are not supported as "
-                        "initial values."
-                    )
-                suggested.append(v.mapping)
-                out_mappings.append(v.mapping)
-            else:
-                suggested.append(v)
-        return (
-            (type(initial_values)(suggested), predicate, body),
-            tuple(out_mappings),
-        )
-    return (initial_values, predicate, body), ()
-
-
-def buffer_store_rule(
-    destination: TensorLayout,
-    source: TensorLayout,
-) -> RuleSignature:
-    """buffer_store: both tensors must have same placements."""
-    return (destination.mapping, source.mapping), (destination.mapping,)
-
-
-def buffer_store_slice_rule(
-    destination: TensorLayout,
-    source: TensorLayout,
-    indices: object,
-) -> RuleSignature:
-    """buffer_store_slice: both tensors must have same placements."""
-    return (destination.mapping, source.mapping, indices), (
-        destination.mapping,
-    )
+def reject_distributed_rule(x: TensorLayout, op_name: str = "") -> ActionSet:
+    """Auto-gathers to fully :class:`Replicated`."""
+    return force_replicated_action_set(x)

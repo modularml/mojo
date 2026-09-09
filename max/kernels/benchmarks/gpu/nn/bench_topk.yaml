@@ -18,35 +18,32 @@ params:
 
 # TTS
 - $N: [193856]
-  $K: [1, 50, 75, 255]
+  $K: [1, 5, 10, 20, 30, 50, 75, 255]
   $batch_size: [1, 2, 4, 8, 16, 32, 64, 256]
   $fill_fn_name: ["fill_random"]
   out_idx_type: [DType.uint64]
   sampling: [True]
-  USE_OLD_TOP_K_KERNEL: [False, True]
 
 # gemma
 - $N: [256000]
-  $K: [1, 50, 75, 255]
+  $K: [1, 5, 10, 20, 30, 50, 75, 255]
   $batch_size: [1, 2, 4, 8, 16, 32, 64, 256]
   $fill_fn_name: ["fill_random"]
   out_idx_type: [DType.uint64]
   sampling: [True]
-  USE_OLD_TOP_K_KERNEL: [False, True]
 
 # llama
 - $N: [128256]
-  $K: [1, 50, 75, 255]
+  $K: [1, 5, 10, 20, 50, 75, 255]
   $batch_size: [1, 2, 4, 8, 16, 32, 64, 256]
   $fill_fn_name: ["fill_random"]
   out_idx_type: [DType.uint64]
   sampling: [True]
-  USE_OLD_TOP_K_KERNEL: [False, True]
 
 # FlashInfer path (softmax + dual-pivot rejection sampling)
 # TTS
 - $N: [193856]
-  $K: [1, 50, 75, 255]
+  $K: [1, 5, 10, 20, 30, 50, 75, 255]
   $batch_size: [1, 2, 4, 8, 16, 32, 64, 256]
   $fill_fn_name: ["fill_random"]
   out_idx_type: [DType.uint64]
@@ -55,7 +52,7 @@ params:
 
 # gemma - FI
 - $N: [256000]
-  $K: [1, 50, 75, 255]
+  $K: [1, 5, 10, 20, 30, 50, 75, 255]
   $batch_size: [1, 2, 4, 8, 16, 32, 64, 256]
   $fill_fn_name: ["fill_random"]
   out_idx_type: [DType.uint64]
@@ -64,7 +61,7 @@ params:
 
 # llama - FI
 - $N: [128256]
-  $K: [1, 50, 75, 255]
+  $K: [1, 5, 10, 20, 30, 50, 75, 255]
   $batch_size: [1, 2, 4, 8, 16, 32, 64, 256]
   $fill_fn_name: ["fill_random"]
   out_idx_type: [DType.uint64]

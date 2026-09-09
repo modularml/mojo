@@ -89,6 +89,9 @@ def _detect_hf_flakes(
             return False
         if exc.response is None:
             return False
+        # 429 is transient rate limiting, not a permanent client fault.
+        if exc.response.status_code == 429:
+            return False
         # 4xx status codes indicate client error.
         return 400 <= exc.response.status_code < 500
 

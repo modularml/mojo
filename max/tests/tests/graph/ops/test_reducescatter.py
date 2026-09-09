@@ -66,7 +66,7 @@ def test_reducescatter_wrong_shape() -> None:
         ValueError,
         match=(
             r"reducescatter.sum operation must have the same shape across all"
-            r" input tensors."
+            r" input tensors in each group."
         ),
     ):
         with Graph(
@@ -261,3 +261,60 @@ def test_reducescatter_ragged_axis0() -> None:
             expected_rows = 2 if dev_idx < 1 else 1  # 9 % 8 == 1
             assert output.shape[0] == expected_rows
             assert output.shape[1] == 16
+
+
+def test_reducescatter_grouped_ragged_axis0() -> None:
+    """Test grouped ragged partitioning with different per-group shapes."""
+    num_gpus = 8
+    group_size = 4
+    devices = [DeviceRef.GPU(id=i) for i in range(num_gpus)]
+    signals = Signals(devices)
+    input_shapes = [[5, 128]] * group_size + [[3, 128]] * group_size
+    expected_rows = [2, 1, 1, 1, 1, 1, 1, 0]
+
+    with Graph(
+        "grouped_reducescatter",
+        input_types=[
+            TensorType(dtype=DType.float32, shape=shape, device=dev)
+            for shape, dev in zip(input_shapes, devices, strict=True)
+        ]
+        + list(signals.input_types()),
+    ) as graph:
+        reducescatter_outputs = ops.reducescatter.sum(
+            inputs=(v.tensor for v in graph.inputs[:num_gpus]),
+            signal_buffers=(v.buffer for v in graph.inputs[num_gpus:]),
+            axis=0,
+            group_size=group_size,
+        )
+        graph.output(*reducescatter_outputs)
+        for dev_idx, (output, device) in enumerate(
+            zip(reducescatter_outputs, devices, strict=True)
+        ):
+            assert device == output.device
+            assert output.shape == [expected_rows[dev_idx], 128]
+
+
+def test_reducescatter_group_size_must_divide_inputs() -> None:
+    """Test grouped reduce-scatter requires full contiguous groups."""
+    num_gpus = 6
+    devices = [DeviceRef.GPU(id=i) for i in range(num_gpus)]
+    signals = Signals(devices)
+
+    with pytest.raises(
+        ValueError,
+        match=r"group_size to evenly divide the number of input tensors",
+    ):
+        with Graph(
+            "grouped_reducescatter",
+            input_types=[
+                TensorType(dtype=DType.float32, shape=[6, 16], device=dev)
+                for dev in devices
+            ]
+            + list(signals.input_types()),
+        ) as graph:
+            ops.reducescatter.sum(
+                inputs=(v.tensor for v in graph.inputs[:num_gpus]),
+                signal_buffers=(v.buffer for v in graph.inputs[num_gpus:]),
+                axis=0,
+                group_size=4,
+            )

@@ -13,14 +13,15 @@
 """Online softmax for RDNA Wave32 attention kernels.
 
 Warp lane layout is `col_major(16, 2)` (lane_row = l % 16,
-lane_col = l // 16). Per-lane C/D fragment is `row_major(1, 8)` — 8
+lane_col = l // 16). Per-lane C/D fragment is `row_major(1, 8)`: 8
 fp32 elements stored as a row vector. `full()` runs one online-softmax
 iteration end-to-end (max → exp → sum → correction → output update).
 """
 
-import std.gpu.primitives.warp as warp
+import max.gpu.primitives.warp as warp
 from std.math.uutils import umod
-from std.gpu import barrier, lane_id, warp_id as get_warp_id
+from max.gpu import lane_id, warp_id as get_warp_id
+from max.gpu.sync import barrier
 from layout import TileTensor
 from layout.tile_layout import col_major, row_major
 from layout.tile_tensor import stack_allocation as tt_stack_allocation
@@ -35,6 +36,22 @@ struct SoftmaxRDNA[
     num_warps_n: Int,
     use_exp2: Bool = False,
 ]:
+    """Online softmax accumulator for RDNA Wave32 attention kernels.
+
+    Tracks per-row running maximum and sum across online softmax iterations
+    so that attention scores can be normalized incrementally as new key/value
+    tiles arrive. The `full()` method runs one complete iteration (max → exp →
+    sum → correction → output update) end-to-end.
+
+    Parameters:
+        dtype: Element type of the score and output fragments.
+        num_m_mmas: Number of MMA tiles along the query (row) dimension.
+        num_n_mmas: Number of MMA tiles along the key (column) dimension.
+        num_warps_m: Number of warps assigned to the row dimension.
+        num_warps_n: Number of warps assigned to the column dimension.
+        use_exp2: Selects `exp2` instead of natural `exp` for the softmax kernel.
+    """
+
     comptime _warp_rows = 16
     comptime _warp_cols = 2
     comptime WarpLayoutT = type_of(
@@ -67,8 +84,8 @@ struct SoftmaxRDNA[
     comptime RowMaxTensorType = TileTensor[
         Self.dtype,
         type_of(Self.row_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     comptime RowSumTensorType = Self.RowMaxTensorType
 
@@ -81,8 +98,8 @@ struct SoftmaxRDNA[
     comptime ScoreFragTensorType = TileTensor[
         Self.dtype,
         type_of(Self.score_frag_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
 
     var score_frag_rowmax: Self.ScoreFragTensorType
@@ -92,19 +109,19 @@ struct SoftmaxRDNA[
     @always_inline
     def __init__(out self):
         self.rowmax_tensor = tt_stack_allocation[
-            dtype=Self.dtype, address_space=AddressSpace.LOCAL
+            dtype=Self.dtype, address_space=.LOCAL
         ](Self.row_layout)
         self.rowsum_tensor = tt_stack_allocation[
-            dtype=Self.dtype, address_space=AddressSpace.LOCAL
+            dtype=Self.dtype, address_space=.LOCAL
         ](Self.row_layout)
         self.score_frag_rowmax = tt_stack_allocation[
-            dtype=Self.dtype, address_space=AddressSpace.LOCAL
+            dtype=Self.dtype, address_space=.LOCAL
         ](Self.score_frag_layout)
         self.score_frag_rowsum = tt_stack_allocation[
-            dtype=Self.dtype, address_space=AddressSpace.LOCAL
+            dtype=Self.dtype, address_space=.LOCAL
         ](Self.score_frag_layout).fill(0)
         self.correction = tt_stack_allocation[
-            dtype=Self.dtype, address_space=AddressSpace.LOCAL
+            dtype=Self.dtype, address_space=.LOCAL
         ](Self.score_frag_layout).fill(1)
 
     @always_inline
@@ -337,7 +354,16 @@ struct SoftmaxRDNA[
         warp_scratch: TileTensor[mut=True, Self.dtype, ...],
     ):
         """Single-pass online softmax iteration: max -> exp -> sum ->
-        correction -> update output -> update max/sum."""
+        correction -> update output -> update max/sum.
+
+        Args:
+            output: Accumulator tile of partial softmax outputs to correct
+                in place with the per-row renormalization factor.
+            score: Attention score tile for this iteration; overwritten in
+                place with exponentiated, max-subtracted values.
+            warp_scratch: Shared-memory scratch tile used for cross-warp row
+                reductions of the running maximum and sum.
+        """
         self.calculate_qk_max(score, warp_scratch)
         self.exp(score)
         self.calculate_qk_sum(score, warp_scratch)

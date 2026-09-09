@@ -19,11 +19,13 @@ Modules
 .. toctree::
    :maxdepth: 1
 
+   experimental.compilation
    experimental.functional
    experimental.nn
    experimental.nn.norm
    experimental.nn.rope
-   experimental.random
    experimental.sharding
    experimental.tensor
+   experimental.tree_utils
+   experimental.testing
    experimental.torch

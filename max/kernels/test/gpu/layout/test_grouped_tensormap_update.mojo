@@ -34,11 +34,11 @@ This pattern is based on NVIDIA CuTe DSL's grouped block-scaled GEMM which uses
 
 from std.sys import size_of
 
-from std.gpu import barrier
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TMADescriptor
-from std.gpu import block_idx, thread_idx
-from std.gpu.sync import syncwarp
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TMADescriptor
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import syncwarp
 from layout import Layout, LayoutTensor
 from layout._fillers import arange
 from layout._utils import ManagedLayoutTensor
@@ -50,7 +50,7 @@ from layout.tma_async import (
     TMATensorTile,
     TMATensorTileArray,
 )
-from std.memory import stack_allocation, UnsafePointer
+from std.memory import unsafe_stack_allocation
 
 from std.utils.index import Index, IndexList
 
@@ -90,10 +90,10 @@ def test_grouped_tensormap_update_kernel[
     ],
     # Per-group source tensors (stored as pointers as integers)
     group_a_ptrs: LayoutTensor[
-        DType.uint64, Layout.row_major(num_groups, 1), MutAnyOrigin
+        .uint64, Layout.row_major(num_groups, 1), MutAnyOrigin
     ],
     group_b_ptrs: LayoutTensor[
-        DType.uint64, Layout.row_major(num_groups, 1), MutAnyOrigin
+        .uint64, Layout.row_major(num_groups, 1), MutAnyOrigin
     ],
     # Template TMA descriptor (grid constant, for SMEM init)
     template_tma_a: TMATensorTile[dtype, tma_rank, tile_shape, desc_shape],
@@ -122,33 +122,33 @@ def test_grouped_tensormap_update_kernel[
     ]()
 
     # Allocate SMEM for tiles
-    tile_a = LayoutTensor[
+    var tile_a = LayoutTensor[
         dtype,
         tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
-    tile_b = LayoutTensor[
+    var tile_b = LayoutTensor[
         dtype,
         tile_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
     # Allocate SMEM for tensormap descriptors
-    var smem_desc_a = stack_allocation[
-        1, TMADescriptor, alignment=128, address_space=AddressSpace.SHARED
+    var smem_desc_a = unsafe_stack_allocation[
+        1, TMADescriptor, alignment=128, address_space=.SHARED
     ]()
-    var smem_desc_b = stack_allocation[
-        1, TMADescriptor, alignment=128, address_space=AddressSpace.SHARED
+    var smem_desc_b = unsafe_stack_allocation[
+        1, TMADescriptor, alignment=128, address_space=.SHARED
     ]()
 
     # Allocate barriers
-    var mbar = stack_allocation[
-        2, SharedMemBarrier, address_space=AddressSpace.SHARED, alignment=8
+    var mbar = unsafe_stack_allocation[
+        2, SharedMemBarrier, address_space=.SHARED, alignment=8
     ]()
 
     barrier()  # Initial sync before entering loop
@@ -174,10 +174,10 @@ def test_grouped_tensormap_update_kernel[
             var a_addr = Int(group_a_ptrs[group_idx, 0])
             var b_addr = Int(group_b_ptrs[group_idx, 0])
 
-            var a_ptr = UnsafePointer[mut=True, Scalar[dtype], MutAnyOrigin](
+            var a_ptr = MutPointer[Scalar[dtype], MutAnyOrigin](
                 unsafe_from_address=a_addr
             )
-            var b_ptr = UnsafePointer[mut=True, Scalar[dtype], MutAnyOrigin](
+            var b_ptr = MutPointer[Scalar[dtype], MutAnyOrigin](
                 unsafe_from_address=b_addr
             )
 
@@ -242,38 +242,38 @@ def test_grouped_tensormap_update[
     comptime tile_layout = Layout.row_major(M, N)
     comptime num_blocks = 1  # Single block for this test
 
-    # Create per-group source tensors using InlineArray for non-copyable types
+    # Create per-group source tensors using Array for non-copyable types
     # Use tensor[update=False]() to avoid overwriting with uninitialized device memory
     # Use float32 to avoid bfloat16 precision issues during testing
 
     # Group 0
-    var src_a0 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
-    var src_b0 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
+    var src_a0 = ManagedLayoutTensor[.float32, tile_layout](ctx)
+    var src_b0 = ManagedLayoutTensor[.float32, tile_layout](ctx)
     arange(src_a0.tensor[update=False](), 1)
     arange(src_b0.tensor[update=False](), 100)
 
     # Group 1
-    var src_a1 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
-    var src_b1 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
+    var src_a1 = ManagedLayoutTensor[.float32, tile_layout](ctx)
+    var src_b1 = ManagedLayoutTensor[.float32, tile_layout](ctx)
     arange(src_a1.tensor[update=False](), 1001)
     arange(src_b1.tensor[update=False](), 1100)
 
     # Group 2 (only used if num_groups >= 3)
-    var src_a2 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
-    var src_b2 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
+    var src_a2 = ManagedLayoutTensor[.float32, tile_layout](ctx)
+    var src_b2 = ManagedLayoutTensor[.float32, tile_layout](ctx)
     arange(src_a2.tensor[update=False](), 2001)
     arange(src_b2.tensor[update=False](), 2100)
 
     # Group 3 (only used if num_groups >= 4)
-    var src_a3 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
-    var src_b3 = ManagedLayoutTensor[DType.float32, tile_layout](ctx)
+    var src_a3 = ManagedLayoutTensor[.float32, tile_layout](ctx)
+    var src_b3 = ManagedLayoutTensor[.float32, tile_layout](ctx)
     arange(src_a3.tensor[update=False](), 3001)
     arange(src_b3.tensor[update=False](), 3100)
 
     # Create pointer tensors for kernel
     comptime ptr_layout = Layout.row_major(num_groups, 1)
-    var a_ptrs = ManagedLayoutTensor[DType.uint64, ptr_layout](ctx)
-    var b_ptrs = ManagedLayoutTensor[DType.uint64, ptr_layout](ctx)
+    var a_ptrs = ManagedLayoutTensor[.uint64, ptr_layout](ctx)
+    var b_ptrs = ManagedLayoutTensor[.uint64, ptr_layout](ctx)
 
     # Fill pointer tensors based on num_groups
     # Use update=False to avoid overwriting with uninitialized device memory
@@ -311,8 +311,8 @@ def test_grouped_tensormap_update[
 
     # Create output tensors (concatenated results from all groups)
     comptime dst_layout = Layout.row_major(num_groups * M, N)
-    var dst_a = ManagedLayoutTensor[DType.float32, dst_layout](ctx)
-    var dst_b = ManagedLayoutTensor[DType.float32, dst_layout](ctx)
+    var dst_a = ManagedLayoutTensor[.float32, dst_layout](ctx)
+    var dst_b = ManagedLayoutTensor[.float32, dst_layout](ctx)
 
     # Create template TMA descriptors (using group 0's tensors)
     var template_tma_a = create_tensor_tile[Index(M, N)](
@@ -324,14 +324,10 @@ def test_grouped_tensormap_update[
 
     # Create GMEM tensormap arrays (one entry per block)
     comptime tensormap_layout = Layout.row_major(128 * num_blocks)
-    var device_tensormaps_a = ManagedLayoutTensor[
-        DType.uint8, tensormap_layout
-    ](
+    var device_tensormaps_a = ManagedLayoutTensor[.uint8, tensormap_layout](
         ctx,
     )
-    var device_tensormaps_b = ManagedLayoutTensor[
-        DType.uint8, tensormap_layout
-    ](
+    var device_tensormaps_b = ManagedLayoutTensor[.uint8, tensormap_layout](
         ctx,
     )
 
@@ -404,7 +400,7 @@ def test_grouped_tensormap_update[
                 var out_m = g * M + m
                 var idx = m * N + n
 
-                var actual_a = dst_a_host[out_m, n].cast[DType.float32]()
+                var actual_a = dst_a_host[out_m, n].cast[.float32]()
                 var expected_a = Float32(expected_a_start + idx)
                 if actual_a != expected_a:
                     if errors < 5:
@@ -422,7 +418,7 @@ def test_grouped_tensormap_update[
                         )
                     errors += 1
 
-                var actual_b = dst_b_host[out_m, n].cast[DType.float32]()
+                var actual_b = dst_b_host[out_m, n].cast[.float32]()
                 var expected_b = Float32(expected_b_start + idx)
                 if actual_b != expected_b:
                     if errors < 5:

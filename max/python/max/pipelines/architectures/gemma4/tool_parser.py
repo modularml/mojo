@@ -14,17 +14,14 @@ import json
 import re
 from typing import Any, ClassVar
 
+from max.pipelines.context.exceptions import InputError
+from max.pipelines.lib.pipeline_variants.structured_output_backend import (
+    build_xgrammar_tool_grammar,
+)
 from max.pipelines.lib.tool_parsing import (
     StructuralTagToolParser,
-    canonicalize_lark_rule_name,
-    escape_for_lark_string,
     generate_call_id,
-    get_token_id,
-    grammar_rule_for_json_type,
-    maybe_name_from_tool,
-    names_from_tools,
     register,
-    resolve_lark_token_reference,
 )
 from max.pipelines.modeling.types import (
     ParsedToolCall,
@@ -41,37 +38,19 @@ TOOL_CALL_PATTERN = re.compile(
 )
 
 
-def _tool_call_rule(
-    func_ref: str,
-    body: str,
-    tcs_ref: str = SpecialToken.TOOL_CALL_START.name,
-    tce_ref: str = SpecialToken.TOOL_CALL_END.name,
-) -> str:
-    """Build a Lark rule fragment for a single tool call alternative."""
-    return f'{tcs_ref} "call:" {func_ref} "{{" {body} "}}" {tce_ref}'
+def _json_loads_gemma4_string(body: str) -> str:
+    """Decode a ``<|"|>``-delimited Gemma4 string body as a JSON string body.
 
-
-def _has_schema_constraints(schema: dict[str, Any]) -> bool:
-    """Return True if *schema* declares properties or additionalProperties."""
-    return (
-        bool(schema.get("properties"))
-        or schema.get("additionalProperties", False) is not False
-    )
-
-
-def _extract_tool_schemas(
-    tools: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]] | None:
-    """Extract parameter schemas from an OpenAI-style tools list."""
-    schemas: dict[str, dict[str, Any]] = {}
-    for t in tools:
-        name = maybe_name_from_tool(t)
-        if not name:
-            continue
-        params = t.get("function", {}).get("parameters")
-        if params:
-            schemas[name] = params
-    return schemas or None
+    The grammar emits the body JSON-escaped (e.g. ``\\t`` for a tab) except a
+    literal ``"``, which is emitted raw. Backslashes are always doubled, so no
+    ``"`` is ever already-escaped: escape every ``"`` to ``\\"`` and decode
+    with :func:`json.loads`. Falls open (returns ``body`` unchanged) on
+    malformed input.
+    """
+    try:
+        return json.loads('"' + body.replace('"', '\\"') + '"')
+    except json.JSONDecodeError:
+        return body
 
 
 def _parse_gemma4_value(value_str: str) -> object:
@@ -164,9 +143,9 @@ def _parse_gemma4_args(
             end_pos = args_str.find(SpecialToken.STRING_DELIM, i)
             if end_pos == -1:
                 # Unterminated string — take rest
-                result[key] = args_str[val_start:]
+                result[key] = _json_loads_gemma4_string(args_str[val_start:])
                 break
-            result[key] = args_str[val_start:end_pos]
+            result[key] = _json_loads_gemma4_string(args_str[val_start:end_pos])
             i = end_pos + len(SpecialToken.STRING_DELIM)
 
         # Nested object: {...}
@@ -257,9 +236,9 @@ def _parse_gemma4_array(arr_str: str, *, partial: bool = False) -> list[Any]:
             i += len(SpecialToken.STRING_DELIM)
             end_pos = arr_str.find(SpecialToken.STRING_DELIM, i)
             if end_pos == -1:
-                items.append(arr_str[i:])
+                items.append(_json_loads_gemma4_string(arr_str[i:]))
                 break
-            items.append(arr_str[i:end_pos])
+            items.append(_json_loads_gemma4_string(arr_str[i:end_pos]))
             i = end_pos + len(SpecialToken.STRING_DELIM)
 
         # Nested object
@@ -313,102 +292,6 @@ def _parse_gemma4_array(arr_str: str, *, partial: bool = False) -> list[Any]:
             items.append(_parse_gemma4_value(arr_str[val_start:i]))
 
     return items
-
-
-def _enum_value_rule(
-    rule_name: str,
-    enum_values: list[Any],
-    sd_ref: str,
-    rules_parts: list[str],
-) -> str:
-    """Generate a Lark rule matching only the given enum literals."""
-    alternatives: list[str] = []
-    for val in enum_values:
-        if isinstance(val, bool):
-            alternatives.append('"true"' if val else '"false"')
-        elif isinstance(val, str):
-            alternatives.append(
-                f'{sd_ref} "{escape_for_lark_string(val)}" {sd_ref}'
-            )
-        elif isinstance(val, int):
-            alternatives.append(f'"{val}"')
-        elif isinstance(val, float):
-            alternatives.append(f'"{val}"')
-        elif val is None:
-            alternatives.append('"null"')
-        elif isinstance(val, dict):
-            alternatives.append("object_val")
-        elif isinstance(val, list):
-            alternatives.append("array_val")
-    if not alternatives:
-        return "value"
-    rules_parts.append(f"{rule_name}: " + " | ".join(alternatives))
-    return rule_name
-
-
-def _generate_ordered_args_rule(
-    prefix: str,
-    prop_rule_names: list[str],
-    required: set[str],
-    prop_names: list[str],
-    rules_parts: list[str],
-    ap_value_rule: str | None = None,
-) -> str:
-    """Generate Lark suffix rules enforcing fixed property order.
-
-    Properties must appear in schema-definition order. Required properties
-    cannot be skipped; optional ones may be omitted. Duplicates are
-    impossible by construction since each property has exactly one slot.
-    """
-    n = len(prop_rule_names)
-
-    if ap_value_rule is not None:
-        n += 1
-        ap_rule_name = f"ap_{prefix}"
-        ap_arg_name = f"ap_{prefix}_arg"
-        rules_parts.append(f'{ap_arg_name}: KEY ":" {ap_value_rule}')
-        rules_parts.append(
-            f'{ap_rule_name}: {ap_arg_name} ("," {ap_arg_name})*'
-        )
-        prop_names.append(ap_rule_name)
-        prop_rule_names.append(ap_rule_name)
-
-    if n == 0:
-        return ""
-
-    is_req = [name in required for name in prop_names]
-
-    has_req_after = [False] * n
-    for i in range(n - 2, -1, -1):
-        has_req_after[i] = is_req[i + 1] or has_req_after[i + 1]
-
-    for i in range(n - 1, -1, -1):
-        sfx = f"{prefix}_sfx_{i}"
-        prop = prop_rule_names[i]
-
-        if i == n - 1:
-            rules_parts.append(f"{sfx}: {prop}")
-        else:
-            next_sfx = f"{prefix}_sfx_{i + 1}"
-            if has_req_after[i]:
-                if is_req[i]:
-                    rules_parts.append(f'{sfx}: {prop} "," {next_sfx}')
-                else:
-                    rules_parts.append(
-                        f'{sfx}: {prop} "," {next_sfx} | {next_sfx}'
-                    )
-            else:
-                if is_req[i]:
-                    rules_parts.append(f'{sfx}: {prop} ("," {next_sfx})?')
-                else:
-                    rules_parts.append(
-                        f'{sfx}: {prop} ("," {next_sfx})? | {next_sfx}'
-                    )
-
-    top_sfx = f"{prefix}_sfx_0"
-    if any(is_req):
-        return top_sfx
-    return f"{top_sfx}?"
 
 
 @register("gemma4")
@@ -481,299 +364,55 @@ class Gemma4ToolParser(StructuralTagToolParser):
         except Exception:
             return "{}"
 
-    # ----- Constrained decoding grammar (Gemma4-specific) ---------------
+    # ----- Constrained decoding grammar (xgrammar StructuralTag) ---------
 
-    @staticmethod
-    def _build_func_name_pattern(
-        tool_names: list[str] | None = None,
-    ) -> str:
-        """Return a Lark regex terminal for the function name."""
-        if tool_names is not None:
-            escaped = [re.escape(n) for n in tool_names]
-            return "(" + "|".join(escaped) + ")"
-        return r"[a-zA-Z0-9_\-\.]+"
-
-    @staticmethod
-    def _resolve_ap_value_rule(
-        schema: dict[str, Any],
-        rule_prefix: str,
-        sd_ref: str,
-        rules_parts: list[str],
-        depth: int = 0,
-    ) -> str | None:
-        """Resolve ``additionalProperties`` to a Lark value rule name."""
-        ap = schema.get("additionalProperties", False)
-        if ap is False:
-            return None
-        if ap is True:
-            return "value"
-        return Gemma4ToolParser._generate_property_value_rule(
-            ap, f"{rule_prefix}_ap_val", sd_ref, rules_parts, depth
-        )
-
-    @staticmethod
-    def _generate_property_value_rule(
-        prop_schema: dict[str, Any],
-        rule_prefix: str,
-        sd_ref: str,
-        rules_parts: list[str],
-        depth: int = 0,
-        max_depth: int = 5,
-    ) -> str:
-        """Return the Lark rule name for a property's value, recursing for objects/arrays."""
-        if depth > max_depth:
-            return "value"
-
-        enum_values = prop_schema.get("enum")
-        if enum_values is not None and len(enum_values) > 0:
-            return _enum_value_rule(
-                f"{rule_prefix}_enum", enum_values, sd_ref, rules_parts
-            )
-
-        json_type = prop_schema.get("type", "")
-
-        if isinstance(json_type, list):
-            alternatives = list(
-                dict.fromkeys(grammar_rule_for_json_type(t) for t in json_type)
-            )
-            if len(alternatives) == 1:
-                return alternatives[0]
-            union_rule = f"{rule_prefix}_union"
-            rules_parts.append(f"{union_rule}: " + " | ".join(alternatives))
-            return union_rule
-
-        if json_type == "object" and _has_schema_constraints(prop_schema):
-            nested_props = prop_schema.get("properties", {})
-            nested_required = set(prop_schema.get("required", []))
-            nested_prop_rules: list[str] = []
-            nested_prop_names: list[str] = []
-            for nested_name, nested_schema in nested_props.items():
-                nested_rule = (
-                    f"{rule_prefix}_{canonicalize_lark_rule_name(nested_name)}"
-                )
-                nested_val = Gemma4ToolParser._generate_property_value_rule(
-                    nested_schema,
-                    nested_rule,
-                    sd_ref,
-                    rules_parts,
-                    depth + 1,
-                )
-                rules_parts.append(
-                    f'{nested_rule}: "{escape_for_lark_string(nested_name)}" ":" {nested_val}'
-                )
-                nested_prop_rules.append(nested_rule)
-                nested_prop_names.append(nested_name)
-
-            obj_rule = f"{rule_prefix}_obj"
-            args_rule = _generate_ordered_args_rule(
-                rule_prefix,
-                nested_prop_rules,
-                nested_required,
-                nested_prop_names,
-                rules_parts,
-                Gemma4ToolParser._resolve_ap_value_rule(
-                    prop_schema, rule_prefix, sd_ref, rules_parts, depth + 1
-                ),
-            )
-            rules_parts.append(f'{obj_rule}: "{{" {args_rule} "}}"')
-            return obj_rule
-
-        if json_type == "array" and prop_schema.get("items"):
-            items_val = Gemma4ToolParser._generate_property_value_rule(
-                prop_schema["items"],
-                f"{rule_prefix}_item",
-                sd_ref,
-                rules_parts,
-                depth + 1,
-            )
-            arr_rule = f"{rule_prefix}_arr"
-            rules_parts.append(
-                f'{arr_rule}: "[" ({items_val} ("," {items_val})*)? "]"'
-            )
-            return arr_rule
-
-        return grammar_rule_for_json_type(json_type)
-
-    @staticmethod
-    def _generate_schema_aware_rules(
-        tool_names: list[str],
-        tool_schemas: dict[str, dict[str, Any]],
-        tcs_ref: str = SpecialToken.TOOL_CALL_START.name,
-        tce_ref: str = SpecialToken.TOOL_CALL_END.name,
-        sd_ref: str = SpecialToken.STRING_DELIM.name,
-    ) -> tuple[str, str]:
-        """Generate per-tool argument rules based on parameter schemas."""
-        tool_call_alternatives: list[str] = []
-        rules_parts: list[str] = []
-
-        for name in set(tool_names):
-            safe = canonicalize_lark_rule_name(name)
-            schema = tool_schemas.get(name, {})
-            properties = schema.get("properties", {})
-
-            if not _has_schema_constraints(schema):
-                tool_call_alternatives.append(
-                    _tool_call_rule(
-                        f'"{escape_for_lark_string(name)}"',
-                        "args_body",
-                        tcs_ref,
-                        tce_ref,
-                    )
-                )
-                continue
-
-            prefix = f"tc_{safe}"
-            required = set(schema.get("required", []))
-            prop_rule_names: list[str] = []
-            prop_names: list[str] = []
-            for prop_name, prop_schema in properties.items():
-                rule_name = f"{prefix}_{canonicalize_lark_rule_name(prop_name)}"
-                value_rule = Gemma4ToolParser._generate_property_value_rule(
-                    prop_schema, rule_name, sd_ref, rules_parts
-                )
-                rules_parts.append(
-                    f'{rule_name}: "{escape_for_lark_string(prop_name)}" ":" {value_rule}'
-                )
-                prop_rule_names.append(rule_name)
-                prop_names.append(prop_name)
-
-            args_rule = _generate_ordered_args_rule(
-                prefix,
-                prop_rule_names,
-                required,
-                prop_names,
-                rules_parts,
-                Gemma4ToolParser._resolve_ap_value_rule(
-                    schema, prefix, sd_ref, rules_parts
-                ),
-            )
-            tool_call_alternatives.append(
-                _tool_call_rule(
-                    f'"{escape_for_lark_string(name)}"',
-                    args_rule,
-                    tcs_ref,
-                    tce_ref,
-                )
-            )
-
-        tool_call_rule = "tool_call: " + " | ".join(tool_call_alternatives)
-        extra_rules = "\n".join(rules_parts)
-        return tool_call_rule, extra_rules
-
-    @staticmethod
-    def _get_special_token_ids(
-        tokenizer: PipelineTokenizer[Any, Any, Any],
-    ) -> dict[str, int] | None:
-        """Resolve Gemma4 special token IDs from the tokenizer."""
-        result: dict[str, int] = {}
-        for token in SpecialToken:
-            tid = get_token_id(tokenizer, token.value)
-            if tid is not None:
-                result[token.name] = tid
-        return result if result else None
+    XGRAMMAR_FORMAT = "gemma_4"
 
     @staticmethod
     def generate_tool_call_grammar(
         response_format_schema: dict[str, Any] | None = None,
         tools: list[dict[str, Any]] | None = None,
         tokenizer: PipelineTokenizer[Any, Any, Any] | None = None,
+        backend: str = "xgrammar",
+        tool_choice: str | dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> str:
-        """Generates a Lark grammar for constrained decoding of Gemma4 tool calls."""
-        tool_names = names_from_tools(tools)
+        """Generate a constrained-decoding grammar for Gemma 4 tool calls.
 
-        special_token_ids = (
-            Gemma4ToolParser._get_special_token_ids(tokenizer)
-            if tokenizer is not None
-            else None
-        )
-        if not special_token_ids:
-            raise ValueError(
-                "tokenizer is required for grammar generation; "
-                "it must resolve Gemma4 special token IDs"
+        Returns a serialized xgrammar ``StructuralTag`` that frames the
+        ``<|tool_call>call:func{...}<tool_call|>`` envelope and constrains each
+        call's arguments to that tool's JSON schema with bare keys and
+        ``<|"|>`` string delimiters (a ``"json"``-style ``JSONSchemaFormat``
+        configured via its bare-key and string-delimiter options). The full
+        JSON schema spec is enforced by xgrammar's native converter.
+
+        When ``response_format_schema`` is provided (tool_choice=auto), the
+        grammar also accepts a JSON response conforming to that schema as an
+        alternative to a tool call -- the model's first tokens select the
+        branch (mirrors the Kimi xgrammar path).
+
+        Args:
+            response_format_schema: Optional JSON schema dict. When provided,
+                the grammar also accepts a schema-conforming JSON response as an
+                alternative to a tool call.
+            tools: OpenAI-style tool dicts.
+            tokenizer: Unused (the xgrammar tag references literal markers).
+            backend: Structured-output backend; must be ``"xgrammar"``.
+            tool_choice: ``"auto"``, ``"required"``, or a named choice.
+            **kwargs: Ignored; accepts future kwargs.
+
+        Returns:
+            The StructuralTag serialized as a JSON string.
+        """
+        if backend != "xgrammar":
+            raise InputError(
+                "Gemma 4 constrained tool calling requires the xgrammar "
+                "backend; run with --structured-output-backend=xgrammar."
             )
-        tool_schemas = _extract_tool_schemas(tools) if tools else None
-
-        sd_ref = resolve_lark_token_reference(
-            special_token_ids[SpecialToken.STRING_DELIM.name]
-        )
-        tcs_ref = resolve_lark_token_reference(
-            special_token_ids[SpecialToken.TOOL_CALL_START.name]
-        )
-        tce_ref = resolve_lark_token_reference(
-            special_token_ids[SpecialToken.TOOL_CALL_END.name]
-        )
-        te_ref = resolve_lark_token_reference(
-            special_token_ids[SpecialToken.TURN_END.name]
-        )
-        trs_ref = resolve_lark_token_reference(
-            special_token_ids[SpecialToken.TOOL_RESPONSE_START.name]
-        )
-
-        use_schema_aware = (
-            tool_schemas is not None
-            and tool_names is not None
-            and any(
-                _has_schema_constraints(tool_schemas.get(n, {}))
-                for n in tool_names
-            )
-        )
-
-        if use_schema_aware:
-            assert tool_names is not None
-            assert tool_schemas is not None
-            tool_call_rule, schema_rules = (
-                Gemma4ToolParser._generate_schema_aware_rules(
-                    tool_names, tool_schemas, tcs_ref, tce_ref, sd_ref
-                )
-            )
-            func_name_terminal = ""
-        else:
-            func_name_pattern = Gemma4ToolParser._build_func_name_pattern(
-                tool_names
-            )
-            tool_call_rule = "tool_call: " + _tool_call_rule(
-                "FUNC_NAME", "args_body", tcs_ref, tce_ref
-            )
-            schema_rules = ""
-            func_name_terminal = f"FUNC_NAME: /{func_name_pattern}/"
-
-        rules = [
-            f"tool_calls: tool_call+ ({te_ref} | {trs_ref})",
-            tool_call_rule,
-            schema_rules,
-            'args_body: (arg ("," arg)*)?',
-            'arg: KEY ":" value',
-            "value: string_val | number_val | bool_val | object_val | array_val | null_val",
-            f"string_val: {sd_ref} STRING_CONTENT {sd_ref}",
-            "number_val: NUMBER",
-            "integer_val: INTEGER",
-            "bool_val: BOOL",
-            'null_val: "null"',
-            'object_val: "{" args_body "}"',
-            'array_val: "[" (value ("," value)*)? "]"',
-        ]
-        terminals = [
-            r"STRING_CONTENT: /[\s\S]*/",
-            func_name_terminal,
-            r"KEY: /[a-zA-Z_][-a-zA-Z0-9_.]*/",
-            r"NUMBER: /\-?[0-9]+(\.[0-9]+)?([eE][\+\-]?[0-9]+)?/",
-            r"INTEGER: /\-?[0-9]+([eE][\+\-]?[0-9]+)?/",
-            'BOOL: "true" | "false"',
-        ]
-        rule_lines = "\n".join(line for line in rules if line)
-        terminal_lines = "\n".join(line for line in terminals if line)
-        tool_grammar = f"\n{rule_lines}\n\n{terminal_lines}\n"
-
-        if response_format_schema is None:
-            return f"\nstart: tool_calls\n{tool_grammar}"
-
-        schema_with_opts = {
-            **response_format_schema,
-            "x-guidance": {"whitespace_pattern": ""},
-        }
-        schema_json = json.dumps(schema_with_opts, separators=(",", ":"))
-        return (
-            f"\nstart: tool_calls | json_response\n"
-            f"json_response: %json {schema_json}\n{tool_grammar}"
+        normalized_choice = tool_choice if tool_choice is not None else "auto"
+        return build_xgrammar_tool_grammar(
+            Gemma4ToolParser.XGRAMMAR_FORMAT,
+            tools or [],
+            normalized_choice,
+            response_format_schema=response_format_schema,
         )

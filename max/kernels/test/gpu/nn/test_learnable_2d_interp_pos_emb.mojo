@@ -22,7 +22,7 @@ Verifies correct behavior for:
 
 from std.math import clamp, floor, sin, cos
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Idx, TileTensor, row_major
 from nn.learnable_2d_interp_pos_emb import learnable_2d_interp_pos_emb
 from std.testing import assert_almost_equal
@@ -40,8 +40,8 @@ def test_no_interp_no_temporal[dtype: DType](ctx: DeviceContext) raises:
     # Allocate host buffers.
     var x_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
     var w_ptr = ctx.enqueue_create_host_buffer[dtype](H * W * dim)
-    var g_ptr = ctx.enqueue_create_host_buffer[DType.int64](N * 3)
-    var tw_ptr = ctx.enqueue_create_host_buffer[DType.float32](num_frames * dim)
+    var g_ptr = ctx.enqueue_create_host_buffer[.int64](N * 3)
+    var tw_ptr = ctx.enqueue_create_host_buffer[.float32](num_frames * dim)
     var out_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
 
     # Fill via TileTensors.
@@ -79,8 +79,8 @@ def test_no_interp_no_temporal[dtype: DType](ctx: DeviceContext) raises:
     # Run GPU kernel.
     var x_dev = ctx.enqueue_create_buffer[dtype](L * dim)
     var w_dev = ctx.enqueue_create_buffer[dtype](H * W * dim)
-    var g_dev = ctx.enqueue_create_buffer[DType.int64](N * 3)
-    var tw_dev = ctx.enqueue_create_buffer[DType.float32](num_frames * dim)
+    var g_dev = ctx.enqueue_create_buffer[.int64](N * 3)
+    var tw_dev = ctx.enqueue_create_buffer[.float32](num_frames * dim)
     var out_dev = ctx.enqueue_create_buffer[dtype](L * dim)
 
     ctx.enqueue_copy(x_dev, x_ptr)
@@ -126,8 +126,8 @@ def test_no_interp_with_temporal[dtype: DType](ctx: DeviceContext) raises:
 
     var x_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
     var w_ptr = ctx.enqueue_create_host_buffer[dtype](H * W * dim)
-    var g_ptr = ctx.enqueue_create_host_buffer[DType.int64](N * 3)
-    var tw_ptr = ctx.enqueue_create_host_buffer[DType.float32](num_frames * dim)
+    var g_ptr = ctx.enqueue_create_host_buffer[.int64](N * 3)
+    var tw_ptr = ctx.enqueue_create_host_buffer[.float32](num_frames * dim)
     var out_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
 
     # x_ptr is consumed by the kernel as input; zero-init since the test
@@ -164,8 +164,8 @@ def test_no_interp_with_temporal[dtype: DType](ctx: DeviceContext) raises:
     # GPU.
     var x_dev = ctx.enqueue_create_buffer[dtype](L * dim)
     var w_dev = ctx.enqueue_create_buffer[dtype](H * W * dim)
-    var g_dev = ctx.enqueue_create_buffer[DType.int64](N * 3)
-    var tw_dev = ctx.enqueue_create_buffer[DType.float32](num_frames * dim)
+    var g_dev = ctx.enqueue_create_buffer[.int64](N * 3)
+    var tw_dev = ctx.enqueue_create_buffer[.float32](num_frames * dim)
     var out_dev = ctx.enqueue_create_buffer[dtype](L * dim)
 
     ctx.enqueue_copy(x_dev, x_ptr)
@@ -219,8 +219,8 @@ def test_bicubic_constant_field[dtype: DType](ctx: DeviceContext) raises:
 
     var x_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
     var w_ptr = ctx.enqueue_create_host_buffer[dtype](H * W * dim)
-    var g_ptr = ctx.enqueue_create_host_buffer[DType.int64](N * 3)
-    var tw_ptr = ctx.enqueue_create_host_buffer[DType.float32](num_frames * dim)
+    var g_ptr = ctx.enqueue_create_host_buffer[.int64](N * 3)
+    var tw_ptr = ctx.enqueue_create_host_buffer[.float32](num_frames * dim)
     var out_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
 
     # x_ptr is consumed by the kernel as input; zero-init since the test
@@ -256,8 +256,8 @@ def test_bicubic_constant_field[dtype: DType](ctx: DeviceContext) raises:
     # GPU.
     var x_dev = ctx.enqueue_create_buffer[dtype](L * dim)
     var w_dev = ctx.enqueue_create_buffer[dtype](H * W * dim)
-    var g_dev = ctx.enqueue_create_buffer[DType.int64](N * 3)
-    var tw_dev = ctx.enqueue_create_buffer[DType.float32](num_frames * dim)
+    var g_dev = ctx.enqueue_create_buffer[.int64](N * 3)
+    var tw_dev = ctx.enqueue_create_buffer[.float32](num_frames * dim)
     var out_dev = ctx.enqueue_create_buffer[dtype](L * dim)
 
     ctx.enqueue_copy(x_dev, x_ptr)
@@ -316,8 +316,8 @@ def test_multi_video[dtype: DType](ctx: DeviceContext) raises:
 
     var x_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
     var w_ptr = ctx.enqueue_create_host_buffer[dtype](H * W * dim)
-    var g_ptr = ctx.enqueue_create_host_buffer[DType.int64](N * 3)
-    var tw_ptr = ctx.enqueue_create_host_buffer[DType.float32](num_frames * dim)
+    var g_ptr = ctx.enqueue_create_host_buffer[.int64](N * 3)
+    var tw_ptr = ctx.enqueue_create_host_buffer[.float32](num_frames * dim)
     var out_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
     var exp_ptr = ctx.enqueue_create_host_buffer[dtype](L * dim)
 
@@ -412,8 +412,8 @@ def test_multi_video[dtype: DType](ctx: DeviceContext) raises:
     # GPU.
     var x_dev = ctx.enqueue_create_buffer[dtype](L * dim)
     var w_dev = ctx.enqueue_create_buffer[dtype](H * W * dim)
-    var g_dev = ctx.enqueue_create_buffer[DType.int64](N * 3)
-    var tw_dev = ctx.enqueue_create_buffer[DType.float32](num_frames * dim)
+    var g_dev = ctx.enqueue_create_buffer[.int64](N * 3)
+    var tw_dev = ctx.enqueue_create_buffer[.float32](num_frames * dim)
     var out_dev = ctx.enqueue_create_buffer[dtype](L * dim)
 
     ctx.enqueue_copy(x_dev, x_ptr)
@@ -449,7 +449,7 @@ def test_sincos_embed(ctx: DeviceContext) raises:
     """Verify sincos positional embedding values."""
     comptime dim = 4
     comptime num_frames = 2
-    var tw_ptr = ctx.enqueue_create_host_buffer[DType.float32](num_frames * dim)
+    var tw_ptr = ctx.enqueue_create_host_buffer[.float32](num_frames * dim)
     var tw_tt = TileTensor(tw_ptr, row_major[num_frames, dim]())
 
     var half = dim // 2
@@ -486,8 +486,8 @@ def test_sincos_embed(ctx: DeviceContext) raises:
 def main() raises:
     with DeviceContext() as ctx:
         test_sincos_embed(ctx)
-        test_no_interp_no_temporal[DType.float32](ctx)
-        test_no_interp_with_temporal[DType.float32](ctx)
-        test_bicubic_constant_field[DType.float32](ctx)
-        test_multi_video[DType.float32](ctx)
+        test_no_interp_no_temporal[.float32](ctx)
+        test_no_interp_with_temporal[.float32](ctx)
+        test_bicubic_constant_field[.float32](ctx)
+        test_multi_video[.float32](ctx)
     print("All learnable_2d_interp_pos_emb tests passed!")

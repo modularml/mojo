@@ -1,0 +1,156 @@
+---
+title: Mojo stability guarantees
+sidebar_label: Mojo stability guarantees
+sidebar_position: 2
+description: >
+  Learn which Mojo language features and APIs are considered stable
+  and which are subject to change or removal.
+---
+
+:::caution
+This is an early and preliminary version of our stability discussion.
+We'll update this page as we finalize the Mojo 1.x stability model.
+:::
+
+The Mojo language and standard library follow semantic versioning for
+language features and standard library APIs identified as stable.
+Roughly speaking, this means:
+
+- Major versions (1.0, 2.0) can contain breaking changes that aren't
+  backward-compatible.
+
+- Minor versions (1.1, 1.2) can add new functionality in a
+  backward-compatible way.
+
+- Patch versions (1.0.1, 1.2.1) can contain bug fixes that are
+  backward-compatible.
+
+Stability guarantees apply to source code only; the Mojo ABI is currently not
+stable.
+
+Unstable features can change at any point.
+
+We may make exceptions to the stability policy if we discover a critical issue
+with a stabilized API.
+
+## Mojo standard library stability
+
+<!-- rumdl-disable MD033 -->
+
+We consider standard library APIs unstable unless specifically marked stable. In
+source code, the <code>@stable(since="<var>version</var>")</code> decorator
+marks these APIs. The API documentation displays these stable markers:
+
+- Stable structs and traits show a "Stable since <var>version</var>" label below
+  the struct/trait name.
+
+- Other stable API members show a <var>version</var> badge in the right margin
+  (for example, "1.0.0").
+
+Marking a struct stable means that the struct's *signature* is stable. It
+**doesn't** guarantee that any member APIs are stable. We stabilize member
+APIs on a case-by-case basis.
+
+There are two limited cases in which we may change stable APIs:
+
+- For functions and methods, stabilizing one or more members of an overload set
+  doesn't guarantee those exact members will continue to exist. The exact
+  overload set may evolve, but it will continue to support the same inputs.
+
+- We may change a stable struct's signature by adding new optional parameters,
+  with default values that match the previous behavior. Adding a new parameter
+  like this is backward-compatible in most cases. However, this can break code
+  that explicitly unbinds all parameters using the ellipsis (`...`). To
+  understand how this could happen, consider the following code:
+
+  ```mojo
+  def callee(l: List[Int]):
+      pass
+
+  def caller(l: List[Int, ...]):
+      callee(l)
+  ```
+
+  Since `List` only has one parameter, the ellipsis in `List[Int, ...]` doesn't
+  unbind anything. `List[Int]` and `List[Int, ...]` evaluate to the same type.
+  But suppose `List` adds a new, optional parameter:
+
+  ```mojo
+  struct List[T: Movable, /, A: Allocator = DefaultAllocator]: 
+  ```
+
+  In this case, the code above will not compile. The `List[Int, ...]` now
+  unbinds the `A` parameter, so the `caller()` function is automatically
+  parameterized on `A`. It will accept a `List` with *any* value for `A`. But
+  the `callee()` function will *only* accept a `List[Int]` with the *default*
+  value for A.
+
+When you invoke Mojo with the `--warn-on-unstable-apis` flag, it issues a
+warning for each unstable API you use. We don't currently recommend this
+because the stable API set is small.
+
+<!-- rumdl-enable MD033 -->
+
+## Mojo language stability
+
+A wide part of the Mojo language is stable. Most language constructs,
+including control flow, types, and ownership, are stable. As a rule,
+Mojo's lifetime and operator dunders such as `__add__()`, `__init__()`,
+and `__deinit__()` are stable.
+
+A small set of language features exists to support the compiler, the
+standard library, or advanced metaprogramming. Treat these as
+implementation details, not public-facing language items. They may
+change or disappear without notice and don't have stability guarantees.
+
+Unlike standard library APIs, these language features *can't be marked*
+as stable or unstable and the compiler won't warn when you use them
+(`--warn-on-unstable-apis`).
+
+When writing code intended for compatibility across future versions of
+Mojo, avoid relying on these implementation details.
+
+### The double-underscore prefix
+
+Avoid using any language feature with a leading double underscore (`__`)
+unless the manual explicitly documents it as stable.
+
+Examples of unsafe prefixed keywords include:
+
+- `__mlir_type`
+- `__mlir_op`
+- `__mlir_attr`
+- `__generator_type`
+
+These features are subject to change as the language evolves.
+
+### Internal-use dunder names (double underscore prefix and suffix)
+
+Several language features exist for specialized compiler or library work. These
+aren't widely used and may be subject to change. The following are rarely-used
+power features that are not yet stabilized:
+
+- `__merge_with__()`
+- `__list_literal__`
+- `__literal_size__`
+
+### Internal-use decorators
+
+Some decorators exist only to support language migration, compiler
+implementation, or standard library development. Avoid decorators named
+like:
+
+- `@__parameter`, `@__copy_capture`: legacy closure support
+- `@__allow_legacy_custom_self_types`
+- `@__name`
+- `@__llvm_arg_metadata`
+- `@__unsafe_nested_origins_read_only`
+
+Consider any decorators beginning with `@__` as internal and unstable,
+unless the manual explicitly documents them as public.
+
+### `async`/`await` is unstable
+
+Lastly, Mojo's async system isn't fully built out. So although the `async` and
+`await` keywords aren't prefixed, consider them unstable as well.
+Any async behavior may be subject to change.

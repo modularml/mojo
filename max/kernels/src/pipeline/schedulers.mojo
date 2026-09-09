@@ -13,7 +13,7 @@
 """Scheduling algorithms: greedy and within-iteration optimal schedulers.
 
 These are free functions that consume a LoopBody and return a permutation.
-The graph (LoopBody) never schedules itself — scheduling is an external
+The graph (LoopBody) never schedules itself; scheduling is an external
 concern. This follows the LLVM pattern where ScheduleDAG is pure data and
 MachineSchedStrategy is a separate pluggable component.
 
@@ -53,12 +53,7 @@ def _is_ready(
 
 @fieldwise_init
 struct ScheduleMetrics(ImplicitlyCopyable, Movable):
-    """Combined evaluation metrics for a schedule ordering.
-
-    Fields:
-        makespan: Total execution time (max finish time across all ops).
-        vgpr_peak: Peak VGPR pressure (max simultaneous live VGPRs).
-    """
+    """Combined evaluation metrics for a schedule ordering."""
 
     var makespan: Int
     """Total execution time (max finish time across all ops)."""
@@ -80,9 +75,9 @@ def _evaluate_schedule(
 
     Models hardware with independent MMA and VALU execution units, plus
     optional LDS port contention and VGPR pressure tracking:
-      - MMA_UNIT: serial (capacity 1) — MFMA ops serialize with each other
-      - VALU: serial (capacity 1) — VALU ops serialize with each other
-      - MMA and VALU are *independent* — they can issue simultaneously.
+      - MMA_UNIT: serial (capacity 1), MFMA ops serialize with each other
+      - VALU: serial (capacity 1), VALU ops serialize with each other
+      - MMA and VALU are *independent*; they can issue simultaneously.
       - LDS port (when lds_contention_penalty > 0): shared between LDS reads
         and LDS writes. Overlapping ops incur a penalty.
       - VGPR pressure: tracked via op.vgpr_def (registers allocated) and
@@ -161,7 +156,7 @@ def _asap_lower_bound(body: LoopBody, lds_contention_penalty: Int = 0) -> Int:
     """Compute a lower bound on the achievable within-iteration makespan.
 
     Returns max(critical_path, compute_bound, lds_serial_bound) where:
-      critical_path   = max(ASAP[i] + latency[i]) — longest dep chain
+      critical_path   = max(ASAP[i] + latency[i]): longest dep chain
       compute_bound   = max(mma_serial_bound, valu_serial_bound)
       mma_serial_bound = min_mma_asap + sum(latency[i]) for MMA ops
       valu_serial_bound = min_valu_asap + sum(latency[i]) for VALU ops
@@ -172,7 +167,7 @@ def _asap_lower_bound(body: LoopBody, lds_contention_penalty: Int = 0) -> Int:
     then MMA serial time is T + sum(mma_latencies), not just the sum.
 
     Note: MMA_UNIT and VALU are independent execution units on CDNA, so
-    their bounds are taken as max (not sum) — the smaller one runs in the
+    their bounds are taken as max (not sum), the smaller one runs in the
     shadow of the larger.
 
     Note: this is a within-iteration bound, not the MII (minimum initiation
@@ -258,7 +253,7 @@ def greedy_schedule(body: LoopBody) -> List[Int]:
 
     Returns a permutation of [0, num_ops) suitable for
     build_program_from_ldg_ordered(). When ops are defined in execution
-    order, this produces the identity permutation — validating that the
+    order, this produces the identity permutation, validating that the
     dependency graph is sufficient to derive the schedule.
     """
     var scheduled = List[Bool]()
@@ -312,7 +307,7 @@ def simple_greedy_schedule(body: LoopBody) -> List[Int]:
         body: The loop body whose ops are to be scheduled.
 
     Returns:
-        Permutation of [0, num_ops) — a valid execution ordering.
+        Permutation of [0, num_ops): a valid execution ordering.
     """
     var scheduled = List[Bool]()
     for _ in range(len(body.ops)):
@@ -427,7 +422,7 @@ def optimal_schedule(body: LoopBody, max_vgpr: Int = 999999) -> List[Int]:
     peak VGPR pressure exceeds the budget. This enables occupancy
     exploration: "What is the fastest schedule that fits in N VGPRs?"
 
-    Uses iterative backtracking with explicit state — no recursion.
+    Uses iterative backtracking with explicit state (no recursion).
 
     Returns:
         Permutation of [0, num_ops) with minimum makespan (and
@@ -551,11 +546,11 @@ def optimal_schedule_with_halves(
     blocks 0-3 (warp group 0), last N/2 to blocks 4-7 (warp group 1).
 
     Pruning optimizations for compile-time feasibility:
-      1. Seed best_cost from greedy greedy_schedule() — provides
+      1. Seed best_cost from greedy greedy_schedule(): provides
          a strong upper bound that prunes most branches immediately.
       2. Early termination when best_cost == lower_bound and pressure
-         is at the floor — provably optimal, stop searching.
-      3. Incremental VGPR pressure tracking — branches that exceed
+         is at the floor: provably optimal, stop searching.
+      3. Incremental VGPR pressure tracking: branches that exceed
          max_vgpr are pruned the moment they cross the budget.
 
     When max_globals_per_block > 0, an additional structural constraint

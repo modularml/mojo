@@ -63,6 +63,7 @@ from std.sys.info import (
     has_nvidia_gpu_accelerator,
 )
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     BenchConfig,
@@ -71,7 +72,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from internal_utils import arg_parse
 from layout import (
     UNKNOWN_VALUE,
@@ -112,9 +113,9 @@ def _resolve_impl[impl: StaticString, dtype: DType]() -> StaticString:
             return "cudnn"
         else:
             comptime if has_amd_gpu_accelerator() and (
-                dtype == DType.float8_e4m3fn
-                or dtype == DType.bfloat16
-                or dtype == DType.float16
+                dtype == .float8_e4m3fn
+                or dtype == .bfloat16
+                or dtype == .float16
             ):
                 return "amd_4wave"
             else:
@@ -322,69 +323,63 @@ def bench_conv2d[
 
     comptime if resolved == "im2col":
 
-        @parameter
         @always_inline
-        @__copy_capture(input_tt, filter_rscf_tt, output_tt)
-        def im2col_bench(mut bencher: Bencher) raises:
-            @parameter
-            @always_inline
-            def kernel(ctx: DeviceContext) raises:
-                _ = dispatch_im2col_matmul_conv2d(
-                    input_tt,
-                    filter_rscf_tt,
-                    output_tt,
-                    stride_idx,
-                    dilation_idx,
-                    pad_idx,
-                    1,
-                    ctx,
-                )
+        def im2col_kernel(ctx: DeviceContext) raises {imm}:
+            _ = dispatch_im2col_matmul_conv2d(
+                input_tt,
+                filter_rscf_tt,
+                output_tt,
+                stride_idx,
+                dilation_idx,
+                pad_idx,
+                1,
+                ctx,
+            )
 
-            bencher.iter_custom[kernel](ctx)
+        @always_inline
+        def im2col_bench(mut bencher: Bencher) raises {imm}:
+            bencher_iter_custom(bencher, im2col_kernel, ctx)
 
-        b.bench_function[im2col_bench](
+        b.bench_function(
+            im2col_bench,
             BenchId("conv2d_im2col", input_id=bench_input_id),
             [ThroughputMeasure(BenchMetric.flops, flops)],
         )
-    elif resolved == "cudnn":
+    comptime if resolved == "cudnn":
         comptime assert has_nvidia_gpu_accelerator(), (
             "impl=cudnn requires an NVIDIA target. Build for an NVIDIA"
             " accelerator (e.g. cuda:b200) or pick a different impl."
         )
 
-        @parameter
         @always_inline
-        @__copy_capture(input_tt, filter_fcrs_tt, output_tt)
-        def cudnn_bench(mut bencher: Bencher) raises:
-            @parameter
-            @always_inline
-            def kernel(ctx: DeviceContext) raises:
-                conv_cudnn[dtype, dtype, dtype](
-                    input_tt,
-                    filter_fcrs_tt,
-                    output_tt,
-                    stride_idx,
-                    dilation_idx,
-                    pad_idx,
-                    1,
-                    ctx,
-                )
+        def cudnn_kernel(ctx: DeviceContext) raises {imm}:
+            conv_cudnn[dtype, dtype, dtype](
+                input_tt,
+                filter_fcrs_tt,
+                output_tt,
+                stride_idx,
+                dilation_idx,
+                pad_idx,
+                1,
+                ctx,
+            )
 
-            bencher.iter_custom[kernel](ctx)
+        @always_inline
+        def cudnn_bench(mut bencher: Bencher) raises {imm}:
+            bencher_iter_custom(bencher, cudnn_kernel, ctx)
 
-        b.bench_function[cudnn_bench](
+        b.bench_function(
+            cudnn_bench,
             BenchId("conv2d_cudnn", input_id=bench_input_id),
             [ThroughputMeasure(BenchMetric.flops, flops)],
         )
-    elif resolved == "amd_4wave":
+    comptime if resolved == "amd_4wave":
         comptime assert has_amd_gpu_accelerator(), (
             "impl=amd_4wave requires an AMD target. Build for an AMD"
             " accelerator (e.g. amdgpu:mi355) or pick a different impl."
         )
         comptime assert (
-            dtype == DType.float8_e4m3fn
-            or dtype == DType.bfloat16
-            or dtype == DType.float16
+            dtype == .float8_e4m3fn or dtype == .bfloat16 or dtype == .float16
         ), (
             "impl=amd_4wave requires dtype in"
             " {float8_e4m3fn, bfloat16, float16}."
@@ -402,6 +397,7 @@ def bench_conv2d[
         # `stride_h`/`stride_w` args must equal 1 for this arm.
         comptime H_OUT_STATIC = in_height + 2 * pad_h_static - filter_r + 1
         comptime W_OUT_STATIC = in_width + 2 * pad_w_static - filter_s + 1
+
         if (
             stride_h != 1
             or stride_w != 1
@@ -491,28 +487,26 @@ def bench_conv2d[
             output_amd_dev.unsafe_ptr(), output_2d_layout
         )
 
-        @parameter
         @always_inline
-        @__copy_capture(input_nhwc_amd, filter_frsc_tt, output_2d_tt)
-        def amd_4wave_bench(mut bencher: Bencher) raises:
-            @parameter
-            @always_inline
-            def kernel(ctx: DeviceContext) raises:
-                amd_4wave_conv[
-                    H=in_height,
-                    W=in_width,
-                    H_out=H_OUT_STATIC,
-                    W_out=W_OUT_STATIC,
-                    R=filter_r,
-                    S=filter_s,
-                    pad_h=pad_h_static,
-                    pad_w=pad_w_static,
-                    C_in=in_channels,
-                ](input_nhwc_amd, filter_frsc_tt, output_2d_tt, ctx)
+        def amd_4wave_kernel(ctx: DeviceContext) raises {imm}:
+            amd_4wave_conv[
+                H=in_height,
+                W=in_width,
+                H_out=H_OUT_STATIC,
+                W_out=W_OUT_STATIC,
+                R=filter_r,
+                S=filter_s,
+                pad_h=pad_h_static,
+                pad_w=pad_w_static,
+                C_in=in_channels,
+            ](input_nhwc_amd, filter_frsc_tt, output_2d_tt, ctx)
 
-            bencher.iter_custom[kernel](ctx)
+        @always_inline
+        def amd_4wave_bench(mut bencher: Bencher) raises {imm}:
+            bencher_iter_custom(bencher, amd_4wave_kernel, ctx)
 
-        b.bench_function[amd_4wave_bench](
+        b.bench_function(
+            amd_4wave_bench,
             BenchId("conv2d_amd_4wave", input_id=bench_input_id),
             [ThroughputMeasure(BenchMetric.flops, flops)],
         )
@@ -520,7 +514,7 @@ def bench_conv2d[
         _ = filter_frsc_dev^
         _ = output_amd_dev^
         _ = filter_frsc_host^
-    else:
+    comptime if resolved == "naive":
         # Naive Mojo NHWC-RSCF kernel.
         comptime naive_kernel = conv2d_gpu_naive_nhwc_rscf[
             input_layout,
@@ -535,28 +529,26 @@ def bench_conv2d[
         var grid_dim_x = ceildiv(w_out * h_out, block_size)
         var grid_dim_y = batch
 
-        @parameter
         @always_inline
-        @__copy_capture(input_buf, filter_rscf_buf, output_buf)
-        def naive_bench(mut bencher: Bencher) raises:
-            @parameter
-            @always_inline
-            def kernel(ctx: DeviceContext) raises:
-                ctx.enqueue_function[naive_kernel](
-                    input_buf,
-                    filter_rscf_buf,
-                    output_buf,
-                    stride_idx,
-                    dilation_idx,
-                    pad_idx,
-                    1,
-                    grid_dim=(grid_dim_x, grid_dim_y, 1),
-                    block_dim=(block_size, block_size, 1),
-                )
+        def naive_conv_kernel(ctx: DeviceContext) raises {imm}:
+            ctx.enqueue_function[naive_kernel](
+                input_buf,
+                filter_rscf_buf,
+                output_buf,
+                stride_idx,
+                dilation_idx,
+                pad_idx,
+                Int32(1),
+                grid_dim=(grid_dim_x, grid_dim_y, 1),
+                block_dim=(block_size, block_size, 1),
+            )
 
-            bencher.iter_custom[kernel](ctx)
+        @always_inline
+        def naive_bench(mut bencher: Bencher) raises {imm}:
+            bencher_iter_custom(bencher, naive_conv_kernel, ctx)
 
-        b.bench_function[naive_bench](
+        b.bench_function(
+            naive_bench,
             BenchId("conv2d_naive", input_id=bench_input_id),
             [ThroughputMeasure(BenchMetric.flops, flops)],
         )
@@ -593,8 +585,8 @@ def bench_conv2d[
         ctx.synchronize()
         var max_diff: Float32 = 0.0
         for i in range(output_size):
-            var a = output_host[i].cast[DType.float32]()
-            var c = output_ref_host[i].cast[DType.float32]()
+            var a = output_host[i].cast[.float32]()
+            var c = output_ref_host[i].cast[.float32]()
             var d = abs(a - c)
             if d > max_diff:
                 max_diff = d
@@ -613,7 +605,7 @@ def bench_conv2d[
 
 
 def main() raises:
-    comptime dtype = get_defined_dtype["dtype", DType.bfloat16]()
+    comptime dtype = get_defined_dtype["dtype", .bfloat16]()
     comptime N = get_defined_int["N", 1]()
     comptime H = get_defined_int["H", 240]()
     comptime W = get_defined_int["W", 416]()

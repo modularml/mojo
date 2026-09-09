@@ -18,9 +18,17 @@ from std.sys import align_of, simd_width_of
 
 import std.benchmark
 from std.algorithm import Static2DTileUnitFunc as Tile2DFunc
-from std.algorithm import sync_parallelize, vectorize
+from std.algorithm import vectorize
+
+from max.algorithm import sync_parallelize
 from layout import *
-from std.memory import memset_zero
+from std.memory import (
+    Allocation,
+    ThinAllocation,
+    alloc,
+    dealloc,
+    unsafe_memset_zero,
+)
 from std.python import Python
 
 comptime M = 512  # rows of A and C
@@ -31,23 +39,29 @@ comptime dtype = DType.float32
 
 
 struct Matrix[rows: Int, cols: Int]:
-    var data: UnsafePointer[Scalar[dtype], MutAnyOrigin]
+    var data: ThinAllocation[Scalar[dtype]]
 
     # Initialize zeroeing all values
     def __init__(out self):
-        self.data = alloc[Scalar[dtype]](Self.rows * Self.cols)
-        memset_zero(self.data, Self.rows * Self.cols)
+        self.data = alloc[Scalar[dtype]](
+            {count = Self.rows * Self.cols}
+        ).into_thin()
+        unsafe_memset_zero(self.data.unsafe_ptr(), Self.rows * Self.cols)
 
     # Initialize taking a pointer, don't set any elements
-    def __init__(out self, data: UnsafePointer[Scalar[dtype], MutAnyOrigin]):
-        self.data = data
+    def __init__(out self, var data: Allocation[Scalar[dtype]]):
+        assert data.layout().count() == Self.rows * Self.cols
+        self.data = data^.into_thin()
+
+    def __deinit__(deinit self):
+        dealloc(self.data^.unsafe_with_layout({count = Self.rows * Self.cols}))
 
     ## Initialize with random values
     @staticmethod
     def rand() -> Self:
-        var data = alloc[Scalar[dtype]](Self.rows * Self.cols)
-        rand(data, Self.rows * Self.cols)
-        return Self(data)
+        var data = alloc[Scalar[dtype]]({count = Self.rows * Self.cols})
+        rand(data.unsafe_span())
+        return Self(data^)
 
     def __getitem__(self, y: Int, x: Int) -> Scalar[dtype]:
         return self.load(y, x)
@@ -56,10 +70,14 @@ struct Matrix[rows: Int, cols: Int]:
         self.store(y, x, val)
 
     def load[nelts: Int = 1](self, y: Int, x: Int) -> SIMD[dtype, nelts]:
-        return self.data.load[width=nelts](y * self.cols + x)
+        return self.data.unsafe_ptr().unsafe_load[width=nelts](
+            y * self.cols + x
+        )
 
-    def store[nelts: Int = 1](self, y: Int, x: Int, val: SIMD[dtype, nelts]):
-        return self.data.store(y * self.cols + x, val)
+    def store[
+        nelts: Int = 1
+    ](mut self, y: Int, x: Int, val: SIMD[dtype, nelts]):
+        return self.data.unsafe_ptr().unsafe_store(y * self.cols + x, val)
 
 
 def matmul_naive(mut C: Matrix, A: Matrix, B: Matrix):
@@ -71,8 +89,8 @@ def matmul_naive(mut C: Matrix, A: Matrix, B: Matrix):
 
 # Perform 2D tiling on the iteration space defined by end_x and end_y
 def tile[
-    tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int
-](end_x: Int, end_y: Int):
+    tile_x: Int, tile_y: Int
+](end_x: Int, end_y: Int, tiled_fn: Some[Tile2DFunc]):
     for y in range(0, end_y, tile_y):
         for x in range(0, end_x, tile_x):
             tiled_fn[tile_x, tile_y](x, y)
@@ -91,20 +109,20 @@ def matmul_unrolled(mut C: Matrix, A: Matrix, B: Matrix):
     comptime assert N % tile_n == 0, "N must be a multiple of tile_n"
     comptime assert K % tile_k == 0, "K must be a multiple of tile_k"
 
-    @parameter
-    def calc_row(m0: Int):
+    def calc_row(m0: Int) {mut C, imm}:
         for m in range(tile_m * m0, tile_m * m0 + tile_m):
             _ = m  # FIXME: param closures not noticing access.
 
-            @parameter
-            def calc_tile[tile_x: Int, tile_y: Int](x: Int, y: Int):
+            def calc_tile[
+                tile_x: Int, tile_y: Int
+            ](x: Int, y: Int) {mut C, imm}:
                 comptime for _k in range(tile_y):
                     var k = _k + y
                     var A_val = A[m, k]
 
                     def dot[
                         simd_size: Int
-                    ](n: Int) {x, mut C, mut A_val, read B, read m, mut k}:
+                    ](n: Int) {x, mut C, mut A_val, imm B, imm m, mut k}:
                         var idx = n + x
                         C.store(
                             m,
@@ -120,15 +138,25 @@ def matmul_unrolled(mut C: Matrix, A: Matrix, B: Matrix):
                         unroll_factor=unroll_factor,
                     ](dot)
 
-            tile[calc_tile, tile_n, tile_k](C.cols, B.rows)
+            tile[tile_n, tile_k](C.cols, B.rows, calc_tile)
 
-    sync_parallelize[calc_row](C.rows // tile_m)
+    sync_parallelize(calc_row, C.rows // tile_m)
 
 
 def matmul_tiled_layout(mut C: Matrix, A: Matrix, B: Matrix):
-    var dst = LayoutTensor[dtype, Layout.row_major(M, N)](C.data)
-    var lhs = LayoutTensor[dtype, Layout.row_major(M, K)](A.data)
-    var rhs = LayoutTensor[dtype, Layout.row_major(K, N)](B.data)
+    var dst = LayoutTensor[dtype, Layout.row_major(M, N)](
+        C.data.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    )
+    var lhs = LayoutTensor[dtype, Layout.row_major(M, K)](
+        A.data.unsafe_ptr()
+        .unsafe_mut_cast[True]()
+        .unsafe_origin_cast[MutUntrackedOrigin]()
+    )
+    var rhs = LayoutTensor[dtype, Layout.row_major(K, N)](
+        B.data.unsafe_ptr()
+        .unsafe_mut_cast[True]()
+        .unsafe_origin_cast[MutUntrackedOrigin]()
+    )
 
     comptime vec_size = simd_width_of[dtype]() * 2
 
@@ -140,8 +168,7 @@ def matmul_tiled_layout(mut C: Matrix, A: Matrix, B: Matrix):
     comptime assert N % tile_n == 0, "N must be a multiple of tile_n"
     comptime assert K % tile_k == 0, "K must be a multiple of tile_k"
 
-    @parameter
-    def calc_row(m_1: Int):
+    def calc_row(m_1: Int) {imm}:
         for k_1 in range(K // tile_k):
             for n_1 in range(N // tile_n):
                 var lhs_view = lhs.tile[tile_m, tile_k](m_1, k_1)
@@ -174,21 +201,23 @@ def matmul_tiled_layout(mut C: Matrix, A: Matrix, B: Matrix):
                             unroll_factor=unroll_factor,
                         ](dot)
 
-    sync_parallelize[calc_row](M // tile_m)
-
-
-def alloc_aligned_tile[
-    M: Int, N: Int, dtype: DType
-]() -> UnsafePointer[Scalar[dtype], MutAnyOrigin]:
-    comptime alignment = align_of[SIMD[dtype, simd_width_of[dtype]()]]()
-    comptime cache_width = ((N + alignment - 1) // alignment) * alignment
-    return alloc[Scalar[dtype]](M * cache_width, alignment=alignment)
+    sync_parallelize(calc_row, M // tile_m)
 
 
 def matmul_tiled_layout_cache(mut C: Matrix, A: Matrix, B: Matrix):
-    var dst = LayoutTensor[dtype, Layout.row_major(M, N)](C.data)
-    var lhs = LayoutTensor[dtype, Layout.row_major(M, K)](A.data)
-    var rhs = LayoutTensor[dtype, Layout.row_major(K, N)](B.data)
+    var dst = LayoutTensor[dtype, Layout.row_major(M, N)](
+        C.data.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    )
+    var lhs = LayoutTensor[dtype, Layout.row_major(M, K)](
+        A.data.unsafe_ptr()
+        .unsafe_mut_cast[True]()
+        .unsafe_origin_cast[MutUntrackedOrigin]()
+    )
+    var rhs = LayoutTensor[dtype, Layout.row_major(K, N)](
+        B.data.unsafe_ptr()
+        .unsafe_mut_cast[True]()
+        .unsafe_origin_cast[MutUntrackedOrigin]()
+    )
 
     comptime vec_size = simd_width_of[dtype]() * 2
 
@@ -200,8 +229,7 @@ def matmul_tiled_layout_cache(mut C: Matrix, A: Matrix, B: Matrix):
     comptime assert N % tile_n == 0, "N must be a multiple of tile_n"
     comptime assert K % tile_k == 0, "K must be a multiple of tile_k"
 
-    @parameter
-    def calc_row(m_1: Int):
+    def calc_row(m_1: Int) {imm}:
         var rhs_cache = LayoutTensor[
             dtype, Layout.row_major(tile_k, tile_n), MutAnyOrigin
         ].stack_allocation()
@@ -238,13 +266,23 @@ def matmul_tiled_layout_cache(mut C: Matrix, A: Matrix, B: Matrix):
                             unroll_factor=unroll_factor,
                         ](dot)
 
-    sync_parallelize[calc_row](M // tile_m)
+    sync_parallelize(calc_row, M // tile_m)
 
 
 def matmul_layout_transposed(mut C: Matrix, A: Matrix, B: Matrix):
-    var dst = LayoutTensor[dtype, Layout.row_major(M, N)](C.data)
-    var lhs = LayoutTensor[dtype, Layout.row_major(M, K)](A.data)
-    var rhs = LayoutTensor[dtype, Layout.row_major(K, N)](B.data)
+    var dst = LayoutTensor[dtype, Layout.row_major(M, N)](
+        C.data.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin]()
+    )
+    var lhs = LayoutTensor[dtype, Layout.row_major(M, K)](
+        A.data.unsafe_ptr()
+        .unsafe_mut_cast[True]()
+        .unsafe_origin_cast[MutUntrackedOrigin]()
+    )
+    var rhs = LayoutTensor[dtype, Layout.row_major(K, N)](
+        B.data.unsafe_ptr()
+        .unsafe_mut_cast[True]()
+        .unsafe_origin_cast[MutUntrackedOrigin]()
+    )
 
     comptime vec_size = 4 * simd_width_of[dtype]()
 
@@ -260,8 +298,7 @@ def matmul_layout_transposed(mut C: Matrix, A: Matrix, B: Matrix):
         tile_k % vec_size == 0
     ), "tile_k must be a multiple of vec_size"
 
-    @parameter
-    def calc_row(m_1: Int):
+    def calc_row(m_1: Int) {imm}:
         var rhs_cache = LayoutTensor[
             dtype, Layout.row_major(tile_n, tile_k), MutAnyOrigin
         ].stack_allocation()
@@ -298,7 +335,7 @@ def matmul_layout_transposed(mut C: Matrix, A: Matrix, B: Matrix):
 
                         dst_view[m, n] += sum.reduce_add()
 
-    sync_parallelize[calc_row](M // tile_m)
+    sync_parallelize(calc_row, M // tile_m)
 
 
 @always_inline
@@ -310,15 +347,14 @@ def bench[
     var C = Matrix[M, N]()
 
     @always_inline
-    @parameter
-    def test_fn():
+    def test_fn() {mut C, imm A, imm B}:
         _ = func(C, A, B)
 
-    var secs = std.benchmark.run[test_fn](max_runtime_secs=0.5).mean()
+    var secs = std.benchmark.run(test_fn, max_runtime_secs=0.5).mean()
 
-    A.data.free()
-    B.data.free()
-    C.data.free()
+    _ = A^
+    _ = B^
+    _ = C^
 
     var gflops = ((2 * M * N * K) / secs) / 1e9
 
@@ -366,10 +402,6 @@ def test_all() raises:
         raise Error(
             "Layout Transposed output does not match naive implementation"
         )
-
-    A.data.free()
-    B.data.free()
-    C.data.free()
 
 
 def main() raises:

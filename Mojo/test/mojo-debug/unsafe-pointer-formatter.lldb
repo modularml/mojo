@@ -1,0 +1,41 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# COM: Verify that mojoPointerSummaryProvider displays the dereferenced value
+# COM: for UnsafePointer variables of different types: Int, Bool, and Float64.
+# COM:
+# COM: Four breakpoints exercise:
+# COM:   bp1 - Int pointer: summary shows signed decimal (42)
+# COM:   bp2 - Int pointer to negative value: shows -5
+# COM:   bp3 - Bool pointer: summary comes from boolSummaryProvider (True/False)
+# COM:   bp4 - Float64 pointer: summary from wrapping-type / scalar providers
+
+# TODO(MOTO-1007): Remove this once we have a fix for asan.
+# UNSUPPORTED: asan
+
+# RUN: %debug \
+# RUN:   -X -b \
+# RUN:   -X -o -X 'b unsafe_pointer.mojo:27' \
+# RUN:   -X -o -X 'b unsafe_pointer.mojo:31' \
+# RUN:   -X -o -X 'b unsafe_pointer.mojo:35' \
+# RUN:   -X -o -X 'b unsafe_pointer.mojo:39' \
+# RUN:   -X -o -X 'run' \
+# RUN:   -X -o -X 'frame variable p_int' \
+# RUN:   -X -o -X 'continue' \
+# RUN:   -X -o -X 'frame variable p_neg' \
+# RUN:   -X -o -X 'continue' \
+# RUN:   -X -o -X 'frame variable p_bool' \
+# RUN:   -X -o -X 'continue' \
+# RUN:   -X -o -X 'frame variable p_float' \
+# RUN:   '%S/Inputs/unsafe_pointer.mojo' | FileCheck %s
+
+# CHECK: p_int = 42
+
+# CHECK: p_neg = -5
+
+# CHECK: p_bool[0] = True
+
+# CHECK: p_float = 3.125

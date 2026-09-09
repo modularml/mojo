@@ -10,12 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Provides average- and max-pooling kernels with configurable padding, dilation, and stride for CPU and GPU."""
 
 from std.sys.info import simd_width_of
 
-from std.algorithm import stencil, stencil_gpu
-from std.gpu.host import DeviceContext
-from std.gpu.host.info import is_cpu, is_gpu
+from max.algorithm import stencil, stencil_gpu
+from max.gpu.host import DeviceContext
+from max.gpu.host.info import is_cpu, is_gpu
 from layout import Coord, TileTensor, coord_to_index_list
 
 from std.utils.index import IndexList
@@ -24,9 +25,11 @@ from std.utils.numerics import min_or_neg_inf
 from .shapes import get_sliding_window_out_dim
 
 
-# Pooling method.
 @fieldwise_init
 struct PoolMethod(TrivialRegisterPassable):
+    """Represents the pooling method, selecting between max and average pooling.
+    """
+
     var value: Int
     comptime MAX = PoolMethod(0)  # Max pooling.
     comptime AVG = PoolMethod(1)  # Average pooling not counting padded regions.
@@ -48,12 +51,31 @@ def pool_shape_ceil[
     dilations_type: DType,
     paddings_type: DType,
 ](
-    input_buf: TileTensor[input_type, ...],
-    filter_buf: TileTensor[filter_type, ...],
-    strides_buf: TileTensor[strides_type, ...],
-    dilations_buf: TileTensor[dilations_type, ...],
-    paddings_buf: TileTensor[paddings_type, ...],
+    input_buf: TileTensor[mut=False, input_type, ...],
+    filter_buf: TileTensor[mut=False, filter_type, ...],
+    strides_buf: TileTensor[mut=False, strides_type, ...],
+    dilations_buf: TileTensor[mut=False, dilations_type, ...],
+    paddings_buf: TileTensor[mut=False, paddings_type, ...],
 ) raises -> IndexList[input_buf.rank]:
+    """Computes the output shape of a pooling operation using ceil rounding for the spatial dimensions.
+
+    Parameters:
+        input_type: Data type of the input tensor.
+        filter_type: Data type of the filter tensor.
+        strides_type: Data type of the strides tensor.
+        dilations_type: Data type of the dilations tensor.
+        paddings_type: Data type of the paddings tensor.
+
+    Args:
+        input_buf: The input tensor.
+        filter_buf: The filter size buffer.
+        strides_buf: The strides size buffer.
+        dilations_buf: The dilations size buffer.
+        paddings_buf: The paddings size buffer.
+
+    Returns:
+        The output shape with ceil-mode rounding applied.
+    """
     return pool_shape_impl[
         input_type,
         filter_type,
@@ -72,12 +94,31 @@ def pool_shape[
     dilations_type: DType,
     paddings_type: DType,
 ](
-    input_buf: TileTensor[input_type, ...],
-    filter_buf: TileTensor[filter_type, ...],
-    strides_buf: TileTensor[strides_type, ...],
-    dilations_buf: TileTensor[dilations_type, ...],
-    paddings_buf: TileTensor[paddings_type, ...],
+    input_buf: TileTensor[mut=False, input_type, ...],
+    filter_buf: TileTensor[mut=False, filter_type, ...],
+    strides_buf: TileTensor[mut=False, strides_type, ...],
+    dilations_buf: TileTensor[mut=False, dilations_type, ...],
+    paddings_buf: TileTensor[mut=False, paddings_type, ...],
 ) raises -> IndexList[input_buf.rank]:
+    """Computes the output shape of a pooling operation using floor rounding for the spatial dimensions.
+
+    Parameters:
+        input_type: Data type of the input tensor.
+        filter_type: Data type of the filter tensor.
+        strides_type: Data type of the strides tensor.
+        dilations_type: Data type of the dilations tensor.
+        paddings_type: Data type of the paddings tensor.
+
+    Args:
+        input_buf: The input tensor.
+        filter_buf: The filter size buffer.
+        strides_buf: The strides size buffer.
+        dilations_buf: The dilations size buffer.
+        paddings_buf: The paddings size buffer.
+
+    Returns:
+        The output shape with floor-mode rounding applied.
+    """
     return pool_shape_impl[
         input_type,
         filter_type,
@@ -97,11 +138,11 @@ def pool_shape_impl[
     paddings_type: DType,
     ceil_mode: Bool,
 ](
-    input_buf: TileTensor[input_type, ...],
-    filter_buf: TileTensor[filter_type, ...],
-    strides_buf: TileTensor[strides_type, ...],
-    dilations_buf: TileTensor[dilations_type, ...],
-    paddings_buf: TileTensor[paddings_type, ...],
+    input_buf: TileTensor[mut=False, input_type, ...],
+    filter_buf: TileTensor[mut=False, filter_type, ...],
+    strides_buf: TileTensor[mut=False, strides_type, ...],
+    dilations_buf: TileTensor[mut=False, dilations_type, ...],
+    paddings_buf: TileTensor[mut=False, paddings_type, ...],
 ) raises -> IndexList[input_buf.rank]:
     """
     Compute the output shape of a pooling operation, and assert the inputs are
@@ -178,15 +219,19 @@ def pool_shape_impl[
 def max_pool_cpu[
     dtype: DType, int_type: DType
 ](
-    input: TileTensor[dtype, ...],
-    filter: TileTensor[int_type, ...],
-    strides: TileTensor[int_type, ...],
-    dilations: TileTensor[int_type, ...],
-    paddings: TileTensor[int_type, ...],
+    input: TileTensor[mut=False, dtype, ...],
+    filter: TileTensor[mut=False, int_type, ...],
+    strides: TileTensor[mut=False, int_type, ...],
+    dilations: TileTensor[mut=False, int_type, ...],
+    paddings: TileTensor[mut=False, int_type, ...],
     output: TileTensor[mut=True, dtype, ...],
     ceil_mode: Bool = False,
 ):
     """Computes fp32 pooling.
+
+    Parameters:
+        dtype: Data type of the input and output tensors.
+        int_type: Data type of the filter, strides, dilations, and paddings tensors.
 
     Args:
         input: Batched image input to the pool2d operator.
@@ -267,7 +312,7 @@ def max_pool_cpu[
 
     @always_inline
     def max_pool_compute[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
@@ -277,7 +322,7 @@ def max_pool_cpu[
 
     @always_inline
     def max_pool_compute_finalize[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
@@ -357,15 +402,19 @@ def max_pool_gpu[
     dtype: DType, int_type: DType
 ](
     ctx: DeviceContext,
-    input: TileTensor[dtype, ...],
-    filter: TileTensor[int_type, ...],
-    strides: TileTensor[int_type, ...],
-    dilations: TileTensor[int_type, ...],
-    paddings: TileTensor[int_type, ...],
+    input: TileTensor[mut=False, dtype, ...],
+    filter: TileTensor[mut=False, int_type, ...],
+    strides: TileTensor[mut=False, int_type, ...],
+    dilations: TileTensor[mut=False, int_type, ...],
+    paddings: TileTensor[mut=False, int_type, ...],
     output: TileTensor[mut=True, dtype, ...],
     ceil_mode: Bool = False,
 ) raises:
     """Computes max pooling on GPU.
+
+    Parameters:
+        dtype: Data type of the input and output tensors.
+        int_type: Data type of the filter, strides, dilations, and paddings tensors.
 
     Args:
         ctx: The DeviceContext to use for GPU execution.
@@ -439,7 +488,9 @@ def max_pool_gpu[
     @always_inline
     def load_fn[
         simd_width: Int, dtype: DType
-    ](point: IndexList[output.rank, ...]) {input,} -> SIMD[dtype, simd_width]:
+    ](point: IndexList[output.rank, ...]) {var input} -> SIMD[
+        dtype, simd_width
+    ]:
         var i = input.layout(Coord(point))
         return rebind[SIMD[dtype, simd_width]](
             input.raw_load[width=simd_width](i)
@@ -451,7 +502,7 @@ def max_pool_gpu[
 
     @always_inline
     def max_pool_compute[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
@@ -461,12 +512,12 @@ def max_pool_gpu[
 
     @always_inline
     def max_pool_compute_finalize[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
     ) {
-        output, mut
+        var output
     }:
         var i = output.layout(Coord(point))
         output.raw_store(i, val)
@@ -517,17 +568,20 @@ def avg_pool_cpu[
     rank: Int = 4,
     count_boundary: Bool = False,
 ](
-    input: TileTensor[dtype, ...],
-    filter: TileTensor[int_type, ...],
-    strides: TileTensor[int_type, ...],
-    dilations: TileTensor[int_type, ...],
-    paddings: TileTensor[int_type, ...],
+    input: TileTensor[mut=False, dtype, ...],
+    filter: TileTensor[mut=False, int_type, ...],
+    strides: TileTensor[mut=False, int_type, ...],
+    dilations: TileTensor[mut=False, int_type, ...],
+    paddings: TileTensor[mut=False, int_type, ...],
     output: TileTensor[mut=True, dtype, ...],
     ceil_mode: Bool = False,
 ):
     """Computes the average pool.
 
     Params:
+        dtype: Data type of the input and output tensors.
+        int_type: Data type of the filter, strides, dilations, and paddings tensors.
+        rank: Rank of the input and output tensors (defaults to 4).
         count_boundary: Whether to count the boundary in the average computation.
 
     Args:
@@ -623,7 +677,9 @@ def avg_pool_cpu[
     @always_inline
     def load_fn[
         simd_width: Int, dtype: DType
-    ](point: IndexList[output.rank, ...]) {input,} -> SIMD[dtype, simd_width]:
+    ](point: IndexList[output.rank, ...]) {var input} -> SIMD[
+        dtype, simd_width
+    ]:
         var i = input.layout(Coord(point))
         return rebind[SIMD[dtype, simd_width]](
             input.raw_load[width=simd_width](i)
@@ -635,7 +691,7 @@ def avg_pool_cpu[
 
     @always_inline
     def avg_pool_compute[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
@@ -656,12 +712,12 @@ def avg_pool_cpu[
 
     @always_inline
     def avg_pool_compute_finalize_exclude_boundary[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
     ) {
-        output,
+        var output,
         var output_height,
         var padding_h_low,
         var padding_h_high,
@@ -690,12 +746,12 @@ def avg_pool_cpu[
 
     @always_inline
     def avg_pool_compute_finalize[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
     ) {
-        output,
+        var output,
         var pool_window_h,
         var pool_window_w,
     }:
@@ -803,17 +859,19 @@ def avg_pool_gpu[
     count_boundary: Bool = False,
 ](
     ctx: DeviceContext,
-    input: TileTensor[dtype, ...],
-    filter: TileTensor[int_type, ...],
-    strides: TileTensor[int_type, ...],
-    dilations: TileTensor[int_type, ...],
-    paddings: TileTensor[int_type, ...],
+    input: TileTensor[mut=False, dtype, ...],
+    filter: TileTensor[mut=False, int_type, ...],
+    strides: TileTensor[mut=False, int_type, ...],
+    dilations: TileTensor[mut=False, int_type, ...],
+    paddings: TileTensor[mut=False, int_type, ...],
     output: TileTensor[mut=True, dtype, ...],
     ceil_mode: Bool = False,
 ) raises:
     """Computes the average pool on GPU.
 
     Params:
+        dtype: Data type of the input and output tensors.
+        int_type: Data type of the filter, strides, dilations, and paddings tensors.
         count_boundary: Whether to count the boundary in the average computation.
 
     Args:
@@ -912,7 +970,9 @@ def avg_pool_gpu[
     @always_inline
     def load_fn[
         simd_width: Int, dtype: DType
-    ](point: IndexList[output.rank, ...]) {input,} -> SIMD[dtype, simd_width]:
+    ](point: IndexList[output.rank, ...]) {var input} -> SIMD[
+        dtype, simd_width
+    ]:
         var i = input.layout(Coord(point))
         return rebind[SIMD[dtype, simd_width]](
             input.raw_load[width=simd_width](i)
@@ -924,7 +984,7 @@ def avg_pool_gpu[
 
     @always_inline
     def avg_pool_compute[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
@@ -945,12 +1005,12 @@ def avg_pool_gpu[
 
     @always_inline
     def avg_pool_compute_finalize_exclude_boundary[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
     ) {
-        output,
+        var output,
         var output_height,
         var padding_h_low,
         var padding_h_high,
@@ -977,12 +1037,12 @@ def avg_pool_gpu[
 
     @always_inline
     def avg_pool_compute_finalize[
-        simd_width: SIMDSize
+        simd_width: SIMDLength
     ](
         point: IndexList[output.rank, ...],
         val: SIMD[dtype, simd_width],
     ) {
-        output,
+        var output,
         var pool_window_h,
         var pool_window_w,
     }:
@@ -1086,15 +1146,37 @@ def avg_pool[
     count_boundary: Bool = False,
     target: StaticString = "cpu",
 ](
-    input: TileTensor[dtype, ...],
-    filter: TileTensor[int_type, ...],
-    strides: TileTensor[int_type, ...],
-    dilations: TileTensor[int_type, ...],
-    paddings: TileTensor[int_type, ...],
+    input: TileTensor[mut=False, dtype, ...],
+    filter: TileTensor[mut=False, int_type, ...],
+    strides: TileTensor[mut=False, int_type, ...],
+    dilations: TileTensor[mut=False, int_type, ...],
+    paddings: TileTensor[mut=False, int_type, ...],
     output: TileTensor[mut=True, dtype, ...],
     ceil_mode: Bool = False,
     ctx: Optional[DeviceContext] = None,
 ) raises:
+    """Dispatches the average pooling operation to the CPU or GPU backend based on the target.
+
+    Parameters:
+        dtype: Data type of the input and output tensors.
+        int_type: Data type of the filter, strides, dilations, and paddings tensors.
+        count_boundary: Whether to count the boundary in the average computation.
+        target: Execution target, either "cpu" or "gpu".
+
+    Args:
+        input: Batched image input to the pool2d operator.
+        filter: Filter size on height and width dimensions with assumed tuple
+            (filter_h, filter_w).
+        strides: Strides on height and width dimensions with assumed
+            tuple (stride_h, stride_w).
+        dilations: Dilations on height and width dimensions with assumed
+            tuple (dilation_h, dilation_w).
+        paddings: Paddings on height and width dimensions with assumed
+            tuple (pad_h_before, pad_h_after, pad_w_before, pad_w_after)).
+        output: Pre-allocated output tensor space.
+        ceil_mode: Ceiling mode defines the output shape and implicit padding.
+        ctx: The DeviceContext to use for GPU execution.
+    """
     comptime if is_cpu[target]():
         avg_pool_cpu[count_boundary=count_boundary](
             input, filter, strides, dilations, paddings, output, ceil_mode
@@ -1120,15 +1202,36 @@ def max_pool[
     int_type: DType,
     target: StaticString = "cpu",
 ](
-    input: TileTensor[dtype, ...],
-    filter: TileTensor[int_type, ...],
-    strides: TileTensor[int_type, ...],
-    dilations: TileTensor[int_type, ...],
-    paddings: TileTensor[int_type, ...],
+    input: TileTensor[mut=False, dtype, ...],
+    filter: TileTensor[mut=False, int_type, ...],
+    strides: TileTensor[mut=False, int_type, ...],
+    dilations: TileTensor[mut=False, int_type, ...],
+    paddings: TileTensor[mut=False, int_type, ...],
     output: TileTensor[mut=True, dtype, ...],
     ceil_mode: Bool = False,
     ctx: Optional[DeviceContext] = None,
 ) raises:
+    """Dispatches the max pooling operation to the CPU or GPU backend based on the target.
+
+    Parameters:
+        dtype: Data type of the input and output tensors.
+        int_type: Data type of the filter, strides, dilations, and paddings tensors.
+        target: Execution target, either "cpu" or "gpu".
+
+    Args:
+        input: Batched image input to the pool2d operator.
+        filter: Filter size on height and width dimensions with assumed tuple
+            (filter_h, filter_w).
+        strides: Strides on height and width dimensions with assumed
+            tuple (stride_h, stride_w).
+        dilations: Dilations on height and width dimensions with assumed
+            tuple (dilation_h, dilation_w).
+        paddings: Paddings on height and width dimensions with assumed
+            tuple (pad_h_before, pad_h_after, pad_w_before, pad_w_after)).
+        output: Pre-allocated output tensor space.
+        ceil_mode: Ceiling mode defines the output shape and implicit padding.
+        ctx: The DeviceContext to use for GPU execution.
+    """
     comptime if is_cpu[target]():
         max_pool_cpu(
             input, filter, strides, dilations, paddings, output, ceil_mode

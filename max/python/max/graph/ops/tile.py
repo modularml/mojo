@@ -27,31 +27,48 @@ from .validation import _check_device_placement
 
 
 def tile(x: TensorValueLike, repeats: Iterable[DimLike]) -> TensorValue:
-    """Returns a new tensor by tiling the input along each dimension.
+    """Repeats a tensor along each of its dimensions.
 
-    The input is copied ``N_i`` times on the i-th dimension, where
-    ``N_i = repeats[i]``. The i-th dimension of the output shape is the
-    i-th dimension of the input shape multiplied by ``N_i``.
+    Each dimension ``i`` is copied ``repeats[i]`` times, so its output size is
+    ``x.shape[i] * repeats[i]``.
+
+    This op runs on CPU. By default, an input on another device is copied to
+    CPU for the operation (emitting a warning) and the result is copied back.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("tile_example") as graph:
+            x = ops.constant([[1, 2], [3, 4]], DType.int32, device=device)
+
+            # Repeat the columns twice, leaving the rows unchanged.
+            graph.output(ops.tile(x, [1, 2]))  # [[1, 2, 1, 2], [3, 4, 3, 4]]
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
-        x: The input symbolic tensor to tile.
-        repeats: An iterable of repeat counts, one per dimension of ``x``.
-            All values must be positive. The length must equal the rank of
-            ``x``.
+        x: The tensor to tile.
+        repeats: The number of copies for each dimension, one positive value per
+            dimension of ``x``.
 
     Returns:
-        A symbolic tensor whose i-th dimension size equals
-        ``x.shape[i] * repeats[i]``.
+        A ``TensorValue`` representing the tiled input.
 
     Raises:
-        ValueError: If the length of ``repeats`` does not match the rank of
-            ``x``, or if any repeat value is not positive. Also raised for
-            GPU inputs when ``strict_device_placement=DevicePlacementPolicy.Error``.
+        ValueError: If ``repeats`` doesn't have one value per dimension, if a
+            statically-known repeat isn't positive, or if ``x`` is on a
+            non-CPU device and
+            ``strict_device_placement=DevicePlacementPolicy.Error``.
     """
     x = dtype_promotion._restrict_to_strong_dtypes(x)
     shape = x.shape
 
-    repeats = list(Dim(d) for d in repeats)
+    repeats = [Dim(d) for d in repeats]
     if len(shape) != len(repeats):
         raise ValueError(
             "Input rank and number of elements in repeats must match:"

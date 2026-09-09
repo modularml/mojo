@@ -13,13 +13,14 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from functools import wraps
+from pathlib import Path
 from typing import Any, TypeVar
 from unittest.mock import MagicMock, patch
 
 from max.driver import DeviceSpec
-from max.graph.weights import WeightsFormat
 from max.pipelines.lib import (
     KVCacheConfig,
     MAXModelConfig,
@@ -28,28 +29,43 @@ from max.pipelines.lib import (
     SupportedEncoding,
 )
 from max.pipelines.lib.model_manifest import ModelManifest
-from transformers import AutoConfig
+from max.pipelines.weights.hf_utils import (
+    HuggingFaceRepo,
+)
+from max.pipelines.weights.hf_utils import (
+    generate_local_model_path as _real_generate_local_model_path,
+)
+from transformers import AutoConfig, PretrainedConfig
 from typing_extensions import ParamSpec
 
-from .memory_estimation import mock_estimate_memory_footprint
+from .memory_estimation import mock_plan_from_sizes
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
+
+
+def _offline_safe_local_model_path(repo_id: str, revision: str) -> str:
+    """Resolve a real cached repo's local snapshot; fall back to a fake path.
+
+    ``MAXModelConfig`` construction resolves the offline snapshot under
+    ``HF_HUB_OFFLINE``. Real cached repos resolve normally so real-repo tests
+    keep working; uncached/placeholder repos get a fake path that preserves the
+    repo id so construction stays offline instead of raising
+    ``LocalEntryNotFoundError``. ``_real_generate_local_model_path`` is captured
+    at import so patching the module attribute never recurses.
+    """
+    try:
+        return _real_generate_local_model_path(repo_id, revision)
+    except Exception:
+        return f"/fake/cache/{repo_id}"
 
 
 class DummyMAXModelConfig(MAXModelConfig):
     def weights_size(self) -> int:
         return 1000
 
-    def validate_and_resolve_quantization_encoding_weight_path(
-        self, default_encoding: SupportedEncoding
-    ) -> None:
-        pass
-
-    def validate_and_resolve_with_resolved_quantization_encoding(
-        self,
-        supported_encodings: set[SupportedEncoding],
-        default_weights_format: WeightsFormat,
+    def _validate_final_architecture_model_path_weight_path(
+        self, weight_path: list[Path]
     ) -> None:
         pass
 
@@ -62,6 +78,10 @@ class DummyPipelineConfig(PipelineConfig):
         max_batch_size: int | None,
         max_length: int | None,
         device_specs: list[DeviceSpec] | None = None,
+        max_batch_total_tokens: int | None = None,
+        device_graph_capture: bool | None = None,
+        weight_path: list[Path] | None = None,
+        huggingface_config: PretrainedConfig | None = None,
         # TODO(AITLIB-328): These values do not belong in PipelineConfig,
         # but are somehow used by MockPipelineModel in pipeline_model.py.
         eos_prob: float | None = None,
@@ -87,19 +107,39 @@ class DummyPipelineConfig(PipelineConfig):
             device_specs=device_specs,
             quantization_encoding=quantization_encoding,
             max_length=max_length,
+            weight_path=weight_path if weight_path is not None else [],
+            kv_cache=KVCacheConfig(),
         )
-        model_config.kv_cache = KVCacheConfig()
-        # NOTE: Using MagicMock without spec here because HuggingFace configs
-        # vary by model type (LlamaConfig, Qwen2Config, etc.). Tests that need
-        # strict type checking should pass a model-specific huggingface_config
-        # parameter to DummyPipelineConfig or use the real AutoConfig.
-        # TODO: Consider accepting huggingface_config as an optional parameter
-        # to allow tests to provide model-specific spec'd mocks.
-        model_config._huggingface_config = MagicMock()
+        # model_construct bypasses __init__, where user intent for max_length
+        # is captured; mirror the capture so planning sees the same bit.
+        model_config._max_length_user_provided = max_length is not None
+
+        # `ArchConfig.initialize` resolves the encoding via
+        # `_select_quantization_encoding`, which reads the HF weight repo's
+        # supported encodings. Seed the repo cache with an offline stub (no
+        # supported encodings, no weight files) so resolution stays offline and
+        # keeps the given encoding; this avoids a network `HuggingFaceRepo`
+        # lookup for the fake `model_path`.
+        weight_repo_stub = MagicMock(spec=HuggingFaceRepo)
+        weight_repo_stub.repo_id = model_config.huggingface_weight_repo_id
+        weight_repo_stub.revision = model_config.huggingface_weight_revision
+        weight_repo_stub.subfolder = model_config.subfolder
+        weight_repo_stub.supported_encodings = []
+        weight_repo_stub.files_for_encoding.return_value = {}
+        weight_repo_stub.encoding_for_file.return_value = None
+        model_config._cached_weight_repo = weight_repo_stub
+        # Tests that assert on config contents pass their own.
+        model_config._huggingface_config = (
+            huggingface_config
+            if huggingface_config is not None
+            else MagicMock()
+        )
 
         manifest = ModelManifest({"main": model_config})
         runtime = PipelineRuntimeConfig.model_construct(
             max_batch_size=max_batch_size,
+            max_batch_total_tokens=max_batch_total_tokens,
+            device_graph_capture=device_graph_capture,
         )
         base = PipelineConfig.model_construct(
             runtime=runtime,
@@ -234,7 +274,7 @@ def mock_huggingface_hub_repo_exists_with_retry(
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         with patch("huggingface_hub.revision_exists", return_value=True):
             with patch(
-                "max.pipelines.modeling.weights.hf_utils.generate_local_model_path",
+                "max.pipelines.weights.hf_utils.generate_local_model_path",
                 side_effect=fake_generate_local_model_path,
             ):
                 return func(*args, **kwargs)
@@ -273,7 +313,7 @@ def mock_generate_local_model_path(
     @wraps(func)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         with patch(
-            "max.pipelines.modeling.weights.hf_utils.generate_local_model_path",
+            "max.pipelines.weights.hf_utils.generate_local_model_path",
             side_effect=fake_generate_local_model_path,
         ):
             return func(*args, **kwargs)
@@ -291,32 +331,97 @@ def mock_pipeline_config_hf_dependencies(
     - mock_huggingface_hub_repo_exists_with_retry
     - mock_huggingface_hub_file_exists
     - mock_huggingface_config
-    - mock_estimate_memory_footprint
+    - mock_plan_from_sizes
     """
     return mock_generate_local_model_path(
         mock_huggingface_hub_repo_exists_with_retry(
             mock_huggingface_hub_file_exists(
-                mock_huggingface_config(mock_estimate_memory_footprint(func))
+                mock_huggingface_config(mock_plan_from_sizes(func))
             )
         )
     )
 
 
-# This is a helper decorator to mock the PipelineConfig.resolve() method.
-# In practice, it is used to skip all the other validation and resolution steps.
-# We're just testing if the config fields are set correctly.
+@contextmanager
+def patched_hf_construction() -> Iterator[None]:
+    """No-op the HuggingFace network calls that ``MAXModelConfig`` construction
+    makes, so a config referencing a fake/uncached repo can be *constructed*
+    offline -- including under ``HF_HUB_OFFLINE`` (as CI runs).
+
+    ``MAXModelConfig.__init__`` eagerly builds its ``HuggingFaceRepo`` handles
+    (whose ``__post_init__`` either runs ``validate_hf_repo_access`` online or
+    resolves the local snapshot via ``generate_local_model_path`` offline, the
+    path CI hits), probes ``file_exists`` for a loadable config, and loads it
+    via ``load_huggingface_config``. ``validate_repo_access()`` uses the
+    ``validate_hf_repo_access`` reference imported into ``model_config``. All
+    are patched so a fake/uncached repo stays offline: the offline snapshot
+    resolves to a fake local path that preserves the repo id, and the mocked
+    config is a bare ``MagicMock`` -- callers that assert on config contents
+    should set ``_huggingface_config`` or patch loading themselves.
+    """
+    with (
+        patch(
+            "max.pipelines.weights.hf_utils.validate_hf_repo_access",
+            return_value=None,
+        ),
+        patch(
+            "max.pipelines.lib.config.model_config.validate_hf_repo_access",
+            return_value=None,
+        ),
+        patch(
+            "max.pipelines.weights.hf_utils.generate_local_model_path",
+            side_effect=_offline_safe_local_model_path,
+        ),
+        # Keep the eager config-existence probe offline for online fake repos
+        # (local paths already resolve via os.path.exists).
+        patch("huggingface_hub.file_exists", return_value=False),
+        # architectures=None keeps the architecture name undeterminable, so
+        # construction-time resolution skips instead of rejecting the fake
+        # repo as an unknown architecture.
+        patch(
+            "max.pipelines.lib.config.model_config.load_huggingface_config",
+            return_value=MagicMock(architectures=None),
+        ),
+    ):
+        yield
+
+
+def mock_hf_repo_access(func: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Decorator form of :func:`patched_hf_construction`.
+
+    Lets a test construct a config against a fake/uncached repo offline.
+    Unlike :func:`mock_pipeline_config_resolve`, this does not touch
+    ``resolve``/memory planning, so tests that exercise real resolution
+    behavior against a fake repo can still use it.
+    """
+
+    @wraps(func)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with patched_hf_construction():
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
+# Helper decorator that mocks the registry's resolution phase (memory
+# planning) and HF repo access, so tests can exercise config construction
+# and field wiring without touching the network or estimating memory.
 def mock_pipeline_config_resolve(func: Callable[_P, _R]) -> Callable[_P, _R]:
     @wraps(func)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        from max.pipelines.lib.memory_estimation import MemoryPlan
+
         with (
             patch(
-                "max.pipelines.lib.config.PipelineConfig.resolve",
-                return_value=None,
+                "max.pipelines.lib.memory_estimation.MemoryEstimator.plan",
+                side_effect=lambda config, *a, **kw: MemoryPlan(
+                    planned_max_batch_size=1,
+                    footprint=0,
+                    planned_max_length=config.model.max_length,
+                    device_specs=tuple(config.model.device_specs),
+                ),
             ),
-            patch(
-                "max.pipelines.lib.config.model_config.validate_hf_repo_access",
-                return_value=None,
-            ),
+            patched_hf_construction(),
         ):
             return func(*args, **kwargs)
 

@@ -27,6 +27,7 @@ Usage:
 from std.math import ceildiv
 from std.sys import get_defined_int
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -34,8 +35,8 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.gpu.host import DeviceContext
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 from std.random import rand, seed
 from std.utils import Index
 from internal_utils import arg_parse
@@ -67,7 +68,7 @@ from linalg.matmul.gpu.sm100_structured.grouped_block_scaled.grouped_block_scale
 def _get_run_name[
     in_type: DType,
     out_type: DType,
-](num_groups: Int, m_per_group: Int, n: Int, k: Int, cta_group: Int,) -> String:
+](num_groups: Int, m_per_group: Int, n: Int, k: Int, cta_group: Int) -> String:
     var mode_str = "1SM" if cta_group == 1 else "2SM"
     return String(
         "grouped_block_scaled_gemm(",
@@ -258,9 +259,7 @@ def bench_grouped_block_scaled_gemm[
         problem_sizes_host[g * 4 + 2] = Int32(Int(k.value()))
         problem_sizes_host[g * 4 + 3] = 1
 
-    var problem_sizes_device = ctx.enqueue_create_buffer[DType.int32](
-        max_groups * 4
-    )
+    var problem_sizes_device = ctx.enqueue_create_buffer[.int32](max_groups * 4)
     ctx.enqueue_copy(problem_sizes_device, problem_sizes_host)
 
     var a_ptrs_host = List(
@@ -279,11 +278,11 @@ def bench_grouped_block_scaled_gemm[
         length=max_groups, fill=UInt64(Int(sfb_device.unsafe_ptr()))
     )
 
-    var a_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var b_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var c_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var sfa_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
-    var sfb_ptrs_device = ctx.enqueue_create_buffer[DType.uint64](max_groups)
+    var a_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var b_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var c_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var sfa_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
+    var sfb_ptrs_device = ctx.enqueue_create_buffer[.uint64](max_groups)
 
     ctx.enqueue_copy(a_ptrs_device, a_ptrs_host)
     ctx.enqueue_copy(b_ptrs_device, b_ptrs_host)
@@ -340,26 +339,26 @@ def bench_grouped_block_scaled_gemm[
     # Total FLOPs for all groups
     var total_flops = 2 * M * Int(n.value()) * Int(k.value()) * num_groups
 
-    @parameter
-    @__copy_capture(
-        a_ptrs_tensor,
-        b_ptrs_tensor,
-        c_ptrs_tensor,
-        sfa_ptrs_tensor,
-        sfb_ptrs_tensor,
-        problem_sizes_tensor_host,
-        a_template,
-        b_template,
-        c_template,
-        sfa_template,
-        sfb_template,
-        total_tiles,
-    )
     @always_inline
-    def bench_func(mut bencher: Bencher):
-        @parameter
+    def bench_func(
+        mut bencher: Bencher,
+    ) {
+        var a_ptrs_tensor,
+        var b_ptrs_tensor,
+        var c_ptrs_tensor,
+        var sfa_ptrs_tensor,
+        var sfb_ptrs_tensor,
+        var problem_sizes_tensor_host,
+        var a_template,
+        var b_template,
+        var c_template,
+        var sfa_template,
+        var sfb_template,
+        var total_tiles,
+        imm,
+    }:
         @always_inline
-        def kernel_launch(ctx: DeviceContext, iteration: Int) raises:
+        def kernel_launch(ctx: DeviceContext, iteration: Int) raises {imm}:
             grouped_block_scaled_matmul[
                 transpose_b=transpose_b,
                 max_groups=max_groups,
@@ -381,9 +380,10 @@ def bench_grouped_block_scaled_gemm[
                 ctx,
             )
 
-        bencher.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(bencher, kernel_launch, ctx)
 
-    bench.bench_function[bench_func](
+    bench.bench_function(
+        bench_func,
         BenchId(
             _get_run_name[a_type, c_type](
                 num_groups, M, Int(n.value()), Int(k.value()), cta_group

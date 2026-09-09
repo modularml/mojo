@@ -1,10 +1,10 @@
 # Test for pipeline unit tests.
 
 load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("//max/tests/integration/xarch_warm:eager_py_test.bzl", "modular_eager_py_test")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -17,8 +17,42 @@ modular_py_test(
     deps = [
         "//max/python/max/graph",
         "//max/python/max/pipelines/lib",
-        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/weights",
+        "//max/tests/integration/test_common:fake_weights",
         "//max/tests/integration/test_common:mocks",
+        requirement("huggingface-hub"),
+        requirement("pydantic"),
+    ],
+)
+
+# Builds real Module weights, so unwarmed the first eager dispatch
+# cold-compiles a GC model and blows the 60s budget.
+modular_eager_py_test(
+    name = "test_modulev3_lora_manager",
+    size = "small",
+    srcs = ["test_modulev3_lora_manager.py"],
+    cpu_only = True,
+    env = {
+        # Don't background-compile every eager graph (SDLC-4307 CI cpu/mem).
+        "MAX_EAGER_EXECUTOR": "fallback-internal",
+    },
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/lora",
+        requirement("numpy"),
     ],
 )
 
@@ -26,10 +60,47 @@ modular_py_test(
     name = "test_model_config_encoding_resolution",
     size = "medium",
     srcs = ["test_model_config_encoding_resolution.py"],
+    # These are offline unit tests: a stray hub lookup for a gated repo turns
+    # into a 401 instead of a cache miss. Linux CI passes HF_HUB_OFFLINE=1 for
+    # the whole invocation (ci/default/test.sh); the macOS lane does not, so
+    # pin it per target.
+    env = {"HF_HUB_OFFLINE": "1"},
+    tags = ["skip-external-ci"],
     deps = [
         "//max/python/max/driver",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/diffusion",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/weights",
+        "//max/tests/integration/test_common:fake_weights",
+    ],
+)
+
+modular_py_test(
+    name = "test_denoising_cache_defaults",
+    size = "medium",
+    srcs = ["test_denoising_cache_defaults.py"],
+    # Offline unit tests; Linux CI passes HF_HUB_OFFLINE=1 for the whole
+    # invocation (ci/default/test.sh), the macOS lane does not.
+    env = {"HF_HUB_OFFLINE": "1"},
+    # The root package registers the lazy architecture table; flux2/wan are
+    # materialized at runtime by the construction-time architecture lookup.
+    ignore_extra_deps = [
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/flux2",
+        "//max/python/max/pipelines/architectures/wan",
+    ],
+    tags = ["skip-external-ci"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/flux2",
+        "//max/python/max/pipelines/architectures/wan",
+        "//max/python/max/pipelines/diffusion",
+        "//max/python/max/pipelines/lib",
+        "//max/tests/integration/test_common:fake_weights",
+        requirement("pydantic"),
     ],
 )
 
@@ -42,8 +113,12 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/graph",
         "//max/python/max/pipelines",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/kv_cache",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/sampling",
+        "//max/tests/integration/test_common:fake_weights",
         "//max/tests/integration/test_common:pipeline_model_dummy",
         "//max/tests/integration/test_common:registry",
     ],
@@ -59,13 +134,17 @@ modular_py_test(
     }),
     deps = [
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/weights",
     ],
 )
 
 modular_py_test(
     name = "test_model_manifest",
     srcs = ["test_model_manifest.py"],
+    # See test_model_config_encoding_resolution above: offline unit tests that
+    # rely on HF_HUB_OFFLINE, which only Linux CI sets invocation-wide.
+    env = {"HF_HUB_OFFLINE": "1"},
+    tags = ["skip-external-ci"],
     deps = [
         "//max/python/max/graph",
         "//max/python/max/pipelines/lib",
@@ -96,6 +175,7 @@ modular_py_test(
     }),  # FIXME: MOCO-2411
     deps = [
         "//max/python/max/pipelines",
+        "//max/python/max/pipelines/lib",
     ],
 )
 
@@ -112,7 +192,7 @@ modular_py_test(
     ],
     deps = [
         "//max/python/max/pipelines/lib",
-        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/weights",
         requirement("huggingface-hub"),
         requirement("transformers"),
     ],
@@ -126,6 +206,8 @@ modular_py_test(
         exclude = [
             "**/*_gpu.py",
             "test_autoconfig_error_propagation.py",
+            "test_denoising_cache_defaults.py",
+            "test_modulev3_lora_manager.py",
             "test_device_graph_capture_release.py",
             "test_model_config_encoding_resolution.py",
             "test_model_config_subfolder.py",
@@ -150,15 +232,14 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/support",
-        "//max/tests/integration:hf_repo_lock",
         "//max/tests/integration/test_common:mocks",
         "//max/tests/integration/test_common:numerics",
+        requirement("av"),
         requirement("numpy"),
-        requirement("transformers"),
     ],
 )
 
@@ -181,6 +262,7 @@ modular_py_test(
 modular_py_test(
     name = "test_attention_dispatch_resolver_gpu",
     size = "medium",
+    timeout = "long",
     srcs = ["test_attention_dispatch_resolver_gpu.py"],
     exec_properties = {
         "test.resources:gpu-memory": "1.2",
@@ -207,7 +289,7 @@ modular_py_test(
     timeout = "long",
     srcs = ["test_mla_probe_strategy_gpu.py"],
     exec_properties = {
-        "test.resources:gpu-memory": "1.2",
+        "test.resources:gpu-memory": "2",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
@@ -218,9 +300,9 @@ modular_py_test(
     ],
     target_compatible_with = ["//:b200_gpu"],
     deps = [
+        "//max/python/max/dtype",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/lib",
     ],
 )
 
@@ -243,8 +325,8 @@ modular_py_test(
         "//max/python/max/driver",
         "//max/python/max/engine",
         "//max/python/max/graph",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
-        "//max/python/max/pipelines/modeling",
         "//max/tests/integration/test_common:numerics",
         requirement("numpy"),
     ],
@@ -258,11 +340,12 @@ modular_py_test(
         exclude = [
             "test_attention_dispatch_resolver_gpu.py",
             "test_mla_probe_strategy_gpu.py",
+            "test_smollm2_lora_modulev3_gpu.py",
             "test_structured_output_spec_decode_gpu.py",
         ],
     ),
     exec_properties = {
-        "test.resources:gpu-memory": "23",
+        "test.resources:gpu-memory": "22",
     },
     gpu_constraints = ["//:has_gpu"],
     ignore_extra_deps = [
@@ -279,14 +362,44 @@ modular_py_test(
     deps = [
         "//max/python/max/driver",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
-        "//max/tests/integration:hf_repo_lock",
-        "//max/tests/integration/test_common:graph_utils",
-        "//max/tests/integration/test_common:lora_utils",
         "//max/tests/integration/test_common:registry",
         requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_smollm2_lora_modulev3_gpu",
+    size = "large",
+    srcs = ["test_smollm2_lora_modulev3_gpu.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "8",
+    },
+    gpu_constraints = ["//:has_gpu"],
+    ignore_extra_deps = [
+        # Neither is imported directly: the arch is resolved by a registry
+        # string lookup and registry is loaded as a pytest plugin.
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+        "//max/tests/integration/test_common:registry",
+    ],
+    tags = [
+        "gpu",
+        "manual",
+        "no-sandbox",
+        "requires-network",
+    ],
+    # The ModuleV3 LoRA SGMV kernels are validated on B200 only.
+    target_compatible_with = ["//:b200_gpu"],
+    deps = [
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/llama3_modulev3",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lora",
+        "//max/python/max/pipelines/modeling",
+        "//max/tests/integration/test_common:lora_utils",
+        "//max/tests/integration/test_common:registry",
         requirement("pytest-asyncio"),
     ],
 )
@@ -303,6 +416,12 @@ modular_py_test(
     ignore_extra_deps = [
         # Used as a pytest plugin
         "//max/tests/integration/test_common:registry",
+        # Pytest plugin for async tests; not a direct import.
+        requirement("pytest-asyncio"),
+        # EAGLE arch is loaded dynamically via the pipeline registry.
+        "//max/python/max/pipelines/architectures/unified_eagle_llama3",
+        # Used at runtime by apply_chat_template; not a direct import.
+        requirement("jinja2"),
     ],
     tags = [
         "gpu",
@@ -313,11 +432,13 @@ modular_py_test(
     deps = [
         "//max/python/max/driver",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/architectures/unified_eagle_llama3",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
-        "//max/tests/integration:hf_repo_lock",
         "//max/tests/integration/test_common:registry",
+        requirement("jinja2"),
         requirement("numpy"),
+        requirement("pytest-asyncio"),
     ],
 )

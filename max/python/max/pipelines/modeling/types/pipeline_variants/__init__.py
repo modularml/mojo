@@ -12,11 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from .audio_generation import (
-    AudioGenerationContextType,
     AudioGenerationInputs,
-    AudioGenerationMetadata,
-    AudioGenerationOutput,
-    AudioGenerationRequest,
 )
 from .embeddings_generation import (
     EmbeddingsContext,
@@ -25,62 +21,38 @@ from .embeddings_generation import (
     EmbeddingsGenerationOutput,
 )
 from .pixel_generation import (
-    PixelGenerationContext,
-    PixelGenerationContextType,
     PixelGenerationInputs,
 )
 from .text_generation import (
     BatchType,
-    GrammarEnforcementSnapshot,
+    CompletedBatchStats,
     ImageContentPart,
-    ImageMetadata,
     MessageContent,
-    SpecDecodingState,
     TextContentPart,
-    TextGenerationContext,
-    TextGenerationContextType,
     TextGenerationInputs,
-    TextGenerationOutput,
     TextGenerationRequest,
     TextGenerationRequestFunction,
     TextGenerationRequestMessage,
     TextGenerationRequestTool,
-    TextGenerationResponseFormat,
     VideoContentPart,
-    VLMContextType,
-    VLMTextGenerationContext,
 )
 
 __all__ = [
-    "AudioGenerationContextType",
     "AudioGenerationInputs",
-    "AudioGenerationMetadata",
-    "AudioGenerationOutput",
-    "AudioGenerationRequest",
     "BatchType",
+    "CompletedBatchStats",
     "EmbeddingsContext",
     "EmbeddingsGenerationContextType",
     "EmbeddingsGenerationInputs",
     "EmbeddingsGenerationOutput",
-    "GrammarEnforcementSnapshot",
     "ImageContentPart",
-    "ImageMetadata",
     "MessageContent",
-    "PixelGenerationContext",
-    "PixelGenerationContextType",
     "PixelGenerationInputs",
-    "SpecDecodingState",
     "TextContentPart",
-    "TextGenerationContext",
-    "TextGenerationContextType",
     "TextGenerationInputs",
-    "TextGenerationOutput",
     "TextGenerationRequest",
     "TextGenerationRequestFunction",
     "TextGenerationRequestMessage",
     "TextGenerationRequestTool",
-    "TextGenerationResponseFormat",
-    "VLMContextType",
-    "VLMTextGenerationContext",
     "VideoContentPart",
 ]

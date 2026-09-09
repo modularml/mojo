@@ -9,6 +9,6 @@ ignore_directories([
     "**/.*.venv",
     "**/.venv",
     "**/.git",
-    "**/.magic",
     "**/.pixi",
+    "**/node_modules",
 ])

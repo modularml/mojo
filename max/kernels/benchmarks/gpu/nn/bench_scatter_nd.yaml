@@ -1,0 +1,44 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+name: bench_scatter_nd
+file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_scatter_nd.mojo
+
+params:
+# Slice-style row scatter: large table, slice-width sweep (KERN-3002).
+- $mode: ["row"]
+  dtype: [float32, bfloat16]
+  rows: 131072
+  cols: [256, 1024, 4096]
+  num_idx: 4096
+
+# Few index rows: occupancy worst case for the old one-thread-per-row kernel.
+- $mode: ["row"]
+  dtype: float32
+  rows: 131072
+  cols: 1024
+  num_idx: 64
+
+# Small table, every row updated.
+- $mode: ["row"]
+  dtype: float32
+  rows: 8192
+  cols: 256
+  num_idx: 8192
+
+# Element-style scatter (r_minus_m = 0).
+- $mode: ["elem"]
+  dtype: float32
+  rows: 4096
+  cols: 4096
+  num_idx: 65536

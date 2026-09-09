@@ -18,7 +18,7 @@ Documents known limitations:
 """
 
 from layout import TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 import linalg.matmul.vendor.blas as vendor_blas
 from linalg.matmul.gpu.amd.amd_ping_pong_matmul import (
     amd_ping_pong_matmul as ping_pong_matmul,
@@ -33,8 +33,8 @@ def test_shape[
     """Test a single shape."""
     var device_a = ctx.enqueue_create_buffer[in_dtype](M * K)
     var device_b = ctx.enqueue_create_buffer[in_dtype](N * K)
-    var device_c = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var device_c_ref = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var device_c = ctx.enqueue_create_buffer[.float32](M * N)
+    var device_c_ref = ctx.enqueue_create_buffer[.float32](M * N)
 
     # Use random data to expose precision and swizzle bugs.
     # Small range [-0.5, 0.5] keeps values representable in low-precision formats.
@@ -117,124 +117,124 @@ def main() raises:
         # BF16: Works with all M values
         print("\nBF16 - Testing various M values:")
         print("  M=4096 (aligned)...", end="")
-        test_shape[DType.bfloat16, 4096, 4096, 4096, enable_swizzle=True](ctx)
+        test_shape[.bfloat16, 4096, 4096, 4096, enable_swizzle=True](ctx)
         print(" PASSED")
 
         print("  M=1000 (unaligned)...", end="")
-        test_shape[DType.bfloat16, 1000, 4096, 4096](ctx)
+        test_shape[.bfloat16, 1000, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=300...", end="")
-        test_shape[DType.bfloat16, 300, 4096, 4096](ctx)
+        test_shape[.bfloat16, 300, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=100 (small)...", end="")
-        test_shape[DType.bfloat16, 100, 4096, 4096](ctx)
+        test_shape[.bfloat16, 100, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=16 (very small)...", end="")
-        test_shape[DType.bfloat16, 16, 4096, 4096](ctx)
+        test_shape[.bfloat16, 16, 4096, 4096](ctx)
         print(" PASSED")
 
         # FP8 - Testing various M values
         print("\nFP8 - Testing aligned M values (M % 256 == 0):")
         print("  M=4096...", end="")
-        test_shape[DType.float8_e4m3fn, 4096, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 4096, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=2048...", end="")
-        test_shape[DType.float8_e4m3fn, 2048, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 2048, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=256...", end="")
-        test_shape[DType.float8_e4m3fn, 256, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 256, 4096, 4096](ctx)
         print(" PASSED")
 
         # Test FP8 without swizzle to isolate the issue
         print("\nFP8 - Testing unaligned M without swizzle:")
         print("  M=1000...", end="")
-        test_shape[DType.float8_e4m3fn, 1024, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 1024, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=300...", end="")
-        test_shape[DType.float8_e4m3fn, 300, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 300, 4096, 4096](ctx)
         print(" PASSED")
 
         # FP8 partial blocks: test 32×32×64 MMA (M % 32 == 0, M % 256 != 0)
         print("\nFP8 - Testing 32×32×64 MMA (M % 32 == 0, M % 256 != 0):")
         print("  M=992 (partial block, 32-aligned)...", end="")
-        test_shape[DType.float8_e4m3fn, 992, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 992, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=960 (partial block, 32-aligned)...", end="")
-        test_shape[DType.float8_e4m3fn, 960, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 960, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=1088 (partial block, 32-aligned)...", end="")
-        test_shape[DType.float8_e4m3fn, 1088, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 1088, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=288 (partial block, 32-aligned, edge case)...", end="")
-        test_shape[DType.float8_e4m3fn, 288, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 288, 4096, 4096](ctx)
         print(" PASSED")
 
         print("\nFP8 - Testing 16×16×128 MMA (M % 256 == 0):")
         print("  M=1024 (full blocks)...", end="")
-        test_shape[DType.float8_e4m3fn, 1024, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 1024, 4096, 4096](ctx)
         print(" PASSED")
 
         print("\nFP8 - Testing 16×16×128 MMA (unaligned M, fallback):")
         print("  M=1000 (partial block, unaligned)...", end="")
-        test_shape[DType.float8_e4m3fn, 1000, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 1000, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=1001 (partial block, unaligned)...", end="")
-        test_shape[DType.float8_e4m3fn, 1001, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 1001, 4096, 4096](ctx)
         print(" PASSED")
 
         # Baseline 256x256 with various M values
         # (skinny BM=128 config is disabled due to pipeline race conditions)
         print("\nFP8 - Testing baseline 256x256:")
         print("  M=128 N=4096...", end="")
-        test_shape[DType.float8_e4m3fn, 128, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 128, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=256 N=4096...", end="")
-        test_shape[DType.float8_e4m3fn, 256, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 256, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=512 N=4096...", end="")
-        test_shape[DType.float8_e4m3fn, 512, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 512, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=4096 N=4096...", end="")
-        test_shape[DType.float8_e4m3fn, 4096, 4096, 4096](ctx)
+        test_shape[.float8_e4m3fn, 4096, 4096, 4096](ctx)
         print(" PASSED")
 
         print("\nBF16 - Testing small M values:")
         print("  M=128 (small)...", end="")
-        test_shape[DType.bfloat16, 128, 4096, 4096](ctx)
+        test_shape[.bfloat16, 128, 4096, 4096](ctx)
         print(" PASSED")
 
         print("  M=192...", end="")
-        test_shape[DType.bfloat16, 192, 4096, 4096](ctx)
+        test_shape[.bfloat16, 192, 4096, 4096](ctx)
         print(" PASSED")
 
         print("\nFP8 - Testing llama3-8B shapes:")
         print("  M=256 N=2304 K=16384...", end="")
-        test_shape[DType.float8_e4m3fn, 256, 2304, 16384](ctx)
+        test_shape[.float8_e4m3fn, 256, 2304, 16384](ctx)
         print(" PASSED")
 
         print("  M=256 N=16384 K=2048...", end="")
-        test_shape[DType.float8_e4m3fn, 256, 16384, 2048](ctx)
+        test_shape[.float8_e4m3fn, 256, 16384, 2048](ctx)
         print(" PASSED")
 
         print("  M=2048 N=2304 K=16384...", end="")
-        test_shape[DType.float8_e4m3fn, 2048, 2304, 16384](ctx)
+        test_shape[.float8_e4m3fn, 2048, 2304, 16384](ctx)
         print(" PASSED")
 
         print("  M=2048 N=16384 K=2048...", end="")
-        test_shape[DType.float8_e4m3fn, 2048, 16384, 2048](ctx)
+        test_shape[.float8_e4m3fn, 2048, 16384, 2048](ctx)
         print(" PASSED")
 
         print("\n" + "=" * 60)

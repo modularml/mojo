@@ -1,0 +1,31 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "sampling",
+    srcs = glob(["**/*.py"]),
+    ignore_unresolved_imports = [
+        # TYPE_CHECKING-only; lib depends on sampling at runtime so no dep possible.
+        # TODO: remove once lib/ is fully dissolved into top-level packages.
+        "max.pipelines.lib.config.PipelineConfig",
+    ],
+    # lib depends on sampling at runtime, so sampling cannot depend on lib —
+    # creating a circular Bazel dep. The TYPE_CHECKING import of PipelineConfig
+    # from lib therefore cannot be resolved by mypy when building this target
+    # in isolation.
+    tags = ["no-mypy"],
+    deps = [
+        "//max/python/max/config",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/profiler",
+        requirement("numpy"),
+        requirement("pydantic"),
+        requirement("typing-extensions"),
+    ],
+)

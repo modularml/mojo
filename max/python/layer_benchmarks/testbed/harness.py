@@ -19,7 +19,8 @@ import dataclasses
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, NamedTuple
 
-import torch
+# torch is a caller-supplied dep, see BUILD.bazel
+import torch  # type: ignore[import-not-found]
 from max.driver import Accelerator, Buffer, DLPackArray
 from max.engine import InferenceSession, Model
 from max.graph import Graph

@@ -14,14 +14,14 @@
 from std.math import ceildiv
 from std.random import seed
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import (
     KVCacheStaticParams,
     PagedKVCacheCollection,
 )
 from layout import *
 from layout._utils import ManagedLayoutTensor, UNKNOWN_VALUE
-from std.memory import memset_zero
+from std.memory import unsafe_memset_zero
 from nn.kv_cache_ragged import kv_cache_store_padded, kv_cache_store_ragged
 from std.testing import assert_almost_equal
 
@@ -125,7 +125,7 @@ def test_kv_cache_store_ragged_basic(ctx: DeviceContext) raises:
 
     var q_device_tensor = q_managed.device_tensor()
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(q_device_tensor)
     def input_fn[
@@ -245,7 +245,7 @@ def test_kv_cache_store_padded_basic(ctx: DeviceContext) raises:
         kv_block_runtime_layout, ctx
     )
     var kv_block_tensor = kv_block_managed.tensor()
-    memset_zero(kv_block_tensor.ptr, kv_block_shape.flattened_length())
+    unsafe_memset_zero(kv_block_tensor.ptr, kv_block_shape.flattened_length())
 
     var paged_lut = PagedLookupTable[page_size].build(
         valid_lengths,
@@ -300,17 +300,16 @@ def test_kv_cache_store_padded_basic(ctx: DeviceContext) raises:
                         batch_idx, token_idx, head_idx, head_dim_idx
                     ] = Float32(expected_linear_idx)
 
-    var valid_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var valid_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
     with valid_lengths_device.map_to_host() as valid_lengths_host:
         for i in range(batch_size):
             valid_lengths_host[i] = UInt32(valid_lengths[i])
 
     var valid_lengths_tensor = LayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE), MutAnyOrigin
+        .uint32,
+        Layout.row_major(UNKNOWN_VALUE),
     ](
-        valid_lengths_device.unsafe_ptr(),
+        valid_lengths_device,
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(
             IndexList[1](batch_size)
         ),
@@ -318,7 +317,7 @@ def test_kv_cache_store_padded_basic(ctx: DeviceContext) raises:
 
     var q_device_tensor = q_managed.device_tensor()
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(q_device_tensor)
     def input_fn[

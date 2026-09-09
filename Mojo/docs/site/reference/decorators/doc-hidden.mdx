@@ -1,0 +1,129 @@
+---
+title: '@doc_hidden'
+description: Hides declarations from generated documentation.
+codeTitle: true
+---
+
+The `@doc_hidden` [decorator](/docs/reference/decorators/) marks a declaration
+as hidden from documentation generation. It allows you to exclude internal
+implementation details, special methods, or other code from appearing in
+published API documentation while keeping them accessible in your source code.
+
+This decorator is particularly useful when you need to maintain internal APIs,
+helper methods, or alternative initializers that exist for implementation
+purposes but shouldn't be part of your library's public documentation.
+
+API members with names starting and ending with double underscores ("dunder"
+members) are always treated as public and included in documentation unless they
+are decorated with `@doc_hidden`.
+
+Mojo treats any other API names starting with a single or double underscore (`_`
+or `__`) as internal and omits them from the generated documentation—no need for
+`@doc_hidden`.
+
+The `@doc_hidden` decorator only affects documentation generation. Hidden
+declarations are fully accessible in source code and can be accessed like any
+other declaration. The same is true of internal declarations that start with
+underscores—they are internal _by convention_, there are no access
+restrictions.
+
+## When to use `@doc_hidden`
+
+Use `@doc_hidden` to hide:
+
+- **Alternative initializers and dunder methods**: Hide alternative `__init__()`
+  methods or other dunder methods that users don't need to call directly. The
+  `@doc_hidden` decorator is especially useful for dunder methods, since they're
+  public by default and you can't hide them by renaming them.
+- **Internal methods**: Hide private or internal helper methods that are
+  implementation details.
+- **Deprecated internals**: Hide old internal APIs that remain for backward
+  compatibility but shouldn't appear in new documentation. See also
+  [`@deprecated`](/docs/reference/decorators/deprecated/).
+
+## Usage
+
+Apply `@doc_hidden` just above any declaration you want to exclude from
+generated documentation:
+
+```mojo
+struct Calculator:
+    """A simple calculator struct demonstrating @doc_hidden."""
+
+    var value: Int
+
+    def __init__(out self, initial_value: Int = 0):
+        """Creates a new Calculator with an initial value.
+
+        Args:
+            initial_value: The starting value for the calculator. Defaults to 0.
+        """
+        self.value = initial_value
+
+    @doc_hidden
+    def __init__(out self):
+        """Internal initializer that should not appear in public documentation.
+
+        This initializer exists for implementation purposes but users should
+        prefer the initializer that takes an initial value.
+        """
+        self.value = 0
+
+    def add(mut self, amount: Int):
+        """Adds a value to the calculator.
+
+        Args:
+            amount: The value to add.
+        """
+        self.value += amount
+```
+
+The no-argument `__init__()` initializer in this example uses `@doc_hidden`. It
+works in code but won't show up in the generated documentation.
+
+## What can be hidden
+
+You can apply `@doc_hidden` to most APIs:
+
+- **Functions and methods**
+
+  Hide any function or method overload, including
+  initializers (`__init__()`) and other special methods:
+
+  ```mojo
+  struct Point:
+      @doc_hidden
+      def __init__(out self):
+          pass
+  ```
+
+  The `@doc_hidden` decorator only hides the overload immediately following the
+  decorator. So the same function can have both
+  documented overloads and hidden overloads.
+
+- **Entire structs**
+
+  Hide helper or internal structs.
+
+  ```mojo
+  @doc_hidden
+  struct InternalHelper:
+      pass
+  ```
+
+- <strong>`comptime` values and members</strong>
+
+  ```mojo
+  @doc_hidden
+  comptime INTERNAL_CONSTANT = 42
+  ```
+
+- **Struct fields**
+
+  ```mojo
+  struct PublicStruct:
+      @doc_hidden
+      var implementation_detail: Int
+
+      pass
+  ```

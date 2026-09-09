@@ -17,7 +17,7 @@ Single fixed config for both prefill and decode: MMA shape 16x16x16
 single-buffered, depth-padded V SMEM.
 """
 
-from std.gpu import block_idx, lane_id
+from max.gpu import block_idx, lane_id
 from std.math.uutils import umod, ufloordiv
 from std.utils import IndexList
 
@@ -32,6 +32,21 @@ comptime RDNA_MMA_K = 16
 struct MHAAttentionConfigRDNA[token_gen: Bool, config: MHAConfig, group: Int](
     ImplicitlyCopyable
 ):
+    """Holds the fixed RDNA Wave32 multi-head attention configuration and index math.
+
+    Parameterizes a single attention kernel shape (16x16x16 WMMA) for both
+    prefill and decode passes, and exposes the head, tile, and offset helpers
+    the kernel uses to map block and lane IDs to Q/K/V rows in global memory.
+
+    Parameters:
+        token_gen: Whether the kernel is running in decode (token-by-token)
+            generation mode versus prefill.
+        config: The base multi-head attention configuration supplying head
+            counts and tile dimensions.
+        group: Group-query attention group size (number of query heads
+            sharing one key/value head).
+    """
+
     comptime shared_kv = False
     comptime full_kv = False
     comptime depth_padded = True

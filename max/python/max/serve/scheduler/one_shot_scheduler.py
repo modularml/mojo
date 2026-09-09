@@ -23,8 +23,8 @@ import queue
 from collections.abc import Callable
 from typing import Generic
 
+from max.pipelines.context import BaseContextType
 from max.pipelines.modeling.types import (
-    BaseContextType,
     Pipeline,
     PipelineInputsType,
     PipelineOutputType,
@@ -33,11 +33,16 @@ from max.pipelines.modeling.types import (
 from max.profiler import traced
 from max.serve.queue import MAXPullQueue, MAXPushQueue
 from max.serve.scheduler.interface import Scheduler
+from max.serve.scheduler.utils import get_cancelled_reqs
 from max.serve.scheduler_result import SchedulerResult
 
 from .base import SchedulerProgress
 
 logger = logging.getLogger("max.serve")
+
+# How many cancelled request ids to remember while waiting for the requests
+# they name to reach the front of the queue.
+_MAX_REMEMBERED_CANCELLATIONS = 1024
 
 
 class OneShotScheduler(
@@ -54,6 +59,14 @@ class OneShotScheduler(
     The scheduler pulls one request at a time from the queue, executes the pipeline,
     and returns the result. This simple approach is suitable for image generation,
     embeddings with small batch sizes, and other non-autoregressive workloads.
+
+    A request cancelled before it is pulled off the queue is dropped without
+    being executed, which matters here more than for a scheduler that
+    interleaves work: one render can hold this scheduler for minutes, so a
+    client that disconnects can have its request sit queued behind that whole
+    render. A request already handed to the pipeline does run to completion,
+    since :meth:`Pipeline.execute` is one blocking call with no cancellation
+    point to check.
 
     Args:
         pipeline: The pipeline to execute requests with
@@ -83,6 +96,33 @@ class OneShotScheduler(
         self.request_queue = request_queue
         self.response_queue = response_queue
         self.cancel_queue = cancel_queue
+        # Cancelled ids, in arrival order, awaiting the request they name.
+        self._cancelled: dict[RequestID, None] = {}
+
+    def _remember_cancellations(self) -> None:
+        """Drains the cancel queue, keeping what it named for later.
+
+        The ids are kept rather than matched against the work of the moment,
+        because a cancellation usually arrives while some other request is
+        mid-render and the request it names is still queued behind it.
+
+        An id that never matches -- a client that disconnects after its own
+        request already finished -- falls out once
+        ``_MAX_REMEMBERED_CANCELLATIONS`` newer ones have arrived. That bounds
+        the set without having to distinguish the two cases, which cannot be
+        told apart from here.
+        """
+        for req_id in get_cancelled_reqs(self.cancel_queue):
+            self._cancelled[req_id] = None
+        while len(self._cancelled) > _MAX_REMEMBERED_CANCELLATIONS:
+            self._cancelled.pop(next(iter(self._cancelled)))
+
+    def _take_cancellation(self, request_id: RequestID) -> bool:
+        """Whether the request was cancelled, forgetting it if it was."""
+        if request_id in self._cancelled:
+            del self._cancelled[request_id]
+            return True
+        return False
 
     @traced
     def _get_next_request(self) -> BaseContextType | None:
@@ -100,16 +140,32 @@ class OneShotScheduler(
         """Execute one scheduling iteration.
 
         Pulls a single request from the queue, executes it through the pipeline,
-        and sends the response back.
+        and sends the response back. Requests cancelled while they waited are
+        answered as cancelled and never reach the pipeline.
 
         Returns:
-            SchedulerProgress.MADE_PROGRESS if a request was processed,
-            SchedulerProgress.NO_PROGRESS if no requests were available.
+            SchedulerProgress.MADE_PROGRESS if a request was processed or
+            dropped as cancelled, SchedulerProgress.NO_PROGRESS if no requests
+            were available.
         """
-        # Get the next request
+        self._remember_cancellations()
+
+        progress = SchedulerProgress.NO_PROGRESS
         context = self._get_next_request()
+        while context is not None and self._take_cancellation(
+            context.request_id
+        ):
+            logger.info(
+                f"OneShotScheduler: Dropping cancelled request {context.request_id}"
+            )
+            self.response_queue.put_nowait(
+                {context.request_id: SchedulerResult.cancelled()}
+            )
+            progress = SchedulerProgress.MADE_PROGRESS
+            context = self._get_next_request()
+
         if context is None:
-            return SchedulerProgress.NO_PROGRESS
+            return progress
 
         logger.info(f"OneShotScheduler: Starting request {context.request_id}")
 

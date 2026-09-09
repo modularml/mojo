@@ -1,0 +1,341 @@
+---
+title: Benchmark MAX on NVIDIA or AMD GPUs
+sidebar_label: Benchmark performance
+description: Learn how to use our benchmarking script to measure the performance of MAX
+is_tutorial: true
+---
+
+import InstallMAX from '../_includes/install-modular.mdx';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Requirements from '@site/src/components/Requirements';
+import { requirementsWithDockerAndGPU } from '../requirements';
+
+In this tutorial, you'll deploy a MAX inference endpoint using our
+[GPU-enabled containers](/container) and evaluate endpoint performance with
+the [`max benchmark`](/cli/benchmark) CLI command. You'll collect key
+metrics such as throughput, latency, and token-processing speed to benchmark
+under production-like workloads and establish a baseline before scaling or
+integrating MAX into your deployments.
+
+:::caution Datacenter GPU required
+
+For the best performance, use an **NVIDIA B200 / H200 / H100** or **AMD
+MI355X / MI325X / MI300X**.
+
+MAX can serve models on a wide range of CPUs and GPUs, but the big LLMs most
+customers want require an amount of memory that's only available on the latest
+datacenter GPUs. Specifically, this tutorial uses the
+[Gemma 3 27B model](https://huggingface.co/google/gemma-3-27b-it), which
+requires at least 60 GiB of memory.
+
+:::
+
+Deploying AI inference workloads requires careful performance optimization,
+balancing factors such as accuracy, latency, and cost. This tutorial benchmarks
+a [Gemma 3](https://huggingface.co/google/gemma-3-27b-it) endpoint using
+the `max benchmark` CLI command, which provides key metrics to evaluate the
+model server's performance, including:
+
+- Request throughput
+- Input and output token throughput
+- Time-to-first-token (TTFT)
+- Time per output token (TPOT)
+
+Our benchmarking script is adapted from vLLM with additional features, such as
+client-side GPU metric collection to ensure consistent and comprehensive
+performance measurement that's tailored to MAX. You can see the [benchmark
+script source
+here](https://github.com/modular/modular/tree/main/max/python/max/benchmark).
+
+An AI coding agent can run this for you with the `benchmark-model` skill, which
+drives load against an endpoint you're already serving and reports the same
+throughput and latency metrics, plus GPU utilization when it runs on the same
+NVIDIA host as the server. See [Modular skills](/coding-assistants#skills) to
+install it.
+
+System requirements:
+
+<Requirements requirementsData={requirementsWithDockerAndGPU}
+url="/packages#system-requirements" />
+
+:::note
+
+This tutorial is intended for production environments using Docker,
+which can be difficult to set up with GPU access on some systems. If you have
+any trouble with Docker, you can instead run benchmarks on an endpoint created
+with the `max serve` command—for instructions, see the [quickstart
+guide](/get-started).
+
+:::
+
+## Get access to the model
+
+From here on, you should be running commands on the system with your GPU.
+If you haven't already, open a shell to that system now.
+
+You'll first need to authorize your Hugging Face account to access the Gemma
+model:
+
+1. Obtain a [Hugging Face access
+token](https://huggingface.co/settings/tokens) and set it as an environment
+variable:
+
+    ```bash
+    export HF_TOKEN="hf_..."
+    ```
+
+2. Agree to the [Gemma 3 license on Hugging
+Face](https://huggingface.co/google/gemma-3-27b-it).
+
+## Start the model endpoint
+
+We provide a pre-configured GPU-enabled Docker container that simplifies the
+process to deploy an endpoint with MAX. For more information, see [MAX
+container](/container).
+
+Use this command to pull the MAX container and start the model endpoint:
+
+<Tabs groupId="docker">
+  <TabItem value="nvidia" label="NVIDIA">
+
+  ```bash
+  docker run --rm --gpus=all \
+    --ipc=host \
+    -p 8000:8000 \
+    --env "HF_TOKEN=${HF_TOKEN}" \
+    -v ~/.cache/huggingface:/root/.cache/huggingface \
+    -v ~/.cache/max_cache:/opt/venv/share/max/.max_cache \
+    modular/max-nvidia-full:latest \
+    --model google/gemma-3-27b-it
+  ```
+
+  </TabItem>
+  <TabItem value="amd" label="AMD">
+
+  ```bash
+  docker run \
+    --device /dev/kfd \
+    --device /dev/dri \
+    --group-add video \
+    --ipc=host \
+    -p 8000:8000 \
+    --env "HF_TOKEN=${HF_TOKEN}" \
+    -v ~/.cache/huggingface:/root/.cache/huggingface \
+    -v ~/.cache/max_cache:/opt/venv/share/max/.max_cache \
+    modular/max-amd:latest \
+    --model google/gemma-3-27b-it
+  ```
+
+  </TabItem>
+</Tabs>
+
+If you want to try a different model, see our
+[supported models](/models/).
+
+The server is running when you see the following terminal
+message (beware Docker prints [JSON logs by default](/container#logs)):
+
+```output
+🚀 Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+## Start benchmarking
+
+Open a second terminal and install the `max[all]` or `max[benchmark]` package
+to get the `max` CLI tool we'll use to perform benchmarking.
+
+### Set up your environment
+
+<InstallMAX folder="max-benchmark"/>
+
+### Benchmark the model
+
+To benchmark MAX with the `sonnet` dataset, use this command:
+
+```bash
+max benchmark \
+  --model google/gemma-3-27b-it \
+  --backend modular \
+  --endpoint /v1/chat/completions \
+  --dataset-name sonnet \
+  --num-prompts 500 \
+  --sonnet-input-len 550 \
+  --output-lengths 256 \
+  --sonnet-prefix-len 200
+```
+
+:::note
+
+By default, this sends requests to `localhost:8000`, but you can override with
+the `--host` and `--port` arguments.
+
+In order to download the dataset, you must have permission to write to your
+Hugging Face cache. You might need to change permissions with `chown`.
+
+:::
+
+When you want to save your own benchmark configurations, you can define them in
+a YAML file and pass it to the `--config-file` option. For example, copy our
+[`gemma-3-27b-sonnet-decode-heavy-prefix200.yaml`](https://github.com/modular/modular/tree/main/max/python/max/benchmark/configs/gemma-3-27b-sonnet-decode-heavy-prefix200.yaml)
+file from GitHub, and you can benchmark the same model with this command:
+
+```sh
+max benchmark --config-file gemma-3-27b-sonnet-decode-heavy-prefix200.yaml
+```
+
+For more information, including other datasets and configuration options, see
+the [`max benchmark` documentation](/cli/benchmark).
+
+### Use your own dataset
+
+The command above uses the `sonnet` dataset from Hugging Face, but you can
+also provide a path to your own dataset.
+
+For example, you can download the
+[ShareGPT](https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered)
+dataset with this command:
+
+```bash
+wget https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json
+```
+
+You can then use the local dataset with the `--dataset-path` argument:
+
+```bash
+max benchmark \
+  ...
+  --dataset-path ShareGPT_V3_unfiltered_cleaned_split.json \
+```
+
+## Interpret the results
+
+Of course, your results depend on your hardware, but the structure of the
+output should look like this:
+
+```output
+============ Serving Benchmark Result ============
+Successful requests:                     50
+Failed requests:                         0
+Benchmark duration (s):                  25.27
+Total input tokens:                      12415
+Total generated tokens:                  11010
+Total nonempty serving response chunks:  11010
+Input request rate (req/s):              inf
+Request throughput (req/s):              1.97837
+------------Client Experience Metrics-------------
+Max Concurrency:                         50
+Mean input token throughput (tok/s):     282.37
+Std input token throughput (tok/s):      304.38
+Median input token throughput (tok/s):   140.81
+P90 input token throughput (tok/s):      9.76
+P95 input token throughput (tok/s):      7.44
+P99 input token throughput (tok/s):      4.94
+Mean output token throughput (tok/s):    27.31
+Std output token throughput (tok/s):     8.08
+Median output token throughput (tok/s):  30.64
+P90 output token throughput (tok/s):     12.84
+P95 output token throughput (tok/s):     9.11
+P99 output token throughput (tok/s):     4.71
+---------------Time to First Token----------------
+Mean TTFT (ms):                          860.54
+Std TTFT (ms):                           228.57
+Median TTFT (ms):                        809.41
+P90 TTFT (ms):                           1214.68
+P95 TTFT (ms):                           1215.34
+P99 TTFT (ms):                           1215.82
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          46.72
+Std TPOT (ms):                           39.77
+Median TPOT (ms):                        32.63
+P90 TPOT (ms):                           78.24
+P95 TPOT (ms):                           111.87
+P99 TPOT (ms):                           216.31
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           31.16
+Std ITL (ms):                            91.79
+Median ITL (ms):                         1.04
+P90 ITL (ms):                            176.93
+P95 ITL (ms):                            272.52
+P99 ITL (ms):                            276.72
+-------------Per-Request E2E Latency--------------
+Mean Request Latency (ms):               7694.01
+Std Request Latency (ms):                6284.40
+Median Request Latency (ms):             5667.19
+P90 Request Latency (ms):                16636.07
+P95 Request Latency (ms):                21380.10
+P99 Request Latency (ms):                25251.18
+```
+
+For more information about each metric, see the
+[MAX benchmarking key metrics](https://github.com/modular/modular/tree/main/max/python/max/benchmark#key-metrics-explained).
+
+### Measure latency with finite request rates
+
+Latency metrics like time-to-first-token (TTFT) and time per output token
+(TPOT) matter most when the server isn't overloaded. An overloaded server will
+queue requests, which results in a massive increase in latency that varies
+depending on the size of the benchmark more than the actual latency of the
+server. Benchmarks with a larger number of prompts result in a deeper queue.
+
+If you'd like to vary the size of the queue, you can adjust the request rate
+with the `--request-rate` flag. This creates a stochastic request load with
+an average rate of `N` requests per second.
+
+### Comparing to alternatives
+
+You can run the benchmarking script using the Modular or vLLM
+backends to compare performance with alternative LLM serving frameworks. Before
+running the benchmark, make sure you set up and launch the corresponding
+inference engine so the script can send requests to it.
+
+:::tip Optional cleanup
+
+When you're done benchmarking, you can clean up the Docker image with the
+following command:
+
+<Tabs groupId="cleanup">
+  <TabItem value="nvidia" label="NVIDIA">
+
+  ```bash
+  docker rmi $(docker images -q modular/max-nvidia-full:latest)
+  ```
+
+  </TabItem>
+  <TabItem value="amd" label="AMD">
+
+  ```bash
+  docker rmi $(docker images -q modular/max-amd:latest)
+  ```
+
+  </TabItem>
+</Tabs>
+
+:::
+
+## Next steps
+
+Now that you have detailed benchmarking results for Gemma 3 on
+MAX using an NVIDIA or AMD GPU, you can explore more advanced scaling
+optimizations:
+
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.
+- [Using LoRA adapters](/serve/lora-adapters): Use LoRA adapters with MAX
+  to serve task-specific, fine-tuned variants of LLMs.
+- [The `benchmark-model` skill](https://github.com/modular/skills/tree/main/benchmark-model):
+  An AI coding agent skill that runs this benchmark workflow for you, then hands
+  off to the `profile-model` skill when the numbers show a bottleneck. See
+  [GPU system profiling](/gpu-system-profiling) for that next step.
+
+To read more about our performance methodology, check our blog post,
+[MAX GPU: State of the Art Throughput on a New GenAI platform](https://www.modular.com/blog/max-gpu-state-of-the-art-throughput-on-a-new-genai-platform).
+
+You can also share your experience on the [Modular
+Forum](https://forum.modular.com/) and in our [Discord
+Community](https://discord.gg/modular).
+
+Read the LLM Inference Handbook to learn more about
+[inference metrics](https://handbook.modular.com/llm-inference-basics/llm-inference-metrics/)
+and
+[performance benchmarks](https://handbook.modular.com/inference-optimization/llm-performance-benchmarks/).

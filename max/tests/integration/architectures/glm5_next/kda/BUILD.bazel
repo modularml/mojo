@@ -1,0 +1,42 @@
+load("//bazel:api.bzl", "modular_py_library", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_library(
+    name = "torch_reference",
+    testonly = True,
+    srcs = ["torch_reference.py"],
+    imports = ["."],
+    deps = [
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_kimi_delta_attention",
+    srcs = ["test_kimi_delta_attention.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "16",
+    },
+    gpu_constraints = ["//:has_gpu"],
+    tags = ["gpu"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":torch_reference",
+        requirement("numpy"),
+        requirement("torch"),
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/glm5_next",
+    ],
+)

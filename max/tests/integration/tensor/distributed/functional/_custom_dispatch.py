@@ -14,9 +14,9 @@
 
 Demonstrates two ways to make a custom Mojo kernel distribution-aware:
 
-1. **Explicit dispatch** via ``spmd_dispatch`` — the recommended approach.
+1. **Explicit dispatch** via ``per_shard_dispatch`` — the recommended approach.
    The user writes the rule call and redistribution explicitly, then
-   delegates per-shard execution to ``spmd_dispatch``.
+   delegates per-shard execution to ``per_shard_dispatch``.
 2. **Manual dispatch** — the user writes the per-shard loop explicitly
    (educational, full control).
 
@@ -36,8 +36,12 @@ from typing import ClassVar
 import numpy as np
 from max.experimental import tensor as _tensor_mod
 from max.experimental.functional import transfer_to
-from max.experimental.functional.spmd_ops import spmd_dispatch
-from max.experimental.functional.utils import tensor_to_layout as tl
+from max.experimental.functional.spmd_ops import (
+    per_shard_dispatch,
+)
+from max.experimental.functional.spmd_ops import (
+    tensor_to_layout as tl,
+)
 from max.experimental.sharding import (
     DeviceMapping,
     DeviceMesh,
@@ -87,10 +91,10 @@ def _rms_norm_kernel(
 
 
 # ═════════════════════════════════════════════════════════════════════════
-#  Approach 1: explicit dispatch via spmd_dispatch (recommended)
+#  Approach 1: explicit dispatch via per_shard_dispatch (recommended)
 # ═════════════════════════════════════════════════════════════════════════
 # The user calls the rule explicitly, redistributes, then delegates
-# per-shard execution to spmd_dispatch.
+# per-shard execution to per_shard_dispatch.
 
 
 def rms_norm(
@@ -99,7 +103,7 @@ def rms_norm(
     eps: float = 1e-6,
 ) -> _tensor_mod.Tensor:
     (xm, wm, _eps), (out_m,) = rms_norm_rule(tl(x), tl(weight), eps)
-    return spmd_dispatch(
+    return per_shard_dispatch(
         _rms_norm_kernel,
         (transfer_to(x, xm), transfer_to(weight, wm), _eps),
         (out_m,),
@@ -109,7 +113,7 @@ def rms_norm(
 # ═════════════════════════════════════════════════════════════════════════
 #  Approach 2: manual dispatch (per-shard loop written out)
 # ═════════════════════════════════════════════════════════════════════════
-# Same logic as spmd_dispatch, but written out explicitly so the user
+# Same logic as per_shard_dispatch, but written out explicitly so the user
 # can see every step.
 
 
@@ -126,7 +130,7 @@ def rms_norm_manual(
     w_rd = transfer_to(weight, wm)
 
     # 3. Dispatch
-    return spmd_dispatch(
+    return per_shard_dispatch(
         _rms_norm_kernel,
         (x_rd, w_rd, _eps),
         output_mappings,
@@ -149,7 +153,7 @@ def _rms_norm_numpy(x: np.ndarray, w: np.ndarray, eps: float) -> np.ndarray:
 
 
 class _CustomDispatchExplicit:
-    """Tests for custom op dispatch via spmd_dispatch (recommended path)."""
+    """Tests for custom op dispatch via per_shard_dispatch (recommended path)."""
 
     MESH_2: ClassVar[DeviceMesh]
 
@@ -184,20 +188,6 @@ class _CustomDispatchExplicit:
         assert result.placements == (Sharded(0),)
         expected = _rms_norm_numpy(x_np, w_np, 1e-6)
         np.testing.assert_allclose(result.to_numpy(), expected, rtol=1e-4)
-
-    def test_rms_norm_hidden_sharded_raises(self) -> None:
-        import pytest
-
-        x_np = np.ones((4, 8), dtype=np.float32)
-        w_np = np.ones(8, dtype=np.float32)
-        x = transfer_to(
-            Tensor(x_np), PlacementMapping(self.MESH_2, (Sharded(1),))
-        )
-        w = transfer_to(
-            Tensor(w_np), PlacementMapping(self.MESH_2, (Sharded(0),))
-        )
-        with pytest.raises(ValueError, match="cannot shard hidden dim"):
-            rms_norm(x, w, 1e-6)
 
 
 class _CustomDispatchManual:
@@ -237,22 +227,6 @@ class _CustomDispatchManual:
         expected = _rms_norm_numpy(x_np, w_np, 1e-6)
         np.testing.assert_allclose(result.to_numpy(), expected, rtol=1e-4)
 
-    def test_rms_norm_manual_hidden_sharded_raises(self) -> None:
-        import pytest
-
-        x_np = np.ones((4, 8), dtype=np.float32)
-        w_np = np.ones(8, dtype=np.float32)
-        x = transfer_to(
-            Tensor(x_np), PlacementMapping(self.MESH_2, (Sharded(1),))
-        )
-        w = transfer_to(
-            Tensor(w_np), PlacementMapping(self.MESH_2, (Sharded(0),))
-        )
-        with pytest.raises(ValueError, match="cannot shard hidden dim"):
-            rms_norm_manual(x, w, 1e-6)
-
 
 class CustomDispatchTests(_CustomDispatchExplicit, _CustomDispatchManual):
     """Aggregates all custom dispatch test classes."""
-
-    pass

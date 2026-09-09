@@ -18,9 +18,13 @@ package(default_visibility = ["//max:consumers"])
 # Wrapper to expose cutlass module from nvidia-cutlass-dsl.
 # The nvidia_cutlass_dsl.pth file adds python_packages/ to sys.path,
 # but Bazel doesn't process .pth files. We use imports to achieve the same.
+# The six `..` segments walk from this package up to the runfiles root, where
+# external repos live; the version must track the nvidia-cutlass-dsl pin in
+# oss/modular/bazel/pip/requirements/pycross_lock_file.bzl, since Bazel
+# silently ignores an `imports` entry that does not resolve.
 modular_py_library(
     name = "cutlass-imports",
-    imports = ["../../../../../external/rules_pycross++lock_file+modular_pip_lock_file_repo/deps/nvidia-cutlass-dsl-libs-base@4.4.1/site-packages/nvidia_cutlass_dsl/python_packages"],
+    imports = ["../../../../../../rules_pycross++lock_file+modular_pip_lock_file_repo/deps/nvidia-cutlass-dsl-libs-base@4.4.2/site-packages/nvidia_cutlass_dsl/python_packages"],
     tags = ["no-pydeps"],  # TODO: Fix and re-enable
     target_compatible_with = [
         "//:nvidia_gpu",

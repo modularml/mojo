@@ -22,6 +22,12 @@ from .graph import (
     KernelLibrary,
     Module,
 )
+from .graph import (
+    default_custom_extensions as default_custom_extensions,
+)
+from .graph import (
+    default_custom_extensions_scope as default_custom_extensions_scope,
+)
 from .type import (
     BufferType,
     DeviceKind,

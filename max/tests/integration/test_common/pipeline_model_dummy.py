@@ -24,7 +24,7 @@ from max.engine import InferenceSession, Model
 from max.graph import DeviceRef, Graph, TensorType
 from max.graph.weights import WeightsFormat
 from max.nn.kv_cache import (
-    KVCacheInputs,
+    KVCacheInputsInterface,
     KVCacheParams,
     KVCacheQuantizationConfig,
 )
@@ -35,10 +35,10 @@ from max.pipelines import (
     ModelOutputs,
     PipelineConfig,
     SupportedArchitecture,
-    TextContext,
     TextTokenizer,
     upper_bounded_default,
 )
+from max.pipelines.context import TextContext, TokenBuffer
 from max.pipelines.lib import PipelineModelWithKVCache
 from max.pipelines.lib.interfaces import (
     ArchConfig,
@@ -47,9 +47,7 @@ from max.pipelines.lib.interfaces import (
 from max.pipelines.modeling.types import (
     PipelineTask,
     PipelineTokenizer,
-    TextGenerationContext,
     TextGenerationRequest,
-    TokenBuffer,
 )
 from transformers import AutoConfig
 
@@ -76,16 +74,10 @@ class DummyPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
             next_token_logits=model_inputs.input1, logits=model_inputs.input1
         )
 
-    @classmethod
-    def calculate_max_seq_len(
-        cls, pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        raise NotImplementedError("calculate_max_seq_len is not implemented")
-
     def prepare_initial_token_inputs(
         self,
-        replica_batches: Sequence[Sequence[TextGenerationContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
+        replica_batches: Sequence[Sequence[TextContext]],
+        kv_cache_inputs: KVCacheInputsInterface[Buffer, Buffer] | None = None,
         return_n_logits: int = 1,
     ) -> DummyModelInputs:
         """Prepares the initial inputs to be passed to `.execute()`.
@@ -104,21 +96,6 @@ class DummyPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
             input3=Buffer.zeros((0, 0), DType.float32),
             input4=Buffer.zeros((0, 0), DType.float32),
             kv_cache_inputs=None,
-        )
-
-    def prepare_next_token_inputs(
-        self,
-        next_tokens: Buffer,
-        prev_model_inputs: ModelInputs,
-    ) -> DummyModelInputs:
-        """Prepares the secondary inputs to be passed to `.execute()`.
-
-        While `prepare_initial_token_inputs` is responsible for managing the initial inputs.
-        This function is responsible for updating the inputs, for each step in a multi-step execution pattern.
-        """
-        return DummyModelInputs(
-            input1=Buffer.zeros((0, 0), DType.float32),
-            kv_cache_inputs=prev_model_inputs.kv_cache_inputs,
         )
 
     @classmethod
@@ -199,7 +176,7 @@ class DummyPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
     ) -> Model:
         """Provided a PipelineConfig and InferenceSession, build and load the model graph."""
         assert hasattr(self, "kv_params")
-        kv_inputs = self.kv_params.get_symbolic_inputs().flatten()
+        kv_inputs = self.kv_params.flattened_kv_inputs()
         with Graph(
             "dummy",
             input_types=[
@@ -215,37 +192,27 @@ class DummyPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
 
 
 class DummyLlamaPipelineModel(DummyPipelineModel):
-    @classmethod
-    def calculate_max_seq_len(
-        cls, pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        assert pipeline_config.model is not None
-        try:
-            return upper_bounded_default(
-                upper_bound=huggingface_config.max_position_embeddings,
-                default=pipeline_config.model.max_length,
-            )
-        except ValueError as e:
-            raise ValueError(
-                "Unable to infer max_length for DummyModel, the provided "
-                f"max_length ({pipeline_config.model.max_length}) exceeds the "
-                f"model's max_position_embeddings "
-                f"({huggingface_config.max_position_embeddings})."
-            ) from e
+    """Llama-flavored dummy; the bounded policy lives on its arch config."""
 
 
 class DummyTextTokenizer(TextTokenizer):
+    init_kwargs: dict[str, Any] = {}
+
     def __init__(
         self, model_path: str, pipeline_config: PipelineConfig, *args, **kwargs
     ) -> None:
+        type(self).init_kwargs = kwargs
         assert pipeline_config.model is not None
         self.max_length = pipeline_config.model.max_length or 100
-        self.delegate = DummyTextTokenizer.Delegate(max_length=self.max_length)
+        # Named _delegate: a public `delegate` attribute signals a HuggingFace
+        # tokenizer, which structured-output setup would hand to a grammar
+        # backend that only accepts real HF tokenizers.
+        self._delegate = DummyTextTokenizer.Delegate(max_length=self.max_length)
 
     @property
-    def eos(self) -> int:
-        """The end of sequence token for this tokenizer."""
-        return -1
+    def eos_token_ids(self) -> set[int]:
+        """Dummy tokenizer has no EOS tokens."""
+        return set()
 
     @property
     def expects_content_wrapping(self) -> bool:
@@ -280,12 +247,12 @@ class DummyTextTokenizer(TextTokenizer):
     async def encode(
         self, prompt: str | Sequence[int], add_special_tokens: bool = True
     ) -> npt.NDArray[np.integer[Any]]:
-        return self.delegate.encode(prompt, add_special_tokens)
+        return self._delegate.encode(prompt, add_special_tokens)
 
     async def decode(
         self, encoded: npt.NDArray[np.integer[Any]], **kwargs
     ) -> str:
-        return self.delegate.decode(encoded, **kwargs)
+        return self._delegate.decode(encoded, **kwargs)
 
     class Delegate:
         def __init__(self, max_length: int) -> None:
@@ -313,11 +280,23 @@ class DummyPixelArchConfig(ArchConfig):
         return self.max_seq_len
 
     @classmethod
+    def calculate_max_seq_len(
+        cls,
+        huggingface_config: AutoConfig,
+        model_config: MAXModelConfig,
+    ) -> int:
+        del huggingface_config, model_config
+        return 123
+
+    @classmethod
     def initialize(
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> DummyPixelArchConfig:
+        del max_seq_len
         return cls()
 
 
@@ -332,8 +311,8 @@ class DummyPixelTokenizer(
         type(self).init_kwargs = kwargs
 
     @property
-    def eos(self) -> int:
-        return 0
+    def eos_token_ids(self) -> set[int]:
+        return set()
 
     @property
     def expects_content_wrapping(self) -> bool:
@@ -362,6 +341,34 @@ class DummyPixelTokenizer(
 
 @dataclass(kw_only=True)
 class DummyLlamaArchConfig(ArchConfigWithAttentionKVCache):
+    DEFAULT_ENCODING = "bfloat16"
+    SUPPORTED_ENCODINGS = {"bfloat16"}
+
+    def get_kv_params(self) -> KVCacheParams:
+        # Mirror DummyLlamaPipelineModel.get_kv_params: memory estimation reads
+        # the params from this config, so an fp8 cache must carry the same
+        # quantization (scale) overhead here or the estimated budget comes up
+        # short of what allocation actually needs per page.
+        if self._kv_params is not None:
+            return self._kv_params
+        cache_dtype = self.cache_dtype or self.dtype
+        kvcache_quant_config = None
+        if cache_dtype in (DType.float8_e4m3fn, DType.float8_e4m3fnuz):
+            kvcache_quant_config = KVCacheQuantizationConfig(
+                scale_dtype=DType.float32,
+                quantization_granularity=self.head_dim // 2,
+            )
+        self._kv_params = self.kv_cache.to_params(
+            dtype=cache_dtype,
+            n_kv_heads=self.num_key_value_heads,
+            head_dim=self.head_dim,
+            num_layers=self.num_layers,
+            devices=self.devices,
+            data_parallel_degree=self.data_parallel_degree,
+            kvcache_quant_config=kvcache_quant_config,
+        )
+        return self._kv_params
+
     @property
     def num_key_value_heads(self) -> int:
         """Number of key-value heads to use for the KV cache."""
@@ -391,6 +398,25 @@ class DummyLlamaArchConfig(ArchConfigWithAttentionKVCache):
         """The maximum sequence length that can be processed by the model."""
         assert self.huggingface_config is not None
         return self.huggingface_config.max_position_embeddings
+
+    @classmethod
+    def calculate_max_seq_len(
+        cls,
+        huggingface_config: AutoConfig,
+        model_config: MAXModelConfig,
+    ) -> int:
+        return upper_bounded_default(
+            upper_bound=huggingface_config.max_position_embeddings,
+            default=model_config.max_length,
+        )
+
+
+# Wire the ArchConfig onto the pipeline models (mirrors real arches, which set
+# `model_config_cls` as a ClassVar). Assigned here rather than in the class body
+# because `DummyLlamaArchConfig` references the model classes and so must be
+# defined after them. Generic consumers (e.g. `_resolved_encoding`) read
+# `DEFAULT_ENCODING` through this pointer.
+DummyPipelineModel.model_config_cls = DummyLlamaArchConfig
 
 
 DUMMY_LLAMA_ARCH = SupportedArchitecture(
@@ -474,7 +500,6 @@ DUMMY_GEMMA_ARCH = SupportedArchitecture(
     tokenizer=DummyTextTokenizer,
     context_type=TextContext,
     default_weights_format=WeightsFormat.safetensors,
-    rope_type="normal",
     multi_gpu_supported=False,
     config=DummyLlamaArchConfig,
 )

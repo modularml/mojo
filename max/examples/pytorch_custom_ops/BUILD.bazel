@@ -79,7 +79,6 @@ mojo_library(
     srcs = [":kernel_sources"],
     validate_missing_docs = False,
     deps = [
-        "//max:compiler",
         "//max:extensibility",
         "//max:layout",
         "@mojo//:std",

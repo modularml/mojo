@@ -16,7 +16,7 @@ from std.random import rand
 from std.sys.info import simd_width_of
 
 from std.itertools import product
-from layout import Layout, LayoutTensor, RuntimeLayout
+from layout import Coord, Layout, LayoutTensor, RuntimeLayout
 from layout import lt_to_tt
 from nn.conv.conv import (
     ConvDirectNHWC,
@@ -59,16 +59,16 @@ def test[
 
     var conv_shape = ConvShape[1](
         n=N,
-        input_dims=Index(W),
-        output_dims=Index(WO),
-        filter_dims=Index(S),
+        input_dims=Coord(Index(W)),
+        output_dims=Coord(Index(WO)),
+        filter_dims=Coord(Index(S)),
         c=C,
         f=F,
-        stride=Index(stride),
-        dilation=Index(dilation),
-        pad_d=Index(0, 0),
-        pad_h=Index(0, 0),
-        pad_w=pad_w,
+        stride=Coord(Index(stride)),
+        dilation=Coord(Index(dilation)),
+        pad_d=Coord(Index(0, 0)),
+        pad_h=Coord(Index(0, 0)),
+        pad_w=Coord(pad_w),
         num_groups=num_groups,
     )
 
@@ -85,9 +85,6 @@ def test[
     # Find the tile size used in packing.
     comptime micro_kernel_height = get_direct_conv_micro_kernel_height()
     comptime micro_kernel_width = get_direct_conv_micro_kernel_width()
-
-    var micro_kernel_f_size = get_direct_conv_micro_kernel_width() * simd_size
-    var rounded_F = ceildiv(F, micro_kernel_f_size) * micro_kernel_f_size
 
     # Buffers for direct conv.
     comptime layout_3d = Layout.row_major[3]()

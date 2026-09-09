@@ -104,21 +104,7 @@ class ResnetBlock2D(Module[[Tensor, Tensor | None], Tensor]):
         )
 
         self.conv_shortcut: Conv2d | None = None
-        if self.use_conv_shortcut:
-            self.conv_shortcut = Conv2d(
-                kernel_size=1,
-                in_channels=in_channels,
-                out_channels=out_channels,
-                dtype=dtype,
-                stride=1,
-                padding=0,
-                dilation=1,
-                num_groups=1,
-                has_bias=conv_shortcut_bias,
-                device=device,
-                permute=True,
-            )
-        elif in_channels != out_channels:
+        if self.use_conv_shortcut or in_channels != out_channels:
             self.conv_shortcut = Conv2d(
                 kernel_size=1,
                 in_channels=in_channels,

@@ -1,0 +1,1 @@
+CopyToClipboard2@SnippetLinkSearch[,"def KGEN_FuncOp"][[1]];

@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Provides a thin wrapper around `randn` to fill a `TileTensor` with standard-normal random values."""
 
 from std.random import randn
 

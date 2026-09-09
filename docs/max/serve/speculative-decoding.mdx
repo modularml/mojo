@@ -5,17 +5,16 @@ description: Use speculative decoding to accelerate LLM inference
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import MDXListing from '@site/src/components/Listing/MDXListing';
-import InstallOpenAI from '../../_includes/install-openai.mdx';
+import InstallOpenAI from '../_includes/install-openai.mdx';
 
 Speculative decoding accelerates LLM token generation without changing the
-model's outputs. A smaller, faster draft step proposes several candidate
-tokens, and the larger target model verifies them in one forward pass. MAX
-accepts the prefix the target agrees with and resamples at the first
-disagreement, so quality matches running the target alone.
+model's outputs. A smaller, faster draft step proposes several candidate tokens,
+and the larger target model verifies them in one forward pass. MAX accepts the
+prefix the target agrees with and resamples at the first disagreement, so
+quality matches running the target alone.
 
-The speedup comes from batching verification across K candidate positions.
-When the target accepts all K drafts, you get K+1 tokens per step instead
+The speedup comes from batching verification across `K` candidate positions.
+When the target accepts all `K` drafts, you get `K+1` tokens per step instead
 of one, converting a memory-bandwidth-bound workload into one that better
 uses available compute.
 
@@ -30,21 +29,20 @@ implementation matures.
 
 We recommend running speculative decoding on an accelerator. For more
 information, see [System
-requirements](/max/packages#system-requirements).
+requirements](/packages#system-requirements).
 
 :::
 
 ## Supported methods
 
-MAX supports common speculative-decoding methods like EAGLE, EAGLE3, and
-MTP. For experimenting with arbitrary target/draft pairs, use
-`standalone`.
+MAX supports common speculative-decoding methods like EAGLE, EAGLE3,
+MTP, and DFlash.
 
-| Method             | Draft source                                                           | Supported targets and hardware                                    |
-|--------------------|------------------------------------------------------------------------|-------------------------------------------------------------------|
-| `eagle` / `eagle3` | A trained EAGLE draft that shares the target's embedding and `lm_head` | Llama 3 (1 GPU), Kimi K2.5 (8× B200).                             |
-| `mtp`              | A native multi-token prediction head inside the target checkpoint      | DeepSeek V3 and derivatives (8× B200).                            |
-| `standalone`       | A separate small model you pass with `--draft-model-path`              | Any target with a same-family draft, on any GPU the pair fits on. |
+| Method   | Draft source                                                                     | Supported targets and hardware                                                                |
+|----------|----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| `eagle`  | A trained EAGLE or EAGLE3 draft that shares the target's embedding and `lm_head` | Llama 3 (1 GPU), Kimi K2.5 and K2.6 (8× B200).                                                |
+| `mtp`    | A native multi-token prediction head inside the target checkpoint                | DeepSeek V3 and derivatives (8× B200), GLM-5.2 (8× B200), Gemma 4 (1 GPU), Inkling (8× B200). |
+| `dflash` | A trained DFlash draft (a multi-layer block transformer) paired with the target  | Llama 3 (1 GPU), Kimi K2.5 (8× B200).                                                         |
 
 ## Serve with speculative decoding
 
@@ -74,7 +72,7 @@ max serve \
 We use `atomicapple0/EAGLE-LLaMA3.1-Instruct-8B` because it ships
 safetensors weights. For the full list of weight formats MAX supports,
 see
-[`WeightsFormat`](/max/api/python/generated/max.graph.weights.WeightsFormat).
+[`WeightsFormat`](/api/python/generated/max.graph.weights.WeightsFormat).
 
 Once the server prints `Server ready on http://0.0.0.0:8000`, send a
 chat-completion request:
@@ -93,7 +91,7 @@ response = client.chat.completions.create(
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "What are the benefits of speculative decoding?"},
     ],
-    max_tokens=500,
+    max_completion_tokens=500,
 )
 
 print(response.choices[0].message.content)
@@ -131,45 +129,7 @@ response = client.chat.completions.create(
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "What are the benefits of speculative decoding?"},
     ],
-    max_tokens=500,
-)
-
-print(response.choices[0].message.content)
-```
-
-  </TabItem>
-  <TabItem value="standalone" label="Standalone">
-
-Serve `Llama 3.1 8B Instruct` with `Llama 3.2 1B Instruct` as the
-draft:
-
-```sh
-max serve \
-  --model meta-llama/Llama-3.1-8B-Instruct \
-  --speculative-method standalone \
-  --draft-model-path meta-llama/Llama-3.2-1B-Instruct \
-  --num-speculative-tokens 2 \
-  --devices gpu
-```
-
-Once the server prints `Server ready on http://0.0.0.0:8000`, send a
-chat-completion request:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="http://localhost:8000/v1",
-    api_key="EMPTY",
-)
-
-response = client.chat.completions.create(
-    model="meta-llama/Llama-3.1-8B-Instruct",
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "What are the benefits of speculative decoding?"},
-    ],
-    max_tokens=500,
+    max_completion_tokens=500,
 )
 
 print(response.choices[0].message.content)
@@ -178,14 +138,13 @@ print(response.choices[0].message.content)
   </TabItem>
 </Tabs>
 
-## Read the startup architecture name
+## Interpret the startup architecture name
 
-For EAGLE and MTP, MAX reports a unified architecture at startup, for
-example `UnifiedEagleLlama3ForCausalLM` or
-`UnifiedMTPDeepseekV3ForCausalLM`. That's expected: MAX compiles the
-target, draft, and verifier into a single graph. `standalone` runs the
-target and draft as separate models and reports the target's normal
-architecture.
+When you serve a model with speculative decoding, MAX shows a combined
+architecture name in the startup banner. It differs from the target architecture
+name because MAX resolves the target and its speculative mechanism into a
+dedicated speculative decoding architecture. For example, serving
+`deepseek-ai/DeepSeek-V3` with MTP appears as `UnifiedMTPDeepseekV3ForCausalLM`.
 
 ## Monitor acceptance rates
 
@@ -212,27 +171,22 @@ better-matched draft checkpoint.
 
 ## Tune speculative decoding
 
-The following flags control how MAX drafts tokens and how verification
-decides to accept them. The first three map to fields on
-[`SpeculativeConfig`](/max/api/python/generated/max.pipelines.SpeculativeConfig)
-when you configure a pipeline programmatically. The last two live on
-the draft model's config and on `KVCacheConfig`.
+The following flags control how MAX drafts tokens and how verification decides
+to accept them. The **Config** column shows the config class each flag maps to
+when you configure a pipeline programmatically.
 
-- `--num-speculative-tokens`: number of tokens the draft proposes per
-  step. Default is `2`. Larger values raise peak speedup but hurt
-  acceptance at later positions.
-- `--rejection-sampling-strategy`: how the target verifies drafted
-  tokens. Accepts `greedy`, `residual`, `typical-acceptance`, or
-  `logit-comparison`. When unset, EAGLE and MTP default to
-  `typical-acceptance`; `standalone` defaults to `residual`.
-- `--synthetic-acceptance-rate`: benchmarking-only knob that accepts
-  each drafted token with a calibrated probability, ignoring real logits.
-  Use this to model hypothetical speedups without changing the draft.
-- `--draft-devices`: device list for the draft model. Useful when you
-  want the draft and target on different GPUs.
-- `--device-memory-utilization`: fraction of device memory MAX may use.
-  Speculative decoding allocates KV cache for both the target and the
-  draft, so leave more headroom than you would for single-model serving.
+| Flag                                    | Description                                                                                                                                                                                                                                                                                                                                                                           | Config                                                                         |
+|-----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| `--num-speculative-tokens`              | Number of tokens the draft proposes per step. Defaults to `2` for EAGLE and MTP. For DFlash-style block drafters, MAX reads the value from the draft checkpoint's trained width. If the checkpoint doesn't declare a width, you must set this flag explicitly. Larger values raise peak speedup but hurt acceptance at later positions.                                               | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--rejection-sampling-strategy`         | How the target verifies drafted tokens. Accepts `greedy`, `residual`, `typical-acceptance`, or `logit-comparison`. When unset, EAGLE and MTP default to `typical-acceptance`.                                                                                                                                                                                                         | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--synthetic-acceptance-rate`           | Benchmarking-only knob that accepts each drafted token with a calibrated probability, ignoring real logits. Use this to model hypothetical speedups without changing the draft.                                                                                                                                                                                                       | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--draft-proposal`                      | How the draft model proposes tokens. `argmax` (default) selects tokens deterministically. `sampled` draws from the draft model's distribution and preserves that distribution for verification. `sampled` requires a GPU, a static vocabulary size, and a serving architecture that supports it.                                                                                      | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--use-relaxed-acceptance-for-thinking` | Whether to accept a draft token inside a `<think>...</think>` block when it matches any of the target's top candidates within a probability threshold, instead of requiring an exact match. Outside the thinking span, the strict acceptance rule still applies. Requires `--draft-proposal argmax` and a serving architecture that supports relaxed acceptance. Defaults to `false`. | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--relaxed-topk`                        | The number of top candidates from the target distribution to consider when relaxed acceptance is active. Ignored when relaxed acceptance is off. Defaults to `10`.                                                                                                                                                                                                                    | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--relaxed-delta`                       | The probability gap below the top candidate within which candidates remain eligible for relaxed acceptance. Ignored when relaxed acceptance is off. Defaults to `0.6`.                                                                                                                                                                                                                | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--use-greedy-acceptance`               | Whether to use greedy (argmax) draft acceptance instead of the stochastic sampler, which lets MAX capture the fused speculative graph with CUDA graphs. Valid only for greedy serving (temperature 0, top-k 1), and incompatible with relaxed and synthetic acceptance. Requires a serving architecture that supports it. Defaults to `false`.                                        | [`SpeculativeConfig`](/api/python/generated/max.pipelines.SpeculativeConfig)   |
+| `--draft-devices`                       | Device list for the draft model. Useful when you want the draft and target on different GPUs.                                                                                                                                                                                                                                                                                         | Draft model config                                                             |
+| `--device-memory-utilization`           | Fraction of device memory MAX may use. Speculative decoding allocates KV cache for both the target and the draft, so leave more headroom than you would for single-model serving.                                                                                                                                                                                                     | [`KVCacheConfig`](/api/python/generated/max.pipelines.kv_cache.KVCacheConfig/) |
 
 For EAGLE and MTP, MAX auto-enables the overlap scheduler and device
 graph capture. Both reduce per-step latency and need no additional
@@ -240,19 +194,20 @@ flags.
 
 ## Compatibility and limits
 
-These restrictions apply when speculative decoding is enabled:
+When using speculative decoding:
 
-- `--max-num-steps` must be `1`. Speculative-decoding pipelines manage
-  multi-step KV allocation internally, and any other value raises a
-  configuration error.
-- `--enable-echo` isn't supported alongside speculative decoding.
-- Structured output (JSON-schema-constrained generation) isn't supported
-  alongside speculative decoding.
-- The target and draft must share the same `max_length`.
-- Repetition, frequency, and presence penalties are disabled when a
-  separate draft model is configured (`--draft-model-path`). That covers
-  EAGLE and `standalone`. MTP keeps the draft head inside the target
-  checkpoint, so it supports penalties.
+- The `--enable-echo` flag isn't supported.
+- The [`--max-length`](/cli/serve/#--max-length-max_length) and
+  [`--draft-max-length`](/cli/serve/#--draft-max-length-draft_max_length)
+  are both capped at the draft model's maximum supported length. MAX
+  clamps both to that limit if either exceeds it.
+- [Structured output](/serve/structured-output) is supported. MAX
+  applies the constraint bitmask to each speculated position during
+  verification. This feature requires a GPU deployment.
+- Repetition, frequency, and presence penalties aren't supported when
+  using a separate draft model (`--draft-model-path`), including EAGLE.
+  Repetition, frequency, and presence penalties are supported when using
+  MTP.
 
 ## Next steps
 
@@ -260,10 +215,11 @@ You can combine speculative decoding with prefix caching and with
 disaggregated inference. The following topics go deeper on performance
 and deployment:
 
-export const docs = [
-  '../../serve/prefix-caching.mdx',
-  '../../deploy/benchmark.mdx',
-  '../../deploy/local-to-cloud.mdx',
-];
-
-<MDXListing mdxList={docs} />
+- [Prefix caching with PagedAttention](/serve/prefix-caching): Use prefix
+  caching and PagedAttention when serving a model with the MAX CLI.
+- [Benchmark MAX on NVIDIA or AMD GPUs](/serve/benchmark): Learn how to
+  use our benchmarking script to measure the performance of MAX.
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.
+- [Speculative decoding](https://handbook.modular.com/inference-optimization/speculative-decoding/):
+  Learn more about it in the LLM Inference Handbook.

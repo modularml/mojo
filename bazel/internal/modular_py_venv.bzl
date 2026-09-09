@@ -21,7 +21,7 @@ def _collect_venv_files_impl(ctx):
 
         for file in dep[DefaultInfo].default_runfiles.files.to_list():
             # Only collect binaries, shared libraries (including versioned .so.*), and Mojo precompiled files.
-            if not file.extension in ("", "so", "dylib", "mojoc", "mojopkg") or ".so." in file.basename:
+            if not file.extension in ("", "so", "dylib", "mojoc") or ".so." in file.basename:
                 continue
 
             # Directories only matter if they have files in them.

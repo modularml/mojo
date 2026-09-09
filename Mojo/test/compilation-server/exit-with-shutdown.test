@@ -1,0 +1,12 @@
+// RUN: compilation-server -test < %s | FileCheck %s
+{"jsonrpc":"2.0","id":0,"method":"initialize"}
+//      CHECK:  "id": 0,
+// CHECK-NEXT:  "jsonrpc": "2.0",
+// CHECK-NEXT:  "result": "hello"
+// -----
+{"jsonrpc":"2.0","id":1,"method":"shutdown"}
+//      CHECK:  "id": 1,
+// CHECK-NEXT:  "jsonrpc": "2.0",
+// CHECK-NEXT:  "result": null
+// -----
+{"jsonrpc":"2.0","method":"exit"}

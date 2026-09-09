@@ -1,0 +1,235 @@
+---
+title: Materializing compile-time values at run time
+sidebar_label: Materialization
+description: How to use compile-time values at run time.
+---
+
+Mojo's compile-time metaprogramming makes it easy to make calculations at
+compile time for later use. The process of making a *compile-time value*
+available at run time is called *materialization*. For types that can be
+trivially copied, this isn't an issue. The compiler can simply insert the value
+into the compiled program wherever it's needed.
+
+```mojo
+comptime threshold: Int = some_calculation()  # calculate at compile time
+
+for i in range(1000):
+    my_function(i, threshold)  # use value at runtime
+```
+
+However, Mojo also allows you to create instances of much more complex types at
+compile-time: types that dynamically allocate memory, like `List` and `Dict`.
+Re-using these values at run time presents some questions, like where the memory
+is allocated, who owns the values, and when the values are destroyed.
+
+This page describes when Mojo materializes values, and presents some techniques
+for avoiding unnecessary materialization of complex values.
+
+## Implicit and explicit materialization
+
+When you use a `comptime` value at run time, you're explicitly or implicitly
+copying the value into a run-time variable:
+
+```mojo
+comptime comptime_value = 1000
+var runtime_value = comptime_value
+```
+
+This process of moving a compile-time value to a run-time variable is called
+*materialization*. If the value is implicitly copyable, like an `Int` or `Bool`,
+Mojo treats it as *implicitly materializable* as well.
+
+But types that **aren't** implicitly copyable present other challenges. Consider
+the following code:
+
+```mojo
+def lookup_fn(count: Int):
+    comptime list_of_values: List[Int] = [1, 3, 5, 7]
+
+    for i in range(count):
+        # Some computation, doesn't matter what it is.
+        var idx = dynamic_function(i)
+
+        # Look up another value
+        var lookup = list_of_values[idx]
+
+        # Use the value
+        process(lookup)
+```
+
+This looks reasonable, but compiling it produces an error on this line:
+
+```mojo
+var lookup = list_of_values[idx]
+```
+
+```output
+cannot materialize comptime value of type 'List[Int]' to runtime
+because it is not 'ImplicitlyCopyable'
+```
+
+Just like Mojo forces you to explicitly copy a value that's expensive to
+copy, it forces you to explicitly materialize values that are expensive to
+materialize, by calling the
+[`materialize()`](/docs/std/builtin/value/materialize/) function.
+
+Here's the code above with explicit materialization added:
+
+```mojo
+def lookup_fn(count: Int):
+    comptime list_of_values: List[Int] = [1, 3, 5, 7]
+
+    for i in range(count):
+        var idx = dynamic_function(i)
+
+        # This is the problem
+        var tmp: List[Int] = materialize[list_of_values]()
+        var lookup = tmp[idx]
+        # tmp is destroyed here
+
+        process(lookup)
+```
+
+This code materializes the list of values *inside* of the loop, which includes
+dynamically allocating heap memory and storing the four elements into that
+memory. Because the last use of `tmp` is on the next line, the memory then gets
+deallocated before the loop iterates. This creates and destroys the list on
+every iteration of the loop, which is clearly wasteful.
+
+A more efficient version would materialize the list *outside* of the loop:
+
+```mojo
+def lookup_fn(count: Int):
+    comptime list_of_values: List[Int] = [1, 3, 5, 7]
+
+    var list = materialize[list_of_values]()
+    for i in range(count):
+        var idx = dynamic_function(i)
+
+        var lookup = list[idx]
+
+        process(lookup)
+    # materialized list is destroyed here
+```
+
+This is why Mojo requires you to explicitly materialize non-trivial values; it
+puts you in control of when your program allocates resources.
+
+## Global lookup tables
+
+Mojo doesn't currently have a general-purpose mechanism for creating global
+static data. This is a problem for some performance-sensitive code where you
+want to use a static lookup table. Even if you declare the table as a `comptime`
+value, you need to materialize it each time you want to use the data.
+
+The [`global_constant()`](/docs/std/builtin/globals/global_constant/) function
+provides a solution for storing a compile-time value into static global storage,
+so you can access it without repeatedly materializing the value. However, this
+currently only works for self-contained values which don't include pointers to
+other locations in memory. That rules out using collection types like `List` and
+`Dict`.
+
+The easiest way to use `global_constant()` is with
+[`Array`](/docs/std/collections/array/Array/), which
+allocates a statically sized array of elements on the stack. The following code
+uses `global_constant()` to create a static lookup table.
+
+```mojo
+from std.builtin.globals import global_constant
+
+def use_lookup(idx: Int) -> Int64:
+    comptime numbers: Array[Int64, 10] = [
+        1, 3, 14, 34, 63, 101, 148, 204, 269, 343
+    ]
+    ref lookup_table = global_constant[numbers]()
+    if idx >= len(lookup_table):
+          return 0
+    return lookup_table[idx]
+
+def main():
+    print(use_lookup(3))
+
+```
+
+At compile time, Mojo allocates the `numbers` array, and then the
+`global_constant()` function copies it into static constant memory, where the
+code can reference it without requiring any dynamic logic to create or populate
+the array. At run time, the `lookup_table` identifier receives an immutable
+reference to this memory.
+
+Note the use of `ref lookup_table` to bind the reference returned by
+`global_constant()`. Using `var lookup_table` would cause a compiler error,
+because it would trigger a copy, and `Array` doesn't support implicit
+copying.
+
+## Using the `comptime` keyword
+
+Another approach that you can use to avoid materializing a complex value is to
+use the `comptime` keyword to control when Mojo evaluates an expression.
+Assigning an expression to a `comptime` value causes Mojo to evaluate the
+expression at compile time.
+
+For example, if you want to force a function to run at compile time:
+
+```mojo
+comptime tmp = calculate_something()  # executed at compile time
+var y = x * tmp  # executed at run time
+```
+
+If you're only creating a `comptime` value for a single use, you can use a
+`comptime` sub-expression instead:
+
+```mojo
+var y = x * comptime (calculate_something())
+```
+
+This works exactly like the previous example, without creating a named temporary
+value. The `comptime` keyword here tells Mojo to evaluate the expression inside
+the parentheses (`calculate_something()`) at compile time.
+
+For example, you can use a `comptime` sub-expression when working with the
+`Layout` type, which determines how you store and retrieve data in a
+`LayoutTensor`. Materializing a `Layout` requires dynamic allocation, which
+isn't supported on GPUs. So calling this code on a GPU produces an error:
+
+```mojo
+comptime layout = Layout.row_major(16, 8)
+var x = layout.size() // WARP_SIZE  # Can't implicitly materialize layout
+```
+
+A `comptime` sub-expression fixes this issue:
+
+```mojo
+comptime layout = Layout.row_major(16, 8)
+var x = comptime (layout.size()) // WARP_SIZE
+```
+
+Now, the expression `layout.size()` gets evaluated at compile time, so there's
+no need to materialize the layout.
+
+You could also achieve the same effect using a named `comptime` value.
+
+```mojo
+comptime layout = Layout.row_major(16, 8)
+comptime layout_size = layout.size()
+var x = layout_size // WARP_SIZE
+```
+
+The `comptime` sub-expression is just a more compact way to express the same
+thing.
+
+## Materializing literals
+
+Literal values, like string literals and numeric literals are also materialized
+to their run-time equivalents, but this is mostly handled automatically by the
+compiler:
+
+```mojo
+comptime str_literal = "Hello"  # at compile time, a StringLiteral
+var str = str_literal  # at run time, a String.
+var static_str: StaticString = str_literal  # or a StaticString
+```
+
+Both `String` and `StaticString` can be implicitly created from a
+`StringLiteral`, but without a type annotation, Mojo defaults to materializing
+`StringLiteral` as a `String`.

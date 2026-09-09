@@ -11,48 +11,36 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Placement rules for pooling ops (NHWC layout).
-
-- ``pool_rule`` — nonlinear (max_pool2d)
-- ``linear_pool_rule`` — linear (avg_pool2d)
-"""
+"""Placement rules for ``max_pool`` and ``avg_pool``."""
 
 from __future__ import annotations
 
-from max.experimental.sharding.mappings import PlacementMapping
-from max.experimental.sharding.placements import Partial, Replicated, Sharded
+from typing import Any
+
+from max.experimental.sharding.placements import Sharded
 from max.experimental.sharding.types import TensorLayout
 
-from ._common import RuleSignature
-
-_SPATIAL_AXES = {1, 2}
-
-
-def _pool_impl(
-    input: TensorLayout, *extra: object, linear: bool
-) -> RuleSignature:
-    placements = input.mapping.to_placements()
-    mesh = input.mapping.mesh
-    if not linear:
-        suggested_p = tuple(
-            Replicated() if isinstance(p, Partial) else p for p in placements
-        )
-    else:
-        suggested_p = placements
-    for p in suggested_p:
-        if isinstance(p, Sharded) and p.axis in _SPATIAL_AXES:
-            raise ValueError(
-                f"pool: cannot pool along spatially-sharded axis {p.axis}."
-            )
-    m = PlacementMapping(mesh, suggested_p)
-    return (m, *extra), (m,)
+from ..action import ActionSet, AxisAssignment
+from ..cost import P, R, build_action_set
 
 
-def pool_rule(input: TensorLayout, *extra: object) -> RuleSignature:
-    """Nonlinear pooling: resolves Partials."""
-    return _pool_impl(input, *extra, linear=False)
+# NHWC: N=0, H=1, W=2, C=3. ``*extra`` absorbs kernel/stride/etc.
+def pool_rule(input: TensorLayout, *extra: Any) -> ActionSet:
+    """Strategies for pooling (max/avg): shard on N or C axis (NHWC)."""
+    rows = [
+        AxisAssignment((R,), R),
+        AxisAssignment((Sharded(0),), Sharded(0)),
+        AxisAssignment((Sharded(3),), Sharded(3)),
+    ]
+    return build_action_set(rows, layouts=(input,), extras=extra)
 
 
-def linear_pool_rule(input: TensorLayout, *extra: object) -> RuleSignature:
-    """Linear pooling (avg_pool): Partials pass through."""
-    return _pool_impl(input, *extra, linear=True)
+def linear_pool_rule(input: TensorLayout, *extra: Any) -> ActionSet:
+    """Strategies for linear pooling (avg_pool2d): adds Partial passthrough."""
+    rows = [
+        AxisAssignment((R,), R),
+        AxisAssignment((Sharded(0),), Sharded(0)),
+        AxisAssignment((Sharded(3),), Sharded(3)),
+        AxisAssignment((P,), P),
+    ]
+    return build_action_set(rows, layouts=(input,), extras=extra)

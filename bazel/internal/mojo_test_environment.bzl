@@ -57,7 +57,7 @@ def _extract_linker_variables(ctx):
 def _mojo_test_environment_implementation(ctx):
     mojo_toolchain = ctx.toolchains["@rules_mojo//:toolchain_type"].mojo_toolchain_info
 
-    _, transitive_mojodeps = collect_mojoinfo(ctx.attr.data)
+    _, transitive_mojodeps, data_ccdeps = collect_mojoinfo(ctx.attr.data)
     if not transitive_mojodeps:
         return [
             CcInfo(),  # Requirement of py_test
@@ -107,6 +107,28 @@ def _mojo_test_environment_implementation(ctx):
                 shared_libs.append(path)
                 shared_libs.append("-Xlinker,-rpath,-Xlinker,{}".format(paths.dirname(path)))
 
+    # Cc libraries reached through the Mojo dependency graph rather than the
+    # toolchain: CompilerRT comes in via `std`, and the AsyncRT bindings via
+    # `max`, so they arrive as ccdeps of the mojo deps that need them.
+    for linker_input in data_ccdeps.linking_context.linker_inputs.to_list():
+        for library in linker_input.libraries:
+            if not library.dynamic_library:
+                continue
+
+            transitive_files.append(depset([library.dynamic_library]))
+
+            # Matched on the library rather than the target name, because these
+            # arrive through a merged CcInfo that no longer carries labels.
+            if "KGENCompilerRTShared" in library.dynamic_library.basename:
+                compilerrt = library.dynamic_library
+
+            path = library.dynamic_library.path
+            if ctx.attr.short_path:
+                path = library.dynamic_library.short_path
+
+            shared_libs.append(path)
+            shared_libs.append("-Xlinker,-rpath,-Xlinker,{}".format(paths.dirname(path)))
+
     if not compilerrt:
         fail("CompilerRT library not found")
 
@@ -137,7 +159,14 @@ def _mojo_test_environment_implementation(ctx):
             ).merge_all(transitive_runfiles),
         ),
         platform_common.TemplateVariableInfo({
-            "COMPILER_RT_PATH": compilerrt.short_path if ctx.attr.short_path else compilerrt.path,
+            # CompilerRT is no longer an implicit dep, so it is only present for
+            # targets that actually reach it. Always define the variable --
+            # consumers expand $(COMPILER_RT_PATH) unconditionally, and an
+            # undefined template variable is an error rather than an empty
+            # string.
+            "COMPILER_RT_PATH": (
+                (compilerrt.short_path if ctx.attr.short_path else compilerrt.path) if compilerrt else ""
+            ),
             "COMPUTED_IMPORT_PATH": ",".join(sorted(sets.to_list(import_paths))),
             "COMPUTED_LIBS": ",".join(sorted(shared_libs)),
             "LLD_PATH": mojo_toolchain.lld.short_path if ctx.attr.short_path else mojo_toolchain.lld.path,

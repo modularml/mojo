@@ -31,7 +31,7 @@ back to the caller's im2col / cuDNN path. Acceptance rules:
   - `stride[0] == stride[1] == stride[2]` and stride ∈ {1, 2}.
   - `symmetric_padding[i] ∈ {0, 1, 2}` for each axis, with the
     further constraint that `pad_h == pad_w` (the kernel takes a
-    single (stride, pad) tuple) and `pad_d` may differ — but for now
+    single (stride, pad) tuple) and `pad_d` may differ, but for now
     we require all three pads equal so the static-launch enumeration
     stays bounded.
 
@@ -48,8 +48,8 @@ When accepted, the dispatcher:
 Mirrors the structure of `nn.conv.gpu.amd.dispatch`.
 """
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.math.uutils import udivmod
 from std.sys import simd_width_of
@@ -74,35 +74,41 @@ def _transpose_qrscf_to_fk_kpad[
 ](
     src_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     dst_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    Q: Int,
-    R: Int,
-    S: Int,
-    C: Int,
-    F: Int,
-    K_padded: Int,
+    Q: Int32,
+    R: Int32,
+    S: Int32,
+    C: Int32,
+    F: Int32,
+    K_padded: Int32,
 ):
     """GPU kernel: filter QRSCF `[Q*R*S*C, F]` -> `[F, K_padded]`.
 
     `K_padded >= Q*R*S*C`; padded trailing columns are zero-filled.
     """
-    var K_real = Q * R * S * C
-    var total = F * K_padded
+    var _Q = Int(Q)
+    var _R = Int(R)
+    var _S = Int(S)
+    var _C = Int(C)
+    var _F = Int(F)
+    var _K_padded = Int(K_padded)
+    var K_real = _Q * _R * _S * _C
+    var total = _F * _K_padded
     var tid = global_idx.x
     if tid >= total:
         return
-    var f = tid // K_padded
-    var k = tid - f * K_padded
+    var f = tid // _K_padded
+    var k = tid - f * _K_padded
     if k >= K_real:
         dst_ptr.store(tid, Scalar[dtype](0))
         return
-    var q = k // (R * S * C)
-    var rsc = k - q * (R * S * C)
-    var r = rsc // (S * C)
-    var sc = rsc - r * (S * C)
-    var s = sc // C
-    var c = sc - s * C
-    # QRSCF source index: (((q*R + r)*S + s)*C + c)*F + f.
-    var qrscf_idx = (((q * R + r) * S + s) * C + c) * F + f
+    var q = k // (_R * _S * _C)
+    var rsc = k - q * (_R * _S * _C)
+    var r = rsc // (_S * _C)
+    var sc = rsc - r * (_S * _C)
+    var s = sc // _C
+    var c = sc - s * _C
+    # QRSCF source index: (((q*_R + r)*_S + s)*_C + c)*_F + f.
+    var qrscf_idx = (((q * _R + r) * _S + s) * _C + c) * _F + f
     dst_ptr.store(tid, src_ptr.load(qrscf_idx))
 
 
@@ -112,35 +118,43 @@ def _transpose_fcqrs_to_fk_kpad[
 ](
     src_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     dst_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    F: Int,
-    C: Int,
-    Q: Int,
-    R: Int,
-    S: Int,
-    K_padded: Int,
+    F: Int32,
+    C: Int32,
+    Q: Int32,
+    R: Int32,
+    S: Int32,
+    K_padded: Int32,
 ):
     """GPU kernel: filter FCQRS `[F, C, Q, R, S]` -> `[F, K_padded]`.
 
     `K_padded >= Q*R*S*C`; padded trailing columns are zero-filled.
     """
-    var K_real = Q * R * S * C
-    var total = F * K_padded
+    var _F = Int(F)
+    var _C = Int(C)
+    var _Q = Int(Q)
+    var _R = Int(R)
+    var _S = Int(S)
+    var _K_padded = Int(K_padded)
+    var K_real = _Q * _R * _S * _C
+    var total = _F * _K_padded
     var tid = global_idx.x
     if tid >= total:
         return
-    var f = tid // K_padded
-    var k = tid - f * K_padded
+    var f = tid // _K_padded
+    var k = tid - f * _K_padded
     if k >= K_real:
         dst_ptr.store(tid, Scalar[dtype](0))
         return
-    var q = k // (R * S * C)
-    var rsc = k - q * (R * S * C)
-    var r = rsc // (S * C)
-    var sc = rsc - r * (S * C)
-    var s = sc // C
-    var c = sc - s * C
-    # FCQRS source index: f*C*Q*R*S + c*Q*R*S + q*R*S + r*S + s.
-    var fcqrs_idx = f * C * Q * R * S + c * Q * R * S + q * R * S + r * S + s
+    var q = k // (_R * _S * _C)
+    var rsc = k - q * (_R * _S * _C)
+    var r = rsc // (_S * _C)
+    var sc = rsc - r * (_S * _C)
+    var s = sc // _C
+    var c = sc - s * _C
+    # FCQRS source index: f*_C*_Q*_R*_S + c*_Q*_R*_S + q*_R*_S + r*_S + s.
+    var fcqrs_idx = (
+        f * _C * _Q * _R * _S + c * _Q * _R * _S + q * _R * _S + r * _S + s
+    )
     dst_ptr.store(tid, src_ptr.load(fcqrs_idx))
 
 
@@ -174,6 +188,41 @@ def dispatch_amd_4wave_conv3d[
     """Try to dispatch a Conv3D to `amd_4wave_conv` on MI355X. Returns
     True if handled; False if the caller should fall through (typically
     to `dispatch_im2col_matmul_conv3d`).
+
+    Parameters:
+        input_type: `DType` of the input tensor; must be
+            `float8_e4m3fn`, `bfloat16`, or `float16`.
+        filter_type: `DType` of the filter tensor; must equal
+            `input_type`.
+        output_type: `DType` of the output tensor; `bfloat16` for
+            FP8 input, otherwise tracks `input_type`.
+        filter_is_fcqrs: `True` if the filter is laid out as FCQRS
+            `[F, C, Q, R, S]`; `False` if QRSCF `[Q*R*S*C, F]`.
+        elementwise_lambda_fn: Optional epilogue applied to the conv
+            output (defaults to `None`).
+        block_m_override: Override for the BM tile size, 0 uses the
+            heuristic (defaults to 0).
+        block_n_override: Override for the BN tile size, 0 uses the
+            heuristic (defaults to 0).
+        block_k_override: Override for the BK tile size, 0 uses the
+            heuristic (defaults to 0).
+
+    Args:
+        input: Input NDHWC tensor of shape `[N, D, H, W, C_in]`;
+            all spatial dims must be static.
+        filter: Filter tensor; FCQRS `[F, C, Q, R, S]` when
+            `filter_is_fcqrs` else QRSCF `[Q, R, S, C, F]`.
+        output: Output NDHWC tensor of shape
+            `[N, D_out, H_out, W_out, C_out]`.
+        stride: Per-axis stride `[stride_d, stride_h, stride_w]`;
+            all three must be equal and in `{1, 2}`.
+        dilation: Per-axis dilation; must be `(1, 1, 1)`.
+        symmetric_padding: Per-axis symmetric padding
+            `[pad_d, pad_h, pad_w]`; each in `{0, 1, 2}` and
+            `pad_h` must equal `pad_w`.
+        num_groups: Convolution group count; must be 1.
+        ctx: `DeviceContext` used to enqueue the transpose and
+            conv kernels.
     """
     comptime assert input.flat_rank == 5, "input must be rank 5 (NDHWC)"
     comptime assert filter.flat_rank == 5, "filter must be rank 5"
@@ -223,7 +272,7 @@ def dispatch_amd_4wave_conv3d[
     comptime _shapes_ok = (
         _C_in >= _simd_w and _C_out >= 64 and _Q > 1 and _R > 0 and _S > 0
     )
-    # Gate the entire dispatch body — including the `@parameter` closure
+    # Gate the entire dispatch body — including the `@__parameter` closure
     # definitions below — on `_shapes_ok`. Mojo type-checks closure
     # bodies even past a `comptime if not _shapes_ok: return False`
     # early-return, so a shape that we *intend* to decline (e.g.
@@ -305,12 +354,12 @@ def dispatch_amd_4wave_conv3d[
             ctx.enqueue_function[_transpose_fcqrs_to_fk_kpad[filter_type]](
                 filter.ptr,
                 filter_fk_ptr,
-                _C_out,
-                _C_in,
-                _Q,
-                _R,
-                _S,
-                _K_padded,
+                Int32(_C_out),
+                Int32(_C_in),
+                Int32(_Q),
+                Int32(_R),
+                Int32(_S),
+                Int32(_K_padded),
                 grid_dim=transpose_grid,
                 block_dim=_transpose_block,
             )
@@ -318,12 +367,12 @@ def dispatch_amd_4wave_conv3d[
             ctx.enqueue_function[_transpose_qrscf_to_fk_kpad[filter_type]](
                 filter.ptr,
                 filter_fk_ptr,
-                _Q,
-                _R,
-                _S,
-                _C_in,
-                _C_out,
-                _K_padded,
+                Int32(_Q),
+                Int32(_R),
+                Int32(_S),
+                Int32(_C_in),
+                Int32(_C_out),
+                Int32(_K_padded),
                 grid_dim=transpose_grid,
                 block_dim=_transpose_block,
             )
@@ -335,7 +384,7 @@ def dispatch_amd_4wave_conv3d[
         # -------- Static vs runtime-HW dispatch --------------------
         comptime if _all_dhw_static:
 
-            @parameter
+            @__parameter
             @always_inline
             def _launch_static[
                 stride_v: Int, pad_d_c: Int, pad_hw_c: Int
@@ -423,8 +472,8 @@ def dispatch_amd_4wave_conv3d[
                         _N_static, _D_static, _H_static, _W_static, _C_in
                     ]()
                     comptime _output_2d_layout = row_major[_M_total_v, _C_out]()
-                    var input_ndhwc_tt = TileTensor(input.ptr, _ndhwc_in_layout)
-                    var output_2d_tt = TileTensor(output.ptr, _output_2d_layout)
+                    var input_ndhwc_tt = input.reshape(_ndhwc_in_layout)
+                    var output_2d_tt = output.reshape(_output_2d_layout)
                     amd_4wave_conv[
                         elementwise_lambda_fn=elementwise_lambda_fn,
                         block_m_override=_BM_static,
@@ -522,7 +571,7 @@ def dispatch_amd_4wave_conv3d[
             # Dynamic-DHW path. Materialize the runtime input dims and
             # output dims, then call the kernel via use_runtime_hw=True.
 
-            @parameter
+            @__parameter
             @always_inline
             def _launch_runtime[
                 stride_v: Int, pad_d_c: Int, pad_hw_c: Int
@@ -540,7 +589,7 @@ def dispatch_amd_4wave_conv3d[
                 var _rt_M_total = _rt_N * _rt_D_out * _rt_H_out * _rt_W_out
                 var _output_dims = IndexList[2](_rt_M_total, _C_out)
                 var _dyn_out_layout = row_major(Coord(_output_dims))
-                var output_2d_tt = TileTensor(output.ptr, _dyn_out_layout)
+                var output_2d_tt = output.reshape(_dyn_out_layout)
                 # Runtime-HW shape isn't known at comptime; leave
                 # BM/BN at the launcher default (128/128 for bf16) and
                 # only set BK from the static K-padding heuristic.

@@ -24,16 +24,13 @@ def test_broadcast_empty_shape():
     comptime output_layout = row_major[0]()
 
     # Create a 1D tensor of layout (1), of the form [1]
-    var input_stack = InlineArray[Scalar[DType.int], input_layout.product()](
-        uninitialized=True
-    )
+    var input_stack = Array[Int, input_layout.product()](fill=1)
     var input = TileTensor(input_stack, input_layout)
-    input[0] = 1
 
     # Create a 1D tensor of shape (0)
     # Note: output_layout.product() is 0, but we need to allocate a buffer for the
     # output tensor.
-    var output_stack = InlineArray[Scalar[DType.int], 1](uninitialized=True)
+    var output_stack = Array[Int, 1](fill={})
     var output = TileTensor(output_stack, output_layout)
 
     broadcast(output, input)
@@ -56,18 +53,14 @@ def test_broadcast_same_shape():
 
     # Create a 3D tensor of shape (1, 2, 1), of the form
     # [[[1], [2]]]
-    var input_stack = InlineArray[Scalar[DType.int], input_layout.product()](
-        uninitialized=True
+    var input_stack = Array[Int, input_layout.product()](
+        fill_with=lambda (i: Int) -> Int: i + 1
     )
     var input = TileTensor(input_stack, input_layout)
-    input[0, 0, 0] = 1
-    input[0, 1, 0] = 2
 
     # Create a 3D tensor of shape (1, 2, 1)
-    var output_stack = InlineArray[Scalar[DType.int], output_layout.product()](
-        uninitialized=True
-    )
-    var output = TileTensor(output_stack, output_layout).fill(0)
+    var output_stack = Array[Int, output_layout.product()](fill=0)
+    var output = TileTensor(output_stack, output_layout)
 
     broadcast(output, input)
     # output tensor will have the form:
@@ -94,19 +87,14 @@ def test_broadcast_single_axis():
 
     # Create a 2D tensor of shape (1, 2), of the form
     # [[1, 2]]
-    var input_stack = InlineArray[Scalar[DType.int], input_layout.product()](
-        uninitialized=True
+    var input_stack = Array[Int, input_layout.product()](
+        fill_with=lambda (i: Int) -> Int: i + 1
     )
     var input = TileTensor(input_stack, input_layout)
 
-    input[0, 0] = 1
-    input[0, 1] = 2
-
     # Create a 2D tensor of shape (3, 2)
-    var output_stack = InlineArray[Scalar[DType.int], output_layout.product()](
-        uninitialized=True
-    )
-    var output = TileTensor(output_stack, output_layout).fill(0)
+    var output_stack = Array[Int, output_layout.product()](fill=0)
+    var output = TileTensor(output_stack, output_layout)
 
     broadcast(output, input)
     # output tensor will have the form:
@@ -141,19 +129,14 @@ def test_broadcast_multi_axes():
 
     # Create a 3D tensor of shape (1, 2, 1), of the form
     # [[[1], [2]]]
-    var input_stack = InlineArray[Scalar[DType.int], input_layout.product()](
-        uninitialized=True
+    var input_stack = Array[Int, input_layout.product()](
+        fill_with=lambda (i: Int) -> Int: i + 1
     )
     var input = TileTensor(input_stack, input_layout)
 
-    input[0, 0, 0] = 1
-    input[0, 1, 0] = 2
-
     # Create a 3D tensor of shape (2, 2, 3)
-    var output_stack = InlineArray[Scalar[DType.int], output_layout.product()](
-        uninitialized=True
-    )
-    var output = TileTensor(output_stack, output_layout).fill(0)
+    var output_stack = Array[Int, output_layout.product()](fill=0)
+    var output = TileTensor(output_stack, output_layout)
 
     broadcast(output, input)
     # output tensor will have the form:
@@ -198,25 +181,14 @@ def test_broadcast_multi_axes_nested():
 
     # Create a 5D tensor of shape (2, 1, 2, 1, 2), of the form
     # [[[[[1, 2]], [[3, 4]]]], [[[[5, 6]], [[7, 8]]]]]
-    var input_stack = InlineArray[Scalar[DType.int], input_layout.product()](
-        uninitialized=True
+    var input_stack = Array[Int, input_layout.product()](
+        fill_with=lambda (i: Int) -> Int: i + 1
     )
     var input = TileTensor(input_stack, input_layout)
 
-    input[0, 0, 0, 0, 0] = 1
-    input[0, 0, 0, 0, 1] = 2
-    input[0, 0, 1, 0, 0] = 3
-    input[0, 0, 1, 0, 1] = 4
-    input[1, 0, 0, 0, 0] = 5
-    input[1, 0, 0, 0, 1] = 6
-    input[1, 0, 1, 0, 0] = 7
-    input[1, 0, 1, 0, 1] = 8
-
     # Create a 5D tensor of shape (2, 2, 2, 2, 2)
-    var output_stack = InlineArray[Scalar[DType.int], output_layout.product()](
-        uninitialized=True
-    )
-    var output = TileTensor(output_stack, output_layout).fill(0)
+    var output_stack = Array[Int, output_layout.product()](fill=0)
+    var output = TileTensor(output_stack, output_layout)
 
     broadcast(output, input)
 

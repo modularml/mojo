@@ -105,6 +105,12 @@ M_newAsyncTensorMap(const M_RuntimeContext *context);
 /// You are responsible for the lifetime of the input tensor data.  Its data
 /// gets "borrowed" into the Tensor Map.
 ///
+/// When `tensorSpec` targets an accelerator, the data is borrowed in place
+/// (zero-copy) only if `input` already resides on that device; a host pointer
+/// is instead staged onto the device via a copy. In the staged case, in-place
+/// mutations the model makes to its device input are not reflected back into
+/// your host pointer.
+///
 /// @param tensors The tensor map, from `M_newAsyncTensorMap()`.
 /// @param input The input tensor data.
 /// @param tensorSpec The tensor spec, from `M_newTensorSpec()`.  This gets

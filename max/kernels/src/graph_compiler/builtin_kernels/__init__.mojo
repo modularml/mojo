@@ -11,6 +11,15 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Provides the graph compiler's built-in kernel registrations.
+
+Each module binds graph op names (such as `mo.matmul`) to the open-source
+kernels in `linalg`, `nn`, `comm`, and related packages using the same
+`@extensibility.register` mechanism available to custom ops, so these
+registrations double as worked examples of how kernels connect to MAX
+graphs.
+"""
+
 from .attention import *
 from .conv import *
 from .distributed import *
@@ -19,6 +28,7 @@ from .ep import *
 from .gather_scatter import *
 from .kernels import *
 from .kv_cache import *
+from .mtp import *
 from .linalg import *
 from .quantization import *
 from .reductions import *

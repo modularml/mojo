@@ -103,7 +103,7 @@ class Qwen3EmbeddingTransformer(Module):
         embedding: Embedding,
         rope: RotaryEmbedding,
         embedding_multiplier: float = 1.0,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> None:
         """Initialize the embedding transformer.
 

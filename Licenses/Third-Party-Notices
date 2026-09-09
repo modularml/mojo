@@ -1,0 +1,706 @@
+This Third-Party Notices file provides notices and information about third
+party components included in the SOFTWARE. The following third-party
+components are licensed to Licensee pursuant to the following terms and conditions:
+
+1. Licensee's use of LLVM is subject to the terms and conditions of the Apache License v2.0 with LLVM Exceptions.
+   All third-party software packages are copyright by their respective authors.
+   The Apache 2.0 with LLVM exceptions license terms and conditions are hereby incorporated into the Agreement by this reference.
+   The full text of the license can be found at: <https://github.com/llvm/llvm-project/blob/main/LICENSE.TXT>
+
+2. Licensee's use of curl/libcurl is subject to the terms and conditions of the MIT license.
+    All third-party software packages are copyright by their respective authors.
+    The MIT license terms and conditions are hereby incorporated into the Agreement by this reference.
+
+   COPYRIGHT AND PERMISSION NOTICE
+
+   Copyright © 1996 - 2022, Daniel Stenberg, <daniel@haxx.se>, and many
+   contributors, see the THANKS file.
+
+   All rights reserved.
+
+   Permission to use, copy, modify, and distribute this software for any purpose
+   with or without fee is hereby granted, provided that the above copyright
+   notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN
+   NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+   OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of a copyright holder shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization of the copyright holder.
+
+3. Licensee's use of OpenTelemetry C++ is subject to the terms and conditions of the Apache 2.0 license.
+   All third-party software packages are copyright by their respective authors.
+   The Apache 2.0 license terms and conditions are hereby incorporated into the Agreement by this reference.
+   The full text of the Apache 2.0 license can be found at: <https://www.apache.org/licenses/LICENSE-2.0>
+
+4. Licensee's use of Mbed TLS is subject to the terms and conditions of the Apache 2.0 license.
+   All third-party software packages are copyright by their respective authors.
+   The Apache 2.0 license terms and conditions are hereby incorporated into the Agreement by this reference.
+   The full text of the Apache 2.0 license can be found at: <https://www.apache.org/licenses/LICENSE-2.0>
+
+5. Licensee's use of Google's gperftools is subject to the terms and conditions of the 3-clause BSD license.
+   All third-party software packages are copyright by their respective authors.
+   The 3-clause BSD license terms and conditions are hereby incorporated into the Agreement by this reference.
+
+   Copyright (c) 2005, Google Inc.
+
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are
+   met:
+
+       * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+       *Redistributions in binary form must reproduce the above
+   copyright notice, this list of conditions and the following disclaimer
+   in the documentation and/or other materials provided with the
+   distribution.
+       * Neither the name of Google Inc. nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+6. Licensee's use of libz is subject to the terms and conditions of the zlib license.
+   All third-party software packages are copyright by their respective authors.
+   The zlib license terms and conditions are hereby incorporated into the Agreement by this reference.
+
+  Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+  Jean-loup Gailly        Mark Adler
+  <jloup@gzip.org>          <madler@alumni.caltech.edu>
+
+7. Licensee's use of Zstandard is subject to the terms and conditions of the Zstandard license.
+   All third-party software packages are copyright by their respective authors.
+   The Zstandard license terms and conditions are hereby incorporated into the Agreement by this reference.
+
+   Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without modification,
+   are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+      list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
+
+   * Neither the name Facebook, nor Meta, nor the names of its contributors may
+      be used to endorse or promote products derived from this software without
+      specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+8. Licensee's use of a derivative work of llama.cpp is subject to the terms and conditions of the MIT license.
+   All third-party software packages are copyright by their respective authors.
+   The MIT license terms and conditions are hereby incorporated into the Agreement by this reference.
+
+   MIT License
+
+   Copyright (c) 2023-2024 The ggml authors
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+9. Licensee's use of AMD's HIP runtime API is subject to terms and conditions of the AMD license.
+   The AMD license terms and conditions are hereby incorporated into the Agreement by this reference.
+
+   Copyright (c) 2008 - 2024 Advanced Micro Devices, Inc. All rights reserved.
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+   THE SOFTWARE.
+
+10. Licensee's use of Protocol Buffers is subject to the terms and conditions of the 3-clause BSD license.
+   All third-party software packages are copyright by their respective authors.
+   The 3-clause BSD license terms and conditions are hereby incorporated into the Agreement by this reference.
+
+   Copyright 2008 Google Inc.  All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are
+   met:
+
+      * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+      *Redistributions in binary form must reproduce the above
+   copyright notice, this list of conditions and the following disclaimer
+   in the documentation and/or other materials provided with the
+   distribution.
+      * Neither the name of Google Inc. nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+   Code generated by the Protocol Buffer compiler is owned by the owner
+   of the input file used when generating it.  This code is not
+   standalone and requires a support library to be linked with it.  This
+   support library is itself covered by the above license.
+
+11. Licensee's use of metal-cpp is subject to the terms and conditions of the Apache 2.0 license.
+   All third-party software packages are copyright by their respective authors.
+   The Apache 2.0 license terms and conditions are hereby incorporated into the Agreement by this reference.
+   The full text of the Apache 2.0 license can be found at: <https://www.apache.org/licenses/LICENSE-2.0>
+
+12. Licensee's use of NVSHMEM is subject to the terms and conditions of the below licenses.
+   Copyright (c) 2016-2025, NVIDIA CORPORATION. All rights reserved.
+
+   Unless otherwise noted in the ADDITIONAL LICENSES section, the entirety of the NVSHMEM repository is covered under the LICENSE AGREEMENT FOR NVIDIA SOFTWARE DEVELOPMENT KITS and the NVSHMEM SUPPLEMENT TO SOFTWARE LICENSE AGREEMENT FOR NVIDIA SOFTWARE DEVELOPMENT KITS supplement below.
+
+   LICENSE AGREEMENT FOR NVIDIA SOFTWARE DEVELOPMENT KITS
+
+   This license agreement, including exhibits attached ("Agreement”) is a legal agreement between you and NVIDIA Corporation ("NVIDIA") and governs your use of a NVIDIA software development kit (“SDK”).
+
+   Each SDK has its own set of software and materials, but here is a description of the types of items that may be included in a SDK: source code, header files, APIs, data sets and assets (examples include images, textures, models, scenes, videos, native API input/output files), binary software, sample code, libraries, utility programs, programming code and documentation.
+
+   This Agreement can be accepted only by an adult of legal age of majority in the country in which the SDK is used.
+
+   If you are entering into this Agreement on behalf of a company or other legal entity, you represent that you have the legal authority to bind the entity to this Agreement, in which case “you” will mean the entity you represent.
+
+   If you don’t have the required age or authority to accept this Agreement, or if you don’t accept all the terms and conditions of this Agreement, do not download, install or use the SDK.
+
+   You agree to use the SDK only for purposes that are permitted by (a) this Agreement, and (b) any applicable law, regulation or generally accepted practices or guidelines in the relevant jurisdictions.
+
+   1. License.
+
+   1.1 Grant
+
+   Subject to the terms of this Agreement, NVIDIA hereby grants you a non-exclusive, non-transferable license, without the right to sublicense (except as expressly provided in this Agreement) to:
+
+   (i) Install and use the SDK,
+
+   (ii)    Modify and create derivative works of source code delivered in the SDK, and
+
+   (iii) Distribute those portions of the SDK that are identified in this Agreement as distributable, as incorporated into a software application that meets the distribution requirements indicated in this Agreement.
+
+   1.2 Distribution Requirements
+
+   These are the distribution requirements for you to exercise the distribution grant:
+
+   (i) Your application must have material additional functionality, beyond the included portions of the SDK.
+
+   (ii)    The distributable portions of the SDK shall only be accessed by your application.
+
+   (iii)    The following notice shall be included in modifications and derivative works of sample source code distributed: “This software contains source code provided by NVIDIA Corporation.”
+
+   (iv)     Unless a developer tool is identified in this Agreement as distributable, it is delivered for your internal use only.
+
+   (v) The terms under which you distribute your application must be consistent with the terms of this Agreement, including (without limitation) terms relating to the license grant and license restrictions and protection of NVIDIA’s intellectual property rights. Additionally, you agree that you will protect the privacy, security and legal rights of your application users.
+
+   (vi) You agree to notify NVIDIA in writing of any known or suspected distribution or use of the SDK not in compliance with the requirements of this Agreement, and to enforce the terms of your agreements with respect to distributed SDK.
+
+   1.3 Authorized Users
+
+   You may allow employees and contractors of your entity or of your subsidiary(ies) to access and use the SDK from your secure network to perform work on your behalf.
+
+   If you are an academic institution you may allow users enrolled or employed by the academic institution to access and use the SDK from your secure network.
+
+   You are responsible for the compliance with the terms of this Agreement by your authorized users. If you become aware that your authorized users didn’t follow the terms of this Agreement, you agree to take reasonable steps to resolve the non-compliance and prevent new occurrences.
+
+   1.4 Pre-Release SDK
+   The SDK versions identified as alpha, beta, preview or otherwise as pre-release, may not be fully functional, may contain errors or design flaws, and may have reduced or different security, privacy, accessibility, availability, and reliability standards relative to commercial versions of NVIDIA software and materials. Use of a pre-release SDK may result in unexpected results, loss of data, project delays or other unpredictable damage or loss.
+   You may use a pre-release SDK at your own risk, understanding that pre-release SDKs are not intended for use in production or business-critical systems.
+   NVIDIA may choose not to make available a commercial version of any pre-release SDK. NVIDIA may also choose to abandon development and terminate the availability of a pre-release SDK at any time without liability.
+   1.5  Updates
+
+   NVIDIA may, at its option, make available patches, workarounds or other updates to this SDK. Unless the updates are provided with their separate governing terms, they are deemed part of the SDK licensed to you as provided in this Agreement.
+
+   You agree that the form and content of the SDK that NVIDIA provides may change without prior notice to you. While NVIDIA generally maintains compatibility between versions, NVIDIA may in some cases make changes that introduce incompatibilities in future versions of the SDK.
+
+   1.6  Third Party Licenses
+
+   The SDK may come bundled with, or otherwise include or be distributed with, third party software licensed by a NVIDIA supplier and/or open source software provided under an open source license. Use of third party software is subject to the third-party license terms, or in the absence of third party terms, the terms of this Agreement. Copyright to third party software is held by the copyright holders indicated in the third-party software or license.
+
+   1.7 Reservation of Rights
+
+   NVIDIA reserves all rights, title and interest in and to the SDK not expressly granted to you under this Agreement.
+
+   1. Limitations.
+
+   The following license limitations apply to your use of the SDK:
+
+   2.1 You may not reverse engineer, decompile or disassemble, or remove copyright or other proprietary notices from any portion of the SDK or copies of the SDK.
+
+   2.2 Except as expressly provided in this Agreement, you may not copy, sell, rent, sublicense, transfer, distribute, modify, or create derivative works of any portion of the SDK.
+
+   2.3 Unless you have an agreement with NVIDIA for this purpose, you may not indicate that an application created with the SDK is sponsored or endorsed by NVIDIA.
+
+   2.4 You may not bypass, disable, or circumvent any encryption, security, digital rights management or authentication mechanism in the SDK.
+
+   2.5 You may not use the SDK in any manner that would cause it to become subject to an open source software license. As examples, licenses that require as a condition of use, modification, and/or distribution that the SDK be (i) disclosed or distributed in source code form; (ii) licensed for the purpose of making derivative works; or (iii) redistributable at no charge.
+
+   2.6  Unless you have an agreement with NVIDIA for this purpose, you may not use the SDK with any system or application where the use or failure of the system or application can reasonably be expected to threaten or result in personal injury, death, or catastrophic loss. Examples include use in nuclear, avionics, navigation, military, medical, life support or other life critical applications. NVIDIA does not design, test or manufacture the SDK for these critical uses and NVIDIA shall not be liable to you or any third party, in whole or in part, for any claims or damages arising from such uses.
+
+   2.7 You agree to defend, indemnify and hold harmless NVIDIA and its affiliates, and their respective employees, contractors, agents, officers and directors, from and against any and all claims, damages, obligations, losses, liabilities, costs or debt, fines, restitutions and expenses (including but not limited to attorney’s fees and costs incident to establishing the right of indemnification) arising out of or related to your use of the SDK outside of the scope of this Agreement, or not in compliance with its terms.
+
+   1. Ownership.
+
+   3.1 NVIDIA or its licensors hold all rights, title and interest in and to the SDK and its modifications and derivative works, including their respective intellectual property rights. This SDK may include software and materials from NVIDIA’s licensors, and these licensors are intended third party beneficiaries that may enforce this Agreement with respect to their intellectual property rights.
+
+   3.2 You may, but don’t have to, provide to NVIDIA suggestions, feature requests or other feedback regarding the SDK, including possible enhancements or modifications to the SDK. For any feedback that you voluntarily provide, you hereby grant NVIDIA and its affiliates a perpetual, non-exclusive, worldwide, irrevocable license to use, reproduce, modify, license, sublicense (through multiple tiers of sublicensees), and distribute (through multiple tiers of distributors) it without the payment of any royalties or fees to you. NVIDIA will use feedback at its choice.
+
+   1. No Warranties.
+
+   THE SDK IS PROVIDED BY NVIDIA “AS IS” AND “WITH ALL FAULTS.” TO THE MAXIMUM EXTENT PERMITTED BY LAW, NVIDIA AND ITS AFFILIATES EXPRESSLY DISCLAIM ALL WARRANTIES OF ANY KIND OR NATURE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, OR THE ABSENCE OF ANY DEFECTS THEREIN, WHETHER LATENT OR PATENT. NO WARRANTY IS MADE ON THE BASIS OF TRADE USAGE, COURSE OF DEALING OR COURSE OF TRADE.
+
+   1. Limitations of Liability.
+
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, NVIDIA AND ITS AFFILIATES SHALL NOT BE LIABLE FOR ANY SPECIAL, INCIDENTAL, PUNITIVE OR CONSEQUENTIAL DAMAGES, OR ANY LOST PROFITS, LOSS OF USE, LOSS OF DATA OR LOSS OF GOODWILL, OR THE COSTS OF PROCURING SUBSTITUTE PRODUCTS, ARISING OUT OF OR IN CONNECTION WITH THIS AGREEMENT OR THE USE OR PERFORMANCE OF THE SDK, WHETHER SUCH LIABILITY ARISES FROM ANY CLAIM BASED UPON BREACH OF CONTRACT, BREACH OF WARRANTY, TORT (INCLUDING NEGLIGENCE), PRODUCT LIABILITY OR ANY OTHER CAUSE OF ACTION OR THEORY OF LIABILITY. IN NO EVENT WILL NVIDIA’S AND ITS AFFILIATES TOTAL CUMULATIVE LIABILITY UNDER OR ARISING OUT OF THIS AGREEMENT EXCEED US$10.00. THE NATURE OF THE LIABILITY OR THE NUMBER OF CLAIMS OR SUITS SHALL NOT ENLARGE OR EXTEND THIS LIMIT.
+
+   These exclusions and limitations of liability shall apply regardless if NVIDIA or its affiliates have been advised of the possibility of such damages, and regardless of whether a remedy fails its essential purpose. These exclusions and limitations of liability form an essential basis of the bargain between the parties, and, absent any of these exclusions or limitations of liability, the provisions of this Agreement, including, without limitation, the economic terms, would be substantially different.
+
+   1. Termination.
+
+   6.1 This Agreement will continue to apply until terminated by either you or NVIDIA as described below.
+
+   6.2 If you want to terminate this Agreement, you may do so by stopping to use the SDK.
+
+   6.3 NVIDIA may, at any time, terminate this Agreement if: (i) you fail to comply with any term of this Agreement and the non-compliance is not fixed within thirty (30) days following notice from NVIDIA (or immediately if you violate NVIDIA’s intellectual property rights); (ii) you commence or participate in any legal proceeding against NVIDIA with respect to the SDK; or (iii) NVIDIA decides to no longer provide the SDK in a country or, in NVIDIA’s sole discretion, the continued use of it is no longer commercially viable.
+
+   6.4 Upon any termination of this Agreement, you agree to promptly discontinue use of the SDK and destroy all copies in your possession or control. Your prior distributions in accordance with this Agreement are not affected by the termination of this Agreement. Upon written request, you will certify in writing that you have complied with your commitments under this section. Upon any termination of this Agreement all provisions survive except for the licenses granted to you.
+
+   1. General.
+
+   If you wish to assign this Agreement or your rights and obligations, including by merger, consolidation, dissolution or operation of law, contact NVIDIA to ask for permission. Any attempted assignment not approved by NVIDIA in writing shall be void and of no effect. NVIDIA may assign, delegate or transfer this Agreement and its rights and obligations, and if to a non-affiliate you will be notified.
+
+   You agree to cooperate with NVIDIA and provide reasonably requested information to verify your compliance with this Agreement.
+
+   This Agreement will be governed in all respects by the laws of the United States and of the State of Delaware as those laws are applied to contracts entered into and performed entirely within Delaware by Delaware residents, without regard to the conflicts of laws principles. The United Nations Convention on Contracts for the International Sale of Goods is specifically disclaimed. You agree to all terms of this Agreement in the English language.
+
+   The state or federal courts residing in Santa Clara County, California shall have exclusive jurisdiction over any dispute or claim arising out of this Agreement. Notwithstanding this, you agree that NVIDIA shall still be allowed to apply for injunctive remedies or an equivalent type of urgent legal relief in any jurisdiction.
+
+   If any court of competent jurisdiction determines that any provision of this Agreement is illegal, invalid or unenforceable, such provision will be construed as limited to the extent necessary to be consistent with and fully enforceable under the law and the remaining provisions will remain in full force and effect. Unless otherwise specified, remedies are cumulative.
+
+   Each party acknowledges and agrees that the other is an independent contractor in the performance of this Agreement.
+
+   The SDK is “commercial items” consisting of “commercial computer software” and “commercial computer software documentation” provided, to the extent consistent with a governing federal procurement contract, with RESTRICTED RIGHTS. Contractor/manufacturer is NVIDIA, 2788 San Tomas Expressway, Santa Clara, CA 95051.
+
+   The SDK is subject to United States export laws and regulations. You agree that you will not ship, transfer or export the SDK into any country, or use the SDK in any manner, prohibited by the United States Bureau of Industry and Security or economic sanctions regulations administered by the U.S. Department of Treasury’s Office of Foreign Assets Control (OFAC), or any applicable export laws, restrictions or regulations. These laws include restrictions on destinations, end users and end use. By accepting this Agreement, you confirm that you are not a resident or citizen of any country currently embargoed by the U.S. and that you are not otherwise prohibited from receiving the SDK.
+
+   Any notice delivered by NVIDIA to you under this Agreement will be delivered via mail, email or fax. You agree that any notices that NVIDIA sends you electronically will satisfy any legal communication requirements. Please direct your legal notices or other correspondence to NVIDIA Corporation, 2788 San Tomas Expressway, Santa Clara, California 95051, United States of America, Attention: Legal Department.
+
+   This Agreement and any exhibits incorporated into this Agreement constitute the entire agreement of the parties with respect to the subject matter of this Agreement and supersede all prior negotiations or documentation exchanged between the parties relating to this SDK license. Any additional and/or conflicting terms on documents issued by you are null, void, and invalid. Any amendment or waiver under this Agreement shall be in writing and signed by representatives of both parties.
+
+   (v. September 3, 2019)
+
+   NVSHMEM SUPPLEMENT TO SOFTWARE LICENSE AGREEMENT FOR NVIDIA SOFTWARE DEVELOPMENT KITS
+
+   The terms in this supplement govern your use of the NVIDIA NVSHMEM SDK under the terms of your license agreement (“Agreement”) as modified by this supplement. Capitalized terms used but not defined below have the meaning assigned to them in the Agreement.
+
+   This supplement is an exhibit to the Agreement and is incorporated as an integral part of the Agreement. In the event of conflict between the terms in this supplement and the terms in the Agreement, the terms in this supplement govern.
+
+   1. License Scope. The SDK is licensed for you to develop applications only for use in systems with NVIDIA GPUs.
+
+   2. Distribution. The following portions of the SDK are distributable under the Agreement: any portion of the SDK.
+
+   3. Licensing. If the distribution terms in this Agreement are not suitable for your organization, or for any questions regarding this Agreement, please contact NVIDIA at <nvidia-compute-license-questions@nvidia.com>.
+   (v. July 11, 2019)
+
+=======================================================================
+   ADDITIONAL LICENSES
+   Licenses specific to pre-existing software incorporated into NVSHMEM
+   =======================================================================
+
+   ------------------------------------------------------------------------
+   Portions derived from DF-NVSHMEM-prototype
+   (<https://github.com/NVIDIA/DF-NVSHMEM-prototype>), under these terms:
+
+   Copyright (c) 2014, NVIDIA Corporation.  All rights reserved.
+
+   The U.S. Department of Energy funded the development of this software
+   under subcontract 7078610 with Lawrence Berkeley National Laboratory.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+* Neither the name of the NVIDIA Corporation Lawrence Berkeley National
+    Laboratory, the U.S. Department of Energy, nor the names of its
+    contributors may be used to endorse or promote products derived from
+    this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+   THE POSSIBILITY OF SUCH DAMAGE.
+
+   ------------------------------------------------------------------------
+   ------------------------------------------------------------------------
+
+END Portions derived from DF-NVSHMEM-prototype
+   ------------------------------------------------------------------------
+
+   ----------------------------------------------------------------------------------
+
+   Portions derived from Sandia OpenSHMEM
+   (<https://github.com/Sandia-OpenSHMEM/SOS>), under these terms:
+
+   Copyright 2011 Sandia Corporation. Under the terms of Contract
+   DE-AC04-94AL85000 with Sandia Corporation, the U.S.  Government
+   retains certain rights in this software.
+
+   Copyright (c) 2017 Intel Corporation. All rights reserved.
+   This software is available to you under the BSD license.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are
+   met:
+
+* Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer listed
+   in this license in the documentation and/or other materials
+   provided with the distribution.
+
+* Neither the name of the copyright holders nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+   The copyright holders provide no reassurances that the source code
+   provided does not infringe any patent, copyright, or any other
+   intellectual property rights of third parties.  The copyright holders
+   disclaim any liability to any recipient for claims brought against
+   recipient by any third party for infringement of that parties
+   intellectual property rights.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+   ----------------------------------------------------------------------------------
+
+   Copyright Notice
+   1998--2020, Argonne National Laboratory
+
+   Permission is hereby granted to use, reproduce, prepare derivative works, and
+   to redistribute to others.  This software was authored by:
+
+   Mathematics and Computer Science Division
+   Argonne National Laboratory, Argonne IL 60439
+
+   (and)
+
+   Department of Computer Science
+   University of Illinois at Urbana-Champaign
+
+       GOVERNMENT LICENSE
+
+   Portions of this material resulted from work developed under a U.S.
+   Government Contract and are subject to the following license: the Government
+   is granted for itself and others acting on its behalf a paid-up, nonexclusive,
+   irrevocable worldwide license in this computer software to reproduce, prepare
+   derivative works, and perform publicly and display publicly.
+
+       DISCLAIMER
+
+   This computer code material was prepared, in part, as an account of work
+   sponsored by an agency of the United States Government.  Neither the United
+   States, nor the University of Chicago, nor any of their employees, makes any
+   warranty express or implied, or assumes any legal liability or responsibility
+   for the accuracy, completeness, or usefulness of any information, apparatus,
+   product, or process disclosed, or represents that its use would not infringe
+   privately owned rights.
+
+   ----------------------------------------------------------------------------------
+
+   ----------------------------------------------------------------------------------
+
+END Portions derived from Sandia OpenSHMEM
+   ----------------------------------------------------------------------------------
+
+   ----------------------------------------------------------------------------------
+   mlx5_ifc.h is included in NVSHMEM as received from the rdma-core repository.
+   Attribution Statements: Nvidia actively chooses the BSD license to apply to files with this copyright and license.
+   /*
+
+* Copyright (c) 2019 Mellanox Technologies, Inc.  All rights reserved.
+*
+* This software is available to you under a choice of one of two
+* licenses.  You may choose to be licensed under the terms of the GNU
+* General Public License (GPL) Version 2, available from the file
+* COPYING in the main directory of this source tree, or the
+* OpenIB.org BSD license below:
+*
+*     Redistribution and use in source and binary forms, with or
+*     without modification, are permitted provided that the following
+*     conditions are met:
+*
+*      - Redistributions of source code must retain the above
+*        copyright notice, this list of conditions and the following
+*        disclaimer.
+*
+*      - Redistributions in binary form must reproduce the above
+*        copyright notice, this list of conditions and the following
+*        disclaimer in the documentation and/or other materials
+*        provided with the distribution.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+* BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+* ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+* CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+   */
+
+   ----------------------------------------------------------------------------------
+
+   ----------------------------------------------------------------------------------
+
+END Inclusion of mlx5_ifc.h from RDMA Core
+   ----------------------------------------------------------------------------------
+
+The NVSHMEM libfabric transport includes several headers from the libfabric project as-is
+   in binary distributions.
+   Attribution Statements: Nvidia actively chooses the BSD license to apply to files with this copyright and license.
+   Copyright (c) 2015-2021 Intel Corporation.  All rights reserved.
+   Copyright (c) 2015-2019 Cisco Systems, Inc.  All rights reserved
+   ==================================================================
+
+      BSD license
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions
+   are met:
+
+* Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above
+    copyright notice, this list of conditions and the following
+    disclaimer in the documentation and/or other materials provided
+    with the distribution.
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+   FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+   COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+   BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+   POSSIBILITY OF SUCH DAMAGE
+   ==================================================================
+
+   ----------------------------------------------------------------------------------
+
+END Inclusion of mlx5_ifc.h from RDMA Core
+   ----------------------------------------------------------------------------------
+
+   ----------------------------------------------------------------------------------
+
+   mlx5_prm.h is included in NVSHMEM as received from the dpdk repository.
+   /* SPDX-License-Identifier: BSD-3-Clause
+
+* Copyright 2016 6WIND S.A.
+* Copyright 2016 Mellanox Technologies, Ltd
+   */
+
+   ----------------------------------------------------------------------------------
+
+   ----------------------------------------------------------------------------------
+
+END Inclusion of mlx5_prm.h from dpdk
+   ----------------------------------------------------------------------------------
+
+13. Licensee's use of Cameron Desrochers' Concurrent Queue is subject to the terms and conditions of the BSD 2-Clause "Simplified" License.
+    All third-party software packages are copyright by their respective authors.
+    The 2-Clause "Simplified" BSD License terms and conditions are hereby incorporated into the Agreement by this reference.
+
+    Copyright (c) 2013-2020, Cameron Desrochers.
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, this
+    list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+    AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+    ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+    LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+    CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+    SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+    INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+    CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+    ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+    POSSIBILITY OF SUCH DAMAGE.
+
+14. Licensee's use of AMD's ROCR-Runtime is subject to the terms and conditions of the University of Illinois/NCSA Open Source License.
+   The license terms and conditions are hereby incorporated into the Agreement by this reference.
+   The full text of the license can be found at: <https://github.com/ROCm/ROCR-Runtime/blob/master/LICENSE.md>
+
+   Copyright (c) 2014 Advanced Micro Devices, Inc.
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   with the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+      * Redistributions of source code must retain the above copyright notice,
+        this list of conditions and the following disclaimers.
+      * Redistributions in binary form must reproduce the above copyright notice,
+        this list of conditions and the following disclaimers in the documentation
+        and/or other materials provided with the distribution.
+      * Neither the names of Advanced Micro Devices, Inc. nor the names of its
+        contributors may be used to endorse or promote products derived from this
+        Software without specific prior written permission.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH
+   THE SOFTWARE.
+
+15. Licensee's use of AMD's rocprofiler-sdk is subject to the terms and conditions of the MIT license.
+   The MIT license terms and conditions are hereby incorporated into the Agreement by this reference.
+   The full text of the license can be found at: <https://github.com/ROCm/rocprofiler-sdk/blob/main/LICENSE>
+
+   Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+   THE SOFTWARE.
+
+16. Licensee's use of AMD's rocshmem is subject to the terms and conditions of the MIT license.
+   The MIT license terms and conditions are hereby incorporated into the Agreement by this reference.
+   The full text of the license can be found at: <https://github.com/ROCm/rocSHMEM/blob/develop_deprecated/LICENSE.md>
+
+Copyright (c) Advanced Micro Devices, Inc. All rights reserved.
+
+SPDX-License-Identifier: MIT
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

@@ -11,15 +11,19 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Provides shared CPU matmul utilities including tile-consumer traits, kernel shape selection, and partial SIMD load/store helpers."""
+
 from std.math import align_down, align_up, ceildiv, iota
-from std.sys import align_of
 from std.sys._build import is_debug_build
 from std.sys.info import CompilationTarget, simd_width_of, size_of
 from std.sys.intrinsics import masked_load, masked_store
 from std.utils.index import Index, IndexList
 from std.algorithm import vectorize
 from layout.layout import *
-from layout import LayoutTensor, TileTensor
+from layout import LayoutTensor, TileTensor, Coord, TensorLayout
+from layout.tile_layout import Layout as _NewLayout
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
+from std.reflection import reflect
 
 
 @always_inline
@@ -55,9 +59,9 @@ def partial_simd_load[
         The SIMD vector loaded and zero-filled.
     """
     # Create a mask based on input bounds.
-    var effective_lbound = SIMD[DType.int32, width](max(lbound, 0))
-    var effective_rbound = SIMD[DType.int32, width](min(width, rbound))
-    var incr = iota[DType.int32, width]()
+    var effective_lbound = SIMD[.int32, width](max(lbound, 0))
+    var effective_rbound = SIMD[.int32, width](min(width, rbound))
+    var incr = iota[.int32, width]()
     var mask = incr.ge(effective_lbound) & incr.lt(effective_rbound)
 
     return masked_load[width](storage, mask, pad_value)
@@ -65,7 +69,7 @@ def partial_simd_load[
 
 @always_inline
 def partial_simd_store[
-    dtype: DType, //, width: SIMDSize
+    dtype: DType, //, width: SIMDLength
 ](
     storage: UnsafePointer[mut=True, Scalar[dtype], ...],
     lbound: Int,
@@ -94,21 +98,245 @@ def partial_simd_store[
         data: The vector value to store.
     """
     # Create a mask based on input bounds.
-    var effective_lbound = SIMD[DType.int32, width](max(lbound, 0))
-    var effective_rbound = SIMD[DType.int32, width](min(width, rbound))
-    var incr = iota[DType.int32, width]()
+    var effective_lbound = SIMD[.int32, width](max(lbound, 0))
+    var effective_rbound = SIMD[.int32, width](min(width, rbound))
+    var incr = iota[.int32, width]()
     var mask = incr.ge(effective_lbound) & incr.lt(effective_rbound)
 
     return masked_store(data, storage, mask)
 
 
 comptime elementwise_epilogue_type = def[
-    dtype: DType, width: SIMDSize, *, alignment: Int = 1
+    dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](IndexList[2], SIMD[dtype, width]) capturing -> None
 
 comptime elementwise_compute_lambda_type = def[
-    dtype: DType, width: SIMDSize, *, alignment: Int = 1
+    dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](IndexList[2], SIMD[dtype, width]) capturing -> SIMD[dtype, width]
+
+
+trait TileConsumer(DevicePassable, TrivialRegisterPassable):
+    """Trait for an epilogue operation which consumes a tile of data.
+
+    The kernel feeds the consumer a tile (in `src_address_space`); the
+    consumer is terminal (does whatever it does and returns nothing).
+    For a non-terminal counterpart, see `TileOperation`; for aux-load
+    capabilities, see `AuxLoading` / `AuxLoadingPipelined` (which refine
+    `TileOperation`, not this trait).
+    """
+
+    comptime src_address_space: AddressSpace
+    """AddressSpace of the tile being consumed"""
+
+    # Default `DevicePassable` boilerplate so conformers need not restate it:
+    # the device type is the consumer itself, encoding bit-copies it, and the
+    # name comes from reflection.
+    comptime device_type: AnyType = Self
+
+    def _to_device_type(
+        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+    ):
+        encoder.encode(self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        return String(reflect[Self].name())
+
+    def __call__[
+        dtype: DType,
+        LayoutType: TensorLayout,
+    ](
+        ref self,
+        tile_coord: Coord,
+        tile: TileTensor[
+            dtype, LayoutType, ..., address_space=Self.src_address_space
+        ],
+        thread_layout: _NewLayout,
+    ) -> None:
+        """Consume `tile`; terminal (returns nothing).
+
+        Parameters:
+            dtype: Element type of the tile.
+            LayoutType: Layout of the tile.
+        Args:
+            tile_coord: Absolute element coord of this sub-tile's top-left in the
+                global output tensor.
+            tile: The tile of data being consumed.
+            thread_layout: Logical layout of the threads collaborating on this
+                call
+        """
+        ...
+
+
+trait TileOperation(DevicePassable, TrivialRegisterPassable):
+    """Non-terminal counterpart to `TileConsumer`: mutates a tile in
+    place between MMA and store. Composes additively with capability
+    subtraits like `AuxLoading` for ops that need pre-loaded data.
+
+    Surface matches `TileConsumer.__call__` modulo `mut=True` on the
+    tile (the op writes back) and on `self`. The two traits are role-
+    distinct (terminal vs non-terminal); a struct that wants to be
+    both would need separate disambiguation, which we'll deal with
+    if/when that comes up.
+    """
+
+    comptime src_address_space: AddressSpace
+    """AddressSpace of the tile being transformed (typically LOCAL)."""
+
+    # Default `DevicePassable` boilerplate so conformers need not restate it:
+    # the device type is the op itself, encoding bit-copies it, and the name
+    # comes from reflection.
+    comptime device_type: AnyType = Self
+
+    def _to_device_type(
+        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+    ):
+        encoder.encode(self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        return String(reflect[Self].name())
+
+    def __call__[
+        dtype: DType,
+        LayoutType: TensorLayout,
+    ](
+        mut self,
+        tile_coord: Coord,
+        tile: TileTensor[
+            dtype,
+            LayoutType,
+            MutAnyOrigin,
+            ...,
+            address_space=Self.src_address_space,
+        ],
+        thread_layout: _NewLayout,
+    ) -> type_of(tile):
+        """Transform `tile` and return it.
+
+        Returns a `TileTensor` of the same shape as its tile argument.
+
+        Parameters:
+            dtype: Element type of the tile.
+            LayoutType: Layout of the tile.
+        Args:
+            tile_coord: Absolute element coord of this sub-tile's top-left in
+                the global output tensor — consistent with `TileConsumer.__call__`
+                and the legacy `elementwise_compute_lambda_type`.
+            thread_layout: Logical layout of the threads collaborating on this
+                call. Passed as a value (its static dims are comptime-readable
+                via `type_of(thread_layout)`), so the kernel states "this call
+                runs over these threads" the way the `tile` argument states
+                "this tile is M x N". Impls that load aux inputs use it (e.g. to
+                build a load copier) and should `comptime assert` it is static.
+            tile: Per-warp tile (kernel side passes a `TileTensor` view over the
+                per-thread register storage; `tile.static_shape` is the warp
+                tile shape).
+        """
+        ...
+
+
+struct NullTileConsumer(TileConsumer):
+    """No-op TileConsumer. Used as the default when no fusion is requested,
+    and as the placeholder type when a kernel's `tile_consumer` Optional is
+    None.
+    """
+
+    comptime src_address_space = AddressSpace.LOCAL
+
+    def __init__(out self):
+        comptime assert (
+            False
+        ), "NullTileConsumer is a null sentinel. Do not use!"
+
+    def __call__[
+        dtype: DType,
+        LayoutType: TensorLayout,
+    ](
+        ref self,
+        tile_coord: Coord,
+        tile: TileTensor[
+            dtype, LayoutType, ..., address_space=Self.src_address_space
+        ],
+        thread_layout: _NewLayout,
+    ) -> None:
+        pass
+
+
+struct NullTileOperation(TileOperation):
+    """No-op `TileOperation` sentinel: parallel to `NullTileConsumer`.
+    Used as the default `TileOperationType` so kernels without a fused
+    op compile without callers having to spell out a placeholder.
+    """
+
+    comptime src_address_space = AddressSpace.LOCAL
+
+    def __init__(out self):
+        comptime assert (
+            False
+        ), "NullTileOperation is a null sentinel. Do not use!"
+
+    def __call__[
+        dtype: DType,
+        LayoutType: TensorLayout,
+    ](
+        mut self,
+        tile_coord: Coord,
+        tile: TileTensor[
+            dtype,
+            LayoutType,
+            MutAnyOrigin,
+            ...,
+            address_space=Self.src_address_space,
+        ],
+        thread_layout: _NewLayout,
+    ) -> type_of(tile):
+        return tile
+
+
+@always_inline
+def is_valid_epilogue[T: AnyType]() -> Bool:
+    """Whether `T` is a real epilogue rather than a null sentinel.
+
+    A kernel that accepts a `TileOperation`/`TileConsumer` type parameter
+    (defaulting to `NullTileOperation`/`NullTileConsumer`) uses this in a
+    `comptime if` to elide the epilogue call when no epilogue was bound.
+
+    Parameters:
+        T: The epilogue type to test (a `TileOperation` or `TileConsumer`).
+
+    Returns:
+        False iff `T` is one of the epilogue null sentinels.
+    """
+    return not (T == NullTileOperation or T == NullTileConsumer)
+
+
+@always_inline
+def lora_qkv_plane_row_offset[
+    splits: IndexList[2]
+](out_col: Int, plane_stride: Int) -> Int:
+    """Additive row offset into a 3-plane row-stacked activation `[3*M, K]`.
+
+    Lets a grouped matmul read a *different* plane of the activation per
+    output-column region within a single launch, without a capturing closure
+    (which the warp-specialized kernel's GPU slicer cannot handle in the load
+    path). Used by the LoRA-B QKV expand to select the matching plane of the
+    planar shrink output `P [3, M, R]` for the Q / K / V output regions.
+
+    For output column `out_col`, the plane is 0 when `out_col < splits[0]`, 1
+    when `out_col < splits[1]`, else 2; the returned offset is
+    `plane * plane_stride`. `splits == (0, 0)` disables it (returns 0), so the
+    default is a no-op for every other caller.
+    """
+    comptime if splits[0] <= 0:
+        return 0
+    else:
+        var plane = 2
+        if out_col < splits[0]:
+            plane = 0
+        elif out_col < splits[1]:
+            plane = 1
+        return plane * plane_stride
 
 
 @fieldwise_init
@@ -148,15 +376,21 @@ struct GemmShape(TrivialRegisterPassable):
         layout_a: Layout,
         layout_b: Layout,
     ](
-        c: LayoutTensor[_, layout_c, ...],
-        a: LayoutTensor[_, layout_a, ...],
-        b: LayoutTensor[_, layout_b, ...],
+        c: LayoutTensor[mut=False, _, layout_c, ...],
+        a: LayoutTensor[mut=False, _, layout_a, ...],
+        b: LayoutTensor[mut=False, _, layout_b, ...],
     ) -> GemmShape:
         """Constructor of a gemm shape record from input buffers.
 
         M, N, and K are intentionally calculated using `a` and `c` ONLY. This
         is because `b` may be padded to a multiple of the tile size if it has
         been pre-packed.
+
+        Parameters:
+            transpose_b: Whether matrix B is stored in transposed form.
+            layout_c: The memory layout of the output C tensor.
+            layout_a: The memory layout of the input A tensor.
+            layout_b: The memory layout of the input B tensor.
 
         Args:
             c: LayoutTensor with allocated output space.
@@ -174,12 +408,19 @@ struct GemmShape(TrivialRegisterPassable):
     @staticmethod
     def get[
         transpose_b: Bool,
-    ](c: TileTensor, a: TileTensor, b: TileTensor,) -> GemmShape:
+    ](
+        c: TileTensor[mut=False, ...],
+        a: TileTensor[mut=False, ...],
+        b: TileTensor[mut=False, ...],
+    ) -> GemmShape:
         """Constructor of a gemm shape record from TileTensor inputs.
 
         M, N, and K are intentionally calculated using `a` and `c` ONLY. This
         is because `b` may be padded to a multiple of the tile size if it has
         been pre-packed.
+
+        Parameters:
+            transpose_b: Whether matrix B is stored in transposed form.
 
         Args:
             c: TileTensor with allocated output space.
@@ -267,6 +508,10 @@ def calculate_tile_n_k[
         c_type: The dtype of the C tensor.
         kernel_cols: The umber of columns of the micro kernel.
 
+    Args:
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+
     Returns:
         The calculated tile size to partition the matmul as (TileN, TileK).
     """
@@ -317,7 +562,7 @@ def _get_tile_n_k[
     c_type: DType,
     kernel_cols: Int,
     transpose_b: Bool,
-](b: TileTensor) -> IndexList[2]:
+](b: TileTensor[mut=False, ...]) -> IndexList[2]:
     comptime assert b.rank == 2
     var tile_n_k: IndexList[2]
 
@@ -336,6 +581,11 @@ def _get_tile_n_k[
 # The number of registers used for the inner kernel is:
 #   kernel_rows*kernel_cols + 1*kernel_cols + 1
 def get_matmul_kernel_shape_x86[kernel_type: Bool]() -> MicroKernelShape:
+    """Returns the micro kernel shape tuned for x86 targets.
+
+    Parameters:
+        kernel_type: Selects between the two tuned shapes for the target.
+    """
     comptime if CompilationTarget.has_avx512f():
         comptime if kernel_type:
             return MicroKernelShape(8, 3)
@@ -348,6 +598,14 @@ def get_matmul_kernel_shape_x86[kernel_type: Bool]() -> MicroKernelShape:
 def get_matmul_kernel_shape_ARM[
     a_type: DType, b_type: DType, c_type: DType, kernel_type: Bool
 ]() -> MicroKernelShape:
+    """Returns the micro kernel shape tuned for ARM targets.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+        kernel_type: Selects between the two tuned shapes for the target.
+    """
     comptime if CompilationTarget.is_neoverse_n1():
         comptime if kernel_type:
             return MicroKernelShape(4, 4)
@@ -372,6 +630,16 @@ def get_matmul_kernel_shape_ARM[
 def get_matmul_kernel_shape[
     a_type: DType, b_type: DType, c_type: DType, kernel_type: Bool
 ]() -> MicroKernelShape:
+    """Returns the micro kernel shape for the current target and dtypes.
+
+    Dispatches to the ARM or x86 variant based on the compilation target.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+        kernel_type: Selects between the two tuned shapes for the target.
+    """
     comptime use_i8mm = use_i8mm_fn[a_type, b_type, c_type]()
 
     comptime if CompilationTarget.has_neon():
@@ -383,6 +651,12 @@ def get_matmul_kernel_shape[
 
 
 def get_matmul_arch_factor[use_vnni: Bool, use_i8mm: Bool]() -> Int:
+    """Returns the architecture-dependent alignment factor for matmul tiling.
+
+    Parameters:
+        use_vnni: Whether VNNI is available on the target.
+        use_i8mm: Whether the i8mm instruction is available on the target.
+    """
     if use_i8mm:
         return 8
     elif use_vnni:
@@ -393,6 +667,10 @@ def get_matmul_arch_factor[use_vnni: Bool, use_i8mm: Bool]() -> Int:
 
 # prefetching at least on the Graviton 2 performs worse than without.
 def get_matmul_prefetch_b_distance_k() -> Int:
+    """Returns the K-dimension prefetch distance for the B matrix.
+
+    Returns zero on NEON targets where prefetching hurts performance.
+    """
     comptime if CompilationTarget.has_neon():
         return 0
     return 4
@@ -401,11 +679,14 @@ def get_matmul_prefetch_b_distance_k() -> Int:
 # Min task size. This is copied from MLAS.
 # TODO: Replace this magic number with a heuristic based on arch.
 def get_min_task_size() -> Int:
+    """Returns the minimum task size used to limit parallel matmul task counts.
+    """
     return 65536
 
 
 # Unroll factor in packing B
 def get_packB_unroll_factor() -> Int:
+    """Returns the unroll factor applied while packing the B matrix."""
     return 8
 
 
@@ -423,7 +704,21 @@ def get_matmul_num_tasks[
     kernel_type: Bool,
 ](m: Int, n: Int, k: Int, max_num_tasks: Int) -> Int:
     """Compute the number of tasks for parallel matmul.
-    The max number of tasks is typically the number of threads/cores."""
+    The max number of tasks is the thread or core count.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+        simd_size: The SIMD vector width for the target and dtype.
+        kernel_type: Selects between the two tuned shapes for the target.
+
+    Args:
+        m: The M dimension of the matmul.
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+        max_num_tasks: Upper bound on task count (thread or core count).
+    """
 
     # The min tasks complexity is from MLAS.
     # TODO: We can fine-tune this based on mojo.matmul's scaling.
@@ -465,6 +760,21 @@ struct SubMatmulConfig(ImplicitlyCopyable):
 def partition_work(
     task_id: Int, num_tasks: Int, work: Int, work_block_size: Int
 ) -> IndexList[2]:
+    """Partitions `work` into blocks distributed across `num_tasks` tasks.
+
+    The work is first grouped into `work_block_size`-sized blocks for alignment
+    and load/store efficiency, then the blocks are split between tasks as
+    evenly as possible.
+
+    Args:
+        task_id: The index of the task to compute the range for.
+        num_tasks: The total number of tasks sharing the work.
+        work: The total amount of work to partition.
+        work_block_size: The block size used to align the partitioning.
+
+    Returns:
+        A pair `(offset, length)` describing this task's work range.
+    """
     var num_work_blocks = ceildiv(work, work_block_size)
     var blocks_per_task, blocks_per_task_extra = divmod(
         num_work_blocks, num_tasks
@@ -490,6 +800,28 @@ def get_partitioned_matmul[
     kernel_rows: Int,
     kernel_cols: Int,
 ](m: Int, n: Int, k: Int, task_id: Int, num_tasks: Int) -> SubMatmulConfig:
+    """Returns the sub-matmul config for a given task in a parallel matmul.
+
+    When the i8mm instruction is available the partition is forced to have an
+    even number of rows, except possibly for the last range.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+        kernel_rows: The static number of rows of the micro kernel.
+        kernel_cols: The static number of columns of the micro kernel.
+
+    Args:
+        m: The M dimension of the matmul.
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+        task_id: The index of the task to compute the partition for.
+        num_tasks: The total number of tasks sharing the matmul.
+
+    Returns:
+        The sub-matmul offset and shape for this task.
+    """
     comptime use_i8mm = use_i8mm_fn[a_type, b_type, c_type]()
 
     comptime if use_i8mm:
@@ -517,6 +849,27 @@ def get_partitioned_matmul_mojo[
     kernel_cols: Int,
     use_i8mm: Bool = False,
 ](m: Int, n: Int, k: Int, task_id: Int, num_tasks: Int) -> SubMatmulConfig:
+    """Returns the sub-matmul config for a task using the Mojo partitioner.
+
+    Splits the work into row and column tasks via `partition_work` after
+    determining the task grid with `get_partitioned_matmul_mojo_shape`.
+
+    Parameters:
+        b_type: The dtype of the B tensor.
+        kernel_rows: The static number of rows of the micro kernel.
+        kernel_cols: The static number of columns of the micro kernel.
+        use_i8mm: Whether the i8mm instruction is available on the target.
+
+    Args:
+        m: The M dimension of the matmul.
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+        task_id: The index of the task to compute the partition for.
+        num_tasks: The total number of tasks sharing the matmul.
+
+    Returns:
+        The sub-matmul offset and shape for this task.
+    """
     var shape = get_partitioned_matmul_mojo_shape[
         b_type, kernel_rows, kernel_cols, use_i8mm
     ](m, n, k, num_tasks)
@@ -538,6 +891,27 @@ def get_partitioned_matmul_mojo_shape[
     kernel_cols: Int,
     use_i8mm: Bool,
 ](m: Int, n: Int, k: Int, num_tasks: Int) -> IndexList[2]:
+    """Returns the row and column task counts that best balance a parallel matmul.
+
+    Searches over feasible task grids and selects the one that minimizes the
+    per-task work, with heuristics for small `m` and L2-cache-aware column
+    partitioning.
+
+    Parameters:
+        b_type: The dtype of the B tensor.
+        kernel_rows: The static number of rows of the micro kernel.
+        kernel_cols: The static number of columns of the micro kernel.
+        use_i8mm: Whether the i8mm instruction is available on the target.
+
+    Args:
+        m: The M dimension of the matmul.
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+        num_tasks: The total number of tasks sharing the matmul.
+
+    Returns:
+        A pair `(num_row_tasks, num_col_tasks)` describing the task grid.
+    """
     var num_row_tasks = 1
     var num_col_tasks = 1
 
@@ -584,6 +958,11 @@ def get_partitioned_matmul_mojo_shape[
 
 def get_pack_data_size[dtype: DType]() -> Int:
     """Utility to compute the number of elements to pack in each tile.
+
+    Parameters:
+        dtype: Element type whose byte size scales the available cache or
+            stack budget into an element count.
+
     Returns:
         The number of elements to pack.
     """
@@ -617,9 +996,14 @@ def get_kernel_config[
     *,
     kernel_type: Bool = False,
 ]() -> KernelConfig:
-    """Utility function to extract matmul configuration parameters for exported
-    Functions.
-        TODO: Add target dependent configuration parameters.
+    """Extracts matmul configuration parameters for exported functions.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+        kernel_type: Selects between the two tuned shapes for the target
+            (defaults to False).
     """
     comptime simd_size = simd_width_of[c_type]()
 
@@ -636,36 +1020,46 @@ def get_kernel_config[
 
 @always_inline
 def use_vnni_fn[a_type: DType, b_type: DType, c_type: DType]() -> Bool:
+    """Returns whether the VNNI instruction should be used for the given dtypes.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+    """
     comptime if (
         CompilationTarget.has_neon_int8_dotprod()
         and not CompilationTarget.has_neon_int8_matmul()
     ):
         return (
-            (a_type == DType.int8 and b_type == DType.int8)
-            or (a_type == DType.uint8 and b_type == DType.uint8)
-        ) and c_type == DType.int32
+            (a_type == .int8 and b_type == .int8)
+            or (a_type == .uint8 and b_type == .uint8)
+        ) and c_type == .int32
     elif CompilationTarget.has_avx2():
-        return (
-            a_type == DType.uint8
-            and b_type == DType.int8
-            and c_type == DType.int32
-        )
+        return a_type == .uint8 and b_type == .int8 and c_type == .int32
     else:
         return False
 
 
 @always_inline
 def use_i8mm_fn[a_type: DType, b_type: DType, c_type: DType]() -> Bool:
+    """Returns whether the i8mm instruction should be used for the given dtypes.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+    """
     # u8u8, u8s8, s8s8, but not s8u8
     # Output must be 32-bit integer (int32 or uint32) since i8mm produces 4-wide
     # SIMD vectors.
     return (
         CompilationTarget.has_neon_int8_matmul()
-        and (c_type == DType.int32 or c_type == DType.uint32)
+        and (c_type == .int32 or c_type == .uint32)
         and (
-            (a_type == DType.uint8 and b_type == DType.uint8)
-            or (a_type == DType.uint8 and b_type == DType.int8)
-            or (a_type == DType.int8 and b_type == DType.int8)
+            (a_type == .uint8 and b_type == .uint8)
+            or (a_type == .uint8 and b_type == .int8)
+            or (a_type == .int8 and b_type == .int8)
         )
     )
 
@@ -674,6 +1068,13 @@ def use_i8mm_fn[a_type: DType, b_type: DType, c_type: DType]() -> Bool:
 # Currently only allows two shapes.
 @always_inline
 def get_kernel_type(m: Int, n: Int, k: Int) -> Bool:
+    """Returns the kernel shape variant to use based on the matmul dimensions.
+
+    Args:
+        m: The M dimension of the matmul.
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+    """
     comptime if CompilationTarget.has_avx512f():
         return m > 0 and m <= 32
     elif CompilationTarget.has_neon():
@@ -687,8 +1088,21 @@ def get_kernel_type(m: Int, n: Int, k: Int) -> Bool:
 
 
 def dispatch_get_kernel_type[
-    func: def[x: Bool]() raises capturing[_] -> None,
-](m: Int, n: Int, k: Int) raises:
+    FuncType: ImplicitlyCopyable & def[x: Bool]() raises -> None,
+](func: FuncType, m: Int, n: Int, k: Int) raises:
+    """Invokes `func` with the kernel type selected for the matmul dimensions.
+
+    Parameters:
+        FuncType: The comptime-parameterized function type to dispatch,
+            specialized on a boolean kernel type.
+
+    Args:
+        func: The comptime-parameterized function to dispatch, specialized on
+            a boolean kernel type.
+        m: The M dimension of the matmul.
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+    """
     if get_kernel_type(m, n, k):
         func[True]()
     else:
@@ -696,8 +1110,23 @@ def dispatch_get_kernel_type[
 
 
 def dispatch_get_kernel_type[
-    func: def[x: Bool]() capturing[_] -> None,
-](m: Int, n: Int, k: Int):
+    FuncType: ImplicitlyCopyable & def[x: Bool]() -> None,
+](func: FuncType, m: Int, n: Int, k: Int):
+    """Invokes `func` with the kernel type selected for the matmul dimensions.
+
+    Non-raising overload of `dispatch_get_kernel_type`.
+
+    Parameters:
+        FuncType: The comptime-parameterized function type to dispatch,
+            specialized on a boolean kernel type.
+
+    Args:
+        func: The comptime-parameterized function to dispatch, specialized on
+            a boolean kernel type.
+        m: The M dimension of the matmul.
+        n: The N dimension of the matmul.
+        k: The K dimension of the matmul.
+    """
     if get_kernel_type(m, n, k):
         func[True]()
     else:
@@ -714,10 +1143,23 @@ def packA_i8mm[
     a_ptr: UnsafePointer[mut=False, Scalar[a_type], ...],
     a_packed_ptr: UnsafePointer[mut=True, Scalar[a_type], ...],
 ):
+    """Packs a range of rows of matrix A for the i8mm kernel layout.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+
+    Args:
+        t0: The starting row index of the range to pack.
+        t1: The ending row index of the range to pack (exclusive).
+        k: The K dimension of the matmul.
+        a_ptr: Pointer to the source A matrix in row-major layout.
+        a_packed_ptr: Pointer to the destination packed A buffer.
+    """
+
     @always_inline
     def packA_helper[
         nrow: Int
-    ](offset: Int) {var k, var t0, read a_ptr, read a_packed_ptr}:
+    ](offset: Int) {var k, var t0, imm a_ptr, imm a_packed_ptr}:
         var kl = align_down(k, 8)
         var kh = align_up(k, 8)
         var j = t0 + offset
@@ -742,6 +1184,8 @@ def packA_i8mm[
 
 @fieldwise_init
 struct InnerKernelID(TrivialRegisterPassable):
+    """Identifies the inner matmul kernel variant selected for a target."""
+
     comptime DEFAULT = InnerKernelID(0)
     comptime VNNI = InnerKernelID(1)
     comptime NEON = InnerKernelID(2)
@@ -758,6 +1202,13 @@ struct InnerKernelID(TrivialRegisterPassable):
 def select_inner_kernel[
     a_type: DType, b_type: DType, c_type: DType
 ]() -> InnerKernelID:
+    """Returns the inner kernel variant to use for the given dtypes and target.
+
+    Parameters:
+        a_type: The dtype of the A tensor.
+        b_type: The dtype of the B tensor.
+        c_type: The dtype of the C tensor.
+    """
     comptime use_vnni = use_vnni_fn[a_type, b_type, c_type]()
     comptime use_i8mm = use_i8mm_fn[a_type, b_type, c_type]()
 
@@ -769,59 +1220,3 @@ def select_inner_kernel[
         return InnerKernelID.DEFAULT
     else:
         return InnerKernelID.VNNI
-
-
-@always_inline
-def apply_epilogue[
-    elementwise_lambda: elementwise_epilogue_type,
-    dst_layout: Layout,
-    dst_element_layout: Layout = Layout(1, 1),
-](src: LayoutTensor, offset: Int):  # register or shared memory
-    # Check if input is 2D simd tile. This is only for double buffer gemm
-    # TODO: extend it to 1D simd tile.
-    comptime if (
-        src.element_layout.rank() == 2
-        and dst_element_layout.shape == src.element_layout.shape
-        and dst_element_layout.stride[1] == 1
-        and src.element_layout.stride[1] == 1
-    ):
-        # update an element tensor.
-        comptime num_copies = src.element_layout.shape[0].value()
-        comptime vec_width = src.element_layout.shape[1].value()
-
-        comptime for i in range(dst_layout.size()):
-            # Offset to the current element.
-            comptime src_offset = src.layout(i)
-            comptime dst_offset = dst_layout(i)
-
-            comptime for j in range(num_copies):
-                comptime src_idx = src_offset + src.element_layout(j)
-                comptime dst_idx = dst_offset + dst_element_layout(j)
-                # C matrix dimension. For 2D simd tile, element_layout preserves
-                # the matrix dimension, layout doesn't.
-                comptime N = dst_element_layout.stride[0].value()
-
-                var vec = src.ptr.load[
-                    width=vec_width,
-                    alignment=align_of[SIMD[src.dtype, vec_width]](),
-                ](src_idx)
-
-                var m, n = divmod(dst_idx + offset, N)
-
-                elementwise_lambda[src.dtype, vec_width]((m, n), vec)
-
-    # Scalar case
-    # TODO: 1D vector is included, should handle it in a separate branch.
-    else:
-        comptime assert dst_element_layout.rank() == 1
-
-        comptime for i in range(src.layout.size() * src.element_size):
-            comptime src_idx = make_layout(src.element_layout, src.layout)(i)
-            comptime dst_idx = make_layout(dst_element_layout, dst_layout)(i)
-            # C matrix dimension. For scalar or 1D vector element, the layout
-            # preserves the matrix dimension.
-            comptime N = dst_layout.stride[0].value()
-
-            var m, n = divmod(src_idx + offset, N)
-
-            elementwise_lambda[src.dtype, 1]((m, n), src.ptr[src_idx + offset])

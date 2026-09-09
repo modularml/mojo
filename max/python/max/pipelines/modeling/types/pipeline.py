@@ -31,13 +31,13 @@ class PipelineInputs:
 
     .. code-block:: python
 
+        from max.pipelines.modeling.types.pipeline import PipelineInputs
+
         class MyPipelineInputs(PipelineInputs):
             def __init__(self, data: str, config: dict):
                 self.data = data
                 self.config = config
     """
-
-    ...
 
 
 # TODO: We should change this to a abstract base class, but this blocks
@@ -107,11 +107,39 @@ class Pipeline(Generic[PipelineInputsType, PipelineOutputType], ABC):
 
     .. code-block:: python
 
+        from max.pipelines.modeling.types.pipeline import (
+            Pipeline,
+            PipelineInputs,
+            PipelineOutput,
+        )
+        from max.pipelines.request import RequestID
+
+        class MyInputs(PipelineInputs):
+            pass
+
+        class MyOutput(PipelineOutput):
+            @property
+            def is_done(self) -> bool:
+                return True
+
         class MyPipeline(Pipeline[MyInputs, MyOutput]):
+            @property
+            def max_batch_size(self) -> int:
+                return 1
+
             def execute(self, inputs: MyInputs) -> dict[RequestID, MyOutput]:
                 # Implementation here
+                return {}
+
+            def release(self, request_id: RequestID) -> None:
                 pass
     """
+
+    @property
+    @abstractmethod
+    def max_batch_size(self) -> int:
+        """Returns the maximum number of requests processed in a single batch."""
+        ...
 
     @abstractmethod
     def execute(

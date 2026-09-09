@@ -1,0 +1,34 @@
+load("//bazel:api.bzl", "modular_run_binary_test", "mojo_binary")
+
+package(default_visibility = ["//oss/modular/docs:__subpackages__"])
+
+MOJO_SRCS = glob(["*.mojo"])
+
+[
+    mojo_binary(
+        name = src.split(".")[0],
+        srcs = [src],
+        copts = [
+            "--ignore-deprecated=a",
+            "--ignore-deprecated=b",
+        ] if src == "basic_deprecation.mojo" else [
+            "--ignore-deprecated=MyStruct",
+            "--ignore-deprecated=OtherStruct.function",
+            "--ignore-deprecated=pi",
+        ],
+        deps = [
+            "@mojo//:std",
+        ],
+    )
+    for src in MOJO_SRCS
+]
+
+[
+    modular_run_binary_test(
+        name = src.split(".")[0] + "_test",
+        size = "small",
+        binary = src.split(".")[0],
+        tags = ["manual"],
+    )
+    for src in MOJO_SRCS
+]

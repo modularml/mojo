@@ -12,7 +12,8 @@ const macDetails = (
 const linuxDetails = (
   <ul>
     <li>Ubuntu 22.04 LTS</li>
-    <li>x86-64 CPU (with&nbsp;<a href="https://www.intel.com/content/www/us/en/support/articles/000057621/processors.html" target="_blank" rel="noopener noreferrer">SSE4.2 or
+    <li>x86-64-v3 or later CPU (Haswell-class or newer; CPUs from approximately 2013
+  onward; with&nbsp;<a href="https://www.intel.com/content/www/us/en/support/articles/000057621/processors.html" target="_blank" rel="noopener noreferrer">SSE4.2 or
       newer</a>)
       or AWS Graviton2/3 CPU</li>
     <li>Minimum 8 GiB RAM (or much more, depending on the model you run)</li>

@@ -65,11 +65,14 @@ class Gemma3LanguageModel(Module[..., tuple[Tensor, ...]]):
         image_token_indices = image_token_indices.to(self.language_model.mesh)
 
         kv_inputs = iter(x._graph_value for x in variadic_args)
-        kv_collections = (
-            self.kv_params.get_symbolic_inputs().unflatten(kv_inputs).inputs
+        kv_cache_local, kv_cache_global = (
+            self.kv_params.unflatten_basic_kv_tree(kv_inputs)
         )
-        kv_collection = PagedCacheValues.from_upstream(
-            kv_collections, tokens.mapping
+        sliding_kv = PagedCacheValues.from_upstream(
+            kv_cache_local, tokens.mapping
+        )
+        global_kv = PagedCacheValues.from_upstream(
+            kv_cache_global, tokens.mapping
         )
 
         # Get text embeddings
@@ -81,6 +84,11 @@ class Gemma3LanguageModel(Module[..., tuple[Tensor, ...]]):
             inputs_embeds, image_embeddings, image_token_indices
         )
 
+        kv_by_type = {
+            "sliding_attention": sliding_kv,
+            "full_attention": global_kv,
+        }
+
         # Run through transformer layers
         h = merged
         for idx, layer in enumerate(self.language_model.layers):
@@ -88,7 +96,7 @@ class Gemma3LanguageModel(Module[..., tuple[Tensor, ...]]):
             h = layer(
                 layer_idx_tensor,
                 h,
-                kv_collection,
+                kv_by_type[self.language_model._layer_kv_key[idx]],
                 input_row_offsets=input_row_offsets,
             )
 

@@ -65,11 +65,11 @@ def custom(
     """Creates a node to execute a custom graph operation in the graph.
 
     The custom op should be registered by annotating a function with the
-    [`@compiler.register`](/mojo/manual/decorators/compiler-register/)
+    [`@extensibility.register`](/api/mojo/extensibility/decorators/register/)
     decorator.
 
     Args:
-        name: The op name provided to ``@compiler.register``.
+        name: The op name provided to ``@extensibility.register``.
         values: The op function's arguments.
         out_types: The list of op function's return type.
         parameters: Dictionary of extra parameters expected by the kernel.
@@ -128,11 +128,11 @@ def inplace_custom(
     """Creates a node to execute an in-place custom graph operation in the graph.
 
     The custom op should be registered by annotating a function with the
-    [`@compiler.register`](/mojo/manual/decorators/compiler-register/)
+    [`@extensibility.register`](/api/mojo/extensibility/decorators/register/)
     decorator.
 
     Args:
-        name: The op name provided to ``@compiler.register``.
+        name: The op name provided to ``@extensibility.register``.
         device: Device that the op is assigned to.
             This becomes a `target` parameter to the kernel.
         values: The op function's arguments.

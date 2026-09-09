@@ -6,7 +6,8 @@ modular_py_library(
     name = "request",
     srcs = glob(["**/*.py"]),
     deps = [
-        requirement("httpx"),
+        # No HTTP client here on purpose: the serving layer fetches media URLs
+        # (see MediaDataUriFetcher in open_responses.py).
         requirement("numpy"),
         requirement("pillow"),
         requirement("pydantic"),

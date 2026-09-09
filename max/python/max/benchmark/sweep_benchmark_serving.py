@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -29,7 +28,6 @@ from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 
-import yaml
 from max.benchmark.benchmark_serving import (
     BenchmarkRunResult,
     save_result_json,
@@ -40,37 +38,18 @@ from max.benchmark.benchmark_serving import (
 from max.benchmark.benchmark_serving import (
     parse_args as _parse_serving_args,
 )
-from max.benchmark.benchmark_shared.config import ServingBenchmarkConfig
+from max.benchmark.benchmark_shared.config import (
+    ServingBenchmarkConfig,
+)
+from max.benchmark.benchmark_shared.model_csv import CsvStreamWriter
 from max.benchmark.sweep_benchmark_serving_result_utils import (
-    LLMBenchmarkResult,
-    LLMBenchmarkResultWriter,
-    SweepServingBenchmarkResult,
     SweepUploader,
-    TextToImageBenchmarkResult,
-    TextToImageBenchmarkResultWriter,
     validate_sweep_serving_percentiles,
 )
 
 DESCRIPTION = "Run a suite of sweep serving benchmarks."
 
 logger = logging.getLogger("sweep-benchmark-serving")
-
-
-def _build_sweep_result(
-    result: BenchmarkRunResult,
-    percentiles: list[int],
-    *,
-    is_pixel_gen: bool = False,
-) -> SweepServingBenchmarkResult:
-    """Convert a :class:`BenchmarkRunResult` to the CSV-writable form."""
-    if result.result is None:
-        if is_pixel_gen:
-            return TextToImageBenchmarkResult.zeros(percentiles)
-        return LLMBenchmarkResult.zeros(percentiles)
-    metrics = result.result.metrics
-    if metrics.task_type == "pixel":
-        return TextToImageBenchmarkResult.from_metrics(metrics, percentiles)
-    return LLMBenchmarkResult.from_metrics(metrics, percentiles)
 
 
 def parse_args(
@@ -131,6 +110,7 @@ def run_sweep(
     *,
     uploader: SweepUploader | None = None,
     report_result: Callable[[BenchmarkRunResult], None] | None = None,
+    server_liveness: Callable[[], bool] | None = None,
 ) -> list[BenchmarkRunResult]:
     """Set up CSV + upload infrastructure and delegate benchmarking to the library.
 
@@ -153,6 +133,11 @@ def run_sweep(
             during the run rather than after — preserves "live progress"
             visibility and ensures partial results survive a mid-sweep
             crash.
+        server_liveness: Optional predicate forwarded to
+            :func:`benchmark_serving.main_with_parsed_args`. When the
+            orchestrator launched the server it passes a process-liveness
+            check so the server-ready wait aborts promptly on a crashed
+            bring-up instead of polling until the timeout.
 
     Returns:
         The per-iteration :class:`BenchmarkRunResult` list produced by
@@ -187,18 +172,6 @@ def run_sweep(
     ]
     validate_sweep_serving_percentiles(percentiles)
 
-    # Peek at workload YAML for task type (needed to choose the CSV writer
-    # class before the benchmark runs).
-    is_pixel_gen = False
-    if config.workload_config:
-        with open(config.workload_config) as f:
-            wl = yaml.safe_load(f)
-        is_pixel_gen = wl.get("benchmark-task") in (
-            "text-to-image",
-            "image-to-image",
-            "text-to-video",
-        )
-
     upload_active = uploader is not None and config.upload_results
 
     # ---- CSV output + upload ----
@@ -214,37 +187,33 @@ def run_sweep(
     # No log directory configured (dry-run without --log-dir): skip CSV
     # and per-result JSON output but still drive the benchmarks.
     if log_dir is None:
-        for result in benchmark_serving_main(config):
+        for result in benchmark_serving_main(
+            config, server_liveness=server_liveness
+        ):
             results.append(result)
             if report_result is not None:
                 report_result(result)
         return results
 
     results_csv_path = log_dir / "results.csv"
-    writer_cls = (
-        TextToImageBenchmarkResultWriter
-        if is_pixel_gen
-        else LLMBenchmarkResultWriter
-    )
-    result_writer = writer_cls(
-        results_csv_path,
-        percentiles=percentiles,
-        collect_gpu_stats=config.collect_gpu_stats,
-        uploader=uploader if upload_active else None,
-    )
-
-    with result_writer:
-        for result in benchmark_serving_main(config):
+    # results.csv streams one row per iteration (all columns) as that
+    # iteration's JSON blob is written, so a crash mid-sweep still leaves the
+    # completed rows on disk. The per-concurrency JSON blobs remain the source
+    # of truth; the authoritative all-columns superset can be regenerated from
+    # them via results_to_csv if a later iteration surfaces new columns.
+    with CsvStreamWriter(results_csv_path) as csv_writer:
+        for result in benchmark_serving_main(
+            config, server_liveness=server_liveness
+        ):
             results.append(result)
-            # Save per-concurrency JSON with full metrics.
-            json_path: str | None = None
+            # Save per-concurrency JSON with full metrics, then stream its row.
             if result.result is not None:
                 assert config.model is not None
-                json_path = str(
+                json_path = (
                     log_dir / f"results-{result.max_concurrency}-median.json"
                 )
                 save_result_json(
-                    json_path,
+                    str(json_path),
                     config,
                     result.result,
                     benchmark_task=config.benchmark_task,
@@ -253,24 +222,13 @@ def run_sweep(
                     request_rate=result.request_rate,
                     record_max_concurrency=result.max_concurrency,
                 )
+                csv_writer.write_result(json_path)
+                if upload_active and uploader is not None:
+                    uploader.upload(str(json_path))
 
-            sweep_result = _build_sweep_result(
-                result, percentiles, is_pixel_gen=is_pixel_gen
-            )
-            if upload_active:
-                sweep_result.result_filename = json_path
-
-            result_writer.write_row(
-                max_concurrency=result.max_concurrency,
-                request_rate=result.request_rate,
-                num_prompts=result.num_prompts,
-                result=sweep_result,
-            )
-
-            # Stream the row to the results-publication reporter, if the
-            # caller wired one in. Fires here — after CSV/upload side
-            # effects, before the next iteration begins — so a crash
-            # mid-sweep still leaves rows 1..N-1 published downstream.
+            # Stream the row to the results-publication reporter, if the caller
+            # wired one in — so a crash mid-sweep still leaves rows 1..N-1
+            # published downstream.
             if report_result is not None:
                 report_result(result)
 

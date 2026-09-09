@@ -25,11 +25,11 @@ SDK, APIs, and tools. The SDK provides:
 
 # Build specific components
 ./bazelw build //max/python/max
-./bazelw build //max/python/max/entrypoints:pipelines
+./bazelw build //max/python/max/_entrypoints:pipelines
 ./bazelw build //max/python/max/serve
 
 # Build and install MAX CLI
-./bazelw run //max/python/max/entrypoints:pipelines
+./bazelw run //max/python/max/_entrypoints:pipelines
 ```
 
 ### Running Tests
@@ -40,14 +40,13 @@ SDK, APIs, and tools. The SDK provides:
 
 # Run specific test suites
 ./bazelw test //max/tests/integration/graph
-./bazelw test //max/tests/integration/architectures/llama3:test_cross_attention
+./bazelw test //max/tests/integration/architectures/llama3:tests_gpu
 
 # Run tests with specific arguments
 ./bazelw test --test_arg=-k --test_arg=test_attention \
-  //max/tests/integration/architectures/llama3:test_cross_attention
+  //max/tests/integration/architectures/llama3:tests_gpu
 
 # Run GPU tests remotely
-bt-h100 //max/tests/integration/architectures/llama3:tests_gpu
 bt-b200 //max/tests/integration/architectures/llama3:tests_gpu
 ```
 
@@ -87,16 +86,16 @@ bt-b200 //max/tests/integration/architectures/llama3:tests_gpu
 
 ```bash
 # Generate text with a model
-./bazelw run //max/python/max/entrypoints:pipelines -- generate \
+./bazelw run //max/python/max/_entrypoints:pipelines -- generate \
   --model modularai/Llama-3.1-8B-Instruct-GGUF \
   --prompt "Hello, world!"
 
 # Serve a model locally
-./bazelw run //max/python/max/entrypoints:pipelines -- serve \
+./bazelw run //max/python/max/_entrypoints:pipelines -- serve \
   --model modularai/Llama-3.1-8B-Instruct-GGUF
 
 # Run with custom configuration
-./bazelw run //max/python/max/entrypoints:pipelines -- generate \
+./bazelw run //max/python/max/_entrypoints:pipelines -- generate \
   --model model.gguf \
   --max-new-tokens 256 \
   --temperature 0.7
@@ -135,8 +134,7 @@ result = session.run(input_data)
 
 ```python
 @register_pipelines_model("your-model", provider="your-org")
-class YourModelConfig(HFModelConfig):
-    ...
+class YourModelConfig(HFModelConfig): ...
 ```
 
 ## Testing Guidelines
@@ -151,10 +149,10 @@ class YourModelConfig(HFModelConfig):
 
 ```bash
 # Test full pipeline execution
-./bazelw test //max/tests/integration:test_llama3
+./bazelw test //max/tests/integration/architectures/llama3:tests_gpu
 
 # Test serving infrastructure
-./bazelw test //max/tests/integration/serve:test_tinyllama_serving_cpu
+./bazelw test //max/tests/integration/serve:tests_cpu_hf
 ```
 
 ### Avoid Per-Test Graph Recompilation
@@ -185,7 +183,7 @@ blow-up is in CI, not locally.
   test sharding instead of splitting into separate files. Add `shard_count` or
   `per_test_shard_count` to the BUILD rule:
 
-  ```python
+  ```bzl
   modular_py_test(
       name = "tests",
       srcs = ["test_attention.py", ...],
@@ -211,11 +209,11 @@ blow-up is in CI, not locally.
 
 ```bash
 # Benchmark model performance
-./bazelw run //max/python/max/entrypoints:pipelines -- benchmark \
+./bazelw run //max/python/max/_entrypoints:pipelines -- benchmark \
   --model model
 
 # Profile model execution
-./bazelw run //max/python/max/entrypoints:pipelines -- profile \
+./bazelw run //max/python/max/_entrypoints:pipelines -- profile \
   --model model
 ```
 
@@ -325,14 +323,16 @@ When investigating model issues or comparing configurations between models:
    ```
 
 3. **Model versions are locked in**:
-   - Check `max/tests/integration/hf-repo-lock.tsv` for
-     exact revision hashes
+   - Our CI runners resolve models offline against a lockfile of exact revision
+     hashes, kept with the internal HuggingFace cache populator that downloads
+     them (`CloudInfra/services/huggingface-cache-populator/hf-repo-lock.tsv`,
+     not present in the open-source tree)
    - This ensures reproducible builds and tests
 
 ### Adding New Operations
 
 1. Implement operation in `//max/python/max/graph/ops/`
-2. Add C++ binding if needed in `//max/python/max/_core/internal/`
+2. Add C++ binding if needed in `//max/python/max/_core/`
 3. Write comprehensive tests
 4. Update documentation
 
@@ -347,26 +347,10 @@ weights = load_pytorch("model.pt")
 weights = load_safetensors("model.safetensors")
 ```
 
-## SDK-Specific Build Configurations
-
-```bash
-# Debug SDK components
-c debug-sdk
-
-# Optimize for serving
-c serving-opt
-
-# Enable profiling
-c profile
-```
-
 ## Important Notes
 
 - Always run formatting before committing: `./bazelw run //:format`
 - Use type hints throughout Python code
-- Follow the Graph API style guide in `docs/GraphAPIStyleGuide.md`
 - Write comprehensive tests for new features
 - Document new architectures in `architectures/README.md`
 - Performance improvements should include benchmarks
-- Refer to docs/internal/PythonDocstringStyleGuide.md for Python docstring
-  style.

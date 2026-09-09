@@ -167,3 +167,44 @@ def check_streaming_protocol(first_tc_chunks: dict[int, Any]) -> list[str]:
 def check_no_forbidden_tokens(text: str, tokens: list[str]) -> list[str]:
     """Check text for forbidden token substrings. Returns list of found tokens."""
     return [t for t in tokens if t in text]
+
+
+# Structural / reasoning control tokens across tool-calling models. The serving
+# layer decodes with ``skip_special_tokens=True``, so none of these should ever
+# appear as literal text in ``message.content`` / ``message.reasoning``; one that
+# does signals a parser/matcher desync or a dropped reasoning span (a
+# regression). When adding a tool-calling architecture, add its markers
+# here (sourced from its ``tool_parser.py`` / ``reasoning.py``).
+STRUCTURAL_LEAK_MARKERS: tuple[str, ...] = (
+    # Kimi K2.5 — architectures/kimik2_5/{tool_parser,reasoning}.py
+    "<|tool_calls_section_begin|>",
+    "<|tool_calls_section_end|>",
+    "<|tool_call_begin|>",
+    "<|tool_call_end|>",
+    "<|tool_call_argument_begin|>",
+    "<|im_end|>",
+    # Gemma 4 — architectures/gemma4/{tokenizer,reasoning}.py (SpecialToken)
+    "<|tool_call>",
+    "<tool_call|>",
+    "<|tool>",
+    "<tool|>",
+    "<|tool_response>",
+    "<tool_response|>",
+    '<|"|>',
+    "<turn|>",
+    "<|channel>",
+    "<channel|>",
+    # MiniMax M2 — architectures/minimax_m2/tool_parser.py
+    "<minimax:tool_call>",
+    "</minimax:tool_call>",
+    # GLM-4.5+ (GLM-5.1 / GLM-5.2) — architectures/glm5_1/tool_parser.py
+    "<tool_call>",
+    "</tool_call>",
+    "<arg_key>",
+    "</arg_key>",
+    "<arg_value>",
+    "</arg_value>",
+    # Shared reasoning delimiters (Kimi K2.5, MiniMax M2).
+    "<think>",
+    "</think>",
+)

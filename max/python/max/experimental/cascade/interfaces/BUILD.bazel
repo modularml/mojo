@@ -1,0 +1,16 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+# Cascade pipeline abstractions: the CascadePipeline base, the text/image-gen
+# interfaces, and their request DTOs. Sits below workers and the concrete
+# pipelines so neither workers nor serve has to depend on concrete pipeline
+# implementations.
+modular_py_library(
+    name = "interfaces",
+    srcs = glob(["*.py"]),
+    deps = [
+        requirement("pydantic"),
+        "//max/python/max/experimental/cascade/core",
+    ],
+)

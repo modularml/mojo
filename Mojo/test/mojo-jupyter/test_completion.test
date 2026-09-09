@@ -1,0 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// This file is Modular Inc proprietary.
+//
+//===----------------------------------------------------------------------===//
+
+// RUN: %mojo_jupyter_executor %S/test_completion.ipynb | FileCheck %s
+
+// Check completions for `std.builtin.`.
+// CHECK: completion: range
+// CHECK: completion: string
+
+// Check completions for `struct.`.
+// CHECK: completion: field_value

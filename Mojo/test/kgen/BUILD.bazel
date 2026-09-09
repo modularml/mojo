@@ -1,0 +1,21 @@
+load("//bazel:api.bzl", "lit_tests")
+
+package(default_visibility = ["//visibility:private"])
+
+lit_tests(
+    name = "kgen",
+    srcs = glob([
+        "**/*.mlir",
+        "**/*.ll",
+    ]),
+    tools = [
+        "//Mojo/tools/hash-mlir",
+        "//Mojo/tools/kgen",
+        "//Mojo/tools/kgen-llvm-opt",
+        "//Mojo/tools/kgen-opt",
+        "//Mojo/tools/kgen-translate",
+        "//Mojo/tools/llvm-module-split",
+        "@llvm-project//llvm:llvm-dis",
+        "@llvm-project//llvm:llvm-objdump",
+    ],
+)

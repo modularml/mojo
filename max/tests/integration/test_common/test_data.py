@@ -20,10 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, cast
 
+from max.pipelines.context import SamplingParams
 from max.pipelines.modeling.types import (
     ImageContentPart,
     RequestID,
-    SamplingParams,
     TextContentPart,
     TextGenerationRequest,
     TextGenerationRequestMessage,
@@ -36,7 +36,7 @@ from max.pipelines.request.provider_options import (
     ImageProviderOptions,
     ProviderOptions,
 )
-from max.support import fetch_bytes_from_s3
+from test_common.storage import load_bytes
 
 
 @dataclass(frozen=True)
@@ -130,7 +130,13 @@ class MockTextGenerationRequest:
                 model_name=self.model_name,
                 sampling_params=sampling_params,
                 messages=self.messages,
-                images=[fetch_bytes_from_s3(img) for img in self.images],
+                # `load_bytes` rather than `max.support.fetch_bytes_from_s3`:
+                # it caches under ~/.cache/modular/testdata and falls back to
+                # anonymous credentials for this public bucket, which is what
+                # the torch half of logit verification already does. Without it
+                # the MAX half of a multimodal comparison needs an AWS SSO
+                # session and the torch half does not.
+                images=[load_bytes(img) for img in self.images],
             )
         else:
             return TextGenerationRequest(

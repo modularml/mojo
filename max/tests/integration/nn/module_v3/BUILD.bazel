@@ -1,25 +1,51 @@
 load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("//max/tests/integration/xarch_warm:eager_py_test.bzl", "modular_eager_py_test")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
 
-modular_py_test(
+modular_eager_py_test(
     name = "tests",
-    srcs = glob(["**/*.py"]),
+    srcs = [
+        "norm/test_rms_norm.py",
+        "rope/test_rope.py",
+        "rope/test_yarn.py",
+        "test_attention_stacked_qkv.py",
+        "test_embedding.py",
+        "test_linear.py",
+        "test_module.py",
+        "test_module_typing.py",
+        "test_print_hook.py",
+        "test_qkv_linear.py",
+        "test_sequential.py",
+        "test_subgraph.py",
+        "test_transparent_module.py",
+    ],
+    cpu_only = True,
     data = ["//max/tests/integration/Inputs/kernel_verification_ops"],
     env = {
+        # Don't background-compile every eager graph (SDLC-4307 CI cpu/mem).
+        "MAX_EAGER_EXECUTOR": "fallback-internal",
         "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
+    },
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
+    per_test_shard_count = {
+        # Each case compiles its own graph; shard so the per-test compiles run
+        # in parallel and the suite stays well under the per-target timeout.
+        "test_subgraph.py": 4,
     },
     per_test_tags = {
         "rope/test_rope.py": ["skip-external-ci"],
         "rope/test_yarn.py": ["manual"],
         "test_module.py": ["skip-external-ci"],
-        "test_module_gpt2.py": ["manual"],
         "test_module_typing.py": ["skip-external-ci"],
+        "test_print_hook.py": ["skip-external-ci"],
     },
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
@@ -27,12 +53,106 @@ modular_py_test(
         "//conditions:default": [],
     }),
     deps = [
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/experimental/testing",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/nn/hooks:print_hook",
+        requirement("numpy"),
+        requirement("typing-extensions"),
+    ],
+)
+
+modular_py_test(
+    name = "test_module_gpu",
+    srcs = ["test_module_gpu.py"],
+    # See `tests` (SDLC-4307).
+    env = {"MAX_EAGER_EXECUTOR": "fallback-internal"},
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
+    tags = ["gpu"],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        # FIXME: MOCO-2411
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": ["//:nvidia_gpu"],
+    }),
+    deps = [
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+    ],
+)
+
+modular_eager_py_test(
+    name = "tests_gpu",
+    srcs = [
+        "norm/test_group_norm.py",
+        "test_conv.py",
+        "test_conv2d_orientation.py",
+        "test_module_gpt2.py",
+    ],
+    data = ["//max/tests/integration/Inputs/kernel_verification_ops"],
+    env = {
+        # See `tests` (SDLC-4307).
+        "MAX_EAGER_EXECUTOR": "fallback-internal",
+        "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
+    },
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    gpu_constraints = ["//:has_gpu"],
+    ignore_extra_deps = [
+        # lazy import
+        "//max/python/max/_interpreter_ops",
+    ],
+    per_test_tags = {
+        "test_module_gpt2.py": ["manual"],
+    },
+    tags = ["gpu"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
+        "//:asan": ["@platforms//:incompatible"],  # Too slow under ASAN
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/_interpreter_ops",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/experimental",
         "//max/python/max/experimental/nn",
         "//max/python/max/graph",
+        requirement("numpy"),
         requirement("torch"),
-        requirement("typing-extensions"),
+    ],
+)
+
+modular_py_test(
+    name = "lora_wrapper_tests",
+    size = "large",
+    srcs = ["test_lora_wrapper_gpu.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    tags = [
+        "gpu",
+    ],
+    # The SGMV kernels are validated on B200 only.
+    target_compatible_with = ["//:b200_gpu"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        requirement("numpy"),
+        requirement("torch"),
     ],
 )

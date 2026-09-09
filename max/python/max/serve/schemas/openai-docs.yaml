@@ -3,53 +3,8 @@ info:
   title: MAX REST API reference
   description: |
 
-    MAX is a high-performance, Python-based inference server for
-    deploying large language models (LLMs) locally or in the cloud. It provides
-    efficient request handling through advanced batching and scheduling, and
-    an OpenAI-compatible REST endpoint.
-
-    ## Get started
-
-    With just a few commands, you can start a local endpoint with the GenAI
-    model of your choice using our [`max`](/max/cli) CLI
-    and start sending requests.
-
-    When you want to deploy your model to a cloud-hosted endpoint, you can use
-    our [MAX container](/max/container)—see our [Get started with
-    MAX](/max/get-started) and then see our tutorials on using MAX:
-
-    - [Start a chat endpoint](/max/inference/text-to-text)
-    - [Serve an embedding model](/max/inference/embeddings)
-    - [Image-to-text use cases](/max/inference/image-to-text)
-    - [Image generation](/max/inference/image-generation)
-    - [Deploy MAX on GPU in the cloud](/max/deploy/local-to-cloud/)
-
-    ## OpenAI API compatibility
-
-    The MAX REST API is compatible with a subset of the [OpenAI REST
-    API](https://platform.openai.com/docs/api-reference/introduction). This
-    allows you to use many existing OpenAI client applications with MAX
-    endpoints.
-
-    - **Supported endpoints:**
-
-        - [Responses](#POST/v1/responses) (`/v1/responses`)
-        - [Chat completions](#POST/v1/chat/completions) (`/v1/chat/completions`)
-        - [Completions](#POST/v1/completions) (`/v1/completions`)
-        - [Embeddings](#POST/v1/embeddings) (`/v1/embeddings`)
-        - [Batches](#POST/v1/batches) (`/v1/batches`) - The `v1/batches` API is only available as part of Modular's Dedicated Endpoint and Enterprise [editions](https://www.modular.com/pricing).
-        - [List models](#GET/v1/models) (`/v1/models`)
-        - [Health check](#GET/health) (`/health`)
-
-    - **Parameter handling:** While aiming for high compatibility, not all
-    OpenAI body parameters are implemented. Some may be accepted as no-ops
-    (ignored but won't cause errors) to maintain client compatibility. The
-    specific endpoint documentation below details only the parameters that
-    actively affect behavior in MAX.
-
-    In addition to the OpenAI APIs, MAX provides a Prometheus-formatted
-    [metrics endpoint](/max/container#metrics) to help track your model's
-    performance.
+    The MAX REST API provides an OpenAI-compatible REST endpoint for deploying
+    LLMs and other GenAI models locally or in the cloud.
 
 paths:
   /v1/responses:
@@ -58,8 +13,8 @@ paths:
       summary: Create response
       description: |
         Creates a response for the given input. Supports image generation
-        (text-to-image, image-to-image) and video generation (text-to-video,
-        image-to-video). This endpoint follows the
+        (text-to-image, image-to-image), video generation (text-to-video,
+        image-to-video), and audio generation. This endpoint follows the
         [Open Responses](https://huggingface.co/blog/open-responses)
         specification.
 
@@ -71,8 +26,9 @@ paths:
         ```
 
         For detailed usage examples, see the
-        [image generation guide](/max/inference/image-generation) and the
-        [video generation guide](/max/inference/video-generation).
+        [image generation guide](/serve/image-generation), the
+        [video generation guide](/serve/video-generation), and the
+        [audio generation guide](/serve/audio-generation).
       requestBody:
         required: true
         content:
@@ -136,7 +92,8 @@ paths:
                   type: object
                   description: |
                     Provider-specific generation options. Use the `image` key
-                    for image generation models and the `video` key for video
+                    for image generation models, the `video` key for video
+                    generation models, and the `audio` key for audio
                     generation models. The `max` key applies to all models.
                   properties:
                     image:
@@ -147,14 +104,14 @@ paths:
                           type: integer
                           description: |
                             Output image height in pixels. Must be at least 128
-                            and a multiple of 16. Defaults to the model's
+                            and a multiple of 8. Defaults to the model's
                             native resolution.
                           minimum: 128
                         width:
                           type: integer
                           description: |
                             Output image width in pixels. Must be at least 128
-                            and a multiple of 16. Defaults to the model's
+                            and a multiple of 8. Defaults to the model's
                             native resolution.
                           minimum: 128
                         steps:
@@ -343,6 +300,46 @@ paths:
                             inline in `output[0].content[0].video_data`.
                           default: url
                           enum: [url, b64_json]
+                    audio:
+                      type: object
+                      description: |
+                        Configuration options for audio generation models.
+                      properties:
+                        lyrics:
+                          type: string
+                          description: |
+                            The lyrics to sing. Applies to music generation
+                            models.
+                        audio_duration:
+                          type: number
+                          description: |
+                            The maximum length of the generated audio, in
+                            seconds. If you omit
+                            this field, the model uses its default duration.
+                          exclusiveMinimum: 0.0
+                        steps:
+                          type: integer
+                          description: |
+                            The number of denoising steps to run. Applies to
+                            models that generate audio with a diffusion or
+                            flow-matching stage. If you omit this field, the
+                            model uses its default number of steps.
+                          minimum: 1
+                        guidance_scale:
+                          type: number
+                          description: |
+                            The classifier-free guidance scale. If you omit
+                            this field, the model uses its own scales. Audio
+                            models often guide their autoregressive and
+                            denoising stages at different strengths.
+                          exclusiveMinimum: 0.0
+                        audio_format:
+                          type: string
+                          description: |
+                            The format for the returned audio. Only
+                            `wav` is supported.
+                          default: wav
+                          enum: [wav]
             examples:
               textToImage:
                 summary: Text-to-image generation
@@ -402,6 +399,16 @@ paths:
                       num_frames: 81
                       frames_per_second: 16
                       response_format: b64_json
+              audioGeneration:
+                summary: Music generation from a caption and lyrics
+                value:
+                  model: "MiniMaxAI/MiniMax-Music3"
+                  input: "Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums."
+                  seed: 1235
+                  provider_options:
+                    audio:
+                      lyrics: "[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer"
+                      audio_duration: 30
       responses:
         '200':
           description: OK
@@ -461,6 +468,108 @@ paths:
                                   is `url` (the default for video models).
                                   Download from
                                   `GET /v1/videos/{video_id}/content`.
+                              type:
+                                type: string
+                                description: |
+                                  Content-part discriminator. For audio
+                                  output this is `output_audio`.
+                              audio_url:
+                                type: string
+                                description: |
+                                  URL to download the generated audio.
+                              format:
+                                type: string
+                                description: |
+                                  Format of the generated audio. Only
+                                  `wav` is supported.
+                              sample_rate:
+                                type: integer
+                                description: |
+                                  Sample rate of the generated audio, in
+                                  hertz.
+                              num_samples:
+                                type: integer
+                                description: |
+                                  Number of samples per channel in the
+                                  generated audio.
+                  usage:
+                    type: object
+                    description: |
+                      Token and resource usage for the response. For image
+                      generation, token counts are 0; see
+                      `image_generation_details` for image-specific metadata.
+                    properties:
+                      input_tokens:
+                        type: integer
+                        description: The total number of input tokens.
+                      output_tokens:
+                        type: integer
+                        description: The total number of output tokens.
+                      total_tokens:
+                        type: integer
+                        description: The total number of input and output tokens.
+                      input_tokens_details:
+                        type: object
+                        description: Detailed breakdown of input token counts.
+                      output_tokens_details:
+                        type: object
+                        description: Detailed breakdown of output token counts.
+                      image_generation_details:
+                        type: object
+                        description: |
+                          Image generation metadata, present when the response
+                          contains generated images.
+                        required:
+                          - width
+                          - height
+                          - megapixels
+                          - steps
+                          - image_count
+                        properties:
+                          width:
+                            type: integer
+                            description: The width of each generated image in pixels.
+                          height:
+                            type: integer
+                            description: The height of each generated image in pixels.
+                          megapixels:
+                            type: number
+                            description: The megapixels per image.
+                          steps:
+                            type: integer
+                            description: The number of denoising steps used per image.
+                          image_count:
+                            type: integer
+                            description: The number of images generated for the request.
+                      audio_generation_details:
+                        type: object
+                        description: |
+                          Audio generation metadata. Only present when the
+                          response contains generated audio.
+                        required:
+                          - duration_seconds
+                          - sample_rate
+                          - channels
+                          - num_samples
+                          - steps
+                        properties:
+                          duration_seconds:
+                            type: number
+                            description: Duration of the generated audio, in seconds.
+                          sample_rate:
+                            type: integer
+                            description: Sample rate of the generated audio, in hertz.
+                          channels:
+                            type: integer
+                            description: Number of channels in the generated audio.
+                          num_samples:
+                            type: integer
+                            description: Number of samples per channel.
+                          steps:
+                            type: integer
+                            description: |
+                              Number of denoising steps used to generate
+                              the audio.
         '400':
           description: Bad request
           content:
@@ -497,7 +606,7 @@ paths:
                       "content": "Who won the world series in 2020?"
                     },
                 ],
-                max_tokens=100
+                max_completion_tokens=100
             )
 
             print(completion.choices[0].message.content)
@@ -513,7 +622,7 @@ paths:
                     "content": "Who won the world series in 2020?"
                   }
                 ],
-                "max_tokens": 100
+                "max_completion_tokens": 100
               }'
       requestBody:
         required: true
@@ -529,7 +638,7 @@ paths:
                   messages:
                     - role: "user"
                       content: "Who won the world series in 2020?"
-                  max_tokens: 100
+                  max_completion_tokens: 100
               streaming:
                 summary: Streaming chat completion
                 value:
@@ -540,7 +649,7 @@ paths:
                     - role: "user"
                       content: "Write a short poem about AI."
                   stream: true
-                  max_tokens: 100
+                  max_completion_tokens: 100
               withTools:
                 summary: Chat completion with tools
                 value:
@@ -562,7 +671,7 @@ paths:
                               type: "string"
                           required: ["location"]
                   tool_choice: "auto"
-                  max_tokens: 100
+                  max_completion_tokens: 100
               jsonResponse:
                 summary: Chat completion with JSON response format
                 value:
@@ -574,7 +683,7 @@ paths:
                       content: "Generate a JSON object with name, age, and occupation fields"
                   response_format:
                     type: "json_object"
-                  max_tokens: 100
+                  max_completion_tokens: 100
               withImage:
                 summary: Chat completion with image
                 value:
@@ -595,7 +704,7 @@ paths:
                           }
                         }
                       ]
-                  max_tokens: 300
+                  max_completion_tokens: 300
       responses:
         '200':
           description: OK
@@ -743,7 +852,10 @@ paths:
                           tokens: null
                           top_logprobs: []
                     system_fingerprint: null
-                    usage: null
+                    usage:
+                      prompt_tokens: 5
+                      completion_tokens: 36
+                      total_tokens: 41
                 withLogprobs:
                   summary: Completion response with logprobs
                   value:
@@ -864,16 +976,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /v1/batches:
+  /v1/audio/speech:
     post:
-      operationId: createBatch
-      summary: Create batch
+      operationId: createSpeech
+      summary: Create speech
       description: |
-        Creates and executes a batch from an uploaded file of requests.
+        Generates audio from a text prompt. Only compatible with
+        audio or music generation models.
 
-        **Note:** The `v1/batches` API is available as part of Modular's [cloud editions](https://www.modular.com/pricing).
-        If you create a batch and get the response `{"detail":"Not Found"}`, then you don't have access.
-        [Get in touch](https://www.modular.com/request-demo) to learn about access for enterprise teams.
+        For a full walkthrough, see the
+        [audio generation guide](/serve/audio-generation).
       x-codeSamples:
         - lang: Python
           source: |
@@ -884,81 +996,115 @@ paths:
                 api_key="EMPTY",
             )
 
-            client.batches.create(
-                input_file_id=input_path,
-                output_file_id=output_path,
-                endpoint="/v1/chat/completions",
-                completion_window="24h",
-                metadata={
-                    "model": "model-provider/model-ID"
-                }
+            response = client.audio.speech.create(
+                model="MiniMaxAI/MiniMax-Music3",
+                input="[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer",
+                instructions="Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums.",
+                voice="",
+                response_format="wav",
+                extra_body={"audio_duration": 30, "seed": 1235},
             )
+
+            response.write_to_file("song.wav")
         - lang: curl
           source: |
-            curl -X POST http://0.0.0.0:8000/v1/batches \
+            curl -X POST http://0.0.0.0:8000/v1/audio/speech \
               -H "Content-Type: application/json" \
+              -o song.wav \
               -d '{
-                "input_file_id": "input_path",
-                "output_file_id": "output_path",
-                "endpoint": "/v1/chat/completions",
-                "completion_window": "24h",
-                "metadata": {
-                    "model": "model_provider/model_ID"
-                }
+                "model": "MiniMaxAI/MiniMax-Music3",
+                "instructions": "Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums.",
+                "input": "[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer",
+                "audio_duration": 30,
+                "seed": 1235
               }'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Batch'
+              type: object
+              required:
+                - model
+                - input
+                - instructions
+              properties:
+                model:
+                  type: string
+                  description: The ID of the audio generation model to use.
+                input:
+                  type: string
+                  description: |
+                    The text the model renders as audio. For a model
+                    that sings, this field holds the lyrics.
+                instructions:
+                  type: string
+                  description: |
+                    A description of how the audio sounds,
+                    such as the genre, tempo, key, mood, vocal, and
+                    arrangement. Music models require this field.
+                voice:
+                  type: string
+                  description: |
+                    The voice to use. Exists for OpenAI compatibility only;
+                    MAX accepts the field and ignores its value.
+                response_format:
+                  type: string
+                  description: |
+                    The container format for the returned audio. MAX
+                    supports only `wav`. Any other value, such as `mp3`,
+                    returns a `400` error.
+                  default: wav
+                  enum: [wav]
+                audio_duration:
+                  type: number
+                  description: |
+                    The maximum length of the generated audio, in seconds.
+                    If you omit this field, the
+                    model uses its own default duration.
+                  default: 60
+                  exclusiveMinimum: 0.0
+                steps:
+                  type: integer
+                  description: |
+                    The number of denoising steps in the flow-matching
+                    stage. Higher values improve the audio quality and
+                    increase the latency. If you omit this field, the model
+                    uses its own default.
+                  default: 30
+                  minimum: 1
+                guidance_scale:
+                  type: number
+                  description: |
+                    The classifier-free guidance scale.
+                  default: 1.7
+                  exclusiveMinimum: 0.0
+                seed:
+                  type: integer
+                  description: |
+                    The seed for the sampling and noise draws. The same seed
+                    and the same prompt reproduce the same audio.
+                  default: 0
             examples:
-              singleString:
-                summary: Batch request example for chat completions
+              musicGeneration:
+                summary: Music generation from a caption and lyrics
                 value:
-                  completion_window: "24h"
-                  endpoint: "/v1/chat/completions"
-                  input_file_id: "input_path"
-                  metadata:
-                    model: "model_provider/model_ID"
-                    metadata_key: "metadata_value"
-                  output_file_id: "output_path"
+                  model: "MiniMaxAI/MiniMax-Music3"
+                  input: "[verse]\nHeadlights paint the empty road\n[chorus]\nHold the night a little longer"
+                  instructions: "Global Metadata: dream pop, 92 BPM, A minor. Vocal Details: female lead, airy breathy timbre. Arrangement: shimmering electric guitar, soft brushed drums."
+                  audio_duration: 30
+                  seed: 1235
       responses:
         '200':
           description: OK
           content:
-            application/json:
+            audio/wav:
               schema:
-                $ref: '#/components/schemas/BatchResponse'
-              examples:
-                basic:
-                  summary: Basic batch completion response
-                  value:
-                    id: "batch_ID"
-                    object: "batch"
-                    endpoint: "/v1/chat/completions"
-                    errors: null
-                    input_file_id: "input_path"
-                    completion_window: "24h"
-                    status: "validating"
-                    output_file_id: "output_path"
-                    error_file_id: null
-                    created_at: 1711471533
-                    in_progress_at: null
-                    expires_at: null
-                    finalizing_at: null
-                    completed_at: null
-                    failed_at: null
-                    expired_at: null
-                    cancelling_at: null
-                    cancelled_at: null
-                    request_counts:
-                      total: 0
-                      completed: 0
-                      failed: 0
-                    metadata:
-                      model: "model_provider/model_ID"
-                      metadata_key: "metadata_value"
+                type: string
+                format: binary
+                description: |
+                  The generated audio as 16-bit PCM WAV at the model's own
+                  sample rate.
         '400':
           description: Bad request
           content:
@@ -1075,12 +1221,74 @@ components:
         max_tokens:
           type: integer
           minimum: 1
+          deprecated: true
           description: |
             The maximum number of tokens to generate in the chat completion.
+        max_completion_tokens:
+          type: integer
+          minimum: 1
+          description: |
+            The maximum number of tokens to generate in the chat completion.
+            Preferred alias for `max_tokens`. If both are supplied,
+            `max_completion_tokens` takes precedence (no error is raised).
+        reasoning_effort:
+          type: string
+          description: |
+            Controls how much effort the model spends on reasoning. Set to
+            `none` to disable thinking, or `low`, `medium`, or `high` to
+            control the trade-off between speed and reasoning depth. If the
+            request also includes `reasoning.effort`, this field takes
+            precedence.
+        thinking:
+          type: object
+          required:
+            - type
+          description: |
+            Controls model reasoning. Useful if the model expects `thinking`
+            rather than `reasoning` parameters.
+          properties:
+            type:
+              type: string
+              enum: [enabled, disabled, adaptive]
+              description: The reasoning mode.
+        reasoning:
+          type: object
+          description: |
+            Sets the reasoning configuration. See the
+            [Reasoning](/serve/reasoning/) guide for more information.
+
+            Note that some fields are non-functional and only exist
+            to maintain compatibility with different providers.
+          properties:
+            enabled:
+              type: boolean
+              description: Whether to enable reasoning.
+            effort:
+              type: string
+              description: |
+                Controls reasoning effort when `reasoning.enabled` is not set.
+                Set to `none` to disable thinking, or `low`, `medium`, or
+                `high` to enable reasoning at the specified level. Ignored
+                when `enabled` is explicitly set.
+            max_tokens:
+              type: integer
+              description: Accepted for client compatibility. Not used by MAX Serve.
+            exclude:
+              type: boolean
+              description: Accepted for client compatibility. Not used by MAX Serve.
         logprobs:
           type: boolean
           description: |
             Whether to return log probabilities of the output tokens or not.
+        cache_salt:
+          type: string
+          maxLength: 512
+          description: |
+            Per-request salt that isolates this prompt's prefix-cache
+            entries in multi-tenant deployments. Requires
+            `MAX_SERVE_USE_CLIENT_CACHE_SALT` to be enabled. If both this
+            field and the `X-Cache-Salt` header are present, the header
+            takes precedence. Works with any `kv_cache_hash_algo`.
         response_format:
           type: object
           description: |
@@ -1088,8 +1296,23 @@ components:
           properties:
             type:
               type: string
-              enum: [text, json_object]
+              enum: [text, json_object, json_schema]
               description: The format type
+            json_schema:
+              type: object
+              description: |
+                Configuration for the `json_schema` format type. Set this when
+                `type` is `json_schema`.
+              properties:
+                schema:
+                  oneOf:
+                    - type: object
+                    - type: boolean
+                  description: |
+                    The JSON Schema that the output must match. This value can
+                    be a JSON Schema object or a boolean. `true` accepts any
+                    value. `false` can't be satisfied, so MAX returns a `400`
+                    error.
         stream:
           type: boolean
           default: false
@@ -1131,9 +1354,12 @@ components:
       properties:
         role:
           type: string
-          enum: [system, user, assistant, function]
+          enum: [system, user, assistant, developer, function, tool, root]
           description: |
-            The role of the message author.
+            The role of the message author. Use `tool` for a message that
+            carries the result of a tool call (paired with `tool_call_id`).
+            `root` is a model-gated vendor role accepted only when the model's
+            tokenizer enables it.
         content:
           oneOf:
             - type: string
@@ -1141,7 +1367,7 @@ components:
                 The content of the message as a string.
             - type: array
               description: |
-                The content of the message as an array of content parts. For user messages, content parts can be of type text or image_url.
+                The content of the message as an array of content parts. For user messages, content parts can be of type text, image_url, or video_url.
               items:
                 oneOf:
                   - type: object
@@ -1174,6 +1400,17 @@ components:
                             type: string
                             description: |
                               Either a URL of the image or a base64 encoded image with the data-uri scheme.
+                          detail:
+                            type: string
+                            description: |
+                              Optional quality tier. Mutually exclusive with
+                              max_long_side_pixel.
+                          max_long_side_pixel:
+                            type: integer
+                            minimum: 1
+                            description: |
+                              Optional sizing hint. Downscale the image so its
+                              longest side is at most this many pixels.
                   - type: object
                     required:
                       - type
@@ -1192,10 +1429,78 @@ components:
                             type: string
                             description: |
                               Either a URL of the video or the base64 encoded video data.
+                          fps:
+                            type: number
+                            exclusiveMinimum: 0
+                            description: |
+                              Optional sampling hint. Frames per second to
+                              sample the video at.
+                          max_frames:
+                            type: integer
+                            minimum: 1
+                            description: |
+                              Optional sampling hint. Maximum number of frames
+                              to sample from the video.
+                          detail:
+                            type: string
+                            description: |
+                              Optional quality tier. Mutually exclusive with
+                              max_long_side_pixel.
+                          max_long_side_pixel:
+                            type: integer
+                            minimum: 1
+                            description: |
+                              Optional sizing hint. Downscale the video so its
+                              longest side is at most this many pixels.
+        reasoning:
+          type: string
+          description: |
+            The reasoning model's chain-of-thought, populated in response
+            messages when the model produces reasoning text. This is the
+            default field; the opt-in `emit_reasoning_content` server
+            config emits it under `reasoning_content` instead. Exactly one
+            of the two is populated per response.
+        reasoning_content:
+          type: string
+          description: |
+            Alternate chain-of-thought field, populated in response
+            messages instead of `reasoning` when the
+            `emit_reasoning_content` server config is enabled (the naming
+            used by vLLM, SGLang, and the DeepSeek API). Also accepted in
+            request messages to pass prior reasoning back to the model.
         name:
           type: string
           description: |
             The name of the author of this message.
+        tool_call_id:
+          type: string
+          description: |
+            For a `tool` role message, the ID of the tool call this message
+            responds to. Must match an `id` from a prior assistant message's
+            `tool_calls`; a missing, mismatched, or incomplete set of tool
+            replies is rejected with a 400 error.
+        tool_calls:
+          type: array
+          description: |
+            Tool calls generated by the model on an `assistant` message. Echo
+            them back unchanged in the follow-up request, each paired with a
+            `tool` role message whose `tool_call_id` matches the call's `id`.
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+                enum: [function]
+              function:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  arguments:
+                    type: string
+                    description: JSON-encoded string of the call arguments.
 
     ChatCompletionTool:
       type: object
@@ -1215,7 +1520,12 @@ components:
       properties:
         name:
           type: string
-          description: The name of the function to be called
+          maxLength: 64
+          description: |
+            The name of the function to be called. Must be at most 64
+            characters. The default character set is `[a-zA-Z0-9_-]`; some model
+            parsers widen it to allow dotted or namespaced names (for example,
+            `my-tool.v2`).
         description:
           type: string
           description: A description of what the function does
@@ -1437,134 +1747,6 @@ components:
           type: integer
           description: The index of the embedding in the list of embeddings
 
-    Batch:
-      type: object
-      required:
-        - completion_window
-        - endpoint
-        - input_file_id
-        - output_file_id
-        - metadata
-      properties:
-        completion_window:
-          type: string
-          description: |
-            The time frame within which the batch should be processed.
-            Supported completion windows include: `6h`, `12h`, `24h`, or `7d`.
-        endpoint:
-          type: string
-          description: |
-            The endpoint to be used for all requests in the batch.
-            Currently only the `/v1/chat/completions` endpoint is supported.
-        input_file_id:
-          type: string
-          description: |
-            The path to an uploaded file that contains requests for the new
-            batch.
-        metadata:
-          type: map
-          description: |
-            A set of key-value pairs that can be attached to an object. The
-            `metadata["model"]` field is required.
-        output_file_id:
-          type: string
-          description: |
-            The path to the batch output file.
-
-    BatchResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          description: |
-            Unique identifier for the batch.
-        object:
-          type: string
-          description: |
-            Object type `"batch"`.
-        endpoint:
-          type: string
-          description: |
-            Target endpoint for the batch request.
-        errors:
-          type: string
-          description: |
-            List of errors if any.
-        input_file_id:
-          type: string
-          description: |
-            File ID containing batch input data.
-        completion_window:
-          type: string
-          description: |
-            Allowed processing window for the batch.
-        status:
-          type: string
-          description: |
-            Status of batch job creation.
-        output_file_id:
-          type: string
-          description: |
-            File ID containing the batch output results.
-        error_file_id:
-          type: string
-          description: |
-            File ID containing errors for failed batch items.
-        created_at:
-          type: integer
-          description: |
-            Unix timestamp for when the batch was created.
-        in_progress_at:
-          type: integer
-          description: |
-            Unix timestamp when the batch started processing.
-        expires_at:
-          type: integer
-          description: |
-            Unix timestamp when the batch will expire if not processed.
-        completed_at:
-          type: integer
-          description: |
-            Unix timestamp when the batch was completed.
-        failed_at:
-          type: integer
-          description: |
-            Unix timestamp when the batch failed.
-        expired_at:
-          type: integer
-          description: |
-            Unix timestamp when the batch expired based on completion window.
-        cancelling_at:
-          type: integer
-          description: |
-            Unix timestamp when the batch began cancelling.
-        cancelled_at:
-          type: integer
-          description: |
-            Unix timestamp when the batch was cancelled.
-        request_counts:
-          type: object
-          description: |
-            Count of requests in various states, including total number of
-            requests, number of successfully completed requests, and number of
-            failed requests.
-          properties:
-            total:
-              type: integer
-            completed:
-              type: integer
-            failed:
-              type: integer
-        metadata:
-          type: object
-          description: |
-            Set of key-value pairs that can be attached to an object. This can
-            be useful for specifying model, defining the batch output path, or
-            storing additional information about the object in a structured
-            format.
-          additionalProperties:
-            type: string
-
     ListModelsResponse:
       type: object
       required:
@@ -1617,6 +1799,16 @@ components:
         total_tokens:
           type: integer
           description: Total number of tokens used in the request (prompt + completion)
+        completion_tokens_details:
+          type: object
+          description: |
+            Breakdown of the generated completion tokens.
+          properties:
+            reasoning_tokens:
+              type: integer
+              description: |
+                Tokens generated as model reasoning (chain of thought).
+                Populated for reasoning models; otherwise 0.
 
     ErrorResponse:
       type: object

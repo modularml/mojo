@@ -3,14 +3,14 @@
 Custom operations in PyTorch can now be written using Mojo or MAX graphs,
 letting you experiment with new GPU algorithms in a familiar PyTorch
 environment. Mojo custom operations are registered using the
-[`CustomOpLibrary`](https://docs.modular.com/max/api/python/generated/max.experimental.torch.CustomOpLibrary)
+[`CustomOpLibrary`](https://max.modular.com/api/python/generated/max.experimental.torch.CustomOpLibrary)
 class in the `max.torch` package, and MAX graphs use the `@graph_op` decorator
 from `max.torch`.
 
 These examples show how to register and use custom operations in PyTorch
 models, from very basic calculations to complex image processing and full model
 implementations. These examples require a system with a [MAX-compatible
-GPU](https://docs.modular.com/max/faq/#gpu-requirements)
+GPU](https://max.modular.com/faq/#gpu-requirements)
 
 The five examples of PyTorch custom operations consist of:
 

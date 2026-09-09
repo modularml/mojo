@@ -44,6 +44,11 @@ _R = TypeVar("_R")
 # worker callables (e.g. the multiturn session builder).
 _WORKER_TOK: PreTrainedTokenizerBase | None = None
 
+# Architectures resolved once in the parent and forwarded to each worker via
+# `_init_encoder`, so `_default_loader` can skip the redundant (and noisy)
+# per-worker `AutoConfig` Hub lookup. `None` means "resolve in the worker".
+_WORKER_ARCHITECTURES: list[str] | None = None
+
 
 def _default_loader(
     name_or_path: str,
@@ -59,6 +64,7 @@ def _default_loader(
         revision=revision,
         model_max_length=model_max_length,
         trust_remote_code=trust_remote_code,
+        architectures=_WORKER_ARCHITECTURES,
     )
 
 
@@ -72,6 +78,7 @@ def _init_encoder(
     model_max_length: int | None,
     trust_remote_code: bool,
     revision: str | None,
+    architectures: list[str] | None,
     loader: _LoaderFn,
     log_queue: mp.Queue[logging.LogRecord],
     log_level: int,
@@ -85,10 +92,27 @@ def _init_encoder(
     root.setLevel(log_level)
     root.handlers.clear()
     root.addHandler(logging.handlers.QueueHandler(log_queue))
+    global _WORKER_ARCHITECTURES
+    _WORKER_ARCHITECTURES = architectures
     global _WORKER_TOK
-    _WORKER_TOK = loader(
-        name_or_path, model_max_length, trust_remote_code, revision
-    )
+    try:
+        _WORKER_TOK = loader(
+            name_or_path, model_max_length, trust_remote_code, revision
+        )
+    except Exception as exc:
+        # A worker's tokenizer load can fail under HF_HUB_OFFLINE (e.g. a
+        # remote-code file this worker's cache race didn't pick up in time).
+        # The pool's worker-handler thread already tolerates a dead worker
+        # by spawning a replacement while survivors drain the task queue, so
+        # let this worker exit -- but via `SystemExit`, which
+        # `BaseProcess._bootstrap` handles without dumping a raw traceback
+        # to stderr, unlike a plain exception escaping the initializer.
+        logging.getLogger(__name__).warning(
+            "Worker failed to load tokenizer %r, exiting worker: %s",
+            name_or_path,
+            exc,
+        )
+        raise SystemExit(1) from None
 
 
 def _encode_len(text: str) -> int:
@@ -142,20 +166,26 @@ class TokenizerPool:
         self,
         tokenizer: PreTrainedTokenizerBase,
         *,
-        workers: int | None = None,
         loader: _LoaderFn | None = None,
     ) -> None:
         self.tokenizer = tokenizer
-        nproc = workers if workers is not None else max(1, os.cpu_count() or 8)
-        # Tests (and other constrained environments) can cap worker count
-        # via env var without threading `workers=` through every call site.
-        env_cap = os.environ.get("MAX_BENCHMARK_MAX_TOKENIZER_THREADS")
-        if env_cap:
-            try:
-                nproc = min(nproc, max(1, int(env_cap)))
-            except ValueError:
-                pass
-        self._workers = nproc
+        # Make sure to always leave at least one core free for the main thread.
+        # If the core count is unknown, limit to 1 core only.
+        cpu_count = os.cpu_count()
+        if cpu_count and cpu_count > 1:
+            cpu_limit = cpu_count - 1
+        else:
+            cpu_limit = 1
+
+        # Tests (and other constrained environments) can set the
+        # default worker count via env var.
+        env_count = os.environ.get("MAX_BENCHMARK_MAX_TOKENIZER_THREADS")
+        if env_count and env_count.isdigit():
+            workers = int(env_count)
+        else:
+            # Default to 16 cores if no value requested.
+            workers = 16
+        self._workers = min(workers, cpu_limit)
         self._loader = loader if loader is not None else _default_loader
         self._pool: mp.pool.Pool | None = None
         self._log_listener: logging.handlers.QueueListener | None = None
@@ -195,6 +225,12 @@ class TokenizerPool:
             )
             self._log_listener.start()
             revision = getattr(self.tokenizer, "_resolved_revision", None)
+            # Forward the parent's resolved architectures so workers skip the
+            # redundant (and, when the Hub is unreachable, noisy) AutoConfig
+            # probe. `None` leaves each worker to resolve them itself.
+            architectures = getattr(
+                self.tokenizer, "_resolved_architectures", None
+            )
             # huggingface_hub caches HF_HUB_OFFLINE at import time, so set it
             # before spawning workers (not inside the initializer — too late).
             # Restore the parent's env afterward so we don't leak this global
@@ -210,6 +246,7 @@ class TokenizerPool:
                         self.tokenizer.model_max_length,
                         True,
                         revision,
+                        architectures,
                         self._loader,
                         log_queue,
                         root.level,

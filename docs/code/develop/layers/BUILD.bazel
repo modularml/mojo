@@ -1,0 +1,72 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_run_binary_test")
+
+package(default_visibility = ["//visibility:private"])
+
+# subclass_rms_norm.py
+modular_py_binary(
+    name = "subclass_rms_norm",
+    srcs = ["subclass_rms_norm.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/nn",
+    ],
+)
+
+modular_run_binary_test(
+    name = "subclass_rms_norm_test",
+    size = "large",
+    binary = "subclass_rms_norm",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# define_module.py
+modular_py_binary(
+    name = "define_module",
+    srcs = ["define_module.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+    ],
+)
+
+modular_run_binary_test(
+    name = "define_module_test",
+    size = "large",
+    binary = "define_module",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)
+
+# compose_and_run.py
+modular_py_binary(
+    name = "compose_and_run",
+    srcs = ["compose_and_run.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+    ],
+)
+
+modular_run_binary_test(
+    name = "compose_and_run_test",
+    size = "large",
+    binary = "compose_and_run",
+    # Incompatible with macOS: these doc-example tests time out on remote macOS CI workers; Linux CI provides equivalent coverage.
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

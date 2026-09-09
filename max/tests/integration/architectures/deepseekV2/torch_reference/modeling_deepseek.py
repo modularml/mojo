@@ -468,7 +468,7 @@ class MoEGate(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        import torch.nn.init as init
+        from torch.nn import init
 
         init.kaiming_uniform_(self.weight, a=math.sqrt(5))
 

@@ -11,11 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.collections import Set
 from std.random import random_ui64, seed
 from std.math.uutils import udivmod
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
+from kv_cache_test_utils import random_distinct
 from kv_cache.types import (
     ContinuousBatchingKVCacheCollection,
     KVCacheStaticParams,
@@ -60,7 +60,7 @@ def execute_fused_qkv_matmul[
     comptime fused_hidden_size = (2 * kv_hidden_size) + hidden_size
     comptime num_blocks = 32
     comptime CollectionType = ContinuousBatchingKVCacheCollection[
-        dtype, kv_params
+        dtype, kv_params, ...
     ]
 
     debug_assert(
@@ -134,7 +134,7 @@ def execute_fused_qkv_matmul[
 
     # Initialize our KVCache
     var is_context_encoding = True
-    var cache_lengths = ManagedLayoutTensor[DType.uint32, cache_len_layout](
+    var cache_lengths = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -149,22 +149,18 @@ def execute_fused_qkv_matmul[
     )
     var kv_block_host = kv_block.tensor()
 
-    var lookup_table = ManagedLayoutTensor[DType.uint32, cache_len_layout](
+    var lookup_table = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
     var lookup_table_host = lookup_table.tensor[update=False]()
 
-    # Hacky way to get random block indices
-    var block_idx_set = Set[Int]()
-    var idx = 0
-    while len(block_idx_set) < batch_size:
-        var randval = Int(random_ui64(0, num_blocks - 1))
-        if randval in block_idx_set:
-            continue
-        block_idx_set.add(randval)
-        lookup_table_host[idx] = UInt32(randval)
-        idx += 1
+    # Assign each batch entry a distinct block. `random_ui64` is inclusive, so
+    # the original draw range `[0, num_blocks - 1]` is a population of
+    # `num_blocks` blocks.
+    var lut_blocks = random_distinct(num_blocks, batch_size)
+    for idx in range(batch_size):
+        lookup_table_host[idx] = UInt32(lut_blocks[idx])
 
     var kv_collection_device = CollectionType(
         kv_block.device_tensor(),
@@ -176,15 +172,15 @@ def execute_fused_qkv_matmul[
 
     # Create device tensors for kernel calls
     var hidden_state_device_tensor = hidden_state.device_tensor()
-    var weight_device_tensor = LayoutTensor[dtype, weight_layout, MutAnyOrigin](
-        weight_device.unsafe_ptr(),
+    var weight_device_tensor = LayoutTensor[dtype, weight_layout](
+        weight_device,
         RuntimeLayout[weight_layout].row_major(weight_shape),
     )
     var test_output_device_tensor = test_output.device_tensor()
 
     # Create valid_lengths - all sequences have full prompt_len valid
     var valid_lengths = ManagedLayoutTensor[
-        DType.uint32, Layout.row_major(UNKNOWN_VALUE)
+        .uint32, Layout.row_major(UNKNOWN_VALUE)
     ](
         RuntimeLayout[Layout.row_major(UNKNOWN_VALUE)].row_major(
             IndexList[1](batch_size)
@@ -233,8 +229,8 @@ def execute_fused_qkv_matmul[
         UInt32(0 if is_context_encoding else max_seq_len),
     )
 
-    k_cache_host = kv_collection_host.get_key_cache(layer_idx)
-    v_cache_host = kv_collection_host.get_value_cache(layer_idx)
+    var k_cache_host = kv_collection_host.get_key_cache(layer_idx)
+    var v_cache_host = kv_collection_host.get_value_cache(layer_idx)
     for bs in range(batch_size):
         for s in range(prompt_len):
             for q_dim in range(hidden_size):
@@ -244,7 +240,7 @@ def execute_fused_qkv_matmul[
                 )
 
             for k_dim in range(kv_hidden_size):
-                head_idx, head_dim_idx = udivmod(k_dim, kv_params.head_size)
+                var head_idx, head_dim_idx = udivmod(k_dim, kv_params.head_size)
                 assert_almost_equal(
                     ref_output_host[bs * prompt_len + s, hidden_size + k_dim],
                     k_cache_host.load[width=1](
@@ -256,7 +252,7 @@ def execute_fused_qkv_matmul[
                 )
 
             for v_dim in range(kv_hidden_size):
-                head_idx, head_dim_idx = udivmod(v_dim, kv_params.head_size)
+                var head_idx, head_dim_idx = udivmod(v_dim, kv_params.head_size)
                 assert_almost_equal(
                     ref_output_host[
                         bs * prompt_len + s,
@@ -275,10 +271,10 @@ def execute_fused_matmul_suite(ctx: DeviceContext) raises:
     comptime dtypes = (DType.float32, DType.bfloat16)
 
     comptime for dtype_idx in range(2):
-        comptime dtype = dtypes[dtype_idx]
+        comptime dtype = rebind[DType](dtypes[dtype_idx])
         for bs in [1, 16]:
-            ce_cache_sizes = List[Int]()
-            tg_cache_sizes = List[Int]()
+            var ce_cache_sizes = List[Int]()
+            var tg_cache_sizes = List[Int]()
             for _ in range(bs):
                 tg_cache_sizes.append(Int(random_ui64(0, 100)))
                 ce_cache_sizes.append(0)

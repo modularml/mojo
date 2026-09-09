@@ -17,7 +17,7 @@ from std.ffi import _find_dylib
 from std.ffi import _get_dylib_function as _ffi_get_dylib_function
 from std.ffi import _Global, OwnedDLHandle
 
-from std.gpu.host._nvidia_cuda import CUstream
+from max.gpu.host._nvidia_cuda import CUstream
 
 from std.utils import StaticTuple
 
@@ -80,7 +80,7 @@ def _get_dylib_function[
 # function signatures. AnyOrigin will still extend the lifetime of any structs
 # that pass their pointers into the functions below. It turns off the check for
 # aliasing mutable pointers, but the pointers are passed directly to an external
-# library, the data isn't mutated from Mojo. Do not use ExternalOrigin here, as
+# library, the data isn't mutated from Mojo. Do not use UntrackedOrigin here, as
 # that turns off extending the lifetime of Mojo objects e.g. CuDNNConvMeta in
 # conv.mojo destroys the tensor descriptors on last use.
 comptime AnyOpaquePointer = OpaquePointer[AnyOrigin[mut=True]]
@@ -870,7 +870,7 @@ def cudnnGetCudartVersion() raises -> Int:
 
 def cudnnGetCallback(
     mask: UnsafePointer[Int16, _],
-    udata: UnsafePointer[OpaquePointer[ExternalOrigin[mut=True]], _],
+    udata: UnsafePointer[OpaquePointer[UntrackedOrigin[mut=True]], _],
     fptr: OpaquePointer,
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
@@ -888,7 +888,7 @@ def cudnnCreateTensorTransformDescriptor(
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
         "cudnnCreateTensorTransformDescriptor",
-        def(type_of(transform_desc),) thin -> cudnnStatus_t,
+        def(type_of(transform_desc)) thin -> cudnnStatus_t,
     ]()(transform_desc)
 
 
@@ -1001,7 +1001,7 @@ def cudnnCreateReduceTensorDescriptor(
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
         "cudnnCreateReduceTensorDescriptor",
-        def(type_of(reduce_tensor_desc),) thin -> cudnnStatus_t,
+        def(type_of(reduce_tensor_desc)) thin -> cudnnStatus_t,
     ]()(reduce_tensor_desc)
 
 
@@ -1689,12 +1689,10 @@ struct cudnnSoftmaxAlgorithm_t(
 
 def cudnnGetErrorString(
     status: cudnnStatus_t,
-) raises -> UnsafePointer[Int8, ExternalOrigin[mut=False]]:
+) raises -> UnsafePointer[Int8, ImmUntrackedOrigin]:
     return _get_dylib_function[
         "cudnnGetErrorString",
-        def(
-            type_of(status),
-        ) thin -> UnsafePointer[Int8, ExternalOrigin[mut=False]],
+        def(type_of(status),) thin -> UnsafePointer[Int8, ImmUntrackedOrigin],
     ]()(status)
 
 
@@ -1974,7 +1972,7 @@ def cudnnCreateActivationDescriptor(
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
         "cudnnCreateActivationDescriptor",
-        def(type_of(activation_desc),) thin -> cudnnStatus_t,
+        def(type_of(activation_desc)) thin -> cudnnStatus_t,
     ]()(activation_desc)
 
 
@@ -2287,6 +2285,7 @@ comptime cudnnCallback_t = def(
 
 
 struct cudnnAlgorithmUnionStruct(TrivialRegisterPassable):
+    @__allow_legacy_any_origin_fields
     var algo: OpaquePointer[MutAnyOrigin]
 
 
@@ -2812,7 +2811,9 @@ struct cudnnDebugStruct(ImplicitlyCopyable, RegisterPassable):
     var time_sec: Int16
     var time_usec: Int16
     var time_delta: Int16
-    var handle: UnsafePointer[cudnnContext, ExternalOrigin[mut=True]]
+
+    @__allow_legacy_any_origin_fields
+    var handle: UnsafePointer[cudnnContext, UntrackedOrigin[mut=True]]
     var stream: CUstream
     var pid: Int64
     var tid: Int64
@@ -3010,8 +3011,8 @@ def cudnnSetCallback(
     udata: OpaquePointer,
     fptr: def(
         cudnnSeverity_t,
-        OpaquePointer[ExternalOrigin[mut=True]],
-        UnsafePointer[cudnnDebugStruct, ExternalOrigin[mut=True]],
+        OpaquePointer[UntrackedOrigin[mut=True]],
+        UnsafePointer[cudnnDebugStruct, UntrackedOrigin[mut=True]],
         UnsafePointer[Int8, AnyOrigin[mut=True]],
     ) thin -> NoneType,
 ) raises -> cudnnStatus_t:
@@ -3504,7 +3505,7 @@ def cudnnCreateSpatialTransformerDescriptor(
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
         "cudnnCreateSpatialTransformerDescriptor",
-        def(type_of(st_desc),) thin -> cudnnStatus_t,
+        def(type_of(st_desc)) thin -> cudnnStatus_t,
     ]()(st_desc)
 
 
@@ -3530,7 +3531,7 @@ def cudnnCreateAlgorithmDescriptor(
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
         "cudnnCreateAlgorithmDescriptor",
-        def(type_of(algo_desc),) thin -> cudnnStatus_t,
+        def(type_of(algo_desc)) thin -> cudnnStatus_t,
     ]()(algo_desc)
 
 

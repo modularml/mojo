@@ -1,0 +1,58 @@
+[
+    {
+        "description": "format: uri-template",
+        "schema": { "format": "uri-template" },
+        "tests": [
+            {
+                "description": "all string formats ignore integers",
+                "data": 12,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore floats",
+                "data": 13.7,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore objects",
+                "data": {},
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore arrays",
+                "data": [],
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore booleans",
+                "data": false,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore nulls",
+                "data": null,
+                "valid": true
+            },
+            {
+                "description": "a valid uri-template",
+                "data": "http://example.com/dictionary/{term:1}/{term}",
+                "valid": true
+            },
+            {
+                "description": "an invalid uri-template",
+                "data": "http://example.com/dictionary/{term:1}/{term",
+                "valid": false
+            },
+            {
+                "description": "a valid uri-template without variables",
+                "data": "http://example.com/dictionary",
+                "valid": true
+            },
+            {
+                "description": "a valid relative uri-template",
+                "data": "dictionary/{term:1}/{term}",
+                "valid": true
+            }
+        ]
+    }
+]

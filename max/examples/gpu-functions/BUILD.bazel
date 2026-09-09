@@ -1,0 +1,88 @@
+load("//bazel:api.bzl", "modular_run_binary_test", "mojo_binary")
+
+package(default_visibility = ["//visibility:private"])
+
+mojo_binary(
+    name = "vector_addition",
+    srcs = ["vector_addition.mojo"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:layout",
+        "@mojo//:std",
+    ],
+)
+
+modular_run_binary_test(
+    name = "vector_addition_test",
+    binary = "vector_addition",
+    tags = ["gpu"],
+)
+
+mojo_binary(
+    name = "grayscale",
+    srcs = ["grayscale.mojo"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:layout",
+        "@mojo//:std",
+    ],
+)
+
+modular_run_binary_test(
+    name = "grayscale_test",
+    binary = "grayscale",
+    tags = ["gpu"],
+)
+
+mojo_binary(
+    name = "naive_matrix_multiplication",
+    srcs = ["naive_matrix_multiplication.mojo"],
+    tags = ["manual"],  # TODO: Fix compilation and remove this tag
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:layout",
+        "@mojo//:std",
+    ],
+)
+
+modular_run_binary_test(
+    name = "naive_matrix_multiplication_test",
+    binary = "naive_matrix_multiplication",
+    tags = [
+        "gpu",
+        "manual",
+    ],  # Keep manual tag since the binary has it
+)
+
+mojo_binary(
+    name = "mandelbrot",
+    srcs = ["mandelbrot.mojo"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:layout",
+        "@mojo//:std",
+    ],
+)
+
+modular_run_binary_test(
+    name = "mandelbrot_test",
+    binary = "mandelbrot",
+    tags = ["gpu"],
+)
+
+mojo_binary(
+    name = "reduction",
+    srcs = ["reduction.mojo"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)
+
+modular_run_binary_test(
+    name = "reduction_test",
+    binary = "reduction",
+    tags = ["gpu"],
+)

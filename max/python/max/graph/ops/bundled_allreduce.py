@@ -20,7 +20,13 @@ from max._core.dialects import mo
 
 from ..graph import Graph
 from ..type import _ChainType
-from ..value import BufferValue, BufferValueLike, TensorValue, TensorValueLike
+from ..value import (
+    BufferValue,
+    BufferValueLike,
+    TensorValue,
+    TensorValueLike,
+    _ChainValue,
+)
 from .parallel import parallel
 from .utils import _buffer_values, _tensor_values
 
@@ -57,17 +63,19 @@ def sum(
 
     input_types = [inp.type for inp in inputs]
 
-    def body_fn(tensor: TensorValue, _: BufferValue) -> TensorValue:
+    def body_fn(
+        tensor: TensorValue, _: BufferValue, body_chain: _ChainValue
+    ) -> tuple[TensorValue, _ChainValue]:
         peers = graph._add_op_generated(mo.BundledExpandOp, input_types, tensor)
-        out, _out_chain = graph._add_op_generated(
+        out, out_chain = graph._add_op_generated(
             mo.BundledAllreduceSumOp,
             input_types[0],
             _ChainType(),
             peers,
             signal_buffers,
-            in_chain,
+            body_chain,
         )
-        return out.tensor
+        return out.tensor, _ChainValue(out_chain._mlir_value)
 
     result = parallel(
         [inputs],

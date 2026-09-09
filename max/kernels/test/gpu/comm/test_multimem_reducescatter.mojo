@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from comm.sync import enable_p2p
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from test_reducescatter import run_reducescatter_sweep
 from std.testing import assert_true
 

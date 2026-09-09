@@ -19,7 +19,7 @@ from max.dtype import DType
 from max.graph import DeviceRef, ShardingStrategy
 from max.nn.attention import num_heads_for_device
 from max.nn.attention.attention_with_rope import AttentionWithRope
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.rotary_embedding import RotaryEmbedding
 
 
@@ -130,7 +130,7 @@ class TestAttentionWithRopeTPShard:
             max_seq_len=2048,
             head_dim=head_dim,
         )
-        kv_params = KVCacheParams(
+        kv_params = MHAKVCacheParams(
             n_kv_heads=n_kv_heads,
             head_dim=head_dim,
             dtype=DType.bfloat16,

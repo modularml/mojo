@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
+from .distribution import BaseDistribution, DistributionParameter
 from .local import LocalBenchmarkDataset
 from .types import (
     ChatSamples,
@@ -90,16 +91,47 @@ class ChatJudgeBenchmarkDataset(LocalBenchmarkDataset):
         tokenizer: PreTrainedTokenizerBase,
         shuffle: bool = True,
         seed: int | None = None,
+        delay_between_turns_dist: DistributionParameter | None = None,
     ) -> ChatJudgeChatSamples:
+        """Build chat-judge sessions from the backing JSONL file.
+
+        Args:
+            num_sessions: Number of sessions to return.
+            tokenizer: Tokenizer used to estimate per-turn token counts.
+            shuffle: Whether to shuffle sessions before slicing.
+            seed: Seed for the shuffle RNG.
+            delay_between_turns_dist: Optional inter-turn delay (ms), sampled
+                per turn and stored on each user message's
+                `delay_until_next_message`. The final turn of a session gets
+                no delay (there is no next turn).
+
+        Returns:
+            The sampled chat-judge sessions.
+        """
         assert self.dataset_path is not None, (
             "dataset_path must be set; call fetch() first"
+        )
+
+        delay_dist = BaseDistribution.from_distribution_parameter(
+            delay_between_turns_dist
         )
 
         with open(self.dataset_path) as f:
             raw_sessions = [json.loads(line) for line in f if line.strip()]
 
+        # Shuffle (keeping original line index for stable ids) then tokenize
+        # lazily, stopping once num_sessions usable ones are collected, so we
+        # only tokenize what we'll actually use.
+        indexed_sessions = list(enumerate(raw_sessions))
+        if shuffle:
+            rng = random.Random(seed)
+            rng.shuffle(indexed_sessions)
+
         chat_sessions: list[ChatSession] = []
-        for line_idx, raw in enumerate(raw_sessions):
+        for line_idx, raw in indexed_sessions:
+            if len(chat_sessions) >= num_sessions:
+                break
+
             turns = raw.get("turns") or []
             if not turns:
                 continue
@@ -128,6 +160,19 @@ class ChatJudgeBenchmarkDataset(LocalBenchmarkDataset):
             if not any(m.source == "user" for m in session_messages):
                 continue
 
+            # Inter-turn delay normally rides the assistant message (see
+            # random.py), but chat-judge sessions carry no assistant turns,
+            # so it rides each user message. The final turn gets none: there
+            # is no next turn to wait for.
+            if delay_dist is not None:
+                user_messages = [
+                    m for m in session_messages if m.source == "user"
+                ]
+                for msg in user_messages[:-1]:
+                    msg.delay_until_next_message = max(
+                        float(delay_dist.sample_value()), 0.0
+                    )
+
             chat_sessions.append(
                 ChatSession(id=line_idx, messages=session_messages)
             )
@@ -137,15 +182,9 @@ class ChatJudgeBenchmarkDataset(LocalBenchmarkDataset):
                 f"chat-judge: no sessions found in {self.dataset_path}"
             )
 
-        if shuffle:
-            rng = random.Random(seed)
-            rng.shuffle(chat_sessions)
-
-        if num_sessions < len(chat_sessions):
-            chat_sessions = chat_sessions[:num_sessions]
-        elif len(chat_sessions) < num_sessions:
+        if len(chat_sessions) < num_sessions:
             logger.warning(
-                "chat-judge: requested %d sessions but only %d available in %s",
+                "chat-judge: requested %d sessions but only %d usable in %s",
                 num_sessions,
                 len(chat_sessions),
                 self.dataset_path,

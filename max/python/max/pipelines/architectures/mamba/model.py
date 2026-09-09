@@ -14,8 +14,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import numpy as np
 from max.driver import Buffer, Device
@@ -23,10 +22,10 @@ from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import DeviceRef
 from max.graph.weights import Weights, WeightsAdapter
-from max.nn.kv_cache import KVCacheInputs, KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.nn.kv_cache.cache_params import KVCacheParamInterface
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
-from max.pipelines.core import TextContext
+from max.pipelines.context import LogProbabilities, TextContext
 from max.pipelines.lib import (
     KVCacheConfig,
     ModelInputs,
@@ -38,11 +37,13 @@ from max.pipelines.lib.log_probabilities import (
     compute_log_probabilities_ragged,
     log_probabilities_ragged_graph,
 )
+from max.pipelines.lib.memory_estimation import MemoryPlan
 from max.pipelines.lib.utils import parse_state_dict_from_weights
-from max.pipelines.modeling.types import LogProbabilities, RequestID
+from max.pipelines.modeling.types import RequestID
 from max.profiler import traced
 from transformers import AutoConfig
 
+from .batch_processor import MambaBatchProcessor
 from .functional_ops import _get_state_space_paths
 from .model_config import MambaConfig
 from .ssm_cache import SSMStateCache
@@ -85,6 +86,11 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
     The step model processes single new tokens using cached states.
     """
 
+    model_config_cls: ClassVar[type[Any]] = MambaConfig
+    batch_processor_cls: ClassVar[type[MambaBatchProcessor]] = (
+        MambaBatchProcessor
+    )
+
     def __init__(
         self,
         pipeline_config: PipelineConfig,
@@ -92,9 +98,12 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
         devices: list[Device],
         kv_cache_config: KVCacheConfig,
         weights: Weights,
+        *,
+        memory_plan: MemoryPlan,
         adapter: WeightsAdapter | None = None,
         return_logits: ReturnLogits = ReturnLogits.LAST_TOKEN,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
+        max_batch_size: int = 1,
     ) -> None:
         super().__init__(
             pipeline_config,
@@ -102,19 +111,25 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
             devices,
             kv_cache_config,
             weights,
-            adapter,
-            return_logits,
-            return_hidden_states,
+            adapter=adapter,
+            return_logits=return_logits,
+            return_hidden_states=return_hidden_states,
+            max_batch_size=max_batch_size,
+            memory_plan=memory_plan,
         )
         self._prefill_model, self._step_model = self._load_models(session)
         self._ssm_cache = self._create_ssm_cache()
+        if self._batch_processor is not None:
+            bind = getattr(self._batch_processor, "bind_ssm_cache", None)
+            if bind is not None:
+                bind(self._ssm_cache)
         self.logprobs_device = devices[0]
         self.logprobs_model = self._load_logprobs_model(session)
 
     def _create_ssm_cache(self) -> SSMStateCache:
         """Create the SSM state cache with pre-allocated slot buffers."""
         cfg = self._model_config
-        max_slots = self.pipeline_config.runtime.max_batch_size or 1
+        max_slots = self.max_batch_size
         return SSMStateCache(
             num_layers=cfg.num_hidden_layers,
             intermediate_size=cfg.intermediate_size,
@@ -128,14 +143,6 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
     @classmethod
     def get_num_layers(cls, huggingface_config: AutoConfig) -> int:
         return MambaConfig.get_num_layers(huggingface_config)
-
-    @staticmethod
-    def calculate_max_seq_len(
-        pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        return MambaConfig.calculate_max_seq_len(
-            pipeline_config, huggingface_config
-        )
 
     @classmethod
     def get_kv_params(
@@ -152,7 +159,7 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
         These dummy params satisfy the PipelineModelWithKVCache interface
         with negligible memory overhead.
         """
-        return KVCacheParams(
+        return MHAKVCacheParams(
             dtype=cache_dtype or DType.float32,
             n_kv_heads=1,
             head_dim=1,
@@ -175,12 +182,10 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
 
         from .mamba_module import MambaPrefill, MambaStep
 
-        assert self.pipeline_config.runtime.max_batch_size, (
-            "Expected max_batch_size to be set"
-        )
+        assert self.max_batch_size, "Expected max_batch_size to be set"
         self._input_row_offsets_prealloc = Buffer.from_numpy(
             np.arange(
-                self.pipeline_config.runtime.max_batch_size + 1,
+                self.max_batch_size + 1,
                 dtype=np.uint32,
             )
         ).to(self.devices[0])
@@ -191,7 +196,9 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
         )
 
         # Build config: initialize from HF config, then finalize with weights.
-        model_config = MambaConfig.initialize(self.pipeline_config)
+        model_config = MambaConfig.initialize(
+            self.pipeline_config, max_seq_len=self.max_seq_len
+        )
         model_config.finalize(
             huggingface_config=self.huggingface_config,
             state_dict=state_dict,
@@ -297,87 +304,6 @@ class MambaModel(PipelineModelWithKVCache[TextContext]):
             logits=logits,
             next_token_logits=logits,
         )
-
-    def prepare_initial_token_inputs(
-        self,
-        replica_batches: Sequence[Sequence[TextContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
-        return_n_logits: int = 1,
-    ) -> MambaModelInputs:
-        if len(replica_batches) != 1:
-            raise ValueError("Mamba does not support DP>1")
-
-        context_batch = replica_batches[0]
-        request_ids = [ctx.request_id for ctx in context_batch]
-
-        # Claim SSM cache slots for each request (idempotent if already claimed).
-        for rid in request_ids:
-            self._ssm_cache.claim(rid)
-
-        input_row_offsets = np.cumsum(
-            [0] + [ctx.tokens.active_length for ctx in context_batch],
-            dtype=np.uint32,
-        )
-        tokens = np.concatenate([ctx.tokens.active for ctx in context_batch])
-
-        tokens_buf = Buffer.from_numpy(tokens).to(self.devices[0])
-        offsets_buf = Buffer.from_numpy(input_row_offsets).to(self.devices[0])
-        n_logits_buf = Buffer.from_numpy(
-            np.array([return_n_logits], dtype=np.int64)
-        )
-
-        # Check if any request already has computed states (continuation).
-        # For Mamba, SSM state is not reconstructable from tokens alone —
-        # it must be carried forward from the previous step. The pipeline
-        # scheduler calls prepare_initial_token_inputs at the start of each
-        # batch, but if states exist we use step mode instead of re-prefill.
-        has_existing_states = any(
-            self._ssm_cache.contains(rid)
-            and self._ssm_cache.has_valid_state(rid)
-            for rid in request_ids
-        )
-
-        if has_existing_states:
-            layer_states = self._ssm_cache.get_states(request_ids)
-            inputs = MambaModelInputs(
-                tokens_buf,
-                offsets_buf,
-                n_logits_buf,
-                is_prefill=False,
-                layer_states=layer_states,
-                request_ids=request_ids,
-            )
-            inputs.kv_cache_inputs = kv_cache_inputs
-            return inputs
-
-        inputs = MambaModelInputs(
-            tokens_buf,
-            offsets_buf,
-            n_logits_buf,
-            is_prefill=True,
-            request_ids=request_ids,
-        )
-        inputs.kv_cache_inputs = kv_cache_inputs
-        return inputs
-
-    def prepare_next_token_inputs(
-        self,
-        next_tokens: Buffer,
-        prev_model_inputs: ModelInputs,
-    ) -> MambaModelInputs:
-        prev = cast(MambaModelInputs, prev_model_inputs)
-        layer_states = self._ssm_cache.get_states(prev.request_ids)
-
-        inputs = MambaModelInputs(
-            tokens=next_tokens,
-            input_row_offsets=prev.input_row_offsets,
-            return_n_logits=prev.return_n_logits,
-            is_prefill=False,
-            layer_states=layer_states,
-            request_ids=prev.request_ids,
-        )
-        inputs.kv_cache_inputs = prev.kv_cache_inputs
-        return inputs
 
     def release(self, request_id: RequestID) -> None:
         """Release SSM cache slot when a request completes."""

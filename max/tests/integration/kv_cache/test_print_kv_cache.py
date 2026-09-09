@@ -18,7 +18,7 @@ from max.driver import CPU
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, TensorValue, ops
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
+from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams, PagedCacheValues
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,8 @@ class PrintKVCacheModel:
             kv_blocks=kv_inputs[0].buffer,
             cache_lengths=kv_inputs[1].tensor,
             lookup_table=kv_inputs[2].tensor,
-            max_lengths=kv_inputs[3].tensor,
+            max_prompt_length=kv_inputs[3].tensor,
+            max_cache_length=kv_inputs[4].tensor,
         )
         page_size = self.kv_params.page_size
         if page_size is None:
@@ -78,7 +79,7 @@ class PrintKVCacheModel:
 )
 def test_print_kv_cache(dtype: DType) -> None:
     """Tests compiling a print KV cache op."""
-    kv_params = KVCacheParams(
+    kv_params = MHAKVCacheParams(
         dtype=dtype,
         # Use minimal model parameters for faster compilation.
         n_kv_heads=1,
@@ -96,7 +97,7 @@ def test_print_kv_cache(dtype: DType) -> None:
             TensorType(
                 dtype=DType.uint32, shape=[batch_size], device=DeviceRef.CPU()
             ),
-            *kv_params.get_symbolic_inputs().flatten(),
+            *kv_params.flattened_kv_inputs(),
         ],
     )
 

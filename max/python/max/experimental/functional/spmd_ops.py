@@ -17,301 +17,434 @@ Each op is an explicit function that:
 
 1. Calls the sharding rule (with ``tensor_to_layout()`` to convert Tensors to TensorLayouts).
 2. Redistributes tensors to match the rule's suggestions.
-3. Dispatches per-shard via ``spmd_dispatch``.
-
-Rules return ``(suggested_args, output_mappings)`` — a 2-tuple with no kwargs.
+3. Dispatches per-shard via ``per_shard_dispatch``.
 """
 
 from __future__ import annotations
 
 import builtins
-import functools
-import inspect
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
-from max.driver import CPU, Device
+from max.driver import CPU, Buffer
 from max.experimental import tensor
+from max.experimental.realization_context import ensure_context
 from max.experimental.sharding import (
     DeviceMapping,
-    global_shape_from_local,
+    DeviceMesh,
+    PlacementMapping,
+    Replicated,
+    TensorLayout,
 )
+from max.experimental.sharding.per_shard_dim import global_dim
 from max.experimental.tensor import Tensor
-from max.graph import TensorValue, TensorValueLike, Type, ops
-from max.graph.dim import StaticDim
+from max.graph import ShapeLike, TensorValue, TensorValueLike, Type, ops
+from max.graph.dim import Dim, DimLike, StaticDim
 from max.graph.ops.slice_tensor import SliceIndices
+from max.graph.quantization import QuantizationEncoding
 
-from ..sharding.rules._common import RuleSignature
-from ..sharding.rules.conv import (
+from ..sharding import (
+    ActionSet,
+    PerShard,
+    mode,
+)
+from ..sharding.mode import ShardingError
+from ..sharding.rules import (
+    argsort_rule,
+    as_interleaved_complex_rule,
+    band_part_rule,
+    binary_rule,
+    broadcast_to_rule,
+    buffer_store_rule,
+    buffer_store_slice_rule,
+    chunk_rule,
+    cond_rule,
     conv2d_rule,
     conv2d_transpose_rule,
     conv3d_rule,
-)
-from ..sharding.rules.elementwise import (
-    binary_rule,
-    linear_binary_rule,
-    linear_unary_rule,
-    ternary_rule,
-    unary_rule,
-)
-from ..sharding.rules.matmul import matmul_rule
-from ..sharding.rules.misc import (
-    as_interleaved_complex_rule,
-    band_part_rule,
-    buffer_store_rule,
-    buffer_store_slice_rule,
-    cond_rule,
-    fold_rule,
-    irfft_rule,
-    resize_linear_rule,
-    resize_rule,
-    while_loop_rule,
-)
-from ..sharding.rules.norm import normalization_rule
-from ..sharding.rules.pooling import linear_pool_rule, pool_rule
-from ..sharding.rules.reduction import linear_reduce_rule, reduce_rule
-from ..sharding.rules.shape import (
-    argsort_rule,
-    chunk_rule,
+    dequantize_rule,
     flatten_rule,
+    fold_rule,
     gather_nd_rule,
     gather_rule,
+    irfft_rule,
+    layer_norm_rule,
+    linear_binary_rule,
+    linear_pool_rule,
+    linear_reduce_rule,
+    linear_unary_rule,
     masked_scatter_rule,
+    matmul_rule,
+    mean_rule,
     nonzero_rule,
     outer_rule,
     pad_rule,
     permute_rule,
+    pool_rule,
+    qmatmul_rule,
+    rebind_rule,
+    reduce_rule,
     repeat_interleave_rule,
+    reshape_rule,
+    resize_bicubic_rule,
+    resize_linear_rule,
+    resize_nearest_rule,
+    resize_rule,
+    rms_norm_rule,
     same_placement_multi_input_rule,
     scatter_add_rule,
     scatter_nd_add_rule,
     scatter_nd_rule,
     scatter_rule,
     slice_tensor_rule,
+    softmax_rule,
     split_rule,
     squeeze_rule,
     stack_rule,
+    ternary_rule,
     tile_rule,
     top_k_rule,
     transpose_rule,
+    unary_rule,
     unsqueeze_rule,
+    while_loop_rule,
 )
 from ._signatures import install_tensor_signature
-from .collective_ops import transfer_to
 from .creation_ops import full_like
-from .utils import (
-    any_distributed,
-    collect_tensors,
-    ensure_context,
-    map_tensors,
-    tensor_to_layout,
-    to_tensors,
-)
 
-# ═════════════════════════════════════════════════════════════════════════
-#  spmd_dispatch — the per-shard dispatch engine
-# ═════════════════════════════════════════════════════════════════════════
+# Re-exported; user-facing factory lives in ``max.experimental.sharding``.
+__all__ = [
+    "ShardingError",
+    "any_distributed",
+    "map_tensors",
+    "mode",
+    "to_tensors",
+]
 
 
-def spmd_dispatch(
+def to_tensors(values: Any) -> Any:
+    """Converts graph op results to :class:`Tensor`, preserving container type.
+
+    Recurses one level into ``list`` and ``tuple`` containers; unknown
+    types pass through unchanged. Returns ``Tensor`` for ``Buffer`` and
+    ``TensorValue`` leaves, and a same-shape container for list/tuple
+    inputs (each leaf converted independently). ``Any`` reflects that
+    leaves change type while the container type is preserved.
+    """
+
+    def _one(value: Any) -> Tensor | Any:
+        if isinstance(value, Tensor):
+            return value
+        if isinstance(value, Buffer):
+            return Tensor(storage=value)
+        if isinstance(value, TensorValue):
+            return Tensor.from_graph_value(value)
+        return value
+
+    if values is None:
+        return None
+    if isinstance(values, (Buffer, Tensor, TensorValue)):
+        return _one(values)
+    if isinstance(values, (list, tuple)):
+        return type(values)(_one(v) for v in values)
+    return values
+
+
+def map_tensors(
+    fn: Callable[[Tensor], Any], args: tuple[Any, ...]
+) -> tuple[Any, ...]:
+    """Applies ``fn`` to every :class:`Tensor` leaf in ``args``.
+
+    Recurses into ``list`` and ``tuple`` containers; non-tensor leaves
+    pass through unchanged.
+    """
+
+    def _walk(x: Any) -> Any:
+        if isinstance(x, Tensor):
+            return fn(x)
+        if isinstance(x, list):
+            return [_walk(v) for v in x]
+        if isinstance(x, tuple):
+            return tuple(_walk(v) for v in x)
+        return x
+
+    return tuple(_walk(a) for a in args)
+
+
+def tensor_to_layout(t: Tensor) -> TensorLayout:
+    """Converts a :class:`Tensor` to a :class:`TensorLayout` for sharding-rule evaluation.
+
+    ``t.shape`` already carries per-device cells on :class:`Sharded` axes
+    (via :class:`PerShardDim`), so the rules that fold per-rank cells
+    (notably ``reshape_rule``) can do the correct shape arithmetic
+    directly. Non-distributed tensors fall back to a plain :class:`Shape`.
+    """
+    if t.is_distributed:
+        return TensorLayout(
+            t.dtype,
+            t.shape,
+            PlacementMapping(t.mesh, t.placements),
+        )
+    return TensorLayout(
+        t.dtype,
+        t.shape,
+        PlacementMapping(DeviceMesh.single(t.device), (Replicated(),)),
+    )
+
+
+def any_distributed(args: tuple[object, ...]) -> bool:
+    """True if any :class:`Tensor` in ``args`` is distributed (multi-device)."""
+    for a in args:
+        if isinstance(a, Tensor) and a.is_distributed:
+            return True
+        if isinstance(a, (list, tuple)):
+            for item in a:
+                if isinstance(item, Tensor) and item.is_distributed:
+                    return True
+    return False
+
+
+def per_shard_dispatch(
     graph_op: Callable[..., Any],
     args: tuple[Any, ...],
     output_mappings: tuple[DeviceMapping, ...],
+    filtered_kwargs: Mapping[str, Any] | None = None,
 ) -> Any:
-    """Dispatches a graph op per-shard for distributed tensor inputs.
-
-    Runs ``graph_op`` once per device on the target mesh, extracting the
-    per-shard :class:`~max.graph.TensorValue` from each distributed
-    :class:`~max.experimental.tensor.Tensor` in ``args``. Non-distributed
-    tensors pass through to every shard unchanged. The per-shard results
-    are reassembled into distributed
-    :class:`~max.experimental.tensor.Tensor` outputs using
-    ``output_mappings``.
-
-    Also used internally by custom op dispatch.
+    """Runs ``graph_op`` once per shard and reassembles distributed outputs.
 
     Args:
-        graph_op: The graph op to run on each shard. Receives per-shard
-            :class:`~max.graph.TensorValue` inputs and may return a
-            single value, a ``list`` or ``tuple`` of values, or ``None``.
-        args: The positional arguments to pass to ``graph_op``. Any
-            distributed :class:`~max.experimental.tensor.Tensor` is
-            replaced by its per-shard
-            :class:`~max.graph.TensorValue` on each invocation; other
-            values are forwarded unchanged.
-        output_mappings: The
-            :class:`~max.experimental.sharding.DeviceMapping` placements
-            for the outputs. When ``graph_op`` returns multiple values
-            and fewer mappings are provided, the last mapping is reused
-            for the remaining outputs.
-
-    Returns:
-        The reassembled outputs from ``graph_op``. The return matches
-        what ``graph_op`` produces: ``None`` becomes ``None``, a single
-        value becomes a single distributed
-        :class:`~max.experimental.tensor.Tensor`, and a ``list`` or
-        ``tuple`` of values becomes a ``list`` or ``tuple`` of
-        distributed :class:`~max.experimental.tensor.Tensor` objects.
+        graph_op: The per-rank graph op to run.
+        args: Already-redistributed args.
+        output_mappings: One :class:`DeviceMapping` per output.
+        filtered_kwargs: Non-tensor or non-distributed tensor keyword arguments.
     """
     mesh = output_mappings[0].mesh
-    n = mesh.num_devices
 
     with ensure_context():
-        per_shard: list[Any] = []
-        for i in builtins.range(n):
-
-            def _get_shard(t: Tensor, _i: int = i) -> TensorValue:
-                if t.is_distributed:
-                    return TensorValue(t.local_shards[_i])
-                else:
-                    return TensorValue(t)
-
-            shard_args = map_tensors(_get_shard, args)
-            per_shard.append(graph_op(*shard_args))
-
+        per_shard = _run_per_shard(
+            graph_op, args, mesh.num_devices, filtered_kwargs
+        )
         first = per_shard[0]
         if first is None:
             return None
 
-        reference_tensors = collect_tensors(args)
-
-        if not isinstance(first, (list, tuple)):
-            tvs = [TensorValue(s) for s in per_shard]
-            global_shape = global_shape_from_local(
-                [list(tv.shape) for tv in tvs],
-                output_mappings[0].mesh,
-                output_mappings[0].to_placements(),
-                reference_tensors,
+        multi = isinstance(first, (list, tuple))
+        num_out = len(first) if multi else 1
+        outputs = [
+            _reassemble_output(
+                per_shard,
+                j,
+                output_mappings[builtins.min(j, len(output_mappings) - 1)],
+                multi=multi,
             )
-            return Tensor.from_shard_values(
-                tvs, output_mappings[0], global_shape=global_shape
+            for j in builtins.range(num_out)
+        ]
+        return type(first)(outputs) if multi else outputs[0]
+
+
+def _run_per_shard(
+    graph_op: Callable[..., Any],
+    args: tuple[Any, ...],
+    num_devices: int,
+    filtered_kwargs: Mapping[str, Any] | None = None,
+) -> list[Any]:
+    """Calls ``graph_op`` once per shard with per-rank arg unwrapping."""
+    per_shard: list[Any] = []
+    if filtered_kwargs is None:
+        filtered_kwargs = {}
+
+    for i in builtins.range(num_devices):
+
+        def _per_rank(t: Tensor, _i: int = i) -> TensorValue:
+            return (
+                TensorValue(t.local_shards[_i])
+                if t.is_distributed
+                else TensorValue(t)
             )
 
-        num_out = len(first)
-        outputs: list[Tensor] = []
-        for j in builtins.range(num_out):
-            out_m = output_mappings[builtins.min(j, len(output_mappings) - 1)]
-            tvs = [TensorValue(per_shard[i][j]) for i in builtins.range(n)]
-            global_shape = global_shape_from_local(
-                [list(tv.shape) for tv in tvs],
-                out_m.mesh,
-                out_m.to_placements(),
-                reference_tensors,
-            )
-            outputs.append(
-                Tensor.from_shard_values(tvs, out_m, global_shape=global_shape)
-            )
-        return type(first)(outputs)
+        shard_args = map_tensors(_per_rank, args)
+        shard_args = tuple(
+            a[i] if isinstance(a, PerShard) else a for a in shard_args
+        )
+        per_shard.append(graph_op(*shard_args, **filtered_kwargs))
+    return per_shard
 
 
-def _transfer_args(
-    args: tuple[Any, ...], suggested: tuple[Any, ...]
-) -> tuple[Any, ...]:
-    """Transfer Tensor args to match rule-suggested mappings.
-
-    For Tensor args, calls ``transfer_to(tensor, mapping)``.
-    For list/tuple args (e.g. concat's tensor list), walks into the
-    container.  For non-Tensor args, uses the suggested value (which
-    the rule may have modified, e.g. shape localization).
-    """
-    result: list[object] = []
-    for orig, sugg in zip(args, suggested, strict=True):
-        if isinstance(orig, Tensor):
-            assert isinstance(sugg, (Device, DeviceMapping))
-            result.append(transfer_to(orig, sugg))
-        elif isinstance(orig, (list, tuple)):
-            assert isinstance(sugg, (list, tuple))
-            items = [
-                transfer_to(o, s) if isinstance(o, Tensor) else s
-                for o, s in zip(orig, sugg, strict=True)
-            ]
-            result.append(type(orig)(items))
-        else:
-            result.append(sugg)
-    return tuple(result)
+def _reassemble_output(
+    per_shard: Sequence[Any],
+    j: int,
+    out_mapping: DeviceMapping,
+    *,
+    multi: bool,
+) -> Tensor:
+    """Reassembles output ``j`` from per-shard results into one distributed Tensor."""
+    tvs = [TensorValue(s[j] if multi else s) for s in per_shard]
+    return Tensor.from_shard_values(tvs, out_mapping)
 
 
 def functional(
-    graph_op: Callable[..., Any] | None = None,
-    rule: Callable[..., RuleSignature] | None = None,
+    graph_op: Callable[..., Any],
+    rule: Callable[..., ActionSet] | None = None,
 ) -> Callable[..., Any]:
-    """Wraps a :mod:`max.graph.ops` op for use with :class:`~max.experimental.tensor.Tensor` inputs.
+    """Wraps a graph op as a distributed dispatch entry.
 
-    When a sharding ``rule`` is provided, the wrapper also dispatches
-    per-shard for tensors that are sharded across devices.
-
-    Args:
-        graph_op: The :mod:`max.graph.ops` op to wrap.
-        rule: Optional sharding rule for distributed inputs.
-
-    Returns:
-        A callable that wraps ``graph_op``.
+    Returns a callable that local-auto-shards when any argument is a
+    distributed :class:`Tensor` (and a rule is bound), and otherwise
+    forwards to the bare ``graph_op``. The returned wrapper carries
+    ``graph_op`` and ``rule`` as attributes; reassign ``wrapper.rule``
+    to swap the sharding rule at runtime without re-wrapping.
     """
-    if graph_op is None:
-        return functools.partial(functional, rule=rule)
 
-    # Pre-compute signature for canonicalizing kwargs → positional.
-    sig = inspect.signature(graph_op)
-
-    def _canonicalize(
-        args: tuple[object, ...], kwargs: dict[str, object]
-    ) -> tuple[object, ...]:
-        """Bind args+kwargs into a single positional tuple with defaults."""
-        bound = sig.bind(*args, **kwargs)
-        bound.apply_defaults()
-        return tuple(bound.args)
-
-    @functools.wraps(
-        graph_op,
-        assigned=("__module__", "__name__", "__qualname__", "__annotations__"),
-    )
-    def wrapped(*args: Any, **kwargs: Any) -> Any:
-        if rule is not None and (
-            any_distributed(args) or any_distributed(kwargs.values())
-        ):
-            all_args = _canonicalize(args, kwargs)
-            layout_args = map_tensors(tensor_to_layout, all_args)
-            suggested, out_mappings = rule(*layout_args)
-            redistributed = _transfer_args(all_args, suggested)
-            return spmd_dispatch(graph_op, redistributed, out_mappings)
-
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        active_rule = getattr(wrapper, "rule", None)
+        if any_distributed(args) and active_rule is not None:
+            return _local_dispatch(graph_op, active_rule, args, kwargs)
         with ensure_context():
-            result = graph_op(*args, **kwargs)
-            return to_tensors(result)
+            return to_tensors(graph_op(*args, **kwargs))
 
-    # Rewrite annotations so inspect.signature / Sphinx show ``Tensor``
-    # instead of the graph-op's ``TensorValueLike`` parameter types.
-    install_tensor_signature(wrapped)
+    # ``Any``-typed alias so attribute writes are dynamic;
+    # ``functools.wraps`` types the closure as ``_Wrapped[...]`` which
+    # rejects arbitrary attribute assignment under mypy.
+    w: Any = wrapper
+    w.__name__ = getattr(graph_op, "__name__", "wrapper")
+    w.__qualname__ = getattr(graph_op, "__qualname__", w.__name__)
+    w.__module__ = getattr(graph_op, "__module__", w.__module__)
+    w.__wrapped__ = graph_op
+    w.graph_op = graph_op
+    w.rule = rule
+    # Rewrite the wrapper's signature/annotations so inspect.signature and
+    # Sphinx show ``Tensor`` instead of the graph op's ``TensorValueLike``
+    # parameter types (reads graph_op via ``__wrapped__``). From #87216.
+    install_tensor_signature(wrapper)
+    return wrapper
 
-    return wrapped
+
+def _local_dispatch(
+    graph_op: Callable[..., Any],
+    rule: Callable[..., ActionSet],
+    args: tuple[Any, ...],
+    kwargs: Mapping[str, Any],
+) -> Any:
+    """Picks one :class:`Action` for this call and applies it."""
+    from max.experimental.sharding._diagnostics import report_reshard
+    from max.experimental.sharding.mode import current_solver
+
+    # TODO: keyword-only distributed tensor arguments are not supported.
+    flat_args, filtered_kwargs = _canonicalize_call(graph_op, args, kwargs)
+    layout_args = map_tensors(tensor_to_layout, flat_args)
+    in_layouts = _walk_tensor_layouts(layout_args)
+
+    menu = rule(*layout_args)
+    solver = current_solver()
+    action = solver(menu, in_layouts)
+
+    op_name = getattr(graph_op, "__name__", "<op>")
+    report_reshard(solver, op_name, layout_args, menu, action)
+    redistributed = _transfer_args(flat_args, action.inputs)
+
+    if action.outputs:
+        out_mappings = action.outputs
+    else:
+        out_mappings = (
+            next(
+                t.mapping for t in _walk_tensors(flat_args) if t.is_distributed
+            ),
+        )
+    return per_shard_dispatch(
+        graph_op,
+        redistributed,
+        out_mappings,
+        filtered_kwargs,
+    )
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Scalar promotion helper
-# ═════════════════════════════════════════════════════════════════════════
-# The underlying ``ops.add(tensor, 0.5)`` graph op accepts a Python number
-# fine, but the SPMD rule-dispatch path in ``functional()`` expects every
-# argument to be distributable (i.e. produce a ``TensorLayout`` via
-# ``tensor_to_layout``). For binary ops that can take a scalar operand
-# (``F.add(x, eps)`` inside RMSNorm, ``F.mul(x, 0.5)`` inside GELU, …) we
-# promote the scalar to a ``full_like`` Tensor *before* dispatch so the
-# rule always sees two layouts.
+def _canonicalize_call(
+    graph_op: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: Mapping[str, Any],
+) -> tuple[tuple[Any, ...], Mapping[str, Any]]:
+    """Normalizes ``args`` + ``kwargs`` into a positional tuple.
+
+    Binds against ``graph_op``'s signature so kwargs become positional.
+    Falls back to ``args`` when the signature is uninspectable.
+    """
+    import inspect
+
+    sig_source = getattr(graph_op, "graph_op", graph_op)
+    try:
+        bound = inspect.signature(sig_source).bind(*args, **kwargs)
+        bound.apply_defaults()
+        return tuple(bound.args), bound.kwargs
+    except (TypeError, NotImplementedError, ValueError):
+        return args + tuple(kwargs.values()), {}
+
+
+def _walk_tensors(value: Any) -> Iterable[Tensor]:
+    """Yields every :class:`Tensor` reachable through tuples/lists."""
+    if isinstance(value, Tensor):
+        yield value
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            yield from _walk_tensors(v)
+
+
+def _walk_tensor_layouts(value: Any) -> list[Any]:
+    """Flattens TensorLayout leaves out of arbitrary nested args."""
+    out: list[Any] = []
+    if isinstance(value, (list, tuple)):
+        for v in value:
+            out.extend(_walk_tensor_layouts(v))
+        return out
+    if hasattr(value, "mapping") and hasattr(value, "shape"):
+        out.append(value)
+    return out
+
+
+def _transfer_args(
+    args: tuple[Any, ...],
+    suggested: tuple[Any, ...],
+) -> tuple[Any, ...]:
+    """Reshards Tensor args to match the action's per-slot mappings."""
+    from .collective_ops import transfer_to
+
+    result: list[object] = []
+    for orig, sugg in zip(args, suggested, strict=False):
+        if isinstance(sugg, PerShard):
+            result.append(sugg)
+        elif isinstance(orig, Tensor) and isinstance(sugg, DeviceMapping):
+            result.append(transfer_to(orig, sugg))
+        elif isinstance(orig, (list, tuple)) and isinstance(
+            sugg, (list, tuple)
+        ):
+            items = [
+                transfer_to(o, s)
+                if isinstance(o, Tensor) and isinstance(s, DeviceMapping)
+                else s
+                for o, s in zip(orig, sugg, strict=False)
+            ]
+            result.append(type(orig)(items))
+        elif not isinstance(orig, Tensor) and sugg is not None:
+            result.append(sugg)
+        else:
+            result.append(orig)
+    if len(args) > len(suggested):
+        result.extend(args[len(suggested) :])
+    return tuple(result)
 
 
 def _binary_with_scalar_promotion(
     inner: Callable[..., object],
 ) -> Callable[..., Tensor]:
-    """Wrap a binary dispatch so that scalars are promoted to Tensors.
+    """Wraps a binary dispatch with scalar promotion.
 
-    Only the SPMD rule-dispatch path needs both args to be Tensors (so
-    they produce a TensorLayout). The single-device graph-op path handles
-    scalar + tensor natively — including int-dtype tensors, where eager
-    ``full_like(int_tensor, 0.5)`` would bad_cast a float into an int
-    constant. Gate the promotion on ``any_distributed`` to keep the
-    native path intact.
+    Scalar promotion is gated on ``any_distributed`` because the
+    single-device graph-op path handles scalar + tensor natively. Rank
+    differences are not equalized here: broadcasting is handled by the
+    RMO dialect per shard, and the placement rules express trailing-axis
+    alignment directly.
     """
 
-    def wrapper(lhs: Tensor | int | float, rhs: Tensor | int | float) -> Tensor:
+    def wrapper(lhs: Tensor | float, rhs: Tensor | float) -> Tensor:
         if any_distributed((lhs, rhs)):
             if isinstance(lhs, (int, float)) and isinstance(rhs, Tensor):
                 lhs = full_like(rhs, lhs)
@@ -321,22 +454,15 @@ def _binary_with_scalar_promotion(
         assert isinstance(result, Tensor)
         return result
 
-    # Propagate name/qualname/module from the wrapped op so
-    # ``F.add.__name__`` is ``"add"`` rather than ``"wrapper"``. Set
-    # these directly instead of via ``functools.update_wrapper`` so we
-    # don't set ``__wrapped__`` — that would route ``inspect.signature``
-    # through ``inner`` and lose ``wrapper``'s ``Tensor | int | float``
-    # scalar-promotion annotations.
     wrapper.__module__ = getattr(inner, "__module__", wrapper.__module__)
     wrapper.__name__ = getattr(inner, "__name__", wrapper.__name__)
     wrapper.__qualname__ = getattr(inner, "__qualname__", wrapper.__qualname__)
     return wrapper
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Elementwise — Binary (with scalar promotion)
-# ═════════════════════════════════════════════════════════════════════════
-
+#: Adds two tensors element-wise with SPMD distribution support.
+#: Scalars are promoted to tensors automatically.
+#: See :func:`max.graph.ops.add` for details.
 add = _binary_with_scalar_promotion(
     functional(ops.add, rule=linear_binary_rule)
 )
@@ -364,7 +490,7 @@ Args:
     rhs: The right-hand side tensor or scalar.
 
 Returns:
-    A tensor with the broadcast shape containing the element-wise sums.
+    A ``Tensor`` containing the element-wise sums.
 """
 
 sub = _binary_with_scalar_promotion(
@@ -390,7 +516,7 @@ Args:
     rhs: The subtrahend (right-hand side) tensor or scalar.
 
 Returns:
-    A tensor with the broadcast shape containing ``lhs - rhs`` element-wise.
+    A ``Tensor`` containing the result of ``lhs - rhs`` element-wise.
 """
 
 mul = _binary_with_scalar_promotion(functional(ops.mul, rule=binary_rule))
@@ -414,15 +540,18 @@ Args:
     rhs: The right-hand side tensor or scalar.
 
 Returns:
-    A tensor with the broadcast shape containing element-wise products.
+    A ``Tensor`` containing the element-wise products.
 """
 
 div = _binary_with_scalar_promotion(functional(ops.div, rule=binary_rule))
-div.__doc__ = """Divides two tensors element-wise.
+div.__doc__ = """Divides two tensors element-wise using true division (Python ``/``).
+
+For integer operands, this performs true division by promoting to float,
+matching Python's ``/`` operator behavior. For floating-point operands,
+this performs standard floating-point division.
 
 Either operand may be a Python ``int`` or ``float`` scalar, which is
-automatically promoted to a tensor. Integer
-operands are promoted to floating point.
+automatically promoted to a tensor.
 
 .. code-block:: python
 
@@ -439,7 +568,43 @@ Args:
     rhs: The denominator tensor or scalar.
 
 Returns:
-    A tensor with the broadcast shape containing ``lhs / rhs`` element-wise.
+    A ``Tensor`` with the broadcast shape containing ``lhs / rhs``
+    element-wise. The result has a floating-point dtype for integer
+    operands and the promoted dtype for mixed types.
+"""
+
+floor_div = _binary_with_scalar_promotion(
+    functional(ops.floor_div, rule=binary_rule)
+)
+floor_div.__doc__ = """Divides two tensors element-wise using floor division (Python ``//``).
+
+The result is rounded toward negative infinity, matching Python's ``//``.
+Either operand may be a Python ``int`` or ``float`` scalar, which is
+automatically promoted to a tensor. Integer operands stay in the integer
+domain (no ``float64`` promotion), unlike :func:`div`.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.dtype import DType
+
+    a = Tensor([7, 10, 18], dtype=DType.int32)
+    b = Tensor([2, 5, 6], dtype=DType.int32)
+    result = F.floor_div(a, b)
+    # result is [3, 2, 3]
+
+    # Floating-point operands are supported and still round toward -inf.
+    result = F.floor_div(Tensor([7.5, -7.5], dtype=DType.float32), 2.0)
+    # result is [3.0, -4.0]
+
+Args:
+    lhs: The numerator tensor or scalar.
+    rhs: The denominator tensor or scalar.
+
+Returns:
+    A ``Tensor`` with the broadcast shape containing the element-wise
+    floor division of ``lhs`` by ``rhs``.
 """
 
 pow = _binary_with_scalar_promotion(functional(ops.pow, rule=binary_rule))
@@ -463,7 +628,8 @@ Args:
     rhs: The exponent tensor or scalar.
 
 Returns:
-    A tensor with the broadcast shape containing ``lhs ** rhs`` element-wise.
+    A ``Tensor`` with the broadcast shape containing ``lhs ** rhs``
+    element-wise.
 """
 
 mod = _binary_with_scalar_promotion(functional(ops.mod, rule=binary_rule))
@@ -471,6 +637,10 @@ mod.__doc__ = """Computes the element-wise modulus of two tensors.
 
 Either operand may be a Python ``int`` or ``float`` scalar, which is
 automatically promoted to a tensor.
+
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``mod``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 mod on Metal (MOCO-4826)")
 
 .. code-block:: python
 
@@ -487,13 +657,11 @@ Args:
     rhs: The divisor tensor or scalar.
 
 Returns:
-    A tensor with the broadcast shape containing ``lhs % rhs`` element-wise.
+    A ``Tensor`` containing ``lhs % rhs`` element-wise.
 """
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Elementwise — Unary
-# ═════════════════════════════════════════════════════════════════════════
-
+#: Negates a tensor element-wise. Distributed via SPMD.
+#: See :func:`max.graph.ops.negate` for details.
 negate = functional(ops.negate, rule=linear_unary_rule)
 negate.__doc__ = """Negates a tensor element-wise.
 
@@ -510,14 +678,15 @@ Args:
     x: The input tensor.
 
 Returns:
-    A tensor of the same shape and dtype with each element negated.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    negation of each element of ``x``.
 """
 
 relu = functional(ops.relu, rule=unary_rule)
-relu.__doc__ = """Applies the ReLU activation function element-wise.
+relu.__doc__ = """Applies the ReLU (Rectified Linear Unit) activation element-wise.
 
-Computes ``max(0, x)``: negative values are set to zero while positive
-values are unchanged.
+ReLU is defined as ``relu(x) = max(0, x)``, meaning negative values are set
+to zero while positive values are unchanged.
 
 .. code-block:: python
 
@@ -529,10 +698,11 @@ values are unchanged.
     # result is [[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]]
 
 Args:
-    x: The input tensor.
+    x: The input to the ReLU computation.
 
 Returns:
-    A tensor of the same shape and dtype with negative values replaced by ``0``.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing ``x`` with
+    its negative elements replaced by ``0``.
 """
 
 abs = functional(ops.abs, rule=unary_rule)
@@ -551,14 +721,14 @@ Args:
     x: The input tensor.
 
 Returns:
-    A tensor of the same shape and dtype with each element replaced by
-    its absolute value.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    absolute value of each element of ``x``.
 """
 
 exp = functional(ops.exp, rule=unary_rule)
 exp.__doc__ = """Computes the exponential of a tensor element-wise.
 
-Computes ``e ** x`` for each element, where ``e`` is Euler's number.
+This applies ``exp(x) = e^x``, where ``e`` is Euler's number.
 
 .. code-block:: python
 
@@ -570,17 +740,21 @@ Computes ``e ** x`` for each element, where ``e`` is Euler's number.
     # result is approximately [1.0, 2.718, 7.389]
 
 Args:
-    x: The input tensor.
+    x: The input to the exponential function. Must have a floating-point
+        dtype.
 
 Returns:
-    A tensor of the same shape and dtype with the exponential applied
-    element-wise.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing ``e``
+    raised to the power of each element of ``x``.
 """
 
 log = functional(ops.log, rule=unary_rule)
 log.__doc__ = """Computes the natural logarithm of a tensor element-wise.
 
-``log(x)`` is undefined for ``x <= 0`` on real numbers.
+This applies ``log(x)``. It is the inverse of the exponential
+function ``x = e^y``, where ``e`` is Euler's number.
+Note that ``log(x)`` is undefined for ``x <= 0`` and complex numbers
+are not currently supported.
 
 .. code-block:: python
 
@@ -592,17 +766,16 @@ log.__doc__ = """Computes the natural logarithm of a tensor element-wise.
     # result is approximately [0.0, 1.0, 2.0, 2.996]
 
 Args:
-    x: The input tensor. Must contain positive values for real-valued results.
+    x: The input to the log computation. Must have a floating-point dtype
+        and contain positive values only.
 
 Returns:
-    A tensor of the same shape and dtype with the natural logarithm applied
-    element-wise.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    natural logarithm of each element of ``x``.
 """
 
 sqrt = functional(ops.sqrt, rule=unary_rule)
 sqrt.__doc__ = """Computes the square root of a tensor element-wise.
-
-Requires non-negative inputs for real-valued results.
 
 .. code-block:: python
 
@@ -614,11 +787,12 @@ Requires non-negative inputs for real-valued results.
     # result is [1.0, 2.0, 3.0, 4.0]
 
 Args:
-    x: The input tensor. Must have a floating-point dtype.
+    x: The input tensor. Must have a floating-point dtype. Negative values
+        produce ``NaN`` since MAX doesn't support complex numbers.
 
 Returns:
-    A tensor of the same shape and dtype with the square root of each
-    element.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    square root of each element of ``x``.
 """
 
 rsqrt = functional(ops.rsqrt, rule=unary_rule)
@@ -639,82 +813,103 @@ Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with the reciprocal square root
-    of each element.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    reciprocal square root of each element of ``x``.
 """
 
-sigmoid = functional(ops.sigmoid, rule=unary_rule)
-sigmoid.__doc__ = """Applies the sigmoid activation function element-wise.
+_sigmoid_impl = functional(ops.sigmoid, rule=unary_rule)
 
-Computes ``1 / (1 + exp(-x))`` for each element, mapping all values to
-the range ``(0, 1)``.
 
-.. code-block:: python
+def sigmoid(x: Tensor) -> Tensor:
+    """Applies the sigmoid activation function element-wise.
 
-    from max.experimental import Tensor
-    from max.experimental import functional as F
+    Computes ``sigmoid(x) = 1 / (1 + exp(-x))``, mapping all values to the
+    range ``(0, 1)``.
 
-    x = Tensor([[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]])
-    result = F.sigmoid(x)
-    # result is approximately:
-    # [[0.119, 0.269, 0.5], [0.731, 0.881, 0.953]]
+    .. code-block:: python
 
-Args:
-    x: The input tensor.
+        from max.experimental import Tensor
+        from max.experimental import functional as F
 
-Returns:
-    A tensor of the same shape and dtype with values in the range ``(0, 1)``.
-"""
+        x = Tensor([[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]])
+        result = F.sigmoid(x)
+        # result is approximately:
+        # [[0.119, 0.269, 0.5], [0.731, 0.881, 0.953]]
 
-silu = functional(ops.silu, rule=unary_rule)
-silu.__doc__ = """Applies the SiLU (Swish) activation function element-wise.
+    Args:
+        x: The input to the sigmoid computation. Must have a floating-point
+            dtype.
 
-Computes ``x * sigmoid(x)`` for each element.
+    Returns:
+        A ``Tensor`` of the same shape and dtype as ``x`` containing each
+        element of ``x`` mapped to the range ``(0, 1)``.
+    """
+    return _sigmoid_impl(x)
 
-.. code-block:: python
 
-    from max.experimental import Tensor
-    from max.experimental import functional as F
+_silu_impl = functional(ops.silu, rule=unary_rule)
 
-    x = Tensor([-1.0, 0.0, 1.0, 2.0])
-    result = F.silu(x)
-    # result is approximately [-0.269, 0.0, 0.731, 1.762]
 
-Args:
-    x: The input tensor.
+def silu(x: Tensor) -> Tensor:
+    """Applies the SiLU (Swish) activation function element-wise.
 
-Returns:
-    A tensor of the same shape and dtype with the SiLU activation applied
-    element-wise.
-"""
+    Computes ``silu(x) = x * sigmoid(x)``.
 
-gelu = functional(ops.gelu, rule=unary_rule)
-gelu.__doc__ = """Applies the GELU (Gaussian Error Linear Unit) activation element-wise.
+    .. code-block:: python
 
-.. code-block:: python
+        from max.experimental import Tensor
+        from max.experimental import functional as F
 
-    from max.experimental import Tensor
-    from max.experimental import functional as F
+        x = Tensor([-1.0, 0.0, 1.0, 2.0])
+        result = F.silu(x)
+        # result is approximately [-0.269, 0.0, 0.731, 1.762]
 
-    x = Tensor([-1.0, 0.0, 1.0])
-    result = F.gelu(x)
-    # result is approximately [-0.159, 0.0, 0.841]
+    Args:
+        x: The input to the SiLU computation. Must have a floating-point
+            dtype.
 
-Args:
-    x: The input tensor.
-    approximate: The approximation method. Defaults to ``"none"`` (exact
-        form using ``erf``). Use ``"tanh"`` for the tanh-based approximation
-        or ``"quick"`` for the sigmoid-based approximation.
+    Returns:
+        A ``Tensor`` of the same shape and dtype as ``x`` containing the
+        SiLU activation applied to each element of ``x``.
+    """
+    return _silu_impl(x)
 
-Returns:
-    A tensor of the same shape and dtype with the GELU activation applied
-    element-wise.
-"""
+
+_gelu_impl = functional(ops.gelu, rule=unary_rule)
+
+
+def gelu(x: Tensor, approximate: str = "none") -> Tensor:
+    """Applies the GELU (Gaussian Error Linear Unit) activation element-wise.
+
+    .. code-block:: python
+
+        from max.experimental import Tensor
+        from max.experimental import functional as F
+
+        x = Tensor([-1.0, 0.0, 1.0])
+        result = F.gelu(x)
+        # result is approximately [-0.159, 0.0, 0.841]
+
+    Args:
+        x: The input to the GELU computation. Must have a floating-point
+            dtype.
+        approximate: The approximation method. Defaults to ``"none"``
+            (exact form using ``erf``). Use ``"tanh"`` for the tanh-based
+            approximation or ``"quick"`` for the sigmoid-based
+            approximation.
+
+    Returns:
+        A ``Tensor`` of the same shape and dtype as ``x`` containing the
+        GELU activation applied to each element of ``x``.
+    """
+    return _gelu_impl(x, approximate)
+
 
 tanh = functional(ops.tanh, rule=unary_rule)
 tanh.__doc__ = """Computes the hyperbolic tangent of a tensor element-wise.
 
-Maps all values to the range ``(-1, 1)``.
+This applies ``tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))``, which
+maps all values to the range ``(-1, 1)``.
 
 .. code-block:: python
 
@@ -730,7 +925,8 @@ Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with values in the range ``(-1, 1)``.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing each
+    element of ``x`` mapped to the range ``(-1, 1)``.
 """
 
 cos = functional(ops.cos, rule=unary_rule)
@@ -746,11 +942,12 @@ cos.__doc__ = """Computes the cosine of a tensor element-wise.
     # result is approximately [1.0, 0.878, 0.540]
 
 Args:
-    x: The input tensor, interpreted as radians. Must have a floating-point
+    x: The input interpreted as radians. Must have a floating-point
         dtype.
 
 Returns:
-    A tensor of the same shape and dtype with the cosine of each element.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    cosine of each element of ``x``.
 """
 
 sin = functional(ops.sin, rule=unary_rule)
@@ -766,15 +963,19 @@ sin.__doc__ = """Computes the sine of a tensor element-wise.
     # result is approximately [0.0, 0.479, 0.841]
 
 Args:
-    x: The input tensor, interpreted as radians. Must have a floating-point
+    x: The input interpreted as radians. Must have a floating-point
         dtype.
 
 Returns:
-    A tensor of the same shape and dtype with the sine of each element.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    sine of each element of ``x``.
 """
 
 erf = functional(ops.erf, rule=unary_rule)
 erf.__doc__ = """Computes the error function of a tensor element-wise.
+
+The error function ``erf`` is the probability that a randomly sampled
+normal distribution falls within a given range.
 
 .. code-block:: python
 
@@ -786,17 +987,43 @@ erf.__doc__ = """Computes the error function of a tensor element-wise.
     # result is approximately [-0.843, 0.0, 0.843]
 
 Args:
-    x: The input tensor.
+    x: The input to the error function. Must have a floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with the error function applied
-    element-wise.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the error
+    function applied to each element of ``x``.
+"""
+
+ceil = functional(ops.ceil, rule=unary_rule)
+ceil.__doc__ = """Computes the ceiling of a tensor element-wise.
+
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``ceil``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 ceil on Metal (MOCO-4826)")
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([1.5, 2.0, -1.5, -2.7])
+    result = F.ceil(x)
+    # result is [2.0, 2.0, -1.0, -2.0]
+
+Args:
+    x: The input tensor. Must have a floating-point dtype.
+
+Returns:
+    A ``Tensor`` of the same shape and dtype as ``x`` containing each
+    element of ``x`` rounded up toward positive infinity.
 """
 
 floor = functional(ops.floor, rule=unary_rule)
 floor.__doc__ = """Computes the floor of a tensor element-wise.
 
-Rounds each element down toward negative infinity.
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``floor``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 floor on Metal (MOCO-4826)")
 
 .. code-block:: python
 
@@ -811,13 +1038,20 @@ Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with each element rounded down.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing each
+    element of ``x`` rounded down toward negative infinity.
 """
 
 round = functional(ops.round, rule=unary_rule)
 round.__doc__ = """Rounds a tensor to the nearest integer element-wise.
 
-Ties round toward the nearest even number (banker's rounding).
+Values exactly halfway between two integers round to the nearest even integer
+(for example, ``2.5`` rounds to ``2.0`` and ``3.5`` rounds to ``4.0``). All
+other values follow normal rounding to the nearest integer.
+
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``round``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 round on Metal (MOCO-4826)")
 
 .. code-block:: python
 
@@ -833,13 +1067,16 @@ Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with each element rounded.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing each
+    element of ``x`` rounded to the nearest integer.
 """
 
 trunc = functional(ops.trunc, rule=unary_rule)
 trunc.__doc__ = """Truncates a tensor toward zero element-wise.
 
-Discards the fractional part of each element.
+.. Skipped: Tensor defaults to bfloat16 on an accelerator, and Metal cannot
+   compile a bf16 ``trunc``. Remove this skip once MOCO-4826 is fixed.
+.. skip: next if(__import__("sys").platform == "darwin", "no bf16 trunc on Metal (MOCO-4826)")
 
 .. code-block:: python
 
@@ -854,7 +1091,8 @@ Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with the fractional part discarded.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing each
+    element of ``x`` truncated toward zero.
 """
 
 
@@ -874,8 +1112,8 @@ Args:
     x: The input tensor.
 
 Returns:
-    A boolean tensor of the same shape, with ``True`` where the input is
-    positive or negative infinity.
+    A ``Tensor`` with ``bool`` dtype and the same shape as ``x`` that is
+    ``True`` where ``x`` is positive or negative infinity.
 """
 
 is_nan = functional(ops.is_nan, rule=unary_rule)
@@ -894,7 +1132,8 @@ Args:
     x: The input tensor.
 
 Returns:
-    A boolean tensor of the same shape, with ``True`` where the input is NaN.
+    A ``Tensor`` with ``bool`` dtype and the same shape as ``x`` that is
+    ``True`` where ``x`` is NaN.
 """
 
 logical_not = functional(ops.logical_not, rule=unary_rule)
@@ -904,8 +1143,9 @@ logical_not.__doc__ = """Computes the element-wise logical NOT of a boolean tens
 
     from max.experimental import Tensor
     from max.experimental import functional as F
+    from max.dtype import DType
 
-    x = Tensor([True, False, True])
+    x = Tensor([True, False, True], dtype=DType.bool)
     result = F.logical_not(x)
     # result is [False, True, False]
 
@@ -913,13 +1153,15 @@ Args:
     x: The input boolean tensor.
 
 Returns:
-    A boolean tensor of the same shape with each element negated.
+    A ``Tensor`` with ``bool`` dtype and the same shape as ``x`` containing
+    the element-wise logical NOT of ``x``.
 """
 
 log1p = functional(ops.log1p, rule=unary_rule)
 log1p.__doc__ = """Computes ``log(1 + x)`` element-wise.
 
-More numerically accurate than ``log(1 + x)`` when ``x`` is close to zero.
+Note that ``log(1 + x)`` is undefined for ``x <= -1`` and complex
+numbers are not currently supported.
 
 .. code-block:: python
 
@@ -931,11 +1173,11 @@ More numerically accurate than ``log(1 + x)`` when ``x`` is close to zero.
     # result is approximately [0.0, 1e-7, 0.693]
 
 Args:
-    x: The input tensor.
+    x: The input to the log computation. Must have a floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with ``log(1 + x)`` applied
-    element-wise.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing
+    ``log(1 + x)`` for each element of ``x``.
 """
 
 atanh = functional(ops.atanh, rule=unary_rule)
@@ -955,49 +1197,67 @@ Args:
         floating-point dtype.
 
 Returns:
-    A tensor of the same shape and dtype with the inverse hyperbolic tangent
-    of each element.
+    A ``Tensor`` of the same shape and dtype as ``x`` containing the
+    inverse hyperbolic tangent of each element of ``x``.
 """
 
-acos = functional(ops.acos, rule=unary_rule)
-acos.__doc__ = """Computes the arccosine of a tensor element-wise.
+_acos_impl = functional(ops.acos, rule=unary_rule)
 
-.. code-block:: python
 
-    from max.experimental import Tensor
-    from max.experimental import functional as F
+def acos(x: Tensor) -> Tensor:
+    """Computes the arccosine of a tensor element-wise.
 
-    x = Tensor([-1.0, 0.0, 1.0])
-    result = F.acos(x)
-    # result is approximately [3.1416, 1.5708, 0.0] or [pi, pi/2, 0]
+    .. code-block:: python
 
-Args:
-    x: The input tensor, with values in the range ``[-1, 1]``. Values
-        outside this domain are clamped. Must have a floating-point dtype.
+        from max.experimental import Tensor
+        from max.experimental import functional as F
 
-Returns:
-    A tensor of the same shape and dtype with values in the range
-    ``[0, pi]`` (radians).
-"""
+        x = Tensor([-1.0, 0.0, 1.0])
+        result = F.acos(x)
+        # result is approximately [3.1416, 1.5708, 0.0] or [pi, pi/2, 0]
 
-dequantize = functional(ops.dequantize, rule=unary_rule)
-dequantize.__doc__ = """Dequantizes a quantized tensor back to a floating-point representation.
+    Args:
+        x: The input tensor with values in ``[-1, 1]``. Must have a
+            floating-point dtype. For ``float16``, ``bfloat16``, and
+            ``float32``, values outside this domain are clamped to the valid
+            range. For ``float64``, out-of-domain values produce ``NaN``.
 
-Currently supports the ``Q4_0``, ``Q4_K``, and ``Q6_K`` encodings.
+    Returns:
+        A ``Tensor`` of the same shape and dtype as ``x`` containing the
+        arccosine of each element of ``x``. Values range from ``[0, π]``
+        (radians).
+    """
+    return _acos_impl(x)
 
-Args:
-    encoding: The :class:`~max.graph.quantization.QuantizationEncoding`
-        used to pack ``quantized``.
-    quantized: The input quantized tensor.
 
-Returns:
-    A floating-point tensor with the values reconstructed from the
-    quantized input.
-"""
+#: Dequantizes a tensor. Distributed via SPMD.
+#: See :func:`max.graph.ops.dequantize` for details.
+_dequantize_impl = functional(ops.dequantize, rule=dequantize_rule)
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Elementwise — Comparison / Logical
-# ═════════════════════════════════════════════════════════════════════════
+
+def dequantize(encoding: QuantizationEncoding, quantized: Tensor) -> Tensor:
+    """Dequantizes a quantized tensor to floating point.
+
+    .. note::
+
+        This currently supports the ``Q4_0``, ``Q4_K``, and ``Q6_K``
+        encodings only.
+
+    Args:
+        encoding: The quantization encoding to use.
+        quantized: The quantized tensor to dequantize.
+
+    Returns:
+        A ``Tensor`` containing the dequantized, floating point result.
+
+    Raises:
+        ValueError: If ``encoding`` is not a supported quantization encoding,
+            or if the last dimension isn't divisible by the encoding's block
+            size.
+        TypeError: If the last dimension of ``quantized`` isn't static.
+    """
+    return _dequantize_impl(encoding, quantized)
+
 
 equal = _binary_with_scalar_promotion(functional(ops.equal, rule=binary_rule))
 equal.__doc__ = """Tests element-wise equality between two tensors.
@@ -1020,8 +1280,8 @@ Args:
     rhs: The right-hand side tensor or scalar.
 
 Returns:
-    A boolean tensor that is ``True`` when
-    ``lhs == rhs``.
+    A ``Tensor`` with ``bool`` dtype containing the element-wise result
+    of ``lhs == rhs``.
 """
 
 not_equal = _binary_with_scalar_promotion(
@@ -1047,8 +1307,8 @@ Args:
     rhs: The right-hand side tensor or scalar.
 
 Returns:
-    A boolean tensor that is ``True`` when
-    ``lhs != rhs``.
+    A ``Tensor`` with ``bool`` dtype containing the element-wise result
+    of ``lhs != rhs``.
 """
 
 greater = _binary_with_scalar_promotion(
@@ -1074,8 +1334,8 @@ Args:
     rhs: The right-hand side tensor or scalar.
 
 Returns:
-    A boolean tensor that is ``True`` when
-    ``lhs > rhs``.
+    A ``Tensor`` with ``bool`` dtype containing the element-wise result
+    of ``lhs > rhs``.
 """
 
 greater_equal = _binary_with_scalar_promotion(
@@ -1101,8 +1361,8 @@ Args:
     rhs: The right-hand side tensor or scalar.
 
 Returns:
-    A boolean tensor that is ``True`` when
-    ``lhs >= rhs``.
+    A ``Tensor`` with ``bool`` dtype containing the element-wise result
+    of ``lhs >= rhs``.
 """
 
 logical_and = _binary_with_scalar_promotion(
@@ -1116,9 +1376,10 @@ Only supports boolean inputs.
 
     from max.experimental import Tensor
     from max.experimental import functional as F
+    from max.dtype import DType
 
-    a = Tensor([True, True, False])
-    b = Tensor([True, False, False])
+    a = Tensor([True, True, False], dtype=DType.bool)
+    b = Tensor([True, False, False], dtype=DType.bool)
     result = F.logical_and(a, b)
     # result is [True, False, False]
 
@@ -1127,8 +1388,8 @@ Args:
     rhs: The right-hand side boolean tensor.
 
 Returns:
-    A boolean tensor that is ``True`` when both
-    inputs are ``True``.
+    A ``Tensor`` with ``bool`` dtype containing the element-wise logical
+    AND of ``lhs`` and ``rhs``.
 """
 
 logical_or = _binary_with_scalar_promotion(
@@ -1142,9 +1403,10 @@ Only supports boolean inputs.
 
     from max.experimental import Tensor
     from max.experimental import functional as F
+    from max.dtype import DType
 
-    a = Tensor([True, True, False])
-    b = Tensor([True, False, False])
+    a = Tensor([True, True, False], dtype=DType.bool)
+    b = Tensor([True, False, False], dtype=DType.bool)
     result = F.logical_or(a, b)
     # result is [True, True, False]
 
@@ -1153,8 +1415,8 @@ Args:
     rhs: The right-hand side boolean tensor.
 
 Returns:
-    A boolean tensor that is ``True`` when at
-    least one input is ``True``.
+    A ``Tensor`` with ``bool`` dtype containing the element-wise logical
+    OR of ``lhs`` and ``rhs``.
 """
 
 logical_xor = _binary_with_scalar_promotion(
@@ -1168,9 +1430,10 @@ Only supports boolean inputs.
 
     from max.experimental import Tensor
     from max.experimental import functional as F
+    from max.dtype import DType
 
-    a = Tensor([True, True, False])
-    b = Tensor([True, False, False])
+    a = Tensor([True, True, False], dtype=DType.bool)
+    b = Tensor([True, False, False], dtype=DType.bool)
     result = F.logical_xor(a, b)
     # result is [False, True, False]
 
@@ -1179,30 +1442,68 @@ Args:
     rhs: The right-hand side boolean tensor.
 
 Returns:
-    A boolean tensor that is ``True`` when exactly
-    one input is ``True``.
+    A ``Tensor`` with ``bool`` dtype containing the element-wise logical
+    XOR of ``lhs`` and ``rhs``.
 """
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Elementwise — Ternary / Binary min-max
-# ═════════════════════════════════════════════════════════════════════════
+#: SPMD-distributed wrapper around :func:`max.graph.ops.where`.
+_where_inner = functional(ops.where, rule=ternary_rule)
 
-where = functional(ops.where, rule=ternary_rule)
-where.__doc__ = """Selects elements from two tensors based on a boolean condition.
 
-For each position, returns the corresponding element from ``x`` where
-``condition`` is ``True`` and from ``y`` otherwise. Inputs are broadcast
-to a common shape.
+def where(
+    cond: Tensor,
+    x: Tensor | float,
+    y: Tensor | float,
+) -> Tensor:
+    """Selects elements from two tensors element-wise based on a condition.
 
-Args:
-    condition: A boolean tensor controlling the selection.
-    x: The tensor providing values where ``condition`` is ``True``.
-    y: The tensor providing values where ``condition`` is ``False``.
+    At each position, takes the element from ``x`` where ``cond`` is true and
+    the element from ``y`` where it's false. Scalar ``x`` or ``y`` operands are
+    promoted to tensors, and the inputs are broadcast to a common shape.
 
-Returns:
-    A tensor with the broadcast shape, with elements selected from ``x``
-    or ``y`` according to ``condition``.
-"""
+    .. code-block:: python
+
+        from max.experimental import Tensor
+        from max.experimental import functional as F
+        from max.dtype import DType
+
+        cond = Tensor([True, False, True], dtype=DType.bool)
+        x = Tensor([1, 2, 3], dtype=DType.int32)
+        y = Tensor([10, 20, 30], dtype=DType.int32)
+        # Take x where True and y where False, producing [1, 20, 3].
+        result = F.where(cond, x, y)
+        # result is [1, 20, 3]
+
+    Args:
+        cond: The tensor selecting which input to take at each
+            position. Must have a boolean dtype.
+        x: The tensor to select from where ``cond`` is true.
+        y: The tensor to select from where ``cond`` is false.
+
+    Returns:
+        A ``Tensor`` containing the element-wise selection from ``x`` and
+        ``y`` according to ``cond``. It has the promoted dtype of ``x`` and
+        ``y``, lives on their shared device, and has the broadcast shape of
+        the inputs.
+
+    Raises:
+        ValueError: If ``cond`` doesn't have a boolean dtype, if the inputs
+            aren't all on the same device, or if the dtypes of ``x`` and
+            ``y`` can't be safely promoted.
+        Error: If the input shapes aren't broadcast-compatible.
+    """
+    if isinstance(x, (int, float)) and isinstance(y, Tensor):
+        x = full_like(y, x)
+    elif isinstance(x, (int, float)):
+        x = full_like(cond, x)
+    if isinstance(y, (int, float)) and isinstance(x, Tensor):
+        y = full_like(x, y)
+    elif isinstance(y, (int, float)):
+        y = full_like(cond, y)
+    result = _where_inner(cond, x, y)
+    assert isinstance(result, Tensor)
+    return result
+
 
 elementwise_min = _binary_with_scalar_promotion(
     functional(ops.elementwise.min, rule=binary_rule)
@@ -1258,10 +1559,8 @@ Returns:
     position.
 """
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Cast
-# ═════════════════════════════════════════════════════════════════════════
-
+#: Casts a tensor to a different data type. Distributed via SPMD.
+#: See :func:`max.graph.ops.cast` for details.
 cast = functional(ops.cast, rule=unary_rule)
 cast.__doc__ = """Casts a tensor to a different data type.
 
@@ -1288,10 +1587,8 @@ Returns:
 """
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Matmul / Linear Algebra
-# ═════════════════════════════════════════════════════════════════════════
-
+#: Performs matrix multiplication. Distributed via SPMD.
+#: See :func:`max.graph.ops.matmul` for details.
 matmul = functional(ops.matmul, rule=matmul_rule)
 matmul.__doc__ = """Performs matrix multiplication between two tensors.
 
@@ -1325,59 +1622,22 @@ Returns:
     A tensor representing the matrix product of ``lhs`` and ``rhs``.
 """
 
-layer_norm = functional(ops.layer_norm, rule=normalization_rule)
-layer_norm.__doc__ = """Applies layer normalization over the last dimension of a tensor.
-
-Computes ``gamma * (input - mean) / sqrt(var + epsilon) + beta``, where
-``mean`` and ``var`` are reduced over the last axis of ``input`` and
-broadcast back across the leading axes.
-
-Args:
-    input: The input tensor.
-    gamma: The scale parameter tensor.
-    beta: The shift parameter tensor.
-    epsilon: A small constant added to the variance for numerical stability.
-
-Returns:
-    A tensor of the same shape and dtype as ``input`` with layer
-    normalization applied.
-"""
-
-qmatmul = functional(ops.qmatmul, rule=matmul_rule)
-qmatmul.__doc__ = """Performs matrix multiplication between a floating-point and a quantized tensor.
-
-Computes ``dequantize(quantize(lhs) @ transpose(rhs))``: ``lhs`` is
-quantized to match ``rhs``'s encoding, the matmul runs in the quantized
-domain, then the result is dequantized back to floating point. ``rhs``
-must be supplied in *transposed* form — for ``lhs`` of shape ``[M, K]``
-and (transposed) ``rhs`` of shape ``[N, K]``, the output shape is
-``[M, N]``. Currently supports the ``Q4_0``, ``Q4_K``, and ``Q6_K``
-encodings.
-
-Args:
-    encoding: The quantization encoding used to pack ``rhs``.
-    config: Optional quantization configuration. Required for some
-        encodings (for example, ``GPTQ``); may be :obj:`None` otherwise.
-    lhs: The left-hand side floating-point tensor.
-    rhs: One or more packed and transposed quantized right-hand side
-        tensors.
-
-Returns:
-    A floating-point tensor containing the dequantized matrix product.
-"""
-
-# ═════════════════════════════════════════════════════════════════════════
-#  Pooling
-# ═════════════════════════════════════════════════════════════════════════
+#: Applies layer normalization. Distributed via SPMD.
+#: See :func:`max.graph.ops.layer_norm` for details.
+layer_norm = functional(ops.layer_norm, rule=layer_norm_rule)
+#: Performs quantized matrix multiplication. Distributed via SPMD.
+#: See :func:`max.graph.ops.qmatmul` for details.
+qmatmul = functional(ops.qmatmul, rule=qmatmul_rule)
 
 avg_pool2d = functional(ops.avg_pool2d, rule=linear_pool_rule)
-avg_pool2d.__doc__ = """Applies 2D average pooling to a tensor.
+avg_pool2d.__doc__ = """Applies 2D average pooling.
 
 Slides a window of size ``kernel_size`` over the spatial dimensions and
-replaces each window with the average of its values.
+replaces each window with its average value.
 
 Args:
-    input: The input tensor with shape ``(N, H, W, C)``.
+    input: The input tensor in channels-last (NHWC) layout,
+        ``(batch_size, height, width, channels)``.
     kernel_size: A tuple ``(kernel_h, kernel_w)`` giving the height and
         width of the sliding window.
     stride: The stride of the sliding window. Either a single ``int``
@@ -1392,12 +1652,11 @@ Args:
     ceil_mode: When ``True``, uses ceil instead of floor when computing
         the output spatial shape. Defaults to ``False``.
     count_boundary: When ``True``, includes padding elements in the
-        divisor when computing each window's average. Defaults to
-        ``True``.
+        divisor when computing the average. Defaults to ``True``.
 
 Returns:
-    A tensor with shape ``(N, H_out, W_out, C)`` containing the
-    average-pooled values.
+    A ``Tensor`` containing the averaged values, with shape
+    ``(batch_size, height_out, width_out, channels)``.
 """
 
 max_pool2d = functional(ops.max_pool2d, rule=pool_rule)
@@ -1407,7 +1666,8 @@ Slides a window of size ``kernel_size`` over the spatial dimensions and
 replaces each window with its maximum value.
 
 Args:
-    input: The input tensor with shape ``(N, H, W, C)``.
+    input: The input tensor in channels-last (NHWC) layout,
+        ``(batch_size, height, width, channels)``.
     kernel_size: A tuple ``(kernel_h, kernel_w)`` giving the height and
         width of the sliding window.
     stride: The stride of the sliding window. Either a single ``int``
@@ -1416,168 +1676,356 @@ Args:
     dilation: The spacing between kernel elements. Either a single
         ``int`` applied to both spatial dimensions, or a tuple
         ``(dilation_h, dilation_w)``. Defaults to ``1``.
-    padding: Zero-padding added to both sides of each spatial dimension.
-        Either a single ``int`` applied to both spatial dimensions, or a
-        tuple ``(pad_h, pad_w)``. Defaults to ``0``.
+    padding: Padding added to both sides of each spatial dimension.
+        Out-of-bounds positions are excluded from the maximum (equivalently,
+        they use the dtype's minimum value or negative infinity), so padding
+        cannot win over negative input values. Either a single ``int`` applied
+        to both spatial dimensions, or a tuple ``(pad_h, pad_w)``. Defaults
+        to ``0``.
     ceil_mode: When ``True``, uses ceil instead of floor when computing
         the output spatial shape. Defaults to ``False``.
 
 Returns:
-    A tensor with shape ``(N, H_out, W_out, C)`` containing the
-    max-pooled values.
+    A ``Tensor`` containing the max-pooled values, with shape
+    ``(batch_size, height_out, width_out, channels)``.
 """
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Shape
-# ═════════════════════════════════════════════════════════════════════════
-
+#: Permutes the dimensions of a tensor. Distributed via SPMD.
+#: See :func:`max.graph.ops.permute` for details.
 permute = functional(ops.permute, rule=permute_rule)
-permute.__doc__ = """Permutes the dimensions of a tensor.
+permute.__doc__ = """Permutes all dimensions of a tensor.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # x has shape (1, 2, 3).
+    x = Tensor.ones([1, 2, 3])
+    # Reorder the dimensions to (2, 0, 1), producing shape (3, 1, 2).
+    result = F.permute(x, [2, 0, 1])
 
 Args:
-    x: The input tensor.
-    dims: A list of dimension indices specifying the new ordering.
+    x: The input tensor to permute.
+    dims: The target order of the dimensions as a list of axis indices.
+        Each axis may be negative to index from the end of the tensor.
 
 Returns:
-    A tensor with its dimensions reordered according to ``dims``.
+    A ``Tensor`` containing ``x`` with its dimensions reordered to match
+    ``dims``. It has the same elements and dtype as ``x``, with the order of
+    the elements changed according to the permutation.
+
+Raises:
+    ValueError: If the length of ``dims`` does not match the rank of the
+        input, or if ``dims`` contains duplicate dimensions.
+    IndexError: If any dimension in ``dims`` is out of range.
 """
 
 transpose = functional(ops.transpose, rule=transpose_rule)
-transpose.__doc__ = """Swaps two dimensions of a tensor.
+transpose.__doc__ = """Transposes two axes of a tensor.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # x has shape (2, 3).
+    x = Tensor.ones([2, 3])
+    # Swap axes 0 and 1, producing shape (3, 2).
+    result = F.transpose(x, 0, 1)
 
 Args:
-    x: The input tensor.
-    axis_1: The first axis to swap.
-    axis_2: The second axis to swap.
+    x: The input tensor to transpose.
+    axis_1: One of the two axes to transpose. If negative, this indexes from
+        the end of the tensor. For example, a value of ``-1`` refers to the
+        last axis.
+    axis_2: The other axis to transpose. If negative, this indexes from the
+        end of the tensor.
 
 Returns:
-    A tensor with ``axis_1`` and ``axis_2`` swapped.
+    A ``Tensor`` containing the input with ``axis_1`` and ``axis_2``
+    transposed. It has the same elements and dtype as ``x``, with the order
+    of the elements changed according to the transposition. For a rank-zero
+    tensor, axes ``-1`` and ``0`` are accepted and the scalar is returned
+    unchanged.
+
+Raises:
+    IndexError: If ``axis_1`` or ``axis_2`` is out of range.
 """
 
 unsqueeze = functional(ops.unsqueeze, rule=unsqueeze_rule)
-unsqueeze.__doc__ = """Inserts a size-1 dimension into a tensor.
+unsqueeze.__doc__ = """Inserts a dimension of size ``1`` into a tensor.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # x has shape (3,).
+    x = Tensor.ones([3])
+    # Insert a size-1 dimension at axis 0, producing shape (1, 3).
+    result = F.unsqueeze(x, 0)
 
 Args:
-    x: The input tensor.
-    axis: The position at which to insert the new size-1 dimension.
-        Negative values count from the end.
+    x: The input tensor to unsqueeze.
+    axis: The index at which to insert a new dimension into the input's
+        shape. Elements at that index or higher are shifted back. If
+        negative, it indexes relative to ``1`` plus the rank of the tensor.
+        For example, a value of ``-1`` adds a new dimension at the end, and
+        ``-2`` inserts the dimension immediately before the last dimension.
 
 Returns:
-    A tensor of rank ``x.rank + 1`` with a size-1 dimension inserted at
-    ``axis``.
+    A ``Tensor`` containing ``x`` with a new dimension inserted at ``axis``.
+    That dimension has a size of ``1``, so the result holds the same elements
+    as ``x`` with one more dimension.
+
+Raises:
+    ValueError: If ``axis`` is out of bounds.
 """
 
 squeeze = functional(ops.squeeze, rule=squeeze_rule)
-squeeze.__doc__ = """Removes a size-1 dimension from a tensor.
+#: SPMD-distributed wrapper around :func:`max.graph.ops.reshape`.
+reshape = functional(ops.reshape, rule=reshape_rule)
+reshape.__doc__ = """Reshapes a tensor.
+
+If a value of ``-1`` is present in ``shape``, that dimension becomes an
+automatically calculated dimension collecting all unspecified dimensions.
+Its length becomes the number of elements in the original tensor divided by
+the product of the other dimensions of ``shape``.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # x has shape (2, 3).
+    x = Tensor.ones([2, 3])
+    # Reshape the same 6 elements into shape (3, 2).
+    result = F.reshape(x, [3, 2])
 
 Args:
-    x: The input tensor.
-    axis: The dimension to remove. Must have size 1.
+    x: The input tensor to reshape.
+    shape: The new shape as an iterable of dimensions (a list, tuple, or
+        ``Dim`` values). A single dimension may be ``-1``.
 
 Returns:
-    A tensor of rank ``x.rank - 1`` with the size-1 dimension at ``axis``
-    removed.
+    A ``Tensor`` containing ``x`` with a new ``shape``. The order and total
+    number of elements stays the same as the input.
+
+Raises:
+    ValueError: If ``shape`` contains more than one ``-1`` dimension, if a
+        ``-1`` dimension is requested while another dimension is ``0``, or if
+        the input and target shapes have a different number of elements.
 """
-
+#: Flattens a tensor. Distributed via SPMD.
+#: See :func:`max.graph.ops.flatten` for details.
 flatten = functional(ops.flatten, rule=flatten_rule)
-flatten.__doc__ = """Flattens a contiguous range of dimensions into one.
+flatten.__doc__ = """Flattens the specified dimensions of a tensor.
 
-All dimensions from ``start_dim`` to ``end_dim`` (inclusive) are merged
-into a single output dimension. The number and order of elements is
-unchanged.
+This does not change the order or total number of elements in the tensor.
+All dimensions from ``start_dim`` to ``end_dim`` (inclusive) are merged into
+a single output dimension.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # x has shape (2, 2, 2).
+    x = Tensor.ones([2, 2, 2])
+    # Merge dimensions 1 and 2 into one, producing shape (2, 4).
+    result = F.flatten(x, start_dim=1)
 
 Args:
-    x: The input tensor.
-    start_dim: The first dimension to flatten. Negative values count
-        from the end. Defaults to ``0``.
-    end_dim: The last dimension to flatten (inclusive). Negative values
-        count from the end. Defaults to ``-1``.
+    x: The input tensor to flatten.
+    start_dim: The first dimension to flatten. Supports negative indexing.
+        Defaults to ``0``.
+    end_dim: The last dimension to flatten (inclusive). Supports negative
+        indexing. Defaults to ``-1``.
 
 Returns:
-    A tensor with the specified dimension range merged into a single
-    dimension.
+    A ``Tensor`` containing the ``start_dim`` through ``end_dim`` of ``x``
+    merged into one dimension.
+
+Raises:
+    IndexError: If ``start_dim`` or ``end_dim`` is out of range.
+    ValueError: If ``start_dim`` comes after ``end_dim``.
 """
 
 tile = functional(ops.tile, rule=tile_rule)
-tile.__doc__ = """Repeats a tensor along each dimension.
+tile.__doc__ = """Repeats a tensor along each of its dimensions.
+
+Each dimension ``i`` is copied ``repeats[i]`` times, so its output size is
+``x.shape[i] * repeats[i]``.
+
+This op runs on CPU. An input on another device is copied to CPU for the
+operation and the result is copied back.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([[1, 2], [3, 4]])
+
+    # Repeat the columns twice, leaving the rows unchanged.
+    result = F.tile(x, [1, 2])
+    # [[1, 2, 1, 2], [3, 4, 3, 4]]
 
 Args:
-    x: The input tensor.
-    repeats: An iterable of repeat counts, one per dimension of ``x``.
-        All values must be positive and the length must equal the rank
-        of ``x``.
+    x: The tensor to tile.
+    repeats: The number of copies for each dimension, one positive value
+        per dimension of ``x``.
 
 Returns:
-    A tensor whose ``i``-th dimension size equals
-    ``x.shape[i] * repeats[i]``.
+    A ``Tensor`` containing the tiled input.
+
+Raises:
+    ValueError: If ``repeats`` doesn't have one value per dimension, if any
+        statically known value isn't positive, or if ``x`` is on a non-CPU
+        device and ``strict_device_placement=DevicePlacementPolicy.Error``.
 """
 
 pad = functional(ops.pad, rule=pad_rule)
-pad.__doc__ = """Pads a tensor along every dimension.
+#: SPMD-distributed wrapper around :func:`max.graph.ops.broadcast_to`.
+_broadcast_to_impl = functional(ops.broadcast_to, rule=broadcast_to_rule)
 
-Args:
-    input: The input tensor.
-    paddings: A flat sequence of ``2 * rank(input)`` non-negative
-        integers in the order
-        ``[pad_before_dim0, pad_after_dim0, pad_before_dim1, pad_after_dim1, ...]``.
-    mode: The padding mode. One of ``"constant"`` (fill with ``value``),
-        ``"reflect"`` (reflect interior values about the edges, excluding
-        the boundary), or ``"edge"`` (repeat the nearest boundary
-        element). Defaults to ``"constant"``.
-    value: The constant fill value used when ``mode == "constant"``.
-        Defaults to ``0``.
 
-Returns:
-    A tensor with the same dtype as ``input`` padded along each
-    dimension according to ``paddings``.
-"""
+def broadcast_to(x: Tensor, shape: ShapeLike) -> Tensor:
+    """Broadcasts a tensor to a target shape.
 
+    Each input dimension must either equal the corresponding target
+    dimension or be ``1`` (which is then stretched to match). This
+    follows NumPy broadcasting semantics and is equivalent to PyTorch's
+    :func:`torch.broadcast_to`.
+
+    .. code-block:: python
+
+        from max.experimental import Tensor
+        from max.experimental import functional as F
+
+        x = Tensor.ones([3, 1])
+        result = F.broadcast_to(x, [3, 4])
+        # result has shape (3, 4)
+
+        # Add a new leading dimension
+        result = F.broadcast_to(x, [2, 3, 4])
+        # result has shape (2, 3, 4)
+
+    Args:
+        x: The input tensor. Must not contain any dynamic dimensions.
+        shape: The target shape. A static shape (no dynamic dimensions).
+
+    Returns:
+        A ``Tensor`` with the same elements as ``x`` but with the target
+        shape.
+    """
+    return _broadcast_to_impl(x, shape)
+
+
+#: Repeats elements of a tensor. Distributed via SPMD.
+#: See :func:`max.graph.ops.repeat_interleave` for details.
 repeat_interleave = functional(
     ops.repeat_interleave, rule=repeat_interleave_rule
 )
-repeat_interleave.__doc__ = """Repeats elements of a tensor along a dimension.
+repeat_interleave.__doc__ = """Repeats each element of a tensor along an axis.
 
 Unlike :func:`tile`, which repeats whole blocks, this repeats each
 element ``repeats`` times consecutively.
 
+This op runs on CPU only; a GPU input raises an error.
+
+.. note::
+
+    The functional API currently supports only integer ``repeats``. Use
+    :func:`max.graph.ops.repeat_interleave` for per-element tensor repeats.
+
+The examples below use an input containing ``[[1.0, 2.0], [3.0, 4.0]]``:
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.driver import CPU
+
+    input = Tensor([[1.0, 2.0], [3.0, 4.0]], device=CPU())
+
+    # Repeat each row twice.
+    output = F.repeat_interleave(input, repeats=2, axis=0)
+    # [[1, 2], [1, 2], [3, 4], [3, 4]], shape (4, 2)
+
+    # Repeat each column twice.
+    output = F.repeat_interleave(input, repeats=2, axis=1)
+    # [[1, 1, 2, 2], [3, 3, 4, 4]], shape (2, 4)
+
+    # With no axis, flatten the input first, then repeat each element.
+    output = F.repeat_interleave(input, repeats=2)
+    # [1, 1, 2, 2, 3, 3, 4, 4], shape (8,)
+
 Args:
     x: The input tensor.
-    repeats: The number of repetitions for each element. May be a single
-        ``int`` (the same count applied to every element) or a 1-D
-        :class:`~max.graph.TensorValue` giving a per-element count.
-    axis: The dimension along which to repeat. When ``None`` (the
-        default), the input is flattened to 1-D before repetition.
-    out_dim: The output dimension size along ``axis``. Required when
-        ``repeats`` is a :class:`~max.graph.TensorValue`, since the
-        output size depends on values that aren't known at graph build
-        time.
+    repeats: The integer number of times to repeat each element.
+    axis: The axis to repeat along. If ``None`` (the default), the input
+        is flattened first.
+    out_dim: The output size along ``axis``. This is inferred when
+        ``repeats`` is an integer.
 
 Returns:
-    A tensor with elements repeated along ``axis``.
+    A ``Tensor`` containing the input with its elements interleaved.
+
+Raises:
+    ValueError: If ``repeats`` is non-positive, if ``axis`` is out of
+        range, or if the input is on a GPU device.
 """
 
 slice_tensor = functional(ops.slice_tensor, rule=slice_tensor_rule)
-slice_tensor.__doc__ = """Slices a subtensor view from a tensor using NumPy-style indexing.
+slice_tensor.__doc__ = """Slices out a subtensor of the input tensor based on ``indices``.
 
-Supports the usual NumPy index forms — integers, ``slice`` objects, an
-``Ellipsis`` (``...``), and ``None`` (insert a new size-1 axis).
+The semantics of :func:`slice_tensor()` follow basic NumPy slicing
+semantics, with one index per dimension. Each index is one of:
+
+- An integer.
+- A scalar tensor (a dynamic integer index).
+- A ``slice``.
+- A ``(slice, out_dim)`` tuple, which names the output dimension when
+  slicing a dynamic dimension.
+- ``None`` (to insert a size-1 dimension).
+- ``Ellipsis`` (to fill in full slices for the remaining dimensions).
+
+Slice indices must stay within ``[-dim, dim]``, and slice steps must be
+positive.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    # Take rows 0 and 1 and columns 1 and 2, producing [[2, 3], [5, 6]].
+    result = F.slice_tensor(x, [slice(0, 2), slice(1, 3)])
+    # result is [[2, 3], [5, 6]]
 
 Args:
-    x: The input tensor.
-    indices: A sequence of slice specifications, one per dimension. May
-        also use ``Ellipsis`` for omitted dimensions or ``None`` to
-        insert a new axis.
+    x: The input tensor to slice.
+    indices: The per-dimension index expressions. Each entry is an integer,
+        a scalar tensor, a ``slice``, a ``(slice, out_dim)`` tuple,
+        ``None``, or ``Ellipsis``.
 
 Returns:
-    A tensor view containing the selected slice.
+    A ``Tensor`` containing the sliced subtensor of ``x``.
+
+Raises:
+    IndexError: If a slice bound or integer index is out of range for its
+        dimension.
+    ValueError: If ``x`` is a scalar, if more indices than dimensions are
+        given, if more than one ``Ellipsis`` appears, or if a slice step
+        is ``0``.
+    NotImplementedError: If a plain ``slice`` targets a dynamic dimension.
+        Pass a ``(slice, out_dim)`` tuple instead.
 """
 
 concat = functional(ops.concat, rule=same_placement_multi_input_rule)
-concat.__doc__ = """Concatenates a sequence of tensors along an axis.
-
-All input tensors must have the same dtype, the same rank, the same
-device, and the same size in every dimension except ``axis``. The
-sequence must contain at least one tensor.
+concat.__doc__ = """Concatenates tensors along an axis.
 
 .. code-block:: python
 
@@ -1596,311 +2044,701 @@ sequence must contain at least one tensor.
     # [[1, 2, 5, 6], [3, 4, 7, 8]]
 
 Args:
-    original_vals: The non-empty sequence of tensors to concatenate.
-    axis: The dimension along which to concatenate. Negative values
-        index relative to the end of the tensor shape. Defaults to ``0``.
+    original_vals: The tensors to concatenate. They must have the same
+        rank and size on every dimension except ``axis``.
+    axis: The axis to concatenate along. Negative values count from the
+        end. Defaults to ``0``.
 
 Returns:
-    A tensor with the same rank, dtype, and device as the inputs, whose
-    size along ``axis`` is the sum of the inputs' sizes along that axis.
+    A ``Tensor`` containing the concatenated inputs. Its size along
+    ``axis`` is the sum of the inputs' sizes and every other axis is
+    unchanged.
 
 Raises:
-    ValueError: If ``original_vals`` is empty, the inputs differ in rank,
-        or the inputs differ in size along a non-``axis`` dimension.
-    IndexError: If ``axis`` is out of range for the input rank.
+    ValueError: If no tensors are provided, if the inputs don't all have
+        the same rank, if they differ in size on any dimension other than
+        ``axis``, or if they aren't all on the same device.
+    IndexError: If ``axis`` is out of range.
 """
 
 stack = functional(ops.stack, rule=stack_rule)
-stack.__doc__ = """Stacks a sequence of tensors along a new dimension.
+stack.__doc__ = """Stacks tensors along a new axis.
 
-All input tensors must have the same shape.
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    a = Tensor([[1, 2], [3, 4]])
+    b = Tensor([[5, 6], [7, 8]])
+
+    # Stack the two (2, 2) tensors into one (2, 2, 2) tensor
+    result = F.stack([a, b], axis=0)
+    # result has shape (2, 2, 2)
 
 Args:
-    values: The sequence of tensors to stack.
-    axis: The position at which to insert the new dimension. Defaults to
-        ``0``.
+    values: The tensors to stack. Each must have the same dtype, rank,
+        shape, and device.
+    axis: The position of the new axis. Negative values count from the
+        end, where ``-1`` inserts the new axis as the last dimension.
+        Defaults to ``0``.
 
 Returns:
-    A tensor of rank one greater than the inputs, with the new dimension
-    at ``axis``.
+    A ``Tensor`` containing the stacked inputs. It has one more dimension
+    than the inputs, and the new dimension has size ``len(values)``.
+
+Raises:
+    ValueError: If ``values`` is empty, or if the tensors don't all have
+        the same dtype, rank, shape, and device.
+    IndexError: If ``axis`` is out of range.
 """
 
 argsort = functional(ops.argsort, rule=argsort_rule)
-argsort.__doc__ = """Returns the indices that would sort a 1-D tensor.
+argsort.__doc__ = """Returns the indices that would sort a rank-1 tensor.
 
-Currently only supports rank-1 inputs.
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([3.0, 1.0, 2.0])
+    # Ascending order visits 1, 2, 3, so the indices are [1, 2, 0].
+    result = F.argsort(x, ascending=True)
+    # result is [1, 2, 0]
 
 Args:
-    x: The input tensor. Must have rank 1.
-    ascending: When ``True`` (the default), sort in ascending order. When
-        ``False``, sort in descending order.
+    x: The input tensor to sort. Must be rank 1.
+    ascending: Whether to sort in ascending order. If ``False``, sorts in
+        descending order. Defaults to ``True``.
 
 Returns:
-    An ``int64`` tensor of the same shape as ``x`` containing sort
-    indices.
+    A ``Tensor`` containing the sorting indices, with the same shape as
+    ``x`` and ``int64`` dtype.
+
+Raises:
+    ValueError: If ``x`` is not rank 1.
 """
 
 nonzero = functional(ops.nonzero, rule=nonzero_rule)
-nonzero.__doc__ = """Returns the indices of the non-zero elements of a tensor.
+nonzero.__doc__ = """Returns the indices of all nonzero elements of a tensor.
 
-Indices are produced in row-major order.
+Each row is the multi-index of one nonzero element, and the rows are
+generated in row-major order.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([[0, 1], [2, 0]])
+    # Nonzero elements at (0, 1) and (1, 0) produce [[0, 1], [1, 0]].
+    result = F.nonzero(x, out_dim="nonzero")
+    # result is [[0, 1], [1, 0]]
 
 Args:
-    x: The input tensor. Must have rank at least 1 (scalars are not
-        supported).
-    out_dim: The symbolic dimension labeling the dynamically-sized
-        first axis of the output. Sized at runtime to the number of
-        non-zero elements in ``x``.
+    x: The input tensor.
+    out_dim: The new data-dependent dimension for the number of nonzero
+        elements.
 
 Returns:
-    A 2-D ``int64`` tensor of shape ``(out_dim, rank(x))`` where each
-    row is the multi-dimensional index of a non-zero element.
+    A ``Tensor`` containing the indices of the nonzero elements of ``x``,
+    with shape ``[out_dim, x.rank]`` and ``int64`` dtype.
 
 Raises:
-    ValueError: If ``x`` is a scalar (rank 0).
+    ValueError: If ``x`` is scalar, or if ``x`` is on a non-CPU device and
+        ``strict_device_placement=DevicePlacementPolicy.Error``.
 """
 
 gather = functional(ops.gather, rule=gather_rule)
-gather.__doc__ = """Gathers values from a tensor along an axis using indices.
+gather.__doc__ = """Selects elements out of an input tensor by index.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.dtype import DType
+
+    x = Tensor([[1, 2], [3, 4], [5, 6]], dtype=DType.int32)
+    indices = Tensor([0, 2], dtype=DType.int64)
+    # Select rows 0 and 2, producing [[1, 2], [5, 6]].
+    result = F.gather(x, indices, axis=0)
+    # result is [[1, 2], [5, 6]]
+
+.. note::
+
+    When the gather axis is :class:`~max.experimental.sharding.Sharded`, the
+    dispatcher first calls :func:`allgather` to make the input
+    :class:`~max.experimental.sharding.Replicated`. It doesn't emit an
+    expert-parallel ``(Sharded(a_axis), R) → Partial(SUM)`` row, because that's
+    only correct when the caller masks indices per rank. Models that want
+    expert-parallel semantics override ``gather.rule`` with their own rule.
 
 Args:
-    input: The input tensor to gather from.
-    indices: An integer tensor of indices.
-    axis: The axis to gather along.
+    input: The input tensor to select elements from.
+    indices: A tensor of ``int32`` or ``int64`` index values on the same
+        device as ``input``.
+    axis: The dimension that ``indices`` indexes into ``input``. If
+        negative, indexes relative to the end of the input tensor. For
+        example, ``gather(input, indices, axis=-1)`` indexes against the
+        last dimension of ``input``.
 
 Returns:
-    A tensor whose shape along ``axis`` matches ``indices``, with values
-    pulled from ``input``.
+    A ``Tensor`` containing the selected elements. Its shape is
+    ``input.shape`` with the dimension at ``axis`` replaced by
+    ``indices.shape``.
+
+Raises:
+    IndexError: If ``axis`` is out of range for ``input``.
+    ValueError: If ``indices`` isn't integral or isn't on the same device
+        as ``input``.
 """
 
 scatter = functional(ops.scatter, rule=scatter_rule)
-scatter.__doc__ = """Writes values into a tensor at positions specified by indices.
+scatter.__doc__ = """Writes ``updates`` into a copy of ``input`` at positions given by ``indices``.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.driver import CPU
+    from max.dtype import DType
+
+    x = Tensor([1, 2, 3, 4, 5], dtype=DType.int32, device=CPU())
+    updates = Tensor([10, 20], dtype=DType.int32, device=CPU())
+    indices = Tensor([0, 3], dtype=DType.int64, device=CPU())
+    # Overwrite positions 0 and 3, producing [10, 2, 3, 20, 5].
+    result = F.scatter(x, updates, indices, axis=0)
+    # result is [10, 2, 3, 20, 5]
+
+.. note::
+
+    When the scatter axis is :class:`~max.experimental.sharding.Sharded`, the
+    dispatcher first calls :func:`allgather` to make the input
+    :class:`~max.experimental.sharding.Replicated`. It doesn't emit a
+    per-rank-local ``(Sharded(a_axis), R, R) → Sharded(a_axis)`` row, because
+    that's only correct when the caller masks indices and updates per rank.
+    Models that want expert-parallel semantics override ``scatter.rule`` with
+    their own rule.
 
 Args:
-    input: The destination tensor.
-    updates: The values to write.
-    indices: An integer tensor of positions to write to.
-    axis: The axis to scatter along. Defaults to ``-1``.
+    input: The input tensor to write elements to.
+    updates: A tensor of elements to write to ``input``.
+    indices: The positions in ``input`` to update.
+    axis: The axis along which ``indices`` indexes. Defaults to ``-1``.
 
 Returns:
-    A tensor matching ``input`` with the scattered values written in.
+    A ``Tensor`` containing ``input`` with ``updates`` written at
+    ``indices``. It has the same shape and dtype as ``input``.
+
+Raises:
+    ValueError: If ``axis`` is out of range, if the input and updates
+        dtypes mismatch, if ``indices`` dtype is not int32/int64, if the
+        inputs aren't all on the same device, or if any input is on a
+        non-CPU device and
+        ``strict_device_placement=DevicePlacementPolicy.Error``.
+    Error: If ``input``, ``updates``, and ``indices`` don't share the same
+        rank, if ``updates`` and ``indices`` don't have the same shape, or
+        if any ``indices`` dimension exceeds the matching ``input``
+        dimension.
 """
 
 scatter_add = functional(ops.scatter_add, rule=scatter_add_rule)
-scatter_add.__doc__ = """Scatters values into a tensor, accumulating via addition.
+scatter_add.__doc__ = """Creates a new tensor by accumulating ``updates`` into ``input`` at ``indices``.
 
-Like :func:`scatter`, but when multiple updates target the same position
-their sum is written.
+Produces an output tensor by scattering elements from ``updates`` into
+``input`` according to ``indices``, summing values at duplicate indices. For
+a 2-D input with ``axis=0`` the update rule is:
+
+.. code-block:: text
+
+    output[indices[i][j]][j] += updates[i][j]
+
+and with ``axis=1``:
+
+.. code-block:: text
+
+    output[i][indices[i][j]] += updates[i][j]
 
 Args:
-    input: The destination tensor.
-    updates: The values to add at each position.
-    indices: An integer tensor of positions to write to.
-    axis: The axis to scatter along. Defaults to ``-1``.
+    input: The input tensor to accumulate into.
+    updates: A tensor of values to add.
+    indices: The positions in ``input`` to update.
+    axis: The axis along which ``indices`` indexes into. Defaults to ``-1``.
 
 Returns:
-    A tensor matching ``input`` with the accumulated values added in.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``axis`` is out of range, if the input and updates
+        dtypes mismatch, if ``indices`` dtype is not int32/int64, if the
+        inputs aren't all on the same device, or if any input is on a
+        non-CPU device and
+        ``strict_device_placement=DevicePlacementPolicy.Error``.
+    Error: If ``input``, ``updates``, and ``indices`` don't share the same
+        rank, if ``updates`` and ``indices`` don't have the same shape, or
+        if any ``indices`` dimension exceeds the matching ``input``
+        dimension.
 """
 
 scatter_max = functional(ops.scatter_max, rule=scatter_add_rule)
-scatter_max.__doc__ = """Scatters values into a tensor, keeping the per-position maximum.
+scatter_max.__doc__ = """Creates a new tensor by scattering the maximum of ``updates`` into ``input``.
 
-When multiple updates target the same position, the maximum is written.
+Produces an output tensor by scattering elements from ``updates`` into
+``input`` according to ``indices``, keeping the maximum at duplicate indices.
+For a 2-D input with ``axis=0`` the update rule is:
+
+.. code-block:: text
+
+    output[indices[i][j]][j] = max(output[indices[i][j]][j], updates[i][j])
+
+and with ``axis=1``:
+
+.. code-block:: text
+
+    output[i][indices[i][j]] = max(output[i][indices[i][j]], updates[i][j])
 
 Args:
-    input: The destination tensor.
-    updates: The candidate values.
-    indices: An integer tensor of positions to write to.
-    axis: The axis to scatter along. Defaults to ``-1``.
+    input: The input tensor to scatter into.
+    updates: A tensor of values to compare.
+    indices: The positions in ``input`` to update.
+    axis: The axis along which ``indices`` indexes into. Defaults to ``-1``.
 
 Returns:
-    A tensor matching ``input`` with maximums written into the scattered
-    positions.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``axis`` is out of range, if the input and updates
+        dtypes mismatch, if ``indices`` dtype is not int32/int64, if the
+        inputs aren't all on the same device, or if any input is on a
+        non-CPU device and
+        ``strict_device_placement=DevicePlacementPolicy.Error``.
+    Error: If ``input``, ``updates``, and ``indices`` don't share the same
+        rank, if ``updates`` and ``indices`` don't have the same shape, or
+        if any ``indices`` dimension exceeds the matching ``input``
+        dimension.
 """
 
 scatter_min = functional(ops.scatter_min, rule=scatter_add_rule)
-scatter_min.__doc__ = """Scatters values into a tensor, keeping the per-position minimum.
+scatter_min.__doc__ = """Creates a new tensor by scattering the minimum of ``updates`` into ``input``.
 
-When multiple updates target the same position, the minimum is written.
+Produces an output tensor by scattering elements from ``updates`` into
+``input`` according to ``indices``, keeping the minimum at duplicate indices.
+For a 2-D input with ``axis=0`` the update rule is:
+
+.. code-block:: text
+
+    output[indices[i][j]][j] = min(output[indices[i][j]][j], updates[i][j])
+
+and with ``axis=1``:
+
+.. code-block:: text
+
+    output[i][indices[i][j]] = min(output[i][indices[i][j]], updates[i][j])
 
 Args:
-    input: The destination tensor.
-    updates: The candidate values.
-    indices: An integer tensor of positions to write to.
-    axis: The axis to scatter along. Defaults to ``-1``.
+    input: The input tensor to scatter into.
+    updates: A tensor of values to compare.
+    indices: The positions in ``input`` to update.
+    axis: The axis along which ``indices`` indexes into. Defaults to ``-1``.
 
 Returns:
-    A tensor matching ``input`` with minimums written into the scattered
-    positions.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``axis`` is out of range, if the input and updates
+        dtypes mismatch, if ``indices`` dtype is not int32/int64, if the
+        inputs aren't all on the same device, or if any input is on a
+        non-CPU device and
+        ``strict_device_placement=DevicePlacementPolicy.Error``.
+    Error: If ``input``, ``updates``, and ``indices`` don't share the same
+        rank, if ``updates`` and ``indices`` don't have the same shape, or
+        if any ``indices`` dimension exceeds the matching ``input``
+        dimension.
 """
 
 scatter_mul = functional(ops.scatter_mul, rule=scatter_add_rule)
-scatter_mul.__doc__ = """Scatters values into a tensor, accumulating via multiplication.
+scatter_mul.__doc__ = """Creates a new tensor by scattering the product of ``updates`` into ``input``.
 
-When multiple updates target the same position, their product is written.
+Produces an output tensor by scattering elements from ``updates`` into
+``input`` according to ``indices``, multiplying values at duplicate indices.
+For a 2-D input with ``axis=0`` the update rule is:
+
+.. code-block:: text
+
+    output[indices[i][j]][j] *= updates[i][j]
+
+and with ``axis=1``:
+
+.. code-block:: text
+
+    output[i][indices[i][j]] *= updates[i][j]
 
 Args:
-    input: The destination tensor.
-    updates: The values to multiply at each position.
-    indices: An integer tensor of positions to write to.
-    axis: The axis to scatter along. Defaults to ``-1``.
+    input: The input tensor to scatter into.
+    updates: A tensor of values to multiply.
+    indices: The positions in ``input`` to update.
+    axis: The axis along which ``indices`` indexes into. Defaults to ``-1``.
 
 Returns:
-    A tensor matching ``input`` with the product of the scattered values.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``axis`` is out of range, if the input and updates
+        dtypes mismatch, if ``indices`` dtype is not int32/int64, if the
+        inputs aren't all on the same device, or if any input is on a
+        non-CPU device and
+        ``strict_device_placement=DevicePlacementPolicy.Error``.
+    Error: If ``input``, ``updates``, and ``indices`` don't share the same
+        rank, if ``updates`` and ``indices`` don't have the same shape, or
+        if any ``indices`` dimension exceeds the matching ``input``
+        dimension.
 """
 
 scatter_nd = functional(ops.scatter_nd, rule=scatter_nd_rule)
-scatter_nd.__doc__ = """Writes values into a tensor at multi-dimensional indices.
+scatter_nd.__doc__ = """Scatters slices from ``updates`` into a copy of ``input`` at N-dimensional indices.
+
+The last dimension of ``indices`` is the index vector. Its values select a
+slice (or scalar) in ``input``. When the index vector length ``k`` is less
+than ``input.rank``, each update writes a whole slice of the trailing
+``input.rank - k`` dimensions.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.driver import CPU
+    from max.dtype import DType
+
+    x = Tensor(
+        [[1, 2], [3, 4], [5, 6]], dtype=DType.int32, device=CPU()
+    )
+    updates = Tensor(
+        [[10, 20], [50, 60]], dtype=DType.int32, device=CPU()
+    )
+    indices = Tensor([[0], [2]], dtype=DType.int64, device=CPU())
+    # Overwrite rows 0 and 2, producing [[10, 20], [3, 4], [50, 60]].
+    result = F.scatter_nd(x, updates, indices)
+    # result is [[10, 20], [3, 4], [50, 60]]
 
 Args:
-    input: The destination tensor.
-    updates: The values to write.
-    indices: A tensor of multi-dimensional indices.
+    input: The input tensor to write elements to.
+    updates: A tensor of elements to write to ``input``, with shape
+        ``indices.shape[:-1] + input.shape[k:]``.
+    indices: An ``int32`` or ``int64`` tensor specifying where to write
+        ``updates``. Its last dimension ``k`` is the index vector length
+        (``k <= input.rank``) and its leading dimensions may take any
+        shape. Full indexing uses ``k = input.rank`` and partial indexing
+        uses ``k < input.rank``.
 
 Returns:
-    A tensor matching ``input`` with the scattered values written in.
+    A ``Tensor`` containing ``input`` with ``updates`` scattered in. It has
+    the same shape and dtype as ``input``.
+
+Raises:
+    ValueError: If dtypes, devices, ranks, or shapes are incompatible, or
+        if ``indices`` isn't an integral tensor.
 """
 
 scatter_nd_add = functional(ops.scatter_nd_add, rule=scatter_nd_add_rule)
-scatter_nd_add.__doc__ = """Scatters values via multi-dimensional indices, accumulating via addition.
+scatter_nd_add.__doc__ = """Creates a new tensor by accumulating ``updates`` into ``input`` at N-D indices.
+
+Produces an output tensor by scattering slices from ``updates`` into a copy
+of ``input`` according to N-dimensional index vectors, summing values at
+duplicate index positions. Each index vector is the last dimension of
+``indices`` and selects a slice (or scalar) in ``input``.
+
+Example for ``input.shape = [4, 2]``, ``indices.shape = [3, 1]``
+(1-D partial indexing, writes whole rows):
+
+.. code-block:: text
+
+    output[indices[i, 0], :] += updates[i, :]
 
 Args:
-    input: The destination tensor.
-    updates: The values to add at each position.
-    indices: A tensor of multi-dimensional indices.
+    input: The input tensor to accumulate into.
+    updates: A tensor of values to add.
+    indices: An index tensor whose last dimension is the index vector length
+        ``k`` (``k <= input.rank``).
 
 Returns:
-    A tensor matching ``input`` with the accumulated values added in.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``input`` and ``updates`` dtypes mismatch, if
+        ``indices`` dtype isn't int32 or int64, or if the inputs aren't all
+        on the same device.
 """
 
 scatter_nd_max = functional(ops.scatter_nd_max, rule=scatter_nd_add_rule)
-scatter_nd_max.__doc__ = """Scatters values via multi-dimensional indices, keeping the per-position max.
+scatter_nd_max.__doc__ = """Creates a new tensor by scattering the maximum of ``updates`` into ``input`` at N-D indices.
+
+Produces an output tensor by scattering slices from ``updates`` into a copy
+of ``input`` according to N-dimensional index vectors, keeping the maximum at
+duplicate index positions. Each index vector is the last dimension of
+``indices`` and selects a slice (or scalar) in ``input``.
+
+Example for ``input.shape = [4, 2]``, ``indices.shape = [3, 1]``
+(1-D partial indexing, writes whole rows):
+
+.. code-block:: text
+
+    output[indices[i, 0], :] = max(output[indices[i, 0], :], updates[i, :])
 
 Args:
-    input: The destination tensor.
-    updates: The candidate values.
-    indices: A tensor of multi-dimensional indices.
+    input: The input tensor to scatter into.
+    updates: A tensor of values to compare.
+    indices: An index tensor whose last dimension is the index vector length
+        ``k`` (``k <= input.rank``).
 
 Returns:
-    A tensor matching ``input`` with maximums written into the scattered
-    positions.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``input`` and ``updates`` dtypes mismatch, if
+        ``indices`` dtype isn't int32 or int64, or if the inputs aren't all
+        on the same device.
 """
 
 scatter_nd_min = functional(ops.scatter_nd_min, rule=scatter_nd_add_rule)
-scatter_nd_min.__doc__ = """Scatters values via multi-dimensional indices, keeping the per-position min.
+scatter_nd_min.__doc__ = """Creates a new tensor by scattering the minimum of ``updates`` into ``input`` at N-D indices.
+
+Produces an output tensor by scattering slices from ``updates`` into a copy
+of ``input`` according to N-dimensional index vectors, keeping the minimum at
+duplicate index positions. Each index vector is the last dimension of
+``indices`` and selects a slice (or scalar) in ``input``.
+
+Example for ``input.shape = [4, 2]``, ``indices.shape = [3, 1]``
+(1-D partial indexing, writes whole rows):
+
+.. code-block:: text
+
+    output[indices[i, 0], :] = min(output[indices[i, 0], :], updates[i, :])
 
 Args:
-    input: The destination tensor.
-    updates: The candidate values.
-    indices: A tensor of multi-dimensional indices.
+    input: The input tensor to scatter into.
+    updates: A tensor of values to compare.
+    indices: An index tensor whose last dimension is the index vector length
+        ``k`` (``k <= input.rank``).
 
 Returns:
-    A tensor matching ``input`` with minimums written into the scattered
-    positions.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``input`` and ``updates`` dtypes mismatch, if
+        ``indices`` dtype isn't int32 or int64, or if the inputs aren't all
+        on the same device.
 """
 
 scatter_nd_mul = functional(ops.scatter_nd_mul, rule=scatter_nd_add_rule)
-scatter_nd_mul.__doc__ = """Scatters values via multi-dimensional indices, accumulating via multiplication.
+scatter_nd_mul.__doc__ = """Creates a new tensor by scattering the product of ``updates`` into ``input`` at N-D indices.
+
+Produces an output tensor by scattering slices from ``updates`` into a copy
+of ``input`` according to N-dimensional index vectors, multiplying values at
+duplicate index positions. Each index vector is the last dimension of
+``indices`` and selects a slice (or scalar) in ``input``.
+
+Example for ``input.shape = [4, 2]``, ``indices.shape = [3, 1]``
+(1-D partial indexing, writes whole rows):
+
+.. code-block:: text
+
+    output[indices[i, 0], :] *= updates[i, :]
 
 Args:
-    input: The destination tensor.
-    updates: The values to multiply at each position.
-    indices: A tensor of multi-dimensional indices.
+    input: The input tensor to scatter into.
+    updates: A tensor of values to multiply.
+    indices: An index tensor whose last dimension is the index vector length
+        ``k`` (``k <= input.rank``).
 
 Returns:
-    A tensor matching ``input`` with the product of the scattered values.
+    A ``Tensor`` containing the updated tensor. It has the same shape and
+    dtype as ``input``.
+
+Raises:
+    ValueError: If ``input`` and ``updates`` dtypes mismatch, if
+        ``indices`` dtype isn't int32 or int64, or if the inputs aren't all
+        on the same device.
 """
 
 gather_nd = functional(ops.gather_nd, rule=gather_nd_rule)
 gather_nd.__doc__ = """Selects elements from a tensor by N-dimensional index.
 
-Unlike :func:`gather`, which indexes a single axis, ``gather_nd`` indexes
-multiple dimensions at once. The trailing dimension of ``indices``
-selects elements from ``input`` immediately after any ``batch_dims``
-leading dimensions; remaining trailing dimensions of ``input`` are
-sliced into the output.
+Unlike :func:`gather()`, which indexes along a single axis,
+``gather_nd()`` indexes along multiple dimensions at once. The last
+dimension of ``indices`` is the index vector: its values select
+elements from ``input`` immediately after any ``batch_dims`` leading
+dimensions. Any remaining trailing dimensions of ``input`` are sliced
+into the output as features.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.dtype import DType
+
+    input = Tensor(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    indices = Tensor([[0, 1], [1, 0]], dtype=DType.int64)
+    gathered = F.gather_nd(input, indices)
+    # gathered is [[3.0, 4.0], [5.0, 6.0]]
+
+Each row of ``indices`` selects one row from the first two dimensions of
+``input``. The trailing dimension is copied into the output.
 
 Args:
     input: The input tensor to gather from.
     indices: An integer tensor of multi-dimensional indices. Its last
-        dimension must be static and gives the size of the index vector.
-    batch_dims: The number of leading batch dimensions shared between
+        dimension must be static and gives the size of the index
+        vector.
+    batch_dims: The number of leading batch dimensions shared by
         ``input`` and ``indices``. The shapes must match exactly along
-        these leading dimensions. Defaults to ``0``.
+        these leading dimensions. This function does not broadcast.
+        Defaults to ``0``.
 
 Returns:
-    A tensor with the same dtype as ``input``. Its shape is the
-    concatenation of:
+    A ``Tensor`` containing the gathered elements, with the same dtype as
+    ``input``. Its shape is the concatenation of:
 
-    - ``input.shape[:batch_dims]`` (the leading batch dimensions),
-    - ``indices.shape[batch_dims:-1]`` (the index dimensions), and
-    - ``input.shape[batch_dims + indices.shape[-1]:]`` (the trailing
-      sliced dimensions).
+    - ``input.shape[:batch_dims]`` — the leading batch dimensions.
+    - ``indices.shape[batch_dims:-1]`` — the gather dimensions.
+    - ``input.shape[batch_dims + indices.shape[-1]:]`` — the trailing
+      sliced dimensions.
+
+Raises:
+    ValueError: If any input is invalid. This includes when ``indices``'s
+        last dimension is not static, ``indices`` is not an integer tensor,
+        ``batch_dims`` is negative or greater than ``indices.rank - 1``,
+        ``batch_dims + indices.shape[-1]`` exceeds ``input.rank``, or the
+        leading ``batch_dims`` of ``input`` and ``indices`` don't match.
 """
 
 masked_scatter = functional(ops.masked_scatter, rule=masked_scatter_rule)
-masked_scatter.__doc__ = """Replaces positions in a tensor where a boolean mask is ``True``.
+masked_scatter.__doc__ = """Updates tensor values at positions where ``mask`` is true.
+
+Positions are filled in row-major order, so the first ``True`` position in
+``mask`` takes the first element of ``updates``, and so on.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.dtype import DType
+
+    x = Tensor([[1, 2], [3, 4]], dtype=DType.int32)
+    mask = Tensor([[True, False], [False, True]], dtype=DType.bool)
+    updates = Tensor([10, 20], dtype=DType.int32)
+    # Write into the True positions, producing [[10, 2], [3, 20]].
+    result = F.masked_scatter(x, mask, updates, out_dim="num_updates")
+    # result is [[10, 2], [3, 20]]
 
 Args:
-    input: The destination tensor.
-    mask: A boolean tensor of the same shape as ``input``.
-    updates: The values to write into the masked positions.
-    out_dim: The output dimension size for the number of replaced
-        elements. Used to construct the symbolic output shape.
+    input: The input tensor to write elements to.
+    mask: A tensor selecting the positions to write, broadcast to the shape
+        of ``input``. Pass a boolean tensor. A weak Python value is
+        converted to boolean, but an existing tensor is used unchanged.
+    updates: A tensor of elements to write to ``input``.
+    out_dim: The new data-dependent dimension for the number of ``True``
+        positions in ``mask``.
 
 Returns:
-    A tensor matching ``input`` with values from ``updates`` written
-    wherever ``mask`` is ``True``.
+    A ``Tensor`` containing ``input`` with ``updates`` written where
+    ``mask`` is true. It has the same shape and dtype as ``input``.
+
+Raises:
+    ValueError: If ``input`` and ``updates`` have mismatched dtypes, or if
+        the inputs aren't all on the same device.
 """
 
 outer = functional(ops.outer, rule=outer_rule)
-outer.__doc__ = """Computes the outer product of two 1-D tensors.
+outer.__doc__ = """Computes the outer product of two vectors.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    lhs = Tensor([1.0, 2.0, 3.0])
+    rhs = Tensor([4.0, 5.0])
+    # Outer product, producing [[4, 5], [8, 10], [12, 15]].
+    result = F.outer(lhs, rhs)
+    # result has shape (3, 2)
 
 Args:
-    lhs: The left-hand side 1-D tensor of length ``M``.
-    rhs: The right-hand side 1-D tensor of length ``N``.
+    lhs: The left side of the product. Must be rank 1.
+    rhs: The right side of the product. Must be rank 1.
 
 Returns:
-    A 2-D tensor of shape ``(M, N)`` whose ``(i, j)`` element is
-    ``lhs[i] * rhs[j]``.
-"""
+    A ``Tensor`` containing the
+    `outer product <https://en.wikipedia.org/wiki/Outer_product>`_ of the
+    two input vectors. It has rank 2, with dimension sizes equal to the
+    number of elements of ``lhs`` and ``rhs`` respectively.
 
-# Multi-output shape ops
+Raises:
+    ValueError: If ``lhs`` or ``rhs`` is not rank 1.
+"""
 
 _split_impl = functional(ops.split, rule=split_rule)
 
 
 def split(
     x: Tensor,
-    split_size_or_sections: int | list[int],
+    split_size_or_sections: int | Sequence[DimLike],
     axis: int = 0,
 ) -> list[Tensor]:
     """Splits a tensor into chunks along an axis.
 
-    When ``split_size_or_sections`` is an ``int``, splits into equal-sized
-    chunks (the last chunk may be smaller). When it is a list of ints,
-    splits into chunks with exactly those sizes.
+    An ``int`` ``split_size_or_sections`` produces equal chunks (the
+    last may be smaller); a sequence specifies per-chunk sizes.
+
+    .. code-block:: python
+
+        from max.experimental import Tensor
+        from max.experimental import functional as F
+
+        x = Tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+        first, second = F.split(x, [2, 4], axis=0)
+        # first is [1.0, 2.0]
+        # second is [3.0, 4.0, 5.0, 6.0]
 
     Args:
-        x: The input tensor.
-        split_size_or_sections: Either a chunk size (``int``) or a list of
-            per-chunk sizes.
-        axis: The axis along which to split.
+        x: The tensor to split.
+        split_size_or_sections: Either a positive chunk size or a sequence
+            giving the exact size of each output section.
+        axis: The axis to split. Negative values count from the end.
+            Defaults to ``0``.
 
     Returns:
-        A list of tensors, each a chunk of the input along ``axis``.
+        A list of tensors in their original order along ``axis``.
+
+    Raises:
+        TypeError: If an integer chunk size is used for a non-static axis.
+        ValueError: If a section size is negative or explicit section sizes
+            don't sum to the input size.
+        IndexError: If ``axis`` is out of range.
     """
     if isinstance(split_size_or_sections, int):
-        dim = x.shape[axis]
+        # On a sharded axis ``x.shape[axis]`` is a PerShardDim carrying the
+        # global size; ``global_dim`` recovers that static global (and is a
+        # no-op on a plain dim).
+        dim = global_dim(Dim(x.shape[axis]))
         if not isinstance(dim, StaticDim):
             raise TypeError(
                 f"split(x, chunk_size={split_size_or_sections}, axis={axis}): "
-                f"non-static dim {dim!r}; pass an explicit split_sizes list."
+                f"non-static dim {x.shape[axis]!r}; pass an explicit "
+                "split_sizes list."
             )
-        dim_size = int(dim)
+        dim_size = dim.dim
         chunk_size = split_size_or_sections
         num_full, remainder = divmod(dim_size, chunk_size)
-        split_sizes: list[int] = [chunk_size] * num_full
+        split_sizes: list[DimLike] = [chunk_size] * num_full
         if remainder > 0:
             split_sizes.append(remainder)
     else:
@@ -1909,87 +2747,103 @@ def split(
 
 
 top_k = functional(ops.top_k, rule=top_k_rule)
-top_k.__doc__ = """Returns the k largest elements (and their indices) along an axis.
-
-Args:
-    input: The input tensor.
-    k: The number of largest elements to return.
-    axis: The axis along which to find the top-k. Defaults to ``-1``.
-
-Returns:
-    A pair ``(values, indices)`` where ``values`` are the top-k entries
-    and ``indices`` are their positions along ``axis``.
-"""
-
-bottom_k = functional(ops.bottom_k, rule=top_k_rule)
-bottom_k.__doc__ = """Returns the k smallest elements (and their indices) along an axis.
-
-Values are returned sorted in ascending order.
-
-Args:
-    input: The input tensor.
-    k: The number of smallest elements to return.
-    axis: The axis along which to find the bottom-k. Defaults to ``-1``.
-
-Returns:
-    A pair ``(values, indices)`` where ``values`` are the k smallest
-    entries in ascending order and ``indices`` are their positions along
-    ``axis``.
-"""
-
-chunk = functional(ops.chunk, rule=chunk_rule)
-chunk.__doc__ = """Splits a tensor into a given number of equal-sized chunks along an axis.
-
-``chunks`` must statically divide ``x.shape[axis]``; otherwise this
-raises a :obj:`ValueError`. Splitting a scalar (rank-0) tensor is only
-valid when ``chunks == 1``.
-
-For example, splitting a length-6 vector into three chunks:
+top_k.__doc__ = """Returns the ``k`` largest values along an axis with their indices.
 
 .. code-block:: python
 
     from max.experimental import Tensor
     from max.experimental import functional as F
 
-    x = Tensor.arange(6)         # [0, 1, 2, 3, 4, 5]
-    parts = F.chunk(x, 3)
-    # parts[0] is [0, 1]
-    # parts[1] is [2, 3]
-    # parts[2] is [4, 5]
+    x = Tensor([1.0, 3.0, 2.0, 5.0, 4.0])
+    values, indices = F.top_k(x, k=2, axis=-1)
+    # values is [5, 4] and indices is [3, 4]
 
 Args:
-    x: The input tensor.
-    chunks: The number of chunks to produce. Must evenly divide
-        ``x.shape[axis]``.
-    axis: The axis along which to split. Negative values count from the
-        end. Defaults to ``0``.
+    input: The input tensor from which to select the top ``k``.
+    k: The number of values to select from ``input``. Must be in the range
+        ``[0, input.shape[axis]]``.
+    axis: The axis along which to select the top ``k``. Defaults to ``-1``.
+        On a GPU input, only the last axis is supported.
 
 Returns:
-    A list of ``chunks`` tensors of equal size along ``axis``.
+    A tuple of two ``Tensor`` objects. The first holds the top ``k`` values
+    along ``axis``, and the second holds their ``int64`` indices in
+    ``input``. Both tensors have the shape of ``input`` with the ``axis``
+    dimension reduced to size ``k``.
 """
 
+bottom_k = functional(ops.bottom_k, rule=top_k_rule)
+bottom_k.__doc__ = """Returns the ``k`` smallest values along an axis with their indices.
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Reduction helpers
-# ═════════════════════════════════════════════════════════════════════════
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([1.0, 3.0, 2.0, 5.0, 4.0])
+    # The two smallest values are 1 and 2 at indices 0 and 2.
+    values, indices = F.bottom_k(x, k=2, axis=-1)
+    # values is [1, 2]
+    # indices is [0, 2]
+
+Args:
+    input: The input tensor from which to select the bottom ``k``.
+    k: The number of values to select from ``input``. Must be in the range
+        ``[0, input.shape[axis]]``.
+    axis: The axis along which to select the bottom ``k``. Defaults to
+        ``-1``. On a GPU input, only the last axis is supported.
+
+Returns:
+    A tuple of two ``Tensor`` objects. The first holds the bottom ``k``
+    values along ``axis`` in ascending order, and the second holds their
+    ``int64`` indices in ``input``. Both tensors have the shape of
+    ``input`` with the ``axis`` dimension reduced to size ``k``.
+"""
+
+chunk = functional(ops.chunk, rule=chunk_rule)
+chunk.__doc__ = """Splits a tensor into equal-sized chunks along an axis.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([1, 2, 3, 4, 5, 6])
+
+    # Split into three equal chunks along axis 0
+    parts = F.chunk(x, 3, axis=0)
+    # parts[0] is [1, 2]
+    # parts[1] is [3, 4]
+    # parts[2] is [5, 6]
+
+Args:
+    x: The tensor to chunk.
+    chunks: The number of chunks. Must be positive and evenly divide the
+        size of ``x`` along ``axis``.
+    axis: The axis to split along. Defaults to ``0``.
+
+Returns:
+    A list of ``Tensor`` objects (chunks), each the same size along
+    ``axis``.
+
+Raises:
+    ValueError: If ``chunks`` does not evenly divide the size of ``x``
+        along ``axis``, or if ``x`` is a scalar and ``chunks`` is greater
+        than ``1``.
+    IndexError: If ``axis`` is out of range for ``x``.
+"""
 
 
 def _reduce_op(
     graph_op: Callable[..., object],
-    *,
-    rule: Callable[..., RuleSignature],
+    rule: Callable[..., ActionSet],
 ) -> Callable[..., Tensor]:
-    """Build a reduction wrapper matching the old ``functional`` semantics.
+    """Builds a reduction wrapper.
 
-    When ``axis`` is an ``int``, delegates directly to the single-axis
-    graph op (via ``functional()``).
-
-    When ``axis is None``, flattens the tensor to 1-D first, then reduces
-    on axis 0 — producing shape ``[1]``.  This is pure syntactic sugar
-    at the Tensor level; the graph op itself always reduces exactly one
-    axis.
+    An integer ``axis`` delegates to the single-axis graph op;
+    ``axis=None`` flattens to 1-D first.
     """
-    single_axis = functional(graph_op, rule=rule)
+    single_axis = functional(graph_op, rule)
 
     def fn(
         x: Tensor,
@@ -1997,10 +2851,6 @@ def _reduce_op(
     ) -> Tensor:
         assert isinstance(x, tensor.Tensor)
         if axis is None:
-            # Lazy import: ``shape_ops`` imports ``functional`` from this
-            # module, so a top-level import would be circular.
-            from .shape_ops import reshape
-
             x = reshape(x, [-1])
             axis = 0
         return single_axis(x, axis)
@@ -2010,19 +2860,11 @@ def _reduce_op(
 
 def _reduce_elementwise_op(
     graph_op: Callable[..., object],
-    *,
-    rule: Callable[..., RuleSignature],
+    rule: Callable[..., ActionSet],
     elementwise_fn: Callable[[Tensor, Tensor], Tensor],
 ) -> Callable[..., Tensor]:
-    """Build a function that acts as reduction (1 arg) or elementwise (2 args).
-
-    ``max(x)`` reduces along an axis; ``max(x, y)`` computes element-wise
-    maximum.  The ``y`` argument disambiguates the two modes.
-
-    Matches old ``functional`` semantics: ``axis=None`` flattens to 1-D
-    then reduces on axis 0.
-    """
-    reduce_fn = _reduce_op(graph_op, rule=rule)
+    """Builds a function that reduces (1 arg) or runs elementwise (2 args)."""
+    reduce_fn = _reduce_op(graph_op, rule)
 
     def fn(
         x: Tensor,
@@ -2037,36 +2879,16 @@ def _reduce_elementwise_op(
     return fn
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Reduction ops
-# ═════════════════════════════════════════════════════════════════════════
-
+#: Computes the sum along one or more axes. Distributed via SPMD.
+#: See :func:`max.graph.ops.sum` for details.
 sum = _reduce_op(ops.sum, rule=linear_reduce_rule)
-sum.__doc__ = """Computes the sum of a tensor along an axis.
-
-Args:
-    x: The input tensor.
-    axis: The axis along which to reduce. When ``None``, the tensor is
-        flattened to 1-D and reduced. Defaults to ``-1``.
-
-Returns:
-    A tensor with the sum computed along ``axis``.
-"""
-
-mean = _reduce_op(ops.mean, rule=linear_reduce_rule)
-mean.__doc__ = """Computes the mean of a tensor along an axis.
-
-Args:
-    x: The input tensor.
-    axis: The axis along which to reduce. When ``None``, the tensor is
-        flattened to 1-D and reduced. Defaults to ``-1``.
-
-Returns:
-    A tensor with the mean computed along ``axis``.
-"""
-
+#: Computes the mean along one or more axes. Distributed via SPMD.
+#: See :func:`max.graph.ops.mean` for details.
+mean = _reduce_op(ops.mean, rule=mean_rule)
+#: Computes the product along one or more axes. Distributed via SPMD.
+#: See :func:`max.graph.ops.prod` for details.
 prod = _reduce_op(ops.prod, rule=reduce_rule)
-prod.__doc__ = """Computes the product of a tensor along an axis.
+prod.__doc__ = """Computes the product of elements along a specified axis.
 
 Args:
     x: The input tensor.
@@ -2074,7 +2896,13 @@ Args:
         flattened to 1-D and reduced. Defaults to ``-1``.
 
 Returns:
-    A tensor with the product computed along ``axis``.
+    A ``Tensor`` containing the product along ``axis``. For an integer
+    ``axis``, it has the same rank as ``x`` with the ``axis`` dimension
+    reduced to size ``1``. When ``axis`` is ``None``, the result has shape
+    ``(1,)``.
+
+Raises:
+    ValueError: If ``axis`` is out of range for ``x``.
 """
 
 _argmax_impl = _reduce_op(ops.argmax, rule=reduce_rule)
@@ -2087,14 +2915,41 @@ def argmax(
 ) -> Tensor:
     """Returns the indices of the maximum values along an axis.
 
+    It's useful for finding the position of the largest element along a
+    given dimension, such as determining predicted classes in
+    classification.
+
+    When the input contains ties (identical maximum values), behavior
+    depends on the device: CPU returns the first matching index, while
+    GPU may return any of them.
+
+    .. code-block:: python
+
+        from max.experimental import Tensor
+        from max.experimental import functional as F
+
+        x = Tensor([[1.2, 3.5, 2.1, 0.8], [2.3, 1.9, 4.2, 3.1]])
+        indices = F.argmax(x, axis=-1)
+        # indices has shape (2, 1): [[1], [2]]
+
+        # Or flatten before reducing:
+        flat_index = F.argmax(x, axis=None)
+        # flat_index has shape (1,): [6] (flattened index of max value 4.2)
+
     Args:
         x: The input tensor.
-        axis: The axis along which to find the maximum. When ``None``, the
-            tensor is flattened to 1-D first. Defaults to ``-1``.
+        axis: The axis along which to compute the argmax. Negative values
+            index from the last dimension. When ``None``, the tensor is
+            flattened to 1-D first. Defaults to ``-1``.
 
     Returns:
-        An integer tensor of indices marking the positions of the maximum
-        values along ``axis``.
+        A ``Tensor`` with ``int64`` dtype containing the indices of the
+        maximum values along ``axis``. For an integer ``axis``, the result
+        has the same rank as ``x`` with the ``axis`` dimension reduced to
+        size ``1``. When ``axis`` is ``None``, the result has shape ``(1,)``.
+
+    Raises:
+        ValueError: If ``axis`` is out of range for ``x``.
     """
     return _argmax_impl(x, axis=axis)
 
@@ -2105,14 +2960,33 @@ def argmin(
 ) -> Tensor:
     """Returns the indices of the minimum values along an axis.
 
+    When the input contains ties (identical minimum values), behavior
+    depends on the device: CPU returns the first matching index, while
+    GPU may return any of them.
+
+    .. code-block:: python
+
+        from max.experimental import Tensor
+        from max.experimental import functional as F
+
+        x = Tensor([[1.2, 3.5, 2.1, 0.8], [2.3, 1.9, 4.2, 3.1]])
+        indices = F.argmin(x, axis=-1)
+        # indices has shape (2, 1): [[3], [1]]
+
     Args:
         x: The input tensor.
-        axis: The axis along which to find the minimum. When ``None``, the
-            tensor is flattened to 1-D first. Defaults to ``-1``.
+        axis: The axis along which to compute the argmin. Negative values
+            index from the last dimension. When ``None``, the tensor is
+            flattened to 1-D first. Defaults to ``-1``.
 
     Returns:
-        An integer tensor of indices marking the positions of the minimum
-        values along ``axis``.
+        A ``Tensor`` with ``int64`` dtype containing the indices of the
+        minimum values along ``axis``. For an integer ``axis``, the result
+        has the same rank as ``x`` with the ``axis`` dimension reduced to
+        size ``1``. When ``axis`` is ``None``, the result has shape ``(1,)``.
+
+    Raises:
+        ValueError: If ``axis`` is out of range for ``x``.
     """
     return _argmin_impl(x, axis=axis)
 
@@ -2152,8 +3026,11 @@ Args:
         the tensor is flattened to 1-D first. Defaults to ``-1``.
 
 Returns:
-    A tensor containing either the reduced maximum along ``axis`` or the
+    A ``Tensor`` containing either the reduced maximum along ``axis`` or the
     element-wise maximum with the broadcast shape of the inputs.
+
+Raises:
+    ValueError: If ``axis`` is out of range for ``x`` when reducing.
 """
 
 min = _reduce_elementwise_op(
@@ -2191,38 +3068,21 @@ Args:
         the tensor is flattened to 1-D first. Defaults to ``-1``.
 
 Returns:
-    A tensor containing either the reduced minimum along ``axis`` or the
+    A ``Tensor`` containing either the reduced minimum along ``axis`` or the
     element-wise minimum with the broadcast shape of the inputs.
+
+Raises:
+    ValueError: If ``axis`` is out of range for ``x`` when reducing.
 """
 
-softmax = functional(ops.softmax, rule=reduce_rule)
-softmax.__doc__ = """Applies the softmax function to a tensor along an axis.
-
-Normalizes the values along ``axis`` so that they sum to ``1``.
-
-Args:
-    value: The input tensor.
-    axis: The axis along which to compute the softmax. Defaults to the
-        final axis (``-1``).
-
-Returns:
-    A tensor of the same shape and dtype with softmax applied along
-    ``axis``.
-"""
-
-logsoftmax = functional(ops.logsoftmax, rule=reduce_rule)
-logsoftmax.__doc__ = """Computes ``log(softmax(x))`` along an axis.
-
-Args:
-    value: The input tensor.
-    axis: The axis along which to compute the log-softmax. Defaults to the
-        final axis (``-1``).
-
-Returns:
-    A tensor of the same shape and dtype with log-softmax applied along
-    ``axis``.
-"""
-
+#: Applies the softmax function along an axis. Distributed via SPMD.
+#: See :func:`max.graph.ops.softmax` for details.
+softmax = functional(ops.softmax, rule=softmax_rule)
+#: Applies the log softmax function along an axis. Distributed via SPMD.
+#: See :func:`max.graph.ops.logsoftmax` for details.
+logsoftmax = functional(ops.logsoftmax, rule=softmax_rule)
+#: Computes the cumulative sum along an axis. Distributed via SPMD.
+#: See :func:`max.graph.ops.cumsum` for details.
 cumsum = functional(ops.cumsum, rule=linear_reduce_rule)
 cumsum.__doc__ = """Computes the cumulative sum of a tensor along an axis.
 
@@ -2242,206 +3102,323 @@ Returns:
 """
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Convolution
-# ═════════════════════════════════════════════════════════════════════════
-
-
+#: Applies 2D convolution. Distributed via SPMD.
+#: See :func:`max.graph.ops.conv2d` for details.
 conv2d = functional(ops.conv2d, rule=conv2d_rule)
-conv2d.__doc__ = """Applies a 2D convolution to a tensor.
+conv2d.__doc__ = """Computes the 2-D convolution product of the input with the given filter, bias, strides, dilations, paddings, and groups.
 
-Computes the 2-D convolution product of ``x`` with ``filter``, plus the
-optional ``bias``. Currently supports strides and padding on the input
-only.
+This uses the following layout assumptions:
 
-Args:
-    x: A rank-4 input tensor. With the default ``NHWC`` input layout,
-        the shape is ``(N, H, W, C_in)``.
-    filter: A rank-4 convolution kernel. With the default ``RSCF``
-        filter layout, the shape is ``(H, W, C_in / groups, C_out)``.
-    stride: The stride of the convolution, as ``(stride_h, stride_w)``.
-        Defaults to ``(1, 1)``.
-    dilation: The spacing between kernel elements, as ``(dilation_h,
-        dilation_w)``. Defaults to ``(1, 1)``.
-    padding: Zero-padding applied to the input, as
-        ``(pad_h_before, pad_h_after, pad_w_before, pad_w_after)``.
-        Defaults to ``(0, 0, 0, 0)``.
-    groups: The number of groups for grouped convolution. Both ``C_in``
-        and ``C_out`` must be divisible by ``groups``. Defaults to ``1``.
-    bias: Optional rank-1 bias tensor of shape ``(C_out,)`` added to the
-        convolution output.
-    input_layout: The layout of the input tensor. Defaults to
-        ``ConvInputLayout.NHWC``.
-    filter_layout: The layout of the filter tensor. Defaults to
-        ``FilterLayout.RSCF``.
+- The input has channels-last (NHWC) layout, meaning
+  ``(batch_size, height, width, in_channels)``.
+- The filter has RSCF layout, meaning
+  ``(height, width, in_channels / num_groups, out_channels)``.
+- The bias has shape ``(out_channels,)``.
 
-Returns:
-    The convolution result. With the default ``NHWC`` input layout, the
-    shape is ``(N, H_out, W_out, C_out)``.
-
-Raises:
-    ValueError: If ``x`` is not rank 4, ``filter`` is not rank 4, or
-        ``bias`` is provided and is not rank 1.
-"""
-
-conv3d = functional(ops.conv3d, rule=conv3d_rule)
-conv3d.__doc__ = """Applies a 3D convolution to a tensor.
-
-Computes the 3-D convolution product of ``x`` with ``filter``, plus the
-optional ``bias``. Currently supports strides and padding on the input
-only.
-
-Args:
-    x: A rank-5 input tensor. With the default channels-last (NDHWC)
-        input layout, the shape is ``(N, D, H, W, C_in)``.
-    filter: A rank-5 convolution kernel. With the default ``QRSCF``
-        filter layout, the shape is ``(D, H, W, C_in / groups, C_out)``.
-    stride: The stride of the convolution, as
-        ``(stride_d, stride_h, stride_w)``. Defaults to ``(1, 1, 1)``.
-    dilation: The spacing between kernel elements, as
-        ``(dilation_d, dilation_h, dilation_w)``. Defaults to
-        ``(1, 1, 1)``.
-    padding: Zero-padding applied to the input, as
-        ``(pad_d_before, pad_d_after, pad_h_before, pad_h_after,
-        pad_w_before, pad_w_after)``. Defaults to ``(0, 0, 0, 0, 0, 0)``.
-    groups: The number of groups for grouped convolution. Both ``C_in``
-        and ``C_out`` must be divisible by ``groups``. Defaults to ``1``.
-    bias: Optional rank-1 bias tensor of shape ``(C_out,)`` added to the
-        convolution output.
-    input_layout: The layout of the input tensor. Defaults to
-        ``ConvInputLayout.NHWC`` (channels-last).
-    filter_layout: The layout of the filter tensor. Defaults to
-        ``FilterLayout.QRSCF``.
-
-Returns:
-    The convolution result. With the default channels-last input
-    layout, the shape is ``(N, D, H_out, W_out, C_out)``.
-
-Raises:
-    ValueError: If ``x`` is not rank 5, ``filter`` is not rank 5, or
-        ``bias`` is provided and is not rank 1.
-"""
-
-conv2d_transpose = functional(ops.conv2d_transpose, rule=conv2d_transpose_rule)
-conv2d_transpose.__doc__ = """Applies a 2D transposed convolution to a tensor.
-
-Also known as fractionally-strided or deconvolution. Computes the
-gradient of a 2-D convolution with respect to its input, as if the
-original convolution had the same filter and hyperparameters. Commonly
-used to upsample feature maps.
-
-Args:
-    x: A rank-4 input tensor. With the default ``NHWC`` input layout,
-        the shape is ``(N, H, W, C_in)``.
-    filter: A rank-4 convolution kernel. With the default ``RSCF``
-        filter layout, the shape is ``(H, W, C_out, C_in)``. Note that
-        the channel order is reversed relative to :func:`conv2d`.
-    stride: The stride of the transposed convolution, as
-        ``(stride_h, stride_w)``. Defaults to ``(1, 1)``.
-    dilation: The spacing between kernel elements, as
-        ``(dilation_h, dilation_w)``. Defaults to ``(1, 1)``.
-    padding: Zero-padding applied to the input, as
-        ``(pad_h_before, pad_h_after, pad_w_before, pad_w_after)``.
-        Defaults to ``(0, 0, 0, 0)``.
-    output_paddings: Additional size added to one side of each spatial
-        output dimension, as ``(out_pad_h, out_pad_w)``. Resolves the
-        ambiguity in output shape when ``stride > 1``. Each value must be
-        strictly less than the corresponding ``stride``. Currently only
-        ``(0, 0)`` is supported. Defaults to ``(0, 0)``.
-    bias: Optional rank-1 bias tensor of shape ``(C_out,)`` added to the
-        transposed-convolution output.
-    input_layout: The layout of the input tensor. Defaults to
-        ``ConvInputLayout.NHWC``.
-    filter_layout: The layout of the filter tensor. Defaults to
-        ``FilterLayout.RSCF``.
-
-Returns:
-    The transposed-convolution result with shape
-    ``(N, H_out, W_out, C_out)`` for the default ``NHWC`` input layout.
-
-Raises:
-    ValueError: If ``x`` is not rank 4, ``filter`` is not rank 4,
-        ``bias`` is provided and is not rank 1, or any
-        ``output_paddings`` value is greater than or equal to the
-        corresponding ``stride``.
-"""
-
-
-# ═════════════════════════════════════════════════════════════════════════
-#  Misc
-# ═════════════════════════════════════════════════════════════════════════
-
-band_part = functional(ops.band_part, rule=band_part_rule)
-band_part.__doc__ = """Masks out everything except a diagonal band of an input matrix.
-
-Operates on the last two axes of ``x`` (any earlier axes are treated as
-batch dimensions). Elements outside the central diagonal band of each
-sub-matrix are set to zero.
-
-Args:
-    x: The input tensor. Must have rank at least 2.
-    num_lower: The number of subdiagonals to keep. Use :obj:`None` to
-        keep the entire lower triangle.
-    num_upper: The number of superdiagonals to keep. Use :obj:`None` to
-        keep the entire upper triangle.
-    exclude: When ``True``, inverts the selection — elements inside the
-        band are zeroed and elements outside are kept. Defaults to
-        ``False``.
-
-Returns:
-    A tensor of the same shape as ``x`` with elements outside the band
-    set to zero.
-"""
-
-fold = functional(ops.fold, rule=fold_rule)
-fold.__doc__ = """Combines an array of sliding local blocks into a larger containing tensor.
-
-The inverse of an ``unfold`` operation.
-
-The input tensor is rank 3 with shape ``(N, C * kernel_sizes, L)``,
-where ``N`` is the batch dimension, ``C`` is the number of channels,
-``kernel_sizes`` is the product ``kernel_size[0] * kernel_size[1]``, and
-``L`` is the number of local blocks. The output is rank 4 with shape
-``(N, C, output_size[0], output_size[1])``.
-
-The number of blocks ``L`` must satisfy:
+The padding values are expected to take the form (pad_dim1_before,
+pad_dim1_after, pad_dim2_before, pad_dim2_after...) and represent padding
+0's before and after the indicated *spatial* dimensions in the input. In
+2-D convolution, dim1 here represents H and dim2 represents W. In
+Python-like syntax, padding a 2x3 spatial input with [0, 1, 2, 1] would
+yield:
 
 .. code-block:: text
 
-    L = prod((output_size[d] + 2 * padding[d]
-              - dilation[d] * (kernel_size[d] - 1) - 1) / stride[d] + 1)
+    input = [
+      [1, 2, 3],
+      [4, 5, 6]
+    ]
+    # Shape is 2x3
 
-where ``d`` ranges over the spatial dimensions.
+    padded_input = [
+      [0, 0, 1, 2, 3, 0],
+      [0, 0, 4, 5, 6, 0],
+      [0, 0, 0, 0, 0, 0]
+    ]
+    # Shape is 3x6
+
+This op currently only supports strides and padding on the input.
+
+Convolving a 2x2 input with an all-ones 2x2 filter sums the window:
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # NHWC input: batch 1, 2x2 spatial, 1 channel.
+    x = Tensor([[[[1.0], [2.0]], [[3.0], [4.0]]]])
+    # RSCF filter: 2x2, 1 in-channel, 1 out-channel, all ones.
+    filter = Tensor([[[[1.0]], [[1.0]]], [[[1.0]], [[1.0]]]])
+    result = F.conv2d(x, filter)
+    # result is [[[[10]]]] with shape (1, 1, 1, 1)
 
 Args:
-    input: The 3-D input tensor of unfolded blocks with shape
-        ``(N, C * kernel_sizes, L)``.
-    output_size: The spatial dimensions of the output, as
-        ``(out_h, out_w)``. Must be a tuple of two ints.
-    kernel_size: The size of the sliding blocks, as
-        ``(kernel_h, kernel_w)``. Must be a tuple of two ints.
-    stride: The stride of the sliding blocks. Either a single ``int``
-        applied to both spatial dimensions, or a tuple
-        ``(stride_h, stride_w)``. Defaults to ``1``.
-    dilation: The spacing between kernel elements. Either a single
-        ``int`` applied to both spatial dimensions, or a tuple
-        ``(dilation_h, dilation_w)``. Defaults to ``1``.
-    padding: Zero-padding added to both sides of each spatial dimension.
-        Either a single ``int`` applied to both spatial dimensions, or a
-        tuple ``(pad_h, pad_w)``. Defaults to ``0``.
+    x: An NHWC input tensor to perform the convolution upon.
+    filter: The convolution filter in RSCF layout,
+        ``(height, width, in_channels / num_groups, out_channels)``.
+    stride: The stride of the convolution operation.
+    dilation: The spacing between the kernel points.
+    padding: The amount of padding applied to the input.
+    groups: When greater than 1, divides the convolution into multiple
+        parallel convolutions. The number of input and output channels
+        must both be divisible by the number of groups.
+    bias: An optional 1-D bias of shape ``(out_channels,)``.
+    input_layout: The layout of the input tensor. Defaults to NHWC.
+    filter_layout: The layout of the filter tensor. Defaults to RSCF.
 
 Returns:
-    The folded 4-D tensor with shape
+    A ``Tensor`` containing the result of the convolution, with
+    shape ``(batch_size, height_out, width_out, out_channels)``.
+
+Raises:
+    ValueError: If ``x`` isn't rank 4, ``filter`` isn't rank 4, ``bias`` is
+        given and isn't rank 1, or ``x`` and ``filter`` aren't on the same
+        device.
+"""
+
+conv3d = functional(ops.conv3d, rule=conv3d_rule)
+conv3d.__doc__ = """Computes the 3-D convolution product of the input with the given filter, bias, strides, dilations, paddings, and groups.
+
+This uses the following layout assumptions:
+
+- The input has channels-last (NDHWC) layout, meaning
+  ``(batch_size, depth, height, width, in_channels)``.
+- The filter has QRSCF layout, meaning
+  ``(depth, height, width, in_channels / num_groups, out_channels)``.
+
+The padding values are expected to take the form (pad_dim1_before,
+pad_dim1_after, pad_dim2_before, pad_dim2_after...) and represent padding
+0's before and after the indicated *spatial* dimensions in the input. In
+3-D convolution, dim1 here represents D, dim2 represents H and dim3
+represents W. In Python-like syntax, padding a 2x3 spatial input with
+[0, 1, 2, 1] would yield:
+
+.. code-block:: text
+
+    input = [
+      [1, 2, 3],
+      [4, 5, 6]
+    ]
+    # Shape is 2x3
+
+    padded_input = [
+      [0, 0, 1, 2, 3, 0],
+      [0, 0, 4, 5, 6, 0],
+      [0, 0, 0, 0, 0, 0]
+    ]
+    # Shape is 3x6
+
+This op currently only supports strides and padding on the input.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.dtype import DType
+
+    # NDHWC input: batch 1, 4x4x4 spatial, 1 channel.
+    x = Tensor.ones((1, 4, 4, 4, 1), dtype=DType.float32)
+    # QRSCF filter: 2x2x2, 1 in-channel, 1 out-channel.
+    filter = Tensor.ones((2, 2, 2, 1, 1), dtype=DType.float32)
+    result = F.conv3d(x, filter)
+    # result has shape (1, 3, 3, 3, 1)
+
+Args:
+    x: An NDHWC input tensor to perform the convolution upon.
+    filter: The convolution filter in QRSCF layout,
+        ``(depth, height, width, in_channels / num_groups, out_channels)``.
+    stride: The stride of the convolution operation.
+    dilation: The spacing between the kernel points.
+    padding: The amount of padding applied to the input.
+    groups: When greater than 1, divides the convolution into multiple
+        parallel convolutions. The number of input and output channels
+        must both be divisible by the number of groups.
+    bias: An optional 1-D bias of shape ``(out_channels,)``.
+    input_layout: The layout of the input tensor. Defaults to NDHWC.
+    filter_layout: The layout of the filter tensor. Defaults to QRSCF.
+
+Returns:
+    A ``Tensor`` containing the result of the convolution, with
+    shape ``(batch_size, depth_out, height_out, width_out, out_channels)``.
+
+Raises:
+    ValueError: If ``x`` isn't rank 5, ``filter`` isn't rank 5, or ``bias``
+        is given and isn't rank 1.
+"""
+
+conv2d_transpose = functional(ops.conv2d_transpose, rule=conv2d_transpose_rule)
+conv2d_transpose.__doc__ = """Computes the 2-D deconvolution of the input with the given filter, strides, dilations, and paddings.
+
+This computes the transpose (gradient) of convolution, with the following
+layout assumptions (where ``out_channels`` is with respect to the original
+convolution):
+
+- The input ``x`` has channels-last (NHWC) layout, meaning
+  ``(batch_size, height, width, in_channels)``.
+- The filter has RSCF layout, meaning
+  ``(kernel_height, kernel_width, out_channels, in_channels)``.
+- The bias has shape ``(out_channels,)``.
+
+This op effectively computes the gradient of a convolution with respect to
+its input, as if the original convolution had the same filter and
+hyperparameters as this op. For a visualization of the computation, see
+`Transposed Convolution
+<https://d2l.ai/chapter_computer-vision/transposed-conv.html>`_.
+
+The padding values take the form ``(pad_dim1_before, pad_dim1_after,
+pad_dim2_before, pad_dim2_after, ...)`` and are cropped (removed) from the
+indicated *spatial* dimensions of the output. In 2-D transposed
+convolution, ``dim1`` represents ``H_out`` and ``dim2`` represents
+``W_out``. In Python-like syntax, cropping a 2x4 spatial output with
+``[0, 1, 2, 1]`` would yield:
+
+.. code-block:: text
+
+    output = [
+      [1, 2, 3, 4],
+      [5, 6, 7, 8]
+    ]
+    # Shape is 2x4
+
+    cropped_output = [
+      [3],
+    ]
+    # Shape is 1x1
+
+Deconvolving a 1x1 input with an all-ones 2x2 filter (filter is RSCF, with
+``out_channels`` and ``in_channels`` with respect to the original
+convolution):
+
+.. code-block:: python
+
+    from max.driver import CPU
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.experimental.tensor import default_device
+
+    with default_device(CPU()):
+        # NHWC input: batch 1, 1x1 spatial, 1 channel.
+        x = Tensor([[[[3.0]]]])
+        # RSCF filter: 2x2 kernel, 1 out-channel, 1 in-channel, all ones.
+        filter = Tensor([[[[1.0]], [[1.0]]], [[[1.0]], [[1.0]]]])
+        result = F.conv2d_transpose(x, filter)
+
+Args:
+    x: An NHWC input tensor to perform the deconvolution upon.
+    filter: The convolution filter in RSCF layout,
+        ``(height, width, out_channels, in_channels)``.
+    stride: The stride of the sliding window as a tuple
+        ``(stride_h, stride_w)``. Defaults to ``(1, 1)``.
+    dilation: The spacing between the kernel points.
+    padding: The amount cropped from each spatial dimension of the output.
+    output_paddings: The number of zeros added at the end of each output
+        spatial axis. This resolves the ambiguity between multiple output
+        shapes when a stride is greater than 1. Only ``0`` is supported.
+    bias: An optional tensor of shape ``(out_channels,)``.
+    input_layout: The layout of the input tensor. Defaults to NHWC.
+    filter_layout: The layout of the filter tensor. Defaults to RSCF.
+
+Returns:
+    A ``Tensor`` containing the result of the deconvolution, in
+    channels-first (NCHW) layout
+    ``(batch_size, out_channels, height_out, width_out)``. This differs from
+    the channels-last (NHWC) input layout.
+
+Raises:
+    ValueError: If ``x`` isn't rank 4, ``filter`` isn't rank 4, ``bias`` is
+        given and isn't rank 1, an output padding isn't smaller than its
+        stride, or ``x`` and ``filter`` aren't on the same device.
+"""
+
+
+#: Copies a tensor setting everything outside a central band to zero. Distributed via SPMD.
+#: See :func:`max.graph.ops.band_part` for details.
+band_part = functional(ops.band_part, rule=band_part_rule)
+band_part.__doc__ = """Set all values to zero except a diagonal band of an input matrix.
+
+All but the last two axes are treated as batches, and
+the last two axes define the matrices.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+    # Keep the main diagonal and one sub-diagonal, producing
+    # [[1, 0, 0], [1, 1, 0], [0, 1, 1]].
+    result = F.band_part(x, num_lower=1, num_upper=0)
+    # result is [[1, 0, 0], [1, 1, 0], [0, 1, 1]]
+
+Args:
+    x: The input tensor to mask.
+    num_lower: The number of diagonal bands to include below the central
+        diagonal. If ``None`` or ``-1``, includes the entire lower triangle.
+        Defaults to ``None``.
+    num_upper: The number of diagonal bands to include above the central
+        diagonal. If ``None`` or ``-1``, includes the entire upper triangle.
+        Defaults to ``None``.
+    exclude: Whether to invert the selection, zeroing out the elements in
+        the band instead. Defaults to ``False``.
+
+Returns:
+    A ``Tensor`` containing ``x`` with the masked-out elements set to zero
+    and the remaining elements copied from ``x``. It has the same shape and
+    dtype as ``x``.
+
+Raises:
+    ValueError: If the input tensor rank is less than 2, or if ``num_lower``
+        or ``num_upper`` are out of bounds for statically known dimensions.
+"""
+
+fold = functional(ops.fold, rule=fold_rule)
+fold.__doc__ = """Combines an array of sliding local blocks into a larger tensor.
+
+``L``, the number of blocks, must equal ``prod((output_size[d] + 2 *
+padding[d] - dilation[d] * (kernel_size[d] - 1) - 1) // stride[d] + 1)``,
+where ``d`` ranges over all spatial dimensions.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.dtype import DType
+
+    # Shape (N, C * kernel_h * kernel_w, L) = (1, 1 * 2 * 2, 9).
+    x = Tensor.ones((1, 4, 9), dtype=DType.float32)
+    # Fold nine 2x2 blocks into a 4x4 image.
+    result = F.fold(x, output_size=(4, 4), kernel_size=(2, 2))
+    # result has shape (1, 1, 4, 4)
+
+Args:
+    input: The 3-D tensor to fold, with shape
+        ``(N, C * kernel_sizes, L)``, where ``N`` is the batch dimension,
+        ``C`` is the number of channels, ``kernel_sizes`` is the product of
+        the kernel sizes, and ``L`` is the number of local blocks.
+    output_size: The spatial dimensions of the output tensor, as a tuple
+        of two ints.
+    kernel_size: The size of the sliding blocks, as a tuple of two ints.
+    stride: The stride of the sliding blocks. Either an int or a tuple of
+        two ints. Defaults to ``1``.
+    dilation: The spacing between kernel elements. Either an int or a
+        tuple of two ints. Defaults to ``1``.
+    padding: The zero-padding added on both sides of the input. Either an
+        int or a tuple of two ints. Defaults to ``0``.
+
+Returns:
+    A ``Tensor`` containing the folded 4-D tensor, with shape
     ``(N, C, output_size[0], output_size[1])``.
 
 Raises:
-    ValueError: If dimension 1 of ``input`` is not a multiple of
-        ``kernel_size[0] * kernel_size[1]``, or if dimension 2 of
-        ``input`` doesn't match the computed number of blocks ``L``.
+    ValueError: If the input's channel dimension isn't a multiple of the
+        total kernel size, or if the number of blocks ``L`` doesn't match
+        the value computed from the other arguments.
 """
 
 as_interleaved_complex = functional(
-    ops.complex.as_interleaved_complex, rule=as_interleaved_complex_rule
+    ops.complex.as_interleaved_complex,
+    rule=as_interleaved_complex_rule,
 )
 as_interleaved_complex.__doc__ = """Reshapes a real tensor of alternating (real, imag) values into complex form.
 
@@ -2476,80 +3453,49 @@ Returns:
 """
 
 resize = functional(ops.resize, rule=resize_rule)
-resize.__doc__ = """Resizes a 4-D tensor to the given shape.
+resize.__doc__ = """Resizes a tensor to a given shape using a specified interpolation method.
 
-The input must be in NCHW layout — that is, a rank-4 tensor whose
-dimensions represent ``(N, C, H, W)``: batch size, channels, height,
-and width.
+.. code-block:: python
 
-Dispatches to :func:`resize_nearest`, :func:`resize_linear`, or
-:func:`resize_bicubic` based on ``interpolation``.
+    from max.driver import CPU
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.experimental.tensor import default_device
+    from max.graph.ops import InterpolationMode
+
+    with default_device(CPU()):
+        # NCHW input: batch 1, 1 channel, 2x2 spatial.
+        x = Tensor([[[[1.0, 2.0], [3.0, 4.0]]]])
+        # Upscale the spatial dimensions to 4x4.
+        result = F.resize(x, [1, 1, 4, 4], InterpolationMode.BILINEAR)
+        # result has shape (1, 1, 4, 4)
 
 Args:
-    input: The input tensor. Must have rank 4 in NCHW layout.
-    shape: The full output shape of length 4 as ``(N, C, H, W)``.
-    interpolation: The interpolation mode used to compute output values.
-        Defaults to ``InterpolationMode.BILINEAR``.
+    input: The input tensor to resize. Must be rank 4 in channels-first
+        (NCHW) layout, ``(batch_size, channels, height, width)``.
+    shape: The desired output shape, of length 4, layout
+        ``(batch_size, channels, height, width)``.
+    interpolation: The interpolation method, given as an
+        :class:`~max.graph.ops.InterpolationMode`. Defaults to
+        :attr:`~max.graph.ops.InterpolationMode.BILINEAR`.
 
 Returns:
-    A resized tensor with the given ``shape`` and the same dtype as
-    ``input``.
+    A ``Tensor`` containing the resized tensor with the given ``shape``.
+
+Raises:
+    ValueError: If ``input`` doesn't have rank 4, or if ``shape`` has the
+        wrong number of elements.
 """
 
 resize_linear = functional(ops.resize_linear, rule=resize_linear_rule)
-resize_linear.__doc__ = """Resizes a tensor using linear (bilinear) interpolation.
-
-Args:
-    input: The input symbolic tensor to resize.
-    size: The full output shape. Must have the same rank as ``input``.
-    coordinate_transform_mode: How to map an output coordinate back to an
-        input coordinate. One of ``0`` (``half_pixel``, the default),
-        ``1`` (``align_corners``), ``2`` (``asymmetric``), or ``3``
-        (``half_pixel_1D``).
-    antialias: When ``True``, applies an antialiasing filter when the
-        output is smaller than the input (downscaling). Has no effect
-        when upscaling. Defaults to ``False``.
-
-Returns:
-    A tensor with the given ``size`` and the same dtype as ``input``.
-"""
-
-resize_nearest = functional(ops.resize_nearest, rule=resize_rule)
-resize_nearest.__doc__ = """Resizes a tensor using nearest-neighbor interpolation.
-
-Args:
-    input: The input symbolic tensor to resize.
-    size: The full output shape. Must have the same rank as ``input``.
-    coordinate_transform_mode: How to map an output coordinate back to an
-        input coordinate. One of ``0`` (``half_pixel``, the default),
-        ``1`` (``align_corners``), ``2`` (``asymmetric``), or ``3``
-        (``half_pixel_1D``).
-    round_mode: How to round the mapped coordinate to select the nearest
-        input sample. One of ``0`` (``HalfDown``, the default), ``1``
-        (``HalfUp``), ``2`` (``Floor``), or ``3`` (``Ceil``).
-
-Returns:
-    A tensor with the given ``size`` and the same dtype as ``input``.
-"""
-
-resize_bicubic = functional(ops.resize_bicubic, rule=resize_rule)
-resize_bicubic.__doc__ = """Resizes a 4-D tensor using bicubic interpolation.
-
-The input must be in NCHW layout — that is, a rank-4 tensor whose
-dimensions represent ``(N, C, H, W)``: batch size, channels, height,
-and width.
-
-Uses a 4x4-pixel Catmull-Rom cubic filter with half-pixel coordinate
-mapping.
-
-Args:
-    input: The input tensor. Must have rank 4 in NCHW layout.
-    size: The full output shape of length 4 as ``(N, C, H, W)``.
-
-Returns:
-    A tensor with the given ``size`` and the same dtype as ``input``.
-"""
-
+#: Resizes a tensor using nearest-neighbor interpolation. Distributed via SPMD.
+#: See :func:`max.graph.ops.resize_nearest` for details.
+resize_nearest = functional(ops.resize_nearest, rule=resize_nearest_rule)
+#: Resizes a tensor using bicubic interpolation. Distributed via SPMD.
+#: See :func:`max.graph.ops.resize_bicubic` for details.
+resize_bicubic = functional(ops.resize_bicubic, rule=resize_bicubic_rule)
+#: Computes the inverse real FFT. Distributed via SPMD.
+#: See :func:`max.graph.ops.irfft` for details.
 irfft = functional(ops.irfft, rule=irfft_rule)
 irfft.__doc__ = """Computes the inverse of the real-input FFT.
 
@@ -2578,11 +3524,6 @@ Returns:
 """
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Control flow
-# ═════════════════════════════════════════════════════════════════════════
-
-
 def _cond_graph(
     pred: TensorValueLike,
     out_types: Iterable[Type[Any]] | None,
@@ -2606,18 +3547,19 @@ it is transferred to CPU automatically.
 
 .. code-block:: python
 
+    from max.driver import CPU
     from max.dtype import DType
     from max.experimental import Tensor
     from max.experimental import functional as F
     from max.graph import DeviceRef, TensorType
 
     def then_fn():
-        return Tensor([1.0, 2.0])
+        return Tensor([1.0, 2.0], dtype=DType.float32, device=CPU())
 
     def else_fn():
-        return Tensor([10.0, 20.0])
+        return Tensor([10.0, 20.0], dtype=DType.float32, device=CPU())
 
-    pred = Tensor(True)
+    pred = Tensor(True, dtype=DType.bool, device=CPU())
     out_types = [TensorType(DType.float32, [2], DeviceRef.CPU())]
     (result,) = F.cond(pred, out_types, then_fn, else_fn)
     # pred is True, so result is [1.0, 2.0]
@@ -2673,13 +3615,16 @@ def _while_loop_graph(
 while_loop = functional(_while_loop_graph, rule=while_loop_rule)
 while_loop.__doc__ = """Repeatedly executes a body function while a predicate holds.
 
-Both ``predicate`` and ``body`` take the same number and types of
-arguments as the initial values. The predicate must return a single
-boolean scalar tensor that controls loop continuation; the body must
-return updated values matching the types of ``initial_values``.
+Both ``predicate`` and ``body`` receive and return :class:`Tensor`
+values. They take the same number and types of arguments as the initial
+values. The predicate must return a single boolean scalar tensor that
+controls loop continuation, and that tensor must reside on CPU; the body
+must return updated values matching the types of ``initial_values``.
 
 .. code-block:: python
 
+    from max.driver import CPU
+    from max.dtype import DType
     from max.experimental import Tensor
     from max.experimental import functional as F
 
@@ -2689,7 +3634,7 @@ return updated values matching the types of ``initial_values``.
     def body(x):
         return x + 1
 
-    x = Tensor(0)
+    x = Tensor(0, dtype=DType.int32, device=CPU())
     (result,) = F.while_loop(x, predicate, body)
     # Loop continues until ``x >= 10``; result is ``10``.
 
@@ -2706,13 +3651,31 @@ Returns:
 """
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Mutation ops
-#
-#  These are hand-rolled (not using ``functional()``) because they
-#  mutate in-place via ``__buffervalue__()`` rather than returning a
-#  new Tensor.
-# ═════════════════════════════════════════════════════════════════════════
+# Mutation ops: hand-rolled because they write in-place via __buffervalue__().
+
+
+def _spmd_buffer_write(
+    destination: Tensor,
+    source: Tensor,
+    write: Callable[[Any, Any], None],
+) -> None:
+    """Per-shard in-place write; flows each post-write value back to ``destination._state``."""
+    shards = list(destination.local_shards)
+    src_shards = list(source.local_shards) if source.is_distributed else None
+    for i, dest_tensor in enumerate(shards):
+        dest_shard = dest_tensor.__buffervalue__()
+        src_shard = (
+            src_shards[i].__tensorvalue__()
+            if src_shards is not None
+            else source.__tensorvalue__()
+        )
+        write(dest_shard, src_shard)
+        if destination._state is not None and dest_tensor._state is not None:
+            new_values = list(destination._state.values)
+            new_values[i] = dest_tensor._state.value
+            destination._state = type(destination._state)(
+                tuple(new_values), destination._state.ctx
+            )
 
 
 def buffer_store(destination: Tensor, source: Tensor) -> None:
@@ -2730,14 +3693,7 @@ def buffer_store(destination: Tensor, source: Tensor) -> None:
 
     with ensure_context():
         if destination.is_distributed:
-            for i in builtins.range(len(destination.local_shards)):
-                dest_shard = destination.local_shards[i].__buffervalue__()
-                src_shard = (
-                    source.local_shards[i].__tensorvalue__()
-                    if source.is_distributed
-                    else source.__tensorvalue__()
-                )
-                ops.buffer_store(dest_shard, src_shard)
+            _spmd_buffer_write(destination, source, ops.buffer_store)
         else:
             ops.buffer_store(
                 destination.__buffervalue__(), source.__tensorvalue__()
@@ -2763,136 +3719,113 @@ def buffer_store_slice(
 
     with ensure_context():
         if destination.is_distributed:
-            for i in builtins.range(len(destination.local_shards)):
-                dest_shard = destination.local_shards[i].__buffervalue__()
-                src_shard = (
-                    source.local_shards[i].__tensorvalue__()
-                    if source.is_distributed
-                    else source.__tensorvalue__()
-                )
-                dest_shard[indices] = src_shard
+
+            def _write(dest_buf: Any, src_tv: Any) -> None:
+                dest_buf[indices] = src_tv
+
+            _spmd_buffer_write(destination, source, _write)
         else:
             dest_buf = destination.__buffervalue__()
             source_tv = source.__tensorvalue__()
             dest_buf[indices] = source_tv
 
 
-# ═════════════════════════════════════════════════════════════════════════
-#  Additional ops (no sharding rule — replicated-only for now)
-# ═════════════════════════════════════════════════════════════════════════
-
+#: Applies group normalization.
+#: See :func:`max.graph.ops.group_norm` for details.
 group_norm = functional(ops.group_norm)
-group_norm.__doc__ = """Applies group normalization over the channel axis of a tensor.
-
-Splits the channel axis (axis 1) of ``input`` into ``num_groups``
-groups, computes the mean and variance within each group, and
-normalizes. ``gamma`` and ``beta`` then apply a per-channel affine
-transform.
-
-Args:
-    input: The input tensor.
-    gamma: The scale parameter tensor.
-    beta: The shift parameter tensor.
-    num_groups: The number of groups to split the channels into.
-    epsilon: A small constant added to the variance for numerical
-        stability.
-
-Returns:
-    A tensor of the same shape and dtype as ``input`` with group
-    normalization applied.
-"""
-
-rms_norm = functional(ops.rms_norm)
-rms_norm.__doc__ = """Applies RMS (root-mean-square) normalization over the last dimension of a tensor.
-
-Computes ``input / rms(input) * (weight + weight_offset)`` where
-``rms(x) = sqrt(mean(x ** 2) + epsilon)``. The reduction runs over the
-last axis of ``input`` and is broadcast back across the leading axes.
-
-Args:
-    input: The input tensor.
-    weight: The scale parameter tensor.
-    epsilon: A small constant added to the mean-square for numerical
-        stability.
-    weight_offset: A constant added to ``weight`` before scaling. Defaults
-        to ``0.0``.
-    multiply_before_cast: When ``True``, multiplies by the scaled weight
-        before casting the result back to the input dtype. Defaults to
-        ``False``.
-
-Returns:
-    A tensor of the same shape and dtype as ``input`` with RMS
-    normalization applied.
-"""
-
+#: Applies RMS normalization.
+#: See :func:`max.graph.ops.rms_norm` for details.
+rms_norm = functional(ops.rms_norm, rule=rms_norm_rule)
+#: Filters boxes with high intersection-over-union.
+#: See :func:`max.graph.ops.non_maximum_suppression` for details.
 non_maximum_suppression = functional(ops.non_maximum_suppression)
-non_maximum_suppression.__doc__ = """Filters boxes by greedy non-maximum suppression per ``(batch, class)`` pair.
+non_maximum_suppression.__doc__ = """Filters boxes with high intersection-over-union (IoU).
 
-Object detectors often produce many overlapping bounding boxes around
-the same object. Non-maximum suppression keeps only the
-highest-scoring representative and discards lower-scoring boxes that
-significantly overlap one already kept.
+Applies greedy non-maximum suppression independently per (batch, class)
+pair. For each pair, the algorithm:
 
-Overlap is measured by intersection-over-union (IoU): the area of the
-intersection of two boxes divided by the area of their union. A value
-of ``0`` means no overlap and a value of ``1`` means the boxes are
-identical.
-
-For each ``(batch, class)`` pair, the algorithm:
-
-1. Drops boxes whose score is at or below ``score_threshold``.
+1. Discards boxes whose score is at or below ``score_threshold``.
 2. Sorts the remaining boxes by score in descending order.
-3. Walks the sorted list, keeping each box unless its IoU with an
-   already-kept box exceeds ``iou_threshold`` (in which case it's
-   suppressed).
-4. Stops once ``max_output_boxes_per_class`` boxes have been kept.
+3. Greedily selects boxes, suppressing any later candidate whose IoU with
+   an already-selected box exceeds ``iou_threshold``.
+4. Stops after ``max_output_boxes_per_class`` selections per pair.
 
-Boxes are expressed in ``[y1, x1, y2, x2]`` corner format.
+Boxes use ``(y1, x1, y2, x2)`` corner format. Coordinates may be normalized
+or absolute, since the op handles both. All inputs must be on CPU.
+
+.. code-block:: python
+
+    from max.driver import CPU
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.dtype import DType
+
+    device = CPU()
+    # boxes: (batch, num_boxes, 4); scores: (batch, num_classes, num_boxes).
+    boxes = Tensor.ones((1, 3, 4), dtype=DType.float32, device=device)
+    scores = Tensor.ones((1, 1, 3), dtype=DType.float32, device=device)
+    # Each output row is (batch_index, class_index, box_index), with a
+    # data-dependent number of rows.
+    result = F.non_maximum_suppression(
+        boxes,
+        scores,
+        max_output_boxes_per_class=Tensor(2, dtype=DType.int64, device=device),
+        iou_threshold=Tensor(0.5, dtype=DType.float32, device=device),
+        score_threshold=Tensor(0.0, dtype=DType.float32, device=device),
+    )
+    # result has shape (num_selected, 3)
 
 Args:
-    boxes: A 3-D float tensor of shape ``[batch, num_boxes, 4]``.
-    scores: A 3-D float tensor of per-class scores of shape
-        ``[batch, num_classes, num_boxes]``. Must have the same dtype as
+    boxes: The input boxes tensor of shape
+        ``(batch_size, num_boxes, 4)``, with a float dtype.
+    scores: The per-class scores of shape
+        ``(batch_size, num_classes, num_boxes)``, with the same dtype as
         ``boxes``.
     max_output_boxes_per_class: A scalar ``int64`` tensor giving the
-        maximum number of boxes selected per ``(batch, class)`` pair.
+        maximum number of boxes to select per (batch, class) pair.
     iou_threshold: A scalar float tensor giving the IoU suppression
         threshold.
-    score_threshold: A scalar float tensor giving the minimum score
-        required to keep a box.
-    out_dim: The name of the symbolic output dimension representing the
-        number of selected boxes. Defaults to ``"num_selected"``.
+    score_threshold: A scalar float tensor giving the minimum score to
+        consider.
+    out_dim: The name for the dynamic output dimension, which is the number
+        of selected boxes. Defaults to ``"num_selected"``.
 
 Returns:
-    An ``int64`` tensor of shape ``[out_dim, 3]`` where each row is
-    ``[batch_index, class_index, box_index]``.
+    A ``Tensor`` containing the selected boxes, with shape
+    ``(out_dim, 3)`` and ``int64`` dtype. Each row is
+    ``(batch_index, class_index, box_index)``.
 """
 
 roi_align = functional(ops.roi_align)
-roi_align.__doc__ = """Performs Region of Interest (ROI) align pooling on an NHWC tensor.
+roi_align.__doc__ = """Applies ROI-align pooling.
 
-Extracts fixed-size feature maps from regions of interest in the input
-tensor using bilinear interpolation.
+Extracts fixed-size feature maps from regions of interest (ROIs) using
+bilinear interpolation.
 
 Args:
-    input: The input feature-map tensor of shape ``[N, H, W, C]``.
-    rois: A tensor of regions of interest of shape ``[M, 5]``, where
-        each row is ``[batch_index, x1, y1, x2, y2]``.
-    output_height: The height of each pooled output feature map.
-    output_width: The width of each pooled output feature map.
-    spatial_scale: A multiplicative factor mapping ROI coordinates to
+    input: The input tensor in channels-last (NHWC) layout,
+        ``(batch_size, height, width, channels)``.
+    rois: The regions of interest with shape ``(num_rois, 5)``, where each
+        row is ``(batch_index, x1, y1, x2, y2)``.
+    output_height: The height of each output feature map.
+    output_width: The width of each output feature map.
+    spatial_scale: The multiplicative factor mapping ROI coordinates to
         input spatial coordinates. Defaults to ``1.0``.
     sampling_ratio: The number of sampling points per bin in each
-        direction. ``0`` (the default) means adaptive
-        (``ceil(bin_size)``).
+        direction. ``0`` means adaptive (``ceil(bin_size)``). Defaults to
+        ``0.0``.
     aligned: When ``True``, applies a half-pixel offset to ROI
         coordinates for more precise alignment. Defaults to ``False``.
-    mode: The pooling mode applied to sampled values. One of ``"AVG"``
-        or ``"MAX"``. Defaults to ``"AVG"``.
+    mode: The pooling mode, either ``"AVG"`` or ``"MAX"``. Defaults to
+        ``"AVG"``.
 
 Returns:
-    A tensor of shape ``[M, output_height, output_width, C]`` of pooled
-    features.
+    A ``Tensor`` containing the pooled values, with shape
+    ``(num_rois, output_height, output_width, channels)``.
+
+Raises:
+    ValueError: If ``input`` isn't rank 4, ``rois`` isn't rank 2 with
+        5 columns, or ``mode`` is invalid.
 """
 
 
@@ -2901,24 +3834,12 @@ def clamp(
     lower_bound: TensorValueLike,
     upper_bound: TensorValueLike,
 ) -> Tensor:
-    """Clamps the values of a tensor to a specified range.
-
-    Equivalent to ``max(min(x, upper_bound), lower_bound)``.
-
-    Args:
-        x: The input tensor.
-        lower_bound: The minimum value (tensor or scalar).
-        upper_bound: The maximum value (tensor or scalar).
-
-    Returns:
-        A tensor of the same shape and dtype with values clamped to
-        ``[lower_bound, upper_bound]``.
-    """
+    """Clamps tensor values to ``[lower_bound, upper_bound]``."""
     return max(min(x, upper_bound), lower_bound)
 
 
 clip = clamp
-rebind = functional(ops.rebind)
+rebind = functional(ops.rebind, rule=rebind_rule)
 rebind.__doc__ = """Rebinds the symbolic shape of a tensor.
 
 Asserts at runtime that the tensor's dimensions match the new shape.
@@ -2935,4 +3856,409 @@ Args:
 
 Returns:
     A tensor with the same data and the new symbolic shape.
+"""
+
+group_norm.__doc__ = """Computes group normalization over the channel axis of ``input``.
+
+Splits the channel axis (axis 1) of ``input`` into ``num_groups``
+groups, computes the mean and variance within each group, and
+normalizes. ``gamma`` and ``beta`` then apply a per-channel affine
+transform. Useful when the batch axis is small enough that batch
+normalization is unstable.
+
+.. note::
+
+    This op executes only on CUDA/HIP GPU targets.
+
+Args:
+    input: The tensor to normalize, of shape ``(batch, channels, ...)``.
+    gamma: The per-channel scale applied after normalization. A 1-D
+        tensor whose length matches the channel axis of ``input``.
+    beta: The per-channel bias added after scaling. A 1-D tensor with
+        the same shape as ``gamma``.
+    num_groups: The number of groups to split the channel axis into.
+        Must divide the channel size evenly.
+    epsilon: A small positive constant added to the variance for
+        numerical stability.
+
+Returns:
+    A ``Tensor`` with the same shape and dtype as ``input``.
+
+Raises:
+    ValueError: If ``input`` has fewer than 2 dimensions.
+"""
+layer_norm.__doc__ = """Computes layer normalization over the last dimension of ``input``.
+
+The output is ``gamma * (input - mean) / sqrt(var + epsilon) + beta``,
+where ``mean`` and ``var`` are reduced over the last axis of ``input``
+and broadcast back across the leading axes.
+
+Reduction is performed in the dtype of ``input``. For numerically stable
+normalization on float16 or bfloat16 inputs, cast to float32 before
+calling this op and cast the result back.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([[1.0, 3.0]])
+    gamma = Tensor([1.0, 1.0])
+    beta = Tensor([0.0, 0.0])
+    result = F.layer_norm(x, gamma, beta, epsilon=1e-5)
+    # Each row is normalized to zero mean and approximately unit variance.
+
+Args:
+    input: The tensor to normalize. Reduction runs over the last axis.
+    gamma: The scale applied after normalization. A 1-D tensor whose
+        length matches the last dimension of ``input``.
+    beta: The bias added after scaling. A 1-D tensor with the same
+        shape as ``gamma``.
+    epsilon: A small positive constant added to the variance for
+        numerical stability.
+
+Returns:
+    A ``Tensor`` with the same shape and dtype as ``input``.
+
+Raises:
+    ValueError: If ``gamma`` or ``beta`` does not match the last
+        dimension of ``input``, or if ``epsilon`` is not positive.
+"""
+logsoftmax.__doc__ = """Computes the log-softmax of a tensor along an axis.
+
+Args:
+    value: The input to the log-softmax computation. Must have a
+        floating-point dtype.
+    axis: The axis along which to compute the log-softmax. Defaults to the
+        final axis (``-1``).
+
+Returns:
+    A ``Tensor`` of the same shape and dtype as ``value`` containing the
+    log-softmax of ``value`` computed along ``axis``.
+"""
+mean.__doc__ = """Computes the mean of elements along a specified axis.
+
+Args:
+    x: The input tensor.
+    axis: The axis along which to reduce. When ``None``, the tensor is
+        flattened to 1-D and reduced. Defaults to ``-1``.
+
+Returns:
+    A ``Tensor`` containing the mean along ``axis``. For an integer ``axis``,
+    it has the same rank as ``x`` with the ``axis`` dimension reduced to size
+    ``1``. When ``axis`` is ``None``, the result has shape ``(1,)``.
+
+Raises:
+    ValueError: If ``axis`` is out of range for ``x``.
+"""
+pad.__doc__ = """Pads a tensor along every dimension.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([[1, 2], [3, 4]])
+
+    # Pad one element before and after each dimension.
+    result = F.pad(x, [1, 1, 1, 1])
+    # [[0, 0, 0, 0], [0, 1, 2, 0], [0, 3, 4, 0], [0, 0, 0, 0]]
+
+Args:
+    input: The tensor to pad.
+    paddings: The amount to pad. For a tensor of rank ``N``, pass ``2*N``
+        non-negative integers in the order ``[before_dim0, after_dim0,
+        before_dim1, after_dim1, ...]``.
+    mode: How to fill the padded cells. Supported values:
+
+        * ``"constant"``: fill using ``value``.
+        * ``"reflect"``: reflect the content across each edge, excluding
+          the boundary element (like ``numpy.pad`` with ``mode='reflect'``).
+        * ``"edge"``: repeat the nearest boundary element (like
+          ``numpy.pad`` with ``mode='edge'``).
+    value: The fill value for ``mode="constant"``. Defaults to ``0``.
+
+Returns:
+    A ``Tensor`` containing the padded input, with the same dtype as
+    ``input``.
+
+Raises:
+    ValueError: If ``mode`` is unsupported, or any padding value is
+        negative.
+    AssertionError: If the number of padding values isn't twice the input
+        rank.
+"""
+qmatmul.__doc__ = """Performs matrix multiplication between floating point and quantized tensors.
+
+Quantizes the ``lhs`` floating point value to match the encoding of the
+``rhs`` quantized value, performs the matmul, and then dequantizes the
+result. Compared to a regular matmul op, this one expects the ``rhs`` value
+to be transposed. For example, if the ``lhs`` shape is ``[32, 64]`` and the
+quantized ``rhs`` shape is also ``[32, 64]``, then the output shape is
+``[32, 32]``. That is, this function returns the result from:
+
+.. code-block:: text
+
+    dequantize(quantize(lhs) @ transpose(rhs))
+
+The last two dimensions in ``lhs`` are treated as matrices and multiplied
+by ``rhs`` (which must be a 2-D tensor). Any remaining dimensions in
+``lhs`` are broadcast dimensions.
+
+.. note::
+
+    This currently supports ``Q4_0``, ``Q4_K``, ``Q6_K``, and supported
+    ``GPTQ`` configurations.
+
+Args:
+    encoding: The quantization encoding to use.
+    config: The quantization config. Pass ``None`` for Vroom encodings;
+        a supported configuration is required for GPTQ.
+    lhs: The non-quantized, left-hand side of the matmul.
+    rhs: The transposed and quantized right-hand side tensor(s).
+
+Returns:
+    A ``Tensor`` containing the dequantized, floating point result.
+
+Raises:
+    ValueError: If ``encoding`` is not a supported quantization encoding.
+    TypeError: If ``lhs`` or ``rhs`` has an unsupported dtype or rank.
+    AssertionError: If GPTQ is selected without a configuration.
+"""
+resize_bicubic.__doc__ = """Resizes a tensor using bicubic interpolation.
+
+Produces an output tensor whose dimensions are given by ``size`` using a
+4x4-pixel Keys/PyTorch (``a = -0.75``) cubic convolution filter with
+half-pixel coordinate mapping.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # NCHW input: batch 1, 1 channel, 2x2 spatial.
+    x = Tensor([[[[1.0, 2.0], [3.0, 4.0]]]])
+    # Upscale the spatial dimensions to 4x4.
+    result = F.resize_bicubic(x, [1, 1, 4, 4])
+    # result has shape (1, 1, 4, 4)
+
+Args:
+    input: The input tensor to resize. Must be rank 4 in channels-first
+        (NCHW) layout, ``(batch_size, channels, height, width)``.
+    size: The desired output shape, of length 4,
+        ``(batch_size, channels, height, width)``.
+
+Returns:
+    A ``Tensor`` containing the resized tensor, with shape ``size``
+    and the same dtype as ``input``.
+
+Raises:
+    ValueError: If ``input`` doesn't have rank 4, or if ``size`` has a
+        different length.
+"""
+resize_linear.__doc__ = """Resizes a tensor using linear (bilinear) interpolation.
+
+Produces an output tensor whose shape is given by ``size`` using separable
+1-D linear filters. It resizes any dimension whose size changes, including
+the batch and channel dimensions. The operation maps output coordinates
+back to input coordinates according to ``coordinate_transform_mode``.
+
+.. code-block:: python
+
+    from max.driver import CPU
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.experimental.tensor import default_device
+
+    with default_device(CPU()):
+        # NCHW input: batch 1, 1 channel, 2x2 spatial.
+        x = Tensor([[[[1.0, 2.0], [3.0, 4.0]]]])
+        # Upscale the spatial dimensions to 4x4.
+        result = F.resize_linear(x, [1, 1, 4, 4])
+        # result has shape (1, 1, 4, 4)
+
+Args:
+    input: The input tensor to resize.
+    size: The desired output shape. Must have the same rank as ``input``.
+    coordinate_transform_mode: How to map an output coordinate to an input
+        coordinate. Allowed values:
+
+        - ``0`` (``half_pixel``): Default. Shifts by 0.5 before
+          scaling, consistent with most deep learning frameworks.
+        - ``1`` (``align_corners``): Aligns the corner pixels of the input
+          and output so that the first and last coordinates are preserved
+          exactly.
+        - ``2`` (``asymmetric``): Applies no shift, mapping each output
+          coordinate to ``coordinate / scale``.
+        - ``3`` (``half_pixel_1D``): Like ``half_pixel``, except any axis
+          whose output size is ``1`` maps to coordinate ``0``.
+    antialias: When ``True``, applies an antialiasing filter when
+        downscaling, which reduces aliasing artifacts by widening the tent
+        filter support by ``1 / scale``. Has no effect when upscaling.
+        Defaults to ``False``.
+
+Returns:
+    A ``Tensor`` containing the resized tensor, with shape ``size``
+    and the same dtype as ``input``.
+
+Raises:
+    ValueError: If ``coordinate_transform_mode`` isn't 0-3, or if ``size``
+        has a different rank than ``input``.
+"""
+resize_nearest.__doc__ = """Resizes a tensor using nearest-neighbor interpolation.
+
+Produces an output tensor whose dimensions are given by ``size`` by
+selecting the nearest input sample for each output coordinate.
+
+.. code-block:: python
+
+    from max.driver import CPU
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+    from max.experimental.tensor import default_device
+
+    with default_device(CPU()):
+        # NCHW input: batch 1, 1 channel, 2x2 spatial.
+        x = Tensor([[[[1.0, 2.0], [3.0, 4.0]]]])
+        # Upscale the spatial dimensions to 4x4.
+        result = F.resize_nearest(x, [1, 1, 4, 4])
+        # result has shape (1, 1, 4, 4)
+
+Args:
+    input: The input tensor to resize.
+    size: The desired output shape. Must have the same rank as ``input``.
+    coordinate_transform_mode: How to map an output coordinate to an input
+        coordinate. Allowed values:
+
+        - ``0`` (``half_pixel``). Default.
+        - ``1`` (``align_corners``).
+        - ``2`` (``asymmetric``).
+        - ``3`` (``half_pixel_1D``).
+
+        See :func:`resize_linear` for a description of each mode.
+    round_mode: How to round the mapped coordinate to select the nearest
+        input sample. Allowed values:
+
+        - ``0`` (``HalfDown``, the default): ``ceil(x - 0.5)``.
+        - ``1`` (``HalfUp``): ``floor(x + 0.5)``.
+        - ``2`` (``Floor``): ``floor(x)``.
+        - ``3`` (``Ceil``): ``ceil(x)``.
+
+Returns:
+    A ``Tensor`` containing the resized tensor, with shape ``size``
+    and the same dtype as ``input``.
+
+Raises:
+    ValueError: If ``coordinate_transform_mode`` isn't 0-3, ``round_mode``
+        isn't 0-3, or ``size`` has a different rank than ``input``.
+"""
+rms_norm.__doc__ = """Computes root mean square normalization over the last dimension of ``input``.
+
+The output is ``input / rms(input) * (weight + weight_offset)`` where
+``rms(x) = sqrt(mean(x ** 2) + epsilon)``. Reduction runs over the last
+axis of ``input`` and is broadcast back across the leading axes. See
+`Root Mean Square Layer Normalization
+<https://arxiv.org/abs/1910.07467>`_ for the original formulation.
+
+Two variants are supported through ``weight_offset`` and
+``multiply_before_cast``:
+
+- **Llama-style** (default): ``weight_offset=0`` and
+  ``multiply_before_cast=False``. The normalized input is cast to the
+  output dtype before multiplication by the weight.
+- **Gemma-style**: ``weight_offset=1`` and ``multiply_before_cast=True``.
+  The weight is treated as ``1 + weight`` and multiplication runs in
+  the reduction dtype before casting back.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    x = Tensor([[3.0, 4.0]])
+    weight = Tensor([1.0, 1.0])
+    # Llama-style (default).
+    y_llama = F.rms_norm(x, weight, epsilon=1e-6)
+    # Gemma-style treats the weight as 1 + weight.
+    y_gemma = F.rms_norm(
+        x, weight, epsilon=1e-6, weight_offset=1.0, multiply_before_cast=True
+    )
+
+Args:
+    input: The tensor to normalize. Reduction runs over the last axis.
+    weight: The scale applied after normalization. A 1-D tensor whose
+        shape matches the last dimension of ``input``.
+    epsilon: A small positive constant added to the mean of squares for
+        numerical stability.
+    weight_offset: A value added to ``weight`` before scaling. Use
+        ``1.0`` for Gemma-style normalization and ``0.0`` otherwise.
+        Defaults to ``0.0``.
+    multiply_before_cast: Whether to multiply by the (offset) weight
+        before casting the normalized input back to the output dtype.
+        Llama-style sets this to ``False``. Defaults to ``False``.
+
+Returns:
+    A ``Tensor`` with the same shape and dtype as ``input``.
+
+Raises:
+    ValueError: If ``weight`` does not match the last dimension of
+        ``input``.
+"""
+softmax.__doc__ = """Computes the softmax of a tensor along an axis.
+
+Normalizes the values along ``axis`` so that they sum to ``1``, with each
+output element representing the exponentiated input divided by the sum of
+exponentiated values along that axis.
+
+Args:
+    value: The input to the softmax computation. Must have a floating-point
+        dtype.
+    axis: The axis along which to compute the softmax. Defaults to the
+        final axis (``-1``).
+
+Returns:
+    A ``Tensor`` of the same shape and dtype as ``value`` containing the
+    softmax of ``value`` computed along ``axis``.
+"""
+squeeze.__doc__ = """Removes a dimension of size ``1`` from a tensor.
+
+.. code-block:: python
+
+    from max.experimental import Tensor
+    from max.experimental import functional as F
+
+    # x has shape (2, 1, 3).
+    x = Tensor.ones([2, 1, 3])
+    # Remove the size-1 dimension at axis 1, producing shape (2, 3).
+    result = F.squeeze(x, 1)
+
+Args:
+    x: The input tensor to squeeze.
+    axis: The dimension to remove from the input's shape. If negative, this
+        indexes from the end of the tensor. For example, a value of ``-1``
+        removes the last dimension.
+
+Returns:
+    A ``Tensor`` containing ``x`` with the dimension at ``axis`` removed.
+    That dimension size must equal ``1``, so the result holds the same
+    elements as ``x`` with one fewer dimension.
+
+Raises:
+    ValueError: If the dimension at ``axis`` does not have size ``1``.
+    IndexError: If ``axis`` is out of range, including for a rank-zero input.
+"""
+sum.__doc__ = """Computes the sum of elements along a specified axis.
+
+Args:
+    x: The input tensor.
+    axis: The axis along which to reduce. When ``None``, the tensor is
+        flattened to 1-D and reduced. Defaults to ``-1``.
+
+Returns:
+    A ``Tensor`` containing the sum along ``axis``. For an integer ``axis``,
+    it has the same rank as ``x`` with the ``axis`` dimension reduced to size
+    ``1``. When ``axis`` is ``None``, the result has shape ``(1,)``.
+
+Raises:
+    ValueError: If ``axis`` is out of range for ``x``.
 """

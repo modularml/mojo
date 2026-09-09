@@ -15,8 +15,8 @@ MOGGKernelAPI kernels with deliberately wrong behavior, so a passing test
 can only mean the user registration shadowed the built-in.
 """
 
-import extensibility as compiler
-from std.gpu.host import DeviceContext
+import extensibility
+from max.gpu.host import DeviceContext
 from extensibility import (
     ElementwiseBinaryOp,
     InputTensor,
@@ -32,12 +32,12 @@ from std.utils.index import IndexList
 
 # Built-in `mo.add` returns `lhs + rhs`.  This override returns
 # `lhs + rhs + 1000`, an observable sentinel that no real add would produce.
-@compiler.register("mo.add")
+@extensibility.register("mo.add")
 struct AddOverride(ElementwiseBinaryOp):
     @staticmethod
     def elementwise[
         dtype: DType,
-        width: Int,
+        width: SIMDLength,
     ](lhs: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
         return lhs + rhs + 1000
 
@@ -45,7 +45,7 @@ struct AddOverride(ElementwiseBinaryOp):
 # Built-in `mo.reduce.layer_norm` computes the actual normalization.  This
 # override raises immediately; the test asserts the error surfaces, which is
 # only possible if the user registration shadowed the built-in.
-@compiler.register("mo.reduce.layer_norm")
+@extensibility.register("mo.reduce.layer_norm")
 struct LayerNormOverride:
     @staticmethod
     def execute[
@@ -61,15 +61,3 @@ struct LayerNormOverride:
         ctx: DeviceContext,
     ) capturing raises:
         raise Error("LAYER_NORM_OVERRIDE_FIRED")
-
-    @staticmethod
-    def shape[
-        dtype: DType,
-        rank: Int,
-    ](
-        input: InputTensor[dtype=dtype, rank=rank, ...],
-        gamma: InputTensor[dtype=dtype, rank=1, ...],
-        beta: InputTensor[dtype=dtype, rank=1, ...],
-        epsilon: Scalar[dtype=dtype],
-    ) -> IndexList[rank]:
-        return input.shape()

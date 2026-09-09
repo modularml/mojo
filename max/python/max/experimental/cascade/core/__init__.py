@@ -20,6 +20,7 @@ from max.experimental.cascade.core.interfaces import (
     Worker,
     WorkerType,
 )
+from max.experimental.cascade.core.pipeline_method import pipeline_method
 from max.experimental.cascade.core.worker_method import (
     MaybeAsync,
     worker_method,
@@ -33,5 +34,6 @@ __all__ = [
     "Runtime",
     "Worker",
     "WorkerType",
+    "pipeline_method",
     "worker_method",
 ]

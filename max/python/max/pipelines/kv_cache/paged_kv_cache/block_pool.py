@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import logging
 
-from max.pipelines.kv_cache.memory_tier import MemoryTier
 from max.profiler import traced
 
 from .block_utils import FreeKVCacheBlockQueue, KVCacheBlock
@@ -41,14 +40,10 @@ class BlockPool:
     @traced
     def __init__(
         self,
-        memory_tier: MemoryTier,
         total_num_blocks: int,
-        enable_prefix_caching: bool,
         enable_runtime_checks: bool = False,
     ) -> None:
-        self.memory_tier = memory_tier
         self.total_num_blocks = total_num_blocks
-        self.enable_prefix_caching = enable_prefix_caching
         self.enable_runtime_checks = enable_runtime_checks
 
         # A Block pool of all kv-cache blocks.
@@ -66,15 +61,23 @@ class BlockPool:
         # between requests for prefix caching. The cached block may be used by
         # running requests or in the free_block_queue that could potentially
         # be evicted.
-        self.prefix_cache: dict[int, KVCacheBlock] = {}
+        self.prefix_cache: dict[bytes, KVCacheBlock] = {}
+
+        # Placeholder block for dummy / padding requests. It will never be freed.
+        self.null_block = KVCacheBlock(
+            self.total_num_blocks, is_null=True, ref_cnt=42
+        )
 
     @traced
     def commit_into_prefix_cache(
         self,
-        block_hash: int,
+        block_hash: bytes,
         block: KVCacheBlock,
     ) -> None:
         """Commit a block into the prefix cache."""
+        if block.is_null:
+            raise ValueError("Cannot commit null block into prefix cache")
+
         assert block.block_hash is None
         block.block_hash = block_hash
 
@@ -84,9 +87,9 @@ class BlockPool:
 
     def get_or_commit_into_prefix_cache(
         self,
-        block_hash: int,
+        block_hash: bytes,
         block: KVCacheBlock,
-    ) -> None | KVCacheBlock:
+    ) -> KVCacheBlock | None:
         """Get or commit a block into the prefix cache.
 
         If there already exists a committed block with the same hash, we return
@@ -126,7 +129,7 @@ class BlockPool:
         block.block_hash = None
 
     @traced
-    def alloc_block(self) -> tuple[KVCacheBlock, int | None]:
+    def alloc_block(self) -> tuple[KVCacheBlock, bytes | None]:
         """Allocates a block from the free block queue."""
         # First allocate block
         curr_block = self.free_block_queue.popleft()
@@ -134,7 +137,6 @@ class BlockPool:
 
         # If the block is committed into prefix cache, evict it.
         block_hash = curr_block.block_hash
-        assert self.enable_prefix_caching or block_hash is None
         if block_hash is not None:
             self.uncommit_block(curr_block)
 
@@ -150,6 +152,9 @@ class BlockPool:
         A block can be in both the prefix cache and the free block queue at the
         same time.
         """
+        if block.is_null:
+            return
+
         block.ref_cnt -= 1
         assert block.ref_cnt >= 0
         if block.ref_cnt == 0:
@@ -203,5 +208,7 @@ class BlockPool:
             assert block.block_hash == block_hash
 
         # Check that the total number of blocks is correct.
-        free_blocks = self.num_free_blocks
-        assert free_blocks + len(set(active_bids)) == self.total_num_blocks
+        assert (
+            self.num_free_blocks + len(set(active_bids))
+            == self.total_num_blocks
+        )

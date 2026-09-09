@@ -37,10 +37,11 @@ import mteb
 import numpy as np
 
 # Pipelines
-from max.entrypoints.cli import pipeline_config_options
+from max._entrypoints.cli.config import pipeline_config_options
 from max.pipelines import (
     PIPELINE_REGISTRY,
     EmbeddingsPipelineType,
+    PipelineArgs,
     PipelineConfig,
 )
 from max.pipelines.modeling.types import (
@@ -207,26 +208,28 @@ def main(
     if workspace_dir := os.getenv("BUILD_WORKSPACE_DIRECTORY"):
         os.chdir(workspace_dir)
 
-    pipeline_config = PipelineConfig(**config_kwargs)
+    pipeline_config = PipelineArgs.from_flat_kwargs(**config_kwargs)
 
     model: EmbeddingModel | mteb.encoder_interface.Encoder
     logging.info(f"Loading model with {model_library} library.")
     if model_library == "mteb":
-        model = mteb.get_model(pipeline_config.model.model_path)
+        model = mteb.get_model(pipeline_config.model_path)
     else:
+        pipeline_cfg = PipelineConfig.from_args(pipeline_config)
         tokenizer, pipeline = PIPELINE_REGISTRY.retrieve(
-            pipeline_config, task=PipelineTask.EMBEDDINGS_GENERATION
+            pipeline_cfg,
+            task=PipelineTask.EMBEDDINGS_GENERATION,
         )
 
         # Cast pipeline to the expected type for embeddings generation
         embeddings_pipeline = cast(EmbeddingsPipelineType, pipeline)
 
         huggingface_config = AutoConfig.from_pretrained(
-            pipeline_config.model.model_path,
-            trust_remote_code=pipeline_config.model.trust_remote_code,
+            pipeline_cfg.model.model_path,
+            trust_remote_code=pipeline_cfg.model.trust_remote_code,
         )
         model = EmbeddingModel(
-            pipeline_config, tokenizer, embeddings_pipeline, huggingface_config
+            pipeline_cfg, tokenizer, embeddings_pipeline, huggingface_config
         )
 
     tasks: mteb.Benchmark | mteb.overview.MTEBTasks

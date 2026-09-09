@@ -8,10 +8,160 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
+
+modular_py_test(
+    name = "test_config_init",
+    srcs = ["test_config_init.py"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/lib",
+    ],
+)
+
+modular_py_test(
+    name = "test_quantization",
+    srcs = ["test_quantization.py"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_mtp",
+    srcs = ["test_mtp.py"],
+    # Builds the draft head but never runs it. Constructing it reaches
+    # `VocabParallelEmbedding` -> `Allreduce.__init__`, which instantiates
+    # `Accelerator(id=0)` unconditionally; with no CUDA device that aborts the
+    # process inside the driver rather than raising.
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    tags = ["gpu"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_mtp_forward",
+    size = "large",
+    srcs = ["test_mtp_forward.py"],
+    # The 280 MB signal buffer is a single allocation, so the default
+    # per-test GPU budget cannot serve it whatever the model size.
+    exec_properties = {
+        "test.resources:gpu-memory": "8",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    tags = ["gpu"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/integration/test_common:context_utils",
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_mrope",
+    srcs = ["test_mrope.py"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/architectures/qwen3vl_moe",
+        "//max/python/max/pipelines/context",
+        requirement("numpy"),
+        requirement("torch"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_vision_cache",
+    srcs = ["test_vision_cache.py"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/architectures/qwen3vl_moe",
+        "//max/python/max/pipelines/architectures/unified_mtp_qwen3_5",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_sharding",
+    srcs = ["test_sharding.py"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+    ],
+)
+
+modular_py_test(
+    name = "test_memory_planner",
+    srcs = ["test_memory_planner.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+    ],
+)
+
+modular_py_test(
+    name = "test_state_warmup",
+    srcs = ["test_state_warmup.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        requirement("numpy"),
+    ],
+)
 
 modular_py_test(
     name = "test_tokenizer",
@@ -21,9 +171,28 @@ modular_py_test(
         "requires-network",
     ],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/qwen3_5",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_tool_parser",
+    srcs = ["test_tool_parser.py"],
+    deps = [
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/modeling",
+    ],
+)
+
+modular_py_test(
+    name = "test_reasoning",
+    srcs = ["test_reasoning.py"],
+    deps = [
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        requirement("numpy"),
+        requirement("pytest-asyncio"),
     ],
 )

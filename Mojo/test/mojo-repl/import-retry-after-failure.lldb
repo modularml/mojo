@@ -1,0 +1,27 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# A failed import is not cached as if it were a module: every distinct import
+# site of the missing name reports its own error, and once the working
+# directory changes to where the module actually lives, retrying the same
+# import resolves it.
+
+# CHECK: unable to locate module 'imported_module'
+from imported_module import called_function
+
+# CHECK: unable to locate module 'imported_module'
+from imported_module import called_function
+
+%cd ./Inputs
+
+from imported_module import called_function
+
+# CHECK: called_function was called
+called_function()

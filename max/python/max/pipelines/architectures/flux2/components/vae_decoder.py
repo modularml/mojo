@@ -26,6 +26,9 @@ from max.graph import Module as GraphModule
 from max.graph.weights import Weights, load_weights
 from max.nn.layer import Module
 from max.pipelines.lib.compiled_component import CompiledComponent
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.profiler import traced
 
@@ -52,6 +55,7 @@ class PostprocessAndDecode(Module):
         num_channels: int,
         device: DeviceRef,
         dtype: DType,
+        latents_in_dtype: DType | None = None,
     ) -> None:
         super().__init__()
         self.decoder = decoder
@@ -59,6 +63,13 @@ class PostprocessAndDecode(Module):
         self._num_channels = num_channels
         self._device = device
         self._dtype = dtype
+        # Dtype of the incoming latents.  In a uniform-precision pipeline this
+        # equals the VAE compute dtype, but a mixed-precision assembly (e.g. an
+        # NVFP4 transformer whose compute dtype is bfloat16 feeding an
+        # float32 VAE) produces latents in a different dtype than the VAE
+        # expects.  We accept latents at this dtype and cast to ``dtype`` as
+        # the first graph op; the cast is a no-op when they match.
+        self._latents_in_dtype = latents_in_dtype or dtype
 
         # Named with a ``decoder_`` prefix so the FQN doesn't collide with
         # ``PreprocessAndEncode``'s ``encoder_bn_*`` when both components
@@ -82,6 +93,13 @@ class PostprocessAndDecode(Module):
         h_carrier: TensorValue,
         w_carrier: TensorValue,
     ) -> TensorValue:
+        # Reconcile the incoming latents dtype with the VAE compute dtype.
+        # No-op when they already match (uniform-precision pipeline); widens
+        # bfloat16 -> float32 for a mixed-precision assembly (NVFP4 transformer
+        # feeding a float32 VAE).
+        if latents_bsc.dtype != self._dtype:
+            latents_bsc = ops.cast(latents_bsc, self._dtype)
+
         batch = latents_bsc.shape[0]
         c = latents_bsc.shape[2]
 
@@ -140,7 +158,7 @@ class PostprocessAndDecode(Module):
     def input_types(self) -> tuple[TensorType, ...]:
         return (
             TensorType(
-                self._dtype,
+                self._latents_in_dtype,
                 shape=["batch", "seq", self._num_channels],
                 device=self._device,
             ),
@@ -173,12 +191,16 @@ class VaeDecoder(CompiledComponent):
         session: InferenceSession,
         *,
         graphs_module: GraphModule | None = None,
+        latents_in_dtype: DType | None = None,
     ) -> None:
         super().__init__(manifest, session, graphs_module=graphs_module)
 
         config = manifest["vae"]
         config_dict = config.huggingface_config.to_dict()
-        encoding = config.quantization_encoding or "bfloat16"
+        resolved_encoding, resolved_weight_path = (
+            _resolve_component_encoding_and_weights(config)
+        )
+        encoding = resolved_encoding or "bfloat16"
         devices = load_devices(config.device_specs)
 
         vae_config = AutoencoderKLFlux2Config.generate(
@@ -211,10 +233,11 @@ class VaeDecoder(CompiledComponent):
             num_channels=num_channels,
             device=device,
             dtype=dtype,
+            latents_in_dtype=latents_in_dtype,
         )
 
         # Load and adapt weights.
-        paths = config.resolved_weight_paths()
+        paths = config.resolved_weight_paths(resolved_weight_path)
         weights = load_weights(paths)
         state_dict = self._adapt_state_dict(weights, fused.raw_state_dict())
 

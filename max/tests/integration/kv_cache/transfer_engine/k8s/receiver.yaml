@@ -1,0 +1,115 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# Service — not strictly needed for the receiver (it doesn't accept inbound
+# connections), but provides a stable label selector for kubectl wait.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kv-smoke-receiver
+spec:
+  selector:
+    app: kv-smoke-receiver
+  ports:
+    - name: placeholder
+      port: 1
+      targetPort: 1
+  clusterIP: None
+
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kv-smoke-receiver
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 1800
+  template:
+    metadata:
+      labels:
+        app: kv-smoke-receiver
+    spec:
+      restartPolicy: Never
+      runtimeClassName: "nvidia"
+      imagePullSecrets:
+        - name: ecr-secret
+      # Force receiver onto a different node than the sender.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: kv-smoke-sender
+              topologyKey: kubernetes.io/hostname
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-B200
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: test-script
+          configMap:
+            name: kv-smoke-script
+      containers:
+        - name: receiver
+          image: ENGINE_IMAGE_PLACEHOLDER
+          imagePullPolicy: Always
+          command: ["/bin/bash", "-c"]
+          args:
+            - >-
+              python /smoke/test_transfer_engine_cross_node.py
+              --role receiver
+              --sender-addr tcp://kv-smoke-sender:5555
+              ${SMOKE_EXTRA_ARGS}
+          env:
+            - name: SMOKE_EXTRA_ARGS
+              value: EXTRA_ARGS_PLACEHOLDER
+            - name: MODULAR_NIXL_TRANSFER_BACKEND
+              value: libfabric
+            - name: FI_EFA_USE_DEVICE_RDMA
+              value: "1"
+            # Surface libfabric provider warnings (e.g. EFA MR registration
+            # detail) in pod logs so smoke failures are diagnosable from CI.
+            - name: FI_LOG_LEVEL
+              value: warn
+            - name: MODULAR_DEVICE_CONTEXT_MEMORY_MANAGER_SIZE_PERCENT
+              value: "90"
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              vpc.amazonaws.com/efa: "1"
+              memory: 243200Mi
+            requests:
+              nvidia.com/gpu: "1"
+              vpc.amazonaws.com/efa: "1"
+              cpu: 22250m   # guarantee scheduling; no CPU limit so transfers can burst
+              memory: 243200Mi
+          securityContext:
+            # IPC_LOCK: RDMA memory pinning. NET_ADMIN: EFA device access.
+            # EFA device plugin injects devices with correct cgroup permissions
+            # so full privileged is unnecessary. Matches dkv production config.
+            capabilities:
+              add:
+                - IPC_LOCK
+                - NET_ADMIN
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: test-script
+              mountPath: /smoke

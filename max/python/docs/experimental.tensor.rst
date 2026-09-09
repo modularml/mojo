@@ -33,22 +33,3 @@ Defaults
    default_dtype
    defaults
    defaults_like
-
-Realization
------------
-
-.. autosummary::
-   :nosignatures:
-   :toctree: generated
-   :template: autosummary/class.rst
-
-   RealizationContext
-   RealizationState
-
-.. autosummary::
-   :nosignatures:
-   :toctree: generated
-   :template: autosummary/function.rst
-
-   current_realization_context
-   realization_context

@@ -1,0 +1,15 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(default_visibility = ["//Mojo:consumers"])
+
+modular_cc_binary(
+    name = "hash-mlir",
+    srcs = glob(["*.cpp"]),
+    deps = [
+        "//AsyncRT:RuntimeGlobals",
+        "//Mojo:ToolCommon",
+        "//Support:Base",
+        "//Support:Globals",
+        "@llvm-project//mlir:BytecodeWriter",
+    ],
+)

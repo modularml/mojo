@@ -11,137 +11,65 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""TensorLayout-based rules for convolution ops.
-
-Convolution follows matmul-like semantics (bilinear in input x filter).
-Partial handling: P x R = P (bilinear), P x non-R = resolve first.
-"""
+"""Placement rules for ``conv2d``, ``conv3d``, and ``conv2d_transpose``."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
-
-from max.experimental.sharding.mappings import PlacementMapping
-from max.experimental.sharding.placements import (
-    Partial,
-    Placement,
-    Replicated,
-    Sharded,
-)
+from max.experimental.sharding.placements import Sharded
 from max.experimental.sharding.types import TensorLayout
 from max.graph.type import ConvInputLayout, FilterLayout
 
-from ._common import RuleSignature, is_partial, is_replicated, is_sharded
-from .matmul import _resolve_per_axis_placements
+from ..action import ActionSet, AxisAssignment
+from ..cost import P, R, build_action_set
 
 
-@dataclass(frozen=True)
-class ConvRoles:
-    """Axis role assignments for a convolution op."""
+def _conv_action_set(
+    spatial: int,
+    transpose: bool,
+    x: TensorLayout,
+    filter: TensorLayout,
+    groups: int,
+    input_layout: ConvInputLayout,
+    filter_layout: FilterLayout,
+    extras: tuple[object, ...],
+) -> ActionSet:
+    expected_filter = FilterLayout.RSCF if spatial == 2 else FilterLayout.QRSCF
+    if filter_layout != expected_filter:
+        raise ValueError(
+            f"Unsupported filter layout for conv{spatial}d: {filter_layout}"
+        )
 
-    x_batch: int
-    x_cin: int
-    x_spatial: frozenset[int]
-    f_cin: int
-    f_cout: int
-    out_cout: int
-
-
-def _conv_axis_rule(
-    roles: ConvRoles,
-) -> Callable[[Placement, Placement], tuple[Placement, Placement, Placement]]:
-    def rule(
-        pl: Placement, pr: Placement
-    ) -> tuple[Placement, Placement, Placement]:
-        if is_replicated(pl) and is_replicated(pr):
-            return (Replicated(), Replicated(), Replicated())
-        if is_sharded(pl, roles.x_batch) and is_replicated(pr):
-            return (pl, pr, Sharded(roles.x_batch))
-        if is_replicated(pl) and is_sharded(pr, roles.f_cout):
-            return (pl, pr, Sharded(roles.out_cout))
-        if is_sharded(pl, roles.x_cin) and is_sharded(pr, roles.f_cin):
-            return (pl, pr, Partial())
-        if (
-            is_sharded(pl)
-            and isinstance(pl, Sharded)
-            and pl.axis in roles.x_spatial
-        ):
-            raise ValueError(
-                f"conv: sharding input along spatial axis {pl.axis} "
-                f"is not supported. Gather first."
-            )
-        if is_partial(pl) and is_replicated(pr):
-            return (pl, pr, Partial(pl.reduce_op))
-        if is_replicated(pl) and is_partial(pr):
-            return (pl, pr, Partial(pr.reduce_op))
-        if is_partial(pl) and is_partial(pr):
-            raise ValueError(
-                "conv: Partial x Partial is not supported. "
-                "Use resolve_partials() on at least one input first."
-            )
-        if is_partial(pl):
-            return (Replicated(), pr, _infer_output(Replicated(), pr))
-        if is_partial(pr):
-            return (pl, Replicated(), _infer_output(pl, Replicated()))
-        raise NotImplementedError(f"conv: unsupported placements: {pl} x {pr}")
-
-    def _infer_output(pl: Placement, pr: Placement) -> Placement:
-        if is_replicated(pl) and is_replicated(pr):
-            return Replicated()
-        if is_replicated(pl) and is_sharded(pr, roles.f_cout):
-            return Sharded(roles.out_cout)
-        if is_sharded(pl, roles.x_batch) and is_replicated(pr):
-            return Sharded(roles.x_batch)
-        return Replicated()
-
-    return rule
-
-
-def _resolve_conv2d_roles(
-    input_layout: ConvInputLayout, filter_layout: FilterLayout
-) -> ConvRoles:
     if input_layout == ConvInputLayout.NHWC:
-        x_batch, x_cin, x_spatial, out_cout = 0, 3, frozenset({1, 2}), 3
+        n_axis_x = 0
+        cin_axis_x = x.rank - 1
+        cout_axis_out = x.rank - 1
     elif input_layout == ConvInputLayout.NCHW:
-        x_batch, x_cin, x_spatial, out_cout = 0, 1, frozenset({2, 3}), 1
+        n_axis_x = 0
+        cin_axis_x = 1
+        cout_axis_out = 1
     else:
-        raise ValueError(f"Unsupported input layout: {input_layout}")
-    if filter_layout == FilterLayout.RSCF:
-        f_cin, f_cout = 2, 3
-    else:
-        raise ValueError(f"Unsupported filter layout: {filter_layout}")
-    return ConvRoles(
-        x_batch=x_batch,
-        x_cin=x_cin,
-        x_spatial=x_spatial,
-        f_cin=f_cin,
-        f_cout=f_cout,
-        out_cout=out_cout,
-    )
+        raise ValueError(
+            f"Unsupported input layout for conv{spatial}d: {input_layout}"
+        )
 
+    if transpose:
+        cout_axis_filt = filter.rank - 2
+        cin_axis_filt = filter.rank - 1
+    else:
+        cin_axis_filt = filter.rank - 2
+        cout_axis_filt = filter.rank - 1
 
-def _resolve_conv3d_roles(
-    input_layout: ConvInputLayout, filter_layout: FilterLayout
-) -> ConvRoles:
-    if input_layout == ConvInputLayout.NHWC:
-        x_batch, x_cin, x_spatial = 0, 4, frozenset({1, 2, 3})
-    elif input_layout == ConvInputLayout.NCHW:
-        x_batch, x_cin, x_spatial = 0, 1, frozenset({2, 3, 4})
-    else:
-        raise ValueError(f"Unsupported input layout: {input_layout}")
-    if filter_layout == FilterLayout.QRSCF:
-        f_cin, f_cout = 3, 4
-    else:
-        raise ValueError(f"Unsupported filter layout: {filter_layout}")
-    return ConvRoles(
-        x_batch=x_batch,
-        x_cin=x_cin,
-        x_spatial=x_spatial,
-        f_cin=f_cin,
-        f_cout=f_cout,
-        out_cout=x_cin,
-    )
+    rows = [
+        AxisAssignment((R, R), R),
+        AxisAssignment((Sharded(n_axis_x), R), Sharded(n_axis_x)),
+        AxisAssignment((R, Sharded(cout_axis_filt)), Sharded(cout_axis_out)),
+    ]
+    if groups == 1:
+        rows.append(
+            AxisAssignment((Sharded(cin_axis_x), Sharded(cin_axis_filt)), P)
+        )
+    rows.extend([AxisAssignment((P, R), P), AxisAssignment((R, P), P)])
+    return build_action_set(rows, layouts=(x, filter), extras=extras)
 
 
 def conv2d_rule(
@@ -154,24 +82,17 @@ def conv2d_rule(
     bias: TensorLayout | None = None,
     input_layout: ConvInputLayout = ConvInputLayout.NHWC,
     filter_layout: FilterLayout = FilterLayout.RSCF,
-) -> RuleSignature:
-    """Sharding rule for conv2d."""
-    roles = _resolve_conv2d_roles(input_layout, filter_layout)
-    mesh = x.mapping.mesh
-
-    suggested_x_p, suggested_w_p, out_p = _resolve_per_axis_placements(
-        x.mapping.to_placements(),
-        filter.mapping.to_placements(),
-        mesh.ndim,
-        _conv_axis_rule(roles),
-        "conv2d",
-    )
-    xm = PlacementMapping(mesh, suggested_x_p)
-    fm = PlacementMapping(mesh, suggested_w_p)
-    return (
-        (
-            xm,
-            fm,
+) -> ActionSet:
+    """Strategies for ``conv2d``: data-parallel on N + channel-parallel on C."""
+    return _conv_action_set(
+        2,
+        False,
+        x,
+        filter,
+        groups,
+        input_layout,
+        filter_layout,
+        extras=(
             stride,
             dilation,
             padding,
@@ -180,7 +101,6 @@ def conv2d_rule(
             input_layout,
             filter_layout,
         ),
-        (PlacementMapping(mesh, out_p),),
     )
 
 
@@ -194,24 +114,17 @@ def conv3d_rule(
     bias: TensorLayout | None = None,
     input_layout: ConvInputLayout = ConvInputLayout.NHWC,
     filter_layout: FilterLayout = FilterLayout.QRSCF,
-) -> RuleSignature:
-    """Sharding rule for conv3d."""
-    roles = _resolve_conv3d_roles(input_layout, filter_layout)
-    mesh = x.mapping.mesh
-
-    suggested_x_p, suggested_w_p, out_p = _resolve_per_axis_placements(
-        x.mapping.to_placements(),
-        filter.mapping.to_placements(),
-        mesh.ndim,
-        _conv_axis_rule(roles),
-        "conv3d",
-    )
-    xm = PlacementMapping(mesh, suggested_x_p)
-    fm = PlacementMapping(mesh, suggested_w_p)
-    return (
-        (
-            xm,
-            fm,
+) -> ActionSet:
+    """Strategies for ``conv3d``: same DP/channel-TP family as ``conv2d``."""
+    return _conv_action_set(
+        3,
+        False,
+        x,
+        filter,
+        groups,
+        input_layout,
+        filter_layout,
+        extras=(
             stride,
             dilation,
             padding,
@@ -220,7 +133,6 @@ def conv3d_rule(
             input_layout,
             filter_layout,
         ),
-        (PlacementMapping(mesh, out_p),),
     )
 
 
@@ -234,33 +146,17 @@ def conv2d_transpose_rule(
     bias: TensorLayout | None = None,
     input_layout: ConvInputLayout = ConvInputLayout.NHWC,
     filter_layout: FilterLayout = FilterLayout.RSCF,
-) -> RuleSignature:
-    """Sharding rule for conv2d transpose."""
-    roles = _resolve_conv2d_roles(input_layout, filter_layout)
-    if filter_layout == FilterLayout.RSCF:
-        roles = ConvRoles(
-            x_batch=roles.x_batch,
-            x_cin=roles.x_cin,
-            x_spatial=roles.x_spatial,
-            f_cin=3,
-            f_cout=2,
-            out_cout=roles.out_cout,
-        )
-    mesh = x.mapping.mesh
-
-    suggested_x_p, suggested_w_p, out_p = _resolve_per_axis_placements(
-        x.mapping.to_placements(),
-        filter.mapping.to_placements(),
-        mesh.ndim,
-        _conv_axis_rule(roles),
-        "conv2d_transpose",
-    )
-    xm = PlacementMapping(mesh, suggested_x_p)
-    fm = PlacementMapping(mesh, suggested_w_p)
-    return (
-        (
-            xm,
-            fm,
+) -> ActionSet:
+    """Strategies for ``conv2d_transpose``: transpose-conv variant of ``conv2d``."""
+    return _conv_action_set(
+        2,
+        True,
+        x,
+        filter,
+        1,
+        input_layout,
+        filter_layout,
+        extras=(
             stride,
             dilation,
             padding,
@@ -269,5 +165,4 @@ def conv2d_transpose_rule(
             input_layout,
             filter_layout,
         ),
-        (PlacementMapping(mesh, out_p),),
     )

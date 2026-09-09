@@ -24,7 +24,7 @@ from typing import Any, cast, get_args
 import click
 import torch
 from max import pipelines
-from max.entrypoints.cli import DevicesOptionType
+from max._entrypoints.cli.config import DevicesOptionType
 from max.pipelines.lib.device_specs import (
     _default_device_specs,
     device_specs_from_normalized_device_handle,

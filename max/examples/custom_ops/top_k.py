@@ -156,7 +156,8 @@ def main() -> None:
     session = InferenceSession(devices=[device])
 
     # Compile the graph.
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     # Create a driver tensor from the next word probabilities
     input_tensor = Buffer.from_numpy(probabilities).to(device)

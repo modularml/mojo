@@ -1,5 +1,5 @@
 # ===----------------------------------------------------------------------=== #
-# Copyright (c) 2025, Modular Inc. All rights reserved.
+# Copyright (c) 2026, Modular Inc. All rights reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions:
 # https://llvm.org/LICENSE.txt
@@ -21,7 +21,7 @@ from pathlib import Path
 import torch
 import tvm_ffi
 from flashinfer.aot import gen_gemm_sm100_module_cutlass_fp4
-from flashinfer.fp4_quantization import (
+from flashinfer.quantization.fp4_quantization import (
     SfLayout,
     e2m1_and_ufp8sf_scale_to_float,
     nvfp4_quantize,

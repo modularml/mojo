@@ -1,14 +1,15 @@
-# MAX AI kernels contributor guide
+# MAX accelerator library contributor guide
 
-Thank you for your interest in contributing to the MAX AI kernels! We’re excited
-to welcome external contributors to help build high-performance CPU and GPU
-kernels in Mojo.
+Thank you for your interest in contributing to the MAX accelerator library!
+We’re excited to welcome external contributors to help build high-performance
+CPU and GPU kernels in Mojo.
 
-## Contributing to MAX AI kernels
+## Contributing to the accelerator library
 
-The MAX AI kernels power key components of MAX and Mojo, and contributions here
-can have a meaningful impact across the AI ecosystem. Before jumping in, please
-take a moment to review our contribution guidelines and processes.
+The accelerator library powers key components of MAX and Mojo, and
+contributions here can have a meaningful impact across the AI ecosystem. Before
+jumping in, please take a moment to review our contribution guidelines and
+processes.
 
 We welcome contributions across a wide range of functionality, but **if you’re
 proposing a change that could affect the performance of the core kernel
@@ -41,15 +42,16 @@ a written proposal. The proposal process:
 architecture
 
 **To submit a proposal, create a GitHub Pull Request that adds a document to the
-[`modular/mojo/proposals`](https://github.com/modular/modular/tree/main/mojo/proposals)
+[`modular/Mojo/proposals`](https://github.com/modular/modular/tree/main/Mojo/proposals)
 directory.**
 
 Contributors are encouraged to react with a 👍 to proposal PRs if they support
-the high-level direction. Proposals are reviewed and assigned to MAX AI kernels
-leads. A proposal can be merged once the lead approves, all blocking issues are
-resolved, and relevant decisions are incorporated. If a lead chooses to defer or
-reject the proposal, they will explain the reasoning and close the PR. This
-process is inspired by successful practices in other open source communities.
+the high-level direction. Proposals are reviewed and assigned to accelerator
+library leads. A proposal can be merged once the lead approves, all blocking
+issues are resolved, and relevant decisions are incorporated. If a lead chooses
+to defer or reject the proposal, they will explain the reasoning and close the
+PR. This process is inspired by successful practices in other open source
+communities.
 
 ## Submitting pull requests
 

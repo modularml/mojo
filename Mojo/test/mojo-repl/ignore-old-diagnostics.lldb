@@ -1,0 +1,19 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+def foo():
+    var value = 10
+    _ = value^
+# CHECK: ] warning:
+
+# Check that we don't re-emit the previous warning in the next expression.
+var somethingelse = 10
+# CHECK-NOT: ] warning
+

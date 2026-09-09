@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 
 import pytest
 from async_asgi_testclient import TestClient
 from fastapi import FastAPI
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import PIPELINE_REGISTRY, PipelineConfig
 from max.pipelines.modeling.types import PipelineTask
 from max.serve.api_server import ServingTokenGeneratorSettings, fastapi_app
@@ -27,6 +28,14 @@ from max.serve.mocks.mock_api_requests import simple_openai_request
 from max.serve.pipelines.echo_gen import (
     EchoPipelineTokenizer,
     EchoTokenGenerator,
+)
+
+# FIXME: SERVSYS-1275 — serve integration tests run for many minutes on
+# contended macOS CI workers, pushing the macOS job past its 2h cap. Skip on
+# macOS until the serve-test slowness is addressed.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "darwin",
+    reason="SERVSYS-1275: too slow on macOS CI; exceeds the 2h job timeout",
 )
 
 MAX_CHUNK_TO_READ_BYTES: int = 1024 * 10

@@ -38,9 +38,11 @@ class ModelConfig(ConfigFileModel):
     model: str | None = Field(default=None)
     seed: int = Field(default=42)
 
+
 class ShapeConfig(ConfigFileModel):
     batch_size: int = Field(default=1)
     input_len: int = Field(default=256)
+
 
 # Make sure to inherit from ConfigFileModel and include the @Parameter decorator
 # with name="*".
@@ -48,6 +50,7 @@ class ShapeConfig(ConfigFileModel):
 class MyCLIConfig(ConfigFileModel):
     model_config: ModelConfig = ModelConfig()
     shape_config: ShapeConfig = ShapeConfig()
+
 
 def main() -> None:
     """Main entry point for the CLI application."""
@@ -63,9 +66,7 @@ def main() -> None:
 
     # Define your command
     @app.default
-    def run(
-        config: MyCLIConfig = MyCLIConfig()
-    ) -> None:
+    def run(config: MyCLIConfig = MyCLIConfig()) -> None:
         """Run the application."""
         print(f"Model: {config.model_config.model}")
         print(f"Batch size: {config.shape_config.batch_size}")

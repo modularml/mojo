@@ -24,9 +24,9 @@ comptime simd_size = 16
 
 
 def kernel6x4(
-    a_ptr: UnsafePointer[Float32, _],
-    b_ptr: UnsafePointer[Float32, _],
-    c_ptr: UnsafePointer[mut=True, Float32, _],
+    a_ptr: ImmPointer[Float32, _],
+    b_ptr: ImmPointer[Float32, _],
+    c_ptr: MutPointer[Float32, _],
     n: Int,
     k: Int,
     kc: Int,
@@ -82,37 +82,37 @@ def kernel6x4(
             b_ptr + 4 * simd_size * pr + simd_size * 19
         )
 
-        var av = a_ptr[0 * k + pr].cast[DType.float32]()
+        var av = a_ptr[0 * k + pr].cast[.float32]()
         cv0 += av * bv0
         cv1 += av * bv1
         cv2 += av * bv2
         cv3 += av * bv3
 
-        av = a_ptr[1 * k + pr].cast[DType.float32]()
+        av = a_ptr[1 * k + pr].cast[.float32]()
         cv4 += av * bv0
         cv5 += av * bv1
         cv6 += av * bv2
         cv7 += av * bv3
 
-        av = a_ptr[2 * k + pr].cast[DType.float32]()
+        av = a_ptr[2 * k + pr].cast[.float32]()
         cv8 += av * bv0
         cv9 += av * bv1
         cv10 += av * bv2
         cv11 += av * bv3
 
-        av = a_ptr[3 * k + pr].cast[DType.float32]()
+        av = a_ptr[3 * k + pr].cast[.float32]()
         cv12 += av * bv0
         cv13 += av * bv1
         cv14 += av * bv2
         cv15 += av * bv3
 
-        av = a_ptr[4 * k + pr].cast[DType.float32]()
+        av = a_ptr[4 * k + pr].cast[.float32]()
         cv16 += av * bv0
         cv17 += av * bv1
         cv18 += av * bv2
         cv19 += av * bv3
 
-        av = a_ptr[5 * k + pr].cast[DType.float32]()
+        av = a_ptr[5 * k + pr].cast[.float32]()
         cv20 += av * bv0
         cv21 += av * bv1
         cv22 += av * bv2
@@ -145,9 +145,9 @@ def kernel6x4(
 
 
 def kernel6x4_naive(
-    a_ptr: UnsafePointer[Float32, _],
-    b_ptr: UnsafePointer[Float32, _],
-    c_ptr: UnsafePointer[mut=True, Float32, _],
+    a_ptr: ImmPointer[Float32, _],
+    b_ptr: ImmPointer[Float32, _],
+    c_ptr: MutPointer[Float32, _],
     n: Int,
     k: Int,
     kc: Int,

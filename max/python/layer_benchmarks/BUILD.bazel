@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
+load("//max/tests/integration/test_common:mef_precompile.bzl", "CPU_TORCH", "precompiled_mefs")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -19,6 +20,39 @@ modular_py_library(
 
 # -- Model test bed framework --
 
+_TESTBED_DEPS = [
+    ":benchmark_utils",
+    "//max/python/max:_core",
+    "//max/python/max/driver",
+    "//max/python/max/dtype",
+    "//max/python/max/engine",
+    "//max/python/max/graph",
+    "//max/python/max/nn",
+    "//max/python/max/pipelines/architectures/autoencoders",
+    "//max/python/max/pipelines/architectures/gemma3",
+    "//max/python/max/pipelines/architectures/gemma4",
+    "//max/python/max/pipelines/architectures/gpt_oss",
+    "//max/python/max/pipelines/architectures/olmo2",
+    "//max/python/max/pipelines/architectures/qwen2_5vl",
+    "//max/python/max/pipelines/architectures/qwen3",
+    "//max/python/max/pipelines/architectures/umt5",
+    "//max/python/max/pipelines/context",
+    "//max/python/max/pipelines/kv_cache",
+    "//max/python/max/pipelines/modeling",
+    "//max/python/max/profiler",
+    requirement("cyclopts"),
+    requirement("numpy"),
+    requirement("tabulate"),
+    requirement("transformers"),
+    requirement("typing-extensions"),
+]
+
+# torch is supplied by whoever links this library, not declared here: the MEF
+# producer needs the CPU wheel (CPU_TORCH in mef_precompile.bzl) because its
+# build action runs on a CPU builder, where an accelerator-flavored wheel only
+# imports if that accelerator's runtime is installed, while the tests need the
+# target platform's wheel for their torch reference layers. Declaring one here
+# would put both in the producer's runfiles, and they are incompatible.
 modular_py_library(
     name = "testbed",
     srcs = glob(
@@ -28,37 +62,22 @@ modular_py_library(
     ignore_extra_deps = [
         "//max/python/max/profiler",
     ],
+    ignore_unresolved_imports = ["torch"],
     imports = ["."],
-    deps = [
-        ":benchmark_utils",
-        "//max/python/max:_core",
-        "//max/python/max/driver",
-        "//max/python/max/dtype",
-        "//max/python/max/engine",
-        "//max/python/max/graph",
-        "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
-        "//max/python/max/pipelines/core",
-        "//max/python/max/pipelines/kv_cache",
-        "//max/python/max/pipelines/modeling",
-        "//max/python/max/profiler",
-        requirement("cyclopts"),
-        requirement("torch"),
-        requirement("numpy"),
-        requirement("tabulate"),
-        requirement("transformers"),
-        requirement("typing-extensions"),
-    ],
+    deps = _TESTBED_DEPS,
 )
 
 modular_py_binary(
     name = "dump_ir",
     srcs = ["testbed/dump_ir_cli.py"],
+    # torch is imported by the testbed, not by this entry point.
+    ignore_extra_deps = [requirement("torch")],
     imports = ["."],
     main = "testbed/dump_ir_cli.py",
     deps = [
         ":testbed",
         requirement("cyclopts"),
+        requirement("torch"),
     ],
 )
 
@@ -75,11 +94,55 @@ exports_files([
 ])
 
 # -- Harness tests --
+#
+# Every harness test compiles exactly one graph, named by a spec in
+# testbed/specs.py. Each test's graph is compiled to a MEF by a CPU build
+# action (`precompiled_mefs`, one target per test) and the test initializes that
+# artifact instead of compiling on the GPU worker; see
+# docs/internal/CompileOnCpuRunOnGpu.md. A test target's spec name is its own
+# name minus the "harness_" prefix.
 
 _HARNESS_TEST_DEPS = [
+    ":layer_mefs",
     ":testbed",
-    "//max/python/max/pipelines/modeling",
+    "//max/python/max/pipelines/context",
+    requirement("torch"),
 ]
+
+# CPU producer for the MEFs, run only as a build action by precompiled_mefs.
+modular_py_binary(
+    name = "precompile_layer_bin",
+    testonly = True,
+    srcs = ["precompile_layer.py"],
+    imports = ["."],
+    main = "precompile_layer.py",
+    # FIXME: pydeps_test sees CPU_TORCH's two branches as two torch deps, and
+    # they cannot both be declared.
+    tags = [
+        "manual",
+        "no-pydeps",
+    ],
+    deps = [
+        ":testbed",
+        "//max/python/max/graph",
+        "//max/tests/integration/test_common:mef_precompile",
+    ] + CPU_TORCH,
+)
+
+# GPU-side half of the split: resolves a spec's precompiled MEF and initializes
+# it. Testonly because it depends on the testonly precompile helpers.
+modular_py_library(
+    name = "layer_mefs",
+    testonly = True,
+    srcs = ["layer_mefs.py"],
+    imports = ["."],
+    deps = [
+        ":testbed",
+        "//max/python/max/driver",
+        "//max/python/max/engine",
+        "//max/tests/integration/test_common:mef_precompile",
+    ],
+)
 
 _GPU_CONSTRAINTS = ["//:has_gpu"] + select({
     "//:apple_gpu": ["@platforms//:incompatible"],
@@ -123,11 +186,25 @@ _HARNESS_TESTS = {
 }
 
 [
+    precompiled_mefs(
+        name = name + "_mefs",
+        producer = ":precompile_layer_bin",
+        specs = [name[len("harness_"):]],
+        target_compatible_with = constraints,
+    )
+    for name, constraints in _HARNESS_TESTS.items()
+]
+
+[
     modular_py_test(
         name = name,
         srcs = ["test_{}.py".format(name)],
+        data = [":{}_mefs".format(name)],
+        env = {"LAYER_BENCHMARK_MEFS": "$(rlocationpaths :{}_mefs)".format(name)},
         exec_properties = {"test.resources:gpu-memory": "10"},
         gpu_constraints = constraints,
+        # torch is imported by the testbed, not by the test source.
+        ignore_extra_deps = [requirement("torch")],
         imports = ["."],
         tags = ["gpu"],
         deps = _HARNESS_TEST_DEPS,
@@ -135,57 +212,107 @@ _HARNESS_TESTS = {
     for name, constraints in _HARNESS_TESTS.items()
 ]
 
+precompiled_mefs(
+    name = "harness_rms_norm_mefs",
+    producer = ":precompile_layer_bin",
+    specs = ["rms_norm"],
+    target_compatible_with = _GPU_CONSTRAINTS,
+)
+
 modular_py_test(
     name = "harness_rms_norm",
     srcs = ["test_harness_rms_norm.py"],
+    data = [":harness_rms_norm_mefs"],
+    env = {"LAYER_BENCHMARK_MEFS": "$(rlocationpaths :harness_rms_norm_mefs)"},
     exec_properties = {"test.resources:gpu-memory": "10"},
     gpu_constraints = _GPU_CONSTRAINTS,
-    ignore_extra_deps = ["//max/python/max/pipelines/modeling"],
+    ignore_extra_deps = [
+        "//max/python/max/pipelines/context",
+        # torch is imported by the testbed, not by the test source.
+        requirement("torch"),
+    ],
     imports = ["."],
     tags = ["gpu"],
     deps = _HARNESS_TEST_DEPS,
 )
 
+precompiled_mefs(
+    name = "harness_text_encoder_mefs",
+    producer = ":precompile_layer_bin",
+    specs = ["text_encoder"],
+    target_compatible_with = _GPU_CONSTRAINTS,
+)
+
 modular_py_test(
     name = "harness_text_encoder",
     srcs = ["test_harness_text_encoder.py"],
+    data = [":harness_text_encoder_mefs"],
+    # The precompiled MEF covers the default smoke config only; a
+    # TEXT_ENC_*-overridden config is a different graph and compiles in-process.
+    env = {
+        "LAYER_BENCHMARK_MEFS": "$(rlocationpaths :harness_text_encoder_mefs)",
+    },
     # Production UMT5 (24-layer, d_model=4096) needs ~40GB for weights +
     # activations. Default (10GB) suffices for the small smoke config.
     exec_properties = {"test.resources:gpu-memory": "10"},
     gpu_constraints = _GPU_CONSTRAINTS,
-    ignore_extra_deps = ["//max/python/max/pipelines/modeling"],
+    ignore_extra_deps = [
+        "//max/python/max/pipelines/context",
+        # torch is imported by the testbed, not by the test source.
+        requirement("torch"),
+    ],
     imports = ["."],
     tags = ["gpu"],
     deps = _HARNESS_TEST_DEPS + [":benchmark_utils"],
+)
+
+precompiled_mefs(
+    name = "harness_wan_vae_attention_mefs",
+    producer = ":precompile_layer_bin",
+    specs = ["wan_vae_attention"],
+    target_compatible_with = _GPU_CONSTRAINTS,
 )
 
 modular_py_test(
     name = "harness_wan_vae_attention",
     srcs = ["test_harness_wan_vae_attention.py"],
+    data = [":harness_wan_vae_attention_mefs"],
+    # As for the text encoder, WAN_VAE_*-overridden shapes compile in-process.
+    env = {
+        "LAYER_BENCHMARK_MEFS": "$(rlocationpaths :harness_wan_vae_attention_mefs)",
+    },
     # Smoke config (dim=96, 8x8) fits easily. Production tiers
     # (dim=384, 60x106 at 480p / 90x160 at 720p) use ~40GB because
     # torch SDPA materializes the NxN attention matrix for head_dim
     # larger than the flash-attn threshold.
-    exec_properties = {"test.resources:gpu-memory": "40"},
+    exec_properties = {"test.resources:gpu-memory": "38"},
     gpu_constraints = _GPU_CONSTRAINTS,
-    ignore_extra_deps = ["//max/python/max/pipelines/modeling"],
+    ignore_extra_deps = [
+        "//max/python/max/pipelines/context",
+        # torch is imported by the testbed, not by the test source.
+        requirement("torch"),
+    ],
     imports = ["."],
     tags = ["gpu"],
     deps = _HARNESS_TEST_DEPS + [":benchmark_utils"],
 )
 
+# Framework unit tests: these exercise the compile-in-process path itself, so
+# they get no precompiled MEFs.
 modular_py_test(
     name = "testbed_validation",
     srcs = ["test_testbed_validation.py"],
     exec_properties = {"test.resources:gpu-memory": "10"},
     gpu_constraints = _GPU_CONSTRAINTS,
-    ignore_extra_deps = ["//max/python/max/pipelines/modeling"],
+    ignore_extra_deps = ["//max/python/max/pipelines/context"],
     imports = ["."],
     tags = ["gpu"],
-    deps = _HARNESS_TEST_DEPS + [
+    deps = [
+        ":testbed",
         "//max/python/max/dtype",
         "//max/python/max/graph",
         "//max/python/max/nn",
+        "//max/python/max/pipelines/context",
         requirement("torch"),
     ],
 )

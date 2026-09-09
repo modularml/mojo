@@ -1,0 +1,33 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+# Composite runtimes: a round-robin pool and a device-routed hybrid. Depends
+# only on core (transport-agnostic), so it stays light -- callers can pool
+# without pulling the heavier gRPC / HTTP worker runtimes.
+modular_py_library(
+    name = "routing",
+    srcs = [
+        "__init__.py",
+        "routing.py",
+    ],
+    deps = [
+        "//max/python/max/experimental/cascade/core",
+    ],
+)
+
+# Config-driven assembly of a device-routed hybrid pool. Sits above the runtime
+# backends (core / grpc_runtime / http_runtime) and builds one from a
+# ``ContextConfig``. Its own target so the heavier gRPC / HTTP worker runtimes
+# stay opt-in and only load for callers that select them (e.g. the serve CLI).
+modular_py_library(
+    name = "context_config",
+    srcs = ["context_config.py"],
+    deps = [
+        requirement("pydantic"),
+        ":routing",
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/experimental/cascade/grpc_runtime",
+        "//max/python/max/experimental/cascade/http_runtime",
+    ],
+)

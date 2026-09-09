@@ -13,13 +13,13 @@
 
 from std.collections import List
 from spmv_utils import ELLMatrix, generate_sparse_matrix, spmv_cpu, verify
-from std.gpu import block_idx, thread_idx, block_dim
-from std.gpu.host import DeviceContext
+from max.gpu import block_idx, thread_idx, block_dim
+from max.gpu.host import DeviceContext
 
 
 def spmv_ell_kernel(
     ellMatrix: ELLMatrix,
-    x: UnsafePointer[Float32, MutAnyOrigin],
+    x: UnsafePointer[Float32, ImmutAnyOrigin],
     y: UnsafePointer[Float32, MutAnyOrigin],
 ):
     var row = block_idx.x * block_dim.x + thread_idx.x
@@ -111,10 +111,10 @@ def main() raises:
     var ctx = DeviceContext()
 
     # Device allocation
-    var d_colIdx_buf = ctx.enqueue_create_buffer[DType.uint32](rows * max_nnz)
-    var d_value_buf = ctx.enqueue_create_buffer[DType.float32](rows * max_nnz)
-    var d_x_buf = ctx.enqueue_create_buffer[DType.float32](cols)
-    var d_y_buf = ctx.enqueue_create_buffer[DType.float32](rows)
+    var d_colIdx_buf = ctx.enqueue_create_buffer[.uint32](rows * max_nnz)
+    var d_value_buf = ctx.enqueue_create_buffer[.float32](rows * max_nnz)
+    var d_x_buf = ctx.enqueue_create_buffer[.float32](cols)
+    var d_y_buf = ctx.enqueue_create_buffer[.float32](rows)
 
     # Copy to device
     ctx.enqueue_copy(d_colIdx_buf, h_colIdx_ptr)
@@ -129,7 +129,11 @@ def main() raises:
     h_y_zeros.free()
 
     var d_ellMatrix = ELLMatrix(
-        rows, cols, max_nnz, d_colIdx_buf.unsafe_ptr(), d_value_buf.unsafe_ptr()
+        rows,
+        cols,
+        max_nnz,
+        d_colIdx_buf.unsafe_ptr().as_unsafe_any_origin(),
+        d_value_buf.unsafe_ptr().as_unsafe_any_origin(),
     )
 
     var blockSize = 256

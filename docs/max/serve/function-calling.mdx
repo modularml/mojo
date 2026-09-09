@@ -6,9 +6,8 @@ description: Implement OpenAI-compatible function calling and tool use for agent
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import MDXListing from '@site/src/components/Listing/MDXListing';
-import InstallModular from '../../_includes/install-modular.mdx';
-import InstallOpenAI from '../../_includes/install-openai.mdx';
+import InstallMAX from '../_includes/install-modular.mdx';
+import InstallOpenAI from '../_includes/install-openai.mdx';
 
 Function calling is a feature available with some large language models (LLMs)
 that allows them to call external program functions (or tools). This allows the
@@ -54,7 +53,7 @@ The `tools` parameter provides information that allows the LLM to understand:
 - How to call each function (the arguments it accepts/requires)
 
 For example, here's a request with the [chat completions
-API](/max/rest-api/#POST/v1/chat/completions) that declares an available
+API](/rest-api/create-chat-completion/) that declares an available
 function named `get_weather()`:
 
 ```python
@@ -105,7 +104,10 @@ Let's take a closer look at each parameter shown in the `tools` property:
 
 - `type`: Currently this is always `function`
 - `function`: Definition of the function
-  - `name`: The function name used by the LLM to call it
+  - `name`: The function name used by the LLM to call it. Must be at most 64
+    characters; the default character set is `[a-zA-Z0-9_-]`, though some model
+    parsers widen it to allow dotted or namespaced names (for example,
+    `my-tool.v2`)
   - `description`: A function description that helps the LLM understand when to
     use it
   - `parameters`: Definition of the function parameters
@@ -153,7 +155,38 @@ result = get_weather(args["location"])
 
 If the function is designed to **fetch data** for the model, you should call
 the function and then call the model again with the function results appended
-as a message using the `tool` role.
+as a message using the `tool` role. Append the assistant message that contained
+the `tool_calls`, then one message per result with the `tool` role and the
+matching `tool_call_id`:
+
+```json
+"messages": [
+  { "role": "user", "content": "What's the weather in San Francisco?" },
+  {
+    "role": "assistant",
+    "tool_calls": [
+      {
+        "id": "call_abc123",
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "arguments": "{\"location\": \"San Francisco\"}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "call_abc123",
+    "content": "{\"temperature\": 62, \"unit\": \"F\"}"
+  }
+]
+```
+
+Each `tool` message's `tool_call_id` must match the `id` of a tool call in the
+preceding assistant message. A request with a non-JSON `tool_calls` argument, an
+unmatched `tool_call_id`, or only a partial set of tool replies is rejected with
+a 400 error.
 
 If the function is designed to **perform an action**, then you don't need to
 call the model again.
@@ -185,6 +218,8 @@ we've verified work with function calling:
   collection
 - [Meta's Llama 3.2 language models & evals](https://huggingface.co/collections/meta-llama/metas-llama-32-language-models-and-evals-675bfd70e574a62dd0e40586)
   collection
+- [Qwen3.5](https://huggingface.co/Qwen/Qwen3.5-27B), which includes dedicated
+  tool-calling and reasoning parsers
 
 :::note
 
@@ -202,7 +237,7 @@ locally-hosted endpoint:
 
 1. Create a virtual environment and install the `max` CLI:
 
-    <InstallModular folder="function-calling" />
+    <InstallMAX folder="function-calling" />
 
 2. Start an endpoint with a model that supports function calling:
 
@@ -357,10 +392,7 @@ send the function results back to the LLM as input, see the
 Now that you know the basics of function calling, you can get started with MAX
 on GPUs.
 
-export const docs = [
-  '../../serve/structured-output.mdx',
-  '../../serve/offline-inference.mdx',
-  '../../deploy/local-to-cloud.mdx',
-];
-
-<MDXListing mdxList={docs} />
+- [Structured output](/serve/structured-output): Enable structured output
+  with your GenAI deployments for predictable responses.
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.

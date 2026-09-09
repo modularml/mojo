@@ -52,8 +52,7 @@ for k in range(0, K, tile_size):
   # Guard writing to shared memory.
   barrier()
 
-  @parameter
-  for kk in range(tile_size):
+  comptime for kk in range(tile_size):
     accum += a_smem_tile[i, kk] * b_smem_tile[kk, j]
 
   # Guard read of shared memory.
@@ -296,7 +295,7 @@ compute a numerically stable softmax for a small tile.
 
 for kv_offset in range(0, num_keys, kv_tile_size):
     # 1st matmul, skip scaling and masking
-    k_tile = LayoutTensor[...](...)
+    k_tile = LayoutTensor(...)
     mma(p_tile, q_tile, k_tile, transpose_b = True)
 
     # ????????????? How to apply softmax to a p_tile ?????????????????
@@ -306,7 +305,7 @@ for kv_offset in range(0, num_keys, kv_tile_size):
     # To avoid overflow
     #   y[i] = exp(x[i] - max(x)) / sum(exp(x[i] - max(x))
 
-    # fn softmax(x):
+    # def softmax(x):
     #   var x_max       = rowmax(x)            # Need the entire row !!!!
     #   var numerator   = exp(x - x_max)
     #   var denominator = rowsum(numerator)    # Need the entire row !!!!
@@ -315,7 +314,7 @@ for kv_offset in range(0, num_keys, kv_tile_size):
     # ?????????????????????????????????????????????????????????????????
 
     # 2nd matmul
-    v_tile = LayoutTensor[...](...)
+    v_tile = LayoutTensor(...)
     mma(output_tile, p_tile, v_tile)
 ```
 
@@ -339,7 +338,7 @@ var rowmax, rowsum = -inf, 0.0
 
 for kv_offset in range(0, num_keys, kv_tile_size):
     # 1st matmul, skip scaling and masking
-    k_tile = LayoutTensor[...](...)
+    k_tile = LayoutTensor(...)
     mma(p_tile, q_tile, k_tile, transpose_b = True)
 
     # ===================== Online softmax ======================
@@ -355,7 +354,7 @@ for kv_offset in range(0, num_keys, kv_tile_size):
     output_tile = output_tile * correction
 
     # 2nd matmul
-    v_tile = LayoutTensor[...](...)
+    v_tile = LayoutTensor(...)
     mma(output_tile, p_tile, v_tile)
 
   # apply softmax's denominator

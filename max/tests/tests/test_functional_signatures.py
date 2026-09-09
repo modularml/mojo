@@ -61,12 +61,12 @@ SIGNATURE_CASES = [
     (F.cond, ["-> 'list[Tensor]'"]),
     (F.while_loop, ["-> 'list[Tensor]'"]),
     # Scalar-promotion binary: ``wrapper`` defines its own
-    # ``Tensor | int | float`` annotation (a string under future-annotations).
+    # ``Tensor | float`` annotation (a string under future-annotations).
     (
         F.add,
         [
-            "lhs: 'Tensor | int | float'",
-            "rhs: 'Tensor | int | float'",
+            "lhs: 'Tensor | float'",
+            "rhs: 'Tensor | float'",
             "-> 'Tensor'",
         ],
     ),

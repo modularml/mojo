@@ -21,7 +21,7 @@ This module provides:
 """
 
 from std.math.uutils import umod
-from std.gpu import thread_idx, WARP_SIZE
+from max.gpu import thread_idx, WARP_SIZE
 from linalg.structuring import SMemArray
 from std.atomic import Atomic
 from std.sys._assembly import inlined_assembly
@@ -34,12 +34,15 @@ from std.sys._assembly import inlined_assembly
 
 @always_inline
 def wait_for_counter(
-    counter: UnsafePointer[
-        mut=True, Int32, _, address_space=AddressSpace.SHARED
-    ],
+    counter: UnsafePointer[mut=True, Int32, _, address_space=.SHARED],
     threshold: Int32,
 ):
-    """Spin-wait until counter reaches threshold."""
+    """Spin-wait until counter reaches threshold.
+
+    Args:
+        counter: Shared-memory atomic counter to poll.
+        threshold: Value the counter must reach before returning.
+    """
     while Atomic.load(counter) < threshold:
         inlined_assembly[
             "s_sleep 0", NoneType, constraints="", has_side_effect=True
@@ -48,12 +51,15 @@ def wait_for_counter(
 
 @always_inline
 def increment_counter_if_first_thread(
-    counter: UnsafePointer[
-        mut=True, Int32, _, address_space=AddressSpace.SHARED
-    ],
+    counter: UnsafePointer[mut=True, Int32, _, address_space=.SHARED],
     increment: Int32,
 ):
-    """Atomically increment counter, but only from the first thread in warp."""
+    """Atomically increment counter, but only from the first thread in warp.
+
+    Args:
+        counter: Shared-memory atomic counter to update.
+        increment: Amount to add to the counter.
+    """
     if umod(thread_idx.x, WARP_SIZE) == 0:
         _ = Atomic.fetch_add(counter, increment)
 
@@ -98,6 +104,11 @@ trait SyncStrategy(TrivialRegisterPassable):
 
         Blocks until all consumers have finished reading from this tile
         (counter >= phase).
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
+            phase: Counter threshold to wait for before acquiring the tile.
         """
         ...
 
@@ -106,6 +117,10 @@ trait SyncStrategy(TrivialRegisterPassable):
         """Producer signals that it has finished writing to the tile.
 
         Increments the appropriate counter to notify waiting consumers.
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
         """
         ...
 
@@ -115,6 +130,11 @@ trait SyncStrategy(TrivialRegisterPassable):
 
         Blocks until producer has finished writing to this tile
         (counter >= phase).
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
+            phase: Counter threshold to wait for before acquiring the tile.
         """
         ...
 
@@ -123,6 +143,10 @@ trait SyncStrategy(TrivialRegisterPassable):
         """Consumer signals that it has finished reading from the tile.
 
         Increments the appropriate counter to notify waiting producers.
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
         """
         ...
 
@@ -163,6 +187,12 @@ struct SingleCounterSync[
     - Each phase advances by (writes_per_warp_block + reads_per_warp_block)
     - Producers wait for phase N, increment counter by 1
     - Consumers wait for phase N+1, increment counter by 1
+
+    Parameters:
+        pipeline_stages: Number of pipeline stages in the ring buffer.
+        block_rows: Total number of rows in the work block.
+        warp_rows: Number of rows processed by a single warp.
+        reads_per_warp_block: Number of consumer read operations per warp block.
     """
 
     comptime writes_per_warp_block = 1
@@ -234,6 +264,12 @@ struct SplitCounterSync[
     - Producer phase advances by reads_per_warp_block (waits for N consumers)
     - Consumer phase advances by writes_per_warp_block (waits for 1 producer)
     - This asymmetry reflects the 1-producer-to-N-consumers relationship
+
+    Parameters:
+        pipeline_stages: Number of pipeline stages in the ring buffer.
+        block_rows: Total number of rows in the work block.
+        warp_rows: Number of rows processed by a single warp.
+        reads_per_warp_block: Number of consumer read operations per warp block.
     """
 
     comptime writes_per_warp_block = 1
@@ -267,13 +303,24 @@ struct SplitCounterSync[
 
     @always_inline
     def wait_producer_acquire(self, tile_idx: Int, stage: Int, phase: Int32):
-        """Producer waits on consumer counter."""
+        """Producer waits on consumer counter.
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
+            phase: Counter threshold to wait for before acquiring the tile.
+        """
         var staged_idx = self.get_staged_idx(tile_idx, stage)
         wait_for_counter(self.consumer_counters[staged_idx], phase)
 
     @always_inline
     def signal_producer_release(mut self, tile_idx: Int, stage: Int):
-        """Producer increments producer counter."""
+        """Producer increments producer counter.
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
+        """
         var staged_idx = self.get_staged_idx(tile_idx, stage)
         increment_counter_if_first_thread(
             self.producer_counters[staged_idx],
@@ -282,13 +329,24 @@ struct SplitCounterSync[
 
     @always_inline
     def wait_consumer_acquire(self, tile_idx: Int, stage: Int, phase: Int32):
-        """Consumer waits on producer counter."""
+        """Consumer waits on producer counter.
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
+            phase: Counter threshold to wait for before acquiring the tile.
+        """
         var staged_idx = self.get_staged_idx(tile_idx, stage)
         wait_for_counter(self.producer_counters[staged_idx], phase)
 
     @always_inline
     def signal_consumer_release(mut self, tile_idx: Int, stage: Int):
-        """Consumer increments consumer counter by 1."""
+        """Consumer increments consumer counter by 1.
+
+        Args:
+            tile_idx: Index of the tile within a stage (0 to block_warps-1).
+            stage: Pipeline stage (0 to pipeline_stages-1).
+        """
         var staged_idx = self.get_staged_idx(tile_idx, stage)
         increment_counter_if_first_thread(
             self.consumer_counters[staged_idx], Int32(1)

@@ -65,7 +65,7 @@ Op logging is implemented using the `Trace` struct from `runtime.tracing` with
 `TraceLevel.OP`:
 
 ```mojo
-from runtime.tracing import Trace, TraceLevel
+from max.runtime.tracing import Trace, TraceLevel
 
 # Create a trace for an operation
 with Trace[TraceLevel.OP](op_name, detail, task_id=task_id):

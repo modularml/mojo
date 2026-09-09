@@ -1,0 +1,199 @@
+---
+title: GPU debugging
+sidebar_position: 4
+description: Debugging Mojo programs on GPU.
+---
+
+You can debug Mojo code running on GPUs using
+[CUDA-GDB](https://docs.nvidia.com/cuda/cuda-gdb/index.html#). You can either
+debug using the `cuda-gdb` command-line interface, or through VS Code, using the
+Mojo and NVIDIA extensions.
+
+:::note Limitations
+
+Currently there are a couple of notable limitations to debugging Mojo code on
+GPU:
+
+- GPU debugging is supported only on NVIDIA GPUs.
+- You cannot debug Mojo code running inside a MAX
+  [custom operation](/develop/custom-ops/).
+  (You can only debug Mojo GPU
+  code launched from a Mojo program when using the
+  [gpu.host](/api/mojo/max/gpu/host/) API).
+
+:::
+
+## GPU debugging setup
+
+To debug Mojo code on GPU, first make sure you have a [compatible
+GPU](https://mojolang.org/docs/requirements#gpu-compatibility).
+
+If you're using VS Code, you can run it on the same system where your GPU code
+is running (the "target system"), or on a separate system using remote
+debugging.
+
+To debug on GPU, you need to choose to debug with CUDA-GDB when you start a
+debugging session. Note that CUDA-GDB has very limited debugging capabilities
+for Mojo code running on the CPU.
+
+To set up for GPU debugging:
+
+1. Install the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)
+   12.4 or later on the target system. Make sure that the `cuda-gdb`
+   binary is in your `$PATH` environment variable. For example, if you have CUDA
+   Toolkit 12.8 installed, add `/usr/local/cuda12.8/bin` to your `$PATH`.
+
+2. If using VS Code, install
+   [Nsight Visual Studio Code Edition](https://marketplace.visualstudio.com/items?itemName=nvidia.nsight-vscode-edition)
+   and the
+   [Mojo extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo)
+   from the Visual Studio Marketplace.
+
+### Using the classic debugger backend
+
+CUDA-GDB includes two debugger backends, called the "classic debugger" and the
+"universal debugger." By default, Mojo uses the CUDA-GDB universal debugger.
+However, some systems require the classic debugger, instead. If you find that
+the debugger is losing its connection with the process being debugged, you may
+need to use the classic debugger. To use the classic debugger backend:
+
+- On the target system, set the environment variable
+  `CUDBG_USE_LEGACY_DEBUGGER` to `1` in your shell configuration file (for
+  example, `.bashrc`, `.zshrc` or `config.fish`). Source the file or start a
+  new shell.
+
+- When creating a launch configuration for GPU debugging, add the following
+  settings to the `launch.json` configuration:
+
+  ```json
+  "legacyDebugger": true,
+  "initCommands": [
+      "set environment CUDBG_USE_LEGACY_DEBUGGER=1"
+  ],
+  ```
+
+## Start GPU debugging from the command line
+
+To start a GPU debugging session in VS Code from the command line, run the
+following command on the target system:
+
+```bash
+mojo debug --cuda-gdb --break-on-launch --vscode myproject.mojo
+```
+
+To use the CUDA-GDB command line debugger, omit the `--vscode` argument.
+
+The `--break-on-launch` flag is optional but very useful: it stops execution as
+soon as the GPU kernel launches, allowing you to set breakpoints inside the GPU
+code.
+
+## Start GPU debugging from VS Code
+
+The easiest way to start GPU debugging from VS Code is to add a
+[Launch configuration](https://mojolang.org/docs/tools/debugging/#launch-configurations).
+For example, the following launch configuration starts debugging the current
+Mojo file using CUDA-GDB.
+
+```json
+  {
+    "type": "mojo-cuda-gdb",
+    "request": "launch",
+    "name": "Mojo: Debug current Mojo file with CUDA-GDB",
+    "description": "Launch and debug the Mojo file that is active on the editor when the debug session starts, using CUDA-GDB.",
+    "mojoFile": "${file}",
+    "args": [],
+    "env": [],
+    "cwd": "${workspaceFolder}",
+    "breakOnLaunch": true,
+    "legacyDebugger": true,
+    "initCommands": [
+        "set environment CUDBG_USE_LEGACY_DEBUGGER=1"
+    ],
+  },
+```
+
+The last two settings, `legacyDebugger` and `initCommands` should only be
+included if required on your system to maintain a stable connection to the
+process being debugged, as described in
+[Using the classic debugger backend](#using-the-classic-debugger-backend).
+
+## Issuing CUDA-GDB commands
+
+Some features of the debugger are only available via CUDA-GDB commands, so it's
+worth familiarizing yourself with CUDA-GDB even if you're using VS Code as a
+frontend.
+
+If you're running in VS Code, you can enter CUDA-GDB commands in the debug
+console by prefixing them with a single backtick (`). Note that the console may
+automatically add a second backtick at the end of your command, which prevents
+it from being recognized as a CUDA-GDB command. Be sure to remove the second
+backtick before submitting the command.
+
+The examples in the following section are raw CUDA-GDB commands, without the
+backtick.
+
+A good starting point for learning about CUDA-GDB is the
+[CUDA-GDB User Manual](https://docs.nvidia.com/cuda/cuda-gdb/index.html#)
+
+## Tips and tricks
+
+The following sections provide tips for some common tasks in GPU debugging.
+
+### Setting breakpoints in GPU code
+
+There are a few quirks to setting breakpoints in GPU code. If you set a
+breakpoint in GPU code before the GPU kernel launches, the breakpoint will show
+up in a different function (a CPU function).
+
+When the debugger pauses at this first breakpoint, click **Continue** to resume
+execution, and the debugger should stop at the correct location in the GPU code.
+When paused at the first breakpoint, you can add more breakpoints in the GPU
+code, however, the breakpoints won't show up in the left gutter until the GPU
+kernel launches.
+
+Symbol breakpoints aren't supported when debugging with CUDA-GDB.
+
+On the CUDA-GDB command line, you can set a breakpoint using the `break`
+command (which can be abbreviated to `b`):
+
+<code><strong>break</strong>
+<var>filename.mojo</var>:<var>line_number</var></code><br/>
+<code><strong>b</strong> <var>filename.mojo</var>:<var>line_number</var></code>
+
+### Stepping not supported on GPU
+
+The step commands—**Step Over**, **Step Into**, and **Step Out** do not work
+reliably on GPU. Instead we recommend adding breakpoints and using **Continue**
+to move between breakpoints.
+
+### Changing kernel focus
+
+You can use CUDA-GDB commands to change the current _kernel focus_: that is,
+the block and thread index that you're currently inspecting. Use the `cuda`
+to inspect the current focus or change focus:
+
+```plaintext
+cuda block thread
+block (0,0,0), thread (0,0,0)
+cuda block 0,0,0 thread 1,0,0
+[Switching focus to CUDA kernel 0, grid 1, block (0,0,0), thread (1,0,0), device 0, sm 0, warp 0, lane 1]
+```
+
+For more information, see
+[Kernel focus](https://docs.nvidia.com/cuda/cuda-gdb/index.html#kernel-focus) in
+the CUDA-GDB documentation.
+
+### Inspecting registers
+
+Inspect the values of registers using the `info registers` command.
+
+```plaintext
+`info registers $R0 $R1
+info registers $R0 $R1
+R0             0xebfffda8          -335544920
+R1             0xfffda8            16776616
+```
+
+For more information, see
+[Registers](https://docs.nvidia.com/cuda/cuda-gdb/index.html#registers) in
+the CUDA-GDB documentation.

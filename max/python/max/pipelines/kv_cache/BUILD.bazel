@@ -2,16 +2,121 @@ load("//bazel:api.bzl", "modular_py_library", "requirement")
 
 package(default_visibility = ["//max:consumers"])
 
+# GPU-flavor NIXL transport plugins for the build's target GPU vendor. When
+# no vendor is configured (CPU-only CI, local host builds) all flavors are
+# staged so the same runfiles tree serves any machine it lands on. Wheel and
+# conda packaging is independent of this (utils/packaging stages the
+# .stripped variants of every flavor unconditionally: one universal
+# linux-x86_64 package serves both vendors).
+filegroup(
+    name = "_nixl_gpu_flavor_plugins",
+    srcs = select({
+        "//:nvidia_gpu": [
+            # The verbs flavor adds the uct_ib RDMA transports for InfiniBand
+            # internode transfers; max._core prefers it on hosts with a real IB
+            # port, else falls back to the plain cuda flavor.
+            "@nixl_upstream//:cuda-verbs/libplugin_UCX.so",
+            "@nixl_upstream//:cuda/libplugin_LIBFABRIC.so",
+            "@nixl_upstream//:cuda/libplugin_UCX.so",
+        ],
+        "//:amd_gpu": [
+            # The verbs flavor adds the uct_ib RDMA transports; max._core
+            # prefers it when rdma-core resolves at runtime.
+            "@nixl_upstream//:rocm-verbs/libplugin_UCX.so",
+            "@nixl_upstream//:rocm/libplugin_UCX.so",
+        ],
+        "//conditions:default": [
+            "@nixl_upstream//:cuda-verbs/libplugin_UCX.so",
+            "@nixl_upstream//:cuda/libplugin_LIBFABRIC.so",
+            "@nixl_upstream//:cuda/libplugin_UCX.so",
+            "@nixl_upstream//:rocm-verbs/libplugin_UCX.so",
+            "@nixl_upstream//:rocm/libplugin_UCX.so",
+        ],
+    }),
+    visibility = ["//visibility:private"],
+)
+
+# The complete NIXL plugin staging for the target host: the vendor-selected
+# GPU flavors above plus the cpu flavor, which is staged unconditionally —
+# it is the vendor-neutral runfiles anchor max._core resolves the plugin base
+# directory from (see Support/BazelRunfiles.cpp), and its tcp/shm transports
+# have no GPU load-time deps. Linux-x86_64 only (upstream ships prebuilt
+# binaries for that platform); empty elsewhere. Depend on this from any
+# target that creates a NIXL agent under `bazel run`/`bazel test`.
+filegroup(
+    name = "nixl_host_plugins",
+    srcs = select({
+        "//:linux_x86_64": [
+            ":_nixl_gpu_flavor_plugins",
+            "@nixl_upstream//:cpu/libplugin_UCX.so",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//max:__subpackages__"],
+)
+
+# The connector interface (KVConnector protocol + KVConnectorTransfer /
+# CompletedTransfer) as its own lightweight target, so connector
+# implementations (notably the dKV connector) can depend on just the interface
+# without pulling in — or forming a cycle with — the full kv_cache library.
+modular_py_library(
+    name = "kv_connector",
+    srcs = ["kv_connector.py"],
+    deps = [
+        "//max/python/max/nn",
+    ],
+)
+
+# The NIXL plugin RTLD_GLOBAL preload as its own stdlib-only target, for the
+# same reason as :kv_connector above — every code path that creates a NIXL
+# agent needs it, including the dKV connector, which cannot depend on the full
+# kv_cache library without forming a cycle.
+modular_py_library(
+    name = "nixl_plugin_deps",
+    srcs = ["_nixl_plugin_deps.py"],
+)
+
+# The MODULAR_NIXL_TRANSFER_BACKEND validator as its own stdlib-only target,
+# for the same reason as :nixl_plugin_deps above — the transfer engine and
+# the dKV connector both read the variable and must share one accepted set.
+modular_py_library(
+    name = "nixl_backend",
+    srcs = ["_nixl_backend.py"],
+)
+
 modular_py_library(
     name = "kv_cache",
-    srcs = glob(["**/*.py"]),
+    srcs = glob(
+        ["**/*.py"],
+        exclude = [
+            "kv_connector.py",
+            "_nixl_backend.py",
+            "_nixl_plugin_deps.py",
+        ],
+    ),
+    # Stage the upstream NIXL transport plugins into the runfiles tree so that
+    # `bazel run` workers (which have no install tree) can find them: max._core
+    # resolves this runfiles location and sets NIXL_PLUGIN_DIR before the NIXL
+    # plugin manager is constructed.
+    data = [":nixl_host_plugins"],
+    # The Rust tiered connector's pyo3 module is provided at runtime only
+    # (private kv-tier-connector wheel, linux-x86_64); the shim lazily imports
+    # it, so declare it unresolved here rather than as a build dep.
+    ignore_unresolved_imports = ["kv_tier_connector"],
+    test_docstring_examples = True,
     deps = [
+        ":kv_connector",
+        ":nixl_backend",
+        ":nixl_plugin_deps",
+        "//max/python/max/pipelines/context",
         requirement("numpy"),
         requirement("msgspec"),
-        requirement("tqdm"),
+        requirement("psutil"),
+        requirement("pydantic"),
+        requirement("typing-extensions"),
         "//max/python/max:_core",
         "//max/python/max/_core_mojo",
-        "//max/python/max/_distributed_ops",
+        "//max/python/max/config",
         "//max/python/max/driver",
         "//max/python/max/dtype",
         "//max/python/max/engine",

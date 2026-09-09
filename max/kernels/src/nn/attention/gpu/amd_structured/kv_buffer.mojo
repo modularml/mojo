@@ -35,8 +35,7 @@ TileTensor is used throughout:
 from std.math import ceildiv
 from std.math.uutils import umod, ufloordiv
 from std.sys import simd_width_of, llvm_intrinsic
-from std.gpu import WARP_SIZE, lane_id
-from std.memory.pointer import AddressSpace as BaseAddressSpace
+from max.gpu import WARP_SIZE, lane_id
 from layout import (
     ComptimeInt,
     Coord,
@@ -46,6 +45,7 @@ from layout import (
     MixedLayout,
     TensorLayout,
     TileTensor,
+    DefaultEngine,
 )
 from layout.tile_layout import row_major
 from layout.tile_tensor import stack_allocation
@@ -59,6 +59,7 @@ from structured_kernels.amd_tile_io import (
     RegTileLoader,
     RegTileWriterLDS,
     SubTileLoaderLDS,
+    TiledMmaLoader,
     load_lds_fragment,
 )
 
@@ -81,6 +82,17 @@ struct KVCacheIterator[
     When cache_depth != depth, the DRAM stride uses cache_depth (e.g., MLA
     K_rope reads 64 columns from a 576-wide cache row). head_dim_offset
     shifts the column start (e.g., skip to rope portion at column 512).
+
+    Parameters:
+        cache_t: MHA operand wrapping the KV cache pointer and dtype.
+        tile_size: Number of rows loaded per DRAM tile.
+        kv_num_heads: Number of KV heads in the cache.
+        depth: Per-head depth read from each cache row (head dimension).
+        cache_depth: Row stride of the paged KV cache in elements
+            (defaults to `depth`).
+        head_dim_offset: Column offset within each cache row, used to
+            skip to a sub-region such as the rope portion (defaults to
+            `0`).
     """
 
     comptime GmemTileLayout = MixedLayout[
@@ -90,9 +102,7 @@ struct KVCacheIterator[
         ].element_types,
     ]
     comptime GmemTileType = TileTensor[
-        Self.cache_t.dtype,
-        Self.GmemTileLayout,
-        ImmutAnyOrigin,
+        Self.cache_t.dtype, Self.GmemTileLayout, ImmutAnyOrigin
     ]
 
     var cache: Self.cache_t
@@ -151,12 +161,26 @@ def _get_k_swizzle[mma_m: Int, bk: Int]() -> Optional[Swizzle]:
     """K swizzle for decode.
 
     XORs upper row bits into lower address bits to spread different rows
-    across LDS bank groups in the col_major thread distribution. Returns
-    Swizzle(3,0,4) for 32x32 MMA, Swizzle(3,0,3) for 16x16, and None for
-    BK > 64 (fp8 16x16x128).
+    across LDS bank groups in the col_major thread distribution. `bk`
+    here is the SMEM physical block width (`_bk_smem`), NOT the MMA strip
+    width; the swizzle math operates on per-block addresses.
+
+    Two shapes, by MFMA M-dim:
+
+    - `mma_m == 16` (16x16x{32,64,128}): `Swizzle(3, 0, 3)`. At
+      bk=128 (8 vecs/row at simd_w=16B) this XORs vec_idx[3:6]
+      (= 8 consecutive rows) into vec_idx[0:3] (= col-in-row).
+      At bk=64 (4 vecs/row) the same `S=3` shift XORs row bits
+      m[1..3] (skipping m[0]) into vec_idx[0..2], reaching all 8
+      distinct bank values across the 16 lanes per col_vec AND
+      simultaneously spreading V's `ds_read_tr8_b64` accesses to
+      V's structural conflict floor. A shallower `Swizzle(2, 0, 2)`
+      is not enough: `S=2` only XORs `m[0..1]`, the LSBs that
+      least-distinguish 16 rows, leaving 2-way conflicts behind.
+      At bk=32 (BF16 16x16x32 decode) the same swizzle applies.
+    - `mma_m == 32` (32x32x{16,64}): `Swizzle(3, 0, 4)` matches the
+      32x32 lane geometry (4 16B vecs per 32-row tile).
     """
-    comptime if bk > 64:
-        return None
     comptime if mma_m == 32:
         return Swizzle(3, 0, 4)
     return Swizzle(3, 0, 3)
@@ -178,7 +202,19 @@ struct KVBuffer[
     cache_depth: Int = depth,
     head_dim_offset: Int = 0,
     reg_chunk_depth: Int = depth,
+    reg_chunk_keys: Int = WN,
     smem_depth: Int = depth,
+    # SMEM physical block width. When `bk_smem < BK`, the SMEM stride is
+    # `bk_smem` and each MMA K=BK strip is composed of `BK / bk_smem`
+    # adjacent SMEM blocks. Used by MLA decode at depth=576 (BK=128,
+    # bk_smem=64) to avoid wasting an 8 KB pad on a partial block.
+    bk_smem: Int = BK,
+    # Number of SMEM stages (double-buffer depth). Defaults to 2, so every
+    # existing caller is byte-identical. A single-block consumer with no KV
+    # streaming loop (e.g. MSA prefill: one `load_from_dram[0]`/
+    # `load_from_shared(0)`) never touches the 2nd stage, so it can pass 1 to
+    # halve the SMEM allocation.
+    num_smem_stages: Int = 2,
 ]:
     """KV cache buffer managing DMA, LDS staging, and register tiles.
 
@@ -187,12 +223,12 @@ struct KVBuffer[
     SMEM is navigated via `.tile()` on a strided parent TileTensor whose
     (BK, BN) strides encode the blocked layout (num_repeats contiguous
     BN×BK blocks per stage, two stages). Stage selection and in-stage
-    block selection both happen via the tile column index — no pointer
+    block selection both happen via the tile column index, no pointer
     arithmetic required. smem_mma_subtile is still used for V-operand
     MMA sub-tiles which have mma_cols != BK.
 
     When full_kv=True (depth<=256), each SMEM stage holds BN x smem_depth
-    elements — the full tile. When full_kv=False (depth=512), each stage
+    elements: the full tile. When full_kv=False (depth=512), each stage
     holds only BN x BK elements, and the caller iterates over BK blocks.
 
     `smem_depth` defaults to `depth`. It exists for per-warp V buffers
@@ -203,6 +239,48 @@ struct KVBuffer[
 
     MMA register tiles (mma_tile) are TileTensor in LOCAL address space.
     TiledMmaOp (mma.mojo) handles SMEM→register loads and MMA dispatch.
+
+    Parameters:
+        kv_t: MHA operand wrapping the KV cache pointer and dtype
+            (inferred).
+        mma_shape: MFMA instruction shape `[M, N, K]` used for register
+            tiling.
+        swizzle: LDS bank-conflict swizzle for SMEM loads and stores, or
+            `None`.
+        BN: Number of keys per DRAM tile (block tile extent along the
+            key axis).
+        WN: Number of keys per warp tile (warp tile extent along the key
+            axis).
+        BK: Strip width along the MMA K dimension of one DRAM-to-SMEM
+            load.
+        num_threads: Number of threads in the block driving DMA and
+            register distribution.
+        depth: Per-head depth of the KV cache (head dimension).
+        kv_num_heads: Number of KV heads in the cache.
+        transpose: `True` for the K operand (column strips from `BN x
+            depth`), `False` for V.
+        full_kv: When `True`, each SMEM stage holds the full `BN x
+            smem_depth` tile; when `False`, each stage holds only `BN x
+            BK` and the caller iterates over BK blocks (defaults to
+            `True`).
+        cache_depth: Row stride of the paged KV cache in elements
+            (defaults to `depth`).
+        head_dim_offset: Column offset within each cache row, used to
+            skip to a sub-region such as the rope portion (defaults to
+            `0`).
+        reg_chunk_depth: Cap on the K (transpose) register tile depth
+            coverage, in elements (defaults to `depth`).
+        reg_chunk_keys: Cap on the V (non-transpose) register tile key
+            coverage, in keys (defaults to `WN`).
+        smem_depth: Depth extent of one SMEM stage; larger than `depth`
+            for per-warp V buffers whose `depth` is smaller than `BK`
+            (defaults to `depth`).
+        bk_smem: SMEM physical block width; when less than `BK`, each MMA
+            K strip is composed of `BK / bk_smem` adjacent SMEM blocks
+            (defaults to `BK`).
+        num_smem_stages: Number of SMEM stages (double-buffer depth); a
+            single-block consumer with no streaming loop may pass `1` to
+            halve the SMEM allocation (defaults to `2`).
     """
 
     comptime MMA_N = Self.mma_shape[1]
@@ -211,61 +289,70 @@ struct KVBuffer[
         Self.WN if Self.transpose else Self.depth, Self.MMA_N
     )
     comptime num_k_mmas2 = ceildiv(Self.BK, Self.MMA_K)
-    # B-operand fragment size: matches the old prefill KV buffer's
-    # input_frag_size = num_matrix_reg[MMA_K, MMA_N].
-    # For BF16 [32,32,16]: 8.  For FP8 [32,32,64]: 32.
+    # B-operand fragment size: `num_matrix_reg[MMA_K, MMA_N]`.
+    # For BF16 [32,32,16]: 8. For FP8 [32,32,64]: 32.
     comptime input_frag_size = (Self.MMA_K * Self.MMA_N) // WARP_SIZE
     comptime simd_width = simd_width_of[Self.kv_t.dtype]()
     comptime num_k_tiles = ceildiv(
         Self.depth if Self.transpose else Self.WN, Self.BK
     )
-    # Register-side strip count. For the K path (transpose=True) the caller
-    # can cap depth coverage via reg_chunk_depth so the reg tile stays small
-    # even when SMEM holds the full depth; global strip index maps into the
-    # reg tile via `bk_tile % _reg_num_k_tiles`.
+    # Register-side strip count. The caller can cap the reg tile so it stays
+    # small even when SMEM holds the full tile: K (transpose=True) via
+    # reg_chunk_depth (depth coverage), V (transpose=False) via reg_chunk_keys
+    # (key coverage). The global strip index maps into the (aliased) reg tile
+    # via `bk_tile % _reg_num_k_tiles`; the caller must then drive the strip
+    # loop explicitly (load[strip] -> consume) so slots don't clobber early.
     comptime _reg_num_k_tiles = (
-        ceildiv(
-            Self.reg_chunk_depth, Self.BK
-        ) if Self.transpose else Self.num_k_tiles
+        ceildiv(Self.reg_chunk_depth, Self.BK) if Self.transpose else ceildiv(
+            Self.reg_chunk_keys, Self.BK
+        )
     )
 
     comptime warp_tile_rows = 32
-    comptime num_repeats = Self.smem_depth // Self.BK
-    comptime smem_cols = Self.smem_depth if Self.full_kv else Self.BK
+    comptime num_repeats = Self.smem_depth // Self.bk_smem
+    comptime smem_cols = Self.smem_depth if Self.full_kv else Self.bk_smem
     comptime smem_stage_size = Self.BN * Self.smem_cols
 
     # Strided parent view over the full 2-stage SMEM allocation.
-    # Shape (BN, _smem_total_cols) with stride (BK, BN) so that
-    # `.tile[tile_rows, BK]((tile_row, tile_col))` produces
-    # `tile_row * tile_rows * BK + tile_col * BN * BK`, matching the
-    # block-aligned offsets of the blocked (BN × BK) SMEM layout.
-    # tile_col indexes linearly over all blocks across both stages, so
-    # stage selection happens via coordinate arithmetic rather than
-    # pointer arithmetic (col = buffer_idx * blocks_per_stage + block).
+    # Shape (BN, _smem_total_cols) with stride (bk_smem, BN) so that
+    # `.tile[tile_rows, bk_smem]((tile_row, tile_col))` produces
+    # `tile_row * tile_rows * bk_smem + tile_col * BN * bk_smem`,
+    # matching the block-aligned offsets of the blocked
+    # (BN × bk_smem) SMEM layout. tile_col indexes linearly over all
+    # blocks across both stages, so stage selection happens via
+    # coordinate arithmetic rather than pointer arithmetic
+    # (col = buffer_idx * blocks_per_stage + block).
     comptime _blocks_per_stage = Self.num_repeats if Self.full_kv else 1
-    comptime _smem_total_cols = 2 * Self._blocks_per_stage * Self.BK
+    comptime _smem_total_cols = (
+        Self.num_smem_stages * Self._blocks_per_stage * Self.bk_smem
+    )
     comptime _SmemParentLayout = MixedLayout[
         Coord[
             ComptimeInt[Self.BN], ComptimeInt[Self._smem_total_cols]
         ].element_types,
-        Coord[ComptimeInt[Self.BK], ComptimeInt[Self.BN]].element_types,
+        Coord[ComptimeInt[Self.bk_smem], ComptimeInt[Self.BN]].element_types,
     ]
-    # Strides for sub-tiles of width BK: plain row-major (BK, 1) so
-    # element indexing within a block behaves normally.
+    # Strides for sub-tiles of width bk_smem: plain row-major (bk_smem, 1)
+    # so element indexing within a block behaves normally.
     comptime _SmemTileStrides = MixedLayout[
-        Coord[ComptimeInt[Self.BK], ComptimeInt[1]].element_types,
+        Coord[ComptimeInt[Self.bk_smem], ComptimeInt[1]].element_types,
         Coord[ComptimeInt[1], ComptimeInt[1]].element_types,
     ]
 
     comptime _num_warps = Self.num_threads // WARP_SIZE
     comptime _dma_col_groups = (
-        Self.smem_depth // Self.BK
+        Self.smem_depth // Self.bk_smem
     ) if Self.full_kv else 1
     comptime _total_tiles = (
         Self.BN // Self.warp_tile_rows
     ) * Self._dma_col_groups
     comptime _tiles_per_warp = ceildiv(Self._total_tiles, Self._num_warps)
-    comptime vm_instrs_per_load = UInt32(Self._tiles_per_warp * 2)
+    # A nonuniform tile split has no single safe per-wave outstanding count;
+    # zero makes pipelined consumers wait for every wave's DMA to finish.
+    comptime vm_instrs_per_load = UInt32(
+        Self._tiles_per_warp * 2 if Self._total_tiles % Self._num_warps
+        == 0 else 0
+    )
 
     comptime _mma_total_rows = Self.num_mmas * Self.num_k_mmas2 * Self._reg_num_k_tiles
     comptime mma_layout = row_major[
@@ -274,8 +361,8 @@ struct KVBuffer[
     comptime MMATileType = TileTensor[
         Self.kv_t.dtype,
         type_of(Self.mma_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     comptime KVMmaOpType = KVMmaOp[
         Self.kv_t.dtype,
@@ -297,9 +384,10 @@ struct KVBuffer[
         Self.kv_t.dtype,
         Self._SmemParentLayout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]
 
+    @__allow_legacy_any_origin_fields
     var smem_tile: Self.SmemParentType
 
     var kv_cache_iter: KVCacheIterator[
@@ -323,18 +411,27 @@ struct KVBuffer[
         tile_rows: Int,
     ](self, tile_row: Int, block_col: Int) -> TileTensor[
         Self.kv_t.dtype,
-        type_of(row_major[tile_rows, Self.BK]()),
+        type_of(row_major[tile_rows, Self.bk_smem]()),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]:
-        """Get a (tile_rows, BK) row-major sub-tile from SMEM.
+        """Get a (tile_rows, bk_smem) row-major sub-tile from SMEM.
 
-        tile_row indexes along BN (rows within a BN×BK block), block_col
-        indexes linearly across all BN×BK blocks in both stages.
+        tile_row indexes along BN (rows within a BN×bk_smem block),
+        block_col indexes linearly across all BN×bk_smem blocks in both
+        stages.
+
+        Parameters:
+            tile_rows: Number of rows in the returned sub-tile.
+
+        Args:
+            tile_row: Row index along `BN` within a `BN x bk_smem` block.
+            block_col: Linear index across all `BN x bk_smem` blocks in
+                both stages.
         """
         return self._smem_view().tile[
             tile_rows,
-            Self.BK,
+            Self.bk_smem,
             stride_layout=Self._SmemTileStrides,
         ](Coord(tile_row, block_col))
 
@@ -378,42 +475,77 @@ struct KVBuffer[
                     warp_row, _stage_block_base
                 )
                 var gmem_warp_tile = gmem_tile.tile[
-                    Self.warp_tile_rows, Self.BK
+                    Self.warp_tile_rows, Self.bk_smem
                 ](warp_row, 0)
+                # Default `hoist_scalar_offset=False` keeps the legacy
+                # per-iter `Int(src_partitions.ptr) - dram_base` codegen.
                 loader.load(smem_warp, gmem_warp_tile)
         elif (
             Self.smem_depth == 64
             and Self.BN <= Self.warp_tile_rows * 2
-            and Self.smem_depth // Self.BK >= 2
+            and Self.smem_depth // Self.bk_smem >= 2
         ):
             var warp_r, warp_c = divmod(Int(self.warp_id), 2)
             var smem_warp = self.smem_block_tile[Self.warp_tile_rows](
                 warp_r, _stage_block_base + warp_c
             )
-            var gmem_warp_tile = gmem_tile.tile[Self.warp_tile_rows, Self.BK](
-                warp_r, warp_c
-            )
+            var gmem_warp_tile = gmem_tile.tile[
+                Self.warp_tile_rows, Self.bk_smem
+            ](warp_r, warp_c)
             loader.load(smem_warp, gmem_warp_tile)
         else:
             comptime num_warps = Self.num_threads // WARP_SIZE
             comptime num_row_groups = Self.BN // Self.warp_tile_rows
-            comptime num_col_groups = Self.smem_depth // Self.BK
+            comptime num_col_groups = Self.smem_depth // Self.bk_smem
             comptime total_tiles = num_row_groups * num_col_groups
             comptime tiles_per_warp = ceildiv(total_tiles, num_warps)
+            # Coverage: every tile must be reachable by some (warp, t) pair.
+            comptime assert tiles_per_warp * num_warps >= total_tiles
 
-            comptime for t in range(tiles_per_warp):
-                comptime tile_idx = Int(t) * num_warps
-                var warp_tile = UInt32(tile_idx) + self.warp_id
-                var warp_row, warp_col = divmod(
-                    warp_tile, UInt32(num_col_groups)
-                )
-                var smem_warp = self.smem_block_tile[Self.warp_tile_rows](
-                    Int(warp_row), _stage_block_base + Int(warp_col)
-                )
-                var gmem_warp_tile = gmem_tile.tile[
-                    Self.warp_tile_rows, Self.BK
-                ](Int(warp_row), Int(warp_col))
-                loader.load(smem_warp, gmem_warp_tile)
+            # Bounds guard only needed when `num_warps` doesn't divide
+            # `total_tiles` (e.g. W in {5,7,8} at depth=576/BN=128 → 36 tiles):
+            # the last warp's final tile would index past `total_tiles` and
+            # over-read. When it divides exactly (e.g. W=4) the unguarded loop
+            # below is exact — byte-identical at S=1.
+            comptime _needs_dma_guard = (total_tiles % num_warps) != 0
+            comptime if _needs_dma_guard:
+                comptime for t in range(tiles_per_warp):
+                    comptime tile_idx = Int(t) * num_warps
+                    var warp_tile = UInt32(tile_idx) + self.warp_id
+                    # Mirrors the guarded streaming twin
+                    # (`if warp_tile < total_dma_tiles` below).
+                    if warp_tile < UInt32(total_tiles):
+                        var warp_row, warp_col = divmod(
+                            warp_tile, UInt32(num_col_groups)
+                        )
+                        var smem_warp = self.smem_block_tile[
+                            Self.warp_tile_rows
+                        ](Int(warp_row), _stage_block_base + Int(warp_col))
+                        var gmem_warp_tile = gmem_tile.tile[
+                            Self.warp_tile_rows, Self.bk_smem
+                        ](Int(warp_row), Int(warp_col))
+                        loader.load(smem_warp, gmem_warp_tile)
+            else:
+                comptime for t in range(tiles_per_warp):
+                    comptime tile_idx = Int(t) * num_warps
+                    var warp_tile = UInt32(tile_idx) + self.warp_id
+                    var warp_row, warp_col = divmod(
+                        warp_tile, UInt32(num_col_groups)
+                    )
+                    var smem_warp = self.smem_block_tile[Self.warp_tile_rows](
+                        Int(warp_row), _stage_block_base + Int(warp_col)
+                    )
+                    var gmem_warp_tile = gmem_tile.tile[
+                        Self.warp_tile_rows, Self.bk_smem
+                    ](Int(warp_row), Int(warp_col))
+                    loader.load(smem_warp, gmem_warp_tile)
+
+        # K-tail padding is handled register-side in `zero_partial_tile_pad`
+        # (as the reference does — see that method for the rationale). The
+        # SMEM tail bytes for `cols [depth, smem_depth)` of the last K-tile
+        # remain at whatever the DMA's OOB-clamp / row-aliasing produced; the K
+        # MFMA never reads from those bytes because the per-lane fragment's
+        # upper half is overridden with zero after the LDS load.
 
     # split[N]()[idx] → tile[rows_per_split, cols](idx, 0)
     comptime _rows_per_k_tile = Self.num_mmas * Self.num_k_mmas2
@@ -426,8 +558,8 @@ struct KVBuffer[
     ](self) -> TileTensor[
         Self.kv_t.dtype,
         type_of(row_major[Self._rows_per_k_mma, Self.input_frag_size]()),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]:
         comptime reg_slot = bk_tile_idx % Self._reg_num_k_tiles
         return self.kv_mma_op.mma_tile_at[reg_slot, k_mma_tile_idx]()
@@ -439,15 +571,80 @@ struct KVBuffer[
     ](self) -> TileTensor[
         Self.kv_t.dtype,
         type_of(row_major[Self._rows_per_k_mma, Self.input_frag_size]()),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]:
-        """Alias for get_mma_tile, kept for decode-call-site symmetry."""
+        """Alias for get_mma_tile, kept for decode-call-site symmetry.
+
+        Parameters:
+            k_mma_tile_idx: Index of the MFMA tile along the K dimension
+                within one BK strip.
+            bk_tile_idx: Index of the BK strip along the depth (transpose)
+                or key (non-transpose) axis.
+        """
         return self.get_mma_tile[k_mma_tile_idx, bk_tile_idx]()
 
     @always_inline
+    def zero_partial_tile_pad(self):
+        """Register-side zero for the OOB tail of the partial K-tile.
+
+        When `depth % BK != 0`, the last K-tile (i = depth // BK) spans
+        `BK` K-positions but only `valid_cols = depth - i*BK` are valid;
+        the trailing `BK - valid_cols` are pad and must read as zero.
+
+        Per-lane K-fragment layout: the `input_frag_size` elements per
+        lane interleave across MFMA-K such that the LOWER
+        `valid_per_lane = input_frag_size * valid_cols / BK` elements
+        correspond to the valid K-range and the UPPER
+        `input_frag_size - valid_per_lane` elements correspond to the
+        pad. Zero the upper portion per lane.
+
+        The reference pre-zeros half of the partial-tile K-fragment dwords
+        once and reuses; we re-zero each K LDS load because the LDS loader
+        fills the whole reg tile.
+
+        A no-op when `depth % BK == 0`.
+
+        NOTE: keep in sync with `QRegisterBuffer.__init__`'s partial-tile
+        zero in `buffers.mojo`. Both sites share the upper-half-is-pad
+        assumption (asserted below); a future config that violates it
+        (`valid_cols > BK/2`) needs a different zero pattern in both.
+        """
+        comptime if Self.depth % Self.BK != 0:
+            comptime partial_bk_tile = Self.depth // Self.BK
+            comptime valid_cols_in_partial = (
+                Self.depth - partial_bk_tile * Self.BK
+            )
+            # Upper-half-is-pad invariant: today (depth=576, BK=128)
+            # `valid_cols` is exactly BK/2, so the lo half of each
+            # lane's per-tile fragment covers the valid K-range and the
+            # hi half is pad. A future config with `valid_cols > BK/2`
+            # would split the valid range across both halves and need a
+            # different zero pattern.
+            comptime assert valid_cols_in_partial <= Self.BK // 2, (
+                "zero_partial_tile_pad assumes valid cols fit in the"
+                " lower-K half of the per-lane fragment"
+            )
+            comptime valid_per_lane = (
+                Self.input_frag_size * valid_cols_in_partial // Self.BK
+            )
+            comptime zero_per_lane = Self.input_frag_size - valid_per_lane
+            comptime assert (
+                zero_per_lane > 0
+            ), "zero_partial_tile_pad: zero_per_lane must be positive"
+            comptime for k_mma in range(Self.num_k_mmas2):
+                # Zero cols [valid_per_lane .. input_frag_size) of each
+                # lane's partial-bk-tile fragment — the K-pad portion
+                # produced by `load_b`'s `lo.join(hi)` upper half.
+                _ = (
+                    self.mma_subtile[k_mma, partial_bk_tile]()
+                    .tile[Self._rows_per_k_mma, zero_per_lane](0, 1)
+                    .fill(0)
+                )
+
+    @always_inline
     def load_from_shared(self, buffer: Int):
-        # The no-index form loads every strip into the reg tile.  When the
+        # The no-index form loads every strip into the reg tile. When the
         # reg tile is chunked (_reg_num_k_tiles < num_k_tiles) slots alias,
         # so the caller must drive the chunk loop explicitly via the
         # indexed overload.
@@ -460,64 +657,67 @@ struct KVBuffer[
             and Self.kv_t.dtype.is_float8()
             and Self.mma_shape[0] == 16
         ):
-            # FP8 16x16x128 V load: scalar path.
-            # A-operand register layout via col_major(16, 4):
-            # thread l at (row=l%16, col_group=l//16) holds 32 FP8
-            # values from V^T[depth_row, keys g*32..(g+1)*32].
-            # V SMEM is row_major(BN, BK): V[key, d] = base + key*BK + d.
-            #
-            # INTENTIONALLY NOT wrapped in `TiledMmaOp.load_b` /
-            # `SubTileLoaderLDS.load` / an equivalent structured abstraction.
-            # The A-operand layout is a per-lane **permuted scalar gather**
-            # (each lane pulls 32 FP8 scalars from non-contiguous SMEM
-            # rows parameterized by `lane_id()`), which no existing
-            # distribute / vectorize primitive encodes. Wrapping it in a
-            # new struct would just be a paperweight around the same
-            # `(v_base + (key + j) * BK + depth_idx).load[width=1]()`
-            # loop below — zero reuse beyond this one site, gated by the
-            # narrow `mma_shape[0] == 16 && !transpose && is_float8`
-            # comptime guard.
-            # If this pattern ever appears elsewhere, the right move is
-            # a `FP8VScalarGather` helper alongside `ds_read_tr16_b64_*`
-            # in `structured_kernels/amd_tile_io.mojo`.
+            # FP8 16x16x128 V load: paired-lane `ds_read_tr8_b64`.
+            # Each (bk_tile, dt) iteration covers one MFMA tile of V
+            # (16 depths * 128 keys = 2048 FP8 = 64 lanes * 32 FP8/lane)
+            # via 4 `ds_read_tr8_b64` calls at key_base ∈ {0,8,16,24}.
+            # Lane partition for the 64-lane wave:
+            #   key_group g  = lid // 16     (0..3 -> 16-lane "rows")
+            #   pair_idx  p  = (lid%16) // 2 (0..7 -> pair within row;
+            #                                 even/odd share same pair)
+            #   is_odd    o  = lid % 2       (0 or 1)
+            # See `TiledMmaLoader.load_v_fp8_strip_16` for the address
+            # arithmetic; per-lane output: V[key=g*32..g*32+31,
+            # depth=butterfly(lid%16) + dt*16] where butterfly is the
+            # natural depth permutation of `ds_read_tr8_b64`'s two
+            # interleaved 8x8 transposes. The MFMA A-operand consumes
+            # this permuted layout directly (the 16x16x128 m_h lane
+            # mapping IS the butterfly).
             comptime MMA_M_ = Self.mma_shape[0]
             comptime num_depth_tiles = Self.depth // MMA_M_
 
-            var lid = lane_id()
-            var v_base = self.smem_tile.tile[Self.BN, Self.BK](
+            var v_base = self.smem_tile.tile[Self.BN, Self.bk_smem](
                 0, buffer * Self._blocks_per_stage
             ).ptr
-            var row = umod(lid, MMA_M_)
-            var col_group = ufloordiv(lid, MMA_M_)
+
+            var lid = lane_id()
+            var key_group = Int(ufloordiv(lid, 16))
+            var pair_idx = Int(ufloordiv(umod(lid, 16), 2))
+            var is_odd = Int(umod(lid, 2))
+
             var reg_vec = self.kv_mma_op.reg_tile.vectorize[
                 1, Self.input_frag_size
             ]()
 
             comptime for bk_tile in range(Self.num_k_tiles):
                 comptime for dt in range(num_depth_tiles):
-                    var depth_idx = Int(row) + dt * MMA_M_
-                    var key_start = bk_tile * Self.BK + Int(col_group) * 32
-                    var vals = SIMD[Self.kv_t.dtype, Self.input_frag_size]()
-                    for j in range(Self.input_frag_size):
-                        vals[j] = (
-                            v_base + (key_start + j) * Self.BK + depth_idx
-                        ).load[width=1]()
+                    var joined = TiledMmaLoader[
+                        Self.kv_t.dtype,
+                        Self.mma_shape,
+                        swizzle=Self.swizzle,
+                    ].load_v_fp8_strip_16[
+                        Self.BN, Self.bk_smem, bk_tile, Int(dt)
+                    ](
+                        v_base, key_group, pair_idx, is_odd
+                    )
                     reg_vec[bk_tile * num_depth_tiles + dt, 0] = rebind[
                         type_of(reg_vec[0, 0])
-                    ](vals)
+                    ](joined)
         elif not Self.transpose and Self.kv_t.dtype.is_float8():
             # FP8 V vector load using ds_read_tr8_b64 with paired-lane
-            # addressing.  Replaces ~128 scalar LDS reads with ~16 vector
+            # addressing. Replaces ~128 scalar LDS reads with ~16 vector
             # reads (8x fewer instructions).
             #
             # Paired lanes (even/odd) access the same key at depth offsets
-            # differing by 8.  After the hardware 8x8 transpose, each lane
-            # holds 8 contiguous depth values.  Even lanes cover depths
-            # [d, d+8), odd lanes [d+8, d+16) -> 16 unique depths per
-            # 16-lane row.  Two rows within hw0 (depth_base 0 and 16) give
-            # 32 depths; hw1 shifts keys by +4 for the complementary MFMA
-            # C-output column pattern, covering all 64 BN keys per MFMA
-            # tile. The per-strip load lives in
+            # differing by 8. After the hardware 8x8 transpose, each lane
+            # holds 8 different keys at ONE depth (NOT 8 contiguous depths
+            # per lane — that's the pre-transpose source layout). The 16
+            # lanes in a row collectively cover 16 unique depths; the
+            # depth-per-lane mapping is `depth_in_block = lane_in_row +
+            # (row_in_warp % 2) * 16`. Two rows within hw0 (depth_base 0
+            # and 16) give 32 depths; hw1 shifts keys by +4 for the
+            # complementary MFMA C-output column pattern, covering all
+            # 64 BN keys per MFMA tile. The per-strip load lives in
             # `TiledMmaLoader.load_v_fp8_strip` — see that method for
             # the addressing details; here we precompute the lane-only
             # coords once and iterate (bk_tile, dt).
@@ -559,12 +759,46 @@ struct KVBuffer[
             comptime num_warps_n = Self.BN // Self.WN
             var warp_col = umod(Int(self.warp_id), num_warps_n)
 
-            var warp_smem = self.smem_block_tile[Self.wtile_dim0](
-                Int(warp_col), buffer * Self._blocks_per_stage + bk_tile
-            )
+            comptime if Self.bk_smem < Self.BK:
+                # bk_smem-split path: each MMA K=BK strip is composed of
+                # `BK / bk_smem` adjacent BN×bk_smem SMEM blocks. For the
+                # FP8 16x16x128 case (BK=128, bk_smem=64), that's two
+                # blocks per strip. The final strip may be partial when
+                # depth % BK != 0 — no hi block, register-zero the upper
+                # half of the MMA fragment.
+                # The K-split path uses `load_prefill_split` (two 64-wide
+                # blocks per 128-wide MMA strip). Generalizing to other
+                # ratios would need a `BK / bk_smem`-arity load helper;
+                # not implemented today since the only shipping config
+                # is depth=576, BK=128, bk_smem=64.
+                comptime assert (
+                    Self.bk_smem * 2 == Self.BK
+                ), "Only bk_smem == BK/2 supported in the K split path"
+                comptime num_full_strips = Self.depth // Self.BK
+                comptime has_hi = bk_tile < num_full_strips
 
-            comptime reg_slot = bk_tile % Self._reg_num_k_tiles
-            self.kv_mma_op.load_prefill[reg_slot](warp_smem)
+                var base_block = buffer * Self._blocks_per_stage + bk_tile * 2
+                var warp_lo = self.smem_block_tile[Self.wtile_dim0](
+                    Int(warp_col), base_block
+                )
+                # When has_hi=False we still pass warp_lo as the hi arg
+                # (it's ignored by load_prefill_split via comptime branch).
+                var warp_hi = self.smem_block_tile[Self.wtile_dim0](
+                    Int(warp_col),
+                    base_block + 1 if has_hi else base_block,
+                )
+
+                comptime reg_slot = bk_tile % Self._reg_num_k_tiles
+                self.kv_mma_op.load_prefill_split[reg_slot, has_hi](
+                    warp_lo, warp_hi
+                )
+            else:
+                var warp_smem = self.smem_block_tile[Self.wtile_dim0](
+                    Int(warp_col), buffer * Self._blocks_per_stage + bk_tile
+                )
+
+                comptime reg_slot = bk_tile % Self._reg_num_k_tiles
+                self.kv_mma_op.load_prefill[reg_slot](warp_smem)
 
         else:
             comptime if Self.kv_t.dtype.is_float8():
@@ -615,6 +849,26 @@ struct DecodeStreamingKVBuffer[
 
     K (transpose=True): BN x BK SMEM, column strips from BN x depth.
     V (transpose=False): BK x depth SMEM (blocked BK x BK), row strips.
+
+    Parameters:
+        kv_t: MHA operand wrapping the KV cache pointer and dtype
+            (inferred).
+        mma_shape: MFMA instruction shape `[M, N, K]` used for register
+            tiling.
+        swizzle: LDS bank-conflict swizzle for SMEM loads and stores, or
+            `None`.
+        BN: Number of keys per DRAM tile (block tile extent along the
+            key axis).
+        WN: Number of keys per warp tile (warp tile extent along the key
+            axis).
+        BK: Strip width along the MMA K dimension of one per-iteration
+            DRAM-to-SMEM load.
+        num_threads: Number of threads in the block driving DMA and
+            register distribution.
+        depth: Per-head depth of the KV cache (head dimension).
+        kv_num_heads: Number of KV heads in the cache.
+        transpose: `True` for the K operand (column strips from `BN x
+            depth`), `False` for V (row strips).
     """
 
     comptime MMA_N = Self.mma_shape[1]
@@ -641,8 +895,8 @@ struct DecodeStreamingKVBuffer[
     comptime MMATileType = TileTensor[
         Self.kv_t.dtype,
         type_of(Self.mma_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     comptime KVMmaOpType = KVMmaOp[
         Self.kv_t.dtype,
@@ -681,10 +935,10 @@ struct DecodeStreamingKVBuffer[
     ]
 
     var kv_mma_op: Self.KVMmaOpType
+
+    @__allow_legacy_any_origin_fields
     var smem_ptr: UnsafePointer[
-        Scalar[Self.kv_t.dtype],
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        Scalar[Self.kv_t.dtype], MutAnyOrigin, address_space=.SHARED
     ]
     var warp_id: UInt32
 
@@ -695,9 +949,7 @@ struct DecodeStreamingKVBuffer[
         batch_idx: Int,
         head_idx: Int,
         smem_ptr: UnsafePointer[
-            Scalar[Self.kv_t.dtype],
-            MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            Scalar[Self.kv_t.dtype], MutAnyOrigin, address_space=.SHARED
         ],
         num_keys: Int,
         warp_id: UInt32,
@@ -713,14 +965,14 @@ struct DecodeStreamingKVBuffer[
         Self.kv_t.dtype,
         Self._KSmemParentLayout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]:
         """Single-stage K SMEM view (BN × BK) with strides (BK, BN)."""
         return TileTensor[
             Self.kv_t.dtype,
             Self._KSmemParentLayout,
             MutAnyOrigin,
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
         ](self.smem_ptr, Self._KSmemParentLayout())
 
     @always_inline
@@ -730,12 +982,19 @@ struct DecodeStreamingKVBuffer[
         Self.kv_t.dtype,
         type_of(row_major[tile_rows, Self.BK]()),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]:
         """Get a (tile_rows, BK) row-major sub-tile from the K SMEM.
 
         Single-stage K SMEM has one BN×BK block, so only the row index
         along BN varies.
+
+        Parameters:
+            tile_rows: Number of rows in the sub-tile.
+
+        Args:
+            tile_row: Row index along `BN` within the `BN x BK` SMEM
+                block.
         """
         return self._k_smem_view().tile[
             tile_rows,
@@ -746,11 +1005,21 @@ struct DecodeStreamingKVBuffer[
     @always_inline
     def load_from_dram[
         strip_idx: Int
-    ](self, gmem_tile: TileTensor[Self.kv_t.dtype, ...],):
+    ](
+        self,
+        gmem_tile: TileTensor[Self.kv_t.dtype, Engine=DefaultEngine[], ...],
+    ):
         """Load one BK-wide strip from an external DRAM tile to SMEM.
 
         K (transpose=True): columns [strip*BK, (strip+1)*BK] from BN x depth.
         V (transpose=False): rows [strip*BK, (strip+1)*BK] from BN x depth.
+
+        Parameters:
+            strip_idx: Strip index along the K dimension (transpose) or
+                the row axis (non-transpose) of the DRAM tile.
+
+        Args:
+            gmem_tile: External DRAM tile to load the strip from.
         """
         comptime if Self.transpose:
             comptime if Self.kv_t.dtype.is_float8():
@@ -780,7 +1049,7 @@ struct DecodeStreamingKVBuffer[
                 ](gmem_tile)
 
                 var load_buf = stack_allocation[
-                    Self.kv_t.dtype, AddressSpace.LOCAL
+                    Self.kv_t.dtype, address_space=.LOCAL
                 ](row_major[_k_rows_per_stage, _k_sw]())
 
                 var dram_strip = gmem_tile.tile[Self.BN, Self.BK](0, strip_idx)
@@ -794,7 +1063,7 @@ struct DecodeStreamingKVBuffer[
                     Self.kv_t.dtype,
                     type_of(_k_smem_layout),
                     MutAnyOrigin,
-                    address_space=AddressSpace.SHARED,
+                    address_space=.SHARED,
                 ](self.smem_ptr, _k_smem_layout)
 
                 RegTileWriterLDS[
@@ -850,7 +1119,7 @@ struct DecodeStreamingKVBuffer[
             ](gmem_tile)
 
             var load_buf = stack_allocation[
-                Self.kv_t.dtype, AddressSpace.LOCAL
+                Self.kv_t.dtype, address_space=.LOCAL
             ](row_major[_v_rows_per_stage, _v_sw]())
 
             var dram_strip = gmem_tile.tile[Self.BK, Self.depth](strip_idx, 0)
@@ -865,7 +1134,7 @@ struct DecodeStreamingKVBuffer[
                 Self.kv_t.dtype,
                 type_of(_v_smem_layout),
                 MutAnyOrigin,
-                address_space=AddressSpace.SHARED,
+                address_space=.SHARED,
             ](self.smem_ptr, _v_smem_layout)
 
             RegTileWriterLDS[
@@ -937,7 +1206,7 @@ struct DecodeStreamingKVBuffer[
                 Self.kv_t.dtype,
                 type_of(_v_smem_layout),
                 MutAnyOrigin,
-                address_space=AddressSpace.SHARED,
+                address_space=.SHARED,
             ](self.smem_ptr, _v_smem_layout)
             var warp_tile = smem_tile.tile[Self.BK, _v_warp_depth](
                 0, Int(warp_col)
@@ -965,10 +1234,15 @@ struct DecodeStreamingKVBuffer[
     ](self) -> TileTensor[
         Self.kv_t.dtype,
         type_of(row_major[Self.num_mmas, Self.input_frag_size]()),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]:
-        """Get register tile for one k_mma group within the single strip."""
+        """Get register tile for one k_mma group within the single strip.
+
+        Parameters:
+            k_mma_idx: Index of the MFMA tile along the K dimension
+                within the strip.
+        """
         return self.kv_mma_op.mma_tile_at[0, k_mma_idx]()
 
 
@@ -978,6 +1252,13 @@ struct DecodeStreamingKVBuffer[
 
 
 trait KVBufferConfig:
+    """Tiling configuration shared by the K and V decode buffer roles.
+
+    Defines the warp-tile and block-tile dimensions, the MMA iteration
+    axis used to walk the DRAM tile, and the warp-tile coordinate lookup
+    that `DecodeKVBuffer` uses to select its SMEM sub-view per warp.
+    """
+
     comptime wsize: Int
     comptime wtile_dim0: Int
     comptime wtile_dim1: Int
@@ -995,6 +1276,18 @@ trait KVBufferConfig:
 
 @fieldwise_init
 struct KBufferConfig[BN: Int, BK: Int, WN: Int](KVBufferConfig):
+    """K-role decode buffer config that iterates DRAM along the column axis.
+
+    The warp tile is `[WN, BK]` (key-block width by strip width), the block
+    tile is `[BN, BK]`, and `iterator_axis = 1` advances `tile_idx` across
+    column strips of the DRAM tile.
+
+    Parameters:
+        BN: Number of keys per block tile (extent along the key axis).
+        BK: Strip width along the MMA K dimension.
+        WN: Number of keys per warp tile.
+    """
+
     comptime wsize = Self.wtile_dim0
     comptime wtile_dim0 = Self.WN
     comptime wtile_dim1 = Self.BK
@@ -1013,6 +1306,19 @@ struct KBufferConfig[BN: Int, BK: Int, WN: Int](KVBufferConfig):
 
 @fieldwise_init
 struct VBufferConfig[BN: Int, BK: Int, WN: Int, depth: Int](KVBufferConfig):
+    """V-role decode buffer config that iterates DRAM along the row axis.
+
+    The warp tile is `[BK, depth // num_warps_n]` (strip width by per-warp
+    depth slice), the block tile is `[BK, depth]`, and `iterator_axis = 0`
+    advances `tile_idx` across row strips of the DRAM tile.
+
+    Parameters:
+        BN: Number of keys per block tile (extent along the key axis).
+        BK: Strip width along the MMA K dimension.
+        WN: Number of keys per warp tile.
+        depth: Per-head depth of the KV cache (head dimension).
+    """
+
     comptime wsize = Self.wtile_dim1
     comptime wtile_dim0 = Self.BK
     comptime wtile_dim1 = Self.depth // (Self.BN // Self.WN)
@@ -1044,6 +1350,39 @@ struct DecodeKVBuffer[
     num_stages: Int = 1,
     token_gen: Bool = False,
 ]:
+    """Double-buffered register-staged KV buffer for the AMD decode mirror path.
+
+    Stages DRAM tiles through a register `load_tile` (optionally multi-stage)
+    before copying to SMEM and loading into the MFMA `mma_tile`. The
+    `KVBufferConfig` parameter selects the K (transpose) or V
+    (non-transpose) tiling, iterator axis, and warp-tile coordinate so a
+    single implementation serves both operands.
+
+    Parameters:
+        dtype: Element type of the KV cache tiles (inferred).
+        kv_tile_layout: Runtime layout of the DRAM KV tile used to build
+            `gmem_tile` (inferred).
+        config: K or V role config selecting warp tile, block tile,
+            iterator axis, and warp-tile coordinate.
+        tensor_core_mma: MFMA descriptor (shape, group size, transpose_b,
+            out type) driving SMEM-to-register loads.
+        swizzle: LDS bank-conflict swizzle for SMEM loads and stores, or
+            `None`.
+        BN: Number of keys per DRAM tile (block tile extent along the
+            key axis).
+        WN: Number of keys per warp tile (warp tile extent along the key
+            axis).
+        BK: Strip width along the MMA K dimension of one DRAM-to-SMEM
+            load.
+        depth: Per-head depth of the KV cache (head dimension).
+        num_threads: Number of threads in the block driving DMA and
+            register distribution.
+        num_stages: Number of register buffer stages for double buffering
+            (defaults to 1).
+        token_gen: Selects the token-generation thread layout for DMA
+            distribution (defaults to `False`).
+    """
+
     comptime _dtype = Self.dtype
     comptime _num_stages = Self.num_stages
     comptime MMA_N = Self.tensor_core_mma.shape[1]
@@ -1080,8 +1419,8 @@ struct DecodeKVBuffer[
     comptime LoadTile = TileTensor[
         Self.dtype,
         type_of(Self._load_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     var load_tile: Self.LoadTile
 
@@ -1092,8 +1431,8 @@ struct DecodeKVBuffer[
     comptime MmaTile = TileTensor[
         Self.dtype,
         type_of(Self._mma_layout),
-        MutExternalOrigin,
-        address_space=AddressSpace.LOCAL,
+        MutUntrackedOrigin,
+        address_space=.LOCAL,
     ]
     var mma_tile: Self.MmaTile
 
@@ -1114,8 +1453,10 @@ struct DecodeKVBuffer[
         Self.dtype,
         type_of(Self._smem_layout),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]
+
+    @__allow_legacy_any_origin_fields
     var smem_tile: Self.SmemTile
 
     # DRAM tile and loader.
@@ -1128,6 +1469,8 @@ struct DecodeKVBuffer[
         row_major[Self._thread_rows, Self._thread_cols](),
         Self.num_threads,
     ]
+
+    @__allow_legacy_any_origin_fields
     var gmem_tile: Self.GmemTileType
     var reg_loader: Self.RegLoaderType
     var tile_idx: Int
@@ -1139,10 +1482,10 @@ struct DecodeKVBuffer[
         gmem_tile: Self.GmemTileType,
         smem_tile: Self.SmemTile,
     ):
-        self.load_tile = stack_allocation[Self.dtype, AddressSpace.LOCAL](
+        self.load_tile = stack_allocation[Self.dtype, address_space=.LOCAL](
             Self._load_layout
         )
-        self.mma_tile = stack_allocation[Self.dtype, AddressSpace.LOCAL](
+        self.mma_tile = stack_allocation[Self.dtype, address_space=.LOCAL](
             Self._mma_layout
         )
         self.smem_tile = smem_tile
@@ -1178,14 +1521,14 @@ struct DecodeKVBuffer[
         Self.dtype,
         type_of(row_major[Self._mma_rows, Self._mma_cols]()),
         MutAnyOrigin,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ]:
         return rebind[
             TileTensor[
                 Self.dtype,
                 type_of(row_major[Self._mma_rows, Self._mma_cols]()),
                 MutAnyOrigin,
-                address_space=AddressSpace.LOCAL,
+                address_space=.LOCAL,
             ]
         ](self.mma_tile)
 

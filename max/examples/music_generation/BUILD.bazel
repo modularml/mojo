@@ -1,0 +1,27 @@
+load("//bazel:api.bzl", "modular_py_binary", "requirement")
+
+package(default_visibility = ["//visibility:private"])
+
+modular_py_binary(
+    name = "generate_song",
+    srcs = [
+        "generate_song.py",
+        "seam_check.py",
+    ],
+    data = ["songs/dream_pop.json"],
+    # So that `python generate_song.py` and this target resolve `seam_check`
+    # the same way.
+    imports = ["."],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/minimax_music3",
+        "//max/python/max/pipelines/audio",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/request",
+        requirement("huggingface-hub"),
+        requirement("numpy"),
+        requirement("requests"),
+    ],
+)

@@ -16,12 +16,13 @@ import functools
 import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 import pytest
 from max.pipelines.lib import (
     KVCacheConfig,
     MAXModelConfig,
+    ModelManifest,
     PipelineConfig,
     PipelineRuntimeConfig,
 )
@@ -63,12 +64,21 @@ def enable_prefix_caching(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture
-def mock_pipeline_config(enable_prefix_caching: bool) -> PipelineConfig:
+def runtime_overrides(request: pytest.FixtureRequest) -> dict[str, Any]:
+    """Runtime config fields for ``mock_pipeline_config``'s construction.
+    This is bound indirectly - hence the request.param pattern.
+    See https://docs.pytest.org/en/7.1.x/example/parametrize.html
+    """
+    return request.param if hasattr(request, "param") else {}
+
+
+@pytest.fixture
+def mock_pipeline_config(
+    enable_prefix_caching: bool, runtime_overrides: dict[str, Any]
+) -> PipelineConfig:
     runtime = PipelineRuntimeConfig.model_construct(
         max_batch_size=1,
-    )
-    pipeline_config = PipelineConfig.model_construct(
-        runtime=runtime,
+        **runtime_overrides,
     )
 
     kv_cache_config = KVCacheConfig.model_construct(
@@ -77,13 +87,14 @@ def mock_pipeline_config(enable_prefix_caching: bool) -> PipelineConfig:
 
     model_config = MAXModelConfig.model_construct(
         served_model_name="echo",
+        kv_cache=kv_cache_config,
     )
     model_config._huggingface_config = PretrainedConfig()
 
-    model_config.kv_cache = kv_cache_config
-    pipeline_config.model = model_config
-
-    return pipeline_config
+    return PipelineConfig.model_construct(
+        runtime=runtime,
+        models=ModelManifest({"main": model_config}),
+    )
 
 
 # simple decorator to make hung test cases fail faster than the bazel 300s timeout

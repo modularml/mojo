@@ -140,6 +140,21 @@ class TestValuePropertySetters:
         assert InferenceSession.debug.ir_output_dir == dir_path
 
 
+def _run_with_env(
+    env_overrides: dict[str, str], check_script: str
+) -> subprocess.CompletedProcess[str]:
+    """Run a Python snippet in a subprocess with extra env vars set."""
+    env = os.environ.copy()
+    env.update(env_overrides)
+    return subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(check_script)],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Source tracebacks (lives on Graph.debug)
 # ---------------------------------------------------------------------------
@@ -241,15 +256,7 @@ def _run_debug_env_check(
     env_value: str, check_script: str
 ) -> subprocess.CompletedProcess[str]:
     """Run a Python snippet in a subprocess with MODULAR_DEBUG set."""
-    env = os.environ.copy()
-    env["MODULAR_DEBUG"] = env_value
-    return subprocess.run(
-        [sys.executable, "-c", textwrap.dedent(check_script)],
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=60,
-    )
+    return _run_with_env({"MODULAR_DEBUG": env_value}, check_script)
 
 
 class TestModularDebugEnvVar:

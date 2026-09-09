@@ -6,21 +6,20 @@ description: Extend MAX Graph with custom Mojo kernels for optimized performance
 ---
 
 Custom operations (custom ops) extend
-[MAX graphs](/max/api/python/generated/max.graph.Graph) with custom
+[MAX graphs](/api/python/generated/max.graph.Graph) with custom
 [Mojo](https://mojolang.org/docs/manual) kernels. Whether you need to
 optimize performance of functions, implement custom algorithms, or create
 hardware-specific versions of existing operators, custom ops provide the
 flexibility you need.
 
-The [custom ops](/max/api/python/graph.ops#max.graph.ops.custom) API provides
+The [custom ops](/api/python/graph.ops#max.graph.ops.custom) API provides
 complete control over MAX Graph while handling kernel integration and
 optimization pipelines automatically.
 
 Try it now with our
 [custom ops examples](https://github.com/modular/modular/tree/main/max/examples/custom_ops)
-on GitHub or follow the
-[Build custom ops for GPUs](/max/develop/build-custom-ops) tutorial and
-[let us know what you think](https://www.modular.com/community).
+on GitHub or follow the [Build custom ops for GPUs](/develop/build-custom-ops)
+tutorial and [let us know what you think](https://www.modular.com/community).
 
 ## How it works
 
@@ -38,13 +37,13 @@ your custom op implementation into the execution flow.
 
 For more information:
 
-- Follow the [Build custom ops for GPUs tutorial](/max/develop/build-custom-ops)
+- Follow the [Build custom ops for GPUs tutorial](/develop/build-custom-ops)
 - Learn more about
-  [GPU programming with Mojo](https://mojolang.org/docs/manual/gpu/basics)
+  [GPU programming with Mojo](/gpu/architecture)
 - Explore the
   [Custom ops GitHub examples](https://github.com/modular/modular/tree/main/max/examples/custom_ops)
 - Reference the
-  [MAX Graph custom ops API](/max/api/python/graph.ops#max.graph.ops.custom)
+  [MAX Graph custom ops API](/api/python/graph.ops#max.graph.ops.custom)
 
 ## Mojo custom ops in PyTorch
 
@@ -56,15 +55,16 @@ Mojo implementations.
 Custom operations in PyTorch can now be written using Mojo, letting you
 experiment with new GPU algorithms in a familiar PyTorch environment. These
 custom operations are registered using the
-[`CustomOpLibrary`](/max/api/python/generated/max.experimental.torch.CustomOpLibrary)
-class in the [`max.torch`](/max/api/python/experimental.torch) package.
+[`CustomOpLibrary`](/api/python/generated/max.experimental.torch.CustomOpLibrary)
+class in the [`max.experimental.torch`](/api/python/experimental.torch) package.
 
 ### How it works
 
 The integration process has three steps:
 
 1. Write your kernel implementation in Mojo.
-2. Register your custom operation using `CustomOpLibrary` from `max.torch`.
+2. Register your custom operation using `CustomOpLibrary` from
+   `max.experimental.torch`.
 3. Replace specific operations in your existing PyTorch model with your Mojo
    implementation.
 

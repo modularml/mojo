@@ -10,8 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from std.gpu.host import DeviceContext
-from std.gpu.host.info import Vendor
+from max.gpu.host import DeviceContext
 from layout import TileTensor, coord, row_major
 from nn.irfft import irfft
 from std.testing import assert_almost_equal
@@ -24,7 +23,7 @@ def test_irfft_basic[
     batch_size: Int,
     input_size: Int,  # Size of complex input (number of complex values)
     output_size: Int,  # Size of real output
-    dtype: DType = DType.float32,
+    dtype: DType = .float32,
 ](ctx: DeviceContext) raises:
     """
     Basic IRFFT test.
@@ -45,8 +44,8 @@ def test_irfft_basic[
 
     # Input shape: [batch_size, input_size*2] because complex values are stored
     # as interleaved float32 (real, imag, real, imag, ...)
-    comptime input_shape = coord[batch_size, input_size * 2]()
-    comptime output_shape = coord[batch_size, output_size]()
+    comptime input_shape = coord[batch_size, input_size * 2]
+    comptime output_shape = coord[batch_size, output_size]
 
     var input_runtime_layout = row_major(input_shape)
     var output_runtime_layout = row_major(output_shape)
@@ -65,7 +64,7 @@ def test_irfft_basic[
     with input_device.map_to_host() as input_host:
         var input_tensor = TileTensor(
             input_host, input_runtime_layout
-        ).make_dynamic[DType.int64]()
+        ).make_dynamic[.int64]()
         for b in range(batch_size):
             # DC component: real=1.0, imag=0.0
             input_tensor[b, 0] = 1.0  # real part
@@ -103,7 +102,7 @@ def test_irfft_basic[
     with output_device.map_to_host() as output_host:
         var output_tensor = TileTensor(
             output_host, output_runtime_layout
-        ).make_dynamic[DType.int64]()
+        ).make_dynamic[.int64]()
         var first_value = output_tensor[0, 0]
         print("First output value:", first_value)
 
@@ -123,7 +122,7 @@ def test_irfft_basic[
 def main() raises:
     with DeviceContext() as ctx:
         # Check if we're running on an NVIDIA GPU
-        if ctx.default_device_info.vendor != Vendor.NVIDIA_GPU:
+        if ctx.default_device_info.api != "cuda":
             print("Skipping cuFFT tests - not running on NVIDIA GPU")
             return
 
@@ -140,7 +139,7 @@ def main() raises:
     # First context - default device (GPU 0)
     print("Creating first device context (default device)...")
     with DeviceContext() as ctx1:
-        if ctx1.default_device_info.vendor != Vendor.NVIDIA_GPU:
+        if ctx1.default_device_info.api != "cuda":
             print("Skipping cuFFT tests - not running on NVIDIA GPU")
             return
 
@@ -150,7 +149,7 @@ def main() raises:
         # Second context - device 1
         print("Creating second device context (device 1)...")
         with DeviceContext(device_id=1) as ctx2:
-            if ctx2.default_device_info.vendor != Vendor.NVIDIA_GPU:
+            if ctx2.default_device_info.api != "cuda":
                 print(
                     "Skipping cuFFT tests on device 1 - not running on NVIDIA"
                     " GPU"

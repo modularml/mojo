@@ -36,8 +36,8 @@ transpose bugs are detectable). Full nibble range 0..15 covers
 negative FP4 values.
 """
 
-from std.gpu.host import DeviceContext, HostBuffer
-from std.gpu.host.info import MI355X
+from max.gpu.host import DeviceContext, HostBuffer
+from max.gpu.host.info import MI355X
 from std.math import ceildiv
 from std.random import rand
 from std.testing import assert_almost_equal
@@ -99,17 +99,17 @@ comptime _MXFP4_GROUP: Int = 32  # elements per scale group
 
 
 def cpu_routed_reference(
-    a: TileTensor[DType.uint8, ...],
-    b: TileTensor[DType.uint8, ...],
-    sfa: TileTensor[DType.uint8, ...],
-    sfb: TileTensor[DType.uint8, ...],
+    a: TileTensor[.uint8, ...],
+    b: TileTensor[.uint8, ...],
+    sfa: TileTensor[.uint8, ...],
+    sfb: TileTensor[.uint8, ...],
     pair_to_expert: List[Int],
     num_tokens: Int,
     topk: Int,
     N: Int,
     K: Int,
     is_token_slot: Bool,
-    mut c_out: TileTensor[mut=True, DType.float32, ...],
+    mut c_out: TileTensor[mut=True, .float32, ...],
 ):
     """Computes the routed MoE matmul output on the CPU as one GEMV per
     (token, slot) pair — independent of the kernel's sort-block structure.
@@ -136,7 +136,7 @@ def cpu_routed_reference(
     # Zero-fill output (inactive pairs / out-of-range t,s leave zeros here).
     for c_row in range(num_tokens * topk):
         for n in range(N):
-            c_out[Coord(c_row, n)] = SIMD[DType.float32, 1](0.0)
+            c_out[Coord(c_row, n)] = Float32(0.0)
 
     for t in range(num_tokens):
         for s in range(topk):
@@ -161,7 +161,7 @@ def cpu_routed_reference(
                         acc += a_pair[0] * a_scale * b_pair[0] * b_scale
                         acc += a_pair[1] * a_scale * b_pair[1] * b_scale
 
-                c_out[Coord(c_row, n)] = SIMD[DType.float32, 1](acc)
+                c_out[Coord(c_row, n)] = Float32(acc)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -201,10 +201,8 @@ def build_routing_metadata(
     expert_ids_input: List[Int],
     topk: Int,
     sort_block_m: Int,
-    mut sti_out: HostBuffer[
-        DType.uint32
-    ],  # length size_expert_ids * sort_block_m
-    mut ei_out: HostBuffer[DType.int32],  # length size_expert_ids
+    mut sti_out: HostBuffer[.uint32],  # length size_expert_ids * sort_block_m
+    mut ei_out: HostBuffer[.int32],  # length size_expert_ids
 ):
     """Builds `sorted_token_ids` and per-block `expert_ids` arrays.
 
@@ -309,16 +307,12 @@ def run_routed_test_case[
     var num_input_rows = (num_tokens * topk) if is_token_slot else num_tokens
 
     # ---- Host buffers ----
-    var a_h = ctx.enqueue_create_host_buffer[DType.uint8](
-        num_input_rows * k_bytes
-    )
-    var b_h = ctx.enqueue_create_host_buffer[DType.uint8](
-        num_experts * N * k_bytes
-    )
-    var sfa_h = ctx.enqueue_create_host_buffer[DType.uint8](
+    var a_h = ctx.enqueue_create_host_buffer[.uint8](num_input_rows * k_bytes)
+    var b_h = ctx.enqueue_create_host_buffer[.uint8](num_experts * N * k_bytes)
+    var sfa_h = ctx.enqueue_create_host_buffer[.uint8](
         num_input_rows * k_scales
     )
-    var sfb_h = ctx.enqueue_create_host_buffer[DType.uint8](
+    var sfb_h = ctx.enqueue_create_host_buffer[.uint8](
         num_experts * N * k_scales
     )
     ctx.synchronize()
@@ -338,23 +332,23 @@ def run_routed_test_case[
     )
 
     # ---- Routing tables ----
-    var sti_h = ctx.enqueue_create_host_buffer[DType.uint32](
+    var sti_h = ctx.enqueue_create_host_buffer[.uint32](
         size_expert_ids * sort_block_m
     )
-    var ei_h = ctx.enqueue_create_host_buffer[DType.int32](size_expert_ids)
+    var ei_h = ctx.enqueue_create_host_buffer[.int32](size_expert_ids)
     ctx.synchronize()
     build_routing_metadata(
         n_e, expert_ids_input, topk, sort_block_m, sti_h, ei_h
     )
 
     # ---- Host preshuffle (SFB per expert, SFA per chunk; B is preshuffled on-GPU below) ----
-    var sfb_pre_hb = ctx.enqueue_create_host_buffer[DType.uint8](
+    var sfb_pre_hb = ctx.enqueue_create_host_buffer[.uint8](
         num_experts * sfb_per_expert_bytes
     )
-    var sfa_pre_hb = ctx.enqueue_create_host_buffer[DType.uint8](
+    var sfa_pre_hb = ctx.enqueue_create_host_buffer[.uint8](
         size_expert_ids * sfa_per_block_bytes
     )
-    var sfa_scratch_hb = ctx.enqueue_create_host_buffer[DType.uint8](
+    var sfa_scratch_hb = ctx.enqueue_create_host_buffer[.uint8](
         sfa_per_block_bytes
     )
     ctx.synchronize()
@@ -372,7 +366,7 @@ def run_routed_test_case[
     # just `t`. `size_expert_ids` is runtime, so each block is preshuffled
     # individually with E=1 into a scratch HostBuffer, then copied into
     # the right offset of the main `sfa_pre_hb`.
-    var sfa_block_gathered = ctx.enqueue_create_host_buffer[DType.uint8](
+    var sfa_block_gathered = ctx.enqueue_create_host_buffer[.uint8](
         sort_block_m * k_scales
     )
     ctx.synchronize()
@@ -400,24 +394,20 @@ def run_routed_test_case[
             sfa_pre_hb[blk * sfa_per_block_bytes + i] = sfa_scratch_hb[i]
 
     # ---- Device buffers + copy ----
-    var a_dev = ctx.enqueue_create_buffer[DType.uint8](num_input_rows * k_bytes)
-    var b_raw_dev = ctx.enqueue_create_buffer[DType.uint8](
-        num_experts * N * k_bytes
-    )
-    var b_pre_dev = ctx.enqueue_create_buffer[DType.uint8](
-        num_experts * N * k_bytes
-    )
-    var sfa_pre_dev = ctx.enqueue_create_buffer[DType.uint8](
+    var a_dev = ctx.enqueue_create_buffer[.uint8](num_input_rows * k_bytes)
+    var b_raw_dev = ctx.enqueue_create_buffer[.uint8](num_experts * N * k_bytes)
+    var b_pre_dev = ctx.enqueue_create_buffer[.uint8](num_experts * N * k_bytes)
+    var sfa_pre_dev = ctx.enqueue_create_buffer[.uint8](
         size_expert_ids * sfa_per_block_bytes
     )
-    var sfb_pre_dev = ctx.enqueue_create_buffer[DType.uint8](
+    var sfb_pre_dev = ctx.enqueue_create_buffer[.uint8](
         num_experts * sfb_per_expert_bytes
     )
-    var sti_dev = ctx.enqueue_create_buffer[DType.uint32](
+    var sti_dev = ctx.enqueue_create_buffer[.uint32](
         size_expert_ids * sort_block_m
     )
-    var ei_dev = ctx.enqueue_create_buffer[DType.int32](size_expert_ids)
-    var c_dev = ctx.enqueue_create_buffer[DType.float32](num_tokens * topk * N)
+    var ei_dev = ctx.enqueue_create_buffer[.int32](size_expert_ids)
+    var c_dev = ctx.enqueue_create_buffer[.float32](num_tokens * topk * N)
 
     ctx.enqueue_copy(a_dev, a_h)
     ctx.enqueue_copy(b_raw_dev, b_h)
@@ -427,10 +417,10 @@ def run_routed_test_case[
     ctx.enqueue_copy(ei_dev, ei_h)
 
     # GPU-side preshuffle b_raw_dev → b_pre_dev.
-    var b_raw_dev_tt = TileTensor[mut=False](
+    var b_raw_dev_tt = TileTensor[mut=False, ...](
         b_raw_dev, row_major[num_experts, N, k_bytes]()
     )
-    var b_pre_dev_tt = TileTensor[mut=True](
+    var b_pre_dev_tt = TileTensor[mut=True, ...](
         b_pre_dev,
         Shuffler[num_experts].b_5d_grouped_layout[N=N, K_BYTES=k_bytes],
     )
@@ -442,26 +432,28 @@ def run_routed_test_case[
     c_dev.enqueue_fill(Float32(0.0))
 
     # ---- TileTensors ----
-    var a_tt = TileTensor[mut=False](
+    var a_tt = TileTensor[mut=False, ...](
         a_dev, row_major(Coord(num_input_rows, Idx[k_bytes]))
     )
-    var b_pre_tt = TileTensor[mut=False](
+    var b_pre_tt = TileTensor[mut=False, ...](
         b_pre_dev,
         row_major(Coord(Idx[1], Idx[num_experts * N * k_bytes])),
     )
-    var sfa_pre_tt = TileTensor[mut=False](
+    var sfa_pre_tt = TileTensor[mut=False, ...](
         sfa_pre_dev,
         row_major(Coord(Idx[1], size_expert_ids * sfa_per_block_bytes)),
     )
-    var sfb_pre_tt = TileTensor[mut=False](
+    var sfb_pre_tt = TileTensor[mut=False, ...](
         sfb_pre_dev,
         row_major(Coord(Idx[1], Idx[num_experts * sfb_per_expert_bytes])),
     )
-    var sti_tt = TileTensor[mut=False](
+    var sti_tt = TileTensor[mut=False, ...](
         sti_dev, row_major(Coord(size_expert_ids * sort_block_m))
     )
-    var ei_tt = TileTensor[mut=False](ei_dev, row_major(Coord(size_expert_ids)))
-    var c_tt = TileTensor[mut=True](
+    var ei_tt = TileTensor[mut=False, ...](
+        ei_dev, row_major(Coord(size_expert_ids))
+    )
+    var c_tt = TileTensor[mut=True, ...](
         c_dev, row_major(Coord(num_tokens * topk, Idx[N]))
     )
 
@@ -480,10 +472,10 @@ def run_routed_test_case[
     )
 
     # ---- Compute CPU reference + compare ----
-    var c_kernel_h = ctx.enqueue_create_host_buffer[DType.float32](
+    var c_kernel_h = ctx.enqueue_create_host_buffer[.float32](
         num_tokens * topk * N
     )
-    var c_ref_h = ctx.enqueue_create_host_buffer[DType.float32](
+    var c_ref_h = ctx.enqueue_create_host_buffer[.float32](
         num_tokens * topk * N
     )
     ctx.enqueue_copy(c_kernel_h, c_dev)

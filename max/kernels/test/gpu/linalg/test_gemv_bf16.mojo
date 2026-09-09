@@ -13,9 +13,9 @@
 
 from std.math import ceildiv
 
-import std.gpu.primitives.warp as warp
-from std.gpu import WARP_SIZE
-from std.gpu.host import DeviceContext
+import max.gpu.primitives.warp as warp
+from max.gpu import WARP_SIZE
+from max.gpu.host import DeviceContext
 from layout import Coord, Idx, TileTensor, row_major
 from linalg.gemv import gemv_kernel
 from linalg.matmul.gpu import matmul_kernel_naive
@@ -49,35 +49,34 @@ def run_matvec(M: Int, N: Int, K: Int, *, ctx: DeviceContext) raises:
     for i in range(M * N):
         c_host_n[i] = 0
 
-    var a_device = ctx.enqueue_create_buffer[DType.bfloat16](M * K)
-    var b_device = ctx.enqueue_create_buffer[DType.bfloat16](K * N)
-    var c_device = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var a_device_n = ctx.enqueue_create_buffer[DType.float32](M * K)
-    var b_device_n = ctx.enqueue_create_buffer[DType.float32](K * N)
-    var c_device_n = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var a_device = ctx.enqueue_create_buffer[.bfloat16](M * K)
+    var b_device = ctx.enqueue_create_buffer[.bfloat16](K * N)
+    var c_device = ctx.enqueue_create_buffer[.float32](M * N)
+    var a_device_n = ctx.enqueue_create_buffer[.float32](M * K)
+    var b_device_n = ctx.enqueue_create_buffer[.float32](K * N)
+    var c_device_n = ctx.enqueue_create_buffer[.float32](M * N)
 
     ctx.enqueue_copy(a_device, a_host)
     ctx.enqueue_copy(b_device, b_host)
 
     comptime WARPS_PER_BLOCK = 32
-    comptime kernel = gemv_kernel[DType.float32, DType.bfloat16, DType.bfloat16]
+    comptime kernel = gemv_kernel[.float32, .bfloat16, .bfloat16]
 
     @always_inline
-    @parameter
-    def run_func_gemv(ctx: DeviceContext) raises:
+    def run_func_gemv(ctx: DeviceContext) raises {imm}:
         ctx.enqueue_function[kernel](
             c_device,
             a_device,
             b_device,
-            M,
-            N,
-            K,
+            Int32(M),
+            Int32(N),
+            Int32(K),
             grid_dim=ceildiv(M, WARPS_PER_BLOCK),
             block_dim=WARP_SIZE * WARPS_PER_BLOCK,
         )
 
     var kernelType = "GEMV"
-    var nstime = ctx.execution_time[run_func_gemv](iterations)
+    var nstime = ctx.execution_time(run_func_gemv, iterations)
     var flops = 2 * M * N * K
     var sectime = Float64(nstime) / Float64(iterations) / 1000000000
     print(kernelType, "KERNEL:")
@@ -97,32 +96,30 @@ def run_matvec(M: Int, N: Int, K: Int, *, ctx: DeviceContext) raises:
     # a/b are constructed as immutable to match the ImmutAnyOrigin
     # parameters that matmul_kernel_naive expects (enqueue_function
     # requires exact type matches).
-    from std.memory import UnsafePointer
 
     var c_tt = TileTensor(
         c_device_n,
         row_major(Coord(M, N)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin](
+        ImmPointer[Float32, ImmutAnyOrigin](
             unsafe_from_address=Int(a_device_n.unsafe_ptr())
         ),
         row_major(Coord(M, K)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin](
+        ImmPointer[Float32, ImmutAnyOrigin](
             unsafe_from_address=Int(b_device_n.unsafe_ptr())
         ),
         row_major(Coord(K, N)),
     )
 
     @always_inline
-    @parameter
-    def run_func_naive(ctx: DeviceContext) raises:
+    def run_func_naive(ctx: DeviceContext) raises {imm}:
         comptime kernel = matmul_kernel_naive[
-            DType.float32,
-            DType.float32,
-            DType.float32,
+            .float32,
+            .float32,
+            .float32,
             type_of(c_tt).LayoutType,
             type_of(a_tt).LayoutType,
             type_of(b_tt).LayoutType,
@@ -133,14 +130,14 @@ def run_matvec(M: Int, N: Int, K: Int, *, ctx: DeviceContext) raises:
             c_tt,
             a_tt,
             b_tt,
-            M,
-            N,
-            K,
+            Int32(M),
+            Int32(N),
+            Int32(K),
             grid_dim=(ceildiv(M, BLOCK_DIM), ceildiv(N, BLOCK_DIM)),
             block_dim=(BLOCK_DIM, BLOCK_DIM),
         )
 
-    nstime = ctx.execution_time[run_func_naive](iterations)
+    nstime = ctx.execution_time(run_func_naive, iterations)
     var sectime2 = Float64(nstime) / Float64(iterations) / 1000000000
     print("SHMEM MATMUL:")
     print(sectime2, "sec")

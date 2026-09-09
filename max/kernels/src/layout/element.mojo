@@ -30,8 +30,8 @@ from std.sys import align_of
 
 from layout.layout import coalesce, is_contiguous_dim
 
-from . import Layout, RuntimeLayout
-from .int_tuple import UNKNOWN_VALUE, _get_index_type
+from . import Layout, RuntimeLayout, RuntimeTuple
+from .int_tuple import IntTuple, UNKNOWN_VALUE, _get_index_type
 
 
 @always_inline
@@ -102,7 +102,7 @@ struct Element[
         index_type: The integer type of the index pointing to each element.
     """
 
-    comptime element_data_type = SIMD[Self.dtype, size=Self.layout.size()]
+    comptime element_data_type = SIMD[Self.dtype, length=Self.layout.size()]
     """The SIMD type used to store and process the element data.
 
     This type alias defines a SIMD vector with the specified data type and size
@@ -118,7 +118,7 @@ struct Element[
 
     var runtime_layout: RuntimeLayout[
         Self.layout,
-        element_type=DType.int32,
+        element_type=.int32,
         linear_idx_type=Self.index_type,
     ]
     """The runtime layout information for memory access patterns.
@@ -142,7 +142,7 @@ struct Element[
         element_data: Self.element_data_type,
         runtime_layout: RuntimeLayout[
             Self.layout,
-            element_type=DType.int32,
+            element_type=.int32,
             linear_idx_type=Self.index_type,
         ],
     ):
@@ -158,14 +158,19 @@ struct Element[
     @always_inline("nodebug")
     @staticmethod
     def load(
-        ptr: UnsafePointer[Scalar[Self.dtype], ...],
+        # Bare `Pointer`, not `ImmPointer`: a `mut=True` source pointer (the
+        # usual case, since `MemoryElement` wraps a mutable `LayoutTensor`'s
+        # `.ptr`) passed to `ImmPointer[Scalar, ...]` would force a mut->imm
+        # conversion whose `...`-elided `address_space` falls back to `.GENERIC`,
+        # silently breaking `.LOCAL`/`.SHARED` loads on the GPU.
+        ptr: Pointer[Scalar[Self.dtype], ...],
         runtime_layout: RuntimeLayout[
             Self.layout,
-            element_type=DType.int32,
+            element_type=.int32,
             linear_idx_type=Self.index_type,
         ] = RuntimeLayout[
             Self.layout,
-            element_type=DType.int32,
+            element_type=.int32,
             linear_idx_type=Self.index_type,
         ](),
     ) -> Self:
@@ -195,7 +200,7 @@ struct Element[
                 comptime alignment = align_of[Self.element_data_type]()
                 return Self(
                     ptr.load[
-                        width=Self.element_data_type.size, alignment=alignment
+                        width=Self.element_data_type.length, alignment=alignment
                     ]()
                 )
 
@@ -242,14 +247,14 @@ struct Element[
     @always_inline("nodebug")
     @staticmethod
     def masked_load(
-        ptr: UnsafePointer[Scalar[Self.dtype], ...],
+        ptr: Pointer[Scalar[Self.dtype], ...],
         runtime_layout: RuntimeLayout[
             Self.layout,
-            element_type=DType.int32,
+            element_type=.int32,
             linear_idx_type=Self.index_type,
         ] = RuntimeLayout[
             Self.layout,
-            element_type=DType.int32,
+            element_type=.int32,
             linear_idx_type=Self.index_type,
         ](),
     ) -> Self:
@@ -285,7 +290,7 @@ struct Element[
 
                 return Self(
                     ptr.load[
-                        width=Self.element_data_type.size, alignment=alignment
+                        width=Self.element_data_type.length, alignment=alignment
                     ](0)
                 )
 
@@ -299,8 +304,6 @@ struct Element[
         comptime if Self.layout.stride[0] == 1:
             comptime size = Int(Self.layout.shape[0])
             comptime elements = Int(Self.layout.shape[1])
-            comptime vec_type = SIMD[dtype, size]
-            comptime alignment = align_of[vec_type]
             var element_data = Self.element_data_type()
             if runtime_layout.dim(0) < size:
                 comptime dim_0 = Int(Self.layout.shape[0])
@@ -330,8 +333,6 @@ struct Element[
         elif Self.layout.stride[1] == 1:
             comptime size = Int(Self.layout.shape[1])
             comptime elements = Int(Self.layout.shape[0])
-            comptime vec_type = SIMD[dtype, size]
-            comptime alignment = align_of[vec_type]
             var element_data = Self.element_data_type()
             if runtime_layout.dim(1) < size:
                 comptime dim_0 = Int(Self.layout.shape[0])
@@ -374,7 +375,7 @@ struct Element[
         return Element(element_data, runtime_layout)
 
     @always_inline("nodebug")
-    def store(self, ptr: MutUnsafePointer[Scalar[Self.dtype], ...]):
+    def store(self, ptr: MutPointer[Scalar[Self.dtype], ...]):
         """Stores element data to memory according to the specified layout.
 
         This method performs a layout-aware store operation, writing data to memory
@@ -446,7 +447,7 @@ struct Element[
                 )
 
     @always_inline("nodebug")
-    def masked_store(self, ptr: MutUnsafePointer[Scalar[Self.dtype], ...]):
+    def masked_store(self, ptr: MutPointer[Scalar[Self.dtype], ...]):
         """Stores element data to memory with masking for partial stores.
 
         This method performs a layout-aware store operation with boundary checking.
@@ -619,10 +620,8 @@ struct MemoryElement[
         index_type=Self.index_type,
     ]
 
-    var ptr: UnsafePointer[
-        Scalar[Self.dtype],
-        Self.origin,
-        address_space=Self.address_space,
+    var ptr: Pointer[
+        Scalar[Self.dtype], Self.origin, address_space=Self.address_space
     ]
     """Pointer to the memory location where the data is stored.
 
@@ -633,7 +632,7 @@ struct MemoryElement[
 
     var runtime_layout: RuntimeLayout[
         Self.layout,
-        element_type=DType.int32,
+        element_type=.int32,
         linear_idx_type=Self.index_type,
     ]
     """Runtime layout information used for memory access calculations.
@@ -645,14 +644,12 @@ struct MemoryElement[
 
     def __init__(
         out self,
-        ptr: UnsafePointer[
-            Scalar[Self.dtype],
-            Self.origin,
-            address_space=Self.address_space,
+        ptr: Pointer[
+            Scalar[Self.dtype], Self.origin, address_space=Self.address_space
         ],
         runtime_layout: RuntimeLayout[
             Self.layout,
-            element_type=DType.int32,
+            element_type=.int32,
             linear_idx_type=Self.index_type,
         ],
     ):
@@ -686,6 +683,7 @@ struct MemoryElement[
         """
         return type_of(result).load(self.ptr, self.runtime_layout)
 
+    @__allow_legacy_custom_self_type
     @always_inline("nodebug")
     def store(
         self: Self._AsMut,
@@ -706,6 +704,7 @@ struct MemoryElement[
         """
         return src.store(self.ptr)
 
+    @__allow_legacy_custom_self_type
     @always_inline("nodebug")
     def transfer(self: Self._AsMut, src: MemoryElement):
         """Transfers data from another `MemoryElement` to this one.

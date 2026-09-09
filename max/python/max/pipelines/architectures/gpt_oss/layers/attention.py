@@ -27,6 +27,7 @@ from max.nn.kernels import (
 )
 from max.nn.kv_cache import (
     KVCacheParams,
+    MHAKVCacheParams,
     PagedCacheValues,
 )
 from max.nn.layer import Module, Shardable
@@ -72,7 +73,8 @@ class GptOssAttention(Module, Shardable):
             hidden_size: The dimension of the hidden states.
             kv_params: KV Cache Params, including the number of kv heads, the
                 head dim, and data type.
-            layer_idx: The layer number associated with this Attention block.
+            layer_idx: Index of this layer within its KV group (not the
+                global decoder index).
             dtype: DType of the attention inputs and weights.
             devices: Device to place the weights and run the computation. If
                 multiple are provided, the first device is used. Use
@@ -248,6 +250,7 @@ class GptOssAttention(Module, Shardable):
                 device_idx=shard_idx,
                 num_devices=self.sharding_strategy.num_devices,
             )
+            assert isinstance(self.kv_params, MHAKVCacheParams)
             sharded_num_kv_heads = num_heads_for_device(
                 num_heads=self.kv_params.n_kv_heads,
                 device_idx=shard_idx,

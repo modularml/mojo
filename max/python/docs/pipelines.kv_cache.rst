@@ -11,6 +11,30 @@ max.pipelines.kv_cache
 
 .. currentmodule:: max.pipelines.kv_cache
 
+Memory planning
+---------------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated
+   :template: autosummary/class.rst
+
+   MemoryPlanner
+   ModelConfig
+   ModelConfigWithKVCache
+   PagedMemoryPlanner
+
+Configuration
+-------------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated
+   :template: autosummary/class.rst
+
+   KVCacheConfig
+   KVConnectorConfig
+
 Cache manager
 -------------
 
@@ -19,8 +43,8 @@ Cache manager
    :toctree: generated
    :template: autosummary/class.rst
 
+   ByteCount
    DummyKVCache
-   IncrementCacheLengthsProcessor
    InsufficientBlocksError
    PagedKVCacheManager
 
@@ -46,4 +70,13 @@ Factory functions
 
    available_port
    load_kv_manager
-   load_multi_kv_managers
+
+Utilities
+---------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated
+   :template: autosummary/function.rst
+
+   cache_dtype_for_encoding

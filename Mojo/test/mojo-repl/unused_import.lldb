@@ -1,0 +1,23 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+%cd ./Inputs
+
+# Check that we import a module, but don't use it immediately. This is mirroring
+# what happens if you execute a single cell multiple times, before writing one
+# that uses the import.
+from imported_module import called_function
+
+from imported_module import called_function
+
+# CHECK: called_function was called
+from imported_module import called_function
+called_function()
+

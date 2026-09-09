@@ -44,7 +44,7 @@ baseline is comptime-gated off for K-padded shapes (no aligned-K
 reference to compare against).
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.random import rand
 from std.sys import get_defined_int, get_defined_string
 from std.time import perf_counter_ns

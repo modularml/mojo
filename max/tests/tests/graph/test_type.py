@@ -47,7 +47,7 @@ def test_static_dim__equals_dim_value(i: int) -> None:
     dim = StaticDim(i)
     assert isinstance(dim, Dim)
     assert dim == i
-    assert dim == dim
+    assert dim == dim  # noqa: PLR0124
 
 
 @given(i=...)
@@ -103,7 +103,7 @@ def test_symbolic_dim(name: str) -> None:
     dim = SymbolicDim(name)
     assert isinstance(dim, Dim)
     assert dim == name
-    assert dim == dim
+    assert dim == dim  # noqa: PLR0124
 
 
 # TODO(MSDK-695): less restrictive dim names

@@ -12,10 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 
 from .ep_config import EPConfig, calculate_ep_max_tokens_per_rank
-from .ep_manager import EPBatchManager, EPCommInitializer
+from .ep_manager import EPBatchManager, EPCommBuffers, EPCommInitializer
 
 __all__ = [
     "EPBatchManager",
+    "EPCommBuffers",
     "EPCommInitializer",
     "EPConfig",
     "calculate_ep_max_tokens_per_rank",

@@ -14,8 +14,8 @@
 from std.collections import Optional
 from std.sys import align_of
 
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from layout import (
     Coord,
     Idx,
@@ -41,7 +41,7 @@ def test_grouped_matmul_sm100_blockwise_scaled_fp8[
     expert_shape: IndexList[2],
     umma_shape: IndexList[3] = Index(64, 64, 32),
     use_epilogue: Bool = False,
-    scales_type: DType = DType.float32,
+    scales_type: DType = .float32,
 ](
     num_active_experts: Int,
     num_tokens_by_expert: List[Int],
@@ -60,8 +60,8 @@ def test_grouped_matmul_sm100_blockwise_scaled_fp8[
     comptime K = expert_shape[1]
     comptime swizzle = TensorMapSwizzle.SWIZZLE_128B
 
-    total_num_tokens = 0
-    max_num_tokens_by_expert = 0
+    var total_num_tokens = 0
+    var max_num_tokens_by_expert = 0
     for i in range(len(num_tokens_by_expert)):
         var M = num_tokens_by_expert[i]
         total_num_tokens += M
@@ -120,10 +120,10 @@ def test_grouped_matmul_sm100_blockwise_scaled_fp8[
     var b_host_ptr = ctx.enqueue_create_host_buffer[b_type](b_size)
     var c_host_ptr = ctx.enqueue_create_host_buffer[c_type](c_size)
     var c_host_ref_ptr = ctx.enqueue_create_host_buffer[c_type](c_size)
-    var a_offsets_host_ptr = ctx.enqueue_create_host_buffer[DType.uint32](
+    var a_offsets_host_ptr = ctx.enqueue_create_host_buffer[.uint32](
         num_active_experts + 1
     )
-    var expert_ids_host_ptr = ctx.enqueue_create_host_buffer[DType.int32](
+    var expert_ids_host_ptr = ctx.enqueue_create_host_buffer[.int32](
         num_active_experts
     )
     var a_scales_host_ptr = ctx.enqueue_create_host_buffer[scales_type](
@@ -153,10 +153,10 @@ def test_grouped_matmul_sm100_blockwise_scaled_fp8[
     var b_device_buffer = ctx.enqueue_create_buffer[b_type](b_size)
     var c_device_buffer = ctx.enqueue_create_buffer[c_type](c_size)
     var c_device_ref_buffer = ctx.enqueue_create_buffer[c_type](c_size)
-    var a_offsets_device_buffer = ctx.enqueue_create_buffer[DType.uint32](
+    var a_offsets_device_buffer = ctx.enqueue_create_buffer[.uint32](
         num_active_experts + 1
     )
-    var expert_ids_device_buffer = ctx.enqueue_create_buffer[DType.int32](
+    var expert_ids_device_buffer = ctx.enqueue_create_buffer[.int32](
         num_active_experts
     )
     var a_scales_device_buffer = ctx.enqueue_create_buffer[scales_type](
@@ -187,12 +187,12 @@ def test_grouped_matmul_sm100_blockwise_scaled_fp8[
 
     var c_tensor = c_device_tt
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(c_tensor)
     def epilogue_fn[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = align_of[SIMD[_dtype, width]](),
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> None:
@@ -298,8 +298,8 @@ def test_grouped_matmul_sm100_blockwise_scaled_fp8[
 def main() raises:
     with DeviceContext() as ctx:
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=1,
             expert_shape=Index(256, 256),
             use_epilogue=True,
@@ -307,8 +307,8 @@ def main() raises:
 
         # Single expert, last M-tile partial (100 mod 64 != 0).
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=1,
             expert_shape=Index(256, 256),
         ](1, [100], [0], ctx)
@@ -320,8 +320,8 @@ def main() raises:
         # multiple of 16. Before the per-tile alignment check, that faulted
         # with CUDA_ERROR_ILLEGAL_INSTRUCTION in the full-TMA path.
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=2,
             expert_shape=Index(1536, 2048),
         ](2, [707, 709], [0, 1], ctx)
@@ -330,8 +330,8 @@ def main() raises:
         # (64, 128, 32) so the BN=128 dispatch hits the partial-tile A copy
         # path. Expert 1 starts at row 5 → byte offset 5*4=20, not 16-aligned.
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=2,
             expert_shape=Index(256, 256),
             umma_shape=Index(64, 128, 32),
@@ -343,138 +343,138 @@ def main() raises:
         # `grouped_matmul_sm100_blockwise_scaled_fp8_persistent` detects this
         # and routes to the naive kernel.
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=2,
             expert_shape=Index(256, 256),
         ](2, [3, 4], [0, 1], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=1,
             expert_shape=Index(512, 1024),
         ](1, [256], [0], ctx)
 
         # Simple expert routing
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=4,
             expert_shape=Index(512, 1024),
         ](1, [256], [2], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=4,
             expert_shape=Index(4096, 7168),
         ](2, [128, 256], [0, 2], ctx)
 
         # Unaligned grouped matmul
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=4,
             expert_shape=Index(512, 1024),
         ](2, [20, 40], [0, 2], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=6,
             expert_shape=Index(7168, 2048),
         ](4, [20, 1500, 300, 28], [0, 3, 2, 4], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=6,
             expert_shape=Index(1280, 1024),
             use_epilogue=True,
         ](4, [20, 1500, 300, 28], [0, 3, 2, 4], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.float32,
+            .float8_e4m3fn,
+            .float32,
             num_experts=4,
             expert_shape=Index(512, 1024),
         ](2, [20, 40], [0, 2], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.float32,
+            .float8_e4m3fn,
+            .float32,
             num_experts=1,
             expert_shape=Index(512, 1024),
         ](1, [512], [0], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.float32,
+            .float8_e4m3fn,
+            .float32,
             num_experts=6,
             expert_shape=Index(7168, 2048),
         ](4, [20, 1500, 300, 28], [0, 3, 2, 4], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.float32,
+            .float8_e4m3fn,
+            .float32,
             num_experts=6,
             expert_shape=Index(1280, 1024),
             use_epilogue=True,
         ](4, [20, 1500, 300, 28], [0, 3, 2, 4], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=4,
             expert_shape=Index(4096, 7168),
         ](2, [8, 64], [0, 2], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=6,
             expert_shape=Index(7168, 2048),
         ](4, [20, 4, 4, 40], [0, 3, 2, 4], ctx)
 
         # bf16 scales tests
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=1,
             expert_shape=Index(256, 256),
-            scales_type=DType.bfloat16,
+            scales_type=.bfloat16,
         ](1, [128], [0], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=1,
             expert_shape=Index(512, 1024),
-            scales_type=DType.bfloat16,
+            scales_type=.bfloat16,
         ](1, [256], [0], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=4,
             expert_shape=Index(4096, 7168),
-            scales_type=DType.bfloat16,
+            scales_type=.bfloat16,
         ](2, [128, 256], [0, 2], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=6,
             expert_shape=Index(7168, 2048),
-            scales_type=DType.bfloat16,
+            scales_type=.bfloat16,
         ](4, [24, 1504, 296, 32], [0, 3, 2, 4], ctx)
 
         test_grouped_matmul_sm100_blockwise_scaled_fp8[
-            DType.float8_e4m3fn,
-            DType.bfloat16,
+            .float8_e4m3fn,
+            .bfloat16,
             num_experts=6,
             expert_shape=Index(1280, 1024),
             use_epilogue=True,
-            scales_type=DType.bfloat16,
+            scales_type=.bfloat16,
         ](4, [24, 1504, 296, 32], [0, 3, 2, 4], ctx)

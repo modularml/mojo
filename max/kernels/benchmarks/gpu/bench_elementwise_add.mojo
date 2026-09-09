@@ -14,7 +14,8 @@
 from std.random import randn
 from std.sys import simd_width_of, size_of
 
-from std.algorithm.functional import elementwise
+from max.algorithm.functional import elementwise
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -22,7 +23,8 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
+from std.memory import alloc, dealloc
 
 from std.utils import IndexList
 
@@ -37,61 +39,66 @@ def bench_add[
     var input0_ptr = ctx.enqueue_create_buffer[type](size)
     var input1_ptr = ctx.enqueue_create_buffer[type](size)
     var output_ptr = ctx.enqueue_create_buffer[type](size)
-    var input0_ptr_host = alloc[Scalar[type]](size)
-    var input1_ptr_host = alloc[Scalar[type]](size)
-    var output_ptr_host = alloc[Scalar[type]](size)
-    randn(input0_ptr_host, size)
-    randn(input1_ptr_host, size)
-    randn(output_ptr_host, size)
-    ctx.enqueue_copy(input0_ptr, input0_ptr_host)
-    ctx.enqueue_copy(input1_ptr, input1_ptr_host)
-    ctx.enqueue_copy(output_ptr, output_ptr_host)
+
+    var input0_host = alloc[Scalar[type]]({count = size}).into_managed()
+    var input0_ptr_host = input0_host.unsafe_ptr()
+    var input1_host = alloc[Scalar[type]]({count = size}).into_managed()
+    var input1_ptr_host = input1_host.unsafe_ptr()
+    var output_host = alloc[Scalar[type]]({count = size}).into_managed()
+    var output_ptr_host = output_host.unsafe_ptr()
+
+    randn(input0_host.unsafe_span())
+    randn(input1_host.unsafe_span())
+    randn(output_host.unsafe_span())
+    ctx.enqueue_copy(input0_ptr, input0_host.unsafe_span())
+    ctx.enqueue_copy(input1_ptr, input1_host.unsafe_span())
+    ctx.enqueue_copy(output_ptr, output_host.unsafe_span())
 
     var input0 = TileTensor(input0_ptr, row_major(Coord(shape)))
     var input1 = TileTensor(input1_ptr, row_major(Coord(shape)))
     var output = TileTensor(output_ptr, row_major(Coord(shape)))
 
-    @parameter
     @always_inline
-    @__copy_capture(input0, input1, output)
-    def add[
-        simd_width: Int, _rank: Int, alignment: Int = 1
-    ](out_index: IndexList[_rank]):
-        var idx = Coord(out_index)
+    def add[simd_width: Int, alignment: Int = 1](idx: Coord) {var}:
         comptime assert input0.flat_rank >= idx.flat_rank
         var val = input0.load[width=simd_width](idx) + input1.load[
             width=simd_width
         ](idx)
         output.store[width=simd_width](idx, val)
 
-    @parameter
     @always_inline
-    def bench_func(mut b: Bencher, shape: IndexList[rank]) raises:
-        @parameter
+    def bench_func(mut b: Bencher, shape: IndexList[rank]) raises {imm}:
         @always_inline
-        def kernel_launch(ctx: DeviceContext) raises:
-            elementwise[add, simd_width=unroll_by, target="gpu"](shape, ctx)
+        def kernel_launch(ctx: DeviceContext) raises {imm}:
+            elementwise[simd_width=unroll_by, target="gpu"](
+                add, Coord(shape), ctx
+            )
 
-        b.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(b, kernel_launch, ctx)
 
-    b.bench_with_input[type_of(shape), bench_func](
+    b.bench_with_input(
+        bench_func,
         BenchId("add", String(shape)),
         shape,
         # TODO: Pick relevant benchmetric.
         [ThroughputMeasure(BenchMetric.elements, size * size_of[type]() * 3)],
     )
 
-    ctx.enqueue_copy(output_ptr_host, output_ptr)
+    ctx.enqueue_copy(output_host.unsafe_span(), output_ptr)
 
     comptime nelts = simd_width_of[type]()
     for i in range(0, size, nelts):
         if not (
-            output_ptr_host.load[width=nelts](i).eq(
-                input0_ptr_host.load[width=nelts](i)
-                + input1_ptr_host.load[width=nelts](i)
+            output_ptr_host.unsafe_load[width=nelts](i).eq(
+                input0_ptr_host.unsafe_load[width=nelts](i)
+                + input1_ptr_host.unsafe_load[width=nelts](i)
             )
         ).reduce_and():
             raise Error(t"mismatch at flattened idx {i}")
+
+    dealloc(input0_host^)
+    dealloc(input1_host^)
+    dealloc(output_host^)
 
 
 def main() raises:

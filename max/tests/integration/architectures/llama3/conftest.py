@@ -14,22 +14,10 @@
 import os
 from pathlib import Path
 
-import hf_repo_lock
 import pytest
 from hypothesis import settings
 from max.driver import CPU
 from max.engine import InferenceSession
-
-LLAMA_3_1_HF_REPO_ID = "meta-llama/Llama-3.1-8B-Instruct"
-LLAMA_3_1_HF_REVISION = hf_repo_lock.revision_for_hf_repo(LLAMA_3_1_HF_REPO_ID)
-
-LLAMA_3_1_LORA_HF_REPO_ID = "FinGPT/fingpt-mt_llama3-8b_lora"
-LLAMA_3_1_LORA_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    LLAMA_3_1_LORA_HF_REPO_ID
-)
-
-SMOLLM2_HF_REPO_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
-SMOLLM2_HF_REVISION = hf_repo_lock.revision_for_hf_repo(SMOLLM2_HF_REPO_ID)
 
 pytest_plugins = "test_common.registry"
 

@@ -12,12 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 """Shared utilities for KV cache tests."""
 
-from std.collections import Set
 from std.math import ceildiv
-from std.random import random_ui64
+from std.random import shuffle
 from std.utils.numerics import isinf, isnan
 
-from std.gpu.host import DeviceBuffer, DeviceContext
+from max.gpu.host import DeviceBuffer, DeviceContext
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
 from layout._utils import ManagedLayoutTensor
 
@@ -43,6 +42,58 @@ def padded_lut_cols(cols: Int) -> Int:
     return ((cols + 7) // 8) * 8 + _LUT_TAIL_PAD
 
 
+def randperm(n: Int) -> List[Int]:
+    """Return a uniformly random permutation of `[0, n)`.
+
+    Builds the identity permutation `[0, n)` and shuffles it in place with the
+    stdlib Fisher-Yates `shuffle`.
+
+    Use this instead of `random_distinct` when the caller also needs the
+    *complement* of the sample: `perm[:k]` is a uniform sample of `k` distinct
+    values without replacement, and `perm[k:]` is exactly the unsampled
+    remainder. That turns a "do something to every value we did NOT pick" loop
+    (e.g. poisoning unreferenced KV blocks) into a slice walk, with no
+    membership `Set` and no per-element `in` probe.
+
+    Args:
+        n: Size of the permutation; elements are `[0, n)`.
+
+    Returns:
+        A list holding a random permutation of `[0, n)`.
+    """
+    var perm: List[Int] = [i for i in range(n)]
+    shuffle(perm)
+    return perm^
+
+
+def random_distinct(n: Int, k: Int) -> List[Int]:
+    """Sample `k` distinct integers uniformly without replacement from `[0, n)`.
+
+    The first `k` elements of a uniform random permutation are themselves a
+    uniform sample of `k` distinct values without replacement, so this takes
+    the `k`-element prefix of `randperm(n)`.
+
+    This replaces the rejection-sampling idiom (draw into a `Set[Int]`,
+    redraw on collision), whose expected work blows up as `k` approaches `n`:
+    the last few distinct values each take on average `n / (n - i)` draws, so
+    selecting nearly all of a population is roughly `n * H_n` draws
+    (coupon-collector). The paged-KV LUT routinely needs almost every block,
+    which is exactly that worst case. A full shuffle is `O(n)` with no redraws.
+
+    Constraints (caller-enforced): `0 <= k <= n`.
+
+    Args:
+        n: Size of the population `[0, n)` to sample from.
+        k: Number of distinct values to return.
+
+    Returns:
+        A list of `k` distinct integers in `[0, n)`, in sampled order.
+    """
+    var perm = randperm(n)
+    perm.shrink(k)
+    return perm^
+
+
 def assert_no_nan_inf[
     dtype: DType, layout: Layout
 ](
@@ -62,7 +113,7 @@ def assert_no_nan_inf[
     var host = output.tensor[update=True]()
     var n = host.runtime_layout.size()
     for i in range(n):
-        var v = host.ptr[i].cast[DType.float32]()
+        var v = host.ptr[i].cast[.float32]()
         if isnan(v):
             raise Error(
                 String("NaN at element ")
@@ -89,7 +140,7 @@ struct _KVCacheTestTensor[dtype: DType, layout: Layout, rank: Int](Copyable):
     comptime tensor_type = LayoutTensor[Self.dtype, Self.layout, ImmutAnyOrigin]
 
     var shape: IndexList[Self.rank]
-    var host_ptr: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]
+    var host_ptr: MutPointer[Scalar[Self.dtype], MutUntrackedOrigin]
     var device_buf: Optional[DeviceBuffer[Self.dtype]]
 
     def __init__(out self, shape: IndexList[Self.rank]):
@@ -97,7 +148,7 @@ struct _KVCacheTestTensor[dtype: DType, layout: Layout, rank: Int](Copyable):
         self.host_ptr = alloc[Scalar[Self.dtype]](shape.flattened_length())
         self.device_buf = None
 
-    def __del__(deinit self):
+    def __deinit__(deinit self):
         self.host_ptr.free()
 
     def copy_to_device(mut self, ctx: DeviceContext) raises:
@@ -115,10 +166,10 @@ struct _KVCacheTestTensor[dtype: DType, layout: Layout, rank: Int](Copyable):
     def _runtime_layout(self) -> RuntimeLayout[Self.layout]:
         return RuntimeLayout[Self.layout].row_major(self.shape)
 
-    def _tensor(
-        self, ptr: UnsafePointer[Scalar[Self.dtype], _]
-    ) -> Self.tensor_type:
-        return Self.tensor_type(ptr, self._runtime_layout())
+    def _tensor(self, ptr: Pointer[Scalar[Self.dtype], _]) -> Self.tensor_type:
+        return Self.tensor_type(
+            ptr.as_imm().as_unsafe_any_origin(), self._runtime_layout()
+        )
 
 
 struct CacheLengthsTable(Copyable):
@@ -192,7 +243,7 @@ struct CacheLengthsTable(Copyable):
 
 
 struct PagedLookupTable[page_size: Int](Copyable):
-    var paged_lut: _KVCacheTestTensor[DType.uint32, Layout.row_major[2](), 2]
+    var paged_lut: _KVCacheTestTensor[.uint32, Layout.row_major[2](), 2]
 
     def __init__(
         out self, batch_size: Int, max_full_context_length: Int
@@ -217,24 +268,27 @@ struct PagedLookupTable[page_size: Int](Copyable):
     ) raises:
         var batch_size = len(prompt_lens)
 
-        var host_tensor = LayoutTensor[
-            DType.uint32, type_of(self.paged_lut).layout
-        ](
+        var host_tensor = LayoutTensor[.uint32, type_of(self.paged_lut).layout](
             self.paged_lut.host_ptr,
             self.paged_lut._runtime_layout(),
         )
-        var used_set = Set[Int]()
+        # Sample one distinct paged block per page across the whole batch up
+        # front, then hand them out in iteration order. Total pages needed is
+        # <= num_paged_blocks by construction.
+        var total_pages = 0
+        for batch in range(batch_size):
+            total_pages += ceildiv(
+                prompt_lens[batch] + cache_lens[batch], Self.page_size
+            )
+        var blocks = random_distinct(num_paged_blocks, total_pages)
 
+        var page_pos = 0
         for batch in range(batch_size):
             var seq_len = prompt_lens[batch] + cache_lens[batch]
 
             for block_idx in range(0, ceildiv(seq_len, Self.page_size)):
-                var randval = Int(random_ui64(0, UInt64(num_paged_blocks - 1)))
-                while randval in used_set:
-                    randval = Int(random_ui64(0, UInt64(num_paged_blocks - 1)))
-
-                used_set.add(randval)
-                host_tensor[batch, block_idx] = UInt32(randval)
+                host_tensor[batch, block_idx] = UInt32(blocks[page_pos])
+                page_pos += 1
 
         if ctx:
             self.paged_lut.copy_to_device(ctx.value())
@@ -262,7 +316,7 @@ struct PagedLookupTable[page_size: Int](Copyable):
         num_paged_blocks: Int,
         ctx: DeviceContext,
     ) raises -> Self:
-        @parameter
+        @__parameter
         def _to_list(idx_list: IndexList) -> List[Int]:
             var list = List[Int](capacity=idx_list.size)
             for i in range(idx_list.size):

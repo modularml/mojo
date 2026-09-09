@@ -7,8 +7,7 @@ show_languages: true
 is_tutorial: true
 ---
 
-import InstallModular from '../../_includes/install-modular.mdx';
-import MDXListing from '@site/src/components/Listing/MDXListing';
+import InstallMAX from '../_includes/install-modular.mdx';
 
 When working with PyTorch models, you might encounter performance bottlenecks in
 specific operations that could benefit from custom optimization. You might also
@@ -31,11 +30,11 @@ integrating a custom op in Mojo and running it in PyTorch.
 
 Let's start by creating a Python project and installing the necessary tools.
 
-<InstallModular folder="pytorch_custom_ops" extraLibraries={["torch", "pillow", "numpy"]} />
+<InstallMAX folder="pytorch_custom_ops" extraLibraries={["torch", "pillow", "numpy"]} />
 
-This will install the `modular` package along with PyTorch (`torch`), PIL for
+This will install the `max` package along with PyTorch (`torch`), PIL for
 image processing (`pillow`), and NumPy for array operations. When you install
-the `modular` package, you'll get access to the `max` Python APIs and the Mojo
+the `max` package, you'll get access to the MAX Python APIs and the Mojo
 compiler—everything needed to build high-performance custom operations.
 
 ## Build the PyTorch interface
@@ -47,7 +46,7 @@ the interface.
 Create a new file called `grayscale.py` and add the following code:
 
 ```python title="grayscale.py"
-from std.pathlib import Path
+from pathlib import Path
 import torch
 
 @torch.compile
@@ -65,14 +64,14 @@ we need to bridge to our Mojo implementation.
 
 ## Integrate the custom operation
 
-The [`max.torch`](/max/api/python/experimental.torch) module provides
-[`CustomOpLibrary`](/max/api/python/generated/max.experimental.torch.CustomOpLibrary),
+The [`max.experimental.torch`](/api/python/experimental.torch) module provides
+[`CustomOpLibrary`](/api/python/generated/max.experimental.torch.CustomOpLibrary),
 which allows you to load and use compiled Mojo operations directly in PyTorch.
 
 Update the `grayscale.py` file to include the following code:
 
 ```python title="grayscale.py"
-from std.pathlib import Path
+from pathlib import Path
 import torch
 from max.experimental.torch import CustomOpLibrary
 
@@ -88,9 +87,9 @@ def grayscale(pic: torch.Tensor):
 ```
 
 The `CustomOpLibrary` loads operations from a precompiled Mojo package file
-(`.mojoc` or `.mojopkg`). Once loaded, you can call these operations just like
-any other PyTorch function. The operations automatically handle data movement
-between PyTorch and MAX, and integrate with PyTorch when needed.
+(`.mojoc`). Once loaded, you can call these operations just like any other
+PyTorch function. The operations automatically handle data movement between
+PyTorch and MAX, and integrate with PyTorch when needed.
 
 The compilation of your Mojo code into a `.mojoc` file is handled when you run
 your Python script. You don't need to manually invoke the Mojo compiler or
@@ -99,63 +98,98 @@ manage build steps.
 ## Implement the Mojo kernel
 
 Now for the core implementation—our high-performance Mojo kernel. We'll create a
-Mojo package that defines our grayscale conversion operation
+Mojo package that defines our grayscale conversion operation.
 
-Create a new file called `grayscale.mojo` inside the `operations` folder and add
-the following code:
+First, create an empty file called `__init__.mojo` inside the `operations`
+folder. This file marks the folder as a Mojo package, which `CustomOpLibrary`
+requires:
+
+```bash
+touch operations/__init__.mojo
+```
+
+Then create a new file called `grayscale.mojo` inside the `operations` folder
+and add the following code:
 
 ```mojo title="grayscale.mojo"
-from compiler import register
-from max.tensor import InputTensor, OutputTensor, foreach
-from std.gpu.host import DeviceContext
+import extensibility
+
+from max.gpu.host import DeviceContext
+from extensibility import InputTensor, OutputTensor, foreach
+
+from std.utils.coord import Coord, coord_to_index_list
 from std.utils.index import IndexList
 
-@register("grayscale")
+
+@extensibility.register("grayscale")
 struct Grayscale:
+    """Convert RGB image tensor to grayscale using weighted formula."""
+
     @staticmethod
     def execute[
-        target: StaticString,
+        target: StaticString,  # "cpu" or "gpu"
     ](
-        img_out: OutputTensor[dtype=DType.uint8, rank=2, ...],
-        img_in: InputTensor[dtype=DType.uint8, rank=3, ...],
+        img_out: OutputTensor[dtype=.uint8, rank=2, ...],
+        img_in: InputTensor[dtype=.uint8, rank=3, ...],
         ctx: DeviceContext,
     ) raises:
-        @parameter
+        """Execute grayscale conversion on the input image tensor.
+
+        Args:
+            img_out: Output tensor for grayscale image (height x width).
+            img_in: Input tensor for RGB image (height x width x channels).
+            ctx: Device context for execution.
+        """
+
+        @__parameter
         @always_inline
         def color_to_grayscale[
             simd_width: Int
-        ](idx: IndexList[img_out.rank]) -> SIMD[DType.uint8, simd_width]:
-            @parameter
-            def load(idx: IndexList[img_in.rank]) -> SIMD[DType.float32, simd_width]:
-                return img_in.load[simd_width](idx).cast[DType.float32]()
+        ](idx: Coord) -> SIMD[.uint8, simd_width]:
+            """Convert RGB pixel to grayscale using perceptual weighting.
 
-            var row = idx[0]
-            var col = idx[1]
+            Args:
+                idx: Index into the output tensor (row, col).
 
-            # Load RGB values
+            Returns:
+                Grayscale value as SIMD vector.
+            """
+
+            @__parameter
+            def load(
+                idx: IndexList[img_in.rank],
+            ) -> SIMD[.float32, simd_width]:
+                return img_in.load[simd_width](idx).cast[.float32]()
+
+            var idx_l = coord_to_index_list(idx)
+            var row = idx_l[0]
+            var col = idx_l[1]
+
+            # Load RGB values from input tensor
             var r = load(IndexList[3](row, col, 0))
             var g = load(IndexList[3](row, col, 1))
             var b = load(IndexList[3](row, col, 2))
 
             # Apply standard grayscale conversion formula
+            # These weights are based on human visual perception
             var gray = 0.21 * r + 0.71 * g + 0.07 * b
-            return min(gray, 255).cast[DType.uint8]()
 
+            # Clamp to valid uint8 range and convert back
+            return min(gray, 255).cast[.uint8]()
+
+        # Execute the conversion using parallel foreach
         foreach[color_to_grayscale, target=target, simd_width=1](img_out, ctx)
 ```
 
-First, the `@register("grayscale")` decorator makes this operation available to
-PyTorch under the name `grayscale`. This is the `ops.grayscale(output, pic)`
-function called in the PyTorch model.
+First, the `@extensibility.register("grayscale")` decorator makes this operation
+available to PyTorch under the name `grayscale`. This is the
+`ops.grayscale(output, pic)` function called in the PyTorch model.
 
-Then, the
-[`foreach`](/max/api/kernels/extensibility/managed_tensor_slice/foreach/)
+The `color_to_grayscale` function takes a coordinate into the output tensor and
+returns a SIMD vector of the grayscale value. The
+[`foreach`](/api/mojo/extensibility/managed_tensor_slice/foreach/)
 primitive automatically parallelizes the operation across available compute
 units.
-
-The `color_to_grayscale` function takes an index list and returns a SIMD vector
-of the grayscale value. The `foreach` primitive automatically parallelizes the
-operation across available compute units.
 
 Finally, the `target` parameter allows the same code to run on both CPU and GPU.
 
@@ -213,9 +247,8 @@ improvements over CPU-only implementations.
 Now that you wrote a Mojo kernel with your PyTorch model, check out these
 other tutorials:
 
-export const docs = [
-  '../../develop/build-custom-ops.mdx',
-  '../../develop/modules.mdx',
-];
-
-<MDXListing mdxList={docs} />
+- [Build custom ops for GPUs](/develop/build-custom-ops): Write custom GPU
+  and CPU operations in Mojo and load them into a MAX graph.
+- [Build a model graph with Module](/develop/modules): Learn how to
+  compose modules, write custom modules with explicit weights, load checkpoint
+  data, and construct a model graph.

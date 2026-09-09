@@ -17,7 +17,8 @@ blocks for grid-level parallelism.
 """
 
 from std.collections import OptionalReg
-from std.gpu import barrier, block_idx
+from max.gpu import block_idx
+from max.gpu.sync import barrier
 from std.utils.numerics import get_accum_type, min_or_neg_inf
 
 from nn.attention.mha_utils import get_start_and_end_for_partitions
@@ -45,7 +46,7 @@ __extension AttentionRDNA:
         ), "RDNA decode requires output_depth == depth (no MLA)"
 
         @always_inline
-        @parameter
+        @__parameter
         def loop_over_kvcache[
             tile_size: Int
         ](kv_tile_start_row: Int, end: Int, not_last_iter: Bool):
@@ -79,7 +80,7 @@ __extension AttentionRDNA:
                 depth=Self.depth,
                 num_threads=Self.num_threads,
                 num_stages=Self.num_stages,
-            ](k_tile, self.k_smem_ptr)
+            ](k_tile, self.k_smem_ptr.as_unsafe_any_origin())
 
             var v_buffer = VBufferRDNA[
                 tensor_core_mma=Self.get_tensor_core_mma_pv(),
@@ -91,7 +92,7 @@ __extension AttentionRDNA:
                 num_warps_n=Self.num_warps_n,
             ](
                 v_tile,
-                self.v_smem_ptr,
+                self.v_smem_ptr.as_unsafe_any_origin(),
                 total_rows=kv_tile_num_rows,
             )
 
@@ -152,7 +153,7 @@ __extension AttentionRDNA:
                 barrier()
             barrier()
 
-        start, end = get_start_and_end_for_partitions[Self.BN](
+        var start, end = get_start_and_end_for_partitions[Self.BN](
             self.num_keys, num_partitions, block_idx.x
         )
 

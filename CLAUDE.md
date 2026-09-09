@@ -25,7 +25,7 @@ All builds use the `./bazelw` wrapper from the repository root:
 
 # Build specific targets
 ./bazelw build //max/kernels/...
-./bazelw build //mojo/stdlib/...
+./bazelw build //Mojo/stdlib/...
 
 # Run tests
 ./bazelw test //...
@@ -58,8 +58,8 @@ pixi run hello             # Run hello.mojo
 
 # Common Pixi tasks available in different directories:
 # - /mojo/: build, tests, examples, benchmarks
-# - /max/: llama3, mistral, generate, serve
-# - /examples/*/: main, test, hello, dev-server, format
+# - /max/examples/*/: main, test, hello, dev-server, format
+# - /Mojo/examples/*/: main, test, hello, dev-server, format
 
 # List available tasks
 pixi task list
@@ -69,10 +69,10 @@ pixi task list
 
 ```bash
 # Install the MAX nightly within a Python virtual environment using pip
-pip install modular --extra-index-url https://whl.modular.com/nightly/simple/
+pip install "max[serve]" --extra-index-url https://whl.modular.com/nightly/simple/
 
 # Install MAX globally using Pixi, an alternative to the above
-pixi global install -c conda-forge -c https://conda.modular.com/max-nightly
+pixi global install max-serve -c conda-forge -c https://conda.modular.com/max-nightly
 
 # Start OpenAI-compatible server
 max serve --model modularai/Llama-3.1-8B-Instruct-GGUF
@@ -89,16 +89,26 @@ docker run --gpus=1 -p 8000:8000 docker.modular.com/modular/max-nvidia-full:late
 modular/
 ├── mojo/                    # Mojo programming language
 │   ├── stdlib/              # Standard library implementation
-│   ├── docs/                # User documentation
+│   ├── docs/                # User documentation (mojolang.org)
 │   ├── proposals/           # Language proposals (RFCs)
+│   ├── examples/            # Mojo usage examples
 │   └── integration-test/    # Integration tests
 ├── max/                     # MAX framework
 │   ├── kernels/             # High-performance Mojo kernels (GPU/CPU)
-│   ├── serve/               # Python inference server (OpenAI-compatible)
-│   ├── pipelines/           # Model architectures (Python)
-│   └── nn/                  # Neural network operators (Python)
-├── examples/                # Usage examples
-├── benchmark/               # Benchmarking tools
+│   ├── mojo/max/            # The `max` Mojo package
+│   │   ├── gpu/             # GPU programming APIs (`max.gpu`)
+│   │   ├── algorithm/       # Parallel algorithms (`max.algorithm`)
+│   │   ├── benchmark/       # Benchmarking tools (`max.benchmark`)
+│   │   └── runtime/         # Async runtime APIs (`max.runtime`)
+│   ├── python/max/          # Python packages
+│   │   ├── serve/           # Inference server (OpenAI-compatible)
+│   │   ├── pipelines/       # Model architectures (Python)
+│   │   ├── nn/              # Neural network operators (Python)
+│   │   ├── driver/          # Device and runtime driver
+│   │   └── ...              # graph, engine, kv_cache, etc.
+│   ├── examples/            # MAX usage examples
+│   └── tests/               # MAX tests
+├── docs/                    # MAX docs site sources (max.modular.com)
 └── bazel/                   # Build system configuration
 ```
 
@@ -106,7 +116,8 @@ modular/
 
 1. **Language Separation**:
    - Low-level performance kernels in Mojo (`max/kernels/`)
-   - High-level orchestration in Python (`max/serve/`, `max/pipelines/`)
+   - High-level orchestration in Python (`max/python/max/serve/`,
+     `max/python/max/pipelines/`)
 
 2. **Hardware Abstraction**:
    - Platform-specific optimizations via dispatch tables
@@ -129,7 +140,8 @@ modular/
 ### Branch Strategy
 
 - Work from `main` branch (synced with nightly builds)
-- `stable` branch for released versions
+- Released versions live on per-release branches named `max/v<version>`, cut
+  from `main`
 - Create feature branches for significant changes
 
 ### Testing Requirements
@@ -171,7 +183,8 @@ python max/kernels/benchmarks/autotune/kbench.py benchmarks/gpu/linalg/bench_mat
 - Install nightly VS Code extension
 - Avoid deprecated types like `Tensor` (use modern alternatives)
 - Follow value semantics and ownership conventions
-- Use `Reference` types with explicit lifetimes in APIs
+- Use `Origin` parameters (`ImmOrigin`/`MutOrigin`) with `Pointer` in APIs
+- Prefer `Pointer` to the deprecated `UnsafePointer` alias
 
 ### MAX Kernel Development
 
@@ -200,10 +213,15 @@ Many benchmarks and tests use compile-time defines:
 
 Currently accepting contributions for:
 
-- Mojo standard library (`/mojo/stdlib/`)
-- MAX AI kernels (`/max/kernels/`)
+- Mojo standard library (`/Mojo/stdlib/`)
+- MAX accelerator library (`/max/kernels/`)
+- MAX API and models (`/max/`)
+- Code examples (`/max/examples/`, `/Mojo/examples/`)
+- Mojo documentation (`/Mojo/docs/site/`)
 
-Other areas are not open for external contributions.
+Each area has its own guidelines in the nearest `CONTRIBUTING.md`; the root
+`CONTRIBUTING.md` is the full contributor guide. Other areas are not open for
+external contributions.
 
 ## Platform Support
 
@@ -211,33 +229,46 @@ Other areas are not open for external contributions.
 - macOS: ARM64 (Apple Silicon)
 - Windows: Not currently supported
 
-## LLM-friendly Documentation
+## LLM-friendly documentation
 
-- Docs index: <https://docs.modular.com/llms.txt>
-- Mojo API docs: <https://docs.modular.com/llms-mojo.txt>
-- Python API docs: <https://docs.modular.com/llms-python.txt>
-- Comprehensive docs: <https://docs.modular.com/llms-full.txt>
+MAX documentation (max.modular.com):
+
+- <https://max.modular.com/llms.txt>: index of the MAX docs
+- <https://max.modular.com/llms-max-guides.txt>: MAX guides for deployment,
+  serving, and model development
+- <https://max.modular.com/llms-python.txt>: MAX Python API reference
+- <https://max.modular.com/llms-accelerator-api.txt>: MAX accelerator library
+  (Mojo) API reference
+- <https://max.modular.com/llms-c-api.txt>: MAX C API reference
+- <https://max.modular.com/releases-llms.txt>: MAX release notes
+
+Mojo language documentation (mojolang.org):
+
+- <https://mojolang.org/llms.txt>: index of the Mojo docs
+- <https://mojolang.org/llms-full.txt>: full text of the Mojo manual, language
+  reference, tools, and CLI docs, but not the stdlib API reference
+- <https://mojolang.org/llms-stdlib.txt>: Mojo standard library API reference
+- <https://mojolang.org/llms-manual.txt>: full text of the Mojo Manual
+- <https://mojolang.org/llms-reference.txt>: full text of the Mojo language
+  reference
+- <https://mojolang.org/llms-cli.txt>: full text of the Mojo CLI reference
 
 ## Git commit style
 
-- **Atomic Commits:** Keep commits small and focused. Each commit should
+- **Atomic Commits**: Keep commits small and focused. Each commit should
 address a single, logical change. This makes it easier to understand the
 history and revert changes if needed.
-- **Descriptive Commit Messages:** Write clear, concise, and informative commit
+- **Descriptive Commit Messages**: Write clear, concise, and informative commit
 messages. Explain the *why* behind the change, not just *what* was changed. Use
-a consistent format (e.g., imperative mood: "Fix bug", "Add feature").
-- **Commit titles:** git commit titles should have the `[Stdlib]` or `[Kernel]`
-depending on whether the kernel is modified and if they are modifying GPU
-functions then they should use `[GPU]` tag as well.
-- The commit messages should be surrounded by BEGIN_PUBLIC and END_PUBLIC
-- Here is an example template a git commit
+a consistent format (for example, imperative mood: "Fix bug", "Add feature").
+- **Commit titles**: Prefix the title with a component tag, such as `[stdlib]`
+  or `[Kernels]`. Tag casing varies by component, so match what recent commits
+  to that component use: `git log --oneline -50 -- path/to/component`. Pull
+  request titles use the same format, and CI checks it.
+- Here is an example commit message:
 
 ```git
 [Kernels] Some new feature
 
-BEGIN_PUBLIC
-[Kernels] Some new feature
-
-This add a new feature for [xyz] to enable [abc]
-END_PUBLIC
+This adds a new feature for [xyz] to enable [abc]
 ```

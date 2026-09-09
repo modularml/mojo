@@ -1,0 +1,476 @@
+---
+title: System requirements
+description: >-
+  Operating system, hardware, software, and GPU compatibility requirements for
+  Mojo.
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Mojo runs on Mac, Linux, and Windows (with WSL). You don't need a GPU to
+program with Mojo—GPU support is optional.
+
+For installation instructions, see the [install guide](/install/).
+
+## Operating system
+
+<Tabs groupId="os">
+<TabItem value="linux" label="Linux">
+
+- glibc 2.34 or later (for example, Ubuntu 22.04 LTS or later).
+
+  :::note Officially supported distribution
+
+  Modular tests Mojo on Ubuntu 22.04 LTS or later. Other Linux distributions
+  that meet the glibc 2.34+ requirement are expected to work but aren't
+  continuously tested. If your system has an older glibc version, run Mojo
+  inside a container with a compatible base image such as Ubuntu 22.04.
+
+  :::
+
+</TabItem>
+<TabItem value="mac" label="Mac">
+
+- macOS Sequoia (15) or later.
+- Apple silicon (M1–M5 processor).
+
+</TabItem>
+<TabItem value="windows" label="Windows">
+
+Mojo doesn't natively support Windows. You can use Mojo on [Windows with
+WSL](https://learn.microsoft.com/en-us/windows/wsl/install) using a compatible
+version of Ubuntu (see the Linux requirements).
+
+</TabItem>
+</Tabs>
+
+## Hardware
+
+{/* rumdl's MD013 reflow strips blank lines inside the nested admonition
+below; disable it for this section. */}
+<!-- rumdl-disable MD013 -->
+
+- **CPU:** x86-64-v3 (Haswell-class or newer; CPUs from approximately 2013
+  onward) or ARM64 Neoverse N1 or newer (for example, AWS Graviton2 and later)
+  on Linux; Apple silicon on macOS.
+
+  :::note x86-64-v3 CPU instruction sets
+
+  The [x86-64-v3 microarchitecture
+  level](https://github.com/llvm/llvm-project/blob/main/clang/docs/UsersManual.md#x86)
+  requires AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, and XSAVE
+  instructions. To verify your x86-64 CPU on Linux, run
+  `cat /proc/cpuinfo | grep flags` and confirm those flags are present.
+  This requirement doesn't apply to ARM64 or Apple silicon hosts.
+
+  :::
+
+<!-- rumdl-enable MD013 -->
+
+- **RAM:** 8 GiB minimum for Mojo development. MAX inference and model serving
+  require significantly more memory, with the exact amount varying by model.
+  For the catalog of supported models, see the
+  [supported models](https://max.modular.com/models/) page; for a
+  specific model, check its Hugging Face page for memory details.
+- **GPU:** Optional. Mojo supports GPU programming across NVIDIA, AMD, and Apple
+  silicon. See [GPU compatibility](#gpu-compatibility) below for supported
+  hardware and driver requirements.
+
+## Software
+
+- A C compiler (such as `cc`, `gcc`, or `clang`) on Linux—used as a linker.
+- Xcode or Xcode Command Line Tools 16 or later on macOS.
+
+## GPU compatibility
+
+Mojo supports GPU programming across NVIDIA, AMD, and Apple silicon GPUs. This
+section covers which GPUs work with Mojo and the software each vendor requires.
+
+We categorize GPU compatibility into two levels:
+
+- **Continuously tested:** Run in Modular's CI on every release. High confidence
+  that GPU code compiles and executes correctly.
+- **Known compatible:** Confirmed to work by Modular or community members, but
+  not continuously tested. These GPUs share an architecture with a tested GPU
+  and should work without issues.
+
+### NVIDIA GPUs
+
+#### Software requirements
+
+- NVIDIA GPU driver 580 or later
+
+  Check your driver version with
+  [`nvidia-smi`](https://developer.nvidia.com/system-management-interface).
+  To update, see the [NVIDIA driver
+  docs](https://www.nvidia.com/en-us/drivers/).
+
+- **Older drivers:** If you're using an NVIDIA driver older than 580 (common on
+  some cloud providers), set the `MODULAR_NVPTX_COMPILER_PATH` environment
+  variable to point to a system `ptxas` binary from a CUDA Toolkit installation:
+
+  ```bash
+  export MODULAR_NVPTX_COMPILER_PATH=/usr/local/cuda/bin/ptxas
+  ```
+
+  This bypasses the bundled compiler's driver version check and enables Mojo
+  to compile GPU code with your existing driver.
+
+#### Hardware compatibility
+
+<table>
+  <thead>
+    <tr>
+      <th>GPU</th>
+      <th>Architecture</th>
+      <th>Arch target</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colSpan="3"><strong>Continuously tested</strong></td>
+    </tr>
+    <tr>
+      <td>B200</td>
+      <td>Blackwell</td>
+      <td><code>sm_100</code></td>
+    </tr>
+    <tr>
+      <td colSpan="3"><strong>Known compatible</strong></td>
+    </tr>
+    <tr>
+      <td>B300</td>
+      <td>Blackwell</td>
+      <td><code>sm_103</code></td>
+    </tr>
+    <tr>
+      <td>B100</td>
+      <td>Blackwell</td>
+      <td><code>sm_100</code></td>
+    </tr>
+    <tr>
+      <td>DGX Spark</td>
+      <td>Blackwell</td>
+      <td><code>sm_121</code></td>
+    </tr>
+    <tr>
+      <td>H200</td>
+      <td>Hopper</td>
+      <td><code>sm_90</code></td>
+    </tr>
+    <tr>
+      <td>H100</td>
+      <td>Hopper</td>
+      <td><code>sm_90</code></td>
+    </tr>
+    <tr>
+      <td>L4</td>
+      <td>Ada Lovelace</td>
+      <td><code>sm_89</code></td>
+    </tr>
+    <tr>
+      <td>L40</td>
+      <td>Ada Lovelace</td>
+      <td><code>sm_89</code></td>
+    </tr>
+    <tr>
+      <td>RTX 50XX series</td>
+      <td>Blackwell</td>
+      <td><code>sm_120</code></td>
+    </tr>
+    <tr>
+      <td>RTX 40XX series</td>
+      <td>Ada Lovelace</td>
+      <td><code>sm_89</code></td>
+    </tr>
+    <tr>
+      <td>A100</td>
+      <td>Ampere</td>
+      <td><code>sm_80</code></td>
+    </tr>
+    <tr>
+      <td>A10</td>
+      <td>Ampere</td>
+      <td><code>sm_86</code></td>
+    </tr>
+    <tr>
+      <td>A1000</td>
+      <td>Ampere</td>
+      <td><code>sm_86</code></td>
+    </tr>
+    <tr>
+      <td>RTX 30XX series</td>
+      <td>Ampere</td>
+      <td><code>sm_86</code></td>
+    </tr>
+    <tr>
+      <td>Jetson Orin / Orin Nano</td>
+      <td>Ampere</td>
+      <td><code>sm_87</code></td>
+    </tr>
+    <tr>
+      <td>Jetson Thor</td>
+      <td>Blackwell</td>
+      <td><code>sm_110</code></td>
+    </tr>
+    <tr>
+      <td>T4</td>
+      <td>Turing</td>
+      <td><code>sm_75</code></td>
+    </tr>
+    <tr>
+      <td>RTX 20XX series</td>
+      <td>Turing</td>
+      <td><code>sm_75</code></td>
+    </tr>
+  </tbody>
+</table>
+
+**Pre-Turing NVIDIA GPUs:** Pre-Turing GPUs (such as Pascal-generation GTX
+10XX and Tesla P100) are not supported out of the box. To use Mojo on these
+GPUs, set the `MODULAR_NVPTX_COMPILER_PATH` environment variable to point to a
+system `ptxas` binary compatible with your hardware and driver version.
+
+### AMD GPUs
+
+#### Software requirements
+
+- AMD GPU driver 6.3.3 or later (MI355X requires ROCm 7.0 or later)
+
+  - For data center GPUs (Instinct series), see the
+    [Ubuntu native install guide](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/install-methods/package-manager/package-manager-ubuntu.html).
+  - For Radeon GPUs on Ubuntu, see the
+    [Linux install guide for Radeon software](https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/native_linux/install-radeon.html).
+  - For Radeon GPUs on WSL, see the
+    [WSL install guide for Radeon software](https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-radeon.html).
+
+#### Hardware compatibility
+
+<table>
+  <thead>
+    <tr>
+      <th>GPU</th>
+      <th>Architecture</th>
+      <th>Arch target</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colSpan="3"><strong>Continuously tested</strong></td>
+    </tr>
+    <tr>
+      <td>MI355X</td>
+      <td>CDNA4</td>
+      <td><code>gfx950</code></td>
+    </tr>
+    <tr>
+      <td>MI300X</td>
+      <td>CDNA3</td>
+      <td><code>gfx942</code></td>
+    </tr>
+    <tr>
+      <td colSpan="3"><strong>Known compatible</strong></td>
+    </tr>
+    <tr>
+      <td>MI325X</td>
+      <td>CDNA3</td>
+      <td><code>gfx942</code></td>
+    </tr>
+    <tr>
+      <td>MI250X</td>
+      <td>CDNA2</td>
+      <td><code>gfx90a</code></td>
+    </tr>
+    <tr>
+      <td>Radeon RX 9070</td>
+      <td>RDNA4</td>
+      <td><code>gfx1201</code></td>
+    </tr>
+    <tr>
+      <td>Radeon RX 9060</td>
+      <td>RDNA4</td>
+      <td><code>gfx1200</code></td>
+    </tr>
+    <tr>
+      <td>Radeon 880M / 890M</td>
+      <td>RDNA3.5</td>
+      <td><code>gfx1150</code></td>
+    </tr>
+    <tr>
+      <td>Radeon 860M</td>
+      <td>RDNA3.5</td>
+      <td><code>gfx1152</code></td>
+    </tr>
+    <tr>
+      <td>Radeon 8060S</td>
+      <td>RDNA3.5</td>
+      <td><code>gfx1151</code></td>
+    </tr>
+    <tr>
+      <td>Radeon RX 7900</td>
+      <td>RDNA3</td>
+      <td><code>gfx1100</code></td>
+    </tr>
+    <tr>
+      <td>Radeon RX 7800 / 7700</td>
+      <td>RDNA3</td>
+      <td><code>gfx1101</code></td>
+    </tr>
+    <tr>
+      <td>Radeon RX 7600</td>
+      <td>RDNA3</td>
+      <td><code>gfx1102</code></td>
+    </tr>
+    <tr>
+      <td>Radeon 780M</td>
+      <td>RDNA3</td>
+      <td><code>gfx1103</code></td>
+    </tr>
+    <tr>
+      <td>Radeon RX 6900</td>
+      <td>RDNA2</td>
+      <td><code>gfx1030</code></td>
+    </tr>
+    <tr>
+      <td>Van Gogh (Steam Deck)</td>
+      <td>RDNA2</td>
+      <td><code>gfx1033</code></td>
+    </tr>
+  </tbody>
+</table>
+
+### Apple silicon GPUs
+
+#### Software requirements
+
+- macOS Sequoia (15) or later
+- Xcode 16 or later
+- You may need to install the Metal toolchain after upgrading macOS or Xcode:
+
+  ```bash
+  xcodebuild -downloadComponent MetalToolchain
+  ```
+
+#### Hardware compatibility
+
+<table>
+  <thead>
+    <tr>
+      <th>Chip</th>
+      <th>Support level</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>M5</td>
+      <td>Known compatible</td>
+    </tr>
+    <tr>
+      <td>M4</td>
+      <td>Known compatible</td>
+    </tr>
+    <tr>
+      <td>M3</td>
+      <td>Known compatible</td>
+    </tr>
+    <tr>
+      <td>M2</td>
+      <td>Known compatible</td>
+    </tr>
+    <tr>
+      <td>M1</td>
+      <td>Known compatible</td>
+    </tr>
+  </tbody>
+</table>
+
+## Troubleshooting GPU detection
+
+### What Mojo looks for
+
+When Mojo needs a GPU, the runtime attempts to load vendor-specific driver
+libraries in this order:
+
+1. **NVIDIA** (CUDA): loads `libcuda.so.1` and `libnvidia-ml.so.1`
+2. **AMD** (HIP): loads `libamdhip64.so`
+3. **Apple** (Metal): uses the Metal framework (built into macOS)
+
+If Mojo can't load any of these libraries, it falls back to CPU execution.
+
+### Verifying GPU access
+
+Use the `--target-accelerator` flag to compile for a specific GPU architecture:
+
+```bash
+mojo build --target-accelerator=sm_90 my_kernel.mojo
+```
+
+To check that your system's GPU is accessible at runtime, try a minimal GPU
+program:
+
+```mojo title="check_gpu.mojo"
+from max.gpu.host import DeviceContext
+
+def main() raises:
+    var ctx = DeviceContext()
+    print("GPU:", ctx.name())
+```
+
+```bash
+mojo check_gpu.mojo
+```
+
+If Mojo can't find a GPU, this raises an error explaining what it tried.
+
+### Common issues
+
+**GPU not detected despite `nvidia-smi` showing a GPU:**
+
+- Verify that the NVIDIA driver version is 580 or later (`nvidia-smi` shows
+  the version in the top-right corner). If your driver is older, set
+  `MODULAR_NVPTX_COMPILER_PATH` as described in the [NVIDIA software
+  requirements](#software-requirements) section above.
+- Ensure `libcuda.so.1` is on your library path. On most systems, the NVIDIA
+  driver installer places it in `/usr/lib/x86_64-linux-gnu/` or
+  `/usr/lib64/`.
+- If using a container, make sure you're passing GPU access through (for
+  example, `docker run --gpus all`).
+- Set `MLRT_CUDA_DEBUG=1` to get detailed logging of the CUDA detection
+  process.
+
+**AMD GPU not detected:**
+
+- Verify that you have ROCm/HIP installed and that `libamdhip64.so` is
+  available.
+- Check your ROCm version: `apt show rocm-libs 2>/dev/null | grep Version` or
+  `rocm-smi --showdriverversion`.
+- Ensure your user is in the `render` and `video` groups:
+  `sudo usermod -aG render,video $USER` (then log out and back in).
+
+**Apple GPU not detected or Metal toolchain errors:**
+
+- Ensure you're on macOS Sequoia (15) or later: `sw_vers`.
+- Install the Metal toolchain: `xcodebuild -downloadComponent MetalToolchain`.
+- Verify that you have Xcode Command Line Tools:
+  `xcode-select --install`.
+
+**Pre-Turing NVIDIA GPU errors:**
+
+- Set `MODULAR_NVPTX_COMPILER_PATH` to a compatible system `ptxas` binary.
+  For example: `export MODULAR_NVPTX_COMPILER_PATH=/usr/local/cuda/bin/ptxas`.
+
+**WSL: GPU not detected or driver mismatch:**
+
+- Make sure you follow the WSL-specific installation instructions for your
+  GPU vendor, not the native Linux instructions.
+- For NVIDIA on WSL, the GPU driver should be installed on the Windows host,
+  not inside WSL. WSL automatically makes the host driver available.
+- For AMD on WSL, see the
+  [WSL install guide for Radeon software](https://rocm.docs.amd.com/projects/radeon/en/latest/docs/install/wsl/install-radeon.html).
+
+---
+
+If your GPU works with Mojo but isn't listed here, let us know on the
+[Modular community forum](https://forum.modular.com) or [file a GitHub
+issue](https://github.com/modular/modular/issues).

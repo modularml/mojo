@@ -1,0 +1,357 @@
+---
+title: Traits
+sidebar_label: Traits
+description: >-
+  What a trait is, why Mojo needs them, and how to use one.
+---
+
+Traits define contracts between types and the code that use them. Those
+contracts describe behavior, such as the methods a type must provide, as
+well as related (*associated*) types and constants. When a type conforms
+to a trait, the compiler verifies that it satisfies every requirement,
+allowing code to *rely* on the trait's interface.
+
+Traits are Mojo's pathway to polymorphism. They let you write code that
+works across many types without depending on implementation details that
+fall outside the contract. They're especially important for parameterized
+types and functions, which let you write code that works across many
+concrete types. By constraining a parameterized type to one or more
+traits, you give the compiler the information it needs to reason about the
+type and verify the code is safe and correct.
+
+Imagine you're writing code that works with many brands of sensors. Each
+sensor has its own implementation. They all know how to produce a
+reading, a run-time value such as a deflection angle. They also report a
+standard error range, a compile-time constant specific to that device.
+
+Each sensor also declares a measurement *type* that determines how the
+reading is interpreted. Some sensors measure angles, others distance or
+pressure. Your code shouldn't care how a particular sensor works or how it
+represents its measurements. An angle measurement, for example, might use
+degrees, radians, or gradians. It only needs to know that every sensor
+provides the operations and information it depends on.
+
+Traits express those requirements as a single contract. Instead of writing
+a function for each sensor type, you write one function against the trait,
+and any conforming type can use it. Mojo verifies that every required
+method, associated type, and compile-time value is present, so your code
+can use them without runtime overhead or capability checks.
+
+Traits are a foundation of Mojo code reuse. You write code in terms of
+what a trait requires rather than enumerating concrete types. That keeps
+your code flexible while preserving compile-time correctness.
+
+## Defining traits
+
+Traits let the compiler reason about a type's shape and capabilities: its
+methods, associated types, and compile-time values. Declare a trait with
+the `trait` keyword, followed by a name and a block of requirements:
+
+```mojo
+trait DeflectionSensing:
+    def fetch_reading(self) -> Float64:
+        ...
+```
+
+The three dots mark `fetch_reading()` as required. `DeflectionSensing`
+doesn't say how a type produces a value, only that a conforming type must
+be able to.
+
+### Domain-specific behavior
+
+A trait can provide a default implementation based on the information it
+knows about conforming types. The default implementation can call other
+required methods, but it can't call methods that aren't part of the
+trait's contract.
+
+Default methods are a good fit for domain-specific behavior that can be
+expressed in terms of the trait's requirements. For example,
+`within_tolerance()` validates a sensor's current reading:
+
+```mojo
+trait DeflectionSensing:
+    def fetch_reading(self) -> Float64:
+        ...
+
+    comptime absolute_tolerance: Float64 = 0.05  # This is made up for this example
+
+    def within_tolerance(self) -> Bool:
+        return abs(self.fetch_reading()) <= Self.absolute_tolerance
+```
+
+Conforming types inherit default implementations and can override them.
+
+Mojo doesn't provide a way to call a default implementation from an
+override.
+
+### Refining other traits
+
+A trait can refine another trait, meaning that it inherits every
+requirement from the refined trait while adding new ones. For example,
+`CalibratableDeflectionSensing` does everything `DeflectionSensing` does,
+but also requires a `calibrate()` method:
+
+```mojo
+trait CalibratableDeflectionSensing(DeflectionSensing):
+    def calibrate(mut self):
+        ...
+
+struct EddyCurrentSensor(CalibratableDeflectionSensing):
+    def fetch_reading(self) -> Float64:
+        # its implementation
+
+    def calibrate(mut self):
+        # its implementation
+```
+
+A conforming `EddyCurrentSensor` must implement `calibrate()`, while also
+meeting every requirement of `DeflectionSensing`. It inherits the default
+implementation of `within_tolerance()`, which calls `fetch_reading()` and
+uses the `absolute_tolerance` constant.
+
+## The trait contract
+
+A trait contract consists of methods and three kinds of compile-time
+members: associated types, required compile-time values, and shared
+compile-time constants.
+
+Methods can be required or provided. Required methods must be implemented
+by every conforming type. Provided methods include a default
+implementation that conforming types can override.
+
+Compile-time members either require each conforming type to provide its
+own value or define a value shared by every conforming type.
+
+- *Required methods* use the `...` ellipsis in their body. Every
+  conforming type must implement them.
+
+  ```mojo
+  trait Loggable:
+      def log(self, message: String):
+          ...
+  ```
+
+- *Provided methods* are implemented in the trait. Conforming types can
+  override them. Even a default no-op implementation is a valid provided
+  method.
+
+  ```mojo
+  trait Pausable:
+      def pause(self):
+          pass
+  ```
+
+- *Associated types* require conforming types to declare a subordinate
+  type. They're most commonly used in collections, where a parameterized
+  collection declares an element type.
+
+  ```mojo
+  trait Container:
+      associatedtype Element: Movable
+  ```
+
+- *Required compile-time values* must be defined by every conforming type.
+  They're often used for values that vary across implementations.
+
+  ```mojo
+  trait Pausable:
+      comptime max_pause_seconds: Float64
+  ```
+
+- *Shared compile-time constants* are defined by the trait and shared by
+  every conforming type.
+
+  ```mojo
+  trait DeflectionSensing:
+      comptime absolute_tolerance: Float64 = 0.05
+  ```
+
+A trait that declares none of these elements is called a *marker trait*.
+It doesn't require any methods, associated types, or compile-time values.
+Instead, it marks a conforming type as having a particular property or
+capability.
+
+## Conforming to a trait
+
+A struct conforms to a trait by listing it in parentheses after the
+struct name and implementing its required methods:
+
+```mojo
+@fieldwise_init
+struct CapacitiveSensor(Copyable, DeflectionSensing):
+    def fetch_reading(self) -> Float64:
+        # Not a very good sensor, but a simple example.
+        return Float64(21.5)
+```
+
+If a struct claims to conform to `DeflectionSensing` but doesn't implement
+`fetch_reading()`, it won't compile. At compile time, Mojo verifies that
+`CapacitiveSensor` satisfies every `DeflectionSensing` requirement,
+including its methods and comptime elements.
+
+Traits don't use duck typing. A struct that implements `fetch_reading()`
+but doesn't declare `DeflectionSensing` isn't a conforming type.
+
+### Required comptime members
+
+Define required comptime values directly on the conforming type with
+`comptime name = value`. For example, if `Pausable` requires a
+`max_pause_seconds` value, you'd declare it like this:
+
+```mojo
+@fieldwise_init
+struct Timer(Copyable, Pausable):
+    comptime max_pause_seconds: Float64 = 30.0
+
+    def pause(self):
+        print("Paused")
+```
+
+## Parameterizing functions and types with traits
+
+With the `DeflectionSensing` trait, you can build types for specific
+sensors, such as `CapacitiveSensor` or `EddyCurrentSensor`.
+
+By conforming to the trait, each type implements all required methods and
+comptime members. This shared contract lets you write a single function
+that works with any of them:
+
+```mojo
+def averaged_poll[
+    SensorType: DeflectionSensing, //  # infer-only
+](sensor: SensorType, samples: Int) -> Float64:
+    var total: Float64 = 0.0
+    for _ in range(samples):
+        total += sensor.fetch_reading()
+    return total / Float64(samples)
+```
+
+Since every sensor conforms to `DeflectionSensing`, the compiler knows
+that `fetch_reading()` is available:
+
+```mojo
+var sensor = CapacitiveSensor()
+var average_reading = averaged_poll(sensor, 10)
+print("Average reading:", average_reading)  # Fixed to 21.5 for the example
+```
+
+The call site doesn't use square brackets because the compiler infers
+`SensorType` from the argument.
+
+Use the `Some[]` shorthand when you don't need to name the type:
+
+```mojo
+def averaged_poll_2(sensor: Some[DeflectionSensing], samples: Int) -> Float64:
+    var total: Float64 = 0.0
+    for _ in range(samples):
+        total += sensor.fetch_reading()
+    return total / Float64(samples)
+```
+
+Use the named form when you need to refer to the type again, for example
+to require two arguments of the *same* conforming type:
+
+```mojo
+def compare_readings[
+    SensorType: DeflectionSensing
+](a: SensorType, b: SensorType) -> Float64:
+    return a.fetch_reading() - b.fetch_reading()
+```
+
+## Combining traits
+
+A parameter can require more than one trait. Use an ampersand (`&`) to
+combine them. Any type passed to the parameter must conform to every
+trait in the combination.
+
+For example, you could define a `Loggable` trait and require that a sensor
+conform to both `DeflectionSensing` and `Loggable`:
+
+```mojo
+trait Loggable:
+    def log(self, message: String):
+        ...
+
+def poll_and_log[T: DeflectionSensing & Loggable](sensor: T):
+    print(sensor.fetch_reading())
+    sensor.log("Polling sensor")
+```
+
+Refinement and composition solve different problems. Use refinement when
+one trait naturally extends another and that relationship should always
+hold. Use composition when a function or type needs multiple independent
+capabilities.
+
+### Reusing trait compositions
+
+If you reuse the same combination in multiple places, give it a name with
+a `comptime` declaration:
+
+```mojo
+comptime SensorLike = DeflectionSensing & Loggable
+
+struct SmartSensor(Copyable, SensorLike):
+    def fetch_reading(self) -> Float64:
+        return 18.2
+
+    def log(self, message: String):
+        print("reading logged")
+```
+
+`SensorLike` isn't a new trait. It's shorthand for
+`DeflectionSensing & Loggable`. Any type that conforms to both traits
+automatically satisfies `SensorLike`; there's nothing extra to declare.
+
+## Default implementations
+
+A trait can provide a working implementation instead of just requiring
+one:
+
+```mojo
+trait DefaultLoggable:
+    def log(self, message: String):
+        print("reading logged")
+
+@fieldwise_init
+struct BasicSensor(Copyable, DefaultLoggable):
+    pass
+```
+
+`BasicSensor` conforms without implementing `log()`. It inherits the
+trait's implementation, but any conforming type can override it by
+providing its own `log()`.
+
+Default implementations can conflict. If a type conforms to two traits
+that both provide the same method, Mojo won't choose between them:
+
+```mojo
+trait PowerCycle:
+    def restart(self):
+        print("Restarting via power cycle")
+
+trait Rebootable:
+    def restart(self):
+        print("Restarting via soft reboot")
+
+struct Gateway(PowerCycle, Rebootable):
+    pass
+    # Error: conflicting default implementations for restart().
+```
+
+Resolve the conflict by implementing `restart()` on `Gateway`. Your
+implementation overrides both defaults.
+
+## Things to know
+
+**You can't add traits to existing types.** Conformance is declared where
+a type is defined. You can't retroactively make `Float64`, `Int`, or any
+other type you don't own conform to a new trait.
+
+**Conformance is explicit.** A struct that happens to implement
+`fetch_reading()` doesn't conform to `DeflectionSensing` unless it
+declares the trait. Mojo checks declared conformance, not just matching
+method names.
+
+**Traits are all or nothing.** A conforming type must satisfy every
+requirement, either by implementing it directly or by inheriting a
+default implementation. There's no partial conformance.

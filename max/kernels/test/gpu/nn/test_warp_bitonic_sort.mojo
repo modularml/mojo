@@ -13,7 +13,7 @@
 
 """Test warp-level bitonic sort correctness in MoE router."""
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import TileTensor, row_major
 from nn.moe import router_group_limited, single_group_router
 from std.testing import assert_equal
@@ -32,11 +32,11 @@ def test_warp_bitonic_sort_interleaved[
     """
     comptime experts_per_group = n_experts // n_groups
 
-    var scores_dev = ctx.enqueue_create_buffer[DType.float32](n_experts)
-    var bias_dev = ctx.enqueue_create_buffer[DType.float32](n_experts)
-    var indices_dev = ctx.enqueue_create_buffer[DType.int32](topk_experts)
-    var weights_dev = ctx.enqueue_create_buffer[DType.float32](topk_experts)
-    var scores_host = ctx.enqueue_create_host_buffer[DType.float32](n_experts)
+    var scores_dev = ctx.enqueue_create_buffer[.float32](n_experts)
+    var bias_dev = ctx.enqueue_create_buffer[.float32](n_experts)
+    var indices_dev = ctx.enqueue_create_buffer[.int32](topk_experts)
+    var weights_dev = ctx.enqueue_create_buffer[.float32](topk_experts)
+    var scores_host = ctx.enqueue_create_host_buffer[.float32](n_experts)
 
     ctx.synchronize()
 
@@ -160,11 +160,11 @@ def test_single_group_router[
 ](ctx: DeviceContext) raises:
     """Verify single group router correctly routes experts."""
     var num_warps = n_experts // 32
-    var scores_dev = ctx.enqueue_create_buffer[DType.float32](n_experts)
-    var bias_dev = ctx.enqueue_create_buffer[DType.float32](n_experts)
-    var indices_dev = ctx.enqueue_create_buffer[DType.int32](topk_experts)
-    var weights_dev = ctx.enqueue_create_buffer[DType.float32](topk_experts)
-    var scores_host = ctx.enqueue_create_host_buffer[DType.float32](n_experts)
+    var scores_dev = ctx.enqueue_create_buffer[.float32](n_experts)
+    var bias_dev = ctx.enqueue_create_buffer[.float32](n_experts)
+    var indices_dev = ctx.enqueue_create_buffer[.int32](topk_experts)
+    var weights_dev = ctx.enqueue_create_buffer[.float32](topk_experts)
+    var scores_host = ctx.enqueue_create_host_buffer[.float32](n_experts)
     ctx.synchronize()
 
     with bias_dev.map_to_host() as bias_map:
@@ -247,10 +247,10 @@ def test_single_group_router_raw_score_used_for_weights[
 
     Uses integer-valued raw scores so expected weights are exact.
     """
-    var scores_dev = ctx.enqueue_create_buffer[DType.float32](n_experts)
-    var bias_dev = ctx.enqueue_create_buffer[DType.float32](n_experts)
-    var indices_dev = ctx.enqueue_create_buffer[DType.int32](topk_experts)
-    var weights_dev = ctx.enqueue_create_buffer[DType.float32](topk_experts)
+    var scores_dev = ctx.enqueue_create_buffer[.float32](n_experts)
+    var bias_dev = ctx.enqueue_create_buffer[.float32](n_experts)
+    var indices_dev = ctx.enqueue_create_buffer[.int32](topk_experts)
+    var weights_dev = ctx.enqueue_create_buffer[.float32](topk_experts)
     ctx.synchronize()
 
     # Raw scores: experts 0..k-1 get scores k, k-1, ..., 1

@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.weights.weight_loading import (
+from max.pipelines.weights.weight_loading import (
     AUTO_CAST_ENV_VAR,
     auto_cast_weights_from_env,
 )

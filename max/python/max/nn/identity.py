@@ -31,11 +31,19 @@ class Identity(Module):
 
     .. code-block:: python
 
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType
         from max.nn import Identity
 
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
         identity = Identity()
-        # In graph construction:
-        output = identity(input_tensor)  # output == input_tensor
+        input_type = TensorType(DType.float32, [1, 256], device=device_ref)
+        with Graph("identity", input_types=[input_type]) as graph:
+            output = identity(graph.inputs[0])  # output == input_tensor
+            graph.output(output)
     """
 
     def __call__(self, x: TensorValue) -> TensorValue:

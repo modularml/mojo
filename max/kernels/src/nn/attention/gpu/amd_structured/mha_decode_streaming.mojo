@@ -16,13 +16,14 @@ Per-tile loop: K strips from DRAM→LDS→REG for QK MMA,
 P scores through SMEM for PV MMA, split-K partitioning.
 
 Uses DecodeStreamingKVBuffer for single-buffer, per-strip DRAM→SMEM staging
-(no KVCacheIterator — strips are sub-tiled from an external DRAM tile).
+(no KVCacheIterator; strips are sub-tiled from an external DRAM tile).
 """
 
 from std.math import ceildiv
 from std.sys.intrinsics import readfirstlane
-from std.gpu import barrier, block_idx
-from std.gpu import warp_id as get_warp_id
+from max.gpu import block_idx
+from max.gpu.sync import barrier
+from max.gpu import warp_id as get_warp_id
 from std.memory import bitcast
 from std.utils import IndexList
 from std.utils.numerics import get_accum_type
@@ -47,7 +48,7 @@ __extension Attention:
         ],
         num_partitions: Int,
     ):
-        """MHA decode — streams K strips DRAM→LDS→REG per QK MMA.
+        """MHA decode: streams K strips DRAM→LDS→REG per QK MMA.
 
         Trades higher per-launch overhead for better throughput at
         batch ≥ 128 with long keys. Selected via `MHA_STREAMING_DECODE=True`.
@@ -72,7 +73,7 @@ __extension Attention:
         comptime k_swizzle = Swizzle(2, 0, 2)
 
         var warp_id = UInt32(
-            readfirstlane(bitcast[DType.int32](UInt32(get_warp_id())))
+            readfirstlane(bitcast[.int32](UInt32(get_warp_id())))
         )
 
         # QK MMA op.
@@ -92,7 +93,7 @@ __extension Attention:
         ]
 
         # Split-K range for this block.
-        start, end = get_start_and_end_for_partitions[Self.BN](
+        var start, end = get_start_and_end_for_partitions[Self.BN](
             self.num_keys, num_partitions, block_idx.x
         )
 
@@ -136,7 +137,7 @@ __extension Attention:
                 self.k,
                 self.batch_idx,
                 Self.kv_head_idx(),
-                self.k_smem_ptr,
+                self.k_smem_ptr.as_unsafe_any_origin(),
                 self.num_keys,
                 warp_id,
             )
@@ -156,7 +157,7 @@ __extension Attention:
                 self.v,
                 self.batch_idx,
                 Self.kv_head_idx(),
-                self.v_smem_ptr,
+                self.v_smem_ptr.as_unsafe_any_origin(),
                 self.num_keys,
                 warp_id,
             )

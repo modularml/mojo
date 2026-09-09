@@ -124,7 +124,12 @@ def _compute(*, subtile: Int = 0) -> OpDesc:
 
 
 def load_frags[start: Int, end: Int]() -> Pipe[end - start]:
-    """Build a Pipe of load_frag ops for k-tiles start..end-1."""
+    """Build a Pipe of load_frag ops for k-tiles start..end-1.
+
+    Parameters:
+        start: Inclusive starting K-tile index for the load_frag op range.
+        end: Exclusive ending K-tile index for the load_frag op range.
+    """
     var p = Pipe[end - start]()
     comptime for k in range(start, end):
         p.ops[k - start] = _load_frag(subtile=k)
@@ -132,7 +137,12 @@ def load_frags[start: Int, end: Int]() -> Pipe[end - start]:
 
 
 def compute_range[start: Int, end: Int]() -> Pipe[end - start]:
-    """Build a Pipe of compute ops for k-tiles start..end-1."""
+    """Build a Pipe of compute ops for k-tiles start..end-1.
+
+    Parameters:
+        start: Inclusive starting K-tile index for the compute op range.
+        end: Exclusive ending K-tile index for the compute op range.
+    """
     var p = Pipe[end - start]()
     comptime for k in range(start, end):
         p.ops[k - start] = _compute(subtile=k)
@@ -148,7 +158,7 @@ def _logical_body[num_k_tiles: Int]() -> List[OpDesc]:
     """Logical op table for single-buffer matmul iteration.
 
     Pure data: declares WHAT ops exist with buffer metadata only.
-    No resource kinds, no latencies, no roles — those come from the
+    No resource kinds, no latencies, no roles; those come from the
     TargetCostModel.
     """
     with PipelineBody() as b:
@@ -171,6 +181,10 @@ struct SingleBufferSchedule[num_k_tiles: Int](PipelineSchedule):
     The algorithm declares logical ops (tag + buffer metadata only).
     The target cost model supplies resource, latency, and role.
     The framework derives the pipeline ordering and dependency edges.
+
+    Parameters:
+        num_k_tiles: Number of K-tiles along the contraction dimension,
+            each producing one fragment load and one MMA compute op.
     """
 
     var hints: AMDScheduleHints
@@ -205,7 +219,14 @@ struct SingleBufferSchedule[num_k_tiles: Int](PipelineSchedule):
     def transform_kernel(
         self, ker: List[ScheduleEntry], body: List[OpDesc]
     ) -> List[ScheduleEntry]:
-        """Append AMD schedule_group_barrier hints to kernel entries."""
+        """Append AMD schedule_group_barrier hints to kernel entries.
+
+        Args:
+            ker: The kernel schedule entries to append AMD
+                schedule_group_barrier hints to.
+            body: The annotated body ops used to count fragment loads and
+                split loop-carried vs non-loop-carried frags.
+        """
         var result = ker.copy()
         append_amd_hints(result, body, self.config(), self.hints)
         return result^
@@ -229,10 +250,28 @@ def build_default_matmul_schedule[
     """Build the complete software pipeline schedule for the default matmul.
 
     Uses ScheduleCompiler with SingleBufferSchedule trait implementation.
-    All phases derived from the logical body — no magic numbers in derivation.
+    All phases derived from the logical body; no magic numbers in derivation.
 
     Returns a ScheduleCompiler with all phases as Lists. Use as a
-    comptime value — the kernel reads entries via comptime for.
+    comptime value; the kernel reads entries via comptime for.
+
+    Parameters:
+        num_k_tiles: Number of K-tiles along the contraction dimension,
+            each producing one fragment load and one MMA compute op.
+        num_m_mmas: Number of MMA tiles along the M dimension of the
+            output tile.
+        num_n_mmas: Number of MMA tiles along the N dimension of the
+            output tile.
+        num_k_mmas: Number of MMA tiles along the K dimension per
+            COMPUTE body op.
+        MMA_M: M dimension of a single MMA instruction (for example 16
+            or 32).
+        MMA_N: N dimension of a single MMA instruction (for example 16
+            or 32).
+        a_loads_per_thread: Number of DS_WRITE ops per STORE_SMEM for
+            the A operand tile.
+        b_loads_per_thread: Number of DS_WRITE ops per STORE_SMEM for
+            the B operand tile.
     """
     var schedule = SingleBufferSchedule[num_k_tiles](
         AMDScheduleHints(

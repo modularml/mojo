@@ -1,0 +1,31 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "audio",
+    srcs = glob(["**/*.py"]),
+    ignore_unresolved_imports = [
+        # lib depends on audio at runtime -- lib/registry.py imports
+        # AudioGenerationPipeline to route the audio task -- so audio cannot
+        # take a dep on lib in return without a circular Bazel dep. The
+        # imports below are TYPE_CHECKING-only or deferred to function scope
+        # to break the runtime cycle. See diffusion/BUILD.bazel, which has
+        # the same shape for the same reason.
+        "max.pipelines.lib.config.PipelineConfig",
+        "max.pipelines.lib.model_manifest.ModelManifest",
+        "max.pipelines.lib.pipeline_runtime_config.PipelineRuntimeConfig",
+    ],
+    # The TYPE_CHECKING imports from lib cannot be resolved by mypy when this
+    # target is built in isolation, for the circularity described above.
+    tags = ["no-mypy"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/engine",
+        "//max/python/max/experimental",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/request",
+        requirement("numpy"),
+    ],
+)

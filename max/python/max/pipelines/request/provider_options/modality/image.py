@@ -27,16 +27,24 @@ class ImageProviderOptions(PixelProviderOptionsBase):
     """
 
     # Override base width/height to add image-specific minimum and the
-    # multiple-of-16 constraint enforced by ``_validate_dimensions``.
+    # multiple-of-8 constraint enforced by ``_validate_dimensions``. The
+    # multiple-of-8 floor matches the VAE spatial scale factor used by every
+    # currently supported pixel architecture; per-model tokenizers are
+    # responsible for any further rounding to a patchification-compatible
+    # size (e.g., Wan rounds each dimension down to a multiple of
+    # ``vae_scale_factor * 2`` = 16).
+    # Using 8 here lets callers request standard resolutions such as 1080p
+    # (1920x1080) without the schema layer rejecting heights that are not
+    # exact multiples of 16.
     width: int | None = Field(
         None,
-        description="The width of the generated image in pixels. Must be at least 128 and a multiple of 16.",
+        description="The width of the generated image in pixels. Must be at least 128 and a multiple of 8.",
         ge=128,
     )
 
     height: int | None = Field(
         None,
-        description="The height of the generated image in pixels. Must be at least 128 and a multiple of 16.",
+        description="The height of the generated image in pixels. Must be at least 128 and a multiple of 8.",
         ge=128,
     )
 
@@ -78,9 +86,7 @@ class ImageProviderOptions(PixelProviderOptionsBase):
     @model_validator(mode="after")
     def _validate_dimensions(self) -> "ImageProviderOptions":
         for name, value in [("width", self.width), ("height", self.height)]:
-            if value is not None and value % 16 != 0:
-                raise ValueError(
-                    f"{name} must be a multiple of 16, got {value}"
-                )
+            if value is not None and value % 8 != 0:
+                raise ValueError(f"{name} must be a multiple of 8, got {value}")
 
         return self

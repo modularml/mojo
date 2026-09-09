@@ -1,10 +1,29 @@
-load("//bazel:api.bzl", "lit_tests")
+load("//bazel:api.bzl", "lit_tests", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
 lit_tests(
     name = "test",
-    srcs = glob(["**/*.mojo"]),
+    srcs = glob(
+        ["**/*.mojo"],
+        exclude = [
+            # Single-GPU MI355 byte-equivalence tests. Pure local
+            # quantize/copy kernels (no rocshmem runtime), so they run as the
+            # standalone mojo_test rules below instead of in this 4-GPU,
+            # requires-network lit_tests sweep.
+            "test_mx_ep_wait_scale_fusion.mojo",
+            "test_mxfp4_fused_silu_scale_fusion.mojo",
+            "test_mxfp6_fused_silu_scale_fusion.mojo",
+            "test_mxfp8_fused_silu_scale_fusion.mojo",
+            "test_mxfp6_fused_silu.mojo",
+            "test_mxfp6_send_buf.mojo",
+            "test_mxfp8_scale_overflow_probe.mojo",
+            # Single-GPU device-scope ordering regression guard. Pure std, no
+            # rocshmem runtime; runs as the standalone mojo_test below.
+            "test_ep_combine_ordering.mojo",
+        ],
+    ),
     env = select({
         "//:nvidia_gpu": {
             "MODULAR_SHMEM_LIB_DIR": "../+http_archive+nvshmem_prebuilt",
@@ -36,5 +55,133 @@ lit_tests(
     tags = [
         "gpu",
         "requires-network",
+    ],
+)
+
+# Standalone single-GPU MI355 (gfx950) byte-equivalence tests for
+# the fused scale_4d preshuffle emission. They import only the local quantize/
+# copy kernels from shmem.ep_comm (MXTokenFormat / fused_silu_mx_kernel)
+# and never call the rocshmem runtime, so they need neither MODULAR_SHMEM_LIB_DIR
+# (the rocshmem host lib is dlopen'd lazily only at shmem_init/collective time)
+# nor requires-network. //max:shmem links the device bitcode at compile time.
+mojo_test(
+    name = "test_mx_ep_wait_scale_fusion.mojo.test",
+    size = "large",
+    srcs = ["test_mx_ep_wait_scale_fusion.mojo"],
+    # Undeclared, the memory manager caps its cache at 205 MB, which the earlier
+    # cases fragment below the widest EP8 case's single contiguous 102 MiB
+    # request -- a cache failure with the device near-empty.
+    exec_properties = {
+        "test.resources:gpu-memory": "1",
+    },
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_mxfp4_fused_silu_scale_fusion.mojo.test",
+    size = "large",
+    srcs = ["test_mxfp4_fused_silu_scale_fusion.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_mxfp6_send_buf.mojo.test",
+    size = "large",
+    srcs = ["test_mxfp6_send_buf.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_mxfp6_fused_silu.mojo.test",
+    size = "large",
+    srcs = ["test_mxfp6_fused_silu.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_mxfp6_fused_silu_scale_fusion.mojo.test",
+    size = "large",
+    srcs = ["test_mxfp6_fused_silu_scale_fusion.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_mxfp8_fused_silu_scale_fusion.mojo.test",
+    size = "large",
+    srcs = ["test_mxfp8_fused_silu_scale_fusion.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_mxfp8_scale_overflow_probe.mojo.test",
+    size = "large",
+    srcs = ["test_mxfp8_scale_overflow_probe.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+# Single-GPU (gfx950) regression guard for the EP-combine device-scope
+# data-ready acquire fence. Pure std (no rocshmem runtime): a NaN-poisoned,
+# oversubscribed producer/consumer handoff that reads stale ~55% of the time if
+# the fence is missing, and 0 with it.
+mojo_test(
+    name = "test_ep_combine_ordering.mojo.test",
+    size = "large",
+    srcs = ["test_ep_combine_ordering.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
     ],
 )

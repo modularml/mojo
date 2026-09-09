@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Coord, Layout, RuntimeLayout, TileTensor, row_major
 from layout._utils import ManagedLayoutTensor
 from nn.slice import sliced_add
@@ -57,7 +57,7 @@ def test_sliced_add[
             c_host.raw_store(idx, 0.0)
 
     # Keep lora_end_idx on host; sliced_add reads this scalar on host.
-    var lora_end_idx = ManagedLayoutTensor[DType.int64, Layout.row_major[1]()](
+    var lora_end_idx = ManagedLayoutTensor[.int64, Layout.row_major[1]()](
         RuntimeLayout[Layout.row_major[1]()].row_major(IndexList[1](1)),
         ctx,
     )
@@ -111,25 +111,25 @@ def test_sliced_add[
 
 def test_sliced_add_boundary_cases(ctx: DeviceContext) raises:
     # Test case 1: batch_end_idx = 0 (no addition, all copy)
-    test_sliced_add[DType.float32, 4, 8, 0](ctx)
+    test_sliced_add[.float32, 4, 8, 0](ctx)
 
     # Test case 2: batch_end_idx = rows (all addition)
-    test_sliced_add[DType.float32, 4, 8, 4](ctx)
+    test_sliced_add[.float32, 4, 8, 4](ctx)
 
     # Test case 3: batch_end_idx in middle
-    test_sliced_add[DType.float32, 8, 16, 4](ctx)
+    test_sliced_add[.float32, 8, 16, 4](ctx)
 
     # Test case 4: Single row with addition
-    test_sliced_add[DType.float32, 1, 8, 1](ctx)
+    test_sliced_add[.float32, 1, 8, 1](ctx)
 
     # Test case 5: Larger tensor
-    test_sliced_add[DType.float32, 128, 64, 64](ctx)
+    test_sliced_add[.float32, 128, 64, 64](ctx)
 
 
 def test_sliced_add_dtypes(ctx: DeviceContext) raises:
-    test_sliced_add[DType.float32, 16, 32, 8](ctx)
-    test_sliced_add[DType.float16, 16, 32, 8](ctx)
-    test_sliced_add[DType.bfloat16, 16, 32, 8](ctx)
+    test_sliced_add[.float32, 16, 32, 8](ctx)
+    test_sliced_add[.float16, 16, 32, 8](ctx)
+    test_sliced_add[.bfloat16, 16, 32, 8](ctx)
 
 
 def main() raises:

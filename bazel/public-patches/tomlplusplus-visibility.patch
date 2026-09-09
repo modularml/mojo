@@ -1,0 +1,11 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -22,6 +22,7 @@ cc_library(
+     ],
+     includes = ["include/toml++"],
+     strip_include_prefix = "include",
++    visibility = ["//visibility:public"],
+ )
+
+ cc_library(

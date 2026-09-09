@@ -45,14 +45,14 @@ struct RuntimeLayout[
     layout: Layout,
     /,
     *,
-    element_type: DType = DType.int64,
-    linear_idx_type: DType = DType.int64,
+    element_type: DType = .int64,
+    linear_idx_type: DType = .int64,
 ](Defaultable, TrivialRegisterPassable, Writable):
     """A runtime-configurable layout that uses `RuntimeTuple` for storage.
 
     This struct provides a layout implementation that can be modified at runtime,
-    unlike the static [`Layout`](/docs/layout/layout/Layout) type. It
-    uses [`RuntimeTuple`](/docs/layout/runtime_tuple/RuntimeTuple) for
+    unlike the static [`Layout`](/api/mojo/layout/layout/Layout) type. It
+    uses [`RuntimeTuple`](/api/mojo/layout/runtime_tuple/RuntimeTuple) for
     shape and stride storage.
 
     Parameters:
@@ -437,7 +437,7 @@ def coalesce[
 
 
 def make_layout[
-    l1: Layout, l2: Layout, /, *, linear_idx_type: DType = DType.uint64
+    l1: Layout, l2: Layout, /, *, linear_idx_type: DType = .uint64
 ](
     a: RuntimeLayout[l1, ...],
     b: RuntimeLayout[l2, ...],

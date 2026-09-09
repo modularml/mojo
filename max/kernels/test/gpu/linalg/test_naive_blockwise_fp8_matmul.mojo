@@ -13,7 +13,7 @@
 
 from std.math import ceildiv
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from internal_utils import assert_almost_equal
 from std.random import rand
 from layout import CoordLike, Coord, Idx, TileTensor, row_major
@@ -84,8 +84,8 @@ def test_naive_blockwise_fp8_matmul[
 
     var a_host_ptr = ctx.enqueue_create_host_buffer[input_type](a_size)
     var b_host_ptr = ctx.enqueue_create_host_buffer[input_type](b_size)
-    var c_host_ptr = ctx.enqueue_create_host_buffer[DType.float32](c_size)
-    var c_host_ref_ptr = ctx.enqueue_create_host_buffer[DType.float32](c_size)
+    var c_host_ptr = ctx.enqueue_create_host_buffer[.float32](c_size)
+    var c_host_ref_ptr = ctx.enqueue_create_host_buffer[.float32](c_size)
 
     rand(a_host_ptr.unsafe_ptr(), a_size)
     rand(b_host_ptr.unsafe_ptr(), b_size)
@@ -94,10 +94,10 @@ def test_naive_blockwise_fp8_matmul[
         c_host_ptr[i] = 0
         c_host_ref_ptr[i] = 0
 
-    var a_scale_host_ptr = ctx.enqueue_create_host_buffer[DType.float32](
+    var a_scale_host_ptr = ctx.enqueue_create_host_buffer[.float32](
         a_scale_size
     )
-    var b_scale_host_ptr = ctx.enqueue_create_host_buffer[DType.float32](
+    var b_scale_host_ptr = ctx.enqueue_create_host_buffer[.float32](
         b_scale_size
     )
 
@@ -129,8 +129,8 @@ def test_naive_blockwise_fp8_matmul[
                     Coord(_k, _n)
                 ]
                 res += (
-                    a_host[_m, _k].cast[DType.float32]()
-                    * b_elem.cast[DType.float32]()
+                    a_host[_m, _k].cast[.float32]()
+                    * b_elem.cast[.float32]()
                     * a_scale
                     * b_scale
                 )
@@ -139,9 +139,9 @@ def test_naive_blockwise_fp8_matmul[
 
     var a_device = ctx.enqueue_create_buffer[input_type](a_size)
     var b_device = ctx.enqueue_create_buffer[input_type](b_size)
-    var c_device = ctx.enqueue_create_buffer[DType.float32](c_size)
-    var a_scale_device = ctx.enqueue_create_buffer[DType.float32](a_scale_size)
-    var b_scale_device = ctx.enqueue_create_buffer[DType.float32](b_scale_size)
+    var c_device = ctx.enqueue_create_buffer[.float32](c_size)
+    var a_scale_device = ctx.enqueue_create_buffer[.float32](a_scale_size)
+    var b_scale_device = ctx.enqueue_create_buffer[.float32](b_scale_size)
 
     ctx.enqueue_copy(a_scale_device, a_scale_host_ptr)
     ctx.enqueue_copy(b_scale_device, b_scale_host_ptr)
@@ -204,37 +204,37 @@ def main() raises:
     with DeviceContext() as ctx:
         comptime for transpose_b in range(0, 2):
             test_naive_blockwise_fp8_matmul[
-                DType.float8_e4m3fn,
+                .float8_e4m3fn,
                 Index(1, 128, 128),
                 transpose_b=Bool(transpose_b),
             ](ctx, Idx[128], Idx[128], Idx[128])
 
             test_naive_blockwise_fp8_matmul[
-                DType.float8_e4m3fn,
+                .float8_e4m3fn,
                 Index(1, 64, 128),
                 transpose_b=Bool(transpose_b),
             ](ctx, Idx[128], Idx[256], Idx[128])
 
             test_naive_blockwise_fp8_matmul[
-                DType.float8_e4m3fn,
+                .float8_e4m3fn,
                 Index(1, 64, 16),
                 transpose_b=Bool(transpose_b),
             ](ctx, Idx[128], Idx[128], Idx[128])
 
             test_naive_blockwise_fp8_matmul[
-                DType.float8_e4m3fn,
+                .float8_e4m3fn,
                 Index(1, 128, 128),
                 transpose_b=Bool(transpose_b),
             ](ctx, Idx[120], Idx[128], Idx[128])
 
             test_naive_blockwise_fp8_matmul[
-                DType.float8_e4m3fn,
+                .float8_e4m3fn,
                 Index(1, 128, 128),
                 transpose_b=Bool(transpose_b),
             ](ctx, Idx[120], Idx[129], Idx[128])
 
             test_naive_blockwise_fp8_matmul[
-                DType.float8_e4m3fn,
+                .float8_e4m3fn,
                 Index(32, 128, 64),
                 transpose_b=Bool(transpose_b),
             ](ctx, Idx[120], Idx[129], Idx[129])

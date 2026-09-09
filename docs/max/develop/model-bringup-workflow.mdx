@@ -1,40 +1,46 @@
 ---
 title: Model bring-up workflow
-sidebar_label: Model bring-up workflow
 description: Understand MAX's model architecture system and how to implement a custom architecture by mapping config fields, translating weight names, connecting to the KV cache, and extending the compute graph.
 ---
 
-MAX organizes model support through **architectures**: Python module directories
-that define the compute graph, map configuration, and load weights. An
-architecture connects your Hugging Face checkpoint to the
-[MAX pipeline](/max/develop/pipelines) and gives you hardware-optimized
-kernels, production batching, KV cache management, and multi-GPU distribution,
-with no serving layer to write yourself.
+:::tip
+You can automate this entire model bring-up process using AI coding agents. See
+[Bring up a model with AI agent skills](/develop/model-bringup-skills/) for
+details.
+:::
 
-MAX ships with implementations for the most common transformer families: dense
-transformers, mixture-of-experts variants, and sliding-window attention models.
-Most publicly released checkpoints are structurally close enough to one of
-those that adopting an existing architecture requires only weight renaming or a
-few config field overrides. Some models require new layers that differ
-minimally from an existing one, such as a different activation function or an
-added normalization; start those from a copy of the closest layer in `max.nn`
-rather than writing from scratch. When your model's compute graph differs
-structurally from any of the available implementations, you write a new one.
+_Model bring-up_ is the process of adapting a pretrained model from Hugging
+Face or PyTorch to run in MAX.
 
-This guide starts with the directory structure every custom architecture shares,
-then covers the two decisions that shape your implementation: which reference
-architecture to start from, and how far your model's compute graph departs from
-it.
+To bring a model to MAX, you must implement a _model architecture_. A model
+architecture is a Python package that defines the model's compute graph, maps
+its configuration, and loads its weights. Once implemented, you can [serve the
+model](/develop/serve-custom-model-architectures/) with hardware-optimized
+kernels, production batching, KV cache management, and multi-GPU distribution.
+
+This guide shows how to write a custom architecture by choosing a reference
+implementation, adapting its configuration and weights, and extending the
+compute graph where your model differs.
+
+:::note
+
+MAX [supports models](/models/) across various modalities. This guide
+focuses on transformer-based text generation models, as they share common,
+established implementation patterns in MAX.
+
+:::
 
 ## Architecture directory structure
 
-A custom architecture lives in a directory:
+The majority of text-generation model architectures follow this standard
+directory layout:
 
 ```text
 {your_model}/
 ├── layers/
 ├── __init__.py
 ├── arch.py
+├── batch_processor.py
 ├── model_config.py
 ├── model.py
 ├── {model_name}.py
@@ -43,14 +49,25 @@ A custom architecture lives in a directory:
 
 Each file serves a distinct role:
 
-- `layers/`: holds custom layer implementations for components that differ
-  fundamentally from anything in `max.nn`.
+- `layers/`: holds custom layer implementations for components that `max.nn`
+  doesn't provide. See [Write a custom layer](/develop/layers).
 - `__init__.py`: exposes the `ARCHITECTURES` list that MAX reads to register
   each entry.
 - `arch.py`: registers the architecture with MAX, declaring its name (which must
   match the `architectures[0]` value in the model's Hugging Face `config.json`),
   supported encodings, and the classes that implement the config, model, and
-  weight adapter.
+  weight adapter. Models that use a KV cache should also set the
+  `memory_planner` field (usually
+  [`PagedMemoryPlanner`](/api/python/generated/max.pipelines.kv_cache.PagedMemoryPlanner/))
+  so MAX can size the KV cache and batch limits.
+- `batch_processor.py`: optional batch processor that prepares model inputs for
+  each scheduled batch. Create one only when the model has unique batching
+  logic; if batching matches an existing family, reuse that family's processor
+  by registering it through the
+  [`batching`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture#max.pipelines.lib.registry.SupportedArchitecture.batching)
+  field in `arch.py` (for example, `batching=Llama3BatchProcessor`) rather than
+  creating a new file or overriding the model class. See
+  [Delegating input preparation to a batch processor](/develop/pipelines#delegating-input-preparation-to-a-batch-processor).
 - `model_config.py`: translates Hugging Face `config.json` fields into a typed
   configuration object MAX uses to build the compute graph.
 - `model.py`: the pipeline model class registered in `arch.py`. When building
@@ -62,9 +79,8 @@ Each file serves a distinct role:
 - `weight_adapters.py`: translates Hugging Face checkpoint weight names to MAX
   weight slot names.
 
-Pass the parent directory and package name to `--custom-architectures` when you
-run `max generate` or `max serve`. MAX imports the package at startup, reads its
-`ARCHITECTURES` list, and registers each entry before the model loads.
+The following sections go into detail about how each component works and
+whether they require customization.
 
 ## Choose a reference architecture
 
@@ -111,6 +127,7 @@ features, not model name or family, for example:
 [gemma3-arch]: https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/gemma3
 [deepseekV2-arch]: https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/deepseekV2
 [deepseekV3-arch]: https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/deepseekV3
+[arch-kv-cache]: /api/python/generated/max.pipelines.lib.interfaces.ArchConfigWithAttentionKVCache/
 
 The sections below build on each other. Config field mapping, weight naming,
 and KV cache integration are required for every LLM implementation. If your
@@ -127,8 +144,11 @@ typed configuration object to build the compute graph. The general pattern is to
 subclass the reference config class and override the fields where the Hugging
 Face convention differs from MAX's representation. The **Files and versions**
 tab on a Hugging Face model page includes the `config.json` your config class
-needs to map. Use the config to identify which fields your subclass must
-override and which MAX field names they correspond to:
+needs to map. For a field-by-field guide to reading a config and sorting its
+fields into the work each implies, see
+[Read a model config](/develop/read-model-config). Use the config to
+identify which fields your subclass must override and which MAX field names they
+correspond to:
 
 ```json title="config.json"
 {
@@ -154,87 +174,53 @@ class YourConfig(Llama3Config):
     logits_scaling: float = 16.0
 
     @classmethod
-    def initialize_from_config(cls, pipeline_config, huggingface_config):
-        config = super().initialize_from_config(pipeline_config, huggingface_config)
+    def initialize_from_config(
+        cls, pipeline_config, huggingface_config, model_config=None, *, max_seq_len
+    ):
+        config = super().initialize_from_config(
+            pipeline_config, huggingface_config, model_config, max_seq_len=max_seq_len
+        )
         logit_scale = getattr(huggingface_config, "logit_scale", 0.0625)
         config.logits_scaling = 1.0 / logit_scale  # 0.0625 → 16.0
         return config
 ```
 
-## Map weight names
+## Map checkpoint weights
 
-You can't load Hugging Face weights directly into a MAX model because both
-frameworks derive weight names as attribute paths through an `nn.Module`
-hierarchy, and those hierarchies don't match. To load weights, you need a
-function that translates Hugging Face checkpoint keys to MAX weight slot names.
+When you construct your MAX `Module`, you declare each weight with a name,
+shape, dtype, and quantization encoding. Checkpoint weights rarely match your
+declared weights, so you write a weight adapter function. The function
+converts the checkpoint into the weights your `Module` expects.
 
-The model's `.safetensors.index.json` file (in the **Files and versions** tab
-on Hugging Face) shows the checkpoint's key names and shapes. Use it to
-identify the prefix and naming patterns your weight adapter must translate:
+Renaming is the most common transformation needed in a weight adapter. However,
+you might also need to cast dtypes, drop weights the `Module` doesn't use, and
+transform tensor layouts. To learn how to implement these transformations, see
+[Write a weight adapter](/develop/weight-adapters).
 
-```text
-model.embed_tokens.weight                    [vocab_size, hidden_size]  BF16
-model.layers.0.input_layernorm.weight        [hidden_size]              BF16
-model.layers.0.self_attn.q_proj.weight       [hidden_size, hidden_size] BF16
-model.layers.0.mlp.gate_proj.weight          [ffn_size, hidden_size]    BF16
-model.norm.weight                            [hidden_size]              BF16
-```
-
-The most common transformation is stripping a top-level prefix. A rename map
-and a conversion function registered in `arch.py` are all you need to handle
-it:
-
-```python title="weight_adapters.py"
-YOUR_MODEL_SAFETENSOR_MAPPING = {
-    "model.": "",  # removes the top-level "model." prefix
-}
-
-# pass this function to SupportedArchitecture(weight_adapters=...) in arch.py
-def convert_safetensor_state_dict(state_dict, huggingface_config, model_config):
-    ...
-```
-
-After MAX compiles the compute graph, it walks the model's `state_dict()` to
-get a list of named weight slots. It calls your adapter to translate Hugging
-Face checkpoint keys into slot names, then fills each slot by name. For all
-weights to load correctly, your adapter must map every checkpoint key to a slot
-name that exists in the model, and the attribute path your `nn.Module`
-hierarchy assigns to each parameter must match what the adapter returns. For
-quantized models, check the precision of weights and scales and cast to match
-kernel expectations before returning them from the adapter.
-
-MAX supports multiple weight formats through
-[`load_weights()`](/max/api/python/generated/max.graph.weights.load_weights/):
-
-- `.safetensors` (Safetensors)
-- `.gguf` (GGUF)
-
-Write a separate adapter function for each format you need to support, following
-the same rename-map pattern. For the full API, see
-[`max.graph.weights`](/max/api/python/graph.weights/).
-
-### FP8 and FP4 checkpoints
+:::note FP8 and FP4 checkpoints
 
 For architectures that load FP8 or FP4 checkpoints, use
-[`QuantFormat`](/max/api/python/generated/max.nn.QuantFormat) and
-[`QuantConfig`](/max/api/python/generated/max.nn.QuantConfig) from `max.nn`.
+[`QuantFormat`](/api/python/generated/max.nn.QuantFormat) and
+[`QuantConfig`](/api/python/generated/max.nn.QuantConfig) from `max.nn`.
 `QuantFormat` identifies the checkpoint's quantization scheme (such as
-`COMPRESSED_TENSORS_FP8` or `NVFP4`) and `QuantConfig` carries the per-layer
-scaling settings: which layers are quantized, the granularity and dtype of
-weight and activation scales, and the block sizes that the hardware-accelerated
-kernels require.
+`COMPRESSED_TENSORS_FP8`, `NVFP4`, or `MXFP8`) and `QuantConfig` carries the
+per-layer scaling settings: which layers are quantized, the granularity and
+dtype of weight and activation scales, and the block sizes that the
+hardware-accelerated kernels require.
+
+:::
 
 ## Connect to the KV cache
 
 MAX pre-allocates the KV cache at startup from values your config provides,
 before the first request arrives. Four values drive the allocation:
-`num_key_value_heads`, `head_dim`, `num_layers`, and `model_max_seq_len`. Wrong
+`num_key_value_heads`, `head_dim`, `num_layers`, and `max_seq_len`. Wrong
 values produce a cache the wrong size: the model runs but generates incoherent
 output rather than raising an error. The interface that carries these values is
-[`ArchConfigWithAttentionKVCache`](/max/api/python/generated/max.pipelines.lib.interfaces.ArchConfigWithAttentionKVCache/),
-which your config class must subclass and implement.
+[`ArchConfigWithAttentionKVCache`][arch-kv-cache], which your config class must
+subclass and implement.
 
-The four abstract properties your subclass must define are:
+The abstract properties your subclass must define are:
 
 - `num_key_value_heads: int`: total KV heads across all devices. Use
   `num_key_value_heads` from the Hugging Face config, not `num_attention_heads`.
@@ -242,7 +228,9 @@ The four abstract properties your subclass must define are:
   produces a cache sized for the wrong number of heads, silently.
 - `head_dim: int`: dimensionality of each attention head.
 - `num_layers: int`: number of hidden layers.
-- `model_max_seq_len: int`: maximum sequence length the model supports.
+
+`ArchConfigWithAttentionKVCache` stores `max_seq_len` directly, set from the
+required keyword-only `max_seq_len` argument that `initialize()` receives.
 
 MAX calls `get_kv_params()` on your config to size the cache. The standard
 implementation uses a static `construct_kv_params()` helper that calls
@@ -269,12 +257,12 @@ def construct_kv_params(
     )
 ```
 
-Store the result as a [`KVCacheParams`][kv-cache-params] in a `kv_params`
-field on your config class and return it from `get_kv_params()`. Then pass it
-to each [`AttentionWithRope`][attn-with-rope] layer at construction time:
-
-[kv-cache-params]: /max/api/python/generated/max.nn.kv_cache.KVCacheParams/
-[attn-with-rope]: /max/api/python/generated/max.nn.AttentionWithRope/
+Store the result as a
+[`KVCacheParams`](/api/python/generated/max.nn.kv_cache.KVCacheParams/) in a
+`kv_params` field on your config class and return it from `get_kv_params()`.
+Then pass it to each
+[`AttentionWithRope`](/api/python/generated/max.nn.attention.AttentionWithRope/)
+layer at construction time:
 
 ```python title="model.py"
 self.attn = AttentionWithRope(
@@ -283,13 +271,20 @@ self.attn = AttentionWithRope(
 )
 ```
 
+Most architectures return a flat `KVCacheParams`. Architectures with multiple or
+hybrid KV caches (for example, separate sliding-window and full-attention
+caches) return a
+[`MultiKVCacheParams`](/api/python/generated/max.nn.kv_cache.MultiKVCacheParams/)
+tree instead, which the cache manager consumes through the shared
+[`KVCacheParamInterface`](/api/python/generated/max.nn.kv_cache.KVCacheParamInterface/).
+
 With `kv_params` correctly configured, MAX dispatches fused attention kernels
 (RoPE application, KV store, and flash attention) and manages paged memory
-allocation. See [Serve custom model
-architectures](/max/develop/serve-custom-model-architectures) for a complete
-implementation with [`KVCacheConfig`][kv-cache-config] wired end-to-end.
-
-[kv-cache-config]: /max/api/python/generated/max.pipelines.lib.config.KVCacheConfig/
+allocation. See
+[Serve custom model architectures](/develop/serve-custom-model-architectures)
+for a complete implementation with
+[`KVCacheConfig`](/api/python/generated/max.pipelines.kv_cache.KVCacheConfig/)
+wired end-to-end.
 
 {/* TODO(docs): Link to attention-kv-cache page once it exists. Covers
 AttentionWithRope call signature, input_row_offsets, and KV cache failure modes
@@ -329,9 +324,10 @@ Subclassing overrides attributes or methods within an existing graph structure.
 Graph extension changes the structure itself: how many normalization layers a
 block applies, whether attention and MLP share their input, which parameters are
 learnable. What those changes look like depends entirely on your model's
-architecture. [`max.nn`](/max/api/python/nn) provides the building blocks
+architecture. [`max.nn`](/api/python/nn) provides the building blocks
 (attention layers, normalization, MLP, embeddings), and most structural
-differences can be expressed by composing from what's already there. The
+differences can be expressed by composing from what's already there.
+[Write a custom layer](/develop/layers) covers these build patterns. The
 examples below show two cases where a model's structure differed from the
 reference and required graph-level changes.
 
@@ -353,9 +349,11 @@ The parallel form requires one `input_layernorm` per block (not two) and a
 single residual add.
 
 When building any `nn.Module` that holds a list of layers, store them in
-[`LayerList`](/max/api/python/generated/max.nn.LayerList/) rather than a plain
-Python list. `LayerList` registers each layer in the `nn.Module` hierarchy
-under a numeric index (`0`, `1`, …), so weight names resolve to
+[`Sequential`](/api/python/generated/max.nn.Sequential/) rather than a
+plain Python list. `Sequential` (a subclass of
+[`LayerList`](/api/python/generated/max.nn.LayerList/), which you'll still
+see across existing architectures) registers each layer in the `nn.Module`
+hierarchy under a numeric index (`0`, `1`, …), so weight names resolve to
 `layers.0.*`, `layers.1.*`, and so on. A plain Python list doesn't register
 its items in the hierarchy: MAX won't find those weights during loading, and
 the layers run with uninitialized values.
@@ -382,8 +380,8 @@ self.input_layernorm = LayerNorm(
 attribute that the weight adapter maps from the checkpoint.
 `ConstantLayerNorm` has none.
 
-[const-layernorm]: /max/api/python/generated/max.nn.ConstantLayerNorm/
-[layernorm-no-bias]: /max/api/python/generated/max.nn.LayerNorm/
+[const-layernorm]: /api/python/generated/max.nn.ConstantLayerNorm/
+[layernorm-no-bias]: /api/python/generated/max.nn.LayerNorm/
 
 When you reuse subcomponents from a reference architecture (attention layers,
 normalization, MLP), verify that those subcomponents don't define parameters
@@ -406,15 +404,18 @@ file in `layers/` rather than putting everything in `model.py`.
 
 ## Expose the architecture
 
-<!-- rumdl-disable MD013 -->
 The `arch.py` file ties the rest of the package together. It should include one
 or more
-[`SupportedArchitecture`](/max/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture/)
-instances that point MAX at your config class, model class, weight
-adapters, and more:
-<!-- rumdl-enable MD013 -->
+[`SupportedArchitecture`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture/)
+instances that point MAX at your config class, model class, weight adapters, and
+more:
 
 ```python title="arch.py"
+from max.pipelines.architectures.llama3.batch_processor import (
+    Llama3BatchProcessor,
+)
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
+
 qwen2_arch = SupportedArchitecture(
     name="Qwen2ForCausalLM",
     task=PipelineTask.TEXT_GENERATION,
@@ -424,6 +425,9 @@ qwen2_arch = SupportedArchitecture(
     weight_adapters={
         WeightsFormat.safetensors: weight_adapters.convert_safetensor_state_dict,
     },
+    # Reuse the Llama 3 family's batch processor and the paged memory planner.
+    batching=Llama3BatchProcessor,
+    memory_planner=PagedMemoryPlanner,
     # ... tokenizer, context_type, default_weights_format, ...
 )
 ```
@@ -451,19 +455,25 @@ several `architectures[0]` strings.
 ## Next steps
 
 With your architecture implemented, see [Serve custom model
-architectures](/max/develop/serve-custom-model-architectures) to run a
+architectures](/develop/serve-custom-model-architectures) to run a
 generation, package your implementation, and load it at serve time.
 
-If your model requires an operation that [`max.nn`](/max/api/python/nn)
+If your model requires an operation that [`max.nn`](/api/python/nn)
 doesn't provide and can't be composed from what's already there, see
-[Custom ops](/max/develop/custom-ops) for the interface, registration, and
+[Custom ops](/develop/custom-ops) for the interface, registration, and
 worked examples.
 
-{/*
-TODO(docs): Add a logit verification guide. The workflow is: run the same prompt
-through your MAX model and the Hugging Face reference and compare the top-5 logit
-rankings to verify numerical correctness. Link to that guide here once it exists.
+Once your architecture loads and generates text, verify its forward pass
+numerically against a PyTorch reference. See
+[Logit comparison](/develop/logit-comparison) for quick verification and
+[Layer comparison](/develop/layer-comparison) to localize the first layer
+that diverges when the logits don't match. To run that per-layer comparison with
+an AI coding agent, use the
+[`debug-model`](/develop/model-bringup-skills/#debug-output-divergences)
+skill.
 
-Reviewer note: please review this page without the logit verification content.
-That section will be addressed in a follow-up doc.
-*/}
+Once the forward pass matches, confirm the model's task accuracy holds across a
+full benchmark with the
+[`eval-model`](https://github.com/modular/skills/blob/main/eval-model/SKILL.md)
+skill, which runs standard datasets against the served model and compares the
+scores against the original model.

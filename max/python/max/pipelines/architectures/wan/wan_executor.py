@@ -26,11 +26,14 @@ from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import Graph, TensorType, ops
 from max.pipelines.diffusion.cache import (
-    DenoisingCacheConfig,
     TaylorSeerBufferState,
     TaylorSeerCache,
 )
+from max.pipelines.diffusion.config import DenoisingCacheConfig
 from max.pipelines.lib.bfloat16_utils import float32_to_bfloat16_as_uint16
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.pipelines.lib.pipeline_executor import PipelineExecutor
 from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
@@ -43,6 +46,21 @@ from .components import TextEncoder, VaeWrapper, WanTransformer
 from .context import WanContext
 
 logger = logging.getLogger("max.pipelines")
+
+
+def _tokens_are_cfg_batched(tokens_shape: tuple[int, ...]) -> bool:
+    """Whether a tokens tensor holds a pre-concatenated ``[cond; uncond]`` CFG
+    batch.
+
+    ``prepare_inputs`` only batches CFG for the T2V path, producing a 2-D
+    ``[2, seq_len]`` tensor. The I2V / sequential path leaves tokens 1-D
+    ``[seq_len]``, where ``shape[0]`` is the sequence length — guarding on rank
+    prevents that from being mistaken for a batch of 2 (which would skip
+    negative-prompt encoding and collapse the unconditional pass to zero,
+    over-guiding the prediction and producing degenerate output).
+    """
+    return len(tokens_shape) > 1 and int(tokens_shape[0]) > 1
+
 
 # ---------------------------------------------------------------------------
 # Input / Output structs
@@ -164,11 +182,6 @@ class WanExecutor(
 
     default_num_inference_steps: int = 50
 
-    # TaylorSeer defaults (from https://github.com/Shenyi-Z/TaylorSeer).
-    _DEFAULT_TAYLORSEER_CACHE_INTERVAL: int = 5
-    _DEFAULT_TAYLORSEER_WARMUP_STEPS: int = 4
-    _DEFAULT_TAYLORSEER_MAX_ORDER: int = 1
-
     def __init__(
         self,
         manifest: ModelManifest,
@@ -181,8 +194,18 @@ class WanExecutor(
 
         # Extract model config.
         transformer_config = manifest["transformer"]
-        encoding = transformer_config.quantization_encoding or "bfloat16"
-        self._model_dtype: DType = supported_encoding_dtype(encoding)
+        resolved_encoding, _ = _resolve_component_encoding_and_weights(
+            transformer_config
+        )
+        encoding = resolved_encoding or "bfloat16"
+        # Under FP8 only the DiT linear weights are quantized; latents, the
+        # CFG-combine / scheduler helper graphs, guidance scales, and the
+        # TaylorSeer cache all operate in the bfloat16 working dtype.
+        self._model_dtype: DType = (
+            DType.bfloat16
+            if encoding == "float8_e4m3fn"
+            else supported_encoding_dtype(encoding)
+        )
         self._model_device: Device = load_devices(
             transformer_config.device_specs
         )[0]
@@ -220,7 +243,6 @@ class WanExecutor(
         self._cache_config: DenoisingCacheConfig = (
             runtime_config.denoising_cache
         )
-        self._resolve_cache_defaults()
 
         self._taylor_cache: TaylorSeerCache | None = None
         if self._cache_config.taylorseer:
@@ -399,11 +421,10 @@ class WanExecutor(
         # ``prepare_inputs`` already decides whether to batch CFG: when it
         # does, ``inputs.tokens`` arrives at B=2 ([cond; uncond]) and
         # ``inputs.negative_tokens`` is ``None``. When it doesn't,
-        # ``inputs.tokens`` is B=1 and ``inputs.negative_tokens`` may be
-        # set for sequential CFG. So a single text-encoder call on
-        # ``inputs.tokens`` produces the right embedding shape for both
-        # paths.
-        cfg_batched = int(inputs.tokens.shape[0]) > 1
+        # ``inputs.tokens`` is 1-D ``[seq_len]`` and ``inputs.negative_tokens``
+        # may be set for sequential CFG. So a single text-encoder call on
+        # ``inputs.tokens`` produces the right embedding shape for both paths.
+        cfg_batched = _tokens_are_cfg_batched(tuple(inputs.tokens.shape))
         guidance_scale_val = self._buffer_to_scalar_f32(inputs.guidance_scale)
         do_cfg = cfg_batched or (
             guidance_scale_val > 1.0 and inputs.negative_tokens is not None
@@ -895,18 +916,6 @@ class WanExecutor(
         return self._session.load(g)
 
     # -- TaylorSeer helpers ---------------------------------------------------
-
-    def _resolve_cache_defaults(self) -> None:
-        """Fill nullable DenoisingCacheConfig fields with Wan defaults."""
-        cc = self._cache_config
-        if cc.taylorseer_cache_interval is None:
-            cc.taylorseer_cache_interval = (
-                self._DEFAULT_TAYLORSEER_CACHE_INTERVAL
-            )
-        if cc.taylorseer_warmup_steps is None:
-            cc.taylorseer_warmup_steps = self._DEFAULT_TAYLORSEER_WARMUP_STEPS
-        if cc.taylorseer_max_order is None:
-            cc.taylorseer_max_order = self._DEFAULT_TAYLORSEER_MAX_ORDER
 
     def _taylor_predict_5d(
         self,

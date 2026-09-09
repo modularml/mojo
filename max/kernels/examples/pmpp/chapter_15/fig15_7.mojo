@@ -24,7 +24,7 @@ def writeTile(
     ldc: Int,
     maxRow: Int,
     maxCol: Int,
-    C_r: SIMD[DType.float32, tM * tN],
+    C_r: SIMD[.float32, tM * tN],
 ):
     """Write tile from registers to global memory.
 

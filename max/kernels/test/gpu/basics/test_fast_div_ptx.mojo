@@ -11,8 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
 from layout import IntTuple, Layout, LayoutTensor
 from std.python import Python, PythonObject
 from std.testing import assert_true
@@ -64,8 +64,8 @@ def main() raises:
     comptime layout = Layout(IntTuple(1))
 
     # Test uint32 FastDiv.
-    comptime kernel_u32_pow2 = fast_div_kernel[DType.uint32, layout, 4]
-    comptime kernel_u32_div = fast_div_kernel[DType.uint32, layout, 3]
+    comptime kernel_u32_pow2 = fast_div_kernel[.uint32, layout, 4]
+    comptime kernel_u32_div = fast_div_kernel[.uint32, layout, 3]
 
     var asm = _compile_code[
         kernel_u32_pow2,
@@ -80,8 +80,8 @@ def main() raises:
     assert_true(contains_fastdiv_div_sequence(asm))
 
     # Test uint64 FastDiv.
-    comptime kernel_u64_pow2 = fast_div_kernel[DType.uint64, layout, 4]
-    comptime kernel_u64_div = fast_div_kernel[DType.uint64, layout, 3]
+    comptime kernel_u64_pow2 = fast_div_kernel[.uint64, layout, 4]
+    comptime kernel_u64_div = fast_div_kernel[.uint64, layout, 3]
 
     asm = _compile_code[
         kernel_u64_pow2,

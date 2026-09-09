@@ -17,16 +17,16 @@ import json
 import random
 from collections.abc import Sequence
 
-from huggingface_hub import hf_hub_download
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
+from ._hf_download import hf_hub_download_with_retry
 from .huggingface import HuggingFaceBenchmarkDataset
 from .types import RequestSamples, SampledRequest
 
 
 class ShareGPTBenchmarkDataset(HuggingFaceBenchmarkDataset):
     def fetch(self) -> None:
-        self.dataset_path = hf_hub_download(
+        self.dataset_path = hf_hub_download_with_retry(
             repo_id="anon8231489123/ShareGPT_Vicuna_unfiltered",
             filename="ShareGPT_V3_unfiltered_cleaned_split.json",
             repo_type="dataset",

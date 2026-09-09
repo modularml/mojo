@@ -119,6 +119,7 @@ struct Depth512MBars[
     comptime size: Int = Self.num_fixed + Self.KV_barriers
 
     # ---- storage --------------------------------------------------------------
+    @__allow_legacy_any_origin_fields
     var mbar_base: MBarType
 
     # ---- construction ---------------------------------------------------------
@@ -126,6 +127,11 @@ struct Depth512MBars[
     @always_inline
     def __init__(out self, mbar_base: MBarType):
         """Wrap a base mbarrier pointer from Depth512AttentionSMem.mbar_base().
+
+        Args:
+            mbar_base: Base `mbarrier` address for all barriers managed by
+                this struct, from
+                `Depth512AttentionSMem.mbar_base()`.
         """
         self.mbar_base = mbar_base
 
@@ -156,6 +162,10 @@ struct Depth512MBars[
 
         With num_kv_stages <= 11, total size <= 32 = WARP_SIZE, so a single
         wave covers all barriers.
+
+        Args:
+            lane_idx: Warp lane index (`tid % 32`); each lane initializes
+                one barrier when `lane_idx < size`.
         """
         if lane_idx < Int32(Self.size):
             self.mbar_base[lane_idx].init(Self._init_count(lane_idx))

@@ -65,15 +65,17 @@ def load_from_s3(s3_path: str, cache_dir: str | None = None) -> str:
                 s3_path,
                 local_path,
             )
-        except (UnauthorizedSSOTokenError, NoCredentialsError) as e:
+        except UnauthorizedSSOTokenError as e:
+            # A rejected token means the caller meant to authenticate, so
+            # silently downgrading them to anonymous would hide the problem.
             raise RuntimeError(
                 "AWS authentication failed. Please run 'aws sso login' to "
                 "refresh your credentials."
             ) from e
-        except SSOTokenLoadError:
-            print(
-                "Error loading SSO Token, attempting with anonymous credentials"
-            )
+        except (SSOTokenLoadError, NoCredentialsError):
+            # The bucket is public, so a stale SSO session or a machine with no
+            # AWS config at all can still read it unsigned.
+            print("No usable AWS credentials, retrying anonymously")
             s3 = boto3.client(
                 "s3", aws_access_key_id="", aws_secret_access_key=""
             )

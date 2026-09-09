@@ -6,14 +6,32 @@ modular_py_library(
     name = "diffusion",
     srcs = glob(["**/*.py"]),
     ignore_unresolved_imports = [
-        # TYPE_CHECKING-only; lib depends on diffusion at runtime so no dep possible
+        # lib depends on diffusion at runtime -- lib/registry.py and
+        # lib/pipeline_variants/__init__.py both import PixelGenerationPipeline
+        # from diffusion/pipeline.py, a real, necessary dependency (the
+        # registry needs it to route diffusion pipelines) -- so diffusion
+        # cannot take a normal dep on lib in return (circular Bazel dep).
+        # These imports are TYPE_CHECKING-only or deferred to function scope
+        # to break the runtime circular import.
+        #
+        # TODO: eliminating this would mean diffusion no longer needing
+        # anything from lib.config/lib.pipeline_executor/lib.weight_loader --
+        # e.g. by moving PipelineConfig/ModelManifest to a lower-level module
+        # neither package needs to import back from. Nontrivial; not just a
+        # matter of dropping an unused re-export (that part -- lib re-exporting
+        # DiffusionPipeline -- was already fixed and made no difference to
+        # this list, since the PixelGenerationPipeline edge remains).
         "max.pipelines.lib.config.PipelineConfig",
+        "max.pipelines.lib.config.model_config._resolve_component_encoding_and_weights",
+        "max.pipelines.lib.model_manifest.ModelManifest",
         "max.pipelines.lib.pipeline_executor.PipelineExecutor",
+        "max.pipelines.lib.weight_loader.adapt_module_loader",
     ],
-    # lib depends on diffusion at runtime (DenoisingCacheConfig), so diffusion
-    # cannot depend on lib — creating a circular Bazel dep. The TYPE_CHECKING
-    # imports of PipelineConfig/PipelineExecutor from lib therefore cannot be
-    # resolved by mypy when building this target in isolation.
+    # lib depends on diffusion at runtime (PixelGenerationPipeline,
+    # DenoisingCacheConfig), so diffusion cannot depend on lib -- creating a
+    # circular Bazel dep. The TYPE_CHECKING imports of
+    # PipelineConfig/PipelineExecutor from lib therefore cannot be resolved by
+    # mypy when building this target in isolation. See the TODO above.
     tags = ["no-mypy"],
     deps = [
         "//max/python/max:_core",
@@ -25,8 +43,10 @@ modular_py_library(
         "//max/python/max/experimental/nn",
         "//max/python/max/graph",
         "//max/python/max/nn",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/pipelines/request",
+        "//max/python/max/pipelines/weights",
         requirement("numpy"),
         requirement("pydantic"),
         requirement("tqdm"),

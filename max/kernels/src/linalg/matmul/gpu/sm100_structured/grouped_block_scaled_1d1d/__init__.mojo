@@ -31,6 +31,11 @@ See PORTING_PLAN.md for implementation details.
 from .grouped_1d1d_matmul import grouped_matmul_block_scaled
 from .dispatch import (
     grouped_matmul_nvfp4_dispatch,
+    grouped_matmul_mxfp8_dispatch,
     grouped_matmul_block_scaled_sm100_dispatch,
 )
+from .grouped_matmul_block_scaled_swiglu import (
+    grouped_matmul_block_scaled_swiglu_sm100_dispatch,
+)
 from .grouped_matmul_swiglu_nvfp4 import grouped_matmul_swiglu_nvfp4_dispatch
+from .grouped_matmul_swiglu_mxfp8 import grouped_matmul_swiglu_mxfp8_dispatch

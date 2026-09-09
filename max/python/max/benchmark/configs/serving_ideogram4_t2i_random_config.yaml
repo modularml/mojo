@@ -1,0 +1,74 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# Ideogram 4 text-to-image serving benchmark configuration (random dataset).
+#
+# Bring-up note: this pipeline tokenizes the raw prompt directly (magic-prompt
+# expansion and safety screening are bypassed), so generated content is OOD.
+# This benchmark measures serving cost (latency / throughput / GPU memory),
+# not image quality.
+#
+# Invocation (drive the in-repo benchmark via CLI flags against a running
+# `max serve --model-path ideogram-ai/ideogram-4-fp8` with the responses API):
+#
+#   MAX_SERVE_API_TYPES='["responses"]' \
+#     ./bazelw run //max/python/max/_entrypoints:pipelines -- serve \
+#       --model-path ideogram-ai/ideogram-4-fp8
+#
+#   ./bazelw run //max/python/max/_entrypoints:pipelines -- benchmark \
+#     --model ideogram-ai/ideogram-4-fp8 --benchmark-task text-to-image \
+#     --endpoint /v1/responses --dataset-name synthetic-pixel \
+#     --num-prompts 5 --request-rate inf --max-concurrency 1 \
+#     --no-flush-prefix-cache --collect-gpu-stats \
+#     --image-width 1024 --image-height 1024 --image-steps 20 \
+#     --image-guidance-scale 7.0
+
+name: "Serving Benchmark Configuration - Ideogram 4 T2I Random"
+description: "Benchmark ideogram-ai/ideogram-4-fp8 text-to-image serving via /v1/responses using random prompts."
+version: "0.0.1"
+
+benchmark_config:
+  model: "ideogram-ai/ideogram-4-fp8"
+  benchmark_task: "text-to-image"
+  endpoint: "/v1/responses"
+  dataset_name: "synthetic-pixel"
+  num_chat_sessions: null
+
+  # Workload
+  num_prompts: 5
+  request_rate: "inf"
+  max_concurrency: 1
+  max_benchmark_duration_s: null
+
+  # Pixel-generation pipelines have no prefix cache; flushing it 500s.
+  flush_prefix_cache: false
+
+  # Server target
+  host: "localhost"
+  port: 8000
+  base_url: null
+
+  # T2I generation options
+  image_width: 1024
+  image_height: 1024
+  image_steps: 20
+  image_guidance_scale: 7.0
+  image_negative_prompt: null
+  image_seed: null
+
+  # Output and observability
+  skip_test_prompt: false
+  collect_gpu_stats: true
+  collect_cpu_stats: true
+  collect_server_stats: true
+  result_filename: null

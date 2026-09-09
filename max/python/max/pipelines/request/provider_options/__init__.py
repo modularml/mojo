@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .max import MaxProviderOptions
 from .modality import (
+    AudioProviderOptions,
     GeneratedMediaResponseFormat,
     ImageProviderOptions,
     PixelProviderOptionsBase,
@@ -56,12 +57,17 @@ class ProviderOptions(BaseModel):
         description="Video generation modality options.",
     )
 
+    audio: AudioProviderOptions | None = Field(
+        None,
+        description="Audio generation modality options.",
+    )
+
     # Add more modality fields here as needed:
     # text: TextModalityOptions | None = None
-    # tts: TTSModalityOptions | None = None
 
 
 __all__ = [
+    "AudioProviderOptions",
     "GeneratedMediaResponseFormat",
     "ImageProviderOptions",
     "MaxProviderOptions",

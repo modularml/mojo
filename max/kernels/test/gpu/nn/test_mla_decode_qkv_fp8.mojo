@@ -13,9 +13,17 @@
 
 """Test for native FP8 MLA decode kernel where Q, K, V are ALL FP8.
 
-This test verifies the SM100 native FP8 MLA decode kernel (MLA_SM100_Decode_QKV_FP8)
-which uses native FP8 WGMMA for both QK and PV matmuls. Unlike the KV-only FP8
-kernel, here Q is also stored and loaded as FP8 e4m3fn.
+This test verifies the native FP8 MLA decode kernels (Q, K, V all FP8 e4m3fn,
+BF16 output) on BOTH backends, selected by `flare_mla_decoding`:
+- NVIDIA SM100 (B200): `MLA_SM100_Decode_QKV_FP8`, native FP8 WGMMA for QK + PV.
+- AMD gfx950 (MI355X): the `amd_structured` `Attention.mla_decode` 16x16x128
+  path (num_heads <= 16) / 32x32x64 path (num_heads > 16).
+Unlike the KV-only FP8 kernel, here Q is also stored and loaded as FP8 e4m3fn.
+
+On AMD the test also exercises MTP token folding (S = q_seq_len > 1, M = H*S <= 128
+via the warp-local geometry) using `test_decoding_fold`; the GPU-naive reference
+`mha_gpu_naive` already does per-token causal masking, so it serves as the
+equivalence reference.
 
 The test:
 1. Creates random BF16 Q, quantizes to FP8 -> Q_fp8 (for the kernel)
@@ -33,8 +41,8 @@ from std.sys import (
     has_nvidia_gpu_accelerator,
 )
 
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -42,7 +50,6 @@ from layout import (
     RuntimeLayout,
     TileTensor,
     UNKNOWN_VALUE,
-    lt_to_tt,
     row_major,
 )
 from nn.attention.gpu.mha import mha_gpu_naive
@@ -57,8 +64,8 @@ from nn.attention.gpu.nvidia.sm100.mla_decode_dispatch import (
     MLADispatchScalarArgs,
 )
 from nn.attention.mha_utils import MHAConfig
-from std.testing import assert_almost_equal
-from std.gpu.host.info import B200, _is_sm10x_gpu
+from std.testing import assert_almost_equal, assert_raises
+from max.gpu.host.info import B200, _is_sm10x_gpu
 from std.utils.index import Index
 
 
@@ -88,8 +95,8 @@ def host_cast_fp8_to_bf16[
     fp8_t: DType,
     bf16_t: DType,
 ](
-    src: UnsafePointer[Scalar[fp8_t], _],
-    dst: UnsafePointer[mut=True, Scalar[bf16_t], _],
+    src: Pointer[Scalar[fp8_t], _],
+    dst: MutPointer[Scalar[bf16_t], _],
     size: Int,
 ):
     """Cast FP8 data to BF16 element-by-element on the host."""
@@ -102,8 +109,8 @@ def host_quantize_bf16_to_fp8[
     bf16_t: DType,
     fp8_t: DType,
 ](
-    src: UnsafePointer[Scalar[bf16_t], _],
-    dst: UnsafePointer[mut=True, Scalar[fp8_t], _],
+    src: Pointer[Scalar[bf16_t], _],
+    dst: MutPointer[Scalar[fp8_t], _],
     size: Int,
 ):
     """Quantize BF16 data to FP8 element-by-element on the host."""
@@ -272,7 +279,7 @@ def test[
 
     # Valid length (empty -- not using ragged) for mha_gpu_naive
     var null_valid_length = LayoutTensor[
-        DType.uint32,
+        .uint32,
         Layout.row_major(UNKNOWN_VALUE),
         MutAnyOrigin,
     ](
@@ -293,37 +300,37 @@ def test[
         seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(
         q_fp8_tt,
         k_fp8_tt,
         out_tt,
-        scalar_args_buf_lt,
+        scalar_args_buf_tt,
     )
     def kernel_launch(ctx: DeviceContext) raises:
         comptime config = MHAConfig[q_type](num_heads, depth)
         comptime if mla_mask_type == MLAMaskType.CAUSAL:
             flare_mla_decoding[config=config](
-                out_tt.as_any_origin(),
+                out_tt.as_unsafe_any_origin(),
                 q_fp8_tt,
                 k_fp8_tt,
                 CausalMask(),
                 scale,
                 ctx,
-                lt_to_tt(scalar_args_buf_lt),
+                scalar_args_buf_tt,
             )
         elif mla_mask_type == MLAMaskType.NO_MASK:
             flare_mla_decoding[config=config](
-                out_tt.as_any_origin(),
+                out_tt.as_unsafe_any_origin(),
                 q_fp8_tt,
                 k_fp8_tt,
                 NullMask(),
                 scale,
                 ctx,
-                lt_to_tt(scalar_args_buf_lt),
+                scalar_args_buf_tt,
             )
 
     kernel_launch(ctx)
@@ -355,10 +362,13 @@ def test[
 
     # Create BF16 K operand for reference
     var k_bf16_operand = LayoutTensorMHAOperand(
-        LayoutTensor[output_type, k_layout, MutAnyOrigin](
-            k_bf16_device.ptr,
-            RuntimeLayout[k_layout].row_major(
-                k_bf16_device.runtime_layout.shape.value.canonicalize()
+        TileTensor(
+            k_bf16_device.ptr.as_unsafe_any_origin(),
+            row_major(
+                Int(batch_size),
+                Int(num_keys),
+                Idx[kv_num_heads],
+                Idx[depth],
             ),
         )
     )
@@ -429,13 +439,13 @@ def test[
                         d
                         + depth * (h + s * num_heads)
                         + b * depth * num_heads * seq_len
-                    ].cast[DType.float64]()
+                    ].cast[.float64]()
                     # Kernel output: [b, s, h, d] with stride v_depth
                     var actual = flash_output_ptr[
                         d
                         + v_depth * (h + s * num_heads)
                         + b * v_depth * num_heads * seq_len
-                    ].cast[DType.float64]()
+                    ].cast[.float64]()
                     if abs((actual - expect)) > 1e-1:
                         if num_mismatches < 10:
                             print(b, h, s, d, actual, expect)
@@ -450,6 +460,7 @@ def test[
         )
     print("  PASSED")
 
+    _ = mla_args
     _ = q_fp8_device_ptr
     _ = k_fp8_device_ptr
     _ = q_bf16_dequant_device_ptr
@@ -531,26 +542,23 @@ def bench[
         seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @parameter
     @always_inline
-    @__copy_capture(
-        q_fp8_tt,
-        k_fp8_tt,
-        out_tt,
-        scalar_args_buf_lt,
-    )
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {
+        var q_fp8_tt, var k_fp8_tt, var out_tt, var scalar_args_buf_tt, imm
+    }:
         comptime config = MHAConfig[q_type](num_heads, depth)
         flare_mla_decoding[config=config](
-            out_tt.as_any_origin(),
+            out_tt.as_unsafe_any_origin(),
             q_fp8_tt,
             k_fp8_tt,
             NullMask(),
             scale,
             ctx,
-            lt_to_tt(scalar_args_buf_lt),
+            scalar_args_buf_tt,
         )
 
     comptime nrun = 200
@@ -560,7 +568,7 @@ def bench[
         kernel_launch(ctx)
     ctx.synchronize()
 
-    var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+    var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
         nrun
     )
     var ustime = nstime / 1000.0
@@ -578,6 +586,7 @@ def bench[
         "us",
     )
 
+    _ = mla_args
     _ = q_fp8_device_ptr
     _ = k_fp8_device_ptr
     _ = output_device_ptr
@@ -641,6 +650,42 @@ def test_decoding_fold[
         group=num_heads,
         batch_size=batch_size,
     ](seq_len, num_keys, ctx)
+
+
+# Shared MTP token-fold coverage units, used by BOTH the NVIDIA SM100 fold block
+# (Layout G, BM=64 single-tile packing) and the AMD warp-local fold block (BM
+# buckets). The (num_heads, S) fold and its reference are identical across
+# backends; each backend routes the same config to its own kernel, so the config
+# enumeration lives here once and each block drives it at its own (batch_size,
+# num_keys) plus its own architecture-specific geometry probes.
+
+
+# One fold config under both masks. CAUSAL is the discriminating case (only it
+# exercises the per-token score_row = num_keys - S + token transform); NO_MASK
+# pairs with it to also cover the unmasked reduction.
+def run_fold_both_masks[
+    batch_size: Int,
+    num_heads: Int,
+](ctx: DeviceContext, seq_len: Int, num_keys: Int) raises:
+    test_decoding_fold[batch_size, num_heads, MLAMaskType.NO_MASK](
+        ctx, seq_len, num_keys
+    )
+    test_decoding_fold[batch_size, num_heads, MLAMaskType.CAUSAL](
+        ctx, seq_len, num_keys
+    )
+
+
+# AMD warp-local coverage triple for one (batch, num_heads, S): NO_MASK + CAUSAL
+# at a short cache (heuristic np=1), then CAUSAL at cl=2048 (heuristic np>1, so
+# the row-keyed split-K reduce is exercised for this fold).
+def run_fold_warp_local[
+    batch_size: Int,
+    num_heads: Int,
+](ctx: DeviceContext, seq_len: Int) raises:
+    run_fold_both_masks[batch_size, num_heads](ctx, seq_len, 256)
+    test_decoding_fold[batch_size, num_heads, MLAMaskType.CAUSAL](
+        ctx, seq_len, 2048
+    )
 
 
 # SlidingWindowCausalMask helper for Layout G coverage.
@@ -768,7 +813,7 @@ def test_sw[
     )
 
     var null_valid_length = LayoutTensor[
-        DType.uint32,
+        .uint32,
         Layout.row_major(UNKNOWN_VALUE),
         MutAnyOrigin,
     ](
@@ -788,26 +833,26 @@ def test_sw[
         seq_len,
         ctx,
     )
-    var scalar_args_buf_lt = mla_args.gpu_layout_tensor()
+    var scalar_args_buf_tt = mla_args.gpu_tile_tensor()
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(
         q_fp8_tt,
         k_fp8_tt,
         out_tt,
-        scalar_args_buf_lt,
+        scalar_args_buf_tt,
     )
     def kernel_launch(ctx: DeviceContext) raises:
         comptime config = MHAConfig[q_type](num_heads, depth)
         flare_mla_decoding[config=config](
-            out_tt.as_any_origin(),
+            out_tt.as_unsafe_any_origin(),
             q_fp8_tt,
             k_fp8_tt,
             SlidingWindowCausalMask[window_size](),
             scale,
             ctx,
-            lt_to_tt(scalar_args_buf_lt),
+            scalar_args_buf_tt,
         )
 
     kernel_launch(ctx)
@@ -833,10 +878,13 @@ def test_sw[
     )
 
     var k_bf16_operand = LayoutTensorMHAOperand(
-        LayoutTensor[output_type, k_layout, MutAnyOrigin](
-            k_bf16_device.ptr,
-            RuntimeLayout[k_layout].row_major(
-                k_bf16_device.runtime_layout.shape.value.canonicalize()
+        TileTensor(
+            k_bf16_device.ptr.as_unsafe_any_origin(),
+            row_major(
+                Int(batch_size),
+                Int(num_keys),
+                Idx[kv_num_heads],
+                Idx[depth],
             ),
         )
     )
@@ -879,12 +927,12 @@ def test_sw[
                         d
                         + depth * (h + s * num_heads)
                         + b * depth * num_heads * seq_len
-                    ).cast[DType.float64]()
+                    ).cast[.float64]()
                     var actual = flash_output_ptr.load(
                         d
                         + v_depth * (h + s * num_heads)
                         + b * v_depth * num_heads * seq_len
-                    ).cast[DType.float64]()
+                    ).cast[.float64]()
                     if abs((actual - expect)) > 1e-1:
                         if num_mismatches < 10:
                             print(b, h, s, d, actual, expect)
@@ -899,6 +947,7 @@ def test_sw[
         )
     print("  PASSED")
 
+    _ = mla_args
     _ = q_fp8_device_ptr
     _ = k_fp8_device_ptr
     _ = q_bf16_dequant_device_ptr
@@ -965,6 +1014,44 @@ def main() raises:
             test_decoding[1, MLAMaskType.NO_MASK](ctx, 1, 32768)
             test_decoding[1, MLAMaskType.NO_MASK](ctx, 1, 65536)
 
+            # Two-wave split-K coverage (num_heads=16 latency-bound heuristic):
+            # bs=4 now dispatches np=128 and bs=8 np=64 across this band. Verify
+            # split-K correctness at the elevated partition counts the
+            # two-wave heuristic selects (the bs=1 cases above only exercise
+            # the unchanged bs=1 path). num_heads=16 only — that is the path
+            # the two-wave heuristic touches.
+            print("=== Two-wave split-K coverage (bs=4/8, num_heads=16) ===")
+            test[
+                MLAMaskType.NO_MASK,
+                DType.float8_e4m3fn,
+                DType.float8_e4m3fn,
+                DType.bfloat16,
+                576,
+                16,
+                group=16,
+                batch_size=4,
+            ](1, 40960, ctx)
+            test[
+                MLAMaskType.CAUSAL,
+                DType.float8_e4m3fn,
+                DType.float8_e4m3fn,
+                DType.bfloat16,
+                576,
+                16,
+                group=16,
+                batch_size=4,
+            ](1, 73728, ctx)
+            test[
+                MLAMaskType.NO_MASK,
+                DType.float8_e4m3fn,
+                DType.float8_e4m3fn,
+                DType.bfloat16,
+                576,
+                16,
+                group=16,
+                batch_size=8,
+            ](1, 32768, ctx)
+
             # fold-path configs.  num_q_heads * q_len <= BM(64) and
             # q_len > 1 triggers fold_q=True in the dispatcher.  BM=64 packs
             # q_len_fold * num_q_heads M-rows into a single tile, so grid.y=1.
@@ -981,8 +1068,7 @@ def main() raises:
                 )
 
                 # num_heads=16, q_len=2: 16*2=32 <= 64  (half-pack)
-                test_decoding_fold[1, 16, MLAMaskType.NO_MASK](ctx, 2, 256)
-                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 2, 256)
+                run_fold_both_masks[1, 16](ctx, 2, 256)
                 test_decoding_fold[2, 16, MLAMaskType.NO_MASK](ctx, 2, 1024)
                 test_decoding_fold[4, 16, MLAMaskType.CAUSAL](ctx, 2, 1024)
                 # Narrowing probes for A4 bug: vary bs and cl independently.
@@ -1005,8 +1091,7 @@ def main() raises:
                 test_decoding_fold[8, 16, MLAMaskType.NO_MASK](ctx, 2, 4096)
 
                 # num_heads=16, q_len=4: 16*4=64  (exactly fills BM)
-                test_decoding_fold[1, 16, MLAMaskType.NO_MASK](ctx, 4, 256)
-                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 4, 256)
+                run_fold_both_masks[1, 16](ctx, 4, 256)
                 test_decoding_fold[2, 16, MLAMaskType.NO_MASK](ctx, 4, 1024)
                 test_decoding_fold[4, 16, MLAMaskType.CAUSAL](ctx, 4, 1024)
                 test_decoding_fold[8, 16, MLAMaskType.NO_MASK](ctx, 4, 4096)
@@ -1042,7 +1127,7 @@ def main() raises:
                 # Block 1 — Layout G triggering configs (fork kernel).
                 print("=== Layout G triggers (M<=32, cl>=1024) ===")
 
-                # Production target: Kimi K2.5 TP=8 spec decode.
+                # Production target: Kimi K2.5 TP=8 MTP.
                 #   batch=8 num_heads=8 q_len=4 cl=65536 NO_MASK.
                 test_decoding_fold[8, 8, MLAMaskType.NO_MASK](ctx, 4, 65536)
 
@@ -1187,6 +1272,204 @@ def main() raises:
                 test_decoding_fold[8, 32, MLAMaskType.NO_MASK](ctx, 1, 8192)
                 # q=1, num_heads=32 with CAUSAL mask, batch=2.
                 test_decoding_fold[2, 32, MLAMaskType.CAUSAL](ctx, 1, 16384)
+
+            # ===-------------------------------------------------=== #
+            # AMD MTP token-fold: M = num_heads * S query rows folded into the
+            # QK^T MMA M dimension (heads-inner: row = token*H + head). Legacy
+            # (1,4) geometry (BM=WM=16, WN=32) covers M <= 16; larger M is
+            # warp-local (below). CAUSAL is mandatory — it is the only mask
+            # exercising the per-token score_row = num_keys - S + token transform.
+            # Split-K is re-keyed by query row, so any nk>256 case (heuristic
+            # np>1) also exercises the row-keyed reduce; the split-K block below
+            # adds large-np + bs=2 discriminators.
+            #
+            # Why a separate block from the NVIDIA fold above (not just reusing
+            # it): the shared fold units `run_fold_both_masks` / `run_fold_warp_
+            # local` ARE reused across both, but the *config envelope* differs by
+            # backend. The AMD fold is FP8-only, num_heads <= 16, and M <= 128 via
+            # warp-local BM buckets {16,32,48,64,80,96,112,128}; the NVIDIA block
+            # probes num_heads=32, SlidingWindowCausalMask, and the Layout-G/E
+            # cl>=1024 routing gate — all of which either hit the AMD host `raise`
+            # (num_heads>16) or are SM100-only dispatch decisions absent on AMD.
+            # Conversely NVIDIA caps the fold at M<=32 (Layout G), so the AMD
+            # high-S geometry (M up to 128, the K-DMA bounds guard at 36%W!=0,
+            # row-keyed split-K) is unreachable from the NVIDIA configs. Hence the
+            # shared helpers, arch-specific config lists.
+            # ===-------------------------------------------------=== #
+            comptime if has_amd_gpu_accelerator():
+                print("=== AMD MTP token-fold (M = H*S <= 128) ===")
+
+                # --- H=8/S=2 → M=16 (legacy (1,4)) ---
+                # Short num_keys (heuristic would pick np=1 anyway).
+                run_fold_both_masks[1, 8](ctx, 2, 64)
+                run_fold_both_masks[1, 8](ctx, 2, 200)
+                run_fold_both_masks[1, 8](ctx, 2, 256)
+                # Large num_keys: heuristic picks np>1 (nk=2048 → np=8), so this
+                # exercises the row-keyed split-K reduce for the (1,4) fold.
+                run_fold_both_masks[1, 8](ctx, 2, 2048)
+                # batch_size=2.
+                test_decoding_fold[2, 8, MLAMaskType.NO_MASK](ctx, 2, 128)
+                test_decoding_fold[2, 8, MLAMaskType.CAUSAL](ctx, 2, 256)
+                test_decoding_fold[2, 8, MLAMaskType.CAUSAL](ctx, 2, 2048)
+
+                # ===-------------------------------------------------=== #
+                # Warp-local (2,1) (BM=32, WM=16, WN=128) for 16 < M <= 32. First
+                # exercise of num_warps_m>1 with num_warps_n=1 (warp-local
+                # softmax). CAUSAL discriminates same-M/different-S: H=16/S=2 and
+                # H=8/S=4 are both M=32 but have different per-token causal
+                # positions, so each must match its own reference.
+                # ===-------------------------------------------------=== #
+                print("=== AMD MTP warp-local (16 < M = H*S <= 32) ===")
+
+                # --- H=16/S=2 → M=32 (full BM=32, canonical warp-local; Kimi
+                # TP4). ---
+                run_fold_both_masks[1, 16](ctx, 2, 256)
+                run_fold_both_masks[1, 16](ctx, 2, 2048)
+                test_decoding_fold[2, 16, MLAMaskType.CAUSAL](ctx, 2, 256)
+
+                # --- H=8/S=3 → M=24 (partial BM=32: warp 1 owns abs rows
+                # 16..31, only 16..23 live; abs rows 24..31 are padding — the
+                # per-fragment dead-row guard must mask them). Kimi TP8. ---
+                run_fold_warp_local[1, 8](ctx, 3)
+                test_decoding_fold[2, 8, MLAMaskType.CAUSAL](ctx, 3, 256)
+
+                # --- H=8/S=4 → M=32 (full BM=32; same M as H=16/S=2 but
+                # 4 tokens of 8 heads → different per-token causal). Kimi TP8. ---
+                run_fold_warp_local[1, 8](ctx, 4)
+                test_decoding_fold[2, 8, MLAMaskType.CAUSAL](ctx, 4, 256)
+
+                # ===-------------------------------------------------=== #
+                # Warp-local (M/16, 1) for 32 < M <= 64 — first exercise of >=3
+                # M-warps (BM=48 W=3, BM=64 W=4, all full tiles). K-DMA bounds
+                # guard stays elided (36 % {3,4} == 0). CAUSAL discriminates
+                # same-M/different-S: H=16/S=4 and H=8/S=8 are both M=64.
+                # ===-------------------------------------------------=== #
+                print("=== AMD MTP warp-local (32 < M = H*S <= 64) ===")
+
+                # --- H=16/S=3 → M=48 (BM=48, W=3). Kimi TP4. ---
+                run_fold_warp_local[1, 16](ctx, 3)
+                test_decoding_fold[2, 16, MLAMaskType.CAUSAL](ctx, 3, 256)
+
+                # --- H=16/S=4 → M=64 (BM=64, W=4). Kimi TP4. ---
+                run_fold_warp_local[1, 16](ctx, 4)
+                test_decoding_fold[2, 16, MLAMaskType.CAUSAL](ctx, 4, 256)
+
+                # --- H=8/S=5 → M=40 (BM=48, W=3, PARTIAL: rows 40..47 pad →
+                # dead-row guard). First partial tile at W>=3. ---
+                run_fold_warp_local[1, 8](ctx, 5)
+
+                # --- H=8/S=6 → M=48 (BM=48, W=3, full tile). Kimi TP8. ---
+                run_fold_warp_local[1, 8](ctx, 6)
+
+                # --- H=8/S=7 → M=56 (BM=64, W=4, PARTIAL: rows 56..63 pad). ---
+                run_fold_warp_local[1, 8](ctx, 7)
+
+                # --- H=8/S=8 → M=64 (BM=64, W=4, full; same M as H=16/S=4,
+                # different per-token causal). Kimi TP8. ---
+                run_fold_warp_local[1, 8](ctx, 8)
+
+                # ===-------------------------------------------------=== #
+                # High-S warp-local for 64 < M <= 128 (BM {80,96,112,128}, W
+                # {5,6,7,8}). First exercise of the K-DMA bounds guard, emitted
+                # when 36 % W != 0 → W in {5,7,8}. H=16/S=8 → M=128 is the full
+                # 8-tile fold cap (~89KB LDS).
+                # ===-------------------------------------------------=== #
+                print("=== AMD MTP warp-local (64 < M = H*S <= 128) ===")
+
+                # --- H=16/S=5 → M=80 (BM=80, W=5: K-DMA guard ACTIVE). ---
+                run_fold_warp_local[1, 16](ctx, 5)
+
+                # --- H=16/S=6 → M=96 (BM=96, W=6: 36%6==0, guard elided). ---
+                run_fold_warp_local[1, 16](ctx, 6)
+
+                # --- H=16/S=7 → M=112 (BM=112, W=7: K-DMA guard ACTIVE). ---
+                run_fold_warp_local[1, 16](ctx, 7)
+
+                # --- H=16/S=8 → M=128 (BM=128, W=8: K-DMA guard ACTIVE; the
+                # full 8-tile fold cap, ~89KB LDS). ---
+                run_fold_warp_local[1, 16](ctx, 8)
+                test_decoding_fold[2, 16, MLAMaskType.CAUSAL](ctx, 8, 256)
+
+                # --- H=8/S=1 → M=8 (S=1 regression on the half-tile path) ---
+                # S=1 is split-K-safe, so large num_keys is fine.
+                test_decoding_fold[1, 8, MLAMaskType.NO_MASK](ctx, 1, 256)
+                test_decoding_fold[1, 8, MLAMaskType.CAUSAL](ctx, 1, 2048)
+
+                # --- H=16/S=1 → M=16 (S=1 regression; full tile) ---
+                # Same M=16 as H=8/S=2 but different token semantics — each
+                # matches its own per-token reference, proving the kernel applies
+                # per-token (not per-head) positions for H=8/S=2.
+                test_decoding_fold[1, 16, MLAMaskType.NO_MASK](ctx, 1, 256)
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 1, 2048)
+
+                # ===-------------------------------------------------=== #
+                # Row-keyed split-K (num_partitions > 1) for S > 1. Forces large
+                # np via long num_keys and pairs same-M/different-S CAUSAL configs
+                # so the per-ROW stat keying is checked through the reduce (a
+                # head-keyed collision would mismatch the reference).
+                #   nk=4096 → np=16; nk=65536 → np=256.
+                # ===-------------------------------------------------=== #
+                print("=== AMD MTP row-keyed split-K (S>1, np>1) ===")
+
+                # Same-M discriminators through split-K (M=32: H=16/S=2 vs
+                # H=8/S=4; M=64: H=16/S=4 vs H=8/S=8). Each must match its OWN
+                # per-token reference at np>1.
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 2, 4096)
+                test_decoding_fold[1, 8, MLAMaskType.CAUSAL](ctx, 4, 4096)
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 4, 4096)
+                test_decoding_fold[1, 8, MLAMaskType.CAUSAL](ctx, 8, 4096)
+
+                # batch_size=2 at np>1 — exercises BOTH the per-batch and
+                # per-partition row strides (× q_seq_len) in the workspace.
+                test_decoding_fold[2, 16, MLAMaskType.CAUSAL](ctx, 2, 4096)
+                test_decoding_fold[2, 8, MLAMaskType.CAUSAL](ctx, 4, 4096)
+
+                # High-S warp-local (W>4) through split-K: H=16/S=5 (M=80) and
+                # H=16/S=8 (M=128, the 8-tile cap).
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 5, 4096)
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 8, 4096)
+
+                # 128-partition reducer (nk=32768 → pages=128 → np=128, the
+                # W_PARTS_128/parts_per_lane=2 bucket) with S>1. Pairs M=32 (W=2)
+                # and M=128 (W=8, the full fold cap) against the 128-reducer.
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 2, 32768)
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 8, 32768)
+
+                # 256-partition reducer (nk=65536 → np=256, parts_per_lane=4)
+                # with S>1 + CAUSAL, including W=8 (M=128) × np=256.
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 4, 65536)
+                test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 8, 65536)
+                test_decoding_fold[1, 8, MLAMaskType.CAUSAL](ctx, 8, 65536)
+                test_decoding_fold[2, 8, MLAMaskType.NO_MASK](ctx, 2, 65536)
+
+                # --- Negative tests: unsupported folds MUST raise ---
+                # Supported: S=1 (any H), or S>1 with num_heads <= 16 AND
+                # S <= MLA_DECODE_MAX_SEQ_LEN AND num_heads*S <= 128. Anything
+                # outside must fail loudly at launch (never silently downgrade to
+                # a smaller-S kernel and drop tokens). Three ways out of the
+                # envelope: (a) M > 128, (b) num_heads > 16 (only the
+                # num_heads<=16 arm threads q_seq_len), and (c) S > 8 even when
+                # M <= 128 (the independent S cap, which binds for num_heads<16).
+                # The host-side `raise` fires in default builds (unlike the
+                # compiled-out `debug_assert`).
+                print("=== AMD MTP unsupported-fold rejection (must raise) ===")
+
+                # H=16/S=9 → M=144 (> 128: the fold cap; smallest over).
+                with assert_raises():
+                    test_decoding_fold[1, 16, MLAMaskType.CAUSAL](ctx, 9, 256)
+                # H=16/S=12 → M=192 (well over the cap).
+                with assert_raises():
+                    test_decoding_fold[1, 16, MLAMaskType.NO_MASK](ctx, 12, 256)
+                # H=32/S=2 → M=64 (<= 128): isolates the num_heads > 16 term (the
+                # 32x32x64 fold isn't implemented).
+                with assert_raises():
+                    test_decoding_fold[1, 32, MLAMaskType.CAUSAL](ctx, 2, 256)
+                # H=8/S=10 → M=80 (<= 128) but S > MLA_DECODE_MAX_SEQ_LEN=8:
+                # isolates the S-cap term. Caught at the chokepoint, not the
+                # dispatch ladder's backstop (the ladder builds only S=1..8).
+                with assert_raises():
+                    test_decoding_fold[1, 8, MLAMaskType.CAUSAL](ctx, 10, 256)
+                print("unsupported folds correctly rejected.")
 
             print("All tests passed!")
 

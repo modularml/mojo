@@ -13,11 +13,13 @@
 
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import SupportedArchitecture, TextTokenizer
 from max.pipelines.modeling.types import PipelineTask
 
+from ..deepseekV3.memory_planner import DeepseekV3MemoryPlanner
 from ..deepseekV3.model_config import DeepseekV3Config
+from .batch_processor import UnifiedMTPDeepseekV3BatchProcessor
 from .model import UnifiedMTPDeepseekV3Model
 from .weight_adapters import convert_with_mtp_state_dict
 
@@ -27,12 +29,8 @@ unified_mtp_deepseekV3_arch = SupportedArchitecture(
     example_repo_ids=[
         "deepseek-ai/DeepSeek-V3",
     ],
-    default_encoding="bfloat16",
-    supported_encodings={
-        "bfloat16",
-        "float8_e4m3fn",
-        "float4_e2m1fnx2",
-    },
+    default_encoding=DeepseekV3Config.DEFAULT_ENCODING,
+    supported_encodings={"bfloat16", "float8_e4m3fn", "float4_e2m1fnx2"},
     multi_gpu_supported=True,
     pipeline_model=UnifiedMTPDeepseekV3Model,
     tokenizer=TextTokenizer,
@@ -44,4 +42,6 @@ unified_mtp_deepseekV3_arch = SupportedArchitecture(
     supports_empty_batches=True,
     requires_max_batch_context_length=True,
     config=DeepseekV3Config,
+    memory_planner=DeepseekV3MemoryPlanner,
+    batching=UnifiedMTPDeepseekV3BatchProcessor,
 )

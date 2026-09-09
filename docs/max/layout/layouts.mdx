@@ -1,0 +1,485 @@
+---
+title: Introduction to layouts
+sidebar_position: 1
+description: Using layouts to describe multidimensional data.
+---
+
+Mojo's [`layout` package](/api/mojo/layout/) provides a
+number of APIs for working with dense multidimensional arrays, which simplify
+writing algorithms for handling linear algebra.
+
+This package includes the following main types:
+
+- The [`Layout`](/api/mojo/layout/layout/Layout/) struct
+  describes an arrangement of data in memory. A *layout* is a function that maps
+  a set of logical coordinates (like (*x*, *y*) in a two-dimensional array) to a
+  linear index value. Layouts can be hierarchical (for example, representing a
+  2D matrix that's further subdivided into tiles).
+- [`LayoutTensor`](/api/mojo/layout/layout_tensor/LayoutTensor/)
+  is a flexible tensor type that combines a `Layout` and a pointer to data.
+- The [`IntTuple`](/api/mojo/layout/int_tuple/IntTuple/)
+  struct is a hierarchical tuple type, where each element of the tuple can
+  either be an integral value or a nested `IntTuple`. The `IntTuple` type is
+  used extensively for defining and indexing layouts and layout tensors.
+
+:::tip Example code
+
+You can find most of the code examples on this page in the
+[public GitHub repo](https://github.com/modular/modular/tree/main/max/examples/layouts).
+
+Some of the concepts presented here can be a little hard to grasp from static
+examples, so we recommend downloading the example code and experimenting.
+
+:::
+
+## What's a Layout?
+
+A layout is a function that maps a set of logical coordinates to a single linear
+index value.
+
+For example, a layout could describe a 2x4 row-major matrix, or a 6x6
+column-major matrix.
+
+```mojo
+from layout import Layout, print_layout
+
+var l2x4row_major = Layout.row_major(2, 4)
+var l6x6col_major = Layout.col_major(6, 6)
+```
+
+Layouts are made up of two tuples: shape and stride, where shape describes the
+logical coordinate space and the stride determines the mapping to the linear
+index value. A layout can be written as (*shape*:*stride*). For
+example, a contiguous vector of length 4 can be represented as (4:1):
+
+<figure>
+
+![](../images/layout/1d-layout-with-strides.png#light)
+![](../images/layout/1d-layout-with-strides-dark.png#dark)
+
+<figcaption><b>Figure 1.</b> 1D layout (4:1)</figcaption>
+</figure>
+
+A 3x4 row-major layout can be represented as ((3, 4):(4, 1)). That is, the
+*shape* is 3x4 and the *strides* are 4 and 1. You can break this down into two
+sub-layouts or *modes*: a row mode and a column mode: 3 rows with a stride of 4
+(3:4, the first numbers from each tuple) and 4 columns with a stride of 1 (4:1,
+the second numbers from each tuple).
+
+The
+[`print_layout()`](/api/mojo/layout/layout/print_layout/)
+function generates an ASCII diagram of any 2D layout, showing the coordinates on
+the outside and the corresponding index values in the grid.
+
+```mojo
+var l3x4row_major = Layout.row_major(3, 4)
+print_layout(l3x4row_major)
+```
+
+Output:
+
+```plaintext
+((3, 4):(4, 1))
+       0    1    2    3
+    +----+----+----+----+
+ 0  |  0 |  1 |  2 |  3 |
+    +----+----+----+----+
+ 1  |  4 |  5 |  6 |  7 |
+    +----+----+----+----+
+ 2  |  8 |  9 | 10 | 11 |
+    +----+----+----+----+
+```
+
+The coordinate to index mapping is performed by calculating the dot product of
+the logical coordinates and the corresponding strides. For example, given the
+coordinates (*i, j*) and the layout shown above, the index value is $i*4 + j*1$.
+So coordinate (1, 1) maps to 5, as shown in the diagram.
+
+The following example shows how to use a `Layout` to convert between coordinates
+and index values.
+
+```mojo
+var coords = IntTuple(1, 1)
+var idx = l3x4row_major(coords)
+print("index at coordinates (1, 1): ", idx)
+print("coordinates at index 7:", l3x4row_major.idx2crd(7))
+```
+
+Output:
+
+```plaintext
+index at coordinates (1, 1):  5
+coordinates at index 7: (1, 3)
+```
+
+As this example shows, the layout is a function that takes a set of integer
+coordinates and returns a single integer (the linear index). The `Layout` struct
+also provides an
+[`idx2crd()`](/api/mojo/layout/layout/Layout/#idx2crd)
+method that transforms a linear index into a set of logical coordinates.
+
+:::note Printing layouts
+
+You can use `print_layout()` to print a diagram of any 2D layout. You can pass
+*any* layout to the built-in `print()` function to print a string representation
+of the layout in the form of a (*shape*:*stride*) pair.
+
+:::
+
+### IntTuple: representing hierarchical shapes and strides
+
+A layout's shape and stride are represented using the
+[`IntTuple`](/api/mojo/layout/int_tuple/IntTuple/) type.
+Each element of an `IntTuple` is either an integer value or a nested `IntTuple`.
+You can create nested `IntTuples` using the `IntTuple` constructor:
+
+```mojo
+var shape1 = IntTuple(4, IntTuple(2, 2))
+```
+
+A layout's shape and stride tuples must be *congruent*—that is, they need to
+have the same hierarchical structure: the tuples must have the same number of
+elements, and any elements that are nested tuples must also have the same number
+of elements.
+
+The [`int_tuple`](/api/mojo/layout/int_tuple/) package
+provides a number of functions for working with `IntTuple`. For example, it
+provides a
+[`congruent()`](/api/mojo/layout/int_tuple/congruent/)
+function for testing the congruency of two tuples.
+
+### Modes
+
+A layout has one or more *modes*, where a mode is a shape:stride pair. For
+example, the 1D vector layout (8:1) has a single mode: 8 elements with a stride
+of 1:
+
+<figure>
+
+![](../images/layout/1d-layout.png#light)
+![](../images/layout/1d-layout-dark.png#dark)
+
+<figcaption><b>Figure 2.</b> 1D layout</figcaption>
+</figure>
+
+The 2D row-major matrix layout ((2, 4):(4, 1)) has two modes, 2:4 (the first
+numbers from each tuple) and 4:1 (the second numbers from each tuple). Taking
+them right to left, the second mode describes 4 columns with a stride of one.
+The first mode specifies that there are two of these groups with a stride of 4:
+
+<figure>
+
+![](../images/layout/2d-layout-with-strides.png#light)
+![](../images/layout/2d-layout-with-strides-dark.png#dark)
+
+<figcaption><b>Figure 3.</b> 2D layout with strides</figcaption>
+</figure>
+
+In a column-major layout, the row number varies the fastest, so a column-major
+2x4 matrix has the layout ((2, 4):(1, 2)) and looks like this:
+
+<figure>
+
+![](../images/layout/2d-col-major-layout-with-strides.png#light)
+![](../images/layout/2d-col-major-layout-with-strides-dark.png#dark)
+
+<figcaption><b>Figure 4.</b> 2D column-major layout with strides</figcaption>
+</figure>
+
+A layout's *rank* is the number of modes in its shape. A rank-1 (or 1D) layout
+describes a vector. A rank-2 layout describes a 2D matrix, and so on.
+
+A layout's *size* is defined as the product of all of the modes in the layout's
+shape. To put it another way, it's the number of elements that the layout
+addresses: that is, the *domain* of the layout function.
+
+Modes can also be nested to represent more complicated strides along a
+dimension. For example, the layout (8:1) represents a 1D vector of 8 elements.
+
+<figure>
+
+![](../images/layout/1d-layout.png#light)
+![](../images/layout/1d-layout-dark.png#dark)
+
+<figcaption><b>Figure 5.</b> 1D vector layout</figcaption>
+</figure>
+
+The layout (((4, 2):(1, 4))) is *also* a 1D vector of 8 elements. The extra set
+of parentheses indicates a nested or hierarchical mode. Instead of being
+represented by a single mode like 8:1, this layout's single dimension is
+represented by the multi-mode (4, 2):(1, 4):
+
+<figure>
+
+![](../images/layout/1d-multi-modal-layout.png#light)
+![](../images/layout/1d-multi-modal-layout-dark.png#dark)
+
+<figcaption><b>Figure 6.</b> 1D layout with nested modes</figcaption>
+</figure>
+
+Note that in the nested modes, there's no notion of row and column. You can
+think of the first mode as the "inner" mode (defining a group) and the next mode
+as an "outer" mode (defining a repeat of the group) as shown above.
+
+A set of nested modes (a *multi-mode*) counts as a single mode when considering
+the parent layout's rank. For example, the layouts (8:1) and (((4, 2):(1, 4)))
+are both rank-1 layouts.
+
+This gets more interesting when we move to two dimensions. Consider the
+following 2D layouts:
+
+<figure>
+
+![](../images/layout/multi-modal-layout.png#light)
+![](../images/layout/multi-modal-layout-dark.png#dark)
+
+<figcaption><b>Figure 7.</b> Two 2D layouts</figcaption>
+</figure>
+
+Layouts A and B are both 2D matrix layouts with the same overall 2D shape, but
+with the elements in a different order. Layout B is *tiled*, so instead of being
+in row-major or column-major order, four consecutive indices are grouped into
+each 2x2 tile. This is sometimes called *tile-major order*.
+
+We can break this tiled layout into two modes, one for the rows and one for the
+columns:
+
+- Layout B has a row mode of (2, 2):(1, 4). We can further break this into two
+  sub-modes: the inner mode, 2:1, defines a group of two rows with a stride of
+  one. The outer mode, 2:4, specifies that the group occurs twice with a stride
+  of 4.
+- The column has the mode (2, 2):(2, 8). Once again we can break this into two
+  sub-modes: (2:2) defines a group of two columns with a stride of two, and the
+  group occurs twice with a stride of 8 (2:8).
+
+  If all of those modes are swimming before your eyes, take a moment to study
+  the figure and trace out the strides yourself.
+
+### Coordinates
+
+Coordinates for layouts can be written in the same format as the shape tuple.
+For example, coordinates for layout B above can be written ((*i, j*), (*k, l*)).
+However, this layout can also be addressed as a logical 2D matrix, just like
+layout A. So ((0, 1), (0, 1)) and (2, 2) are both valid coordinates that map to
+the same index.
+
+In fact, this is true for any layout: the layout can be addressed with 1D or 2D
+coordinates as well as its "natural" coordinates. When mapping coordinates, the
+dimensions are traversed in *colexicographical* order (that is, a generalized
+column-major order, where the leftmost coordinate varies fastest). Table 1 shows
+how different 1D and 2D coordinates map to the "natural" coordinates of the ((2,
+2), (2, 2)) shape shown above:
+
+<figure>
+
+| 1D  | 2D     | Natural          |
+|-----|:-------|:-----------------|
+| 0   | (0, 0) | ((0, 0), (0, 0)) |
+| 1   | (1, 0) | ((1, 0), (0, 0)) |
+| 2   | (2, 0) | ((0, 1), (0, 0)) |
+| 3   | (3, 0) | ((1, 1), (0, 0)) |
+| 4   | (0, 1) | ((0, 0), (1, 0)) |
+| 5   | (1, 1) | ((1, 0), (1, 0)) |
+| 6   | (2, 1) | ((0, 1), (1, 0)) |
+| 7   | (3, 1) | ((1, 1), (1, 0)) |
+| 8   | (0, 2) | ((0, 0), (0, 1)) |
+| ... | ...    | ...              |
+| 15  | (3, 3) | ((1, 1), (1, 1)) |
+
+<figcaption><b>Table 1.</b> Mapping between 1D, 2D, and natural coordinates</figcaption>
+</figure>
+
+## Making layouts
+
+There are multiple ways to create layouts. The
+[`row_major()`](/api/mojo/layout/layout/Layout/#row_major)
+and
+[`col_major()`](/api/mojo/layout/layout/Layout/#col_major)
+static methods are probably the simplest ways to create a layout. The
+`row_major()` method creates a generalized row-major layout: that is, the
+rightmost coordinate varies the fastest. The `col_major()` method creates a
+generalized column-major layout, where the leftmost coordinate varies the
+fastest.
+
+```mojo
+print(Layout.row_major(4, 4, 4))
+print(Layout.col_major(4, 4, 4))
+```
+
+Output:
+
+```plaintext
+((4, 4, 4):(16, 4, 1))
+((4, 4, 4):(1, 4, 16))
+```
+
+If you know the shape and strides in advance, you can construct an arbitrarily
+complex layout using the `Layout` constructor. For example:
+
+```mojo
+var tiled_layout = Layout(
+    IntTuple(IntTuple(3, 2), IntTuple(2, 5)), # shape
+    IntTuple(IntTuple(1, 6), IntTuple(3, 12)) # strides
+)
+print_layout(tiled_layout)
+```
+
+Output:
+
+```plaintext
+
+(((3, 2), (2, 5)):((1, 6), (3, 12)))
+       0    1    2    3    4    5    6    7    8    9
+    +----+----+----+----+----+----+----+----+----+----+
+ 0  |  0 |  3 | 12 | 15 | 24 | 27 | 36 | 39 | 48 | 51 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 1  |  1 |  4 | 13 | 16 | 25 | 28 | 37 | 40 | 49 | 52 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 2  |  2 |  5 | 14 | 17 | 26 | 29 | 38 | 41 | 50 | 53 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 3  |  6 |  9 | 18 | 21 | 30 | 33 | 42 | 45 | 54 | 57 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 4  |  7 | 10 | 19 | 22 | 31 | 34 | 43 | 46 | 55 | 58 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 5  |  8 | 11 | 20 | 23 | 32 | 35 | 44 | 47 | 56 | 59 |
+    +----+----+----+----+----+----+----+----+----+----+
+```
+
+The result is a 6x10 tile-major layout. The layout is indexed vertically in 2
+groups of 3 rows (3, 2) : (1, 6) and horizontally in 5 groups of 2 columns (2,
+5):(3, 12). Alternatively, you can think of this as a layout consisting of 3x2
+column-major tiles ((3, 2):(1, 3)) that are arranged into two rows of 5, ((2,
+5):(6, 12)).
+
+The `Layout` constructor works fine if you know the shape and strides in
+advance, but calculating the strides for a complicated layout isn't always
+intuitive.
+
+An easier way to generate this layout is the
+[`tile_to_shape()`](/api/mojo/layout/layout/tile_to_shape/)
+function. This takes a layout (representing the tile) and a final shape to tile
+to:
+
+```mojo
+var tts = tile_to_shape(Layout.col_major(3, 2), IntTuple(6, 10))
+print_layout(tts)
+```
+
+Output:
+
+```plaintext
+(((3, 2), (2, 5)):((1, 6), (3, 12)))
+       0    1    2    3    4    5    6    7    8    9
+    +----+----+----+----+----+----+----+----+----+----+
+ 0  |  0 |  3 | 12 | 15 | 24 | 27 | 36 | 39 | 48 | 51 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 1  |  1 |  4 | 13 | 16 | 25 | 28 | 37 | 40 | 49 | 52 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 2  |  2 |  5 | 14 | 17 | 26 | 29 | 38 | 41 | 50 | 53 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 3  |  6 |  9 | 18 | 21 | 30 | 33 | 42 | 45 | 54 | 57 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 4  |  7 | 10 | 19 | 22 | 31 | 34 | 43 | 46 | 55 | 58 |
+    +----+----+----+----+----+----+----+----+----+----+
+ 5  |  8 | 11 | 20 | 23 | 32 | 35 | 44 | 47 | 56 | 59 |
+    +----+----+----+----+----+----+----+----+----+----+
+```
+
+A variation on `tile_to_shape()` is the
+[`blocked_product()`](/api/mojo/layout/layout/blocked_product/)
+function. The main difference is that where `tile_to_shape()` takes an output
+*shape*, `blocked_product()` takes a *tiler* layout: essentially, every element
+in the tiler layout is replaced by a tile. The following example generates the
+same tiled layout using `blocked_product()`. It also prints out the two input
+layouts.
+
+```mojo
+# Define 2x3 tile
+var tile = Layout.col_major(3, 2)
+# Define a 2x5 tiler
+var tiler = Layout.col_major(2, 5)
+var blocked = blocked_product(tile.copy(), tiler.copy())
+
+print("Tile:")
+print_layout(tile)
+print("\nTiler:")
+print_layout(tiler)
+print("\nTiled layout:")
+print(blocked)
+```
+
+Output:
+
+```plaintext
+Tile:
+((3, 2):(1, 3))
+      0   1
+    +---+---+
+ 0  | 0 | 3 |
+    +---+---+
+ 1  | 1 | 4 |
+    +---+---+
+ 2  | 2 | 5 |
+    +---+---+
+
+Tiler:
+((2, 5):(1, 2))
+       0    1    2    3    4
+    +----+----+----+----+----+
+ 0  |  0 |  2 |  4 |  6 |  8 |
+    +----+----+----+----+----+
+ 1  |  1 |  3 |  5 |  7 |  9 |
+    +----+----+----+----+----+
+
+Tiled layout:
+(((3, 2), (2, 5)):((1, 6), (3, 12)))
+
+```
+
+As you can see, `blocked_product()` combines two simple layouts to generate a
+more complex one.
+
+Finally, if you know the *shape* you want and the *order* in which you want to
+iterate through the dimensions, you can use the
+[`make_ordered_layout()`](/api/mojo/layout/layout/make_ordered_layout/)
+function. For example, the following example is yet one more way to generate the
+previous tiled layout:
+
+```mojo
+var ordered = make_ordered_layout(
+    IntTuple(IntTuple(3, 2), IntTuple(2, 5)), # shape
+    IntTuple(IntTuple(0, 2), IntTuple(1, 3))  # order
+)
+print(ordered)
+```
+
+Output:
+
+```plaintext
+(((3, 2), (2, 5)):((1, 6), (3, 12)))
+```
+
+The generated layout's strides follow the same ordering as `order`—that is, the
+dimension with the smallest corresponding `order` value has the smallest stride
+value, and so on. The strides are computed such that the layout is dense—that
+is, the logical multidimensional array is contiguous.
+
+## Non-contiguous layouts
+
+All of the examples so far have been dense layouts, where all of the elements
+are contiguous in memory. However, layouts can also describe sparse logical
+arrays. For example, a (4:2) layout is a sparse 1D array:
+
+<figure>
+
+![](../images/layout/1d-sparse-layout.png#light)
+![](../images/layout/1d-sparse-layout-dark.png#dark)
+
+<figcaption><b>Figure 8.</b> 1D sparse layout (4:2)</figcaption>
+</figure>
+
+A layout's *cosize* is the size of the layout's codomain, which you can think of
+as the size of the smallest contiguous array that can contain all of the
+layout's elements. The cosize is the largest linear index value generated by the
+layout plus 1. So in the example in Figure 8, the layout has a size of 4, but a
+cosize of 7.

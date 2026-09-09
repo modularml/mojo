@@ -19,7 +19,7 @@ scheduling framework.
 Role-typed methods (load/store/frag/compute) communicate programmer intent;
 actual roles are stamped by `annotate_ops()` via the `TargetCostModel`.
 
-Example — single-buffer matmul:
+Example: single-buffer matmul:
 
     with PipelineBody() as b:
         b.load(LOAD_DRAM, ch=0)
@@ -29,7 +29,7 @@ Example — single-buffer matmul:
         b.fan[num_k_tiles](COMPUTE)
         return b.done()
 
-Example — ping-pong half:
+Example: ping-pong half:
 
     with PipelineBody() as b:
         b.load(LOAD_A, ch=0, stage=os, sub=1, k=k_special)
@@ -76,7 +76,18 @@ struct PipelineBody(Movable):
         sub: Int = 0,
         k: KOffsetKind = KOffsetKind.NONE,
     ):
-        """Append a global load (DRAM → LDS or DRAM → registers)."""
+        """Append a global load (DRAM → LDS or DRAM → registers).
+
+        Args:
+            tag: Kernel-specific op tag (0-127) used by `_emit` dispatch.
+            ch: Data path identifier for edge derivation. Ops on the same
+                channel share a buffer (defaults to -1).
+            stage: Buffer stage index (0 or 1 for double-buffering)
+                (defaults to 0).
+            sub: Subtile index within the stage (defaults to 0).
+            k: How to compute the K dimension offset for loads
+                (defaults to `KOffsetKind.NONE`).
+        """
         self._ops.append(
             OpDesc.logical(
                 tag, channel=ch, stage=stage, subtile=sub, k_offset=k
@@ -91,7 +102,16 @@ struct PipelineBody(Movable):
         stage: Int = 0,
         sub: Int = 0,
     ):
-        """Append a shared memory store (registers → LDS)."""
+        """Append a shared memory store (registers → LDS).
+
+        Args:
+            tag: Kernel-specific op tag (0-127) used by `_emit` dispatch.
+            ch: Data path identifier for edge derivation. Ops on the same
+                channel share a buffer (defaults to -1).
+            stage: Buffer stage index (0 or 1 for double-buffering)
+                (defaults to 0).
+            sub: Subtile index within the stage (defaults to 0).
+        """
         self._ops.append(
             OpDesc.logical(tag, channel=ch, stage=stage, subtile=sub)
         )
@@ -104,13 +124,29 @@ struct PipelineBody(Movable):
         stage: Int = 0,
         sub: Int = 0,
     ):
-        """Append a fragment load (LDS → registers)."""
+        """Append a fragment load (LDS → registers).
+
+        Args:
+            tag: Kernel-specific op tag (0-127) used by `_emit` dispatch.
+            ch: Data path identifier for edge derivation. Ops on the same
+                channel share a buffer (defaults to -1).
+            stage: Buffer stage index (0 or 1 for double-buffering)
+                (defaults to 0).
+            sub: Subtile index within the stage (defaults to 0).
+        """
         self._ops.append(
             OpDesc.logical(tag, channel=ch, stage=stage, subtile=sub)
         )
 
     def compute(mut self, tag: Int, *, stage: Int = 0, sub: Int = 0):
-        """Append a compute/MMA op."""
+        """Append a compute/MMA op.
+
+        Args:
+            tag: Kernel-specific op tag (0-127) used by `_emit` dispatch.
+            stage: Buffer stage index (0 or 1 for double-buffering)
+                (defaults to 0).
+            sub: Subtile index within the stage (defaults to 0).
+        """
         self._ops.append(OpDesc.logical(tag, stage=stage, subtile=sub))
 
     def barrier(mut self):
@@ -126,7 +162,18 @@ struct PipelineBody(Movable):
         sub: Int = 0,
         k: KOffsetKind = KOffsetKind.NONE,
     ):
-        """Append a generic logical op (escape hatch for non-standard ops)."""
+        """Append a generic logical op (escape hatch for non-standard ops).
+
+        Args:
+            tag: Kernel-specific op tag (0-127) used by `_emit` dispatch.
+            ch: Data path identifier for edge derivation. Ops on the same
+                channel share a buffer (defaults to -1).
+            stage: Buffer stage index (0 or 1 for double-buffering)
+                (defaults to 0).
+            sub: Subtile index within the stage (defaults to 0).
+            k: How to compute the K dimension offset for loads
+                (defaults to `KOffsetKind.NONE`).
+        """
         self._ops.append(
             OpDesc.logical(
                 tag, channel=ch, stage=stage, subtile=sub, k_offset=k
@@ -145,7 +192,20 @@ struct PipelineBody(Movable):
         stage: Int = 0,
         k: KOffsetKind = KOffsetKind.NONE,
     ):
-        """Append N ops with subtile=0..N-1 (fan-out pattern)."""
+        """Append N ops with subtile=0..N-1 (fan-out pattern).
+
+        Parameters:
+            N: Number of ops to append (subtile ranges from 0 to N-1).
+
+        Args:
+            tag: Kernel-specific op tag (0-127) used by `_emit` dispatch.
+            ch: Data path identifier for edge derivation. Ops on the same
+                channel share a buffer (defaults to -1).
+            stage: Buffer stage index (0 or 1 for double-buffering)
+                (defaults to 0).
+            k: How to compute the K dimension offset for loads
+                (defaults to `KOffsetKind.NONE`).
+        """
         comptime for i in range(N):
             self._ops.append(
                 OpDesc.logical(
@@ -158,6 +218,15 @@ struct PipelineBody(Movable):
 
         First dimension maps to stage (0..M-1), second to subtile (0..N-1).
         For flat patterns where only subtile varies, use fan[M*N] instead.
+
+        Parameters:
+            M: Number of stage values (stage ranges from 0 to M-1).
+            N: Number of subtile values (subtile ranges from 0 to N-1).
+
+        Args:
+            tag: Kernel-specific op tag (0-127) used by `_emit` dispatch.
+            ch: Data path identifier for edge derivation. Ops on the same
+                channel share a buffer (defaults to -1).
         """
         comptime for i in range(M):
             comptime for j in range(N):
@@ -169,6 +238,9 @@ struct PipelineBody(Movable):
 
     def extend(mut self, mut other: PipelineBody):
         """Absorb all ops from another builder (for hierarchical composition).
+
+        Args:
+            other: Builder whose ops are appended to this one.
         """
         for i in range(len(other._ops)):
             self._ops.append(other._ops[i])

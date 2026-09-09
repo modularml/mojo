@@ -32,27 +32,45 @@ def _product(dims: Iterable[Dim]) -> Dim:
 def reshape(x: TensorValueLike, shape: ShapeLike) -> TensorValue:
     """Reshapes a symbolic tensor.
 
-    The number and order of the elements in the tensor is unchanged.
-    In other words, if you were to iterate over elements in the tensor
-    by major dimension to minor dimension, the iteration order would stay
-    the same.
+    If a value of ``-1`` is present in ``shape``, that dimension becomes an
+    automatically calculated dimension collecting all unspecified dimensions.
+    Its length becomes the number of elements in the original tensor divided by
+    the product of the other dimensions of ``shape``.
 
-    If a value of -1 is present in the shape, that dimension becomes
-    an automatically calculated dimension collecting all unspecified dimensions.
-    Its length becomes the number of elements in the original tensor
-    divided by the product of elements of the reshape.
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("reshape") as graph:
+            # x has shape (2, 3).
+            x = ops.constant(
+                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+                DType.float32,
+                device=device,
+            )
+            # Reshape the same 6 elements into shape (3, 2).
+            graph.output(ops.reshape(x, [3, 2]))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
         x: The input symbolic tensor to reshape.
-        shape: The new shape as a list of dimensions.
-               A single dimension may be `-1`.
+        shape: The new shape as an iterable of dimensions (for example, a
+            list, tuple, or ``Dim`` objects). A single dimension may be
+            ``-1``.
 
     Returns:
-        A symbolic tensor with the same elements as the original tensor, but
-        in a new shape. Its symbolic shape is the same as :code:`shape`.
+        A ``TensorValue`` representing ``x`` with a new ``shape``. The order and
+        total number of elements stays the same as the input.
 
     Raises:
-        ValueError: if input and target shapes' number of elements mismatch.
+        ValueError: If ``shape`` contains more than one ``-1`` dimension, if a
+            ``-1`` dimension is requested while another dimension is ``0``, or
+            if the input and target shapes have a different number of elements.
     """
     x = TensorValue(x)
     shape = Shape(shape)

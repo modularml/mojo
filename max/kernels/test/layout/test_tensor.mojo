@@ -57,9 +57,7 @@ def print_mode2_shape2_tensor[
 def test_basic_tensor_ops() raises:
     print("== test_basic_tensor_ops")
 
-    var managed_tensor = ManagedLayoutTensor[
-        DType.float32, Layout(IntTuple(8, 4))
-    ]()
+    var managed_tensor = ManagedLayoutTensor[.float32, Layout(IntTuple(8, 4))]()
     var tensor = managed_tensor.tensor()
     arange(tensor)
 
@@ -116,7 +114,7 @@ def test_basic_tensor_ops() raises:
 
     print("----1d-tensor-tiles----")
     var tensor_8 = LayoutTensor[
-        DType.float32, Layout(8), MutAnyOrigin
+        .float32, Layout(8), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor_8)
     # CHECK: ----tile[ 0 ]----
@@ -152,9 +150,7 @@ def test_basic_tensor_ops() raises:
 def test_tesnsor_fragments() raises:
     print("== test_tesnsor_fragments")
 
-    var managed_tensor = ManagedLayoutTensor[
-        DType.float32, Layout(IntTuple(8, 4))
-    ]()
+    var managed_tensor = ManagedLayoutTensor[.float32, Layout(IntTuple(8, 4))]()
 
     var tensor = managed_tensor.tensor()
     arange(tensor)
@@ -191,9 +187,7 @@ def test_tesnsor_fragments() raises:
 def test_tensor_tile_and_distribute() raises:
     print("== test_tensor_tile_and_distribute")
 
-    var managed_tensor = ManagedLayoutTensor[
-        DType.float32, Layout(IntTuple(8, 8))
-    ]()
+    var managed_tensor = ManagedLayoutTensor[.float32, Layout(IntTuple(8, 8))]()
 
     var tensor = managed_tensor.tensor()
     arange(tensor)
@@ -283,9 +277,7 @@ def test_tensor_tile_and_distribute() raises:
 # CHECK-LABEL: test_tensor_tile_and_distribute_custom_layout
 def test_tensor_tile_and_distribute_custom_layout() raises:
     print("== test_tensor_tile_and_distribute_custom_layout")
-    var managed_tensor = ManagedLayoutTensor[
-        DType.float32, Layout(IntTuple(2, 4))
-    ]()
+    var managed_tensor = ManagedLayoutTensor[.float32, Layout(IntTuple(2, 4))]()
     var tensor = managed_tensor.tensor()
     arange(tensor)
     # CHECK: 0.0   1.0   2.0   3.0
@@ -333,7 +325,7 @@ def test_tensor_tile_and_distribute_custom_layout() raises:
 def test_copy_to_tile_major_layout():
     print("== test_copy_to_tile_major_layout")
     var mat_4x4_row_major = LayoutTensor[
-        DType.float32, Layout(IntTuple(4, 4), IntTuple(4, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(4, 4), IntTuple(4, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(mat_4x4_row_major)
 
@@ -353,7 +345,7 @@ def test_copy_to_tile_major_layout():
         IntTuple(IntTuple(1, 8), IntTuple(2, 4)),
     )
     var mat_4x4_tiled_2x2 = LayoutTensor[
-        DType.float32, tiled_major_layout, MutAnyOrigin
+        .float32, tiled_major_layout, MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     print_layout(materialize[tiled_major_layout]())
 
@@ -392,7 +384,7 @@ def test_copy_to_tile_major_layout():
 def test_distribute_tiled_layout():
     print("== test_distribute_tiled_layout")
     var tensor = LayoutTensor[
-        DType.float32, Layout(IntTuple(4, 8), IntTuple(8, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(4, 8), IntTuple(8, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor)
     comptime threads_2x4_layout = Layout(
@@ -433,7 +425,7 @@ def test_distribute_with_tile_size():
     print("== test_distribute_with_tile_size")
 
     var tensor0 = LayoutTensor[
-        DType.float32, Layout(IntTuple(16, 8), IntTuple(8, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(16, 8), IntTuple(8, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor0)
 
@@ -505,7 +497,7 @@ def test_distribute_with_tile_size():
         var tile = tensor0.vectorize[2, 2]().distribute[thread_layout](tid)
         print(tile)
     var tensor8x1 = LayoutTensor[
-        DType.float32, Layout(IntTuple(8, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(8, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor8x1)
 
@@ -552,7 +544,7 @@ def test_distribute_with_tile_size():
 def test_vectorize_reads():
     print("== test_vectorize_reads")
     var tensor = LayoutTensor[
-        DType.float32, Layout(IntTuple(8, 8), IntTuple(1, 8)), MutAnyOrigin
+        .float32, Layout(IntTuple(8, 8), IntTuple(1, 8)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor)
     var tensor_8_2_vec = tensor.vectorize[1, 4]()
@@ -594,7 +586,7 @@ def test_vectorize_writes():
     print("== test_vectorize_writes")
     var tensor = (
         LayoutTensor[
-            DType.float32,
+            .float32,
             Layout(IntTuple(4, 4), IntTuple(1, 4)),
             MutAnyOrigin,
         ]
@@ -603,18 +595,10 @@ def test_vectorize_writes():
     )
 
     var tensor_2x2 = tensor.vectorize[2, 2]()
-    tensor_2x2[0, 0] = rebind[tensor_2x2.element_type](
-        SIMD[DType.float32, 4](1)
-    )
-    tensor_2x2[0, 1] = rebind[tensor_2x2.element_type](
-        SIMD[DType.float32, 4](2)
-    )
-    tensor_2x2[1, 0] = rebind[tensor_2x2.element_type](
-        SIMD[DType.float32, 4](3)
-    )
-    tensor_2x2[1, 1] = rebind[tensor_2x2.element_type](
-        SIMD[DType.float32, 4](4)
-    )
+    tensor_2x2[0, 0] = rebind[tensor_2x2.element_type](SIMD[.float32, 4](1))
+    tensor_2x2[0, 1] = rebind[tensor_2x2.element_type](SIMD[.float32, 4](2))
+    tensor_2x2[1, 0] = rebind[tensor_2x2.element_type](SIMD[.float32, 4](3))
+    tensor_2x2[1, 1] = rebind[tensor_2x2.element_type](SIMD[.float32, 4](4))
     # CHECK: 1.0 1.0 2.0 2.0
     # CHECK: 1.0 1.0 2.0 2.0
     # CHECK: 3.0 3.0 4.0 4.0
@@ -626,7 +610,7 @@ def test_vectorize_writes():
 def test_slice():
     print("==test_slice")
     var tensor = LayoutTensor[
-        DType.float32, Layout(IntTuple(4, 4), IntTuple(1, 4)), MutAnyOrigin
+        .float32, Layout(IntTuple(4, 4), IntTuple(1, 4)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor)
     # CHECK: row_slice_sub_column
@@ -669,7 +653,7 @@ def test_slice():
 def test_copy_vectorized():
     print("== test_copy_vectorized")
     var tensor_8_8 = LayoutTensor[
-        DType.float32, Layout(IntTuple(8, 8), IntTuple(8, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(8, 8), IntTuple(8, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor_8_8)
     var vec_8_1 = tensor_8_8.vectorize[1, 4]()
@@ -684,11 +668,11 @@ def test_copy_vectorized():
     print(vec_8_1)
     var tensor_8_8_zeros = (
         LayoutTensor[
-            DType.float32,
+            .float32,
             Layout(IntTuple(8, 8), IntTuple(8, 1)),
             MutAnyOrigin,
         ]
-        .stack_allocation[stack_alignment=align_of[SIMD[DType.float32, 4]]()]()
+        .stack_allocation[stack_alignment=align_of[SIMD[.float32, 4]]()]()
         .vectorize[1, 4]()
         .fill(0)
     )
@@ -730,11 +714,11 @@ def test_copy_vectorized():
 
     var tensor_8_8_zeros_4_4 = (
         LayoutTensor[
-            DType.float32,
+            .float32,
             Layout(IntTuple(8, 8), IntTuple(8, 1)),
             MutAnyOrigin,
         ]
-        .stack_allocation[stack_alignment=align_of[SIMD[DType.float32, 4]]()]()
+        .stack_allocation[stack_alignment=align_of[SIMD[.float32, 4]]()]()
         .vectorize[4, 4]()
         .fill(0)
     )
@@ -749,7 +733,7 @@ def test_copy_vectorized():
 def test_distribute_vectorized():
     print("== test_distribute_vectorized")
     var tensor_8_8 = LayoutTensor[
-        DType.float32, Layout(IntTuple(8, 8), IntTuple(8, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(8, 8), IntTuple(8, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor_8_8)
 
@@ -791,14 +775,13 @@ def test_distribute_vectorized():
 
     # Fill the buffer first because we can't fill a vectorized tensor.
     # This will become easier when we can vectorize nested layout.
-    ptr = stack_allocation[64 * 32, DType.float32, alignment=16]()
+    var ptr = unsafe_stack_allocation[64 * 32, DType.float32, alignment=16]()
     for i in range(64 * 32):
         ptr[i] = Float32(i)
 
-    tensor_4x16x64 = LayoutTensor[
-        DType.float32,
+    var tensor_4x16x64 = LayoutTensor[
+        .float32,
         Layout(IntTuple(IntTuple(16, 16), 4), IntTuple(IntTuple(32, 2), 512)),
-        MutAnyOrigin,
         element_layout=Layout(2),
     ](ptr)
 
@@ -830,7 +813,7 @@ def test_distribute_vectorized():
 
 def test_distribute_axis_projection():
     var tensor_4x4 = LayoutTensor[
-        DType.float32, Layout(IntTuple(4, 4), IntTuple(4, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(4, 4), IntTuple(4, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor_4x4)
 
@@ -947,7 +930,7 @@ def test_distribute_axis_projection():
 
 def test_split():
     var tensor_4x4 = LayoutTensor[
-        DType.float32, Layout(IntTuple(4, 4), IntTuple(4, 1)), MutAnyOrigin
+        .float32, Layout(IntTuple(4, 4), IntTuple(4, 1)), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
     arange(tensor_4x4)
 
@@ -986,7 +969,7 @@ def test_split():
 # def test_copy_subtiles_scalars():
 #    print("== test_copy_subtiles_scalars")
 #    var tensor_13x7 = LayoutTensor[
-#        DType.float32, Layout.row_major(13, 7)
+#        .float32, Layout.row_major(13, 7)
 #    ].stack_allocation[stack_alignment=16]()
 #    arange(tensor_13x7)
 #    print(tensor_13x7)
@@ -1081,7 +1064,7 @@ def test_split():
 #            )
 #            print("----tile-data[", tile_m, ",", tile_n, "]----")
 #            var tile_4x2_cache = LayoutTensor[
-#                DType.float32, Layout.row_major(tile_m_size, tile_n_size)
+#                .float32, Layout.row_major(tile_m_size, tile_n_size)
 #            ].stack_allocation[stack_alignment=16]().fill(0)
 #            tile_4x2_cache.copy_from[
 #                dst_coords_bound = rebind[
@@ -1095,7 +1078,7 @@ def test_split():
 # def test_copy_distributed_subtiles_scalars():
 #    print("== test_copy_distributed_subtiles_scalars")
 #    var tensor_13x7 = LayoutTensor[
-#        DType.float32, Layout.row_major(13, 7)
+#        .float32, Layout.row_major(13, 7)
 #    ].stack_allocation[stack_alignment=16]()
 #    arange(tensor_13x7)
 #
@@ -1246,7 +1229,7 @@ def test_split():
 #                tile_m, tile_n
 #            )
 #            var tile_4x4_cache = LayoutTensor[
-#                DType.float32, Layout.row_major(tile_m_size, tile_n_size)
+#                .float32, Layout.row_major(tile_m_size, tile_n_size)
 #            ].stack_allocation[stack_alignment=16]().fill(0)
 #            tile_4x4_cache.copy_from[
 #                dst_coords_bound = rebind[
@@ -1261,7 +1244,7 @@ def test_split():
 #                    th_id
 #                )
 #                var tile_2x2_cache = LayoutTensor[
-#                    DType.float32, Layout.row_major(2, 2)
+#                    .float32, Layout.row_major(2, 2)
 #                ].stack_allocation[stack_alignment=16]().fill(0)
 #                tile_2x2_cache.copy_from[
 #                    dst_coords_bound = rebind[
@@ -1276,7 +1259,7 @@ def test_copy_subtiles_scalars_back():
     print("== test_copy_subtiles_scalars_back")
 
     var tensor_13x7 = (
-        LayoutTensor[DType.float32, Layout.row_major(13, 7), MutAnyOrigin]
+        LayoutTensor[.float32, Layout.row_major(13, 7), MutAnyOrigin]
         .stack_allocation[stack_alignment=16]()
         .fill(-1)
     )
@@ -1405,7 +1388,7 @@ def test_copy_subtiles_scalars_back():
                 tile_m, tile_n
             )
             var tile_4x4_cache = LayoutTensor[
-                DType.float32,
+                .float32,
                 Layout.row_major(tile_m_size, tile_n_size),
                 MutAnyOrigin,
             ].stack_allocation[stack_alignment=16]()
@@ -1419,7 +1402,7 @@ def test_slice_with_offsets():
     print("== test_slice_with_offsets")
 
     var tensor_4x3x2_row_major = LayoutTensor[
-        DType.float32, Layout.row_major(4, 3, 2), MutAnyOrigin
+        .float32, Layout.row_major(4, 3, 2), MutAnyOrigin
     ].stack_allocation[stack_alignment=16]()
 
     for i in range(4 * 3 * 2):
@@ -1501,9 +1484,9 @@ def test_layout_tensor_iterator():
     comptime size = 64
     comptime type = DType.float32
 
-    var arr = InlineArray[Scalar[type], size](uninitialized=True)
-    for i in range(size):
-        arr[i] = Float32(i)
+    var arr = Array[Scalar[type], size](
+        fill_with=lambda (i: Int) -> Scalar[type]: Float32(i)
+    )
 
     comptime layout_2x2_8x1 = Layout(IntTuple(2, 2), IntTuple(8, 1))
 
@@ -1602,9 +1585,9 @@ def test_nested_layout_tensor_iterator():
     comptime size = N * K
     comptime type = DType.float32
 
-    var arr = InlineArray[Scalar[type], size](uninitialized=True)
-    for i in range(size):
-        arr[i] = Float32(i)
+    var arr = Array[Scalar[type], size](
+        fill_with=lambda (i: Int) -> Scalar[type]: Float32(i)
+    )
 
     # Here we define a float32 tensor (64 * TN, 2 * TK):
     #              K
@@ -1652,7 +1635,7 @@ def test_nested_layout_tensor_iterator():
 
     # View a row in plain_tensor as an array of [64, 2] tiles.
     var nested_tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         nested_layout,
     ](arr)
 
@@ -1678,11 +1661,11 @@ def test_nested_layout_tensor_iterator():
 # def test_copy_from_bigger_tensor():
 #    print("== test_copy_from_bigger_tensor")
 #    var tensor_5x7 = LayoutTensor[
-#        DType.float32, Layout.row_major(8, 8)
+#        .float32, Layout.row_major(8, 8)
 #    ].stack_allocation().fill(0)
 #
 #    var tensor_8x8 = LayoutTensor[
-#        DType.float32, Layout.row_major(8, 8)
+#        .float32, Layout.row_major(8, 8)
 #    ].stack_allocation()
 #    arange(tensor_8x8)
 #
@@ -1704,12 +1687,12 @@ def test_nested_layout_tensor_iterator():
 # def test_copy_from_smaller_tensor():
 #     print("== test_copy_from_smaller_tensor")
 #     var tensor_5x7 = LayoutTensor[
-#         DType.float32, Layout.row_major(8, 8)
+#         .float32, Layout.row_major(8, 8)
 #     ].stack_allocation()
 #     arange(tensor_5x7)
 #
 #     var tensor_8x8 = LayoutTensor[
-#         DType.float32, Layout.row_major(8, 8)
+#         .float32, Layout.row_major(8, 8)
 #     ].stack_allocation().fill(0)
 #
 #     tensor_8x8.copy_from[
@@ -1731,27 +1714,27 @@ def test_nested_layout_tensor_iterator():
 #    print("== test_copy_from_vectorized_masked_write")
 #
 #    var tensor_4x8 = LayoutTensor[
-#        DType.float32, Layout.row_major(4, 8)
+#        .float32, Layout.row_major(4, 8)
 #    ].stack_allocation()
 #    arange(tensor_4x8)
 #
 #    var tensor_8x8 = LayoutTensor[
-#        DType.float32, Layout.row_major(8, 8)
+#        .float32, Layout.row_major(8, 8)
 #    ].stack_allocation()
 #    arange(tensor_8x8)
 #
 #    var tensor_8x8_data = LayoutTensor[
-#        DType.float32, Layout.row_major(8, 8)
+#        .float32, Layout.row_major(8, 8)
 #    ].stack_allocation()
 #
-#    var tensor_1x5 = LayoutTensor[DType.float32, Layout.row_major(1, 5)](
+#    var tensor_1x5 = LayoutTensor[.float32, Layout.row_major(1, 5)](
 #        tensor_8x8_data.ptr
 #    )
 #
 #    _ = tensor_8x8_data.fill(-1)
 #
 #    var tensor_1x8 = LayoutTensor[
-#        DType.float32, Layout.row_major(1, 8)
+#        .float32, Layout.row_major(1, 8)
 #    ].stack_allocation()
 #    arange(tensor_1x8)
 #
@@ -1774,7 +1757,7 @@ def test_nested_layout_tensor_iterator():
 #    print("write-1x5:")
 #    print(tensor_8x8_data)
 #
-#    var tensor_3x8 = LayoutTensor[DType.float32, Layout.row_major(3, 8)](
+#    var tensor_3x8 = LayoutTensor[.float32, Layout.row_major(3, 8)](
 #        tensor_8x8_data.ptr
 #    )
 #
@@ -1799,7 +1782,7 @@ def test_nested_layout_tensor_iterator():
 #    print("write-3x8:")
 #    print(tensor_8x8_data)
 #
-#    var tensor_5x8 = LayoutTensor[DType.float32, Layout.row_major(5, 8)](
+#    var tensor_5x8 = LayoutTensor[.float32, Layout.row_major(5, 8)](
 #        tensor_8x8_data.ptr
 #    )
 #
@@ -1829,11 +1812,11 @@ def test_nested_layout_tensor_iterator():
 # def test_copy_from_vectorized_masked_read():
 #    print("== test_copy_from_vectorized_masked_read")
 #    var tensor_8x8 = LayoutTensor[
-#        DType.float32, Layout.row_major(8, 8)
+#        .float32, Layout.row_major(8, 8)
 #    ].stack_allocation().fill(-1)
 #
 #    var tensor_8x5 = LayoutTensor[
-#        DType.float32, Layout.row_major(8, 5)
+#        .float32, Layout.row_major(8, 5)
 #    ].stack_allocation()
 #    arange(tensor_8x5)
 #
@@ -1857,7 +1840,7 @@ def test_nested_layout_tensor_iterator():
 #    print(tensor_8x8)
 #
 #    var tensor_5x8 = LayoutTensor[
-#        DType.float32, Layout.row_major(5, 8)
+#        .float32, Layout.row_major(5, 8)
 #    ].stack_allocation()
 #    arange(tensor_5x8)
 #
@@ -1907,13 +1890,13 @@ def test_binary_math_ops() raises:
     print("== test_binary_math_ops")
 
     var managed_tensor_a = ManagedLayoutTensor[
-        DType.float32, Layout(IntTuple(8, 4))
+        .float32, Layout(IntTuple(8, 4))
     ]()
     var tensor_a = managed_tensor_a.tensor()
     arange(tensor_a, start=1)
 
     var managed_tensor_b = ManagedLayoutTensor[
-        DType.float32, Layout(IntTuple(8, 4))
+        .float32, Layout(IntTuple(8, 4))
     ]()
     var tensor_b = managed_tensor_b.tensor()
     arange(tensor_b, start=32, step=-1)
@@ -1976,7 +1959,7 @@ def test_binary_math_ops() raises:
 
 def test_vectorized_tile() raises:
     var managed_tensor_a = ManagedLayoutTensor[
-        DType.float32, Layout(IntTuple(8, 4))
+        .float32, Layout(IntTuple(8, 4))
     ]()
     var tensor_a = managed_tensor_a.tensor()
     var vt = tensor_a.vectorize[1, 2]().tile[4, 2](0, 0)
@@ -1991,7 +1974,7 @@ def test_nested_tile() raises:
     comptime base_layout = Layout.row_major(8, 8)
     comptime tiler_layout = Layout.row_major(2, 2)
     comptime layout = blocked_product(base_layout, tiler_layout)
-    var managed_tensor_a = ManagedLayoutTensor[DType.float32, layout]()
+    var managed_tensor_a = ManagedLayoutTensor[.float32, layout]()
     arange(managed_tensor_a.tensor())
     var tensor_a = managed_tensor_a.tensor()
     var vt = tensor_a.tile[4, 4](0, 0)
@@ -2002,11 +1985,11 @@ def test_nested_tile() raises:
 
 def test_tensor_size() raises:
     comptime layout = Layout.row_major(4, 4)
-    var stack = InlineArray[UInt32, layout.size()](uninitialized=True)
-    var tensor = LayoutTensor[DType.uint32, layout](stack)
+    var stack = Array[UInt32, layout.size()](fill={})
+    var tensor = LayoutTensor[.uint32, layout](stack)
     assert_equal(tensor.size(), 16)
     comptime layout2 = Layout.row_major(4, UNKNOWN_VALUE)
-    var runtime_tensor = LayoutTensor[DType.uint32, layout2](
+    var runtime_tensor = LayoutTensor[.uint32, layout2](
         stack,
         RuntimeLayout[layout2].row_major(IndexList[2](4, 4)),
     )
@@ -2016,10 +1999,10 @@ def test_tensor_size() raises:
 # This test doesn't need to run, it just needs to compile
 def test_merge():
     comptime layout = Layout.row_major(4, 4)
-    var stack = InlineArray[UInt32, layout.size()](uninitialized=True)
-    var tensor = LayoutTensor[DType.uint32, layout](stack)
-    var stack2 = InlineArray[UInt32, layout.size()](uninitialized=True)
-    var tensor2 = LayoutTensor[DType.uint32, layout](stack2)
+    var stack = Array[UInt32, layout.size()](fill={})
+    var tensor = LayoutTensor[.uint32, layout](stack)
+    var stack2 = Array[UInt32, layout.size()](fill={})
+    var tensor2 = LayoutTensor[.uint32, layout](stack2)
     var a = tensor if tensor.size() > 1 else tensor2
     print(a)
 
@@ -2031,7 +2014,7 @@ def test_flatten_vectorize() raises:
     causing bounds-check assertions to fire on valid accesses.
     """
     comptime W = 4
-    var managed = ManagedLayoutTensor[DType.float32, Layout.row_major(W, W)]()
+    var managed = ManagedLayoutTensor[.float32, Layout.row_major(W, W)]()
     var t = managed.tensor()
     for i in range(W * W):
         t.ptr[i] = Float32(i)

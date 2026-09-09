@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
+
+package(default_visibility = ["//max:consumers"])
+
+# Host (CPU) unit tests for the comm primitives. No GPU required.
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS + [
+            "--debug-level",
+            "full",
+        ],
+        deps = [
+            "//max:comm",
+            "//max:internal_utils",
+            "@mojo//:std",
+        ],
+    )
+    for src in glob(["*.mojo"])
+]

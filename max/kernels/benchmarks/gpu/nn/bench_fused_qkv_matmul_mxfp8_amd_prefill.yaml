@@ -1,0 +1,46 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# Prefill sweep for CDNA4 fused MXFP8 QKV at M3 TP4 geometry.
+# Sibling yaml covers decode; this walks CE chunks to 8192. All knobs are runtime.
+
+name: bench_fused_qkv_matmul_mxfp8_amd_prefill
+file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_fused_qkv_matmul_mxfp8_amd.mojo
+
+params:
+
+# Chunk-fill sweep, one prompt, up to the 8k CE budget.
+- $seq_len: [512, 1024, 2048, 4096, 8192]
+  $batch_size: 1
+  $has_indexer: [False, True]
+  metadata:
+    MODEL: minimax-m3
+
+# Fixed M=8192, batch 2/4/8: same GEMM, different ragged + paged-store pattern.
+- $seq_len: 4096
+  $batch_size: 2
+  $has_indexer: [False, True]
+  metadata:
+    MODEL: minimax-m3
+
+- $seq_len: 2048
+  $batch_size: 4
+  $has_indexer: [False, True]
+  metadata:
+    MODEL: minimax-m3
+
+- $seq_len: 1024
+  $batch_size: 8
+  $has_indexer: [False, True]
+  metadata:
+    MODEL: minimax-m3

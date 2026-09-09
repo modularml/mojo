@@ -1,0 +1,192 @@
+<!-- title: Mojo Compile-time -->
+<!-- subtitle: Reasoning and optimization: the facts you give the compiler, and what it does with them -->
+<!-- layout: landscape -->
+<!-- width: 1500 -->
+<!-- columns: 3 -->
+<!-- Compiler verified: 2026-08-17, Mojo 1.0.0 (ed45d567) -->
+<!-- Last updated: 2026-08-17 (1.0.0 audit) -->
+
+<style>
+  .sheet .lead{font-size:11px;margin:0 0 4px;}
+  .sheet p.note{font-size:10.5px;}
+  .sheet .panel{break-inside:avoid;}
+  .sheet ul.rows{list-style:none;margin:0;padding:0;font-size:10.5px;}
+  .sheet ul.rows li{padding:4px 0;margin:0;border-bottom:1px solid var(--line);}
+  .sheet ul.rows li:last-child{border-bottom:none;}
+</style>
+
+<section class="panel">
+  <h2>Mojo Compile-time <span class="sum">compile-time Mojo is just Mojo</span></h2>
+  <div class="body">
+    <ul class="rows">
+      <li>One language. Compile time and runtime use the same Mojo.</li>
+      <li>The compiler acts on what it can prove, using constraints and conformance rules in
+        code.</li>
+      <li>Proven facts enable or disable methods, constructors, and conformances.</li>
+      <li>Compile-time computation shifts expensive work out of runtime.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Parameters: types and values <span class="sum">[ ] compile-time parameters, ( ) runtime arguments</span></h2>
+  <div class="body">
+<pre class="code">def repeat[T: Copyable, n: Int](x: T) -> Array[T, n]:
+    ... # T is a type, n is a value
+struct Matrix[dtype: DType, rows: Int, cols: Int]: ...</pre>
+    <p class="note">Use parameterized declarations for functions and structs. The compiler
+      creates a concrete implementation for each unique set of parameter values.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>where: prove, then gate <span class="sum">on traits or parameter facts</span></h2>
+  <div class="body">
+<pre class="code">def sort(mut self) where conforms_to(Self.T, Comparable): ...
+struct Box[T](Writable where conforms_to(T, Writable)): ...
+def chunk[w: Int]() where w.is_power_of_two(): ...</pre>
+    <p class="note">A precondition the compiler must prove, such as trait facts, numeric
+      truths, or a DType's kind, before the call compiles.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Conformances prove capabilities <span class="sum">check and specialize</span></h2>
+  <div class="body">
+<pre class="code">def largest[T: Comparable & Copyable](xs: List[T]) -> T:
+    ... # only operations T guarantees will compile</pre>
+    <p class="note">A trait conformance guarantees what capabilities the parameters support, so
+      only valid code compiles.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Conditional availability <span class="sum">exists only when it can</span></h2>
+  <div class="body">
+<pre class="code">struct Buffer[T: Copyable, n: Int](
+    Writable where conforms_to(T, Writable), # conforms only if T does
+):
+    def first(self) -> Self.T where Self.n > 0: ... # method only if n > 0</pre>
+    <p class="note">A type, method, conformance, or comptime declaration is available only when
+      the compiler can prove its condition. The API is correct by construction: a missing
+      capability or unmet constraint means calls with invalid parameters won't compile.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Reflect a type <span class="sum">read a type's shape</span></h2>
+  <div class="body">
+<pre class="code">comptime name = reflect[T].name() # also .field_count(), .field_names(), ...
+comptime t = type_of(x) # the type of an expression</pre>
+    <p class="note"><b>reflect[T]</b> reads a type's structure and <b>type_of</b> an expression's
+      type, so parameterized code adapts to any shape.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Run code at compile time <span class="sum">any function, no marker</span></h2>
+  <div class="body">
+<pre class="code">def meters(ft: Float64) -> Float64:
+    return ft * 0.3048
+comptime track = meters(100.0) # runs while compiling, baked in</pre>
+    <p class="note">Every fact must be established at compile time.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Compile-time numeric precision <span class="sum">literals stay exact</span></h2>
+  <div class="body">
+<pre class="code">comptime MAX = 2 ** 200 # arbitrary-precision integer
+comptime c = 0.1 + 0.2 # 0.3 exactly: a literal, kept exact
+var r = 0.1 + 0.2 # a Float64, subject to rounding</pre>
+    <p class="note">Literals stay exact. <b>Float64</b> rounds values like <b>0.1</b>, and
+      repeated computations accumulate rounding error. Compute accuracy-sensitive constants at
+      compile time.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Front-load compute <span class="sum">move work to compile time</span></h2>
+  <div class="body">
+<pre class="code">def slow_calc() -> Float64:
+    ... # an expensive calculation
+comptime FACTOR = slow_calc() # computed while compiling, baked in</pre>
+    <p class="note">Run expensive computation once while compiling; the result is baked in, free
+      at runtime. For tables and other compile-time data, <b>global_constant</b> gives O(1)
+      access without materializing them each time.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>comptime if / for <span class="sum">branch and unroll early</span></h2>
+  <div class="body">
+<pre class="code">comptime if is_nvidia_gpu(): # only the live branch compiles
+    use_nvidia()
+else:
+    use_fallback()
+comptime for i in range(4): # fully unrolled
+    process[i]()</pre>
+    <p class="note"><b>comptime if</b> compiles the live branch only; <b>comptime for</b> unrolls,
+      removing loop overhead.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Query the target <span class="sum">size, alignment, SIMD width</span></h2>
+  <div class="body">
+<pre class="code">comptime w = simd_width_of[DType.float32]() # lanes that fit a register
+size_of[T]() align_of[T]() # layout, at compile time</pre>
+    <p class="note"><b>sys.info</b> answers machine questions at compile time, so one source
+      adapts to every target.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Materialization <span class="sum">bring comptime values to runtime</span></h2>
+  <div class="body">
+<pre class="code">comptime table: List[Int] = [3, 5, 7, 11, 13] # a comptime List (heap-backed)
+var t = materialize[table]() # -> a runtime List; you choose when it allocates
+ref g = global_constant[POWERS]() # POWERS: a fixed scalar table, read g[i], no copy</pre>
+    <p class="note">Scalars materialize automatically; heap-backed values (<b>List</b>, <b>Dict</b>)
+      need <b>materialize</b>. <b>global_constant</b> keeps one static copy to index.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>comptime members <span class="sum">comptime lives on types too</span></h2>
+  <div class="body">
+<pre class="code">struct Stack[T: Copyable]:
+    comptime Element = Self.T # associated type
+    comptime capacity = 1024 # comptime value member
+comptime Scalar[dt: DType] = SIMD[dt, 1] # parametric alias</pre>
+    <p class="note">A type carries its own compile-time members (values, associated types, and
+      parametric aliases), reached through <b>Self</b>.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Inlining <span class="sum">force or forbid</span></h2>
+  <div class="body">
+<pre class="code">@always_inline
+def lerp(a: Float64, b: Float64, t: Float64) -> Float64:
+    return a + (b - a) * t # expanded at every call site
+@no_inline
+def cold_path(): ... # kept as a real call</pre>
+    <p class="note">Inlining replaces a function call with the function body, reducing call
+      overhead for small, frequently called functions. Add <b>@always_inline</b> to request
+      inlining, <b>@no_inline</b> to exclude the option, or let the compiler decide.</p>
+  </div>
+</section>
+
+<section class="panel py">
+  <h2>The compile-time boundary <span class="sum">what can't happen early</span></h2>
+  <div class="body">
+    <ul class="rows">
+      <li>Everything used in compile-time code must be known at compile time. A compile-time
+        value, parameter, <b>if</b>, or <b>for</b> can't depend on runtime input.</li>
+      <li>At compile time, you can't perform file I/O, make foreign calls, or call functions
+        that can raise.</li>
+      <li>Compile-time code runs on the CPU, like all compilation.</li>
+    </ul>
+  </div>
+</section>

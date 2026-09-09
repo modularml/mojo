@@ -29,8 +29,8 @@ from max.graph.weights import (
     weights_format,
 )
 from max.nn.transformer import ReturnLogits
+from max.pipelines.context import BaseContextType
 from max.pipelines.modeling.types import (
-    BaseContextType,
     EmbeddingsContext,
     EmbeddingsGenerationInputs,
     EmbeddingsGenerationOutput,
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 from max.support.algorithm import flatten2d
 
 from .interfaces import PipelineModel
+from .memory_estimation import MemoryPlan
 
 logger = logging.getLogger("max.pipelines")
 
@@ -63,22 +64,19 @@ class EmbeddingsPipeline(EmbeddingsPipelineType):
         self,
         pipeline_config: PipelineConfig,
         pipeline_model: type[PipelineModel[EmbeddingsContext]],
-        eos_token_id: int,
         weight_adapters: dict[WeightsFormat, WeightsAdapter],
         tokenizer: PipelineTokenizer[
             BaseContextType, npt.NDArray[np.integer[Any]], TextGenerationRequest
         ],
+        memory_plan: MemoryPlan,
     ) -> None:
         del tokenizer  # Unused.
         self._pipeline_config = pipeline_config
+        self._max_batch_size = memory_plan.planned_max_batch_size
         self._weight_adapters = weight_adapters
-        # Initialize Session.
-        devices = load_devices(self._pipeline_config.model.device_specs)
+        devices = load_devices(list(memory_plan.require_device_specs()))
         session = InferenceSession(devices=[*devices])
         self._pipeline_config.configure_session(session)
-
-        if not self._pipeline_config.model.quantization_encoding:
-            raise ValueError("quantization_encoding must not be None")
 
         # Resolve weight paths (downloads from HF if needed).
         weight_paths = self._pipeline_config.model.resolved_weight_paths()
@@ -102,7 +100,13 @@ class EmbeddingsPipeline(EmbeddingsPipelineType):
                 weights_format(weight_paths), None
             ),
             return_logits=ReturnLogits.ALL,
+            memory_plan=memory_plan,
         )
+
+    @property
+    def max_batch_size(self) -> int:
+        """Return the maximum number of requests that can be processed in one batch."""
+        return self._max_batch_size
 
     @traced
     def execute(
@@ -115,9 +119,9 @@ class EmbeddingsPipeline(EmbeddingsPipelineType):
         outputs per request.
         """
         tracer: Tracer = Tracer()
-        replica_batches = list(
+        replica_batches = [
             list(replica_batch.values()) for replica_batch in inputs.batches
-        )
+        ]
         # Flatten our batch for consistent indexing.
         context_batch = flatten2d(replica_batches)
 
@@ -151,4 +155,3 @@ class EmbeddingsPipeline(EmbeddingsPipelineType):
     def release(self, request_id: RequestID) -> None:
         """Releases resources for the request (no-op for embeddings)."""
         # Nothing to release.
-        pass

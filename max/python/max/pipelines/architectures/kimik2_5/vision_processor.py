@@ -34,7 +34,7 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from max.pipelines.core.exceptions import InputError
+from max.pipelines.context.exceptions import InputError
 from max.support.math import ceildiv
 from PIL import Image, UnidentifiedImageError
 
@@ -435,7 +435,7 @@ class KimiK2_5VisionProcessor:
         Requires the ``av`` (PyAV) package for video decoding.
         """
         try:
-            import av
+            from max.pipelines.context import open_video_container
         except ImportError as exc:
             raise ImportError(
                 "Video processing requires the 'av' package. "
@@ -448,9 +448,7 @@ class KimiK2_5VisionProcessor:
         elif isinstance(video_url, bytes):
             src = io.BytesIO(video_url)
 
-        container = av.open(src)
-        if not isinstance(container, av.container.InputContainer):
-            raise TypeError(f"Expected InputContainer, got {type(container)}")
+        container = open_video_container(src)
         stream = container.streams.video[0]
         fps: float = float(stream.average_rate or stream.base_rate or 30.0)
         num_frames: int = stream.frames or 0

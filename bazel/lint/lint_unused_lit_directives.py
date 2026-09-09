@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 _LIT_REGEX = re.compile(
@@ -109,7 +110,7 @@ def _main() -> None:
         print(
             "error: failed to query test files, likely an error in the linter."
         )
-        exit(1)
+        sys.exit(1)
 
     errors = []
     for file in all_test_files - lit_test_files:
@@ -124,14 +125,15 @@ def _main() -> None:
                     errors.append(
                         f"error: {file}: has a CHECK line but is not a filecheck test file, either change it to use the 'mojo_filecheck_test' or 'lit_tests' rules, or remove the CHECK line"
                     )
-            else:
+            # FIXME (SDLC-4326): Temporary exclusion on `plugins` directory
+            elif not str(file).startswith("plugins"):
                 errors.append(
                     f"error: {file}: has a RUN line but is not a lit test file, either change it to use the 'lit_tests' rule, or remove the RUN lines"
                 )
 
     if errors:
         print("\n".join(sorted(errors)))
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

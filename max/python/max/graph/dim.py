@@ -33,6 +33,7 @@ class Dim:
 
     .. code-block:: python
 
+        from max.dtype import DType
         from max.graph import Dim, TensorType, DeviceRef
 
         # Create a TensorType with a symbolic "batch" dimension and a static dimension of size 10
@@ -96,7 +97,7 @@ class Dim:
             f"int({self!r}): Int conversions only supported for static dims"
         )
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Checks whether two dimensions are equal.
 
         Dimensions are equal if they are the same dimension type
@@ -112,7 +113,7 @@ class Dim:
         """
         raise NotImplementedError
 
-    def __ne__(self, other: Any) -> bool:
+    def __ne__(self, other: object) -> bool:
         """Checks whether two dimensions are not equal.
 
         The inverse of __eq__.
@@ -126,32 +127,48 @@ class Dim:
         return not self == other
 
     def __add__(self, rhs: DimLike) -> Dim:
+        if not isinstance(rhs, DimLike):
+            return NotImplemented
         return AlgebraicDim.apply(kgen.POC.add, self, rhs)
 
     def __radd__(self, lhs: DimLike) -> Dim:
+        if not isinstance(lhs, DimLike):
+            return NotImplemented
         return Dim(lhs) + self
 
     def __mul__(self, rhs: DimLike) -> Dim:
+        if not isinstance(rhs, DimLike):
+            return NotImplemented
         return AlgebraicDim.apply(kgen.POC.mul_no_wrap, self, rhs)
 
     def __rmul__(self, lhs: DimLike) -> Dim:
+        if not isinstance(lhs, DimLike):
+            return NotImplemented
         return Dim(lhs) * self
 
     def __neg__(self) -> Dim:
         return -1 * self
 
     def __sub__(self, rhs: DimLike) -> Dim:
+        if not isinstance(rhs, DimLike):
+            return NotImplemented
         return self + -Dim(rhs)
 
     def __rsub__(self, lhs: DimLike) -> Dim:
+        if not isinstance(lhs, DimLike):
+            return NotImplemented
         return lhs + -self
 
     def __floordiv__(self, rhs: DimLike) -> Dim:
+        if not isinstance(rhs, DimLike):
+            return NotImplemented
         if isinstance(rhs, int | StaticDim) and int(rhs) == 0:
             raise ZeroDivisionError
         return AlgebraicDim.apply(kgen.POC.div, self, rhs)
 
     def __rfloordiv__(self, lhs: DimLike) -> Dim:
+        if not isinstance(lhs, DimLike):
+            return NotImplemented
         return lhs // self
 
     def to_mlir(self) -> builtin.TypedAttr:
@@ -188,6 +205,22 @@ class Dim:
         """Lists the symbolic dimension names on which this dim depends."""
         raise NotImplementedError
 
+    def substitute(self, mapping: Mapping[str, DimLike]) -> Dim:
+        """Returns this dim with named symbols replaced per ``mapping``.
+
+        Substituting static values folds the result through the compiler's
+        own attribute evaluation; substituting symbols renames. Unmapped
+        symbols are left intact.
+
+        Args:
+            mapping: A mapping from symbolic dimension name to the
+                replacement dim (or dim-like value).
+
+        Returns:
+            The dim with substitutions applied.
+        """
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class SymbolicDim(Dim):
@@ -201,6 +234,9 @@ class SymbolicDim(Dim):
     strings ``"batch"`` and ``"x"`` to :class:`TensorType`:
 
     .. code-block:: python
+
+       from max.dtype import DType
+       from max.graph import DeviceRef, TensorType
 
        tensor_type = TensorType(DType.float32, ("batch", "x", 10), device=DeviceRef.CPU())
     """
@@ -229,7 +265,7 @@ class SymbolicDim(Dim):
     def __repr__(self) -> str:
         return f"Dim({self.name!r})"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Whether the dimension is the same as another symbolic dimension.
 
         Symbolic dimensions with the same name are interpreted as the same
@@ -279,6 +315,20 @@ class SymbolicDim(Dim):
         """Lists the symbolic dimension names on which this dim depends."""
         yield self
 
+    def substitute(self, mapping: Mapping[str, DimLike]) -> Dim:
+        """Returns this dim with named symbols replaced per ``mapping``.
+
+        Args:
+            mapping: A mapping from symbolic dimension name to the
+                replacement dim (or dim-like value).
+
+        Returns:
+            ``Dim(mapping[self.name])`` if ``self.name`` is in ``mapping``,
+            otherwise this dim unchanged.
+        """
+        replacement = mapping.get(self.name)
+        return self if replacement is None else Dim(replacement)
+
 
 @dataclass(frozen=True)
 class AlgebraicDim(Dim):
@@ -295,6 +345,8 @@ class AlgebraicDim(Dim):
     Equivalent expressions simplify to the same form:
 
     .. code-block:: python
+
+        from max.graph import Dim
 
         Dim("x") + 1 + 1 == Dim("x") + 2  # True
 
@@ -330,6 +382,34 @@ class AlgebraicDim(Dim):
         )
         return Dim(attr)
 
+    def substitute(self, mapping: Mapping[str, DimLike]) -> Dim:
+        """Returns this dim with named symbols replaced per ``mapping``.
+
+        Substitutes into each operand, then reapplies the operator, so
+        substitution to static values folds through the compiler's own
+        attribute evaluation rather than being recomputed in Python.
+
+        Args:
+            mapping: A mapping from symbolic dimension name to the
+                replacement dim (or dim-like value).
+
+        Returns:
+            The dim with substitutions applied, re-folded by the compiler.
+
+        Raises:
+            ZeroDivisionError: If substitution produces a zero divisor.
+        """
+        operands = [
+            Dim(operand).substitute(mapping) for operand in self.attr.operands
+        ]
+        # __floordiv__'s zero guard does not run here, and the compiler
+        # neither folds nor rejects a literal zero divisor.
+        if self.attr.opcode == kgen.POC.div and operands[1] == 0:
+            raise ZeroDivisionError(
+                f"substituting into {self} produced a zero divisor"
+            )
+        return AlgebraicDim.apply(self.attr.opcode, *operands)
+
     def __format__(self, format_spec: str) -> str:
         formatters: Mapping[str, Callable[[Any], str]] = {
             "str": str,
@@ -362,7 +442,7 @@ class AlgebraicDim(Dim):
     def __repr__(self) -> str:
         return f"{self:repr}"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, AlgebraicDim) and self.attr == other.attr
 
     def to_mlir(self) -> kgen.ParamOperatorAttr:
@@ -411,9 +491,9 @@ class StaticDim(Dim):
 
     .. code-block:: python
 
-        from max.graph import TensorType
         from max.dtype import DType
-        tensor = TensorType(DType.int64, (4, 5))
+        from max.graph import DeviceRef, TensorType
+        tensor = TensorType(DType.int64, (4, 5), device=DeviceRef.CPU())
         # This creates a tensor with 2 static dimensions: 4 and 5 respectively
     """
 
@@ -438,6 +518,18 @@ class StaticDim(Dim):
         if not -(2**63) <= self.dim < 2**63:
             raise ValueError("Dim value must be -2**63 <= dim < 2**63")
 
+    def substitute(self, mapping: Mapping[str, DimLike]) -> Dim:
+        """Returns this dim unchanged: a static dim has no symbols.
+
+        Args:
+            mapping: A mapping from symbolic dimension name to the
+                replacement dim (or dim-like value). Ignored.
+
+        Returns:
+            This dim, unchanged.
+        """
+        return self
+
     def __str__(self) -> str:
         return str(self.dim)
 
@@ -447,7 +539,7 @@ class StaticDim(Dim):
     def __int__(self) -> int:
         return self.dim
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Whether the dimension has the same size as another dimension.
 
         Args:
@@ -499,4 +591,4 @@ class StaticDim(Dim):
         return ()
 
 
-DimLike = int | str | Dim | np.integer[Any] | builtin.TypedAttr
+DimLike = int | str | Dim | np.integer | builtin.TypedAttr

@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from max.dtype import DType
 from max.graph import DeviceRef, TensorValue, ops
@@ -38,7 +38,20 @@ class DFlashLlama3(Module):
         config: Llama3Config,
         *,
         num_context_features: int,
+        layer_types: Sequence[str] | None = None,
     ) -> None:
+        """Builds the draft stack.
+
+        Args:
+            config: The draft's own Llama3-shaped config.
+            num_context_features: Number of target hidden-state taps the
+                ``fc`` projection consumes. Decoupled from the draft's layer
+                count: the Gemma4 DFlash drafter fuses six taps into five
+                layers.
+            layer_types: Per-layer ``"sliding_attention"`` /
+                ``"full_attention"`` selection from the draft checkpoint.
+                ``None`` applies ``config.sliding_window`` to every layer.
+        """
         super().__init__()
         if num_context_features <= 0:
             raise ValueError(
@@ -53,6 +66,29 @@ class DFlashLlama3(Module):
             raise ValueError(
                 "DFlashLlama3 currently supports a single device only."
             )
+        if layer_types is not None:
+            if len(layer_types) != config.num_hidden_layers:
+                raise ValueError(
+                    "DFlash layer_types must have one entry per draft layer."
+                    f" Got {len(layer_types)} entries for"
+                    f" {config.num_hidden_layers} layers."
+                )
+            unknown = sorted(
+                set(layer_types) - {"sliding_attention", "full_attention"}
+            )
+            if unknown:
+                raise ValueError(
+                    f"DFlash draft has unsupported layer_types {unknown};"
+                    " expected only 'sliding_attention' or 'full_attention'."
+                )
+            if (
+                "sliding_attention" in layer_types
+                and config.sliding_window is None
+            ):
+                raise ValueError(
+                    "DFlash sliding_attention layers require a"
+                    " sliding_window on the draft config."
+                )
 
         self.config = config
         self.num_context_features = num_context_features
@@ -63,7 +99,13 @@ class DFlashLlama3(Module):
         rms_norm_eps = config.rms_norm_eps
 
         self.rope = create_rope_embedding(
-            hidden_size=config.hidden_size,
+            # RoPE spans num_heads x head_dim, which is only hidden_size when
+            # the draft's head_dim happens to be hidden_size // num_heads.
+            # The Gemma4 DFlash drafter breaks that (64 x 128 over a 5376
+            # hidden), so derive the span from the KV head_dim.
+            hidden_size=(
+                config.kv_params.head_dim * config.num_attention_heads
+            ),
             num_attention_heads=config.num_attention_heads,
             rope_theta=config.rope_theta,
             max_seq_len=config.max_seq_len,
@@ -82,7 +124,13 @@ class DFlashLlama3(Module):
             )
 
         layers: list[TransformerBlock] = []
-        for _ in range(config.num_hidden_layers):
+        for layer_idx in range(config.num_hidden_layers):
+            sliding_window = (
+                config.sliding_window
+                if layer_types is None
+                or layer_types[layer_idx] == "sliding_attention"
+                else None
+            )
             attention = AttentionWithRope(
                 rope=self.rope,
                 num_attention_heads=config.num_attention_heads,
@@ -99,7 +147,12 @@ class DFlashLlama3(Module):
                 clip_qkv=config.clip_qkv,
                 use_qk_norm=True,
                 rms_norm_eps=rms_norm_eps,
-                mask_variant=MHAMaskVariant.NULL_MASK,
+                mask_variant=(
+                    MHAMaskVariant.SLIDING_WINDOW_NONCAUSAL_MASK
+                    if sliding_window is not None
+                    else MHAMaskVariant.NULL_MASK
+                ),
+                sliding_window=sliding_window,
             )
             mlp = MLP(
                 config.dtype,

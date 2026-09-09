@@ -22,7 +22,7 @@ Covers BF16 (non-swizzle path with single up-front divmod, carry-
 increment per iter) and FP8 (swizzle path with per-iter divmod).
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.random import rand
 from std.utils import IndexList
 

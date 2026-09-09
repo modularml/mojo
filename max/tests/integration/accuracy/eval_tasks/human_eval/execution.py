@@ -186,8 +186,6 @@ def chdir(root: str) -> Generator[None, None, None]:
     os.chdir(root)
     try:
         yield
-    except BaseException as exc:
-        raise exc
     finally:
         os.chdir(cwd)
 

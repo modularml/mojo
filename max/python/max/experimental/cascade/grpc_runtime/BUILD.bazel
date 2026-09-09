@@ -1,0 +1,80 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+# ===----------------------------------------------------------------------=== #
+load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_grpc_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+proto_library(
+    name = "cascade_runtime_v1",
+    srcs = ["cascade_runtime_v1.proto"],
+    visibility = ["//visibility:private"],
+)
+
+py_proto_library(
+    name = "cascade_runtime_v1_py",
+    visibility = ["//visibility:private"],
+    deps = [":cascade_runtime_v1"],
+)
+
+py_grpc_library(
+    name = "cascade_runtime_v1_grpc_py",
+    srcs = [":cascade_runtime_v1"],
+    strip_prefixes = ["max.python."],
+    visibility = ["//visibility:private"],
+    deps = [":cascade_runtime_v1_py"],
+)
+
+modular_py_library(
+    name = "grpc_proto_srcs",
+    srcs = [
+        ":cascade_runtime_v1_grpc_py",
+        ":cascade_runtime_v1_py",
+    ],
+    tags = ["no-mypy"],
+    deps = [
+        requirement("grpcio"),
+        requirement("protobuf"),
+    ],
+)
+
+modular_py_library(
+    name = "grpc_runtime",
+    srcs = [
+        "__init__.py",
+        "client.py",
+        "codec.py",
+        "runtime.py",
+        "server.py",
+        "subproc.py",
+    ],
+    ignore_extra_deps = [
+        # Provides generated _pb2 files imported as relative imports;
+        # pydeps cannot trace generated-file consumers to their providing target.
+        ":grpc_proto_srcs",
+    ],
+    tags = ["no-mypy"],
+    deps = [
+        ":grpc_proto_srcs",
+        requirement("cyclopts"),
+        requirement("grpcio"),
+        requirement("numpy"),
+        requirement("pydantic"),
+        requirement("prometheus-client"),
+        "//max/python/max/experimental/cascade/core",
+        "//max/python/max/serve:process_control",
+    ],
+)
+
+modular_py_binary(
+    name = "grpc_worker",
+    srcs = ["__main__.py"],
+    main = "__main__.py",
+    deps = [":grpc_runtime"],
+)

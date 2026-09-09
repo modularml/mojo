@@ -11,19 +11,19 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
-from std.gpu.intrinsics import ldg
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
+from max.gpu.intrinsics import ldg
 from layout import Layout, LayoutTensor
 from std.testing import assert_true
 
 
-def ldg_kernel(i8: UnsafePointer[Int8, MutAnyOrigin]):
+def ldg_kernel(i8: MutPointer[Int8, MutAnyOrigin]):
     i8.store(1, ldg(i8))
 
 
 def layout_kernel(
-    a: LayoutTensor[mut=False, DType.int8, Layout.row_major(1), _],
+    a: LayoutTensor[mut=False, .int8, Layout.row_major(1), _],
     mut b: type_of(a[0]),
 ):
     b = a[0]

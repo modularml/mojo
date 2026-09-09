@@ -15,7 +15,7 @@
 from collections.abc import Callable
 
 from max._core import Operation
-from max._core.dialects import kgen, rmo
+from max._core.dialects import builtin, kgen, rmo
 from max.dtype import DType
 
 from .. import dtype_promotion
@@ -23,7 +23,6 @@ from ..graph import Graph
 from ..type import DeviceRef, TensorType
 from ..value import TensorValue, TensorValueLike
 from .cast import cast
-from .constant import constant
 from .custom import custom
 from .validation import assert_same_device
 
@@ -77,18 +76,31 @@ add.__doc__ = """Adds two tensors element-wise.
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([4.0, 5.0, 6.0], DType.float32, device=device)
-    result = ops.add(lhs, rhs)
-    # result: [5.0, 7.0, 9.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
 
+    device = DeviceRef.CPU()
+    with Graph("add_example") as graph:
+        lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([4.0, 5.0, 6.0], DType.float32, device=device)
+        graph.output(ops.add(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [5.0, 7.0, 9.0])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value containing the element-wise sums.
+    A ``TensorValue`` representing the element-wise sums.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -106,17 +118,33 @@ def div(lhs: TensorValueLike, rhs: TensorValueLike) -> TensorValue:
 
     .. code-block:: python
 
-        lhs = ops.constant([6.0, 10.0, 18.0], DType.float32, device=device)
-        rhs = ops.constant([2.0, 5.0, 6.0], DType.float32, device=device)
-        result = ops.div(lhs, rhs)
-        # result: [3.0, 2.0, 3.0]
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("div_example") as graph:
+            lhs = ops.constant(
+                [6.0, 10.0, 18.0], DType.float32, device=device
+            )
+            rhs = ops.constant([2.0, 5.0, 6.0], DType.float32, device=device)
+            graph.output(ops.div(lhs, rhs))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.array_equal(result.to_numpy(), [3.0, 2.0, 3.0])
 
     Args:
         lhs: The numerator input.
         rhs: The denominator input.
 
     Returns:
-        A tensor value with the broadcast shape containing ``lhs / rhs``
+        A ``TensorValue`` with the broadcast shape representing ``lhs / rhs``
         element-wise. The result has a floating-point dtype for integer
         operands and the promoted dtype for mixed types.
 
@@ -138,24 +166,105 @@ def div(lhs: TensorValueLike, rhs: TensorValueLike) -> TensorValue:
     ].tensor
 
 
+def floor_div(lhs: TensorValueLike, rhs: TensorValueLike) -> TensorValue:
+    """Divides two tensors element-wise using floor division (Python ``//``).
+
+    The result is rounded toward negative infinity for all operands, matching
+    Python's ``//``. Integer operands stay in the integer domain: the divide
+    truncates toward zero, then a floor correction is applied for signed
+    integers (a no-op for unsigned or non-negative operands). Floating-point
+    operands compute ``floor(lhs / rhs)``.
+
+    Unlike :obj:`div`, integer operands are never promoted to ``float64``. This
+    matters on backends without native 64-bit floating-point support (for
+    example, Apple/Metal GPUs), where an ``f64`` intermediate fails to compile.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("floor_div_example") as graph:
+            lhs = ops.constant([7, 10, 18], DType.int32, device=device)
+            rhs = ops.constant([2, 5, 6], DType.int32, device=device)
+            graph.output(ops.floor_div(lhs, rhs))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.array_equal(result.to_numpy(), [3, 2, 3])
+
+    Args:
+        lhs: The numerator input.
+        rhs: The denominator input.
+
+    Returns:
+        A ``TensorValue`` with the broadcast shape representing the element-wise
+        floor division of ``lhs`` by ``rhs``.
+
+    Raises:
+        Error: If the input shapes are not compatible for broadcasting.
+        Error: If one of the inputs has an unsupported dtype.
+        Error: If the two symbols are parts of different graphs.
+    """
+    lhs, rhs = dtype_promotion._promote_weak_dtypes(lhs, rhs)
+    assert_same_device(lhs, rhs)
+    if lhs.dtype.is_integral() and rhs.dtype.is_integral():
+        # Integer division stays in the integer domain, mirroring `mod`
+        # (`rmo.ModOp`), so there is no `float64` promotion like `div` does.
+        # `rmo.DivOp` truncates toward zero.
+        quotient = Graph.current._add_op_generated(
+            rmo.DivOp, input_x=lhs, input_y=rhs
+        )[0].tensor
+        if lhs.dtype.is_signed_integral():
+            # Truncation toward zero and floor division differ by one when the
+            # exact quotient is negative (operand signs differ) and the divide
+            # leaves a nonzero remainder. Correct so the result matches `//`.
+            remainder = mod(lhs, rhs)
+            quotient = quotient - (
+                (remainder != 0) & ((lhs < 0) ^ (rhs < 0))
+            ).cast(quotient.dtype)
+        return quotient
+    return floor(div(lhs, rhs))
+
+
 max = _elementwise_binary(rmo.MaxOp, "max")
 max.__doc__ = """
 Computes the element-wise maximum of two tensors.
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([4.0, 2.0, 6.0], DType.float32, device=device)
-    result = ops.max(lhs, rhs)
-    # result: [4.0, 5.0, 6.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
 
+    device = DeviceRef.CPU()
+    with Graph("max_example") as graph:
+        lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([4.0, 2.0, 6.0], DType.float32, device=device)
+        graph.output(ops.max(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [4.0, 5.0, 6.0])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value with the maximum value at each position.
+    A ``TensorValue`` representing the maximum value at each position.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -169,17 +278,31 @@ Computes the element-wise minimum of two tensors.
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([4.0, 2.0, 6.0], DType.float32, device=device)
-    result = ops.min(lhs, rhs)
-    # result: [1.0, 2.0, 3.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("min_example") as graph:
+        lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([4.0, 2.0, 6.0], DType.float32, device=device)
+        graph.output(ops.min(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [1.0, 2.0, 3.0])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value with the minimum value at each position.
+    A ``TensorValue`` representing the minimum value at each position.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -193,17 +316,31 @@ Computes the element-wise modulus of two tensors.
 
 .. code-block:: python
 
-    lhs = ops.constant([10.0, 7.0, 5.0], DType.float32, device=device)
-    rhs = ops.constant([3.0, 2.0, 4.0], DType.float32, device=device)
-    result = ops.mod(lhs, rhs)
-    # result: [1.0, 1.0, 1.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("mod_example") as graph:
+        lhs = ops.constant([10.0, 7.0, 5.0], DType.float32, device=device)
+        rhs = ops.constant([3.0, 2.0, 4.0], DType.float32, device=device)
+        graph.output(ops.mod(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [1.0, 1.0, 1.0])
 
 Args:
     lhs: The dividend.
     rhs: The divisor.
 
 Returns:
-    A tensor value containing ``lhs % rhs`` element-wise.
+    A ``TensorValue`` representing ``lhs % rhs`` element-wise.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -218,17 +355,31 @@ Multiplies two tensors element-wise.
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([4.0, 5.0, 6.0], DType.float32, device=device)
-    result = ops.mul(lhs, rhs)
-    # result: [4.0, 10.0, 18.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("mul_example") as graph:
+        lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([4.0, 5.0, 6.0], DType.float32, device=device)
+        graph.output(ops.mul(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [4.0, 10.0, 18.0])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value containing the element-wise products.
+    A ``TensorValue`` representing the element-wise products.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -242,17 +393,31 @@ Raises elements of one tensor to the power of another element-wise.
 
 .. code-block:: python
 
-    lhs = ops.constant([2.0, 3.0, 4.0], DType.float32, device=device)
-    rhs = ops.constant([3.0, 2.0, 0.5], DType.float32, device=device)
-    result = ops.pow(lhs, rhs)
-    # result: [8.0, 9.0, 2.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("pow_example") as graph:
+        lhs = ops.constant([2.0, 3.0, 4.0], DType.float32, device=device)
+        rhs = ops.constant([3.0, 2.0, 0.5], DType.float32, device=device)
+        graph.output(ops.pow(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [8.0, 9.0, 2.0], atol=1e-3)
 
 Args:
     lhs: The base tensor.
     rhs: The exponent tensor.
 
 Returns:
-    A tensor value with the broadcast shape containing ``lhs ** rhs`` element-wise.
+    A ``TensorValue`` with the broadcast shape representing ``lhs ** rhs`` element-wise.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -266,17 +431,31 @@ Subtracts two tensors element-wise.
 
 .. code-block:: python
 
-    lhs = ops.constant([5.0, 7.0, 9.0], DType.float32, device=device)
-    rhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
-    result = ops.sub(lhs, rhs)
-    # result: [4.0, 5.0, 6.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("sub_example") as graph:
+        lhs = ops.constant([5.0, 7.0, 9.0], DType.float32, device=device)
+        rhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
+        graph.output(ops.sub(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [4.0, 5.0, 6.0])
 
 Args:
     lhs: The minuend (left-hand side).
     rhs: The subtrahend (right-hand side).
 
 Returns:
-    A tensor value containing the result of ``lhs - rhs`` element-wise.
+    A ``TensorValue`` representing the result of ``lhs - rhs`` element-wise.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -290,18 +469,32 @@ equal.__doc__ = """Tests element-wise equality between two tensors.
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
-    result = ops.equal(lhs, rhs)
-    # result: [True, False, True]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("equal_example") as graph:
+        lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
+        graph.output(ops.equal(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [True, False, True])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value with ``bool`` dtype that is ``True`` when
-    ``lhs == rhs``.
+    A ``TensorValue`` with ``bool`` dtype representing the element-wise result
+    of ``lhs == rhs``.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -314,18 +507,32 @@ greater.__doc__ = """Tests element-wise whether one tensor is greater than anoth
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([1.0, 2.0, 4.0], DType.float32, device=device)
-    result = ops.greater(lhs, rhs)
-    # result: [False, True, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("greater_example") as graph:
+        lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([1.0, 2.0, 4.0], DType.float32, device=device)
+        graph.output(ops.greater(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [False, True, False])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value with ``bool`` dtype that is ``True`` when
-    ``lhs > rhs``.
+    A ``TensorValue`` with ``bool`` dtype representing the element-wise result
+    of ``lhs > rhs``.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -338,18 +545,32 @@ greater_equal.__doc__ = """Tests element-wise whether one tensor is greater than
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([1.0, 2.0, 4.0], DType.float32, device=device)
-    result = ops.greater_equal(lhs, rhs)
-    # result: [True, True, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("greater_equal_example") as graph:
+        lhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([1.0, 2.0, 4.0], DType.float32, device=device)
+        graph.output(ops.greater_equal(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [True, True, False])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value with ``bool`` dtype that is ``True`` when
-    ``lhs >= rhs``.
+    A ``TensorValue`` with ``bool`` dtype representing the element-wise result
+    of ``lhs >= rhs``.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -362,17 +583,32 @@ not_equal.__doc__ = """Tests element-wise inequality between two tensors.
 
 .. code-block:: python
 
-    lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
-    rhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
-    result = ops.not_equal(lhs, rhs)
-    # result: [False, True, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("not_equal_example") as graph:
+        lhs = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
+        rhs = ops.constant([1.0, 5.0, 3.0], DType.float32, device=device)
+        graph.output(ops.not_equal(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [False, True, False])
 
 Args:
     lhs: The left-hand side input.
     rhs: The right-hand side input.
 
 Returns:
-    A tensor value with ``bool`` dtype that is ``True`` when ``lhs != rhs``.
+    A ``TensorValue`` with ``bool`` dtype representing the element-wise result
+    of ``lhs != rhs``.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -385,18 +621,32 @@ logical_and.__doc__ = """Computes the element-wise logical AND of two boolean te
 
 .. code-block:: python
 
-    lhs = ops.constant([True, True, False], DType.bool, device=device)
-    rhs = ops.constant([True, False, True], DType.bool, device=device)
-    result = ops.logical_and(lhs, rhs)
-    # result: [True, False, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("logical_and_example") as graph:
+        lhs = ops.constant([True, True, False], DType.bool, device=device)
+        rhs = ops.constant([True, False, True], DType.bool, device=device)
+        graph.output(ops.logical_and(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [True, False, False])
 
 Args:
     lhs: The left-hand side boolean tensor.
     rhs: The right-hand side boolean tensor.
 
 Returns:
-    A tensor value with ``bool`` dtype that is ``True`` when both
-    inputs are ``True``.
+    A ``TensorValue`` with ``bool`` dtype representing the element-wise logical
+    AND of ``lhs`` and ``rhs``.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -409,18 +659,32 @@ logical_or.__doc__ = """Computes the element-wise logical OR of two boolean tens
 
 .. code-block:: python
 
-    lhs = ops.constant([True, False, False], DType.bool, device=device)
-    rhs = ops.constant([False, True, False], DType.bool, device=device)
-    result = ops.logical_or(lhs, rhs)
-    # result: [True, True, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("logical_or_example") as graph:
+        lhs = ops.constant([True, False, False], DType.bool, device=device)
+        rhs = ops.constant([False, True, False], DType.bool, device=device)
+        graph.output(ops.logical_or(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [True, True, False])
 
 Args:
     lhs: The left-hand side boolean tensor.
     rhs: The right-hand side boolean tensor.
 
 Returns:
-    A tensor value with ``bool`` dtype that is ``True`` when at least
-    one input is ``True``.
+    A ``TensorValue`` with ``bool`` dtype representing the element-wise logical
+    OR of ``lhs`` and ``rhs``.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -433,18 +697,32 @@ logical_xor.__doc__ = """Computes the element-wise logical XOR of two boolean te
 
 .. code-block:: python
 
-    lhs = ops.constant([True, False, True], DType.bool, device=device)
-    rhs = ops.constant([True, True, False], DType.bool, device=device)
-    result = ops.logical_xor(lhs, rhs)
-    # result: [False, True, True]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("logical_xor_example") as graph:
+        lhs = ops.constant([True, False, True], DType.bool, device=device)
+        rhs = ops.constant([True, True, False], DType.bool, device=device)
+        graph.output(ops.logical_xor(lhs, rhs))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [False, True, True])
 
 Args:
     lhs: The left-hand side boolean tensor.
     rhs: The right-hand side boolean tensor.
 
 Returns:
-    A tensor value with ``bool`` dtype that is``True`` when exactly
-    one input is ``True``.
+    A ``TensorValue`` with ``bool`` dtype representing the element-wise logical
+    XOR of ``lhs`` and ``rhs``.
 
 Raises:
     Error: If the input shapes are not compatible for broadcasting.
@@ -489,21 +767,52 @@ def _elementwise_unary_predicate(
     return elementwise_op
 
 
+def _activation(x: TensorValueLike, op_type: type[Operation]) -> TensorValue:
+    """Builds a single fused activation op of the given type.
+
+    Each elementwise activation function (``relu``, ``gelu`` and its
+    approximations, ``sigmoid``, ``silu``) has its own dedicated op, backed by a
+    hardware-optimized fused Mojo kernel, rather than a Python-level composition
+    of ``exp``/``erf``/etc.
+    """
+    x = dtype_promotion._restrict_to_strong_dtypes(x)
+    return Graph.current._add_op_generated(
+        op_type,
+        result=x.type,
+        input=x,
+        output_param_decls=kgen.ParamDeclArrayAttr([]),
+    )[0].tensor
+
+
 abs = _elementwise_unary(rmo.MoAbsOp, "abs")
 abs.__doc__ = """Computes the absolute value of a tensor element-wise.
 
 .. code-block:: python
 
-    x = ops.constant([-1.0, 2.0, -3.0], DType.float32, device=device)
-    result = ops.abs(x)
-    # result: [1.0, 2.0, 3.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("abs_example") as graph:
+        x = ops.constant([-1.0, 2.0, -3.0], DType.float32, device=device)
+        graph.output(ops.abs(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [1.0, 2.0, 3.0])
 
 Args:
     x: The input tensor.
 
 Returns:
-    A tensor value of the same shape and dtype with each element replaced by
-    its absolute value.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+    absolute value of each element of ``x``.
 
 Raises:
     Error: If the input doesn't represent a tensor.
@@ -512,25 +821,38 @@ Raises:
 exp = _elementwise_unary(rmo.MoExpOp, "exp")
 exp.__doc__ = """Computes the exponential of a tensor element-wise.
 
-Use the ``exp`` function to build neural networks with attention mechanisms,
-activation functions, and probability distributions. ``exp(x) = e^x``, where
-``e`` is Euler's number.
+This applies ``exp(x) = e^x``, where ``e`` is Euler's number.
 
 .. code-block:: python
 
-    x = ops.constant([0.0, 1.0, 2.0], DType.float32, device=device)
-    result = ops.exp(x)
-    # result: [1.0, 2.718..., 7.389...]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("exp_example") as graph:
+        x = ops.constant([0.0, 1.0, 2.0], DType.float32, device=device)
+        graph.output(ops.exp(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [1.0, 2.718, 7.389], atol=1e-3)
 
 Args:
-    x: The input to the exponential function.
+    x: The input to the exponential function. Must have a floating-point
+        dtype.
 
 Returns:
-    A tensor value of the same shape and dtype where each element is ``e``
-    raised to the power of the corresponding input element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing ``e``
+    raised to the power of each element of ``x``.
 
 Raises:
-    Error: If the input does not represent a tensor.
+    Error: If the input does not represent a tensor or has a non-floating-point dtype.
 """
 
 erf = _elementwise_unary(rmo.MoErfOp, "erf")
@@ -541,73 +863,34 @@ normal distribution falls within a given range.
 
 .. code-block:: python
 
-    x = ops.constant([-1.0, 0.0, 1.0], DType.float32, device=device)
-    result = ops.erf(x)
-    # result: [-0.842..., 0.0, 0.842...]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("erf_example") as graph:
+        x = ops.constant([-1.0, 0.0, 1.0], DType.float32, device=device)
+        graph.output(ops.erf(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [-0.842, 0.0, 0.842], atol=1e-3)
 
 Args:
-    x: The input to the error function.
+    x: The input to the error function. Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with the error function
-    applied to each element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the error
+    function applied to each element of ``x``.
 
 Raises:
-    Error: If the input is not a tensor.
+    Error: If the input is not a tensor or has a non-floating-point dtype.
 """
-
-
-def _gelu_exact(x: TensorValue):  # noqa: ANN202
-    r"""Computes the exact GELU function element-wise.
-
-    ``gelu`` is defined as ``$$gelu(x) = x \\Phi(x)$$`` where ``$$\\Phi$$``
-    is the cumulative distribution function of the Gaussian distribution.
-
-    Args:
-        x: The input to the GELU function.
-
-    Returns:
-        A tensor value of the same shape and dtype with GELU applied element-wise.
-    """
-    sqrt2 = 1.4142135623730951
-    x_cast = x.cast(_accum_type(x))
-    return (0.5 * x_cast * (1 + erf(x_cast / sqrt2))).cast(x.dtype)
-
-
-def _gelu_quick(x: TensorValue):  # noqa: ANN202
-    """Computes the quick-GELU approximation element-wise.
-
-    ``quick gelu`` is defined as ``gelu_quick(x) = sigmoid(1.702 * x) * x``.
-    Learn more in
-    [Gaussian Error Linear Units (GELUs)](https://arxiv.org/abs/1606.08415).
-
-    Args:
-        x: The input to the quick-GELU computation.
-
-    Returns:
-        A tensor value of the same shape and dtype with the quick-GELU
-        approximation applied element-wise.
-    """
-    x_cast = x.cast(_accum_type(x))
-    return (x_cast * sigmoid(x_cast * 1.702)).cast(x.dtype)
-
-
-def _gelu_tanh(x: TensorValue):  # noqa: ANN202
-    """Computes the tanh-GELU approximation element-wise.
-
-    Args:
-        x: The input to the tanh-GELU computation.
-
-    Returns:
-        A tensor value of the same shape and dtype with the tanh-GELU
-        approximation applied element-wise.
-    """
-    x_cast = x.cast(_accum_type(x))
-    return (
-        x_cast
-        * 0.5
-        * (1.0 + tanh(0.7978845608028654 * (x_cast + 0.044715 * x_cast**3)))
-    ).cast(x.dtype)
 
 
 def gelu(x: TensorValue, approximate: str = "none"):  # noqa: ANN201
@@ -617,35 +900,36 @@ def gelu(x: TensorValue, approximate: str = "none"):  # noqa: ANN201
 
     For ``approximate == "tanh"``, MAX uses the approximation:
 
-    .. math::
+    .. code:: text
 
         gelu(x) = 0.5 * x * (1.0 + tanh(0.7978845608028654 * (x + 0.044715 * x**3)))
 
     For ``approximate == "quick"``, MAX uses the approximation:
 
-    .. math::
+    .. code:: text
 
         gelu(x) = sigmoid(1.702 * x) * x
 
     Args:
-        x: The input to the GELU computation.
+        x: The input to the GELU computation. Must have a floating-point
+            dtype.
         approximate: One of ``"none"``, ``"tanh"``, or ``"quick"``. Defaults
             to ``"none"``.
 
     Returns:
-        A tensor value of the same shape and dtype with the GELU activation
-        applied element-wise.
+        A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+        GELU activation applied to each element of ``x``.
 
     Raises:
-        Error: If the input doesn't represent a tensor.
+        Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
         ValueError: If the approximation method is invalid.
     """
     if approximate == "none":
-        return _gelu_exact(x)
+        return _activation(x, rmo.MoGeluOp)
     if approximate == "tanh":
-        return _gelu_tanh(x)
+        return _activation(x, rmo.MoGeluTanhOp)
     if approximate == "quick":
-        return _gelu_quick(x)
+        return _activation(x, rmo.MoGeluQuickOp)
 
     raise ValueError(f"Invalid approximation method: {approximate}")
 
@@ -654,53 +938,82 @@ log = _elementwise_unary(rmo.MoLogOp, "log")
 log.__doc__ = """
 Computes the natural logarithm of a tensor element-wise.
 
-The natural logarithm is used in loss functions, normalization, and probability
-calculations in machine learning. It is the inverse of the exponential
-function: ``log(x)`` returns the value ``y`` such that ``x = e^y``, where ``e``
-is Euler's number.
+This applies ``log(x)``. It is the inverse of the exponential
+function ``x = e^y``, where ``e`` is Euler's number.
+Note that ``log(x)`` is undefined for ``x <= 0`` and complex numbers
+are not currently supported.
 
 .. code-block:: python
 
-    x = ops.constant([1.0, 2.718, 7.389, 20.0], DType.float32, device=device)
-    result = ops.log(x)
-    # result: [0.0, 1.0, 2.0, 2.996...]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
 
-Note that ``log(x)`` is undefined for ``x <= 0`` on real
-numbers and complex numbers are not currently supported.
+    device = DeviceRef.CPU()
+    with Graph("log_example") as graph:
+        x = ops.constant(
+            [1.0, 2.718, 7.389, 20.0], DType.float32, device=device
+        )
+        graph.output(ops.log(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [0.0, 1.0, 2.0, 2.996], atol=1e-3)
+
 
 Args:
-    x: The input to the log computation. Must contain positive
-    values.
+    x: The input to the log computation. Must contain positive values only.
+        Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape with the natural logarithm applied
-    element-wise.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+    natural logarithm of each element of ``x``.
 
 Raises:
-    Error: If the input doesn't represent a tensor.
+    Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
 """
 
 log1p = _elementwise_unary(rmo.MoLog1pOp, "log1p")
 log1p.__doc__ = """Computes ``log(1 + x)`` element-wise.
 
-.. code-block:: python
-
-    x = ops.constant([0.0, 1.0, 9.0], DType.float32, device=device)
-    result = ops.log1p(x)
-    # result: [0.0, 0.693..., 2.302...]
-
-Note that ``log(1 + x)`` is undefined for ``x <= -1`` on real numbers and complex
+Note that ``log(1 + x)`` is undefined for ``x <= -1`` and complex
 numbers are not currently supported.
 
+.. code-block:: python
+
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("log1p_example") as graph:
+        x = ops.constant([0.0, 1.0, 9.0], DType.float32, device=device)
+        graph.output(ops.log1p(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [0.0, 0.693, 2.302], atol=1e-3)
+
+
 Args:
-    x: The input to the log computation.
+    x: The input to the log computation. Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with ``log(1 + x)`` applied to
-    each element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing
+    ``log(1 + x)`` for each element of ``x``.
 
 Raises:
-    Error: If the input doesn't represent a tensor.
+    Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
 """
 
 
@@ -714,7 +1027,7 @@ def _softmax_like(op_type: type[Operation], name: str):  # noqa: ANN202
             op_type,
             result=value.type,
             input=value,
-            axis=constant(axis, DType.int64, DeviceRef.CPU()),
+            axis=builtin.IntegerAttr(builtin.IndexType(), axis),
             output_param_decls=kgen.ParamDeclArrayAttr([]),
         )[0].tensor
 
@@ -727,43 +1040,78 @@ logsoftmax.__doc__ = """Computes the log-softmax of a tensor along an axis.
 
 .. code-block:: python
 
-    x = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
-    result = ops.logsoftmax(x)
-    # result: [-2.407..., -1.407..., -0.407...]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("logsoftmax_example") as graph:
+        x = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
+        graph.output(ops.logsoftmax(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(
+        result.to_numpy(), [-2.407, -1.407, -0.407], atol=1e-3
+    )
 
 Args:
-    value: The input to the log-softmax computation.
+    value: The input to the log-softmax computation. Must have a
+        floating-point dtype.
     axis: The axis along which to compute the log-softmax. Defaults to the
         final axis (``-1``).
 
 Returns:
-    A tensor value of the same shape and dtype with the log-softmax applied along
-    ``axis``.
+    A ``TensorValue`` of the same shape and dtype as ``value`` representing the
+    log-softmax of ``value`` computed along ``axis``.
 
 Raises:
-    Error: If the input is not a tensor.
+    Error: If the input is not a tensor or has a non-floating-point dtype.
 """
 
 relu = _elementwise_unary(rmo.MoReluOp, "relu")
 relu.__doc__ = """Applies the ReLU (Rectified Linear Unit) activation element-wise.
 
-ReLU is defined as ``relu(x) = max(0, x)``: negative values are set to zero
-while positive values are unchanged. It's one of the most common activation
-functions in neural networks because of its computational efficiency and
-its mitigation of the vanishing gradient problem.
+ReLU is defined as ``relu(x) = max(0, x)``, meaning negative values are set to zero
+while positive values are unchanged.
 
 .. code-block:: python
 
-    x = ops.constant([[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]], DType.float32, device=device)
-    result = ops.relu(x)
-    # result: [[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("relu_example") as graph:
+        x = ops.constant(
+            [[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]],
+            DType.float32,
+            device=device,
+        )
+        graph.output(ops.relu(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(
+        result.to_numpy(), [[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]]
+    )
 
 Args:
     x: The input to the ReLU computation.
 
 Returns:
-    A tensor value of the same shape and dtype with negative values replaced
-    by ``0``.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing ``x`` with
+    its negative elements replaced by ``0``.
 
 Raises:
     Error: If the input doesn't represent a tensor.
@@ -774,28 +1122,48 @@ def sigmoid(x: TensorValue) -> TensorValue:
     """Applies the sigmoid activation function element-wise.
 
     Computes ``sigmoid(x) = 1 / (1 + exp(-x))``, mapping all values to the
-    range ``(0, 1)``. The sigmoid function is commonly used for binary
-    classification tasks and as an activation function in neural networks,
-    particularly in output layers for probability prediction.
+    range ``(0, 1)``.
 
     .. code-block:: python
 
-        x = ops.constant([[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]], DType.float32, device=device)
-        result = ops.sigmoid(x)
-        # result: [[0.119, 0.269, 0.5], [0.731, 0.881, 0.953]]
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("sigmoid_example") as graph:
+            x = ops.constant(
+                [[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]],
+                DType.float32,
+                device=device,
+            )
+            graph.output(ops.sigmoid(x))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.allclose(
+            result.to_numpy(),
+            [[0.119, 0.269, 0.5], [0.731, 0.881, 0.953]],
+            atol=1e-3,
+        )
 
     Args:
-        x: The input to the sigmoid computation.
+        x: The input to the sigmoid computation. Must have a floating-point
+            dtype.
 
     Returns:
-        A tensor value of the same shape and dtype with values in the range
-        ``(0, 1)``.
+        A ``TensorValue`` of the same shape and dtype as ``x`` representing each
+        element of ``x`` mapped to the range ``(0, 1)``.
 
     Raises:
-        Error: If the input doesn't represent a tensor.
+        Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
     """
-    x_cast = x.cast(_accum_type(x))
-    return (1 / (1 + exp(-x_cast))).cast(x.dtype)
+    return _activation(x, rmo.MoSigmoidOp)
 
 
 def silu(x: TensorValue):  # noqa: ANN201
@@ -805,22 +1173,40 @@ def silu(x: TensorValue):  # noqa: ANN201
 
     .. code-block:: python
 
-        x = ops.constant([-2.0, 0.0, 1.0, 3.0], DType.float32, device=device)
-        result = ops.silu(x)
-        # result: [-0.238..., 0.0, 0.731..., 2.857...]
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("silu_example") as graph:
+            x = ops.constant(
+                [-2.0, 0.0, 1.0, 3.0], DType.float32, device=device
+            )
+            graph.output(ops.silu(x))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.allclose(
+            result.to_numpy(), [-0.238, 0.0, 0.731, 2.857], atol=1e-3
+        )
 
     Args:
-        x: The input to the SiLU computation.
+        x: The input to the SiLU computation. Must have a floating-point
+            dtype.
 
     Returns:
-        A tensor value of the same shape and dtype with the SiLU activation
-        applied element-wise.
+        A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+        SiLU activation applied to each element of ``x``.
 
     Raises:
-        Error: If the input doesn't represent a tensor.
+        Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
     """
-    x_cast = x.cast(_accum_type(x))
-    return mul(x_cast, sigmoid(x_cast)).cast(x.dtype)
+    return _activation(x, rmo.MoSiluOp)
 
 
 softmax = _softmax_like(rmo.MoReduceSoftmaxOp, "softmax")
@@ -832,21 +1218,36 @@ exponentiated values along that axis.
 
 .. code-block:: python
 
-    x = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
-    result = ops.softmax(x)
-    # result: [0.090..., 0.244..., 0.665...]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("softmax_example") as graph:
+        x = ops.constant([1.0, 2.0, 3.0], DType.float32, device=device)
+        graph.output(ops.softmax(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [0.090, 0.244, 0.665], atol=1e-3)
 
 Args:
-    value: The input to the softmax computation.
+    value: The input to the softmax computation. Must have a floating-point
+        dtype.
     axis: The axis along which to compute the softmax. Defaults to the
         final axis (``-1``).
 
 Returns:
-    A tensor value of the same shape and dtype with the softmax applied along
-    ``axis``.
+    A ``TensorValue`` of the same shape and dtype as ``value`` representing the
+    softmax of ``value`` computed along ``axis``.
 
 Raises:
-    Error: If the input doesn't represent a tensor.
+    Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
 """
 
 cos = _elementwise_unary(rmo.MoCosOp, "cos")
@@ -854,16 +1255,65 @@ cos.__doc__ = """Computes the cosine of a tensor element-wise.
 
 .. code-block:: python
 
-    x = ops.constant([0.0, 1.5707, 3.1415], DType.float32, device=device)
-    result = ops.cos(x)
-    # result: [1.0, 0.0, -1.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("cos_example") as graph:
+        x = ops.constant([0.0, 1.5707, 3.1415], DType.float32, device=device)
+        graph.output(ops.cos(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [1.0, 0.0, -1.0], atol=1e-3)
 
 Args:
-    x: The input, interpreted as radians. Must have a floating-point
+    x: The input interpreted as radians. Must have a floating-point
         dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with the cosine of each element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the cosine
+    of each element of ``x``.
+
+Raises:
+    Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
+"""
+
+ceil = _elementwise_unary(rmo.MoCeilOp, "ceil")
+ceil.__doc__ = """Computes the ceiling of a tensor element-wise.
+
+.. code-block:: python
+
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("ceil_example") as graph:
+        x = ops.constant([1.5, -1.5, 2.7, -2.7], DType.float32, device=device)
+        graph.output(ops.ceil(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [2.0, -1.0, 3.0, -2.0])
+
+Args:
+    x: The input tensor. Must have a floating-point dtype.
+
+Returns:
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing each
+    element of ``x`` rounded up toward positive infinity.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -874,16 +1324,30 @@ floor.__doc__ = """Computes the floor of a tensor element-wise.
 
 .. code-block:: python
 
-    x = ops.constant([1.5, -1.5, 2.7, -2.7], DType.float32, device=device)
-    result = ops.floor(x)
-    # result: [1.0, -2.0, 2.0, -3.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("floor_example") as graph:
+        x = ops.constant([1.5, -1.5, 2.7, -2.7], DType.float32, device=device)
+        graph.output(ops.floor(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [1.0, -2.0, 2.0, -3.0])
 
 Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype rounded down toward negative
-    infinity.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing each
+    element of ``x`` rounded down toward negative infinity.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -892,17 +1356,36 @@ Raises:
 round = _elementwise_unary(rmo.MoRoundOp, "round")
 round.__doc__ = """Rounds a tensor to the nearest integer element-wise.
 
+Values exactly halfway between two integers round to the nearest even integer
+(for example, ``2.5`` rounds to ``2.0`` and ``3.5`` rounds to ``4.0``). All
+other values follow normal rounding to the nearest integer.
+
 .. code-block:: python
 
-    x = ops.constant([1.5, 2.5, 3.5, -1.5], DType.float32, device=device)
-    result = ops.round(x)
-    # result: [2.0, 2.0, 4.0, -2.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("round_example") as graph:
+        x = ops.constant([1.5, 2.5, 3.5, -1.5], DType.float32, device=device)
+        graph.output(ops.round(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [2.0, 2.0, 4.0, -2.0])
 
 Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype rounded to the nearest integer.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing each
+    element of ``x`` rounded to the nearest integer.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -913,16 +1396,30 @@ rsqrt.__doc__ = """Computes the reciprocal square root of a tensor element-wise.
 
 .. code-block:: python
 
-    x = ops.constant([1.0, 4.0, 9.0, 16.0], DType.float32, device=device)
-    result = ops.rsqrt(x)
-    # result: [1.0, 0.5, 0.333..., 0.25]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("rsqrt_example") as graph:
+        x = ops.constant([1.0, 4.0, 9.0, 16.0], DType.float32, device=device)
+        graph.output(ops.rsqrt(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [1.0, 0.5, 0.333, 0.25], atol=1e-3)
 
 Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with the reciprocal square root
-    of each element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+    reciprocal square root of each element of ``x``.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -931,25 +1428,33 @@ Raises:
 sqrt = _elementwise_unary(rmo.MoSqrtOp, "sqrt")
 sqrt.__doc__ = """Computes the square root of a tensor element-wise.
 
-Square root is commonly used in normalization operations, distance
-calculations, and statistical operations like standard deviation.
-
 .. code-block:: python
 
-    x = ops.constant([1.0, 4.0, 9.0, 16.0], DType.float32, device=device)
-    result = ops.sqrt(x)
-    # result: [1.0, 2.0, 3.0, 4.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
 
-``sqrt`` requires non-negative inputs for real-valued results. For tensors that
-may contain negative values, take the absolute value first.
+    device = DeviceRef.CPU()
+    with Graph("sqrt_example") as graph:
+        x = ops.constant([1.0, 4.0, 9.0, 16.0], DType.float32, device=device)
+        graph.output(ops.sqrt(x))
 
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [1.0, 2.0, 3.0, 4.0], atol=1e-3)
 
 Args:
-    x: The input tensor. Must have a floating-point dtype.
+    x: The input tensor. Must have a floating-point dtype. Negative values
+    produce ``NaN`` since MAX doesn't support complex numbers.
 
 Returns:
-    A tensor value of the same shape and dtype with the square root of each
-    element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the square
+    root of each element of ``x``.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -960,16 +1465,31 @@ sin.__doc__ = """Computes the sine of a tensor element-wise.
 
 .. code-block:: python
 
-    x = ops.constant([0.0, 1.5707, 3.1415], DType.float32, device=device)
-    result = ops.sin(x)
-    # result: [0.0, 1.0, 0.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("sin_example") as graph:
+        x = ops.constant([0.0, 1.5707, 3.1415], DType.float32, device=device)
+        graph.output(ops.sin(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [0.0, 1.0, 0.0], atol=1e-3)
 
 Args:
     x: The input interpreted as radians. Must have a floating-point
         dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with the sine of each element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the sine
+    of each element of ``x``.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -978,25 +1498,43 @@ Raises:
 tanh = _elementwise_unary(rmo.MoTanhOp, "tanh")
 tanh.__doc__ = """Computes the hyperbolic tangent of a tensor element-wise.
 
-Defined as ``tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))``, mapping
-all values to the range ``(-1, 1)``. Commonly used as an activation
-function in recurrent neural networks (RNNs) and as a hidden-layer
-activation in feedforward networks. Unlike sigmoid (which maps to
-``(0, 1)``), tanh is zero-centered, which can help with gradient flow
-during training.
+This applies ``tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))``, which maps
+all values to the range ``(-1, 1)``.
 
 .. code-block:: python
 
-    x = ops.constant([[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]], DType.float32, device=device)
-    result = ops.tanh(x)
-    # result: [[-0.964, -0.762, 0.0], [0.762, 0.964, 0.995]]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("tanh_example") as graph:
+        x = ops.constant(
+            [[-2.0, -1.0, 0.0], [1.0, 2.0, 3.0]],
+            DType.float32,
+            device=device,
+        )
+        graph.output(ops.tanh(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(
+        result.to_numpy(),
+        [[-0.964, -0.762, 0.0], [0.762, 0.964, 0.995]],
+        atol=1e-3,
+    )
 
 Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with values in the range
-    ``(-1, 1)``.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing each
+    element of ``x`` mapped to the range ``(-1, 1)``.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -1007,17 +1545,31 @@ atanh.__doc__ = """Computes the inverse hyperbolic tangent of a tensor element-w
 
 .. code-block:: python
 
-    x = ops.constant([-0.5, 0.0, 0.5], DType.float32, device=device)
-    result = ops.atanh(x)
-    # result: [-0.549..., 0.0, 0.549...]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("atanh_example") as graph:
+        x = ops.constant([-0.5, 0.0, 0.5], DType.float32, device=device)
+        graph.output(ops.atanh(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.allclose(result.to_numpy(), [-0.549, 0.0, 0.549], atol=1e-3)
 
 Args:
     x: The input tensor, with values in the range ``(-1, 1)``. Must have a
         floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with the inverse hyperbolic
-    tangent of each element.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+    inverse hyperbolic tangent of each element of ``x``.
 
 Raises:
     Error: If the input doesn't represent a tensor or has a non-floating-point dtype.
@@ -1028,15 +1580,30 @@ trunc.__doc__ = """Truncates a tensor toward zero element-wise.
 
 .. code-block:: python
 
-    x = ops.constant([1.5, -1.5, 2.7, -2.7], DType.float32, device=device)
-    result = ops.trunc(x)
-    # result: [1.0, -1.0, 2.0, -2.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("trunc_example") as graph:
+        x = ops.constant([1.5, -1.5, 2.7, -2.7], DType.float32, device=device)
+        graph.output(ops.trunc(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [1.0, -1.0, 2.0, -2.0])
 
 Args:
     x: The input tensor. Must have a floating-point dtype.
 
 Returns:
-    A tensor value of the same shape and dtype with the fractional part discarded.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing each
+    element of ``x`` truncated toward zero.
 
 Raises:
     Error: If the input doesn't represent tensor or has a non-floating-point dtype.
@@ -1047,15 +1614,32 @@ is_nan.__doc__ = """Tests element-wise whether a tensor contains NaN values.
 
 .. code-block:: python
 
-    x = ops.constant([1.0, float("nan"), 3.0], DType.float32, device=device)
-    result = ops.is_nan(x)
-    # result: [False, True, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("is_nan_example") as graph:
+        x = ops.constant(
+            [1.0, float("nan"), 3.0], DType.float32, device=device
+        )
+        graph.output(ops.is_nan(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [False, True, False])
 
 Args:
     x: The input tensor.
 
 Returns:
-    A tensor value with ``bool`` dtype and the same shape, that is ``True`` when the input is
+    A ``TensorValue`` with ``bool`` dtype and the same shape as ``x``,
+    representing an element-wise NaN test. An element is ``True`` where ``x`` is
     NaN.
 
 Raises:
@@ -1068,16 +1652,33 @@ is_inf.__doc__ = """Tests element-wise whether a tensor contains infinite values
 
 .. code-block:: python
 
-    x = ops.constant([1.0, float("inf"), 3.0], DType.float32, device=device)
-    result = ops.is_inf(x)
-    # result: [False, True, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("is_inf_example") as graph:
+        x = ops.constant(
+            [1.0, float("inf"), 3.0], DType.float32, device=device
+        )
+        graph.output(ops.is_inf(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [False, True, False])
 
 Args:
     x: The input tensor.
 
 Returns:
-    A tensor value with ``bool`` dtype and the same shape, that is ``True`` when the input is
-    positive or negative infinity.
+    A ``TensorValue`` with ``bool`` dtype and the same shape as ``x``,
+    representing an element-wise infinity test. An element is ``True`` where
+    ``x`` is positive or negative infinity.
 
 Raises:
     Error: If the input doesn't represent a tensor.
@@ -1088,15 +1689,30 @@ logical_not.__doc__ = """Computes the element-wise logical NOT of a boolean tens
 
 .. code-block:: python
 
-    x = ops.constant([True, False, True], DType.bool, device=device)
-    result = ops.logical_not(x)
-    # result: [False, True, False]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("logical_not_example") as graph:
+        x = ops.constant([True, False, True], DType.bool, device=device)
+        graph.output(ops.logical_not(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [False, True, False])
 
 Args:
     x: The input boolean tensor.
 
 Returns:
-    A tensor value with ``bool`` dtype and the same shape, with each element negated.
+    A ``TensorValue`` with ``bool`` dtype and the same shape as ``x``,
+    representing the element-wise logical NOT of ``x``.
 
 Raises:
     Error: If the symbol doesn't represent a tensor.
@@ -1107,15 +1723,30 @@ negate.__doc__ = """Negates a tensor element-wise.
 
 .. code-block:: python
 
-    x = ops.constant([1.0, -2.0, 3.0], DType.float32, device=device)
-    result = ops.negate(x)
-    # result: [-1.0, 2.0, -3.0]
+    from max.dtype import DType
+    from max.engine import InferenceSession
+    from max.graph import DeviceRef, Graph, ops
+
+    device = DeviceRef.CPU()
+    with Graph("negate_example") as graph:
+        x = ops.constant([1.0, -2.0, 3.0], DType.float32, device=device)
+        graph.output(ops.negate(x))
+
+    model = InferenceSession().load(graph)
+    result = model.execute()[0]
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    assert np.array_equal(result.to_numpy(), [-1.0, 2.0, -3.0])
 
 Args:
     x: The input tensor.
 
 Returns:
-    A tensor value of the same shape and dtype with each element negated.
+    A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+    negation of each element of ``x``.
 
 Raises:
     Error: If the input doesn't represent a tensor.
@@ -1125,22 +1756,39 @@ Raises:
 def acos(x: TensorValue) -> TensorValue:
     """Computes the arccosine of a tensor element-wise.
 
-    Returns values in the range ``[0, π]`` (radians) for inputs in ``[-1, 1]``.
-
     .. code-block:: python
 
-        x = ops.constant([-1.0, 0.0, 0.5, 1.0], DType.float32, device=device)
-        result = ops.acos(x)
-        # result: [3.141..., 1.570..., 1.047..., 0.0]
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("acos_example") as graph:
+            x = ops.constant(
+                [-1.0, 0.0, 0.5, 1.0], DType.float32, device=device
+            )
+            graph.output(ops.acos(x))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.allclose(
+            result.to_numpy(), [3.141, 1.570, 1.047, 0.0], atol=1e-3
+        )
 
     Args:
-        x: The input tensor with values in ``[-1, 1]``. Values outside this
-            domain are clamped to the valid range. Must have a
-            floating-point dtype.
+        x: The input tensor with values in ``[-1, 1]``. For the ``float16``,
+            ``bfloat16``, and ``float32`` dtypes, values outside this domain
+            are clamped to the valid range. For ``float64``, they yield
+            ``NaN``. Must have a floating-point dtype.
 
     Returns:
-        A tensor value of the same shape and dtype with the arccosine of each
-        element in radians.
+        A ``TensorValue`` of the same shape and dtype as ``x`` representing the
+        arccosine of each element of ``x``. Values range from ``[0, π]`` (radians).
 
     Raises:
         Error: If the input doesn't represent a tensor or has a non-floating-point dtype.

@@ -12,16 +12,16 @@
 # ===----------------------------------------------------------------------=== #
 """Tests for native MXFP4 grouped matmul on AMD CDNA4.
 
-Validates mxfp4_grouped_matmul_amd against a per-element GPU reference
-that runs one ungrouped mxfp4_block_scaled_matmul_amd per expert and
+Validates block_scaled_grouped_matmul_amd against a per-element GPU reference
+that runs one ungrouped block_scaled_matmul_amd per expert and
 compares the concatenated output.
 
 Usage:
   br test_mxfp4_grouped_matmul_amd.mojo.test
 """
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.memory import bitcast
 from std.random import random_ui64
@@ -31,8 +31,8 @@ from internal_utils import assert_almost_equal
 from layout import Coord, Idx, TileTensor, row_major
 from linalg.fp4_utils import MXFP4_SF_VECTOR_SIZE
 from linalg.matmul.gpu.amd import (
-    mxfp4_block_scaled_matmul_amd,
-    mxfp4_grouped_matmul_amd,
+    block_scaled_matmul_amd,
+    block_scaled_grouped_matmul_amd,
 )
 
 
@@ -49,9 +49,9 @@ def test_mxfp4_grouped_matmul[
     expert_ids_list: List[Int],
     ctx: DeviceContext,
 ) raises:
-    """Test mxfp4_grouped_matmul_amd against per-expert ungrouped matmul.
+    """Test block_scaled_grouped_matmul_amd against per-expert ungrouped matmul.
 
-    Runs mxfp4_block_scaled_matmul_amd independently for each expert
+    Runs block_scaled_matmul_amd independently for each expert
     slice, then compares with the grouped kernel's output.
 
     Parameters:
@@ -87,22 +87,20 @@ def test_mxfp4_grouped_matmul[
     )
 
     # --- Host allocations ---
-    var a_host = ctx.enqueue_create_host_buffer[DType.uint8](
-        total_tokens * packed_K
-    )
-    var b_host = ctx.enqueue_create_host_buffer[DType.uint8](
+    var a_host = ctx.enqueue_create_host_buffer[.uint8](total_tokens * packed_K)
+    var b_host = ctx.enqueue_create_host_buffer[.uint8](
         num_experts * N * packed_K
     )
-    var a_scales_host = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
+    var a_scales_host = ctx.enqueue_create_host_buffer[.float8_e8m0fnu](
         total_tokens * scale_K
     )
-    var b_scales_host = ctx.enqueue_create_host_buffer[DType.float8_e8m0fnu](
+    var b_scales_host = ctx.enqueue_create_host_buffer[.float8_e8m0fnu](
         num_experts * N * scale_K
     )
-    var a_offsets_host = ctx.enqueue_create_host_buffer[DType.uint32](
+    var a_offsets_host = ctx.enqueue_create_host_buffer[.uint32](
         num_active_experts + 1
     )
-    var expert_ids_host = ctx.enqueue_create_host_buffer[DType.int32](
+    var expert_ids_host = ctx.enqueue_create_host_buffer[.int32](
         num_active_experts
     )
 
@@ -114,11 +112,11 @@ def test_mxfp4_grouped_matmul[
 
     # Scales: exponent range [125..129] for reasonable magnitudes.
     for i in range(total_tokens * scale_K):
-        a_scales_host[i] = bitcast[DType.float8_e8m0fnu](
+        a_scales_host[i] = bitcast[.float8_e8m0fnu](
             UInt8(random_ui64(125, 129))
         )
     for i in range(num_experts * N * scale_K):
-        b_scales_host[i] = bitcast[DType.float8_e8m0fnu](
+        b_scales_host[i] = bitcast[.float8_e8m0fnu](
             UInt8(random_ui64(125, 129))
         )
 
@@ -131,23 +129,19 @@ def test_mxfp4_grouped_matmul[
         expert_ids_host[i] = Int32(expert_ids_list[i])
 
     # --- Device allocations ---
-    var a_dev = ctx.enqueue_create_buffer[DType.uint8](total_tokens * packed_K)
-    var b_dev = ctx.enqueue_create_buffer[DType.uint8](
-        num_experts * N * packed_K
-    )
-    var a_scales_dev = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](
+    var a_dev = ctx.enqueue_create_buffer[.uint8](total_tokens * packed_K)
+    var b_dev = ctx.enqueue_create_buffer[.uint8](num_experts * N * packed_K)
+    var a_scales_dev = ctx.enqueue_create_buffer[.float8_e8m0fnu](
         total_tokens * scale_K
     )
-    var b_scales_dev = ctx.enqueue_create_buffer[DType.float8_e8m0fnu](
+    var b_scales_dev = ctx.enqueue_create_buffer[.float8_e8m0fnu](
         num_experts * N * scale_K
     )
-    var a_offsets_dev = ctx.enqueue_create_buffer[DType.uint32](
+    var a_offsets_dev = ctx.enqueue_create_buffer[.uint32](
         num_active_experts + 1
     )
-    var expert_ids_dev = ctx.enqueue_create_buffer[DType.int32](
-        num_active_experts
-    )
-    var c_dev = ctx.enqueue_create_buffer[DType.float32](total_tokens * N)
+    var expert_ids_dev = ctx.enqueue_create_buffer[.int32](num_active_experts)
+    var c_dev = ctx.enqueue_create_buffer[.float32](total_tokens * N)
 
     ctx.enqueue_copy(a_dev, a_host)
     ctx.enqueue_copy(b_dev, b_host)
@@ -157,7 +151,7 @@ def test_mxfp4_grouped_matmul[
     ctx.enqueue_copy(expert_ids_dev, expert_ids_host)
 
     # --- Compute reference: per-expert ungrouped matmul ---
-    var c_ref_dev = ctx.enqueue_create_buffer[DType.float32](total_tokens * N)
+    var c_ref_dev = ctx.enqueue_create_buffer[.float32](total_tokens * N)
     for i in range(num_active_experts):
         var token_start = Int(a_offsets_host[i])
         var token_end = Int(a_offsets_host[i + 1])
@@ -171,24 +165,24 @@ def test_mxfp4_grouped_matmul[
             a_dev.unsafe_ptr() + token_start * packed_K,
             row_major(Coord(num_tokens, Idx[packed_K])),
         )
-        var b_expert_tt = TileTensor[mut=False](
+        var b_expert_tt = TileTensor(
             b_dev.unsafe_ptr() + expert_id * N * packed_K,
             row_major[N, packed_K](),
-        )
-        var sfa_expert_tt = TileTensor[mut=False](
+        ).as_immut()
+        var sfa_expert_tt = TileTensor(
             a_scales_dev.unsafe_ptr() + token_start * scale_K,
             row_major(Coord(num_tokens, Idx[scale_K])),
-        )
-        var sfb_expert_tt = TileTensor[mut=False](
+        ).as_immut()
+        var sfb_expert_tt = TileTensor(
             b_scales_dev.unsafe_ptr() + expert_id * N * scale_K,
             row_major[N, scale_K](),
-        )
-        var c_expert_tt = TileTensor[mut=True](
+        ).as_immut()
+        var c_expert_tt = TileTensor(
             c_ref_dev.unsafe_ptr() + token_start * N,
             row_major(Coord(num_tokens, Idx[N])),
         )
 
-        mxfp4_block_scaled_matmul_amd(
+        block_scaled_matmul_amd(
             c_expert_tt,
             a_expert_tt,
             b_expert_tt,
@@ -200,29 +194,27 @@ def test_mxfp4_grouped_matmul[
     ctx.synchronize()
 
     # --- Run grouped kernel under test ---
-    var a_tt = TileTensor[mut=False](
+    var a_tt = TileTensor(
         a_dev, row_major(Coord(total_tokens, Idx[packed_K]))
-    )
-    var b_tt = TileTensor[mut=False](
+    ).as_immut()
+    var b_tt = TileTensor(
         b_dev, row_major[num_experts, N, packed_K]()
-    )
-    var a_scales_tt = TileTensor[mut=False](
+    ).as_immut()
+    var a_scales_tt = TileTensor(
         a_scales_dev, row_major(Coord(total_tokens, Idx[scale_K]))
-    )
-    var b_scales_tt = TileTensor[mut=False](
+    ).as_immut()
+    var b_scales_tt = TileTensor(
         b_scales_dev, row_major[num_experts, N, scale_K]()
-    )
+    ).as_immut()
     var a_offsets_tt = TileTensor(
         a_offsets_dev, row_major(Coord(num_active_experts + 1))
     )
     var expert_ids_tt = TileTensor(
         expert_ids_dev, row_major(Coord(num_active_experts))
     )
-    var c_tt = TileTensor[mut=True](
-        c_dev, row_major(Coord(total_tokens, Idx[N]))
-    )
+    var c_tt = TileTensor(c_dev, row_major(Coord(total_tokens, Idx[N])))
 
-    mxfp4_grouped_matmul_amd(
+    block_scaled_grouped_matmul_amd(
         c_tt,
         a_tt,
         b_tt,
@@ -237,10 +229,8 @@ def test_mxfp4_grouped_matmul[
     ctx.synchronize()
 
     # --- Compare ---
-    var c_host = ctx.enqueue_create_host_buffer[DType.float32](total_tokens * N)
-    var c_ref_host = ctx.enqueue_create_host_buffer[DType.float32](
-        total_tokens * N
-    )
+    var c_host = ctx.enqueue_create_host_buffer[.float32](total_tokens * N)
+    var c_ref_host = ctx.enqueue_create_host_buffer[.float32](total_tokens * N)
     ctx.enqueue_copy(c_host, c_dev)
     ctx.enqueue_copy(c_ref_host, c_ref_dev)
     ctx.synchronize()

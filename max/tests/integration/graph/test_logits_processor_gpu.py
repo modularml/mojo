@@ -28,14 +28,14 @@ from max.graph import (
     TensorValue,
     ops,
 )
-from max.pipelines import TextContext
-from max.pipelines.lib.sampling.logits_processor import apply_logits_processors
-from max.pipelines.modeling.types import (
+from max.pipelines.context import (
     BatchProcessorInputs,
     ProcessorInputs,
     SamplingParams,
+    TextContext,
     TokenBuffer,
 )
+from max.pipelines.sampling.logits_processor import apply_logits_processors
 
 
 @pytest.fixture(scope="module")

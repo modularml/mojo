@@ -28,6 +28,7 @@ UNARY = [
     F.abs,
     F.argsort,
     F.atanh,
+    F.ceil,
     F.cos,
     F.cumsum,
     F.erf,

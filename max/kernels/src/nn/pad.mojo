@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements tensor padding with constant or edge values for CPU and GPU."""
 
 
 # ===-----------------------------------------------------------------------===#
@@ -21,7 +22,7 @@ from layout import Coord, Idx, TensorLayout, TileTensor, row_major
 
 # TODO Refactor -- we should decide on and put them into a more common file
 from linalg.transpose import _fill_strides
-from std.memory import memcpy
+from std.memory import unsafe_memcpy
 
 
 from std.utils import IndexList, StaticTuple
@@ -57,7 +58,7 @@ struct _NestedLoopIter[n_loops: Int](ImplicitlyCopyable, Iterable, Iterator):
 
     var cur: Self.Element
 
-    comptime LoopBoundSpec = InlineArray[IndexList[2], Self.n_loops]
+    comptime LoopBoundSpec = Array[IndexList[2], Self.n_loops]
     var loop_bounds: Self.LoopBoundSpec
     var early_stop: Bool
 
@@ -124,19 +125,20 @@ def pad_constant[
     paddings_type: DType,
     constant_type: DType,
 ](
-    output: TileTensor[
-        mut=True,
-        dtype,
-        address_space=AddressSpace.GENERIC,
-        ...,
-    ],
-    input: TileTensor[dtype, address_space=AddressSpace.GENERIC, ...],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
     paddings: UnsafePointer[Scalar[paddings_type], _],
     constant: Scalar[constant_type],
 ):
     """
     Fill `output` with values from `input`, and edges padded with `constant`
     based on `paddings`.
+
+    Parameters:
+        dtype: DType of the `input` and `output` buffers.
+        paddings_type: DType of the `paddings` buffer.
+        constant_type: DType of the `constant` value before it is cast to
+            `dtype`.
 
     Args:
         output: The output buffer.
@@ -157,20 +159,16 @@ def pad_constant[
     var constant_cast = rebind[Scalar[dtype]](constant[0])
     comptime output_rank = output.rank
 
-    @__copy_capture(constant_cast)
-    @parameter
     def pad_constant_wrapper(
         output: UnsafePointer[
-            mut=True, Scalar[dtype], address_space=AddressSpace.GENERIC, ...
+            mut=True, Scalar[dtype], address_space=.GENERIC, ...
         ],
-        input: UnsafePointer[
-            Scalar[dtype], address_space=AddressSpace.GENERIC, ...
-        ],
+        input: UnsafePointer[Scalar[dtype], address_space=.GENERIC, ...],
         paddings: UnsafePointer[Scalar[paddings_type], _],
         output_shape: IndexList[output_rank],
-        output_strides: UnsafePointer[mut=True, Scalar[DType.int], _],
-        input_strides: UnsafePointer[Scalar[DType.int], _],
-    ):
+        output_strides: UnsafePointer[mut=True, Int, _],
+        input_strides: UnsafePointer[Int, _],
+    ) {var constant_cast}:
         return _pad_constant_impl[output_rank, dtype, paddings_type](
             output,
             input,
@@ -184,26 +182,24 @@ def pad_constant[
     return _do_pad[
         dtype,
         paddings_type,
-        pad_constant_wrapper,
-    ](output, input, paddings)
+    ](output, input, paddings, pad_constant_wrapper)
 
 
 def pad_reflect[
     dtype: DType,
     paddings_type: DType,
 ](
-    output: TileTensor[
-        mut=True,
-        dtype,
-        address_space=AddressSpace.GENERIC,
-        ...,
-    ],
-    input: TileTensor[dtype, address_space=AddressSpace.GENERIC, ...],
+    output: TileTensor[mut=True, dtype, address_space=.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
     paddings: UnsafePointer[Scalar[paddings_type], _],
 ):
     """
     Fill `output` with values from `input`, and edges padded with reflected
     values from the unpadded region.
+
+    Parameters:
+        dtype: DType of the `input` and `output` buffers.
+        paddings_type: DType of the `paddings` buffer.
 
     Args:
         output: The output buffer.
@@ -226,19 +222,16 @@ def pad_reflect[
 
     comptime output_rank = output.rank
 
-    @parameter
     def pad_reflect_wrapper(
         output: UnsafePointer[
-            mut=True, Scalar[dtype], address_space=AddressSpace.GENERIC, ...
+            mut=True, Scalar[dtype], address_space=.GENERIC, ...
         ],
-        input: UnsafePointer[
-            Scalar[dtype], address_space=AddressSpace.GENERIC, ...
-        ],
+        input: UnsafePointer[Scalar[dtype], address_space=.GENERIC, ...],
         paddings: UnsafePointer[Scalar[paddings_type], _],
         output_shape: IndexList[output_rank],
-        output_strides: UnsafePointer[mut=True, Scalar[DType.int], _],
-        input_strides: UnsafePointer[Scalar[DType.int], _],
-    ):
+        output_strides: UnsafePointer[mut=True, Int, _],
+        input_strides: UnsafePointer[Int, _],
+    ) {}:
         return _pad_reflect_impl[output_rank, dtype, paddings_type](
             output, input, paddings, output_shape, output_strides, input_strides
         )
@@ -246,8 +239,7 @@ def pad_reflect[
     return _do_pad[
         dtype,
         paddings_type,
-        pad_reflect_wrapper,
-    ](output, input, paddings)
+    ](output, input, paddings, pad_reflect_wrapper)
 
 
 @always_inline
@@ -255,8 +247,8 @@ def pad_shape[
     input_type: DType,
     paddings_type: DType,
 ](
-    input_buf: TileTensor[input_type, ...],
-    paddings_buf: TileTensor[paddings_type, ...],
+    input_buf: TileTensor[mut=False, input_type, ...],
+    paddings_buf: TileTensor[mut=False, paddings_type, ...],
 ) raises -> IndexList[input_buf.rank]:
     """
     Compute the output shape of a `pad` operation, and assert the inputs are
@@ -300,36 +292,28 @@ def _do_pad[
     //,
     dtype: DType,
     paddings_type: DType,
-    pad_impl_fn: def(
-        UnsafePointer[
-            mut=True, Scalar[dtype], address_space=AddressSpace.GENERIC, ...
-        ],
-        UnsafePointer[Scalar[dtype], address_space=AddressSpace.GENERIC, ...],
+    PadImplFn: ImplicitlyCopyable
+    & def(
+        UnsafePointer[mut=True, Scalar[dtype], address_space=.GENERIC, ...],
+        UnsafePointer[Scalar[dtype], address_space=.GENERIC, ...],
         UnsafePointer[Scalar[paddings_type], _],
         IndexList[OutputLayoutType.rank],
-        UnsafePointer[mut=True, Scalar[DType.int], _],
-        UnsafePointer[Scalar[DType.int], _],
-    ) capturing[_] -> None,
+        UnsafePointer[mut=True, Int, _],
+        UnsafePointer[Int, _],
+    ) -> None,
 ](
     output: TileTensor[
-        mut=True,
-        dtype,
-        OutputLayoutType,
-        address_space=AddressSpace.GENERIC,
-        ...,
+        mut=True, dtype, OutputLayoutType, address_space=.GENERIC, ...
     ],
-    input: TileTensor[dtype, address_space=AddressSpace.GENERIC, ...],
+    input: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
     paddings: UnsafePointer[Scalar[paddings_type], _],
+    pad_impl_fn: PadImplFn,
 ):
-    var input_strides_stack = InlineArray[Scalar[DType.int], output.rank](
-        uninitialized=True
-    )
+    var input_strides_stack = Array[Int, output.rank](uninitialized=True)
     var input_strides_buf = TileTensor(
         input_strides_stack, row_major[input.rank]()
     )
-    var output_strides_stack = InlineArray[Scalar[DType.int], output.rank](
-        uninitialized=True
-    )
+    var output_strides_stack = Array[Int, output.rank](uninitialized=True)
     var output_strides_buf = TileTensor(
         output_strides_stack, row_major[output.rank]()
     )
@@ -435,7 +419,7 @@ struct _AxisParams[rank: Int, dtype: DType, paddings_type: DType](
             var post_pad_start_ptr = non_pad_start_ptr + self.non_pad
             var input_start_ptr = input + self.input_offset
             _fill(pre_pad_start_ptr, constant, self.pre_pad)
-            memcpy(
+            unsafe_memcpy(
                 dest=non_pad_start_ptr, src=input_start_ptr, count=self.non_pad
             )
             _fill(post_pad_start_ptr, constant, self.post_pad)
@@ -449,8 +433,8 @@ def _pad_constant_axis[
     input: UnsafePointer[Scalar[dtype], _],
     constant: Scalar[dtype],
     output_shape: IndexList[rank],
-    output_strides: UnsafePointer[Scalar[DType.int], _],
-    input_strides: UnsafePointer[Scalar[DType.int], _],
+    output_strides: UnsafePointer[Int, _],
+    input_strides: UnsafePointer[Int, _],
     var axis_params: StaticTuple[_AxisParams[rank, dtype, paddings_type], rank],
 ):
     comptime if axis == (rank - 1):
@@ -487,8 +471,8 @@ def _pad_constant_impl[
     paddings: UnsafePointer[Scalar[paddings_type], _],
     constant: Scalar[dtype],
     output_shape: IndexList[rank],
-    output_strides: UnsafePointer[Scalar[DType.int], _],
-    input_strides: UnsafePointer[Scalar[DType.int], _],
+    output_strides: UnsafePointer[Int, _],
+    input_strides: UnsafePointer[Int, _],
 ):
     """
     Fill axis ∈ [axis, rank) in `output` with values from `input`, and edges
@@ -550,8 +534,7 @@ def _memcpy_regions_fast[
         if cnt == modulo:
             cnt = 0
 
-    @parameter
-    def _common_loop[pre_copy: Bool, singleton: Bool]():
+    def _common_loop[pre_copy: Bool, singleton: Bool]() {var}:
         var curr_rem: Int = 0
         var num_iters = pre_pad if pre_copy else post_pad
         var copy_to: Int = (pre_pad - 1) if pre_copy else (pre_pad + non_pad)
@@ -575,8 +558,14 @@ def _memcpy_regions_fast[
                 copy_from * output_axis_stride
             )
 
-            memcpy(
-                dest=copy_to_ptr, src=copy_from_ptr, count=output_axis_stride
+            # dest and src are non-overlapping slices of the same buffer
+            # (shared origin). Opt out of exclusivity with an unsafe any-origin:
+            # unsafe_memcpy's non-overlap requirement is a caller contract the
+            # exclusivity checker can't prove.
+            unsafe_memcpy(
+                dest=copy_to_ptr,
+                src=copy_from_ptr.as_unsafe_any_origin(),
+                count=output_axis_stride,
             )
             copy_to += -1 if pre_copy else +1
 
@@ -643,19 +632,16 @@ struct _AxisParamsReflect[rank: Int, dtype: DType, paddings_type: DType](
         output_offset: Int,
         input_offset: Int,
         output: UnsafePointer[
-            mut=True,
-            Scalar[Self.dtype],
-            address_space=AddressSpace.GENERIC,
-            ...,
+            mut=True, Scalar[Self.dtype], address_space=.GENERIC, ...
         ],
-        input: UnsafePointer[
-            Scalar[Self.dtype], address_space=AddressSpace.GENERIC, ...
-        ],
+        input: UnsafePointer[Scalar[Self.dtype], address_space=.GENERIC, ...],
     ):
         # no more dimensions to recurse, copy from input to unpadded region
         var non_pad_start_ptr = output + (output_offset + self.pre_pad)
         var input_start_ptr = input + input_offset
-        memcpy(dest=non_pad_start_ptr, src=input_start_ptr, count=self.non_pad)
+        unsafe_memcpy(
+            dest=non_pad_start_ptr, src=input_start_ptr, count=self.non_pad
+        )
 
     @always_inline
     def memcpy_regions(
@@ -682,14 +668,10 @@ def _pad_reflect_axis[
     paddings_type: DType,
     axis: Int,
 ](
-    output: UnsafePointer[
-        mut=True, Scalar[dtype], address_space=AddressSpace.GENERIC, ...
-    ],
-    input: UnsafePointer[
-        Scalar[dtype], address_space=AddressSpace.GENERIC, ...
-    ],
-    output_strides: UnsafePointer[Scalar[DType.int], _],
-    input_strides: UnsafePointer[Scalar[DType.int], _],
+    output: UnsafePointer[mut=True, Scalar[dtype], address_space=.GENERIC, ...],
+    input: UnsafePointer[Scalar[dtype], address_space=.GENERIC, ...],
+    output_strides: UnsafePointer[Int, _],
+    input_strides: UnsafePointer[Int, _],
     var axis_params: StaticTuple[
         _AxisParamsReflect[rank, dtype, paddings_type], rank
     ],
@@ -740,16 +722,12 @@ def _pad_reflect_impl[
     dtype: DType,
     paddings_type: DType,
 ](
-    output: UnsafePointer[
-        mut=True, Scalar[dtype], address_space=AddressSpace.GENERIC, ...
-    ],
-    input: UnsafePointer[
-        Scalar[dtype], address_space=AddressSpace.GENERIC, ...
-    ],
+    output: UnsafePointer[mut=True, Scalar[dtype], address_space=.GENERIC, ...],
+    input: UnsafePointer[Scalar[dtype], address_space=.GENERIC, ...],
     paddings: UnsafePointer[Scalar[paddings_type], _],
     output_shape: IndexList[rank],
-    output_strides: UnsafePointer[mut=True, Scalar[DType.int], _],
-    input_strides: UnsafePointer[Scalar[DType.int], _],
+    output_strides: UnsafePointer[mut=True, Int, _],
+    input_strides: UnsafePointer[Int, _],
 ):
     """
     Fill axis ∈ [axis, rank) in `output` with values from `input`, and edges
@@ -784,7 +762,7 @@ def pad_repeat[
     paddings_type: DType,
 ](
     output: TileTensor[mut=True, dtype, ...],
-    input: TileTensor[dtype, ...],
+    input: TileTensor[mut=False, dtype, ...],
     paddings: UnsafePointer[Scalar[paddings_type], _],
 ):
     """

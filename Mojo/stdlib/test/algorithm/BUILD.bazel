@@ -1,0 +1,48 @@
+load("//bazel:api.bzl", "mojo_filecheck_test", "mojo_test")
+
+package(default_visibility = ["//visibility:private"])
+
+_FILECHECK_TESTS = [
+    "test_tile.mojo",
+]
+
+_MOJO_COMPILE_OPTS = {}
+
+_DISABLED_ASSERTIONS = []
+
+[
+    mojo_filecheck_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ] + _MOJO_COMPILE_OPTS.get(src, []),
+        enable_assertions = src not in _DISABLED_ASSERTIONS,
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in _FILECHECK_TESTS
+]
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        enable_assertions = src not in _DISABLED_ASSERTIONS,
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(
+        ["*.mojo"],
+        exclude = _FILECHECK_TESTS,
+    )
+]

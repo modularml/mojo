@@ -11,16 +11,23 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Provides the split-K tile scheduler for GPU matmul kernels on SM90.
+
+Partitions the K dimension across thread blocks and reduces partial
+accumulations with semaphore-ordered or atomic strategies for deterministic
+or nondeterministic numeric behavior.
+"""
+
 from std.math import align_up, ceildiv
 from std.math.uutils import umod, ualign_up
 from std.atomic import Atomic
 from std.sys import size_of
 
-from std.gpu import NamedBarrierSemaphore
-from std.gpu.globals import WARPGROUP_SIZE
-from std.gpu.host.info import H100
-from std.gpu import block_idx, grid_dim, thread_idx
-from layout import Layout, LayoutTensor, RuntimeLayout
+from max.gpu.sync import NamedBarrierSemaphore
+from max.gpu.globals import WARPGROUP_SIZE
+from max.gpu.host.info import H100
+from max.gpu import block_idx, grid_dim, thread_idx
+from layout import Layout, LayoutTensor, RuntimeLayout, TensorLayout, TileTensor
 from std.bit import log2_floor
 
 from std.utils.index import Index, IndexList
@@ -61,6 +68,13 @@ def _check_scheduler_constraints[
 
 @fieldwise_init
 struct ReductionMode(TrivialRegisterPassable):
+    """Reduction strategy for split-K partial accumulations.
+
+    `Deterministic` serializes CTA reductions using named-barrier semaphores
+    for bit-reproducible results. `Nondeterministic` uses atomic adds for
+    higher throughput at the cost of non-deterministic floating-point output.
+    """
+
     var _value: Int32
 
     # CTAs perform reduction in a serialized fashion so we will have deterministic numeric behavior
@@ -84,6 +98,8 @@ struct ReductionMode(TrivialRegisterPassable):
 
 
 struct SplitKTileScheduler[
+    locks_origin: MutOrigin,
+    //,
     problem_shape_nk: IndexList[2],
     tile_shape: IndexList[3],
     splits: UInt32,
@@ -93,6 +109,26 @@ struct SplitKTileScheduler[
     raster_order: RasterOrder,
     reduction_mode: ReductionMode = ReductionMode.Deterministic,
 ](TrivialRegisterPassable):
+    """Tile scheduler for split-K GPU matmul reductions on SM90.
+
+    Partitions the K dimension into `splits` independent chunks, each processed
+    by a separate thread block. Partial results are accumulated into a workspace
+    buffer and reduced using semaphore-based ordering (`Deterministic`) or
+    atomic additions (`Nondeterministic`). Cluster-aware rasterization keeps
+    spatially close tiles on the same set of SMs for L2 reuse.
+
+    Parameters:
+        locks_origin: Memory origin for the synchronization lock buffer.
+        problem_shape_nk: Static (N, K) dimensions of the matmul problem.
+        tile_shape: Static (BM, BN, BK) tile sizes.
+        splits: Number of K-dimension splits.
+        num_consumer: Number of warp groups consuming each output tile.
+        num_pipeline_stages: Number of software-pipeline stages.
+        cluster_shape: (cluster_m, cluster_n) block cluster dimensions.
+        raster_order: Traversal direction for the output tile grid.
+        reduction_mode: Whether reduction is deterministic or non-deterministic.
+    """
+
     var prob_shape: IndexList[3]  # M x N x K
     var block_id_in_cluster: IndexList[2]
     var blocks_per_problem: UInt32
@@ -108,7 +144,7 @@ struct SplitKTileScheduler[
 
     var cluster_blk_major: UInt32
 
-    var locks_ptr: UnsafePointer[Int32, MutAnyOrigin]
+    var locks_ptr: UnsafePointer[Int32, Self.locks_origin]
 
     comptime k_tiles_per_output_tile = UInt32(
         ceildiv(Self.problem_shape_nk[1], Self.tile_shape[2])
@@ -131,7 +167,7 @@ struct SplitKTileScheduler[
         out self,
         prob_shape: IndexList[3],
         block_id_in_cluster: IndexList[2],
-        locks_ptr: UnsafePointer[mut=True, UInt8, _],
+        locks_ptr: UnsafePointer[UInt8, Self.locks_origin],
     ):
         _check_scheduler_constraints[
             Self.problem_shape_nk,
@@ -146,10 +182,7 @@ struct SplitKTileScheduler[
 
         self.prob_shape = prob_shape
         self.block_id_in_cluster = block_id_in_cluster
-
-        self.locks_ptr = rebind[UnsafePointer[Int32, MutAnyOrigin]](
-            locks_ptr.bitcast[Int32]()
-        )
+        self.locks_ptr = locks_ptr.bitcast[Int32]()
 
         var problem_blocks = Self.get_problem_blocks_shape(
             prob_shape, Self.tile_shape, Self.cluster_shape
@@ -213,18 +246,14 @@ struct SplitKTileScheduler[
         dyn_tile_shape: IndexList[3],
         dyn_cluster_shape: IndexList[2],
     ) -> IndexList[2]:
-        var num_blocks_m = (
-            problem_shape[0] + dyn_tile_shape[0] - 1
-        ) // dyn_tile_shape[0]
-        var num_blocks_n = (
-            problem_shape[1] + dyn_tile_shape[1] - 1
-        ) // dyn_tile_shape[1]
+        var num_blocks_m = ceildiv(problem_shape[0], dyn_tile_shape[0])
+        var num_blocks_n = ceildiv(problem_shape[1], dyn_tile_shape[1])
 
         var problem_blocks_m = (
-            (num_blocks_m + dyn_cluster_shape[0] - 1) // dyn_cluster_shape[0]
+            ceildiv(num_blocks_m, dyn_cluster_shape[0])
         ) * dyn_cluster_shape[0]
         var problem_blocks_n = (
-            (num_blocks_n + dyn_cluster_shape[1] - 1) // dyn_cluster_shape[1]
+            ceildiv(num_blocks_n, dyn_cluster_shape[1])
         ) * dyn_cluster_shape[1]
 
         return IndexList[2](
@@ -444,7 +473,7 @@ struct SplitKTileScheduler[
         dyn_cluster_shape: IndexList[2],
     ) -> Int:
         comptime assert (
-            accum_type == DType.float32
+            accum_type == .float32
         ), "Only support float32 accumulator type"
 
         var num_output_tiles = Self.get_num_tiles(
@@ -507,6 +536,30 @@ struct SplitKTileScheduler[
     def output_tile_index(self, work_tile_info: WorkInfo) -> UInt32:
         return self.get_linear_idx_from_m_and_n(
             work_tile_info.m, work_tile_info.n
+        )
+
+    @always_inline
+    def reduction[
+        accum_type: DType,
+        c_reg_layout: Layout,
+        workspace_layout: TensorLayout,
+    ](
+        self,
+        reduction_workspace: TileTensor[
+            mut=True, accum_type, workspace_layout, _
+        ],
+        c_reg_tile: RegTile[accum_type, c_reg_layout],
+        work_tile_info: WorkInfo,
+        num_barriers: UInt32,
+        warp_group_local_idx: UInt32,
+    ):
+        var reduction_workspace_lt = reduction_workspace.to_layout_tensor()
+        self.reduction(
+            reduction_workspace_lt,
+            c_reg_tile,
+            work_tile_info,
+            num_barriers,
+            warp_group_local_idx,
         )
 
     @always_inline
@@ -604,7 +657,7 @@ struct SplitKTileScheduler[
     @staticmethod
     @always_inline
     def wait_eq(
-        lock_ptr: UnsafePointer[Int32, MutAnyOrigin],
+        lock_ptr: UnsafePointer[mut=True, Int32, _],
         barrier_id: Int32,
         barrier_group_thread_idx: Int,
         lock_idx: UInt32,
@@ -618,7 +671,7 @@ struct SplitKTileScheduler[
     @staticmethod
     @always_inline
     def wait_lt(
-        lock_ptr: UnsafePointer[Int32, MutAnyOrigin],
+        lock_ptr: UnsafePointer[mut=True, Int32, _],
         barrier_id: Int32,
         barrier_group_thread_idx: Int,
         lock_idx: UInt32,
@@ -632,7 +685,7 @@ struct SplitKTileScheduler[
     @staticmethod
     @always_inline
     def arrive_set(
-        lock_ptr: UnsafePointer[Int32, MutAnyOrigin],
+        lock_ptr: UnsafePointer[mut=True, Int32, _],
         barrier_id: Int32,
         barrier_group_thread_idx: Int,
         lock_idx: UInt32,
@@ -660,7 +713,7 @@ struct SplitKTileScheduler[
         comptime BN = workspace_layout.shape[2].value()
 
         comptime assert (
-            accum_type == DType.float32
+            accum_type == .float32
         ), "Only support float32 accumulator type"
 
         comptime num_mma = c_reg_tile.layout.shape[0].value()
@@ -707,7 +760,7 @@ struct SplitKTileScheduler[
         comptime BN = workspace_layout.shape[2].value()
 
         comptime assert (
-            accum_type == DType.float32
+            accum_type == .float32
         ), "Only support float32 accumulator type"
 
         comptime num_mma = c_reg_tile.layout.shape[0].value()

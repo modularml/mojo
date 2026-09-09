@@ -13,7 +13,7 @@
 
 from std.sys.info import simd_bit_width, simd_width_of
 
-from std.gpu.host import get_gpu_target
+from max.gpu.host import get_gpu_target
 from std.testing import assert_equal
 
 

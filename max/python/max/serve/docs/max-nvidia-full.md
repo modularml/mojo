@@ -3,7 +3,7 @@
 
 # **MAX NVIDIA full container**
 
-[Modular Accelerated eXecution (MAX)⁠](https://docs.modular.com/max/) provides
+[Modular Accelerated eXecution (MAX)⁠](https://max.modular.com/) provides
 a high-performance, flexible platform for AI workloads, leveraging modern GPUs
 to deliver accelerated generative AI performance while maintaining portability
 across different hardware configurations and cloud providers.
@@ -16,7 +16,7 @@ need a fully optimized, out-of-the-box solution for deploying AI models.
 
 The MAX container is compatible with the OpenAI API specification and optimized
 for deployment on GPUs. For more information on container contents and instance
-compatibility, see [MAX containers⁠](https://docs.modular.com/max/container/)
+compatibility, see [MAX containers⁠](https://max.modular.com/container/)
 in the MAX documentation.
 
 ### **Quick Start**
@@ -57,7 +57,7 @@ Nightlies
 ### **Documentation**
 
 For more information on Modular and its products, visit the
-[Modular documentation site⁠](https://docs.modular.com/).
+[Modular documentation site⁠](https://max.modular.com/).
 
 ### **Community**
 

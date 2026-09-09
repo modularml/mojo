@@ -35,27 +35,55 @@ def distributed_scatter(
     input_chunks: Iterable[TensorValueLike],
     signal_buffers: Iterable[BufferValueLike],
 ) -> list[TensorValue]:
-    """Scatter different chunks from root GPU to device groups.
+    """Scatters different chunks from a root GPU to device groups.
 
-    Each DP replica group receives a different input chunk. All TP devices
-    within the same replica get the same chunk. Uses a pull-based approach
-    where each GPU reads its chunk from the root GPU via P2P.
+    Each data-parallel replica group receives a different input chunk. All
+    tensor-parallel devices within the same replica get the same chunk. Uses a
+    pull-based approach where each GPU reads its chunk from the root GPU over
+    peer-to-peer transfers.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType, ops
+        from max.nn import Signals
+
+        # Data-parallel size 2, tensor-parallel size 2, across 4 GPUs
+        devices = [DeviceRef.GPU(id=i) for i in range(4)]
+        signals = Signals(devices)
+
+        with Graph(
+            "distributed_scatter",
+            input_types=[
+                # One input chunk per data-parallel replica on the root GPU
+                TensorType(dtype=DType.uint32, shape=[5], device=devices[0]),
+                TensorType(dtype=DType.uint32, shape=[5], device=devices[0]),
+                *signals.input_types(),
+            ],
+        ) as graph:
+            input_chunks = [graph.inputs[0].tensor, graph.inputs[1].tensor]
+            signal_buffers = [inp.buffer for inp in graph.inputs[2:]]
+            # Returns one output per GPU.
+            outputs = ops.distributed_scatter(input_chunks, signal_buffers)
+            graph.output(*outputs)
 
     Args:
-        input_chunks: Input tensors to scatter, one per DP replica. All must
-            reside on the same root device. The number of chunks determines
-            ``dp_size``.
-        signal_buffers: Device buffer values used for synchronization.
-            The number of signal buffers determines the number of
-            participating GPUs (``ngpus``).
+        input_chunks: The input tensors to scatter, one per data-parallel
+            replica. All must reside on the same root device. The number of
+            chunks determines ``dp_size``.
+        signal_buffers: The device buffer values used for synchronization. The
+            number of signal buffers determines the number of participating
+            GPUs (``ngpus``).
 
     Returns:
-        List of output tensors, one per device. Each output tensor has the
+        A list of output tensors, one per device. Each output tensor has the
         same shape and dtype as its replica's input chunk.
 
     Raises:
-        ValueError: If fewer than 2 signal buffers, if input chunks are not
-            on the same device, or if devices are not unique.
+        ValueError: If any input is invalid. This includes when there are no
+            input chunks, the input chunks aren't on the same device, the
+            signal buffer devices aren't unique, or the root device isn't among
+            the signal buffer devices.
     """
     input_chunks = _tensor_values(input_chunks)
     signal_buffers = _buffer_values(signal_buffers)

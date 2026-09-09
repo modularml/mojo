@@ -16,19 +16,20 @@
 # Uses parameterized tile width with shared memory
 
 from std.math import ceildiv, sqrt
-from std.gpu import block_idx, thread_idx, barrier
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace, external_memory
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.memory import external_memory
 
 # ========================== KERNEL CODE ==========================
 
 
 def matrixMulKernel(
-    M: UnsafePointer[Float32, MutExternalOrigin],
-    N: UnsafePointer[Float32, MutExternalOrigin],
-    P: UnsafePointer[Float32, MutExternalOrigin],
-    Width: Int,
-    tile_width: Int,
+    M: UnsafePointer[Float32, MutUntrackedOrigin],
+    N: UnsafePointer[Float32, MutUntrackedOrigin],
+    P: UnsafePointer[Float32, MutUntrackedOrigin],
+    width_dim: Int32,
+    tile_width_dim: Int32,
 ):
     """Matrix multiplication kernel with parameterized tile width.
 
@@ -36,21 +37,20 @@ def matrixMulKernel(
         M: Input matrix M (device).
         N: Input matrix N (device).
         P: Output matrix P = M * N (device).
-        Width: Matrix dimension (Width x Width matrices).
-        tile_width: Tile width for this execution.
+        width_dim: Matrix dimension (Width x Width matrices).
+        tile_width_dim: Tile width for this execution.
     """
+    # `Int` is not device-passable; widen the fixed-width args for indexing.
+    var Width = Int(width_dim)
+    var tile_width = Int(tile_width_dim)
     # Allocate shared memory using external_memory (following working pattern)
     # Use max tile size of 32x32 for allocation
     var Mds = rebind[
-        UnsafePointer[
-            Scalar[DType.float32],
-            MutExternalOrigin,
-            address_space=AddressSpace.SHARED,
-        ]
+        UnsafePointer[Float32, MutUntrackedOrigin, address_space=.SHARED]
     ](
         external_memory[
-            Scalar[DType.float32],
-            address_space=AddressSpace.SHARED,
+            Float32,
+            address_space=.SHARED,
             alignment=16,
             name="shared_dynamic_memory",
         ]()
@@ -67,18 +67,18 @@ def matrixMulKernel(
     for ph in range(ceildiv(Width, tile_width)):
         # Collaborative loading of M and N tiles into shared memory
         if (Row < Width) and (ph * tile_width + tx) < Width:
-            Mds[ty * tile_width + tx] = Scalar[DType.float32](
+            Mds[ty * tile_width + tx] = Float32(
                 M[Row * Width + ph * tile_width + tx]
             )
         else:
-            Mds[ty * tile_width + tx] = Scalar[DType.float32](0.0)
+            Mds[ty * tile_width + tx] = Float32(0.0)
 
         if (ph * tile_width + ty) < Width and Col < Width:
-            Nds[ty * tile_width + tx] = Scalar[DType.float32](
+            Nds[ty * tile_width + tx] = Float32(
                 N[(ph * tile_width + ty) * Width + Col]
             )
         else:
-            Nds[ty * tile_width + tx] = Scalar[DType.float32](0.0)
+            Nds[ty * tile_width + tx] = Float32(0.0)
 
         barrier()
 
@@ -97,9 +97,9 @@ def matrixMulKernel(
 
 
 def cpu_matmul(
-    a: UnsafePointer[Float32, MutExternalOrigin],
-    b: UnsafePointer[Float32, MutExternalOrigin],
-    c: UnsafePointer[Float32, MutExternalOrigin],
+    a: UnsafePointer[Float32, MutUntrackedOrigin],
+    b: UnsafePointer[Float32, MutUntrackedOrigin],
+    c: UnsafePointer[Float32, MutUntrackedOrigin],
     width: Int,
 ):
     """CPU reference implementation for matrix multiplication.
@@ -117,8 +117,8 @@ def cpu_matmul(
 
 
 def initialize(
-    a: UnsafePointer[Float32, MutExternalOrigin],
-    b: UnsafePointer[Float32, MutExternalOrigin],
+    a: UnsafePointer[Float32, MutUntrackedOrigin],
+    b: UnsafePointer[Float32, MutUntrackedOrigin],
     width: Int,
 ):
     """Initialize input matrices with test data.
@@ -197,8 +197,8 @@ def main() raises:
             d_a,
             d_b,
             d_c,
-            width,
-            tile_width,
+            Int32(width),
+            Int32(tile_width),
             grid_dim=(grid_dim_x, grid_dim_y, 1),
             block_dim=(block_dim_x, block_dim_y, 1),
             shared_mem_bytes=shared_mem_bytes,

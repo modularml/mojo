@@ -29,7 +29,11 @@ from max.nn.kernels import (
     flash_attention_ragged,
     rope_split_store_ragged,
 )
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
+from max.nn.kv_cache import (
+    KVCacheParams,
+    MHAKVCacheParams,
+    PagedCacheValues,
+)
 from max.nn.layer import Module, Shardable
 from max.nn.linear import Linear
 from max.nn.quant_config import QuantConfig
@@ -40,6 +44,11 @@ from max.pipelines.architectures.gemma4.layers.rms_norm import Gemma4RMSNorm
 
 class Gemma4Attention(Module, Shardable):
     """Implementation of the attention layer for the Gemma3 text model."""
+
+    # Flash-attention mask override for subclasses (e.g. the DSpark draft's
+    # non-causal block attention). ``None`` selects the standard causal /
+    # sliding-window-causal mask by layer type.
+    mask_variant: MHAMaskVariant | None = None
 
     def __init__(
         self,
@@ -63,7 +72,7 @@ class Gemma4Attention(Module, Shardable):
         qk_norm_eps: float = 1e-6,
         local_window_size: int = 1024,
         quant_config: QuantConfig | None = None,
-        use_interleaved_rope: bool = False,
+        fused_qkv: bool = False,
     ) -> None:
         """Initializes the attention layer.
 
@@ -90,13 +99,10 @@ class Gemma4Attention(Module, Shardable):
             has_bias: Whether to use an attention bias. Defaults to False.
             qk_norm_eps: Value to use for numerical stability. Defaults to 1e-6.
             quant_config: Scaled quantization configuration. Defaults to None.
-            use_interleaved_rope: When True, forces interleaved=True in
-                rope_split_store_ragged regardless of the rope object's own
-                ``interleaved`` attribute.  Required for the fp8 KV cache path
-                because the fp8 kernel's per-block scale layout assumes
-                contiguous head_dim blocks (only achievable with interleaved
-                RoPE storage order).  Defaults to False (non-interleaved,
-                matching the bf16 baseline behaviour).
+            fused_qkv: When True, the qkv/qk projection uses a single stacked
+                weight (``StackedLinear(stacked=True)``) loaded pre-fused from
+                the checkpoint instead of concatenating per-projection weights
+                in-graph (DISTINF-194). Defaults to False.
         """
 
         super().__init__()
@@ -108,11 +114,11 @@ class Gemma4Attention(Module, Shardable):
         self.has_bias = has_bias
         self.devices = devices
         self._sharding_strategy: ShardingStrategy | None = None
+        self.dtype = dtype
         self.scale = 1.0
         self.local_window_size = local_window_size
         self.qk_norm_eps = qk_norm_eps
         self.quant_config = quant_config
-        self.use_interleaved_rope = use_interleaved_rope
 
         self.num_global_key_value_heads = num_global_key_value_heads
         self.global_head_dim = global_head_dim
@@ -125,15 +131,11 @@ class Gemma4Attention(Module, Shardable):
             self.kv_params.head_dim
         )  # MultiKVCacheParams sets head dim to either local or global
 
-        self.q_norm = Gemma4RMSNorm(
-            self.head_dim, DType.bfloat16, self.qk_norm_eps
-        )
-        self.k_norm = Gemma4RMSNorm(
-            self.head_dim, DType.bfloat16, self.qk_norm_eps
-        )
+        self.q_norm = Gemma4RMSNorm(self.head_dim, dtype, self.qk_norm_eps)
+        self.k_norm = Gemma4RMSNorm(self.head_dim, dtype, self.qk_norm_eps)
         self.v_norm = Gemma4RMSNorm(
             self.head_dim,
-            DType.bfloat16,
+            dtype,
             self.qk_norm_eps,
             with_weight=False,
         )
@@ -160,7 +162,7 @@ class Gemma4Attention(Module, Shardable):
                 names=["q_proj", "k_proj", "v_proj"],
                 dtype=dtype,
                 device=devices[0],
-                stacked=False,
+                stacked=fused_qkv,
                 has_bias=has_bias,
                 linear_cls=linear_cls,
                 quant_config=quant_config,
@@ -172,7 +174,7 @@ class Gemma4Attention(Module, Shardable):
                 names=["q_proj", "k_proj"],
                 dtype=dtype,
                 device=devices[0],
-                stacked=False,
+                stacked=fused_qkv,
                 has_bias=has_bias,
                 linear_cls=linear_cls,
                 quant_config=quant_config,
@@ -230,13 +232,6 @@ class Gemma4Attention(Module, Shardable):
         rope = self.rope_local if self.use_local else self.rope_global
 
         freqs_cis = ops.cast(rope.freqs_cis, qkv.dtype).to(qkv.device)
-        # Always use the trained RoPE convention (`rope.interleaved`,
-        # which is False for Gemma4 = HuggingFace `rotate_half`).  The
-        # fp8 KV kernel stores the rope output contiguously regardless
-        # of pairing convention, so there is no need to force
-        # `interleaved=True` under fp8.  Forcing it would change the
-        # rotation pairing against trained k_proj/q_proj weights and
-        # corrupt attention.
         xq = rope_split_store_ragged(
             self.kv_params,
             qkv,
@@ -246,15 +241,18 @@ class Gemma4Attention(Module, Shardable):
             layer_idx,
             n_heads=self.n_heads,
             interleaved=rope.interleaved,
+            q_out_dtype=self.kv_params.dtype,
         )
         xq = xq.reshape((-1, self.n_heads, self.head_dim))
 
         # Calculate Flash Attention.
-        mask_variant = (
-            MHAMaskVariant.SLIDING_WINDOW_CAUSAL_MASK
-            if self.use_local
-            else MHAMaskVariant.CAUSAL_MASK
-        )
+        mask_variant = self.mask_variant
+        if mask_variant is None:
+            mask_variant = (
+                MHAMaskVariant.SLIDING_WINDOW_CAUSAL_MASK
+                if self.use_local
+                else MHAMaskVariant.CAUSAL_MASK
+            )
         attn_out = flash_attention_ragged(
             self.kv_params,
             input=xq,
@@ -264,6 +262,7 @@ class Gemma4Attention(Module, Shardable):
             mask_variant=mask_variant,
             scale=self.scale,
             local_window_size=self.local_window_size if self.use_local else -1,
+            output_dtype=self.dtype,
         )
         attn_out = ops.reshape(attn_out, shape=[total_seq_len, -1])
         ret = self.o_proj(attn_out)
@@ -310,7 +309,8 @@ class Gemma4Attention(Module, Shardable):
 
         else:
             raise ValueError(
-                "Gemma3Attention only supports tensor parallel and replicate sharding strategy"
+                "Gemma3Attention only supports tensor parallel and replicate"
+                " sharding strategy"
             )
 
         self._sharding_strategy = sharding_strategy
@@ -328,7 +328,8 @@ class Gemma4Attention(Module, Shardable):
         """
         if not self.sharding_strategy:
             raise ValueError(
-                "Gemma3Attention layer cannot be sharded because no sharding strategy was provided."
+                "Gemma3Attention layer cannot be sharded because no sharding"
+                " strategy was provided."
             )
 
         # Get sharded weights
@@ -350,6 +351,7 @@ class Gemma4Attention(Module, Shardable):
                 device_idx=shard_idx,
                 num_devices=self.sharding_strategy.num_devices,
             )
+            assert isinstance(self.kv_params, MHAKVCacheParams)
             sharded_num_kv_heads = num_heads_for_device(
                 num_heads=self.kv_params.n_kv_heads,
                 device_idx=shard_idx,
@@ -361,8 +363,10 @@ class Gemma4Attention(Module, Shardable):
                 num_devices=self.sharding_strategy.num_devices,
             )
 
-            # Create new attention instance with sharded configuration
-            sharded = Gemma4Attention(
+            # Create new attention instance with sharded configuration.
+            # Construct via type(self) so subclasses (e.g. a noncausal-mask
+            # decoder variant) shard into their own type rather than the base.
+            sharded = type(self)(
                 rope_global=self.rope_global,
                 rope_local=self.rope_local,
                 num_attention_heads=sharded_num_heads,
@@ -382,7 +386,6 @@ class Gemma4Attention(Module, Shardable):
                 qk_norm_eps=self.qk_norm_eps,
                 local_window_size=self.local_window_size,
                 quant_config=self.quant_config,
-                use_interleaved_rope=self.use_interleaved_rope,
             )
 
             # Assign sharded weights

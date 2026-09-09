@@ -23,4 +23,4 @@ class OlmoModel(Llama3Model):
     """Olmo pipeline model implementation."""
 
     config_class = OlmoConfig
-    norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "layer_norm"
+    norm_method: Literal["rms_norm", "layer_norm"] = "layer_norm"

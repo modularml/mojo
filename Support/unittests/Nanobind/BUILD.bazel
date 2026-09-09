@@ -1,0 +1,26 @@
+load("//bazel:api.bzl", "modular_nanobind_extension", "modular_py_test")
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_nanobind_extension(
+    name = "bindings",
+    testonly = True,
+    srcs = ["test_bindings.cpp"],
+    deps = [
+        "//Support:Base",
+        "//Support:NanobindUtils",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_py_test(
+    name = "test_casters",
+    srcs = ["test_bindings.py"],
+    data = [":bindings"],
+)

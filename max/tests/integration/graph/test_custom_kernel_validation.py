@@ -43,6 +43,20 @@ def kernel_override_ops_path() -> Path:
     return Path(os.environ["MODULAR_KERNEL_OVERRIDE_OPS_PATH"])
 
 
+def _collect_error_chain(exc: BaseException) -> str:
+    """Walks the exception chain and concatenates all messages.
+
+    The compiler diagnostic sits on a ``__cause__``. The top-level message is
+    just the generic "Failed to compile the model" wrapper.
+    """
+    messages = []
+    current: BaseException | None = exc
+    while current is not None:
+        messages.append(str(current))
+        current = current.__cause__
+    return "\n".join(messages)
+
+
 class TestCustomKernelValidation:
     """Tests for ops.custom that require actual kernel validation."""
 
@@ -175,6 +189,40 @@ class TestCustomKernelValidation:
                 word in error_msg
                 for word in ["output", "signature", "result", "type"]
             )
+
+    def test_custom__error__data_dependent_dim_without_shape_function(
+        self, kernel_verification_ops_path: Path, session: InferenceSession
+    ) -> None:
+        """Test error when an output dim can only come from a shape function.
+
+        `op_with_int_parameter` has no shape function, so this used to kill the
+        process instead of failing compilation.
+        """
+        input_type = TensorType(DType.float32, (4,), DeviceRef.CPU())
+        output_type = TensorType(DType.float32, ("nnz",), DeviceRef.CPU())
+
+        graph = Graph(
+            "test_custom_data_dependent_dim_no_shape_fn",
+            input_types=[input_type],
+            output_types=[output_type],
+            custom_extensions=[kernel_verification_ops_path],
+        )
+        with graph:
+            result = ops.custom(
+                name="op_with_int_parameter",
+                device=DeviceRef.CPU(),
+                values=[graph.inputs[0]],
+                out_types=[output_type],
+                parameters={"IntParameter": 1},
+            )
+            graph.output(result[0])
+
+        with pytest.raises(Exception) as exc_info:
+            session.load(graph)
+
+        chain = _collect_error_chain(exc_info.value)
+        assert "requires a registered shape function" in chain
+        assert "op_with_int_parameter" in chain
 
     def test_custom__missing_parameter_behavior(
         self, kernel_verification_ops_path: Path
@@ -469,8 +517,8 @@ class TestCustomOperationExecution:
 
 
 class TestKernelRegistrationOverride:
-    """Empirical verification that user @compiler.register shadows built-in
-    MOGG kernels when the same op-name is registered in a custom mojopkg
+    """Empirical verification that user @extensibility.register shadows built-in
+    MOGG kernels when the same op-name is registered in a custom mojoc
     supplied via Graph(..., custom_extensions=[...]).
     """
 

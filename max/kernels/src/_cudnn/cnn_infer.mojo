@@ -246,7 +246,7 @@ def cudnnCreateConvolutionDescriptor(
 ) raises -> cudnnStatus_t:
     return _get_dylib_function[
         "cudnnCreateConvolutionDescriptor",
-        def(type_of(conv_desc),) thin -> cudnnStatus_t,
+        def(type_of(conv_desc)) thin -> cudnnStatus_t,
     ]()(conv_desc)
 
 
@@ -1104,7 +1104,7 @@ def cudnnConvolutionBackwardData(
     dy: OpaquePointer,
     conv_desc: UnsafePointer[cudnnConvolutionStruct, _],
     algo: cudnnConvolutionBwdDataAlgo_t,
-    work_space: OptionalUnsafePointer[NoneType, MutAnyOrigin],
+    work_space: OptionalPointer[NoneType, MutAnyOrigin],
     work_space_size_in_bytes: Int,
     beta: OpaquePointer,
     dx_desc: UnsafePointer[cudnnTensorStruct, _],

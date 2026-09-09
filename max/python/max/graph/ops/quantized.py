@@ -28,7 +28,15 @@ def repack_gguf_quantized_weights(
     weight: TensorValue,
     quantization_encoding: QuantizationEncoding,
 ) -> TensorValue:
-    """Repacks GGUF quantized weights for the given encoding."""
+    """Repacks GGUF quantized weights for the given encoding.
+
+    Args:
+        weight: The quantized weight tensor to repack.
+        quantization_encoding: The quantization encoding to repack for.
+
+    Returns:
+        A ``TensorValue`` representing the repacked weights.
+    """
     quantization_encoding_str = quantization_encoding.name
     return _repack_quantized_weights(
         f"vroom_{quantization_encoding_str}_repack_weights", (weight,), "vroom"
@@ -176,31 +184,40 @@ def qmatmul(
 ) -> TensorValue:
     """Performs matrix multiplication between floating point and quantized tensors.
 
-    This quantizes the ``lhs`` floating point value to match the encoding of the
-    ``rhs`` quantized value, performs matmul, and then dequantizes the result.
-    Beware that, compared to a regular matmul op, this one expects the ``rhs``
-    value to be transposed. For example, if the ``lhs`` shape is ``[32, 64]``, and
-    the quantized ``rhs`` shape is also ``[32, 64]``, then the output shape is
-    ``[32, 32]``.
+    Quantizes the ``lhs`` floating point value to match the encoding of the
+    ``rhs`` quantized value, performs the matmul, and then dequantizes the
+    result. Compared to a regular matmul op, this one expects the ``rhs`` value
+    to be transposed. For example, if the ``lhs`` shape is ``[32, 64]`` and the
+    quantized ``rhs`` shape is also ``[32, 64]``, then the output shape is
+    ``[32, 32]``. That is, this function returns the result from:
 
-    That is, this function returns the result from:
+    .. code-block:: text
 
         dequantize(quantize(lhs) @ transpose(rhs))
 
     The last two dimensions in ``lhs`` are treated as matrices and multiplied
-    by ``rhs`` (which must be a 2D tensor). Any remaining dimensions in ``lhs``
-    are broadcast dimensions.
+    by ``rhs`` (which must be a 2-D tensor). Any remaining dimensions in
+    ``lhs`` are broadcast dimensions.
 
-    NOTE: Currently this supports Q4_0, Q4_K, and Q6_K encodings only.
+    .. note::
+
+        This currently supports ``Q4_0``, ``Q4_K``, ``Q6_K``, and supported
+        ``GPTQ`` configurations.
 
     Args:
         encoding: The quantization encoding to use.
-        config: Optional quantization config; required for some encodings (for example, GPTQ).
-        lhs: The non-quantized, left-hand-side of the matmul.
-        rhs: The transposed and quantized right-hand-side tensor(s).
+        config: The quantization config. Pass None for Q4_0, Q4_K, and Q6_K;
+            a supported configuration is required for GPTQ.
+        lhs: The non-quantized, left-hand side of the matmul.
+        rhs: The transposed and quantized right-hand side tensor(s).
 
     Returns:
-        The dequantized result (a floating point tensor).
+        A ``TensorValue`` representing the dequantized, floating point result.
+
+    Raises:
+        ValueError: If ``encoding`` is not a supported quantization encoding.
+        TypeError: If ``lhs`` or ``rhs`` has an unsupported dtype or rank.
+        AssertionError: If GPTQ is selected without a configuration.
     """
     if encoding == QuantizationEncoding.GPTQ:
         assert config
@@ -225,14 +242,23 @@ def dequantize(
 ) -> TensorValue:
     """Dequantizes a quantized tensor to floating point.
 
-    NOTE: Currently this supports Q4_0, Q4_K, and Q6_K encodings only.
+    .. note::
+
+        This currently supports the ``Q4_0``, ``Q4_K``, and ``Q6_K``
+        encodings only.
 
     Args:
         encoding: The quantization encoding to use.
         quantized: The quantized tensor to dequantize.
 
     Returns:
-        The dequantized result (a floating point tensor).
+        A ``TensorValue`` representing the dequantized, floating point result.
+
+    Raises:
+        ValueError: If ``encoding`` is not a supported quantization encoding,
+            or if the last dimension isn't divisible by the encoding's block
+            size.
+        TypeError: If the last dimension of ``quantized`` isn't static.
     """
     op_name = _DEQUANTIZE_OP_NAMES.get(encoding)
     if op_name is None:

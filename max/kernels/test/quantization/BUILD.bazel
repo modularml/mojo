@@ -1,15 +1,21 @@
 load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
+
+_EXTRA_DEPS = {
+    "test_qmatmul_k.mojo": ["//max:max_mojo"],
+}
 
 [
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         deps = [
             "//max:quantization",
             "@mojo//:std",
-        ],
+        ] + _EXTRA_DEPS.get(src, []),
     )
     for src in glob(
         ["**/*.mojo"],
@@ -21,6 +27,7 @@ package(default_visibility = ["//max:consumers"])
 mojo_test(
     name = "test_per_channel_grouped_4bit.mojo.test",
     srcs = ["test_per_channel_grouped_4bit.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = [
         "manual",
     ],

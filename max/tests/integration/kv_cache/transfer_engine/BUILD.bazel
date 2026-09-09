@@ -1,32 +1,147 @@
-load("//bazel:api.bzl", "modular_py_test", "requirement")
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
+
+# The NIXL drag race (//utils/benchmarking/nixl) reuses the cross-node harness
+# here as its per-role engine, so extend the inherited default visibility to
+# that package. Set via a gazelle directive so gazelle keeps it stable.
+# gazelle:default_visibility //max/tests:__subpackages__,//:__pkg__,//oss/modular/max/tests:__subpackages__,//utils/benchmarking/nixl:__pkg__
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
+    "//utils/benchmarking/nixl:__pkg__",
 ])
 
-modular_py_test(
-    name = "test_notification_latency",
-    srcs = ["test_notification_latency.py"],
+modular_py_library(
+    name = "transfer_engine_test_helpers",
+    testonly = True,
+    srcs = ["_transfer_engine_helpers.py"],
     imports = ["."],
-    # UCX currently only supports x86_64 linux machines
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/nn",
+    ],
+)
+
+modular_py_binary(
+    name = "run_cross_node",
+    srcs = ["run_cross_node.py"],
+    main = "run_cross_node.py",
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    deps = [],
+)
+
+modular_py_binary(
+    name = "test_transfer_engine_cross_node",
+    srcs = ["test_transfer_engine_cross_node.py"],
+    # The UCCL flavor (plugin + co-located transport lib) so the drag race can
+    # select `--backend uccl` on an AMD host. The other plugin flavors reach
+    # the runfiles tree via the kv_cache dep's :nixl_host_plugins; UCCL is
+    # staged only here, not in that shared set, so it does not flip the gating
+    # AMD transfer tests onto the default-UCCL resolver path.
+    data = [
+        "@nixl_upstream//:rocm_uccl_host_plugin",
+        # GEX-4139: pin the vendored efa_libfabric_prebuilt_cuda shared objects into
+        # the harness's runfiles so ci/nixl-perf-smoke-row.sh can LD_PRELOAD them
+        # (deterministic resolution of libibverbs/libefa) on runners whose system
+        # rdma-core generation does not match the bundled libefa.
+        "@efa_libfabric_prebuilt_cuda//:runtime_libs",
+    ],
+    main = "test_transfer_engine_cross_node.py",
     target_compatible_with = [
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
     deps = [
         "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/nn",
         "//max/python/max/pipelines/kv_cache",
+        requirement("msgspec"),
+        requirement("numpy"),
+        requirement("pyzmq"),
+    ],
+)
+
+modular_py_test(
+    name = "test_transfer_engine_dram",
+    srcs = ["test_transfer_engine_dram.py"],
+    # The CPU-flavor UCX plugin has no GPU driver load-time deps, so these
+    # tests run real NIXL DRAM transfers on CPU-only workers (presubmit).
+    # The test sets NIXL_PLUGIN_DIR to this dependency's cpu/ directory;
+    # the shared conftest.py is deliberately not included since it points
+    # NIXL_PLUGIN_DIR at the CUDA-flavor plugin location.
+    data = [
+        "@nixl_upstream//:cpu/libplugin_UCX.so",
+    ],
+    imports = ["."],
+    # One test per shard: NIXL transfers can hit invalid-FD errors when
+    # multiple transfers share a process (see test_send_recv.py header).
+    shard_count = 4,
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    deps = [
+        ":transfer_engine_test_helpers",
+        "//max/python/max/driver",
+        "//max/python/max/pipelines/kv_cache",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_notification_latency",
+    srcs = [
+        "conftest.py",
+        "test_notification_latency.py",
+    ],
+    # The NIXL plugins reach the runfiles tree via the kv_cache dep's
+    # :nixl_host_plugins data; the conftest resolves NIXL_PLUGIN_DIR through
+    # max._core.
+    # TODO(GEX-3817): fails deterministically on the b200 remote-exec
+    # workers — measured notification latency is ~10.3s against the test's
+    # 8s bound (10/10 runs, 2026-07-17), pointing at a real progress-thread
+    # delivery delay rather than machine flake. Keep manual until the
+    # latency is root-caused.
+    gpu_constraints = ["//:nvidia_gpu"],
+    imports = ["."],
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    deps = [
+        ":transfer_engine_test_helpers",
+        "//max/python/max/driver",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/tests/nixl:nixl_plugin_env",
         requirement("numpy"),
     ],
 )
 
 modular_py_test(
     name = "test_send_recv",
-    srcs = ["test_send_recv.py"],
-    gpu_constraints = ["//:has_gpu"],
+    srcs = [
+        "conftest.py",
+        "test_send_recv.py",
+    ],
+    # The NIXL plugins reach the runfiles tree via the kv_cache dep's
+    # :nixl_host_plugins data (vendor-selected flavors in per-vendor
+    # subdirs); the conftest resolves NIXL_PLUGIN_DIR through max._core.
+    # Needs a GPU host for a loadable UCX flavor: the cuda flavor needs
+    # libcuda, the rocm flavors need libhsa-runtime64; CPU-only machines
+    # (e.g. m7i) have neither until a ucx_cpu flavor ships.
+    gpu_constraints = [
+        "//:has_gpu",
+    ],
     imports = ["."],
     tags = [
         "gpu",
@@ -36,42 +151,37 @@ modular_py_test(
         "@platforms//os:linux",
     ],
     deps = [
+        ":transfer_engine_test_helpers",
         "//max/python/max/driver",
         "//max/python/max/pipelines/kv_cache",
-        requirement("numpy"),
-    ],
-)
-
-modular_py_test(
-    name = "test_send_recv_extra_group",
-    srcs = ["test_send_recv_extra_group.py"],
-    gpu_constraints = ["//:has_gpu"],
-    imports = ["."],
-    tags = [
-        "gpu",
-    ],
-    # UCX currently only supports linux machines
-    target_compatible_with = [
-        "@platforms//os:linux",
-    ],
-    deps = [
-        "//max/python/max/driver",
-        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/tests/nixl:nixl_plugin_env",
         requirement("numpy"),
     ],
 )
 
 modular_py_test(
     name = "test_read_transfer",
-    srcs = ["test_read_transfer.py"],
+    srcs = [
+        "conftest.py",
+        "test_read_transfer.py",
+    ],
+    # The NIXL plugins reach the runfiles tree via the kv_cache dep's
+    # :nixl_host_plugins data; the conftest resolves NIXL_PLUGIN_DIR through
+    # max._core.
+    gpu_constraints = ["//:nvidia_gpu"],
     imports = ["."],
+    tags = [
+        "gpu",
+    ],
     # UCX currently only supports linux machines
     target_compatible_with = [
         "@platforms//os:linux",
     ],
     deps = [
+        ":transfer_engine_test_helpers",
         "//max/python/max/driver",
         "//max/python/max/pipelines/kv_cache",
+        "//max/tests/tests/nixl:nixl_plugin_env",
         requirement("numpy"),
     ],
 )
@@ -83,36 +193,70 @@ _4X_GPU_TESTS = [
     "test_send_recv_heterogeneous_mla_gpu.py",
 ]
 
+_LIGHT_TRANSFER_GPU_TESTS = [
+    "test_basic_gpu.py",
+    "test_send_recv_multi_thread_gpu.py",
+    "test_spawn_plugin_preload_gpu.py",
+]
+
 modular_py_test(
     name = "multi-gpu-tests",
     srcs = glob(
         ["*_gpu.py"],
-        exclude = _4X_GPU_TESTS,
-    ),
+        exclude = _4X_GPU_TESTS + _LIGHT_TRANSFER_GPU_TESTS,
+    ) + ["conftest.py"],
     exec_properties = {
-        "test.resources:gpu-memory": "2",
+        "test.resources:gpu-memory": "3",
     },
     gpu_constraints = [
         "//:has_gpu",
         "//:has_multi_gpu",
-        "//:nvidia_gpu",
     ],
     imports = ["."],
     per_test_tags = {
         "test_send_recv_multi_process_gpu.py": ["manual"],  # FIXME: Times out intermittently (SERVOPT-1326)
     },
     tags = ["gpu"],
+    # NVIDIA or AMD, never Apple: Apple GPUs only exist on the macOS
+    # platform, and NIXL/UCX is Linux-only.
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
     deps = [
+        ":transfer_engine_test_helpers",
+        "//max/python/max/driver",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/tests/nixl:nixl_plugin_env",
+        requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "transfer_light_gpu_tests",
+    srcs = _LIGHT_TRANSFER_GPU_TESTS + ["conftest.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    gpu_constraints = [
+        "//:has_gpu",
+        "//:has_multi_gpu",
+    ],
+    imports = ["."],
+    tags = ["gpu"],
+    deps = [
+        ":transfer_engine_test_helpers",
         "//max/python/max/driver",
         "//max/python/max/dtype",
+        "//max/python/max/nn",
         "//max/python/max/pipelines/kv_cache",
+        "//max/tests/tests/nixl:nixl_plugin_env",
         requirement("numpy"),
     ],
 )
 
 modular_py_test(
     name = "4x-gpu-tests",
-    srcs = _4X_GPU_TESTS,
+    srcs = _4X_GPU_TESTS + ["conftest.py"],
     exec_properties = {
         "test.resources:gpu-memory": "2",
     },
@@ -125,8 +269,10 @@ modular_py_test(
     imports = ["."],
     tags = ["gpu"],
     deps = [
+        ":transfer_engine_test_helpers",
         "//max/python/max/driver",
         "//max/python/max/pipelines/kv_cache",
+        "//max/tests/tests/nixl:nixl_plugin_env",
         requirement("numpy"),
     ],
 )

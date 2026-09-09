@@ -14,13 +14,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import PixelContext
+from max.pipelines.context import PixelContext
+from max.pipelines.diffusion.config import GENERIC_TAYLORSEER_DEFAULTS
 from max.pipelines.lib import SupportedArchitecture
 from max.pipelines.lib.config import MAXModelConfig, PipelineConfig
 from max.pipelines.lib.interfaces import ArchConfig
+from max.pipelines.modeling.config_enums import SupportedEncoding
 from max.pipelines.modeling.types import PipelineTask
+from transformers import AutoConfig
 from typing_extensions import Self
 
 from .pipeline_z_image import ZImagePipeline
@@ -29,9 +33,22 @@ from .tokenizer import ZImageTokenizer
 
 @dataclass(kw_only=True)
 class ZImageArchConfig(ArchConfig):
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {"bfloat16"}
+
     pipeline_config: PipelineConfig
+    quantization_encoding: SupportedEncoding | None = None
 
     def get_max_seq_len(self) -> int:
+        return 0
+
+    @classmethod
+    def calculate_max_seq_len(
+        cls,
+        huggingface_config: AutoConfig,
+        model_config: MAXModelConfig,
+    ) -> int:
+        del huggingface_config, model_config
         return 0
 
     @classmethod
@@ -39,6 +56,8 @@ class ZImageArchConfig(ArchConfig):
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         model_config = model_config or pipeline_config.model
         if len(model_config.device_specs) != 1:
@@ -49,8 +68,8 @@ class ZImageArchConfig(ArchConfig):
 z_image_arch = SupportedArchitecture(
     name="ZImagePipeline",
     task=PipelineTask.PIXEL_GENERATION,
-    default_encoding="bfloat16",
-    supported_encodings={"bfloat16"},
+    default_encoding=ZImageArchConfig.DEFAULT_ENCODING,
+    supported_encodings=ZImageArchConfig.SUPPORTED_ENCODINGS,
     example_repo_ids=[
         "Tongyi-MAI/Z-Image",
         "Zyphra/Z-Image",
@@ -60,4 +79,5 @@ z_image_arch = SupportedArchitecture(
     default_weights_format=WeightsFormat.safetensors,
     tokenizer=ZImageTokenizer,
     config=ZImageArchConfig,
+    denoising_cache_defaults=GENERIC_TAYLORSEER_DEFAULTS,
 )

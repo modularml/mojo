@@ -1,0 +1,64 @@
+---
+title: '@implicit'
+description: Marks an initializer as eligible for implicit conversion.
+codeTitle: true
+---
+
+You can add the `@implicit` decorator on any single-argument initializer to
+identify it as eligible for implicit conversion.
+
+For example:
+
+```mojo
+struct MyInt:
+    var value: Int
+
+    @implicit
+    def __init__(out self, value: Int):
+        self.value = value
+
+    def __init__(out self, value: Float64):
+        self.value = Int(value)
+```
+
+This implicit conversion initializer allows you to pass an `Int` to a function
+that takes a `MyInt` argument, or assign an `Int` to a variable of type `MyInt`.
+However, the initializer that takes a `Float64` value is **not** an implicit
+conversion initializer, so it must be invoked explicitly:
+
+```mojo
+def func(n: MyInt):
+    print("MyInt value: ", n.value)
+
+def main():
+    func(Int(42))             # Implicit conversion from Int: OK
+    func(MyInt(Float64(4.2))) # Explicit conversion from Float64: OK
+    func(Float64(4.2))        # Error: can't convert Float64 to MyInt
+```
+
+## Deprecation
+
+Over time, you may decide that an implicit conversion is no longer appropriate
+for your code base. For example, it may hide complexity or cause ambiguous
+function overloads. In such cases, Mojo lets you mark a conversion as deprecated
+using its built-in `deprecated` argument on the @implicit decorator. Deprecation
+allows you to phase out the conversion gradually instead of causing abrupt
+behavior changes.
+
+Supply a Boolean value to the `deprecated` argument:
+
+```mojo
+struct MyStruct:
+    @implicit(deprecated=True)
+    def __init__(out self, value: Int):
+        # ...
+```
+
+This tells the compiler to emit a warning when the conversion is used
+implicitly, without breaking existing code:
+
+```mojo
+_: MyStruct = 1  # Warns on implicit conversion
+
+_ = MyStruct(1)  # No warning. Conversion is explicit
+```

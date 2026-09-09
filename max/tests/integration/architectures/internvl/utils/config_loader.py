@@ -26,7 +26,7 @@ from max.dtype import DType
 from max.graph import DeviceRef
 from max.graph.weights.weights import WeightData
 from max.nn import ReturnLogits
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams
 from max.pipelines.architectures.internvl.model_config import (
     InternVLConfig,
     VisionConfig,
@@ -102,7 +102,7 @@ class ConfigLoader:
         llm_config = hf_config["llm_config"]
 
         # Create minimal KV cache params
-        kv_params = KVCacheParams(
+        kv_params = MHAKVCacheParams(
             dtype=DType.bfloat16,
             n_kv_heads=llm_config["num_key_value_heads"],
             head_dim=llm_config["hidden_size"]

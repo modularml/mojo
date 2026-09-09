@@ -1,0 +1,466 @@
+---
+title: "Get started with Mojo"
+description: "Learn Mojo syntax by building Conway's Game of Life"
+---
+
+<!-- markdownlint-disable MD033 -->
+
+Get started with Mojo by building
+[Conway's Game of Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life),
+a simulation in which cells live, die, and reproduce based on the state of
+their neighbors.
+
+As you build the game, you'll learn the Mojo syntax you need to start writing
+programs of your own.
+
+:::tip Before you start
+Make sure you've installed Mojo and can build and run Mojo code.
+
+If you're using an AI coding assistant, install
+[Mojo agent skills](/docs/tools/skills). The skills track current Mojo syntax
+and language features.
+
+```bash
+npx skills add modular/skills
+```
+
+:::
+
+## Game state
+
+Conway's Game of Life runs on a two-dimensional grid. Each cell is either
+alive or it's dead. You'll use `1` for live cells and `0` for inactive
+cells. You'll be able to count the neighbors around each cell by adding
+their values.
+
+Create `life.mojo`. Build an 8 x 8 grid containing a
+[glider](https://en.wikipedia.org/wiki/Glider_(Conway%27s_Game_of_Life)):
+
+```mojo
+def main():
+    var count, num_cols = 64, 8
+    var glider_grid: List[Int] = List[Int](length=64, fill=0)
+
+    # Convert (x, y) coordinates to a linear index in the grid
+    var to_index = lambda (x: Int, y: Int) -> Int: y * num_cols + x
+
+    # Set up the grid
+    for coord in [(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)]:
+        glider_grid[to_index(coord[0], coord[1])] = 1
+
+    # Print the grid
+    for index in range(count):
+        print("X" if glider_grid[index] else ".", end="")
+        if index % num_cols == (num_cols - 1): print()
+```
+
+Output:
+
+```output
+..X.....
+X.X.....
+.XX.....
+........
+........
+........
+........
+........
+```
+
+### Checkpoint
+
+- All variable declarations start with `var`. `var` bindings are mutable
+  by default.
+- The `to_index` lambda defines a small local function that converts
+  coordinates to a list index.
+
+When assigning contents, a list expression sets the values:
+
+```mojo
+var values: List[Int] = [12, -7, 64]  # This is a list expression
+```
+
+In parameterized type names, square brackets supply compile-time *parameters*:
+
+```mojo
+List[Int]
+Grid[8, 8]
+```
+
+Parentheses supply run-time *arguments*:
+
+```mojo
+print(value)
+Grid[8, 8]()
+```
+
+## Add reusable printing
+
+Move the display loop to a reusable function. Place this above `main()`:
+
+```mojo
+def print_grid(grid: List[Int], num_cols: Int):
+    for index in range(len(grid)):
+        print("X" if grid[index] else ".", end="")
+        if index % num_cols == (num_cols - 1): print()
+```
+
+Replace the print loop with `print_grid(glider_grid, num_cols)` and run.
+
+## Add lookups
+
+Make a few more changes in place in `life.mojo`:
+
+```mojo
+comptime count = 64
+comptime num_cols = 8
+comptime num_rows = count // num_cols
+
+comptime to_index = lambda (x: Int, y: Int) -> Int: (
+    y * num_cols + x
+)
+comptime to_coord = lambda (i: Int) -> Tuple[Int, Int]: (
+        (i % num_cols, i // num_cols)
+    )
+
+def print_grid(grid: List[Int]):
+    for index in range(len(grid)):
+        print("X" if grid[index] else ".", end="")
+        if index % num_cols == (num_cols - 1): print()
+
+def main():
+    var glider_grid: List[Int] = List[Int](length=64, fill=0)
+
+    # Set up the grid
+    for coord in [(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)]:
+        glider_grid[to_index(coord[0], coord[1])] = 1
+
+    # Print the grid
+    print_grid(glider_grid)
+```
+
+Now you can convert coordinates to indices and indices to coordinates.
+
+### Checkpoint
+
+- You've moved all the constants out from `main()` to `comptime`
+  declarations, making them available throughout this file. They're
+  evaluated at compile time.
+- You've removed the second argument from `print_grid()`.
+
+### Try this
+
+Try declaring the number of rows as a constant and compute the count
+at compile time.
+
+## Define a `Grid` type
+
+Revise your code again, into a new file called `grid.mojo`. You're
+creating a new type, called a `struct`:
+
+```mojo
+struct Grid[num_cols: Int, num_rows: Int]:
+    var cells: List[Int]
+    var count: Int
+
+    def __init__(out self):
+        self.count = Self.num_cols * Self.num_rows
+        self.cells = List[Int](length=self.count, fill=0)
+
+def main():
+    var glider_grid = Grid[8, 8]()
+```
+
+`__init__(out self)` initializes a new `Grid`. Every field must receive a
+value before the initializer returns.
+
+Here, `count` comes from the grid dimensions, and `cells` starts as a list
+of zeros.
+
+### Checkpoint
+
+- `Grid` uses both compile-time parameters and runtime fields.
+- `Self.num_cols` and `Self.num_rows` belong to the parameterized type.
+- `self.cells` and `self.count` belong to one `Grid` instance.
+- If an initializer only assigns arguments directly to fields, add
+  `@fieldwise_init` to the struct instead. Mojo generates that initializer
+  for you. This `Grid` needs custom initialization, so it defines
+  `__init__()` directly.
+
+## Add grid operations
+
+Put the following content into your `Grid` struct:
+
+```mojo
+    comptime to_index = lambda (x: Int, y: Int) -> Int: (
+        y * Self.num_cols + x
+    )
+
+    comptime to_coord = lambda (i: Int) -> Tuple[Int, Int]: (
+        (i % Self.num_cols, i // Self.num_cols)
+    )
+
+    def print_grid(self):
+        for index in range(len(self.cells)):
+            print("X" if self.cells[index] else ".", end="")
+            if index % Self.num_cols == (Self.num_cols - 1): print()
+
+    def __setitem__(mut self, coord: Tuple[Int, Int], value: Int):
+        self.cells[Self.to_index(coord[0], coord[1])] = value
+
+    def __getitem__(self, coord: Tuple[Int, Int]) -> Int:
+        return self.cells[Self.to_index(coord[0], coord[1])]
+```
+
+### Checkpoint
+
+- `Self.to_index()` accesses a compile-time member of the type.
+- Instance methods take `self` as their first argument.
+- `mut self` allows a method to change the instance.
+- `__getitem__()` and `__setitem__()` define indexing behavior, so a
+  `Grid` can use `grid[coord]`.
+
+Don't add this anywhere. It's a preview of how this all works from the
+call site:
+
+```mojo
+# Set up the grid
+for coord in [(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)]:
+    glider_grid[coord] = 1  # Uses indexing
+```
+
+You can overload these methods when their signatures are distinct.
+
+## Import `Grid`
+
+Remove `main()` from `grid.mojo`, save it, and import your new type into
+`life.mojo`:
+
+```mojo
+from grid import Grid  # Separate concerns into separate files
+
+def main():
+    var glider_grid = Grid[8, 8]()
+
+    # Set up the grid
+    for coord in List([(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)]):
+        glider_grid[coord] = 1
+
+    # Print the grid
+    glider_grid.print_grid()
+```
+
+Run it and confirm everything works as expected.
+
+## Be random
+
+Gliders are terrific for validating code but random values are great
+for improving animations. Set up your seed in `main()`:
+
+```mojo
+from std.random import seed
+from grid import Grid
+
+def main():
+    seed()
+
+    # ...
+```
+
+Mojo won't allow runtime statements at global scope, so you can't call
+seed() there. Instead, seed the RNG from executable code, such as main() or
+another function. The seed applies to uses of the imported random module,
+so you only need to seed it once.
+
+### Add some protection
+
+Filling every cell independently gives you random static. It works, but it
+doesn't produce especially interesting Game of Life patterns. Instead,
+build a few random clumps of live cells.
+
+To start, add checks to your setter in `grid.mojo`. A coordinate check
+function helps.
+
+You can add a check to the getter but it's better to test and not return a
+made-up value. Don't make `__getitem__()` silently invent an out-of-bounds
+value; test coordinates before indexing instead.
+
+```mojo
+def is_valid_coord(self, coord: Tuple[Int, Int]) -> Bool:
+    return (
+        not (
+            coord[0] < 0
+            or coord[0] >= Self.num_cols
+            or coord[1] < 0
+            or coord[1] >= Self.num_rows
+        )
+    )
+
+def __setitem__(mut self, coord: Tuple[Int, Int], value: Int):
+    if not self.is_valid_coord(coord): return # no op
+    self.cells[Self.to_index(coord[0], coord[1])] = value
+```
+
+### Construct the random grid
+
+Add a static method that constructs a random `Grid`:
+
+```mojo
+from std.random import random_si64  # Add this import to grid.mojo
+
+@staticmethod
+def random_grid(var clumps: Int = 2) -> Self:
+    var grid = Self()
+    for _ in range(clumps + 1):
+        var idx = Int(random_si64(0, Int64(grid.count) - 1))
+        var x, y = Self.to_coord(idx)
+        grid[(x, y)] = 1  # Fill index cell
+
+        for dx in range(-1, 2):  # -1, 0, or 1
+            for dy in range(-1, 2):
+                if not grid.is_valid_coord((x + dx, y + dy)): continue
+                if random_si64(0, 3) > 0: continue  # 75% skip
+                grid[(x + dx, y + dy)] = 1
+    return grid^
+```
+
+This method builds two clumps by default.
+
+A `@staticmethod` belongs to the type and not an individual instance. Call
+it through `Grid`:
+
+```mojo
+print("\nRandom grid:\n")
+var random_grid = Grid[8, 8].random_grid()
+random_grid.print_grid()
+```
+
+You don't have to add this code except to test it.
+
+### Checkpoint
+
+- This static method still needs `Grid` parameters, namely 8 and 8.
+- Each neighboring cell has a 25% chance of becoming live. Adjust
+  to suit your taste.
+- `random_si64()` returns an `Int64`. Cast the value to `Int`.
+- The clump loop variable is `_`, the discard pattern. Use this when
+  you don't care about the value it produces.
+- A `^` sigil transfers the newly initialized `Grid`, avoiding a copy.
+
+## Evolve
+
+In `life.mojo`, choose one grid as your starting point, and cut out
+the other. Remove the print statements for now.
+
+Now, make the grid start to change over time. Start by adding a
+separate list to `Grid` and initialize it:
+
+```mojo
+struct Grid[num_cols: Int, num_rows: Int]:
+    var cells: List[Int]
+    var next_cells: List[Int]
+    var count: Int
+
+    def __init__(out self):
+        self.count = Self.num_cols * Self.num_rows
+        self.cells = List[Int](length=self.count, fill=0)
+        self.next_cells = List[Int](length=self.count, fill=0)
+```
+
+Conway's Game of Life applies three rules to every cell:
+
+- A live cell stays alive with two or three live neighbors.
+- A dead cell becomes alive with exactly three live neighbors.
+- Every other cell is dead in the next generation.
+
+The updated cells are stored in the new array so they don't affect the
+previous generation math.
+
+Each cell has eight neighbors: the cells in the 3 x 3 square around it,
+excluding the cell itself.
+
+Add these methods to `Grid`:
+
+```mojo
+def evolve(mut self, var i: Int):
+    var is_live = Bool(self.cells[i])
+    self.next_cells[i] = 0
+
+    # Count the neighbors
+    var ncount = -1 if is_live else 0
+    var x, y = Self.to_coord(i)
+    for dx in range(-1, 2):
+        for dy in range(-1, 2):
+            var nx, ny = x + dx, y + dy
+            if not self.is_valid_coord((nx, ny)): continue
+            ncount += self.cells[Self.to_index(nx, ny)]
+
+    # Live cell stays alive with two or three live neighbors
+    if is_live and (ncount == 2 or ncount == 3):
+        self.next_cells[i] = 1
+    # Dead cell becomes alive with exactly three live neighbors
+    elif not is_live and ncount == 3:
+        self.next_cells[i] = 1
+
+def evolve(mut self):
+    for i in range(self.count):
+        var x, y = Self.to_coord(i)
+        # Edges are excluded from evolution and will always go dead.
+        if (x == 0 or y == 0 or 
+            x == Self.num_cols - 1 or y == Self.num_rows - 1):
+            self.next_cells[i] = 0  # Edges go dead
+            continue
+        self.evolve(i)
+
+    # Swap the current and next cell states
+    self.cells = self.next_cells^  # Transfer
+    self.next_cells = List[Int](length=self.count, fill=0) # Fresh
+```
+
+### Checkpoint
+
+- A great example of overloading for different intent: `evolve()` has
+  two forms, one for the full grid, and one for a single cell.
+- The `next_cells` array is always initialized to zero before evolution.
+  At the end, it replaces the cells and is re-initialized.
+- The algorithm progresses in integer order, excluding edges. Live cells
+  start with a count of -1 so they can be counted without special casing.
+- Mojo's "ternary" has no
+  [Elvis](https://en.wikipedia.org/wiki/Elvis_operator).
+  Value if condition else value: `-1 if is_live else 0`.
+
+## Run the simulation
+
+Add a loop so you can watch the grid evolve in the terminal. Here's the
+final `life.mojo`:
+
+```mojo
+from std.random import seed
+from grid import Grid
+from std.time import sleep
+
+def main():
+    seed()
+
+    var grid = Grid[60, 20].random_grid(240)
+    var gen = 1
+
+    for _ in range(300):
+        print(t"\033[H\033J\nGeneration: {gen}")
+        grid.evolve(); grid.print_grid()
+        sleep(0.1); gen += 1
+```
+
+### Checkpoint
+
+- A TString starts with `t"` and creates a template format. `print()`
+  statements automatically perform conversions to strings, but
+  everywhere else you'll need to explicitly call `String()`.
+- The odd characters in the print statement are ANSI escape codes.
+  You'll see the updates generation-by-generation. Keep your terminal
+  at a minimum of 80x24 for best results.
+- Mojo uses semicolons to separate statements, not to end them. One
+  statement per line is the usual form. This listing pairs them to stay
+  compact.
+
+<!-- markdownlint-enable MD033 -->

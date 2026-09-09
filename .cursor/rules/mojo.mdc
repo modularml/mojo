@@ -7,7 +7,7 @@ globs: **/*.mojo
 
 
 - Adhere to Mojos's coding standards to ensure code consistency, readability, and maintainability. Using
-- Always use the documentation in https://docs.modular.com/mojo/manual/
+- Always use the documentation in https://mojolang.org/docs/manual/
 
 - ## 1. Code Organization and Structure
 

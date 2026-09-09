@@ -32,8 +32,6 @@ class ThreadSyncMode(enum.Enum):
 
     STRICT = 1
 
-    DEFAULT = 0
-
 class MemoryType(enum.Enum):
     DRAM = 0
 
@@ -41,7 +39,7 @@ class MemoryType(enum.Enum):
 
     BLK = 2
 
-    OBJ = 2
+    OBJ = 3
 
     FILE = 4
 
@@ -65,41 +63,18 @@ class Status(enum.Enum):
 
     SUCCESS = 0
 
-class NotPostedError(Exception):
-    pass
-
-class InvalidParamError(Exception):
-    pass
-
-class BackendError(Exception):
-    pass
-
-class NotFoundError(Exception):
-    pass
-
-class MismatchError(Exception):
-    pass
-
-class NotAllowedError(Exception):
-    pass
-
-class RepostActiveError(Exception):
-    pass
-
-class UnknownError(Exception):
-    pass
-
-class NotSupportedError(Exception):
-    pass
-
-class RemoteDisconnectError(Exception):
-    pass
-
-class CanceledError(Exception):
-    pass
-
-class NoTelemetryError(Exception):
-    pass
+class NotPostedError(Exception): ...
+class InvalidParamError(Exception): ...
+class BackendError(Exception): ...
+class NotFoundError(Exception): ...
+class MismatchError(Exception): ...
+class NotAllowedError(Exception): ...
+class RepostActiveError(Exception): ...
+class UnknownError(Exception): ...
+class NotSupportedError(Exception): ...
+class RemoteDisconnectError(Exception): ...
+class CanceledError(Exception): ...
+class NoTelemetryError(Exception): ...
 
 class TransferTelemetry:
     @property
@@ -215,8 +190,9 @@ class AgentConfig:
         self,
         use_prog_thread: bool,
         use_listen_thread: bool = False,
-        listen_port: int = 0,
+        listen_port: int = 8888,
         sync_mode: ThreadSyncMode = ThreadSyncMode.NONE,
+        num_workers: int = 1,
         pthr_delay_us: int = 0,
         lthr_delay_us: int = 100000,
     ) -> None: ...
@@ -289,9 +265,6 @@ class Agent:
     def get_transfer_telemetry(
         self, request_handle: int
     ) -> TransferTelemetry: ...
-    def get_transfer_notif_overflow(
-        self, request_handle: int
-    ) -> tuple[int, int]: ...
     def query_transfer_backend(self, request_handle: int) -> int: ...
     def release_transfer_request(self, request_handle: int) -> Status: ...
     def release_descriptor_list_handle(self, handle: int) -> Status: ...

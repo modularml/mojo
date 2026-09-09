@@ -1,0 +1,16 @@
+{
+  "target": "reductions",
+  "spec": {
+    "rank": 2,
+    "reduce_dim": 1,
+    "d0": 8,
+    "d1": 4096,
+    "d2": 1,
+    "op": 5,
+    "dist": 0
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "a long inner row, argmin: past the warp tier's chunk cap into the block tier, which recomputes the row count on device independently of the host launch.",
+  "findings": []
+}

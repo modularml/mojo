@@ -21,11 +21,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
-from huggingface_hub import hf_hub_download
 from PIL import Image
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from typing_extensions import override
 
+from ._hf_download import hf_hub_download_with_retry
 from ._tokenizer_pool import TokenizerPool, _encode_ids
 from .distribution import BaseDistribution, DistributionParameter
 from .local import LocalBenchmarkDataset
@@ -101,7 +101,6 @@ class RandomBenchmarkDataset(LocalBenchmarkDataset):
 
         Random datasets are generated synthetically and don't require file fetching.
         """
-        pass
 
     def gen_multiturn_random_requests(
         self,
@@ -303,7 +302,7 @@ class RandomBenchmarkDataset(LocalBenchmarkDataset):
             Tuple of (sys_prompt_pool, user_prompt_pool), each a list of
             tokenized prompts (list of token IDs).
         """
-        dataset_path = hf_hub_download(
+        dataset_path = hf_hub_download_with_retry(
             repo_id="anon8231489123/ShareGPT_Vicuna_unfiltered",
             filename="ShareGPT_V3_unfiltered_cleaned_split.json",
             repo_type="dataset",

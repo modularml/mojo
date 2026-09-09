@@ -10,6 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Provides Ampere (SM80) matmul dispatch table lookup and config creation."""
+
 from std.hashlib import default_comp_time_hasher
 
 
@@ -19,6 +21,15 @@ from ....utils_gpu import MatmulConfig
 def create_matmul_configs_ampere[
     key: String, a_type: DType, b_type: DType, c_type: DType, transpose_b: Bool
 ]() -> MatmulConfig[a_type, b_type, c_type, transpose_b]:
+    """Returns the Ampere matmul config registered under the given key, falling back to a default config when the key is absent.
+
+    Parameters:
+        key: Tile configuration key to look up in the dispatch table.
+        a_type: Element type of the left-hand input matrix.
+        b_type: Element type of the right-hand input matrix.
+        c_type: Element type of the output matrix.
+        transpose_b: Whether the right-hand input matrix is transposed.
+    """
     var dict = get_dispatch_table[a_type, b_type, c_type, transpose_b]()
     try:
         return dict[key]
@@ -35,6 +46,14 @@ def get_dispatch_table[
     MatmulConfig[a_type, b_type, c_type, transpose_b],
     default_comp_time_hasher,
 ]:
+    """Returns the dispatch table of named Ampere matmul tile configurations for the given dtypes and transpose setting.
+
+    Parameters:
+        a_type: Element type of the left-hand input matrix.
+        b_type: Element type of the right-hand input matrix.
+        c_type: Element type of the output matrix.
+        transpose_b: Whether the right-hand input matrix is transposed.
+    """
     var tile_configs = Dict[
         String,
         MatmulConfig[a_type, b_type, c_type, transpose_b],

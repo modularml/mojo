@@ -26,6 +26,14 @@ def test_accelerator_device() -> None:
     assert not dev.is_host
 
 
+def test_is_host_unified_is_reachable_and_host_is_unified() -> None:
+    # Whether an accelerator is unified depends on the model, so the value is
+    # pinned in GPUDeviceContextTest; here we only need the property to reach
+    # the driver without raising.
+    assert isinstance(Accelerator().is_host_unified, bool)
+    assert CPU().is_host_unified
+
+
 def test_accelerator_is_compatible() -> None:
     accelerator = Accelerator()
     assert accelerator.is_compatible

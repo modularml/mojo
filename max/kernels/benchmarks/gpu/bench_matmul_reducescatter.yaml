@@ -1,0 +1,148 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# Shapes targeted at Kimi K2 (hidden_size=7168, intermediate_size=18432,
+# num_heads x v_head_dim = 64 x 128 = 8192). The matmul+RS fusion applies to
+# row-parallel GEMMs where the output is reduce-scattered across TP ranks:
+#   - Attention o_proj:     N=hidden_size,        K=(num_heads*v_head_dim)/TP
+#   - Dense MLP down_proj:  N=hidden_size,        K=intermediate_size/TP
+#                           (first_k_dense_replace=1 so only the first layer)
+#
+# Two regimes covered:
+#   - Prefill (rows_per_peer = M/ngpus >= 128): whole-tile TMA per peer.
+#   - Decode  (rows_per_peer < 128): per-row TMA, dispatches to the decode
+#     kernel variant. Relevant M values for decode are 1..128 (pre-captured
+#     for CUDA-graph replay).
+#
+# Reference PoC shape: (M=2048, N=8192, K=4096) on 8xB200 -- kept as a
+# cross-check against earlier numbers.
+
+name: bench_matmul_reducescatter
+file: $KERNEL_BENCHMARKS_ROOT/gpu/bench_matmul_reducescatter.mojo
+
+commons: &commons
+  dtype: [DType.bfloat16]
+
+params:
+
+# -----------------------------------------------------------------------------
+# Attention o_proj: N=7168, K=8192/TP
+# -----------------------------------------------------------------------------
+
+# TP=2: K = 8192/2 = 4096
+- <<: *commons
+  num_gpus: [2]
+  $M: [512, 1024, 2048, 4096, 8192]
+  N: 7168
+  K: 4096
+
+# TP=4: K = 8192/4 = 2048
+- <<: *commons
+  num_gpus: [4]
+  $M: [512, 1024, 2048, 4096, 8192]
+  N: 7168
+  K: 2048
+
+# TP=8: K = 8192/8 = 1024
+- <<: *commons
+  num_gpus: [8]
+  $M: [1024, 2048, 4096, 8192]
+  N: 7168
+  K: 1024
+
+# -----------------------------------------------------------------------------
+# Dense MLP down_proj: N=7168, K=18432/TP  (first layer only)
+# -----------------------------------------------------------------------------
+
+# TP=2: K = 18432/2 = 9216
+- <<: *commons
+  num_gpus: [2]
+  $M: [512, 1024, 2048, 4096, 8192]
+  N: 7168
+  K: 9216
+
+# TP=4: K = 18432/4 = 4608
+- <<: *commons
+  num_gpus: [4]
+  $M: [512, 1024, 2048, 4096, 8192]
+  N: 7168
+  K: 4608
+
+# TP=8: K = 18432/8 = 2304
+- <<: *commons
+  num_gpus: [8]
+  $M: [1024, 2048, 4096, 8192]
+  N: 7168
+  K: 2304
+
+# =============================================================================
+# Decode shapes (M < 128 * num_gpus => per-row TMA path).
+# =============================================================================
+# Typical decode token counts: 1 (greedy), small powers of 2 up to the
+# pre-capture limit of 128. A few ragged M values are included to exercise
+# the block-with-remainder row distribution.
+
+# --- Attention o_proj decode ---
+- <<: *commons
+  num_gpus: [2]
+  $M: [1, 2, 4, 8, 16, 32, 64, 128]
+  N: 7168
+  K: 4096
+
+- <<: *commons
+  num_gpus: [4]
+  $M: [1, 2, 4, 8, 16, 32, 64, 128]
+  N: 7168
+  K: 2048
+
+- <<: *commons
+  num_gpus: [8]
+  $M: [1, 2, 4, 8, 16, 32, 64, 128]
+  N: 7168
+  K: 1024
+
+# --- Dense MLP down_proj decode (first layer only) ---
+- <<: *commons
+  num_gpus: [2]
+  $M: [1, 2, 4, 8, 16, 32, 64, 128]
+  N: 7168
+  K: 9216
+
+- <<: *commons
+  num_gpus: [4]
+  $M: [1, 2, 4, 8, 16, 32, 64, 128]
+  N: 7168
+  K: 4608
+
+- <<: *commons
+  num_gpus: [8]
+  $M: [1, 2, 4, 8, 16, 32, 64, 128]
+  N: 7168
+  K: 2304
+
+# --- Ragged M regression (block-with-remainder distribution) ---
+# Pick one representative op (o_proj TP=8) with non-power-of-2 M values.
+- <<: *commons
+  num_gpus: [8]
+  $M: [3, 7, 10, 31, 63, 127]
+  N: 7168
+  K: 1024
+
+# -----------------------------------------------------------------------------
+# PoC reference shape from Notion doc (not a Kimi shape; keep for regression
+# tracking against previous measurements).
+# -----------------------------------------------------------------------------
+- <<: *commons
+  num_gpus: [8]
+  $M: [2048]
+  N: 8192
+  K: 4096

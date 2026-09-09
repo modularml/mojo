@@ -1,0 +1,19 @@
+load("//bazel:api.bzl", "modular_py_library")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "dflash_kimi_k25",
+    srcs = glob(["**/*.py"]),
+    ignore_extra_deps = [
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+    ],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+    ],
+)

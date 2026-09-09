@@ -194,7 +194,7 @@ def run(
     visible_device_prefix = _get_visible_device_prefix(str(target_accelerator))
 
     # 0 means no timeout (infinite wait).
-    effective_timeout = timeout_secs if timeout_secs else None
+    effective_timeout = timeout_secs or None
 
     # Run the code over the mesh of param/values
     t_start_total = time()

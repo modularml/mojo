@@ -15,20 +15,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import ClassVar, Literal
 
 from max.graph import DeviceRef
-from max.graph.weights import WeightData, WeightsFormat, weights_format
-from max.nn.kv_cache import KVCacheParams
+from max.graph.weights import WeightData
+from max.nn.kv_cache import KVCacheParamInterface
 from max.nn.rotary_embedding import Llama3RopeScalingParams
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
+from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.lib.config.model_config import (
+    _interleaved_rope_weights,
+    _select_quantization_encoding,
+)
 from max.pipelines.lib.interfaces.arch_config import (
-    ArchConfigWithDecoderSubconfigKVParams,
     ArchConfigWithKVCache,
+    ArchVLConfigWithTextSubconfig,
 )
 from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
-from max.pipelines.modeling.config_enums import supported_encoding_dtype
+from max.pipelines.modeling.config_enums import (
+    SupportedEncoding,
+    supported_encoding_dtype,
+)
 from transformers import AutoConfig
 from typing_extensions import Self, override
 
@@ -40,10 +48,11 @@ from ..llama3_modulev3.model_config import Llama3Config
 
 
 @dataclass(kw_only=True)
-class Idefics3Config(
-    ArchConfigWithDecoderSubconfigKVParams, ArchConfigWithKVCache
-):
+class Idefics3Config(ArchVLConfigWithTextSubconfig, ArchConfigWithKVCache):
     """Configuration for Idefics3 models (ModuleV3)."""
+
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {"bfloat16"}
 
     devices: list[DeviceRef]
     """Devices that the Idefics3 model is parallelized over."""
@@ -63,6 +72,8 @@ class Idefics3Config(
     text_config: Llama3Config
     """Text model configuration (Llama3-based)."""
 
+    quantization_encoding: SupportedEncoding | None = None
+
     @property
     def image_seq_len(self) -> int:
         """Calculate the number of image tokens after connector processing."""
@@ -72,13 +83,9 @@ class Idefics3Config(
         total_patches = patches_per_side * patches_per_side
         return total_patches // (self.scale_factor * self.scale_factor)
 
-    def get_kv_params(self) -> KVCacheParams:
+    def get_kv_params(self) -> KVCacheParamInterface:
         """Returns the KV cache parameters from the embedded text config."""
         return self.text_config.get_kv_params()
-
-    def get_max_seq_len(self) -> int:
-        """Returns the maximum sequence length from the embedded text config."""
-        return self.text_config.get_max_seq_len()
 
     @staticmethod
     def get_num_layers(huggingface_config: AutoConfig) -> int:
@@ -88,25 +95,14 @@ class Idefics3Config(
         )
         return text_config.num_hidden_layers
 
-    @staticmethod
-    def calculate_max_seq_len(
-        pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        """Calculate maximum sequence length for Idefics3."""
-        text_config = getattr(
-            huggingface_config, "text_config", huggingface_config
-        )
-        return Llama3Config.calculate_max_seq_len(
-            pipeline_config=pipeline_config,
-            huggingface_config=text_config,
-        )
-
     @override
     @classmethod
     def initialize(
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes an Idefics3Config instance from pipeline configuration."""
         model_config = model_config or pipeline_config.model
@@ -124,11 +120,15 @@ class Idefics3Config(
 
         # Build a V3 Llama3Config for the text component.
         text_config = _create_llama3_text_config(
-            pipeline_config, hf_text_config
+            pipeline_config, hf_text_config, max_seq_len
         )
 
         vision_config = Idefics3VisionConfig.initialize_from_config(
             pipeline_config, huggingface_config, text_config.hidden_size
+        )
+
+        quantization_encoding = _select_quantization_encoding(
+            model_config, cls.DEFAULT_ENCODING
         )
 
         return cls(
@@ -142,6 +142,7 @@ class Idefics3Config(
             ),
             vision_config=vision_config,
             text_config=text_config,
+            quantization_encoding=quantization_encoding,
         )
 
     def finalize(
@@ -150,7 +151,7 @@ class Idefics3Config(
         llm_state_dict: dict[str, WeightData],
         return_logits: ReturnLogits,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
-        norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm",
+        norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm",
     ) -> None:
         """Finalize the Idefics3Config with state_dict-dependent fields."""
         hf_text_config = getattr(
@@ -169,25 +170,24 @@ class Idefics3Config(
 def _create_llama3_text_config(
     pipeline_config: PipelineConfig,
     hf_text_config: AutoConfig,
+    max_seq_len: int,
 ) -> Llama3Config:
     """Create a V3 Llama3Config from a text sub-config.
 
-    This replicates the initialization logic of Llama3Config.initialize()
+    This replicates the initialization logic of Llama3Config.initialize(max_seq_len=max_seq_len)
     but accepts a specific HuggingFace text sub-config rather than reading
     from pipeline_config.model.huggingface_config.
     """
     kv_cache_config = pipeline_config.model.kv_cache
-    quantization_encoding = pipeline_config.model.quantization_encoding
-    if quantization_encoding is None:
-        raise ValueError("quantization_encoding must not be None")
-    dtype = supported_encoding_dtype(quantization_encoding)
-    cache_dtype = pipeline_config.model.kv_cache.cache_dtype
-
-    _weights_format = weights_format(pipeline_config.model.weight_path)
-    interleaved_rope_weights = (
-        _weights_format == WeightsFormat.gguf
-        and pipeline_config.model.rope_type == "normal"
+    quantization_encoding = _select_quantization_encoding(
+        pipeline_config.model, Idefics3Config.DEFAULT_ENCODING
     )
+    dtype = supported_encoding_dtype(quantization_encoding)
+    cache_dtype = cache_dtype_for_encoding(
+        quantization_encoding, pipeline_config.model.kv_cache.kv_cache_format
+    )
+
+    interleaved_rope_weights = _interleaved_rope_weights(pipeline_config.model)
 
     device_refs = [
         DeviceRef(spec.device_type, spec.id)
@@ -216,10 +216,6 @@ def _create_llama3_text_config(
         hf_text_config
     )
 
-    max_seq_len = Llama3Config.calculate_max_seq_len(
-        pipeline_config, huggingface_config=hf_text_config
-    )
-
     return Llama3Config(
         hidden_size=hf_text_config.hidden_size,
         num_attention_heads=hf_text_config.num_attention_heads,
@@ -246,4 +242,5 @@ def _create_llama3_text_config(
         devices=device_refs,
         clip_qkv=getattr(hf_text_config, "clip_qkv", None),
         logits_scaling=getattr(hf_text_config, "logits_scaling", 1.0),
+        quantization_encoding=quantization_encoding,
     )

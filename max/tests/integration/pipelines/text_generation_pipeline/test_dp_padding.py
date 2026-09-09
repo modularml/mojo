@@ -14,16 +14,19 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any
 from unittest.mock import MagicMock
 
 import numpy as np
+import numpy.typing as npt
 import pytest
 from max.driver import CPU
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheParams
-from max.pipelines.core import TextContext
+from max.nn.kv_cache import MHAKVCacheParams
+from max.pipelines.context import TextAndVisionContext, TextContext
 from max.pipelines.kv_cache import PagedKVCacheManager
 from max.pipelines.modeling.types import (
     BatchType,
@@ -34,11 +37,32 @@ from max.serve.scheduler.batch_constructor.text_batch_constructor import (
     TextBatchConstructor,
 )
 from max.serve.scheduler.config import TokenGenerationSchedulerConfig
-from max.serve.scheduler.dp_padding import (
-    DPBatchPadder,
-    DPPaddingInfo,
-)
+from max.serve.scheduler.dp_padding import DPBatchPadder, DPPaddingInfo
 from test_common.context_utils import create_text_context
+
+
+@dataclass(kw_only=True)
+class _KimiLikeContext(TextAndVisionContext):
+    """Mimics KimiK2_5TextAndVisionContext: extra fields all have defaults."""
+
+    grid_thws: npt.NDArray[np.int64] = field(
+        default_factory=lambda: np.empty((0, 3), dtype=np.int64)
+    )
+
+
+@dataclass(kw_only=True)
+class _Gemma4LikeContext(TextAndVisionContext):
+    """Mimics Gemma4Context: a required constructor field with no default."""
+
+    mm_token_type_ids: npt.NDArray[np.int64]
+
+    @classmethod
+    def _padding_context_required_fields(cls) -> dict[str, Any]:
+        return {
+            **super()._padding_context_required_fields(),
+            "mm_token_type_ids": np.zeros(1, dtype=np.int64),
+        }
+
 
 PadderKV = tuple[DPBatchPadder, PagedKVCacheManager, MagicMock]
 UnevenTGBatch = tuple[
@@ -62,12 +86,13 @@ def _make_padder(
     max_batch_size: int = 128,
     max_length: int = 100,
     pipeline: MagicMock | None = None,
+    context_type: type[TextContext] = TextContext,
 ) -> tuple[DPBatchPadder, PagedKVCacheManager, MagicMock]:
     """Creates a DPBatchPadder, PagedKVCacheManager, and pipeline mock."""
     if pipeline is None:
         pipeline = MagicMock()
         pipeline.release = MagicMock()
-    kv_params = KVCacheParams(
+    kv_params = MHAKVCacheParams(
         dtype=DType.float32,
         num_layers=1,
         n_kv_heads=1,
@@ -89,6 +114,7 @@ def _make_padder(
         max_length=max_length,
         model_name="test-model",
         pipeline=pipeline,
+        context_type=context_type,
     )
     return padder, kv_manager, pipeline
 
@@ -107,8 +133,8 @@ def _claim_and_alloc(
 ) -> None:
     """Claims and allocates KV cache entries for *contexts* on a replica."""
     for ctx in contexts:
-        kv_manager.claim(ctx.request_id, replica_idx=replica_idx)
-        kv_manager.alloc(ctx, replica_idx=replica_idx, num_steps=1)
+        kv_manager.claim(ctx, replica_idx=replica_idx)
+        kv_manager.alloc(ctx)
 
 
 def _simulate_execute(contexts: list[TextContext]) -> None:
@@ -143,7 +169,7 @@ def _make_inputs(
     num_steps: int = 1,
     batch_type: BatchType = BatchType.CE,
 ) -> TextGenerationInputs[TextContext]:
-    inputs = TextGenerationInputs(batches=batches, num_steps=num_steps)
+    inputs = TextGenerationInputs(batches=batches)
     inputs.batch_type = batch_type
     return inputs
 
@@ -154,10 +180,10 @@ def _release_info(
     pipeline: MagicMock,
 ) -> None:
     """Releases dummy KV entries and pipeline resources for a DPPaddingInfo."""
-    for req_id, replica_idx in info.dummies:
-        if kv_manager.contains(req_id, replica_idx=replica_idx):
-            kv_manager.release(req_id, replica_idx=replica_idx)
-        pipeline.release(req_id)
+    for ctx in info.dummies:
+        if kv_manager.contains(ctx):
+            kv_manager.release(ctx)
+        pipeline.release(ctx.request_id)
 
 
 def _make_batch_constructor(
@@ -168,7 +194,7 @@ def _make_batch_constructor(
     """Creates a TextBatchConstructor wired to a DPBatchPadder."""
     pipeline = MagicMock()
     pipeline.release = MagicMock()
-    # Prevent LoRAManager.get_lora_manager() from detecting a LoRA manager
+    # Prevent get_lora_manager() from detecting a LoRA manager
     # on the mock pipeline (MagicMock responds to hasattr checks).
     del pipeline._pipeline_model
     del pipeline.speech_lm_pipeline
@@ -181,7 +207,6 @@ def _make_batch_constructor(
     )
     scheduler_config = TokenGenerationSchedulerConfig(
         max_batch_size=max_batch_size,
-        max_forward_steps_tg=1,
         target_tokens_per_batch_ce=4096,
         data_parallel_degree=dp_size,
     )
@@ -263,7 +288,7 @@ def test_pads_short_replica(uneven_tg_batch: UnevenTGBatch) -> None:
     assert padded_inputs.batches[0][1] is ctxs_r0[1]
     assert padded_inputs.batches[1][0] is ctxs_r1[0]
     dummy = padded_inputs.batches[1][1]
-    assert kv_manager.contains(dummy.request_id, replica_idx=1)
+    assert kv_manager.contains(dummy)
 
     _release_info(info, kv_manager, pipeline)
 
@@ -329,6 +354,73 @@ def test_dummies_are_appended_to_short_replica(padder_kv: PadderKV) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Context type of padding dummies
+# ---------------------------------------------------------------------------
+
+
+def _pad_uneven_batch(
+    padder: DPBatchPadder, kv_manager: PagedKVCacheManager
+) -> tuple[TextContext, DPPaddingInfo]:
+    """Pads a [2, 1] TG batch and returns the dummy context plus its info."""
+    ctxs_r0 = _make_contexts(2)
+    ctxs_r1 = _make_contexts(1)
+    _claim_and_alloc(kv_manager, ctxs_r0, replica_idx=0)
+    _claim_and_alloc(kv_manager, ctxs_r1, replica_idx=1)
+
+    padded_inputs, info = padder.pad_batch(
+        _make_inputs([ctxs_r0, ctxs_r1], batch_type=BatchType.TG)
+    )
+    assert info is not None
+    return padded_inputs.batches[1][1], info
+
+
+def test_padding_dummies_use_vision_context_type() -> None:
+    """VLM padders build dummies of the arch's TextAndVisionContext subclass.
+
+    The overlap pipeline's vision drive narrows every context in an
+    executed batch via `isinstance(ctx, TextAndVisionContext)`, so plain
+    TextContext dummies crash VLM decode with DP padding.
+    """
+    padder, kv_manager, pipeline = _make_padder(
+        dp_size=2, context_type=_KimiLikeContext
+    )
+    dummy, info = _pad_uneven_batch(padder, kv_manager)
+
+    assert isinstance(dummy, TextAndVisionContext)
+    assert type(dummy) is _KimiLikeContext
+    assert dummy._is_padding_ctx
+    # Empty vision fields: the dummy is a valid "no image" context.
+    assert not dummy.needs_vision_encoding
+
+    _release_info(info, kv_manager, pipeline)
+
+
+def test_padding_dummies_default_to_plain_text_context() -> None:
+    """Text-only archs (the default context type) keep plain TextContext dummies."""
+    padder, kv_manager, pipeline = _make_padder(dp_size=2)
+    dummy, info = _pad_uneven_batch(padder, kv_manager)
+
+    assert type(dummy) is TextContext
+    assert dummy._is_padding_ctx
+
+    _release_info(info, kv_manager, pipeline)
+
+
+def test_padding_dummies_subclass_required_fields() -> None:
+    """Context subclasses with required fields supply their own padding defaults."""
+    padder, kv_manager, pipeline = _make_padder(
+        dp_size=2, context_type=_Gemma4LikeContext
+    )
+    dummy, info = _pad_uneven_batch(padder, kv_manager)
+
+    assert type(dummy) is _Gemma4LikeContext
+    assert isinstance(dummy, TextAndVisionContext)
+    assert not dummy.needs_vision_encoding
+
+    _release_info(info, kv_manager, pipeline)
+
+
+# ---------------------------------------------------------------------------
 # Release lifecycle
 # ---------------------------------------------------------------------------
 
@@ -340,13 +432,13 @@ def test_release_frees_dummy_kv_entries(uneven_tg_batch: UnevenTGBatch) -> None:
 
     assert info is not None
     dummy = padded_inputs.batches[1][1]
-    assert kv_manager.contains(dummy.request_id, replica_idx=1)
+    assert kv_manager.contains(dummy)
 
     _release_info(info, kv_manager, pipeline)
 
-    assert not kv_manager.contains(dummy.request_id, replica_idx=1)
-    assert kv_manager.contains(ctxs_r0[0].request_id, replica_idx=0)
-    assert kv_manager.contains(ctxs_r1[0].request_id, replica_idx=1)
+    assert not kv_manager.contains(dummy)
+    assert kv_manager.contains(ctxs_r0[0])
+    assert kv_manager.contains(ctxs_r1[0])
 
 
 def test_release_idempotent(uneven_tg_batch: UnevenTGBatch) -> None:
@@ -385,11 +477,11 @@ def test_multiple_pad_calls_independent() -> None:
     dummy2 = padded2.batches[0][1]
 
     _release_info(info1, kv_manager, pipeline)
-    assert not kv_manager.contains(dummy1.request_id, replica_idx=1)
-    assert kv_manager.contains(dummy2.request_id, replica_idx=0)
+    assert not kv_manager.contains(dummy1)
+    assert kv_manager.contains(dummy2)
 
     _release_info(info2, kv_manager, pipeline)
-    assert not kv_manager.contains(dummy2.request_id, replica_idx=0)
+    assert not kv_manager.contains(dummy2)
 
 
 def test_release_calls_pipeline_release_for_dummies() -> None:
@@ -415,21 +507,24 @@ def test_release_calls_pipeline_release_for_dummies() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Sentinel blocks
+# Null block (dummy KV slots)
 # ---------------------------------------------------------------------------
 
 
-def test_sentinel_blocks_allocated_at_init(padder_kv: PadderKV) -> None:
-    """Sentinel request IDs are claimed in the KV manager at construction."""
-    padder, kv_manager, _pipeline = padder_kv
+def test_null_block_reserved_per_replica(padder_kv: PadderKV) -> None:
+    """Each replica reserves block 0 as the pool null block at init."""
+    _padder, kv_manager, _pipeline = padder_kv
 
-    assert len(padder._sentinel_ids) == 2
-    for rank, sentinel_id in enumerate(padder._sentinel_ids):
-        assert kv_manager.contains(sentinel_id, replica_idx=rank)
+    for rank in range(2):
+        null_block = kv_manager._replica[
+            rank
+        ].block_manager.device_block_pool.null_block
+        assert null_block.is_null
+        assert null_block.bid == 128
 
 
 def test_padding_does_not_allocate_new_blocks() -> None:
-    """Dummies share the sentinel block; free block count stays constant."""
+    """Dummies map to the null block; used page count stays constant."""
     padder, kv_manager, pipeline = _make_padder(dp_size=2, total_num_pages=128)
 
     ctxs_r0 = _make_contexts(3)
@@ -437,23 +532,23 @@ def test_padding_does_not_allocate_new_blocks() -> None:
     _claim_and_alloc(kv_manager, ctxs_r0, replica_idx=0)
     _claim_and_alloc(kv_manager, ctxs_r1, replica_idx=1)
 
-    used_after_real_r0 = kv_manager.get_num_used_pages(replica_idx=0)
-    used_after_real_r1 = kv_manager.get_num_used_pages(replica_idx=1)
+    used_after_real_r0 = kv_manager.block_count(replica_idx=0).used
+    used_after_real_r1 = kv_manager.block_count(replica_idx=1).used
 
     _, info = padder.pad_batch(
         _make_inputs([ctxs_r0, ctxs_r1], batch_type=BatchType.TG)
     )
     assert info is not None
 
-    assert kv_manager.get_num_used_pages(replica_idx=0) == used_after_real_r0
-    # Dummies share the sentinel block, so used page count should not increase.
-    assert kv_manager.get_num_used_pages(replica_idx=1) == used_after_real_r1
+    assert kv_manager.block_count(replica_idx=0).used == used_after_real_r0
+    # Dummies use the null block, so used page count should not increase.
+    assert kv_manager.block_count(replica_idx=1).used == used_after_real_r1
 
     _release_info(info, kv_manager, pipeline)
 
 
 def test_repeated_pad_and_release_cycles() -> None:
-    """Padding the same replica multiple times reuses the sentinel block safely."""
+    """Padding the same replica multiple times reuses the null block safely."""
     padder, kv_manager, pipeline = _make_padder(dp_size=2, total_num_pages=128)
 
     for _ in range(5):
@@ -462,22 +557,19 @@ def test_repeated_pad_and_release_cycles() -> None:
         _claim_and_alloc(kv_manager, ctxs_r0, replica_idx=0)
         _claim_and_alloc(kv_manager, ctxs_r1, replica_idx=1)
 
-        used_before = kv_manager.get_num_used_pages(replica_idx=1)
+        used_before = kv_manager.block_count(replica_idx=1).used
         _, info = padder.pad_batch(
             _make_inputs([ctxs_r0, ctxs_r1], batch_type=BatchType.TG)
         )
         assert info is not None
-        assert kv_manager.get_num_used_pages(replica_idx=1) == used_before
+        assert kv_manager.block_count(replica_idx=1).used == used_before
 
         _release_info(info, kv_manager, pipeline)
 
-        for rank, sid in enumerate(padder._sentinel_ids):
-            assert kv_manager.contains(sid, replica_idx=rank)
-
         for ctx in ctxs_r0:
-            kv_manager.release(ctx.request_id, replica_idx=0)
+            kv_manager.release(ctx)
         for ctx in ctxs_r1:
-            kv_manager.release(ctx.request_id, replica_idx=1)
+            kv_manager.release(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -558,15 +650,16 @@ def test_advance_requests_deferred_release() -> None:
     tg_inputs = bc.construct_batch()
     info1 = bc._current_dp_padding
     assert info1 is not None
-    dummy_ids = _get_dummy_ids(tg_inputs.batches, [ctxs1_r0, ctxs1_r1])
+    dummies = info1.dummies
+    assert dummies
 
     # First advance_requests on TG: no previous padding, shifts current to prev.
     bc.advance_requests(tg_inputs)
     assert bc._prev_dp_padding is info1
     assert bc._current_dp_padding is None
     # Dummies from TG batch should still be alive.
-    for dummy_id in dummy_ids:
-        assert kv_manager.contains(dummy_id, replica_idx=1)
+    for dummy in dummies:
+        assert kv_manager.contains(dummy)
 
     # Construct an empty batch just to have valid inputs for advance.
     inputs2 = _make_inputs([[], []])
@@ -574,8 +667,8 @@ def test_advance_requests_deferred_release() -> None:
     # Second advance_requests: releases the TG batch's dummies.
     bc.advance_requests(inputs2)
 
-    for dummy_id in dummy_ids:
-        assert not kv_manager.contains(dummy_id, replica_idx=1)
+    for dummy in dummies:
+        assert not kv_manager.contains(dummy)
 
     assert bc._prev_dp_padding is None
     assert bc._current_dp_padding is None

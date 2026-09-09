@@ -1,0 +1,76 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# Sibling of bench_flash_attention.yaml with qkv_type=float8_e4m3fn.
+# Same shape sweep so kdiff lines bf16 vs fp8 up by (depth, seq_len).
+# Exercises mha_sm100_2q_dispatch (FA4) at depth=128 via the fp8 MMA
+# path (KIND_F8F6F4).
+
+name: bench_mha
+file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_mha.mojo
+
+llama3-commons: &llama3-commons
+  mask_rank: 4
+  qkv_type: DType.float8_e4m3fn
+  mask_type: DType.bfloat16
+  depth: 128
+  num_heads: 32
+  group: 4
+  $batch_size: [1]
+  $mode: flash_attention
+params:
+
+# LLama3 shapes for increasing sequence length
+- <<: *llama3-commons
+  $seq_len: 32
+  $num_keys: 32
+
+- <<: *llama3-commons
+  $seq_len: 64
+  $num_keys: 64
+
+- <<: *llama3-commons
+  $seq_len: 128
+  $num_keys: 128
+
+- <<: *llama3-commons
+  $seq_len: 256
+  $num_keys: 256
+
+- <<: *llama3-commons
+  $seq_len: 512
+  $num_keys: 512
+
+- <<: *llama3-commons
+  $seq_len: 1024
+  $num_keys: 1024
+
+- <<: *llama3-commons
+  $seq_len: 1536
+  $num_keys: 1536
+
+- <<: *llama3-commons
+  $seq_len: 2048
+  $num_keys: 2048
+
+- <<: *llama3-commons
+  $seq_len: 4096
+  $num_keys: 4096
+
+- <<: *llama3-commons
+  $seq_len: 8192
+  $num_keys: 8192
+
+- <<: *llama3-commons
+  $seq_len: 16384
+  $num_keys: 16384

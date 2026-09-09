@@ -1,0 +1,31 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_run_binary_test", "requirement")
+
+package(default_visibility = ["//visibility:private"])
+
+# logit_comparison.py
+modular_py_binary(
+    name = "logit_comparison",
+    srcs = ["logit_comparison.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/modeling",
+        requirement("numpy"),
+        requirement("torch"),
+        requirement("transformers"),
+    ],
+)
+
+modular_run_binary_test(
+    name = "logit_comparison_test",
+    size = "enormous",
+    binary = "logit_comparison",
+    # This test downloads ~1.2GB of Qwen3-0.6B-Base weights from Hugging Face
+    # and requires a GPU. Run manually with `bt-b200 //oss/modular/docs/code/develop/logit-comparison:logit_comparison_test`.
+    tags = ["manual"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

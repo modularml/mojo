@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Re-exports the depth-512 multi-head attention kernel package for NVIDIA SM100 GPUs."""
+
 from .barriers import Depth512MBars
 from .config import Depth512SM100Config
 from .dispatch import mha_sm100_depth512_dispatch

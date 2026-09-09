@@ -19,9 +19,8 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.attention import MHAMaskVariant
 from max.nn.kernels import flare_mla_prefill_ragged
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
 def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
@@ -31,7 +30,7 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
     q_head_dim = 192
     k_head_dim = 128
     num_layers = 1
-    kv_params = KVCacheParams(
+    kv_params = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=1,
         head_dim=576,
@@ -60,12 +59,6 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
     input_row_offsets_type = TensorType(
         DType.uint32, ["input_row_offsets_len"], DeviceRef.GPU()
     )
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
 
     def construct() -> Graph:
         with Graph(
@@ -75,7 +68,7 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
                 input_row_offsets_type,
                 k_buffer_type,
                 v_buffer_type,
-                *kv_params.get_symbolic_inputs().flatten(),
+                *kv_params.flattened_kv_inputs(),
             ],
         ) as g:
             (
@@ -86,7 +79,8 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
                 blocks,
                 cache_lengths,
                 lookup_table,
-                is_cache_empty,
+                max_prompt_length,
+                max_cache_length,
                 _attention_dispatch_metadata,
             ) = g.inputs
 
@@ -96,7 +90,8 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
                 blocks.buffer,
                 cache_lengths.tensor,
                 lookup_table.tensor,
-                is_cache_empty.tensor,
+                max_prompt_length.tensor,
+                max_cache_length.tensor,
             )
             result = flare_mla_prefill_ragged(
                 kv_params,
@@ -115,13 +110,6 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
         return g
 
     g = construct()
-    # Create contexts
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context.request_id, replica_idx=0)
-        kv_manager.alloc(context, replica_idx=0, num_steps=1)
-        batch.append(context)
 
     input_row_offsets = Buffer(
         DType.uint32,
@@ -134,7 +122,9 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
     input_row_offsets[batch_size] = running_sum
     input_row_offsets = input_row_offsets.to(device)
 
-    kv_runtime_inputs = kv_manager.runtime_inputs([batch])
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    )
     model = session.load(g)
 
     input_tensor = Buffer.zeros(
@@ -152,7 +142,7 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
         input_row_offsets.to(device),
         k_buffer_tensor.to(device),
         v_buffer_tensor.to(device),
-        *(kv_runtime_inputs.inputs[0].flatten()),
+        *kv_runtime_inputs.flatten(),
     )[0]
     assert isinstance(result, Buffer)
 

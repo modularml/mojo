@@ -1,0 +1,34 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: NO_COLOR=1 %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+%%python
+print(1 + 2)
+
+# CHECK: 3
+
+%%python
+print(1 + 2)
+
+# We support trailing spaces in the python magic line
+# CHECK: 3
+
+x = 1
+%%python
+
+# CHECK: [User] error: `%%python` can only be at the beginning of an expression.
+
+%%python
+var a = Tensor[DType.float64](n)
+
+# CHECK: Traceback (most recent call last):
+# CHECK:     var a = Tensor[DType.float64](n)
+# CHECK:         ^
+# CHECK: SyntaxError: invalid syntax
+

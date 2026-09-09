@@ -1,0 +1,95 @@
+[
+    {
+        "description": "validation of URI References",
+        "schema": { "format": "uri-reference" },
+        "tests": [
+            {
+                "description": "all string formats ignore integers",
+                "data": 12,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore floats",
+                "data": 13.7,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore objects",
+                "data": {},
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore arrays",
+                "data": [],
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore booleans",
+                "data": false,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore nulls",
+                "data": null,
+                "valid": true
+            },
+            {
+                "description": "a valid URI",
+                "data": "http://foo.bar/?baz=qux#quux",
+                "valid": true
+            },
+            {
+                "description": "a valid protocol-relative URI Reference",
+                "data": "//foo.bar/?baz=qux#quux",
+                "valid": true
+            },
+            {
+                "description": "a valid relative URI Reference",
+                "data": "/abc",
+                "valid": true
+            },
+            {
+                "description": "an invalid URI Reference",
+                "data": "\\\\WINDOWS\\fileshare",
+                "valid": false
+            },
+            {
+                "description": "a valid URI Reference",
+                "data": "abc",
+                "valid": true
+            },
+            {
+                "description": "a valid URI fragment",
+                "data": "#fragment",
+                "valid": true
+            },
+            {
+                "description": "an invalid URI fragment",
+                "data": "#frag\\ment",
+                "valid": false
+            },
+            {
+                "description": "unescaped non US-ASCII characters",
+                "data": "/foobar®.txt",
+                "valid": false
+            },
+            {
+                "description": "invalid backslash character",
+                "data": "https://example.org/foobar\\.txt",
+                "valid": false
+            },
+            {
+                "description": "URI with leading-zero IPv4 is structurally valid as a reg-name",
+                "comment": "RFC 3986, Section 3.2.2: If an IP literal fails strict IPv4address parsing, it falls back to reg-name. A string of digits and dots is valid under unreserved characters. JSON Schema format asserts syntax, not scheme-specific DNS semantics.",
+                "data": "http://087.10.0.1/",
+                "valid": true
+            },
+            {
+                "description": "URI with out-of-bounds IPv4 is structurally valid as a reg-name",
+                "comment": "RFC 3986, Section 3.2.2: Fallback to reg-name allows digits and dots.",
+                "data": "http://999.999.999.999/",
+                "valid": true
+            }
+        ]
+    }
+]

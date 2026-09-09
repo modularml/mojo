@@ -1,0 +1,31 @@
+load("//bazel:api.bzl", "modular_py_binary", "modular_run_binary_test", "requirement")
+
+package(default_visibility = ["//visibility:private"])
+
+# layer_comparison.py
+modular_py_binary(
+    name = "layer_comparison",
+    srcs = ["layer_comparison.py"],
+    imports = ["."],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/nn/hooks",
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)
+
+modular_run_binary_test(
+    name = "layer_comparison_test",
+    size = "large",
+    binary = "layer_comparison",
+    # FIXME: MOCO-3663 — doc example tests consistently timeout on remote macOS workers
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

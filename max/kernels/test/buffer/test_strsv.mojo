@@ -18,18 +18,14 @@ comptime simd_width = 8
 
 def strsv[
     size: Int
-](
-    L_ptr_in: UnsafePointer[Float32, _],
-    x_ptr_in: UnsafePointer[mut=True, Float32, _],
-):
+](L_ptr_in: ImmPointer[Float32, _], x_ptr_in: MutPointer[Float32, _],):
     # assuming size is a multiple of simd_width
     var x_ptr = x_ptr_in
     var L_ptr = L_ptr_in
     var n: Int = size
-    var x_solved_storage = InlineArray[Float32, simd_width * simd_width](
-        uninitialized=True
-    )
-    var x_solved = x_solved_storage.unsafe_ptr().mut_cast[True]()
+    var x_solved_storage = Array[Float32, simd_width * simd_width](fill={})
+    var x_solved_ptr = x_solved_storage.unsafe_ptr()
+    var x_solved = x_solved_ptr
 
     while True:
         for j in range(simd_width):
@@ -43,7 +39,7 @@ def strsv[
 
         # Save the solution of the triangular tile in stack, while
         # packing them as simd vectors.
-        var x_vec: SIMD[DType.float32, simd_width]
+        var x_vec: SIMD[.float32, simd_width]
         for i in range(simd_width):
             # Broadcast one solution value to a simd vector.
             x_vec = x_ptr[i]
@@ -69,7 +65,7 @@ def strsv[
 
 
 # Fill the lower triangle matrix.
-def fill_L[size: Int](L: UnsafePointer[mut=True, Float32, _]):
+def fill_L[size: Int](L: MutPointer[Float32, _]):
     for j in range(size):
         for i in range(size):
             if i == j:
@@ -79,14 +75,14 @@ def fill_L[size: Int](L: UnsafePointer[mut=True, Float32, _]):
 
 
 # Fill the rhs, which is also used to save the solution vector.
-def fill_x[size: Int](x: UnsafePointer[mut=True, Float32, _]):
+def fill_x[size: Int](x: MutPointer[Float32, _]):
     for i in range(size):
         x[i] = 1.0
 
 
 def naive_strsv[
     size: Int
-](L: UnsafePointer[Float32, _], x: UnsafePointer[mut=True, Float32, _],):
+](L: ImmPointer[Float32, _], x: MutPointer[Float32, _],):
     for j in range(size):
         var x_j = x[j]
         for i in range(j + 1, size):
@@ -98,13 +94,15 @@ def test_strsv() raises:
     print("== test_strsv")
 
     comptime size: Int = 64
-    var l_stack = InlineArray[Float32, size * size](uninitialized=True)
-    var x0_stack = InlineArray[Float32, size](uninitialized=True)
-    var x1_stack = InlineArray[Float32, size](uninitialized=True)
+    var l_stack = Array[Float32, size * size](fill={})
+    var x0_stack = Array[Float32, size](fill={})
+    var x1_stack = Array[Float32, size](fill={})
 
-    var L = l_stack.unsafe_ptr().mut_cast[True]()
-    var x0 = x0_stack.unsafe_ptr().mut_cast[True]()
-    var x1 = x1_stack.unsafe_ptr().mut_cast[True]()
+    var L = l_stack.unsafe_ptr()
+    var x0_ptr = x0_stack.unsafe_ptr()
+    var x0 = x0_ptr
+    var x1_ptr = x1_stack.unsafe_ptr()
+    var x1 = x1_ptr
 
     fill_L[size](L)
     fill_x[size](x0)

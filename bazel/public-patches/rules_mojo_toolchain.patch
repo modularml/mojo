@@ -1,0 +1,105 @@
+diff --git a/mojo/mojo_library.bzl b/mojo/mojo_library.bzl
+index 9468b24..99dbbeb 100644
+--- a/mojo/mojo_library.bzl
++++ b/mojo/mojo_library.bzl
+@@ -21,6 +21,26 @@ def _mojo_library_implementation(ctx):
+     mojo_toolchain = ctx.toolchains["//:toolchain_type"].mojo_toolchain_info
+     build_env = getattr(ctx.toolchains["//:toolchain_type"], "build_env", {})
+ 
++    # A child rule may supply a different compiler to invoke, without being
++    # reconfigured itself: an attribute transition on `_mojo_override` moves only
++    # the compiler's own subgraph, leaving this target and its deps -- and so
++    # the cc libraries it propagates -- in the incoming configuration.
++    override = getattr(ctx.attr, "_mojo_override", None)
++    override_exe = getattr(ctx.executable, "_mojo_override", None)
++
++    # ctx.attr exposes an attribute carrying a transition as a one-element list,
++    # while ctx.executable still resolves to the single File.
++    if type(override) == "list":
++        override = override[0] if override else None
++
++    mojo = override_exe or mojo_toolchain.mojo
++    mojo_tools = mojo_toolchain.all_tools
++    if override:
++        mojo_tools = mojo_tools + [
++            override[DefaultInfo].default_runfiles.files,
++            override[DefaultInfo].files,
++        ]
++
+     mojo_precmp_file = ctx.actions.declare_file(ctx.label.name + ".mojoc")
+     args = ctx.actions.args()
+     args.add("precompile")
+@@ -64,9 +84,9 @@ def _mojo_library_implementation(ctx):
+     file_args.add_all(import_paths, map_each = format_import)
+     file_args.add_all([ctx.files.srcs[0]], map_each = _format_root)
+     ctx.actions.run(
+-        executable = mojo_toolchain.mojo,
++        executable = mojo,
+         inputs = depset(ctx.files.srcs + ctx.files.additional_compiler_inputs, transitive = [transitive_mojodeps]),
+-        tools = mojo_toolchain.all_tools,
++        tools = mojo_tools,
+         outputs = precompile_outputs,
+         arguments = [args, file_args],
+         mnemonic = "MojoPrecompile",
+diff --git a/mojo/private/mojo_binary_test.bzl b/mojo/private/mojo_binary_test.bzl
+index af29da0..309b5f4 100644
+--- a/mojo/private/mojo_binary_test.bzl
++++ b/mojo/private/mojo_binary_test.bzl
+@@ -101,6 +101,26 @@ def _mojo_binary_test_implementation(ctx, *, shared_library = False):
+     extra_runfiles = getattr(ctx.exec_groups["mojo_compile"].toolchains["//:toolchain_type"], "extra_runfiles", [])
+     py_toolchain = ctx.toolchains[_PYTHON_TOOLCHAIN_TYPE]
+ 
++    # A child rule may supply a different compiler to invoke, without being
++    # reconfigured itself: an attribute transition on `_mojo_override` moves only
++    # the compiler's own subgraph, leaving this target and its deps -- and so
++    # the cc libraries it links -- in the incoming configuration.
++    override = getattr(ctx.attr, "_mojo_override", None)
++    override_exe = getattr(ctx.executable, "_mojo_override", None)
++
++    # ctx.attr exposes an attribute carrying a transition as a one-element list,
++    # while ctx.executable still resolves to the single File.
++    if type(override) == "list":
++        override = override[0] if override else None
++
++    mojo = override_exe or mojo_toolchain.mojo
++    mojo_tools = mojo_toolchain.all_tools
++    if override:
++        mojo_tools = mojo_tools + [
++            override[DefaultInfo].default_runfiles.files,
++            override[DefaultInfo].files,
++        ]
++
+     object_file = ctx.actions.declare_file(ctx.label.name + ".lo")
+     args = ctx.actions.args()
+     args.add("build")
+@@ -147,8 +167,8 @@ def _mojo_binary_test_implementation(ctx, *, shared_library = False):
+         args.add("--experimental-export-fixit", fixits_file)
+ 
+     ctx.actions.run(
+-        executable = mojo_toolchain.mojo,
+-        tools = mojo_toolchain.all_tools,
++        executable = mojo,
++        tools = mojo_tools,
+         inputs = depset(ctx.files.srcs + ctx.files.additional_compiler_inputs, transitive = [transitive_mojodeps]),
+         outputs = compile_outputs,
+         arguments = [args],
+diff --git a/mojo/private/toolchain.BUILD b/mojo/private/toolchain.BUILD
+index 9fc4509..f16eea3 100644
+--- a/mojo/private/toolchain.BUILD
++++ b/mojo/private/toolchain.BUILD
+@@ -11,15 +11,11 @@ _INTERNAL_LIBRARIES = [
+     for library in glob(
+         [
+             # Globbed to allow .so or .dylib
+-            "lib/libAsyncRTMojoBindings.*",
+             "lib/libAsyncRTRuntimeGlobals.*",
+             "lib/libKGENCompilerRTShared.*",
+             "lib/libMSupportGlobals.*",
+         ],
+         allow_empty = False,
+-    ) + glob(
+-        ["lib/libNVPTX.so"],  # buildifier: disable=constant-glob
+-        allow_empty = True,
+     )
+ ]
+ 

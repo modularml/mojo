@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 
-import hf_repo_lock
 import numpy as np
 import pytest
 import torch
@@ -32,22 +31,14 @@ ACCURACY_RTOL = 1e-4
 ACCURACY_ATOL = 1e-6
 
 WHISPER_LARGE_V3_HF_REPO_ID = "openai/whisper-large-v3"
-WHISPER_LARGE_V3_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    WHISPER_LARGE_V3_HF_REPO_ID
-)
 
 logger = logging.getLogger("max.pipelines")
 
 
 @pytest.fixture
 def whisper_large_v3_local_path() -> str:
-    assert isinstance(WHISPER_LARGE_V3_HF_REVISION, str), (
-        "WHISPER_LARGE_V3_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            WHISPER_LARGE_V3_HF_REPO_ID, WHISPER_LARGE_V3_HF_REVISION
-        )
+        model_path = generate_local_model_path(WHISPER_LARGE_V3_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {str(e)}")
         logger.warning(

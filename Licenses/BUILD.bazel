@@ -1,0 +1,17 @@
+load("//bazel:api.bzl", "pkg_files")
+
+# gazelle:default_visibility //visibility:public
+
+package(default_visibility = ["//visibility:public"])
+
+EXPORTS = [
+    "LICENSE",
+    "Third-Party-Notices",
+]
+
+pkg_files(
+    name = "Licenses",
+    srcs = EXPORTS,
+)
+
+exports_files(EXPORTS)

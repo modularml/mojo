@@ -75,7 +75,6 @@ def test_publish_metrics_emits_snapshot() -> None:
             num_blocks=64,
             max_batch_size=4,
             page_size=8,
-            kvcache_ce_watermark=1.0,
         )
         for _ in range(3):
             enqueue_request(request_queue, prompt_len=16, max_seq_len=128)
@@ -109,7 +108,6 @@ def test_snapshot_tracks_pending_count() -> None:
             num_blocks=64,
             max_batch_size=2,
             page_size=8,
-            kvcache_ce_watermark=1.0,
         )
         # max_batch_size * dp * 2 = 4 — ensures the drain pulls every
         # request in a single pass.

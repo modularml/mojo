@@ -1,0 +1,16 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "speculators_common",
+    srcs = glob(["**/*.py"]),
+    deps = [
+        requirement("numpy"),
+        requirement("transformers"),
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/lib",
+    ],
+)

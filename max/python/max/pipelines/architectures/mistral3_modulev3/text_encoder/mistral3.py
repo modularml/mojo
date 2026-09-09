@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from max.driver import CPU
 from max.dtype import DType
 from max.experimental import functional as F
 from max.experimental.nn import Embedding, Linear, Module
@@ -114,13 +115,23 @@ class Mistral3TextEncoderTransformer(Module[[Tensor], Tensor]):
         self.device = config.device
         self._hidden_state_layers = set(config.hidden_state_layers)
         self._sorted_hidden_state_layers = sorted(config.hidden_state_layers)
+        self._output_seq_len: int | None = config.output_seq_len
 
+        # Compute the rotary-embedding cos/sin lookup table on CPU to
+        # match the legacy graph API's ``max.nn.RotaryEmbedding`` (see
+        # ``max/python/max/nn/rotary_embedding.py``).  GPU and CPU fp32
+        # transcendentals can disagree by ~1 ULP, and even tiny rope
+        # offsets shift the entire denoising trajectory once they feed
+        # text conditioning into 50 FLUX.2 diffusion steps -- enough to
+        # drop V3 vs V2 SSIM well below the verify_pipelines threshold.
+        # The attention code transfers the resulting freqs to ``x.device``
+        # at use time.
         self.rope = RotaryEmbedding(
             dim=config.hidden_size,
             n_heads=config.num_attention_heads,
             theta=config.rope_theta,
             max_seq_len=config.max_seq_len,
-            device=config.device.to_device(),
+            device=CPU(),
             head_dim=config.head_dim,
             interleaved=False,
         )
@@ -192,6 +203,24 @@ class Mistral3TextEncoderTransformer(Module[[Tensor], Tensor]):
         # Read L and D directly from the tensor dims to avoid any Python-side
         # constant that could force a device sync at eager execution time.
         seq_len = stacked.shape[1]
-        return F.reshape(
+        embeds = F.reshape(
             stacked, [1, seq_len, stacked.shape[2] * stacked.shape[3]]
         )
+
+        # When ``output_seq_len`` is configured, left-pad with zeros so the
+        # downstream transformer (FLUX.2 joint attention) sees the static
+        # text sequence length it was trained with.  Without this, the
+        # transformer's rope position table covers tokens 0..(pad-1) for
+        # text but the actual encoder output only fills the first
+        # ``seq_len`` slots; image tokens then index the rope table at
+        # offsets that mistake them for text positions, scrambling the
+        # spatial layout of the generated image.  Matches V2's
+        # ``Mistral3TextEncoderTransformer`` output-padding path.
+        if self._output_seq_len is not None:
+            pad_count = self._output_seq_len - seq_len
+            zero = F.constant(0, dtype=embeds.dtype, device=self.device)
+            zero = F.reshape(zero, [1, 1, 1])
+            zeros = F.broadcast_to(zero, shape=[1, pad_count, embeds.shape[2]])
+            embeds = F.concat([zeros, embeds], axis=1)
+
+        return embeds

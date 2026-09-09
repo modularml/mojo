@@ -10,17 +10,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Provides SM100 (Blackwell) MMA operation structs for warp-specialized GEMM kernels using UMMA instructions."""
+
 from std.sys import size_of
 from std.math import align_up
 
-from std.gpu.primitives.cluster import cluster_mask_base
-from std.gpu.host._tensormap import SwizzleMode
-from std.gpu.memory import AddressSpace
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_id_in_cluster
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.compute.arch.tcgen05 import *
-from std.gpu.compute.arch.mma_nvidia_sm100 import MMASmemDescriptorPair
+from max.gpu.primitives.cluster import cluster_mask_base
+from max.gpu import block_id_in_cluster
+from max.gpu.host._tensormap import SwizzleMode
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.compute.arch.tcgen05 import *
+from max.gpu.compute.arch.mma_nvidia_sm100 import MMASmemDescriptorPair
 from layout import IntTuple, Layout, TileTensor
 from layout.tile_layout import TensorLayout, _types_to_int_tuple
 from layout.tensor_core_async import (
@@ -31,13 +32,18 @@ from layout.tensor_core_async import (
 )
 
 from std.utils.index import Index, IndexList, product
-from linalg.fp4_utils import SF_MN_GROUP_SIZE, SF_ATOM_M, SF_ATOM_K
+from linalg.fp4_utils import (
+    SF_MN_GROUP_SIZE,
+    SF_ATOM_M,
+    SF_ATOM_K,
+    block_scaled_operands_compatible,
+)
 
 
 def _create_mma_desc_k_major[
     dtype: DType, swizzle_mode: TensorMapSwizzle
 ](
-    ptr: UnsafePointer[Scalar[dtype], address_space=AddressSpace.SHARED, ...]
+    ptr: UnsafePointer[Scalar[dtype], address_space=.SHARED, ...]
 ) -> MMASmemDescriptor:
     """Creates an MMA descriptor for K-major layout directly from swizzle mode.
 
@@ -52,6 +58,12 @@ def _create_mma_desc_k_major[
 
 @fieldwise_init("implicit")
 struct Major(TrivialRegisterPassable):
+    """Selects the major (contiguous) dimension for an MMA operand tile layout.
+
+    Used to configure whether the K dimension or the MN dimension is the
+    innermost (contiguous) axis of the tile in shared memory.
+    """
+
     var val: Int
 
     comptime K = Major(0)
@@ -93,7 +105,7 @@ def max_contiguous_tile_shape[
 def _create_mma_desc_pair[
     dtype: DType, //, canonical_layout: Layout, swizzle_mode: TensorMapSwizzle
 ](
-    ptr: UnsafePointer[Scalar[dtype], address_space=AddressSpace.SHARED, ...]
+    ptr: UnsafePointer[Scalar[dtype], address_space=.SHARED, ...]
 ) -> MMASmemDescriptorPair:
     # Extract the stride values from the canonical layout
     # The canonical layout is expected to have at least 2 dimensions
@@ -116,12 +128,41 @@ def smem_descriptor[
     BK: Int,
     swizzle_mode: TensorMapSwizzle,
     is_k_major: Bool,
+    page_dense: Bool = False,
 ](
-    ptr: UnsafePointer[Scalar[dtype], address_space=AddressSpace.SHARED, ...]
+    ptr: UnsafePointer[Scalar[dtype], address_space=.SHARED, ...]
 ) -> MMASmemDescriptorPair:
+    """Creates an MMASmemDescriptorPair for an SM100 MMA operand tile in shared memory.
+
+    Selects either K-major or MN-major tile layout based on `is_k_major`, builds the
+    canonical descriptor layout, and creates the corresponding pair of SMEM descriptors
+    used by the SM100 UMMA instructions.
+
+    Parameters:
+        dtype: Element type of the operand.
+        BMN: Block tile size along the M or N dimension.
+        BK: Block tile size along the K dimension.
+        swizzle_mode: Swizzle mode for the shared memory access pattern.
+        is_k_major: When True, uses K-major (A/Q@K') layout; when False, uses
+            MN-major (V/P@V) layout.
+        page_dense: When True, selects the page-dense (row-major atoms) variant
+            of the tile layout for the SM100 row-major page-fold path.
+
+    Args:
+        ptr: Pointer into shared memory for the operand tile.
+
+    Returns:
+        An `MMASmemDescriptorPair` ready for use with SM100 UMMA instructions.
+    """
+    # `page_dense` selects the native chunk-inner (row-major atoms) layout
+    # (SM100 row-major page-fold path) for the corresponding operand frame:
+    # k-major (`is_k_major=True`, K / Q@K') and mn-major (`is_k_major=False`,
+    # V / P@V) each have their own page-dense branch in their `tile_layout_*`.
     comptime smem_layout = tile_layout_k_major[
-        dtype, BMN, BK, swizzle_mode
-    ]() if is_k_major else tile_layout_mn_major[dtype, BMN, BK, swizzle_mode]()
+        dtype, BMN, BK, swizzle_mode, page_dense=page_dense
+    ]() if is_k_major else tile_layout_mn_major[
+        dtype, BMN, BK, swizzle_mode, page_dense=page_dense
+    ]()
     comptime canonical_layout = tile_to_descriptor[
         dtype, smem_layout, is_k_major=is_k_major
     ]()
@@ -139,13 +180,34 @@ struct MmaOpSM100_SS[
     mma_shape: IndexList[3],
     /,
     *,
-    accum_type: DType = DType.float32,
+    accum_type: DType = .float32,
     cta_group: Int = 1,
     cluster_shape: IndexList[3] = Index(1, 1, 1),
     a_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     b_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     transpose_b: Bool = False,
 ](Defaultable, TrivialRegisterPassable):
+    """SM100 (Blackwell) warp-specialized MMA operation for standard (non-block-scaled) GEMM.
+
+    Encapsulates a UMMA instruction descriptor and multicast mask for issuing
+    asynchronous tensor-core MMA operations from shared memory to tensor memory
+    (TMEM) on NVIDIA SM100 GPUs. Supports optional CTA clustering for multicast.
+
+    Parameters:
+        c_type: Output accumulator element type.
+        a_type: A operand element type.
+        b_type: B operand element type; must match `a_type`.
+        block_tile_shape: (BM, BN, BK) shape of the shared-memory tile processed
+            per CTA.
+        mma_shape: (MMA_M, MMA_N, MMA_K) shape of a single UMMA instruction.
+        accum_type: Accumulator precision; defaults to float32.
+        cta_group: Number of CTAs collaborating on one tile (1 or 2).
+        cluster_shape: CTA cluster shape for multicast; defaults to (1, 1, 1).
+        a_swizzle: Swizzle mode for the A operand shared-memory layout.
+        b_swizzle: Swizzle mode for the B operand shared-memory layout.
+        transpose_b: Must be True; SM100 UMMA always uses transposed B.
+    """
+
     var idesc: UMMAInsDescriptor[Self._get_umma_kind[Self.a_type]()]
     var mask: UInt16
 
@@ -161,6 +223,9 @@ struct MmaOpSM100_SS[
         comptime assert (
             Self.a_type == Self.b_type
         ), "a_type and b_type must be the same"
+        comptime assert (
+            Self.mma_shape[2] == 32 // size_of[Self.a_type]()
+        ), "MMA_K must be 32 // size_of(a_type) (16 for 16-bit, 32 for 8-bit)"
 
         self.idesc = UMMAInsDescriptor[
             Self._get_umma_kind[Self.a_type]()
@@ -202,10 +267,47 @@ struct MmaOpSM100_SS[
                 self.mask |= dim1_mask << UInt16(block_id_in_cluster.x ^ 1)
 
     @always_inline
+    def make_a_desc(
+        self,
+        a: TileTensor[address_space=.SHARED, ...],
+    ) -> MMASmemDescriptor:
+        """Build the K-major MMA descriptor for an A operand tile.
+
+        Exposed so callers that issue MMAs over several adjacent SMEM tiles
+        (e.g. a k-group loop) can build the descriptor once and advance it by
+        a comptime byte stride per tile, rather than rebuilding the full
+        descriptor (base-pointer mask + bitfield inserts) for each tile.
+
+        Args:
+            a: A operand tile in shared memory.
+
+        Returns:
+            The K-major MMA shared-memory descriptor for `a`.
+        """
+        return _create_mma_desc_k_major[a.dtype, Self.a_swizzle](a.ptr)
+
+    @always_inline
+    def make_b_desc(
+        self,
+        b: TileTensor[address_space=.SHARED, ...],
+    ) -> MMASmemDescriptor:
+        """Build the K-major MMA descriptor for a B operand tile.
+
+        See `make_a_desc` for why this is exposed.
+
+        Args:
+            b: B operand tile in shared memory.
+
+        Returns:
+            The K-major MMA shared-memory descriptor for `b`.
+        """
+        return _create_mma_desc_k_major[b.dtype, Self.b_swizzle](b.ptr)
+
+    @always_inline
     def mma(
         self,
-        a: TileTensor[address_space=AddressSpace.SHARED, ...],
-        b: TileTensor[address_space=AddressSpace.SHARED, ...],
+        a: TileTensor[address_space=.SHARED, ...],
+        b: TileTensor[address_space=.SHARED, ...],
         c_tmem: UInt32,
         init_c: Bool,
     ):
@@ -218,9 +320,32 @@ struct MmaOpSM100_SS[
             init_c: When True, zero-initialize the accumulator on the first
                 K slice instead of accumulating.
         """
-        var a_desc = _create_mma_desc_k_major[a.dtype, Self.a_swizzle](a.ptr)
-        var b_desc = _create_mma_desc_k_major[b.dtype, Self.b_swizzle](b.ptr)
+        self.mma_from_desc(
+            self.make_a_desc(a), self.make_b_desc(b), c_tmem, init_c
+        )
 
+    @always_inline
+    def mma_from_desc(
+        self,
+        a_desc: MMASmemDescriptor,
+        b_desc: MMASmemDescriptor,
+        c_tmem: UInt32,
+        init_c: Bool,
+    ):
+        """Issue MMA operations over K tiles from precomputed SMEM descriptors.
+
+        Identical to `mma`, but takes already-built A/B descriptors. This lets
+        a k-group caller build the descriptor base once and advance it by a
+        comptime byte stride per tile (the SM100 SMEM-descriptor base address
+        adds linearly), avoiding a redundant full descriptor rebuild per tile.
+
+        Args:
+            a_desc: Precomputed K-major descriptor for the A operand tile.
+            b_desc: Precomputed K-major descriptor for the B operand tile.
+            c_tmem: TMEM address for the accumulator.
+            init_c: When True, zero-initialize the accumulator on the first
+                K slice instead of accumulating.
+        """
         # K-major swizzle layout: within a swizzle tile (k < sw_K), elements
         # are stride-1. Across swizzle tile boundaries (k >= sw_K), the
         # offset jumps by rows * sw_K elements to the next swizzle group.
@@ -252,7 +377,7 @@ struct MmaOpSM100_SS[
     @always_inline
     def commit(
         self,
-        ptr_mbar: UnsafePointer[address_space=AddressSpace.SHARED, ...],
+        ptr_mbar: UnsafePointer[address_space=.SHARED, ...],
     ):
         comptime if product(Self.cluster_shape) == 1:
             mma_arrive[Self.cta_group](ptr_mbar)
@@ -265,7 +390,7 @@ struct MmaOpSM100_SS[
 
     @staticmethod
     def _get_umma_kind[dtype: DType]() -> UMMAKind:
-        comptime if dtype == DType.float32:
+        comptime if dtype == .float32:
             return UMMAKind.KIND_TF32
         elif dtype in (DType.float16, DType.bfloat16):
             return UMMAKind.KIND_F16
@@ -291,7 +416,7 @@ struct MmaOpSM100_BlockScaled_SS[
     mma_shape: IndexList[3],
     /,
     *,
-    accum_type: DType = DType.float32,
+    accum_type: DType = .float32,
     cta_group: Int = 1,
     cluster_shape: IndexList[3] = Index(1, 1, 1),
     a_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
@@ -299,6 +424,30 @@ struct MmaOpSM100_BlockScaled_SS[
     transpose_b: Bool = False,
     enable_small_sfb: Bool = False,
 ](Defaultable, TrivialRegisterPassable):
+    """SM100 (Blackwell) warp-specialized MMA operation for block-scaled GEMM (MXFP4, MXFP8, NVFP4).
+
+    Extends `MmaOpSM100_SS` with per-block scale factor handling for quantized
+    formats. Copies scale factors from shared memory to TMEM via `tcgen05_cp`
+    and issues UMMA instructions with the appropriate scale index per K slice.
+
+    Parameters:
+        c_type: Output accumulator element type.
+        a_type: A operand element type (float8_e4m3fn or uint8 for FP4).
+        b_type: B operand element type; must match `a_type`.
+        sfa_dtype: Scale factor dtype for A; must match `sfb_dtype`.
+        sfb_dtype: Scale factor dtype for B.
+        scaling_kind: UMMA scaling kind (MXF8F6F4, MXF4, or MXF4NVF4).
+        block_tile_shape: (BM, BN, BK) shape of the shared-memory tile.
+        mma_shape: (MMA_M, MMA_N, MMA_K) shape of a single UMMA instruction.
+        accum_type: Accumulator precision; defaults to float32.
+        cta_group: Number of CTAs collaborating on one tile (1 or 2).
+        cluster_shape: CTA cluster shape for multicast; defaults to (1, 1, 1).
+        a_swizzle: Swizzle mode for the A operand.
+        b_swizzle: Swizzle mode for the B operand.
+        transpose_b: Must be True; SM100 UMMA always uses transposed B.
+        enable_small_sfb: Allow SFB loading for MMA_N < 64 via cooperative tcgen05_st.
+    """
+
     var idesc: UMMAInsDescriptor[Self.scaling_kind]
     var mask: UInt16
 
@@ -319,9 +468,9 @@ struct MmaOpSM100_BlockScaled_SS[
             1,
             2,
         ), "MmaOpSM100 only supports cta_group 1 or 2"
-        comptime assert (
-            Self.a_type == Self.b_type
-        ), "a_type and b_type must be the same"
+        comptime assert block_scaled_operands_compatible[
+            Self.a_type, Self.b_type
+        ](), "a_type and b_type must be the same, or the W4A8 pair"
         comptime assert Self.a_type in (
             DType.float8_e4m3fn,
             DType.uint8,  # TODO: (KERN-2238) replace with FP4-E2M1
@@ -375,10 +524,10 @@ struct MmaOpSM100_BlockScaled_SS[
     @always_inline
     def mma(
         self,
-        a: TileTensor[address_space=AddressSpace.SHARED, ...],
-        b: TileTensor[address_space=AddressSpace.SHARED, ...],
-        sfa_smem: TileTensor[address_space=AddressSpace.SHARED, ...],
-        sfb_smem: TileTensor[address_space=AddressSpace.SHARED, ...],
+        a: TileTensor[address_space=.SHARED, ...],
+        b: TileTensor[address_space=.SHARED, ...],
+        sfa_smem: TileTensor[address_space=.SHARED, ...],
+        sfb_smem: TileTensor[address_space=.SHARED, ...],
         c_tmem: UInt32,
         sfa_tmem: UInt32,
         sfb_tmem: UInt32,
@@ -455,6 +604,9 @@ struct MmaOpSM100_BlockScaled_SS[
                     ](sfb_smem, sfb_tmem + UInt32(sfb_k_offset))
 
         # K-iteration: offset = k * sizeof (contiguous within swizzle tile).
+        # Both operands span one byte per element here: the FP4 TMA copy pads
+        # an E2M1 operand into shared memory (8 packed bytes then an 8-byte
+        # gap per 16 values), so a K offset scales the same for either dtype.
         comptime for k in range(0, Self.block_tile_shape[2], Self.mma_shape[2]):
             comptime a_offset = k * size_of[Self.a_type]()
             comptime b_offset = k * size_of[Self.b_type]()
@@ -539,7 +691,7 @@ struct MmaOpSM100_BlockScaled_SS[
     @always_inline
     def commit(
         self,
-        ptr_mbar: UnsafePointer[address_space=AddressSpace.SHARED, ...],
+        ptr_mbar: UnsafePointer[address_space=.SHARED, ...],
     ):
         comptime if product(Self.cluster_shape) == 1:
             mma_arrive[Self.cta_group](ptr_mbar)
@@ -556,11 +708,7 @@ struct MmaOpSM100_BlockScaled_SS[
         SFLayoutType: TensorLayout,
         TILE_MN: Int,
         tile_k_idx: Int,
-    ](
-        self,
-        sf_smem: TileTensor[address_space=AddressSpace.SHARED, ...],
-        sf_tmem: UInt32,
-    ):
+    ](self, sf_smem: TileTensor[address_space=.SHARED, ...], sf_tmem: UInt32,):
         """TileTensor overload for copying scale factors to TMEM via tcgen05_cp.
 
         Only valid for MMA_N % 64 == 0.  For smaller MMA_N, the caller

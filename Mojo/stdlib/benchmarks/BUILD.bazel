@@ -1,0 +1,112 @@
+load("@module_versions//:config.bzl", "DEFAULT_PYTHON_VERSION")
+load("//bazel:api.bzl", "modular_py_binary", "mojo_test")
+
+# gazelle:default_visibility //visibility:private
+
+package(default_visibility = ["//visibility:private"])
+
+_SRCS = glob(["**/*.mojo"])
+
+# Benchmarks that construct `PythonObject`s start an interpreter in process,
+# so their targets need a Python toolchain. The rest must not request one.
+_PYTHON_SRCS = ["python/bench_python_object.mojo"]
+
+_PYTHON_VERSION = DEFAULT_PYTHON_VERSION.replace("_", ".")
+
+_EXTRA_DEPS = {
+    "algorithm/bench_elementwise.mojo": ["//max:max_mojo"],
+    "memory/bench_heap_parallel.mojo": ["//max:max_mojo"],
+}
+
+_DATA = [
+    "collections/data/UN_charter_AR.html",
+    "collections/data/UN_charter_AR.txt",
+    "collections/data/UN_charter_EN.html",
+    "collections/data/UN_charter_EN.txt",
+    "collections/data/UN_charter_ES.html",
+    "collections/data/UN_charter_ES.txt",
+    "collections/data/UN_charter_RU.html",
+    "collections/data/UN_charter_RU.txt",
+    "collections/data/UN_charter_zh-CN.html",
+    "collections/data/UN_charter_zh-CN.txt",
+    "collections/string/data/canada.txt",
+    "collections/string/data/mesh.txt",
+]
+
+_TARGET_COMPATIBLE_WITH = select({
+    "//:asan": ["@platforms//:incompatible"],  # Too slow to build with ASAN
+    "//conditions:default": [],
+})
+
+# Smoke tests: each benchmark is run once in Mode.Test (via `-t`) to verify it
+# still compiles and executes without crashing. These are cheap enough for
+# every presubmit — they are picked up by `//...` expansion automatically.
+[
+    mojo_test(
+        name = src + ".smoke",
+        srcs = [src],
+        args = ["-t"],
+        data = _DATA,
+        enable_assertions = False,
+        python_version = _PYTHON_VERSION if src in _PYTHON_SRCS else None,
+        target_compatible_with = _TARGET_COMPATIBLE_WITH,
+        deps = ["@mojo//:std"] + _EXTRA_DEPS.get(src, []),
+    )
+    for src in _SRCS
+]
+
+# Full benchmark runs: no `-t`, so `Bench` executes each benchmark with its
+# configured repetitions and reports timings. Tagged `manual` so `//...`
+# wildcards skip them in presubmit, and `stdlib-benchmark` so ad-hoc runs
+# can select them via a tag filter.
+[
+    mojo_test(
+        name = src + ".bench",
+        srcs = [src],
+        data = _DATA,
+        enable_assertions = False,
+        python_version = _PYTHON_VERSION if src in _PYTHON_SRCS else None,
+        tags = [
+            "manual",
+            "stdlib-benchmark",
+        ],
+        target_compatible_with = _TARGET_COMPATIBLE_WITH,
+        deps = ["@mojo//:std"] + _EXTRA_DEPS.get(src, []),
+    )
+    for src in _SRCS
+]
+
+modular_py_binary(
+    name = "builtin/bench_debug_assert_compiletime.py.bench",
+    srcs = ["builtin/bench_debug_assert_compiletime.py"],
+    # py_binary derives its entry point from the target name, which here ends
+    # in `.bench` to match the Mojo benchmarks above.
+    main = "builtin/bench_debug_assert_compiletime.py",
+    mojo_deps = ["@mojo//:std"],
+    tags = [
+        "manual",
+        "stdlib-benchmark",
+    ],
+    target_compatible_with = _TARGET_COMPATIBLE_WITH,
+)
+
+modular_py_binary(
+    name = "format/bench_tstring_compiletime.py.bench",
+    srcs = ["format/bench_tstring_compiletime.py"],
+    main = "format/bench_tstring_compiletime.py",
+    mojo_deps = ["@mojo//:std"],
+    tags = [
+        "manual",
+        "stdlib-benchmark",
+    ],
+    target_compatible_with = _TARGET_COMPATIBLE_WITH,
+)
+
+# Named entry point for running every benchmark in full measurement mode. The
+# test_suite itself is `manual` so it is not swept in by `//...`, but
+# referring to it explicitly expands to every `.bench`.
+test_suite(
+    name = "all_benchmarks",
+    tags = ["manual"],
+    tests = [":" + src + ".bench" for src in _SRCS],
+)

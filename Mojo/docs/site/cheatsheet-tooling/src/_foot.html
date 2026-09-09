@@ -1,0 +1,42 @@
+  </div>
+</div>
+
+<script>
+(function(){
+  var KW=new Set("def struct trait var ref comptime if elif else for while break continue pass return raise try except finally with as from import and or not in is mut out deinit imm raises where assert thin abi".split(" "));
+  var LIT=new Set("True False None".split(" "));
+  var TY=new Set("Int UInt Int8 Int16 Int32 Int64 Int128 Int256 UInt8 UInt16 UInt32 UInt64 UInt128 UInt256 Byte Float16 Float32 Float64 BFloat16 Float8_e4m3fn Float8_e5m2 Float4_e2m1fn Bool String List Dict Optional SIMD Scalar DType Error NoneType StaticString Comparable Copyable Movable Writable Writer ImplicitlyCopyable ImplicitlyDestructible AnyType Equatable Sized Printable PrettyPrintable Identifiable Powable Intable TrivialRegisterPassable RegisterPassable Container Shape Box Pair MyInt Color Point Bag Buffer Matrix Test ValueError Self".split(" "));
+  var BI=new Set("print len range reflect type_of".split(" "));
+  var NL=String.fromCharCode(1);   // sentinel for real (non-string) newlines
+  function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function sp(c,s){return '<span class="'+c+'">'+esc(s)+'</span>';}
+  function hl(src){
+    var re=/(#[^\n]*)|(@[A-Za-z_]\w*)|((?:[rRtT]{1,2})?(?:\x22{3}[\s\S]*?\x22{3}|\x27{3}[\s\S]*?\x27{3}|\x22(?:\\.|[^\x22\\\n])*\x22|\x27(?:\\.|[^\x27\\\n])*\x27))|(\b\d[\w.]*\b)|([A-Za-z_]\w*)|([-+*/%@^&|!<>=~:]+)/g;
+    var out="",last=0,m;
+    while((m=re.exec(src))){
+      out+=esc(src.slice(last,m.index)).replace(/\n/g,NL);last=re.lastIndex;
+      if(m[1])out+=sp('c',m[1]);
+      else if(m[2])out+=sp('d',m[2]);
+      else if(m[3])out+=sp('s',m[3]);
+      else if(m[4])out+=sp('n',m[4]);
+      else if(m[5]){var w=m[5];
+        if(KW.has(w))out+=sp('k',w);
+        else if(LIT.has(w))out+=sp('l',w);
+        else if(TY.has(w))out+=sp('t',w);
+        else if(BI.has(w))out+=sp('b',w);
+        else out+=esc(w);}
+      else if(m[6])out+=sp('o',m[6]);
+    }
+    out+=esc(src.slice(last)).replace(/\n/g,NL);
+    return out;
+  }
+  var blocks=document.querySelectorAll('pre.code');
+  for(var i=0;i<blocks.length;i++){
+    var lines=hl(blocks[i].textContent).split(NL),h="";
+    for(var j=0;j<lines.length;j++){h+='<span class="cl">'+lines[j]+'</span>';}
+    blocks[i].innerHTML=h;
+  }
+})();
+</script>
+</body>
+</html>

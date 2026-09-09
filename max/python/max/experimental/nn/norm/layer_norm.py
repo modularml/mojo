@@ -70,31 +70,26 @@ class LayerNorm(Module[[Tensor], Tensor]):
     small amount of throughput for numerical stability on float16 or
     bfloat16 inputs.
 
-    For example:
-
     .. code-block:: python
 
+        from max.driver import CPU
         from max.dtype import DType
         from max.experimental.nn.norm import LayerNorm
-        from max.experimental.realization_context import (
-            GraphRealizationContext,
-            realization_context,
-        )
-        from max.experimental.tensor import Tensor
-        from max.graph import DeviceRef, Graph, TensorType
+        from max.experimental.tensor import Tensor, default_device
 
-        graph = Graph(
-            "ln",
-            input_types=[
-                TensorType(DType.float32, ("batch", "seq", 2048), DeviceRef.GPU()),
-            ],
-        )
-        ctx = GraphRealizationContext(graph)
-        with realization_context(ctx), ctx:
-            x = Tensor.from_graph_value(graph.inputs[0])
+        with default_device(CPU()):
             norm = LayerNorm(2048)
+            x = Tensor.ones([2, 4, 2048], dtype=DType.float32)
             y = norm(x)
-            graph.output(y)
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert y.shape == [2, 4, 2048]
+        # A constant input has zero variance, so it normalizes to zeros.
+        assert np.allclose(y.to_numpy(), 0.0, atol=1e-3)
+
 
     Args:
         dim: The size of the last dimension of the input.

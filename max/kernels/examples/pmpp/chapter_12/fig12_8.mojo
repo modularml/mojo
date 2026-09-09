@@ -11,15 +11,15 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import WARP_SIZE, barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
-from std.gpu.primitives.id import (
+from max.gpu import WARP_SIZE, block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
+from max.gpu.primitives.id import (
     lane_id,
     warp_id,
 )
-from std.gpu.primitives.warp import shuffle_up
+from max.gpu.primitives.warp import shuffle_up
 
 
 # ========================== CONFIGURATION ==========================
@@ -65,9 +65,7 @@ def warp_scan(val: UInt32) -> UInt32:
 
 def block_scan(
     val: UInt32,
-    warp_sums: UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
-    ],
+    warp_sums: UnsafePointer[mut=True, UInt32, _, address_space=.SHARED],
 ) -> UInt32:
     """Block-level inclusive scan.
 
@@ -106,12 +104,8 @@ def block_scan(
 
 def block_exclusive_scan(
     val: UInt32,
-    warp_sums: UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
-    ],
-    temp: UnsafePointer[
-        UInt32, MutAnyOrigin, address_space=AddressSpace.SHARED
-    ],
+    warp_sums: UnsafePointer[mut=True, UInt32, _, address_space=.SHARED],
+    temp: UnsafePointer[mut=True, UInt32, _, address_space=.SHARED],
 ) -> UInt32:
     """Convert inclusive scan to exclusive scan.
 
@@ -150,15 +144,15 @@ def filter_kernel(
         N: Number of elements.
     """
     # Allocate shared memory for scan operations
-    var warp_sums = stack_allocation[
+    var warp_sums = unsafe_stack_allocation[
         NUM_WARPS,
         UInt32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var temp = stack_allocation[
+    var temp = unsafe_stack_allocation[
         BLOCK_DIM,
         UInt32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     var i = block_idx.x * BLOCK_DIM + thread_idx.x

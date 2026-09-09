@@ -14,6 +14,7 @@
 from std.random import seed
 from std.sys import get_defined_int
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -21,7 +22,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from internal_utils import arg_parse
 from layout import Idx, TileTensor, row_major
 from layout._fillers import random
@@ -53,6 +54,7 @@ def execute_fp8_index[
     batch_size: Int,
     seq_len: Int,
     num_keys: Int,
+    run_benchmark: Bool,
 ) raises:
     var q_size = batch_size * seq_len * num_heads * depth
     var qs_size = batch_size * seq_len * num_heads
@@ -60,17 +62,17 @@ def execute_fp8_index[
     var ks_size = batch_size * num_keys
     var o_size = batch_size * seq_len * num_keys
 
-    var q_device_ptr = ctx.enqueue_create_buffer[DType.float8_e4m3fn](q_size)
-    var qs_device_ptr = ctx.enqueue_create_buffer[DType.float32](qs_size)
-    var k_device_ptr = ctx.enqueue_create_buffer[DType.float8_e4m3fn](k_size)
-    var ks_device_ptr = ctx.enqueue_create_buffer[DType.float32](ks_size)
-    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var q_device_ptr = ctx.enqueue_create_buffer[.float8_e4m3fn](q_size)
+    var qs_device_ptr = ctx.enqueue_create_buffer[.float32](qs_size)
+    var k_device_ptr = ctx.enqueue_create_buffer[.float8_e4m3fn](k_size)
+    var ks_device_ptr = ctx.enqueue_create_buffer[.float32](ks_size)
+    var input_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
-    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[DType.uint32](
+    var cache_row_offsets_device_ptr = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
-    var o_device_ptr = ctx.enqueue_create_buffer[DType.float32](o_size)
+    var o_device_ptr = ctx.enqueue_create_buffer[.float32](o_size)
 
     var q_layout = row_major((batch_size * seq_len, Idx[num_heads], Idx[depth]))
     var qs_layout = row_major((batch_size * seq_len, Idx[num_heads]))
@@ -115,41 +117,60 @@ def execute_fp8_index[
     # and a final scale+sum per (seq, key). Approximate with the GEMV term.
     var flop_count = batch_size * seq_len * num_keys * num_heads * depth * 2
 
-    @parameter
-    @__copy_capture(
-        q_device,
-        qs_device,
-        k_device,
-        ks_device,
-        o_device,
-        input_row_offsets_device,
-        cache_row_offsets_device,
-    )
-    @always_inline
-    def bench_func(mut b: Bencher):
-        @parameter
+    if run_benchmark:
+
         @always_inline
-        def kernel_launch(ctx: DeviceContext) raises:
-            fp8_index[num_heads, depth](
-                o_device,
-                q_device,
-                qs_device,
-                k_device,
-                ks_device,
-                input_row_offsets_device,
-                cache_row_offsets_device,
-                batch_size,
-                seq_len,
-                num_keys,
-                ctx,
-            )
+        def bench_func(
+            mut b: Bencher,
+        ) raises {
+            var q_device,
+            var qs_device,
+            var k_device,
+            var ks_device,
+            var o_device,
+            var input_row_offsets_device,
+            var cache_row_offsets_device,
+            imm,
+        }:
+            @always_inline
+            def kernel_launch(ctx: DeviceContext) raises {imm}:
+                fp8_index[num_heads, depth](
+                    o_device,
+                    q_device,
+                    qs_device,
+                    k_device,
+                    ks_device,
+                    input_row_offsets_device,
+                    cache_row_offsets_device,
+                    batch_size,
+                    seq_len,
+                    num_keys,
+                    ctx,
+                )
 
-        b.iter_custom[kernel_launch](ctx)
+            bencher_iter_custom(b, kernel_launch, ctx)
 
-    m.bench_function[bench_func](
-        BenchId(_get_run_name[num_heads, depth](batch_size, seq_len, num_keys)),
-        [ThroughputMeasure(BenchMetric.flops, flop_count)],
-    )
+        m.bench_function(
+            bench_func,
+            BenchId(
+                _get_run_name[num_heads, depth](batch_size, seq_len, num_keys)
+            ),
+            [ThroughputMeasure(BenchMetric.flops, flop_count)],
+        )
+    else:
+        fp8_index[num_heads, depth](
+            o_device,
+            q_device,
+            qs_device,
+            k_device,
+            ks_device,
+            input_row_offsets_device,
+            cache_row_offsets_device,
+            batch_size,
+            seq_len,
+            num_keys,
+            ctx,
+        )
 
     _ = q_device_ptr
     _ = qs_device_ptr
@@ -167,13 +188,14 @@ def main() raises:
     var batch_size = arg_parse("batch_size", 2)
     var seq_len = arg_parse("seq_len", 128)
     var num_keys = arg_parse("num_keys", 128)
+    var run_benchmark = arg_parse("run_benchmark", True)
 
     seed(0)
 
     var m = Bench()
     with DeviceContext() as ctx:
         execute_fp8_index[num_heads, depth](
-            ctx, m, batch_size, seq_len, num_keys
+            ctx, m, batch_size, seq_len, num_keys, run_benchmark
         )
 
     m.dump_report()

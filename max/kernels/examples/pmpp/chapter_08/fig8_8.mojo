@@ -14,10 +14,10 @@
 from std.random import random_float64
 from std.itertools import product
 
-from std.gpu import barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 
 # ========================== TILING CONFIGURATION ==========================
 comptime STENCIL_WIDTH = 7
@@ -28,10 +28,10 @@ comptime IN_TILE_DIM = OUT_TILE_DIM + ((STENCIL_WIDTH - 1) // STENCIL_ORDER)
 
 # ========================== KERNEL CODE ==========================
 def stencil_kernel(
-    d_in: UnsafePointer[Float32, MutAnyOrigin],
+    d_in: UnsafePointer[Float32, ImmutAnyOrigin],
     d_out: UnsafePointer[Float32, MutAnyOrigin],
-    d_c: UnsafePointer[Float32, MutAnyOrigin],  # Stencil coefficients
-    N: Int,
+    d_c: UnsafePointer[Float32, ImmutAnyOrigin],  # Stencil coefficients
+    n_dev: Int32,
 ):
     """3D stencil kernel with shared memory tiling and halo cells.
 
@@ -39,13 +39,15 @@ def stencil_kernel(
         d_in: Input 3D array (flattened).
         d_out: Output 3D array (flattened).
         d_c: Stencil coefficients [7] (center, k-1, k+1, j-1, j+1, i-1, i+1).
-        N: Dimension size (N x N x N).
+        n_dev: Dimension size (N x N x N).
     """
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var N = Int(n_dev)
     # Allocate shared memory tile (includes halo cells)
-    var in_s = stack_allocation[
+    var in_s = unsafe_stack_allocation[
         IN_TILE_DIM * IN_TILE_DIM * IN_TILE_DIM,
-        Scalar[DType.float32],
-        address_space=AddressSpace.SHARED,
+        Float32,
+        address_space=.SHARED,
     ]()
 
     # Get thread and block indices
@@ -62,7 +64,7 @@ def stencil_kernel(
     if i >= 0 and i < N and j >= 0 and j < N and k >= 0 and k < N:
         var global_idx = i * N * N + j * N + k
         var shared_idx = tz * IN_TILE_DIM * IN_TILE_DIM + ty * IN_TILE_DIM + tx
-        in_s[shared_idx] = Scalar[DType.float32](d_in[global_idx])
+        in_s[shared_idx] = Float32(d_in[global_idx])
 
     # Wait for all threads to finish loading
     barrier()
@@ -105,10 +107,10 @@ def stencil_kernel(
 
 # ========================== TEST CODE ==========================
 def cpu_3d_stencil(
-    h_in: UnsafePointer[Float32, MutAnyOrigin],
-    h_out: UnsafePointer[Float32, MutAnyOrigin],
+    h_in: UnsafePointer[mut=False, Float32, _],
+    h_out: UnsafePointer[mut=True, Float32, _],
     N: Int,
-    coeffs: UnsafePointer[Float32, MutAnyOrigin],
+    coeffs: UnsafePointer[mut=False, Float32, _],
 ):
     """CPU reference implementation of 3D stencil."""
     for i, j, k in product(range(N), range(N), range(N)):
@@ -214,7 +216,7 @@ def main() raises:
         d_in,
         d_out,
         d_c,
-        N,
+        Int32(N),
         grid_dim=(grid_dim_x, grid_dim_y, grid_dim_z),
         block_dim=(block_dim_x, block_dim_y, block_dim_z),
     )

@@ -1,0 +1,48 @@
+load("//bazel:api.bzl", "lit_tests", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+_LIT_TESTS = [
+    "test_tracing.mojo",
+    "test_op_logging.mojo",
+]
+
+_EXTRA_DEPS = {
+    "test_initialize_runtime.mojo": ["//max:max_mojo"],
+    "test_asyncrt.mojo": ["//max:max_mojo"],
+    "test_trace_profiler_range.mojo": ["//max:max_mojo"],
+}
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ] + _EXTRA_DEPS.get(src, []),
+    )
+    for src in glob(
+        ["*.mojo"],
+        exclude = _LIT_TESTS,
+    )
+]
+
+lit_tests(
+    name = "lit_tests",
+    size = "large",
+    srcs = _LIT_TESTS,
+    mojo_deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

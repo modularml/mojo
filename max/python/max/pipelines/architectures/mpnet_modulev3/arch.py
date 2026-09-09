@@ -12,11 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import SupportedArchitecture, TextTokenizer
 from max.pipelines.modeling.types import PipelineTask
 
 from . import weight_adapters
+from .batch_processor import MPNetModuleV3BatchProcessor
 from .model import MPNetPipelineModel
 from .model_config import MPNetConfig
 
@@ -26,11 +27,8 @@ mpnet_modulev3_arch = SupportedArchitecture(
     example_repo_ids=[
         "sentence-transformers/all-mpnet-base-v2",
     ],
-    default_encoding="bfloat16",
-    supported_encodings={
-        "float32",
-        "bfloat16",
-    },
+    default_encoding=MPNetConfig.DEFAULT_ENCODING,
+    supported_encodings=MPNetConfig.SUPPORTED_ENCODINGS,
     pipeline_model=MPNetPipelineModel,
     tokenizer=TextTokenizer,
     context_type=TextContext,
@@ -41,4 +39,5 @@ mpnet_modulev3_arch = SupportedArchitecture(
     },
     required_arguments={"enable_prefix_caching": False},
     config=MPNetConfig,
+    batching=MPNetModuleV3BatchProcessor,
 )

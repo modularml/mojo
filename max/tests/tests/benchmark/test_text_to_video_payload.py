@@ -14,6 +14,12 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from typing import Any
+
+import aiohttp
+import pytest
 from max.benchmark.benchmark_shared.config import (
     PIXEL_GENERATION_TASKS,
     get_pixel_gen_endpoint,
@@ -27,7 +33,9 @@ from max.benchmark.benchmark_shared.datasets.types import (
 )
 from max.benchmark.benchmark_shared.request import (
     PixelGenerationRequestFuncInput,
+    _add_input_reference,
     _build_pixel_generation_payload,
+    _build_sglang_video_form,
 )
 
 
@@ -116,3 +124,92 @@ def test_get_pixel_gen_endpoint_vllm_image() -> None:
 
 def test_get_pixel_gen_endpoint_modular_video() -> None:
     assert get_pixel_gen_endpoint("modular", "text-to-video") == "/v1/responses"
+
+
+# ---------------------------------------------------------------------------
+# image-to-video: routes to the same video endpoints as text-to-video, and
+# uploads the conditioning image as a multipart `input_reference` file on the
+# vllm-omni / sglang backends.
+# ---------------------------------------------------------------------------
+
+
+def test_image_to_video_is_a_pixel_generation_task() -> None:
+    assert "image-to-video" in PIXEL_GENERATION_TASKS
+
+
+def test_get_pixel_gen_endpoint_image_to_video() -> None:
+    # i2v diverts to the video endpoints just like t2v.
+    assert get_pixel_gen_endpoint("vllm", "image-to-video") == "/v1/videos/sync"
+    assert get_pixel_gen_endpoint("sglang", "image-to-video") == "/v1/videos"
+    assert (
+        get_pixel_gen_endpoint("modular", "image-to-video") == "/v1/responses"
+    )
+
+
+def _form_field_map(
+    form: aiohttp.FormData,
+) -> dict[str, tuple[Any, Any]]:
+    """Map a FormData's field name to its (type_options, value).
+
+    Reaches into aiohttp's untyped ``_fields`` internals, hence ``Any``.
+    """
+    return {
+        opts["name"]: (opts, value) for opts, _headers, value in form._fields
+    }
+
+
+def test_add_input_reference_attaches_image_file(tmp_path: Path) -> None:
+    image_path = tmp_path / "frame.png"
+    image_path.write_bytes(b"\x89PNG fake bytes")
+    form = aiohttp.FormData()
+    _add_input_reference(form, [str(image_path)])
+
+    fields = _form_field_map(form)
+    assert "input_reference" in fields
+    opts, value = fields["input_reference"]
+    assert opts["filename"] == "frame.png"
+    assert value == b"\x89PNG fake bytes"
+
+
+def test_add_input_reference_noop_without_image() -> None:
+    form = aiohttp.FormData()
+    _add_input_reference(form, None)
+    _add_input_reference(form, [])
+    assert form._fields == []
+
+
+def test_add_input_reference_raises_on_missing_file() -> None:
+    form = aiohttp.FormData()
+    with pytest.raises(FileNotFoundError):
+        _add_input_reference(form, ["/does/not/exist.png"])
+
+
+def test_build_sglang_video_form_for_image_to_video(tmp_path: Path) -> None:
+    image_path = tmp_path / "frame.png"
+    image_path.write_bytes(b"img")
+    func_input = PixelGenerationRequestFuncInput(
+        model="Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+        session_id=None,
+        prompt="pan across the scene",
+        input_image_paths=[str(image_path)],
+        api_url="http://localhost:8000/v1/videos",
+        image_options=PixelGenerationImageOptions(
+            width=832,
+            height=480,
+            steps=30,
+            guidance_scale=4.0,
+            num_frames=81,
+        ),
+    )
+    form = _build_sglang_video_form(func_input)
+    fields = _form_field_map(form)
+
+    # size is a single WxH form field; num_frames is top-level.
+    assert fields["size"][1] == "832x480"
+    assert fields["num_frames"][1] == "81"
+    # sampling knobs ride along JSON-encoded under extra_body.
+    extra_body = json.loads(fields["extra_body"][1])
+    assert extra_body["num_inference_steps"] == 30
+    assert extra_body["guidance_scale"] == 4.0
+    # the conditioning image is attached as input_reference.
+    assert "input_reference" in fields

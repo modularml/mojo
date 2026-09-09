@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "lit_tests", "mojo_filecheck_test", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -24,6 +25,19 @@ _FILECHECK_TESTS = [
 ]
 
 _EXTRA_COPTS = {}
+
+_EXTRA_DEPS = {
+    "test_fast_div.mojo": ["//max:max_mojo"],
+    "test_print_elementwise.mojo": ["//max:max_mojo"],
+    "test_random.mojo": ["//max:max_mojo"],
+    "test_tcgen05.mojo": ["//max:max_mojo"],
+    "test_wmma.mojo": ["//max:max_mojo"],
+    "test_wmma_amd.mojo": ["//max:max_mojo"],
+}
+
+_FILECHECK_EXTRA_DEPS = {
+    "test_tensor_core_fp8_mma_sync.mojo": ["//max:max_mojo"],
+}
 
 _APPLE_GPU_INCOMPATIBLE = select({
     "//:apple_gpu": ["@platforms//:incompatible"],
@@ -53,7 +67,6 @@ _EXTRA_CONSTRAINTS = {
     "test_print.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: MOCO-2405
     "test_capture_trait_type.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: MOCO-2405
     "test_printf.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: MOCO-2405
-    "test_launch_binary.mojo": _APPLE_GPU_INCOMPATIBLE,  # Requires metallib tool which may not be available on Mac
     "test_init_vector_gpu.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: KERN-2360 - MetalAIRPass address space propagation bug
     "test_prefix_sum.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: llvm.ctlz intrinsic not evaluating at compile time on macOS
     "test_shuffle.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: llvm.ctlz intrinsic not evaluating at compile time on macOS
@@ -63,11 +76,51 @@ _EXTRA_CONSTRAINTS = {
     "test_fast_div.mojo": _APPLE_GPU_INCOMPATIBLE,  # FIXME: MOCO-3587 — Metal compilation failure (originally wrong FastDiv remainder)
 }
 
+_GPU_MEMORY = {
+    "test_accelerator_arch.mojo": "1",
+    "test_dim.mojo": "1",
+    "test_fast_div.mojo": "1",
+    "test_fast_div_ptx.mojo": "1",
+    "test_has_nvidia_gpu.mojo": "1",
+    "test_info.mojo": "1",
+    "test_invariant_load.mojo": "1",
+    "test_is_sm90.mojo": "1",
+    "test_load_width_codegen.mojo": "1",
+    "test_strided_load.mojo": "1",
+    "test_targetinfo.mojo": "1",
+    "test_tcgen05.mojo": "1",
+    "test_add_constant.mojo": "1",
+    "test_barrier.mojo": "1",
+    "test_capture_trait_type.mojo": "2",
+    "test_cast_roundtrip.mojo": "1",
+    "test_constant_memory.mojo": "1",
+    "test_convert.mojo": "1",
+    "test_function_mts.mojo": "1",
+    "test_grid_dim.mojo": "1",
+    "test_id.mojo": "1",
+    "test_init_vector_gpu.mojo": "1",
+    "test_laneid.mojo": "1",
+    "test_launch_binary.mojo": "1",
+    "test_prefix_sum.mojo": "1",
+    "test_print_elementwise.mojo": "2",
+    "test_random.mojo": "1",
+    "test_semaphore.mojo": "1",
+    "test_shuffle.mojo": "1",
+    "test_simd_reduction.mojo": "1",
+    "test_sleep.mojo": "1",
+    "test_sum.mojo": "1",
+    "test_verify_buffers_gpu.mojo": "1",
+    "test_wmma.mojo": "1",
+}
+
 [
     mojo_test(
         name = src + ".test",
         srcs = [src],
-        copts = _EXTRA_COPTS.get(src, []),
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS + _EXTRA_COPTS.get(src, []),
+        exec_properties = {
+            "test.resources:gpu-memory": _GPU_MEMORY.get(src, "0.8"),
+        },
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []),
         deps = [
@@ -77,7 +130,7 @@ _EXTRA_CONSTRAINTS = {
             "//max:nn",
             "//max:quantization",
             "@mojo//:std",
-        ],
+        ] + _EXTRA_DEPS.get(src, []),
     )
     for src in glob(
         ["**/*.mojo"],
@@ -88,6 +141,7 @@ _EXTRA_CONSTRAINTS = {
 mojo_test(
     name = "test_gpu_mem_alloc_validation.mojo.test",
     srcs = ["test_gpu_mem_alloc_validation.mojo"],
+    copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
     tags = [
         "gpu",
         "manual",
@@ -107,7 +161,7 @@ mojo_test(
     mojo_filecheck_test(
         name = src + ".test",
         srcs = [src],
-        copts = _EXTRA_COPTS.get(src, []),
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS + _EXTRA_COPTS.get(src, []),
         expect_crash = src == "test_debug_assert_gpu_error.mojo",
         tags = ["gpu"],
         target_compatible_with = ["//:has_gpu"] + _EXTRA_CONSTRAINTS.get(src, []),
@@ -118,7 +172,7 @@ mojo_test(
             "//max:nn",
             "//max:quantization",
             "@mojo//:std",
-        ],
+        ] + _FILECHECK_EXTRA_DEPS.get(src, []),
     )
     for src in _FILECHECK_TESTS
 ]

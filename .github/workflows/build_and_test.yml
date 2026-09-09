@@ -70,6 +70,26 @@ jobs:
 
           # NOTE: Skip the buildbuddy sidecar on linux where the machine is too small.
           # TODO: Remove this once upstream has fixed the issue.
-          BB_DISABLE_SIDECAR=1 ./bazelw test --config=ci --config=public-cache "${args[@]}" --build_tag_filters=-skip-external-ci,-requires-network --test_tag_filters=-skip-external-ci,-requires-network -- //...
+          export BB_DISABLE_SIDECAR=1
+
+          ./bazelw test --config=ci \
+            --config=public-cache \
+            "${args[@]}" \
+            --build_tag_filters=-skip-external-ci,-requires-network \
+            --test_tag_filters=-skip-external-ci,-requires-network \
+            --config=prebuilt-mojo \
+            -- \
+            //... \
+            -//AsyncRT/... \
+            -//Cache/... \
+            -//Config/... \
+            -//Init/... \
+            -//Mojo/... \
+            -//Support/... \
+            //Mojo/docs/site/... \
+            //Mojo/examples/... \
+            //Mojo/integration-test/... \
+            //Mojo/python/... \
+            //Mojo/stdlib/...
         env:
           BUILDBUDDY_TOKEN: ${{ secrets.BUILDBUDDY_TOKEN }}

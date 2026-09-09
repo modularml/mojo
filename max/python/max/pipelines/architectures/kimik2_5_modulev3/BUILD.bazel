@@ -1,0 +1,44 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+filegroup(
+    name = "recipe_configs",
+    srcs = glob(["**/recipes/**/*.yaml"]),
+)
+
+modular_py_library(
+    name = "kimik2_5_modulev3",
+    srcs = glob(["**/*.py"]),
+    data = [":recipe_configs"],
+    ignore_extra_deps = [
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+        # Kimi K2.5: used at runtime by HF custom tokenizer, not a direct import
+        requirement("tiktoken"),
+    ],
+    deps = [
+        requirement("av"),
+        requirement("numpy"),
+        requirement("pillow"),
+        requirement("tiktoken"),  # Required by HF custom tokenizer for Kimi K2.5
+        requirement("transformers"),
+        requirement("typing-extensions"),
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+        "//max/python/max/pipelines/architectures/deepseekV3_modulev3",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/weights",
+        "//max/python/max/support",
+        "//max/python/max:tensor",
+    ],
+)

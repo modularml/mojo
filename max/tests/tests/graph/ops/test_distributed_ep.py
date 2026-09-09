@@ -215,7 +215,7 @@ def test_dispatch_fp8_basic() -> None:
 # -----------------------------------------------------------------------
 
 
-def test_dispatch_nvfp4_basic() -> None:
+def test_dispatch_block_scaled_nv_basic() -> None:
     """NVFP4 dispatch produces 6 output groups per device."""
     token_last_dim = HIDDEN_SIZE // 2
     input_types: list[Type[Any]] = [
@@ -265,7 +265,7 @@ def test_dispatch_nvfp4_basic() -> None:
         idx += n
         counters = [graph.inputs[idx + i].buffer for i in range(n)]
 
-        results = ops.distributed_ep.dispatch_nvfp4(
+        results = ops.distributed_ep.dispatch_block_scaled_nv(
             input_tokens,
             topk_ids,
             send_ptrs,

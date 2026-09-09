@@ -15,14 +15,13 @@ from std.math import exp
 from std.random import rand, seed
 from std.sys import argv
 
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from std.sys import has_amd_gpu_accelerator
-from std.gpu.host.info import (
+from max.gpu.host.info import (
     A100,
     H100,
     GPUInfo,
-    Vendor,
     _is_sm10x_gpu,
 )
 from layout import (
@@ -52,11 +51,7 @@ def is_benchmark() -> Bool:
 
 
 def is_sm8(info: GPUInfo) -> Bool:
-    return (
-        info.vendor == Vendor.NVIDIA_GPU
-        and info.compute >= 8
-        and info.compute < 9
-    )
+    return info.api == "cuda" and info.compute >= 8 and info.compute < 9
 
 
 def test[
@@ -167,10 +162,10 @@ def test[
         row_major((batch_size, seq_len, Idx[num_heads], Idx[depth])),
     )
 
-    @parameter
     @always_inline
-    @__copy_capture(q_device, k_device, v_device, output_device)
-    def kernel_launch(ctx: DeviceContext) raises:
+    def kernel_launch(
+        ctx: DeviceContext,
+    ) raises {var q_device, var k_device, var v_device, var output_device, imm}:
         flash_attention[decoding_warp_split_k=decoding_warp_split_k](
             output_device,
             q_device,
@@ -188,7 +183,7 @@ def test[
         # Warmup
         kernel_launch(ctx)
 
-        var nstime = Float64(ctx.execution_time[kernel_launch](nrun)) / Float64(
+        var nstime = Float64(ctx.execution_time(kernel_launch, nrun)) / Float64(
             nrun
         )
         var sectime = nstime / 1000000
@@ -228,7 +223,7 @@ def test[
     ctx.enqueue_copy(output_ptr, output_ref_device_ptr)
     ctx.synchronize()
 
-    @parameter
+    @__parameter
     def get_rtol() -> Float64:
         return 2e-2 if num_partitions and num_partitions.value() >= 4 else 1e-2
 
@@ -241,7 +236,7 @@ def test[
                 ]()
                 var actual = flash_output_ptr[
                     d + depth * (h + s * num_heads)
-                ].cast[DType.float64]()
+                ].cast[.float64]()
                 var rerr = abs((actual - expect) / expect)
                 assert_almost_equal(
                     actual,
@@ -258,7 +253,7 @@ def test[
 
 
 def test_depth_supported_by_gpu(info: GPUInfo) -> List[Int]:
-    var depths = [64, 128, 512]
+    var depths: List = [64, 128, 512]
 
     if info == materialize[H100]() or _is_sm10x_gpu(info):
         depths.append(80)
@@ -268,7 +263,7 @@ def test_depth_supported_by_gpu(info: GPUInfo) -> List[Int]:
 
 
 def test_context_encoding(ctx: DeviceContext) raises:
-    test[DType.bfloat16, depth=127, num_heads=2](111, 121, ctx)
+    test[.bfloat16, depth=127, num_heads=2](111, 121, ctx)
 
     comptime depths = test_depth_supported_by_gpu(ctx.default_device_info)
 
@@ -383,12 +378,28 @@ def test_context_encoding(ctx: DeviceContext) raises:
             num_heads=3,
         ](119, 200, ctx)
 
+        # Zero seq_len / num_keys: the FLUX.2 VAE mid-block attention
+        # runs on a flattened spatial dim, which is zero when the
+        # encoder is invoked on a ``(0, 0, 3)`` placeholder image for
+        # the text-to-image path.  The kernel must early-return rather
+        # than launching with zero grid dims.
+        test[
+            DType.bfloat16,
+            depth=128,
+            num_heads=1,
+        ](0, 0, ctx)
+        test[
+            DType.bfloat16,
+            depth=128,
+            num_heads=3,
+        ](0, 0, ctx)
+
 
 def test_decoding[
     batch_size: Int,
     num_partitions: Optional[Int],
     split_k: Bool,
-    qkv_type: DType = DType.bfloat16,
+    qkv_type: DType = .bfloat16,
 ](ctx: DeviceContext, use_index_input: Bool = False) raises:
     comptime depths = test_depth_supported_by_gpu(ctx.default_device_info)
 
@@ -453,7 +464,7 @@ def test_decoding_large_group[
     batch_size: Int,
     num_partitions: Optional[Int] = None,
     split_k: Bool = False,
-    qkv_type: DType = DType.bfloat16,
+    qkv_type: DType = .bfloat16,
 ](ctx: DeviceContext, use_index_input: Bool = False) raises:
     comptime depths = test_depth_supported_by_gpu(ctx.default_device_info)
 
@@ -558,7 +569,7 @@ def test_flash_attention_sink_kernel(ctx: DeviceContext, seq_len: Int) raises:
     )
 
     @always_inline
-    def launch(ctx: DeviceContext) raises {read}:
+    def launch(ctx: DeviceContext) raises {imm}:
         flash_attention[sink=True](
             out_device,
             q_device,
@@ -568,7 +579,7 @@ def test_flash_attention_sink_kernel(ctx: DeviceContext, seq_len: Int) raises:
             scale,  # 0.0 -> all QK logits are exactly zero
             ctx,
             None,
-            sink_weights=sinks_device.get_immutable(),
+            sink_weights=sinks_device.as_imm().as_unsafe_any_origin(),
         )
 
     launch(ctx)
@@ -586,10 +597,23 @@ def test_flash_attention_sink_kernel(ctx: DeviceContext, seq_len: Int) raises:
     # (since V=1)
     for s in range(seq_len):
         for d in range(depth):
-            var got0 = out_host[0, s, 0, d].cast[DType.float32]()
-            var got1 = out_host[0, s, 1, d].cast[DType.float32]()
+            var got0 = out_host[0, s, 0, d].cast[.float32]()
+            var got1 = out_host[0, s, 1, d].cast[.float32]()
             assert_almost_equal(got0, want0, atol=2e-2, rtol=2e-2)
             assert_almost_equal(got1, want1, atol=2e-2, rtol=2e-2)
+
+    # Keep every device buffer alive until the kernel and the readback have both
+    # completed. `sinks_device` wraps `sinks_dev.unsafe_ptr()` (a raw pointer,
+    # no ownership), so without this keepalive `sinks_dev` can be freed before
+    # the async attention kernel reads it; the allocator then reuses that memory
+    # and the kernel reads a garbage sink weight (intermittently 0 -> output
+    # num_keys/(num_keys+1), or a large value -> output ~0). Mirrors the
+    # `_ = sink_d^` keepalive in `test_apple_fa_prefill.mojo`.
+    _ = q_dev^
+    _ = k_dev^
+    _ = v_dev^
+    _ = out_dev^
+    _ = sinks_dev^
 
 
 def main() raises:

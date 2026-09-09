@@ -15,7 +15,7 @@ from std.math import ceildiv, isclose
 from std.random import rand
 from std.sys.info import simd_width_of
 
-from layout import Layout, LayoutTensor, RuntimeLayout
+from layout import Coord, Layout, LayoutTensor, RuntimeLayout
 from layout import lt_to_tt
 from nn.conv.conv import (
     ConvDirectNHWC,
@@ -67,23 +67,18 @@ def test[
     var WO = (W + pad_w[0] + pad_w[1] - dilation[2] * (S - 1) - 1) // stride[2] + 1
     # fmt: on
 
-    # Alternative with explicit dtype parameters
-    var padding_0 = IndexList[2](pad_d[0], pad_d[1])
-    var padding_1 = IndexList[2](pad_h[0], pad_h[1])
-    var padding_2 = IndexList[2](pad_w[0], pad_w[1])
-
     var conv_shape = ConvShape[3](
         n=N,
-        input_dims=DHW,
-        output_dims=Index(DO, HO, WO),
-        filter_dims=QRS,
+        input_dims=Coord(DHW),
+        output_dims=Coord(Index(DO, HO, WO)),
+        filter_dims=Coord(QRS),
         c=C,
         f=F,
-        stride=stride,
-        dilation=dilation,
-        pad_d=pad_d,
-        pad_h=pad_h,
-        pad_w=pad_w,
+        stride=Coord(stride),
+        dilation=Coord(dilation),
+        pad_d=Coord(pad_d),
+        pad_h=Coord(pad_h),
+        pad_w=Coord(pad_w),
         num_groups=num_groups,
     )
 
@@ -104,9 +99,6 @@ def test[
     # Find the tile size used in packing.
     comptime micro_kernel_height = get_direct_conv_micro_kernel_height()
     comptime micro_kernel_width = get_direct_conv_micro_kernel_width()
-
-    var micro_kernel_f_size = get_direct_conv_micro_kernel_width() * simd_size
-    var rounded_F = ceildiv(F, micro_kernel_f_size) * micro_kernel_f_size
 
     comptime layout_5d = Layout.row_major[5]()
     comptime layout_6d = Layout.row_major[6]()
@@ -234,7 +226,7 @@ def test[
 def main() raises:
     comptime dtype = DType.float32
 
-    test[DType.float32, False](  # dtype, filter_packed
+    test[.float32, False](  # dtype, filter_packed
         1,  # N: batch size
         IndexList[3](4, 4, 4),  # DHW: depth, height, width
         2,  # C: channels

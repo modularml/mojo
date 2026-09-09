@@ -79,50 +79,64 @@ Direct API (for special cases):
 
 from std.sys import size_of
 
-from std.gpu.memory import AddressSpace
-from layout.tma_async import SharedMemBarrier
+from .pipeline_backend import PipelineBackend, NvidiaMbarBackend
 
-comptime MbarPtr = UnsafePointer[
-    SharedMemBarrier, MutAnyOrigin, address_space=AddressSpace.SHARED
-]
+# SM100 (B200) warp-specialized pipeline backoff hint, in nanoseconds.
+#
+# `SharedMemBarrier.wait` lowers to the
+# `LAB_WAIT: mbarrier.try_wait.parity ...; @P1 bra DONE; bra LAB_WAIT;`.
+# Without a `ticks` operand `try_wait.parity` returns immediately, so the warp
+# tight-spins (BRA/SYNCS per iteration). With a `ticks` operand the hardware
+# *suspends* the warp for up to `ticks` ns (it wakes the instant the barrier
+# flips, so this is a ceiling, not a fixed sleep) — the NANOSLEEP-equivalent
+# idiom cuBLAS `nvjet` uses. Cuts the spin instructions when a warp would
+# otherwise re-iterate the loop many times (near-full occupancy / many waves).
+comptime SM100_PIPELINE_WAIT_TICKS = UInt32(0x989680)
 
 
-struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
-    """A producer-consumer pipeline using shared memory barriers to
-    enforce synchronization (between producer and consumer warps).
+struct ProducerConsumerPipeline[
+    num_stages: Int, Backend: PipelineBackend = NvidiaMbarBackend[num_stages]
+](TrivialRegisterPassable):
+    """A producer-consumer pipeline that synchronizes producer and consumer
+    warps through a pluggable hardware backend.
 
     Parameters:
         num_stages: The number of pipeline stages.
+        Backend: The synchronization backend. Defaults to `NvidiaMbarBackend`
+            (NVIDIA `mbarrier`); other backends (e.g. atomic counters for AMD)
+            plug in without changing this struct.
 
     This struct is commonly used with warp specialization to pipeline operations
     between two warps/warpgroups with data dependencies.
     """
 
-    # Full implies data has been produced. Producer signals this barrier
-    # and consumer waits on this barrier.
-    var full: MbarPtr
-
-    # Empty implies data has been consumed. Consumer signals this barrier
-    # and producer waits on this barrier.
-    var empty: MbarPtr
+    # Hardware synchronization backend (mbarrier, atomic counters, ...).
+    var backend: Self.Backend
 
     # The stage in pipeline, from 0 to num_stages-1
     var _consumer_stage: UInt32
     var _producer_stage: UInt32
 
-    # The phase for shared memory barrier, between 0 and 1
+    # The lap around the ring for each side, incremented on wrap-around.
+    # Backends map it onto their substrate (NVIDIA uses the low bit as parity).
     var _consumer_phase: UInt32
     var _producer_phase: UInt32
 
     @always_inline
-    def __init__(out self, ptr: MbarPtr):
+    def __init__(
+        out self,
+        ptr: UnsafePointer[
+            Self.Backend.BarrierStorage,
+            MutUntrackedOrigin,
+            address_space=.SHARED,
+        ],
+    ):
         """Initialize the producer-consumer pipeline with default phases.
 
         Args:
             ptr: Pointer to shared memory barriers.
         """
-        self.full = ptr
-        self.empty = ptr + Self.num_stages
+        self.backend = Self.Backend.__init__[Self.num_stages](ptr)
         self._producer_stage = 0
         self._consumer_stage = 0
         # This ensures producer's wait_consumer() passes trivially at
@@ -131,14 +145,31 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
         self._consumer_phase = 0
 
     @always_inline
-    def wait_producer(self):
-        """Consumer waits for producer."""
-        self.full[self._consumer_stage].wait(self._consumer_phase)
+    def wait_producer[ticks: Optional[UInt32] = None](self):
+        """Consumer waits for producer.
+
+        Parameters:
+            ticks: Optional hardware-suspend ceiling (ns) forwarded to
+                `SharedMemBarrier.wait`. `None` (default) preserves the
+                immediate-return spin for every existing caller; pass
+                `SM100_PIPELINE_WAIT_TICKS` to let the warp suspend instead
+                of busy-spinning while blocked.
+        """
+        self.backend.wait_full[ticks=ticks](
+            self._consumer_stage, self._consumer_phase
+        )
 
     @always_inline
-    def wait_consumer(self):
-        """Producer waits for consumer."""
-        self.empty[self._producer_stage].wait(self._producer_phase)
+    def wait_consumer[ticks: Optional[UInt32] = None](self):
+        """Producer waits for consumer.
+
+        Parameters:
+            ticks: Optional hardware-suspend ceiling (ns) forwarded to
+                `SharedMemBarrier.wait`. See `wait_producer` for semantics.
+        """
+        self.backend.wait_empty[ticks=ticks](
+            self._producer_stage, self._producer_phase
+        )
 
     @always_inline
     def try_wait_producer(self) -> Bool:
@@ -155,7 +186,7 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
             pipeline.wait_producer_if_needed(ready)
             ```
         """
-        return self.full[self._consumer_stage].try_wait(self._consumer_phase)
+        return self.backend.try_full(self._consumer_stage, self._consumer_phase)
 
     @always_inline
     def try_wait_consumer(self) -> Bool:
@@ -167,7 +198,9 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
         Note:
             Use this with wait_consumer_if_needed() for the try-acquire pattern.
         """
-        return self.empty[self._producer_stage].try_wait(self._producer_phase)
+        return self.backend.try_empty(
+            self._producer_stage, self._producer_phase
+        )
 
     @always_inline
     def wait_producer_if_needed(self, already_ready: Bool):
@@ -190,7 +223,7 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
             self.wait_consumer()
 
     @always_inline
-    def producer_mbar(self, stage: UInt32) -> MbarPtr:
+    def producer_mbar(self, stage: UInt32) -> Self.Backend.Handle:
         """Get the producer barrier for a specific stage.
 
         Args:
@@ -199,10 +232,10 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
         Returns:
             The shared memory barrier that the producer signals.
         """
-        return self.full + stage
+        return self.backend.full_handle(stage)
 
     @always_inline
-    def consumer_mbar(self, stage: UInt32) -> MbarPtr:
+    def consumer_mbar(self, stage: UInt32) -> Self.Backend.Handle:
         """Get the consumer barrier for a specific stage.
 
         Args:
@@ -211,7 +244,7 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
         Returns:
             The shared memory barrier that the consumer signals.
         """
-        return self.empty + stage
+        return self.backend.empty_handle(stage)
 
     @always_inline
     def producer_stage(self) -> UInt32:
@@ -236,8 +269,8 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
         """Advance the consumer to the next pipeline stage.
 
         Increments the consumer stage and wraps to 0 when reaching num_stages,
-        toggling the phase bit on wrap-around.
-        Only switch phase at end of pipeline because we assume all barriers
+        incrementing the lap counter on wrap-around.
+        Only advance the lap at end of pipeline because we assume all barriers
         are at the same consumer/producer phase before checked. Once checked,
         the execution moves to next barrier.
         """
@@ -245,20 +278,20 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
 
         if self._consumer_stage == UInt32(Self.num_stages):
             self._consumer_stage = 0
-            self._consumer_phase ^= 1
+            self._consumer_phase += 1
 
     @always_inline
     def producer_step(mut self):
         """Advance the producer to the next pipeline stage.
 
         Increments the producer stage and wraps to 0 when reaching num_stages,
-        toggling the phase bit on wrap-around.
+        incrementing the lap counter on wrap-around.
         """
         self._producer_stage += 1
 
         if self._producer_stage == UInt32(Self.num_stages):
             self._producer_stage = 0
-            self._producer_phase ^= 1
+            self._producer_phase += 1
 
     @staticmethod
     @always_inline
@@ -269,7 +302,10 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
             The total number of bytes needed for all pipeline barriers
             (2 * num_stages barriers).
         """
-        return UInt32(2 * Self.num_stages * size_of[SharedMemBarrier]())
+        return UInt32(
+            Self.Backend.storage_elems[Self.num_stages]()
+            * size_of[Self.Backend.BarrierStorage]()
+        )
 
     @always_inline
     def init_mbars(
@@ -284,10 +320,9 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
 
         This function must be called by a single thread and must be called before any the pipeline object is used.
         """
-
-        comptime for i in range(Self.num_stages):
-            self.full[i].init(producer_arrive_count)
-            self.empty[i].init(consumer_arrive_count)
+        self.backend.init_barriers[Self.num_stages](
+            producer_arrive_count, consumer_arrive_count
+        )
 
     @always_inline
     def producer_signal_and_step(mut self):
@@ -299,7 +334,7 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
         3. Advance to next stage
         """
         self.wait_consumer()
-        _ = self.full[self._producer_stage].arrive()
+        self.backend.arrive_full(self._producer_stage)
         self.producer_step()
 
     @always_inline
@@ -312,7 +347,7 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
         3. Advance to next stage
         """
         self.wait_producer()
-        _ = self.empty[self._consumer_stage].arrive()
+        self.backend.arrive_empty(self._consumer_stage)
         self.consumer_step()
 
     # =========================================================================
@@ -322,7 +357,9 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
     @always_inline
     def produce[
         origin: MutOrigin, //
-    ](ref[origin] self) -> ProduceContext[origin, Self.num_stages]:
+    ](ref[origin] self) -> ProduceContext[
+        origin, Self.num_stages, Self.Backend
+    ]:
         """Produce one pipeline stage with encapsulated barriers.
 
         Usage:
@@ -330,6 +367,9 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
                 # stage.index() gives current stage
                 # stage.mbar() gives barrier for signaling
                 # __exit__ calls producer_step()
+
+        Parameters:
+            origin: Origin of the mutable borrow of `self` (inferred).
 
         Returns:
             Context that waits for consumer on enter, advances on exit.
@@ -339,13 +379,18 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
     @always_inline
     def consume[
         origin: MutOrigin, //
-    ](ref[origin] self) -> ConsumeContext[origin, Self.num_stages]:
+    ](ref[origin] self) -> ConsumeContext[
+        origin, Self.num_stages, Self.Backend
+    ]:
         """Consume one pipeline stage with encapsulated barriers.
 
         Usage:
             with pipeline.consume() as stage:
                 # stage.index() gives current stage
                 # __exit__ signals consumer done and advances
+
+        Parameters:
+            origin: Origin of the mutable borrow of `self` (inferred).
 
         Returns:
             Context that waits for producer on enter, signals+advances on exit.
@@ -355,7 +400,9 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
     @always_inline
     def consume_explicit[
         origin: MutOrigin, //
-    ](ref[origin] self) -> ExplicitConsumeContext[origin, Self.num_stages]:
+    ](ref[origin] self) -> ExplicitConsumeContext[
+        origin, Self.num_stages, Self.Backend
+    ]:
         """Consume one pipeline stage with EXPLICIT barrier arrive.
 
         Use this for kernels requiring lane-guarded or specialized signaling.
@@ -374,6 +421,9 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
                 else:
                     umma_arrive_leader_cta(stage.mbar())
 
+        Parameters:
+            origin: Origin of the mutable borrow of `self` (inferred).
+
         Returns:
             Context that waits for producer on enter, advances only on exit.
         """
@@ -386,7 +436,7 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
     @always_inline
     def acquire_producer[
         origin: MutOrigin, //
-    ](ref[origin] self) -> ProducerStage[origin, Self.num_stages]:
+    ](ref[origin] self) -> ProducerStage[origin, Self.num_stages, Self.Backend]:
         """Acquire a producer stage handle using linear types.
 
         Waits for the consumer to free the current stage, then returns a
@@ -397,20 +447,19 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
             # ... produce data, signal via stage.mbar() ...
             stage^.release()  # Advances to next stage
 
+        Parameters:
+            origin: Origin of the mutable borrow of `self` (inferred).
+
         Returns:
             A ProducerStage handle that must be released.
         """
         self.wait_consumer()
-        return ProducerStage(
-            Pointer(to=self),
-            self._producer_stage,
-            self.producer_mbar(self._producer_stage),
-        )
+        return ProducerStage(Pointer(to=self), self._producer_stage)
 
     @always_inline
     def acquire_consumer[
         origin: MutOrigin, //
-    ](ref[origin] self) -> ConsumerStage[origin, Self.num_stages]:
+    ](ref[origin] self) -> ConsumerStage[origin, Self.num_stages, Self.Backend]:
         """Acquire a consumer stage handle using linear types.
 
         Waits for the producer to fill the current stage, then returns a
@@ -428,15 +477,14 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
                 stage.arrive()
             stage^.release_without_signal()
 
+        Parameters:
+            origin: Origin of the mutable borrow of `self` (inferred).
+
         Returns:
             A ConsumerStage handle that must be released.
         """
         self.wait_producer()
-        return ConsumerStage(
-            Pointer(to=self),
-            self._consumer_stage,
-            self.consumer_mbar(self._consumer_stage),
-        )
+        return ConsumerStage(Pointer(to=self), self._consumer_stage)
 
 
 # =============================================================================
@@ -462,7 +510,8 @@ struct ProducerConsumerPipeline[num_stages: Int](TrivialRegisterPassable):
 struct ProducerStage[
     pipeline_origin: MutOrigin,
     num_stages: Int,
-](Movable):
+    Backend: PipelineBackend = NvidiaMbarBackend[num_stages],
+](Deinitable where False, Movable):
     """Unified handle for producing to a pipeline stage.
 
     Works as both a linear type (direct use) and within context managers.
@@ -475,26 +524,26 @@ struct ProducerStage[
     Parameters:
         pipeline_origin: Origin of the pipeline reference.
         num_stages: Number of pipeline stages.
+        Backend: The synchronization backend (see `ProducerConsumerPipeline`).
     """
 
     var pipeline: Pointer[
-        ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+        ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+        Self.pipeline_origin,
     ]
     var _index: UInt32
-    var _mbar: MbarPtr
 
     @always_inline
     def __init__(
         out self,
         pipeline: Pointer[
-            ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+            ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+            Self.pipeline_origin,
         ],
         index: UInt32,
-        mbar: MbarPtr,
     ):
         self.pipeline = pipeline
         self._index = index
-        self._mbar = mbar
 
     @always_inline
     def index(self) -> UInt32:
@@ -502,12 +551,12 @@ struct ProducerStage[
         return self._index
 
     @always_inline
-    def mbar(self) -> MbarPtr:
+    def mbar(self) -> Self.Backend.Handle:
         """Get the barrier to signal when production is complete.
 
         Caller is responsible for signaling via mma_arrive or similar.
         """
-        return self._mbar
+        return self.pipeline[].backend.full_handle(self._index)
 
     @always_inline
     def release(deinit self):
@@ -522,6 +571,7 @@ struct ProducerStage[
 struct ProduceContext[
     pipeline_origin: MutOrigin,
     num_stages: Int,
+    Backend: PipelineBackend = NvidiaMbarBackend[num_stages],
 ]:
     """Context manager for producing one pipeline stage.
 
@@ -530,18 +580,28 @@ struct ProduceContext[
 
     Note: The actual production signal (mma_arrive) is kernel-specific
     and must be called by the user before exiting the context.
+
+    Parameters:
+        pipeline_origin: Origin of the pipeline reference.
+        num_stages: Number of pipeline stages.
+        Backend: Pipeline synchronization backend (defaults to
+            `NvidiaMbarBackend`).
     """
 
     var pipeline: Pointer[
-        ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+        ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+        Self.pipeline_origin,
     ]
-    var _stage: Optional[ProducerStage[Self.pipeline_origin, Self.num_stages]]
+    var _stage: Optional[
+        ProducerStage[Self.pipeline_origin, Self.num_stages, Self.Backend]
+    ]
 
     @always_inline
     def __init__(
         out self,
         pipeline: Pointer[
-            ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+            ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+            Self.pipeline_origin,
         ],
     ):
         self.pipeline = pipeline
@@ -551,14 +611,15 @@ struct ProduceContext[
     def __enter__(
         mut self,
     ) -> ref[self._stage.value()] ProducerStage[
-        Self.pipeline_origin, Self.num_stages
+        Self.pipeline_origin, Self.num_stages, Self.Backend
     ]:
         """Wait for consumer and return reference to stage."""
         self.pipeline[].wait_consumer()
+        # `_stage` is empty here; destroy it before repopulating, since an
+        # `Optional` of a non-implicitly-deletable stage can't drop implicitly.
+        self._stage^.deinit_assert_empty()
         self._stage = ProducerStage(
-            self.pipeline,
-            self.pipeline[].producer_stage(),
-            self.pipeline[].producer_mbar(self.pipeline[].producer_stage()),
+            self.pipeline, self.pipeline[].producer_stage()
         )
         return self._stage.value()
 
@@ -568,12 +629,17 @@ struct ProduceContext[
         self._stage.take().release()
         # take() already sets _stage to None
 
+    @always_inline
+    def __deinit__(deinit self):
+        self._stage^.deinit_assert_empty()
+
 
 @explicit_destroy("Must call release() or release_without_signal()")
 struct ConsumerStage[
     pipeline_origin: MutOrigin,
     num_stages: Int,
-](Movable):
+    Backend: PipelineBackend = NvidiaMbarBackend[num_stages],
+](Deinitable where False, Movable):
     """Unified handle for consuming from a pipeline stage.
 
     Works as both a linear type (direct use) and within context managers.
@@ -590,26 +656,26 @@ struct ConsumerStage[
     Parameters:
         pipeline_origin: Origin of the pipeline reference.
         num_stages: Number of pipeline stages.
+        Backend: The synchronization backend (see `ProducerConsumerPipeline`).
     """
 
     var pipeline: Pointer[
-        ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+        ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+        Self.pipeline_origin,
     ]
     var _index: UInt32
-    var _mbar: MbarPtr
 
     @always_inline
     def __init__(
         out self,
         pipeline: Pointer[
-            ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+            ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+            Self.pipeline_origin,
         ],
         index: UInt32,
-        mbar: MbarPtr,
     ):
         self.pipeline = pipeline
         self._index = index
-        self._mbar = mbar
 
     @always_inline
     def index(self) -> UInt32:
@@ -617,13 +683,13 @@ struct ConsumerStage[
         return self._index
 
     @always_inline
-    def mbar(self) -> MbarPtr:
+    def mbar(self) -> Self.Backend.Handle:
         """Get the barrier for manual signaling.
 
         Use this for specialized signaling patterns like umma_arrive_leader_cta.
         For standard usage, just call release().
         """
-        return self._mbar
+        return self.pipeline[].backend.empty_handle(self._index)
 
     @always_inline
     def arrive(self):
@@ -634,7 +700,7 @@ struct ConsumerStage[
                 stage.arrive()
             stage^.release_without_signal()
         """
-        _ = self._mbar[0].arrive()
+        self.pipeline[].backend.arrive_empty(self._index)
 
     @always_inline
     def release(deinit self):
@@ -644,7 +710,7 @@ struct ConsumerStage[
             arrive()
             consumer_step()
         """
-        _ = self.pipeline[].empty[self._index].arrive()
+        self.pipeline[].backend.arrive_empty(self._index)
         self.pipeline[].consumer_step()
 
     @always_inline
@@ -659,23 +725,34 @@ struct ConsumerStage[
 struct ConsumeContext[
     pipeline_origin: MutOrigin,
     num_stages: Int,
+    Backend: PipelineBackend = NvidiaMbarBackend[num_stages],
 ]:
     """Context manager for consuming one pipeline stage.
 
     - __enter__: Waits for producer to be ready, returns ref to stage
     - __exit__: Releases the stage (signals consumption + advances)
+
+    Parameters:
+        pipeline_origin: Origin of the pipeline reference.
+        num_stages: Number of pipeline stages.
+        Backend: Pipeline synchronization backend (defaults to
+            `NvidiaMbarBackend`).
     """
 
     var pipeline: Pointer[
-        ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+        ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+        Self.pipeline_origin,
     ]
-    var _stage: Optional[ConsumerStage[Self.pipeline_origin, Self.num_stages]]
+    var _stage: Optional[
+        ConsumerStage[Self.pipeline_origin, Self.num_stages, Self.Backend]
+    ]
 
     @always_inline
     def __init__(
         out self,
         pipeline: Pointer[
-            ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+            ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+            Self.pipeline_origin,
         ],
     ):
         self.pipeline = pipeline
@@ -685,16 +762,15 @@ struct ConsumeContext[
     def __enter__(
         mut self,
     ) -> ref[self._stage.value()] ConsumerStage[
-        Self.pipeline_origin, Self.num_stages
+        Self.pipeline_origin, Self.num_stages, Self.Backend
     ]:
         """Wait for producer and return reference to stage."""
         self.pipeline[].wait_producer()
         var stage_idx = self.pipeline[].consumer_stage()
-        self._stage = ConsumerStage(
-            self.pipeline,
-            stage_idx,
-            self.pipeline[].consumer_mbar(stage_idx),
-        )
+        # `_stage` is empty here; destroy it before repopulating, since an
+        # `Optional` of a non-implicitly-deletable stage can't drop implicitly.
+        self._stage^.deinit_assert_empty()
+        self._stage = ConsumerStage(self.pipeline, stage_idx)
         return self._stage.value()
 
     @always_inline
@@ -703,10 +779,15 @@ struct ConsumeContext[
         self._stage.take().release()
         # take() already sets _stage to None
 
+    @always_inline
+    def __deinit__(deinit self):
+        self._stage^.deinit_assert_empty()
+
 
 struct ExplicitConsumeContext[
     pipeline_origin: MutOrigin,
     num_stages: Int,
+    Backend: PipelineBackend = NvidiaMbarBackend[num_stages],
 ]:
     """Context manager for consuming with EXPLICIT barrier arrive.
 
@@ -721,18 +802,28 @@ struct ExplicitConsumeContext[
             if lane_id() < CLUSTER_SIZE:
                 stage.arrive()
         # __exit__ only calls consumer_step(), not arrive()
+
+    Parameters:
+        pipeline_origin: Origin of the pipeline reference.
+        num_stages: Number of pipeline stages.
+        Backend: Pipeline synchronization backend (defaults to
+            `NvidiaMbarBackend`).
     """
 
     var pipeline: Pointer[
-        ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+        ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+        Self.pipeline_origin,
     ]
-    var _stage: Optional[ConsumerStage[Self.pipeline_origin, Self.num_stages]]
+    var _stage: Optional[
+        ConsumerStage[Self.pipeline_origin, Self.num_stages, Self.Backend]
+    ]
 
     @always_inline
     def __init__(
         out self,
         pipeline: Pointer[
-            ProducerConsumerPipeline[Self.num_stages], Self.pipeline_origin
+            ProducerConsumerPipeline[Self.num_stages, Self.Backend],
+            Self.pipeline_origin,
         ],
     ):
         self.pipeline = pipeline
@@ -742,17 +833,16 @@ struct ExplicitConsumeContext[
     def __enter__(
         mut self,
     ) -> ref[self._stage.value()] ConsumerStage[
-        Self.pipeline_origin, Self.num_stages
+        Self.pipeline_origin, Self.num_stages, Self.Backend
     ]:
         """Wait for producer and return reference to stage with barrier access.
         """
         self.pipeline[].wait_producer()
         var stage_idx = self.pipeline[].consumer_stage()
-        self._stage = ConsumerStage(
-            self.pipeline,
-            stage_idx,
-            self.pipeline[].consumer_mbar(stage_idx),
-        )
+        # `_stage` is empty here; destroy it before repopulating, since an
+        # `Optional` of a non-implicitly-deletable stage can't drop implicitly.
+        self._stage^.deinit_assert_empty()
+        self._stage = ConsumerStage(self.pipeline, stage_idx)
         return self._stage.value()
 
     @always_inline
@@ -761,3 +851,7 @@ struct ExplicitConsumeContext[
         # Caller is responsible for signaling via stage.arrive() or stage.mbar()
         self._stage.take().release_without_signal()
         # take() already sets _stage to None
+
+    @always_inline
+    def __deinit__(deinit self):
+        self._stage^.deinit_assert_empty()

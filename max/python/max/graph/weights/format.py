@@ -55,6 +55,7 @@ def weights_format(weight_paths: list[Path]) -> WeightsFormat:
     .. code-block:: python
 
         from pathlib import Path
+        from max.graph.weights import weights_format
 
         # Detect format for safetensor files
         paths = [Path("model-00001.safetensors"), Path("model-00002.safetensors")]

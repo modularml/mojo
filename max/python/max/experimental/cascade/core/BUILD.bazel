@@ -1,4 +1,4 @@
-load("//bazel:api.bzl", "modular_py_library")
+load("//bazel:api.bzl", "modular_py_library", "requirement")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -8,5 +8,7 @@ modular_py_library(
     srcs = glob(["*.py"]),
     deps = [
         "//max/python/max/support:taskgroups",
+        requirement("numpy"),
+        requirement("pydantic"),
     ],
 )

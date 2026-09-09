@@ -22,8 +22,7 @@ Additional SMEM allocations:
 Tile storage is shared via BlockScaledTileCore from block_scaled_smem.mojo.
 """
 
-from std.gpu.memory import AddressSpace
-from std.gpu.host.nvidia.tma import TMADescriptor
+from max.gpu.host.nvidia.tma import TMADescriptor
 
 from ..block_scaled.block_scaled_smem import BlockScaledTileCore
 from ..structured_kernels.config import BlockScaledMatmulConfig
@@ -52,9 +51,19 @@ struct GroupedBlockScaledSmem[
     Thin wrapper over BlockScaledTileCore + SmemPipelineBundle + TMA descriptors.
 
     Layout in SMEM:
-    1. Tile storage (via core) — A, B, C, SFA, SFB tiles
+    1. Tile storage (via core): A, B, C, SFA, SFB tiles
     2. Pipeline barriers
     3. Tensormap descriptors (5 x 128 bytes = 640 bytes)
+
+    Parameters:
+        a_type: Element type of the A operand matrix.
+        b_type: Element type of the B operand matrix.
+        c_type: Element type of the C output matrix.
+        sfa_dtype: Element type of the A operand scaling factors.
+        sfb_dtype: Element type of the B operand scaling factors.
+        transpose_b: Whether the B operand is stored in transposed layout.
+        config: Block-scaled matmul configuration providing tile shapes,
+            pipeline stage counts, and scaling factor layout parameters.
     """
 
     # ========== Core (tile storage + constants) ==========

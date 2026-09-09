@@ -16,20 +16,20 @@
 from std.random import random_si64
 from std.math import ceildiv
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Coord, Idx, TileTensor, row_major
 from linalg.matmul.gpu import _matmul_gpu, matmul_kernel_naive
 from std.utils import IndexList
 
 comptime epilogue_func_type = def[
-    type: DType, width: SIMDSize, *, alignment: Int = 1
+    type: DType, width: SIMDLength, *, alignment: Int = 1
 ](IndexList[2], IndexList[2], SIMD[type, width]) capturing -> SIMD[type, width]
 
 
-@parameter
+@__parameter
 @always_inline
 def epilogue_test_fn[
-    dtype: DType, width: SIMDSize, *, alignment: Int = 1
+    dtype: DType, width: SIMDLength, *, alignment: Int = 1
 ](
     idx: IndexList[2],
     dim_space: IndexList[2],
@@ -56,7 +56,7 @@ def test[
     M: Optional[Int],
     N: Optional[Int],
     K: Optional[Int],
-](ctx: DeviceContext, m: Int, n: Int, k: Int,) raises:
+](ctx: DeviceContext, m: Int, n: Int, k: Int) raises:
     comptime assert Bool(N) and Bool(
         K
     ), "This test currently requires static N and K."
@@ -153,9 +153,9 @@ def test[
         c_tt,
         a_tt,
         b_tt,
-        m,
-        n,
-        k,
+        Int32(m),
+        Int32(n),
+        Int32(k),
         grid_dim=(ceildiv(m, BLOCK_DIM), ceildiv(n, BLOCK_DIM)),
         block_dim=(BLOCK_DIM, BLOCK_DIM),
     )
@@ -234,15 +234,26 @@ def test_gemv_split_k[in_type: DType](ctx: DeviceContext) raises:
 def main() raises:
     with DeviceContext() as ctx:
         # GEMV_SPLIT_K tests for bf16 and fp8
-        test_gemv_split_k[DType.bfloat16](ctx)
-        test_gemv_split_k[DType.float8_e4m3fn](ctx)
+        test_gemv_split_k[.bfloat16](ctx)
+        test_gemv_split_k[.float8_e4m3fn](ctx)
 
         # BF16-only tests for other GEMV paths (FP8 not supported here)
 
+        # GEMV_KERNEL_VECTOR: M = 1, N wider than the split-K grid limit and
+        # K shallow enough that the kernel packs several rows per warp.
+        test[
+            in_type=.bfloat16,
+            out_type=.bfloat16,
+            transpose_b=True,
+            M=None,
+            N=Int(262144),
+            K=Int(256),
+        ](ctx, 1, 262144, 256)
+
         # GEMV_KERNEL_VECTOR: N = 1, K % simd_width == 0, transpose_b = False
         test[
-            in_type=DType.bfloat16,
-            out_type=DType.float32,
+            in_type=.bfloat16,
+            out_type=.float32,
             transpose_b=False,
             M=None,
             N=Int(1),
@@ -251,8 +262,8 @@ def main() raises:
 
         # GEMV_KERNEL_VECTOR: N = 1, K % simd_width == 0, transpose_b = True
         test[
-            in_type=DType.bfloat16,
-            out_type=DType.bfloat16,
+            in_type=.bfloat16,
+            out_type=.bfloat16,
             transpose_b=True,
             M=None,
             N=Int(1),
@@ -261,8 +272,8 @@ def main() raises:
 
         # GEMV_KERNEL: M = 1, K % simd_width !=0, transpose_b = True
         test[
-            in_type=DType.bfloat16,
-            out_type=DType.float32,
+            in_type=.bfloat16,
+            out_type=.float32,
             transpose_b=True,
             M=None,
             N=Int(4096),
@@ -271,8 +282,8 @@ def main() raises:
 
         # GEMV_KERNEL: N = 1, K % simd_width !=0, transpose_b = False
         test[
-            in_type=DType.bfloat16,
-            out_type=DType.float32,
+            in_type=.bfloat16,
+            out_type=.float32,
             transpose_b=False,
             M=None,
             N=Int(1),
@@ -281,8 +292,8 @@ def main() raises:
 
         # matmul_naive: M = 1, K % WARP_SIZE != 0, transpose_b = False
         test[
-            in_type=DType.bfloat16,
-            out_type=DType.float32,
+            in_type=.bfloat16,
+            out_type=.float32,
             transpose_b=False,
             M=None,
             N=Int(4096),

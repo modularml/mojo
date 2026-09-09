@@ -1,0 +1,23 @@
+load("//bazel:api.bzl", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
+
+package(default_visibility = ["//max:consumers"])
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
+        exec_properties = {
+            "test.resources:gpu-memory": "0.8",
+        },
+        tags = ["gpu"],
+        target_compatible_with = ["//:has_gpu"],
+        deps = [
+            "//max:algorithm",
+            "//max:layout",
+            "@mojo//:std",
+        ],
+    )
+    for src in glob(["**/*.mojo"])
+]

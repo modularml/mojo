@@ -20,13 +20,68 @@ import logging
 import os
 from typing import Any
 
-from max.pipelines.lib.config.model_config import MAXModelConfig
+from max.pipelines.lib._model_components import (
+    architecture_name_for,
+    updated_component,
+)
+from max.pipelines.lib.config.model_config import (
+    MAXModelConfig,
+    _build_model_config,
+)
 from max.pipelines.lib.weight_loader import WeightLoader, _role_prefixed_loader
-from max.pipelines.modeling.weights.hf_utils import HuggingFaceRepo
+from max.pipelines.weights.hf_utils import HuggingFaceRepo
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
 logger = logging.getLogger(__name__)
+
+# In precedence order: a repo that ships both is a Modular Pipeline with a
+# plain diffusers one alongside it, and the plain one is the simpler
+# description.
+_MODEL_INDEX_FILENAMES = ("model_index.json", "modular_model_index.json")
+
+_IMMUTABLE_MSG = (
+    "ModelManifest is immutable; construct a new one with the component "
+    "configs you need."
+)
+
+
+def _component_subfolder(key: str, value: Any) -> str | None:
+    """Returns the subfolder of one index entry, or None if it is metadata.
+
+    Both index formats describe a component as a list whose first two
+    elements are the library and class that load it. A ``model_index.json``
+    stops there, and the component's subfolder is its key. A
+    ``modular_model_index.json`` adds a third element, a dict of loading
+    arguments, which states the subfolder outright.
+
+    Only the subfolder is read from those arguments. They also carry a
+    ``pretrained_model_name_or_path``, but it is the checkpoint's canonical
+    repo id, so honoring it would redirect a local checkout back to the Hub;
+    the repo the caller asked for wins instead. Supporting a component that
+    genuinely lives in another repo would mean telling those two cases apart,
+    which this does not attempt.
+
+    Args:
+        key: The entry's key, which is the component's role.
+        value: The entry's value.
+
+    Returns:
+        The component's subfolder, or None if ``value`` is metadata rather
+        than a component.
+    """
+    if not isinstance(value, list) or len(value) not in (2, 3):
+        return None
+    if not all(isinstance(v, str) and v for v in value[:2]):
+        return None
+    if len(value) == 2:
+        return key
+
+    loading_args = value[2]
+    if not isinstance(loading_args, dict):
+        return None
+    subfolder = loading_args.get("subfolder")
+    return subfolder if isinstance(subfolder, str) and subfolder else key
 
 
 class ModelManifest(dict[str, MAXModelConfig]):
@@ -38,8 +93,11 @@ class ModelManifest(dict[str, MAXModelConfig]):
     speculative decoding) store models under their respective roles.
 
     ``ModelManifest`` is a ``dict[str, MAXModelConfig]`` subclass, so
-    standard dict operations (``[]``, ``in``, ``len``, ``items``, etc.)
-    work directly.
+    standard read operations (``[]``, ``in``, ``len``, ``items``, etc.)
+    work directly. The manifest is immutable: it is complete at
+    construction, and mutating operations raise ``TypeError``. Construct
+    it with the component configs you need; :meth:`with_override` is for
+    replacing one component of a manifest you were handed.
 
     For diffusion pipelines constructed from ``model_index.json``, the
     ``metadata`` property exposes non-component entries (e.g.
@@ -59,7 +117,17 @@ class ModelManifest(dict[str, MAXModelConfig]):
     ) -> None:
         super().__init__(*args, **kwargs)
         self._metadata: dict[str, Any] = dict(metadata) if metadata else {}
-        self._resolved: bool = False
+
+    def __reduce__(
+        self,
+    ) -> tuple[
+        type[ModelManifest],
+        tuple[dict[str, MAXModelConfig]],
+        dict[str, Any],
+    ]:
+        # Unpickling a dict subclass replays its items through __setitem__,
+        # which this class rejects. Rebuild it in one call instead.
+        return (ModelManifest, (dict(self),), {"_metadata": self._metadata})
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -129,37 +197,33 @@ class ModelManifest(dict[str, MAXModelConfig]):
                 f"{role!r} (available roles: {list(self.keys())})"
             ) from None
 
-    def _check_frozen(self) -> None:
-        # During pickle reconstruction, __setitem__ is called before
-        # __init__, so _resolved may not exist yet.
-        if getattr(self, "_resolved", False):
-            raise TypeError(
-                "ModelManifest is frozen after resolve(). "
-                "Use with_override() to create a new manifest."
-            )
-
     def __setitem__(self, key: str, value: MAXModelConfig) -> None:
-        self._check_frozen()
-        super().__setitem__(key, value)
+        raise TypeError(_IMMUTABLE_MSG)
 
     def __delitem__(self, key: str) -> None:
-        self._check_frozen()
-        super().__delitem__(key)
+        raise TypeError(_IMMUTABLE_MSG)
 
+    # No __ior__ guard: |= updates at the C level without calling these,
+    # and nothing merges into a manifest.
     def update(self, *args: Any, **kwargs: Any) -> None:
-        """Update the manifest with new model configs."""
-        self._check_frozen()
-        super().update(*args, **kwargs)
+        """Raises ``TypeError``: the manifest is immutable."""
+        raise TypeError(_IMMUTABLE_MSG)
 
     def pop(self, *args: Any) -> Any:
-        """Remove and return a model config by key."""
-        self._check_frozen()
-        return super().pop(*args)
+        """Raises ``TypeError``: the manifest is immutable."""
+        raise TypeError(_IMMUTABLE_MSG)
+
+    def popitem(self) -> tuple[str, MAXModelConfig]:
+        """Raises ``TypeError``: the manifest is immutable."""
+        raise TypeError(_IMMUTABLE_MSG)
+
+    def setdefault(self, *args: Any) -> Any:
+        """Raises ``TypeError``: the manifest is immutable."""
+        raise TypeError(_IMMUTABLE_MSG)
 
     def clear(self) -> None:
-        """Remove all model configs from the manifest."""
-        self._check_frozen()
-        super().clear()
+        """Raises ``TypeError``: the manifest is immutable."""
+        raise TypeError(_IMMUTABLE_MSG)
 
     # ------------------------------------------------------------------
     # Properties
@@ -205,49 +269,7 @@ class ModelManifest(dict[str, MAXModelConfig]):
         Raises:
             ValueError: If the architecture name cannot be determined.
         """
-        if "main" in self:
-            arch_name = self["main"].architecture_name
-            if arch_name:
-                return arch_name
-            raise ValueError(
-                f"Cannot determine architecture name for main model "
-                f"{self['main'].model_path!r}: HuggingFace config has "
-                f"no 'architectures' field."
-            )
-
-        # Diffusion pipeline — use stored metadata from model_index.json.
-        if not self:
-            raise ValueError(
-                "Cannot determine architecture name: manifest is empty."
-            )
-        class_name = self._metadata.get("_class_name")
-        if class_name:
-            return class_name
-        any_config = next(iter(self.values()))
-        raise ValueError(
-            f"Cannot determine architecture name for diffusion model "
-            f"{any_config.model_path!r}: metadata has no "
-            f"'_class_name' field."
-        )
-
-    @property
-    def total_weights_size(self) -> int:
-        """Total weight size in bytes across all components.
-
-        Walks every ``MAXModelConfig`` in the manifest and sums
-        ``weights_size()``.  Components with no weight files (e.g.
-        schedulers) contribute zero.
-
-        Raises:
-            RuntimeError: If the manifest has not been resolved via
-                ``resolve()`` first.
-        """
-        if not self._resolved:
-            raise RuntimeError(
-                "ModelManifest must be resolved before accessing "
-                "total_weights_size. Call resolve() first."
-            )
-        return sum(config.weights_size() for config in self.values())
+        return architecture_name_for(self, self._metadata)
 
     def loader(self) -> WeightLoader:
         """Returns a :class:`WeightLoader` over the role-prefixed union.
@@ -291,19 +313,6 @@ class ModelManifest(dict[str, MAXModelConfig]):
             config.log_model_info(role=role)
 
     # ------------------------------------------------------------------
-    # Resolution
-    # ------------------------------------------------------------------
-
-    def resolve(self) -> None:
-        """Validates and resolves every config in the manifest.
-
-        Delegates to ``MAXModelConfig.resolve()`` for each component.
-        """
-        for config in self.values():
-            config.resolve()
-        self._resolved = True
-
-    # ------------------------------------------------------------------
     # Immutable update operations
     # ------------------------------------------------------------------
 
@@ -313,37 +322,24 @@ class ModelManifest(dict[str, MAXModelConfig]):
         config: MAXModelConfig | None = None,
         **field_overrides: Any,
     ) -> ModelManifest:
-        """Return a new manifest with the given role updated.
+        """Returns a new manifest with one role replaced.
 
-        Three usage patterns:
-
-        1. **Partial field update** on an existing component::
-
-               manifest.with_override("transformer",
-                   weight_path=[Path("w.safetensors")],
-                   quantization_encoding="float4_e2m1fnx2",
-               )
-
-        2. **Full replacement or addition** of a component::
-
-               manifest.with_override("draft",
-                   config=MAXModelConfig(model_path="org/draft"),
-               )
-
-        3. **Add/replace with additional field tweaks**::
-
-               manifest.with_override("draft",
-                   config=base_cfg,
-                   quantization_encoding="q4_0",
-               )
+        For callers handed a manifest they did not build and cannot
+        construct differently -- merging late CLI flags into a
+        caller-supplied manifest, for instance. Code that owns the
+        component configs builds the manifest with them instead:
+        chaining overrides rebuilds the whole mapping once per change,
+        and the intermediate manifests mean nothing.
 
         Args:
             role: The semantic role string identifying the component.
             config: A complete ``MAXModelConfig`` to use as the base.
                 When ``None``, the existing config for *role* is used
                 (the role must already exist).
-            **field_overrides: Individual field values to set on the
-                config via ``model_copy(update=...)``.
+            **field_overrides: Individual field values to override on the
+                config. Overriding ``model_path``/``weight_path`` rebuilds the
+                config through its constructor so weight-path identity
+                resolution re-runs; other overrides use ``model_copy``.
 
         Returns:
             A new ``ModelManifest`` — the original is not modified.
@@ -369,9 +365,10 @@ class ModelManifest(dict[str, MAXModelConfig]):
         else:
             base = config
 
-        updated_config = (
-            base.model_copy(update=field_overrides) if field_overrides else base
-        )
+        if not field_overrides:
+            updated_config = base
+        else:
+            updated_config = updated_component(base, **field_overrides)
         new_models = {**self, role: updated_config}
         return ModelManifest(new_models, metadata=self._metadata)
 
@@ -425,7 +422,7 @@ class ModelManifest(dict[str, MAXModelConfig]):
         config_kwargs: dict[str, Any] = {"model_path": model_path, **kwargs}
         if revision is not None:
             config_kwargs["huggingface_model_revision"] = revision
-        model = MAXModelConfig(**config_kwargs)
+        model = _build_model_config(MAXModelConfig, **config_kwargs)
         return cls({"main": model})
 
     # ------------------------------------------------------------------
@@ -434,35 +431,42 @@ class ModelManifest(dict[str, MAXModelConfig]):
 
     @staticmethod
     def _load_model_index(repo: HuggingFaceRepo) -> dict[str, Any] | None:
-        """Load ``model_index.json`` from a model repository.
+        """Load a component index from a model repository.
+
+        Tries ``model_index.json``, then ``modular_model_index.json``: the
+        latter is written by ``diffusers``' Modular Pipelines feature, whose
+        index describes each component as a 3-element entry rather than a
+        2-element one.
 
         Args:
             repo: A ``HuggingFaceRepo`` handle (local or remote).
 
-        Returns the parsed JSON dict, or ``None`` if the file does not
-        exist.
+        Returns the parsed JSON dict, or ``None`` if neither file exists.
         """
         if repo.repo_type == "local":
-            index_path = os.path.join(repo.repo_id, "model_index.json")
-            if not os.path.isfile(index_path):
-                return None
-            with open(index_path) as f:
-                return json.load(f)
+            for filename in _MODEL_INDEX_FILENAMES:
+                index_path = os.path.join(repo.local_path, filename)
+                if os.path.isfile(index_path):
+                    with open(index_path) as f:
+                        return json.load(f)
+            return None
 
-        # Remote repo — single hf_hub_download call.
+        # Remote repo — one hf_hub_download call per candidate filename.
         from huggingface_hub import hf_hub_download
         from huggingface_hub.utils import EntryNotFoundError
 
-        try:
-            config_path = hf_hub_download(
-                repo_id=repo.repo_id,
-                filename="model_index.json",
-                revision=repo.revision,
-            )
-        except EntryNotFoundError:
-            return None
-        with open(config_path) as f:
-            return json.load(f)
+        for filename in _MODEL_INDEX_FILENAMES:
+            try:
+                config_path = hf_hub_download(
+                    repo_id=repo.repo_id,
+                    filename=filename,
+                    revision=repo.revision,
+                )
+            except EntryNotFoundError:
+                continue
+            with open(config_path) as f:
+                return json.load(f)
+        return None
 
     @staticmethod
     def _discover_diffusers_components(
@@ -472,10 +476,10 @@ class ModelManifest(dict[str, MAXModelConfig]):
     ) -> tuple[dict[str, MAXModelConfig], dict[str, Any]] | None:
         """Detect a diffusers repo and expand it into per-component configs.
 
-        Reads ``model_index.json`` from *repo*.  If the file exists, each
-        component listed in it gets its own ``MAXModelConfig`` with
-        ``subfolder`` set to the component name.  Non-component entries
-        are returned as metadata.
+        Reads the repo's component index (see :meth:`_load_model_index`). If
+        one exists, each component listed in it gets its own
+        ``MAXModelConfig`` pointed at that component's subfolder.
+        Non-component entries are returned as metadata.
 
         Args:
             repo: A ``HuggingFaceRepo`` handle (local or remote).
@@ -489,7 +493,7 @@ class ModelManifest(dict[str, MAXModelConfig]):
             A ``(components, metadata)`` tuple, or ``None`` if this is
             not a diffusion pipeline.  *components* maps role names to
             ``MAXModelConfig`` instances; *metadata* contains all
-            non-component entries from ``model_index.json``.
+            non-component entries from the index.
         """
         try:
             model_index = ModelManifest._load_model_index(repo)
@@ -497,7 +501,7 @@ class ModelManifest(dict[str, MAXModelConfig]):
             raise
         except Exception:
             logger.info(
-                "Could not load model_index.json for %s",
+                "Could not load a component index for %s",
                 repo.repo_id,
                 exc_info=True,
             )
@@ -508,22 +512,21 @@ class ModelManifest(dict[str, MAXModelConfig]):
         components: dict[str, MAXModelConfig] = {}
         metadata: dict[str, Any] = {}
         for key, value in model_index.items():
-            # A valid component is a 2-element list of non-empty strings.
-            if (
-                isinstance(value, list)
-                and len(value) == 2
-                and all(isinstance(v, str) and v for v in value)
-            ):
-                config_kwargs: dict[str, Any] = {
-                    **kwargs,
-                    "model_path": repo.repo_id,
-                    "subfolder": key,
-                }
-                if revision is not None:
-                    config_kwargs["huggingface_model_revision"] = revision
-                components[key] = MAXModelConfig(**config_kwargs)
-            else:
+            subfolder = _component_subfolder(key, value)
+            if subfolder is None:
                 metadata[key] = value
+                continue
+
+            config_kwargs: dict[str, Any] = {
+                **kwargs,
+                "model_path": repo.repo_id,
+                "subfolder": subfolder,
+            }
+            if revision is not None:
+                config_kwargs["huggingface_model_revision"] = revision
+            components[key] = _build_model_config(
+                MAXModelConfig, **config_kwargs
+            )
 
         if not components:
             return None

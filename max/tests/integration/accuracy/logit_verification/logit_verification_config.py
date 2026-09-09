@@ -68,13 +68,22 @@ class LogitVerificationPipelineConfig(BaseModel):
     "Logit verification pipeline configuration"
 
     pre_submit_agents: list[Agent] = Field(default_factory=list)
-    post_submit_agents: list[Agent] = Field(default_factory=list)
     pipeline: str
 
     compatible_with: list[DeviceKind] = Field(default_factory=list)
     encoding: SupportedEncoding
     tags: list[str] = Field(default_factory=list)
     pregenerated_torch_goldens: PregeneratedTorchGoldens | None = None
+
+    torch_reference_is_unquantized_source: bool = False
+    """Whether this quantized pipeline's oracle points torch at the bf16 model
+    the checkpoint was quantized from.
+
+    A quantized encoding normally cannot produce a torch golden locally, since
+    ``transformers`` cannot load the checkpoint. When the oracle sets
+    ``torch_model_path`` (see ``create_pipelines.py``) it can: the reference is
+    the unquantized source model, and the tolerances then carry the
+    quantization error itself."""
 
     absolute_tolerance: float | None = None
     relative_tolerance: float | None = None
@@ -96,34 +105,11 @@ class LogitVerificationConfig(BaseModel):
     )
 
     @property
-    def combined_matrix(self) -> list[list[tuple[str, Agent]]]:
-        return [
-            [
-                (pipeline_name, agent)
-                for agent in set(
-                    self.pipelines[pipeline_name].pre_submit_agents
-                )
-                | set(self.pipelines[pipeline_name].post_submit_agents)
-            ]
-            for pipeline_name in self.pipelines
-        ]
-
-    @property
     def pre_submit_matrix(self) -> list[list[tuple[str, Agent]]]:
         return [
             [
                 (pipeline_name, agent)
                 for agent in self.pipelines[pipeline_name].pre_submit_agents
-            ]
-            for pipeline_name in self.pipelines
-        ]
-
-    @property
-    def post_submit_matrix(self) -> list[list[tuple[str, Agent]]]:
-        return [
-            [
-                (pipeline_name, agent)
-                for agent in self.pipelines[pipeline_name].post_submit_agents
             ]
             for pipeline_name in self.pipelines
         ]

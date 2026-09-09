@@ -115,7 +115,7 @@ def test_stack_error_with_many_different_shapes(
     input_types: list[TensorType],
 ) -> None:
     # Using a list comprehension to check if there are different ranks
-    assume(len(set(len(t.shape) for t in input_types)) > 1)
+    assume(len({len(t.shape) for t in input_types}) > 1)
     with graph_builder(input_types=input_types) as graph:
         with pytest.raises(
             ValueError, match="All inputs to stack must be the same rank"

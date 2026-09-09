@@ -99,25 +99,25 @@ class RotaryEmbedding(Module[..., Tensor]):
 
     .. code-block:: python
 
-        from max.experimental.nn.rope import RotaryEmbedding, positional_embedding
+        from max.experimental import random
+        from max.experimental.nn.rope import RotaryEmbedding
         from max.experimental.tensor import Tensor
 
-        # Create RoPE for 128-dimensional heads with max sequence length of 2048
-        rope = RotaryEmbedding(
-            weight=positional_embedding(
-                dim=128,
-                base=10000.0,
-                max_sequence_length=2048
-            )
-        )
+        # RotaryEmbedding wraps a precomputed RoPE rotation table of shape
+        # (max_sequence_length, head_dim // 2, 2).
+        rope = RotaryEmbedding(weight=Tensor.zeros([2048, 64, 2]))
 
-        # Apply to query or key tensors in attention
+        # Apply to query or key tensors in attention.
         # Shape: (batch, seq_len, num_heads, head_dim)
-        query = Tensor.randn([4, 128, 12, 128])
+        random.set_seed(0)
+        query = random.normal([4, 128, 12, 128])
         query_with_rope = rope(query, start_pos=0)
 
-        print(query_with_rope.shape)  # (4, 128, 12, 128)
-        # Positional information now encoded in the rotation of query vectors
+        print(query_with_rope.shape)  # [4, 128, 12, 128]
+
+    .. invisible-code-block: python
+
+        assert query_with_rope.shape == [4, 128, 12, 128]
     """
 
     weight: Tensor
@@ -154,7 +154,7 @@ class RotaryEmbedding(Module[..., Tensor]):
             Input activation tensor with rotary positional embeddings applied and
             the same shape as `x`.
         """
-        _, seq_len, _, _ = x.shape
+        seq_len = x.shape[1]
         start_pos = Dim(start_pos)
 
         x_complex = F.as_interleaved_complex(x)
@@ -185,7 +185,7 @@ class TransposedRotaryEmbedding(RotaryEmbedding):
             Input activation tensor with rotary positional embeddings applied and
             the same shape as `x`.
         """
-        _, seq_len, _, _ = x.shape
+        seq_len = x.shape[1]
         *rest, head_dim = x.shape
         start_pos = Dim(start_pos)
 

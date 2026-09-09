@@ -48,11 +48,10 @@ from .kv_cache import (
     KVCacheInputs,
     KVCacheMetrics,
     KVCacheParams,
-    build_max_lengths_tensor,
+    build_max_lengths_tensors,
 )
 from .layer import Layer, LayerList, Module, Shardable
-from .linear import MLP, ColumnParallelLinear, GPTQLinear, Linear
-from .lora import AttentionWithRopeAndLoRA, LinearLoRA, SupportsLoRA
+from .linear import MLP, ColumnParallelLinear, FusedMLP, GPTQLinear, Linear
 from .moe import MoE, MoEGate, MoEQuantized, forward_moe_sharded_layers
 from .norm import ConstantLayerNorm, GroupNorm, LayerNorm, RMSNorm
 from .quant_config import (
@@ -94,7 +93,6 @@ __all__ = [
     "MLP",
     "Allreduce",
     "AttentionWithRope",
-    "AttentionWithRopeAndLoRA",
     "ColumnParallelLinear",
     "ConstantLayerNorm",
     "Conv1D",
@@ -106,6 +104,7 @@ __all__ = [
     "DistributedTransformerBlock",
     "DynamicRotaryEmbedding",
     "Embedding",
+    "FusedMLP",
     "GGUFQAttentionWithRope",
     "GPTQAttentionWithRope",
     "GPTQLinear",
@@ -120,7 +119,6 @@ __all__ = [
     "LayerList",
     "LayerNorm",
     "Linear",
-    "LinearLoRA",
     "LinearScalingParams",
     "Llama3RopeScalingParams",
     "Llama3RotaryEmbedding",
@@ -147,7 +145,6 @@ __all__ = [
     "Shardable",
     "Signals",
     "StackedLinear",
-    "SupportsLoRA",
     "TensorParallelAttentionWithRope",
     "TensorParallelLatentAttentionWithRope",
     "Transformer",
@@ -157,7 +154,7 @@ __all__ = [
     "WeightScaleSpec",
     "YarnRotaryEmbedding",
     "YarnScalingParams",
-    "build_max_lengths_tensor",
+    "build_max_lengths_tensors",
     "clamp",
     "forward_moe_sharded_layers",
     "split_batch",

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -959,7 +958,7 @@ def run_diffusers(
             f"    theoretical: seq_len={int(theory['seq_len']):,}"
             f"  latent={theory['latent_shape']}"
             f"  est_total="
-            f"{sum(v for k, v in theory.items() if isinstance(v, float) and k not in ('seq_len',)):.1f}GB",
+            f"{sum(v for k, v in theory.items() if isinstance(v, float) and k != 'seq_len'):.1f}GB",
             flush=True,
         )
 
@@ -1214,7 +1213,7 @@ def run_max(
             f"    theoretical: seq_len={int(theory['seq_len']):,}"
             f"  latent={theory['latent_shape']}"
             f"  est_total="
-            f"{sum(v for k, v in theory.items() if isinstance(v, float) and k not in ('seq_len',)):.1f}GB",
+            f"{sum(v for k, v in theory.items() if isinstance(v, float) and k != 'seq_len'):.1f}GB",
             flush=True,
         )
 

@@ -29,6 +29,9 @@ from max.benchmark.benchmark_shared.datasets._tokenizer_pool import (
 from max.benchmark.benchmark_shared.datasets.agentic_code import (
     AgenticCodeBenchmarkDataset,
 )
+from max.benchmark.benchmark_shared.datasets.artificial_analysis import (
+    ArtificialAnalysisBenchmarkDataset,
+)
 from max.benchmark.benchmark_shared.datasets.arxiv_summarization import (
     ArxivSummarizationBenchmarkDataset,
 )
@@ -239,6 +242,19 @@ def sample_requests(
                 tokenizer=tokenizer,
                 output_lengths=output_lengths,
             )
+        elif isinstance(benchmark_dataset, ArtificialAnalysisBenchmarkDataset):
+            assert args.num_prompts is not None
+            return benchmark_dataset.sample_requests(
+                num_requests=args.num_prompts,
+                tokenizer=tokenizer,
+                output_lengths=output_lengths,
+                shuffle=(
+                    output_lengths is None and not args.record_output_lengths
+                ),
+                input_len=args.random_input_len,
+                output_len=args.random_output_len,
+                seed=args.seed,
+            )
         elif isinstance(benchmark_dataset, ArxivSummarizationBenchmarkDataset):
             if output_lengths:
                 raise ValueError(
@@ -384,6 +400,7 @@ def sample_requests(
                 tokenizer=tokenizer,
                 shuffle=(not args.record_output_lengths),
                 seed=args.seed,
+                delay_between_turns_dist=args.delay_between_chat_turns,
             )
         elif isinstance(benchmark_dataset, AgenticCodeBenchmarkDataset):
             if args.num_chat_sessions:
@@ -502,6 +519,19 @@ def sample_requests(
             if args.num_frames is None:
                 raise ValueError(
                     "--num-frames is required for --benchmark-task text-to-video"
+                )
+        elif benchmark_task == "image-to-video":
+            if not isinstance(
+                benchmark_dataset,
+                (LocalImageBenchmarkDataset, SyntheticPixelBenchmarkDataset),
+            ):
+                raise ValueError(
+                    "image-to-video currently supports only "
+                    "--dataset-name local-image or synthetic-pixel"
+                )
+            if args.num_frames is None:
+                raise ValueError(
+                    "--num-frames is required for --benchmark-task image-to-video"
                 )
         elif not isinstance(
             benchmark_dataset,

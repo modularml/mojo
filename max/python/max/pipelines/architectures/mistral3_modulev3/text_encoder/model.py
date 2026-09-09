@@ -28,7 +28,7 @@ from max.experimental.tensor import Tensor
 from max.graph.weights import Weights
 from max.pipelines.lib import SupportedEncoding
 from max.pipelines.modeling.base.component_model import ComponentModel
-from max.pipelines.modeling.weights.weight_loading import (
+from max.pipelines.weights.weight_loading import (
     auto_cast_weights_from_env,
 )
 from max.profiler import traced

@@ -1,0 +1,35 @@
+load("//bazel:api.bzl", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+# TODO(SERVOPT-957): Re-enable on macOS once test timeout issue is fixed.
+modular_py_test(
+    name = "tests",
+    srcs = glob(["*.py"]),
+    data = [
+        "//max/tests/tests/serve/testdata",
+    ],
+    env = {
+        "MAX_SERVE_DISABLE_TELEMETRY": "True",
+        "MAX_SERVE_TESTDATA": "max/tests/tests/serve/testdata",
+    },
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/serve",
+        "//max/python/max/serve:config",
+        "//max/python/max/serve:process_control",
+        "//max/python/max/serve/pipelines",
+        "//max/python/max/serve/telemetry",
+        "//max/python/max/serve/worker_interface",
+        requirement("pytest-asyncio"),
+        requirement("fastapi"),
+        requirement("uvicorn"),
+    ],
+)

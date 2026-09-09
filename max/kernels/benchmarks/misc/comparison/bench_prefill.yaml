@@ -26,6 +26,20 @@ deepseek-v2-commons: &deepseek-v2-commons
   model: "deepseek-v2"
 
 params:
+# Full causal attention. window_size=-1 disables the sliding window.
 - <<: *deepseek-v2-commons
   $batch_size: [2]
-  $qkv_len: [2048, 4096, 8192]
+  $q_len: [2048, 4096]
+  # kv_len = cache_len + q_len; cache_len=0 is pure prefill.
+  $cache_len: [0, 2048, 4096, 8192]
+  $window_size: [-1]
+# Causal sliding window attention (SlidingWindowCausalMask). window_size is the
+# number of keys each query attends to, itself included. FlashInfer's SM100
+# cutlass backend does not support SWA (window_left is dropped), so only tridao
+# and MAX are compared here.
+# - <<: *deepseek-v2-commons
+#   $engine: ["tridao", "modular_max"]
+#   $batch_size: [2]
+#   $q_len: [2048]
+#   $cache_len: [0, 2048, 4096, 8192]
+#   $window_size: [1024, 4096]

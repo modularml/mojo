@@ -13,7 +13,7 @@
 
 from std.math import ceildiv
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -94,27 +94,27 @@ def run_slot_indexed_gpu[
     rand[state_dtype](conv_state_initial_h.ptr, pool_size)
 
     # Slot assignments device buffer.
-    var slot_idx_heap = ctx.enqueue_create_host_buffer[DType.uint32](batch_size)
-    var slot_idx_h = LayoutTensor[DType.uint32, layout_1d, _](
+    var slot_idx_heap = ctx.enqueue_create_host_buffer[.uint32](batch_size)
+    var slot_idx_h = LayoutTensor[.uint32, layout_1d, _](
         slot_idx_heap,
         RuntimeLayout[layout_1d].row_major(Index(batch_size)),
     )
     for b in range(batch_size):
-        slot_idx_h.ptr.store(b, Scalar[DType.uint32](slot_assignments[b]))
+        slot_idx_h.ptr.store(b, UInt32(slot_assignments[b]))
 
     # input_row_offsets: [batch_size + 1]
-    var input_row_offsets_heap = ctx.enqueue_create_host_buffer[DType.uint32](
+    var input_row_offsets_heap = ctx.enqueue_create_host_buffer[.uint32](
         batch_size + 1
     )
-    var input_row_offsets_h = LayoutTensor[DType.uint32, layout_1d, _](
+    var input_row_offsets_h = LayoutTensor[.uint32, layout_1d, _](
         input_row_offsets_heap,
         RuntimeLayout[layout_1d].row_major(Index(batch_size + 1)),
     )
     var cumsum = 0
-    input_row_offsets_h.ptr.store(0, Scalar[DType.uint32](0))
+    input_row_offsets_h.ptr.store(0, UInt32(0))
     for b in range(batch_size):
         cumsum += seq_lengths[b]
-        input_row_offsets_h.ptr.store(b + 1, Scalar[DType.uint32](cumsum))
+        input_row_offsets_h.ptr.store(b + 1, UInt32(cumsum))
 
     var conv_output_gpu_heap = ctx.enqueue_create_host_buffer[work_dtype](
         total_seq_len * conv_dim
@@ -145,8 +145,8 @@ def run_slot_indexed_gpu[
         conv_dim * KERNEL_SIZE
     )
     var conv_state_device = ctx.enqueue_create_buffer[state_dtype](pool_size)
-    var slot_idx_device = ctx.enqueue_create_buffer[DType.uint32](batch_size)
-    var input_row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
+    var slot_idx_device = ctx.enqueue_create_buffer[.uint32](batch_size)
+    var input_row_offsets_device = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
     var conv_output_device = ctx.enqueue_create_buffer[work_dtype](
@@ -206,9 +206,9 @@ def run_slot_indexed_gpu[
     with ctx.push_context():
         ctx.enqueue_function(
             compiled_func,
-            batch_size,
-            total_seq_len,
-            conv_dim,
+            Int32(batch_size),
+            Int32(total_seq_len),
+            Int32(conv_dim),
             qkv_input_tt,
             conv_weight_tt,
             conv_state_tt,
@@ -304,7 +304,9 @@ def run_slot_indexed_gpu[
             # carry-forward if seq_len < K-1). Reads of the old window
             # complete before any write because the write loop runs after the
             # token loop.
-            var old_window = SIMD[state_dtype, KERNEL_SIZE_MINUS_ONE](0)
+            var old_window = Array[Scalar[state_dtype], KERNEL_SIZE_MINUS_ONE](
+                fill=0
+            )
             comptime for j in range(KERNEL_SIZE_MINUS_ONE):
                 old_window[j] = pool_ref_h.ptr[
                     UInt32(slot) * conv_state_pool_stride
@@ -352,7 +354,7 @@ def run_slot_indexed_gpu[
 def test_slot_indexed_single_sequence_targets_chosen_slot() raises:
     """One-sequence smoke test: writes only to the slot named in slot_idx."""
     var ctx = DeviceContext()
-    run_slot_indexed_gpu[DType.float32, DType.float32, 4](
+    run_slot_indexed_gpu[.float32, DType.float32, 4](
         batch_size=1,
         total_seq_len=5,
         conv_dim=8,
@@ -366,7 +368,7 @@ def test_slot_indexed_single_sequence_targets_chosen_slot() raises:
 def test_slot_indexed_two_sequences_disjoint_slots() raises:
     """Two sequences hitting non-adjacent slots; bf16 pool, fp32 work."""
     var ctx = DeviceContext()
-    run_slot_indexed_gpu[DType.float32, DType.bfloat16, 4](
+    run_slot_indexed_gpu[.float32, DType.bfloat16, 4](
         batch_size=2,
         total_seq_len=7,
         conv_dim=8,
@@ -382,7 +384,7 @@ def test_slot_indexed_short_sequence_carries_state_forward() raises:
     """When seq_len < K-1: window must carry forward from existing pool entry.
     """
     var ctx = DeviceContext()
-    run_slot_indexed_gpu[DType.float32, DType.float32, 4](
+    run_slot_indexed_gpu[.float32, DType.float32, 4](
         batch_size=1,
         total_seq_len=2,
         conv_dim=8,

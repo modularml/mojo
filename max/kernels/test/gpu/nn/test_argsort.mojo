@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Idx, TileTensor, row_major
 
 from nn.argsort import argsort
@@ -28,7 +28,7 @@ def reverse_filler(i: Int, n: Int) -> Float32:
 
 
 def test_argsort[
-    dtype: DType = DType.float32,
+    dtype: DType = .float32,
     *,
     filler: def(Int, Int) thin -> Float32,
     ascending: Bool = True,
@@ -44,7 +44,7 @@ def test_argsort[
         input_host_ptr[i] = filler(i, N).cast[dtype]()
 
     # Allocate device buffers
-    var device_indices = ctx.enqueue_create_buffer[DType.int64](N)
+    var device_indices = ctx.enqueue_create_buffer[.int64](N)
     var device_input = ctx.enqueue_create_buffer[dtype](N)
     ctx.enqueue_copy(device_input, input_host_ptr)
 
@@ -63,12 +63,12 @@ def test_argsort[
     )
 
     # Copy results back
-    var indices_host_ptr = ctx.enqueue_create_host_buffer[DType.int64](N)
+    var indices_host_ptr = ctx.enqueue_create_host_buffer[.int64](N)
     ctx.enqueue_copy(indices_host_ptr, device_indices)
     ctx.synchronize()
 
     # Test for correctness against CPU reference
-    var expected_indices_ptr = ctx.enqueue_create_host_buffer[DType.int64](N)
+    var expected_indices_ptr = ctx.enqueue_create_host_buffer[.int64](N)
     var expected_indices = TileTensor(
         expected_indices_ptr,
         row_major(N),

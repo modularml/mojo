@@ -1,0 +1,16 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: NO_COLOR=1 %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+%%python
+a = 1/0
+
+# CHECK: ZeroDivisionError: division by zero
+# CHECK-NOT: Error: No module named '__lldb_python_module_
+

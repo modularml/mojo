@@ -16,29 +16,12 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.types import TextGenerationContext
-from testbed.harnesses.gemma4_attention import (
-    Gemma4AttentionHarness,
-    Gemma4AttentionStaticParams,
-)
+from layer_mefs import create_runner
+from max.pipelines.context import TextContext
+from testbed.harnesses.gemma4_attention import Gemma4AttentionStaticParams
 from testbed.harnesses.ragged_attention_harness import AttentionDynamicParams
-from testbed.runner import LayerTestRunner, create_session
-
-# gemma4-12b sliding window config (reduced max_seq_len for test GPU memory)
-_STATIC_PARAMS = Gemma4AttentionStaticParams(
-    hidden_size=3840,
-    n_heads=16,
-    n_kv_heads=8,
-    n_global_kv_heads=4,
-    head_dim=256,
-    global_head_dim=512,
-    max_seq_len=16384,
-    rope_theta=1000000.0,
-    is_sliding=True,
-    attention_k_eq_v=True,
-    local_window_size=1024,
-    total_num_pages=2048,
-)
+from testbed.runner import LayerTestRunner
+from testbed.specs import GEMMA4_ATTENTION
 
 _SMOKE_SHAPES = [
     AttentionDynamicParams(batch_size=1, seq_len=1024, ctx_len=1024),
@@ -50,19 +33,16 @@ _SMOKE_SHAPES = [
 def runner() -> LayerTestRunner[
     Gemma4AttentionStaticParams,
     AttentionDynamicParams,
-    list[TextGenerationContext],
+    list[TextContext],
 ]:
-    session, device = create_session()
-    return LayerTestRunner(
-        Gemma4AttentionHarness(_STATIC_PARAMS, session, device)
-    )
+    return create_runner(GEMMA4_ATTENTION)
 
 
 def test_benchmark_smoke(
     runner: LayerTestRunner[
         Gemma4AttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     results = runner.benchmark(_SMOKE_SHAPES, iterations=1, warmup=1)

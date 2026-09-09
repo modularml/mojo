@@ -1,0 +1,110 @@
+// REQUIRES: disabled
+// RUN: mojo-lsp-server -mojo-test < %s | FileCheck -strict-whitespace %s
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":123,"rootPath":"mojo","capabilities":{},"trace":"off"}}
+// CHECK-LABEL: "id": 0
+// CHECK: "definitionProvider": true
+// -----
+{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{
+  "uri":"test:///foo.mojo",
+  "languageId":"mojo",
+  "version":1,
+  "text":"import collections.vector\ndef function():\n  var foo: Int = 420\n  var bar = 1 + foo\n  print(bar)"
+}}}
+// -----
+{"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{
+  "textDocument":{"uri":"test:///foo.mojo"},
+  "position":{
+    "line":3,
+    "character":17
+  }
+}}
+// CHECK-LABEL: "id": 2
+// CHECK-NEXT: "jsonrpc": "2.0"
+// CHECK-NEXT:   "result":
+// CHECK:          "range": {
+// CHECK-NEXT:       "end": {
+// CHECK-NEXT:         "character": 9,
+// CHECK-NEXT:         "line": 2
+// CHECK-NEXT:       },
+// CHECK-NEXT:       "start": {
+// CHECK-NEXT:         "character": 6,
+// CHECK-NEXT:         "line": 2
+// CHECK-NEXT:       }
+// CHECK-NEXT:     },
+// CHECK-NEXT:     "uri": "test:///foo.mojo"
+// -----
+{"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{
+  "textDocument":{"uri":"test:///foo.mojo"},
+  "position":{
+    "line":4,
+    "character":8
+  }
+}}
+// CHECK-LABEL: "id": 3
+// CHECK-NEXT: "jsonrpc": "2.0"
+// CHECK-NEXT:   "result":
+// CHECK:          "range": {
+// CHECK-NEXT:       "end": {
+// CHECK-NEXT:         "character": 9,
+// CHECK-NEXT:         "line": 3
+// CHECK-NEXT:       },
+// CHECK-NEXT:       "start": {
+// CHECK-NEXT:         "character": 6,
+// CHECK-NEXT:         "line": 3
+// CHECK-NEXT:       }
+// CHECK-NEXT:     },
+// CHECK-NEXT:     "uri": "test:///foo.mojo"
+// -----
+{"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{
+  "textDocument":{"uri":"test:///foo.mojo"},
+  "position":{
+    "line": 2,
+    "character": 12
+  }
+}}
+// CHECK-LABEL: "id": 3
+// CHECK-NEXT: "jsonrpc": "2.0"
+// CHECK-NEXT:   "result":
+// CHECK:          "uri": "{{.*}}int.mojo"
+// -----
+{"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{
+  "textDocument":{"uri":"test:///foo.mojo"},
+  "position":{
+    "line": 0,
+    "character": 21
+  }
+}}
+// CHECK-LABEL: "id": 3
+// CHECK-NEXT: "jsonrpc": "2.0"
+// CHECK-NEXT:   "result":
+// CHECK:          "range":
+// CHECK:            "end":
+// CHECK:                "character": 0,
+// CHECK:                "line": 0
+// CHECK:            "start":
+// CHECK:                "character": 0,
+// CHECK:                "line": 0
+// CHECK:          "uri": "{{.*}}vector.mojo"
+// -----
+{"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{
+  "textDocument":{"uri":"test:///foo.mojo"},
+  "position":{
+    "line": 0,
+    "character": 12
+  }
+}}
+// CHECK-LABEL: "id": 3
+// CHECK-NEXT: "jsonrpc": "2.0"
+// CHECK-NEXT:   "result":
+// CHECK:          "range":
+// CHECK:            "end":
+// CHECK:                "character": 0,
+// CHECK:                "line": 0
+// CHECK:            "start":
+// CHECK:                "character": 0,
+// CHECK:                "line": 0
+// CHECK:          "uri": "{{.*}}collections/__init__.mojo"
+// -----
+{"jsonrpc":"2.0","id":4,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

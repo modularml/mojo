@@ -1,0 +1,58 @@
+load(
+    "//bazel:api.bzl",
+    "modular_py_test",
+    "requirement",
+)
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_test(
+    name = "tests",
+    size = "medium",
+    srcs = glob(
+        ["test_*.py"],
+        exclude = ["test_attention_fp8_kv_gpu.py"],
+    ),
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/nemotron_h",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        requirement("numpy"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "attention_fp8_kv_gpu_test",
+    size = "large",
+    srcs = ["test_attention_fp8_kv_gpu.py"],
+    exec_properties = {
+        "test.resources:gpu-memory": "16",
+    },
+    gpu_constraints = ["//:has_gpu"],
+    tags = ["gpu"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/nemotron_h",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/integration/test_common:context_utils",
+        "//max/tests/integration/test_common:graph_utils",
+        requirement("numpy"),
+        requirement("torch"),
+    ],
+)

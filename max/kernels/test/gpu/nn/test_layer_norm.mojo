@@ -11,133 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.math import ceildiv, rsqrt
-from std.sys import simd_width_of
+from std.math import rsqrt
+from std.sys import align_of
 
-from std.gpu import WARP_SIZE
-from std.gpu.host import DeviceContext, get_gpu_target
-from layout import Coord, Idx, TileTensor, row_major
+from max.gpu.host import DeviceContext
+from layout import Coord, TileTensor, row_major
 from layout.math import mean, variance
 from nn.normalization import *
 from std.testing import assert_almost_equal
 
 from std.utils.index import Index, IndexList
-
-
-def run_layer_norm_block[
-    dtype: DType,
-    *,
-    simd_width: Int = simd_width_of[dtype, target=get_gpu_target()](),
-](ctx: DeviceContext, rows: Int, cols: Int, rtol: Float64 = 0.01) raises:
-    print("== run_layer_norm_gpu block kernel")
-
-    var data_h = ctx.enqueue_create_host_buffer[dtype](rows * cols)
-    var res = ctx.enqueue_create_host_buffer[dtype](rows * cols)
-    var gamma_h = ctx.enqueue_create_host_buffer[dtype](cols)
-    var beta_h = ctx.enqueue_create_host_buffer[dtype](cols)
-
-    for i in range(rows * cols):
-        var val = Scalar[dtype](i)
-        data_h[i] = val
-
-    for i in range(cols):
-        gamma_h[i] = (Float64(i + cols) / Float64(cols)).cast[dtype]()
-        beta_h[i] = (Float64(i) / Float64(cols)).cast[dtype]()
-
-    var data_d = ctx.enqueue_create_buffer[dtype](rows * cols)
-    var gamma_d = ctx.enqueue_create_buffer[dtype](cols)
-    var beta_d = ctx.enqueue_create_buffer[dtype](cols)
-
-    var data_shape = Index(rows, cols)
-    var param_shape = Index(cols)
-
-    var data_buf = TileTensor(data_d, row_major(Coord(data_shape)))
-    var gamma = TileTensor(gamma_d, row_major(Coord(param_shape)))
-    var beta = TileTensor(beta_d, row_major(Coord(param_shape)))
-    var epsilon = Scalar[dtype]()
-
-    ctx.enqueue_copy(data_d, data_h)
-    ctx.enqueue_copy(gamma_d, gamma_h)
-    ctx.enqueue_copy(beta_d, beta_h)
-
-    @__copy_capture(data_buf)
-    @always_inline
-    @parameter
-    def input_fn[
-        width: Int, alignment: Int
-    ](row: Int, col: Int) -> SIMD[dtype, width]:
-        var idx = data_buf.layout(Coord(row, col))
-        return data_buf.raw_load[width=width, alignment=alignment](idx)
-
-    @__copy_capture(gamma)
-    @always_inline
-    @parameter
-    def gamma_fn[
-        width: Int, rank: Int, alignment: Int
-    ](coords: IndexList[rank]) -> SIMD[dtype, width]:
-        var idx = gamma.layout(coords[0])
-        return gamma.raw_load[width=width, alignment=alignment](idx)
-
-    @__copy_capture(data_buf)
-    @always_inline
-    @parameter
-    def output_fn[
-        width: SIMDSize, alignment: Int
-    ](row: Int, col: Int, val: SIMD[dtype, width]):
-        var idx = data_buf.layout(Coord(row, col))
-        data_buf.raw_store[width=width, alignment=alignment](
-            idx, rebind[SIMD[dtype, width]](val)
-        )
-
-    var max_warps_per_block = (
-        ctx.default_device_info.max_thread_block_size // WARP_SIZE
-    )
-
-    @always_inline
-    @parameter
-    @__copy_capture(data_buf, gamma, beta, epsilon)
-    def run_func_ln() raises:
-        comptime kernel = layer_norm_gpu_block[
-            LayoutType=beta.LayoutType,
-            origin=beta.origin,
-            simd_width,
-            input_fn,
-            gamma_fn,
-            output_fn,
-        ]
-        ctx.enqueue_function[kernel](
-            IndexList[2](rows, cols),
-            beta,
-            epsilon,
-            grid_dim=(rows, 1),
-            block_dim=min(
-                ceildiv(ceildiv(cols, simd_width), WARP_SIZE) * WARP_SIZE,
-                WARP_SIZE * max_warps_per_block,
-            ),
-        )
-
-    run_func_ln()
-    ctx.enqueue_copy(res, data_d)
-    ctx.synchronize()
-
-    for r in range(rows):
-        var vec = TileTensor(
-            data_h.unsafe_ptr() + r * cols,
-            row_major(cols),
-        )
-        var mean_ref = mean(vec)
-        var var_ref = variance(vec, correction=0)
-        var norm_factor_ref = rsqrt(var_ref + epsilon)
-        for c in range(cols):
-            var idx = r * cols + c
-            var val = ((data_h[idx] - mean_ref) * norm_factor_ref) * gamma_h[
-                c
-            ] + beta_h[c]
-            assert_almost_equal(val, res[idx], rtol=rtol)
-
-    _ = data_d
-    _ = gamma_d
-    _ = beta_d
 
 
 def run_layer_norm_gpu[
@@ -162,12 +45,17 @@ def run_layer_norm_gpu[
         beta_h[i] = (Float64(i) / Float64(cols)).cast[dtype]()
 
     var data_d = ctx.enqueue_create_buffer[dtype](rows * cols)
+    # Distinct output buffer: input_fn (reads) and output_fn (writes) are
+    # separate value-closure args, so they must reference distinct buffer
+    # origins (writing in place into `data_d` would alias the read).
+    var out_d = ctx.enqueue_create_buffer[dtype](rows * cols)
     var gamma_d = ctx.enqueue_create_buffer[dtype](cols)
     var beta_d = ctx.enqueue_create_buffer[dtype](cols)
 
     var param_shape = Index(cols)
 
     var data_buf = TileTensor(data_d, row_major(Coord(shape)))
+    var out_buf = TileTensor(out_d, row_major(Coord(shape)))
     var gamma = TileTensor(gamma_d, row_major(Coord(param_shape)))
     var beta = TileTensor(beta_d, row_major(Coord(param_shape)))
     var epsilon = Scalar[dtype]()
@@ -176,154 +64,36 @@ def run_layer_norm_gpu[
     ctx.enqueue_copy(gamma_d, gamma_h)
     ctx.enqueue_copy(beta_d, beta_h)
 
-    @__copy_capture(data_buf)
     @always_inline
-    @parameter
-    def input_fn[
-        width: Int, _rank: Int, alignment: Int
-    ](coords: IndexList[_rank]) -> SIMD[dtype, width]:
-        var idx = data_buf.layout(Coord(coords))
-
-        return data_buf.raw_load[width=width, alignment=alignment](idx)
-
-    @__copy_capture(gamma)
-    @always_inline
-    @parameter
-    def gamma_fn[
-        width: Int, rank: Int, alignment: Int
-    ](coords: IndexList[rank]) -> SIMD[dtype, width]:
-        var idx = gamma.layout(coords[0])
-        return gamma.raw_load[width=width, alignment=alignment](idx[0])
-
-    @__copy_capture(data_buf)
-    @always_inline
-    @parameter
-    def output_fn[
-        width: SIMDSize, rank_: Int, alignment: Int
-    ](coords: IndexList[rank_], val: SIMD[dtype, width]):
-        var idx = data_buf.layout(Coord(coords))
-        data_buf.raw_store[width=width, alignment=alignment](
-            idx, rebind[SIMD[dtype, width]](val)
-        )
-
-    layer_norm_gpu[input_fn, gamma_fn, output_fn](shape, beta, epsilon, ctx=ctx)
-    ctx.enqueue_copy(res, data_d)
-    ctx.synchronize()
-
-    for r in range(rows):
-        var vec = TileTensor(
-            data_h.unsafe_ptr() + r * cols,
-            row_major(cols),
-        )
-        var mean_ref = mean(vec)
-        var var_ref = variance(vec, correction=0)
-        var norm_factor_ref = rsqrt(var_ref + epsilon)
-        for c in range(cols):
-            var idx = r * cols + c
-            var val = ((data_h[idx] - mean_ref) * norm_factor_ref) * gamma_h[
-                c
-            ] + beta_h[c]
-            assert_almost_equal(val, res[idx], rtol=rtol)
-
-    _ = data_d
-    _ = gamma_d
-    _ = beta_d
-
-
-def run_layer_norm_warp_tiling[
-    dtype: DType,
-    *,
-    simd_width: Int = simd_width_of[dtype, target=get_gpu_target()](),
-](ctx: DeviceContext, rows: Int, cols: Int, rtol: Float64 = 0.01) raises:
-    print("== run_layer_norm_gpu warp tiling kernel")
-
-    var data_h = ctx.enqueue_create_host_buffer[dtype](rows * cols)
-    var res = ctx.enqueue_create_host_buffer[dtype](rows * cols)
-    var gamma_h = ctx.enqueue_create_host_buffer[dtype](cols)
-    var beta_h = ctx.enqueue_create_host_buffer[dtype](cols)
-
-    for i in range(rows * cols):
-        var val = Scalar[dtype](i)
-        data_h[i] = val
-
-    for i in range(cols):
-        gamma_h[i] = (Float64(i + cols) / Float64(cols)).cast[dtype]()
-        beta_h[i] = (Float64(i) / Float64(cols)).cast[dtype]()
-
-    var data_d = ctx.enqueue_create_buffer[dtype](rows * cols)
-    var gamma_d = ctx.enqueue_create_buffer[dtype](cols)
-    var beta_d = ctx.enqueue_create_buffer[dtype](cols)
-
-    var data_shape = Index(rows, cols)
-    var param_shape = Index(cols)
-
-    var data_buf = TileTensor(data_d, row_major(Coord(data_shape)))
-    var gamma = TileTensor(gamma_d, row_major(Coord(param_shape)))
-    var beta = TileTensor(beta_d, row_major(Coord(param_shape)))
-    var epsilon = Scalar[dtype]()
-
-    ctx.enqueue_copy(data_d, data_h)
-    ctx.enqueue_copy(gamma_d, gamma_h)
-    ctx.enqueue_copy(beta_d, beta_h)
-
-    @__copy_capture(data_buf)
-    @always_inline
-    @parameter
     def input_fn[
         width: Int, alignment: Int
-    ](row: Int, col: Int) -> SIMD[dtype, width]:
-        var idx = data_buf.layout(Coord(row, col))
+    ](coords: Coord) {var data_buf} -> SIMD[dtype, width]:
+        var idx = data_buf.layout(coords)
 
-        return data_buf.raw_load[width=width, alignment=alignment](idx)
+        return data_buf.raw_load[
+            width=width, alignment=alignment * align_of[dtype]()
+        ](idx)
 
-    @__copy_capture(gamma)
     @always_inline
-    @parameter
-    def gamma_fn[
-        width: Int, rank: Int, alignment: Int
-    ](coords: IndexList[rank]) -> SIMD[dtype, width]:
-        var idx = gamma.layout(coords[0])
-        return gamma.raw_load[width=width, alignment=alignment](idx)
-
-    @__copy_capture(data_buf)
-    @always_inline
-    @parameter
     def output_fn[
-        width: SIMDSize, alignment: Int
-    ](row: Int, col: Int, val: SIMD[dtype, width]):
-        var idx = data_buf.layout(Coord(row, col))
-        data_buf.raw_store[width=width, alignment=alignment](
+        width: SIMDLength, alignment: Int
+    ](coords: Coord, val: SIMD[dtype, width]) {var out_buf}:
+        var idx = out_buf.layout(coords)
+        out_buf.raw_store[width=width, alignment=alignment * align_of[dtype]()](
             idx, rebind[SIMD[dtype, width]](val)
         )
 
-    comptime max_warps_per_block = ctx.default_device_info.max_thread_block_size // WARP_SIZE
-
-    @always_inline
-    @parameter
-    @__copy_capture(data_buf, gamma, beta, epsilon)
-    def run_func_ln() raises:
-        comptime kernel = layer_norm_gpu_warp_tiling[
-            LayoutType=beta.LayoutType,
-            origin=beta.origin,
-            simd_width,
-            max_warps_per_block,
-            input_fn,
-            gamma_fn,
-            output_fn,
-        ]
-        ctx.enqueue_function[kernel](
-            IndexList[2](rows, cols),
-            beta,
-            epsilon,
-            grid_dim=(rows, 1),
-            block_dim=min(
-                ceildiv(ceildiv(cols, simd_width), WARP_SIZE) * WARP_SIZE,
-                WARP_SIZE * max_warps_per_block,
-            ),
-        )
-
-    run_func_ln()
-    ctx.enqueue_copy(res, data_d)
+    layer_norm[dtype, rank, target="gpu"](
+        input_fn,
+        output_fn,
+        Coord(shape),
+        Int(cols),
+        gamma,
+        beta,
+        epsilon,
+        ctx,
+    )
+    ctx.enqueue_copy(res, out_d)
     ctx.synchronize()
 
     for r in range(rows):
@@ -348,23 +118,16 @@ def run_layer_norm_warp_tiling[
 
 def main() raises:
     with DeviceContext() as ctx:
-        run_layer_norm_block[DType.float32, simd_width=1](ctx, rows=3, cols=5)
-        run_layer_norm_block[DType.float32](ctx, rows=3, cols=8)
-        run_layer_norm_block[DType.float32, simd_width=1](ctx, rows=7, cols=33)
-        run_layer_norm_block[DType.float32](ctx, rows=1, cols=1024)
-        run_layer_norm_block[DType.float32](ctx, rows=1, cols=8192, rtol=0.1)
-
-        run_layer_norm_warp_tiling[DType.float32, simd_width=1](
-            ctx, rows=3, cols=5
-        )
-        run_layer_norm_warp_tiling[DType.float32](ctx, rows=3, cols=8)
-        run_layer_norm_warp_tiling[DType.float32, simd_width=1](
-            ctx, rows=7, cols=33
-        )
-        run_layer_norm_warp_tiling[DType.float32](ctx, rows=1, cols=1024)
-        run_layer_norm_warp_tiling[DType.float32](ctx, rows=10, cols=4096)
-
+        # End-to-end layer_norm across shapes. The blocked/warp-tiled kernel
+        # selection is a scaffolder implementation detail, so only the op's
+        # end-to-end behavior is tested here.
+        run_layer_norm_gpu[.float32](ctx, Index(3, 5))
+        run_layer_norm_gpu[.float32](ctx, Index(3, 8))
+        run_layer_norm_gpu[.float32](ctx, Index(7, 33))
+        run_layer_norm_gpu[.float32](ctx, Index(1, 1024))
+        run_layer_norm_gpu[.float32](ctx, Index(1, 8192), rtol=0.1)
+        run_layer_norm_gpu[.float32](ctx, Index(10, 4096))
         # variable rank
-        run_layer_norm_gpu[DType.float32](ctx, Index(5))
-        run_layer_norm_gpu[DType.float32](ctx, Index(3, 4, 10, 20, 8))
-        run_layer_norm_gpu[DType.float32](ctx, Index(1, 5, 6, 10, 128))
+        run_layer_norm_gpu[.float32](ctx, Index(5))
+        run_layer_norm_gpu[.float32](ctx, Index(3, 4, 10, 20, 8))
+        run_layer_norm_gpu[.float32](ctx, Index(1, 5, 6, 10, 128))

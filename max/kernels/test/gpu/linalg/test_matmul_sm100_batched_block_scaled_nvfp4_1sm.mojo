@@ -14,8 +14,8 @@ from std.math import align_up
 from std.sys import argv, size_of
 import std.itertools
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.memory import alloc
 
 from internal_utils import assert_almost_equal
@@ -42,7 +42,7 @@ from linalg.fp4_utils import (
     NVFP4_SF_VECTOR_SIZE,
     set_batched_scale_factor,
 )
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 
 
 def simple_init() -> Bool:
@@ -166,11 +166,11 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
                     comptime assert b_host.flat_rank == 3
                     b_host[b, n, k] = UInt8(n).cast[b_type]()
     else:
-        rand(a_host.ptr, a_host.num_elements(), min=0, max=255)
-        rand(b_host.ptr, b_host.num_elements(), min=0, max=255)
+        rand(a_host._storage, a_host.num_elements(), min=0, max=255)
+        rand(b_host._storage, b_host.num_elements(), min=0, max=255)
 
-    rand(a_scales_host.ptr, a_scales_host.num_elements())
-    rand(b_scales_host.ptr, b_scales_host.num_elements())
+    rand(a_scales_host._storage, a_scales_host.num_elements())
+    rand(b_scales_host._storage, b_scales_host.num_elements())
     # NOTE: It is very important that we set unused scales to 0.0 otherwise we will hit accuracy issues
     for batch_idx in range(Int(batch.value())):
         for row_idx in range(align_up(Int(m.value()), SF_MN_GROUP_SIZE)):
@@ -267,17 +267,21 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
     var b_scales_batch_stride = b_scales_5d_shape.product()
 
     for b in range(Int(batch.value())):
-        var a_2d = TileTensor(a_tensor.ptr + b * a_batch_stride, a_2d_shape)
-        var b_2d = TileTensor(b_tensor.ptr + b * b_batch_stride, b_2d_shape)
+        var a_2d = TileTensor(
+            a_tensor._storage + b * a_batch_stride, a_2d_shape
+        )
+        var b_2d = TileTensor(
+            b_tensor._storage + b * b_batch_stride, b_2d_shape
+        )
         var c_ref_2d = TileTensor(
-            c_ref_tensor.ptr + b * c_batch_stride, c_2d_shape
+            c_ref_tensor._storage + b * c_batch_stride, c_2d_shape
         )
         var a_scales_5d = TileTensor(
-            a_scales_tensor.ptr + b * a_scales_batch_stride,
+            a_scales_tensor._storage + b * a_scales_batch_stride,
             a_scales_5d_shape,
         )
         var b_scales_5d = TileTensor(
-            b_scales_tensor.ptr + b * b_scales_batch_stride,
+            b_scales_tensor._storage + b * b_scales_batch_stride,
             b_scales_5d_shape,
         )
 
@@ -298,8 +302,8 @@ def test_blackwell_block_scaled_matmul_tma_umma_warp_specialized[
     ctx.synchronize()
 
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=1e-2,
         rtol=1e-2,

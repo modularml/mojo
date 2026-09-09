@@ -84,7 +84,6 @@ class RMSNorm(Module, Shardable):
         weight: TensorValue = self.weight.cast(x.dtype)
         if x.device:
             weight = weight.to(x.device)
-
         return ops.rms_norm(
             x,
             weight,

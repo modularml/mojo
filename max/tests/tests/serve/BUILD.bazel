@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -15,27 +14,42 @@ modular_py_test(
         "pipelines/*.py",
     ]),
     data = [
+        "//max/tests/tests/serve/fixtures/minimax_m3_reasoning_split:fixtures",
         "//max/tests/tests/serve/testdata",
     ],
     env = {
         "MAX_SERVE_DISABLE_TELEMETRY": "True",
         "MAX_SERVE_TESTDATA": "max/tests/tests/serve/testdata",
     },
+    ignore_unresolved_imports = [
+        # test_eplb_rebalance.py imports torch only for an optional parity
+        # check; torch is not a hard test dependency.
+        "torch",
+    ],
     imports = ["../.."],
     per_test_tags = {
         "test_reset_prefix_cache.py": ["external-exclusive"],
+        "test_eplb_rebalance.py": ["no-mypy"],
     },
     target_compatible_with = select({
-        "@platforms//os:macos": ["@platforms//:incompatible"],
+        # note: these tests are critical to max-serve workflows on mac-os, so
+        # the suite as a whole stays enabled on mac-os despite flaky CI infra.
+        # A few individual files that run for many minutes and blow the macOS
+        # job's 2h budget are skipped on macOS in-source via
+        # `pytestmark = pytest.mark.skipif(sys.platform == "darwin", ...)`
+        # (test_openai_routes, test_openai_stream, test_process_control). See
+        # SERVSYS-1275.
         # TODO: SDLC-3622, times out but isn't worth running.
         "//:asan": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     deps = [
-        "//max/python/max/dtype",
-        "//max/python/max/pipelines/architectures",
-        "//max/python/max/pipelines/core",
+        "//max/python/max:_core",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/architectures/qwen3_5",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/lora",
         "//max/python/max/pipelines/modeling",
         "//max/python/max/pipelines/request",
         "//max/python/max/serve",
@@ -53,15 +67,16 @@ modular_py_test(
         "//max/python/max/serve/worker_interface",
         requirement("async-asgi-testclient"),
         requirement("fastapi"),
+        requirement("httpx"),
         requirement("openai"),
         requirement("opentelemetry-api"),
+        requirement("opentelemetry-sdk"),
         requirement("numpy"),
         requirement("pydantic"),
         requirement("pytest-asyncio"),
-        requirement("safetensors"),
+        requirement("pyzmq"),
         requirement("sse-starlette"),
         requirement("taskgroup"),
-        requirement("torch"),
         requirement("transformers"),
         requirement("pillow"),
     ],
@@ -79,10 +94,15 @@ modular_py_test(
         "MAX_SERVE_DISABLE_TELEMETRY": "True",
         "MAX_SERVE_TESTDATA": "max/tests/tests/serve/testdata",
     },
+    ignore_extra_deps = [
+        requirement("jsonschema"),
+    ],
     deps = [
         "//max/python/max/pipelines/modeling",
         "//max/python/max/serve/parser",
         "//max/python/max/serve/router",
         "//max/python/max/serve/schemas",
+        requirement("jsonschema"),
+        requirement("llguidance"),
     ],
 )

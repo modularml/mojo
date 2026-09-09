@@ -22,11 +22,11 @@ GPUs, including:
 
 from std.time import global_perf_counter_ns, perf_counter_ns, sleep
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.testing import assert_true
 
 
-def sleep_kernel_100ms(result_ptr: UnsafePointer[UInt64, MutExternalOrigin]):
+def sleep_kernel_100ms(result_ptr: MutPointer[UInt64, MutUntrackedOrigin]):
     """GPU kernel that sleeps for 100ms and stores elapsed time."""
     # Use global_perf_counter_ns() which returns actual nanoseconds on GPUs.
     var start = global_perf_counter_ns()
@@ -35,7 +35,7 @@ def sleep_kernel_100ms(result_ptr: UnsafePointer[UInt64, MutExternalOrigin]):
     result_ptr[] = end - start
 
 
-def sleep_kernel_500us(result_ptr: UnsafePointer[UInt64, MutExternalOrigin]):
+def sleep_kernel_500us(result_ptr: MutPointer[UInt64, MutUntrackedOrigin]):
     """GPU kernel that sleeps for 500 microseconds (sub-1ms)."""
     var start = global_perf_counter_ns()
     sleep(0.0005)
@@ -43,7 +43,7 @@ def sleep_kernel_500us(result_ptr: UnsafePointer[UInt64, MutExternalOrigin]):
     result_ptr[] = end - start
 
 
-def sleep_kernel_zero(result_ptr: UnsafePointer[UInt64, MutExternalOrigin]):
+def sleep_kernel_zero(result_ptr: MutPointer[UInt64, MutUntrackedOrigin]):
     """GPU kernel that sleeps for zero duration (should return immediately)."""
     var start = global_perf_counter_ns()
     sleep(0.0)
@@ -53,8 +53,8 @@ def sleep_kernel_zero(result_ptr: UnsafePointer[UInt64, MutExternalOrigin]):
 
 def test_sleep_100ms(ctx: DeviceContext) raises:
     """Test 100ms sleep (requires loop since nanosleep max is 1ms)."""
-    var result_host = ctx.enqueue_create_host_buffer[DType.uint64](1)
-    var result_device = ctx.enqueue_create_buffer[DType.uint64](1)
+    var result_host = ctx.enqueue_create_host_buffer[.uint64](1)
+    var result_device = ctx.enqueue_create_buffer[.uint64](1)
 
     result_host[0] = 0
     ctx.enqueue_function[sleep_kernel_100ms](
@@ -76,8 +76,8 @@ def test_sleep_100ms(ctx: DeviceContext) raises:
 
 def test_sleep_500us(ctx: DeviceContext) raises:
     """Test 500 microsecond sleep (sub-1ms, single nanosleep call)."""
-    var result_host = ctx.enqueue_create_host_buffer[DType.uint64](1)
-    var result_device = ctx.enqueue_create_buffer[DType.uint64](1)
+    var result_host = ctx.enqueue_create_host_buffer[.uint64](1)
+    var result_device = ctx.enqueue_create_buffer[.uint64](1)
 
     result_host[0] = 0
     ctx.enqueue_function[sleep_kernel_500us](
@@ -98,8 +98,8 @@ def test_sleep_500us(ctx: DeviceContext) raises:
 
 def test_sleep_zero(ctx: DeviceContext) raises:
     """Test zero duration sleep (should return immediately)."""
-    var result_host = ctx.enqueue_create_host_buffer[DType.uint64](1)
-    var result_device = ctx.enqueue_create_buffer[DType.uint64](1)
+    var result_host = ctx.enqueue_create_host_buffer[.uint64](1)
+    var result_device = ctx.enqueue_create_buffer[.uint64](1)
 
     result_host[0] = 0
     ctx.enqueue_function[sleep_kernel_zero](
@@ -118,7 +118,7 @@ def test_sleep_zero(ctx: DeviceContext) raises:
 
 
 def perf_counter_kernel(
-    result_ptr: UnsafePointer[UInt64, MutExternalOrigin],
+    result_ptr: MutPointer[UInt64, MutUntrackedOrigin],
 ):
     """GPU kernel that measures a single sleep with both timer functions."""
     # Measure the SAME sleep interval with both counters. If both return
@@ -136,8 +136,8 @@ def perf_counter_kernel(
 
 def test_perf_counter_ns(ctx: DeviceContext) raises:
     """Test that perf_counter_ns() returns nanoseconds on GPU, not cycles."""
-    var result_host = ctx.enqueue_create_host_buffer[DType.uint64](2)
-    var result_device = ctx.enqueue_create_buffer[DType.uint64](2)
+    var result_host = ctx.enqueue_create_host_buffer[.uint64](2)
+    var result_device = ctx.enqueue_create_buffer[.uint64](2)
 
     result_host[0] = 0
     result_host[1] = 0

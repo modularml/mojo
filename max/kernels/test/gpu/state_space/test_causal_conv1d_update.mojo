@@ -13,7 +13,7 @@
 
 from std.math import ceildiv, exp
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     Idx,
     Layout,
@@ -42,10 +42,10 @@ def main() raises:
 @always_inline
 def silu_ref[dtype: DType](x: Scalar[dtype]) -> Scalar[dtype]:
     """Reference SiLU implementation: x * sigmoid(x) = x / (1 + exp(-x))."""
-    var x_f32 = x.cast[DType.float32]()
+    var x_f32 = x.cast[.float32]()
     var neg_x = -x_f32
     var exp_neg_x = exp(neg_x)
-    var one = Scalar[DType.float32](1.0)
+    var one = Float32(1.0)
     var sigmoid_x = one / (one + exp_neg_x)
     return (x_f32 * sigmoid_x).cast[dtype]()
 
@@ -186,28 +186,6 @@ def run_causal_conv1d_update_gpu[
         ctx.enqueue_copy(weight_device, weight_buf.ptr)
         ctx.enqueue_copy(bias_device, bias_buf.ptr)
 
-    # Create device tensors
-    var input_device_tensor = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        input_device.unsafe_ptr(),
-        RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen)),
-    )
-    var conv_state_device_tensor = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        conv_state_device.unsafe_ptr(),
-        RuntimeLayout[layout_3d].row_major(Index(batch, dim, state_len)),
-    )
-    var weight_device_tensor = LayoutTensor[dtype, layout_2d, MutAnyOrigin](
-        weight_device.unsafe_ptr(),
-        RuntimeLayout[layout_2d].row_major(Index(dim, width)),
-    )
-    var bias_device_tensor = LayoutTensor[dtype, layout_1d, MutAnyOrigin](
-        bias_device.unsafe_ptr(),
-        RuntimeLayout[layout_1d].row_major(Index(dim)),
-    )
-    var output_device_tensor = LayoutTensor[dtype, layout_3d, MutAnyOrigin](
-        output_device.unsafe_ptr(),
-        RuntimeLayout[layout_3d].row_major(Index(batch, dim, seqlen)),
-    )
-
     # Create TileTensors for GPU kernel
     var input_device_tt = TileTensor(
         input_device,
@@ -249,15 +227,20 @@ def run_causal_conv1d_update_gpu[
                     weight_device_tt.LayoutType,
                     output_device_tt.LayoutType,
                     bias_device_tt.LayoutType,
+                    input_device_tt.Engine,
+                    conv_state_device_tt.Engine,
+                    weight_device_tt.Engine,
+                    output_device_tt.Engine,
+                    bias_device_tt.Engine,
                 ]
             ]()
             ctx.enqueue_function(
                 compiled_func,
-                batch,
-                dim,
-                seqlen,
-                width,
-                state_len,
+                Int32(batch),
+                Int32(dim),
+                Int32(seqlen),
+                Int32(width),
+                Int32(state_len),
                 input_device_tt,
                 conv_state_device_tt,
                 weight_device_tt,
@@ -290,15 +273,19 @@ def run_causal_conv1d_update_gpu[
                     conv_state_device_tt.LayoutType,
                     weight_device_tt.LayoutType,
                     output_device_tt.LayoutType,
+                    input_device_tt.Engine,
+                    conv_state_device_tt.Engine,
+                    weight_device_tt.Engine,
+                    output_device_tt.Engine,
                 ]
             ]()
             ctx.enqueue_function(
                 compiled_func,
-                batch,
-                dim,
-                seqlen,
-                width,
-                state_len,
+                Int32(batch),
+                Int32(dim),
+                Int32(seqlen),
+                Int32(width),
+                Int32(state_len),
                 input_device_tt,
                 conv_state_device_tt,
                 weight_device_tt,
@@ -428,9 +415,7 @@ def test_gpu_causal_conv1d_update_basic() raises:
     var ctx = DeviceContext()
     if not ctx.is_compatible():
         return
-    run_causal_conv1d_update_gpu[DType.float32, True, "none"](
-        2, 8, 1, 3, 4, ctx=ctx
-    )
+    run_causal_conv1d_update_gpu[.float32, True, "none"](2, 8, 1, 3, 4, ctx=ctx)
 
 
 def test_gpu_causal_conv1d_update_with_silu() raises:
@@ -438,9 +423,7 @@ def test_gpu_causal_conv1d_update_with_silu() raises:
     var ctx = DeviceContext()
     if not ctx.is_compatible():
         return
-    run_causal_conv1d_update_gpu[DType.float32, True, "silu"](
-        2, 8, 1, 3, 4, ctx=ctx
-    )
+    run_causal_conv1d_update_gpu[.float32, True, "silu"](2, 8, 1, 3, 4, ctx=ctx)
 
 
 def test_gpu_causal_conv1d_update_without_bias() raises:
@@ -448,7 +431,7 @@ def test_gpu_causal_conv1d_update_without_bias() raises:
     var ctx = DeviceContext()
     if not ctx.is_compatible():
         return
-    run_causal_conv1d_update_gpu[DType.float32, False, "none"](
+    run_causal_conv1d_update_gpu[.float32, False, "none"](
         2, 8, 1, 3, 4, ctx=ctx
     )
 
@@ -458,9 +441,7 @@ def test_gpu_causal_conv1d_update_seqlen_greater_than_one() raises:
     var ctx = DeviceContext()
     if not ctx.is_compatible():
         return
-    run_causal_conv1d_update_gpu[DType.float32, True, "none"](
-        2, 8, 4, 3, 4, ctx=ctx
-    )
+    run_causal_conv1d_update_gpu[.float32, True, "none"](2, 8, 4, 3, 4, ctx=ctx)
 
 
 def test_gpu_causal_conv1d_update_various_widths() raises:
@@ -468,12 +449,6 @@ def test_gpu_causal_conv1d_update_various_widths() raises:
     var ctx = DeviceContext()
     if not ctx.is_compatible():
         return
-    run_causal_conv1d_update_gpu[DType.float32, True, "none"](
-        2, 8, 1, 2, 3, ctx=ctx
-    )
-    run_causal_conv1d_update_gpu[DType.float32, True, "none"](
-        2, 8, 1, 3, 4, ctx=ctx
-    )
-    run_causal_conv1d_update_gpu[DType.float32, True, "none"](
-        2, 8, 1, 4, 5, ctx=ctx
-    )
+    run_causal_conv1d_update_gpu[.float32, True, "none"](2, 8, 1, 2, 3, ctx=ctx)
+    run_causal_conv1d_update_gpu[.float32, True, "none"](2, 8, 1, 3, 4, ctx=ctx)
+    run_causal_conv1d_update_gpu[.float32, True, "none"](2, 8, 1, 4, 5, ctx=ctx)

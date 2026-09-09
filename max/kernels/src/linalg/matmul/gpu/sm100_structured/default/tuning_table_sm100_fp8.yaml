@@ -883,3 +883,27 @@ params:
   M: 8192
   K: 16384
   N: 26624
+- <<: *common
+  _template: ranged
+  M: 7000
+  M_END: 7000 + 32
+  N: 43008
+  K: 5376
+  TUNE_MMA_M: 256
+  TUNE_MMA_N: 256
+  TUNE_CTA_GROUP: 2
+  TUNE_CLUSTER_DIM_X: 2
+  TUNE_CLUSTER_DIM_Y: 1
+  TUNE_BLOCK_SWIZZLE_SIZE: 0
+- <<: *common
+  _template: ranged
+  M: 256
+  M_END: 256 + 32
+  N: 8192
+  K: 5376
+  TUNE_MMA_M: 256
+  TUNE_MMA_N: 128
+  TUNE_CTA_GROUP: 2
+  TUNE_CLUSTER_DIM_X: 2
+  TUNE_CLUSTER_DIM_Y: 1
+  TUNE_BLOCK_SWIZZLE_SIZE: 1

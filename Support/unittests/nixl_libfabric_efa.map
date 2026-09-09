@@ -1,0 +1,11 @@
+# EFA libfabric: adds the FABRIC_1.8 the NIXL plugin binds against.
+FABRIC_1.0 {
+  global:
+    fi_fixture_open;
+  local:
+    *;
+};
+FABRIC_1.8 {
+  global:
+    fi_fixture_open_v18;
+} FABRIC_1.0;

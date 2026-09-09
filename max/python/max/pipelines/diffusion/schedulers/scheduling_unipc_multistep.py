@@ -103,23 +103,26 @@ class UniPCMultistepScheduler:
         """Sets the begin index for the scheduler."""
         self._begin_index = begin_index
 
-    def set_timesteps(self, num_inference_steps: int) -> None:
+    def set_timesteps(
+        self, num_inference_steps: int, flow_shift: float | None = None
+    ) -> None:
         """Initialize internal state for a denoising run.
 
         Must be called before the first ``step()`` call.
 
         Args:
             num_inference_steps: Number of denoising steps.
+            flow_shift: Per-call flow-matching shift. When ``None``, the
+                shift from the scheduler config is used.
         """
+        shift = self.flow_shift if flow_shift is None else float(flow_shift)
         if self.use_flow_sigmas:
             # Match diffusers UniPCMultistepScheduler.set_timesteps exactly:
             # linspace over sigmas directly (not 1-alphas), drop last before shifting.
             sigmas = np.linspace(
                 1, 1 / self.num_train_timesteps, num_inference_steps + 1
             )[:-1]
-            sigmas = (
-                self.flow_shift * sigmas / (1 + (self.flow_shift - 1) * sigmas)
-            )
+            sigmas = shift * sigmas / (1 + (shift - 1) * sigmas)
             # Clamp sigma[0] just below 1.0 so timestep < num_train_timesteps
             # (matches diffusers' `sigmas[0] -= eps` guard).
             eps = 1.0 / self.num_train_timesteps
@@ -178,6 +181,7 @@ class UniPCMultistepScheduler:
         num_inference_steps: int,
         reverse: bool = False,
         sigma_min: float | None = None,
+        flow_shift: float | None = None,
     ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
         """Build timestep/sigma schedule, with flow-matching support.
 
@@ -189,12 +193,14 @@ class UniPCMultistepScheduler:
             reverse: Whether to reverse timesteps (non-flow only).
             sigma_min: Unused. Accepted for interface compatibility with
                 other schedulers.
+            flow_shift: Per-call flow-matching shift. When ``None``, the
+                shift from the scheduler config is used.
 
         Returns:
             Tuple of (timesteps, sigmas) as float32 arrays.
         """
         del image_seq_len, sigma_min
-        self.set_timesteps(num_inference_steps)
+        self.set_timesteps(num_inference_steps, flow_shift=flow_shift)
         assert self.timesteps is not None
         assert self.sigmas is not None
 
@@ -517,7 +523,7 @@ class UniPCMultistepScheduler:
     def step(
         self,
         model_output: np.ndarray,
-        timestep: float | int,
+        timestep: float,
         sample: np.ndarray,
     ) -> np.ndarray:
         """Predict the sample at the previous timestep using UniPC.

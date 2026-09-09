@@ -22,17 +22,18 @@ from collections.abc import Callable
 from max.driver import CPU, Device
 from max.dtype import DType
 from max.experimental import functional as F
-from max.experimental.functional.utils import ensure_context
 from max.experimental.nn import Linear
 from max.experimental.nn.common_layers.functional_kernels import (
-    Independent,
+    fused_silu,
     grouped_matmul_ragged,
     moe_create_indices,
     shard_and_stack,
+    stack_device_shards,
 )
 from max.experimental.nn.common_layers.mlp import MLP
 from max.experimental.nn.module import Module
 from max.experimental.nn.sequential import ModuleList
+from max.experimental.realization_context import ensure_context
 from max.experimental.sharding import (
     DeviceMapping,
     DeviceMesh,
@@ -41,7 +42,6 @@ from max.experimental.sharding import (
 )
 from max.experimental.tensor import Tensor
 from max.graph import TensorValue
-from max.nn.comm.ep import EPBatchManager
 from typing_extensions import Self
 
 
@@ -161,8 +161,8 @@ class MoE(Module[[Tensor], Tensor]):
         return self
 
     @property
-    def gate_up_proj(self) -> Tensor:
-        """Return the stacked expert gate and up projection weights."""
+    def gate_up_proj(self) -> list[Tensor]:
+        """Per-device ``[gate, up]`` expert-weight bundle (one entry here)."""
         gate_list = [expert.gate_proj.weight for expert in self.experts]
         up_list = [expert.up_proj.weight for expert in self.experts]
 
@@ -170,17 +170,62 @@ class MoE(Module[[Tensor], Tensor]):
         for tensors in zip(gate_list, up_list, strict=True):
             gate_up_list.extend(tensors)
 
-        return F.stack(gate_up_list, axis=0).reshape(
-            [self.num_experts, -1, self.hidden_dim]
-        )
+        return [
+            F.stack(gate_up_list, axis=0).reshape(
+                [self.num_experts, -1, self.hidden_dim]
+            )
+        ]
 
     @property
-    def down_proj(self) -> Tensor:
-        """Return the stacked expert down projection weights."""
-        down_proj = F.stack(
-            [expert.down_proj.weight for expert in self.experts], axis=0
+    def down_proj(self) -> list[Tensor]:
+        """Per-device down-projection weight bundle (one entry here)."""
+        return [
+            F.stack(
+                [expert.down_proj.weight for expert in self.experts], axis=0
+            )
+        ]
+
+    def _expert_matmuls_local(
+        self,
+        tokens: Tensor,
+        gate_up: Tensor,
+        down: Tensor,
+        expert_start: Tensor,
+        expert_ids: Tensor,
+        usage_stats: Tensor,
+    ) -> Tensor:
+        """Gate/up matmul -> SiLU -> down matmul."""
+        gate_up_out = grouped_matmul_ragged(
+            tokens, gate_up, expert_start, expert_ids, usage_stats
         )
-        return down_proj
+        silu_out = fused_silu(gate_up_out, expert_start)
+        return grouped_matmul_ragged(
+            silu_out, down, expert_start, expert_ids, usage_stats
+        )
+
+    def _grouped_expert_compute(
+        self,
+        permuted_states: Tensor,
+        expert_start_indices: Tensor,
+        expert_ids: Tensor,
+        expert_usage_stats: Tensor,
+    ) -> Tensor:
+        """Runs :meth:`_expert_matmuls_local` on the (possibly TP) mesh directly."""
+        mesh = permuted_states.mesh
+        gate_up = stack_device_shards(self.gate_up_proj, axis=1, mesh=mesh)
+        down = stack_device_shards(self.down_proj, axis=2, mesh=mesh)
+        out = self._expert_matmuls_local(
+            permuted_states,
+            gate_up,
+            down,
+            expert_start_indices,
+            expert_ids,
+            expert_usage_stats,
+        )
+        return Tensor.from_shard_values(
+            [TensorValue(s) for s in out.local_shards],
+            mapping=permuted_states.mapping,
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass for MoE layer.
@@ -212,7 +257,8 @@ class MoE(Module[[Tensor], Tensor]):
         permutated_states = F.gather(
             x,
             F.cast(
-                token_expert_order // self.num_experts_per_token, DType.int32
+                F.floor_div(token_expert_order, self.num_experts_per_token),
+                DType.int32,
             ),
             axis=0,
         )
@@ -222,25 +268,11 @@ class MoE(Module[[Tensor], Tensor]):
                 router_weight.reshape([-1, 1]), token_expert_order, axis=0
             ).cast(x.dtype)
 
-        gate_up_projs = grouped_matmul_ragged(
+        down_projs = self._grouped_expert_compute(
             permutated_states,
-            self.gate_up_proj,
             expert_start_indices,
             expert_ids,
-            expert_usage_stats.to(CPU()),
-        )
-
-        gate_up_projs = (
-            F.silu(gate_up_projs[:, : self.moe_dim])
-            * gate_up_projs[:, self.moe_dim :]
-        )
-
-        down_projs = grouped_matmul_ragged(
-            gate_up_projs,
-            self.down_proj,
-            expert_start_indices,
-            expert_ids,
-            expert_usage_stats.to(CPU()),
+            expert_usage_stats,
         )
 
         down_projs = F.gather(down_projs, restore_token_order, axis=0).reshape(
@@ -294,8 +326,8 @@ class TensorParallelMoE(MoE):
         return self
 
     @property
-    def gate_up_proj(self) -> Tensor:
-        """Return the stacked expert gate and up projection weights."""
+    def gate_up_proj(self) -> list[Tensor]:
+        """Per-device ``[gate, up]`` weight bundle, sharded along ``moe_dim``."""
         if self.mesh.num_devices == 1:
             return super().gate_up_proj
 
@@ -306,33 +338,27 @@ class TensorParallelMoE(MoE):
         for tensors in zip(gate_list, up_list, strict=True):
             gate_up_list.extend(tensors)
 
-        shards: list[TensorValue] = []
+        shards: list[Tensor] = []
         for shard in shard_and_stack(gate_up_list, devices=self.mesh.devices):
+            assert isinstance(shard, Tensor)
             shards.append(
-                TensorValue(
-                    shard.reshape([self.num_experts, -1, self.hidden_dim])
-                )
+                shard.reshape([self.num_experts, -1, self.hidden_dim])
             )
-        return Tensor.from_shard_values(
-            shards,
-            mapping=PlacementMapping(self.mesh, (Independent(),)),
-        )
+        return shards
 
     @property
-    def down_proj(self) -> Tensor:
-        """Return the stacked expert down projection weights."""
+    def down_proj(self) -> list[Tensor]:
+        """Per-device down-projection weight bundle, sharded along ``moe_dim``."""
         if self.mesh.num_devices == 1:
             return super().down_proj
         down_proj_list = [expert.down_proj.weight for expert in self.experts]
-        shards: list[TensorValue] = []
+        shards: list[Tensor] = []
         for shard in shard_and_stack(
             down_proj_list, devices=self.mesh.devices, axis=-1
         ):
-            shards.append(TensorValue(shard))
-        return Tensor.from_shard_values(
-            shards,
-            mapping=PlacementMapping(self.mesh, (Independent(),)),
-        )
+            assert isinstance(shard, Tensor)
+            shards.append(shard)
+        return shards
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass for tensor parallel MoE layer.
@@ -342,205 +368,15 @@ class TensorParallelMoE(MoE):
         with ensure_context():
             output = super().forward(x)
 
-            # Weights are marked as Independent/Replicated for correct per-device op
-            # dispatch, so the output inherits the replicated placement. The outputs
-            # are actually partial, so re-tag with the correct placement.
+            # `_grouped_expert_compute` reassembles the per-device expert
+            # outputs under the replicated activation placement, but each
+            # device only summed its own ``moe_dim`` slice, so the values are
+            # partial. Re-tag as Partial; the caller resolves with an
+            # all-reduce.
             return Tensor.from_shard_values(
                 [TensorValue(s) for s in output.local_shards],
                 mapping=PlacementMapping(self.mesh, (Partial(),)),
             )
-
-
-class ExpertParallelMoE(MoE):
-    """MoE layer with expert parallelism."""
-
-    def __init__(
-        self, *args, ep_batch_manager: EPBatchManager, **kwargs
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self.ep_batch_manager = ep_batch_manager
-        self.mesh = DeviceMesh.single(self.device)
-
-    def to(self, target: Device | DeviceMesh | DeviceMapping) -> Self:
-        """Transfer the MoE layer to the target device."""
-        self.mesh = _mesh(target)
-        if self.mesh.ndim != 1:
-            raise ValueError(
-                f"Mesh used with ExpertParallelMoE must have exactly one device axis, but got {self.mesh}"
-            )
-
-        self.gate.to(target)
-        if self.shared_experts is not None:
-            self.shared_experts.to(target)
-
-        # Move experts to different devices
-        num_local_experts = self.num_experts // self.mesh.num_devices
-        for i in range(self.mesh.num_devices):
-            for j in range(num_local_experts):
-                self.experts[i * num_local_experts + j].to(self.mesh.devices[i])
-
-        return self
-
-    @property
-    def gate_up_proj(self) -> Tensor:
-        """Return the stacked expert gate and up projection weights."""
-        # Stack the weights for each expert, on the same device.
-        gate_up_list_per_device: list[list[Tensor]] = [
-            [] for _ in self.mesh.devices
-        ]
-        device_to_idx = {
-            device: i for i, device in enumerate(self.mesh.devices)
-        }
-
-        if self.ep_batch_manager.config.fused_shared_expert:
-            assert self.shared_experts is not None, (
-                "Shared experts must be present if fused shared expert is enabled"
-            )
-            for i in range(self.mesh.num_devices):
-                gate_up_list_per_device[i].append(
-                    self.shared_experts.gate_proj.weight.local_shards[i]
-                )
-                gate_up_list_per_device[i].append(
-                    self.shared_experts.up_proj.weight.local_shards[i]
-                )
-
-        for expert in self.experts:
-            device_idx = device_to_idx[expert.device]
-            gate_up_list_per_device[device_idx].append(expert.gate_proj.weight)
-            gate_up_list_per_device[device_idx].append(expert.up_proj.weight)
-
-        gate_up_tensors = []
-        num_local_experts = self.num_experts // self.mesh.num_devices
-        for i in range(self.mesh.num_devices):
-            gate_up = F.stack(gate_up_list_per_device[i], axis=0).reshape(
-                [num_local_experts, -1, self.hidden_dim]
-            )
-            gate_up_tensors.append(TensorValue(gate_up))
-
-        return Tensor.from_shard_values(
-            gate_up_tensors,
-            mapping=PlacementMapping(self.mesh, (Independent(),)),
-        )
-
-    @property
-    def down_proj(self) -> Tensor:
-        """Return the stacked expert down projection weights."""
-        down_proj_list_per_device: list[list[Tensor]] = [
-            [] for _ in self.mesh.devices
-        ]
-        device_to_idx = {
-            device: i for i, device in enumerate(self.mesh.devices)
-        }
-        for expert in self.experts:
-            device_idx = device_to_idx[expert.device]
-            down_proj_list_per_device[device_idx].append(
-                expert.down_proj.weight
-            )
-
-        down_proj_tensors = []
-        for i in range(self.mesh.num_devices):
-            down_proj = F.stack(down_proj_list_per_device[i], axis=0)
-            down_proj_tensors.append(TensorValue(down_proj))
-
-        return Tensor.from_shard_values(
-            down_proj_tensors,
-            mapping=PlacementMapping(self.mesh, (Independent(),)),
-        )
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Forward pass for expert parallel MoE layer.
-
-        Mirrors :func:`max.nn.moe.expert_parallel._ep_forward`:
-        per-device gate -> cross-device dispatch -> per-device local expert
-        compute -> cross-device combine.
-        """
-        # Per-device gate computation. Returns distributed Tensors.
-        router_idx, router_weight = self.gate(x)
-        router_idx = router_idx.cast(DType.int32)
-
-        # Per-device shards as raw graph values for the EP batch manager.
-        x_shards = [TensorValue(s) for s in x.local_shards]
-        topk_id_shards = [TensorValue(s) for s in router_idx.local_shards]
-        router_weight_shards = [
-            TensorValue(s) for s in router_weight.local_shards
-        ]
-        device_ids = [d.id for d in self.mesh.devices]
-
-        batch_mgr = self.ep_batch_manager
-        config = batch_mgr.config
-
-        # Dispatch tokens to the device that owns their assigned expert.
-        if config.use_allreduce:
-            dispatch_results = [
-                batch_mgr.ep_dispatch(
-                    x_shards[i], topk_id_shards[i], device_ids[i]
-                )
-                for i in range(self.mesh.num_devices)
-            ]
-        else:
-            dispatch_results = batch_mgr.ep_dispatch_all(
-                x_shards, topk_id_shards, device_ids
-            )
-
-        # Re-package the per-device dispatch outputs into distributed
-        # Tensors so we can drive the local expert compute through the
-        # standard F.functional dispatch path.
-        placement = PlacementMapping(self.mesh, (Independent(),))
-        dispatched_tokens = Tensor.from_shard_values(
-            [r[0] for r in dispatch_results], mapping=placement
-        )
-        # Common grouped-matmul metadata across devices: (row_offsets,
-        # expert_ids, expert_usage_stats). For BF16 dispatch this is
-        # `dispatch_results[i][1:]`.
-        meta_tensors = [
-            Tensor.from_shard_values(
-                [r[j] for r in dispatch_results], mapping=placement
-            )
-            for j in range(1, len(dispatch_results[0]))
-        ]
-
-        # Local expert compute: gate/up grouped matmul, silu*up,
-        # down grouped matmul.
-        gate_up = grouped_matmul_ragged(
-            dispatched_tokens, self.gate_up_proj, *meta_tensors
-        )
-        silu_out = (
-            F.silu(gate_up[:, : self.moe_dim]) * gate_up[:, self.moe_dim :]
-        )
-        down = grouped_matmul_ragged(silu_out, self.down_proj, *meta_tensors)
-
-        # Combine expert outputs back to their source devices.
-        down_shards = [TensorValue(s) for s in down.local_shards]
-        if config.use_allreduce:
-            combine_results = [
-                batch_mgr.ep_combine(
-                    down_shards[i],
-                    router_weight_shards[i],
-                    device_ids[i],
-                    topk_id_shards[i],
-                )
-                for i in range(self.mesh.num_devices)
-            ]
-        else:
-            combine_results = batch_mgr.ep_combine_all(
-                down_shards, router_weight_shards, device_ids
-            )
-
-        # Optional shared-expert add, then cast back to input dtype.
-        shared_shards: list[TensorValue] | None = None
-        if self.shared_experts is not None and not config.fused_shared_expert:
-            shared_shards = [
-                TensorValue(s) for s in self.shared_experts(x).local_shards
-            ]
-
-        outputs: list[TensorValue] = []
-        for i in range(self.mesh.num_devices):
-            out = combine_results[i]
-            if shared_shards is not None:
-                out = out + shared_shards[i]
-            outputs.append(out.cast(x_shards[i].dtype))
-
-        return Tensor.from_shard_values(outputs, mapping=placement)
 
 
 def _mesh(target: Device | DeviceMesh | DeviceMapping) -> DeviceMesh:

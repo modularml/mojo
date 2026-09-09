@@ -17,31 +17,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
-from max.pipelines.core import TextContext
-from max.pipelines.kv_cache import PagedKVCacheManager
+from max.pipelines.context import (
+    TextContext,
+    TextGenerationContextType,
+    TextGenerationOutput,
+)
+from max.pipelines.kv_cache import PagedKVCacheManagerInterface
 from max.pipelines.modeling.types import (
     BatchType,
     Pipeline,
-    RequestID,
-    TextGenerationContextType,
     TextGenerationInputs,
-    TextGenerationOutput,
 )
-from max.pipelines.modeling.types.tokens import TokenBuffer
 
 
 @dataclass
 class DPPaddingInfo:
     """Padding metadata produced by `DPBatchPadder.pad_batch()`.
 
-    Holds the list of dummy (request_id, replica_idx) pairs allocated
-    for this batch. The caller is responsible for releasing them via
-    the KV cache manager and pipeline.
+    Holds the dummy contexts allocated for this batch. The caller is
+    responsible for releasing them via the KV cache manager and pipeline.
     """
 
-    dummies: list[tuple[RequestID, int]]
-    """List of (request_id, replica_idx) for each dummy context."""
+    dummies: list[TextContext]
+    """The dummy contexts padding out the short replicas."""
 
 
 class DPBatchPadder:
@@ -57,41 +55,31 @@ class DPBatchPadder:
         kv_manager: The KV cache manager used to claim and allocate
             dummy entries.
         max_length: The maximum sequence length for dummy contexts.
-        model_name: The model name passed to dummy `TextContext` instances.
+        model_name: The model name passed to dummy context instances.
         pipeline: The pipeline used to release dummy entries.
+        context_type: The architecture's concrete context class used to
+            construct dummies. VLM batches require every context to be a
+            `TextAndVisionContext`, so padding dummies must match the
+            architecture's registered context type.
     """
 
     def __init__(
         self,
         *,
         dp_size: int,
-        kv_manager: PagedKVCacheManager,
+        kv_manager: PagedKVCacheManagerInterface,
         max_length: int,
         model_name: str,
         pipeline: Pipeline[
             TextGenerationInputs[TextContext], TextGenerationOutput
         ],
+        context_type: type[TextContext] = TextContext,
     ) -> None:
         self._kv_manager = kv_manager
         self._max_length = max_length
         self._model_name = model_name
         self._pipeline = pipeline
-
-        # Pre-allocate one sentinel block per replica. Dummies share
-        # this block via ref-count so padding can never fail due to
-        # block exhaustion.
-        self._sentinel_ids: list[RequestID] = []
-        for rank in range(dp_size):
-            sentinel_id = RequestID(f"_dp_sentinel_r{rank}")
-            sentinel_ctx = TextContext(
-                max_length=max_length,
-                tokens=TokenBuffer(np.zeros(1, dtype=np.int64)),
-                model_name=model_name,
-                request_id=sentinel_id,
-            )
-            kv_manager.claim(sentinel_id, replica_idx=rank)
-            kv_manager.alloc(sentinel_ctx, replica_idx=rank, num_steps=1)
-            self._sentinel_ids.append(sentinel_id)
+        self._context_type = context_type
 
     # ------------------------------------------------------------------
     # Public API
@@ -130,13 +118,13 @@ class DPBatchPadder:
             return inputs, None
 
         # Allocate fresh dummies and track them for release.
-        all_dummies: list[tuple[RequestID, int]] = []
+        all_dummies: list[TextContext] = []
         padded_batches: list[list[TextGenerationContextType]] = []
         for rank, batch in enumerate(inputs.batches):
             pad_count = max_per_rank - len(batch)
             if pad_count > 0:
                 dummies = self._alloc_dummies(rank, pad_count)
-                all_dummies.extend((ctx.request_id, rank) for ctx in dummies)
+                all_dummies.extend(dummies)
                 padded_batches.append(list(batch) + dummies)
             else:
                 padded_batches.append(list(batch))
@@ -144,7 +132,6 @@ class DPBatchPadder:
         padded_inputs: TextGenerationInputs[TextGenerationContextType] = (
             TextGenerationInputs(
                 batches=padded_batches,
-                num_steps=inputs.num_steps,
             )
         )
         # __post_init__ infers batch_type from contexts; override to
@@ -170,16 +157,11 @@ class DPBatchPadder:
         """
         dummies: list[Any] = []
         for _ in range(count):
-            ctx = TextContext(
+            ctx = self._context_type.new_padding_context(
                 max_length=self._max_length,
-                tokens=TokenBuffer(np.zeros(1, dtype=np.int64)),
                 model_name=self._model_name,
             )
             ctx.update(0)
-            self._kv_manager.alloc_dummy(
-                ctx.request_id,
-                replica_idx=replica_idx,
-                sentinel_request_id=self._sentinel_ids[replica_idx],
-            )
+            self._kv_manager.alloc_dummy(ctx, replica_idx=replica_idx)
             dummies.append(ctx)
         return dummies

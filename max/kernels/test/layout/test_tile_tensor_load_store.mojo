@@ -16,9 +16,8 @@ Verifies PTX instruction selection for global memory, shared memory, invariant,
 and vectorized load/store operations when compiled for NVIDIA GPUs.
 """
 
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
-from std.gpu.memory import AddressSpace
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
 from std.testing import assert_true, TestSuite
 
 from layout import (
@@ -45,91 +44,56 @@ comptime _4x4 = RowMajorLayout[ComptimeInt[4], ComptimeInt[4]]
 
 def global_load_store_kernel(
     tensor: TileTensor[
-        mut=True,
-        DType.float32,
-        _4x4,
-        MutAnyOrigin,
-        address_space=AddressSpace.GLOBAL,
+        mut=True, .float32, _4x4, MutAnyOrigin, address_space=.GLOBAL
     ],
 ):
     """Load and store through a TileTensor backed by global memory."""
-    var val = tensor.load(coord[0, 0]())
-    tensor.store(coord[1, 0](), val)
+    var val = tensor.load(coord[0, 0])
+    tensor.store(coord[1, 0], val)
 
 
 def shared_load_kernel(
-    src: TileTensor[
-        DType.float32,
-        _4x4,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
-    ],
+    src: TileTensor[.float32, _4x4, MutAnyOrigin, address_space=.SHARED],
     dst: TileTensor[
-        mut=True,
-        DType.float32,
-        _4x4,
-        MutAnyOrigin,
-        address_space=AddressSpace.GLOBAL,
+        mut=True, .float32, _4x4, MutAnyOrigin, address_space=.GLOBAL
     ],
 ):
     """Load from a shared-memory TileTensor, store to global."""
-    var val = src.load(coord[0, 0]())
-    dst.store(coord[0, 0](), val)
+    var val = src.load(coord[0, 0])
+    dst.store(coord[0, 0], val)
 
 
 def shared_store_kernel(
     dst: TileTensor[
-        mut=True,
-        DType.float32,
-        _4x4,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        mut=True, .float32, _4x4, MutAnyOrigin, address_space=.SHARED
     ],
-    src: TileTensor[
-        DType.float32,
-        _4x4,
-        MutAnyOrigin,
-        address_space=AddressSpace.GLOBAL,
-    ],
+    src: TileTensor[.float32, _4x4, MutAnyOrigin, address_space=.GLOBAL],
 ):
     """Load from global, store to a shared-memory TileTensor."""
-    var val = src.load(coord[0, 0]())
-    dst.store(coord[0, 0](), val)
+    var val = src.load(coord[0, 0])
+    dst.store(coord[0, 0], val)
 
 
 def invariant_load_kernel(
-    src: TileTensor[
-        DType.float32,
-        _4x4,
-        ImmutAnyOrigin,
-        address_space=AddressSpace.GLOBAL,
-    ],
+    src: TileTensor[.float32, _4x4, ImmutAnyOrigin, address_space=.GLOBAL],
     dst: TileTensor[
-        mut=True,
-        DType.float32,
-        _4x4,
-        MutAnyOrigin,
-        address_space=AddressSpace.GLOBAL,
+        mut=True, .float32, _4x4, MutAnyOrigin, address_space=.GLOBAL
     ],
 ):
     """Invariant load should produce a non-coherent (ld.global.nc) instruction.
     """
-    var val = src.load[invariant=True](coord[0, 0]())
-    dst.store(coord[0, 0](), val)
+    var val = src.load[invariant=True](coord[0, 0])
+    dst.store(coord[0, 0], val)
 
 
 def vectorized_load_store_kernel(
     tensor: TileTensor[
-        mut=True,
-        DType.float32,
-        _4x4,
-        MutAnyOrigin,
-        address_space=AddressSpace.GLOBAL,
+        mut=True, .float32, _4x4, MutAnyOrigin, address_space=.GLOBAL
     ],
 ):
     """Width-4 load/store should produce vectorized (v4) instructions."""
-    var val = tensor.load[width=4](coord[0, 0]())
-    tensor.store[width=4](coord[1, 0](), val)
+    var val = tensor.load[width=4](coord[0, 0])
+    tensor.store[width=4](coord[1, 0], val)
 
 
 # ===-----------------------------------------------------------------------===#

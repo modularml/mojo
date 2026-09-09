@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -32,7 +31,9 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/deepseekV3",
+        "//max/python/max/pipelines/architectures/deepseekV3_nextn",
+        "//max/python/max/pipelines/kv_cache",
         "//max/python/max/pipelines/lib",
         requirement("numpy"),
         requirement("transformers"),
@@ -43,8 +44,9 @@ modular_py_test(
     name = "test_tool_parser",
     srcs = ["test_tool_parser.py"],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/deepseekV3",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/weights",
     ],
 )

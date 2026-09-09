@@ -24,7 +24,7 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import TextTokenizer
 
 if TYPE_CHECKING:

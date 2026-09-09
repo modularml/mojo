@@ -12,13 +12,20 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
+from max.pipelines.architectures.deepseekV3.batch_processor import (
+    DeepseekV3BatchProcessor,
+)
 from max.pipelines.architectures.deepseekV3_2 import weight_adapters
-from max.pipelines.core import TextContext
-from max.pipelines.lib import SupportedArchitecture, TextTokenizer
+from max.pipelines.context import TextContext
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
+from max.pipelines.lib import SupportedArchitecture
 from max.pipelines.modeling.types import PipelineTask
 
 from .model import Glm5_1Model
 from .model_config import Glm5_1Config
+from .reasoning import GlmReasoningParser  # noqa: F401  registers "glm45"
+from .tokenizer import GlmTokenizer
+from .tool_parser import GlmToolParser  # noqa: F401  registers "glm45"
 
 glm5_1_arch = SupportedArchitecture(
     name="GlmMoeDsaForCausalLM",
@@ -26,17 +33,16 @@ glm5_1_arch = SupportedArchitecture(
     example_repo_ids=[
         "zai-org/GLM-5.1",
         "zai-org/GLM-5.1-FP8",
+        "zai-org/GLM-5.2",
+        "zai-org/GLM-5.2-FP8",
         "zai-org/GLM-5",
     ],
-    default_encoding="float8_e4m3fn",
-    supported_encodings={
-        "float4_e2m1fnx2",
-        "float8_e4m3fn",
-        "bfloat16",
-    },
+    default_encoding=Glm5_1Config.DEFAULT_ENCODING,
+    supported_encodings=Glm5_1Config.SUPPORTED_ENCODINGS,
     multi_gpu_supported=True,
     pipeline_model=Glm5_1Model,
-    tokenizer=TextTokenizer,
+    batching=DeepseekV3BatchProcessor,
+    tokenizer=GlmTokenizer,
     context_type=TextContext,
     default_weights_format=WeightsFormat.safetensors,
     weight_adapters={
@@ -45,4 +51,14 @@ glm5_1_arch = SupportedArchitecture(
     supports_empty_batches=True,
     requires_max_batch_context_length=True,
     config=Glm5_1Config,
+    memory_planner=PagedMemoryPlanner,
+    tool_parser="glm45",
+    reasoning_parser="glm45",
+    default_structured_output_backend="xgrammar",
+    # GLM strongly prefers pretty-printed JSON: under the compact grammar its
+    # content-bearing continuations are all masked at the first array decision
+    # and the schema's shortest terminator wins (measured 8/8 degenerate
+    # {"findings":[]} vs 0/8 whitespace-tolerant on GLM-5.2). Whitespace runs
+    # stay bounded via STRUCTURED_OUTPUT_MAX_WHITESPACE_RUN.
+    default_structured_output_any_whitespace=True,
 )

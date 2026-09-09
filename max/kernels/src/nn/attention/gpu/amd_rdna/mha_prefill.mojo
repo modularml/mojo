@@ -21,7 +21,8 @@ Recipe (per KV tile):
     P from SMEM as the A operand and V from LDS as B.
 """
 
-from std.gpu import barrier, lane_id
+from max.gpu import lane_id
+from max.gpu.sync import barrier
 
 from .attention import AttentionRDNA
 from .buffers import KBufferRDNA, VBufferRDNA
@@ -34,7 +35,7 @@ __extension AttentionRDNA:
         comptime assert Self.BK == 32, "BK must be 32 for RDNA"
 
         @always_inline
-        @parameter
+        @__parameter
         def loop_over_kvcache[
             tile_size: Int
         ](kv_tile_start_row: Int, end: Int, not_last_iter: Bool):
@@ -68,7 +69,7 @@ __extension AttentionRDNA:
                 depth=Self.depth,
                 num_threads=Self.num_threads,
                 num_stages=Self.num_stages,
-            ](k_tile, self.k_smem_ptr)
+            ](k_tile, self.k_smem_ptr.as_unsafe_any_origin())
 
             var v_buffer = VBufferRDNA[
                 tensor_core_mma=Self.get_tensor_core_mma_pv(),
@@ -80,7 +81,7 @@ __extension AttentionRDNA:
                 num_warps_n=Self.num_warps_n,
             ](
                 v_tile,
-                self.v_smem_ptr,
+                self.v_smem_ptr.as_unsafe_any_origin(),
                 total_rows=kv_tile_num_rows,
             )
 

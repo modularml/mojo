@@ -27,7 +27,7 @@ The expected gap is the accumulated FP8-vs-BF16 per-multiply rounding
 noise summed over K = R*S*C; tolerance below is calibrated for that.
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.random import rand
 
 from layout import Coord, TileTensor, row_major
@@ -38,8 +38,8 @@ from nn.conv.gpu.amd.amd_4wave_conv import amd_4wave_conv
 
 
 def _cast_fp8_to_bf16_host(
-    fp8_ptr: UnsafePointer[Scalar[DType.float8_e4m3fn], ImmutAnyOrigin],
-    bf16_ptr: UnsafePointer[Scalar[DType.bfloat16], MutAnyOrigin],
+    fp8_ptr: ImmPointer[Float8_e4m3fn, _],
+    bf16_ptr: MutPointer[BFloat16, _],
     count: Int,
 ):
     for i in range(count):
@@ -49,8 +49,8 @@ def _cast_fp8_to_bf16_host(
 def _permute_filter_frsc_to_rscf_host[
     dtype: DType
 ](
-    src_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    dst_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    src_ptr: ImmPointer[Scalar[dtype], _],
+    dst_ptr: MutPointer[Scalar[dtype], _],
     *,
     F: Int,
     R: Int,
@@ -110,25 +110,23 @@ def test_4wave_conv_vs_miopen[
     )
 
     # -------- Allocate buffers --------
-    var input_fp8 = ctx.enqueue_create_buffer[DType.float8_e4m3fn](
+    var input_fp8 = ctx.enqueue_create_buffer[.float8_e4m3fn](
         N_batch * H * W * C_in
     )
-    var input_bf16 = ctx.enqueue_create_buffer[DType.bfloat16](
+    var input_bf16 = ctx.enqueue_create_buffer[.bfloat16](
         N_batch * H * W * C_in
     )
-    var filter_fp8_frsc = ctx.enqueue_create_buffer[DType.float8_e4m3fn](
-        C_out * K
-    )
-    var filter_bf16_rscf = ctx.enqueue_create_buffer[DType.bfloat16](
+    var filter_fp8_frsc = ctx.enqueue_create_buffer[.float8_e4m3fn](C_out * K)
+    var filter_bf16_rscf = ctx.enqueue_create_buffer[.bfloat16](
         R * S * C_in * C_out
     )
-    var output_conv = ctx.enqueue_create_buffer[DType.bfloat16](M_total * C_out)
-    var output_miopen = ctx.enqueue_create_buffer[DType.bfloat16](
+    var output_conv = ctx.enqueue_create_buffer[.bfloat16](M_total * C_out)
+    var output_miopen = ctx.enqueue_create_buffer[.bfloat16](
         N_batch * H_out * W_out * C_out
     )
 
     # -------- Init random FP8 + materialize BF16 views --------
-    var input_fp8_host = ctx.enqueue_create_host_buffer[DType.float8_e4m3fn](
+    var input_fp8_host = ctx.enqueue_create_host_buffer[.float8_e4m3fn](
         N_batch * H * W * C_in
     )
     var filter_fp8_frsc_host = ctx.enqueue_create_host_buffer[
@@ -137,7 +135,7 @@ def test_4wave_conv_vs_miopen[
     rand(input_fp8_host.unsafe_ptr(), N_batch * H * W * C_in)
     rand(filter_fp8_frsc_host.unsafe_ptr(), C_out * K)
 
-    var input_bf16_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var input_bf16_host = ctx.enqueue_create_host_buffer[.bfloat16](
         N_batch * H * W * C_in
     )
     _cast_fp8_to_bf16_host(
@@ -148,7 +146,7 @@ def test_4wave_conv_vs_miopen[
 
     # FP8 filter is in [F, R, S, C] (4wave's layout); we need [R, S, C, F]
     # for MIOpen, in BF16.
-    var filter_bf16_frsc_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var filter_bf16_frsc_host = ctx.enqueue_create_host_buffer[.bfloat16](
         C_out * K
     )
     _cast_fp8_to_bf16_host(
@@ -156,10 +154,10 @@ def test_4wave_conv_vs_miopen[
         filter_bf16_frsc_host.unsafe_ptr(),
         C_out * K,
     )
-    var filter_bf16_rscf_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var filter_bf16_rscf_host = ctx.enqueue_create_host_buffer[.bfloat16](
         R * S * C_in * C_out
     )
-    _permute_filter_frsc_to_rscf_host[DType.bfloat16](
+    _permute_filter_frsc_to_rscf_host[.bfloat16](
         filter_bf16_frsc_host.unsafe_ptr(),
         filter_bf16_rscf_host.unsafe_ptr(),
         F=C_out,
@@ -211,10 +209,8 @@ def test_4wave_conv_vs_miopen[
     )
 
     # -------- Compare --------
-    var conv_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
-        M_total * C_out
-    )
-    var miopen_host = ctx.enqueue_create_host_buffer[DType.bfloat16](
+    var conv_host = ctx.enqueue_create_host_buffer[.bfloat16](M_total * C_out)
+    var miopen_host = ctx.enqueue_create_host_buffer[.bfloat16](
         N_batch * H_out * W_out * C_out
     )
     ctx.enqueue_copy(conv_host, output_conv)

@@ -1,14 +1,13 @@
 ---
 title: MAX container
 sidebar_label: Container
-description: Learn more about the provided Docker container for MAX deployment
+description: Learn more about the provided Docker container for MAX deployment.
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-import MDXListing from '@site/src/components/Listing/MDXListing';
 import Requirements from '@site/src/components/Requirements';
-import { requirementsNoMacWithGPU } from '../requirements';
+import { requirementsNoMacWithGPU } from './requirements';
 
 The MAX container is our official Docker container that simplifies the process
 to deploy a GenAI model with an OpenAI-compatible endpoint. The container
@@ -16,14 +15,14 @@ includes the latest version of MAX and it integrates with orchestration tools
 like Kubernetes.
 
 Alternatively, you can also experiment with MAX on a local endpoint using the
-[`max serve`](/max/cli/serve) command. The result is the same because
+[`max serve`](/cli/serve) command. The result is the same because
 the MAX container creates an isolated environment that also uses `max serve` to
 create an endpoint you can interact with using our OpenAI-compatible [REST
-API](/max/rest-api/).
+API](/rest-api/).
 
 :::note Linux only
 
-The MAX container is currently not compatible with macOS.
+The MAX container isn't currently compatible with macOS.
 
 :::
 
@@ -32,7 +31,7 @@ The MAX container is currently not compatible with macOS.
 First, make sure you're on a system with the following requirements:
 
 <Requirements requirementsData={requirementsNoMacWithGPU}
-url="/max/packages#system-requirements" />
+url="/packages#system-requirements" />
 
 Then start an endpoint with the MAX container:
 
@@ -49,8 +48,8 @@ environment variable:
 
 3. Start the container and an endpoint for Gemma 3:
 
-    <Tabs>
-      <TabItem value="nvidia" label="NVIDIA">
+   <Tabs>
+   <TabItem value="nvidia" label="NVIDIA">
 
         ```bash
         docker run --gpus=1 \
@@ -61,8 +60,8 @@ environment variable:
           --model google/gemma-3-27b-it
         ```
 
-      </TabItem>
-      <TabItem value="amd" label="AMD">
+   </TabItem>
+   <TabItem value="amd" label="AMD">
 
         ```bash
         docker run \
@@ -77,8 +76,8 @@ environment variable:
           --model google/gemma-3-27b-it
         ```
 
-      </TabItem>
-    </Tabs>
+   </TabItem>
+   </Tabs>
 
         It can take a few minutes to pull the container and then download and
         compile the model.
@@ -92,8 +91,8 @@ environment variable:
 4. Open a new terminal and send a request using the `openai` Python API or
 `curl`:
 
-    <Tabs>
-      <TabItem value="python" label="Python">
+   <Tabs>
+   <TabItem value="python" label="Python">
 
         1. Create a new virtual environment:
 
@@ -149,10 +148,10 @@ environment variable:
             It was a unique World Series as it was played in a neutral site (Globe Life Field in Arlington, Texas) due to the COVID-19 pandemic.
             ```
 
-      </TabItem>
-      <TabItem value="curl" label="cURL">
+   </TabItem>
+   <TabItem value="curl" label="cURL">
 
-        Run this command:
+   Run this command:
 
         ```sh
         curl -N http://0.0.0.0:8000/v1/chat/completions \
@@ -166,7 +165,7 @@ environment variable:
         }' | grep -o '"content":"[^"]*"' | sed 's/"content":"//g' | sed 's/"//g' | tr -d '\n' | sed 's/\\n/\n/g'
         ```
 
-        You should see results like this:
+   You should see results like this:
 
         ```output
         The **Los Angeles Dodgers** won the World Series in 2020!
@@ -176,14 +175,14 @@ environment variable:
         It was a unique World Series as it was played in a neutral site (Globe Life Field in Arlington, Texas) due to the COVID-19 pandemic.
         ```
 
-      </TabItem>
-    </Tabs>
+   </TabItem>
+   </Tabs>
 
 For details about the OpenAI-compatible endpoint, see [our Serve API
-docs](/max/rest-api/).
+docs](/rest-api/).
 
 To run a different model, change the `--model` to something else from our
-[supported models](/max/models/).
+[supported models](/models/).
 
 For information about the available containers, see the [Modular
 Docker Hub repositories](https://hub.docker.com/r/modular).
@@ -197,32 +196,32 @@ to control features of the endpoint.
 ### Docker options
 
 - `--gpus`: If your system includes a compatible NVIDIA GPU, you must add the
-[`--gpus`
-option](https://docs.docker.com/reference/cli/docker/container/run/#gpus) in
-order for the container to access it. It doesn't hurt to include this even if
-your system doesn't have a [GPU compatible with
-MAX](/max/packages#gpu-compatibility).
+  [`--gpus`
+  option](https://docs.docker.com/reference/cli/docker/container/run/#gpus) in
+  order for the container to access it. It doesn't hurt to include this even if
+  your system doesn't have a [GPU compatible with
+  MAX](/packages#gpu-compatibility).
 
 - `--devices`: When deploying MAX on multiple GPUs, you must specify the ID of
-the GPUs to use. For example, to use four available GPUs, you should include the
-following: `--devices gpu:0,1,2,3`. You can also use `--devices gpu:all` to use
-every visible GPU, or `--devices cpu` to run on CPU. If you omit `--devices`,
-MAX uses the model or config default.
+  the GPUs to use. For example, to use four available GPUs, include the
+  following: `--devices gpu:0,1,2,3`. You can also use `--devices gpu:all`
+  to use every visible GPU, or `--devices cpu` to run on CPU. If you omit
+  `--devices`, MAX uses the model or config default.
 
 - `-v`: We use the [`-v`
-option](https://docs.docker.com/reference/cli/docker/container/run/#volume) to
-save a cache of Hugging Face and MAX models to your local disk that we can
-reuse across containers. You can optionally export a `MODULAR_MAX_CACHE_DIR`
-environment variable to change the MAX cache directory location.
+  option](https://docs.docker.com/reference/cli/docker/container/run/#volume)
+  to save a cache of Hugging Face and MAX models to your local disk that we can
+  reuse across containers. You can optionally export a `MODULAR_MAX_CACHE_DIR`
+  environment variable to change the MAX cache directory location.
 
 - `-p`: We use the [`-p`
-option](https://docs.docker.com/reference/cli/docker/container/run/#publish) to
-specify the exposed port for the endpoint.
+  option](https://docs.docker.com/reference/cli/docker/container/run/#publish)
+  to specify the exposed port for the endpoint.
 
 You also might need some environment variables (set with `--env`):
 
 - `HF_TOKEN`: This is required to access gated models on Hugging Face
-(after your account is granted access). For example:
+  (after your account is granted access). For example:
 
   ```sh
   docker run \
@@ -250,35 +249,35 @@ model with `--model`, but there are other options you might need
 to configure the `max serve` behavior.
 
 To see all available options, see the [`max` CLI
-page](/max/cli/serve), because the MAX container is basically a
+page](/cli/serve), because the MAX container is basically a
 wrapper around that tool.
 
 - `--model`: This is required to specify the model you want to
-deploy. To find other GenAI models that are compatible with MAX, check out
-our [supported models](/max/models/).
+  deploy. To find other GenAI models that are compatible with MAX, check out
+  our [supported models](/models/).
 
 - `--max-length`: Specifies the maximum length of the text sequence (including
-the input tokens). We mention this one here because it's often necessary to
-adjust the max length when you have trouble running a large model on a machine
-with limited memory.
+  the input tokens). We mention this one here because it's often necessary to
+  adjust the max length when you have trouble running a large model on a machine
+  with limited memory.
 
 For the rest of the `max serve` options, see the [`max` CLI
-page](/max/cli/serve).
+page](/cli/serve).
 
 ## Container contents
 
 There are multiple MAX container options, including:
 
-- [`max-full`](/max/container#full-container)
-- [`max-amd`](/max/container#amd-container)
-- [`max-amd-base`](/max/container#amd-container)
-- [`max-nvidia-full`](/max/container#nvidia-container)
-- [`max-nvidia-base`](/max/container#nvidia-container)
+- [`max-full`](/container#full-container)
+- [`max-amd`](/container#amd-container)
+- [`max-amd-base`](/container#amd-container)
+- [`max-nvidia-full`](/container#nvidia-container)
+- [`max-nvidia-base`](/container#nvidia-container)
 
 ### Full container
 
-The full MAX container (`max-full`) is a hardware-agnostic container that's
-built to deploy the latest version of MAX on both AMD and NVIDIA GPUs.
+The full MAX container (`max-full`) is a hardware-agnostic container that
+deploys the latest version of MAX on both AMD and NVIDIA GPUs.
 
 You can run the container on either NVIDIA or AMD as follows:
 
@@ -318,7 +317,7 @@ The `max-full` container includes the following:
 
 - Ubuntu 22.04
 - Python 3.12
-- MAX 25.4
+- MAX
 - PyTorch (GPU) 2.6.0
 - ROCm
 - cuDNN
@@ -335,8 +334,8 @@ The AMD MAX container (`max-amd`) is great if you want an AMD-specific
 deployment without NVIDIA or CUDA dependencies. The AMD MAX container is
 available in two flavors:
 
-- `max-amd` includes all ROCm and PyTorch GPU dependencies
-- `max-amd-base` includes minimal dependencies, ROCm, and the AMD Driver
+- `max-amd` includes all ROCm and PyTorch GPU dependencies.
+- `max-amd-base` includes minimal dependencies, ROCm, and the AMD Driver.
 
 You can run the AMD container as follows:
 
@@ -365,9 +364,9 @@ Hub.
 
 The NVIDIA MAX container is available in two flavors:
 
-- `max-nvidia-full` includes all CUDA and PyTorch GPU dependencies
+- `max-nvidia-full` includes all CUDA and PyTorch GPU dependencies.
 - `max-nvidia-base` includes minimal dependencies, PyTorch CPU, and the NVIDIA
-Driver (excludes CUDA)
+  Driver (excludes CUDA).
 
 You can run the NVIDIA container as follows:
 
@@ -391,9 +390,9 @@ container](https://hub.docker.com/r/modular/max-nvidia-base) on Docker Hub.
 ## Recommended cloud instances
 
 For best performance and compatibility with our
-[supported models](/max/models/), we recommend that you deploy the MAX container
+[supported models](/models/), we recommend that you deploy the MAX container
 on a cloud instance with a GPU that meets the
-[MAX system requirements](/max/packages#system-requirements).
+[MAX system requirements](/packages#system-requirements).
 
 The Modular Platform is hardware-agnostic and optimized for both the latest
 NVIDIA and AMD GPUs. To take full advantage of this flexibility, Modular
@@ -476,85 +475,13 @@ docker run --gpus=1 \
 
 ## Metrics
 
-The MAX container exposes a `/metrics` endpoint that follows the
-[Prometheus](https://prometheus.io/docs/introduction/overview/) text format.
-You can scrape the metrics listed below using Prometheus or another collection
-service.
-
-These are raw metrics and it's up to you to compute the desired time series and
-aggregations. For example, we provide a count for output tokens
-(`maxserve_num_output_tokens_total`), which you can use to calculate the output
-tokens per second (OTP/s).
-
-Here are all the available metrics:
-
-- `maxserve_request_time_milliseconds`: Histogram of time spent handling each
-  request (total inference time, or TIT), in milliseconds.
-- `maxserve_input_processing_time_milliseconds`: Histogram of input processing
-  time (IPT), in milliseconds.
-- `maxserve_output_processing_time_milliseconds`: Histogram of output
-  generation time (OGT), in milliseconds.
-- `maxserve_time_to_first_token_milliseconds`: Histogram of time to first
-  token (TTFT), in milliseconds.
-- `maxserve_num_input_tokens_total`: Total number of input tokens processed
-  so far.
-- `maxserve_num_output_tokens_total`: Total number of output tokens processed
-  so far.
-- `maxserve_input_tokens_per_request`: Histogram of input tokens per request.
-- `maxserve_output_tokens_per_request`: Histogram of output tokens per request.
-- `maxserve_request_count_total`: Total requests since start.
-- `maxserve_num_requests_running`: Number of requests currently running.
-
-### Telemetry
-
-In addition to sharing these metrics via the `/metrics` endpoint, the MAX
-container actively sends the metrics to Modular via push telemetry (using
-OpenTelemetry).
-
-:::note
-
-None of the telemetry includes personally identifiable information (PII).
-
-:::
-
-This telemetry is anonymous and helps us quickly identify problems and build
-better products for you. Without this telemetry, we would rely solely on
-user-submitted bug reports, which are limited and would severely limit our
-performance insights.
-
-However, if you don't want to share this data with Modular, you can disable
-telemetry in your container. To disable telemetry, enable the
-`MAX_SERVE_DISABLE_TELEMETRY` environment variable when you start your MAX
-container. For example:
-
-```bash
-docker run modular/max-nvidia-full:latest \
-    -env MAX_SERVE_DISABLE_TELEMETRY=1 \
-    ...
-```
-
-#### Deployment and user ID
-
-Again, the telemetry is completely anonymous by default. But if you'd like to
-share some information to help our team assist you in understanding your
-deployment performance, you can add some identity information to the telemetry
-with these environment variables:
-
-- `MAX_SERVE_DEPLOYMENT_ID`: Your application name.
-- `MODULAR_USER_ID`: Your company name.
-
-For example:
-
-```bash
-docker run modular/max-nvidia-full:latest \
-    -env MAX_SERVE_DEPLOYMENT_ID='Project name' \
-    -env MODULAR_USER_ID='Example Inc.' \
-    ...
-```
+MAX exposes a Prometheus-compatible `/metrics` endpoint for monitoring
+performance. For the full metrics reference and telemetry configuration, see
+[Serving metrics](/serve/metrics).
 
 ## License
 
-The NVIDIA MAX container is released under the
+The NVIDIA MAX container uses the
 [NVIDIA Deep Learning Container license](https://developer.download.nvidia.com/licenses/NVIDIA_Deep_Learning_Container_License.pdf).
 
 ## Next steps
@@ -562,10 +489,9 @@ The NVIDIA MAX container is released under the
 You can get started with container-based deployments or read more about our
 supported models.
 
-export const docs = [
-  '../deploy/local-to-cloud.mdx',
-  '../deploy/benchmark.mdx',
-  '../models.mdx',
-];
-
-<MDXListing mdxList={docs} />
+- [Deploy MAX on GPU with self-hosted endpoints](/serve/local-to-cloud):
+  Learn how to deploy MAX pipelines to cloud.
+- [Benchmark MAX on NVIDIA or AMD GPUs](/serve/benchmark): Learn how to
+  use our benchmarking script to measure the performance of MAX.
+- [Supported models](/models): See all the model architectures supported
+  by MAX.

@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_multi_py_version_test", "modular_py_test", "req
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -37,11 +36,13 @@ modular_py_test(
         exclude = _MULTI_VERSION_TEST_SRCS + _SEPARATELY_TESTED_OPS + _UNINIT_CHECK_TESTS + ["uninit_check/**/*.py"],
     ),
     data = [
+        "//max/tests/integration/Inputs/kernel_verification_ops",
         "//max/tests/integration/Inputs/test_user_op",
         "//max/tests/tests/graph/testdata",
     ],
     env = {
         "CUSTOM_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/test_user_op)",
+        "MODULAR_KERNEL_VERIFICATION_OPS_PATH": "$(rootpath //max/tests/integration/Inputs/kernel_verification_ops)",
         "MODULAR_PATH": ".",
         "TESTDATA_DIRECTORY": "max/tests/tests/graph/testdata",
     },

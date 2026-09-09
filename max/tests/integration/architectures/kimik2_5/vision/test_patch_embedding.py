@@ -27,7 +27,6 @@ import math
 
 import pytest
 import torch
-import torch.nn as nn
 from conftest import TorchPatchEmbed, TorchPosEmb
 from max.driver import CPU, Accelerator, Buffer, Device
 from max.dtype import DType
@@ -37,6 +36,7 @@ from max.pipelines.architectures.kimik2_5.layers.vision.patch_embedding import (
     Learnable2DInterpPosEmbDividedFixed,
     PatchEmbedding,
 )
+from torch import nn
 from torch.utils.dlpack import from_dlpack
 
 # Kimi K2.5 vision config values (from checkpoint / reference)

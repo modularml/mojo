@@ -1,0 +1,33 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "unified_mtp_glm5_2",
+    srcs = glob(["**/*.py"]),
+    ignore_extra_deps = [
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+    ],
+    deps = [
+        requirement("transformers"),
+        requirement("typing-extensions"),
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+        "//max/python/max/pipelines/architectures/deepseekV3",
+        "//max/python/max/pipelines/architectures/deepseekV3_2",
+        "//max/python/max/pipelines/architectures/deepseekV3_2_nextn",
+        "//max/python/max/pipelines/architectures/glm5_1",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/pipelines/speculative",
+        "//max/python/max:_core",
+    ],
+)

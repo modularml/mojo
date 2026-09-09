@@ -75,7 +75,8 @@ class Transformer(LogitsPostprocessMixin, Module):
                 shape = [batch_size, n_patches, hidden_dim]
             kv_cache_inputs: A tuple of 4 tensor values. In the case of paged attention,
                 (blocks, cache_lengths, lookup_table, is_cache_empty). In the case of
-                continuous attention, (blocks, cache_lengths, lookup_table, max_lengths).
+                continuous attention, (blocks, cache_lengths, lookup_table,
+                max_prompt_length, max_cache_length).
         """
         h = embeds
 

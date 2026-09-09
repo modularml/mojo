@@ -43,7 +43,7 @@ sessions; do not use in production.
 
 Mojo's standard library ships with assertions that catch common kernel-authoring
 bugs, including out-of-bounds accesses on
-[`LayoutTensor`](https://mojolang.org/docs/layout/layout_tensor/LayoutTensor),
+[`LayoutTensor`](/api/mojo/layout/layout_tensor/LayoutTensor),
 which happen when a kernel reads or writes outside the allocated region of a
 tensor. These assertions are compiled out by default, so a buggy kernel produces
 corrupted output downstream instead of a clear error at the kernel site.
@@ -73,12 +73,12 @@ assertions when actively debugging a specific kernel.
 Now that you can pin down GPU failures to the op that caused them, explore
 related debug options and profiling tools:
 
-- [Diagnose runtime errors](/max/develop/debugging-errors): When a GPU
+- [Diagnose runtime errors](/develop/debugging-errors): When a GPU
   failure escalates to a crash, capture Mojo stack traces and IR dumps
   for deeper investigation.
-- [Trace op execution](/max/develop/debugging-tracing): Use op-level
+- [Trace op execution](/develop/debugging-tracing): Use op-level
   tracing alongside synchronous dispatch to see the exact sequence that
   led to the failure.
-- [GPU system profiling](/max/gpu-system-profiling): Move beyond
+- [GPU system profiling](/gpu-system-profiling): Move beyond
   correctness debugging to profile GPU workloads for performance
   bottlenecks.

@@ -24,7 +24,7 @@ Usage::
 Expected: ~1.0 GB
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.time import sleep
 
 
@@ -33,7 +33,7 @@ def main() raises:
     # Allocate 100 MiB — fits within the default MAX memory manager budget
     # (~205 MiB).  NVML will report the full manager chunk (~205 MiB).
     comptime ALLOC_BYTES = 100 * 1024 * 1024
-    var buf = ctx.enqueue_create_buffer[DType.uint8](ALLOC_BYTES)
+    var buf = ctx.enqueue_create_buffer[.uint8](ALLOC_BYTES)
     ctx.synchronize()
     # Hold for 3 s: well above the 0.5 s polling interval.
     sleep(3.0)

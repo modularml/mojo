@@ -24,9 +24,11 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, TensorValue
 from max.graph.ops import conv2d
-from modular_graph_test import modular_graph_test
+from test_common.modular_graph_test import modular_graph_test
 
-device_ref = DeviceRef.GPU() if accelerator_count() > 0 else DeviceRef.CPU()
+# Avoid using TF32 for F32 accuracy tests
+torch.backends.cudnn.allow_tf32 = False
+torch.backends.cuda.matmul.allow_tf32 = False
 
 
 def torch_conv2d(  # noqa: ANN201
@@ -50,20 +52,25 @@ def torch_conv2d(  # noqa: ANN201
     return torch.permute(out, (0, 2, 3, 1))
 
 
-# TODO(KERN-1066): Fix and enable test
-@pytest.mark.skip(reason="Errors are larger than usual (10^-2)")
+@pytest.mark.parametrize("device", [DeviceRef.CPU(), DeviceRef.GPU()])
 @pytest.mark.parametrize(
-    "input_type, filter_type",
+    "input_shape, filter_shape",
     [
-        (
-            TensorType(DType.float32, [1, 16, 16, 4], device=device_ref),
-            TensorType(DType.float32, [16, 16, 4, 5], device=device_ref),
-        ),
+        ([1, 16, 16, 4], [16, 16, 4, 5]),
     ],
 )
 def test_conv2d(
-    session: InferenceSession, input_type: TensorType, filter_type: TensorType
+    session: InferenceSession,
+    input_shape: list[int],
+    filter_shape: list[int],
+    device: DeviceRef,
 ) -> None:
+    if device.device_type == "gpu" and accelerator_count() == 0:
+        pytest.skip("No GPU available")
+
+    input_type = TensorType(DType.float32, input_shape, device=device)
+    filter_type = TensorType(DType.float32, filter_shape, device=device)
+
     with Graph("conv2d", input_types=[input_type, filter_type]) as graph:
         x, filter = graph.inputs
         stride = (16, 16)
@@ -83,6 +90,68 @@ def test_conv2d(
             x, w = torch_inputs
             expected = (
                 torch_conv2d(x, w, stride, dilation, padding)
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            ACCURACY_RTOL = 1e-4
+            ACCURACY_ATOL = 1e-6
+            np.testing.assert_allclose(
+                result,
+                expected,
+                equal_nan=True,
+                rtol=ACCURACY_RTOL,
+                atol=ACCURACY_ATOL,
+            )
+
+
+@pytest.mark.parametrize(
+    "input_shape, filter_shape, groups",
+    [
+        ([1, 16, 16, 4], [16, 16, 2, 6], 2),
+    ],
+)
+def test_conv2d_grouped(
+    session: InferenceSession,
+    input_shape: list[int],
+    filter_shape: list[int],
+    groups: int,
+) -> None:
+    # Grouped conv on CPU requires the filter to be pre-packed; the filter
+    # here is a graph input (not a compile-time constant), which used to
+    # crash with "grouped conv requires packed filter" (KERN-3239).
+    device = DeviceRef.CPU()
+    input_type = TensorType(DType.float32, input_shape, device=device)
+    filter_type = TensorType(DType.float32, filter_shape, device=device)
+
+    with Graph(
+        "conv2d_grouped", input_types=[input_type, filter_type]
+    ) as graph:
+        x, filter = graph.inputs
+        stride = (1, 1)
+        padding = (0, 0)
+        dilation = (1, 1)
+
+        conv = conv2d(
+            x.tensor,
+            filter.tensor,
+            stride,
+            dilation,
+            (0, 0, 0, 0),
+            groups=groups,
+        )
+        graph.output(conv)
+
+        @modular_graph_test(session, graph)
+        def test_correctness(
+            execute: Callable[[Sequence[Buffer]], Buffer],
+            inputs: Sequence[Buffer],
+            torch_inputs: Sequence[torch.Tensor],
+        ) -> None:
+            result = execute(inputs).to_numpy()
+            x, w = torch_inputs
+            expected = (
+                torch_conv2d(x, w, stride, dilation, padding, groups=groups)
                 .detach()
                 .cpu()
                 .numpy()

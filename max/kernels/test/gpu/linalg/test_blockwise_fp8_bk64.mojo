@@ -33,7 +33,7 @@ numerics bug we've introduced.
 from std.math import ceildiv
 from std.random import randn, seed
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import (
     TileTensor,
     row_major,

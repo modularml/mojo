@@ -59,10 +59,10 @@ Thread mapping (GPU)
   current sequence.
 """
 
-from std.gpu import (
-    block_dim_uint as block_dim,
-    block_idx_uint as block_idx,
-    thread_idx_uint as thread_idx,
+from max.gpu import (
+    block_dim,
+    block_idx,
+    thread_idx,
 )
 from layout import TensorLayout, TileTensor
 from std.utils.index import IndexList
@@ -85,20 +85,20 @@ def gated_delta_conv1d_fwd_gpu[
     input_row_offsets_LT: TensorLayout,
     conv_output_ragged_LT: TensorLayout,
 ](
-    batch_size: Int,
-    total_seq_len: Int,
-    conv_dim: Int,
+    batch_size: Int32,
+    total_seq_len: Int32,
+    conv_dim: Int32,
     qkv_input_ragged: TileTensor[
-        work_dtype, qkv_input_ragged_LT, MutExternalOrigin
+        work_dtype, qkv_input_ragged_LT, MutUntrackedOrigin
     ],
-    conv_weight: TileTensor[work_dtype, conv_weight_LT, MutExternalOrigin],
-    conv_state: TileTensor[state_dtype, conv_state_LT, MutExternalOrigin],
-    slot_idx: TileTensor[DType.uint32, slot_idx_LT, MutExternalOrigin],
+    conv_weight: TileTensor[work_dtype, conv_weight_LT, MutUntrackedOrigin],
+    conv_state: TileTensor[state_dtype, conv_state_LT, MutUntrackedOrigin],
+    slot_idx: TileTensor[.uint32, slot_idx_LT, MutUntrackedOrigin],
     input_row_offsets: TileTensor[
-        DType.uint32, input_row_offsets_LT, MutExternalOrigin
+        .uint32, input_row_offsets_LT, MutUntrackedOrigin
     ],
     conv_output_ragged: TileTensor[
-        work_dtype, conv_output_ragged_LT, MutExternalOrigin
+        work_dtype, conv_output_ragged_LT, MutUntrackedOrigin
     ],
     # Strides for [total_seq_len, conv_dim] tensors
     qkv_input_seqlen_stride: UInt32,  # stride along total_seq_len axis
@@ -123,6 +123,9 @@ def gated_delta_conv1d_fwd_gpu[
     conv_channel) pair for the entire sequence; the channel's K weights live
     in registers across the token loop.
     """
+    var _batch_size = Int(batch_size)
+    var _total_seq_len = Int(total_seq_len)
+    var _conv_dim = Int(conv_dim)
     var batch_item_idx = Int(block_idx.x)
     var channel_block_idx = Int(block_idx.y)
     var thread_within_block = Int(thread_idx.x)
@@ -131,16 +134,20 @@ def gated_delta_conv1d_fwd_gpu[
         channel_block_idx * CONV1D_BLOCK_DIM + thread_within_block
     )
 
-    if batch_item_idx >= batch_size or conv_channel_idx >= conv_dim:
+    if batch_item_idx >= _batch_size or conv_channel_idx >= _conv_dim:
         return
 
     # Read the pool slot for this batch item exactly once. The caller
     # (`GatedDeltaNetStateCache.claim`) guarantees `slot < max_slots`.
-    var slot = Int(slot_idx.ptr[batch_item_idx])
+    var slot = Int(slot_idx._storage[batch_item_idx])
 
     # ── Sequence boundaries from ragged offsets ─────────────────────────────
-    var sequence_start_flat_idx = Int(input_row_offsets.ptr[batch_item_idx])
-    var sequence_end_flat_idx = Int(input_row_offsets.ptr[batch_item_idx + 1])
+    var sequence_start_flat_idx = Int(
+        input_row_offsets._storage[batch_item_idx]
+    )
+    var sequence_end_flat_idx = Int(
+        input_row_offsets._storage[batch_item_idx + 1]
+    )
     var sequence_length = sequence_end_flat_idx - sequence_start_flat_idx
 
     # ── Load conv weights for this channel into registers ───────────────────
@@ -151,7 +158,9 @@ def gated_delta_conv1d_fwd_gpu[
             UInt32(conv_channel_idx) * conv_weight_channel_stride
             + UInt32(kernel_offset_k) * conv_weight_offset_stride
         )
-        weight_register[kernel_offset_k] = conv_weight.ptr[weight_flat_offset]
+        weight_register[kernel_offset_k] = conv_weight._storage[
+            weight_flat_offset
+        ]
 
     comptime KERNEL_SIZE_MINUS_ONE = KERNEL_SIZE - 1
 
@@ -184,7 +193,9 @@ def gated_delta_conv1d_fwd_gpu[
                     * qkv_input_seqlen_stride
                     + UInt32(conv_channel_idx) * qkv_input_channel_stride
                 )
-                input_value = Float32(qkv_input_ragged.ptr[ragged_flat_offset])
+                input_value = Float32(
+                    qkv_input_ragged._storage[ragged_flat_offset]
+                )
             else:
                 # Before the current sequence: read from conv_state pool slot.
                 # Map the negative lookback to a position within the K-1 window:
@@ -199,7 +210,9 @@ def gated_delta_conv1d_fwd_gpu[
                         + UInt32(conv_channel_idx) * conv_state_channel_stride
                         + UInt32(window_idx) * conv_state_window_stride
                     )
-                    input_value = Float32(conv_state.ptr[state_flat_offset])
+                    input_value = Float32(
+                        conv_state._storage[state_flat_offset]
+                    )
 
             conv_sum += input_value * Float32(weight_register[kernel_offset_k])
 
@@ -207,7 +220,7 @@ def gated_delta_conv1d_fwd_gpu[
             UInt32(flat_token_idx) * conv_output_seqlen_stride
             + UInt32(conv_channel_idx) * conv_output_channel_stride
         )
-        conv_output_ragged.ptr[output_flat_offset] = Scalar[work_dtype](
+        conv_output_ragged._storage[output_flat_offset] = Scalar[work_dtype](
             conv_sum
         )
 
@@ -235,7 +248,7 @@ def gated_delta_conv1d_fwd_gpu[
                 + UInt32(conv_channel_idx) * qkv_input_channel_stride
             )
             state_value = Scalar[state_dtype](
-                qkv_input_ragged.ptr[source_flat_offset]
+                qkv_input_ragged._storage[source_flat_offset]
             )
         else:
             # Source token is before the current sequence; carry from old state.
@@ -251,11 +264,11 @@ def gated_delta_conv1d_fwd_gpu[
                     + UInt32(conv_channel_idx) * conv_state_channel_stride
                     + UInt32(old_window_idx) * conv_state_window_stride
                 )
-                state_value = conv_state.ptr[old_state_flat_offset]
+                state_value = conv_state._storage[old_state_flat_offset]
 
         var new_state_flat_offset = (
             UInt32(slot) * conv_state_pool_stride
             + UInt32(conv_channel_idx) * conv_state_channel_stride
             + UInt32(state_slot_j) * conv_state_window_stride
         )
-        conv_state.ptr[new_state_flat_offset] = state_value
+        conv_state._storage[new_state_flat_offset] = state_value

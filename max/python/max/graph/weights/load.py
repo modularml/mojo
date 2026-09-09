@@ -15,9 +15,9 @@
 import os
 from pathlib import Path
 
-from ._loader_wrappers import GGUFWeights
 from .format import WeightsFormat, weights_format
 from .load_safetensors import SafetensorWeights
+from .loader_wrappers import GGUFWeights
 from .weights import Weights
 
 
@@ -34,21 +34,56 @@ def load_weights(paths: list[Path]) -> Weights:
 
     .. code-block:: python
 
+        import json
+        import struct
+        import tempfile
         from pathlib import Path
+
+        import numpy as np
+        from max.dtype import DType
+        from max.graph import DeviceRef
         from max.graph.weights import load_weights
 
-        # Load multi-file checkpoints
-        sharded_paths = [
-            Path("model-00001-of-00003.safetensors"),
-            Path("model-00002-of-00003.safetensors"),
-            Path("model-00003-of-00003.safetensors")
-        ]
-        weights = load_weights(sharded_paths)
-        layer_weight = weights.model.layers[23].mlp.gate_proj.weight.allocate(
-            dtype=DType.float32,
-            shape=[4096, 14336],
-            device=DeviceRef.GPU(0)
-        )
+        def write_safetensors(path, tensors):
+            header, buffers, offset = {}, [], 0
+            for name, arr in tensors.items():
+                arr = np.ascontiguousarray(arr)
+                header[name] = {
+                    "dtype": "F32",
+                    "shape": list(arr.shape),
+                    "data_offsets": [offset, offset + arr.nbytes],
+                }
+                buffers.append(arr.tobytes())
+                offset += arr.nbytes
+            blob = json.dumps(header).encode()
+            with open(path, "wb") as f:
+                f.write(struct.pack("<Q", len(blob)))
+                f.write(blob)
+                for b in buffers:
+                    f.write(b)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "model.safetensors"
+            write_safetensors(
+                path,
+                {
+                    "model.layers.23.mlp.gate_proj.weight": np.ones(
+                        (16, 8), dtype=np.float32
+                    )
+                },
+            )
+
+            # load_weights also accepts multiple paths for sharded checkpoints.
+            weights = load_weights([path])
+            layer_weight = weights.model.layers[23].mlp.gate_proj.weight.allocate(
+                dtype=DType.float32,
+                shape=[16, 8],
+                device=DeviceRef.CPU(),
+            )
+
+    .. invisible-code-block: python
+
+        assert layer_weight.shape == [16, 8]
 
     Args:
         paths: List of :class:`pathlib.Path` objects pointing to checkpoint files.

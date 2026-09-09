@@ -33,6 +33,7 @@
 # against a vendor-BLAS + host-side reference to catch numerical drift.
 # ===----------------------------------------------------------------------=== #
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -45,7 +46,7 @@ from std.sys import get_defined_bool, get_defined_int, size_of
 
 from internal_utils import assert_almost_equal
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.math import sqrt
 from layout import Coord, Idx, TileTensor, row_major
 
@@ -60,26 +61,26 @@ from nn.gemv_partial_norm import (
 def _host_reference[
     c_type: DType, a_type: DType
 ](
-    y_ref_ptr: UnsafePointer[Scalar[c_type], MutAnyOrigin],
-    gamma_ptr: UnsafePointer[Scalar[a_type], MutAnyOrigin],
-    normed_ref: UnsafePointer[Scalar[c_type], MutAnyOrigin],
-    unnormed_ref: UnsafePointer[Scalar[c_type], MutAnyOrigin],
+    y_ref_ptr: MutPointer[Scalar[c_type], MutAnyOrigin],
+    gamma_ptr: MutPointer[Scalar[a_type], MutAnyOrigin],
+    normed_ref: MutPointer[Scalar[c_type], MutAnyOrigin],
+    unnormed_ref: MutPointer[Scalar[c_type], MutAnyOrigin],
     n: Int,
     n_normed: Int,
-    eps: Scalar[a_type],
+    eps: Float32,
 ):
     """Reference partial RMS norm on a [1, n] row, computed in f64."""
     var n_unnormed = n - n_normed
     var sumsq: Float64 = 0.0
     for i in range(n_normed):
-        var v = y_ref_ptr[i].cast[DType.float64]()
+        var v = y_ref_ptr[i].cast[.float64]()
         sumsq += v * v
     var mean_sq = sumsq / Float64(n_normed)
-    var norm_factor = Float64(1) / sqrt(mean_sq + eps.cast[DType.float64]())
+    var norm_factor = Float64(1) / sqrt(mean_sq + eps.cast[.float64]())
 
     for i in range(n_normed):
-        var v = y_ref_ptr[i].cast[DType.float64]()
-        var g = gamma_ptr[i].cast[DType.float64]()
+        var v = y_ref_ptr[i].cast[.float64]()
+        var g = gamma_ptr[i].cast[.float64]()
         normed_ref[i] = (v * norm_factor * g).cast[c_type]()
 
     for i in range(n_unnormed):
@@ -191,11 +192,11 @@ def main() raises:
         var a_iter0 = TileTensor(cb_a.offset_ptr(0), a_shape)
         var b_iter0 = TileTensor(cb_b.offset_ptr(0), b_shape)
 
-        var eps = Scalar[a_type](0.001)
+        var eps = Float32(0.001)
 
         # Kernel-internal scratch: reused across iters by design.
-        var counter_buf = ctx.enqueue_create_buffer[DType.int32](1)
-        ctx.enqueue_memset(counter_buf, Scalar[DType.int32](0))
+        var counter_buf = ctx.enqueue_create_buffer[.int32](1)
+        ctx.enqueue_memset(counter_buf, Int32(0))
 
         ctx.synchronize()
 
@@ -208,19 +209,19 @@ def main() raises:
             transpose_b=True,
         )
 
-        @parameter
         @always_inline
-        @__copy_capture(
-            cb_a,
-            cb_b,
-            cb_gamma,
-            cb_y,
-            cb_normed,
-            cb_unnormed,
-            eps,
-            counter_buf,
-        )
-        def kernel_launch(ctx: DeviceContext, iteration: Int) raises:
+        def kernel_launch(
+            ctx: DeviceContext, iteration: Int
+        ) raises {
+            mut cb_a,
+            mut cb_b,
+            mut cb_gamma,
+            mut cb_y,
+            mut cb_normed,
+            mut cb_unnormed,
+            mut counter_buf,
+            imm,
+        }:
             var a_tensor = TileTensor(cb_a.offset_ptr(iteration), a_shape)
             var b_tensor = TileTensor(cb_b.offset_ptr(iteration), b_shape)
             var gamma_tensor = TileTensor(
@@ -245,7 +246,9 @@ def main() raises:
                     b_tensor,
                     gamma_tensor,
                     eps,
-                    counter_buf.unsafe_ptr(),
+                    counter_buf.unsafe_ptr()
+                    .unsafe_mut_cast[True]()
+                    .as_unsafe_any_origin(),
                     ctx,
                 )
             else:
@@ -255,19 +258,18 @@ def main() raises:
                     b_tensor,
                     gamma_tensor,
                     eps,
-                    cb_y.offset_ptr(iteration),
+                    cb_y.offset_ptr(iteration).as_unsafe_any_origin(),
                     ctx,
                 )
 
-        @parameter
         @always_inline
-        def bench_func(mut b: Bencher) raises:
-            b.iter_custom[kernel_launch](ctx)
+        def bench_func(mut b: Bencher) raises {imm}:
+            bencher_iter_custom(b, kernel_launch, ctx)
 
         var bw = ThroughputMeasure(BenchMetric.bytes, total_bytes)
 
         var m = Bench()
-        m.bench_function[bench_func](BenchId(run_name), [bw])
+        m.bench_function(bench_func, BenchId(run_name), [bw])
 
         # Post-bench correctness verification: re-run the kernel into
         # iter=0's output slots and compare to the vendor-BLAS + host
@@ -302,10 +304,10 @@ def main() raises:
         ctx.synchronize()
 
         _host_reference[c_type, a_type](
-            y_ref_host_ptr.unsafe_ptr(),
-            gamma_host_ptr.unsafe_ptr(),
-            normed_ref_ptr.unsafe_ptr(),
-            unnormed_ref_ptr.unsafe_ptr(),
+            y_ref_host_ptr.unsafe_ptr().as_unsafe_any_origin(),
+            gamma_host_ptr.unsafe_ptr().as_unsafe_any_origin(),
+            normed_ref_ptr.unsafe_ptr().as_unsafe_any_origin(),
+            unnormed_ref_ptr.unsafe_ptr().as_unsafe_any_origin(),
             N,
             N_NORMED,
             eps,

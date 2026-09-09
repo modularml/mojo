@@ -12,8 +12,13 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.gpu.host import DeviceContext, get_gpu_target
-from layout import Coord, Idx, Layout, LayoutTensor, TileTensor, row_major
+"""Provides dispatch logic for SM100 block-scaled (NVFP4, MXFP4, MXFP8) matmul kernels with optional elementwise epilogue."""
+
+
+from std.math import ceildiv
+from max.gpu.host import DeviceContext, get_gpu_target
+from max.gpu.primitives.grid_controls import PDLLevel
+from layout import Coord, Idx, Layout, TileTensor, row_major
 from layout.tile_tensor import NullableTileTensor
 from std.logger import Logger
 from linalg.fp4_utils import (
@@ -25,7 +30,7 @@ from linalg.fp4_utils import (
     NVFP4_SF_DTYPE,
     get_scaling_kind,
 )
-from std.gpu.host.info import _is_sm10x_gpu
+from max.gpu.host.info import _is_sm10x_gpu
 from std.collections import Optional
 from linalg.utils import (
     elementwise_epilogue_type,
@@ -34,10 +39,10 @@ from linalg.utils import (
 from std.utils.index import Index, IndexList
 from linalg.matmul.vendor.blas import matmul
 from std.memory import UnsafePointer
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.sys import size_of, simd_width_of
-from std.algorithm import elementwise
-from std.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
+from max.algorithm import elementwise
+from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 from linalg.matmul.gpu.sm100.block_scaled_matmul import (
     blackwell_block_scaled_matmul_tma_umma_warp_specialized,
 )
@@ -82,10 +87,48 @@ def heuristic_and_outliers_dispatch[
     tensor_sf: Float32,
     ctx: DeviceContext,
 ) raises -> Int:
+    """Dispatches an SM100 block-scaled matmul by selecting a tuning config from
+    per-format outlier tables for specific M ranges, falling back to a
+    small-BN config for GEMVs (`m == 1`) and a heuristic config table for the
+    remaining cases. Returns `DISPATCH_HIT` when a matching config is found and
+    launched, or `DISPATCH_MISS` when no config matches.
+
+    Parameters:
+        c_type: Element type of the output tensor `c` (inferred).
+        a_type: Element type of the LHS input tensor `a` (inferred).
+        b_type: Element type of the RHS input tensor `b` (inferred).
+        scales_dtype: Element type of the per-block scale tensors
+            `a_scales` and `b_scales` (inferred).
+        SF_VECTOR_SIZE: Number of elements each scale factor covers.
+            Must match the format: 16 for NVFP4, 32 for MXFP4, or 32
+            for MXFP8.
+        transpose_b: Whether `b` is stored transposed. Must be `True`
+            (defaults to `True`).
+        elementwise_lambda_fn: Optional epilogue applied to the matmul
+            result `c` in a separate kernel after the matmul completes
+            (defaults to `None`).
+        elementwise_compute_lambda_fn: Optional compute function fused
+            into the matmul kernel epilogue (defaults to `None`).
+        pdl_level: Programmatic Dependent Launch scheduling level for
+            overlapping this kernel with prior GPU work (defaults to
+            `PDLLevel()`).
+
+    Args:
+        c: Output TileTensor accumulating the matmul result.
+        a: LHS input TileTensor.
+        b: RHS input TileTensor (must be transposed).
+        a_scales: Per-block scales for `a`.
+        b_scales: Per-block scales for `b`.
+        tensor_sf: Global tensor scaling factor applied as `alpha`.
+        ctx: Device context used to launch the kernel.
+
+    Returns:
+        `DISPATCH_HIT` if a config was selected and the kernel launched, otherwise `DISPATCH_MISS`.
+    """
     var m = Int(c.dim[0]())
 
     comptime scaling_kind = get_scaling_kind[
-        a_type, scales_dtype, SF_VECTOR_SIZE
+        a_type, scales_dtype, SF_VECTOR_SIZE, b_type
     ]()
     comptime is_fp4 = (
         scaling_kind == UMMAKind.KIND_MXF4NVF4
@@ -140,12 +183,10 @@ def heuristic_and_outliers_dispatch[
         _get_tuning_list_sm100_mxfp8(), "mxfp8_heuristic_outliers"
     )
 
-    @parameter
-    @always_inline
-    def rule(x: TuningConfigSM100) -> Bool:
-        return x.K == static_K and x.N == static_N
-
-    comptime outlier_configs = outliers.find[rule]()
+    comptime outlier_configs = outliers.find(
+        rule=lambda (x: TuningConfigSM100) -> Bool: x.K == static_K
+        and x.N == static_N
+    )
 
     comptime for tuning_config in outlier_configs:
         if m >= tuning_config.M and m < tuning_config.M_end:
@@ -183,8 +224,19 @@ def heuristic_and_outliers_dispatch[
 
             return DISPATCH_HIT
 
-    # disaptch to small-BN kernel for m == 1 as it's optimized for GEMVs
-    if m == 1:
+    # Dispatch to the small-BN kernel for the small-M decode regime (m <= 16:
+    # m == 1 GEMV plus small-batch / speculative-decode m ~ 8, 16). It is
+    # optimized for skinny GEMMs; MMA_N=8 tiles the M dim (m=16 -> 2 tiles).
+    # Larger M keeps the cta_group=2 prefill heuristic below.
+    if m <= 16:
+        # Larger k-groups shorten the mainloop for this latency-bound skinny
+        # decode GEMM (K=6144 -> 48 k-iters; kg=4 -> 12 groups vs 24), which an
+        # isolated B200 sweep at the served QKV shapes (N in {2304,2560}, K=6144,
+        # M<=16) showed is ~8% faster than kg=2 and ~40% faster than vendor
+        # cuBLASLt, bit-exact. Needs num_pipeline_stages % kg == 0 (12 % 4 == 0).
+        comptime k_group_size = (
+            4 if num_k_iters % 4 == 0 else (2 if num_k_iters % 2 == 0 else 1)
+        )
         comptime config = BlockScaledMatmulConfig[
             a_type, b_type, c_type, scales_dtype, scales_dtype, transpose_b
         ](
@@ -194,7 +246,7 @@ def heuristic_and_outliers_dispatch[
             cluster_shape=Index(1, 1, 1),
             block_swizzle_size=8,
             num_accum_pipeline_stages=1,
-            k_group_size=2 if num_k_iters % 2 == 0 else 1,
+            k_group_size=k_group_size,
             num_clc_pipeline_stages=0,
             AB_swapped=True,
             is_small_bn=True,
@@ -272,12 +324,17 @@ def _block_scaled_matmul_with_epilogue[
     tensor_sf: Float32,
     ctx: DeviceContext,
 ) raises:
-    """Our sm100 block scaled matmul kernel still does not support fusion of elementwise
-    operations. This is a temporary implementation that uses our sm100 block scaled matmul
-    kernel and dispatch a separate epilogue kernel to apply the elementwise
-    operations. Callers must allocate `c`; when an `elementwise_lambda_fn`
-    is supplied the matmul result is written into `c` and then read back
-    by the lambda.
+    """Launch the SM100 block-scaled matmul, fusing the elementwise epilogue
+    in-kernel.
+
+    When an `elementwise_lambda_fn` is supplied the matmul stores are redirected
+    through it inside the kernel (TMEM -> registers -> lambda, no scratch
+    round-trip): `blackwell_block_scaled_matmul_tma_umma_warp_specialized`
+    threads the lambda into both its main and small-BN paths, where
+    `TileWriter` fires the store-redirect epilogue. When it is `None` the kernel
+    performs its default store. Callers must still allocate `c`; the
+    default-store path writes it, and it defines the (row, col) coordinate space
+    the lambda addresses.
     """
 
     var m = Int(c.dim[0]())
@@ -287,60 +344,26 @@ def _block_scaled_matmul_with_epilogue[
 
     comptime K_phys = a.static_shape[1]
 
-    comptime if not elementwise_lambda_fn:
-        blackwell_block_scaled_matmul_tma_umma_warp_specialized[
-            transpose_b=transpose_b,
-            K=K_phys,
-            config=config,
-            elementwise_compute_lambda_fn=elementwise_compute_lambda_fn,
-            pdl_level=pdl_level,
-        ](
-            c,
-            a,
-            b,
-            a_scales,
-            b_scales,
-            ctx,
-            alpha=tensor_sf,
-        )
-    else:
-        comptime epilogue = elementwise_lambda_fn.value()
-        # Nvidia GPUs >= sm_100 arch support 32B load/store to global memory.
-        comptime use_32b_simd = True
-        comptime simd_size = 32 // size_of[c_type]() if use_32b_simd else (
-            simd_width_of[c_type, target=get_gpu_target()]()
-        )
-
-        # The epilogue lambda takes IndexList[2]. We load from c's raw pointer
-        # using row-major offset since TileTensor.load's Coord constraint
-        # can't be proved when c's layout type is fully inferred.
-        @parameter
-        @__copy_capture(c, n)
-        def epilogue_wrapper[
-            simd_width: Int, rank: Int, alignment: Int = 1
-        ](idx: IndexList[rank]):
-            var c_coord = Index(idx[0], idx[1])
-            var c_val = rebind[SIMD[c_type, simd_width]](
-                c.load[width=simd_width](Coord(c_coord))
-            )
-            epilogue[c_type, simd_width, alignment=alignment](c_coord, c_val)
-
-        blackwell_block_scaled_matmul_tma_umma_warp_specialized[
-            transpose_b=transpose_b,
-            K=K_phys,
-            config=config,
-            elementwise_compute_lambda_fn=elementwise_compute_lambda_fn,
-            pdl_level=pdl_level,
-        ](
-            c,
-            a,
-            b,
-            a_scales,
-            b_scales,
-            ctx,
-            alpha=tensor_sf,
-        )
-        elementwise[epilogue_wrapper, simd_size, target="gpu"](Index(m, n), ctx)
+    # The kernel fuses the elementwise epilogue in-kernel across all regimes
+    # (`TileWriter` fires the store-redirect on both the main and small-BN
+    # paths), so redirect the store through `elementwise_lambda_fn` directly
+    # rather than falling back to a separate elementwise pass at small M.
+    blackwell_block_scaled_matmul_tma_umma_warp_specialized[
+        transpose_b=transpose_b,
+        K=K_phys,
+        config=config,
+        elementwise_lambda_fn=elementwise_lambda_fn,
+        elementwise_compute_lambda_fn=elementwise_compute_lambda_fn,
+        pdl_level=pdl_level,
+    ](
+        c,
+        a,
+        b,
+        a_scales,
+        b_scales,
+        ctx,
+        alpha=tensor_sf,
+    )
 
 
 def _vendor_blas_block_scaled_matmul_with_epilogue[
@@ -422,17 +445,14 @@ def _vendor_blas_block_scaled_matmul_with_epilogue[
         if c.ptr:
             var c_tt = c.value()
 
-            @parameter
-            @__copy_capture(c_tt)
             def epilogue_wrapper[
-                simd_width: Int, rank: Int, alignment: Int = 1
-            ](idx: IndexList[rank]):
-                var c_coord = Index(idx[0], idx[1])
+                simd_width: Int, alignment: Int = 1
+            ](idx: Coord) {var}:
                 var c_val = rebind[SIMD[c_type, simd_width]](
-                    c_tt.load[width=simd_width](Coord(c_coord))
+                    c_tt.load[width=simd_width](idx)
                 )
                 epilogue[c_type, simd_width, alignment=alignment](
-                    c_coord, c_val
+                    Index(idx[0].value(), idx[1].value()), c_val
                 )
 
             matmul(
@@ -446,9 +466,7 @@ def _vendor_blas_block_scaled_matmul_with_epilogue[
                 transpose_b=True,
                 c_row_major=True,
             )
-            elementwise[epilogue_wrapper, simd_size, target="gpu"](
-                Index(m, n), ctx
-            )
+            elementwise[simd_size, target="gpu"](epilogue_wrapper, (m, n), ctx)
             return
 
         # Otherwise, we need to allocate a new buffer for c and apply the epilogue.

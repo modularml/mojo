@@ -13,11 +13,11 @@
 
 from std.os import abort
 from std.pathlib import Path
-from std.ffi import _CPointer, _find_dylib
+from std.ffi import _find_dylib
 from std.ffi import _get_dylib_function as _ffi_get_dylib_function
 from std.ffi import _Global, OwnedDLHandle
 
-from std.gpu.host._nvidia_cuda import _CUstream_st
+from max.gpu.host._nvidia_cuda import _CUstream_st
 
 from std.utils import StaticTuple
 
@@ -26,7 +26,7 @@ from .dtype import DataType, Property
 from .result import Result
 
 
-comptime cublasLtHandle_t = OptionalUnsafePointer[NoneType, _]
+comptime cublasLtHandle_t = OptionalPointer[NoneType, _]
 
 # ===-----------------------------------------------------------------------===#
 # Library Load
@@ -813,9 +813,7 @@ def cublasLtMatmulDescGetAttribute(
 
 # Opaque descriptor for matrix memory layout
 # .
-comptime cublasLtMatrixLayout_t = OptionalUnsafePointer[
-    MatrixLayout, MutAnyOrigin
-]
+comptime cublasLtMatrixLayout_t = OptionalPointer[MatrixLayout, MutAnyOrigin]
 
 # Opaque descriptor for cublasLtMatrixTransform() operation details
 # .
@@ -1536,11 +1534,11 @@ def cublasLtMatrixLayoutDestroy(
 
 # Opaque descriptor for cublasLtMatmul() operation details
 # .
-comptime cublasLtMatmulDesc_t = OptionalUnsafePointer[Descriptor, MutAnyOrigin]
+comptime cublasLtMatmulDesc_t = OptionalPointer[Descriptor, MutAnyOrigin]
 
 # Opaque descriptor for cublasLtMatmulAlgoGetHeuristic() configuration
 # .
-comptime cublasLtMatmulPreference_t = OptionalUnsafePointer[
+comptime cublasLtMatmulPreference_t = OptionalPointer[
     PreferenceOpaque, MutAnyOrigin
 ]
 
@@ -1551,12 +1549,12 @@ def cublasLtMatmul(
     alpha: OpaquePointer[ImmutAnyOrigin],
     _a: OpaquePointer[ImmutAnyOrigin],
     _adesc: cublasLtMatrixLayout_t,
-    _b: _CPointer[NoneType, ImmutAnyOrigin],
+    _b: OptionalPointer[NoneType, ImmutAnyOrigin],
     _bdesc: cublasLtMatrixLayout_t,
     beta: OpaquePointer[ImmutAnyOrigin],
-    _c: _CPointer[NoneType, ImmutAnyOrigin],
+    _c: OptionalPointer[NoneType, ImmutAnyOrigin],
     _cdesc: cublasLtMatrixLayout_t,
-    _d: _CPointer[NoneType, MutAnyOrigin],
+    _d: OptionalPointer[NoneType, MutAnyOrigin],
     _ddesc: cublasLtMatrixLayout_t,
     algo: UnsafePointer[MatmulAlgorithm, ImmutAnyOrigin],
     workspace: OpaquePointer[MutAnyOrigin],

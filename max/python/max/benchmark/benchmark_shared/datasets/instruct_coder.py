@@ -18,9 +18,9 @@ import logging
 import random
 from collections.abc import Sequence
 
-from huggingface_hub import hf_hub_download
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
+from ._hf_download import hf_hub_download_with_retry
 from ._tokenizer_pool import TokenizerPool
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
@@ -66,7 +66,7 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
     def fetch(self) -> None:
         if self.dataset_path is not None:
             return
-        self.dataset_path = hf_hub_download(
+        self.dataset_path = hf_hub_download_with_retry(
             repo_id="likaixin/InstructCoder",
             filename="train.json",
             repo_type="dataset",

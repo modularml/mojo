@@ -56,11 +56,14 @@ class Gemma4VisionModel(Module):
         self.config = config
         self.device = config.devices[0]
         vision_config = config.vision_config
+        assert vision_config is not None
         self.patch_embedder = Gemma4VisionPatchEmbedder(
             config, device=self.device
         )
         self.encoder = Gemma4VisionEncoder(config)
-        self.pooler = Gemma4VisionPooler(vision_config.hidden_size)
+        self.pooler = Gemma4VisionPooler(
+            vision_config.hidden_size, vision_config.pooling_kernel_size
+        )
         self.rope_theta = vision_config.rope_theta
         self.head_dim = vision_config.head_dim
 
@@ -127,7 +130,7 @@ class Gemma4VisionModel(Module):
         patches_flat: Sequence[TensorValue],
         pixel_position_ids: Sequence[TensorValue],
         cu_seqlens: Sequence[TensorValue],
-        pool_weights: Sequence[TensorValue],
+        pool_gather_index: Sequence[TensorValue],
         max_seq_len: TensorValue,
     ) -> list[TensorValue]:
         """Process packed image patches through the full vision tower.
@@ -139,9 +142,8 @@ class Gemma4VisionModel(Module):
                 shape ``[total_patches, 2]``, dtype int32.
             cu_seqlens: Cumulative sequence lengths
                 (image boundaries), shape ``[num_images + 1]``, dtype uint32.
-            pool_weights: Sparse pooling weight matrices,
-                shape ``[num_images * image_seq_length, total_patches]``,
-                dtype bfloat16.
+            pool_gather_index: Per-output-bin patch indices for sparse average
+                pooling, shape ``[num_pooled_tokens, k**2]``, dtype int32.
             max_seq_len: Maximum patches per image (scalar uint32, CPU).
 
         Returns:
@@ -164,7 +166,7 @@ class Gemma4VisionModel(Module):
                 head_dim=self.head_dim,
                 ndim=2,
                 theta=self.rope_theta,
-                dtype=DType.bfloat16,
+                dtype=self.config.unquantized_dtype,
                 device=pos_ids.device,  # or hidden_states.device
             )
             for pos_ids in pixel_position_ids
@@ -186,15 +188,21 @@ class Gemma4VisionModel(Module):
         ]
 
         pooled_list = [
-            pooler(encoded, pw)
-            for pooler, encoded, pw in zip(
-                self.pooler_shards, encoded_list, pool_weights, strict=True
+            pooler(encoded, pgi)
+            for pooler, encoded, pgi in zip(
+                self.pooler_shards,
+                encoded_list,
+                pool_gather_index,
+                strict=True,
             )
         ]
 
         if self.standardize:
+            # `pooled` may be float32 (the pooler defers its float16 downcast);
+            # match the params to its dtype (a no-op otherwise).
             pooled_list = [
-                (pooled - std_bias) * std_scale
+                (pooled - std_bias.cast(pooled.dtype))
+                * std_scale.cast(pooled.dtype)
                 for std_bias, std_scale, pooled in zip(
                     self.std_bias_shards,
                     self.std_scale_shards,
@@ -213,21 +221,22 @@ class Gemma4VisionModel(Module):
     def input_types(self) -> tuple[TensorType | BufferType, ...]:
         """Build the input type list for the vision model graph.
 
-        The vision model receives five device tensors plus one CPU scalar.
+        The vision model receives four device tensors plus one CPU scalar.
 
         * ``patches_flat``        — ``[total_patches, 3 * patch_size²]``, bf16
         * ``pixel_position_ids``  — ``[total_patches, 2]``, int32
         * ``cu_seqlens``          — ``[num_images + 1]``, uint32
-        * ``pool_weights``        — ``[num_pooled_tokens, total_patches]``, bf16
+        * ``pool_gather_index``   — ``[num_pooled_tokens, max_pool_patches]``, int32
         * ``max_seq_len``         — scalar uint32, on CPU (one shared tensor)
         """
         vision_config = self.config.vision_config
+        assert vision_config is not None
         patch_dim = 3 * vision_config.patch_size**2
         devices = self.config.devices
 
         patches_flat_types = [
             TensorType(
-                DType.bfloat16,
+                self.config.unquantized_dtype,
                 shape=["total_patches", patch_dim],
                 device=device,
             )
@@ -249,10 +258,10 @@ class Gemma4VisionModel(Module):
             )
             for device in devices
         ]
-        pool_weights_types = [
+        pool_gather_index_types = [
             TensorType(
-                DType.float32,
-                shape=["num_pooled_tokens", "total_patches"],
+                DType.int32,
+                shape=["num_pooled_tokens", "max_pool_patches"],
                 device=device,
             )
             for device in devices
@@ -267,6 +276,6 @@ class Gemma4VisionModel(Module):
             *patches_flat_types,
             *pixel_position_ids_types,
             *cu_seqlens_types,
-            *pool_weights_types,
+            *pool_gather_index_types,
             max_seq_len_type,
         )

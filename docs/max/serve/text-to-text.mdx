@@ -1,0 +1,286 @@
+---
+title: Text to text
+sidebar_label: Text to text
+description: Generate text using MAX with OpenAI-compatible chat and completion endpoints
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import InstallMAX from '../_includes/install-modular.mdx';
+import InstallOpenAI from '../_includes/install-openai.mdx';
+import Requirements from '@site/src/components/Requirements';
+import { requirementsWithGPU } from '../requirements';
+
+MAX makes it easy to generate text with large language models, whether for
+conversational applications, single-turn prompts, or offline inference
+workflows. MAX text completion endpoints are fully compatible with the OpenAI
+API, so you can use familiar tools and libraries.
+
+Text completions let you instruct a model to produce new text based on a prompt
+or an ongoing conversation. They can be used for a wide range of tasks,
+including writing content, generating synthetic data, building chatbots, or
+powering multi-turn assistants. MAX provides two main endpoints for text
+completions:
+[`v1/chat/completions`](/serve/text-to-text#v1chatcompletions)
+and [`v1/completions`](/serve/text-to-text#v1completions).
+
+## Endpoints
+
+The [`v1/chat/completions`](/rest-api/create-chat-completion/)
+endpoint is recommended as the default for most text use cases and works best
+with instruction-tuned models. This endpoint supports both single-turn and
+multi-turn scenarios.
+
+The [`v1/completions`](/rest-api/create-completion/) endpoint is
+also supported for traditional single-turn text generation tasks, which is
+useful for offline inference or generating text from a prompt without
+conversational context.
+
+### `v1/chat/completions`
+
+The [`v1/chat/completions`](/rest-api/create-chat-completion/)
+endpoint is designed for chat-based models and supports both single-turn and
+multi-turn interactions. You provide a sequence of structured messages with
+roles (`system`, `user`, `assistant`, or `developer`), and the model generates
+a response.
+
+For example, within the `v1/chat/completions` request body, the `"messages"`
+array might look similar to the following:
+
+```json
+"messages": [
+  {
+    "role": "system",
+    "content": "You are a helpful assistant."
+  },
+  {
+    "role": "user",
+    "content": "Who won the world series in 2020?"
+  }
+]
+```
+
+Use a combination of roles to give the model the context it needs. A `system`
+message can define overall model response behavior, `user` messages represent
+instructions or prompts from the end-user interacting with the model, and
+`assistant` messages are a way to incorporate past model responses into the
+message context.
+
+For compatibility with OpenAI SDKs that emit `developer` for the o1/o3
+reasoning models, MAX also accepts `developer` as a system-equivalent role and
+normalizes it to `system` internally.
+
+Some models define extra roles through their chat template. For example, MAX
+also accepts a `root` role, but only when the model's tokenizer enables it.
+Requests that use a role the model doesn't support are rejected.
+
+Use this endpoint whenever you want conversational interaction, such as:
+
+- Building chatbots or assistants
+- Implementing Q&A systems
+- Supporting multi-turn dialogue in applications
+
+It's also fully compatible with single-turn use cases, making it versatile
+enough for general text generation workflows.
+
+### `v1/completions`
+
+The [`v1/completions`](/rest-api/create-completion/) endpoint
+supports traditional text completions. You provide a prompt, and the model
+returns generated text. This endpoint is ideal when you only need a single
+response per request, such as:
+
+- Offline inference workflows
+- Synthetic text generation
+- One-off text generation tasks
+
+Like `v1/chat/completions`, responses from this endpoint include a `usage`
+object reporting prompt, completion, and total token counts.
+
+## Quickstart
+
+Get started quickly serving `google/gemma-4-31B-it` locally with the `max` CLI
+and interact with it through the MAX REST and Python APIs. You'll learn to
+configure the server and make requests using the OpenAI client libraries as a
+drop-in replacement.
+
+System requirements:
+
+<Requirements requirementsData={requirementsWithGPU}
+url="/packages#system-requirements" />
+
+### Set up your environment
+
+Create a Python project to install our APIs and CLI tools:
+
+<InstallMAX folder="chat-quickstart" />
+
+### Serve your model
+
+Use the [`max serve`](/cli/serve) command to start a local server with
+the Gemma 4 model:
+
+```bash
+max serve --model google/gemma-4-31B-it
+```
+
+This creates a server running the `google/gemma-4-31B-it` large language
+model on `http://localhost:8000/v1/chat/completions`, an [OpenAI compatible
+endpoint](https://platform.openai.com/docs/api-reference/chat).
+
+While this example uses the Gemma 4 model, you can replace it with any of the
+models listed in our [supported models](/models/). Make sure that the model
+you choose can fit into the memory of your machine.
+
+:::note
+
+This quickstart uses `google/gemma-4-31B-it` with a `/chat/completions`
+endpoint because the model is instruction-tuned for chat purposes.
+
+If you want to use the `/completions` endpoint, use `google/gemma-4-31B`,
+which is not instruction-tuned.
+
+:::
+
+The endpoint is ready when you see this message printed in your terminal:
+
+```output
+Server ready on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
+
+For a complete list of `max` CLI commands and options, refer to the [MAX CLI
+reference](/cli).
+
+### Generate a text chat completion
+
+MAX supports OpenAI's REST APIs and you can interact
+with the model using either the OpenAI Python SDK or curl:
+
+<Tabs groupId="client">
+<TabItem value="python" label="Python">
+
+You can use OpenAI's Python client to interact with the model.
+First, install the OpenAI API:
+
+<InstallOpenAI />
+
+Then, create a client and make a request to the model:
+
+```python title="generate-text.py"
+from openai import OpenAI
+
+client = OpenAI(
+    base_url = 'http://0.0.0.0:8000/v1',
+    api_key='EMPTY', # required by the API, but not used by MAX
+)
+
+response = client.chat.completions.create(
+  model="google/gemma-4-31B-it",
+  messages=[
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "Who won the world series in 2020?"},
+    {"role": "assistant", "content": "The LA Dodgers won in 2020."},
+    {"role": "user", "content": "Where was it played?"}
+  ]
+)
+print(response.choices[0].message.content)
+```
+
+In this example, you're using the OpenAI Python client to interact with the MAX
+endpoint running on local host `8000`. The `client` object is initialized with
+the base URL `http://0.0.0.0:8000/v1` and the API key is ignored.
+
+When you run this code, the model should respond with information about the 2020
+World Series location:
+
+```sh
+python generate-text.py
+```
+
+```output
+The 2020 World Series was played at Globe Life Field in Arlington, Texas. It was a neutral site due to the COVID-19 pandemic.
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+The following `curl` command sends a chat request to the model's chat
+completions endpoint:
+
+```bash
+curl http://0.0.0.0:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "google/gemma-4-31B-it",
+        "messages": [
+            {
+            "role": "system",
+            "content": "You are a helpful assistant."
+            },
+            {
+            "role": "user",
+            "content": "Hello, how are you?"
+            }
+        ],
+        "max_completion_tokens": 100
+    }'
+```
+
+You should receive a response similar to this:
+
+```json
+{
+  "id": "18b0abd2d2fd463ea43efe2c147bcac0",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": " I'm doing well, thank you for asking. How can I assist you today?",
+        "refusal": "",
+        "tool_calls": null,
+        "role": "assistant",
+        "function_call": null
+      },
+      "logprobs": {
+        "content": [],
+        "refusal": []
+      }
+    }
+  ],
+  "created": 1743543698,
+  "model": "google/gemma-4-31B-it",
+  "service_tier": null,
+  "system_fingerprint": null,
+  "object": "chat.completion",
+  "usage": {
+    "completion_tokens": 17,
+    "prompt_tokens": null,
+    "total_tokens": 17,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  }
+}
+```
+
+For reasoning models, `usage.completion_tokens_details.reasoning_tokens` reports
+how many of the completion tokens were spent on reasoning (it's `0` otherwise).
+
+</TabItem>
+</Tabs>
+
+For complete details on all available API endpoints and options, see the
+[REST API documentation](/rest-api/).
+
+## Next steps
+
+Now that you have successfully set up MAX with an OpenAI-compatible chat
+endpoint, check out additional serving optimizations specific to your use case.
+
+- [Reasoning](/serve/reasoning): Serve reasoning models that separate
+  chain-of-thought from the final answer.
+- [Structured output](/serve/structured-output): Enable structured output
+  with your GenAI deployments for predictable responses.
+- [Prefix caching with PagedAttention](/serve/prefix-caching): Use prefix
+  caching and PagedAttention when serving a model with the MAX CLI.

@@ -14,20 +14,22 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
-from max.benchmark.benchmark_serving import main_with_parsed_args
-from max.benchmark.benchmark_shared.config import (
-    BaseBenchmarkConfig,
-    BaseServingBenchmarkConfig,
-    ServingBenchmarkConfig,
-    TTSServingBenchmarkConfig,
+from max.benchmark.benchmark_serving import (
+    _resolve_seed,
+    main_with_parsed_args,
+    parse_args,
 )
-from pydantic import ValidationError
+from max.benchmark.benchmark_shared.config import (
+    DEFAULT_BENCHMARK_SEED,
+    ServingBenchmarkConfig,
+)
 
 
 class TestServingSweepFields:
@@ -60,7 +62,7 @@ class TestServingSweepFields:
             extra = field_info.json_schema_extra
             if extra is None or not isinstance(extra, dict):
                 continue
-            if name in ["workload_config"]:
+            if name == "workload_config":
                 assert "group" in extra
                 assert extra["group"] == "Workload Configuration"
             elif name in [
@@ -78,10 +80,10 @@ class TestServingSweepFields:
             ]:
                 assert "group" in extra
                 assert extra["group"] == "Sweep Configuration"
-            elif name in ["max_concurrency"]:
+            elif name == "max_concurrency":
                 assert "group" in extra
                 assert extra["group"] == "Request Configuration"
-            elif name in ["request_rate"]:
+            elif name == "request_rate":
                 assert "group" in extra
                 assert extra["group"] == "Traffic Control"
 
@@ -313,63 +315,137 @@ class TestWorkloadMaxConcurrency:
         assert results[0].max_concurrency == 4
 
 
-def test_tts_serving_config_defaults() -> None:
-    """TTSServingBenchmarkConfig can be instantiated with just required fields."""
-    config = TTSServingBenchmarkConfig(workload_config="workload.yaml")
-    assert config.api == "python"
-    assert config.speech_lm_model == "meta-llama/Llama-3.2-1B-Instruct"
-    assert config.request_rate == float("inf")
-    assert config.quantization_encoding == "bfloat16"
-    assert config.top_k == 75
-    assert config.temperature == 1.1
-    assert config.workload_config == "workload.yaml"
-    assert config.seed is None
+# ===----------------------------------------------------------------------=== #
+# Seed handling (PERF-2587)
+# ===----------------------------------------------------------------------=== #
 
 
-def test_tts_serving_config_requires_workload_config() -> None:
-    """workload_config is required; cyclopts enforces it at the CLI."""
-    with pytest.raises(ValidationError):
-        TTSServingBenchmarkConfig.model_validate({})
+class TestSeedDefaultAndOverride:
+    """The seed is pinned by default; ``none`` opts into a fresh random draw."""
+
+    def test_default_seed_is_pinned(self) -> None:
+        """An unset seed defaults to the fixed constant, not ``None``."""
+        assert ServingBenchmarkConfig().seed == DEFAULT_BENCHMARK_SEED
+
+    def test_explicit_int_is_kept(self) -> None:
+        """An explicit integer seed is preserved verbatim."""
+        assert ServingBenchmarkConfig(seed=1234).seed == 1234
+
+    def test_explicit_none_is_kept(self) -> None:
+        """A ``null`` seed (Python ``None``) is preserved as ``None``."""
+        assert ServingBenchmarkConfig(seed=None).seed is None
+
+    def test_parse_args_default(self) -> None:
+        """``parse_args`` with no ``--seed`` yields the pinned default."""
+        assert parse_args(["--model", "m"]).seed == DEFAULT_BENCHMARK_SEED
+
+    def test_parse_args_int(self) -> None:
+        """``--seed 7`` parses to the integer 7."""
+        assert parse_args(["--model", "m", "--seed", "7"]).seed == 7
+
+    @pytest.mark.parametrize("value", ["none", "None", "NONE"])
+    def test_cli_none_maps_to_random(self, value: str) -> None:
+        """``--seed none`` (any case) parses to ``None`` (draw a random seed)."""
+        assert parse_args(["--model", "m", "--seed", value]).seed is None
 
 
-def test_tts_serving_config_inherits_base() -> None:
-    """TTSServingBenchmarkConfig inherits fields from BaseBenchmarkConfig."""
-    assert issubclass(TTSServingBenchmarkConfig, BaseBenchmarkConfig)
-    config = TTSServingBenchmarkConfig(
-        workload_config="workload.yaml", num_prompts=42, seed=7
-    )
-    assert config.num_prompts == 42
-    assert config.seed == 7
+class TestSeedConfigFileLoading:
+    """Seed loaded from a YAML config/workload file."""
+
+    def test_yaml_null_maps_to_random(self, tmp_path: Path) -> None:
+        """YAML ``seed: null`` loads as ``None`` (draw a random seed)."""
+        cfg_path = tmp_path / "serving.yaml"
+        cfg_path.write_text("model: myorg/llama\nseed: null\n")
+
+        assert ServingBenchmarkConfig(config_file=str(cfg_path)).seed is None
+
+    def test_yaml_string_none_maps_to_random(self, tmp_path: Path) -> None:
+        """YAML ``seed: none`` (string) loads as ``None`` via the validator."""
+        cfg_path = tmp_path / "serving.yaml"
+        cfg_path.write_text("model: myorg/llama\nseed: none\n")
+
+        assert ServingBenchmarkConfig(config_file=str(cfg_path)).seed is None
+
+    def test_yaml_int_is_kept(self, tmp_path: Path) -> None:
+        """YAML ``seed: 1234`` loads as the integer 1234."""
+        cfg_path = tmp_path / "serving.yaml"
+        _write_yaml(cfg_path, {"model": "myorg/llama", "seed": 1234})
+
+        assert ServingBenchmarkConfig(config_file=str(cfg_path)).seed == 1234
+
+    def test_yaml_unset_uses_pinned_default(self, tmp_path: Path) -> None:
+        """A YAML file that omits ``seed`` uses the pinned default."""
+        cfg_path = tmp_path / "serving.yaml"
+        _write_yaml(cfg_path, {"model": "myorg/llama"})
+
+        config = ServingBenchmarkConfig(config_file=str(cfg_path))
+        assert config.seed == DEFAULT_BENCHMARK_SEED
 
 
-def test_serving_configs_inherit_base_serving() -> None:
-    """Both serving configs inherit from the shared BaseServingBenchmarkConfig."""
-    assert issubclass(ServingBenchmarkConfig, BaseServingBenchmarkConfig)
-    assert issubclass(TTSServingBenchmarkConfig, BaseServingBenchmarkConfig)
+class TestResolveSeed:
+    """``_resolve_seed`` draws a concrete seed only when one was not pinned."""
+
+    def test_random_seed_is_drawn(self) -> None:
+        """A ``None`` seed is resolved to a concrete int in ``[0, 10000)``."""
+        config = ServingBenchmarkConfig(model="m", seed=None)
+        _resolve_seed(config)
+        assert isinstance(config.seed, int)
+        assert 0 <= config.seed < 10000
+
+    def test_pinned_seed_is_unchanged(self) -> None:
+        """A pinned seed is left exactly as supplied."""
+        config = ServingBenchmarkConfig(model="m", seed=1234)
+        _resolve_seed(config)
+        assert config.seed == 1234
 
 
-def test_shared_serving_defaults_match() -> None:
-    """Shared fields on BaseServingBenchmarkConfig have the same default on both subclasses."""
-    serving = ServingBenchmarkConfig()
-    tts = TTSServingBenchmarkConfig(workload_config="workload.yaml")
-    for field in (
-        "burstiness",
-        "skip_test_prompt",
-        "collect_gpu_stats",
-        "lora_paths",
-        "lora_uniform_traffic_ratio",
-        "per_lora_traffic_ratio",
-    ):
-        assert getattr(serving, field) == getattr(tts, field), (
-            f"{field} default differs between serving and TTS configs"
+# ===----------------------------------------------------------------------=== #
+# extra_body validator
+# ===----------------------------------------------------------------------=== #
+
+
+class TestExtraBodyValidator:
+    """``ServingBenchmarkConfig.extra_body`` accepts dict / inline JSON / file."""
+
+    # Covers the shapes the merge must preserve verbatim: a top-level array
+    # (with a tricky ``}``), a scalar, and a nested object.
+    _NESTED = {
+        "stop": ["}"],
+        "max_tokens": 15,
+        "chat_template_kwargs": {"reasoning_effort": "low"},
+    }
+
+    @staticmethod
+    def _build_with_extra(value: object) -> ServingBenchmarkConfig:
+        """Build a config routing ``value`` through the ``extra_body`` validator.
+
+        ``extra_body`` is typed ``dict[str, Any]`` (its resolved form), but the
+        CLI/file forms feed it a ``str``. ``model_validate`` accepts ``Any``, so
+        this exercises the same validator without a type-checker complaint at the
+        call site (mirroring how cyclopts hands the raw token to the model).
+        """
+        return ServingBenchmarkConfig.model_validate(
+            {"model": "m", "extra_body": value}
         )
 
+    def test_dict_passthrough_preserves_nested(self) -> None:
+        """A mapping is stored verbatim with nested objects/arrays intact."""
+        config = ServingBenchmarkConfig(model="m", extra_body=self._NESTED)
+        assert config.extra_body == self._NESTED
 
-def test_verbose_on_base() -> None:
-    """`verbose` is defined on BaseBenchmarkConfig and inherited by both serving configs."""
-    assert "verbose" in BaseBenchmarkConfig.model_fields
-    assert ServingBenchmarkConfig().verbose is False
-    assert (
-        TTSServingBenchmarkConfig(workload_config="workload.yaml").verbose
-        is False
-    )
+    def test_inline_json_string(self) -> None:
+        """An inline JSON string parses into the equivalent mapping."""
+        config = self._build_with_extra(json.dumps(self._NESTED))
+        assert config.extra_body == self._NESTED
+
+    def test_file_path(self, tmp_path: Path) -> None:
+        """A path to a YAML/JSON file is read and parsed."""
+        payload = tmp_path / "payload.yaml"
+        _write_yaml(payload, self._NESTED)
+        config = self._build_with_extra(str(payload))
+        assert config.extra_body == self._NESTED
+
+    def test_missing_file_rejected(self) -> None:
+        """A path that does not exist surfaces a clear, dual-cause error."""
+        with pytest.raises(ValueError, match="not a readable file path"):
+            self._build_with_extra("/nonexistent/payload.yaml")

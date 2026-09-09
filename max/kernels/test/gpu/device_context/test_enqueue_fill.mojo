@@ -11,13 +11,13 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.testing import assert_equal, assert_true
 from std.utils.numerics import isnan, nan
 
 
 def test_enqueue_fill_host_buffer(ctx: DeviceContext) raises:
-    var host_buffer = ctx.enqueue_create_host_buffer[DType.float64](8)
+    var host_buffer = ctx.enqueue_create_host_buffer[.float64](8)
     host_buffer.enqueue_fill(0.1)
     ctx.synchronize()
 
@@ -33,10 +33,10 @@ def test_enqueue_fill_device_buffer_float64(ctx: DeviceContext) raises:
     """Regression test for when enqueue_fill was O(N) API calls for
     float64 values where the high and low 32-bit halves differ."""
     comptime SIZE = 1024
-    var dev_buf = ctx.enqueue_create_buffer[DType.float64](SIZE)
+    var dev_buf = ctx.enqueue_create_buffer[.float64](SIZE)
     dev_buf.enqueue_fill(2.0)
 
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float64](SIZE)
+    var host_buf = ctx.enqueue_create_host_buffer[.float64](SIZE)
     ctx.enqueue_copy(host_buf, dev_buf)
     ctx.synchronize()
 
@@ -50,11 +50,11 @@ def test_enqueue_fill_device_buffer_float64(ctx: DeviceContext) raises:
 
 def test_enqueue_fill_device_buffer_float64_large(ctx: DeviceContext) raises:
     comptime SIZE = 1 << 20  # 1M elements
-    var dev_buf = ctx.enqueue_create_buffer[DType.float64](SIZE)
+    var dev_buf = ctx.enqueue_create_buffer[.float64](SIZE)
     dev_buf.enqueue_fill(2.0)
 
     # Spot-check a few elements rather than iterating all 1M.
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float64](SIZE)
+    var host_buf = ctx.enqueue_create_host_buffer[.float64](SIZE)
     ctx.enqueue_copy(host_buf, dev_buf)
     ctx.synchronize()
 
@@ -65,10 +65,10 @@ def test_enqueue_fill_device_buffer_float64_large(ctx: DeviceContext) raises:
 
 
 def test_enqueue_fill_device_buffer_float64_small(ctx: DeviceContext) raises:
-    var dev_buf = ctx.enqueue_create_buffer[DType.float64](1)
+    var dev_buf = ctx.enqueue_create_buffer[.float64](1)
     dev_buf.enqueue_fill(3.14)
 
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float64](1)
+    var host_buf = ctx.enqueue_create_host_buffer[.float64](1)
     ctx.enqueue_copy(host_buf, dev_buf)
     ctx.synchronize()
 
@@ -79,11 +79,11 @@ def test_enqueue_fill_device_buffer_float64_nan(ctx: DeviceContext) raises:
     """Test filling with NaN. NaN has hi=0x7FF80000, lo=0x00000000 (unequal
     halves), exercising the doubling copy path with a special float value."""
     comptime SIZE = 256
-    var val = nan[DType.float64]()
-    var dev_buf = ctx.enqueue_create_buffer[DType.float64](SIZE)
+    var val = nan[.float64]()
+    var dev_buf = ctx.enqueue_create_buffer[.float64](SIZE)
     dev_buf.enqueue_fill(val)
 
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float64](SIZE)
+    var host_buf = ctx.enqueue_create_host_buffer[.float64](SIZE)
     ctx.enqueue_copy(host_buf, dev_buf)
     ctx.synchronize()
 
@@ -96,10 +96,10 @@ def test_enqueue_fill_device_buffer_float64_nan(ctx: DeviceContext) raises:
 
 def test_enqueue_fill_device_buffer_float32(ctx: DeviceContext) raises:
     comptime SIZE = 512
-    var dev_buf = ctx.enqueue_create_buffer[DType.float32](SIZE)
+    var dev_buf = ctx.enqueue_create_buffer[.float32](SIZE)
     dev_buf.enqueue_fill(Float32(42.0))
 
-    var host_buf = ctx.enqueue_create_host_buffer[DType.float32](SIZE)
+    var host_buf = ctx.enqueue_create_host_buffer[.float32](SIZE)
     ctx.enqueue_copy(host_buf, dev_buf)
     ctx.synchronize()
 

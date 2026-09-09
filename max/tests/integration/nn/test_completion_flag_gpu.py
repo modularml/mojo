@@ -13,7 +13,7 @@
 """Smoke tests for the ``CompletionFlag`` nanobind class.
 
 Exercises the host-side API in isolation (allocation, reset, signal,
-load). The producer/consumer methods (``DeviceStream.wait_for_host_value``,
+load). The producer/consumer methods (``DeviceQueue.wait_for_host_value``,
 ``mo.wait_host_value``) that actually use the flag's device pointer land
 in follow-on PRs in the same stack and have their own GPU tests.
 """
@@ -31,8 +31,8 @@ def test_completion_flag_construction_initializes_to_zero(
     accelerator: Accelerator,
 ) -> None:
     """A freshly allocated flag reads back as zero."""
-    if accelerator.api != "cuda":
-        pytest.skip("CompletionFlag is only supported on CUDA")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("CompletionFlag is only supported on CUDA/HIP")
 
     flag = CompletionFlag(accelerator)
     assert flag.load() == 0
@@ -44,8 +44,8 @@ def test_completion_flag_device_ptr_is_nonzero(
     """``device_ptr`` is the device-visible address of the flag, suitable
     for passing to graph ops or stream APIs that wait on a memory value.
     Must be non-null."""
-    if accelerator.api != "cuda":
-        pytest.skip("CompletionFlag is only supported on CUDA")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("CompletionFlag is only supported on CUDA/HIP")
 
     flag = CompletionFlag(accelerator)
     assert flag.device_ptr != 0
@@ -56,8 +56,8 @@ def test_completion_flag_signal_then_load_round_trip(
 ) -> None:
     """``signal(value)`` writes a 64-bit value with release semantics;
     ``load()`` reads it back with acquire semantics."""
-    if accelerator.api != "cuda":
-        pytest.skip("CompletionFlag is only supported on CUDA")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("CompletionFlag is only supported on CUDA/HIP")
 
     flag = CompletionFlag(accelerator)
     flag.signal(1)
@@ -71,8 +71,8 @@ def test_completion_flag_reset_after_signal_clears_to_zero(
     accelerator: Accelerator,
 ) -> None:
     """``reset()`` after a ``signal()`` returns the flag to zero."""
-    if accelerator.api != "cuda":
-        pytest.skip("CompletionFlag is only supported on CUDA")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("CompletionFlag is only supported on CUDA/HIP")
 
     flag = CompletionFlag(accelerator)
     flag.signal(42)
@@ -100,8 +100,8 @@ def test_completion_flag_unsafe_ptr_is_distinct_nonzero(
     Must be non-null and distinct from ``device_ptr`` (which addresses
     the 8-byte flag slot; this one addresses the wrapper object
     itself)."""
-    if accelerator.api != "cuda":
-        pytest.skip("CompletionFlag is only supported on CUDA")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("CompletionFlag is only supported on CUDA/HIP")
 
     flag = CompletionFlag(accelerator)
     assert flag._unsafe_ptr != 0
@@ -119,8 +119,8 @@ def test_completion_flag_multiple_allocations_are_independent(
     We can only observe ``reset() == 0`` from Python, so the strongest
     portable check is that the two ``device_ptr``s differ.
     """
-    if accelerator.api != "cuda":
-        pytest.skip("CompletionFlag is only supported on CUDA")
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip("CompletionFlag is only supported on CUDA/HIP")
 
     a = CompletionFlag(accelerator)
     b = CompletionFlag(accelerator)

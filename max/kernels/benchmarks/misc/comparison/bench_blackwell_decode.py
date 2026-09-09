@@ -43,7 +43,7 @@ from max.experimental.torch import torch_dtype_to_max
 from max.graph import BufferType, DeviceRef, Graph, TensorType, ops
 from max.nn.attention import MHAMaskVariant
 from max.nn.kernels import flash_attention_ragged
-from max.nn.kv_cache import KVCacheParams, PagedCacheValues
+from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
 
 # Try importing external libraries (installed via Bazel pycross_wheel_library)
 _flashinfer: types.ModuleType | None
@@ -230,7 +230,7 @@ def bench_max(
     session = InferenceSession(devices=[Accelerator()])
 
     # Setup KV cache configuration
-    kv_params = KVCacheParams(
+    kv_params = MHAKVCacheParams(
         dtype=max_dtype,
         n_kv_heads=num_kv_heads,
         head_dim=head_dim,
@@ -277,10 +277,12 @@ def bench_max(
     cache_lengths_torch = torch.full(
         (batch_size,), cache_len, dtype=torch.uint32, device="cuda"
     )
-    # max_lengths shape: [num_steps, 2] where column 0 is max_seq_length, column 1 is max_cache_length
-    # For decode: max_seq_length=1 (one token), max_cache_length=cache_len
-    max_lengths_torch = torch.tensor(
-        [[1, cache_len]], dtype=torch.uint32, device="cpu"
+    # For decode: max_prompt_length=1 (one token), max_cache_length=cache_len
+    max_prompt_length_torch = torch.tensor(
+        [1], dtype=torch.uint32, device="cpu"
+    )
+    max_cache_length_torch = torch.tensor(
+        [cache_len], dtype=torch.uint32, device="cpu"
     )
 
     # Convert torch tensors to MAX types (these will be the actual runtime inputs)
@@ -291,9 +293,12 @@ def bench_max(
     cache_lengths_max = Buffer.from_dlpack(
         cache_lengths_torch
     )  # Tensor for cache_lengths
-    max_lengths_max = Buffer.from_dlpack(
-        max_lengths_torch
-    )  # Tensor for max_lengths
+    max_prompt_length_max = Buffer.from_dlpack(
+        max_prompt_length_torch
+    )  # Tensor for max_prompt_length
+    max_cache_length_max = Buffer.from_dlpack(
+        max_cache_length_torch
+    )  # Tensor for max_cache_length
     attention_dispatch_metadata_max = Buffer.from_dlpack(
         torch.tensor([batch_size, 1, 0, cache_len], dtype=torch.int64)
     )
@@ -330,9 +335,14 @@ def bench_max(
         device=DeviceRef.GPU(),
     )
 
-    max_lengths_type = TensorType(
+    max_prompt_length_type = TensorType(
         DType.uint32,
-        shape=[1, 2],
+        shape=[1],
+        device=DeviceRef.CPU(),
+    )
+    max_cache_length_type = TensorType(
+        DType.uint32,
+        shape=[1],
         device=DeviceRef.CPU(),
     )
     attention_dispatch_metadata_type = TensorType(
@@ -348,7 +358,8 @@ def bench_max(
             blocks_type,
             cache_lengths_type,
             lookup_table_type,
-            max_lengths_type,
+            max_prompt_length_type,
+            max_cache_length_type,
             attention_dispatch_metadata_type,
         ],
     ) as graph:
@@ -358,7 +369,8 @@ def bench_max(
             blocks,
             cache_lengths,
             lookup_table,
-            max_lengths,
+            max_prompt_length,
+            max_cache_length,
             attention_dispatch_metadata,
         ) = graph.inputs
 
@@ -368,7 +380,8 @@ def bench_max(
             blocks.buffer,
             cache_lengths.tensor,
             lookup_table.tensor,
-            max_lengths.tensor,
+            max_prompt_length.tensor,
+            max_cache_length.tensor,
             attention_dispatch_metadata=attention_dispatch_metadata.tensor,
         )
 
@@ -405,7 +418,8 @@ def bench_max(
             paged_blocks_max,
             cache_lengths_max,
             lut_max,
-            max_lengths_max,
+            max_prompt_length_max,
+            max_cache_length_max,
             attention_dispatch_metadata_max,
         )[0]
         return output
@@ -416,12 +430,14 @@ def bench_max(
 
     # Use bench_kineto to profile the kernel.
     # Split-K decode launches up to two kernels:
-    #   sm100_mha_1q_depth128_..._<hash>         (main decode)
-    #   mha_splitk_reduce_..._<hash>              (reduction, when partitions > 1)
-    # The substring "mha_" matches both (and nothing else in this graph).
+    #   sm100_mha_1q_depth128_..._<hash>    (FA4 SM100MHA2Q main decode; the
+    #                                       num_q=1 variant of the @__name
+    #                                       "sm100_mha_{nq}q_depth{d}_...")
+    #   sm100_splitk_combine_..._<hash>     (fa4_splitk_combine reduction,
+    #                                       when partitions > 1)
     time_s = bench_kineto(
         run_kernel,
-        kernel_names="mha_",
+        kernel_names="sm100_mha_",
         num_tests=100,
         suppress_kineto_output=True,
         flush_l2=True,

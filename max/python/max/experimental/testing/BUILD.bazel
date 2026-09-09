@@ -1,0 +1,12 @@
+load("//bazel:api.bzl", "modular_py_library")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "testing",
+    srcs = ["__init__.py"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/experimental",
+    ],
+)

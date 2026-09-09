@@ -1,0 +1,247 @@
+---
+title: Compile-time evaluation
+sidebar_label: Compile-time evaluation
+description: When and how code is executed at compile time.
+---
+
+<!-- markdownlint-disable MD033 -->
+
+To understand Mojo's metaprogramming, you need to understand how Mojo runs
+code at compile time. Several things can trigger compile-time code execution:
+
+- Assigning an expression to a `comptime` value.
+- Evaluating a `comptime` conditional or loop.
+- Assigning an expression to a compile-time parameter.
+- And a few less common cases, all identified with the `comptime` keyword.
+
+Here are some examples:
+
+```mojo
+comptime SIZE = 1024 // 32
+```
+
+Here the expression `1024 // 32` invokes the `IntLiteral.__floordiv__()`
+method. Since it occurs in a `comptime` assignment, the method must be run
+at compile time.
+
+```mojo
+comptime for i in range(4):
+   print(i)
+```
+
+Here the `range(4)` function needs to run to produce an iterator for the
+`comptime for` statement.
+
+```mojo
+var array = Array[Int, get_array_size()]()
+```
+
+In this example, the `get_array_size()` function needs to run at compile
+time to determine the `length` parameter, which forms part of the type of
+`array`. (For example, if `get_array_size()` returns 32, the type of the
+`array` variable is `Array[Int, 32]`.)
+
+When the compiler encounters a function call in a compile-time context, the
+compiler runs the function separately, as if it was a small separate
+program. This is similar in concept to how C++ evaluates a `constexpr`.
+(For a slightly deeper look at this process, see [How the compiler runs
+code](#how-the-compiler-runs-code).)
+
+While most code can run at compile time, Mojo won't run code that depends
+on the execution environment. The following are examples of code that Mojo
+won't run at compile time:
+
+- File I/O.
+- Foreign function calls (for example, to external libraries).
+- Functions that can
+  [raise errors](/docs/manual/functions/#raising-and-non-raising-functions).
+
+In addition, the compiler can't run functions on the GPU. Compile-time
+functions in GPU code are actually run on the CPU.
+
+When running code, the compiler can allocate memory and instantiate types
+that allocate memory, such as strings and collections. With some
+limitations, it can pass compile-time values on to run-time code, a process
+called _materialization_. For more information, see the section on
+[materialization](/docs/manual/metaprogramming/materialization/).
+
+## `comptime` values
+
+It is very common to want to _name_ compile-time values. Whereas `var`
+defines a runtime value, we need a way to define a named compile-time
+constant. For this, Mojo uses a `comptime` declaration. At its simplest,
+`comptime` can be used to define a constant value:
+
+```mojo
+comptime rows = 512
+```
+
+A `comptime` value is always evaluated at compile time, so you can use
+`comptime` to force a function to run at compile time. You can use this to
+calculate constant values based on information available at compile time,
+such as hardware parameters.
+
+```mojo
+comptime block_size = _calculate_block_size()
+```
+
+Types are another common use for `comptime` values. Because types are
+compile-time expressions, you can use a `comptime` value as a shorthand (a
+type alias or "typedef") for a parameterized type:
+
+```mojo
+comptime Float16 = SIMD[DType.float16, 1]
+comptime UInt8 = SIMD[DType.uint8, 1]
+
+var x: Float16 = 0  # Float16 works like a "typedef"
+```
+
+(These aliases and others are actually defined in the
+[`simd` module](/docs/std/builtin/simd/#comptime-values).)
+
+You can also parameterize a `comptime` value to express more complicated
+relationships. For details, see
+[Parameterized `comptime`
+values](/docs/manual/parameters/#parameterized-comptime-values).
+
+### Compile-time scope
+
+Like `var` variables, `comptime` values obey scope, and you can use local
+`comptime` values within functions as you'd expect. Unlike `var` variables,
+`comptime` values can be defined at the module level, outside of any function.
+
+The following constructs create a new compile-time scope:
+
+- Functions. The body of a function creates a new compile-time scope.
+- Compile-time flow control. Each branch of a compile-time conditional creates
+  its own scope. The body of a `comptime for` loop also creates its own scope.
+
+You can only assign a `comptime` value to a given identifier once in a given
+scope.
+
+```mojo
+comptime VALUE = 10
+
+
+def scope_me():
+    print(VALUE)  # prints 10
+    comptime VALUE = 20
+    # comptime VALUE = 30  # error: invalid redeclaration of VALUE
+    comptime if True:
+        comptime VALUE = 40
+        print(VALUE)  # prints 40
+    print(VALUE)  # prints 20
+```
+
+## Compile-time flow control
+
+One of the simplest things you can do with metaprogramming is using compile-time
+flow control to conditionalize or repeat code. Some sample uses include:
+
+- Conditionalizing platform-specific code (CPU vs. GPU, Linux vs. macOS) without
+  runtime overhead.
+- Unrolling loops to eliminate runtime branches.
+- Handling different data types in parameterized code.
+
+Unlike run-time flow control constructs, compile-time flow control constructs
+are evaluated once, at compile time, and determine what code is actually
+compiled.
+
+### Compile-time conditionals {#comptime-if}
+
+You can add the `comptime` keyword to any `if` condition that's based on a valid
+compile-time expression (an expression that can be evaluated at compile time).
+This ensures that only the live branch of the `if` statement is compiled into
+the program, which can reduce your final binary size. For example:
+
+```mojo
+from std.sys import has_accelerator
+
+def main():
+    comptime if has_accelerator():
+        run_on_gpu()
+    else:
+        run_on_cpu()
+```
+
+In this example, if no accelerator is available, the `run_on_gpu()` function is
+never called, or even compiled.
+
+The `comptime if` statement can include `elif` and `else` branches just like a
+standard `if` statement.
+
+### Compile-time loop unrolling {#comptime-for}
+
+You can add the `comptime` keyword to a `for` loop to create a loop that's
+fully unrolled at compile time. You should generally use this only for loops
+with small loop bodies and low iteration counts.
+
+The loop sequence must be a valid compile-time expression (that is, an
+expression that can be evaluated at compile time). For example, if you use
+`for i in range(LIMIT)`, the expression `range(LIMIT)` defines the loop
+sequence. This is a valid compile-time expression if `LIMIT` is a parameter,
+`comptime` value, or integer literal.
+
+The compiler fully unrolls the loop by replacing the `for` loop with
+`LIMIT` copies of the loop body. The induction variable is replaced with a
+compile-time constant value for each "iteration." For example:
+
+```mojo
+comptime for i in range(1, 5):
+    b[i-1] = a[i] + a[i-1]
+```
+
+This is effectively unrolled to the following run-time code:
+
+```mojo
+b[0] = a[1] + a[0]
+b[1] = a[2] + a[1]
+b[2] = a[3] + a[2]
+b[3] = a[4] + a[3]
+```
+
+This unrolled loop compiles to branchless machine code, unlike a normal `for`
+loop, which includes a bounds test at every iteration. This can be especially
+important on GPU, to avoid
+[thread divergence](https://max.modular.com/gpu/block-and-warp/#warp-level-synchronization).
+
+The `comptime for` construct unrolls at the beginning of compilation, which can
+greatly expand both the code size and the compilation time.
+
+## How the compiler runs code
+
+The process of evaluating compile-time code involves three components of the
+compiler:
+
+- Parser. Parses the code into an intermediate representation (IR) and performs
+  type checking.
+- Interpreter. Runs code at compile time.
+- Elaborator. Substitutes concrete values for compile-time parameters and
+  produces concrete versions of parameterized functions and structs.
+
+When the parser turns code into IR, it also replaces some very simple `comptime`
+expressions with their values, a process called _constant folding_. For example,
+the compiler can constant fold the expression `2 + 3` to `5`. Standard library
+functions that are marked `@always_inline("builtin")` are constant foldable.
+Compile-time expressions that can't be constant folded persist and are evaluated
+in the elaborator.
+
+When the elaborator encounters a function call in a compile-time context, it
+invokes the interpreter to run the function. The interpreter then checks whether
+the function being called has already been _elaborated_ to produce a concrete,
+executable function. If not, the interpreter adds that function to the
+elaborator's work queue, and waits until it's done. Finally, the interpreter
+runs the concrete function—almost like it was a small separate program—and
+passes the return value back to the elaborator, which integrates it into the
+parsed IR.
+
+When reading code, it's important to remember that when a function is being
+interpreted at compile time, the function has been concretized: compile-time
+conditionals have been processed, and compile-time constraints and assertions
+have been tested. This sometimes _appears_ to contradict the expectation that
+your code runs in the order it appears in the function. For example, if your
+function includes a compile-time assertion that fails, compilation fails before
+the interpreter enters the function, so no part of the function is
+evaluated—even code that occurs _before_ the assertion.
+
+<!-- markdownlint-enable MD033 -->

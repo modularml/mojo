@@ -4,8 +4,13 @@ package(default_visibility = ["//max:consumers"])
 
 mojo_shared_library(
     name = "mojo_module",
-    srcs = ["mojo_module.mojo"],
+    srcs = [
+        "mojo_module.mojo",
+        "sha256.mojo",
+    ],
     shared_lib_name = "mojo_module.so",
+    # Prove the production-compiler path for MojoCompile actions on one op.
+    use_production_compiler_for_asan = True,
     deps = [
         "@mojo//:std",
     ],

@@ -30,6 +30,7 @@ CuTe invariants we enforce here:
 """
 
 from layout import Coord, Idx, TileTensor, row_major, col_major
+from layout.int_tuple import IntTuple, coord_to_int_tuple
 from layout.tile_layout import (
     Layout,
     blocked_product,
@@ -242,7 +243,7 @@ def test_tile_tensor_dim_on_nested_returns_product() raises:
     var L = row_major_nested(
         Coord(Coord(Idx[4], Idx[16]), Coord(Idx[1], Idx[1]))
     )
-    var storage = InlineArray[Float32, 64](fill=0.0)
+    var storage = Array[Float32, 64](fill=0.0)
     var t = TileTensor(storage, L)
     assert_equal(Int(t.dim[0]()), 64)
     assert_equal(Int(t.dim[1]()), 1)
@@ -253,7 +254,7 @@ def test_tile_tensor_load_store_via_nested_coord() raises:
     var L = row_major_nested(
         Coord(Coord(Idx[4], Idx[16]), Coord(Idx[1], Idx[1]))
     )
-    var storage = InlineArray[Float32, 64](fill=0.0)
+    var storage = Array[Float32, 64](fill=0.0)
     var t = TileTensor(storage, L)
     # Hierarchical write at ((2,5),(0,0)) -> offset 37.
     t[Coord(Coord(Idx[2], Idx[5]), Coord(Idx[0], Idx[0]))] = 42.0
@@ -277,7 +278,7 @@ def test_tile_tensor_tile_outer_mode_basic() raises:
             Coord(Idx[OUTER_H], Idx[FRAG_H]), Coord(Idx[OUTER_W], Idx[FRAG_W])
         )
     )
-    var storage = InlineArray[Float32, 64](fill=0.0)
+    var storage = Array[Float32, 64](fill=0.0)
     var t = TileTensor(storage, L)
     # Mark a single element via a flat write so we can verify the tile.
     # Outer (i=2, j=0), inner (frag_h=5, frag_w=0): flat (2,5,0,0) -> offset 37.
@@ -301,7 +302,7 @@ def test_tile_tensor_tile_outer_mode_asymmetric() raises:
     var L = row_major_nested(
         Coord(Coord(Idx[B0], Idx[T0]), Coord(Idx[B1], Idx[T1]))
     )
-    var storage = InlineArray[Float32, B0 * B1 * T0 * T1](fill=0.0)
+    var storage = Array[Float32, B0 * B1 * T0 * T1](fill=0.0)
     var t = TileTensor(storage, L)
     # Mark one element: outer (1, 2), inner (3, 1).
     t[Coord(Coord(Idx[1], Idx[3]), Coord(Idx[2], Idx[1]))] = 77.0
@@ -320,7 +321,7 @@ def test_tile_tensor_tile_coord_form() raises:
     var L = row_major_nested(
         Coord(Coord(Idx[B0], Idx[T0]), Coord(Idx[B1], Idx[T1]))
     )
-    var storage = InlineArray[Float32, B0 * B1 * T0 * T1](fill=0.0)
+    var storage = Array[Float32, B0 * B1 * T0 * T1](fill=0.0)
     var t = TileTensor(storage, L)
     t[Coord(Coord(Idx[1], Idx[3]), Coord(Idx[2], Idx[1]))] = 77.0
     var sub = t.tile[T0, T1](Coord(Idx[1], Idx[2]))
@@ -340,7 +341,7 @@ def test_tile_tensor_tile_on_col_major() raises:
     var L = col_major_nested(
         Coord(Coord(Idx[B0], Idx[T0]), Coord(Idx[B1], Idx[T1]))
     )
-    var storage = InlineArray[Float32, B0 * B1 * T0 * T1](fill=0.0)
+    var storage = Array[Float32, B0 * B1 * T0 * T1](fill=0.0)
     var t = TileTensor(storage, L)
     # Mark via hierarchical coord at outer (1, 2), inner (3, 1).
     # Offset = 1*1 + 3*B0 + 2*(B0*T0) + 1*(B0*T0*B1) = 1+6+16+24 = 47.
@@ -358,7 +359,7 @@ def test_tile_tensor_tile_on_flat_parent() raises:
     offset = 1*2*8 + 0*4*1 = 16. Sub-tile starts at row 2, col 0.
     """
     var L = row_major[4, 8]()
-    var storage = InlineArray[Float32, 32](fill=0.0)
+    var storage = Array[Float32, 32](fill=0.0)
     var t = TileTensor(storage, L)
     # Mark row 2, col 3 = offset 2*8 + 3 = 19.
     t[2, 3] = 55.0
@@ -371,8 +372,8 @@ def test_tile_tensor_tile_on_flat_parent() raises:
 # ===----------------------------------------------------------------------=== #
 # Group E — Production-shape geometry from MhaMmaOp.ATT_LAYOUT_NESTED.
 # These tests pin the SAME shape/strides that
-# `max/kernels/src/nn/attention/gpu/amd_structured/hk_mha_mma_op.mojo`'s
-# `ATT_LAYOUT_NESTED` alias produces for the default HK MHA config
+# `max/kernels/src/nn/attention/gpu/amd_structured/mha_mma_op.mojo`'s
+# `ATT_LAYOUT_NESTED` alias produces for the default MHA kernel config
 # (KV_BLOCK=128, Q_BLOCK_SIZE=32, MMA_M=MMA_N=32, MMA_K=16). We inline
 # the constants here (rather than importing `MhaMmaOp`) so the test stays
 # in the layout package and doesn't pull a cross-package dep on
@@ -383,11 +384,11 @@ def test_tile_tensor_tile_on_flat_parent() raises:
 
 def test_mha_mma_op_att_layout_nested_geometry() raises:
     """Pins shape/stride of MhaMmaOp.ATT_LAYOUT_NESTED for the default
-    HK MHA config — `((4, 16), (1, 1))` shape, `((16, 1), (1, 1))`
+    MHA kernel config — `((4, 16), (1, 1))` shape, `((16, 1), (1, 1))`
     strides, same per-lane 64-FP32 storage as the flat ATT_LAYOUT.
     """
     # ATT_LAYOUT_NESTED-equivalent geometry. Source of truth lives at
-    # max/kernels/src/nn/attention/gpu/amd_structured/hk_mha_mma_op.mojo:
+    # max/kernels/src/nn/attention/gpu/amd_structured/mha_mma_op.mojo:
     # ATT_LAYOUT_NESTED.
     comptime KV_BLOCK = 128
     comptime Q_BLOCK_SIZE = 32
@@ -444,7 +445,7 @@ def test_mha_mma_op_att_layout_nested_tile_semantics() raises:
             Coord(Idx[W], Idx[FRAG_W_COL_L]),
         )
     )
-    var storage = InlineArray[Float32, 64](fill=0.0)
+    var storage = Array[Float32, 64](fill=0.0)
     var att = TileTensor(storage, L)
 
     # Walk the (H=4, W=1) outer grid via `.tile[FRAG_H, FRAG_W](i, j)`
@@ -597,3 +598,44 @@ def test_row_major_nested_depth3() raises:
     # Offset = 1*420 + 2*140 + 3*35 + 4*7 + 6*1 = 839.
     assert_equal(L(ch), 839)
     assert_equal(L(cf), 839)
+
+
+# ===----------------------------------------------------------------------=== #
+# Group G — the nested-layout LayoutTensor bridge
+# ===----------------------------------------------------------------------=== #
+
+
+def test_coord_to_int_tuple_types_nested() raises:
+    """The type-only `coord_to_int_tuple` recurses into nested `Coord`s.
+
+    Every level must shrink the pack it recurses on, otherwise the comptime
+    call never terminates. `((2, (3, 5)), 4)` mixes leaf and nested siblings
+    at both levels.
+    """
+    var s = Coord(Coord(Idx[2], Coord(Idx[3], Idx[5])), Idx[4])
+    comptime t = coord_to_int_tuple[*type_of(s).element_types]()
+    assert_equal(t, IntTuple(IntTuple(2, IntTuple(3, 5)), 4))
+    _ = s
+
+
+def test_to_layout_tensor_nested_layout() raises:
+    """`to_layout_tensor()` carries a nested layout across unchanged.
+
+    The runtime shape/stride are flat arrays of the layout's leaves, so a
+    rank-2 nested layout contributes four entries, not two.
+    """
+    var L = row_major_nested(
+        Coord(Coord(Idx[4], Idx[16]), Coord(Idx[2], Idx[8]))
+    )
+    var storage = Array[Float32, 1024](fill=0.0)
+    var t = TileTensor(storage, L)
+    var lt = t.to_layout_tensor()
+
+    comptime LTLayout = type_of(lt).layout
+    assert_equal(LTLayout.shape, IntTuple(IntTuple(4, 16), IntTuple(2, 8)))
+
+    # Flat shape (4, 16, 2, 8) -> flat strides (256, 16, 8, 1).
+    var shape = lt.runtime_layout.shape.value
+    var stride = lt.runtime_layout.stride.value
+    assert_equal(shape, type_of(shape)(4, 16, 2, 8))
+    assert_equal(stride, type_of(stride)(256, 16, 8, 1))

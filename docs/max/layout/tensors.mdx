@@ -1,0 +1,721 @@
+---
+title: Using LayoutTensor
+sidebar_position: 2
+description: Using LayoutTensor to manipulate multidimensional data.
+github_url: https://github.com/modular/modular/tree/main/max/examples/layout_tensor
+---
+
+A
+[`LayoutTensor`](/api/mojo/layout/layout_tensor/LayoutTensor/)
+provides a view of multi-dimensional data stored in a linear array.
+`LayoutTensor` abstracts the logical organization of multi-dimensional data from
+its actual arrangement in memory. You can generate new tensor "views" of the
+same data without copying the underlying data. This facilitates essential
+patterns for writing performant computational algorithms, such as:
+
+- Extracting tiles (sub-tensors) from existing tensors. This is especially
+  valuable on the GPU, allowing a thread block to load a tile into shared
+  memory, for faster access and more efficient caching.
+- Vectorizing tensors—reorganizing them into multi-element vectors for more
+  performant memory loads and stores.
+- Partitioning a tensor into thread-local fragments to distribute work across a
+  thread block.
+
+`LayoutTensor` is especially valuable for writing GPU kernels, and a number of
+its APIs are GPU-specific. However, `LayoutTensor` can also be used for
+CPU-based algorithms.
+
+A `LayoutTensor` consists of three main properties:
+
+- A [layout](/layout/layouts/), defining how the elements are
+  laid out in memory.
+- A `DType`, defining the data type stored in the tensor.
+- A pointer to memory where the data is stored.
+
+Figure 1 shows the relationship between the layout and the storage.
+
+<figure>
+
+![](../images/layout/tensors/layout-tensor-indexing-simple.png#light)
+![](../images/layout/tensors/layout-tensor-indexing-simple-dark.png#dark)
+
+<figcaption><b>Figure 1.</b> Layout and storage for a 2D tensor</figcaption>
+
+</figure>
+
+Figure 1 shows a 2D column-major layout, and the corresponding linear array of
+storage. The values shown inside the layout are offsets into the storage: so the
+coordinates (0, 1) correspond to offset 2 in the storage.
+
+Because `LayoutTensor` is a view, creating a new tensor based on an existing
+tensor doesn't require copying the underlying data. So you can easily create a
+new view, representing a tile (sub-tensor), or accessing the elements in a
+different order. These views all access the same data, so changing the stored
+data in one view changes the data seen by all of the views.
+
+Each element in a tensor can be either a single (scalar) value or a SIMD vector
+of values. For a vectorized layout, you can specify an *element layout* that
+determines how the vector elements are laid out in memory. For more information,
+see [Vectorizing tensors](#vectorizing-tensors).
+
+## Accessing tensor elements
+
+For tensors with simple row-major or column-major layouts, you can address a
+layout tensor like a multidimensional array to access elements:
+
+```mojo
+var element = tensor2d[x, y]
+tensor2d[x, y] = z
+```
+
+The number of indices passed to the subscript operator must match the number of
+coordinates required by the tensor. For simple layouts, this is the same as the
+layout's *rank*: two for a 2D tensor, three for a 3D tensor, and so on. If the
+number of indices is incorrect, you may see a cryptic runtime error.
+
+```mojo
+# Indexing into a 2D tensor requires two indices
+var el1 = tensor2d[x, y]  # Works
+var el2 = tensor2d[x]  # Runtime error
+```
+
+For more complicated "nested" layouts, such as tiled layouts, the
+number of indices **doesn't** match the rank of the tensor. For details, see
+[Tensor indexing and nested layouts](#tensor-indexing-and-nested-layouts).
+
+The `__getitem__()` method returns a SIMD vector of elements, and the compiler
+can't statically determine the size of the vector (which is the size of the
+tensor's element layout). This can cause type checking errors at compile time,
+because some APIs can only accept scalar values (SIMD vectors of width 1). For
+example, consider the following code:
+
+```mojo
+var i: Int = SIMD[.int32, width](15)
+```
+
+If `width` is 1, the vector can be implicitly converted to an `Int`, but if
+`width` is any other value, the vector can't be implicitly converted. If `width`
+isn't known at compile time, this produces an error.
+
+If your tensor stores scalar values, you can work around this by explicitly
+taking the first item in the vector:
+
+```mojo
+var element = tensor[row, col][0]  # element is guaranteed to be a scalar value
+```
+
+You can also access elements using the `load()` and `store()` methods, which
+let you specify the vector width explicitly:
+
+```mojo
+var elements = tensor.load[4](row, col)
+elements = elements * 2
+tensor.store(row, col, elements)
+```
+
+### Tensor indexing and nested layouts
+
+A tensor's layout may have nested modes (or sub-layouts), as described in
+[Introduction to layouts](/layout/layouts/#modes). These layouts
+have one or more of their dimensions divided into sub-layouts. For example,
+Figure 2 shows a tensor with a nested layout:
+
+<figure>
+
+![](../images/layout/tensors/layout-tensor-indexing-nested.png#light)
+![](../images/layout/tensors/layout-tensor-indexing-nested-dark.png#dark)
+
+<figcaption><b>Figure 2.</b> Tensor with nested layout</figcaption>
+
+</figure>
+
+Figure 2 shows a tensor with a tile-major nested layout. Instead of being
+addressed with a single coordinate on each axis, it has a pair of coordinates
+per axis. For example, the coordinates `((1, 0), (0, 1))` map to the offset 6.
+
+You can't pass nested coordinates to the subscript operator `[]`, but you can
+pass a flattened version of the coordinates. For example:
+
+```mojo
+# retrieve the value at ((1, 0), (0, 1))
+var element = nested_tensor[1, 0, 0, 1][0]
+```
+
+The number of indices passed to the subscript operator must match the *flattened
+rank* of the tensor.
+
+You can't currently use the `load()` and `store()` methods for tensors with
+nested layouts. However, these methods are usually used on tensors that have
+been [*tiled*](#tiling-tensors), which yields a tensor with a simple layout.
+
+## Creating a LayoutTensor
+
+There are several ways to create a `LayoutTensor`, depending on where the tensor
+data resides:
+
+- On the CPU.
+- In GPU global memory.
+- In GPU shared or local memory.
+
+In addition to methods for creating a tensor from scratch, `LayoutTensor`
+provides a number of methods for producing a new view of an existing tensor.
+
+:::note No bounds checking
+
+The `LayoutTensor` constructors don't do any bounds-checking to verify
+that the allocated memory is large enough to hold all of the elements specified
+in the layout. It's up to the user to ensure that the proper amount of space is
+allocated.
+
+:::
+
+### Creating a `LayoutTensor` on the CPU
+
+While `LayoutTensor` is often used on the GPU, you can also use it to create
+tensors for use on the CPU.
+
+To create a `LayoutTensor` for use on the CPU, you need a `Layout` and a block
+of memory to store the tensor data. A common way to allocate memory for a
+`LayoutTensor` is to use an
+[`Array`](https://mojolang.org/docs/std/collections/array/Array/):
+
+```mojo
+comptime rows = 8
+comptime columns = 16
+comptime layout = Layout.row_major(rows, columns)
+var storage = Array[Float32, rows * columns](uninitialized=True)
+var tensor = LayoutTensor[.float32, layout](storage).fill(0)
+```
+
+`Array` is a statically-sized, stack-allocated array, so it's a fast and
+efficient way to allocate storage for most kinds of `LayoutTensor`. There are
+target-dependent limits on how much memory can be allocated this way, however.
+
+You can also create a `LayoutTensor` using a
+[`Pointer`](https://mojolang.org/docs/std/memory/pointer/Pointer/). This may be
+preferable for very large tensors.
+
+```mojo
+comptime rows = 1024
+comptime columns = 1024
+comptime buf_size = rows * columns
+comptime layout = Layout.row_major(rows, columns)
+var ptr = alloc[Float32](buf_size)
+unsafe_memset(ptr, 0, buf_size)
+var tensor = LayoutTensor[.float32, layout](ptr)
+```
+
+Note that this example uses
+[`unsafe_memset()`](https://mojolang.org/docs/std/memory/memory/unsafe_memset/)
+instead of the `LayoutTensor` `fill()` method. The `fill()` method performs
+elementwise initialization of the tensor, so it may be slow for large tensors.
+
+### Creating a `LayoutTensor` on the GPU
+
+When creating a `LayoutTensor` for use on the GPU, you need to consider which
+memory space the tensor data will be stored in:
+
+- GPU global memory can only be allocated from the host (CPU), as a
+  `DeviceBuffer`.
+- GPU shared or local memory can be statically allocated on the GPU.
+
+#### Creating a `LayoutTensor` in global memory
+
+You must allocate global memory from the host side, by allocating a
+[`DeviceBuffer`](/api/mojo/max/gpu/host/device_context/DeviceBuffer/).
+You can either construct a `LayoutTensor` using this memory on the host side,
+before invoking a GPU kernel, or you can construct a LayoutTensor inside the
+kernel itself:
+
+- On the CPU, you can construct a `LayoutTensor` using a `DeviceBuffer` as its
+  storage. Although you can create this tensor on the CPU and pass it in to a
+  kernel function, you can't directly modify its values on the CPU, since the
+  memory is on the GPU.
+- On the GPU: When a `DeviceBuffer` is passed in to `enqueue_function()`, the
+  kernel receives a corresponding
+  [`Pointer`](https://mojolang.org/docs/std/memory/pointer/Pointer/) in place of
+  the `DeviceBuffer`. The kernel can then create a `LayoutTensor` using the
+  pointer.
+
+In both cases, if you want to initialize data for the tensor from the CPU, you
+can call
+[`enqueue_copy()`](/api/mojo/max/gpu/host/device_context/DeviceContext/#enqueue_copy)
+or
+[`enqueue_memset()`](/api/mojo/max/gpu/host/device_context/DeviceContext/#enqueue_memset)
+on the buffer prior to invoking the kernel. The following example shows
+initializing a `LayoutTensor` from the CPU and passing it to a GPU kernel.
+
+```mojo
+def initialize_tensor_from_cpu_example() raises:
+    comptime dtype = DType.float32
+    comptime rows = 32
+    comptime cols = 8
+    comptime block_size = 8
+    comptime row_blocks = rows // block_size
+    comptime col_blocks = cols // block_size
+    comptime input_layout = Layout.row_major(rows, cols)
+    comptime size: Int = rows * cols
+
+
+    def kernel(tensor: LayoutTensor[dtype, input_layout, MutAnyOrigin]):
+        if (
+            global_idx.y < tensor.shape[0]()
+            and global_idx.x < tensor.shape[1]()
+        ):
+            tensor[global_idx.y, global_idx.x] = (
+                tensor[global_idx.y, global_idx.x] + 1
+            )
+
+
+    try:
+        var ctx = DeviceContext()
+        var host_buf = ctx.enqueue_create_host_buffer[dtype](size)
+        var dev_buf = ctx.enqueue_create_buffer[dtype](size)
+        ctx.synchronize()
+
+        var expected_values = List[Scalar[dtype]](length=size, fill=0)
+
+        for i in range(size):
+            host_buf[i] = Scalar[dtype](i)
+            expected_values[i] = Scalar[dtype](i + 1)
+        ctx.enqueue_copy(dev_buf, host_buf)
+        var tensor = LayoutTensor[dtype, input_layout](dev_buf)
+
+        ctx.enqueue_function[kernel](
+            tensor,
+            grid_dim=(col_blocks, row_blocks),
+            block_dim=(block_size, block_size),
+        )
+        ctx.enqueue_copy(host_buf, dev_buf)
+        ctx.synchronize()
+
+        for i in range(rows * cols):
+            if host_buf[i] != expected_values[i]:
+                raise Error(
+                    String("Error at position {} expected {} got {}").format(
+                        i, expected_values[i], host_buf[i]
+                    )
+                )
+    except error:
+        print(error)
+```
+
+#### Creating a `LayoutTensor` in shared or local memory
+
+To create a tensor on the GPU in shared memory or local memory, use the
+`LayoutTensor.stack_allocation()` static method to create a tensor with backing
+memory in the appropriate memory space.
+
+Both shared and local memory are very limited resources, so a common pattern
+is to copy a small tile of a larger tensor into shared memory or local memory to
+reduce memory access time.
+
+```mojo
+comptime tile_layout = Layout.row_major(16, 16)
+
+var shared_tile = LayoutTensor[
+    dtype,
+    tile_layout,
+    address_space=.SHARED,
+].stack_allocation()
+```
+
+In the case of shared memory, all threads in a thread block see the same
+allocation. For local memory, each thread gets a separate allocation.
+
+There's no way to explicitly allocate *register* memory. However, the
+compiler can promote some local memory allocations to registers. To enable
+this optimization, keep the size of the tensor small, and all indexing into the
+tensor static—for example, using `comptime for` loops.
+
+:::note
+
+The name `stack_allocation()` is misleading. It is a *static* allocation,
+meaning the allocation is processed at compile time. The allocation is like a
+C/C++ stack allocation in that its lifetime ends when the function in which it
+was allocated returns. This API may be subject to change in the near future.
+
+:::
+
+## Tiling tensors
+
+A fundamental pattern for using a layout tensor is to divide the tensor into
+smaller tiles to achieve better data locality and cache efficiency. In a GPU
+kernel you may want to select a tile that corresponds to the size of a thread
+block. For example, given a 2D thread block of 16x16 threads, you could use a
+16x16 tile (with each thread handling one element in the tile) or a 64x16 tile
+(with each thread handling 4 elements from the tensor).
+
+Tiles are most commonly 1D or 2D. For element-wise calculations, where the
+output value for a given tensor element depends on only one input value, 1D
+tiles are easy to reason about. For calculations that involve neighboring
+elements, 2D tiles can help maintain data locality. For example, matrix
+multiplication or 2D convolution operations usually use 2D tiles.
+
+`LayoutTensor` provides a `tile()` method for extracting a single tile. You can
+also iterate through tiles using the `LayoutTensorIter` type.
+
+When tiling a tensor that isn't an exact multiple of the tile size, you can
+create the tensor as a *masked tensor* (with the optional `masked` parameter set
+to True). When tiling a masked tensor, the tile operations will return partial
+tiles at the edges of the tensor. These tiles will be smaller than the requested
+tile size. You can use the `tensor.dim(axis)` method to query the tile
+dimensions at runtime.
+
+### Extracting a tile
+
+The
+[`LayoutTensor.tile()`](/api/mojo/layout/layout_tensor/LayoutTensor/#tile)
+method extracts a tile with a given size at a given set of coordinates:
+
+```mojo
+comptime rows = 2
+comptime columns = 4
+comptime tile_size = 32
+comptime tile_layout = Layout.row_major(tile_size, tile_size)
+comptime tiler_layout = Layout.row_major(rows, columns)
+comptime tiled_layout = blocked_product(tile_layout, tiler_layout)
+var storage = Array[Float32, tiled_layout.size()](uninitialized=True)
+for i in range(comptime (tiled_layout.size())):
+    storage[i] = Float32(i)
+var tensor = LayoutTensor[.float32, tiled_layout](storage)
+var tile = tensor.tile[tile_size, tile_size](0, 1)
+```
+
+This code creates a 64x128 tensor with 32x32 tiles, and extracts the tile
+at row 0, column 1, as shown in Figure 3.
+
+<figure>
+
+![](../images/layout/tensors/layout-tensor-tile.png#light)
+![](../images/layout/tensors/layout-tensor-tile-dark.png#dark)
+
+<figcaption><b>Figure 3.</b> Extracting a tile from a tensor</figcaption>
+
+</figure>
+
+Note that the coordinates are specified in *tiles*.
+
+The layout of the extracted tile depends on the layout of the parent tensor. For
+example, if the parent tensor has a column-major layout, the extract tile has a
+column-major layout.
+
+If you're extracting a tile from a tensor with a tiled layout, the extracted
+tile must match the tile boundaries of the parent tensor. For example, if the
+parent tensor is composed of 8x8 row-major tiles, a tile size of 8x8 yields an
+extracted tile with an 8x8 row-major layout.
+
+:::note
+
+Trying to extract a tile that's not an even multiple of the parent tile size
+usually results in an error.
+
+:::
+
+If you need to know the type of the tile (to declare a variable, for example),
+you can use the `TileType` type alias, with the same tile size parameters.
+
+```mojo
+var my_tile: tensor.TileType[tile_size, tile_size]
+for i in range (rows):
+    for j in range(columns):
+        my_tile = tensor.tile[tile_size, tile_size](i, j)
+        # ... do something with the tile ...
+```
+
+### Tiled iterators
+
+The
+[`LayoutTensorIter`](/api/mojo/layout/layout_tensor/LayoutTensorIter/)
+struct provides a way to iterate through a block of memory, generating a layout
+tensor for each position. There are two ways to use `LayoutTensorIter`:
+
+- Starting with a memory buffer, you can generate a series of tiles.
+- Given an existing layout tensor, you can extract a set of tiles along a given
+  axis.
+
+#### Tiling a memory buffer
+
+When you start with a memory buffer, `LayoutTensorIter` iterates through the
+memory one tile at a time. This essentially treats the memory as a flat array of
+tiles.
+
+```mojo
+comptime buf_size = 128
+var storage = Array[Int16, buf_size](uninitialized=True)
+for i in range(buf_size):
+    storage[i] = Int16(i)
+comptime tile_layout = Layout.row_major(4, 4)
+var iter = LayoutTensorIter[
+    .int16,
+    tile_layout,
+](storage.unsafe_ptr(), buf_size)
+
+for i in range(ceildiv(buf_size, comptime (tile_layout.size()))):
+    var tile = iter[]
+    # ... do something with tile
+    iter += 1
+```
+
+The iterator constructor takes all of the parameters you'd use to construct a
+`LayoutTensor`—a `DType`, layout, and an origin—and as arguments it takes a
+pointer and the size of the memory buffer.
+
+Note that the iterator doesn't work like a standard iterator, and you can't use
+it directly in a `for` statement like you would use a collection. Instead, you
+can use either the dereference operator (`iter[]`) or the `get()` method to
+retrieve a `LayoutTensor` representing the tile at the current position.
+
+You can advance the iterator by incrementing it, as shown above. The iterator
+also supports `next()` and `next_unsafe()` methods, which return a copy of the
+iterator incremented by a specified offset (default 1). This means you can also
+use a pattern like this:
+
+```mojo
+for i in range(num_tiles):
+    current_tile = iter.next(i)[]
+    …
+```
+
+`LayoutTensorIter` also has an optional boolean `circular` parameter. A
+`LayoutTensorIter`created with `circular=True` treats the memory buffer as
+circular; when it hits the end of the buffer, it starts over again at the
+beginning.
+
+### Tiling a `LayoutTensor`
+
+To iterate over an existing tensor, call the
+[`tiled_iterator()`](/api/mojo/layout/layout_tensor/LayoutTensor/#tiled_iterator)
+method, which produces a `LayoutTensorIter`:
+
+```mojo
+# given a tensor of size rows x cols
+comptime num_row_tiles = ceildiv(rows, tile_size)
+comptime num_col_tiles = ceildiv(cols, tile_size)
+
+for i in range(num_row_tiles):
+    var iter = tensor.tiled_iterator[tile_size, tile_size, axis=1](i, 0)
+
+    for _ in range(num_col_tiles):
+        var tile = iter[]
+        # ... do something with the tile
+        iter += 1
+```
+
+## Vectorizing tensors
+
+When working with tensors, it's frequently efficient to access more than one
+value at a time. For example, having a single GPU thread calculate multiple
+output values ("thread coarsening") can frequently improve performance.
+Likewise, when copying data from one memory space to another, it's often helpful
+for each thread to copy a SIMD vector worth of values, instead of a single
+value. Many GPUs have vectorized copy instructions that can make copying more
+efficient.
+
+To choose the optimum vector size, you need to know the vector operations
+supported for your current GPU for the data type you're working with. (For
+example, if you're working with 4 byte values and the GPU supports 16 byte copy
+operations, you can use a vector width of 4.) The `LayoutTensor` copy operations
+support copy sizes up to 16 bytes.
+
+The
+[`vectorize()`](/api/mojo/layout/layout_tensor/LayoutTensor/#vectorize)
+method creates a new view of the tensor where each element of the tensor is a
+vector of values.
+
+```mojo
+var vectorized_tensor = tensor.vectorize[1, 4]()
+```
+
+The vectorized tensor is a view of the original tensor, pointing to the same
+data. The underlying number of scalar values remains the same, but the tensor
+layout and element layout changes, as shown in Figure 4.
+
+<figure>
+
+![](../images/layout/tensors/vectorized-tensor.png#light)
+![](../images/layout/tensors/vectorized-tensor-dark.png#dark)
+
+<figcaption><b>Figure 4.</b> Vectorizing a tensor</figcaption>
+
+</figure>
+
+## Partitioning a tensor across threads
+
+When working with tensors on the GPU, it's sometimes desirable to distribute the
+elements of a tensor across the threads in a thread block. The
+[`distribute()`](/api/mojo/layout/layout_tensor/LayoutTensor/#distribute)
+method takes a thread layout and a thread ID and returns a thread-specific
+*fragment* of the tensor.
+
+The thread layout is tiled across the tensor. The *N*th thread receives a
+fragment consisting of the *N*th value from each tile. For example, Figure 5
+shows how `distribute()` forms fragments given a 4x4, row-major tensor and a
+2x2, column-major thread layout:
+
+<figure>
+
+![](../images/layout/tensors/distribute-layout.png#light)
+![](../images/layout/tensors/distribute-layout-dark.png#dark)
+
+<figcaption><b>Figure 5.</b> Partitioning a tensor into fragments</figcaption>
+
+</figure>
+
+In Figure 5, the numbers in the data layout represent offsets into storage, as
+usual. The numbers in the thread layout represent thread IDs.
+
+The example in Figure 5 uses a small thread layout for illustration purposes. In
+practice, it's usually optimal to use a thread layout that's the same size as
+the warp size of your GPU, so the work is divided across all available threads.
+For example, the following code vectorizes and partitions a tensor over a full
+warp worth of threads:
+
+```mojo
+comptime thread_layout = Layout.row_major(WARP_SIZE // simd_size, simd_size)
+var fragment = tile.vectorize[1, simd_size]().distribute[thread_layout](lane_id())
+```
+
+Given a 16x16 tile size, a warp size of 32 and a `simd_size` of 4, this code
+produces a 16x4 tensor of 1x4 vectors. The thread layout is an 8x4 row major
+layout.
+
+## Copying tensors
+
+The `layout-tensor` package provides a large set of utilities for copying
+tensors. A number of these are specialized for copying between various GPU
+memory spaces. All of the layout tensor copy methods respect the layouts—so you
+can transform a tensor by copying it to a tensor with a different layout.
+
+`LayoutTensor` itself provides two methods for copying tensor data:
+
+- [`copy_from()`](/api/mojo/layout/layout_tensor/LayoutTensor/#copy_from)
+  copies data from a source tensor to the current tensor, which may be in a
+  different memory space.
+- [`copy_from_async()`](/api/mojo/layout/layout_tensor/LayoutTensor/#copy_from_async)
+  is an optimized copy mechanism for asynchronously copying from GPU global
+  memory to shared memory.
+
+Both of these methods copy the entire source tensor. To divide the copying work
+among multiple threads, you need to use `distribute()` to create thread-local
+tensor fragments, as described in
+[Partitioning a tensor across threads](#partitioning-a-tensor-across-threads).
+
+The following code sample demonstrates using both copy methods to copy data to
+and from shared memory.
+
+```mojo
+def copy_from_async_example():
+    comptime dtype = DType.float32
+    comptime rows = 128
+    comptime cols = 128
+    comptime block_size = 16
+    comptime num_row_blocks = rows // block_size
+    comptime num_col_blocks = cols // block_size
+    comptime input_layout = Layout.row_major(rows, cols)
+    comptime simd_width = 4
+
+    def kernel(tensor: LayoutTensor[dtype, input_layout, MutAnyOrigin]):
+        # extract a tile from the input tensor.
+        var global_tile = tensor.tile[block_size, block_size](
+            Int(block_idx.y), Int(block_idx.x)
+        )
+        comptime tile_layout = Layout.row_major(block_size, block_size)
+        var shared_tile = LayoutTensor[
+            dtype,
+            tile_layout,
+            address_space=.SHARED,
+        ].stack_allocation()
+
+        # Create thread layouts for copying
+        comptime thread_layout = Layout.row_major(
+            WARP_SIZE // simd_width, simd_width
+        )
+        var global_fragment = global_tile.vectorize[
+            1, simd_width
+        ]().distribute[thread_layout](lane_id())
+        var shared_fragment = shared_tile.vectorize[
+            1, simd_width
+        ]().distribute[thread_layout](lane_id())
+
+        shared_fragment.copy_from_async(global_fragment)
+        comptime if is_nvidia_gpu():
+            async_copy_wait_all()
+        barrier()
+
+        # Put some data into the shared tile that we can verify on the host.
+        if global_idx.y < rows and global_idx.x < cols:
+            shared_tile[thread_idx.y, thread_idx.x] = (
+                shared_tile[thread_idx.y, thread_idx.x] + 1
+            )
+        barrier()
+        global_fragment.copy_from(shared_fragment)
+
+    try:
+        var ctx = DeviceContext()
+        var host_buf = ctx.enqueue_create_host_buffer[dtype](rows * cols)
+        var dev_buf = ctx.enqueue_create_buffer[dtype](rows * cols)
+        for i in range(rows * cols):
+            host_buf[i] = Float32(i)
+        var tensor = LayoutTensor[dtype, input_layout](dev_buf)
+
+        ctx.enqueue_copy(dev_buf, host_buf)
+        ctx.enqueue_function[kernel](
+            tensor,
+            grid_dim=(num_row_blocks, num_col_blocks),
+            block_dim=(block_size, block_size),
+        )
+        ctx.enqueue_copy(host_buf, dev_buf)
+        ctx.synchronize()
+        for i in range(rows * cols):
+            if host_buf[i] != Float32(i + 1):
+                raise Error(
+                    String("Unexpected value ", host_buf[i], " at position ", i)
+                )
+    except error:
+        print(error)
+```
+
+### Thread-aware copy functions
+
+The
+[`layout_tensor` package](/api/mojo/layout/layout_tensor/)
+also includes a number of specialized copy functions for different scenarios,
+such as copying from shared memory to local memory. These functions are all
+*thread-aware*: instead of passing in tensor fragments, you pass in a thread
+layout which the function uses to partition the work.
+
+As with the `copy_from()` and `copy_from_async()` methods, use the `vectorize()`
+method prior to copying to take advantage of vectorized copy operations.
+
+Many of the thread-aware copy functions have very specific requirements for the
+shape of the copied tensor and thread layout, based on the specific GPU and data
+type in use.
+
+## Summary
+
+In this document, we've explored the fundamental concepts and practical usage of
+`LayoutTensor`. At its core, `LayoutTensor` provides
+a powerful abstraction for working with multi-dimensional data.
+By combining a layout (which defines memory organization), a data type, and a
+memory pointer, `LayoutTensor` enables flexible and efficient data manipulation
+without unnecessary copying of the underlying data.
+
+We covered several essential tensor operations that form the
+foundation of working with `LayoutTensor`, including creating tensors,
+accessing tensor elements, and copying data between tensors.
+
+We also covered key patterns for optimizing data access:
+
+- Tiling tensors for data locality. Accessing tensors one tile at a time can
+  improve cache efficiency. On the GPU, tiling can allow the threads of a
+  thread block to share high-speed access to a subset of a tensor.
+- Vectorizing tensors for more efficient data loads and stores.
+- Partitioning or distributing tensors into thread-local fragments for
+  processing.
+
+These patterns provide the building blocks for writing efficient kernels in Mojo
+while maintaining clean, readable code.
+
+To see some practical examples of `LayoutTensor` in use, see the MAX guide,
+[Optimize custom ops for GPUs with Mojo](/develop/custom-ops-matmul/).

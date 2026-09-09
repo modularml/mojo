@@ -181,11 +181,11 @@ class GGUFWeights(Weights):
 
         try:
             dtype = _GGML_TO_DTYPE[tensor.tensor_type]
-        except KeyError as e:
+        except KeyError:
             if tensor.tensor_type in _FROM_QUANTIZED_GGML_DTYPES:
                 dtype = DType.uint8
             else:
-                raise e
+                raise
 
         # Dims are reversed for some reason:
         # https://github.com/ggerganov/llama.cpp/blob/master/gguf-py/gguf/gguf_reader.py#L277
@@ -254,7 +254,7 @@ class GGUFWeights(Weights):
         dtype: DType | None = None,
         shape: ShapeLike | None = None,
         quantization_encoding: QuantizationEncoding | None = None,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> Weight:
         """Creates and optionally validates a new Weight."""
         tensor = self._raw_tensor()

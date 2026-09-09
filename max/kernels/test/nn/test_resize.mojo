@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from layout import TileTensor, row_major
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from nn.resize import (
     CoordinateTransformationMode,
     RoundMode,
@@ -27,10 +27,10 @@ def main() raises:
 
     def test_upsample_sizes_nearest_1(ctx: DeviceContext) raises:
         print("== test_upsample_sizes_nearest_1")
-        var input_stack: InlineArray[Float32, 4] = [Float32(1), 2, 3, 4]
+        var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = InlineArray[Float32, 24](uninitialized=True)
+        var output_stack = Array[Float32, 24](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 4, 6]())
 
         resize_nearest_neighbor[
@@ -47,7 +47,7 @@ def main() raises:
 
     def test_downsample_sizes_nearest(ctx: DeviceContext) raises:
         print("== test_downsample_sizes_nearest")
-        var input_stack: InlineArray[Float32, 8] = [
+        var input_stack: Array[Float32, 8] = [
             Float32(1),
             2,
             3,
@@ -59,7 +59,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 4]())
 
-        var output_stack = InlineArray[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
 
         resize_nearest_neighbor[
@@ -78,7 +78,7 @@ def main() raises:
         ctx: DeviceContext,
     ) raises:
         print("== test_downsample_sizes_nearest_half_pixel_1D")
-        var input_stack: InlineArray[Float32, 16] = [
+        var input_stack: Array[Float32, 16] = [
             Float32(0),
             1,
             2,
@@ -98,7 +98,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = InlineArray[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
 
         resize_nearest_neighbor[
@@ -115,10 +115,10 @@ def main() raises:
 
     def test_upsample_sizes_nearest_2(ctx: DeviceContext) raises:
         print("== test_upsample_sizes_nearest_2")
-        var input_stack: InlineArray[Float32, 4] = [Float32(1), 2, 3, 4]
+        var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = InlineArray[Float32, 56](uninitialized=True)
+        var output_stack = Array[Float32, 56](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 7, 8]())
 
         resize_nearest_neighbor[
@@ -137,7 +137,7 @@ def main() raises:
         ctx: DeviceContext,
     ) raises:
         print("== test_upsample_sizes_nearest_floor_align_corners")
-        var input_stack: InlineArray[Float32, 16] = [
+        var input_stack: Array[Float32, 16] = [
             Float32(1),
             2,
             3,
@@ -157,7 +157,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = InlineArray[Float32, 64](uninitialized=True)
+        var output_stack = Array[Float32, 64](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 8, 8]())
 
         resize_nearest_neighbor[
@@ -176,7 +176,7 @@ def main() raises:
         ctx: DeviceContext,
     ) raises:
         print("== test_upsample_sizes_nearest_round_half_up_asymmetric")
-        var input_stack: InlineArray[Float32, 16] = [
+        var input_stack: Array[Float32, 16] = [
             Float32(1),
             2,
             3,
@@ -196,7 +196,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = InlineArray[Float32, 64](uninitialized=True)
+        var output_stack = Array[Float32, 64](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 8, 8]())
 
         resize_nearest_neighbor[
@@ -213,7 +213,7 @@ def main() raises:
 
     def test_upsample_sizes_nearest_ceil_half_pixel(ctx: DeviceContext) raises:
         print("== test_upsample_sizes_nearest_ceil_half_pixel")
-        var input_stack: InlineArray[Float32, 16] = [
+        var input_stack: Array[Float32, 16] = [
             Float32(1),
             2,
             3,
@@ -233,7 +233,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = InlineArray[Float32, 64](uninitialized=True)
+        var output_stack = Array[Float32, 64](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 8, 8]())
 
         resize_nearest_neighbor[
@@ -250,10 +250,10 @@ def main() raises:
 
     def test_upsample_sizes_linear(ctx: DeviceContext) raises:
         print("== test_upsample_sizes_linear")
-        var input_stack: InlineArray[Float32, 4] = [Float32(1), 2, 3, 4]
+        var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = InlineArray[Float32, 16](uninitialized=True)
+        var output_stack = Array[Float32, 16](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 4, 4]())
 
         # TORCH REFERENCE:
@@ -261,7 +261,7 @@ def main() raises:
         # y = torch.nn.functional.interpolate(torch.Tensor(x), (4, 4), mode="bilinear")
         # print(y.flatten())
 
-        var reference_stack: InlineArray[Float32, 16] = [
+        var reference_stack: Array[Float32, 16] = [
             Float32(1.0000),
             1.2500,
             1.7500,
@@ -295,10 +295,10 @@ def main() raises:
 
     def test_upsample_sizes_linear_align_corners(ctx: DeviceContext) raises:
         print("== test_upsample_sizes_linear_align_corners")
-        var input_stack: InlineArray[Float32, 4] = [Float32(1), 2, 3, 4]
+        var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = InlineArray[Float32, 16](uninitialized=True)
+        var output_stack = Array[Float32, 16](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 4, 4]())
 
         # TORCH REFERENCE:
@@ -306,7 +306,7 @@ def main() raises:
         # y = torch.nn.functional.interpolate(
         # torch.Tensor(x), (4, 4), mode="bilinear", align_corners=True)
         # print(y.flatten())
-        var reference_stack: InlineArray[Float32, 16] = [
+        var reference_stack: Array[Float32, 16] = [
             Float32(1.0000),
             1.3333,
             1.6667,
@@ -340,7 +340,7 @@ def main() raises:
 
     def test_downsample_sizes_linear(ctx: DeviceContext) raises:
         print("== test_downsample_sizes_linear")
-        var input_stack: InlineArray[Float32, 8] = [
+        var input_stack: Array[Float32, 8] = [
             Float32(1),
             2,
             3,
@@ -352,13 +352,13 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 4]())
 
-        var output_stack = InlineArray[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
         # TORCH REFERENCE:
         # x = np.arange(1, 9).reshape((1, 1, 2, 4))
         # y = torch.nn.functional.interpolate(torch.Tensor(x), (1, 2), mode="bilinear")
         # print(y.flatten())
-        var reference_stack: InlineArray[Float32, 2] = [
+        var reference_stack: Array[Float32, 2] = [
             Float32(3.50000),
             5.50000,
         ]
@@ -378,7 +378,7 @@ def main() raises:
 
     def test_downsample_sizes_linear_align_corners(ctx: DeviceContext) raises:
         print("== test_downsample_sizes_linear_align_corners")
-        var input_stack: InlineArray[Float32, 8] = [
+        var input_stack: Array[Float32, 8] = [
             Float32(1),
             2,
             3,
@@ -390,7 +390,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 4]())
 
-        var output_stack = InlineArray[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
         # TORCH REFERENCE:
         # x = np.arange(1, 9).reshape((1, 1, 2, 4))
@@ -398,7 +398,7 @@ def main() raises:
         #     torch.Tensor(x), (1, 2), mode="bilinear", align_corners=True
         # )
         # print(y.flatten())
-        var reference_stack: InlineArray[Float32, 2] = [Float32(1), 4]
+        var reference_stack: Array[Float32, 2] = [Float32(1), 4]
 
         resize_linear[CoordinateTransformationMode.AlignCorners, False](
             input, output
@@ -415,7 +415,7 @@ def main() raises:
 
     def test_upsample_sizes_trilinear(ctx: DeviceContext) raises:
         print("== test_upsample_sizes_trilinear")
-        var input_stack: InlineArray[Float32, 16] = [
+        var input_stack: Array[Float32, 16] = [
             Float32(0),
             1,
             2,
@@ -435,7 +435,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 4, 2, 2]())
 
-        var output_stack = InlineArray[Float32, 96](uninitialized=True)
+        var output_stack = Array[Float32, 96](fill={})
         var output = TileTensor(output_stack, row_major[1, 6, 4, 4]())
 
         # TORCH REFERENCE:
@@ -445,7 +445,7 @@ def main() raises:
         # )
         # print(y.flatten())
         # fmt: off
-        var reference_stack: InlineArray[Float32, 96] = [
+        var reference_stack: Array[Float32, 96] = [
             Float32(0.00000),  0.25000,  0.75000,  1.00000,  0.50000,  0.75000,  1.25000,
             1.50000,  1.50000,  1.75000,  2.25000,  2.50000,  2.00000,  2.25000,
             2.75000,  3.00000,  2.00000,  2.25000,  2.75000,  3.00000,  2.50000,
@@ -478,7 +478,7 @@ def main() raises:
 
     def test_downsample_sizes_linear_antialias(ctx: DeviceContext) raises:
         print("== test_downsample_sizes_linear_antialias")
-        var input_stack: InlineArray[Float32, 16] = [
+        var input_stack: Array[Float32, 16] = [
             Float32(0),
             1,
             2,
@@ -498,7 +498,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = InlineArray[Float32, 4](uninitialized=True)
+        var output_stack = Array[Float32, 4](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 2, 2]())
 
         # TORCH REFERENCE:
@@ -507,7 +507,7 @@ def main() raises:
         #     torch.Tensor(x), (2, 2), mode="bilinear", antialias=True
         # )
         # print(y.flatten())
-        var reference_stack: InlineArray[Float32, 4] = [
+        var reference_stack: Array[Float32, 4] = [
             Float32(3.57143),
             5.14286,
             9.85714,
@@ -529,13 +529,13 @@ def main() raises:
 
     def test_no_resize(ctx: DeviceContext) raises:
         print("== test_no_resize")
-        var input_stack: InlineArray[Float32, 4] = [Float32(1), 1, 1, 1]
+        var input_stack: Array[Float32, 4] = [Float32(1), 1, 1, 1]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = InlineArray[Float32, 4](uninitialized=True)
+        var output_stack = Array[Float32, 4](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 2, 2]())
 
-        var reference_stack: InlineArray[Float32, 4] = [
+        var reference_stack: Array[Float32, 4] = [
             Float32(1.0000),
             1.0000,
             1.0000,

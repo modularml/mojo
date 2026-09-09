@@ -15,26 +15,28 @@
 
 from __future__ import annotations
 
-import io
 import json
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
-from max.pipelines.core import TextAndVisionContext
+from max.pipelines.context import (
+    ImageMetadata,
+    TextAndVisionContext,
+    TokenBuffer,
+)
+from max.pipelines.context.exceptions import PromptTooLongError
 from max.pipelines.lib import TextAndVisionTokenizer
+from max.pipelines.lib.tokenizer import encode_dkv_cache_hint, open_image
 from max.pipelines.modeling.types import (
     ImageContentPart,
-    ImageMetadata,
     TextContentPart,
     TextGenerationRequest,
     TextGenerationRequestMessage,
     TextGenerationRequestTool,
-    TokenBuffer,
 )
 from max.support.image import find_contiguous_ranges, hash_image
-from PIL import Image
 from PIL.Image import Image as ImageType
 from transformers import AutoProcessor, AutoTokenizer
 
@@ -90,12 +92,19 @@ class Idefics3Tokenizer(TextAndVisionTokenizer):
         )
 
         # Initialize default EOS token IDs (required by parent class new_context method)
-        self._default_eos_token_ids = set([self.eos])
+        eos_token_id = self.delegate.eos_token_id
+        self._eos_token_ids = (
+            {eos_token_id} if eos_token_id is not None else set()
+        )
 
     async def decode(
-        self, encoded: npt.NDArray[np.integer[Any]], **kwargs
+        self, encoded: npt.NDArray[np.integer[Any]] | int, **kwargs
     ) -> str:
         """Decode token array back into readable text, filtering out special tokens."""
+        # Log-probability responses decode one token id (a plain int) at a
+        # time; match the text tokenizer's handling.
+        if isinstance(encoded, int):
+            encoded = np.array(encoded)
         # Force skip_special_tokens=True to filter out tokens like <end_of_utterance>
         kwargs_with_special_filter = kwargs.copy()
         kwargs_with_special_filter["skip_special_tokens"] = True
@@ -183,12 +192,13 @@ class Idefics3Tokenizer(TextAndVisionTokenizer):
         else:
             raise ValueError(f"{request} does not provide messages or prompt.")
 
-        # Convert image bytes to PIL Image objects.
+        # Convert image bytes to PIL Image objects (open_image reuses the
+        # API server's decode-once result, or decodes raw bytes as a fallback).
         if request.images:
             images = []
-            for image_bytes in request.images:
+            for image in request.images_for_processing():
                 try:
-                    img: ImageType = Image.open(io.BytesIO(image_bytes))
+                    img: ImageType = open_image(image)
                     # Ensure image is in RGB format to avoid channel format issues
                     if img.mode != "RGB":
                         img = img.convert("RGB")
@@ -264,14 +274,13 @@ class Idefics3Tokenizer(TextAndVisionTokenizer):
 
         json_schema = (
             json.dumps(request.response_format.json_schema)
-            if request.response_format and request.response_format.json_schema
+            if request.response_format
+            and request.response_format.json_schema is not None
             else None
         )
 
         if self.max_length and encoded_prompt.shape[0] > self.max_length:
-            raise ValueError(
-                "encoded_prompt is greater than the max_length of the tokenizer"
-            )
+            raise PromptTooLongError(encoded_prompt.shape[0], self.max_length)
 
         start_and_end_idxs = find_contiguous_ranges(
             encoded_prompt, self.vision_token_ids
@@ -294,8 +303,11 @@ class Idefics3Tokenizer(TextAndVisionTokenizer):
             if max_gen_tokens is not None
             else self.max_length,
             json_schema=json_schema,
+            log_probabilities=request.logprobs,
+            log_probabilities_echo=request.echo,
             sampling_params=request.sampling_params,
             target_endpoint=request.target_endpoint,
+            dkv_cache_hint=encode_dkv_cache_hint(request.dkv_cache_hint),
             images=[
                 ImageMetadata(
                     start_idx=start_idx,
@@ -310,6 +322,8 @@ class Idefics3Tokenizer(TextAndVisionTokenizer):
                 )
             ],
             vision_token_ids=self.vision_token_ids,
+            vocab_size=self.tokenizer_vocab_size,
+            cache_salt=request.cache_salt,
         )
         return context
 

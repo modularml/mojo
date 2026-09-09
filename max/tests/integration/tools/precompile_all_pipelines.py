@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from multiprocessing.sharedctypes import Synchronized
 
 import click
-from create_pipelines import PIPELINE_ORACLES
+from create_pipelines import PIPELINE_ORACLES, GenericOracle, PipelineOracle
 from max.pipelines.modeling.config_enums import SupportedEncoding
 from max.tests.integration.accuracy.logit_verification.logit_verification_config import (
     LOGIT_VERIFICATION_CONFIG,
@@ -59,9 +59,23 @@ SKIP_MODELS: set[str] = {
     "modularai/llama-3.1-405b-instruct-autofp8",
     "deepseek-ai/deepseek-r1",
     "deepseek-ai/deepseek-v3.1-terminus",
-    "nvidia/deepseek-r1-0528-nvfp4-v2",
     "amd/kimi-k2.5-mxfp4",
+    "nvidia/kimi-k2.7-code-nvfp4",
 }
+
+
+def resolve_oracle(pipeline: str) -> PipelineOracle:
+    """Resolve a pipeline name to its oracle, defaulting to a generic one.
+
+    Mirrors the fallback in ``generate_llm_logits`` so a pipeline that only
+    needs plain ``GenericOracle`` behavior can live in the logit-verification
+    config without a ``PIPELINE_ORACLES`` entry. Resolving eagerly here would
+    otherwise abort collection -- and therefore the whole precompile step --
+    for every other selected pipeline too.
+    """
+    if pipeline in PIPELINE_ORACLES:
+        return PIPELINE_ORACLES[pipeline]
+    return GenericOracle(model_path=pipeline)
 
 
 @dataclass
@@ -140,7 +154,7 @@ def run_precompile_inprocess(job: PrecompileJob) -> tuple[bool, str, float]:
             normalize_device_specs_input(job.devices)
         )
 
-        oracle = PIPELINE_ORACLES[job.oracle_key]
+        oracle = resolve_oracle(job.oracle_key)
         oracle.create_max_pipeline(
             encoding=job.encoding,
             device_specs=device_specs,
@@ -186,7 +200,7 @@ def collect_precompile_jobs(
             continue
 
         encoding = pipeline_def.encoding
-        oracle = PIPELINE_ORACLES[pipeline_def.pipeline]
+        oracle = resolve_oracle(pipeline_def.pipeline)
         model_path = oracle.model_path
 
         if model_path.casefold() in SKIP_MODELS:

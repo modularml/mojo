@@ -28,21 +28,13 @@ import click
 from pipeline_matrix import PipelineEntry, entries_to_matrix, filter_entries
 
 CONFIGS_DIR = Path("max/tests/integration/accuracy/llm_fuzz/configs")
-SMOKE_TEST_PIPELINE = "nvidia/Kimi-K2.5-NVFP4-ep-dp"
+SMOKE_TEST_PIPELINE = "nvidia/Kimi-K2.7-Code-NVFP4-ep-tp-dflash"
 
 
 PIPELINES: Final[list[PipelineEntry]] = [
     PipelineEntry(
-        pipeline="nvidia/Kimi-K2.5-NVFP4-ep-dp",
-        model_path="nvidia/Kimi-K2.5-NVFP4",
-        runner="modrunner-b200-8x",
-        gpu_flag="--devices gpu:0,1,2,3,4,5,6,7",
-        instance_type="bm.gpu.b200.8",
-        timeout=90,
-    ),
-    PipelineEntry(
-        pipeline="nvidia/Kimi-K2.5-NVFP4-ep-tp",
-        model_path="nvidia/Kimi-K2.5-NVFP4",
+        pipeline="nvidia/Kimi-K2.7-Code-NVFP4-ep-tp-dflash",
+        model_path="nvidia/Kimi-K2.7-Code-NVFP4",
         runner="modrunner-b200-8x",
         gpu_flag="--devices gpu:0,1,2,3,4,5,6,7",
         instance_type="bm.gpu.b200.8",
@@ -50,11 +42,59 @@ PIPELINES: Final[list[PipelineEntry]] = [
     ),
     PipelineEntry(
         pipeline="google/gemma-4-31B-it",
-        model_path="google/gemma-4-31b-it",
+        model_path="google/gemma-4-31B-it",
         runner="modrunner-b200",
         gpu_flag="--devices gpu:0",
         instance_type="bm.gpu.b200.1",
         timeout=60,
+    ),
+    PipelineEntry(
+        pipeline="minimax/MiniMax-M3-MXFP8-ep-tp",
+        model_path="MiniMaxAI/MiniMax-M3-MXFP8",
+        runner="modrunner-b200-8x",
+        gpu_flag="--devices gpu:0,1,2,3,4,5,6,7",
+        instance_type="bm.gpu.b200.8",
+        timeout=90,
+    ),
+    # DP=2 + tiered KV offload — mirrors the production M3 serving recipe and
+    # is the only config that exercises the overlap-scheduler staging race
+    # (heterogeneous_batch_tool_call_invariance scenario).
+    PipelineEntry(
+        pipeline="minimax/MiniMax-M3-MXFP8-ep-dp",
+        model_path="MiniMaxAI/MiniMax-M3-MXFP8",
+        runner="modrunner-b200-8x",
+        gpu_flag="--devices gpu:0,1,2,3,4,5,6,7",
+        instance_type="bm.gpu.b200.8",
+        timeout=90,
+    ),
+    PipelineEntry(
+        pipeline="amd/MiniMax-M3-MXFP4-ep-tp",
+        model_path="amd/MiniMax-M3-MXFP4",
+        runner="modrunner-mi355-4x",
+        gpu_flag="--devices gpu:0,1,2,3",
+        instance_type="bm.gpu.mi355x.4",
+        timeout=90,
+    ),
+    # MXFP8 is vendor-agnostic (unlike MXFP4, which needs an AMD-repacked
+    # checkpoint), so this reuses the same model_path as the B200 MXFP8
+    # entries above; only the runner/topology differ. Mirrors the production
+    # smoke-test recipe at
+    # max_private/minimax_m3/recipes/mxfp8_tp4dp2ep8_8x_mi355.yaml.
+    PipelineEntry(
+        pipeline="amd/MiniMax-M3-MXFP8-ep-tp",
+        model_path="MiniMaxAI/MiniMax-M3-MXFP8",
+        runner="modrunner-mi355-8x",
+        gpu_flag="--devices gpu:0,1,2,3,4,5,6,7",
+        instance_type="bm.gpu.mi355x.8",
+        timeout=90,
+    ),
+    PipelineEntry(
+        pipeline="nvidia/GLM-5.2-NVFP4-ep-tp-mtp",
+        model_path="nvidia/GLM-5.2-NVFP4",
+        runner="modrunner-b200-8x",
+        gpu_flag="--devices gpu:0,1,2,3,4,5,6,7",
+        instance_type="bm.gpu.b200.8",
+        timeout=90,
     ),
 ]
 

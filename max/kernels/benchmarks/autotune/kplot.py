@@ -377,7 +377,7 @@ def parse_and_plot(
     target_col: str = "1",
     compare: bool = False,
     pivots: list[str] = [],  # noqa: B006
-    cfg: PlotConfig = PlotConfig(),
+    cfg: PlotConfig = PlotConfig(),  # noqa: B008
     force: bool = False,
 ) -> None:
     """Parse CSV files and generate plots.
@@ -628,7 +628,7 @@ def cli(
 
     # add documentation for spec: name/separated param-value pairs
     assert key in ["spec", "name"]
-    prefix = output_prefix if output_prefix else "img"
+    prefix = output_prefix or "img"
 
     cfg = PlotConfig(
         extension=extension,

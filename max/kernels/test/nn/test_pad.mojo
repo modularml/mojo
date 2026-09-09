@@ -22,7 +22,7 @@ def test_pad_1d() raises:
 
     # Create an input matrix of the form
     # [1, 2, 3]
-    var input_stack: InlineArray[Scalar[DType.int], 3] = [
+    var input_stack: Array[Int, 3] = [
         1,
         2,
         3,
@@ -31,18 +31,18 @@ def test_pad_1d() raises:
 
     # Create a padding array of the form
     # [1, 2]
-    var paddings_stack: InlineArray[Scalar[DType.int], 2] = [1, 2]
+    var paddings_stack: Array[Int, 2] = [1, 2]
     var paddings = TileTensor(paddings_stack, row_major[2]())
 
     # Create an output matrix of the form
     # [0, 0, 0, 0, 0, 0]
-    var output_stack = InlineArray[Scalar[DType.int], 6](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[6]()).fill(0)
+    var output_stack = Array[Int, 6](fill=0)
+    var output = TileTensor(output_stack, row_major[6]())
 
-    var constant = Scalar[DType.int](5)
+    var constant = Int(5)
 
     # pad
-    pad_constant(output, input, paddings.ptr, constant)
+    pad_constant(output, input, paddings._storage, constant)
 
     # output should have form
     # [5, 1, 2, 3, 5, 5]
@@ -61,7 +61,7 @@ def test_pad_reflect_1d() raises:
 
     # Create an input matrix of the form
     # [1, 2, 3]
-    var input_stack: InlineArray[Scalar[DType.int], 3] = [
+    var input_stack: Array[Int, 3] = [
         1,
         2,
         3,
@@ -70,16 +70,16 @@ def test_pad_reflect_1d() raises:
 
     # Create an output matrix of the form
     # [0, 0, 0, 0, 0, 0, 0, 0]
-    var output_stack = InlineArray[Scalar[DType.int], 8](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[8]()).fill(0)
+    var output_stack = Array[Int, 8](fill=0)
+    var output = TileTensor(output_stack, row_major[8]())
 
     # Create a padding array of the form
     # [3, 2]
-    var paddings_stack: InlineArray[Scalar[DType.int], 2] = [3, 2]
+    var paddings_stack: Array[Int, 2] = [3, 2]
     var paddings = TileTensor(paddings_stack, row_major[2]())
 
     # pad
-    pad_reflect(output, input, paddings.ptr)
+    pad_reflect(output, input, paddings._storage)
 
     # output should have form
     # [2, 3, 2, 1, 2, 3, 2, 1]
@@ -100,7 +100,7 @@ def test_pad_repeat_1d() raises:
 
     # Create an input matrix of the form
     # [1, 2, 3]
-    var input_stack: InlineArray[Scalar[DType.int], 3] = [
+    var input_stack: Array[Int, 3] = [
         1,
         2,
         3,
@@ -109,16 +109,16 @@ def test_pad_repeat_1d() raises:
 
     # Create an output matrix of the form
     # [0, 0, 0, 0, 0, 0, 0, 0]
-    var output_stack = InlineArray[Scalar[DType.int], 8](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[8]()).fill(0)
+    var output_stack = Array[Int, 8](fill=0)
+    var output = TileTensor(output_stack, row_major[8]())
 
     # Create a padding array of the form
     # [3, 2]
-    var paddings_stack: InlineArray[Scalar[DType.int], 2] = [3, 2]
+    var paddings_stack: Array[Int, 2] = [3, 2]
     var paddings = TileTensor(paddings_stack, row_major[2]())
 
     # pad
-    pad_repeat(output, input, paddings.ptr)
+    pad_repeat(output, input, paddings._storage)
 
     # output should have form
     # [1, 1, 1, 1, 2, 3, 3, 3]
@@ -140,29 +140,25 @@ def test_pad_2d() raises:
     # Create an input matrix of the form
     # [[1, 2],
     #  [3, 4]]
-    var input_stack = InlineArray[Scalar[DType.int], 4](uninitialized=True)
+    var input_stack: Array[Int, _] = [1, 2, 3, 4]
     var input = TileTensor(input_stack, row_major[2, 2]())
-    input[0, 0] = 1
-    input[0, 1] = 2
-    input[1, 0] = 3
-    input[1, 1] = 4
 
     # Create a padding array of the form
     # [1, 0, 1, 1]
-    var paddings_stack: InlineArray[Scalar[DType.int], 4] = [1, 0, 1, 1]
+    var paddings_stack: Array[Int, 4] = [1, 0, 1, 1]
     var paddings = TileTensor(paddings_stack, row_major[4]())
 
     # Create an output matrix of the form
     # [[0, 0, 0, 0]
     #  [0, 0, 0, 0]
     #  [0, 0, 0, 0]]
-    var output_stack = InlineArray[Scalar[DType.int], 12](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[3, 4]()).fill(0)
+    var output_stack = Array[Int, 12](fill=0)
+    var output = TileTensor(output_stack, row_major[3, 4]())
 
-    var constant = Scalar[DType.int](6)
+    var constant = Int(6)
 
     # pad
-    pad_constant(output, input, paddings.ptr, constant)
+    pad_constant(output, input, paddings._storage, constant)
 
     # output should have form
     # [[6, 6, 6, 6]
@@ -190,16 +186,12 @@ def test_pad_reflect_2d() raises:
     # Create an input matrix of the form
     # [[1, 2],
     #  [3, 4]]
-    var input_stack = InlineArray[Scalar[DType.int], 4](uninitialized=True)
+    var input_stack: Array[Int, _] = [1, 2, 3, 4]
     var input = TileTensor(input_stack, row_major[2, 2]())
-    input[0, 0] = 1
-    input[0, 1] = 2
-    input[1, 0] = 3
-    input[1, 1] = 4
 
     # Create a padding array of the form
     # [2, 2, 1, 0]
-    var paddings_stack: InlineArray[Scalar[DType.int], 4] = [2, 2, 1, 0]
+    var paddings_stack: Array[Int, 4] = [2, 2, 1, 0]
     var paddings = TileTensor(paddings_stack, row_major[4]())
 
     # Create an output matrix of the form
@@ -209,11 +201,11 @@ def test_pad_reflect_2d() raises:
     #  [0 0 0]
     #  [0 0 0]
     #  [0 0 0]]
-    var output_stack = InlineArray[Scalar[DType.int], 18](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[6, 3]()).fill(0)
+    var output_stack = Array[Int, 18](fill=0)
+    var output = TileTensor(output_stack, row_major[6, 3]())
 
     # pad
-    pad_reflect(output, input, paddings.ptr)
+    pad_reflect(output, input, paddings._storage)
 
     # output should have form
     # [[2 1 2]
@@ -250,16 +242,12 @@ def test_pad_repeat_2d() raises:
     # Create an input matrix of the form
     # [[1, 2],
     #  [3, 4]]
-    var input_stack = InlineArray[Scalar[DType.int], 4](uninitialized=True)
+    var input_stack: Array[Int, _] = [1, 2, 3, 4]
     var input = TileTensor(input_stack, row_major[2, 2]())
-    input[0, 0] = 1
-    input[0, 1] = 2
-    input[1, 0] = 3
-    input[1, 1] = 4
 
     # Create a padding array of the form
     # [2, 2, 1, 0]
-    var paddings_stack: InlineArray[Scalar[DType.int], 4] = [2, 2, 1, 0]
+    var paddings_stack: Array[Int, 4] = [2, 2, 1, 0]
     var paddings = TileTensor(paddings_stack, row_major[4]())
 
     # Create an output matrix of the form
@@ -269,11 +257,11 @@ def test_pad_repeat_2d() raises:
     #  [0 0 0]
     #  [0 0 0]
     #  [0 0 0]]
-    var output_stack = InlineArray[Scalar[DType.int], 18](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[6, 3]()).fill(0)
+    var output_stack = Array[Int, 18](fill=0)
+    var output = TileTensor(output_stack, row_major[6, 3]())
 
     # pad
-    pad_repeat(output, input, paddings.ptr)
+    pad_repeat(output, input, paddings._storage)
 
     # output should have form
     # [[1, 1, 2],
@@ -310,16 +298,12 @@ def test_pad_3d() raises:
     # Create an input matrix of the form
     # [[[1, 2],
     #   [3, 4]]]
-    var input_stack = InlineArray[Scalar[DType.int], 4](uninitialized=True)
+    var input_stack: Array[Int, _] = [1, 2, 3, 4]
     var input = TileTensor(input_stack, row_major[1, 2, 2]())
-    input[0, 0, 0] = 1
-    input[0, 0, 1] = 2
-    input[0, 1, 0] = 3
-    input[0, 1, 1] = 4
 
     # Create a padding array of the form
     # [1, 0, 0, 1, 1, 0]
-    var paddings_stack: InlineArray[Scalar[DType.int], 6] = [1, 0, 0, 1, 1, 0]
+    var paddings_stack: Array[Int, 6] = [1, 0, 0, 1, 1, 0]
     var paddings = TileTensor(paddings_stack, row_major[6]())
 
     # Create an output matrix of the form
@@ -329,13 +313,13 @@ def test_pad_3d() raises:
     #  [[0, 0, 0]
     #   [0, 0, 0]
     #   [0, 0, 0]]]
-    var output_stack = InlineArray[Scalar[DType.int], 18](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[2, 3, 3]()).fill(0)
+    var output_stack = Array[Int, 18](fill=0)
+    var output = TileTensor(output_stack, row_major[2, 3, 3]())
 
-    var constant = Scalar[DType.int](7)
+    var constant = Int(7)
 
     # pad
-    pad_constant(output, input, paddings.ptr, constant)
+    pad_constant(output, input, paddings._storage, constant)
 
     # output should have form
     # [[[7, 7, 7]
@@ -374,20 +358,12 @@ def test_pad_reflect_3d() raises:
     #   [3, 4]],
     #  [[1, 2],
     #   [3 ,4]]]
-    var input_stack = InlineArray[Scalar[DType.int], 8](uninitialized=True)
+    var input_stack: Array[Int, _] = [1, 2, 3, 4, 1, 2, 3, 4]
     var input = TileTensor(input_stack, row_major[2, 2, 2]())
-    input[0, 0, 0] = 1
-    input[0, 0, 1] = 2
-    input[0, 1, 0] = 3
-    input[0, 1, 1] = 4
-    input[1, 0, 0] = 1
-    input[1, 0, 1] = 2
-    input[1, 1, 0] = 3
-    input[1, 1, 1] = 4
 
     # Create a padding array of the form
     # [1, 1, 0, 1, 1, 0]
-    var paddings_stack: InlineArray[Scalar[DType.int], 6] = [1, 1, 0, 1, 1, 0]
+    var paddings_stack: Array[Int, 6] = [1, 1, 0, 1, 1, 0]
     var paddings = TileTensor(paddings_stack, row_major[6]())
 
     # Create an output matrix of the form
@@ -403,11 +379,11 @@ def test_pad_reflect_3d() raises:
     #  [[0 0 0]
     #   [0 0 0]
     #   [0 0 0]]]
-    var output_stack = InlineArray[Scalar[DType.int], 36](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[4, 3, 3]()).fill(0)
+    var output_stack = Array[Int, 36](fill=0)
+    var output = TileTensor(output_stack, row_major[4, 3, 3]())
 
     # pad
-    pad_reflect(output, input, paddings.ptr)
+    pad_reflect(output, input, paddings._storage)
 
     # output should have form
     # [[[2 1 2]
@@ -467,13 +443,12 @@ def test_pad_reflect_3d_singleton() raises:
 
     # Create an input matrix of the form
     # [[[1]]]
-    var input_stack = InlineArray[Scalar[DType.int], 1](uninitialized=True)
+    var input_stack: Array[Int, _] = [1]
     var input = TileTensor(input_stack, row_major[1, 1, 1]())
-    input[0, 0, 0] = 1
 
     # Create a padding array of the form
     # [1, 0, 0, 1, 2, 2]
-    var paddings_stack: InlineArray[Scalar[DType.int], 6] = [
+    var paddings_stack: Array[Int, 6] = [
         1,
         0,
         0,
@@ -488,11 +463,11 @@ def test_pad_reflect_3d_singleton() raises:
     #   [0 0 0 0 0]]
     #  [[0 0 0 0 0]
     #   [0 0 0 0 0]]]
-    var output_stack = InlineArray[Scalar[DType.int], 20](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[2, 2, 5]()).fill(0)
+    var output_stack = Array[Int, 20](fill=0)
+    var output = TileTensor(output_stack, row_major[2, 2, 5]())
 
     # pad
-    pad_reflect(output, input, paddings.ptr)
+    pad_reflect(output, input, paddings._storage)
 
     # output should have the form
     # [[[1 1 1 1 1]
@@ -530,12 +505,12 @@ def test_pad_reflect_4d_big_input() raises:
     comptime out_size = 2 * 3 * 1024 * 1024
 
     # create a big input matrix and fill it with ones
-    var input_ptr = List(length=in_size, fill=Scalar[DType.int](1))
+    var input_ptr = List(length=in_size, fill=Int(1))
     var input = TileTensor(input_ptr, row_major[1, 1, 512, 512]())
 
     # create a padding array of the form
     # [1, 0, 1, 1, 256, 256, 256, 256]
-    var paddings_stack: InlineArray[Scalar[DType.int], 8] = [
+    var paddings_stack: Array[Int, 8] = [
         1,
         0,
         1,
@@ -548,11 +523,11 @@ def test_pad_reflect_4d_big_input() raises:
     var paddings = TileTensor(paddings_stack, row_major[8]())
 
     # create an even bigger output matrix and fill it with zeros
-    var output_ptr = List(length=out_size, fill=Scalar[DType.int](0))
+    var output_ptr = List(length=out_size, fill=Int(0))
     var output = TileTensor(output_ptr, row_major[2, 3, 1024, 1024]())
 
     # pad
-    pad_reflect(output, input, paddings.ptr)
+    pad_reflect(output, input, paddings._storage)
 
     assert_equal(output[0, 0, 0, 0], 1)
     _ = output_ptr^
@@ -568,28 +543,20 @@ def test_pad_repeat_3d() raises:
     #   [3, 4]],
     #  [[1, 2],
     #   [3 ,4]]]
-    var input_stack = InlineArray[Scalar[DType.int], 8](uninitialized=True)
+    var input_stack: Array[Int, _] = [1, 2, 3, 4, 1, 2, 3, 4]
     var input = TileTensor(input_stack, row_major[2, 2, 2]())
-    input[0, 0, 0] = 1
-    input[0, 0, 1] = 2
-    input[0, 1, 0] = 3
-    input[0, 1, 1] = 4
-    input[1, 0, 0] = 1
-    input[1, 0, 1] = 2
-    input[1, 1, 0] = 3
-    input[1, 1, 1] = 4
 
     # Create a padding array of the form
     # [1, 1, 0, 1, 1, 0]
-    var paddings_stack: InlineArray[Scalar[DType.int], 6] = [1, 2, 0, 2, 0, 1]
+    var paddings_stack: Array[Int, 6] = [1, 2, 0, 2, 0, 1]
     var paddings = TileTensor(paddings_stack, row_major[6]())
 
     # Create an output array equivalent to np.zeros((5, 4, 3))
-    var output_stack = InlineArray[Scalar[DType.int], 60](uninitialized=True)
-    var output = TileTensor(output_stack, row_major[5, 4, 3]()).fill(0)
+    var output_stack = Array[Int, 60](fill=0)
+    var output = TileTensor(output_stack, row_major[5, 4, 3]())
 
     # pad
-    pad_repeat(output, input, paddings.ptr)
+    pad_repeat(output, input, paddings._storage)
 
     # output should have form
     # [[[1, 2, 2],

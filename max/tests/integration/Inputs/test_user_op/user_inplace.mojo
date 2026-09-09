@@ -11,37 +11,37 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import compiler
+import extensibility
 from extensibility import (
     _MutableInputTensor as MutableInputTensor,
 )
 
 
-@compiler.register("mutable_test_op")
+@extensibility.register("mutable_test_op")
 struct MutableTestOp:
     @staticmethod
     def execute(in_place_tensor: MutableInputTensor) raises:
-        x = in_place_tensor._ptr.load(0)
+        var x = in_place_tensor._ptr.unsafe_load(0)
         x += 1
-        in_place_tensor._ptr.store(0, x)
+        in_place_tensor._ptr.unsafe_store(0, x)
 
 
-@compiler.register("foo")
+@extensibility.register("foo")
 struct FooKernel:
     @staticmethod
     def execute(in_place_tensor: MutableInputTensor) raises:
-        in_place_tensor._ptr.store(0, 0)
+        in_place_tensor._ptr.unsafe_store(0, 0)
 
 
-@compiler.register("bar")
+@extensibility.register("bar")
 struct BarKernel:
     @staticmethod
     def execute(in_place_tensor: MutableInputTensor) raises:
-        in_place_tensor._ptr.store(0, 0)
+        in_place_tensor._ptr.unsafe_store(0, 0)
 
 
-@compiler.register("baz")
+@extensibility.register("baz")
 struct BazKernel:
     @staticmethod
     def execute(in_place_tensor: MutableInputTensor) raises:
-        in_place_tensor._ptr.store(0, 0)
+        in_place_tensor._ptr.unsafe_store(0, 0)

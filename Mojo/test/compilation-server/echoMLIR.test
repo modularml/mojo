@@ -1,0 +1,28 @@
+// RUN: compilation-server -test < %s | FileCheck %s
+
+{"jsonrpc":"2.0","id":0,"method":"initialize"}
+// CHECK-LABEL: "id": 0
+// -----
+{"jsonrpc":"2.0","id":2,
+ "method":"echoMLIR",
+ "params":{
+    "module":"module attributes {M.target_info = #M.target<triple = \"arm64-apple-darwin23.4.0\", arch = \"apple-m3\">}{kgen.func export @inc(%arg0: index) -> index {kgen.return %arg0 : index}}"
+  }
+}
+// CHECK-LABEL: "id": 2
+// CHECK-NEXT:  "jsonrpc": "2.0"
+// CHECK:  "module": "module attributes {M.target_info = #M.target<triple = \"arm64-apple-darwin23.4.0\", arch = \"apple-m3\">} {\n  kgen.func export @inc(%arg0: index) -> index {\n    kgen.return %arg0 : index\n  }\n}"
+// -----
+{"jsonrpc":"2.0","id":4,
+ "method":"echoMLIR",
+ "params":{
+    "module":"dummy"
+ }
+}
+// CHECK-LABEL: "id": 4
+// CHECK-NEXT: "jsonrpc": "2.0"
+// CHECK:  "module": "Error: cannot parse MLIR module"
+// -----
+{"jsonrpc":"2.0","id":10,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

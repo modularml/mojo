@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 """EAGLE speculative decoding draft model for Llama 3 with unified graph compilation."""
 
+from max.pipelines.lib.interfaces.batch_processor import PersistentInputBuffers
+
 from .arch import unified_eagle_llama3_arch
 from .model import (
-    PersistentInputBuffers,
     UnifiedEagleLlama3Inputs,
     UnifiedEagleLlama3Model,
 )

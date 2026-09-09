@@ -18,9 +18,10 @@
 import enum
 import inspect
 import os
+import pathlib
 import types
 from collections.abc import Iterator, Mapping, Sequence
-from typing import Any, overload
+from typing import Any, TypeAlias, overload
 
 import max._core.driver
 import max._core.dtype
@@ -29,7 +30,7 @@ from max._core.driver import Buffer
 from max._core.mlrt import AsyncValue
 from max._core_types.driver import DLPackArray
 
-InputType = DLPackArray | Buffer | int | float | bool
+InputType: TypeAlias = DLPackArray | Buffer | int | float | bool
 
 class TensorSpec:
     """
@@ -54,9 +55,6 @@ class TensorSpec:
         If a dimension size is unknown/dynamic (such as the batch size), its
         value is ``None``.
         """
-
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
 
 class ModelMetadata:
     """Input and output metadata for a compiled model function."""
@@ -84,12 +82,94 @@ class CompiledModels:
             path: Filesystem path to write the MEF to.
         """
 
+def get_config_value(key: str) -> str:
+    """
+    Reads a config value.
+
+    Global overrides take priority, then the ``MODULAR_<KEY>``
+    environment variable, then ``modular.cfg``.
+
+    Raises:
+        KeyError: If the key is not set in any source.
+        RuntimeError: If the config fails to open.
+    """
+
+def get_global_value(key: str) -> str | None:
+    """
+    Returns the process-wide override for ``key``, or ``None`` if unset.
+
+    Ignores environment variables and ``modular.cfg``.
+    """
+
+def set_global_value(key: str, value: str) -> None:
+    """
+    Sets a process-wide config override.
+
+    Overrides take priority over environment variables and
+    ``modular.cfg`` for every consumer in the process. They are not
+    inherited by subprocesses.
+    """
+
+def unset_global_value(key: str) -> None:
+    """Removes an override set by :func:`set_global_value`."""
+
+def max_cache_dir() -> pathlib.Path | None:
+    """
+    Returns the directory the engine caches compiled models (``.mef``) in.
+
+    Resolved by the compiler itself.
+
+    Returns:
+        pathlib.Path | None: the cache directory, or None if unresolvable.
+    """
+
+@overload
+def read(path: str | os.PathLike) -> CompiledModels:
+    """
+    Reads a compiled-model artifact (``.mef``) from a file path.
+
+    Returns:
+        CompiledModels: the artifact, ready to be initialized on any
+        session via :meth:`InferenceSession._load_all`.
+
+    Raises:
+        RuntimeError: if the file is missing or is not a valid MEF
+        for this engine build.
+    """
+
+@overload
+def read(data: bytes) -> CompiledModels:
+    """
+    Reads a compiled-model artifact (``.mef``) from bytes.
+
+    Returns:
+        CompiledModels: the artifact, ready to be initialized on any
+        session via :meth:`InferenceSession._load_all`.
+
+    Raises:
+        RuntimeError: if the bytes are not a valid MEF for this
+        engine build.
+    """
+
 class Model:
     """
     A loaded model that you can execute.
 
     Do not instantiate this class directly. Instead, create it with
-    :obj:`InferenceSession`.
+    :meth:`InferenceSession.load` or :meth:`InferenceSession.init`.
+
+    A :class:`Model` is callable. Calling it directly (``model(inputs...)``)
+    accepts tensors as positional or keyword arguments and dispatches
+    to :meth:`execute`. You can also call :meth:`execute` directly, which
+    accepts positional arguments only.
+
+    When using keyword arguments, the names must match the model's input
+    metadata (see :attr:`input_metadata`). Calling the model raises
+    ``TypeError`` if a keyword argument doesn't match a model input, if a
+    positional and keyword argument refer to the same parameter, or if the
+    number of inputs doesn't match.
+
+    For supported input types and execution errors, see :meth:`execute`.
     """
 
     @property
@@ -171,94 +251,36 @@ class Model:
             model.execute(input_tensor)
 
         Args:
-            args:
-              A list of input tensors. We currently support :obj:`np.ndarray`,
-              :obj:`torch.Tensor`, and :obj:`max.driver.Buffer` inputs. All
-              inputs will be copied to the device that the model is resident on
+            args: A list of input tensors. The following input types are
+              supported:
+
+              * Any tensors implementing the DLPack protocol, such as
+                :obj:`np.ndarray` or :obj:`torch.Tensor`.
+              * Max Driver buffers, such as :obj:`max.driver.Buffer`.
+              * Scalar inputs, such as :obj:`bool`, :obj:`float`, :obj:`int`,
+                or :obj:`np.generic`.
+
+              All inputs are copied to the device that the model is resident on
               prior to executing.
 
-            output_device:
-              The device to copy output tensors to. Defaults to :obj:`None`, in
-              which case the tensors will remain resident on the same device as
-              the model.
-
         Returns:
-            A list of output tensors and Mojo values. The output tensors will be
-            resident on the execution device by default (you can change it with
-            the ``output_device`` argument).
+            A list of output tensors. The output tensors are resident on the
+            execution device.
 
         Raises:
-            RuntimeError: If the given input tensors' shape don't match what
+            RuntimeError: If the given input tensors' shapes don't match what
               the model expects.
 
-            TypeError: If the given input tensors' dtype cannot be cast to what
+            TypeError: If the given input tensors' dtype can't be cast to what
               the model expects.
 
-            ValueError: If positional inputs are not one of the supported
-              types, i.e. :obj:`np.ndarray`, :obj:`torch.Tensor`, and
-              :obj:`max.driver.Buffer`.
+            ValueError: If positional inputs aren't one of the supported
+              types.
         """
 
     def __call__(self, *args: InputType, **kwargs: InputType) -> list[Buffer]:
-        """
-        Executes the model with the provided input and returns the outputs.
+        """Executes the model. See :class:`Model` for details."""
 
-        Models can be called with any mixture of positional and named inputs:
-
-        .. code-block:: python
-
-            model(a, b, d=d, c=c)
-
-        This function assumes that positional inputs cannot collide with any
-        named inputs that would be present in the same position. If we have a
-        model that takes named inputs `a`, `b`, `c`, and `d` (in that order),
-        the following is invalid.
-
-        .. code-block:: python
-
-            model(a, d, b=b, c=c)
-
-        The function will assume that input `d` will map to the same position as
-        input `b`.
-
-        Args:
-            args: A list of input tensors. We currently support the following
-              input types:
-
-              * Any tensors implementing the DLPack protocol, such as
-                :obj:`np.ndarray`, :obj:`torch.Tensor`
-              * Max Driver buffers, i.e. :obj:`max.driver.Buffer`
-              * Scalar inputs, i.e. :obj:`bool`, :obj:`float`, :obj:`int`,
-                :obj:`np.generic`
-
-            kwargs: Named inputs. We can support the same types supported
-              in :obj:`args`.
-
-        Returns:
-            A list of output tensors. The output tensors will be
-            resident on the execution device.
-
-        Raises:
-            RuntimeError: If the given input tensors' shape don't match what
-              the model expects.
-
-            TypeError: If the given input tensors' dtype cannot be cast to
-              what the model expects.
-
-            ValueError: If positional inputs are not one of the supported
-              types, i.e. :obj:`np.ndarray`, :obj:`torch.Tensor`, and
-              :obj:`max.driver.Buffer`.
-
-            ValueError: If an input name does not correspond to what the model
-              expects.
-
-            ValueError: If any positional and named inputs collide.
-
-            ValueError: If the number of inputs is less than what the model
-              expects.
-        """
-
-    def __repr__(self) -> str: ...
     def capture(
         self, graph_keys: int | Sequence[int], *inputs: Buffer
     ) -> list[Buffer]:
@@ -344,6 +366,16 @@ class Model:
         """
 
     def reload(self, weights_registry: Mapping[str, Any]) -> None: ...
+    def release_weights(self) -> None:
+        """
+        Drops the host-side weight references held by this model.
+
+        Releases the weights registry and the owning references, so the host
+        weight memory can be freed once the caller drops its own references.
+        Safe only when every weight was copied to its execution device during
+        model init: reading a host weight after this call is undefined
+        behavior. ``reload`` remains usable afterwards.
+        """
 
 class DebugConfig:
     """
@@ -499,7 +531,8 @@ class InferenceSession:
         compiled: AsyncValue[CompiledModels],
         weights_registry: Mapping[str, Any],
     ) -> list[Model]: ...
-    def compile_from_path(
+    @overload
+    def compile(
         self,
         model_path: str | os.PathLike,
         custom_extension_paths: Sequence[str | os.PathLike],
@@ -516,11 +549,13 @@ class InferenceSession:
             ready to be initialized with weights via :meth:`_load_all`.
         """
 
-    def compile_from_object(
+    @overload
+    def compile(
         self,
         model: types.CapsuleType,
         custom_extensions: Sequence[str | os.PathLike],
         pipeline_name: str,
+        tile_based_fusion: bool = False,
     ) -> max._core.mlrt.AsyncValue[CompiledModels]:
         """
         Compiles a model from an in-memory capsule object.
@@ -529,10 +564,22 @@ class InferenceSession:
             model: A capsule containing the compiled model object.
             custom_extensions: Paths to custom Mojo extension libraries.
             pipeline_name: Name identifier for the compiled pipeline.
+            tile_based_fusion: When ``True``, compile the graph under the
+                tile-based programming model. Defaults to ``False``.
 
         Returns:
             CompiledModels: The compiled artifact, ready to be initialized
             with weights via :meth:`_load_all`.
+        """
+
+    def _wrap_compiled(
+        self, models: CompiledModels
+    ) -> max._core.mlrt.AsyncValue[CompiledModels]:
+        """
+        Wraps an already-read ``CompiledModels`` in a resolved async handle.
+
+        Consumes ``models``. The handle is allocated on this session's
+        runtime and can be passed to :meth:`_load_all`.
         """
 
     def set_debug_print_options(

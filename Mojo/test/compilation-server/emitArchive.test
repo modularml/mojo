@@ -1,0 +1,33 @@
+// RUN: compilation-server -test < %s | FileCheck %s
+
+{"jsonrpc":"2.0","id":0,"method":"initialize"}
+// CHECK-LABEL: "id": 0
+// -----
+{"jsonrpc":"2.0","id":2,
+ "method":"emitArchive",
+ "params":{
+    "module":"module attributes {M.target_info = #M.target<triple = \"arm64-apple-darwin23.4.0\", arch = \"apple-m3\", features = \"+aes,+bf16,+complxnum,+crc,+dotprod,+fp-armv8,+fp16fml,+fpac,+fullfp16,+hcx,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+ras,+rcpc,+rdm,+sha2,+sha3,+ssbs\", data_layout = \"e-m:o-i64:64-i128:128-n32:64-S128-Fn32\",relocation_model = \"pic\", simd_bit_width = 128, index_bit_width = 64>}{kgen.func export @inc(%arg0: index) -> index {kgen.return %arg0 : index}}",
+    "compilationOptions": {
+        "optimizationLevel": 3,
+        "debugLevel": 0,
+        "targetTriple": "arm64-apple-darwin23.4.0",
+        "targetCpu": "apple-m3",
+        "targetFeatures": "+aes,+bf16,+complxnum,+crc,+dotprod,+fp-armv8,+fp16fml,+fpac,+fullfp16,+hcx,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+ras,+rcpc,+rdm,+sha2,+sha3,+ssbs",
+        "relocModel": 1,
+        "debugInfoLanguage": 1,
+        "saveTempsPrefix": "",
+        "searchPaths": "",
+        "enableLLVMPerFunctionSplitting": true,
+        "enableParallelLLC": true
+    },
+    "isJIT" : false
+  }
+}
+// CHECK-LABEL: "id": 2
+// CHECK-NEXT:  "jsonrpc": "2.0"
+// CHECK:  "archive":
+// CHECK-NOT: "Error"
+// -----
+{"jsonrpc":"2.0","id":10,"method":"shutdown"}
+// -----
+{"jsonrpc":"2.0","method":"exit"}

@@ -1,0 +1,36 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# Initially define an integer value of 10.
+var value = 10
+# CHECK: (Int) value
+
+# Check that we can redefine this in a followup expression.
+var value = True
+# CHECK: (Bool) value
+
+# Check that we can redefine a function that has a return type defined in the
+# same expression.
+struct Struct:
+    def __init__(out self):
+        pass
+def xoo() -> Struct:
+    return Struct()
+var abc = xoo()
+# CHECK: (Struct) abc =
+
+struct Struct:
+    def __init__(out self):
+        pass
+def xoo() -> Struct:
+    return Struct()
+var abc = xoo()
+# CHECK: (Struct) abc =
+

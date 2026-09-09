@@ -1,8 +1,7 @@
-# gazelle:default_visibility //SDK/integration-test:__subpackages__,//max/tests:__subpackages__,//:__pkg__,//oss/modular/max/tests:__subpackages__
+# gazelle:default_visibility //max/tests:__subpackages__,//:__pkg__,//oss/modular/max/tests:__subpackages__
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])

@@ -20,7 +20,7 @@ from max.driver import Buffer
 from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
-from modular_graph_test import ACCURACY_ATOL, ACCURACY_RTOL
+from test_common.modular_graph_test import ACCURACY_ATOL, ACCURACY_RTOL
 
 
 def test_matmul_dense(session: InferenceSession) -> None:

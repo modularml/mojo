@@ -25,7 +25,7 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, Shape, TensorType
 from max.graph.weights import WeightData
 from max.nn import Linear
-from max.pipelines.lib.quant import parse_quant_config
+from max.pipelines.weights.quant import parse_quant_config
 from test_common.graph_utils import is_h100_h200
 from torch.utils.dlpack import from_dlpack
 from transformers.models.llama.configuration_llama import LlamaConfig

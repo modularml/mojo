@@ -1,8 +1,12 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_mojo//mojo:toolchain.bzl", "mojo_copts_toolchain")
 load("@rules_mypy//mypy:mypy.bzl", "mypy_cli")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:api.bzl", "modular_cc_binary", "modular_cc_library", "modular_py_binary", "modular_py_library", "modular_py_test", "requirement")
 load("//bazel:config.bzl", "TOP_LEVEL_TAG")
+load("//max/python/max:all_deps.bzl", "ALL_MAX_PYTHON_DEPS")
 load(":gpu_toolchain_alias.bzl", "gpu_toolchain_alias")
+load(":mojo_toolchain.bzl", "mojo_toolchain")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -128,8 +132,7 @@ modular_py_binary(
         requirement("sphinx"),
         requirement("munch"),
         requirement("torch"),
-        "//max/python/max",
-    ],
+    ] + ALL_MAX_PYTHON_DEPS,
 )
 
 modular_py_binary(
@@ -176,6 +179,28 @@ mojo_copts_toolchain(
     tags = [TOP_LEVEL_TAG],  # Used in MODULE.bazel
 )
 
+mojo_toolchain(
+    name = "mojo_toolchain_target",
+    implicit_deps = [],
+    lld = "@llvm-project//lld:lld",
+    mojo = "//Mojo/tools/mojo",
+    tags = [
+        # Manual so that even in --config=prebuilt-mojo this
+        # doesn't build, since we build this folder in the OSS CI.
+        "manual",
+        TOP_LEVEL_TAG,  # Used in oss.MODULE.bazel
+    ],
+)
+
+# Don't split toolchains on OS, we don't care about cross compilation here.
+toolchain(
+    name = "mojo_toolchain",
+    tags = [TOP_LEVEL_TAG],  # Used in oss.MODULE.bazel
+    target_settings = ["//:use_prebuilt_mojo_toolchain_disabled"],
+    toolchain = ":mojo_toolchain_target",
+    toolchain_type = "@rules_mojo//:toolchain_type",
+)
+
 toolchain(
     name = "mojo_copts_toolchain",
     tags = [TOP_LEVEL_TAG],  # Used in MODULE.bazel
@@ -189,4 +214,43 @@ modular_py_library(
     srcs = ["pytest-shard.py"],
     imports = ["."],
     deps = [requirement("pytest")],
+)
+
+# Avoid default dependencies on mojo
+# gazelle:ignore
+py_binary(
+    name = "gen_dialect_checksum",
+    srcs = ["gen_dialect_checksum.py"],
+)
+
+cc_library(name = "empty_lib")
+
+# TCMalloc compiled with NUMA partition support (kNumaPartitions=2).
+alias(
+    name = "tcmalloc_numa_aware",
+    actual = select({
+        "@platforms//os:macos": "@gperftools-macos//:tcmalloc",
+        # NOTE: This library doesn't override new/free globally, which the default library does
+        "@platforms//os:linux": "@tcmalloc//tcmalloc:tcmalloc_internal_methods_only_numa_aware",
+    }),
+)
+
+# Links in want_numa_aware.cc, overriding the weak default_want_numa_aware()
+# symbol so that TCMalloc enables NUMA awareness by default at runtime.
+# No-op on macOS (gperftools has no NUMA partition support).
+alias(
+    name = "tcmalloc_want_numa_aware",
+    actual = select({
+        "@platforms//os:macos": ":empty_lib",
+        "@platforms//os:linux": "@tcmalloc//tcmalloc:want_numa_aware",
+    }),
+)
+
+modular_cc_library(
+    name = "runtool",
+    srcs = ["runtool-shim.cpp"],
+    # fix_bazel_paths() is intentionally a constructor — it must run before
+    # main() to set MODULAR_HOME and current_path for bazel-run targets.
+    copts = ["-Wno-global-constructors"],
+    alwayslink = True,
 )

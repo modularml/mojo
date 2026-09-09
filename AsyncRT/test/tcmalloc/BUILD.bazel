@@ -1,0 +1,36 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("//bazel:api.bzl", "mojo_binary")
+
+# gazelle:default_visibility //visibility:private
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+# Minimal Mojo program. The runtime links tcmalloc, which reads
+# /sys/devices/system/cpu at startup.
+mojo_binary(
+    name = "minimal_mojo_program",
+    testonly = True,
+    srcs = ["minimal.mojo"],
+    deps = ["@mojo//:std"],
+)
+
+# The program must start with /sys/devices/system/cpu hidden. Linux-only:
+# the masking uses user+mount namespaces and the bug is Linux-specific.
+sh_test(
+    name = "mojo_runs_without_sys_cpu",
+    srcs = ["run_without_sys_cpu.sh"],
+    args = ["$(rootpath :minimal_mojo_program)"],
+    data = [":minimal_mojo_program"],
+    target_compatible_with = ["@platforms//os:linux"],
+)

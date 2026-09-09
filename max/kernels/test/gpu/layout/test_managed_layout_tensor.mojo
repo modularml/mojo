@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import IntTuple, Layout, RuntimeLayout, UNKNOWN_VALUE
 from layout._utils import ManagedLayoutTensor
 from std.testing import assert_equal
@@ -27,14 +27,14 @@ def test_managed_layout_tensor_1d() raises:
     comptime layout_1d = Layout(IntTuple(10))
 
     # Test with CPU context
-    var cpu_tensor = ManagedLayoutTensor[DType.float32, layout_1d]()
+    var cpu_tensor = ManagedLayoutTensor[.float32, layout_1d]()
     var host_tensor_1d = cpu_tensor.tensor[update=False]()
     assert_equal(comptime (host_tensor_1d.layout.rank()), 1)
     assert_equal(host_tensor_1d.dim[0](), 10)
 
     # Test with GPU context
     var gpu_ctx = DeviceContext()
-    var gpu_tensor = ManagedLayoutTensor[DType.float32, layout_1d](gpu_ctx)
+    var gpu_tensor = ManagedLayoutTensor[.float32, layout_1d](gpu_ctx)
     var device_tensor_1d = gpu_tensor.device_tensor[update=False]()
     assert_equal(comptime (device_tensor_1d.layout.rank()), 1)
     assert_equal(device_tensor_1d.dim[0](), 10)
@@ -45,7 +45,7 @@ def test_managed_layout_tensor_2d() raises:
     comptime layout_2d = Layout(IntTuple(4, 6))
 
     # Test with CPU context
-    var cpu_tensor = ManagedLayoutTensor[DType.float32, layout_2d]()
+    var cpu_tensor = ManagedLayoutTensor[.float32, layout_2d]()
     var host_tensor_2d = cpu_tensor.tensor[update=False]()
     assert_equal(comptime (host_tensor_2d.layout.rank()), 2)
     assert_equal(host_tensor_2d.dim[0](), 4)
@@ -53,7 +53,7 @@ def test_managed_layout_tensor_2d() raises:
 
     # Test with GPU context
     var gpu_ctx = DeviceContext()
-    var gpu_tensor = ManagedLayoutTensor[DType.float32, layout_2d](gpu_ctx)
+    var gpu_tensor = ManagedLayoutTensor[.float32, layout_2d](gpu_ctx)
     var device_tensor_2d = gpu_tensor.device_tensor[update=False]()
     assert_equal(comptime (device_tensor_2d.layout.rank()), 2)
     assert_equal(device_tensor_2d.dim[0](), 4)
@@ -65,7 +65,7 @@ def test_managed_layout_tensor_3d() raises:
     comptime layout_3d = Layout(IntTuple(2, 3, 4))
 
     # Test with CPU context
-    var cpu_tensor = ManagedLayoutTensor[DType.float32, layout_3d]()
+    var cpu_tensor = ManagedLayoutTensor[.float32, layout_3d]()
     var host_tensor_3d = cpu_tensor.tensor[update=False]()
     assert_equal(comptime (host_tensor_3d.layout.rank()), 3)
     assert_equal(host_tensor_3d.dim[0](), 2)
@@ -74,7 +74,7 @@ def test_managed_layout_tensor_3d() raises:
 
     # Test with GPU context
     var gpu_ctx = DeviceContext()
-    var gpu_tensor = ManagedLayoutTensor[DType.float32, layout_3d](gpu_ctx)
+    var gpu_tensor = ManagedLayoutTensor[.float32, layout_3d](gpu_ctx)
     var device_tensor_3d = gpu_tensor.device_tensor[update=False]()
     assert_equal(comptime (device_tensor_3d.layout.rank()), 3)
     assert_equal(device_tensor_3d.dim[0](), 2)
@@ -92,7 +92,7 @@ def test_managed_layout_tensor_dynamic() raises:
     var runtime_layout = RuntimeLayout[layout_dynamic].row_major(runtime_shape)
 
     # Test with CPU context
-    var cpu_tensor = ManagedLayoutTensor[DType.float32, layout_dynamic](
+    var cpu_tensor = ManagedLayoutTensor[.float32, layout_dynamic](
         runtime_layout
     )
     var host_tensor_dynamic = cpu_tensor.tensor[update=False]()
@@ -103,7 +103,7 @@ def test_managed_layout_tensor_dynamic() raises:
 
     # Test with GPU context
     var gpu_ctx = DeviceContext()
-    var gpu_tensor = ManagedLayoutTensor[DType.float32, layout_dynamic](
+    var gpu_tensor = ManagedLayoutTensor[.float32, layout_dynamic](
         runtime_layout, gpu_ctx
     )
     var device_tensor_dynamic = gpu_tensor.device_tensor[update=False]()

@@ -16,23 +16,12 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.types import TextGenerationContext
-from testbed.harnesses.attention_with_rope import (
-    AttentionWithRopeHarness,
-    AttentionWithRopeStaticParams,
-)
+from layer_mefs import create_runner
+from max.pipelines.context import TextContext
+from testbed.harnesses.attention_with_rope import AttentionWithRopeStaticParams
 from testbed.harnesses.ragged_attention_harness import AttentionDynamicParams
-from testbed.runner import LayerTestRunner, create_session
-
-_STATIC_PARAMS = AttentionWithRopeStaticParams(
-    hidden_size=16384,
-    n_heads=16,
-    n_kv_heads=1,
-    head_dim=128,
-    max_seq_len=131072,
-    rope_theta=500000.0,
-    dtype="fp8",
-)
+from testbed.runner import LayerTestRunner
+from testbed.specs import ATTENTION_WITH_ROPE_FP8
 
 _SMOKE_SHAPES = [
     AttentionDynamicParams(batch_size=1, seq_len=10000),
@@ -44,19 +33,16 @@ _SMOKE_SHAPES = [
 def runner() -> LayerTestRunner[
     AttentionWithRopeStaticParams,
     AttentionDynamicParams,
-    list[TextGenerationContext],
+    list[TextContext],
 ]:
-    session, device = create_session()
-    return LayerTestRunner(
-        AttentionWithRopeHarness(_STATIC_PARAMS, session, device)
-    )
+    return create_runner(ATTENTION_WITH_ROPE_FP8)
 
 
 def test_benchmark_smoke(
     runner: LayerTestRunner[
         AttentionWithRopeStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     results = runner.benchmark(_SMOKE_SHAPES, iterations=1, warmup=1)

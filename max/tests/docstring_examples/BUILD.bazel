@@ -1,0 +1,32 @@
+load("//bazel:api.bzl", "modular_py_library", "modular_py_test", "requirement")
+
+# gazelle:default_visibility //:__pkg__,//max/python/max:__subpackages__,//max/tests:__subpackages__,//oss/modular/max/tests:__subpackages__
+
+package(default_visibility = [
+    "//:__pkg__",
+    # Opted-in libraries generate a .docstring_examples test that depends on
+    # :sybil_collect, so their packages must see this collector.
+    "//max/python/max:__subpackages__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_library(
+    name = "sybil_collect",
+    testonly = True,
+    srcs = ["sybil_collect.py"],
+    imports = ["."],
+    deps = [
+        requirement("pytest"),
+        requirement("sybil"),
+    ],
+)
+
+modular_py_test(
+    name = "test_sybil_collect",
+    srcs = ["test_sybil_collect.py"],
+    deps = [
+        ":sybil_collect",
+        requirement("sybil"),
+    ],
+)

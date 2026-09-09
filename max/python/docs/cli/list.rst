@@ -32,6 +32,6 @@ pass the ``--json`` flag:
 The JSON output uses the structure
 ``{"architectures": {<name>: {"example_repo_ids": [...], "supported_encodings": [...]}}}``.
 
-.. click:: max.entrypoints.pipelines:cli_list
+.. click:: max._entrypoints.pipelines:cli_list
   :prog: max list
   :hide-description:

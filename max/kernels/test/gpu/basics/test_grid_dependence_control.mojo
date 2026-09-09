@@ -11,16 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.primitives.grid_controls import (
+from max.gpu.primitives.grid_controls import (
     _SUPPORT_PDL_LAUNCH as SUPPORT_PDL_LAUNCH,
 )
-from std.gpu.primitives.grid_controls import (
+from max.gpu.primitives.grid_controls import (
     PDL,
     launch_dependent_grids,
     wait_on_dependent_grids,
 )
-from std.gpu.host import get_gpu_target
-from std.gpu.host.compile import _compile_code
+from max.gpu.host import get_gpu_target
+from max.gpu.host.compile import _compile_code
 from std.testing import assert_true
 
 

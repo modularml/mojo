@@ -1,9 +1,209 @@
-load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "pkg_files", "requirement")
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test", "modular_run_binary_test", "requirement")
 
 package(default_visibility = ["//max:consumers"])
 
+modular_py_library(
+    name = "tuning_codegen_lib",
+    srcs = ["tuning_codegen.py"],
+    imports = ["."],
+    deps = [
+        requirement("pyyaml"),
+    ],
+)
+
 modular_py_binary(
-    name = "kbench",
+    name = "tuning_codegen",
+    srcs = ["tuning_codegen_main.py"],
+    imports = ["."],
+    main = "tuning_codegen_main.py",
+    deps = [
+        ":tuning_codegen_lib",
+    ],
+)
+
+modular_py_test(
+    name = "tuning_codegen_tests",
+    size = "small",
+    srcs = ["tests/test_tuning_codegen.py"],
+    deps = [
+        ":tuning_codegen_lib",
+    ],
+)
+
+filegroup(
+    name = "tuning_codegen_table_data",
+    testonly = True,
+    srcs = [
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_fp8.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_fp8_ranged.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_small_mn.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_batched_bf16.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_batched_fp8.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_bf16.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_fp8.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_mxfp4.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_mxfp8.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_nvfp4.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm100_structured/default/tuning_table_sm100_small_mn_bf16.yaml",
+        "//max/kernels/src/linalg:matmul/gpu/sm90/tuning.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm90/tuning_configs.mojo",
+        "//max/kernels/src/linalg:matmul/gpu/sm90/tuning_custom.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm90/tuning_custom_grid.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm90/tuning_custom_scaled.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm90/tuning_custom_scaled_grid.mojo.snippet",
+        "//max/kernels/src/linalg:matmul/gpu/sm90/tuning_table_bf16.yaml",
+    ],
+)
+
+modular_run_binary_test(
+    name = "sm100_fp8_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_fp8.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_fp8.mojo.snippet",
+        "--snippet-variant=ranged=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_fp8_ranged.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-FP8",
+        "--end-marker=END-TUNING-LIST-SM100-FP8",
+        "--source-label=tuning_table_sm100_fp8.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm100_bf16_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_bf16.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-BF16",
+        "--end-marker=END-TUNING-LIST-SM100-BF16",
+        "--source-label=tuning_table_sm100_bf16.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm100_nvfp4_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_nvfp4.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-NVFP4",
+        "--end-marker=END-TUNING-LIST-SM100-NVFP4",
+        "--source-label=tuning_table_sm100_nvfp4.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm100_mxfp4_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_mxfp4.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-MXFP4",
+        "--end-marker=END-TUNING-LIST-SM100-MXFP4",
+        "--source-label=tuning_table_sm100_mxfp4.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm100_mxfp8_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_mxfp8.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-MXFP8",
+        "--end-marker=END-TUNING-LIST-SM100-MXFP8",
+        "--source-label=tuning_table_sm100_mxfp8.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm100_batched_bf16_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_batched_bf16.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-BATCHED-BF16",
+        "--end-marker=END-TUNING-LIST-SM100-BATCHED-BF16",
+        "--source-label=tuning_table_sm100_batched_bf16.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm100_batched_fp8_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_batched_fp8.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-BATCHED-FP8",
+        "--end-marker=END-TUNING-LIST-SM100-BATCHED-FP8",
+        "--source-label=tuning_table_sm100_batched_fp8.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm100_small_mn_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_table_sm100_small_mn_bf16.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_small_mn.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-SM100-SMALL-MN-BF16",
+        "--end-marker=END-TUNING-LIST-SM100-SMALL-MN-BF16",
+        "--source-label=tuning_table_sm100_small_mn_bf16.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+modular_run_binary_test(
+    name = "sm90_bf16_tuning_codegen_test",
+    args = [
+        "--check",
+        "--manifest=max/kernels/src/linalg/matmul/gpu/sm90/tuning_table_bf16.yaml",
+        "--snippet=max/kernels/src/linalg/matmul/gpu/sm90/tuning.mojo.snippet",
+        "--snippet-variant=custom=max/kernels/src/linalg/matmul/gpu/sm90/tuning_custom.mojo.snippet",
+        "--snippet-variant=custom_grid=max/kernels/src/linalg/matmul/gpu/sm90/tuning_custom_grid.mojo.snippet",
+        "--snippet-variant=custom_scaled=max/kernels/src/linalg/matmul/gpu/sm90/tuning_custom_scaled.mojo.snippet",
+        "--snippet-variant=custom_scaled_grid=max/kernels/src/linalg/matmul/gpu/sm90/tuning_custom_scaled_grid.mojo.snippet",
+        "--target=max/kernels/src/linalg/matmul/gpu/sm90/tuning_configs.mojo",
+        "--begin-marker=BEGIN-TUNING-LIST-BF16",
+        "--end-marker=END-TUNING-LIST-BF16-SMALL",
+        "--source-label=max/kernels/src/linalg/matmul/gpu/sm90/tuning_table_bf16.yaml",
+    ],
+    binary = ":tuning_codegen",
+    data = [":tuning_codegen_table_data"],
+)
+
+# Python-only library form of kbench so out-of-tree consumers can build
+# their own modular_py_binary that pairs the same kbench harness with a
+# different `mojo_deps` set — most notably, a stdlib overlay other than
+# `@mojo//:std`. Carries no mojo_deps itself so the consumer fully
+# controls which `std.mojoc` lands in runfiles.
+modular_py_library(
+    name = "kbench_lib",
     srcs = [
         "__init__.py",
         "kbench.py",
@@ -11,6 +211,29 @@ modular_py_binary(
         "terminal_viz.py",
         "utils.py",
     ],
+    imports = ["."],
+    tags = ["no-pydeps"],  # mirrors the binary's tag
+    visibility = ["//visibility:public"],
+    deps = [
+        ":bencher_utils",
+        requirement("click"),
+        requirement("numpy"),
+        requirement("pandas"),
+        requirement("pygments"),
+        requirement("pyyaml"),
+        requirement("rich"),
+        requirement("scipy"),
+        requirement("plotly"),
+        requirement("tabulate"),
+        requirement("torch"),
+        requirement("packaging"),
+        "@rules_python//python/runfiles",
+    ],
+)
+
+modular_py_binary(
+    name = "kbench",
+    srcs = ["kbench_main.py"],  # kbench.py + helpers come in via :kbench_lib
     data = [
         "@nvshmem_prebuilt//:device",
         "@nvshmem_prebuilt//:host",
@@ -36,12 +259,11 @@ modular_py_binary(
         "//conditions:default": {},
     }),
     imports = ["."],
-    main = "kbench.py",
+    main = "kbench_main.py",
     mojo_deps = [
         "//max:_cublas",
         "//max:_cudnn",
         "//max:_cufft",
-        "//max:_curand",
         "//max:_rocblas",
         "//max:comm",
         "//max:extensibility",
@@ -56,6 +278,12 @@ modular_py_binary(
     ],
     tags = ["no-pydeps"],  # TODO: Fix and re-enable
     deps = [
+        # :kbench_lib brings the other .py files (kbench_model, terminal_viz,
+        # utils, __init__) plus the Python requirements transitively. The
+        # requirements are also listed directly below so the mypy aspect on
+        # this binary can resolve `import click` / `import rich` / … in
+        # kbench.py; without that listing mypy fails import-not-found.
+        ":kbench_lib",
         requirement("click"),
         requirement("numpy"),
         requirement("pandas"),
@@ -67,10 +295,15 @@ modular_py_binary(
         requirement("tabulate"),
         requirement("torch"),
         requirement("packaging"),
-        "//max/kernels/benchmarks/autotune:bencher_utils",
         "@rules_python//python/runfiles",
     ] + select({
         "//:nvidia_gpu": ["//max/kernels/benchmarks/misc/comparison:bench_baseline_lib"],
+        "//:amd_gpu": [
+            "//max/kernels/benchmarks/misc/comparison:bench_amd_mha",
+            "//max/kernels/benchmarks/misc/comparison:bench_amd_mla",
+            "//max/kernels/benchmarks/misc/comparison:bench_amd_mx_gemm",
+            "//max/kernels/benchmarks/misc/comparison:bench_softmax_lib",
+        ],
         "//conditions:default": [],
     }),
 )
@@ -150,7 +383,10 @@ modular_py_test(
     name = "autotune_tests",
     # test_kbench compiles multiple Mojo binaries which can be slow on CI.
     size = "large",
-    srcs = glob(["tests/*.py"]),
+    srcs = glob(
+        ["tests/*.py"],
+        exclude = ["tests/test_tuning_codegen.py"],
+    ),
     data = glob(["tests/*.csv"]) + [
         "sample.mojo",
         "sample.py",
@@ -198,7 +434,11 @@ modular_py_test(
         "//conditions:default": [],
     }),
     deps = [
-        ":kbench",
+        # :kbench_lib provides the .py modules the tests import directly
+        # (kbench, kbench_model, terminal_viz, utils). The :kbench binary
+        # only carries kbench_main.py since the kbench_lib split, so
+        # depending on it instead leaves those imports unresolved.
+        ":kbench_lib",
         ":kplot",
         ":kprofile",
         "//max/kernels/benchmarks/autotune:bencher_utils",
@@ -208,17 +448,4 @@ modular_py_test(
         requirement("pytest-mock"),
         requirement("rich"),
     ],
-)
-
-# TODO: this probably can be removed safely.
-pkg_files(
-    name = "autotune_files",
-    srcs = [
-        "kbench.py",
-        "kplot.py",
-        "kprofile.py",
-        "pyproject.toml",
-        "utils.py",
-    ],
-    prefix = "kernel-benchmark/autotune",
 )

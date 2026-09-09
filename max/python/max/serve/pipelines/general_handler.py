@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
-from max.pipelines.modeling.types import BaseContext, PipelineOutput
+from max.pipelines.context import BaseContext
+from max.pipelines.modeling.types import PipelineOutput
 from max.pipelines.request import OpenResponsesRequest
 from max.serve.pipelines.llm import BasePipeline
 from max.serve.telemetry.stopwatch import StopWatch
@@ -53,10 +54,12 @@ class GeneralPipelineHandler(
             # Create context from request
             context = await self.tokenizer.new_context(request)
 
-            # Stream responses from the engine
-            async for responses in self.model_worker.stream(
+            # Stream responses from the engine. Awaiting the submit hands the
+            # request off to the model worker, so a failed handoff raises here.
+            response_stream = await self.model_worker.stream(
                 request.request_id, context
-            ):
+            )
+            async for responses, _batch_id in response_stream:
                 for response in responses:
                     yield response
         finally:

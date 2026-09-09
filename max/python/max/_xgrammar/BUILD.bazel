@@ -1,0 +1,24 @@
+load("//bazel:api.bzl", "modular_py_library", "requirement")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "_xgrammar",
+    srcs = glob(["**/*.py"]),
+    ignore_unresolved_imports = [
+        "sentencepiece",
+        "tiktoken",
+        "typing_extensions",
+    ],
+    # structural_tag.py / builtin_structural_tag.py / openai_tool_call_schema.py
+    # are vendored verbatim from xgrammar and don't satisfy MAX's strict mypy
+    # config; skip the mypy aspect for this package (cf. //max/python/max/_mlir
+    # "upstream files with violations").
+    tags = ["no-mypy"],
+    deps = [
+        "//max/python/max:_core",
+        requirement("numpy"),
+        requirement("pydantic"),
+        requirement("transformers"),
+    ],
+)

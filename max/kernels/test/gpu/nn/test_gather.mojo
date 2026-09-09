@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import TileTensor, row_major
 from nn.gather_scatter import gather
 
@@ -21,20 +21,20 @@ def test_gather(ctx: DeviceContext) raises:
     print("== test_gather")
 
     @no_inline
-    @parameter
+    @__parameter
     def _test_gather[indices_type: DType]() raises:
         comptime num_rows = 16
         comptime row_size = 4
         comptime num_indices = 16
 
         # Create device buffers
-        var input_device = ctx.enqueue_create_buffer[DType.float32](
+        var input_device = ctx.enqueue_create_buffer[.float32](
             num_rows * row_size
         )
         var indices_device = ctx.enqueue_create_buffer[indices_type](
             num_indices
         )
-        var output_device = ctx.enqueue_create_buffer[DType.float32](
+        var output_device = ctx.enqueue_create_buffer[.float32](
             num_indices * row_size
         )
 
@@ -69,9 +69,9 @@ def test_gather(ctx: DeviceContext) raises:
         )
 
         gather[axis=0, target="gpu"](
-            output_tensor.make_dynamic[DType.int64](),
-            input_tensor.make_dynamic[DType.int64](),
-            indices_tensor.make_dynamic[DType.int64](),
+            output_tensor.make_dynamic[.int64](),
+            input_tensor.make_dynamic[.int64](),
+            indices_tensor.make_dynamic[.int64](),
             context=ctx,
         )
         ctx.synchronize()
@@ -92,12 +92,12 @@ def test_gather(ctx: DeviceContext) raises:
     # CHECK-NEXT: 1.0
     # CHECK-NEXT: 3.0
     # CHECK-NEXT: 7.0
-    _test_gather[DType.int32]()
+    _test_gather[.int32]()
     # CHECK: 0.0
     # CHECK-NEXT: 1.0
     # CHECK-NEXT: 3.0
     # CHECK-NEXT: 7.0
-    _test_gather[DType.int64]()
+    _test_gather[.int64]()
 
 
 def main() raises:

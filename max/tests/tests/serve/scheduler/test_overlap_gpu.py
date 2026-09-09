@@ -21,6 +21,7 @@ from max.driver import (
     Accelerator,
     Buffer,
     DevicePinnedBuffer,
+    Usage,
     accelerator_api,
 )
 from max.dtype import DType
@@ -53,7 +54,6 @@ def build_graph(device_ref: DeviceRef) -> Model:
 
 def expensive_cpu_preprocessing() -> None:
     time.sleep(CPU_WORK_DURATION_SEC)
-    return
 
 
 def expensive_cpu_postprocessing(array: np.ndarray, expected: int) -> None:
@@ -102,18 +102,18 @@ def test_overlap(enable_overlap: bool, expected_elapsed_time: int) -> None:
     if not enable_overlap:
         # Allocate regular pinned buffers for non-overlap case
         a_pinned = Buffer(
-            dtype=DType.int8, shape=[size], device=device, pinned=True
+            dtype=DType.int8, shape=[size], device=device, usage=Usage.STAGING
         )
         a_pinned.to_numpy().fill(1)
         b_pinned = Buffer(
-            dtype=DType.int8, shape=[size], device=device, pinned=True
+            dtype=DType.int8, shape=[size], device=device, usage=Usage.STAGING
         )
         b_pinned.to_numpy().fill(2)
         c_pinned = Buffer(
-            dtype=DType.int8, shape=[size], device=device, pinned=True
+            dtype=DType.int8, shape=[size], device=device, usage=Usage.STAGING
         )
         d_pinned = Buffer(
-            dtype=DType.int8, shape=[size], device=device, pinned=True
+            dtype=DType.int8, shape=[size], device=device, usage=Usage.STAGING
         )
     else:
         # Allocate DevicePinnedBuffer for overlap case
@@ -141,12 +141,16 @@ def test_overlap(enable_overlap: bool, expected_elapsed_time: int) -> None:
             a_pinned.to(device), b_pinned.to(device), sleep_duration
         )
         c_pinned.inplace_copy_from(c)
+        # Reads of pinned host buffers no longer synchronize pending device
+        # work implicitly; the caller owns ordering.
+        device.synchronize()
         expensive_cpu_postprocessing(c_pinned.to_numpy(), expected=3)
 
         # Run batch 2
         expensive_cpu_preprocessing()
         (d,) = model.execute(c, c, sleep_duration)
         d_pinned.inplace_copy_from(d)
+        device.synchronize()
         expensive_cpu_postprocessing(d_pinned.to_numpy(), expected=6)
     else:
         # Run batch 1
@@ -156,14 +160,14 @@ def test_overlap(enable_overlap: bool, expected_elapsed_time: int) -> None:
         )
         c_pinned.inplace_copy_from(c)
         # Record event after batch 1 completes
-        event1 = device.default_stream.record_event()
+        event1 = device.default_queue.record_event()
 
         # Run batch 2 (can overlap with CPU work)
         expensive_cpu_preprocessing()
         (d,) = model.execute(c, c, sleep_duration)
         d_pinned.inplace_copy_from(d)
         # Record event after batch 2 completes
-        event2 = device.default_stream.record_event()
+        event2 = device.default_queue.record_event()
 
         # Postprocess results of batch 1 (wait for batch 1 to complete)
         event1.synchronize()

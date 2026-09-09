@@ -1,0 +1,36 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+
+
+struct Slice(ImplicitlyCopyable):
+    @always_inline
+    def __init__(
+        out self,
+        start: Optional[Int],
+        end: Optional[Int],
+        step: Optional[Int],
+        __slice_literal__: NoneType = None,
+    ):
+        pass
+
+
+struct ContiguousSlice(ImplicitlyCopyable):
+    @always_inline
+    def __init__(
+        out self,
+        start: Optional[Int],
+        end: Optional[Int],
+        stride: NoneType,
+        __slice_literal__: NoneType = None,
+    ):
+        pass

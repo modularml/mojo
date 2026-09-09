@@ -25,6 +25,9 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, Module, TensorType
 from max.graph.weights import load_weights
 from max.pipelines.lib.compiled_component import CompiledComponent
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.profiler import Tracer, traced
 
@@ -40,6 +43,7 @@ from ..wan_transformer import (
     WanTransformerPostProcess,
     WanTransformerPreProcess,
 )
+from ..weight_adapters import adapt_wan_fp8_weights
 
 logger = logging.getLogger("max.pipelines")
 
@@ -53,8 +57,13 @@ class WanTransformer(CompiledComponent):
     Supports MoE (dual expert) by compiling both transformers on device.
     """
 
-    # Diffusers pads to 512 but trims embeddings to 226 for cross-attn.
-    embed_seq_len: int = 226
+    # Wan-AI's reference implementation feeds 512-length text-encoder
+    # context to cross-attention. See:
+    # - diffusers WanPipeline.__call__ default:
+    #   https://github.com/huggingface/diffusers/blob/v0.38.0/src/diffusers/pipelines/wan/pipeline_wan.py#L403
+    # - cache-dit hardcoded 512:
+    #   https://github.com/vipshop/cache-dit/blob/v1.3.9/src/cache_dit/distributed/transformers/wan.py#L80
+    embed_seq_len: int = 512
 
     # Default resolution for block graph compilation (height, width, frames).
     default_resolution: tuple[int, int, int] = (720, 1280, 81)
@@ -69,7 +78,10 @@ class WanTransformer(CompiledComponent):
 
         config_entry = manifest["transformer"]
         config_dict = config_entry.huggingface_config.to_dict()
-        encoding = config_entry.quantization_encoding or "bfloat16"
+        resolved_encoding, resolved_weight_path = (
+            _resolve_component_encoding_and_weights(config_entry)
+        )
+        encoding = resolved_encoding or "bfloat16"
         devices = load_devices(config_entry.device_specs)
 
         self.config = WanConfig.generate(config_dict, encoding, devices)
@@ -93,10 +105,16 @@ class WanTransformer(CompiledComponent):
         self._post_graph: Graph | None = None
         self._cfg_unpack_model: Any = None
 
-        # Load and remap weights.
-        paths = config_entry.resolved_weight_paths()
+        # Load and remap weights. FP8 (Comfy-Org ``fp8_scaled``) checkpoints
+        # use native Wan-AI naming with per-tensor weight/input scales and a
+        # dedicated adapter; the bfloat16 path uses the diffusers remap.
+        self._fp8 = self.config.quant_config is not None
+        paths = config_entry.resolved_weight_paths(resolved_weight_path)
         weights = load_weights(paths)
-        state_dict = _remap_state_dict(weights, target_dtype=DType.bfloat16)
+        if self._fp8:
+            state_dict = adapt_wan_fp8_weights(weights)
+        else:
+            state_dict = _remap_state_dict(weights, target_dtype=DType.bfloat16)
 
         # MoE: load secondary transformer weights.
         state_dict_2 = self._load_moe_weights(manifest)
@@ -122,9 +140,17 @@ class WanTransformer(CompiledComponent):
             return None
 
         config_entry_2 = manifest["transformer_2"]
-        paths_2 = config_entry_2.resolved_weight_paths()
+        _, resolved_weight_path_2 = _resolve_component_encoding_and_weights(
+            config_entry_2
+        )
+        paths_2 = config_entry_2.resolved_weight_paths(resolved_weight_path_2)
         weights_2 = load_weights(paths_2)
-        state_dict_2 = _remap_state_dict(weights_2, target_dtype=DType.bfloat16)
+        if self._fp8:
+            state_dict_2 = adapt_wan_fp8_weights(weights_2)
+        else:
+            state_dict_2 = _remap_state_dict(
+                weights_2, target_dtype=DType.bfloat16
+            )
 
         return state_dict_2
 
@@ -183,6 +209,7 @@ class WanTransformer(CompiledComponent):
                         added_kv_proj_dim=self.config.added_kv_proj_dim,
                         dtype=dtype,
                         device=dev_ref,
+                        quant_config=self.config.quant_config,
                     )
                     for _ in range(self.config.num_layers)
                 ]
@@ -220,12 +247,25 @@ class WanTransformer(CompiledComponent):
                 #   * non-CFG (text emb is also B=1; broadcast is identity)
                 #   * batched CFG (text emb is B=2; broadcast expands
                 #     without a separate pack graph).
+                # I2V models concatenate a VAE-encoded conditioning latent
+                # (in_channels - out_channels channels) onto the noise latent
+                # inside the pre module, so the noise input carries
+                # out_channels and a 4th i2v_condition input supplies the
+                # rest. T2V (in_channels == out_channels) has no condition.
+                cond_channels = (
+                    self.config.in_channels - self.config.out_channels
+                )
+                latent_in_channels = (
+                    self.config.out_channels
+                    if cond_channels > 0
+                    else self.config.in_channels
+                )
                 pre_input_types = [
                     TensorType(
                         DType.float32,
                         [
                             1,
-                            self.config.in_channels,
+                            latent_in_channels,
                             "frames",
                             "height",
                             "width",
@@ -239,6 +279,24 @@ class WanTransformer(CompiledComponent):
                         device=dev,
                     ),
                 ]
+                if cond_channels > 0:
+                    # The condition is concatenated onto the noise latent
+                    # *after* it is broadcast to the text embedding's batch
+                    # axis, so the condition shares the same symbolic
+                    # ``"batch"`` dim (1 for the sequential I2V path).
+                    pre_input_types.append(
+                        TensorType(
+                            dtype,
+                            [
+                                "batch",
+                                cond_channels,
+                                "frames",
+                                "height",
+                                "width",
+                            ],
+                            device=dev,
+                        )
+                    )
                 with Graph(
                     "wan_pre",
                     input_types=pre_input_types,
@@ -551,9 +609,7 @@ class WanTransformer(CompiledComponent):
         ]
 
         for key, value in state_dict.items():
-            if key.startswith("patch_embedding.") or key.startswith(
-                "condition_embedder."
-            ):
+            if key.startswith(("patch_embedding.", "condition_embedder.")):
                 pre_weights[key] = value
             elif key.startswith("blocks."):
                 rest = key[len("blocks.") :]

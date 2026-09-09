@@ -21,8 +21,8 @@ off.
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.pipelines.lib import SamplingConfig, token_sampler
-from max.pipelines.lib.sampling.sampling import _sampling_input_types
+from max.pipelines.sampling import SamplingConfig, token_sampler
+from max.pipelines.sampling.sampling import _sampling_input_types
 
 
 def _input_keys(

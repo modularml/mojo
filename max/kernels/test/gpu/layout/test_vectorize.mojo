@@ -19,7 +19,7 @@ from std.testing import assert_equal
 
 def test_vectorize_2() raises:
     var tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(IntTuple(IntTuple(16, 32), 4), IntTuple(IntTuple(32, 1), 512)),
         MutAnyOrigin,
     ].stack_allocation[stack_alignment=16]()
@@ -44,7 +44,7 @@ def test_vectorize_2() raises:
     assert_equal(val_linear[3], 67)
 
     var three_dim_tensor = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(IntTuple(16, 32, 4), IntTuple(32, 1, 512)),
         MutAnyOrigin,
     ].stack_allocation[stack_alignment=16]()
@@ -71,7 +71,7 @@ def test_vectorize_2() raises:
 
     comptime layout = Layout(IntTuple(8, 8), IntTuple(8, 1))
     var tensor2 = LayoutTensor[
-        DType.float32,
+        .float32,
         layout,
         MutAnyOrigin,
     ].stack_allocation[stack_alignment=8]()
@@ -99,10 +99,10 @@ def test_vectorize_2() raises:
     )
     var heap = alloc[Int32](64, alignment=8)
     var tensor4 = LayoutTensor[
-        DType.int32,
+        .int32,
         layout_unknown,
-        linear_idx_type=DType.int32,
-        layout_int_type=DType.int32,
+        linear_idx_type=.int32,
+        layout_int_type=.int32,
     ](heap, RuntimeLayout[layout_unknown]({8, 8}, {8, 1}))
     for i in range(64):
         tensor4.ptr[i] = Int32(i)

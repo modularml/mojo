@@ -37,7 +37,7 @@ class InterpolationMode(Enum):
     """Bicubic interpolation."""
 
     def __str__(self) -> str:
-        """Return the string representation of the interpolation mode."""
+        """Returns the string representation of the interpolation mode."""
         return self.value
 
 
@@ -47,39 +47,59 @@ def resize_linear(
     coordinate_transform_mode: int = 0,
     antialias: bool = False,
 ) -> TensorValue:
-    """Resize a tensor using linear (bilinear) interpolation.
+    """Resizes a tensor using linear (bilinear) interpolation.
 
-    Produces an output tensor whose spatial dimensions are given by ``size``
-    using separable 1-D linear filters.  The operation maps output coordinates
-    back to input coordinates according to ``coordinate_transform_mode``.
+    Produces an output tensor whose shape is given by ``size`` using separable
+    1-D linear filters. It resizes every dimension whose size changes,
+    including batch and channel dimensions. The operation maps output
+    coordinates back to input coordinates according to
+    ``coordinate_transform_mode``.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("resize_linear") as graph:
+            # NCHW input: batch 1, 1 channel, 2x2 spatial.
+            x = ops.constant(
+                [[[[1.0, 2.0], [3.0, 4.0]]]], DType.float32, device=device
+            )
+            # Upscale the spatial dimensions to 4x4, shape (1, 1, 4, 4).
+            graph.output(ops.resize_linear(x, [1, 1, 4, 4]))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
         input: The input symbolic tensor to resize.
-        size: Desired output shape.  Must have the same rank as ``input``.
+        size: The desired output shape. Must have the same rank as ``input``.
         coordinate_transform_mode: How to map an output coordinate to an input
-            coordinate.  Allowed values:
+            coordinate. Allowed values:
 
-            - ``0`` -- ``half_pixel`` (default): shifts by 0.5 before scaling,
-              consistent with most deep-learning frameworks.
-            - ``1`` -- ``align_corners``: aligns the corner pixels of input and
-              output so that the first and last coordinates are preserved
+            - ``0`` (``half_pixel``): Default. Shifts by 0.5 before
+              scaling, consistent with most deep learning frameworks.
+            - ``1`` (``align_corners``): Aligns the corner pixels of the input
+              and output so that the first and last coordinates are preserved
               exactly.
-            - ``2`` -- ``asymmetric``: no shift; equivalent to floor-dividing
-              coordinates by the scale factor.
-            - ``3`` -- ``half_pixel_1D``: like ``half_pixel`` but only applied
-              to the last spatial dimension.
-        antialias: When ``True``, applies an antialiasing filter when the
-            output is smaller than the input (i.e. when downscaling), which
-            reduces aliasing artifacts by widening the tent filter support by
-            ``1 / scale``.  Has no effect when upscaling.
+            - ``2`` (``asymmetric``): Applies no shift, mapping an output
+              coordinate to ``out_coord / scale``.
+            - ``3`` (``half_pixel_1D``): Like ``half_pixel`` on every axis,
+              except any axis whose output size is 1 maps to coordinate 0.
+        antialias: When ``True``, applies an antialiasing filter when
+            downscaling, which reduces aliasing artifacts by widening the tent
+            filter support by ``1 / scale``. Has no effect when upscaling.
+            Defaults to ``False``.
 
     Returns:
-        A new symbolic tensor with shape ``size`` and the same dtype as
-        ``input``.
+        A ``TensorValue`` representing the resized tensor, with shape ``size``
+        and the same dtype as ``input``.
 
     Raises:
-        ValueError: If ``coordinate_transform_mode`` is not 0-3, or if
-            ``size`` has a different rank than ``input``.
+        ValueError: If ``coordinate_transform_mode`` isn't 0-3, or if ``size``
+            has a different rank than ``input``.
     """
     if coordinate_transform_mode not in (0, 1, 2, 3):
         raise ValueError(
@@ -117,37 +137,56 @@ def resize_nearest(
     coordinate_transform_mode: int = 0,
     round_mode: int = 0,
 ) -> TensorValue:
-    """Resize a tensor using nearest-neighbor interpolation.
+    """Resizes a tensor using nearest-neighbor interpolation.
 
     Produces an output tensor whose dimensions are given by ``size`` by
     selecting the nearest input sample for each output coordinate.
 
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("resize_nearest") as graph:
+            # NCHW input: batch 1, 1 channel, 2x2 spatial.
+            x = ops.constant(
+                [[[[1.0, 2.0], [3.0, 4.0]]]], DType.float32, device=device
+            )
+            # Upscale the spatial dimensions to 4x4, shape (1, 1, 4, 4).
+            graph.output(ops.resize_nearest(x, [1, 1, 4, 4]))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
     Args:
         input: The input symbolic tensor to resize.
-        size: Desired output shape.  Must have the same rank as ``input``.
+        size: The desired output shape. Must have the same rank as ``input``.
         coordinate_transform_mode: How to map an output coordinate to an input
-            coordinate.  Allowed values:
+            coordinate. Allowed values:
 
-            - ``0`` -- ``half_pixel`` (default).
-            - ``1`` -- ``align_corners``.
-            - ``2`` -- ``asymmetric``.
-            - ``3`` -- ``half_pixel_1D``.
+            - ``0`` (``half_pixel``). Default.
+            - ``1`` (``align_corners``).
+            - ``2`` (``asymmetric``).
+            - ``3`` (``half_pixel_1D``).
+
+            See :func:`resize_linear` for a description of each mode.
         round_mode: How to round the mapped coordinate to select the nearest
-            input sample.  Allowed values:
+            input sample. Allowed values:
 
-            - ``0`` -- ``HalfDown`` (default): ``ceil(x - 0.5)``.
-            - ``1`` -- ``HalfUp``: ``floor(x + 0.5)``.
-            - ``2`` -- ``Floor``: ``floor(x)``.
-            - ``3`` -- ``Ceil``: ``ceil(x)``.
+            - ``0`` (``HalfDown``, the default): ``ceil(x - 0.5)``.
+            - ``1`` (``HalfUp``): ``floor(x + 0.5)``.
+            - ``2`` (``Floor``): ``floor(x)``.
+            - ``3`` (``Ceil``): ``ceil(x)``.
 
     Returns:
-        A new symbolic tensor with shape ``size`` and the same dtype as
-        ``input``.
+        A ``TensorValue`` representing the resized tensor, with shape ``size``
+        and the same dtype as ``input``.
 
     Raises:
-        ValueError: If ``coordinate_transform_mode`` is not 0-3,
-            ``round_mode`` is not 0-3, or ``size`` has a different rank
-            than ``input``.
+        ValueError: If ``coordinate_transform_mode`` isn't 0-3, ``round_mode``
+            isn't 0-3, or ``size`` has a different rank than ``input``.
     """
     if coordinate_transform_mode not in (0, 1, 2, 3):
         raise ValueError(
@@ -185,22 +224,43 @@ def resize_bicubic(
     input: TensorValueLike,
     size: ShapeLike,
 ) -> TensorValue:
-    """Resize a tensor using bicubic interpolation.
+    """Resizes a tensor using bicubic interpolation.
 
-    Produces an output tensor whose dimensions are given by ``size`` using
-    a 4x4-pixel Catmull-Rom (a=-0.75) cubic convolution filter with
-    half_pixel coordinate mapping.  Input must be rank-4 NCHW.
+    Produces an output tensor whose dimensions are given by ``size`` using a
+    4x4-pixel Keys/PyTorch (``a = -0.75``) cubic convolution filter with
+    half-pixel coordinate mapping.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("resize_bicubic") as graph:
+            # NCHW input: batch 1, 1 channel, 2x2 spatial.
+            x = ops.constant(
+                [[[[1.0, 2.0], [3.0, 4.0]]]], DType.float32, device=device
+            )
+            # Upscale the spatial dimensions to 4x4, shape (1, 1, 4, 4).
+            graph.output(ops.resize_bicubic(x, [1, 1, 4, 4]))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
-        input: The input symbolic tensor to resize.  Must have rank 4.
-        size: Desired output shape of length 4 (N, C, H, W).
+        input: The input symbolic tensor to resize. Must be rank 4 in
+            channels-first (NCHW) layout,
+            ``(batch_size, channels, height, width)``.
+        size: The desired output shape, of length 4,
+            ``(batch_size, channels, height, width)``.
 
     Returns:
-        A new symbolic tensor with shape ``size`` and the same dtype as
-        ``input``.
+        A ``TensorValue`` representing the resized tensor, with shape ``size``
+        and the same dtype as ``input``.
 
     Raises:
-        ValueError: If ``input`` doesn't have rank 4 or ``size`` has a
+        ValueError: If ``input`` doesn't have rank 4, or if ``size`` has a
             different length.
     """
     input = TensorValue(input)
@@ -232,24 +292,44 @@ def resize(
     shape: ShapeLike,
     interpolation: InterpolationMode = InterpolationMode.BILINEAR,
 ) -> TensorValue:
-    """Resize the input tensor to the given shape.
+    """Resizes a tensor to a given shape using a specified interpolation method.
 
-    This function resizes a tensor using the specified interpolation method.
-    The tensor is expected to have NCHW format (batch, channels, height, width).
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("resize") as graph:
+            # NCHW input: batch 1, 1 channel, 2x2 spatial.
+            x = ops.constant(
+                [[[[1.0, 2.0], [3.0, 4.0]]]], DType.float32, device=device
+            )
+            # Upscale the spatial dimensions to 4x4, shape (1, 1, 4, 4).
+            graph.output(
+                ops.resize(x, [1, 1, 4, 4], ops.InterpolationMode.BILINEAR)
+            )
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
-        input: The input tensor to resize. Must have rank 4 in NCHW format.
-        shape: Desired output shape of length 4 corresponding to (N, C, H, W).
-        interpolation: Desired interpolation enum defined by
-            :class:`InterpolationMode`.  Defaults to
+        input: The input tensor to resize. Must be rank 4 in channels-first
+            (NCHW) layout, ``(batch_size, channels, height, width)``.
+        shape: The desired output shape, of length 4, layout
+            ``(batch_size, channels, height, width)``.
+        interpolation: The interpolation method, given as an
+            :class:`InterpolationMode`. Defaults to
             :attr:`InterpolationMode.BILINEAR`.
 
     Returns:
-        A resized tensor with the shape specified by the shape argument.
+        A ``TensorValue`` representing the resized tensor with the given
+        ``shape``.
 
     Raises:
-        ValueError: If the input doesn't have rank 4, shape has wrong number
-            of elements, or unsupported interpolation mode is specified.
+        ValueError: If ``input`` doesn't have rank 4, or if ``shape`` has the
+            wrong number of elements.
     """
     input = TensorValue(input)
     shape = Shape(shape)

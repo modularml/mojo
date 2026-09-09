@@ -13,12 +13,12 @@
 
 from __future__ import annotations
 
-from max.pipelines.core import TextContext
-from max.pipelines.lib import LoRAManager
+from max.pipelines.context import TextContext
+from max.pipelines.lora import LoRAManagerV3
 
 
 def can_allocate_lora_request(
-    ctx: TextContext, active_loras: set[str], lora_manager: LoRAManager | None
+    ctx: TextContext, active_loras: set[str], lora_manager: LoRAManagerV3 | None
 ) -> bool:
     """Checks if the LoRA request can be allocated and serviced.
 
@@ -60,11 +60,13 @@ def can_allocate_lora_request(
     return num_protected + 1 <= lora_manager.max_num_loras
 
 
-def is_lora(ctx: TextContext, lora_manager: LoRAManager | None) -> bool:
+def is_lora(ctx: TextContext, lora_manager: LoRAManagerV3 | None) -> bool:
     """Helper that checks the manager is not None and if the context is a lora"""
     return bool(lora_manager and lora_manager.is_lora(ctx.model_name))
 
 
-def is_active_lora(ctx: TextContext, lora_manager: LoRAManager | None) -> bool:
+def is_active_lora(
+    ctx: TextContext, lora_manager: LoRAManagerV3 | None
+) -> bool:
     """Helper that checks the manager is not None and if the LoRA is active"""
     return bool(lora_manager and lora_manager.is_active_lora(ctx.model_name))

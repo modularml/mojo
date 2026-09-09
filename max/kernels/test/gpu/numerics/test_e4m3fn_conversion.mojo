@@ -13,7 +13,7 @@
 
 from std.math import nan
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.memory import bitcast
 
 
@@ -53,7 +53,7 @@ from std.memory import bitcast
 def test_e4m3fn_initialization():
     print("== test_e4m3fn_initialization")
 
-    var simd_e4m3fn = SIMD[DType.float8_e4m3fn, 256](
+    var simd_e4m3fn = SIMD[.float8_e4m3fn, 256](
         0.0,
         0.001953125,
         0.00390625,
@@ -181,7 +181,7 @@ def test_e4m3fn_initialization():
         384.0,
         416.0,
         448.0,
-        nan[DType.float8_e4m3fn](),
+        nan[.float8_e4m3fn](),
         -0.0,
         -0.001953125,
         -0.00390625,
@@ -309,7 +309,7 @@ def test_e4m3fn_initialization():
         -384.0,
         -416.0,
         -448.0,
-        nan[DType.float8_e4m3fn](),
+        nan[.float8_e4m3fn](),
     )
 
     for i in range(256):
@@ -354,12 +354,12 @@ def test_e4m3fn_initialization():
 def test_simd_e4m3_to_f32():
     print("== test_simd_e4m3_to_f32")
 
-    var e4m3_simd = SIMD[DType.float8_e4m3fn, 256](0.0)
+    var e4m3_simd = SIMD[.float8_e4m3fn, 256](0.0)
 
     for i in range(256):
-        e4m3_simd[i] = bitcast[DType.float8_e4m3fn](UInt8(i))
+        e4m3_simd[i] = bitcast[.float8_e4m3fn](UInt8(i))
 
-    e4m3_casted_f32 = e4m3_simd.cast[DType.float32]()
+    var e4m3_casted_f32 = e4m3_simd.cast[.float32]()
 
     comptime M = 32
     comptime N = 8
@@ -405,12 +405,12 @@ def test_simd_e4m3_to_f32():
 def test_simd_e4m3_to_f16():
     print("== test_simd_e4m3_to_f16")
 
-    var e4m3_simd = SIMD[DType.float8_e4m3fn, 256](0.0)
+    var e4m3_simd = SIMD[.float8_e4m3fn, 256](0.0)
 
     for i in range(256):
-        e4m3_simd[i] = bitcast[DType.float8_e4m3fn](UInt8(i))
+        e4m3_simd[i] = bitcast[.float8_e4m3fn](UInt8(i))
 
-    e4m3_casted_f16 = e4m3_simd.cast[DType.float16]()
+    var e4m3_casted_f16 = e4m3_simd.cast[.float16]()
 
     comptime M = 32
     comptime N = 8
@@ -456,12 +456,12 @@ def test_simd_e4m3_to_f16():
 def test_simd_e4m3_to_bf16():
     print("== test_simd_e4m3_to_bf16")
 
-    var e4m3_simd = SIMD[DType.float8_e4m3fn, 256](0.0)
+    var e4m3_simd = SIMD[.float8_e4m3fn, 256](0.0)
 
     for i in range(256):
-        e4m3_simd[i] = bitcast[DType.float8_e4m3fn](UInt8(i))
+        e4m3_simd[i] = bitcast[.float8_e4m3fn](UInt8(i))
 
-    e4m3_casted_bf16 = e4m3_simd.cast[DType.bfloat16]()
+    var e4m3_casted_bf16 = e4m3_simd.cast[.bfloat16]()
 
     comptime M = 32
     comptime N = 8
@@ -540,12 +540,12 @@ def test_simd_f32_to_e4m3():
     print("== test_simd_f32_to_e4m3")
 
     comptime M = 512
-    var f32_simd = SIMD[DType.float32, M](0.0)
+    var f32_simd = SIMD[.float32, M](0.0)
 
     for i in range(M):
         f32_simd[i] = Float32(i - 256)
 
-    f32_casted_e4m3 = f32_simd.cast[DType.float8_e4m3fn]()
+    var f32_casted_e4m3 = f32_simd.cast[.float8_e4m3fn]()
 
     for i in range(64):
         for j in range(8):
@@ -605,11 +605,11 @@ def test_simd_e4m3_to_f16_ptx_path(ctx: DeviceContext) raises:
     print("== test_simd_e4m3_to_f16_ptx_path")
 
     comptime M = 256
-    var e4m3_simd = SIMD[DType.float8_e4m3fn, M](0.0)
+    var e4m3_simd = SIMD[.float8_e4m3fn, M](0.0)
     for i in range(M):
-        e4m3_simd[i] = bitcast[DType.float8_e4m3fn](UInt8(i))
+        e4m3_simd[i] = bitcast[.float8_e4m3fn](UInt8(i))
 
-    comptime kernel = test_simd_float8[DType.float8_e4m3fn, M, DType.float16]
+    comptime kernel = test_simd_float8[.float8_e4m3fn, M, .float16]
     ctx.enqueue_function[kernel](e4m3_simd, grid_dim=1, block_dim=1)
     ctx.synchronize()
 
@@ -651,11 +651,11 @@ def test_simd_e4m3_to_f32_ptx_path(ctx: DeviceContext) raises:
     print("== test_simd_e4m3_to_f32_ptx_path")
 
     comptime M = 256
-    var e4m3_simd = SIMD[DType.float8_e4m3fn, M](0.0)
+    var e4m3_simd = SIMD[.float8_e4m3fn, M](0.0)
     for i in range(M):
-        e4m3_simd[i] = bitcast[DType.float8_e4m3fn](UInt8(i))
+        e4m3_simd[i] = bitcast[.float8_e4m3fn](UInt8(i))
 
-    comptime kernel = test_simd_float8[DType.float8_e4m3fn, M, DType.float32]
+    comptime kernel = test_simd_float8[.float8_e4m3fn, M, .float32]
     ctx.enqueue_function[kernel](e4m3_simd, grid_dim=1, block_dim=1)
     ctx.synchronize()
 
@@ -663,7 +663,7 @@ def test_simd_e4m3_to_f32_ptx_path(ctx: DeviceContext) raises:
 def test_simd_float32[
     size: Int,
     target: DType,
-](x: SIMD[DType.float32, size]):
+](x: SIMD[.float32, size]):
     var x_casted = x.cast[target]()
 
     comptime M = 64
@@ -743,11 +743,11 @@ def test_simd_f32_to_e4m3_ptx_path(ctx: DeviceContext) raises:
     print("== test_simd_f32_to_e4m3_ptx_path")
 
     comptime M = 512
-    var f32_simd = SIMD[DType.float32, M](0.0)
+    var f32_simd = SIMD[.float32, M](0.0)
     for i in range(M):
         f32_simd[i] = Float32(i - 256)
 
-    comptime kernel = test_simd_float32[M, DType.float8_e4m3fn]
+    comptime kernel = test_simd_float32[M, .float8_e4m3fn]
     ctx.enqueue_function[kernel](f32_simd, grid_dim=1, block_dim=1)
     ctx.synchronize()
 

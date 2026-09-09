@@ -13,10 +13,11 @@
 """Implements the fold operation."""
 
 
-from std.algorithm import elementwise
-from std.gpu.host import DeviceContext
+from max.algorithm import elementwise
+from max.gpu.host import DeviceContext
 from layout import TileTensor
 
+from std.utils.coord import Coord, coord_to_index_list
 from std.utils.index import IndexList
 
 
@@ -103,23 +104,13 @@ def fold[
     comptime stride_h = stride[0]
 
     @always_inline
-    @parameter
-    @__copy_capture(
-        kernel_w,
-        kernel_h,
-        height_col,
-        width_col,
-    )
-    def fold_fn[
-        width: Int, rank_: Int, alignment: Int = 1
-    ](idx_arg: IndexList[rank_]):
-        comptime assert rank_ == 4, "fold_fn: rank must be 4"
-        var idx = rebind[IndexList[4]](idx_arg)
+    def fold_fn[width: Int, alignment: Int = 1](idx: Coord) {var}:
+        comptime assert idx.rank == 4, "fold_fn: rank must be 4"
 
-        var batch = idx[0]
-        var channel = idx[1]
-        var h_out = idx[2]
-        var w_out = idx[3]
+        var batch = Int(idx[0].value())
+        var channel = Int(idx[1].value())
+        var h_out = Int(idx[2].value())
+        var w_out = Int(idx[3].value())
 
         var output_val = Scalar[dtype](0)
 
@@ -156,15 +147,14 @@ def fold[
                         batch, channel_offset + kernel_offset, patch_offset
                     ][0]
 
-        output[idx[0], idx[1], idx[2], idx[3]] = output_val
+        output[idx] = output_val
 
-    var dispatch_shape = IndexList[4](N, C, H, W)
+    var dispatch_shape = (N, C, H, W)
     elementwise[
-        func=fold_fn,
         simd_width=1,
         target=target,
         _trace_description="fold_fn",
-    ](dispatch_shape, ctx)
+    ](fold_fn, dispatch_shape, ctx)
 
 
 def fold_shape[

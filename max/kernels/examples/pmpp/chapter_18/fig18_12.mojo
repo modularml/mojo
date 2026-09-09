@@ -22,8 +22,8 @@ as Mojo's atomic API differs. The level array stores if visited; races
 on unvisited vertices are harmless as they all write the same level.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim
-from std.gpu.host import DeviceContext
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu.host import DeviceContext
 from std.atomic import Atomic
 from std.collections import List
 
@@ -43,11 +43,13 @@ def bfs_kernel(
     level: UnsafePointer[UInt32, MutAnyOrigin],
     prev_frontier: UnsafePointer[UInt32, MutAnyOrigin],
     curr_frontier: UnsafePointer[UInt32, MutAnyOrigin],
-    num_prev_frontier: Int,
+    num_prev_frontier_dev: Int32,
     num_curr_frontier: UnsafePointer[UInt32, MutAnyOrigin],
     curr_level: UInt32,
 ):
     """BFS kernel: frontier-based traversal with atomic operations."""
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var num_prev_frontier = Int(num_prev_frontier_dev)
     var i = block_idx.x * block_dim.x + thread_idx.x
 
     if i < num_prev_frontier:
@@ -87,17 +89,13 @@ def main() raises:
     var start_vertex = 0
     h_level[start_vertex] = 0
 
-    var d_src_ptrs = ctx.enqueue_create_buffer[DType.uint32](NUM_VERTICES + 1)
-    var d_dst = ctx.enqueue_create_buffer[DType.uint32](num_edges)
-    var d_level = ctx.enqueue_create_buffer[DType.uint32](NUM_VERTICES)
+    var d_src_ptrs = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES + 1)
+    var d_dst = ctx.enqueue_create_buffer[.uint32](num_edges)
+    var d_level = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES)
     # Allocate larger frontier buffers to handle potential duplicates
-    var d_prev_frontier = ctx.enqueue_create_buffer[DType.uint32](
-        NUM_VERTICES * 2
-    )
-    var d_curr_frontier = ctx.enqueue_create_buffer[DType.uint32](
-        NUM_VERTICES * 2
-    )
-    var d_num_curr_frontier = ctx.enqueue_create_buffer[DType.uint32](1)
+    var d_prev_frontier = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES * 2)
+    var d_curr_frontier = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES * 2)
+    var d_num_curr_frontier = ctx.enqueue_create_buffer[.uint32](1)
 
     var h_src_ptrs = alloc[UInt32](NUM_VERTICES + 1)
     var h_dst = alloc[UInt32](num_edges)
@@ -135,7 +133,7 @@ def main() raises:
             d_level,
             d_prev_frontier,
             d_curr_frontier,
-            num_prev_frontier,
+            Int32(num_prev_frontier),
             d_num_curr_frontier,
             curr_level,
             grid_dim=(grid_size, 1, 1),

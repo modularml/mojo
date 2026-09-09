@@ -162,3 +162,28 @@ def test_new_context_default_enables_thinking(
         "Default request behavior must be enable_thinking=True. "
         f"Decoded prompt: {prompt!r}"
     )
+
+
+def test_new_context_forwards_logprobs(tokenizer: Qwen3_5Tokenizer) -> None:
+    """``request.logprobs``/``request.echo`` reach the context.
+
+    Regression test: ``Qwen3VLTokenizer.new_context`` (and several sibling
+    multimodal tokenizers) dropped both fields, so
+    ``TextGenerationInputs.enable_log_probs`` stayed ``False`` and logprob
+    responses came back empty.
+    """
+    request = TextGenerationRequest(
+        request_id=RequestID("test-logprobs"),
+        model_name=tokenizer.model_path,
+        messages=[
+            TextGenerationRequestMessage(
+                role="user",
+                content=[TextContentPart(text="What is 2+2?")],
+            )
+        ],
+        logprobs=2,
+        echo=True,
+    )
+    context = asyncio.run(tokenizer.new_context(request))
+    assert context.log_probabilities == 2
+    assert context.log_probabilities_echo is True

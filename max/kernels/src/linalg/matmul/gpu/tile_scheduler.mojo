@@ -11,10 +11,18 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Provides the persistent tile scheduler for GPU matmul kernels.
+
+Maps thread blocks to output tiles across the launch grid using 1D, 2D-wave,
+or DeepSeek scheduling strategies, and exposes the `TileScheduler`,
+`WorkInfo`, `MatmulSchedule`, and `RasterOrder` types used by persistent
+matmul kernels.
+"""
+
 from std.math import ceildiv
 from std.math.uutils import udivmod
 
-from std.gpu import block_idx, grid_dim
+from max.gpu import block_idx, grid_dim
 
 from std.utils.fast_div import FastDiv
 from std.utils.index import Index, IndexList
@@ -24,6 +32,14 @@ from ...utils_gpu import block_swizzle
 
 @fieldwise_init
 struct RasterOrder(Equatable, Hashable, TrivialRegisterPassable, Writable):
+    """Rasterization order for mapping thread blocks to output tiles.
+
+    Controls the traversal direction of the 2D output tile grid. `AlongN`
+    rasterizes across columns first; `AlongM` rasterizes across rows first.
+    The choice affects L2 cache reuse patterns and should match cluster
+    multicast configuration.
+    """
+
     var _value: Int32
 
     comptime AlongN = Self(0)
@@ -47,6 +63,13 @@ struct RasterOrder(Equatable, Hashable, TrivialRegisterPassable, Writable):
 
 @fieldwise_init
 struct WorkInfo(TrivialRegisterPassable, Writable):
+    """Descriptor for one output tile assigned to a thread block.
+
+    Carries the (m, n) tile coordinates in the output matrix, the starting
+    K-tile index for split-K kernels, the number of K tiles to process, and
+    a validity flag indicating whether the tile falls within the problem bounds.
+    """
+
     # Coordinates in output matrix
     var m: UInt32
     var n: UInt32
@@ -99,6 +122,15 @@ struct WorkInfo(TrivialRegisterPassable, Writable):
 
 @fieldwise_init
 struct MatmulSchedule(TrivialRegisterPassable):
+    """Tile scheduling strategy for GPU matmul kernels.
+
+    Selects how thread blocks are mapped to output tiles across the grid.
+    `TILE1D` uses a simple linear mapping; `TILE2D` adds wave-level 2D
+    swizzling for better L2 locality; `DS_SCHEDULER` uses the DeepSeek
+    persistent block scheduler; `NONE` disables the scheduler (non-persistent
+    kernels).
+    """
+
     var _value: Int32
 
     comptime NONE = Self(0)
@@ -128,6 +160,21 @@ struct TileScheduler[
     raster_dim: UInt32 = 1,
     schedule: MatmulSchedule = MatmulSchedule.TILE2D,
 ](TrivialRegisterPassable):
+    """Persistent tile scheduler for GPU matmul output tiles.
+
+    Maps thread blocks to (m, n) output tile coordinates using 1D, 2D-wave,
+    or DeepSeek scheduling strategies. Supports block clusters with multicast
+    and advances through tiles in a persistent kernel loop via `fetch_next_work`.
+
+    Parameters:
+        problem_shape: Static (M, N, K) dimensions of the matmul problem.
+        tile_shape: Static (BM, BN, BK) tile sizes.
+        grid_shape: (grid_x, grid_y) number of thread blocks in the launch grid.
+        cluster: Block cluster shape (default 1×1×1 for no clustering).
+        raster_dim: Axis along which to rasterize (0 = M, 1 = N).
+        schedule: Tile scheduling strategy to use.
+    """
+
     # grid_shape[0], [1] map to x, y, to N and M in output matrix.
     # tile_shape[0], [1] map to M and N
     # wave_shape[0], [1] map to M and N
@@ -141,7 +188,7 @@ struct TileScheduler[
     var prob_shape: IndexList[3]  # M x N x K
     var num_waves_m: UInt32
     var num_waves_n: UInt32
-    var log_num_waves_n: FastDiv[DType.uint32]
+    var log_num_waves_n: FastDiv[.uint32]
 
     # Member variables for DeepSeek Scheduler
     var current_iter: Int  # Tracks the scheduler's progress across kernel launches
@@ -172,7 +219,7 @@ struct TileScheduler[
         self.num_waves_n = UInt32(
             ceildiv(self.prob_shape[1], Self.wave_shape[1])
         )
-        self.log_num_waves_n = FastDiv[DType.uint32](Int(self.num_waves_n))
+        self.log_num_waves_n = FastDiv[.uint32](Int(self.num_waves_n))
 
         self.current_iter = -1
         self.num_aligned_m_blocks = UInt32(
@@ -207,7 +254,7 @@ struct TileScheduler[
             )
         else:
             var m, n = self._index_to_mn()
-            is_valid = m < self.prob_shape[0] and n < self.prob_shape[1]
+            var is_valid = m < self.prob_shape[0] and n < self.prob_shape[1]
             return WorkInfo(
                 UInt32(m),
                 UInt32(n),
@@ -240,13 +287,13 @@ struct TileScheduler[
     @always_inline
     def _index_to_mn_tile1d(self) -> Tuple[Int, Int]:
         # Grid dim as if there is no persist kernel
-        logical_grid_dim = Index[dtype=DType.uint32](
+        var logical_grid_dim = Index[dtype=DType.uint32](
             ceildiv(self.prob_shape[1], Self.tile_shape[1]),
             ceildiv(self.prob_shape[0], Self.tile_shape[0]),
         )
 
-        by, bx = udivmod(Int(self.idx), logical_grid_dim[0])
-        block_xy_swizzle = block_swizzle(
+        var by, bx = udivmod(Int(self.idx), logical_grid_dim[0])
+        var block_xy_swizzle = block_swizzle(
             Index[dtype=DType.uint32](bx, by), logical_grid_dim
         )
 
@@ -258,28 +305,28 @@ struct TileScheduler[
     @always_inline
     def _index_to_mn_tile2d(self) -> Tuple[Int, Int]:
         # We consider a sweep on busy SMs a wave, not all SMs
-        comptime log_num_grids = FastDiv[DType.uint32](Int(Self.num_grids))
-        comptime log_grid_shape = FastDiv[DType.uint32](Self.grid_shape[0])
+        comptime log_num_grids = FastDiv[.uint32](Int(Self.num_grids))
+        comptime log_grid_shape = FastDiv[.uint32](Self.grid_shape[0])
 
-        comptime FastUInt = Scalar[FastDiv[DType.uint32].uint_type]
+        comptime FastUInt = Scalar[FastDiv[.uint32].uint_type]
 
-        num_waves_executed = FastUInt(self.idx) / log_num_grids
-        idx_in_wave = FastUInt(self.idx) % log_num_grids
+        var num_waves_executed = FastUInt(self.idx) / log_num_grids
+        var idx_in_wave = FastUInt(self.idx) % log_num_grids
 
-        num_waves_executed_m = (
+        var num_waves_executed_m = (
             FastUInt(num_waves_executed) / self.log_num_waves_n
         )
-        num_waves_executed_n = (
+        var num_waves_executed_n = (
             FastUInt(num_waves_executed) % self.log_num_waves_n
         )
 
         # The wave maps to a BM x grid_shape[1] by BN x grid_shape[0]
         # submatrix in C.
-        wave_m = num_waves_executed_m * FastUInt(Self.wave_shape[0])
-        wave_n = num_waves_executed_n * FastUInt(Self.wave_shape[1])
+        var wave_m = num_waves_executed_m * FastUInt(Self.wave_shape[0])
+        var wave_n = num_waves_executed_n * FastUInt(Self.wave_shape[1])
 
-        m_in_wave = FastUInt(idx_in_wave) / log_grid_shape
-        n_in_wave = FastUInt(idx_in_wave) % log_grid_shape
+        var m_in_wave = FastUInt(idx_in_wave) / log_grid_shape
+        var n_in_wave = FastUInt(idx_in_wave) % log_grid_shape
 
         return (
             Int(wave_m + m_in_wave * FastUInt(Self.tile_shape[0])),

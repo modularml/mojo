@@ -1,0 +1,48 @@
+[
+    {
+        "description": "validation of regular expressions",
+        "schema": { "format": "regex" },
+        "tests": [
+            {
+                "description": "all string formats ignore integers",
+                "data": 12,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore floats",
+                "data": 13.7,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore objects",
+                "data": {},
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore arrays",
+                "data": [],
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore booleans",
+                "data": false,
+                "valid": true
+            },
+            {
+                "description": "all string formats ignore nulls",
+                "data": null,
+                "valid": true
+            },
+            {
+                "description": "a valid regular expression",
+                "data": "([abc])+\\s+$",
+                "valid": true
+            },
+            {
+                "description": "a regular expression with unclosed parens is invalid",
+                "data": "^(abc]",
+                "valid": false
+            }
+        ]
+    }
+]

@@ -1,0 +1,204 @@
+---
+title: Automatic destruction
+description: Let Mojo destroy values automatically after their last use.
+---
+
+Mojo destroys values as soon as they're no longer used. It doesn't wait for
+the end of a code block or even the end of an expression. With Mojo's
+*as-soon-as-possible* (ASAP) destruction policy, intermediate values in an
+expression such as `a + (b - c) * d` can be destroyed as soon as their last
+use completes.
+
+At compile time, Mojo determines the last use of each value. After its last
+use, the value's lifetime ends and Mojo calls its `__deinit__()`
+deinitializer.
+
+For cleanup that must happen at a specific, compiler-checked point, Mojo
+also supports *explicit* deinitializers. See
+[Explicit value destruction](/docs/manual/lifecycle/explicit-destroy/).
+
+## When Mojo destroys values
+
+Track when each Number instance is deinitialized by overloading `__deinit__()`
+to print a message:
+
+```mojo
+@fieldwise_init
+struct Number(Writable):
+    var value: Int
+
+    # Track the destruction of each Number instance
+    def __deinit__(deinit self):
+        print(t"Destroying Number(value={self.value})")
+
+    # Add two Number values together
+    def __add__(self, other: Number) -> Number:
+        return Number(self.value + other.value)
+
+    # Subtract a Number value from another
+    def __sub__(self, other: Number) -> Number:
+        return Number(self.value - other.value)
+
+    # Multiply two Number values together
+    def __mul__(self, other: Number) -> Number:
+        return Number(self.value * other.value)
+
+def main():
+    var a = Number(1)
+    var b = Number(2)
+    var c = Number(3)
+    var d = Number(4)
+
+    #     1    2   3    4
+    print(a + (b - c) * d)
+
+    # The output shows the order of destruction for each value.
+    # Expression precedence determines the order of evaluation, and
+    # therefore the order in which these last uses occur:
+
+    # Destroying Number(value=3)   # PARENTHESIZED SUBTRACTION FIRST
+    # Destroying Number(value=2)   # PARENTHESIZED SUBTRACTION FIRST
+    # Destroying Number(value=-1)  # MULTIPLICATION SECOND, intermediate value
+    # Destroying Number(value=4)   # MULTIPLICATION SECOND
+    # Destroying Number(value=-4)  # ADDITION THIRD, intermediate value
+    # Destroying Number(value=1)   # ADDITION THIRD
+
+    # Number(value=-3)  # PRINTS RESULT
+
+    # Destroying Number(value=-3)  # RESULT IS DESTROYED; DEINITIALIZER RUNS
+```
+
+Every value is initialized once and deinitialized once. This happens as the
+expression is evaluated in precedence order: the parenthesized subtraction
+first, then multiplication, then addition. Values are destroyed as soon as
+their last use completes.
+
+Intermediate values that aren't bound to variables (-1, -4, and -3 in this
+example) also have lifecycles. They're destroyed after their last use.
+
+## Deinitializer behavior
+
+`__deinit__()` uses the `deinit`
+[argument convention](/docs/manual/values/ownership/#argument-conventions)
+for `self`. The value and its fields remain valid while `__deinit__()`
+performs cleanup. When the method returns, the instance becomes logically
+deinitialized.
+
+Mojo generates a `__deinit__()` for every struct with deinitializable fields.
+
+In general, don't call `__deinit__()` directly. If you need that level of
+control, use [explicit value
+destruction](/docs/manual/lifecycle/explicit-destroy/). You may also need
+to call `__deinit__()` directly when wrapping a deinitializer for
+parameterized types.
+
+## Moving values out of fields
+
+Deinitializers are the only place where you can safely move values out of an
+instance's fields without having to reinitialize the field before its
+next use.
+
+This special rule isn't about where the code lives. It's about
+guarantees:
+
+```mojo
+def __deinit__(deinit self):
+    var name = self.name^  # OK: can take ownership of fields
+```
+
+The compiler knows that deinitializers like `__deinit__()` are the final
+use of an instance. Because of this, it allows you to move values out of
+fields without reinitializing them.
+
+This ensures that fields are only moved out of struct instances when the
+compiler can guarantee the instance is at the end of its lifetime.
+
+Like instances, struct fields use ASAP destruction within `__deinit__()`
+methods. For example:
+
+```mojo
+struct S:
+   var a: String
+   var b: String
+
+   def __deinit__(deinit self):
+       # Mojo calls a.__deinit__() here.
+       use(b)
+       # Mojo calls b.__deinit__() here.
+```
+
+## Custom deinitializers
+
+Define a custom `__deinit__()` when your type needs to perform cleanup as
+it's destroyed. For example, you might free manually allocated memory or
+close a long-lived resource such as a file.
+
+This logger owns a temporary file. Its deinitializer closes the file when
+the logger is destroyed:
+
+```mojo
+from std.tempfile import NamedTemporaryFile
+
+struct QuickLogger:
+    var temporary_file: NamedTemporaryFile
+
+    def __init__(out self) raises:
+        self.temporary_file = NamedTemporaryFile(mode="w", delete=False)
+
+    # Log a message to the temporary file
+    def log(mut self, message: String) raises:
+        self.temporary_file.write(message + "\n")
+
+    def __deinit__(deinit self):
+        try:
+            print(t"Closing: {self.temporary_file.name}")
+            self.temporary_file.close()
+        except e:
+            print(t"Error: {e}")
+
+def main() raises:
+    var ql = QuickLogger()
+    ql.log("This is a test log message.")
+    ql.log("This is the last use of 'ql'")
+```
+
+## Explicit lifetime extension
+
+Most of the time, Mojo's ASAP destruction requires no extra effort. You may
+need to explicitly mark the last use of a value to control when its
+deinitializer runs.
+
+Use explicit lifetime extension when something outside the value's ordinary
+uses still requires it to remain alive and you can't use origins or
+references to do this.
+
+Assign the value to the `_` *discard pattern* where you want its lifetime to
+end. This marks its last use, so the deinitializer runs immediately after
+the statement:
+
+```mojo
+var s = "abc"
+print(s)  # s.__deinit__() runs after this line
+
+# Extend t's lifetime to the discard line
+var t = "xyz"
+print(t)
+
+# ... some time later
+_ = t  # t.__deinit__() runs after this line
+```
+
+Two cases particularly need explicit lifetime extension: an RAII guard, such
+as a lock, that would otherwise be released too early, and a pointer whose
+origin has been erased, which can lead to a use-after-free. Neither produces
+a compiler error. `_ = value` keeps the value alive until the point where you
+need it released or need the pointer to remain valid.
+
+:::note
+Previous versions of Mojo required the transfer sigil (`^`) when
+discarding a move-only type. This is no longer required, since the
+compiler doesn't move the discarded value. For more on the
+transfer sigil, see
+[ownership
+transfer](/docs/manual/values/ownership/#transfer-arguments-var-and-).
+:::

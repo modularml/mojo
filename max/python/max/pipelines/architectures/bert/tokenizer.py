@@ -49,16 +49,10 @@ class BertTokenizer(TextTokenizer):
             chat_template=chat_template,
             **unused_kwargs,
         )
-
-    @property
-    def eos(self) -> int:
-        if self.delegate.eos_token_id is not None:
-            return self.delegate.eos_token_id
-
-        if self.delegate.sep_token_id is not None:
-            return self.delegate.sep_token_id
-
-        if self.delegate.pad_token_id is not None:
-            return self.delegate.pad_token_id
-
-        return 0
+        if not self._eos_token_ids:
+            if self.delegate.sep_token_id is not None:
+                self._eos_token_ids = {self.delegate.sep_token_id}
+            elif self.delegate.pad_token_id is not None:
+                self._eos_token_ids = {self.delegate.pad_token_id}
+            else:
+                self._eos_token_ids = {0}

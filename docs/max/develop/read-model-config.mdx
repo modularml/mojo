@@ -1,0 +1,525 @@
+---
+title: Read a Hugging Face model config
+sidebar_label: Read a model config
+description: Translate Hugging Face config.json fields into MAX architecture decisions to identify what to reuse, subclass, or implement.
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+When importing a Hugging Face model into MAX as a custom architecture, you're
+responsible for building the graph that the model's `config.json` describes.
+This makes reading and interpreting the config your job. It's the entry point
+of your [model bring-up workflow](/develop/model-bringup-workflow/) and
+the file you consult most frequently.
+
+## What is a model config?
+
+A Hugging Face `config.json` is the serialized record of how a model was built.
+It represents the
+[`PretrainedConfig`](https://huggingface.co/docs/transformers/main/en/main_classes/configuration)
+class generated during training or weight serialization, carrying only the
+model's architectural hyperparameters: the dimensions and structural flags that
+define the graph's shape (rather than training settings like learning rate). It
+contains neither the execution graph nor the tensor weights.
+
+When you run inference with Hugging Face's
+[`transformers`](https://huggingface.co/docs/transformers/index) library, you
+rarely inspect this file directly: the library reads the configuration
+automatically and instantiates the architecture for you. When you port a model
+to MAX, that instantiation step is yours to write.
+
+By reviewing the configuration fields, you can identify which values map
+directly to the MAX configuration schema, which flags require custom graph
+layers, and which entries might contain incorrect defaults that you need to
+verify against the weight dimensions. Use the sections below to interpret each
+field and translate it into a concrete architecture plan.
+
+## Read the config
+
+Before you write any architecture code, load and inspect the complete
+configuration to trace the model's architectural characteristics. The
+dimensions map directly to your MAX configuration, while non-default flags
+locate where the model's execution flow diverges from a standard transformer:
+a decoder-only stack of uniform attention and MLP blocks, like Llama.
+
+You can read a model's configuration on Hugging Face by navigating to the
+**Files and versions** tab of its model repository and viewing the `config.json`
+file, or you can load the config locally and print each field. Start by looking
+at the complete picture rather than the handful of fields a model card mentions.
+To view the configuration without downloading the model's tensor weights,
+create a script named `load_config.py` with the following code:
+
+```python title="load_config.py"
+from transformers import AutoConfig
+
+# Replace with your model ID.
+config = AutoConfig.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0", trust_remote_code=True)
+print(config)
+```
+
+:::note
+
+The `trust_remote_code=True` argument is required for checkpoints using custom
+configuration classes. Without it, the configuration parser defaults to generic
+models and omits custom fields, which are often the fields that define the
+model's architectural differences.
+
+:::
+
+Three fields in the printed configuration frame how you read the rest. The
+following snippet is from TinyLlama 1.1B, with `architectures`, `model_type`,
+and `torch_dtype` highlighted. The remaining properties are the dimensions and
+flags you'll map in the sections below:
+
+```json title="config.json" {2-4,8,17}
+LlamaConfig {
+  "architectures": [
+    "LlamaForCausalLM"
+  ],
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "bos_token_id": 1,
+  "torch_dtype": "bfloat16",
+  "eos_token_id": 2,
+  "head_dim": 64,
+  "hidden_act": "silu",
+  "hidden_size": 2048,
+  "initializer_range": 0.02,
+  "intermediate_size": 5632,
+  "max_position_embeddings": 2048,
+  "mlp_bias": false,
+  "model_type": "llama",
+  "num_attention_heads": 32,
+  "num_hidden_layers": 22,
+  "num_key_value_heads": 4,
+  "pad_token_id": null,
+  "pretraining_tp": 1,
+  "rms_norm_eps": 1e-05,
+  "rope_parameters": {
+    "rope_theta": 10000.0,
+    "rope_type": "default"
+  },
+  "tie_word_embeddings": false,
+  "transformers_version": "5.9.0",
+  "use_cache": true,
+  "vocab_size": 32000
+}
+```
+
+- `architectures`: Lists the architecture classes. The first entry
+  (`architectures[0]`) is the exact string identifier you must register in
+  your architecture's `arch.py` file.
+- `torch_dtype` (or `dtype`): Defines the precision dtype in which the weights
+  are serialized, establishing the default encoding declared in the pipeline.
+  (`torch_dtype` is deprecated and replaced by `dtype`.)
+- `model_type`: Identifies the model family (such as `llama` or `qwen3`),
+  pointing to the closest baseline MAX architecture and indicating the expected
+  weight serialization layout.
+
+Beyond these *core* identifiers, the remaining parameters are highly
+model-specific. They reflect the exact architectural dimensions, flags, and
+design choices established by the model authors during the training phase.
+
+Because instruct, base, and chat variants often differ in parameters like
+`max_position_embeddings`, `rope_scaling`, or `tie_word_embeddings`, always load
+the config for the exact checkpoint you're porting. Copying values from a
+sibling variant can result in a model that loads without errors but fails at
+long sequence lengths or on the final logits projection.
+
+### Explore other model configs
+
+TinyLlama is a model checkpoint using the standard Llama architecture
+(`LlamaForCausalLM`), where almost every field maps directly, and the only
+special consideration is `rope_scaling` if porting a larger context sibling.
+Examining the configuration files for other architectures supported by MAX
+illustrates the spectrum of divergence you encounter:
+
+<Tabs>
+  <TabItem value="qwen3" label="Qwen3">
+
+Qwen3's configuration file looks nearly identical to Llama's, specifying grouped-query attention,
+RoPE, and an explicit `head_dim`. However, its primary structural difference is completely
+absent from the configuration file. Qwen3 applies an RMSNorm to the query and key projections
+prior to attention. This operation is defined entirely in the model's execution code, rather
+than its configuration JSON.
+
+```json title="config.json (condensed)"
+{
+  "architectures": ["Qwen3ForCausalLM"],
+  "model_type": "qwen3",
+  "hidden_size": 4096,
+  "num_hidden_layers": 36,
+  "num_attention_heads": 32,
+  "num_key_value_heads": 8,
+  "head_dim": 128,
+  "intermediate_size": 12288,
+  "max_position_embeddings": 40960,
+  "rope_theta": 1000000,
+  "torch_dtype": "bfloat16"
+}
+```
+
+Relying solely on this config leads you to reuse the Llama 3 architecture. The custom
+`qwen3` architecture exists to accommodate this unlisted difference, which is why you must
+cross-reference config files with the source modeling scripts.
+
+  </TabItem>
+  <TabItem value="deepseek" label="DeepSeek-V3">
+
+DeepSeek-V3 represents the opposite extreme, where the configuration file flags complex graph
+implementations: it combines multi-head latent attention (MLA), a mixture-of-experts (MoE) MLP
+block, YaRN context scaling, and FP8-quantized weights.
+
+```json title="config.json (condensed)"
+{
+  "architectures": ["DeepseekV3ForCausalLM"],
+  "model_type": "deepseek_v3",
+  "hidden_size": 7168,
+  "num_hidden_layers": 61,
+  "num_attention_heads": 128,
+  "q_lora_rank": 1536,
+  "kv_lora_rank": 512,
+  "n_routed_experts": 256,
+  "num_experts_per_tok": 8,
+  "n_shared_experts": 1,
+  "rope_scaling": {"type": "yarn", "factor": 40},
+  "quantization_config": {"quant_method": "fp8", "weight_block_size": [128, 128]},
+  "torch_dtype": "bfloat16"
+}
+```
+
+`q_lora_rank` and `kv_lora_rank` configure latent attention; `n_routed_experts` and
+`num_experts_per_tok` dictate MoE routing; and `quantization_config` indicates that the released
+weights are FP8. Each of these parameters signals custom graph logic, requiring a distinct
+`deepseek_v3` pipeline architecture rather than a dense decoder variant.
+
+  </TabItem>
+</Tabs>
+
+:::note
+The `config.json` snippets shown above have been condensed for brevity.
+:::
+
+These configuration fields generally fall into three categories based on their
+architectural scope. This split establishes your development roadmap.
+
+## Add dimensions directly to `model_config.py`
+
+When mapping fields from `config.json`, start by identifying static dimensions
+and hyperparameters. These fields parameterize existing math (such as sizing
+matrices or defining scalar constants) but don't alter the sequence of
+operations. You'll define these fields in your architecture's
+`model_config.py` file, translating them into a typed configuration dataclass,
+in which each field is a class attribute. For example:
+
+```python
+@dataclass(kw_only=True)
+class MyModelConfig(ArchConfigWithKVCache):
+    hidden_size: int
+    num_hidden_layers: int
+    num_attention_heads: int
+    # ... one attribute per config field you map ...
+```
+
+The following list shows common dimensional parameters that mean the same thing
+across nearly all transformer architectures. While this list isn't exhaustive,
+these are the most common fields that pass directly into standard layers without
+requiring graph changes:
+
+- `hidden_size`
+- `num_hidden_layers`
+- `num_attention_heads`
+- `num_key_value_heads`
+- `intermediate_size`
+- `vocab_size`
+- `max_position_embeddings`
+- `rms_norm_eps`
+- `hidden_act`
+- `tie_word_embeddings`
+- `rope_theta`
+- Special token IDs (such as `bos_token_id` and `eos_token_id`)
+
+TinyLlama represents this simpler class of configuration. You declare these
+fields in `model_config.py` (see
+[Map config fields](/develop/model-bringup-workflow/#map-config-fields)). Four
+of these parameters (`num_key_value_heads`, `head_dim`, `num_hidden_layers`, and
+`max_seq_len`) also size the KV cache that MAX allocates at startup (see
+[the cache parameters](/develop/model-bringup-workflow/#connect-to-the-kv-cache)).
+
+The `model_config.py` file defines a typed configuration dataclass and
+implements an `initialize_from_config()` classmethod to parse the Hugging Face
+JSON. While most fields map directly, others require preprocessing:
+`max_position_embeddings` is clamped against the pipeline's runtime context
+limit to produce `max_seq_len`, and the `dtype` is selected based on the target
+quantization encoding rather than the config's `torch_dtype`.
+
+Even simple dimensions require validation: `hidden_act` maps to a single
+parameter, but `gelu`, `gelu_new`, and `gelu_tanh` represent distinct activation
+functions. Binding the wrong activation function introduces subtle numerical
+drift in the MLP outputs.
+
+Depending on the similarity of your model's architecture to existing MAX
+architectures, you implement these mappings as a standalone base configuration
+or a concise subclass:
+
+<Tabs>
+  <TabItem value="llama3" label="Llama 3.1">
+
+`Llama3Config` is the baseline architecture configuration class that dense decoders extend. Open the configuration schema
+in [`llama3/model_config.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/llama3/model_config.py)
+to inspect how each direct-map field is defined as a typed attribute:
+
+```python title="llama3/model_config.py"
+@dataclass(kw_only=True)
+class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
+    hidden_size: int
+    num_attention_heads: int
+    num_key_value_heads: int
+    num_hidden_layers: int
+    intermediate_size: int
+    vocab_size: int
+    max_seq_len: int
+    rope_theta: float
+    rms_norm_eps: float | None = None
+    tie_word_embeddings: bool = False
+    dtype: DType
+    kv_params: KVCacheParams
+    # ... plus rope scaling params, multipliers, devices, quantization ...
+
+    @classmethod
+    def initialize_from_config(
+        cls, pipeline_config, huggingface_config, model_config=None, *, max_seq_len
+    ):
+        return cls(
+            hidden_size=huggingface_config.hidden_size,
+            num_attention_heads=huggingface_config.num_attention_heads,
+            num_key_value_heads=huggingface_config.num_key_value_heads,
+            num_hidden_layers=huggingface_config.num_hidden_layers,
+            intermediate_size=huggingface_config.intermediate_size,
+            vocab_size=huggingface_config.vocab_size,
+            rope_theta=get_rope_theta(huggingface_config),
+            # max_seq_len is received, not derived here: the caller already
+            # resolved and clamped it before construction.
+            max_seq_len=max_seq_len,
+            dtype=supported_encoding_dtype(pipeline_config.model.quantization_encoding),
+            # ... remaining fields ...
+        )
+```
+
+  </TabItem>
+  <TabItem value="qwen3" label="Qwen3">
+
+Because Qwen3's direct-map fields match Llama's, the configuration class in
+[`qwen3/model_config.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/qwen3/model_config.py)
+subclasses `Llama3Config` to inherit its base fields and appends only the custom MoE properties:
+
+```python title="qwen3/model_config.py"
+@dataclass(kw_only=True)
+class Qwen3Config(Llama3Config):
+    # Inherits hidden_size, num_hidden_layers, vocab_size, rope_theta, and the
+    # rest of the direct-map fields from Llama3Config. Adds the MoE fields.
+    num_experts: int = 0
+    num_experts_per_tok: int = 1
+    moe_intermediate_size: int = 0
+
+    @classmethod
+    def initialize_from_config(cls, pipeline_config, huggingface_config, model_config=None):
+        base = Llama3Config.initialize_from_config(
+            pipeline_config, huggingface_config, model_config
+        )
+        return cls(
+            hidden_size=base.hidden_size,
+            num_attention_heads=base.num_attention_heads,
+            # ... carry the rest of the direct-map fields from base ...
+            num_experts=getattr(huggingface_config, "num_experts", 0),
+            num_experts_per_tok=getattr(huggingface_config, "num_experts_per_tok", 1),
+        )
+```
+
+  </TabItem>
+  <TabItem value="deepseek" label="DeepSeek-V3">
+
+DeepSeek-V3 diverges significantly from dense decoders. Open the standalone configuration class in
+[`deepseekV3/model_config.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/deepseekV3/model_config.py)
+to review the custom schema mapping general parameters alongside structural fields:
+
+```python title="deepseekV3/model_config.py"
+@dataclass(kw_only=True)
+class DeepseekV3Config(ArchConfigWithKVCache):
+    # The same universal fields, with DeepSeek's defaults.
+    hidden_size: int = 7168
+    num_hidden_layers: int = 61
+    num_attention_heads: int = 128
+    intermediate_size: int = 18432
+    vocab_size: int = 129280
+    rms_norm_eps: float = 1e-6
+    rope_theta: float = 10000.0
+
+    # Structural fields, carried as config values for the layer code to read.
+    q_lora_rank: int = 1536          # multi-head latent attention
+    kv_lora_rank: int = 512
+    qk_nope_head_dim: int = 128
+    qk_rope_head_dim: int = 64
+    v_head_dim: int = 128
+    n_routed_experts: int = 256      # mixture of experts
+    num_experts_per_tok: int = 8
+    n_shared_experts: int = 1
+```
+
+  </TabItem>
+</Tabs>
+
+## Build graph layers for structural fields
+
+Structural fields signal that the model departs from a standard transformer
+architecture and requires custom layer logic. When you identify these fields,
+prepare to declare or extend custom layers in the model's graph implementation
+file (such as `llama3.py` or `deepseekV3.py`) using
+[MAX modules](/develop/modules/):
+
+- **Grouped-query or multi-query attention** (`num_key_value_heads` below
+  `num_attention_heads`, or `multi_query`) shares keys and values across query
+  heads.
+- **Sliding-window attention** (`sliding_window`) or **softcapping**
+  (`attn_logit_softcapping`, `final_logit_softcapping`) changes the attention
+  mask or score path.
+- **Mixture of experts** (`num_experts`, `num_experts_per_tok`, router flags)
+  turns the MLP into a routed set of experts.
+- **Multi-head latent attention** (`q_lora_rank`, `kv_lora_rank`,
+  `qk_nope_head_dim`, `qk_rope_head_dim`) projects attention through a low-rank
+  latent space.
+- **QK-norm, post-norm, or MuP scalars** (`use_qk_norm`, `use_post_norm`,
+  `embedding_multiplier`, `logits_scaling`) add norms or scale factors inside
+  the block.
+- **Quantized weights** (`quantization_config`) need a dequantization path for
+  the released checkpoint (see
+  [Extend the compute graph](/develop/model-bringup-workflow/#extend-the-compute-graph)).
+
+Often, the closest baseline MAX architecture already implements some of these
+mechanisms. The following three examples show what it looks like to implement
+custom layer logic based on these structural fields:
+
+<Tabs>
+  <TabItem value="llama3" label="Llama 3.1">
+
+Llama 3.1's only structural variation is `rope_scaling`. This requires no custom layers; instead,
+read the scaling parameters from the configuration and pass them to the rotary embedding constructor in
+[`llama3/model_config.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/llama3/model_config.py):
+
+```python title="llama3/model_config.py"
+# Read rope_scaling into typed params if the config uses the llama3 scheme.
+rope_scaling = getattr(huggingface_config, "rope_scaling", None)
+if rope_scaling and rope_scaling.get("rope_type") == "llama3":
+    rope_scaling_params = Llama3RopeScalingParams(
+        factor=rope_scaling["factor"],
+        low_freq_factor=rope_scaling["low_freq_factor"],
+        high_freq_factor=rope_scaling["high_freq_factor"],
+        orig_max_position=rope_scaling["original_max_position_embeddings"],
+    )
+
+# Build the RoPE embedding (scaling_params=None yields standard RoPE).
+rope = Llama3RotaryEmbedding(
+    dim=hidden_size,
+    n_heads=num_attention_heads,
+    theta=rope_theta,
+    max_seq_len=max_seq_len,
+    scaling_params=rope_scaling_params,
+)
+```
+
+  </TabItem>
+  <TabItem value="qwen3" label="Qwen3">
+
+Qwen3 applies a [`RMSNorm`](/api/python/generated/max.nn.RMSNorm/) to the query and key projections before the RoPE calculation. To implement this
+in the compute graph, define two additional normalization layers in
+[`qwen3/layers/attention.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/qwen3/layers/attention.py)
+and apply them to query and key projections in the block forward pass:
+
+```python title="qwen3/layers/attention.py"
+class Qwen3Attention(Module):
+    def __init__(self, *, hidden_size, num_attention_heads, kv_params, ...):
+        super().__init__()
+        # ... standard QKV and output projections ...
+
+        # Per-head RMSNorm for Q and K, the Qwen3-specific layers.
+        self.q_norm = RMSNorm(kv_params.head_dim, dtype=norm_dtype, eps=qk_norm_eps)
+        self.k_norm = RMSNorm(kv_params.head_dim, dtype=norm_dtype, eps=qk_norm_eps)
+
+    def __call__(self, layer_idx, x, kv_collection, freqs_cis, input_row_offsets):
+        head_dim = self.kv_params.head_dim
+        qkv = self.qkv_proj(x)
+        x_q, x_k, x_v = ops.split(qkv, [q_dim, kv_dim, kv_dim], axis=-1)
+
+        # Apply per-head QK norm before RoPE. This is the structural change.
+        x_q = self.q_norm(x_q.reshape((-1, self.n_heads, head_dim))).reshape((-1, q_dim))
+        x_k = self.k_norm(x_k.reshape((-1, self.num_key_value_heads, head_dim))).reshape((-1, kv_dim))
+
+        # ... Re-concat, apply RoPE, store to KV cache, flash attention, output projection ...
+        qkv = ops.concat((x_q, x_k, x_v), axis=-1)
+        ...
+```
+
+  </TabItem>
+  <TabItem value="deepseek" label="DeepSeek-V3">
+
+DeepSeek-V3 replaces the standard attention mechanism with Multi-head Latent Attention (MLA). The block
+reads low-rank projection parameters directly from the configuration, instantiating a custom attention
+module in [`deepseekV3/deepseekV3.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/deepseekV3/deepseekV3.py):
+
+```python title="deepseekV3/deepseekV3.py"
+# Multi-head latent attention: q_lora_rank and kv_lora_rank project Q and KV
+# through low-rank latent spaces. The head dimension splits into no-rope and
+# rope parts, and the parallelism mode determines the concrete class.
+self.self_attn = TensorParallelLatentAttentionWithRope(
+    rope=rope,
+    num_attention_heads=config.num_attention_heads,
+    hidden_size=config.hidden_size,
+    kv_params=config.kv_params,
+    q_lora_rank=config.q_lora_rank,
+    kv_lora_rank=config.kv_lora_rank,
+    qk_nope_head_dim=config.qk_nope_head_dim,
+    qk_rope_head_dim=config.qk_rope_head_dim,
+    v_head_dim=config.v_head_dim,
+    devices=config.devices,
+)
+```
+
+  </TabItem>
+</Tabs>
+
+## Recognize macro-architecture changes
+
+While most parameters dictate sizes or internal layer logic, some fields signal
+that the overall sequence of operations must change, requiring a completely new
+graph.
+
+For example, a `vision_config` field implies the model is multimodal and needs
+a separate vision tower (like
+[Pixtral](/api/python/pipelines.architectures.pixtral/)) to embed images
+before passing them to the transformer. An encoder-decoder structure (like T5)
+breaks the standard decoder-only block sequence entirely. If a parameter alters
+how blocks are wired together or what inputs they accept, you must write a new
+macro-graph implementation rather than just swapping a custom layer into a
+standard pipeline.
+
+## Next steps
+
+Once you map the configuration fields to config properties and compute graph
+requirements, you can proceed with the remaining integration steps. The
+remainder of the model port involves registering your new architecture, mapping
+checkpoint weights, and validating output logits against the source framework.
+The [model bring-up workflow](/develop/model-bringup-workflow/) provides an
+end-to-end view of this sequence.
+
+These pages go deeper on the steps that follow:
+
+- [Serve custom model architectures](/develop/serve-custom-model-architectures/):
+  Register your architecture package and serve it with `max serve`.
+- [Quantization](/develop/quantize/): Work with quantized weight encodings
+  when a checkpoint's `quantization_config` calls for them.
+
+{/* TODO(docs): link these once the pages exist: choose an implementation
+strategy, map checkpoint weights, read the modeling code, configure attention
+and KV cache, configure positional encoding, verify logits and generation,
+blocked architectures. */}

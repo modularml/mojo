@@ -15,27 +15,30 @@
 # Applies a box blur filter to an image
 
 from std.math import ceildiv
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 from std.itertools import product
 
 # ========================== KERNEL CODE ==========================
 
 
 def blur_kernel(
-    input: UnsafePointer[UInt8, MutExternalOrigin],
-    output: UnsafePointer[UInt8, MutExternalOrigin],
-    m: Int,
-    n: Int,
+    input: UnsafePointer[UInt8, MutUntrackedOrigin],
+    output: UnsafePointer[UInt8, MutUntrackedOrigin],
+    m_dev: Int32,
+    n_dev: Int32,
 ):
     """GPU kernel for image blur.
 
     Args:
         input: Input image (device).
         output: Output blurred image (device).
-        m: Image height (number of rows).
-        n: Image width (number of columns).
+        m_dev: Image height (number of rows).
+        n_dev: Image width (number of columns).
     """
+    # Int is not device-passable; widen the fixed-width args.
+    var m = Int(m_dev)
+    var n = Int(n_dev)
     comptime BLUR_SIZE = 3
 
     var row = global_idx.y
@@ -67,8 +70,8 @@ def blur_kernel(
 
 
 def cpu_blur(
-    h_in: UnsafePointer[UInt8, MutExternalOrigin],
-    h_ref: UnsafePointer[UInt8, MutExternalOrigin],
+    h_in: UnsafePointer[UInt8, MutUntrackedOrigin],
+    h_ref: UnsafePointer[UInt8, MutUntrackedOrigin],
     n: Int,
     m: Int,
 ):
@@ -105,7 +108,7 @@ def cpu_blur(
         h_ref[curr_idx] = avg
 
 
-def initialize(h_in: UnsafePointer[UInt8, MutExternalOrigin], size: Int):
+def initialize(h_in: UnsafePointer[UInt8, MutUntrackedOrigin], size: Int):
     """Initialize input array with test data.
 
     Args:
@@ -151,8 +154,8 @@ def main() raises:
         ctx.enqueue_function[blur_kernel](
             d_in,
             d_out,
-            m,
-            n,
+            Int32(m),
+            Int32(n),
             grid_dim=(grid_dim_x, grid_dim_y, 1),
             block_dim=(block_dim_x, block_dim_y, 1),
         )

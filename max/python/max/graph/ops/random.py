@@ -104,20 +104,35 @@ def gaussian(
 ) -> TensorValue:
     """Samples from a Gaussian (normal) distribution with the given mean and standard deviation.
 
-    Output shape and dtype match the ``like`` tensor type. A seed must be
-    set on the current graph with :func:`set_seed`.
+    A seed must be set on the current graph with :func:`set_seed`.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, TensorType, ops
+
+        device = DeviceRef.CPU()
+        with Graph("gaussian_example") as graph:
+            ops.random.set_seed(0)
+            like = TensorType(DType.float32, [2, 3], device=device)
+            graph.output(ops.random.gaussian(like, mean=0.0, std=1.0))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+        # result is a (2, 3) tensor sampled from a standard normal distribution.
 
     Args:
         like: A :class:`~max.graph.TensorType` whose shape, dtype, and device
             determine the output tensor.
         mean: The mean of the Gaussian distribution. Must be a scalar.
-            Defaults to 0.
+            Defaults to ``0``.
         std: The standard deviation of the Gaussian distribution. Must be a
-            scalar. Defaults to 1.
+            scalar. Defaults to ``1``.
 
     Returns:
-        A symbolic tensor with the same shape and dtype as ``like``, filled
-        with values sampled from the specified Gaussian distribution.
+        A ``TensorValue`` with the same shape and dtype as ``like``, representing
+        values sampled from the specified Gaussian distribution.
 
     Raises:
         RuntimeError: If no seed has been set with :func:`set_seed`.
@@ -156,9 +171,24 @@ def uniform(
 ) -> TensorValue:
     """Samples uniformly from the half-open interval ``[lower, upper)``.
 
-    Values satisfy ``lower ≤ x < upper``. Output shape and dtype match
-    the ``like`` tensor type. A seed must be set on the current graph with
+    Values satisfy ``lower ≤ x < upper``. A seed must be set on the current graph with
     :func:`set_seed`.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, TensorType, ops
+
+        device = DeviceRef.CPU()
+        with Graph("uniform_example") as graph:
+            ops.random.set_seed(0)
+            like = TensorType(DType.float32, [2, 3], device=device)
+            graph.output(ops.random.uniform(like, range=(0.0, 1.0)))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+        # result is a (2, 3) tensor sampled uniformly from [0.0, 1.0).
 
     Args:
         like: A :class:`~max.graph.TensorType` whose shape, dtype, and device
@@ -167,8 +197,8 @@ def uniform(
             sample from. Both bounds must be scalars. Defaults to ``(0, 1)``.
 
     Returns:
-        A symbolic tensor with the same shape and dtype as ``like``, filled
-        with values sampled uniformly from ``[lower, upper)``.
+        A ``TensorValue`` with the same shape and dtype as ``like``,
+        representing values sampled uniformly from ``[lower, upper)``.
 
     Raises:
         RuntimeError: If no seed has been set with :func:`set_seed`.

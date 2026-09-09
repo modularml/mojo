@@ -1,0 +1,34 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+params:
+- M: 1
+  M_END: 17
+  N: 128
+  K: 512
+  MMA_M: 128
+  MMA_N: 16
+  MMA_K: 32
+  CTA_GROUP: 2
+  CLUSTER_X: 2
+  CLUSTER_Y: 1
+  CLUSTER_Z: 1
+  BLOCK_SWIZZLE_SIZE: 0
+  RASTERIZE_ORDER: 1
+  SWAP_AB: true
+  K_GROUP_SIZE: 4
+  NUM_ACCUM_PIPELINE_STAGES: 1
+  NUM_CLC_PIPELINE_STAGES: 0
+  NUM_SPLIT_K: 1
+  NUM_PIPELINE_STAGES: 0
+  IS_SMALL_BN: false
+  BATCH_SIZE: 64

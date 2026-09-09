@@ -1,0 +1,40 @@
+---
+title: MAX REST API
+sidebar_label: Overview
+description: The API reference for the MAX inference endpoint.
+sidebar_position: 1
+---
+
+import RestApiHashRedirect from '@site/src/components/RestApiHashRedirect';
+
+<RestApiHashRedirect />
+
+The MAX REST API provides an OpenAI-compatible REST endpoint for deploying
+LLMs and other GenAI models locally or in the cloud.
+
+To create your first endpoint and start sending inference requests, see the
+[quickstart guide](/get-started).
+
+## Supported endpoints
+
+The MAX API is compatible with a subset of the OpenAI API so you to use any
+existing OpenAI client to send inference requests to your MAX endpoint.
+
+- [Create response](/rest-api/create-response) (`POST /v1/responses`)
+- [Create chat completion](/rest-api/create-chat-completion)
+  (`POST /v1/chat/completions`)
+- [Create completion](/rest-api/create-completion) (`POST /v1/completions`)
+- [Create embeddings](/rest-api/create-embedding) (`POST /v1/embeddings`)
+- [Create speech](/rest-api/create-speech) (`POST /v1/audio/speech`)
+- [List models](/rest-api/list-models) (`GET /v1/models`)
+- [Health check](/rest-api/health) (`GET /health`)
+
+### Parameter handling
+
+While aiming for high compatibility, not all OpenAI body parameters are
+implemented. Some may be accepted as no-ops (ignored but won't cause errors) to
+maintain client compatibility. Each endpoint page documents only the parameters
+that actively affect behavior in MAX.
+
+In addition to the OpenAI APIs, MAX provides a Prometheus-formatted [metrics
+endpoint](/serve/metrics) to help track your model's performance.

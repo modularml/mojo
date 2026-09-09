@@ -14,9 +14,7 @@
 from __future__ import annotations
 
 import logging
-import math
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, ClassVar, cast
 
@@ -25,24 +23,23 @@ import numpy.typing as npt
 from max.driver import Buffer, Device, DLPackArray
 from max.dtype import DType
 from max.engine import InferenceSession, Model
-from max.graph import BufferType, DeviceRef, Graph, TensorType, Type
-from max.graph.buffer_utils import cast_dlpack_to
+from max.graph import BufferType, DeviceRef, Graph, Module, TensorType, Type
 from max.graph.weights import WeightData, Weights, WeightsAdapter
 from max.nn.comm import Signals
-from max.nn.kv_cache import KVCacheInputs
 from max.nn.transformer import ReturnLogits
-from max.pipelines.core import TextAndVisionContext
+from max.pipelines.context import TextAndVisionContext
 from max.pipelines.lib import (
     AlwaysSignalBuffersMixin,
-    CompilationTimer,
     KVCacheConfig,
     ModelInputs,
     ModelOutputs,
+    MultiGraphPipelineModelWithKVCache,
     PipelineConfig,
-    PipelineModelWithKVCache,
 )
+from max.pipelines.lib.memory_estimation import MemoryPlan
 from transformers import AutoConfig
 
+from .batch_processor import Gemma3MultiModalBatchProcessor
 from .model_config import Gemma3ForConditionalGenerationConfig
 from .vision_model.gemma3multimodal import (
     Gemma3LanguageModel,
@@ -54,72 +51,6 @@ from .weight_adapters import (
 )
 
 logger = logging.getLogger("max.pipelines")
-
-
-class _VisionStacker:
-    """Helper class for efficient parallel stacking of vision patches.
-
-    Uses ThreadPoolExecutor for thread management and bulk numpy operations
-    for optimal memory bandwidth utilization.
-    """
-
-    def __init__(self, max_workers: int = 24) -> None:
-        """Initialize the vision stacker with a thread pool.
-
-        Args:
-            max_workers: Maximum number of worker threads (default: 24).
-        """
-        self._pool = ThreadPoolExecutor(max_workers=max_workers)
-
-    def stack(
-        self, images: list[npt.NDArray[np.floating[Any]]]
-    ) -> npt.NDArray[np.floating[Any]]:
-        """Stack images using parallel bulk copy operations.
-
-        Args:
-            images: List of numpy arrays to stack.
-
-        Returns:
-            Stacked numpy array.
-        """
-        n = len(images)
-        if n == 0:
-            return np.empty((0,), dtype=np.float32)
-
-        # Pre-allocate output.
-        out = np.empty((n, *images[0].shape), dtype=images[0].dtype)
-
-        # Divide work evenly among threads.
-        # ThreadPoolExecutor will handle cases where n < workers.
-        workers = self._pool._max_workers
-        step = math.ceil(n / workers)
-        slices = [slice(i, min(i + step, n)) for i in range(0, n, step)]
-
-        # Launch parallel bulk copy tasks.
-        futures = [
-            self._pool.submit(self._copy_block, out, images, sl)
-            for sl in slices
-        ]
-
-        # Wait for completion and propagate any exceptions.
-        for f in as_completed(futures):
-            f.result()
-
-        return out
-
-    @staticmethod
-    def _copy_block(
-        out: npt.NDArray[np.floating[Any]],
-        images: list[npt.NDArray[np.floating[Any]]],
-        sl: slice,
-    ) -> None:
-        """Copy a block of images using bulk numpy operations.
-
-        This method performs a C-level bulk copy that releases the GIL,
-        allowing true parallel execution.
-        """
-        # Convert slice of list to temporary array view and bulk copy.
-        np.copyto(out[sl], np.asarray(images[sl], dtype=images[0].dtype))
 
 
 @dataclass
@@ -168,7 +99,7 @@ class Gemma3MultiModalModelInputs(ModelInputs):
 
 class Gemma3_MultiModalModel(
     AlwaysSignalBuffersMixin,
-    PipelineModelWithKVCache[TextAndVisionContext],
+    MultiGraphPipelineModelWithKVCache[TextAndVisionContext],
 ):
     """Gemma 3 multimodal pipeline model for text generation.
 
@@ -193,11 +124,14 @@ class Gemma3_MultiModalModel(
     """
 
     model_config_cls: ClassVar[type[Any]] = Gemma3ForConditionalGenerationConfig
+    batch_processor_cls: ClassVar[type[Gemma3MultiModalBatchProcessor]] = (
+        Gemma3MultiModalBatchProcessor
+    )
 
     language_model: Model
     """The compiled and initialized MAX Engine model ready for inference."""
 
-    vision_model: Model
+    vision_model: Model | None
     """The compiled and initialized MAX Engine vision model ready for inference."""
 
     # The vision and text towers are in the same weights file, but are in
@@ -212,17 +146,22 @@ class Gemma3_MultiModalModel(
         devices: list[Device],
         kv_cache_config: KVCacheConfig,
         weights: Weights,
+        *,
+        memory_plan: MemoryPlan,
         adapter: WeightsAdapter | None = None,
         return_logits: ReturnLogits = ReturnLogits.LAST_TOKEN,
+        max_batch_size: int = 1,
     ) -> None:
+        self._max_batch_size = max_batch_size
         super().__init__(
             pipeline_config,
             session,
             devices,
             kv_cache_config,
             weights,
-            adapter,
-            return_logits,
+            adapter=adapter,
+            return_logits=return_logits,
+            memory_plan=memory_plan,
         )
 
         # signal_buffers are provided by AlwaysSignalBuffersMixin as a cached_property
@@ -231,28 +170,7 @@ class Gemma3_MultiModalModel(
         # preventing potential race conditions in multi-GPU scenarios.
         _ = self.signal_buffers
 
-        self._stacker = _VisionStacker()
         self.vision_model, self.language_model = self.load_model(session)
-
-    @classmethod
-    def estimate_activation_memory(
-        cls, pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        del pipeline_config, huggingface_config  # Unused.
-
-        # FIXME: We arbitrarily set some memory for activation memory to leave headroom
-        # for vision processing. We should determine this in a more principled way.
-        # Update: Bumped to 15 GiB after #80736 removed MemoryManager fallthrough.
-        return 15 * 1024 * 1024 * 1024  # 15 GiB
-
-    @classmethod
-    def calculate_max_seq_len(
-        cls, pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        """Calculates the maximum sequence length for the InternVL model."""
-        return Gemma3ForConditionalGenerationConfig.calculate_max_seq_len(
-            pipeline_config, huggingface_config
-        )
 
     @classmethod
     def get_num_layers(cls, huggingface_config: AutoConfig) -> int:
@@ -261,65 +179,31 @@ class Gemma3_MultiModalModel(
             huggingface_config
         )
 
-    def load_model(self, session: InferenceSession) -> tuple[Model, Model]:
-        """Loads the compiled Gemma3 MultiModal models into the MAX Engine session.
+    def _load_state_dict(self) -> dict[str, Any]:
+        assert self._max_batch_size, "Expected max_batch_size to be set"
 
-        Returns:
-            A tuple of (vision_model, language_model).
-        """
-        assert self.pipeline_config.runtime.max_batch_size, (
-            "Expected max_batch_size to be set"
-        )
-
-        # Get processed state dict for language and vision models
         weights_dict = dict(self.weights.items())
-        language_weights_dict = convert_safetensor_language_state_dict(
+        self._language_weights_dict = convert_safetensor_language_state_dict(
             weights_dict
         )
-        vision_weights_dict = convert_safetensor_vision_state_dict(weights_dict)
+        self._vision_weights_dict = convert_safetensor_vision_state_dict(
+            weights_dict
+        )
+        return {k: v.data() for k, v in weights_dict.items()}
 
-        raw_state_dict = {k: v.data() for k, v in weights_dict.items()}
+    def _create_model_config(
+        self, state_dict: dict[str, Any]
+    ) -> Gemma3ForConditionalGenerationConfig:
         model_config = Gemma3ForConditionalGenerationConfig.initialize(
-            self.pipeline_config
+            self.pipeline_config, max_seq_len=self.max_seq_len
         )
         model_config.finalize(
             huggingface_config=self.huggingface_config,
-            state_dict=raw_state_dict,
+            state_dict=state_dict,
             return_logits=self.return_logits,
         )
         self.config = model_config
-
-        input_row_offsets_prealloc_host = Buffer.from_numpy(
-            np.arange(
-                self.pipeline_config.runtime.max_batch_size + 1,
-                dtype=np.uint32,
-            )
-        )
-        self._input_row_offsets_prealloc = [
-            input_row_offsets_prealloc_host.to(dev) for dev in self.devices
-        ]
-
-        # Build and compile language model
-        with CompilationTimer("language model") as timer:
-            language_graph, language_weight_dict = self._build_language_graph(
-                model_config, language_weights_dict
-            )
-            timer.mark_build_complete()
-            language_model = session.load(
-                language_graph, weights_registry=language_weight_dict
-            )
-
-        # Build and compile vision model
-        with CompilationTimer("vision model") as timer:
-            vision_graph, vision_model_state_dict = self._build_vision_graph(
-                model_config, vision_weights_dict
-            )
-            timer.mark_build_complete()
-            vision_model = session.load(
-                vision_graph, weights_registry=vision_model_state_dict
-            )
-
-        return vision_model, language_model
+        return model_config
 
     def _language_model_input_types(
         self, config: Gemma3ForConditionalGenerationConfig
@@ -375,18 +259,20 @@ class Gemma3_MultiModalModel(
             *image_embeddings_types,
             *image_token_indices_types,
             *signals.input_types(),
-            *self.kv_params.get_symbolic_inputs().flatten(),
+            *self.kv_params.flattened_kv_inputs(),
         )
 
     def _build_language_graph(
         self,
         config: Gemma3ForConditionalGenerationConfig,
         state_dict: dict[str, WeightData],
+        module: Module | None = None,
     ) -> tuple[Graph, dict[str, DLPackArray]]:
         """Build the language model with our input types and graph"""
         with Graph(
             getattr(self.huggingface_config, "model_type", "Gemma3"),
             input_types=self._language_model_input_types(config),
+            module=module,
         ) as graph:
             language_model = Gemma3LanguageModel(config)
             language_model.load_state_dict(
@@ -396,7 +282,7 @@ class Gemma3_MultiModalModel(
             )
 
             # Unpack inputs following InternVL pattern
-            (tokens, return_n_logits, *variadic_args) = graph.inputs
+            tokens, return_n_logits, *variadic_args = graph.inputs
 
             # Extract input_row_offsets (one per device)
             input_row_offsets = [
@@ -421,15 +307,18 @@ class Gemma3_MultiModalModel(
             ]
             variadic_args = variadic_args[len(self.devices) :]
 
-            # Extract KV cache inputs
-            kv_cache = self._unflatten_kv_inputs(variadic_args)
+            # Extract KV cache inputs from the unified {sliding, global} tree.
+            kv_cache_local, kv_cache_global = (
+                self.kv_params.unflatten_basic_kv_tree(iter(variadic_args))
+            )
 
             outputs = language_model(
                 tokens=tokens.tensor,
                 signal_buffers=signal_buffers,
                 return_n_logits=return_n_logits.tensor,
                 input_row_offsets=input_row_offsets,
-                kv_collections=kv_cache,
+                sliding_kv_collections=kv_cache_local,
+                global_kv_collections=kv_cache_global,
                 image_embeddings=image_embeddings,
                 image_token_indices=image_token_indices,
             )
@@ -464,11 +353,16 @@ class Gemma3_MultiModalModel(
         self,
         config: Gemma3ForConditionalGenerationConfig,
         state_dict: dict[str, WeightData],
+        module: Module | None = None,
     ) -> tuple[Graph, dict[str, DLPackArray]]:
         """Build the vision model with our input types and graph"""
+        vision_graph_name = (
+            getattr(self.huggingface_config, "model_type", "Gemma3") + "_vision"
+        )
         with Graph(
-            getattr(self.huggingface_config, "model_type", "Gemma3"),
+            vision_graph_name,
             input_types=self._vision_model_input_types(config),
+            module=module,
         ) as graph:
             vision_model = Gemma3VisionModel(
                 config,
@@ -507,6 +401,7 @@ class Gemma3_MultiModalModel(
         image_embeddings: list[Buffer]
         image_token_indices: list[Buffer]
         if model_inputs.has_vision_inputs:
+            assert self.vision_model is not None
             assert model_inputs.pixel_values is not None
 
             # Execute vision model: patched pixel_values -> image_embeddings.
@@ -523,9 +418,13 @@ class Gemma3_MultiModalModel(
             assert model_inputs.image_token_indices is not None
             image_token_indices = model_inputs.image_token_indices
         else:
-            # Initialize empty tensors for text-only mode.
-            image_embeddings = self._create_empty_image_embeddings()
-            image_token_indices = self._create_empty_indices()
+            assert isinstance(
+                self._batch_processor, Gemma3MultiModalBatchProcessor
+            )
+            image_embeddings = self._batch_processor.empty_image_embeddings()
+            image_token_indices = (
+                self._batch_processor.empty_image_token_indices()
+            )
 
         assert model_inputs.kv_cache_inputs
 
@@ -554,142 +453,3 @@ class Gemma3_MultiModalModel(
                 logits=model_outputs[0],
                 next_token_logits=model_outputs[0],
             )
-
-    def prepare_initial_token_inputs(
-        self,
-        replica_batches: Sequence[Sequence[TextAndVisionContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
-        return_n_logits: int = 1,
-    ) -> ModelInputs:
-        """Prepare our inputs for the first execution pass of the multimodal model."""
-
-        if len(replica_batches) > 1:
-            raise ValueError("Model does not support DP>1")
-
-        context_batch = replica_batches[0]
-
-        dev = self.devices[0]
-        assert kv_cache_inputs is not None
-        input_row_offsets = Buffer.from_numpy(
-            np.cumsum(
-                [0] + [ctx.tokens.active_length for ctx in context_batch],
-                dtype=np.uint32,
-            )
-        )
-        input_row_offsets_tensors = [
-            input_row_offsets.to(device) for device in self.devices
-        ]
-
-        tokens = np.concatenate([ctx.tokens.active for ctx in context_batch])
-
-        # stack our images in a list of tensors
-        pixel_values = self._prepare_vision_inputs(context_batch)
-
-        # Batch image token indices, offsetting for position in the batch.
-        image_token_indices = self._batch_image_token_indices(context_batch)
-
-        return Gemma3MultiModalModelInputs(
-            tokens=Buffer.from_numpy(tokens).to(dev),
-            input_row_offsets=input_row_offsets_tensors,
-            return_n_logits=Buffer.from_numpy(
-                np.array([return_n_logits], dtype=np.int64)
-            ),
-            signal_buffers=self.signal_buffers,
-            kv_cache_inputs=kv_cache_inputs,
-            pixel_values=pixel_values,
-            image_token_indices=image_token_indices,
-        )
-
-    def prepare_next_token_inputs(
-        self, next_tokens: Buffer, prev_model_inputs: ModelInputs
-    ) -> ModelInputs:
-        prev_model_inputs = cast(Gemma3MultiModalModelInputs, prev_model_inputs)
-        row_offsets_size = prev_model_inputs.input_row_offsets[0].shape[0]
-
-        # Slice each tensor in the list, not the list itself
-        next_row_offsets = [
-            offsets_prealloc[:row_offsets_size]
-            for offsets_prealloc in self._input_row_offsets_prealloc
-        ]
-
-        return Gemma3MultiModalModelInputs(
-            tokens=next_tokens,
-            input_row_offsets=next_row_offsets,
-            return_n_logits=prev_model_inputs.return_n_logits,
-            signal_buffers=self.signal_buffers,
-            kv_cache_inputs=prev_model_inputs.kv_cache_inputs,
-            pixel_values=None,
-        )
-
-    def _prepare_vision_inputs(
-        self, context_batch: Sequence[TextAndVisionContext]
-    ) -> list[Buffer] | None:
-        """Use the VisionStacker to prepare batched vision inputs from multiple contexts.
-        The Tokenizer should have already processed images into pixel_values (pan and scan etc)"""
-        images = []
-        for context in context_batch:
-            for img in context.next_images:
-                images.append(img.pixel_values)
-
-        if not images:
-            return None
-
-        final_images = self._stacker.stack(images)
-
-        tensor = cast_dlpack_to(
-            final_images, DType.float32, DType.bfloat16, self.devices[0]
-        )
-
-        return [tensor.to(dev) for dev in self.devices]
-
-    def _batch_image_token_indices(
-        self, context_batch: Sequence[TextAndVisionContext]
-    ) -> list[Buffer] | None:
-        """Batch image token indices from multiple contexts, adjusting for
-        position in batch.
-        """
-        indices_and_offsets = []
-        batch_offset = 0
-
-        for ctx in context_batch:
-            input_ids = ctx.tokens.active
-
-            # Find where image tokens appear
-            special_image_token_mask = (
-                input_ids == self.config.image_token_index
-            )
-            indices = np.where(special_image_token_mask)[0]
-
-            if len(indices) > 0:
-                indices_and_offsets.append(indices + batch_offset)
-
-            batch_offset += ctx.tokens.active_length
-
-        if not indices_and_offsets:
-            return [
-                Buffer.zeros(shape=[0], dtype=DType.int32).to(self.devices[0])
-            ]
-
-        np_indices = np.concatenate(indices_and_offsets).astype(
-            np.int32, copy=False
-        )
-
-        # Create tensor and distribute to device
-        return [Buffer.from_numpy(np_indices).to(dev) for dev in self.devices]
-
-    def _create_empty_image_embeddings(self) -> list[Buffer]:
-        """Create empty image embeddings for text-only inputs."""
-        return [
-            Buffer.zeros(
-                shape=[0, self.huggingface_config.text_config.hidden_size],
-                dtype=DType.bfloat16,
-            ).to(dev)
-            for dev in self.devices
-        ]
-
-    def _create_empty_indices(self) -> list[Buffer]:
-        """Create empty image token indices tensor."""
-        return [
-            Buffer.zeros(shape=[0], dtype=DType.int32).to(dev)
-            for dev in self.devices
-        ]

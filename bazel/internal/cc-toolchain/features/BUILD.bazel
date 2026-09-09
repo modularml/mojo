@@ -78,6 +78,7 @@ cc_feature(
     name = "generate_dsym",
     args = [
         "//bazel/internal/cc-toolchain/args:generate_dsym",
+        "//bazel/internal/cc-toolchain/args:output_exec_path",
     ],
     overrides = "@rules_cc//cc/toolchains/features/legacy:generate_dsym_file",
 )

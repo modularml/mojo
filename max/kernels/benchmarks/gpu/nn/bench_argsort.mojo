@@ -15,6 +15,7 @@ from std.random import random_float64
 from std.sys import get_defined_dtype, get_defined_int
 from std.sys.info import size_of
 
+from max.benchmark import bencher_iter_custom
 from std.benchmark import (
     Bench,
     Bencher,
@@ -22,7 +23,7 @@ from std.benchmark import (
     BenchMetric,
     ThroughputMeasure,
 )
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Idx, TileTensor, row_major
 from nn.argsort import argsort
 
@@ -39,7 +40,7 @@ def bench_argsort[
 
     # Allocate device buffers.
     var device_input = ctx.enqueue_create_buffer[dtype](N)
-    var device_indices = ctx.enqueue_create_buffer[DType.int64](N)
+    var device_indices = ctx.enqueue_create_buffer[.int64](N)
     ctx.enqueue_copy(device_input, input_host_ptr)
 
     var device_input_tensor = TileTensor(
@@ -60,20 +61,20 @@ def bench_argsort[
     ctx.synchronize()
 
     @always_inline
-    @__copy_capture(device_input_tensor, device_indices_tensor)
-    @parameter
-    def bench_ascending(mut b: Bencher) raises:
-        @parameter
+    def bench_ascending(
+        mut b: Bencher,
+    ) raises {var device_input_tensor, var device_indices_tensor, imm}:
         @always_inline
-        def kernel_launch(ctx: DeviceContext) raises:
+        def kernel_launch(ctx: DeviceContext) raises {imm}:
             argsort[ascending=True, target="gpu"](
                 device_indices_tensor, device_input_tensor, ctx
             )
 
-        b.iter_custom[kernel_launch](ctx)
+        bencher_iter_custom(b, kernel_launch, ctx)
 
     var num_bytes = N * (size_of[dtype]() + size_of[DType.int64]())
-    m.bench_function[bench_ascending](
+    m.bench_function(
+        bench_ascending,
         BenchId("argsort", input_id=String(dtype, "/N=", N)),
         [ThroughputMeasure(BenchMetric.bytes, num_bytes)],
     )
@@ -86,7 +87,7 @@ def bench_argsort[
 
 
 def main() raises:
-    comptime dtype = get_defined_dtype["dtype", DType.float32]()
+    comptime dtype = get_defined_dtype["dtype", .float32]()
     var N = get_defined_int["N", 131072]()
 
     var m = Bench()

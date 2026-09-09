@@ -15,11 +15,12 @@ from std.math import exp2
 from std.pathlib import Path
 from std.sys._assembly import inlined_assembly
 
-from std.gpu import barrier, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.host.compile import _compile_code
-from std.gpu.host.info import A100
-from std.memory import stack_allocation
+from max.gpu import thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.host.compile import _compile_code
+from max.gpu.host.info import A100
+from std.memory import unsafe_stack_allocation
 
 
 def kernel(x: Int) -> Int:
@@ -49,7 +50,7 @@ def test_compile_code() raises:
 def test_compile_function() raises:
     print("== test_compile_function")
 
-    def kernel(x: UnsafePointer[Int, MutAnyOrigin]):
+    def kernel(x: MutPointer[Int, MutAnyOrigin]):
         x[0] = thread_idx.x
 
     # CHECK: tid.x
@@ -99,7 +100,7 @@ def test_compile_function_with_path_func() raises:
         var out_file_name = "my_file_2.ptx"
         comptime out_dir = Path("/tmp")
 
-        @parameter
+        @__parameter
         def dummy_fn() capturing -> Path:
             return out_dir / out_file_name
 
@@ -113,8 +114,8 @@ def test_compile_function_with_path_func() raises:
 def test_short_nvptx_ptr() raises:
     print("== test_short_nvptx_ptr")
 
-    def do_some_shared_mem_op(src: UnsafePointer[Int32, ImmutAnyOrigin]):
-        var a = stack_allocation[20, Int32, address_space=AddressSpace.SHARED]()
+    def do_some_shared_mem_op(src: ImmPointer[Int32, ImmutAnyOrigin]):
+        var a = unsafe_stack_allocation[20, Int32, address_space=.SHARED]()
         a[thread_idx.x] = src[0]
         barrier()
 
@@ -135,9 +136,9 @@ def test_exp2_compile() raises:
     print("== test_exp2_compile")
 
     # https://godbolt.org/z/j9ecfjjP1
-    def exp_op(output: UnsafePointer[Float32, MutAnyOrigin], max_scaled: Int32):
+    def exp_op(output: MutPointer[Float32, MutAnyOrigin], max_scaled: Int32):
         output[] = exp2(
-            output[] * 1.44269504088896340736 - max_scaled.cast[DType.float32]()
+            output[] * 1.44269504088896340736 - max_scaled.cast[.float32]()
         )
 
     # CHECK: "target-cpu"="sm_80" "target-features"="+ptx81,+sm_80" "tune-cpu"="sm_80"
@@ -153,7 +154,7 @@ def test_exp2_compile() raises:
             exp_op,
             target=A100.target(),
             emission_kind="asm",
-            compile_options="nvptx-short-ptr=true,denormal-fp-math-f32=preserve-sign",
+            compile_options="target-abi=shortptr,denormal-fp-math-f32=preserve-sign",
         ]()
     )
 

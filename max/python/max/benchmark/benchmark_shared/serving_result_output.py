@@ -27,6 +27,7 @@ import re
 import statistics
 from collections.abc import Sequence
 from datetime import datetime
+from typing import NamedTuple
 
 import numpy as np
 import yaml
@@ -47,14 +48,18 @@ from max.benchmark.benchmark_shared.lora_benchmark_manager import (
     LoRABenchmarkManager,
 )
 from max.benchmark.benchmark_shared.metrics import (
+    BenchmarkResult,
     LoRAMetrics,
-    PixelGenerationBenchmarkResult,
-    ServingBenchmarkMetrics,
-    SpecDecodeStats,
-    TextGenerationBenchmarkResult,
+    PercentileMetrics,
+    StandardPercentileMetrics,
+    ThroughputMetrics,
+)
+from max.benchmark.benchmark_shared.percentile_metrics import (
+    json_safe,
 )
 from max.benchmark.benchmark_shared.server_metrics import print_server_metrics
 from max.benchmark.benchmark_shared.utils import print_section
+from tabulate import tabulate
 
 logger = logging.getLogger(__name__)
 
@@ -289,26 +294,83 @@ def print_lora_benchmark_results(metrics: LoRAMetrics) -> None:
     print_action_section("unload", metrics.unload_times_ms)
 
 
+# Metric containers exposing the six percentile fields consumed by the summary
+# table. ``StandardPercentileMetrics`` (and its ``RatePercentileMetrics``
+# subclass) and ``ThroughputMetrics`` delegate the fields to an inner
+# ``PercentileMetrics`` via ``__getattr__``.
+_PercentileLike = (
+    PercentileMetrics | StandardPercentileMetrics | ThroughputMetrics
+)
+
+
+class PercentileRow(NamedTuple):
+    """A labeled metric to render as one row of the percentile summary table."""
+
+    label: str
+    metrics: _PercentileLike
+
+
+def format_gpu_statistics_title(n_devices: int) -> str:
+    """Section title stating GPU rows are derived across the sampled devices."""
+    assert n_devices > 0, "GPU statistics title requires at least one device"
+    device_label = "device" if n_devices == 1 else "devices"
+    return f"GPU Statistics (aggregated across {n_devices} {device_label})"
+
+
+def format_percentile_table(rows: Sequence[PercentileRow]) -> str:
+    """Render per-metric percentile stats as one table, one row per metric."""
+    headers = ["Metric", "Mean", "Std", "P50", "P90", "P95", "P99"]
+    table = [
+        [
+            row.label,
+            f"{row.metrics.mean:.2f}",
+            f"{row.metrics.std:.2f}",
+            f"{row.metrics.p50:.2f}",
+            f"{row.metrics.p90:.2f}",
+            f"{row.metrics.p95:.2f}",
+            f"{row.metrics.p99:.2f}",
+        ]
+        for row in rows
+    ]
+    return tabulate(
+        table,
+        headers=headers,
+        tablefmt="simple_outline",
+        colalign=("left", *("right",) * (len(headers) - 1)),
+        disable_numparse=True,
+    )
+
+
 def print_benchmark_summary(
-    metrics: ServingBenchmarkMetrics,
+    metrics: BenchmarkResult,
     request_rate: float,
     max_concurrency: int | None,
     achieved_request_rate: float,
     collect_gpu_stats: bool,
     collect_cpu_stats: bool,
-    spec_decode_stats: SpecDecodeStats | None = None,
     lora_manager: LoRABenchmarkManager | None = None,
 ) -> None:
     """Print benchmark summary for text-generation and pixel-generation."""
-    agg = metrics.aggregates
-    assert agg is not None, (
+    groups = metrics.result_groups
+    assert groups is not None, (
+        "print_benchmark_summary called before result_groups was populated"
+    )
+    summary = groups.summary
+    assert metrics.aggregates is not None, (
         "print_benchmark_summary called on a metrics record with no aggregates"
     )
+    # Summary scalars are filled from aggregates by ``build_result_groups``.
+    assert summary.completed is not None
+    assert summary.failures is not None
+    assert summary.duration is not None
+    assert summary.request_throughput is not None
 
     print_section(title=" Serving Benchmark Result ", char="=")
-    print("{:<40} {:<10}".format("Successful requests:", agg.completed))
-    print("{:<40} {:<10}".format("Failed requests:", agg.failures))
-    print("{:<40} {:<10.2f}".format("Benchmark duration (s):", agg.duration))
+    print("{:<40} {:<10}".format("Successful requests:", summary.completed))
+    print("{:<40} {:<10}".format("Failed requests:", summary.failures))
+    print(
+        "{:<40} {:<10.2f}".format("Benchmark duration (s):", summary.duration)
+    )
     if metrics.text_data is not None:
         t = metrics.text_data
         print("{:<40} {:<10}".format("Total input tokens:", t.total_input))
@@ -324,12 +386,11 @@ def print_benchmark_summary(
                 t.nonempty_response_chunks,
             )
         )
-    else:
-        assert metrics.pixel_data is not None
+    elif summary.total_generated_outputs is not None:
         print(
             "{:<40} {:<10}".format(
                 "Total generated outputs:",
-                metrics.pixel_data.total_generated_outputs,
+                summary.total_generated_outputs,
             )
         )
     offline_benchmark = math.isinf(request_rate) and max_concurrency is None
@@ -341,10 +402,10 @@ def print_benchmark_summary(
     )
     print(
         "{:<40} {:<10.5f}".format(
-            "Request throughput (req/s):", agg.request_throughput
+            "Request throughput (req/s):", summary.request_throughput
         )
     )
-    print("{:<40} {:<10}".format("Max Concurrency:", metrics.max_concurrency))
+    print("{:<40} {:<10}".format("Max Concurrency:", summary.max_concurrency))
     if (
         metrics.text_data is not None
         and metrics.text_data.max_concurrent_conversations is not None
@@ -356,61 +417,80 @@ def print_benchmark_summary(
             )
         )
 
-    if metrics.text_data is not None:
-        t = metrics.text_data
-        print_section(title="Client Experience Metrics")
-        print(
-            t.input_throughput.format_with_prefix(
-                prefix="input token throughput", unit="tok/s"
-            )
-        )
-        print(
-            t.output_throughput.format_with_prefix(
-                prefix="output token throughput", unit="tok/s"
-            )
-        )
-        total_tpm = (
-            (t.total_input + t.total_output) * 60.0 / agg.duration
-            if agg.duration > 0
-            else float("nan")
-        )
+    if summary.aggregate_tokens_per_minute is not None:
         print(
             "{:<40} {:<10.2f}".format(
-                "Total TPM (input+output, whole bench):", total_tpm
+                "Total TPM (input+output, whole bench):",
+                summary.aggregate_tokens_per_minute,
             )
         )
-        print(
-            "{:<40} {:<10.2f}".format(
-                "Global Cached Token Rate:",
-                t.global_cached_token_rate * 100,
+
+    latency = groups.latency_stats
+    if latency is not None:
+        latency_rows = [
+            PercentileRow(label, pm)
+            for label, pm in (
+                ("TTFT (ms)", latency.ttft_ms),
+                ("TPOT (ms)", latency.tpot_ms),
+                ("Step TPOT (ms)", latency.step_tpot_ms),
+                ("ITL (ms)", latency.itl_ms),
+                ("Request Latency (ms)", latency.latency_ms),
             )
-            + "%"
-        )
-        print_section(title="Time to First Token")
-        print(t.ttft_ms.format_with_prefix(prefix="TTFT", unit="ms"))
-        print_section(title="Time per Output Token")
-        print("[(latency - TTFT) / (output_tokens - 1), per request]")
-        print(t.tpot_ms.format_with_prefix(prefix="TPOT", unit="ms"))
-        if t.step_tpot_ms is not None:
-            print_section(title="Time per Output Token (step-based)")
-            print("[ITL / tokens_per_step, per decode step]")
-            print(
-                t.step_tpot_ms.format_with_prefix(prefix="Step TPOT", unit="ms")
+            if pm is not None
+        ]
+        if latency_rows:
+            print_section(title="Latency Stats")
+            print(format_percentile_table(latency_rows))
+            if latency.tpot_ms is not None:
+                print("  TPOT = (latency - TTFT) / (output_tokens - 1)")
+            if latency.step_tpot_ms is not None:
+                print("  Step TPOT = ITL / tokens_per_step, per decode step")
+
+    throughput = groups.throughput_stats
+    if throughput is not None:
+        throughput_rows = [
+            PercentileRow(label, pm)
+            for label, pm in (
+                ("Input throughput (tok/s)", throughput.input_throughput),
+                ("Output throughput (tok/s)", throughput.output_throughput),
             )
-        print_section(title="Inter-token Latency")
-        print(t.itl_ms.format_with_prefix(prefix="ITL", unit="ms"))
-        if t.per_turn_cached_token_rate is not None:
-            print_section(title="Per-Turn Cached Token Rate")
+            if pm is not None
+        ]
+        if throughput_rows:
+            print_section(title="Throughput Stats")
+            print(format_percentile_table(throughput_rows))
             print(
-                t.per_turn_cached_token_rate.format_with_prefix(
-                    prefix="Per-Turn Cached Token Rate", unit="%"
-                )
+                "  Throughput P90/P95/P99 are reversed"
+                " (bottom 10/5/1%; higher is better)"
             )
 
-    print_section(title="Per-Request E2E Latency")
-    print(
-        agg.latency_ms.format_with_prefix(prefix="Request Latency", unit="ms")
-    )
+    cache = groups.cache_stats
+    if cache is not None:
+        print_section(title="Cache Stats")
+        if cache.global_cached_token_rate is not None:
+            print(
+                "{:<40} {:<10.2f}".format(
+                    "Global Cached Token Rate:",
+                    cache.global_cached_token_rate * 100,
+                )
+                + "%"
+            )
+        cache_rows = [
+            PercentileRow(label, pm)
+            for label, pm in (
+                (
+                    "Per-Turn Cached Token Rate (%)",
+                    cache.per_turn_cached_token_rate,
+                ),
+                (
+                    "Per-Turn Cache Retention (%)",
+                    cache.per_turn_cache_retention,
+                ),
+            )
+            if pm is not None
+        ]
+        if cache_rows:
+            print(format_percentile_table(cache_rows))
 
     if metrics.text_data is not None:
         t = metrics.text_data
@@ -419,6 +499,7 @@ def print_benchmark_summary(
         print("{:<40} {:<10}".format("Max output tokens:", t.max_output))
         print("{:<40} {:<10}".format("Max total tokens:", t.max_total))
 
+    spec_decode_stats = metrics.spec_decode_stats
     if spec_decode_stats is not None:
         print_section(title="Speculative Decoding")
         if spec_decode_stats.acceptance_rate is not None:
@@ -459,27 +540,39 @@ def print_benchmark_summary(
                     "{:<40} {:<10.2f}".format(f"  Position {pos}:", rate * 100)
                 )
 
-    # Print GPU and CPU statistics
-    if collect_gpu_stats and metrics.peak_gpu_memory_mib:
-        print_section(title="GPU Statistics")
-        for gpu_id in range(len(metrics.peak_gpu_memory_mib)):
-            print(
-                "{:<40} {:<10.2f}".format(
-                    f"GPU {gpu_id} peak memory (MiB):",
-                    metrics.peak_gpu_memory_mib[gpu_id],
-                )
+    # Per-GPU series stay in result_groups.gpu_stats JSON; the console
+    # reuses the same percentile table as latency / throughput.
+    gpu = groups.gpu_stats
+    if collect_gpu_stats and gpu is not None:
+        gpu_rows = [
+            PercentileRow(
+                label,
+                StandardPercentileMetrics(
+                    [float(v) for v in values], unit=unit
+                ),
             )
-            print(
-                "{:<40} {:<10.2f}".format(
-                    f"GPU {gpu_id} available memory (MiB):",
-                    metrics.available_gpu_memory_mib[gpu_id],
-                )
+            for label, values, unit in (
+                ("Peak GPU memory (MiB)", gpu.peak_gpu_memory_mib, "MiB"),
+                (
+                    "Available GPU memory (MiB)",
+                    gpu.available_gpu_memory_mib,
+                    "MiB",
+                ),
+                ("GPU utilization (%)", gpu.gpu_utilization, "%"),
             )
+            if values
+        ]
+        if gpu_rows:
+            n_devices = max(
+                len(gpu.peak_gpu_memory_mib),
+                len(gpu.available_gpu_memory_mib),
+                len(gpu.gpu_utilization),
+            )
+            print_section(title=format_gpu_statistics_title(n_devices))
+            print(format_percentile_table(gpu_rows))
             print(
-                "{:<40} {:<10.2f}".format(
-                    f"GPU {gpu_id} utilization (%):",
-                    metrics.gpu_utilization[gpu_id],
-                )
+                "  For per-GPU metrics, dump the result JSON instead"
+                " (--result-filename)"
             )
     if collect_cpu_stats:
         cpu = metrics.cpu_metrics
@@ -496,6 +589,27 @@ def print_benchmark_summary(
                 cpu.system_percent if cpu else 0.0,
             )
         )
+    diag = groups.diagnostics
+    if diag is not None:
+        diag_rows = [
+            (label, value)
+            for label, value in (
+                ("Server startup time (s):", diag.server_startup_time),
+                ("Steady-state detected:", diag.steady_state_detected),
+                ("Steady-state windows:", diag.steady_state_window_count),
+                ("Outliers rejected:", diag.num_outliers_rejected),
+            )
+            if value is not None
+        ]
+        if diag_rows or diag.steady_state_warning:
+            print_section(title="Diagnostics")
+            for label, value in diag_rows:
+                if isinstance(value, float):
+                    print(f"{label:<40} {value:<10.2f}")
+                else:
+                    print(f"{label:<40} {value:<10}")
+            if diag.steady_state_warning:
+                print(f"Steady-state warning: {diag.steady_state_warning}")
     print("=" * 50)
     if lora_manager:
         print_lora_benchmark_results(lora_manager.metrics)
@@ -527,8 +641,7 @@ def _parse_metadata(metadata: list[str] | None) -> dict[str, str]:
 def save_result_json(
     result_filename: str | None,
     args: ServingBenchmarkConfig,
-    benchmark_result: TextGenerationBenchmarkResult
-    | PixelGenerationBenchmarkResult,
+    benchmark_result: BenchmarkResult,
     *,
     benchmark_task: BenchmarkTask,
     model_id: str,
@@ -552,7 +665,7 @@ def save_result_json(
         "tokenizer_id": tokenizer_id,
         "num_prompts": (
             agg.completed
-            if (agg := benchmark_result.metrics.aggregates) is not None
+            if (agg := benchmark_result.aggregates) is not None
             else 0
         ),
         "dataset_name": args.dataset_name,
@@ -574,13 +687,14 @@ def save_result_json(
         )
         os.rename(result_filename, f"{result_filename}.orig")
     with open(result_filename, "w") as outfile:
-        json.dump(result_json, outfile)
+        # NaN latencies are real in partially-failed runs; scrub to null so
+        # the file stays consumable by strict JSON parsers (jq, JSON.parse).
+        json.dump(json_safe(result_json), outfile, allow_nan=False)
 
 
 def save_output_lengths(
     args: ServingBenchmarkConfig,
-    benchmark_result: TextGenerationBenchmarkResult
-    | PixelGenerationBenchmarkResult,
+    benchmark_result: BenchmarkResult,
     benchmark_task: BenchmarkTask,
     *,
     iteration_config: tuple[int | None, float] | None = None,
@@ -593,7 +707,6 @@ def save_output_lengths(
             "--record-output-lengths is only supported for text-generation"
         )
         return
-    assert isinstance(benchmark_result, TextGenerationBenchmarkResult)
     args_to_save = (
         "backend",
         "burstiness",
@@ -616,7 +729,7 @@ def save_output_lengths(
         args_dict["max_concurrency"] = mc_snap
         args_dict["request_rate"] = rr_snap
     output_lens_dict["args"] = {x: args_dict[x] for x in args_to_save}
-    text_data = benchmark_result.metrics.text_data
+    text_data = benchmark_result.text_data
     output_lens_dict["output_lengths"] = (
         text_data.output_lens if text_data is not None else []
     )

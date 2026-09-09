@@ -15,15 +15,18 @@ from __future__ import annotations
 
 import logging
 import queue
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
+from max.pipelines.context import TextContext
 from max.pipelines.kv_cache import KVTransferEngineMetadata
 from max.serve.scheduler.base import (
     CancelRequest,
+    PrefillFailure,
+    PrefillProgressPing,
     PrefillRequest,
     PrefillResponse,
 )
-from max.serve.worker_interface.zmq_queue import (
+from max.serve.worker_interface._zmq_queue import (
     ZmqDealerSocket,
     ZmqRouterSocket,
 )
@@ -69,16 +72,42 @@ class DispatcherClient(Generic[Request, Reply]):
         raise queue.Empty()
 
 
-RequestType = PrefillRequest | KVTransferEngineMetadata | CancelRequest
-ReplyType = PrefillResponse | KVTransferEngineMetadata
+RequestType = (
+    PrefillRequest[TextContext] | KVTransferEngineMetadata | CancelRequest
+)
+ReplyType = (
+    PrefillResponse
+    | PrefillFailure
+    | KVTransferEngineMetadata
+    | PrefillProgressPing
+)
 
 
 class PrefillDispatcherServer(DispatcherServer[RequestType, ReplyType]):
-    def __init__(self, bind_addr: str):
+    def __init__(
+        self,
+        bind_addr: str,
+        context_type: type[TextContext] = TextContext,
+    ):
+        """Initializes the prefill-side dispatcher server.
+
+        Args:
+            bind_addr: ZMQ endpoint to bind the router socket to.
+            context_type: The architecture's concrete context class. msgspec
+                decodes ``PrefillRequest.context`` at this declared type, so
+                VLM architectures must pass their ``TextAndVisionContext``
+                subclass or vision fields are silently dropped on the wire.
+        """
         logger.info(f"Starting Prefill Dispatcher Server on {bind_addr}")
         super().__init__(
             endpoint=bind_addr,
-            request_type=RequestType,
+            # context_type is chosen at runtime per architecture, so mypy
+            # can't validate it as a type argument here — erase to Any
+            # before subscripting to avoid a static "not valid as a type"
+            # error on what is otherwise a normal runtime parametrization.
+            request_type=cast(Any, PrefillRequest)[context_type]
+            | KVTransferEngineMetadata
+            | CancelRequest,
             reply_type=ReplyType,
         )
 

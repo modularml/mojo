@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -17,6 +16,7 @@ modular_py_test(
     ),
     tags = [
         "external-exclusive",  # Times out if run with too many other tests
+        "manual",  # FIXME: KERN-3012
     ],
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -28,9 +28,8 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/kv_cache",
-        "//max/tests/integration/graph:modular_graph_test",
-        "//max/tests/integration/test_common:context_utils",
+        "//max/tests/integration/test_common:modular_graph_test",
+        "//max/tests/integration/test_common:simple_kv_cache",
         requirement("numpy"),
         requirement("torch"),
         requirement("hypothesis"),
@@ -51,7 +50,7 @@ modular_py_test(
         "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
     },
     exec_properties = {
-        "test.resources:gpu-memory": "18",
+        "test.resources:gpu-memory": "10",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
@@ -67,9 +66,8 @@ modular_py_test(
         "//max/python/max/experimental/torch",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/kv_cache",
-        "//max/tests/integration/graph:modular_graph_test",
-        "//max/tests/integration/test_common:context_utils",
+        "//max/tests/integration/test_common:modular_graph_test",
+        "//max/tests/integration/test_common:simple_kv_cache",
         requirement("torch"),
         requirement("numpy"),
         requirement("hypothesis"),
@@ -87,7 +85,7 @@ modular_py_test(
         "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
     },
     exec_properties = {
-        "test.resources:gpu-memory": "18",
+        "test.resources:gpu-memory": "10",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],  # FIXME: MOCO-2411
@@ -103,7 +101,7 @@ modular_py_test(
         "//max/python/max/experimental/torch",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/tests/integration/graph:modular_graph_test",
+        "//max/tests/integration/test_common:modular_graph_test",
         requirement("torch"),
         requirement("hypothesis"),
     ],
@@ -129,8 +127,7 @@ modular_py_test(
         "//max/python/max/engine",
         "//max/python/max/graph",
         "//max/python/max/nn",
-        "//max/python/max/pipelines/kv_cache",
-        "//max/tests/integration/test_common:context_utils",
+        "//max/tests/integration/test_common:simple_kv_cache",
         requirement("hypothesis"),
         requirement("numpy"),
         requirement("torch"),

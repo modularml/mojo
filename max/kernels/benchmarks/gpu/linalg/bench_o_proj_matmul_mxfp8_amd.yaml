@@ -1,0 +1,35 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# MiniMax-M3 attention output projection, MXFP8 on CDNA4.
+# Companion to bench_fused_qkv_matmul_mxfp8_amd.yaml. $M is runtime; N/K are -D.
+
+name: bench_o_proj_matmul_mxfp8_amd
+file: $KERNEL_BENCHMARKS_ROOT/gpu/linalg/bench_o_proj_matmul_mxfp8_amd.mojo
+
+params:
+
+# Per device at TP=4: q_dim 8192/4 = 2048 into hidden 6144.
+# M=4 is the batch-1 target-verification shape for three MTP draft tokens.
+- $M: [1, 4, 8, 32, 128, 512, 1024, 2048, 4096, 8192]
+  N: 6144
+  K: 2048
+  metadata:
+    MODEL: minimax-m3
+
+# Unsharded (TP=1) reference. Separate build; N/K are defines.
+- $M: [512, 2048, 8192]
+  N: 6144
+  K: 8192
+  metadata:
+    MODEL: minimax-m3

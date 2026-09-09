@@ -8,28 +8,21 @@ import TabItem from "@theme/TabItem";
 import ModelDropdownTabs from "@site/src/components/ModelDropdownTabs";
 import ContactSection from "@site/src/components/ContactSection";
 import Requirements from "@site/src/components/Requirements";
-import { requirementsNoMacWithGPU } from "../requirements";
-import InstallModular from "../_includes/install-modular.mdx";
+import { requirementsNoMacWithGPU } from "./requirements";
+import InstallMAX from "./_includes/install-modular.mdx";
 import {
   ModelSelector,
   DynamicCode,
   ConditionalContent,
 } from "@site/src/components/ModelSelector";
 
-A major component of the Modular Platform is MAX, our developer framework that
-abstracts away the complexity of building and serving high-performance GenAI
-models on a wide range of hardware, including NVIDIA and AMD GPUs.
-
-Modular supports multiple deployment options including a
-[managed cloud](/max/deploy/cloud) solution, Modular's infrastructure in your
-own VPC, or self-hosted endpoints with MAX. This quickstart shows you how to
-self-host.
-
-In this quickstart, you'll create an endpoint for an open-source LLM using MAX,
-run an inference from a Python client, and then benchmark the endpoint.
+MAX abstracts away the complexity of building and serving high-performance
+GenAI models on a wide range of hardware, including NVIDIA and AMD GPUs. In
+this quickstart, you'll create an endpoint for an LLM using MAX, run inference,
+and then benchmark the endpoint.
 
 If you'd rather create a self-hosted endpoint with Docker, see our
-[tutorial to benchmark MAX](/max/deploy/benchmark).
+[tutorial to benchmark MAX](/serve/benchmark).
 
 :::caution GPU strongly recommended
 
@@ -45,13 +38,13 @@ System requirements:
 
 <Requirements
   requirementsData={requirementsNoMacWithGPU}
-  url="/max/packages#system-requirements"
+  url="/packages#system-requirements"
 />
 
 ## Set up your project
 
-First, install the `modular` package, which includes the `max` CLI you'll
-use to start the model endpoint.
+First, create a project and install the `max` package to get the CLI you'll
+use to create an endpoint and benchmark it.
 
 :::tip
 
@@ -59,12 +52,12 @@ For the most reliable experience, we recommend installing with `pixi`.
 
 :::
 
-<InstallModular folder="quickstart" />
+<InstallMAX folder="quickstart" />
 
 ## Start a model endpoint
 
 Now you'll serve an LLM from a local endpoint using
-[`max serve`](/max/cli/serve). Choose whether you want **text-to-text**,
+[`max serve`](/cli/serve). Choose whether you want **text-to-text**,
 **image-to-text**, or **video-to-text** inference by switching tabs below, then
 use the dropdown to select a model that fits your hardware's memory constraints.
 
@@ -168,7 +161,7 @@ Google's [Gemma 3](https://huggingface.co/collections/google/gemma-3-release)
 models are multimodal. MAX supports text input for all available sizes and image
 input for the [12B](https://huggingface.co/google/gemma-3-12b-it) and
 [27B](https://huggingface.co/google/gemma-3-27b-it) models. All sizes require a
-[compatible GPU](/max/packages#gpu-compatibility).
+[compatible GPU](/packages#gpu-compatibility).
 
 </ConditionalContent>
 
@@ -178,7 +171,7 @@ input for the [12B](https://huggingface.co/google/gemma-3-12b-it) and
 
 MAX supports text, image, and video input for the developer-focused
 [Gemma 4 31B](https://huggingface.co/google/gemma-4-31B-it) model. A
-[compatible GPU](/max/packages#gpu-compatibility) is required.
+[compatible GPU](/packages#gpu-compatibility) is required.
 
 </ConditionalContent>
 
@@ -250,7 +243,7 @@ Google's [Gemma 3](https://huggingface.co/collections/google/gemma-3-release)
 models are multimodal. MAX supports text input for all available sizes and image
 input for the [12B](https://huggingface.co/google/gemma-3-12b-it) and
 [27B](https://huggingface.co/google/gemma-3-27b-it) models. All sizes require a
-[compatible GPU](/max/packages#gpu-compatibility).
+[compatible GPU](/packages#gpu-compatibility).
 
 </ConditionalContent>
 
@@ -260,7 +253,7 @@ input for the [12B](https://huggingface.co/google/gemma-3-12b-it) and
 
 MAX supports text, image, and video input for the developer-focused
 [Gemma 4 31B](https://huggingface.co/google/gemma-4-31B-it) model. A
-[compatible GPU](/max/packages#gpu-compatibility) is required.
+[compatible GPU](/packages#gpu-compatibility) is required.
 
 </ConditionalContent>
 
@@ -271,7 +264,7 @@ MAX supports text, image, and video input for the developer-focused
 OpenGVLab's multimodal
 [InternVL3](https://huggingface.co/collections/OpenGVLab/internvl3) models come
 in many sizes, but they all require a
-[compatible GPU](/max/packages#gpu-compatibility). They aren't gated on
+[compatible GPU](/packages#gpu-compatibility). They aren't gated on
 Hugging Face, so you don't need to provide a Hugging Face access token to start
 the endpoint.
 
@@ -323,7 +316,7 @@ Select a model to change the code below:
 
 MAX supports video-to-text inference for the developer-focused
 [Gemma 4 31B](https://huggingface.co/google/gemma-4-31B-it) model. A
-[compatible GPU](/max/packages#gpu-compatibility) is required.
+[compatible GPU](/packages#gpu-compatibility) is required.
 
 </div>
 
@@ -574,7 +567,7 @@ package:
                 ]
             }
         ],
-        max_tokens=300
+        max_completion_tokens=300
     )
 
     print(completion.choices[0].message.content)`
@@ -703,7 +696,7 @@ package:
                 ]
             }
         ],
-        max_tokens=300
+        max_completion_tokens=300
     )
 
     print(completion.choices[0].message.content)`
@@ -811,7 +804,7 @@ it to the `--config-file` option. For example configurations, see our
 [benchmark config files on GitHub](https://github.com/modular/modular/tree/main/max/python/max/benchmark/configs).
 
 For more details about the tool, including other datasets and configuration
-options, see the [`max benchmark` documentation](/max/cli/benchmark).
+options, see the [`max benchmark` documentation](/cli/benchmark).
 
 :::caution GPU ran out of memory
 
@@ -827,7 +820,7 @@ low as `0.5` (the default is `0.9`).
 
 Now that you've completed this quickstart, try serving and benchmarking a
 different model from our
-[supported models](/max/models/)!
+[supported models](/models/)!
 
 Then, you can try to connect to your endpoint with our
 [Agentic Cookbook](https://modul.ar/cookbook)—an open-source project for

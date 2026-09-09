@@ -15,86 +15,34 @@ import logging
 from os import getenv
 from pathlib import Path
 
-import hf_repo_lock
 import max.driver as md
 import pytest
 from max.engine import InferenceSession
 from max.pipelines.lib import generate_local_model_path
 
 MODULAR_AI_LLAMA_3_1_HF_REPO_ID = "modularai/Llama-3.1-8B-Instruct-GGUF"
-MODULAR_AI_LLAMA_3_1_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    MODULAR_AI_LLAMA_3_1_HF_REPO_ID
-)
-
 LLAMA_3_1_HF_REPO_ID = "meta-llama/Llama-3.1-8B-Instruct"
-LLAMA_3_1_HF_REVISION = hf_repo_lock.revision_for_hf_repo(LLAMA_3_1_HF_REPO_ID)
-
 # used in cases where float32 is needed. SmolLM3 is bfloat16.
 SMOLLM_HF_REPO_ID = "HuggingFaceTB/SmolLM-135M"
-SMOLLM_HF_REVISION = hf_repo_lock.revision_for_hf_repo(SMOLLM_HF_REPO_ID)
 SMOLLM2_HF_REPO_ID = "HuggingFaceTB/SmolLM2-135M"
-SMOLLM2_HF_REVISION = hf_repo_lock.revision_for_hf_repo(SMOLLM2_HF_REPO_ID)
-
 DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID = (
     "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 )
-DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID
-)
-
 LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID = (
     "lmstudio-community/DeepSeek-R1-Distill-Llama-8B-GGUF"
 )
-LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION = (
-    hf_repo_lock.revision_for_hf_repo(
-        LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID
-    )
-)
-
 TINY_RANDOM_LLAMA_HF_REPO_ID = (
     "trl-internal-testing/tiny-random-LlamaForCausalLM"
 )
-TINY_RANDOM_LLAMA_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    TINY_RANDOM_LLAMA_HF_REPO_ID
-)
-
-
 GEMMA_3_1B_IT_HF_REPO_ID = "google/gemma-3-1b-it"
-GEMMA_3_1B_IT_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    GEMMA_3_1B_IT_HF_REPO_ID
-)
-
 LLAMA_3_1_LORA_HF_REPO_ID = "FinGPT/fingpt-mt_llama3-8b_lora"
-LLAMA_3_1_LORA_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    LLAMA_3_1_LORA_HF_REPO_ID
-)
-
 TINY_LLAMA_1_1B_CHAT_V1_0_HF_REPO_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-TINY_LLAMA_1_1B_CHAT_V1_0_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    TINY_LLAMA_1_1B_CHAT_V1_0_HF_REPO_ID
-)
-
 TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REPO_ID = (
     "neubla/tiny-random-LlamaForCausalLM"
 )
-TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REPO_ID
-)
-
-QWEN_32B_PREVIEW_HF_REPO_ID = "Qwen/QwQ-32B-Preview"
-QWEN_32B_PREVIEW_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    QWEN_32B_PREVIEW_HF_REPO_ID
-)
-
+QWQ_32B_HF_REPO_ID = "Qwen/QwQ-32B"
 MISTRAL_NEMO_INSTRUCT_2407_HF_REPO_ID = "mistralai/Mistral-Nemo-Instruct-2407"
-MISTRAL_NEMO_INSTRUCT_2407_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    MISTRAL_NEMO_INSTRUCT_2407_HF_REPO_ID
-)
-
 GOOGLE_GEMMA_3_4B_IT_HF_REPO_ID = "google/gemma-3-4b-it"
-GOOGLE_GEMMA_3_4B_IT_HF_REVISION = hf_repo_lock.revision_for_hf_repo(
-    GOOGLE_GEMMA_3_4B_IT_HF_REPO_ID
-)
 
 logger = logging.getLogger("max.pipelines")
 
@@ -183,13 +131,8 @@ def graph_testdata() -> Path:
 
 @pytest.fixture
 def llama_3_1_8b_instruct_local_path() -> str:
-    assert isinstance(LLAMA_3_1_HF_REVISION, str), (
-        "LLAMA_3_1_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            LLAMA_3_1_HF_REPO_ID, LLAMA_3_1_HF_REVISION
-        )
+        model_path = generate_local_model_path(LLAMA_3_1_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
@@ -201,13 +144,8 @@ def llama_3_1_8b_instruct_local_path() -> str:
 
 @pytest.fixture
 def smollm_135m_local_path() -> str:
-    assert isinstance(SMOLLM_HF_REVISION, str), (
-        "SMOLLM_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            SMOLLM_HF_REPO_ID, SMOLLM_HF_REVISION
-        )
+        model_path = generate_local_model_path(SMOLLM_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
@@ -219,13 +157,8 @@ def smollm_135m_local_path() -> str:
 
 @pytest.fixture
 def smollm2_135m_local_path() -> str:
-    assert isinstance(SMOLLM2_HF_REVISION, str), (
-        "SMOLLM2_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            SMOLLM2_HF_REPO_ID, SMOLLM2_HF_REVISION
-        )
+        model_path = generate_local_model_path(SMOLLM2_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
@@ -237,13 +170,9 @@ def smollm2_135m_local_path() -> str:
 
 @pytest.fixture
 def deepseek_r1_distill_llama_8b_local_path() -> str:
-    assert isinstance(DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION, str), (
-        "DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
         model_path = generate_local_model_path(
-            DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID,
-            DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION,
+            DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID
         )
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
@@ -256,14 +185,9 @@ def deepseek_r1_distill_llama_8b_local_path() -> str:
 
 @pytest.fixture
 def lmstudio_deepseek_r1_distill_llama_8b_local_path() -> str:
-    assert isinstance(LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION, str), (
-        "LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
-
     try:
         model_path = generate_local_model_path(
-            LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID,
-            LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REVISION,
+            LMSTUDIO_DEEPSEEK_R1_DISTILL_LLAMA_8B_HF_REPO_ID
         )
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
@@ -276,13 +200,8 @@ def lmstudio_deepseek_r1_distill_llama_8b_local_path() -> str:
 
 @pytest.fixture
 def modular_ai_llama_3_1_local_path() -> str:
-    assert isinstance(MODULAR_AI_LLAMA_3_1_HF_REVISION, str), (
-        "MODULAR_AI_LLAMA_3_1_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            MODULAR_AI_LLAMA_3_1_HF_REPO_ID, MODULAR_AI_LLAMA_3_1_HF_REVISION
-        )
+        model_path = generate_local_model_path(MODULAR_AI_LLAMA_3_1_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
@@ -294,13 +213,8 @@ def modular_ai_llama_3_1_local_path() -> str:
 
 @pytest.fixture
 def tiny_random_llama_local_path() -> str:
-    assert isinstance(TINY_RANDOM_LLAMA_HF_REVISION, str), (
-        "TINY_RANDOM_LLAMA_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            TINY_RANDOM_LLAMA_HF_REPO_ID, TINY_RANDOM_LLAMA_HF_REVISION
-        )
+        model_path = generate_local_model_path(TINY_RANDOM_LLAMA_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
@@ -312,13 +226,8 @@ def tiny_random_llama_local_path() -> str:
 
 @pytest.fixture
 def gemma_3_1b_it_local_path() -> str:
-    assert isinstance(GEMMA_3_1B_IT_HF_REVISION, str), (
-        "GEMMA_3_1B_IT_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            GEMMA_3_1B_IT_HF_REPO_ID, GEMMA_3_1B_IT_HF_REVISION
-        )
+        model_path = generate_local_model_path(GEMMA_3_1B_IT_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
@@ -330,13 +239,8 @@ def gemma_3_1b_it_local_path() -> str:
 
 @pytest.fixture
 def llama_3_1_8b_lora_local_path() -> str:
-    assert isinstance(LLAMA_3_1_LORA_HF_REVISION, str), (
-        "LLAMA_3_1_LORA_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            LLAMA_3_1_LORA_HF_REPO_ID, LLAMA_3_1_LORA_HF_REVISION
-        )
+        model_path = generate_local_model_path(LLAMA_3_1_LORA_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
@@ -348,13 +252,9 @@ def llama_3_1_8b_lora_local_path() -> str:
 
 @pytest.fixture
 def tiny_llama_1_1b_chat_v1_0_local_path() -> str:
-    assert isinstance(TINY_LLAMA_1_1B_CHAT_V1_0_HF_REVISION, str), (
-        "TINY_LLAMA_1_1B_CHAT_V1_0_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
         model_path = generate_local_model_path(
-            TINY_LLAMA_1_1B_CHAT_V1_0_HF_REPO_ID,
-            TINY_LLAMA_1_1B_CHAT_V1_0_HF_REVISION,
+            TINY_LLAMA_1_1B_CHAT_V1_0_HF_REPO_ID
         )
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
@@ -367,13 +267,9 @@ def tiny_llama_1_1b_chat_v1_0_local_path() -> str:
 
 @pytest.fixture
 def tiny_random_llama_for_causal_lm_local_path() -> str:
-    assert isinstance(TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REVISION, str), (
-        "TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
         model_path = generate_local_model_path(
-            TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REPO_ID,
-            TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REVISION,
+            TINY_RANDOM_LLAMA_FOR_CAUSAL_LM_HF_REPO_ID
         )
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
@@ -385,32 +281,23 @@ def tiny_random_llama_for_causal_lm_local_path() -> str:
 
 
 @pytest.fixture
-def qwen_32b_preview_local_path() -> str:
-    assert isinstance(QWEN_32B_PREVIEW_HF_REVISION, str), (
-        "QWEN_32B_PREVIEW_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
+def qwq_32b_local_path() -> str:
     try:
-        model_path = generate_local_model_path(
-            QWEN_32B_PREVIEW_HF_REPO_ID, QWEN_32B_PREVIEW_HF_REVISION
-        )
+        model_path = generate_local_model_path(QWQ_32B_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(
-            f"Falling back to repo_id: {QWEN_32B_PREVIEW_HF_REPO_ID} as config to PipelineConfig"
+            f"Falling back to repo_id: {QWQ_32B_HF_REPO_ID} as config to PipelineConfig"
         )
-        model_path = QWEN_32B_PREVIEW_HF_REPO_ID
+        model_path = QWQ_32B_HF_REPO_ID
     return model_path
 
 
 @pytest.fixture
 def mistral_nemo_instruct_2407_local_path() -> str:
-    assert isinstance(MISTRAL_NEMO_INSTRUCT_2407_HF_REVISION, str), (
-        "MISTRAL_NEMO_INSTRUCT_2407_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
         model_path = generate_local_model_path(
-            MISTRAL_NEMO_INSTRUCT_2407_HF_REPO_ID,
-            MISTRAL_NEMO_INSTRUCT_2407_HF_REVISION,
+            MISTRAL_NEMO_INSTRUCT_2407_HF_REPO_ID
         )
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
@@ -423,13 +310,8 @@ def mistral_nemo_instruct_2407_local_path() -> str:
 
 @pytest.fixture
 def google_gemma_3_4b_it_local_path() -> str:
-    assert isinstance(GOOGLE_GEMMA_3_4B_IT_HF_REVISION, str), (
-        "GOOGLE_GEMMA_3_4B_IT_HF_REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        model_path = generate_local_model_path(
-            GOOGLE_GEMMA_3_4B_IT_HF_REPO_ID, GOOGLE_GEMMA_3_4B_IT_HF_REVISION
-        )
+        model_path = generate_local_model_path(GOOGLE_GEMMA_3_4B_IT_HF_REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {e}")
         logger.warning(

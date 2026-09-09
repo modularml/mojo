@@ -1,0 +1,15 @@
+{
+  "target": "topk_topp_masked_probs",
+  "spec": {
+    "rows": 8,
+    "d": 221185,
+    "k": 0,
+    "top_p_milli": 1000,
+    "temp_milli": 1000,
+    "dist": 0
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "one past the cluster shared-memory gate: the dispatcher must fall back to the single-block kernel and still satisfy the accept-predicate contract",
+  "findings": []
+}

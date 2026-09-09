@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Idx, TileTensor, row_major
 from nn.spatial_merge import spatial_merge
 from std.testing import assert_equal
@@ -38,7 +38,7 @@ def test_spatial_merge(ctx: DeviceContext) raises:
     # Create device buffers
     var input_device = ctx.enqueue_create_buffer[dtype](input_size)
     var output_device = ctx.enqueue_create_buffer[dtype](output_size)
-    var grid_thw_device = ctx.enqueue_create_buffer[DType.int64](grid_thw_size)
+    var grid_thw_device = ctx.enqueue_create_buffer[.int64](grid_thw_size)
 
     # Initialize input data on host
     with input_device.map_to_host() as input_host:
@@ -115,7 +115,9 @@ def test_spatial_merge(ctx: DeviceContext) raises:
         14,
         15,
     ]
-    var batch0_expected = batch0_expected_list.unsafe_ptr()
+    var batch0_expected: Pointer[
+        batch0_expected_list.T, origin_of(batch0_expected_list)
+    ] = batch0_expected_list.unsafe_ptr()
 
     # Verify results
     with output_device.map_to_host() as output_host:
@@ -159,7 +161,9 @@ def test_spatial_merge(ctx: DeviceContext) raises:
             18,
             19,  # Frame 0 and Frame 1 (repeated)
         ]
-        var batch1_expected = batch1_expected_list.unsafe_ptr()
+        var batch1_expected: Pointer[
+            batch1_expected_list.T, origin_of(batch1_expected_list)
+        ] = batch1_expected_list.unsafe_ptr()
 
         var batch1_start = 4 * C_out  # Batch 0 had 4 output patches
 
@@ -192,6 +196,121 @@ def test_spatial_merge(ctx: DeviceContext) raises:
                     )
 
 
+def test_spatial_merge_no_out_of_bounds(ctx: DeviceContext) raises:
+    # spatial_merge must launch one GPU block per merged output patch. The output
+    # uses the [total_patches, hidden_size] shape, with a sentinel-filled canary
+    # after it: a block that writes past the output overwrites the canary, and a
+    # merged patch left unwritten stays sentinel.
+    comptime dtype = DType.float32
+    comptime merge_size = 2
+    comptime hidden_size = 4
+    comptime batch_size = 1
+
+    # t=1, h=2, w=4: 8 input patches, 2 merged patches (width spans 2 blocks).
+    var grid_thw_list: List[Int64] = [1, 2, 4]
+    var total_input_patches = 8
+    var num_merged_patches = 2
+    var C_out = hidden_size * merge_size * merge_size
+
+    var input_size = total_input_patches * hidden_size
+    # Output uses the production shape [total_patches, hidden_size].
+    var output_rows = total_input_patches
+    var output_size = output_rows * hidden_size  # == num_merged_patches * C_out
+    var canary_size = output_size
+    var grid_thw_size = batch_size * 3
+
+    var sentinel = Float32(-99999.0)
+
+    var input_device = ctx.enqueue_create_buffer[dtype](input_size)
+    var output_device = ctx.enqueue_create_buffer[dtype](
+        output_size + canary_size
+    )
+    var grid_thw_device = ctx.enqueue_create_buffer[.int64](grid_thw_size)
+
+    with input_device.map_to_host() as input_host:
+        var input_host_tensor = TileTensor(
+            input_host,
+            row_major(total_input_patches, hidden_size),
+        )
+        for patch_idx in range(total_input_patches):
+            for feat_idx in range(hidden_size):
+                input_host_tensor[patch_idx, feat_idx] = Float32(
+                    patch_idx * 100 + feat_idx
+                )
+
+    # Sentinel-fill output and canary so any stray or missing write is visible.
+    with output_device.map_to_host() as output_host:
+        for i in range(output_size + canary_size):
+            output_host[i] = sentinel
+
+    with grid_thw_device.map_to_host() as grid_thw_host:
+        var grid_thw_host_tensor = TileTensor(
+            grid_thw_host,
+            row_major[batch_size, 3](),
+        )
+        for i in range(batch_size):
+            for j in range(3):
+                grid_thw_host_tensor[i, j] = grid_thw_list[i * 3 + j]
+
+    var input_tensor = TileTensor(
+        input_device,
+        row_major(total_input_patches, hidden_size),
+    )
+    var output_tensor = TileTensor(
+        output_device,
+        row_major(output_rows, hidden_size),
+    )
+    var grid_thw_tensor = TileTensor(
+        grid_thw_device,
+        row_major[batch_size, 3](),
+    )
+
+    spatial_merge[dtype](
+        output_tensor,
+        input_tensor,
+        grid_thw_tensor,
+        hidden_size,
+        merge_size,
+        ctx,
+    )
+
+    ctx.synchronize()
+
+    # Expected merge of grid [1, 2, 4]:
+    # merged patch 0 (wo=0) contains input patches [0, 1, 4, 5]
+    # merged patch 1 (wo=1) contains input patches [2, 3, 6, 7]
+    var expected_list: List[Int] = [0, 1, 4, 5, 2, 3, 6, 7]
+    var expected: Pointer[
+        expected_list.T, origin_of(expected_list)
+    ] = expected_list.unsafe_ptr()
+
+    with output_device.map_to_host() as output_host:
+        for patch in range(num_merged_patches):
+            for pos in range(merge_size * merge_size):
+                var expected_input_patch = expected[patch * 4 + pos]
+                for feat in range(hidden_size):
+                    var idx = patch * C_out + pos * hidden_size + feat
+                    assert_equal(
+                        output_host[idx],
+                        Float32(expected_input_patch * 100 + feat),
+                        "merged patch="
+                        + String(patch)
+                        + " pos="
+                        + String(pos)
+                        + " feat="
+                        + String(feat),
+                    )
+
+        # A correct kernel never writes into the canary region.
+        for i in range(output_size, output_size + canary_size):
+            assert_equal(
+                output_host[i],
+                sentinel,
+                "spatial_merge wrote out of bounds at index " + String(i),
+            )
+
+
 def main() raises:
     with DeviceContext() as ctx:
         test_spatial_merge(ctx)
+        test_spatial_merge_no_out_of_bounds(ctx)

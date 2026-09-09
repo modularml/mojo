@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 
-from std.algorithm import elementwise
-from std.gpu.host import DeviceContext
+from max.algorithm import elementwise
+from max.gpu.host import DeviceContext
 from layout import (
     TileTensor,
     Coord,
@@ -31,18 +31,14 @@ def print_elements(tensor: TileTensor) raises:
     print("New strides:", tensor.layout.stride_coord())
 
     @always_inline
-    @parameter
     def print_elements_lambda[
-        simd_width: Int, rank: Int, alignment: Int = 1
-    ](idx: IndexList[rank]):
-        var coord = Coord(idx)
-        comptime assert tensor.flat_rank >= coord.flat_rank
-        comptime assert coord.is_flat
-        comptime assert not coord.contains_slices
-        print(tensor[coord])
+        simd_width: Int, alignment: Int = 1
+    ](idx: Coord) {var}:
+        print(tensor[idx])
 
-    elementwise[print_elements_lambda, 1](
-        coord_to_index_list(tensor.layout.shape_coord()),
+    elementwise[1](
+        print_elements_lambda,
+        tensor.layout.shape_coord(),
         DeviceContext(api="cpu"),
     )
 
@@ -66,27 +62,20 @@ def test_arange[
         print("Memory is larger than static limit, test failed")
         return
 
-    var memory4 = InlineArray[Scalar[dtype], max_output_size](
-        uninitialized=True
-    )
+    var memory4 = Array[Scalar[dtype], max_output_size](fill={})
     var out_tensor = TileTensor(memory4, row_major(Coord(outshape)))
 
     @always_inline
-    @__copy_capture(out_tensor, step, start, stop)
-    @parameter
-    def arange_lambda[
-        simd_width: Int, rank: Int, alignment: Int = 1
-    ](idx: IndexList[rank]):
-        var index = rebind[IndexList[1]](idx)
+    def arange_lambda[simd_width: Int, alignment: Int = 1](idx: Coord) {var}:
+        var index = IndexList[1](Int(idx[0].value()))
         var range_val = arange[dtype, simd_width](start, stop, step, index)
         # Extract first element only: idx may have rank > 1 from elementwise,
         # but out_tensor is 1D so we need a single-element coordinate.
         out_tensor.store[width=simd_width](Coord(idx[0]), range_val)
 
-    elementwise[arange_lambda, 1](
-        rebind[IndexList[1]](
-            coord_to_index_list(out_tensor.layout.shape_coord())
-        ),
+    elementwise[1](
+        arange_lambda,
+        out_tensor.layout.shape_coord(),
         DeviceContext(api="cpu"),
     )
 
@@ -109,7 +98,7 @@ def test_arrange_basic() raises:
     # CHECK-NEXT: 5
 
     # print(np.arange(0, 6, 1))
-    test_arange[DType.int32](0, 6, 1)
+    test_arange[.int32](0, 6, 1)
 
     # CHECK-NEXT: Expected output shape:
     # CHECK-NEXT: (3,)
@@ -120,7 +109,7 @@ def test_arrange_basic() raises:
     # CHECK-NEXT: -8
 
     # print(np.arange(38, -13, -23))
-    test_arange[DType.int32](38, -13, -23)
+    test_arange[.int32](38, -13, -23)
 
 
 def main() raises:

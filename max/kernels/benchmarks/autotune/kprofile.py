@@ -16,8 +16,6 @@ import ast
 import os
 import pickle
 import re
-import string
-import subprocess
 import sys
 import warnings
 from dataclasses import dataclass, field
@@ -116,18 +114,6 @@ def top_idx(x, top_percentage=0.05):  # noqa: ANN001, ANN201
     # calculate the threshold to pick top_percentage of the results
     threshold = (top_percentage + (np.min(x) / np.max(x))) * np.max(x)
     return x.where(x < threshold).dropna().index
-
-
-def replace_vals_snippet(p_spec, snippet_path) -> str:  # noqa: ANN001
-    # TODO: raise an error if the parameter is not successfully replaced.
-    with open(snippet_path) as f:
-        c_init = f.read()
-
-    c = c_init[:]
-    for k, v in p_spec.items():
-        print(f"Replacing [{k}]:[{v}]")
-        c = c.replace(f"[@{k}]", str(v))
-    return c
 
 
 def find_common_params(subset):  # noqa: ANN001, ANN201
@@ -432,49 +418,6 @@ def diff_baseline(
             print(LINE)
 
 
-def codegen_snippet(
-    specs: list[TuningSpec], snippet_path: Path, output_path: Path
-) -> None:
-    details = []
-    details += [HEADER]
-
-    prefix = """alias configs = List("""
-    suffix = """)"""
-
-    details += [prefix]
-    sep = ","
-    for idx, s in enumerate(specs):
-        config_str = replace_vals_snippet(s.params[0], snippet_path)
-        print(LINE)
-        details += [f"# Automatically generated from [{s.src_path}]"]
-        details += [f"# index: [{idx}]"]
-        if s.datetime:
-            details += [f"# date: [{s.datetime}]"]
-        if s.git_sha:
-            details += [f"# git-sha: [{s.git_sha}]"]
-        details += [config_str + sep]
-        details += [""]
-    details += [suffix]
-
-    abs_output_path = Path(
-        string.Template(str(output_path)).substitute(os.environ)
-    ).absolute()
-    with open(abs_output_path, "w") as f:
-        f.write("\n".join(details))
-    output = subprocess.run(
-        f"mojo format {abs_output_path}".split(" "),
-        check=False,
-        capture_output=True,
-    )
-    if output.returncode != os.EX_OK:
-        print("ERROR: 'mojo format' failed")
-        print(output.stdout.decode("utf-8"))
-        print(output.stderr.decode("utf-8"))
-        print(LINE)
-
-    print(f"wrote results to [{abs_output_path}]")
-
-
 def yaml_reference_handling(s: str):  # noqa: ANN201
     # all of them should be uniq
     ref_pattern = re.compile(r"('<<'[\s]*:[\s]*'*)([^']*)'")
@@ -514,7 +457,7 @@ def codegen_yaml(specs: list[TuningSpec], output_path: Path) -> None:
     common_params = list(common.T.to_dict().values())
 
     common_key = "common"
-    b = dict({"<<": f"*{common_key}"})
+    b = {"<<": f"*{common_key}"}
     for i, p in enumerate(uniq_params):
         uniq_params[i] = dict(b, **p)
 
@@ -539,34 +482,6 @@ def codegen_yaml(specs: list[TuningSpec], output_path: Path) -> None:
     print(f"num entries: [{len(uniq_rows)}]")
     print(f"wrote results to [{output_yaml}]")
     print(LINE)
-
-
-# TODO: add more checks for inconsistency between various input files.
-def check_specs(
-    specs: list[TuningSpec], key_cols: list[str] | None = None
-) -> bool:
-    # TODO: check specs have the same tuning hash
-    spec_list = [pd.DataFrame([s.params[0]]) for s in specs]
-    merged_specs = pd.concat(spec_list, axis=0, ignore_index=True)
-    print("merged_specs")
-    print(merged_specs.to_string())
-    if not key_cols:
-        pivot_cols, _ = extract_pivots_df(merged_specs)
-        key_cols = pivot_cols
-
-    print(f"Checking keys: {key_cols}")
-    key_cols_values = merged_specs[key_cols]
-    key_cols_values_uniq = key_cols_values.drop_duplicates()
-    if len(key_cols_values) == len(key_cols_values_uniq):
-        print("PASS: UNIQUE KEY COLUMNS")
-        print(LINE)
-        return True
-    else:
-        # TODO: add check for finding the mismatched rows
-        raise ValueError(
-            "Found duplicates in specs! "
-            "Make sure you pass each pkl once, or have specified valid pivots."
-        )
 
 
 def list_intersection(a: list, b: list) -> list:  # type: ignore[type-arg]
@@ -732,7 +647,6 @@ def correlation_analysis(
     df_to_console_table(round(c, 2), index=True)
 
     draw_heatmap(c, "correlation.png")
-    return
 
 
 help_str = "Profile kbench output pickle"
@@ -755,14 +669,6 @@ help_str = "Profile kbench output pickle"
     "-t",
     default=0.0,
     help="Form a new spec from frequent values of each param from top percent.",
-    multiple=False,
-)
-@click.option(
-    "--snippet",
-    "-s",
-    "snippet_path",
-    default=None,
-    help="Path to snippet to replace the parameters with values.",
     multiple=False,
 )
 @click.option(
@@ -845,7 +751,6 @@ def cli(
     files,  # noqa: ANN001
     output_path,  # noqa: ANN001
     top,  # noqa: ANN001
-    snippet_path,  # noqa: ANN001
     ratio,  # noqa: ANN001
     head,  # noqa: ANN001
     tail,  # noqa: ANN001
@@ -868,7 +773,6 @@ def cli(
 
     if verbose:
         print(f"top_percentage: [{top}]")
-        print(f"snippet_path: [{snippet_path}]")
         print(LINE)
 
     top_percentage = float(top) if top else 0
@@ -933,12 +837,6 @@ def cli(
                     invalid_pkls += [path]
             else:
                 print(f"unsupported input: [{path}]")
-
-        if snippet_path:
-            check_specs(specs=specs, key_cols=pivots)
-            codegen_snippet(
-                specs=specs, snippet_path=snippet_path, output_path=output_path
-            )
 
         codegen_yaml(specs=specs, output_path=output_path)
 

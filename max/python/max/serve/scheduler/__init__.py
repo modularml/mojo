@@ -13,48 +13,46 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import AsyncGenerator
 from typing import Any, cast
 
-from max.pipelines.core import TextContext, TTSContext
+_logger = logging.getLogger("max.pipelines")
+
+from max.pipelines.audio.pipeline import AudioGenerationPipeline
+from max.pipelines.context import (
+    AudioContext,
+    BaseContextType,
+    PixelContext,
+    TextContext,
+    TextGenerationOutput,
+)
+from max.pipelines.context.outputs import GenerationOutput
 from max.pipelines.diffusion.pipeline import (
     PixelGenerationPipeline,
 )
-from max.pipelines.kv_cache import PagedKVCacheManager
 from max.pipelines.lib import (
     EmbeddingsPipelineType,
+    MemoryPlan,
     PipelineConfig,
     TextGenerationPipeline,
 )
-from max.pipelines.lib.audio_generator_pipeline import (
-    AudioGeneratorPipelineType,
-)
 from max.pipelines.modeling.types import (
-    AudioGenerationOutput,
-    BaseContext,
-    BaseContextType,
+    AudioGenerationInputs,
     EmbeddingsContext,
     EmbeddingsGenerationOutput,
     Pipeline,
     PipelineInputsType,
-    PipelineOutput,
     PipelineOutputType,
-    PixelGenerationContext,
     PixelGenerationInputs,
     RequestID,
-    TextGenerationOutput,
 )
-from max.pipelines.modeling.types.generation import GenerationOutput
 from max.serve.config import Settings
 from max.serve.queue import MAXPullQueue, MAXPushQueue
 from max.serve.scheduler.interface import Scheduler
 from max.serve.scheduler_result import SchedulerResult
 from max.serve.worker_interface import WorkerQueues
 
-from .audio_generation_scheduler import (
-    AudioGenerationScheduler,
-    AudioGenerationSchedulerConfig,
-)
 from .base import CancelRequest, PrefillRequest, PrefillResponse
 from .config import TokenGenerationSchedulerConfig
 from .decode_scheduler import load_decode_scheduler
@@ -64,8 +62,6 @@ from .prefill_scheduler import load_prefill_scheduler
 from .text_generation_scheduler import load_text_generation_scheduler
 
 __all__ = [
-    "AudioGenerationScheduler",
-    "AudioGenerationSchedulerConfig",
     "CancelRequest",
     "EmbeddingsScheduler",
     "EmbeddingsSchedulerConfig",
@@ -82,27 +78,30 @@ def load_scheduler(
     pipeline_config: PipelineConfig,
     settings: Settings,
     worker_queues: WorkerQueues[BaseContextType, PipelineOutputType],
+    memory_plan: MemoryPlan | None,
 ) -> Scheduler:
     request_queue = worker_queues.request_queue
     response_queue = worker_queues.response_queue
     cancel_queue = worker_queues.cancel_queue
 
+    _logger.info("max_batch_size: %d", pipeline.max_batch_size)
+
     if pipeline.__class__.__name__ == "PixelGenerationPipeline":
         pixel_pipeline = cast(PixelGenerationPipeline[Any], pipeline)
 
         def batch_constructor(
-            context: PixelGenerationContext,
+            context: PixelContext,
         ) -> PixelGenerationInputs[Any]:
-            """Convert a single PixelGenerationContext into PixelGenerationInputs."""
+            """Convert a single PixelContext into PixelGenerationInputs."""
             return PixelGenerationInputs(batch={context.request_id: context})
 
         return OneShotScheduler[
-            PixelGenerationContext, PixelGenerationInputs[Any], GenerationOutput
+            PixelContext, PixelGenerationInputs[Any], GenerationOutput
         ](
             pipeline=pixel_pipeline,
             batch_constructor=batch_constructor,
             request_queue=cast(
-                MAXPullQueue[PixelGenerationContext],
+                MAXPullQueue[PixelContext],
                 request_queue,
             ),
             response_queue=cast(
@@ -112,15 +111,35 @@ def load_scheduler(
                 response_queue,
             ),
             cancel_queue=cancel_queue,
-            max_batch_size=pipeline_config.runtime.max_batch_size
-            if pipeline_config.runtime.max_batch_size is not None
-            else 1,
+        )
+    elif pipeline.__class__.__name__ == "AudioGenerationPipeline":
+        audio_pipeline = cast(AudioGenerationPipeline[Any], pipeline)
+
+        def audio_batch_constructor(
+            context: AudioContext,
+        ) -> AudioGenerationInputs[Any]:
+            return AudioGenerationInputs(batch={context.request_id: context})
+
+        return OneShotScheduler[
+            AudioContext, AudioGenerationInputs[Any], GenerationOutput
+        ](
+            pipeline=audio_pipeline,
+            batch_constructor=audio_batch_constructor,
+            request_queue=cast(
+                MAXPullQueue[AudioContext],
+                request_queue,
+            ),
+            response_queue=cast(
+                MAXPushQueue[
+                    dict[RequestID, SchedulerResult[GenerationOutput]]
+                ],
+                response_queue,
+            ),
+            cancel_queue=cancel_queue,
         )
     elif pipeline.__class__.__name__ == "EmbeddingsPipeline":
         embeddings_scheduler_config = EmbeddingsSchedulerConfig(
-            max_batch_size=pipeline_config.runtime.max_batch_size
-            if pipeline_config.runtime.max_batch_size is not None
-            else 1
+            max_batch_size=pipeline.max_batch_size
         )
         emb_pipeline = cast(EmbeddingsPipelineType, pipeline)
         return EmbeddingsScheduler(
@@ -138,46 +157,6 @@ def load_scheduler(
             ),
             cancel_queue=cancel_queue,
         )
-    elif pipeline.__class__.__name__ == "AudioGeneratorPipeline":
-        assert hasattr(pipeline, "kv_manager")
-        kv_cache = pipeline.kv_manager
-
-        assert pipeline_config.runtime.ce_delay_ms is not None
-        assert (
-            pipeline_config.runtime.enable_prioritize_first_decode is not None
-        )
-        assert pipeline_config.model is not None
-        assert pipeline_config.model.max_length is not None
-
-        token_gen_config = AudioGenerationSchedulerConfig(
-            max_batch_size=pipeline_config.runtime.max_batch_size,
-            max_forward_steps_tg=pipeline_config.runtime.max_num_steps
-            if pipeline_config.runtime.max_num_steps != -1
-            else 1,
-            max_seq_len=pipeline_config.model.max_length,
-            target_tokens_per_batch_ce=pipeline_config.runtime.max_batch_input_tokens,
-            enable_chunked_prefill=pipeline_config.runtime.enable_chunked_prefill,
-            enable_in_flight_batching=pipeline_config.runtime.enable_in_flight_batching,
-            max_queue_size_tg=pipeline_config.runtime.max_queue_size_tg,
-            min_batch_size_tg=pipeline_config.runtime.min_batch_size_tg,
-            ce_delay_ms=pipeline_config.runtime.ce_delay_ms,
-            enable_prioritize_first_decode=pipeline_config.runtime.enable_prioritize_first_decode,
-            data_parallel_degree=pipeline_config.model.data_parallel_degree,
-        )
-        audio_pipeline = cast(AudioGeneratorPipelineType, pipeline)
-        return AudioGenerationScheduler(
-            scheduler_config=token_gen_config,
-            pipeline=audio_pipeline,
-            request_queue=cast(MAXPullQueue[TTSContext], request_queue),
-            response_queue=cast(
-                MAXPushQueue[
-                    dict[RequestID, SchedulerResult[AudioGenerationOutput]]
-                ],
-                response_queue,
-            ),
-            cancel_queue=cancel_queue,
-            kv_cache=kv_cache,
-        )
     elif pipeline_config.runtime.pipeline_role == "prefill_and_decode":
         text_pipeline = cast(TextGenerationPipeline[TextContext], pipeline)
         return load_text_generation_scheduler(
@@ -191,6 +170,8 @@ def load_scheduler(
                 response_queue,
             ),
             cancel_queue=cancel_queue,
+            memory_plan=memory_plan,
+            max_pending_requests=settings.max_pending_requests,
         )
     elif pipeline_config.runtime.pipeline_role == "decode_only":
         text_pipeline = cast(TextGenerationPipeline[TextContext], pipeline)
@@ -206,10 +187,13 @@ def load_scheduler(
             ),
             cancel_queue=cancel_queue,
             settings=settings,
+            memory_plan=memory_plan,
         )
     elif pipeline_config.runtime.pipeline_role == "prefill_only":
         text_pipeline = cast(TextGenerationPipeline[TextContext], pipeline)
-        return load_prefill_scheduler(text_pipeline, pipeline_config, settings)
+        return load_prefill_scheduler(
+            text_pipeline, pipeline_config, settings, memory_plan
+        )
     else:
         raise ValueError(
             f"No scheduler support for pipeline_role ({pipeline_config.runtime.pipeline_role})."

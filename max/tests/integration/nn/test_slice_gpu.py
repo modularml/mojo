@@ -30,8 +30,7 @@ def test_slice_gpu_ideal_case() -> None:
 
         # TODO(MAXPLAT-363): Better error message
         with pytest.raises(TypeError):
-            # mypy restricts what types may be passed to slice literals
-            _ = x_tensor.tensor[x_slice_val.tensor :, :]  # type: ignore
+            _ = x_tensor.tensor[x_slice_val.tensor :, :]
 
 
 def test_slice_gpu_explicit_devices() -> None:

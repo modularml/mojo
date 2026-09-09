@@ -1,0 +1,14 @@
+# gazelle:default_visibility //Mojo:__subpackages__
+
+package(default_visibility = ["//Mojo:__subpackages__"])
+
+exports_files([
+    "std/__init__.mojo",
+    "std/prelude/__init__.mojo",
+])
+
+filegroup(
+    name = "test-packages",
+    testonly = True,
+    srcs = glob(["**/*.mojo"]),
+)

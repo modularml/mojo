@@ -19,7 +19,7 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 import msgspec
-from datasets import load_dataset
+from huggingface_hub import HfFileSystem
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from ._tokenizer_pool import TokenizerPool
@@ -136,8 +136,9 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
 
     The data lives in six per-subset ``<subset>/data.jsonl`` LFS blobs
     (3-5 GB each). To avoid downloading 30 GB before the first prompt is
-    issued, this dataset uses ``datasets.load_dataset(..., streaming=True)``
-    and pulls only enough rows to satisfy the requested sample count.
+    issued, this dataset streams the blob over HTTP with
+    :class:`huggingface_hub.HfFileSystem` and decodes one JSONL line at a time,
+    pulling only enough rows to satisfy the requested sample count.
 
     Coverage gap vs. existing datasets:
 
@@ -187,7 +188,7 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
                 "nemotron-opencode does not support --dataset-path; the "
                 "loader streams "
                 f"{NEMOTRON_OPENCODE_REPO_ID} via "
-                "datasets.load_dataset(streaming=True). Drop --dataset-path "
+                "huggingface_hub.HfFileSystem. Drop --dataset-path "
                 "and let the dataset stream from HuggingFace."
             )
 
@@ -197,10 +198,36 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
         """Stream rows from the configured subset.
 
         Yields decoded ``NemotronOpenCodeRow`` structs in source order (the HF
-        stream does not shuffle). Rows that fail msgspec validation are
+        stream does not shuffle). Rows that fail msgspec decoding/validation are
         silently skipped so a single malformed entry does not abort the
         benchmark. Callers are responsible for breaking out of the iterator
         once they have enough samples.
+
+        Each JSONL line is decoded independently with msgspec rather than
+        through ``datasets.load_dataset``. The upstream loader infers a single
+        Arrow schema across rows via pyarrow, which cannot represent
+        ``messages[].content`` — that field is a plain ``str`` in some rows and
+        a list of content blocks in others. pyarrow aborts with
+        ``ArrowInvalid: Column(/messages/[]/content) changed from string to
+        array`` and ``datasets`` then falls back to a whole-file
+        ``pandas.read_json`` that chokes on the newline-delimited blob with
+        ``ValueError: Trailing data``. Decoding line-by-line sidesteps the
+        cross-row schema unification entirely, and ``NemotronOpenCodeRow``
+        already models the union type.
+        """
+        decoder = msgspec.json.Decoder(NemotronOpenCodeRow)
+        for line in self._stream_jsonl_lines():
+            try:
+                yield decoder.decode(line)
+            except (msgspec.ValidationError, msgspec.DecodeError):
+                continue
+
+    def _stream_jsonl_lines(self) -> Iterable[bytes]:
+        """Stream raw JSONL byte lines for the configured subset.
+
+        Reads the per-subset ``<subset>/data.jsonl`` blob over HTTP via
+        :class:`huggingface_hub.HfFileSystem` without materialising the whole
+        multi-GB file, yielding one stripped, non-empty line at a time.
         """
         if self.subset not in NEMOTRON_OPENCODE_SUBSETS:
             raise ValueError(
@@ -209,18 +236,15 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
             )
         # NOTE: ``self.dataset_name`` is the registry key (e.g.
         # "nemotron-opencode"), not the HuggingFace repo id, so we
-        # deliberately use the module constant here.
-        stream = load_dataset(
-            NEMOTRON_OPENCODE_REPO_ID,
-            data_files=f"{self.subset}/data.jsonl",
-            split="train",
-            streaming=True,
-        )
-        for raw in stream:
-            try:
-                yield msgspec.convert(raw, type=NemotronOpenCodeRow)
-            except msgspec.ValidationError:
-                continue
+        # deliberately use the module constant here. Dataset repos live under
+        # the ``datasets/`` namespace on the HF filesystem.
+        path = f"datasets/{NEMOTRON_OPENCODE_REPO_ID}/{self.subset}/data.jsonl"
+        fs = HfFileSystem()
+        with fs.open(path, "rb") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    yield line
 
     @staticmethod
     def _message_text(
@@ -391,6 +415,11 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
                     # ``ignore_eos=True`` to match sharegpt / arxiv: decode the
                     # full target length instead of letting an early EOS skew
                     # throughput vs. instruct-coder baselines.
+                    #
+                    # Note: This plus the reference-length ``output_len`` stops
+                    # generation mid-argument, so tool-call conformance errors
+                    # are expected here. Removing both restrictions showed
+                    # no tool call errors for Kimi K2.7.
                     ignore_eos=True,
                     tools=(
                         [_anthropic_tool_to_openai(t) for t in tools_raw]

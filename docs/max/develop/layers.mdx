@@ -1,0 +1,283 @@
+---
+title: Write a custom layer
+sidebar_label: Custom layers
+description: Write a custom layer for a model component that max.nn doesn't
+  provide, and connect it to your model.
+---
+
+In MAX, the [`max.nn`](/api/python/nn/) library contains the common layers you
+use to [bring up a model architecture](/develop/model-bringup-workflow/), such
+as [`Linear`](/api/python/generated/max.nn.Linear/#max.nn.Linear),
+[`AttentionWithRope`](/api/python/generated/max.nn.attention.AttentionWithRope/#max.nn.attention.AttentionWithRope),
+and [`RMSNorm`](/api/python/generated/max.nn.RMSNorm/#max.nn.RMSNorm). But newly
+released models frequently introduce novel architectures, with layers that
+`max.nn` doesn't provide yet.
+
+To implement those parts of your model, you write a custom layer: a
+[`Module`](/api/python/generated/max.nn.Module/#max.nn.Module) you define
+yourself and use alongside the built-in layers you reuse.
+
+You can subclass the closest built-in layer, define a new module from scratch,
+compose several layers into a new module, or wrap a custom Mojo op. This page
+walks through each approach, then shows how to connect the layer to your model.
+For the mechanics common to any module, see [Build a model graph with
+Module](/develop/modules/).
+
+Custom layers live in the `layers/` folder of your architecture package, one
+component per file, and `model.py` composes them into the full architecture. See
+the [Model bring-up workflow](/develop/model-bringup-workflow/) for the
+package layout.
+
+## Subclass the closest layer
+
+When a built-in layer is close and already lets you change what you need through
+a constructor argument or an overridable method, subclass it and change only
+what differs. That's how MAX implements Gemma 3's norm, `Gemma3RMSNorm` in
+[`gemma3/layers/rms_norm.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/gemma3/layers/rms_norm.py).
+The norm is a plain `RMSNorm` that scales by `1 + weight` instead of `weight`,
+so the subclass changes a single constructor argument:
+
+{/* @sync: ../../code/develop/layers/subclass_rms_norm.py */}
+
+```python
+from max.dtype import DType
+from max.nn.norm.rms_norm import RMSNorm
+
+
+class ScaledRMSNorm(RMSNorm):
+    """RMSNorm that scales by (1 + weight), the Gemma 3 convention."""
+
+    def __init__(self, dim: int, dtype: DType, eps: float = 1e-6) -> None:
+        super().__init__(dim=dim, dtype=dtype, eps=eps, weight_offset=1.0)
+
+
+layer = ScaledRMSNorm(576, DType.float32)
+print(sorted(layer.state_dict().keys()))
+```
+
+The subclass keeps `RMSNorm`'s weight name, so a checkpoint loads into it
+unchanged, and changes only the scale:
+
+```output
+['weight']
+```
+
+The shipped `Gemma3RMSNorm` adds multi-GPU sharding on top of the same one-line
+change. Prefer subclassing to copying: when the base class exposes an argument
+or method for what you need, you inherit its shapes, weight names, and any
+quantization support, and you maintain one line instead of a fork. Copy a
+layer's source only when nothing fits, and expect to track upstream changes
+yourself.
+
+## Define a layer from scratch
+
+When no built-in layer is close enough to subclass, subclass `Module` directly.
+Declare each parameter as a
+[`Weight`](/api/python/generated/max.graph.Weight/#max.graph.Weight) in
+`__init__()`, then use it in `__call__()` to build the forward pass. Here a
+learnable per-channel scale owns one weight and multiplies it into the input:
+
+{/* @sync: ../../code/develop/layers/define_module.py */}
+
+```python
+from max.dtype import DType
+from max.graph import DeviceRef, TensorValue, Weight
+from max.nn import Module
+
+
+class LearnedScale(Module):
+    """A layer that owns one learnable per-channel scale weight."""
+
+    def __init__(self, dim: int, dtype: DType = DType.float32) -> None:
+        super().__init__()
+        self.weight = Weight("weight", dtype, [dim], device=DeviceRef.CPU())
+
+    def __call__(self, x: TensorValue) -> TensorValue:
+        weight = self.weight.cast(x.dtype)
+        if x.device:
+            weight = weight.to(x.device)
+        return x * weight
+
+
+layer = LearnedScale(576)
+print(sorted(layer.state_dict().keys()))
+```
+
+The `Weight` registers under its attribute name, so `state_dict()` exposes it
+for checkpoint loading:
+
+```output
+['weight']
+```
+
+`__call__()` casts and moves the weight to the input's dtype and device first,
+so the same layer runs on CPU or GPU.
+
+## Compose existing layers into a new module
+
+When your component combines several existing layers, build a new `Module` from
+them: declare them in `__init__()`, and define the computation in `__call__()`.
+Real layers do this at scale. For instance, Qwen 3's attention
+([`qwen3/layers/attention.py`](https://github.com/modular/modular/blob/main/max/python/max/pipelines/architectures/qwen3/layers/attention.py))
+wraps its query and key projections in `RMSNorm` before applying rotary
+embeddings, which no built-in attention does.
+
+The following example composes a small model from custom and built-in layers.
+`NormalizedProjection` composes a single `Linear` with an
+`RMSNorm`. `DecoderBlock` wires that custom layer in like any built-in one,
+assigning it to an attribute beside a `Linear` and calling it in `__call__()`.
+`MiniDecoder` stacks the blocks. Every layer reads the same module-level
+`device`, so one accelerator check configures the whole model:
+
+{/* @sync: ../../code/develop/layers/compose_and_run.py */}
+
+```python
+from max import nn
+from max.driver import accelerator_count
+from max.dtype import DType
+from max.graph import DeviceRef, TensorValue
+
+# Use the GPU when one is available. DeviceRef labels the weights and inputs
+# inside the graph.
+device = DeviceRef.GPU() if accelerator_count() > 0 else DeviceRef.CPU()
+
+
+class NormalizedProjection(nn.Module):
+    """A linear projection whose output is normalized with RMSNorm."""
+
+    def __init__(self, in_dim: int, out_dim: int) -> None:
+        super().__init__()
+        self.proj = nn.Linear(in_dim, out_dim, DType.float32, device)
+        self.norm = nn.RMSNorm(out_dim, dtype=DType.float32)
+
+    def __call__(self, x: TensorValue) -> TensorValue:
+        return self.norm(self.proj(x))
+
+
+class DecoderBlock(nn.Module):
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        self.qk_proj = NormalizedProjection(dim, dim)  # your custom layer
+        self.o_proj = nn.Linear(dim, dim, DType.float32, device)
+
+    def __call__(self, x: TensorValue) -> TensorValue:
+        return self.o_proj(self.qk_proj(x))
+
+
+class MiniDecoder(nn.Module):
+    """Two decoder blocks and an output projection, all on the same device."""
+
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        self.block_0 = DecoderBlock(dim)
+        self.block_1 = DecoderBlock(dim)
+        self.lm_head = nn.Linear(dim, dim, DType.float32, device)
+
+    def __call__(self, x: TensorValue) -> TensorValue:
+        return self.lm_head(self.block_1(self.block_0(x)))
+
+
+model = MiniDecoder(dim=512)
+
+# The composed weight names mirror the attribute hierarchy.
+print(sorted(model.state_dict().keys()))
+```
+
+Each weight's name is its attribute path through the module tree, which is the
+name your checkpoint must match:
+
+```output
+['block_0.o_proj.weight', 'block_0.qk_proj.norm.weight', 'block_0.qk_proj.proj.weight', 'block_1.o_proj.weight', 'block_1.qk_proj.norm.weight', 'block_1.qk_proj.proj.weight', 'lm_head.weight']
+```
+
+From here, a pipeline loads a checkpoint into the module, builds a
+[`Graph`](/api/python/generated/max.graph.Graph/#max.graph.Graph) from it,
+compiles, and executes. For those mechanics, including declaring weights,
+writing the forward pass, and matching weight names to a checkpoint, see
+[Build a model graph with Module](/develop/modules/).
+
+## Wrap a custom op
+
+When you need a primitive the library lacks or a fusion the compiler isn't
+finding, write the computation as a custom operation in Mojo and wrap it in a
+layer that calls the op with
+[`ops.custom()`](/api/python/graph.ops/#max.graph.ops.custom) in
+`__call__()`. The op's `name` matches the string your Mojo kernel registers with
+[`@extensibility.register`](/api/mojo/extensibility/decorators/register/),
+and `out_types` declares the shapes it returns:
+
+```python
+from max import nn
+from max.graph import TensorValue, ops
+
+
+class FusedActivation(nn.Module):
+    """Wraps a Mojo custom op registered as "fused_activation"."""
+
+    def __call__(self, x: TensorValue) -> TensorValue:
+        return ops.custom(
+            "fused_activation",
+            device=x.device,
+            values=[x],
+            out_types=[x.type],  # same shape and dtype as the input
+        )[0].tensor
+```
+
+An MLP block then places the custom-op layer between two `Linear` projections,
+reusing the module-level `device` from the previous example:
+
+```python
+class MLPBlock(nn.Module):
+    def __init__(self, dim: int, hidden_dim: int) -> None:
+        super().__init__()
+        self.up = nn.Linear(dim, hidden_dim, DType.float32, device)
+        self.act = FusedActivation()  # your custom-op layer
+        self.down = nn.Linear(hidden_dim, dim, DType.float32, device)
+
+    def __call__(self, x):
+        return self.down(self.act(self.up(x)))
+```
+
+These snippets show the wrapper pattern, not a runnable program: `ops.custom()`
+resolves `"fused_activation"` against a registered Mojo kernel, so the code runs
+only once that kernel exists. For a complete, runnable custom op, including the
+Mojo kernel, see [Intro to custom ops](/develop/custom-ops/), the [Build
+custom ops for GPUs](/develop/build-custom-ops/) tutorial, or the [custom op
+examples](https://github.com/modular/modular/tree/main/max/examples/custom_ops)
+on GitHub.
+
+## Connect the layer to your model
+
+The examples above each wired a custom layer in the same way: assign it to an
+attribute on the parent module, then call it in the forward pass. Beyond that
+wiring, the following details determine whether the layer loads and runs
+correctly:
+
+- **Weight names**: a layer registers its weights under its attribute path.
+  Match these to the checkpoint so the weights load. See [load weights into the
+  module](/develop/modules/#load-weights-into-the-module). When the
+  checkpoint's names don't line up, a [weight
+  adapter](/develop/weight-adapters/) remaps them.
+- **Stacks**: hold a repeated layer, such as a stack of transformer blocks, in a
+  [`Sequential`](/api/python/generated/max.nn.Sequential/#max.nn.Sequential),
+  never a plain Python list. A plain list doesn't register its children's
+  weights, so they load into nothing and fail silently. (`Sequential` subclasses
+  [`LayerList`](/api/python/generated/max.nn.LayerList/#max.nn.LayerList),
+  which you'll still see across existing architectures.) The
+  [Model bring-up workflow](/develop/model-bringup-workflow/) explains how
+  these containers resolve weight names.
+
+A layer that loads isn't necessarily correct. Verify its output against the
+reference implementation, as described in [Logit
+comparison](/develop/logit-comparison/).
+
+## Next steps
+
+From here, go deeper on the pieces a custom layer touches:
+
+- [Build a model graph with Module](/develop/modules/): the mechanics of
+  writing modules and the `max.nn` layers you compose from.
+- [Model bring-up workflow](/develop/model-bringup-workflow/): where custom
+  layers fit in bringing up a new architecture.
+- [Intro to custom ops](/develop/custom-ops/): write a Mojo kernel when no
+  built-in layer fits.

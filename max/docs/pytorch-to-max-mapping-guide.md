@@ -53,6 +53,7 @@ linear = nn.Linear(768, 3072)
 
 # MAX Layer
 from max import nn
+
 nn.linear = Linear(in_dim=768, out_dim=3072, dtype=DType.float32, device=device)
 
 # MAX Graph Op
@@ -78,7 +79,10 @@ embed = nn.Embedding(50000, 768)
 
 # MAX Layer
 from max import nn
-embed = nn.Embedding(vocab_size=50000, hidden_dim=768, dtype=DType.float32, device=device)
+
+embed = nn.Embedding(
+    vocab_size=50000, hidden_dim=768, dtype=DType.float32, device=device
+)
 ```
 
 ### 3. Normalization Layers
@@ -97,6 +101,7 @@ norm = nn.LayerNorm(768, eps=1e-5)
 
 # MAX Layer
 from max import nn
+
 norm = nn.LayerNorm(dims=768, eps=1e-5, device=device, dtype=DType.float32)
 
 # MAX Graph Op
@@ -124,7 +129,7 @@ scores = ops.matmul(Q, K.transpose(-2, -1)) / ops.sqrt(head_dim)
 
 # Apply mask
 if mask is not None:
-    scores = ops.where(mask, scores, -float('inf'))
+    scores = ops.where(mask, scores, -float("inf"))
 
 # Softmax
 attention_weights = ops.softmax(scores)
@@ -147,7 +152,7 @@ output = ops.matmul(attention_weights, V)
 
 ```python
 # PyTorch
-output = F.gelu(input, approximate='tanh')
+output = F.gelu(input, approximate="tanh")
 
 # MAX Graph Op
 output = ops.gelu(input, approximate="tanh")
@@ -217,6 +222,7 @@ output = ops.gelu(input, approximate="tanh")
 from max import nn
 from max.graph import ops
 
+
 class TransformerBlockMAX:
     def __init__(self, config):
         # High-level MAX implementation
@@ -224,24 +230,22 @@ class TransformerBlockMAX:
             num_attention_heads=config.num_heads,
             hidden_size=config.hidden_size,
             device=config.device,
-            dtype=config.dtype
+            dtype=config.dtype,
         )
 
         self.attention_norm = nn.RMSNorm(
-            dim=config.hidden_size,
-            dtype=config.dtype
+            dim=config.hidden_size, dtype=config.dtype
         )
 
-        self.mlp = nn.Sequential([
-            nn.Linear(config.hidden_size, config.intermediate_size),
-            # Activation handled in forward
-            nn.Linear(config.intermediate_size, config.hidden_size)
-        ])
-
-        self.mlp_norm = nn.RMSNorm(
-            dim=config.hidden_size,
-            dtype=config.dtype
+        self.mlp = nn.Sequential(
+            [
+                nn.Linear(config.hidden_size, config.intermediate_size),
+                # Activation handled in forward
+                nn.Linear(config.intermediate_size, config.hidden_size),
+            ]
         )
+
+        self.mlp_norm = nn.RMSNorm(dim=config.hidden_size, dtype=config.dtype)
 
     def forward(self, x, mask=None):
         # Attention block
@@ -264,10 +268,9 @@ class TransformerBlockMAX:
 from max.graph import Graph, ops
 from max.dtype import DType
 
+
 def multi_head_attention_graph(
-    query, key, value,
-    num_heads, head_dim,
-    mask=None
+    query, key, value, num_heads, head_dim, mask=None
 ):
     """Multi-head attention using MAX graph operations."""
     batch_size, seq_len, hidden_dim = query.shape
@@ -312,9 +315,11 @@ from max import nn
 from max.graph import ops
 from max.dtype import DType
 
+
 class FeedForwardMAX:
-    def __init__(self, hidden_size, intermediate_size,
-                 use_float8=False, device=None):
+    def __init__(
+        self, hidden_size, intermediate_size, use_float8=False, device=None
+    ):
 
         # Configure Float8 if requested
         quant_config = None
@@ -338,7 +343,7 @@ class FeedForwardMAX:
             out_dim=intermediate_size,
             dtype=DType.float32,
             device=device,
-            quant_config=quant_config
+            quant_config=quant_config,
         )
 
         self.w2 = nn.Linear(
@@ -346,7 +351,7 @@ class FeedForwardMAX:
             out_dim=hidden_size,
             dtype=DType.float32,
             device=device,
-            quant_config=quant_config
+            quant_config=quant_config,
         )
 
     def forward(self, x):
@@ -458,7 +463,7 @@ x = x + residual  # Use ops.add for graph ops
 mask = ops.band_part(
     ops.ones((seq_len, seq_len)),
     num_lower=-1,  # Keep all lower triangle
-    num_upper=0    # Remove upper triangle
+    num_upper=0,  # Remove upper triangle
 )
 ```
 
@@ -475,6 +480,6 @@ embeddings = ops.add(token_embeds, pos_embeds)
 
 For the latest updates and additional operations, refer to:
 
-- MAX Python API docs: <https://docs.modular.com/max/api/python>
-- MAX Graph Operations: <https://docs.modular.com/max/graph/ops/>
-- MAX Neural Network Layers: <https://docs.modular.com/max/api/python/nn>
+- MAX Python API docs: <https://max.modular.com/api/python>
+- MAX Graph Operations: <https://max.modular.com/graph/ops/>
+- MAX Neural Network Layers: <https://max.modular.com/api/python/nn>

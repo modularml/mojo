@@ -26,6 +26,9 @@ from max.graph import Module as GraphModule
 from max.graph.weights import Weights, load_weights
 from max.nn.layer import Module
 from max.pipelines.lib.compiled_component import CompiledComponent
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.profiler import traced
 
@@ -173,7 +176,10 @@ class ImageEncoder(CompiledComponent):
 
         config = manifest["vae"]
         config_dict = config.huggingface_config.to_dict()
-        encoding = config.quantization_encoding or "bfloat16"
+        resolved_encoding, resolved_weight_path = (
+            _resolve_component_encoding_and_weights(config)
+        )
+        encoding = resolved_encoding or "bfloat16"
         devices = load_devices(config.device_specs)
 
         vae_config = AutoencoderKLFlux2Config.generate(
@@ -213,7 +219,7 @@ class ImageEncoder(CompiledComponent):
         )
 
         # Load and adapt weights.
-        paths = config.resolved_weight_paths()
+        paths = config.resolved_weight_paths(resolved_weight_path)
         weights = load_weights(paths)
         state_dict = self._adapt_state_dict(weights, fused.raw_state_dict())
         fused.load_state_dict(state_dict, weight_alignment=1)

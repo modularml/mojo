@@ -16,29 +16,36 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import ClassVar, Literal
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.graph.weights import WeightData, WeightsFormat, weights_format
+from max.graph.weights import WeightData
 from max.nn.kv_cache import KVCacheParams
 from max.nn.rotary_embedding import (
     Llama3RopeScalingParams,
     LongRoPEScalingParams,
 )
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
+from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import (
     KVCacheConfig,
     MAXModelConfig,
     PipelineConfig,
-    upper_bounded_default,
+)
+from max.pipelines.lib.config.model_config import (
+    _interleaved_rope_weights,
+    _select_quantization_encoding,
 )
 from max.pipelines.lib.interfaces.arch_config import (
     ArchConfigWithKVCache,
     ArchConfigWithStoredKVParams,
 )
 from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
-from max.pipelines.modeling.config_enums import supported_encoding_dtype
+from max.pipelines.modeling.config_enums import (
+    SupportedEncoding,
+    supported_encoding_dtype,
+)
 from transformers import AutoConfig
 from typing_extensions import Self, override
 
@@ -48,6 +55,12 @@ from .layers.rotary_embedding import LongRoPERotaryEmbedding
 @dataclass(kw_only=True)
 class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
     """Model configuration for Llama3 graph construction/execution."""
+
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "float32",
+        "bfloat16",
+    }
 
     hidden_size: int
     num_attention_heads: int
@@ -62,7 +75,7 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
     dtype: DType
     kv_params: KVCacheParams
     return_logits: ReturnLogits = ReturnLogits.LAST_TOKEN
-    norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm"
+    norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm"
     attention_bias: bool = False
     rms_norm_eps: float | None = None
     tie_word_embeddings: bool = False
@@ -77,9 +90,7 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
     longrope_scaling_params: LongRoPEScalingParams | None = None
     logits_scaling: float = 1.0
     return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE
-
-    def get_max_seq_len(self) -> int:
-        return self.max_seq_len
+    quantization_encoding: SupportedEncoding | None = None
 
     @classmethod
     def construct_kv_params(
@@ -89,9 +100,12 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
         devices: list[DeviceRef],
         kv_cache_config: KVCacheConfig,
         cache_dtype: DType,
+        *,
+        allow_kv_head_replication: bool = False,
     ) -> KVCacheParams:
         """Grouped-attention KV with EAGLE draft-token count when speculative is on."""
         return kv_cache_config.to_params(
+            allow_kv_head_replication=allow_kv_head_replication,
             dtype=cache_dtype,
             n_kv_heads=huggingface_config.num_key_value_heads,
             head_dim=cls.get_head_dim(huggingface_config),
@@ -101,7 +115,9 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             speculative_method=pipeline_config.speculative.speculative_method
             if pipeline_config.speculative
             else None,
-            num_draft_tokens=pipeline_config.speculative.num_speculative_tokens
+            num_draft_tokens=(
+                pipeline_config.speculative.num_speculative_tokens or 0
+            )
             if pipeline_config.speculative
             else 0,
         )
@@ -126,30 +142,14 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             ),
         )
 
-    @staticmethod
-    def calculate_max_seq_len(
-        pipeline_config: PipelineConfig,
-        huggingface_config: AutoConfig,
-    ) -> int:
-        try:
-            return upper_bounded_default(
-                upper_bound=huggingface_config.max_position_embeddings,
-                default=pipeline_config.model.max_length,
-            )
-        except ValueError as e:
-            raise ValueError(
-                "Unable to infer max_length for Llama3, the provided "
-                f"max_length ({pipeline_config.model.max_length}) exceeds the "
-                f"model's max_position_embeddings "
-                f"({huggingface_config.max_position_embeddings})."
-            ) from e
-
     @override
     @classmethod
     def initialize(
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         model_config = model_config or pipeline_config.model
         huggingface_config = model_config.huggingface_config
@@ -161,17 +161,15 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             )
 
         kv_cache_config = model_config.kv_cache
-        quantization_encoding = model_config.quantization_encoding
-        if quantization_encoding is None:
-            raise ValueError("quantization_encoding must not be None")
-        dtype = supported_encoding_dtype(quantization_encoding)
-        cache_dtype = model_config.kv_cache.cache_dtype
-
-        _weights_format = weights_format(model_config.weight_path)
-        interleaved_rope_weights = (
-            _weights_format == WeightsFormat.gguf
-            and model_config.rope_type == "normal"
+        quantization_encoding = _select_quantization_encoding(
+            model_config, cls.DEFAULT_ENCODING
         )
+        dtype = supported_encoding_dtype(quantization_encoding)
+        cache_dtype = cache_dtype_for_encoding(
+            quantization_encoding, model_config.kv_cache.kv_cache_format
+        )
+
+        interleaved_rope_weights = _interleaved_rope_weights(model_config)
 
         device_refs = [
             DeviceRef(spec.device_type, spec.id)
@@ -225,9 +223,7 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
                 dim=huggingface_config.hidden_size,
                 n_heads=huggingface_config.num_attention_heads,
                 theta=get_rope_theta(huggingface_config),
-                max_seq_len=Llama3Config.calculate_max_seq_len(
-                    pipeline_config, huggingface_config=huggingface_config
-                ),
+                max_seq_len=max_seq_len,
                 device=device_refs[0].to_device(),
                 interleaved=interleaved_rope_weights,
                 scaling_params=longrope_scaling_params,
@@ -246,9 +242,7 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             interleaved_rope_weights=interleaved_rope_weights,
             vocab_size=huggingface_config.vocab_size,
             dtype=dtype,
-            max_seq_len=Llama3Config.calculate_max_seq_len(
-                pipeline_config, huggingface_config=huggingface_config
-            ),
+            max_seq_len=max_seq_len,
             kv_params=Llama3Config.construct_kv_params(
                 huggingface_config=huggingface_config,
                 pipeline_config=pipeline_config,
@@ -262,6 +256,7 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
             devices=device_refs,
             clip_qkv=getattr(huggingface_config, "clip_qkv", None),
             logits_scaling=getattr(huggingface_config, "logits_scaling", 1.0),
+            quantization_encoding=quantization_encoding,
         )
 
     def finalize(
@@ -270,7 +265,7 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
         state_dict: dict[str, WeightData],
         return_logits: ReturnLogits,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
-        norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm",
+        norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm",
         attention_bias: bool = False,
     ) -> None:
         """Define parameters that can't be determined just from the pipeline config."""
@@ -310,10 +305,7 @@ class Llama3Config(ArchConfigWithStoredKVParams, ArchConfigWithKVCache):
 
         rms_norm_eps = None
         if norm_method == "rms_norm":
-            if huggingface_config.model_type == "exaone":
-                rms_norm_eps = huggingface_config.layer_norm_epsilon
-            else:
-                rms_norm_eps = huggingface_config.rms_norm_eps
+            rms_norm_eps = huggingface_config.rms_norm_eps
 
         self.norm_method = norm_method
         self.rms_norm_eps = rms_norm_eps

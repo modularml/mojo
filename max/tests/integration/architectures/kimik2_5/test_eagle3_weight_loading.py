@@ -14,7 +14,7 @@
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
 from max.pipelines.architectures.deepseekV3.model_config import DeepseekV3Config
 from max.pipelines.architectures.eagle3_deepseekV3.unified_eagle import (
@@ -23,7 +23,7 @@ from max.pipelines.architectures.eagle3_deepseekV3.unified_eagle import (
 
 
 def _kv_params(num_layers: int) -> KVCacheParams:
-    return KVCacheParams(
+    return MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=8,
         head_dim=16 + 64,  # qk_rope_head_dim + kv_lora_rank

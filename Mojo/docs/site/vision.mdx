@@ -1,0 +1,350 @@
+---
+title: Mojo vision
+sidebar_label: Vision
+description: Our motivations and the design decisions that define the Mojo programming language
+---
+
+As the world rapidly scales the amount of available compute to support the
+growing AI demand, the available hardware is increasingly heterogeneous. The
+compute spans datacenters and client devices that are filled with chips from
+different vendors, each with their own software stack.
+
+Our vision is to unify this fragmented software stack with the one programming
+language developers can use to target all the diverse hardware—CPUs, GPUs,
+custom accelerators, ASICs, and more. Mojo is already able to target CPUs and
+GPUs from different vendors, making it the first language built for the AI era,
+but to be the one systems programming language for all hardware, there's a lot
+of work left to do.
+
+This document explains more about our motives and aspirations for the Mojo
+language. This serves as a baseline to guide our decision-making—it's a
+"directional" vision, not an engineering plan. For a look at some of the
+planned work, instead see the [Mojo roadmap](/docs/roadmap/).
+
+## Mojo's role in Modular's mission
+
+Mojo plays a key role in Modular's mission to [democratize AI
+compute](https://www.modular.com/democratizing-ai-compute). Let's break down
+the mission into its component parts:
+
+- **Democratize**: This is a social statement, saying that we want to free,
+unlock, and enable more people to participate.
+
+- **AI compute**: We have long passed the end of Moore's law, and are awash
+with a wide range of accelerators: GPUs, TPUs, and accelerated CPUs, spanning
+IoT, edge, client, datacenter, and supercomputer applications. (Our ambition is
+to eventually expand Mojo into "all compute.")
+
+Mojo is how we bring these two ideas into a single, coherent solution. To
+achieve this we want to:
+
+- **Unite developers** across domains, skill levels, and backgrounds by
+solving the complexity of juggling Python, C++, Rust, CUDA, and more (the "N
+language problem").
+
+- **Unify hardware** by giving developers a consistent set of tools to access
+the capabilities of any hardware—CPUs, GPUs, custom accelerators, ASICs, and
+more.
+
+It should be easy to start using Mojo, and then incrementally adopt features
+that deliver more performance and scale beyond CPUs into other hardware.
+
+This mission is vast and ambitious, but when done right, we believe Mojo can
+unlock creativity, productivity, and applications we haven't yet imagined.
+
+## Why Mojo was built from scratch
+
+Modern accelerators are complex and very different from traditional CPUs. They
+have features like Tensor Cores, systolic arrays, dedicated convolutional
+units, explicit memory hierarchies, memory transfer accelerators, and a
+variety of exotic and rapidly evolving data types like float6. Achieving our
+mission to unify hardware development means Mojo must deliver the full
+performance potential of any given accelerator.
+
+There are only three ways to tackle these problems. Let's briefly evaluate the
+pros and cons of each:
+
+1. **Extend an existing language like C++, Rust, Julia, Swift**:
+
+   - **Pro**: You get an existing implementation and community.
+
+   - **Con**: None of these languages support the hardware features we need—they
+     were designed for CPUs. They are also all 10+ years old, don't provide the
+     modern metaprogramming features we need, and weren't designed to support
+     hardware features required for AI (such as float6).
+
+2. **Create an embedded DSL for a language like Python or C++**:
+
+   - **Pro**: This is comparatively easy to implement.
+
+   - **Con**: The tooling, UX, and predictability of these systems are very
+     problematic and they are limited by the base language syntax. This is
+     particularly problematic if you're trying to introduce fundamental new
+     concepts because you can't change the grammar of Python or C++.
+     [More about eDSLs](https://www.modular.com/blog/democratizing-ai-compute-part-7-what-about-triton-and-python-edsls)
+
+3. **Build an entirely new programming language from scratch**:
+
+   - **Pro**: You get full control to create the best quality result.
+
+   - **Con**: This is extremely expensive and difficult to do. There are many
+     ways to get this wrong and you must have a strong set of principles to
+     guide development. For comparison, CUDA is a C++ extension and
+     runtime—nothing as ambitious as a new programming language.
+
+We ruled out the first two options because they're insufficient for achieving
+the full scope of our vision.
+
+We believe GPUs, TPUs, and other accelerators are the natural evolution of
+compute going forward and demand high-quality software to achieve their full
+potential. Therefore, we believe it's worthwhile to bet big, rather than do
+something easier that might get near-term results but wither away over time as
+AI and accelerator hardware continues to rapidly evolve.
+
+## Overarching design principles
+
+Because Mojo will evolve over time, it's essential to prioritize
+deliberately—staying focused on our long-term goals while making pragmatic
+short-term decisions. The following are the high-level design principles that
+guide Mojo's development.
+
+### Member of the Python family
+
+Mojo adopts Python's syntax and should feel familiar to Python
+developers—Python is not only [one of the most popular programming languages in
+the world](https://www.tiobe.com/tiobe-index/), but it's also the dominant
+language in AI. Python is beloved for its clean and readable syntax, small core
+language (compared to many alternatives), powerful metaprogramming, and its
+role as a "universal superglue" for integrating complex systems across language
+boundaries.
+
+That's why Mojo supports the core features Python programmers instinctively
+reach for—`if`/`for` statements, lists, dictionaries, etc.—so it's easy to
+migrate code. Mojo will support more Python features over time, but our primary
+focus is on building features that unlock high-performance, portable
+compute—not on quickly achieving surface-level Python compatibility.
+
+### Scalable AI kernel development
+
+A key principle for Mojo is to overcome the fundamental scalability limitations
+that plague traditional kernel libraries and ML compilers, and become a unified
+language for kernel development.
+
+Kernel libraries, while initially useful, become
+[hard to manage as systems grow](https://www.modular.com/blog/democratizing-ai-compute-part-5-what-about-cuda-c-alternatives).
+ML compilers, despite their sophistication, often
+[lack the generality needed for diverse tasks](https://www.modular.com/blog/democratizing-ai-compute-part-6-what-about-ai-compilers)
+like data loading, preprocessing, dynamic shapes, and sparsity—they failed to
+provide an "it just works" experience. Even other
+[MLIR-based compiler systems](https://www.modular.com/blog/democratizing-ai-compute-part-8-what-about-the-mlir-compiler-infrastructure)
+failed to solve this due to a fragmented development process that couldn't scale
+to handle the constantly changing requirements in numerics, data types, AI
+modeling, and hardware.
+
+Thus, while building our inference engine for
+[MAX](https://www.modular.com/max), we wanted a new way to write kernels that
+could scale with the ever-evolving AI industry. We took inspiration from kernel
+programming systems (CUDA, CUTLASS, DSLs, etc.), and built a way to express
+common kernel development patterns in MLIR. Then we took a step further and
+generalized those patterns into a new language that's suitable for
+high-performance kernel development. For example, Mojo includes zero-cost
+abstractions, knobs that can be tuned for optimal hardware performance, a
+library-first design, and metaprogramming to allow specialization for
+particular hardware.
+
+### A modern systems programming language
+
+Mojo must address the realities of modern accelerators, which are essentially
+high-performance embedded systems. For example, you don't want to upload
+megabytes of code just to run a matrix multiplication, and you can't afford
+implicit performance overhead in inner loops. That means Mojo must be designed
+for low-level numerical and hardware-specific programming.
+
+Mojo includes systems programming constructs such as static typing, memory
+management control, and predictable performance semantics. It draws on lessons
+from languages like Swift, C++, Rust, and Zig—and goes beyond them by embracing
+new techniques that allow Mojo to support the wide range of hardware that AI
+developers must face today and in the future.
+
+### Managing language complexity
+
+Mojo must add new features aligned with our mission—but in doing so, we face
+the same scope-creep pressures that every growing language faces eventually.
+
+The complexity of some languages (notably C++) has spiraled out of control by
+adding new features that don't quite fit together. This happens due to a
+"tragedy of the commons"—every feature is justified by a specific use-case, but
+all users suffer from the aggregate complexity. Other languages like Go pride
+themselves on maintaining simplicity and saying "no" to proposals that don't
+benefit long-term goals.
+
+We aim to control complexity through a few specific strategies:
+
+1. **Use Mojo heavily**: Modular is Mojo's largest user and
+maintains the world's largest Mojo codebase (which is open source). This gives
+us direct insight into real-world usability and performance. We use our own
+experience, as well as feedback from our enthusiastic community, to guide
+prioritization.
+
+2. **Align with Python wherever possible**: If Python already supports a
+feature, we adopt its design rather than inventing something new. Any deviation
+from Python requires a strong, mission-driven justification.
+
+3. **Adopt proven ideas from modern languages**: When new features are
+required (such as static types, traits, metaprogramming), we draw from languages
+like Rust, Swift, and Zig rather than create novel and untested solutions.
+
+4. **Innovate only when necessary**: Where existing designs fall short—such
+as ergonomics in Rust or compile-time error messages in Zig—we aim beyond them
+to meet Mojo's goals.
+
+5. **Emphasize composability and simplicity**: Every Mojo feature must work
+reliably in all situations and combine seamlessly with other features (compose
+orthogonally). We're not satisfied with features that work 80% of the time but
+fail in some cases.
+
+6. **Defer syntactic sugar**: Language sugar is often tempting, but we
+prioritize core "big rocks" first. Only once the fundamentals are solid do we
+revisit syntactic enhancements.
+
+These are guiding principles, not a rigid recipe. The Mojo team draws on deep
+experience, learns through continuous implementation and iteration, and listens
+to feedback from the broader community.
+
+## Architectural bets for Mojo
+
+We believe building a new programming model for the future of AI and systems
+programming requires first-principles thinking, not incremental evolution.
+That's why our vision for Mojo is built upon a few specific architectural bets,
+as described in this section.
+
+From the start, we made a foundational bet: By uniting three key technologies,
+we can build a new kind of systems programming architecture that scales across
+the full range of hardware targets while maximizing software reuse.
+
+Thus, Mojo's architecture is built upon the following technologies:
+
+1. Powerful parametric metaprogramming
+2. MLIR Core
+3. MAX framework integration
+
+This design is built on experience, not speculation—before we committed to
+the language, we spent nearly a year prototyping and validating this approach
+through deep compiler research and development.
+
+Let's explore each of these technologies in more detail.
+
+### Powerful parametric metaprogramming
+
+Accelerators are incredibly diverse, and they're constantly evolving. Our
+goal is to drastically reduce the time and effort required to bring up a
+software stack for a new chip. We believe the work should be proportional
+to *how different* that chip is, rather than starting from scratch for every
+architecture.
+
+The core insight behind our approach is this: while no two accelerators are
+exactly alike, their target workloads and macro-architectures share deep
+structural similarities. For example, NVIDIA's Hopper architecture extends from
+Ampere, and AMD's MI300 has meaningful overlap with both. Across the industry,
+NVIDIA's Tensor Core concept has become ubiquitous, showing up in CPUs, GPUs,
+and custom ASICs. These units may be quirky in their own ways, but their
+purpose is the same: efficiently run matrix multiplications.
+
+Previous attempts to simplify kernel development often failed to capitalize on
+this commonality. Many were built on fragmented, vendor-specific libraries like
+cuBLAS or rocBLAS, which prevented true cross-architecture unification. We made
+a different bet: we could reimplement and unify these software stacks
+ourselves—for example, build a graph compiler and runtime stack
+([MAX](https://www.modular.com/max)) *without* CUDA—and use that as a basis to
+abstract across hardware architectures.
+
+Of course, this only works if it scales. The challenge is combinatorial: the
+cross-product of all data types, operators, and hardware targets is too large
+to implement by hand. That's why Mojo includes powerful
+[metaprogramming](/docs/manual/metaprogramming/). We took the ideas behind C++
+templates (compile-time polymorphism and specialization) and built something
+dramatically more usable, with better error messages, faster compile times,
+more expressiveness, and a smoother developer experience.
+
+In late 2022, an early prototype of the Mojo parameter system enabled us to
+implement matrix multiplication in a unified way and match or
+[exceed vendor BLAS libraries across a range of CPUs](https://www.modular.com/blog/the-worlds-fastest-unified-matrix-multiplication).
+This architectural bet has paid off many times over—it's what allows MAX to
+scale across hardware with high performance and maintainable code.
+
+### MLIR Core
+
+MLIR is a widely used open-source compiler framework for building
+domain-specific compilers. It powers systems across AI accelerators, CPUs,
+hardware design, quantum computing, and more. Within it, you can think of *MLIR
+Core* as a flexible "compiler construction toolkit," providing the building
+blocks needed to create powerful custom compilers.
+
+:::note
+
+The broader MLIR project includes many AI-related dialects, such as `linalg`,
+`affine`, and `scf`, but Mojo doesn't use any of these—Mojo is built purely on
+top of MLIR Core.
+
+:::
+
+Mojo is powered by a novel compiler framework, historically code-named **KGEN**
+(for "kernel generator"). KGEN is built using MLIR Core and forms the
+backbone of Mojo's metaprogramming capabilities. It allows explicitly
+parametric code to be represented *before* instantiation, which enables a host
+of benefits: faster compile times, clearer error messages, and support for
+compiling the same source code to multiple target devices.
+
+Another key design choice in Mojo is that it acts as syntactic sugar for MLIR.
+This means Mojo code can directly express MLIR dialect operations, without
+modifying the Mojo compiler itself. While not all MLIR dialects are supported,
+Mojo is designed to cover the most important ones needed for accelerator
+programming. Broader dialect support is possible in the future, but it's not a
+near-term priority.
+
+For a deep dive into how Mojo uses MLIR and KGEN, see the video,
+[Modular Tech Talk: Kernel Programming and
+Mojo](https://www.youtube.com/watch?v=Invd_dxC2RU).
+
+### MAX framework integration
+
+Mojo's low-level programming model and MLIR-based foundation make it easy to
+write high-performance code, but raw kernel performance isn't the whole story.
+In AI and other advanced domains, some of the biggest gains come from
+graph-level optimizations like *kernel fusion*.
+
+That's why Mojo is designed to integrate seamlessly into the [MAX
+framework](https://www.modular.com/max)—our graph compiler and runtime stack.
+This integration allows developers to directly extend MAX using Mojo (for
+example, write custom graph ops)—without modifying the graph compiler
+itself—and still benefit from advanced optimizations and code transformations.
+This is possible because Mojo builds an MLIR representation of the kernel
+code before instantiating it with parameters. This intermediate representation
+(IR) allows the graph compiler to reflect over the kernel to understand the
+inputs and outputs, and transform the kernel's IR directly.
+
+As Mojo evolves, a key goal remains enabling and enriching the MAX framework.
+We want to unlock new forms of optimization and fusion that only become
+possible when you reason across combinations of kernels—not just individual
+operators. These kinds of transformations can dramatically improve performance,
+reduce memory usage, and lower the cost of deploying high-performance AI
+systems at scale.
+
+## Looking ahead
+
+Mojo stands on a carefully engineered foundation—one designed to scale across
+devices, abstractions, and time. These investments are already paying off, and
+we believe they position Mojo to grow into a truly transformative technology
+for the AI era and beyond.
+
+Although this document focuses on the Mojo language, we know it's just one part
+of a larger Mojo ecosystem. When combined, the developer tools, the community,
+and the landscape of Mojo libraries are arguably more important at scale.
+
+We want to build a vibrant ecosystem where people use Mojo to create and share
+a wide range of applications, servers, large-scale distributed systems, database
+connectors, and much more—putting the power of the world's compute hardware at
+your fingertips. That's when we'll feel like Mojo is truly on fire 🔥!
+
+We're building it together, and we're **building it to last**. [Join
+our community](/community/) and help us build the future of Mojo!

@@ -48,6 +48,6 @@ class Qwen2Model(Llama3Model):
             devices,
             kv_cache_config,
             weights,
-            adapter,
-            return_logits,
+            adapter=adapter,
+            return_logits=return_logits,
         )

@@ -17,9 +17,8 @@ transfers on NVIDIA Blackwell (SM100) GPUs using the Tensor Memory Accelerator.
 """
 
 from std.utils.index import IndexList
-from std.gpu.host._tensormap import TensorMap, SwizzleMode, create_tensormap
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.host._tensormap import TensorMap, SwizzleMode, create_tensormap
+from max.gpu.memory import (
     cp_async_bulk_tensor_shared_cluster_global,
 )
 from layout import (
@@ -32,7 +31,7 @@ from layout.int_tuple import depth, to_index_list, product
 from layout.runtime_tuple import to_index_list as runtime_tuple_to_index_list
 from layout.copy import CopyPolicy
 from layout.tma_async import SharedMemBarrier
-from std.gpu.host import DeviceBuffer, DeviceContext
+from max.gpu.host import DeviceBuffer, DeviceContext
 from std.sys import size_of
 from layout.swizzle import Swizzle
 from std.bit import log2_floor
@@ -55,16 +54,6 @@ struct TMADescriptor[
         """
         self.tensormap = tensormap
 
-    @always_inline
-    def __init__(out self, *, copy: Self):
-        """
-        Copy initializes this `TMADescriptor` from another instance.
-
-        Args:
-            copy: The other `TMADescriptor` instance to copy from.
-        """
-        self.tensormap = copy.tensormap
-
 
 def create_tma_descriptor[
     dtype: DType,
@@ -73,7 +62,7 @@ def create_tma_descriptor[
     *,
     swizzle_mode: SwizzleMode = SwizzleMode.NONE,
 ](
-    gmem_tensor: LayoutTensor[dtype, address_space=AddressSpace.GENERIC, ...],
+    gmem_tensor: LayoutTensor[dtype, address_space=.GENERIC, ...],
     ctx: DeviceContext,
 ) raises -> TMADescriptor[dtype, tile_shape, swizzle_mode]:
     """
@@ -107,7 +96,7 @@ def create_tma_descriptor[
         create_tensormap(
             DeviceBuffer(
                 ctx,
-                gmem_tensor.ptr.address_space_cast[AddressSpace.GENERIC](),
+                gmem_tensor.ptr.address_space_cast[.GENERIC](),
                 1,
                 owning=False,
             ),
@@ -167,7 +156,7 @@ struct TMALoad[
             "type mismatch: expected ", Self.dtype, " passed in ", dst.dtype
         )
 
-        comptime assert dst.address_space == AddressSpace.SHARED, String(
+        comptime assert dst.address_space == .SHARED, String(
             "address space mismatch: expected ",
             AddressSpace.SHARED,
             " passed in ",
@@ -183,7 +172,7 @@ struct TMALoad[
 
     @staticmethod
     def verify_source_tensor(src: LayoutTensor):
-        comptime assert src.address_space == AddressSpace.GLOBAL, String(
+        comptime assert src.address_space == .GLOBAL, String(
             "address space mismatch: expected ",
             AddressSpace.GLOBAL,
             " passed in ",
@@ -239,10 +228,8 @@ struct TMALoad[
         return materialize[repeat_pattern]()
 
 
-comptime UInt32Indices[rank: Int] = IndexList[rank, element_type=DType.uint32]
-comptime MBarPtr = UnsafePointer[
-    SharedMemBarrier, _, address_space=AddressSpace.SHARED
-]
+comptime UInt32Indices[rank: Int] = IndexList[rank, element_type=.uint32]
+comptime MBarPtr = UnsafePointer[SharedMemBarrier, _, address_space=.SHARED]
 
 
 def copy[
@@ -251,7 +238,7 @@ def copy[
     cta_group: Int = 1,
 ](
     policy: TMALoad[...],
-    dst: LayoutTensor[_, _, address_space=AddressSpace.SHARED, ...],
+    dst: LayoutTensor[_, _, address_space=.SHARED, ...],
     mbar_ptr: MBarPtr,
     coords: UInt32Indices[rank],
 ):
@@ -372,11 +359,11 @@ def copy[
             dst.ptr.unsafe_mut_cast[True]() + dst_copy_offset,
             UnsafePointer(to=policy.descriptor).bitcast[NoneType](),
             mbar_ptr,
-            copy_tile_coords.cast[DType.int64](),
+            copy_tile_coords.cast[.int64](),
         )
 
 
-@parameter
+@__parameter
 def to_swizzle[dtype: DType, mode: SwizzleMode]() -> Swizzle:
     """Create swizzle based on predefined swizzle modes.
 

@@ -13,11 +13,18 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 
 import pytest
 from max import mlir
 from max._mlir_context import default_mlir_context
+from max.driver import set_virtual_cpu_target
+
+# Set at collection time, before any test imports max._interpreter_ops.
+_test_cpu_target = os.environ.get("MODULAR_TEST_VIRTUAL_CPU_TARGET")
+if _test_cpu_target:
+    set_virtual_cpu_target(_test_cpu_target)
 
 
 @pytest.fixture(scope="function")

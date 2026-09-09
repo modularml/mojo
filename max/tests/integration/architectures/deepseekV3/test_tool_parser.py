@@ -29,7 +29,7 @@ from max.pipelines.modeling.types import (
     ParsedToolCallDelta,
     ParsedToolResponse,
 )
-from max.pipelines.modeling.weights.hf_utils import HuggingFaceRepo
+from max.pipelines.weights.hf_utils import HuggingFaceRepo
 
 
 def test_single_tool_call_parsing() -> None:
@@ -341,9 +341,9 @@ def test_parse_delta_accumulates() -> None:
     """Test that parse_delta accumulates tokens in buffer."""
     parser = DeepseekV3_1ToolParser()
 
-    # Before the section marker fully lands, result is None.
+    # parse_delta should accumulate tokens; return [] to indicate parser is actively buffering and raw tokens shouldn't be used yet.
     result1 = parser.parse_delta("<｜tool▁calls")
-    assert result1 is None
+    assert result1 == []
 
     # Once the marker completes, the parser returns [] (not None) so the
     # streaming path knows to suppress raw structural tokens even with
@@ -820,11 +820,7 @@ def _local_repo(
     path: pathlib.Path, subfolder: str | None = None
 ) -> HuggingFaceRepo:
     """Construct a local HuggingFaceRepo handle pointing at ``path``."""
-    return HuggingFaceRepo(
-        repo_id=str(path),
-        repo_type="local",
-        subfolder=subfolder,
-    )
+    return HuggingFaceRepo(repo_id=str(path), subfolder=subfolder)
 
 
 def test_resolver_picks_v31_for_raw_json_template(

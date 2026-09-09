@@ -1,55 +1,37 @@
 ---
 title: Packages
-description: Learn how to install Modular tools, set up your environment, and choose between nightly and stable versions
+description: Learn how to install MAX tools, set up your environment, and choose between nightly and stable versions
 ---
 
-import InstallModular from '../_includes/install-modular.mdx';
+import InstallMAX from './_includes/install-modular.mdx';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Requirements from '@site/src/components/Requirements';
-import { requirementsNoGPU } from '../requirements';
+import { requirementsNoGPU } from './requirements';
 
-All the Modular APIs and tools (including MAX and Mojo) are included in a
-single Python/Conda package named `modular`. This page explains what's in the
-package and shows how to install it.
+You can install all the MAX API libraries and tools, including Mojo and all
+optional dependencies, with `max[all]` (pip/uv) or `max-all` (conda/pixi).
+Alternatively, you can install just a subset of the tools using one of the
+other `max` package options as described below.
 
-If you just want to get started with Modular, instead see our
-[quickstart guide](/max/get-started/).
+:::tip
 
-## Package managers
+If you just want to get started, instead see the
+[quickstart guide](/get-started/).
 
-You can install `modular` as a Python or Conda package. The install
-instructions below include commands for popular package managers such as
-`pixi`, `uv`, `pip`, and `conda`, but you can also use something else.
-
-Traditional tools like `pip` and `conda` might be necessary for existing
-production environments or Docker containers, but for your local development,
-we recommend using [Pixi](https://pixi.sh/latest/).
-
-Pixi is both a package manager and virtual environment manager, which alone
-makes development a lot easier, but it's also language agnostic, extremely fast,
-and includes lock files to easily reproduce your project environment.
-
-You'll notice that our [GitHub code
-examples](https://github.com/modular/modular/tree/main/max/examples) include a
-`pixi.toml` file. This file configures the environment to make sure we all use
-the same packages and get the same results—you just need to install `pixi`.
-
-So if you're not set on using a particular package manager, we suggest you try
-`pixi`. If you haven't used it before, check out our [Pixi basics guide](/pixi/)
-or the [official Pixi docs](https://pixi.sh/latest/).
+:::
 
 ## Install
 
 To get the latest improvements and new features, we recommend
 installing our nightly build, which we release several times a week. If you
 want a better tested but older version, you can install a stable
-build. (Each release is described in the [changelog](/max/changelog/).)
+build. For version details, see the [release notes](/releases/).
 
 System requirements:
 
 <Requirements requirementsData={requirementsNoGPU}
-url="/max/packages#system-requirements" />
+url="/packages#system-requirements" />
 
 :::tip
 
@@ -57,9 +39,10 @@ We recommend installing with `pixi` for the most reliable experience.
 
 :::
 
-<InstallModular folder="example-project" />
+<InstallMAX folder="example-project" />
 
-The `modular` package installs MAX, Mojo, and other package dependencies.
+See the following section for more details about what's included in
+`max[all]` (and `max-all`).
 
 :::note GitHub stable branch
 
@@ -74,128 +57,106 @@ git clone -b stable https://github.com/modular/modular.git
 
 :::
 
-## Uninstall
-
-<Tabs groupId="install">
-  <TabItem value="pixi" label="pixi">
-  You can uninstall `modular` from your virtual environment with this
-  command:
-
-  ```sh
-  pixi remove modular
-  ```
-
-  To deactivate your virtual environment, run:
-
-  ```sh
-  exit
-  ```
-
-  </TabItem>
-  <TabItem value="uv" label="uv">
-  You can uninstall `modular` from your virtual environment with the following
-  command:
-
-  ```sh
-  uv pip uninstall modular
-  ```
-
-  To deactivate your virtual environment, run:
-
-  ```sh
-  deactivate
-  ```
-
-  </TabItem>
-  <TabItem value="pip" label="pip">
-  You can uninstall `modular` from your virtual environment with the following
-  command:
-
-  ```sh
-  pip uninstall modular
-  ```
-
-  To deactivate your virtual environment, run:
-
-  ```sh
-  deactivate
-  ```
-
-  </TabItem>
-  <TabItem value="conda" label="conda">
-  You can uninstall `modular` from your virtual environment with this
-  command:
-
-  ```sh
-  conda remove modular
-  ```
-
-  To deactivate your virtual environment, run:
-
-  ```sh
-  deactivate
-  ```
-
-  </TabItem>
-</Tabs>
-
 ## What's included
 
-Here's a summary of what's in the `modular` package.
+The `max[all]` (or `max-all`) package includes all optional dependencies so you
+can do everything, including serve models, benchmark endpoints, and program
+with Mojo.
 
-<Tabs groupId="install">
-  <TabItem value="pixi" label="conda/pixi">
+If you're concerned about bloat in your dependencies, you can chose a
+smaller package that includes only what you need. For example, if you only need
+to benchmark an endpoint, you can install just `max[benchmark]`.
 
-    The `modular` Conda package installs the following:
+```mermaid
+---
+config:
+  layout: elk
+  themeVariables:
+    fontFamily: Roboto Mono, PT Mono, Courier New, Courier, monospace
+  elk:
+    nodePlacementStrategy: LINEAR_SEGMENTS
+---
+graph TD
+		ALL["max[all]"]
+		SERVE["max[serve]"]
+		BENCH["max[benchmark]"]
+		MAX[max]
+		MOJO[mojo]
+		MOJO_COMPILER[mojo-compiler]
+		BENCH_DEPS["other benchmark deps"]
+		SERVE_DEPS["other serve deps"]
+    MAX_DEPS["other MAX deps"]
 
-    - MAX tools and libraries:
-      - [`max` CLI](/max/cli/)
-      - [`max` Python library](/max/api/python/)
-      - [`max` Mojo library](/max/api/kernels/comm/)
-      - [MAX Engine C API](/max/api/c/)
-    - The `mojo` package:
-      - [`mojo` CLI](https://mojolang.org/docs/cli/) (includes the Mojo compiler)
-      - [Mojo standard library](https://mojolang.org/docs/std/)
-      - Mojo language server (LSP) for IDE/editor integration
-      - [Mojo debugger](https://mojolang.org/docs/tools/debugging/) (includes LLDB)
-      - [Mojo code formatter](https://mojolang.org/docs/cli/format/)
-      - [Mojo REPL](https://mojolang.org/docs/cli/repl/)
+		ALL --> BENCH
+		ALL --> SERVE
+    ALL --> MOJO
+		SERVE --> MAX
+    SERVE --> SERVE_DEPS
+    BENCH --> MAX
+		BENCH --> BENCH_DEPS
+    MAX --> MAX_DEPS
+		MAX --> MOJO_COMPILER
+		MOJO --> MOJO_COMPILER
+```
 
-    `pixi` known issues:
+### `max[all]`
 
-    - You might encounter issues if you invoke `pixi` within a `conda` virtual
-    environment. It's best if you don't mix the two tools.
+- pip/uv: `max[all]`
+- conda/pixi: `max-all`
 
-  </TabItem>
-  <TabItem value="pip" label="pip/uv">
+This is the "all extras" package. It includes everything MAX has to offer.
 
-    The `modular` Python wheel installs the following:
+It's just a convenient way to get all these packages at once:
 
-    - MAX tools and libraries:
-      - [`max` CLI](/max/cli/)
-      - [`max` Python library](/max/api/python/)
-      - [`max` Mojo library](/max/api/kernels/comm/)
-    - The `mojo` package:
-      - [`mojo` CLI](https://mojolang.org/docs/cli/) (includes the Mojo compiler)
-      - [Mojo standard library](https://mojolang.org/docs/std/)
-      - Mojo language server (LSP) for IDE/editor integration
-      - [Mojo debugger](https://mojolang.org/docs/tools/debugging/) (includes LLDB)
-      - [Mojo code formatter](https://mojolang.org/docs/cli/format/)
-      - [Mojo REPL](https://mojolang.org/docs/cli/repl/)
+- `max[benchmark]`
+- `max[serve]`
+- `mojo`
 
-  </TabItem>
-</Tabs>
+### `max[benchmark]`
 
-:::note Note
+- pip/uv: `max[benchmark]`
+- conda/pixi: `max-benchmark`
 
-For information about the `mojo` package, see the [Mojo install
-guide](https://mojolang.org/docs/manual/install/).
+This is required to use the [`max benchmark`](/cli/benchmark/) command.
 
-:::
+It depends on `max` and other third-party packages.
+
+### `max[serve]`
+
+- pip/uv: `max[serve]`
+- conda/pixi: `max-serve`
+
+This is required to create an endpoint with the [`max serve`](/cli/serve/)
+command.
+
+It depends on `max` and other third-party packages.
+
+### `max`
+
+This is the main package you need to do anything with MAX. It includes:
+
+- [`max` CLI](/cli/): Mostly used to create and benchmark endpoints, but the
+  `serve` and `benchmark` commands require `max[serve]` and `max[benchmark]`,
+  respectively.
+- [MAX Python library](/api/python/): Used to build models.
+- [MAX accelerator library](/api/mojo/): Used to accelerate inference with GPUs.
+- [MAX Engine C API](/api/c/): Used to run inference without an endpoint.
+
+`max` depends on `mojo-compiler` and minimal third-party packages.
+
+If you want all Mojo developer tools, you must install the larger `mojo`
+package, which is included in the `max[all]` package. To see what's in the
+`mojo` and `mojo-compiler` packages, see
+[what's include in the Mojo SDK](https://mojolang.org/docs/faq/#whats-included-in-the-mojo-sdk).
+
+Technically, there are other packages you'll see in your dependency tree
+(such as `max-core`) but they're implementation detail and you should generally
+ignore them—don't set them as explicit dependencies in your project because
+they won't work on their own.
 
 ## System requirements
 
-To install `modular`, your system must meet these specifications.
+Your system must meet these specifications.
 
 <Tabs groupId="os">
 <TabItem value="mac" label="Mac">
@@ -216,7 +177,7 @@ To install `modular`, your system must meet these specifications.
 
   :::note Officially supported distribution
 
-  Modular tests MAX on Ubuntu 22.04 LTS or later. Other Linux distributions
+  We test MAX on Ubuntu 22.04 LTS or later. Other Linux distributions
   that meet the glibc 2.34+ requirement are expected to work but aren't
   continuously tested.
 
@@ -239,7 +200,7 @@ To install `modular`, your system must meet these specifications.
 - 8 GiB RAM minimum for Mojo development. MAX inference and model serving
   require significantly more memory, with the exact amount varying by model.
   For the catalog of supported models, see the
-  [supported models](/max/models/) page; for a specific model, check its
+  [supported models](/models/) page; for a specific model, check its
   Hugging Face page for memory details.
 - Python 3.10–3.14.
 - A C compiler (such as `cc`, `gcc`, or `clang`)—used as a linker.
@@ -281,14 +242,6 @@ with Mojo, the following GPUs are compatible.
       <td>Blackwell</td>
     </tr>
     <tr>
-      <td>H100</td>
-      <td>Hopper</td>
-    </tr>
-    <tr>
-      <td>H200</td>
-      <td>Hopper</td>
-    </tr>
-    <tr>
       <td colSpan="2"><strong>Known compatible for development</strong></td>
     </tr>
     <tr>
@@ -302,6 +255,14 @@ with Mojo, the following GPUs are compatible.
     <tr>
       <td>DGX Spark</td>
       <td>Blackwell</td>
+    </tr>
+    <tr>
+      <td>H200</td>
+      <td>Hopper</td>
+    </tr>
+    <tr>
+      <td>H100</td>
+      <td>Hopper</td>
     </tr>
     <tr>
       <td>L4</td>
@@ -442,9 +403,26 @@ later). For installation, see the
 
 #### Apple silicon GPUs
 
-Apple silicon GPU support (M1–M5) is functional for GPU programming with Mojo.
-Large GenAI model inference via MAX isn't yet available on Apple silicon. For
-details, see the
+We're actively developing Apple silicon GPU support (M1–M5), both for GPU
+programming with Mojo and for model inference with MAX.
+
+MAX supports a subset of models on Apple silicon today. We've manually run
+the [Llama](/api/python/pipelines.architectures.llama3/),
+[Gemma](/api/python/pipelines.architectures.gemma3/),
+[Nemotron](/api/python/pipelines.architectures.nemotron_h/), and
+[FLUX.2](/api/python/pipelines.architectures.flux2/) families, and while Apple
+silicon isn't yet covered by the same nightly CI as the GPUs listed above,
+support continues to mature.
+
+Quantization moves the memory ceiling significantly; for example, FLUX.2 dev
+needs over 120 GB at BF16 and roughly 80 GB at FP4. The FP4 kernels target M5,
+and support for other generations is ongoing.
+
+Architectures we haven't exercised on Metal may depend on kernels that don't
+exist yet. When that happens, the model fails during graph compilation rather
+than at inference time.
+
+For hardware tables and Metal troubleshooting, see
 [Mojo system requirements](https://mojolang.org/docs/requirements/#apple-silicon-gpus).
 
 :::note Notes
@@ -454,8 +432,12 @@ each AI model has different memory requirements. Even if your GPU architecture
 is listed as compatible, confirm that the available memory is sufficient for the
 model you're using.
 
+- On systems where the GPU shares system RAM (Apple silicon and integrated
+GPUs like those in DGX Spark and Strix Halo), a model's weights and activations
+have to fit in memory alongside everything else the system is running.
+
 - MAX can serve models on either CPU or GPU, but some models require one or
-more GPUs. When you browse our [supported models](/max/models/), you can check
+more GPUs. When you browse our [supported models](/models/), you can check
 for multi-GPU support.
 
 - For comprehensive GPU hardware tables, arch targets, and troubleshooting, see
@@ -463,6 +445,7 @@ the
 [Mojo system requirements](https://mojolang.org/docs/requirements/#gpu-compatibility)
 page.
 
-- To deploy MAX in containers, see the [deployment guide](/max/deploy/cloud/).
+- To deploy MAX in containers, see the [deployment
+guide](/serve/local-to-cloud/).
 
 :::

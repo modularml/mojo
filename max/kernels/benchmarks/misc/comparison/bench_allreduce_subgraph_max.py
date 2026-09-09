@@ -223,7 +223,7 @@ def main() -> None:
     )
 
     name = "bench_allreduce_subgraph_max"
-    met_sec, bytes = result if result else [0, 0]
+    met_sec, bytes = result or [0, 0]
     bytes = args.num_bytes
     bytes_per_sec = ThroughputMeasure(Bench.bytes, bytes)
 

@@ -70,7 +70,6 @@ class RecorderMiddleware:
         If include_responses is True, responses are recorded as well.
         Otherwise, only the request will be recorded.
         """
-        ...
 
     @overload
     def __init__(
@@ -91,7 +90,6 @@ class RecorderMiddleware:
         If include_responses is True, responses are recorded as well.
         Otherwise, only the request will be recorded.
         """
-        ...
 
     def __init__(
         self,

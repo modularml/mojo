@@ -12,26 +12,36 @@
 # ===----------------------------------------------------------------------=== #
 """Handles DType promotion for TensorValues.
 
-DType promotion in the graph api is used to decide the DType of the output of an operations with multiple inputs.
-Not all operations have DType promotion, but most binary and mathematical ops have promotion.
+DType promotion decides the output DType of an operation that has multiple
+inputs with differing DTypes. Not all operations promote, but most binary and
+mathematical ops do.
 
-DType promotion will always return one of the input dtypes.
-This avoids accidentally over promoting and harming performance.
+Promotion always returns one of the input DTypes; it never widens to a new
+DType. This avoids accidentally over-promoting and harming performance.
 
-The target DType for promoting a value `x` and `y` is:
-    `(max(category(x), category(y)), max(bitwidth(x), bitwidth(y))`
+To choose a common DType for two values, each input DType is ranked along two
+axes:
 
-Where category is an ordered hierarchy of: `bool < unsigned int < signed int < float`
+- Category, ordered ``bool < unsigned int < signed int < float``.
+- Bit width (for example, 8, 16, 32, or 64 bits).
 
-If all input dtypes can be fully represented by the target dtype, the promotion is successful.
-If an input can not be guaranteed representable (for example, ``uint8`` -> `int8`), an error is raised.
+The common DType is the input DType with the highest category and the largest
+bit width. If an input can't be safely represented in the chosen DType, an
+error is raised instead of widening to a different DType. For example,
+``uint8`` and ``int8`` promote toward ``int8`` (signed outranks unsigned at
+the same bit width), but ``int8`` can't represent the largest ``uint8``
+values, so promotion fails.
 
-DType promotion of a max object and a non-max object will only ever promote to the max object DType.
-An error will be raised if the values in the non-max object are not precisely representable in the max object DType.
-This means that `16777217` will raise an error if converted to float32 (where it would be represented as 16777216.0).
-To convert a value while allowing for minor precision loss, `ops.constant` can be used.
+A weak DType is the implicit DType of a non-max object, such as a Python
+``int`` or ``float`` or a NumPy array. When a max object and a non-max object
+are promoted together, the result always takes the max object's DType, and the
+non-max object is scanned to confirm its values are exactly representable in
+that DType. For example, ``16777217`` raises an error when promoted to
+``float32``, since it would round to ``16777216.0``. To convert a value while
+allowing minor precision loss, use ``ops.constant``.
 
-If only non-max objects attempt promotion, it will always fail.
+Promotion fails if every input is a non-max object, because there is no max
+object DType to promote toward.
 """
 
 import numpy as np
@@ -187,6 +197,8 @@ _DTYPE_MIN_AND_MAX_FULL_PRECISION = {
     DType.uint32: (0, 2**32 - 1),
     DType.uint64: (0, 2**64 - 1),
     DType.float4_e2m1fn: (-(1.5 * 2**2), (1.5 * 2**2)),
+    DType.float6_e2m3fn: (-(1.875 * 2**2), 1.875 * 2**2),
+    DType.float6_e3m2fn: (-(1.75 * 2**4), 1.75 * 2**4),
     DType.float8_e8m0fnu: (2**-127, 2**127),
     DType.float8_e5m2: (-(1.10 * 2**16), 1.10 * 2**16),
     DType.float8_e5m2fnuz: (-(1.75 * 2**15), 1.75 * 2**15),

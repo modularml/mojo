@@ -1,0 +1,37 @@
+[
+  {
+    "id": "gpqa_12",
+    "prompt_index": 12,
+    "gold": "D",
+    "user_prompt": "Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D' (e.g. 'Answer: A'). \n\nA methanol solution of (R)-(+)-Limonene is stirred with Pd/C under a Hydrogen atmosphere. After 1 equivalent of hydrogen is consumed, product 1 is isolated as the major product.\n\n1 is treated with 3-chloroperbenzoic acid, forming product 2.\n\nProduct 2 is treated with sodium methoxide, forming product 3.\n\nProduct 3 is treated with propanoic acid, dicyclohexylcarbodiimide. and a catalytic amount of  4-dimethylaminopyridine, forming product 4.\n\nwhat is a valid structure of product 4? (product 4 exists as a mixture of isomers. the correct answer is one of them).\nA. (1S,2R,4R)-4-isopropyl-2-methoxy-1-methylcyclohexyl propionate\nB. (1S,2S,4R)-4-isopropyl-2-methoxy-1-methylcyclohexyl propionate\nC. 1-methoxy-2-((S)-4-methylcyclohex-3-en-1-yl)propan-2-yl propionate\nD. (1S,2S,5R)-5-isopropyl-2-methoxy-2-methylcyclohexyl propionate",
+    "expected_clean_tokens": 40000
+  },
+  {
+    "id": "gpqa_71",
+    "prompt_index": 71,
+    "gold": "B",
+    "user_prompt": "Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D' (e.g. 'Answer: A'). \n\n7-(tert-butoxy)bicyclo[2.2.1]hepta-2,5-diene is combined with 2 equivalents of 5,6-bis(dibromomethyl)cyclohexa-1,3-diene and sodium iodide at elevated temperature, forming product 1.\n\n1 is treated with aqueous sulfuric acid, forming 2\n\n2 is treated with SO3 and pyridine in DMSO, forming 3.\n\n3 is heated at 150C, forming final product 4. how many chemically distinct hydrogen atoms are there on 4?\nA. 4\nB. 10\nC. 7\nD. 8",
+    "expected_clean_tokens": 45000
+  },
+  {
+    "id": "gpqa_118",
+    "prompt_index": 118,
+    "gold": "C",
+    "user_prompt": "Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D' (e.g. 'Answer: A'). \n\nIdentify product D in the following series of reactions.\n5-bromo-3a,4a-dimethyldecahydrocyclopenta[1,4]cyclobuta[1,2]benzene + H2O ---> A\nA + PDC ---> B\nB + H2CPPh3 ---> C\nC + TsOH ---> D\nA. 3a,5,5-trimethyl-1,2,3,3a,5,6,7,8-octahydrocyclopenta[1,4]cyclobuta[1,2]benzene\nB. 3a,4a,5,5-tetramethyl-2,3,3a,4,4a,5-hexahydro-1H-cyclobuta[1,2:1,4]di[5]annulene\nC. 3a,5-dimethyldecahydrocyclopenta[1,4]cyclobuta[1,2]benzene\nD. 3a,4,5a-trimethyl-1,2,3,3a,5a,6,7,8-octahydrocyclopenta[c]pentalene",
+    "expected_clean_tokens": 20000
+  },
+  {
+    "id": "gpqa_145",
+    "prompt_index": 145,
+    "gold": "B",
+    "user_prompt": "Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D' (e.g. 'Answer: A'). \n\n5-fluorocyclopenta-1,3-diene is reacted with maleic anhydride. What is the major product?\nA. (3aR,4S,7R,7aS,8r)-8-fluoro-3a,4,7,7a-tetrahydro-4,7-methanoisobenzofuran-1,3-dione\nB. (3aR,4R,7S,7aS,8r)-8-fluoro-3a,4,7,7a-tetrahydro-4,7-methanoisobenzofuran-1,3-dione\nC. (3aR,4S,7R,7aS,8s)-8-fluoro-3a,4,7,7a-tetrahydro-4,7-methanoisobenzofuran-1,3-dione\nD. (3aR,4R,7S,7aS,8s)-8-fluoro-3a,4,7,7a-tetrahydro-4,7-methanoisobenzofuran-1,3-dione",
+    "expected_clean_tokens": 50000
+  },
+  {
+    "id": "gpqa_147",
+    "prompt_index": 147,
+    "gold": "B",
+    "user_prompt": "Answer the following multiple choice question. The last line of your response should be in the following format: 'Answer: A/B/C/D' (e.g. 'Answer: A'). \n\nFive binary compounds of fluorine with element Y are known. The bright-red substance A1 decomposes at 293 K into A2 (\u0277F=31,96%) and fluorine. A1 oxidizes xenon under normal conditions. A3 can also interact with xenon. A3 is obtained by fluorination of element Y with fluorine. By adding Y in a 1:1 molar ratio to a hot colorless concentrated solution of A4, A5 can be obtained. In water, A5 decomposes with the formation of two substances. Indicate the range in which the molecular weight of the substance A4 falls.\nA. 110-130\nB. 220-240\nC. 160-180\nD. 140-160",
+    "expected_clean_tokens": 27000
+  }
+]

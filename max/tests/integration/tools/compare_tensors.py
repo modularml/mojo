@@ -235,7 +235,7 @@ def find_matching_tensors(
     max_tensors = {f.stem: f for f in max_dir.rglob("*.max")}
 
     matching_pairs: list[tuple[Path, Path]] = []
-    for name in torch_tensors:
+    for name in torch_tensors:  # noqa: PLC0206
         if name in max_tensors:
             matching_pairs.append((torch_tensors[name], max_tensors[name]))
 

@@ -1,0 +1,32 @@
+load("//bazel:api.bzl", "lit_tests")
+
+package(default_visibility = ["//visibility:private"])
+
+lit_tests(
+    name = "test",
+    size = "large",
+    srcs = glob([
+        "*.lldb",
+        "*.mojo",
+    ]) + glob(
+        ["internal/*.lldb"],
+        # `internal/` is excluded via .bazelignore in the open source build.
+        allow_empty = True,
+    ),
+    custom_substitutions = {
+        # Mirrored from lit.cfg.py to avoid searching $PATH for 'mojo'
+        "%debug": "$(rlocationpath //Mojo/tools/mojo) debug -X -x -X --source-quietly -X -S -X $(rlocationpath //Mojo/unittests:lit-lldb-init.in)",
+    },
+    data = glob(["Inputs/*.mojo"]) + [
+        "//Mojo:MojoLLDB",
+        "//Mojo:gdb-server",
+        "//Mojo:mojo-lldb",
+        "//Mojo/unittests:lit-lldb-init.in",
+    ],
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    tools = [
+        "//Mojo/tools/mojo",
+    ],
+)

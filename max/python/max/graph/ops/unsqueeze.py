@@ -17,21 +17,43 @@ from .reshape import reshape
 
 
 def unsqueeze(x: TensorValueLike, axis: int) -> TensorValue:
-    """Inserts a size-1 dimension into a symbolic tensor.
+    """Inserts a dimension of size ``1`` into a symbolic tensor.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("unsqueeze") as graph:
+            # x has shape (3,).
+            x = ops.constant(
+                [1.0, 2.0, 3.0],
+                DType.float32,
+                device=device,
+            )
+            # Insert a size-1 dimension at axis 0, producing shape (1, 3).
+            graph.output(ops.unsqueeze(x, axis=0))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
         x: The input symbolic tensor to unsqueeze.
         axis: The index at which to insert a new dimension into the input's
-            shape. Elements at that index or higher are shifted back.
-            If negative, it indexes relative *1 plus* the rank of the tensor.
-            For example, :code:`unsqueeze(v, -1)` adds a new dimension at the
-            end, and :code:`unsqueeze(v, -2)` inserts the dimension immediately
-            before the last dimension.
+            shape. Elements at that index or higher are shifted back. If
+            negative, it indexes relative to ``1`` plus the rank of the tensor.
+            For example, a value of ``-1`` adds a new dimension at the end, and
+            ``-2`` inserts the dimension immediately before the last dimension.
 
     Returns:
-        A symbolic tensor with the same number of elements as the input tensor,
-        whose rank is 1 larger than the rank of the input tensor. The result's
-        shape at the :code:`axis` dimension is a static dimension of size 1.
+        A ``TensorValue`` representing ``x`` with a new dimension inserted at
+        ``axis``. That dimension has a size of ``1``, so the result holds the
+        same elements as ``x`` with one more dimension.
+
+    Raises:
+        ValueError: If ``axis`` is out of bounds.
     """
     x = TensorValue(x)
     rank = x.rank

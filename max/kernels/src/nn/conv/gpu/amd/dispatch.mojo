@@ -16,8 +16,8 @@ Returns True when the input/filter/output shapes + runtime stride / pad
 / dilation are handled by the 4-wave conv kernel; False to fall back to
 the caller's MIOpen path. Acceptance rules:
 
-  - Hardware: MI355X (gfx950) only — the 4-wave kernel inherits the
-    chiplet/L2 swizzle and MFMA shapes specific to CDNA4.
+  - Hardware: MI355X (gfx950) only (the 4-wave kernel inherits the
+    chiplet/L2 swizzle and MFMA shapes specific to CDNA4).
   - Input dtype: float8_e4m3fn, bfloat16, or float16. Output dtype:
     bfloat16 for FP8, otherwise tracks input.
   - All input / filter / output spatial shapes must be **static**
@@ -40,8 +40,8 @@ Mirrors the structure of `nn.conv.gpu.amd.rdna.dispatch` and
 `nn.conv.gpu.nvidia.sm100.dispatch`.
 """
 
-from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from max.gpu import global_idx
+from max.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.sys import simd_width_of
 from std.sys.info import _accelerator_arch
@@ -65,32 +65,37 @@ def _transpose_rscf_to_frsc_kpad[
 ](
     src_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     dst_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    R: Int,
-    S: Int,
-    C: Int,
-    F: Int,
-    K_padded: Int,
+    R: Int32,
+    S: Int32,
+    C: Int32,
+    F: Int32,
+    K_padded: Int32,
 ):
     """GPU kernel: filter RSCF `[R*S*C, F]` -> FRSC `[F, K_padded]`.
 
     `K_padded >= R*S*C`; padded trailing columns are zero-filled.
     """
-    var K_real = R * S * C
-    var total = F * K_padded
+    var _R = Int(R)
+    var _S = Int(S)
+    var _C = Int(C)
+    var _F = Int(F)
+    var _K_padded = Int(K_padded)
+    var K_real = _R * _S * _C
+    var total = _F * _K_padded
     var tid = global_idx.x
     if tid >= total:
         return
-    var f = tid // K_padded
-    var k = tid - f * K_padded
+    var f = tid // _K_padded
+    var k = tid - f * _K_padded
     if k >= K_real:
         dst_ptr.store(tid, Scalar[dtype](0))
         return
-    var r = k // (S * C)
-    var sc = k - r * (S * C)
-    var s = sc // C
-    var c = sc - s * C
-    # RSCF source index: ((r * S + s) * C + c) * F + f.
-    var rscf_idx = ((r * S + s) * C + c) * F + f
+    var r = k // (_S * _C)
+    var sc = k - r * (_S * _C)
+    var s = sc // _C
+    var c = sc - s * _C
+    # RSCF source index: ((r * _S + s) * _C + c) * _F + f.
+    var rscf_idx = ((r * _S + s) * _C + c) * _F + f
     dst_ptr.store(tid, src_ptr.load(rscf_idx))
 
 
@@ -100,32 +105,37 @@ def _transpose_fcrs_to_frsc_kpad[
 ](
     src_ptr: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     dst_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    F: Int,
-    C: Int,
-    R: Int,
-    S: Int,
-    K_padded: Int,
+    F: Int32,
+    C: Int32,
+    R: Int32,
+    S: Int32,
+    K_padded: Int32,
 ):
     """GPU kernel: filter FCRS `[F, C, R, S]` -> FRSC `[F, K_padded]`.
 
     `K_padded >= R*S*C`; padded trailing columns are zero-filled.
     """
-    var K_real = R * S * C
-    var total = F * K_padded
+    var _F = Int(F)
+    var _C = Int(C)
+    var _R = Int(R)
+    var _S = Int(S)
+    var _K_padded = Int(K_padded)
+    var K_real = _R * _S * _C
+    var total = _F * _K_padded
     var tid = global_idx.x
     if tid >= total:
         return
-    var f = tid // K_padded
-    var k = tid - f * K_padded
+    var f = tid // _K_padded
+    var k = tid - f * _K_padded
     if k >= K_real:
         dst_ptr.store(tid, Scalar[dtype](0))
         return
-    var r = k // (S * C)
-    var sc = k - r * (S * C)
-    var s = sc // C
-    var c = sc - s * C
-    # FCRS source index: f*C*R*S + c*R*S + r*S + s.
-    var fcrs_idx = f * C * R * S + c * R * S + r * S + s
+    var r = k // (_S * _C)
+    var sc = k - r * (_S * _C)
+    var s = sc // _C
+    var c = sc - s * _C
+    # FCRS source index: f*_C*_R*_S + c*_R*_S + r*_S + s.
+    var fcrs_idx = f * _C * _R * _S + c * _R * _S + r * _S + s
     dst_ptr.store(tid, src_ptr.load(fcrs_idx))
 
 
@@ -173,7 +183,7 @@ def _launch_amd_4wave_conv2d_runtime[
     row stride is `C_out` (NHWC contiguous).
     """
 
-    @parameter
+    @__parameter
     @always_inline
     def _launch[stride_v: Int, pad_v: Int]() raises:
         var _rt_N = Int(input.dim[0]())
@@ -187,7 +197,7 @@ def _launch_amd_4wave_conv2d_runtime[
         # Dynamic 2D `[M_total, C_out]` output view.
         var _output_dims = IndexList[2](_rt_M_total, C_out)
         var _dyn_out_layout = row_major(Coord(_output_dims))
-        var output_2d_tt = TileTensor(output.ptr, _dyn_out_layout)
+        var output_2d_tt = output.reshape(_dyn_out_layout)
         amd_4wave_conv[
             elementwise_lambda_fn=elementwise_lambda_fn,
             R=R,
@@ -268,8 +278,43 @@ def dispatch_amd_4wave_conv2d[
     path (`amd_4wave_conv[has_residual=True]`). The source pointer is
     expected to point to an NHWC-contiguous buffer with the same shape
     as `output`. When `has_residual=False` (default), the call is
-    identical to the no-residual variant — no extra ABI overhead beyond
+    identical to the no-residual variant: no extra ABI overhead beyond
     the launch packet's 16 bytes (DCE'd source_ptr / stride / beta).
+
+    Parameters:
+        input_type: `DType` of the input activation tensor; must be
+            `float8_e4m3fn`, `bfloat16`, or `float16`.
+        filter_type: `DType` of the filter tensor; must equal
+            `input_type`.
+        output_type: `DType` of the output tensor; `bfloat16` for FP8
+            inputs, otherwise tracks `input_type`.
+        filter_is_fcrs: `True` when `filter` is in FCRS layout; `False`
+            for RSCF. Selects the transpose path and the R/S dim indices.
+        has_residual: `True` to fuse `D = Conv + beta * source` in-kernel
+            via `source_ptr` (defaults to `False`).
+        elementwise_lambda_fn: Optional fused 2D-coord epilogue lambda
+            wrapping a 4D NHWC `elementwise_simd_epilogue_type`; `None`
+            fuses no epilogue (defaults to `None`).
+
+    Args:
+        input: Input activation `TileTensor`, rank-4 NHWC with static
+            `C_in`; `N`, `H`, `W` may be dynamic.
+        filter: Filter `TileTensor`, rank-4 FCRS or RSCF per
+            `filter_is_fcrs`, with static `R`, `S`, `C_in`, `C_out`.
+        output: Output activation `TileTensor`, rank-4 NHWC, mutable,
+            with static `C_out`.
+        stride: Convolution stride `[stride_h, stride_w]`; must be
+            `(1, 1)` or `(2, 2)` with `stride_h == stride_w`.
+        dilation: Dilation `[dh, dw]`; must be `(1, 1)`.
+        symmetric_padding: Symmetric padding `[ph, pw]`; must be
+            `(0, 0)`, `(1, 1)`, or `(2, 2)` with `ph == pw`.
+        num_groups: Number of convolution groups; must be `1`.
+        ctx: `DeviceContext` for kernel launches and buffer allocation.
+        source_ptr: Optional pointer to an NHWC-contiguous residual
+            source buffer with the same shape as `output`; read only
+            when `has_residual=True` (defaults to `None`).
+        beta: Scale factor for the residual term in
+            `D = Conv + beta * source` (defaults to `0.0`).
     """
     comptime assert input.flat_rank == 4, "input must be rank 4 (NHWC)"
     comptime assert filter.flat_rank == 4, "filter must be rank 4"
@@ -366,11 +411,11 @@ def dispatch_amd_4wave_conv2d[
             ctx.enqueue_function[_transpose_fcrs_to_frsc_kpad[filter_type]](
                 filter.ptr,
                 filter_frsc_ptr,
-                _C_out,
-                _C_in,
-                _R,
-                _S,
-                _K_padded,
+                Int32(_C_out),
+                Int32(_C_in),
+                Int32(_R),
+                Int32(_S),
+                Int32(_K_padded),
                 grid_dim=transpose_grid,
                 block_dim=_transpose_block,
             )
@@ -378,11 +423,11 @@ def dispatch_amd_4wave_conv2d[
             ctx.enqueue_function[_transpose_rscf_to_frsc_kpad[filter_type]](
                 filter.ptr,
                 filter_frsc_ptr,
-                _R,
-                _S,
-                _C_in,
-                _C_out,
-                _K_padded,
+                Int32(_R),
+                Int32(_S),
+                Int32(_C_in),
+                Int32(_C_out),
+                Int32(_K_padded),
                 grid_dim=transpose_grid,
                 block_dim=_transpose_block,
             )
@@ -400,7 +445,7 @@ def dispatch_amd_4wave_conv2d[
             Scalar[output_type], ImmutAnyOrigin
         ].unsafe_dangling()
 
-        @parameter
+        @__parameter
         @always_inline
         def _src_immut() -> UnsafePointer[Scalar[output_type], ImmutAnyOrigin]:
             comptime if has_residual:
@@ -418,7 +463,7 @@ def dispatch_amd_4wave_conv2d[
         # -------- Static vs runtime-HW dispatch --------------------
         comptime if _all_hw_static:
 
-            @parameter
+            @__parameter
             @always_inline
             def _launch_static[stride_v: Int, pad_v: Int]() raises -> Bool:
                 comptime _eff_R = _R
@@ -448,8 +493,8 @@ def dispatch_amd_4wave_conv2d[
                     _N_static, _H_static, _W_static, _C_in
                 ]()
                 comptime _output_2d_layout = row_major[_M_total_v, _C_out]()
-                var input_nhwc_tt = TileTensor(input.ptr, _nhwc_in_layout)
-                var output_2d_tt = TileTensor(output.ptr, _output_2d_layout)
+                var input_nhwc_tt = input.reshape(_nhwc_in_layout)
+                var output_2d_tt = output.reshape(_output_2d_layout)
                 amd_4wave_conv[
                     elementwise_lambda_fn=elementwise_lambda_fn,
                     H=_H_static,

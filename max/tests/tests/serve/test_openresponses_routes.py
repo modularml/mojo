@@ -12,7 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 """Tests for OpenResponses API routes."""
 
+import io
 import logging
+import wave
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,16 +26,20 @@ import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from max.pipelines.lib import PIPELINE_REGISTRY, PipelineConfig
-from max.pipelines.modeling.types import (
+from max.pipelines.context import (
     BaseContext,
     GenerationStatus,
+)
+from max.pipelines.context.exceptions import PromptTooLongError
+from max.pipelines.context.outputs import GenerationOutput
+from max.pipelines.lib import PIPELINE_REGISTRY, PipelineConfig
+from max.pipelines.modeling.types import (
     PipelineTokenizer,
     RequestID,
 )
-from max.pipelines.modeling.types.generation import GenerationOutput
 from max.pipelines.request import OpenResponsesRequest
 from max.pipelines.request.open_responses import (
+    OutputAudioContent,
     OutputImageContent,
     OutputVideoContent,
 )
@@ -52,9 +58,9 @@ class MockOpenResponsesTokenizer(
     """Mock tokenizer for OpenResponses requests."""
 
     @property
-    def eos(self) -> int:
-        """Return a dummy EOS token ID."""
-        return 0
+    def eos_token_ids(self) -> set[int]:
+        """Mock tokenizer has no EOS tokens."""
+        return set()
 
     @property
     def expects_content_wrapping(self) -> bool:
@@ -327,3 +333,167 @@ def test_openresponses_video_request_returns_inline_base64_when_requested(
         assert content["num_frames"] == 2
         assert content["video_data"]
         assert "video_url" not in content
+
+
+class MockAudioPipelineHandler(GeneralPipelineHandler):
+    """Mock implementation that yields a raw waveform, as an audio model does."""
+
+    SAMPLE_RATE = 44100
+    FRAMES = 256
+
+    def __init__(self) -> None:
+        self.model_name = "test-model"
+        self.logger = Mock()
+        self.debug_logging = False
+
+    async def next(
+        self, request: OpenResponsesRequest
+    ) -> AsyncGenerator[GenerationOutput, None]:
+        ramp = np.linspace(-1.0, 1.0, self.FRAMES, dtype=np.float32)
+        yield GenerationOutput(
+            request_id=request.request_id,
+            final_status=GenerationStatus.END_OF_SEQUENCE,
+            output=[
+                OutputAudioContent.from_numpy_samples(
+                    np.stack([ramp, -ramp]),
+                    sample_rate=self.SAMPLE_RATE,
+                    format="wav",
+                )
+            ],
+        )
+
+
+def test_openresponses_audio_request_returns_download_url(
+    app: FastAPI,
+) -> None:
+    """Audio requests should return a downloadable WAV URL, not raw samples."""
+    app.state.handler = MockAudioPipelineHandler()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/responses",
+            json={
+                "model": "test-model",
+                "input": "a slow jazz ballad, upright bass",
+                "provider_options": {"audio": {"lyrics": "[verse] hello"}},
+            },
+        )
+
+        assert response.status_code == 200
+        content = response.json()["output"][0]["content"][0]
+        assert content["type"] == "output_audio"
+        assert content["format"] == "wav"
+        assert content["sample_rate"] == MockAudioPipelineHandler.SAMPLE_RATE
+        assert content["num_samples"] == MockAudioPipelineHandler.FRAMES
+        assert "samples" not in content
+
+        audio_path = urlparse(content["audio_url"]).path
+        audio_response = client.get(audio_path)
+        assert audio_response.status_code == 200
+        assert audio_response.headers["content-type"] == "audio/wav"
+        with wave.open(io.BytesIO(audio_response.content), "rb") as container:
+            assert container.getnchannels() == 2
+            assert container.getframerate() == (
+                MockAudioPipelineHandler.SAMPLE_RATE
+            )
+            assert container.getnframes() == MockAudioPipelineHandler.FRAMES
+
+
+class CountingAudioPipelineHandler(MockAudioPipelineHandler):
+    """Records whether the model was ever asked to render."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.renders = 0
+
+    async def next(
+        self, request: OpenResponsesRequest
+    ) -> AsyncGenerator[GenerationOutput, None]:
+        self.renders += 1
+        async for output in super().next(request):
+            yield output
+
+
+def test_openresponses_audio_request_rejects_an_unwritable_format(
+    app: FastAPI,
+) -> None:
+    """An unsupported container is refused before anything is generated.
+
+    Only WAV can be written, and the waveform is persisted after the model
+    has run, so leaving this to the media store would spend a full render and
+    then report a server error for what was a bad request.
+    """
+    handler = CountingAudioPipelineHandler()
+    app.state.handler = handler
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/responses",
+            json={
+                "model": "test-model",
+                "input": "a slow jazz ballad, upright bass",
+                "provider_options": {"audio": {"audio_format": "mp3"}},
+            },
+        )
+
+    assert response.status_code == 422
+    assert "audio_format" in response.text
+    assert handler.renders == 0
+
+
+def test_openresponses_audio_request_accepts_wav_in_any_case(
+    app: FastAPI,
+) -> None:
+    app.state.handler = MockAudioPipelineHandler()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/responses",
+            json={
+                "model": "test-model",
+                "input": "a slow jazz ballad, upright bass",
+                "provider_options": {"audio": {"audio_format": "WAV"}},
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["output"][0]["content"][0]["format"] == "wav"
+
+
+class _PromptTooLongPipelineHandler(GeneralPipelineHandler):
+    """Mock handler whose generator raises ``PromptTooLongError`` on first
+    iteration — simulating a tokenizer that rejected an over-length prompt."""
+
+    def __init__(self) -> None:
+        self.model_name = "test-model"
+        self.logger = Mock()
+        self.debug_logging = False
+
+    async def next(
+        self, request: OpenResponsesRequest
+    ) -> AsyncGenerator[GenerationOutput, None]:
+        raise PromptTooLongError(
+            num_tokens=4033,
+            max_length=512,
+            limit_description="text encoder's maximum sequence length",
+        )
+        yield  # pragma: no cover -- unreachable, marks this as a generator
+
+
+def test_openresponses_prompt_too_long_returns_400(app: FastAPI) -> None:
+    """A ``PromptTooLongError`` from the handler must surface as 400 with
+    the exception's message intact, not propagate to a generic 500."""
+    app.state.handler = _PromptTooLongPipelineHandler()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/responses",
+            json={"model": "test-model", "input": "irrelevant"},
+        )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "Prompt is too long" in detail
+    assert "4033 tokens" in detail
+    assert "text encoder's maximum sequence length" in detail
+    assert "512 tokens" in detail

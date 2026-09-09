@@ -10,7 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-
 from max.tests.integration.accuracy.logit_verification.logit_verification_config import (
     LOGIT_VERIFICATION_CONFIG,
 )
@@ -18,14 +17,4 @@ from max.tests.integration.accuracy.logit_verification.logit_verification_config
 
 def test_pre_submit_matrix() -> None:
     matrix = LOGIT_VERIFICATION_CONFIG.pre_submit_matrix
-    assert len(matrix) > 0
-
-
-def test_post_submit_matrix() -> None:
-    matrix = LOGIT_VERIFICATION_CONFIG.post_submit_matrix
-    assert len(matrix) > 0
-
-
-def test_combined_matrix() -> None:
-    matrix = LOGIT_VERIFICATION_CONFIG.combined_matrix
     assert len(matrix) > 0

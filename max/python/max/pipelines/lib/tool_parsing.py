@@ -203,6 +203,7 @@ class StreamingToolCallState:
     id: str = ""
     name: str = ""
     arguments_sent: str = ""
+    opener_sent: bool = False
 
 
 @dataclass
@@ -237,6 +238,17 @@ class StructuralTagToolParser(ABC):
     """
 
     # Marker constants — subclasses override.
+    ENFORCE_TOOL_REGION_TO_EOS: ClassVar[bool] = False
+    """Keep grammar enforcement on after ``SECTION_END``.
+
+    For models whose chat template terminates a tool-call turn immediately
+    after its single section (e.g. MiniMax-M3), leaving enforcement on lets
+    the completed grammar mask everything but EOS, so the turn cannot
+    continue past the section. The default ``False`` keeps the
+    section-bounded region: enforcement flips off at ``SECTION_END`` and
+    the model may emit free text afterwards.
+    """
+
     SECTION_BEGIN: ClassVar[str] = ""
     SECTION_END: ClassVar[str] = ""
     CALL_BEGIN: ClassVar[str] = ""
@@ -249,7 +261,7 @@ class StructuralTagToolParser(ABC):
     @property
     def _start_marker(self) -> str:
         """The marker that opens the tool-call region (section or call)."""
-        return self.SECTION_BEGIN if self.SECTION_BEGIN else self.CALL_BEGIN
+        return self.SECTION_BEGIN or self.CALL_BEGIN
 
     # ----- Public ToolParser protocol -----------------------------------
 
@@ -300,9 +312,11 @@ class StructuralTagToolParser(ABC):
                 cursor = section_end + len(self.SECTION_END)
 
         if not tool_calls:
+            # Do not embed the raw model output -- it may contain PII and is
+            # surfaced to logs. Report only the length for debugging.
             raise ValueError(
                 "Tool calls section found but no valid tool calls parsed "
-                f"from: {response[first_marker_idx:]}"
+                f"(section length: {len(response) - first_marker_idx} chars)"
             )
 
         return ParsedToolResponse(content=content_before, tool_calls=tool_calls)
@@ -318,13 +332,14 @@ class StructuralTagToolParser(ABC):
             - A non-empty list of :class:`ParsedToolCallDelta` when new
               content (tool name, id, or argument bytes) is ready to
               stream.
-            - An empty list ``[]`` once the parser has entered the
-              tool-calls section but has no deltas to emit yet; the
-              caller must suppress the raw structural token from flowing
-              as text.
-            - ``None`` when more tokens are needed before anything can
-              be emitted (for example, buffering a potential
-              section-begin marker).
+            - An empty list ``[]`` when the parser is actively handling
+              this chunk — either inside the tool-calls section or
+              holding back bytes that partially match a section marker.
+              The caller must suppress raw tokens so they don't leak as
+              assistant content.
+            - ``None`` when the chunk is plain text with no marker
+              activity; the caller should pass raw decoded tokens
+              through as assistant content.
         """
         self._buffer += delta
         deltas: list[ParsedToolCallDelta] = []
@@ -353,13 +368,6 @@ class StructuralTagToolParser(ABC):
                     if tool_id and tool_name:
                         tc_state.id = tool_id
                         tc_state.name = tool_name
-                        deltas.append(
-                            ParsedToolCallDelta(
-                                index=i,
-                                id=tool_id,
-                                name=tool_name,
-                            )
-                        )
 
                 if args is not None:
                     args_str = self._format_args_for_streaming(
@@ -368,17 +376,36 @@ class StructuralTagToolParser(ABC):
                     if args_str:
                         args_diff = self._compute_args_diff(i, args_str)
                         if args_diff:
+                            if (
+                                not tc_state.opener_sent
+                                and tc_state.id
+                                and tc_state.name
+                            ):
+                                deltas.append(
+                                    ParsedToolCallDelta(
+                                        index=i,
+                                        id=tc_state.id,
+                                        name=tc_state.name,
+                                    )
+                                )
+                                tc_state.opener_sent = True
                             deltas.append(
                                 ParsedToolCallDelta(
                                     index=i, arguments=args_diff
                                 )
                             )
 
-            # Return [] (not None) while inside the tool-calls section so
-            # the streaming path knows to suppress raw structural tokens
-            # even when there are no deltas to emit yet.
+            # Returning None indicates nothing happening; router passes raw tokens as content.
+            # Return [] to indicate this chunk is actively buffering (e.g. partial marker); suppress raw
+            # tokens so they don't leak as content.
             in_tool_section = marker_pos != -1
-            return deltas if (deltas or in_tool_section) else None
+            has_holdback = (
+                not in_tool_section
+                and len(self._buffer) > self._state.sent_content_idx
+            )
+            return (
+                deltas if (deltas or in_tool_section or has_holdback) else None
+            )
 
         except Exception:
             logger.exception("Error parsing streaming tool call delta")
@@ -388,6 +415,16 @@ class StructuralTagToolParser(ABC):
         """Resets internal state for a new streaming session."""
         self._buffer = ""
         self._state = StreamingState()
+
+    def set_streaming_tool_schemas(
+        self, schemas: Mapping[str, dict[str, Any]]
+    ) -> None:
+        """No-op: these parsers do not need schema-driven streaming.
+
+        Schema-driven parsers (e.g. MiniMax-M3) override this; see
+        ``ToolParser.set_streaming_tool_schemas`` for when that is required.
+        """
+        return
 
     # ----- Hooks (subclasses override) ----------------------------------
 

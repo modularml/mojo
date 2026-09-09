@@ -1,0 +1,287 @@
+---
+title: Creating values
+description: Construct values with generated and custom initializers.
+---
+
+A value's life in Mojo begins when you construct it, directly or
+implicitly. The type uses an *initializer* to prepare the value for use.
+
+Each constructible type provides one or more initializer overloads.
+Initializers set up the value's fields and perform any other required
+preparation.
+
+Initializers and deinitializers together define a value's lifecycle. This
+page covers value creation and initialization.
+
+## Initializers {#constructor}
+
+For simple types, use `@fieldwise_init` to have Mojo generate an
+initializer:
+
+```mojo
+@fieldwise_init
+struct MyStruct:
+    var field1: Int
+    var field2: String
+```
+
+For more complex types, or when you need more control, write your own
+initializer:
+
+```mojo
+struct MyStruct:
+    var field1: Int
+    var field2: String
+
+    def __init__(out self, field1: Int, field2: String):
+        self.field1 = field1
+        self.field2 = field2
+```
+
+An initializer must set up every field in a value. If any field is
+uninitialized when the initializer finishes, the compiler reports an error.
+
+All initializers use the `out self` argument convention. The initializer
+constructs `self` rather than declaring or explicitly returning a result:
+
+```mojo
+# Works with both fieldwise initialization and
+# hand-written initializers
+var new_instance = MyStruct(1, "Hello")
+```
+
+Custom initializers can provide default values, calculate fields, validate
+arguments, or initialize resources.
+
+Where possible, Mojo automatically provides specialized initializers for
+types that conform to `Copyable` or `Movable`.
+
+### Overloading initializers
+
+Like other methods, you can
+[overload](/docs/manual/functions/#overloaded-functions) `__init__()` to
+provide different ways to initialize a value.
+
+Initializer overloads can delegate to each other and use default arguments.
+For example:
+
+```mojo
+struct RetryPolicy:
+    var max_attempts: Int
+    var delay_ms: Int
+
+    # Factory-style convenience overload delegates to the core initializer
+    def __init__(out self):
+        self = Self(3)  # Syntax sugar for `self.__init__(3)`
+
+    # Core initializer provides the default delay
+    def __init__(out self, max_attempts: Int, delay_ms: Int = 1000):
+        self.max_attempts = max_attempts
+        self.delay_ms = delay_ms
+```
+
+This provides several ways to construct the same type:
+
+```mojo
+var standard = RetryPolicy()
+var persistent = RetryPolicy(10)
+var aggressive = RetryPolicy(10, 250)
+```
+
+### Initializers and implicit conversion
+
+Mojo can implicitly convert values when a different type is required during
+assignment or when passing or returning a value.
+
+For example, `Optional[T]` supports implicit conversion from `T` and `None`:
+
+```mojo
+var greeting: Optional[String] = None
+greeting = String("Salve!")
+```
+
+Enable implicit conversion by marking an initializer with
+[`@implicit`](/docs/reference/decorators/implicit/):
+
+```mojo
+struct Target:
+    @implicit
+    def __init__(out self, source: Source):
+        # ...
+```
+
+Use implicit conversions sparingly. They work best when the conversion is
+safe, constant-time, and has one clear meaning. For example:
+
+```mojo
+struct Complex:
+    var real: Float64
+    var imag: Float64
+
+    def __init__(out self, real: Float64, imag: Float64):
+        self.real = real
+        self.imag = imag
+
+    @implicit
+    def __init__(out self, value: Float64):
+        self = Complex(value, 0.0)
+
+def magnitude_squared(value: Complex) -> Float64:
+    return value.real * value.real + value.imag * value.imag
+
+def main():
+    # Implicitly converts 1.6 to Complex(1.6, 0.0)
+    var complex: Complex = 1.6
+
+    # Implicitly converts 3.0 to Complex(3.0, 0.0) in call
+    var result = magnitude_squared(3.0)
+```
+
+### Initializer lists
+
+Without an `@implicit` initializer, `Complex` would lose its implicit
+conversion. *Initializer lists* provide another convenience: braced
+construction of an expected type without spelling its name. This syntax
+works whether the type provides implicit initialization or not:
+
+```mojo
+# Instead of these full type construction calls:
+var result = magnitude_squared(Complex(real=3.0, imag=0.0))  # Full, keyword
+var result = magnitude_squared(Complex(3.0, 0.0))            # Full, positional
+var result = magnitude_squared(Complex(value=3.0))  # Convenience, keyword
+var result = magnitude_squared(Complex(3.0))        # Convenience, positional
+
+# With braced syntax:
+var result = magnitude_squared({real=3.0, imag=0.0})  # Full, keyword
+var result = magnitude_squared({3.0, 0.0})            # Full, positional
+var result = magnitude_squared({value=3.0})           # Convenience, keyword
+var result = magnitude_squared({3.0})                 # Convenience, positional
+```
+
+This is useful for compiler-inferred parameterized types, whose full type
+names can be long and verbose.
+
+### No-initializer types
+
+Mojo allows you to write types that can't be constructed. If a type
+declares no initializer, you can't create an instance and there's no
+lifecycle to manage.
+
+Use them to host static content and behavior without state:
+
+```mojo
+struct HTTPStatus:
+    comptime OK = 200
+    comptime NOT_FOUND = 404
+    comptime INTERNAL_SERVER_ERROR = 500
+
+    @staticmethod
+    def is_success(code: Int) -> Bool:
+        # 2xx is the HTTP status success class
+        return 200 <= code < 300
+```
+
+For example:
+
+```mojo
+def handle(status_code: Int) -> String:
+    if HTTPStatus.is_success(status_code):
+        return "ok"
+    return "failed"
+```
+
+## Copy and move initializers
+
+Copy and move initializers use another value of the same type:
+
+```mojo
+var the_copy = value.copy()  # AKA ValueType(copy=value)
+var the_move = value^        # AKA ValueType(move=value^)
+```
+
+### Copy initializer {#copy-constructor}
+
+`Copyable` establishes values that can be copied. It provides the `copy()`
+method and, when possible, Mojo synthesizes the required copy initializer:
+
+```mojo
+def __init__(out self, *, copy: Self):
+    # ...
+```
+
+A `Copyable` constraint lets generic code explicitly copy a value:
+
+```mojo
+def copy_return[T: Copyable](foo: T) -> T:
+    var copy = foo.copy()
+    return copy^
+```
+
+All `Copyable` types are also `Movable`, so you can transfer ownership of
+the copy when returning it, as shown here.
+
+### Implicitly-copyable types
+
+`ImplicitlyCopyable` allows the compiler to insert copies where an explicit
+copy would otherwise be required.
+
+It refines `Copyable`, so conforming types also support `copy()` and the
+copy initializer. Use `ImplicitlyCopyable` only when implicit copying is
+required by the compiler or an API contract.
+
+Implicit copying can hide potentially expensive work. Prefer an explicit
+`copy()` call, especially when copying may allocate memory or otherwise have
+significant cost. This keeps the operation visible at the call site.
+
+### Move initializer {#move-constructor}
+
+Consider the `RetryPolicy` type defined earlier on this page and the
+following example that transfers ownership of a policy value to a new
+variable:
+
+```mojo
+var policy = RetryPolicy(3, 1000)
+var transferred = policy^
+```
+
+Although `RetryPolicy` declared no conformances, the transfer operator
+still works here. Mojo synthesizes a move initializer for it.
+
+Define custom move initializers when transferring requires custom behavior:
+
+```mojo
+def __init__(out self, *, deinit move: Self):
+    # ...
+```
+
+### Move-only and immovable types
+
+A type that conforms to `Movable` but not `Copyable` is move-only. For
+example, [`OwnedPointer`](/docs/std/memory/owned_pointer/OwnedPointer/) can
+transfer ownership of its stored value but can't copy it.
+[`Atomic`](/docs/std/atomic/atomic/Atomic/) is also move-only, preventing
+copies that would duplicate its value.
+
+A type conforming to neither `Movable` nor `Copyable` is immovable.
+To opt out of `Movable`, conform your type to `Movable where False` or
+define it with a non-movable field:
+
+```mojo
+struct Pinned(Movable where False):
+    var n: Int
+
+    def __init__(out self, n: Int):
+        self.n = n
+```
+
+Mojo rejects `Pinned` value transfers.
+
+Immovable types are useful when a value must remain at a stable memory
+address. For example:
+
+- Other values hold pointers to it, making its address part of its identity.
+  Moving it would leave those pointers dangling.
+- The value contains a pointer to itself. Moving its bits would leave the
+  interior pointer referring to the old, invalid address.
+- An external system tracks the value by address while an operation is in
+  progress. Moving it would invalidate that association.

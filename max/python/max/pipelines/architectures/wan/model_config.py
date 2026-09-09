@@ -16,9 +16,47 @@ from typing import Any
 from max.driver import Device
 from max.dtype import DType
 from max.graph import DeviceRef
+from max.nn.quant_config import (
+    InputScaleSpec,
+    QuantConfig,
+    QuantFormat,
+    ScaleGranularity,
+    ScaleOrigin,
+    WeightScaleSpec,
+)
 from max.pipelines.lib import MAXModelConfigBase, SupportedEncoding
 from max.pipelines.modeling.config_enums import supported_encoding_dtype
 from pydantic import Field
+
+
+def build_wan_fp8_quant_config() -> QuantConfig:
+    """Static per-tensor W8A8 FP8 config for Comfy-Org ``fp8_scaled`` Wan DiT.
+
+    The Comfy-Org checkpoints store every linear weight as ``float8_e4m3fn``
+    with a scalar ``scale_weight`` and a scalar ``scale_input`` (static input
+    quantization). This maps onto MAX's ``matmul_static_scaled_float8`` path
+    via :class:`~max.nn.quant_config.QuantConfig` with per-tensor scales.
+
+    Biases, norms, modulation tables, and the patch-embedding Conv3d stay in
+    ``bfloat16`` — only the linear projections are quantized.
+    """
+    return QuantConfig(
+        input_scale=InputScaleSpec(
+            granularity=ScaleGranularity.TENSOR,
+            origin=ScaleOrigin.STATIC,
+            dtype=DType.float32,
+        ),
+        weight_scale=WeightScaleSpec(
+            granularity=ScaleGranularity.TENSOR,
+            dtype=DType.float32,
+        ),
+        # Wan applies the quant config directly to each Linear rather than
+        # gating by layer index, so these sets are unused; pass empty.
+        mlp_quantized_layers=set(),
+        attn_quantized_layers=set(),
+        format=QuantFormat.COMPRESSED_TENSORS_FP8,
+        bias_dtype=DType.bfloat16,
+    )
 
 
 class WanConfigBase(MAXModelConfigBase):
@@ -41,6 +79,9 @@ class WanConfigBase(MAXModelConfigBase):
     pos_embed_seq_len: int | None = None
     dtype: DType = DType.bfloat16
     device: DeviceRef = Field(default_factory=DeviceRef.GPU)
+    quant_config: QuantConfig | None = None
+    """Static per-tensor FP8 quantization config, populated when the
+    transformer encoding is ``float8_e4m3fn``. ``None`` for bfloat16."""
 
 
 class WanConfig(WanConfigBase):
@@ -55,10 +96,20 @@ class WanConfig(WanConfigBase):
             for key, value in config_dict.items()
             if key in WanConfigBase.__annotations__
         }
+        # The DiT working dtype (activations, norms, modulation) stays
+        # bfloat16 even under FP8 — only linear weights are quantized — so
+        # don't let the float8 encoding flip the model dtype.
+        quant_config: QuantConfig | None = None
+        if encoding == "float8_e4m3fn":
+            model_dtype = DType.bfloat16
+            quant_config = build_wan_fp8_quant_config()
+        else:
+            model_dtype = supported_encoding_dtype(encoding)
         init_dict.update(
             {
-                "dtype": supported_encoding_dtype(encoding),
+                "dtype": model_dtype,
                 "device": DeviceRef.from_device(devices[0]),
+                "quant_config": quant_config,
             }
         )
         return WanConfig(**init_dict)

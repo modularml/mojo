@@ -13,30 +13,29 @@
 
 from std.io.io import _printf
 
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TMADescriptor, create_tma_descriptor
-from std.gpu import block_idx
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TMADescriptor, create_tma_descriptor
+from max.gpu import block_idx
+from max.gpu.memory import (
     cp_async_bulk_tensor_shared_cluster_global,
 )
-from std.gpu.sync import (
+from max.gpu.sync import (
     mbarrier_arrive_expect_tx_shared,
     mbarrier_init,
     mbarrier_try_wait_parity_shared,
 )
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 
 from std.utils.index import Index
 
 
 @__llvm_arg_metadata(descriptor, `nvvm.grid_constant`)
 def kernel_copy_async_tma(descriptor: TMADescriptor):
-    var shmem = stack_allocation[
-        16, DType.float32, alignment=16, address_space=AddressSpace.SHARED
+    var shmem = unsafe_stack_allocation[
+        16, DType.float32, alignment=16, address_space=.SHARED
     ]()
-    var mbar = stack_allocation[1, Int64, address_space=AddressSpace.SHARED]()
-    var descriptor_ptr = UnsafePointer(to=descriptor).bitcast[NoneType]()
+    var mbar = unsafe_stack_allocation[1, Int64, address_space=.SHARED]()
+    var descriptor_ptr = Pointer(to=descriptor).bitcast[NoneType]()
     mbarrier_init(mbar, 1)
 
     mbarrier_arrive_expect_tx_shared(mbar, 64)
@@ -46,26 +45,26 @@ def kernel_copy_async_tma(descriptor: TMADescriptor):
     mbarrier_try_wait_parity_shared(mbar, 0, 10000000)
 
     _printf[
-        "(%lu, %lu) : %g %g %g %g; %g %g %g %g; %g %g %g %g; %g %g %g %g\n"
+        "(%ld, %ld) : %g %g %g %g; %g %g %g %g; %g %g %g %g; %g %g %g %g\n"
     ](
-        UInt(block_idx.x),
-        UInt(block_idx.y),
-        shmem[0].cast[DType.float64](),
-        shmem[1].cast[DType.float64](),
-        shmem[2].cast[DType.float64](),
-        shmem[3].cast[DType.float64](),
-        shmem[4].cast[DType.float64](),
-        shmem[5].cast[DType.float64](),
-        shmem[6].cast[DType.float64](),
-        shmem[7].cast[DType.float64](),
-        shmem[8].cast[DType.float64](),
-        shmem[9].cast[DType.float64](),
-        shmem[10].cast[DType.float64](),
-        shmem[11].cast[DType.float64](),
-        shmem[12].cast[DType.float64](),
-        shmem[13].cast[DType.float64](),
-        shmem[14].cast[DType.float64](),
-        shmem[15].cast[DType.float64](),
+        block_idx.x,
+        block_idx.y,
+        shmem[0].cast[.float64](),
+        shmem[1].cast[.float64](),
+        shmem[2].cast[.float64](),
+        shmem[3].cast[.float64](),
+        shmem[4].cast[.float64](),
+        shmem[5].cast[.float64](),
+        shmem[6].cast[.float64](),
+        shmem[7].cast[.float64](),
+        shmem[8].cast[.float64](),
+        shmem[9].cast[.float64](),
+        shmem[10].cast[.float64](),
+        shmem[11].cast[.float64](),
+        shmem[12].cast[.float64](),
+        shmem[13].cast[.float64](),
+        shmem[14].cast[.float64](),
+        shmem[15].cast[.float64](),
     )
 
 
@@ -80,11 +79,11 @@ def test_tma_tile_copy(ctx: DeviceContext) raises:
     for i in range(64):
         gmem_host[i] = Float32(i)
 
-    var gmem_dev = ctx.enqueue_create_buffer[DType.float32](8 * 8)
+    var gmem_dev = ctx.enqueue_create_buffer[.float32](8 * 8)
 
     ctx.enqueue_copy(gmem_dev, gmem_host)
 
-    var descriptor = create_tma_descriptor[DType.float32, 2](
+    var descriptor = create_tma_descriptor[.float32, 2](
         gmem_dev, (8, 8), (8, 1), (4, 4)
     )
 

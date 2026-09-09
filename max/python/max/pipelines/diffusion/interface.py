@@ -33,11 +33,12 @@ from max.experimental.nn import Module
 from max.experimental.tensor import Tensor
 from max.graph import Graph, TensorType
 from max.graph.weights import load_weights
+from max.pipelines.context import PixelContext
 from max.pipelines.modeling.base.component_model import ComponentModel
-from max.pipelines.modeling.types import PixelGenerationContext
 from tqdm import tqdm
 
-from .cache import DenoisingCacheConfig, DenoisingCacheState
+from .cache import DenoisingCacheState
+from .config import DEFAULT_DENOISING_CACHE_CONFIG, DenoisingCacheConfig
 from .first_block_cache import FirstBlockCache
 from .taylorseer import TaylorSeer, run_denoising_step
 
@@ -85,27 +86,6 @@ class DiffusionPipeline(ABC):
     Used when the request does not specify a ``residual_threshold``.
     """
 
-    default_taylorseer_cache_interval: int = 5
-    """Model-specific default for the TaylorSeer cache interval.
-
-    Subclasses may override this to provide a model-appropriate default.
-    Used when ``DenoisingCacheConfig.taylorseer_cache_interval`` is ``None``.
-    """
-
-    default_taylorseer_warmup_steps: int = 9
-    """Model-specific default for the TaylorSeer warmup steps.
-
-    Subclasses may override this to provide a model-appropriate default.
-    Used when ``DenoisingCacheConfig.taylorseer_warmup_steps`` is ``None``.
-    """
-
-    default_taylorseer_max_order: int = 1
-    """Model-specific default for the TaylorSeer expansion order.
-
-    Subclasses may override this to provide a model-appropriate default.
-    Used when ``DenoisingCacheConfig.taylorseer_max_order`` is ``None``.
-    """
-
     def __init__(
         self,
         pipeline_config: PipelineConfig,
@@ -116,9 +96,10 @@ class DiffusionPipeline(ABC):
         **kwargs: Any,
     ) -> None:
         self.cache_config: DenoisingCacheConfig = (
-            cache_config or DenoisingCacheConfig()
+            cache_config
+            if cache_config is not None
+            else DEFAULT_DENOISING_CACHE_CONFIG
         )
-        self._resolve_cache_defaults()
         self.pipeline_config = pipeline_config
         self.session = session
         self.devices = devices
@@ -128,30 +109,12 @@ class DiffusionPipeline(ABC):
 
         self.init_remaining_components()
 
-    def _resolve_cache_defaults(self) -> None:
-        """Resolve nullable DenoisingCacheConfig fields using pipeline defaults.
-
-        Uses class-level ``default_*`` attributes so that subclasses can
-        override model-specific defaults.  Called before ``_load_sub_models()``
-        so that ComponentModels receive a fully-resolved cache config.
-        """
-        # Mutates in-place; DenoisingCacheConfig is unfrozen.
-        cc = self.cache_config
-        if cc.taylorseer_cache_interval is None:
-            cc.taylorseer_cache_interval = (
-                self.default_taylorseer_cache_interval
-            )
-        if cc.taylorseer_warmup_steps is None:
-            cc.taylorseer_warmup_steps = self.default_taylorseer_warmup_steps
-        if cc.taylorseer_max_order is None:
-            cc.taylorseer_max_order = self.default_taylorseer_max_order
-
     @abstractmethod
     def init_remaining_components(self) -> None:
         """Initialize non-ComponentModel components (e.g., image processors)."""
 
     @abstractmethod
-    def prepare_inputs(self, context: PixelGenerationContext) -> Any:
+    def prepare_inputs(self, context: PixelContext) -> Any:
         """Prepare inputs for the pipeline."""
         raise NotImplementedError(
             f"prepare_inputs is not implemented for {self.__class__.__name__}"
@@ -188,6 +151,18 @@ class DiffusionPipeline(ABC):
                 f"{self.__class__.__name__}.components is not set."
             )
 
+        # Imported here rather than at module scope to break a circular
+        # import: ``max.pipelines.lib`` (``registry.py``,
+        # ``pipeline_variants/__init__.py``) imports ``PixelGenerationPipeline``
+        # from ``diffusion/pipeline.py`` -- a real, necessary dependency, not
+        # just a re-export -- so importing from ``max.pipelines.lib.*`` at
+        # load time here would re-enter a partially-initialized ``lib``
+        # package whenever ``diffusion`` (this package's Bazel target) is
+        # what triggers ``lib`` to load first.
+        from max.pipelines.lib.config.model_config import (
+            _resolve_component_encoding_and_weights,
+        )
+
         models = self.pipeline_config.models
         loaded_sub_models: dict[str, ComponentModel] = {}
 
@@ -205,8 +180,13 @@ class DiffusionPipeline(ABC):
                 )
 
             config_dict = component_config.huggingface_config.to_dict()
-            encoding = component_config.quantization_encoding or "bfloat16"
-            abs_paths = self._get_component_weight_paths(component_config)
+            resolved_encoding, resolved_weight_path = (
+                _resolve_component_encoding_and_weights(component_config)
+            )
+            encoding = resolved_encoding or "bfloat16"
+            abs_paths = self._get_component_weight_paths(
+                component_config, resolved_weight_path
+            )
 
             init_params = inspect.signature(component_cls.__init__).parameters
             init_kwargs: dict[str, Any] = {
@@ -224,14 +204,17 @@ class DiffusionPipeline(ABC):
 
         return loaded_sub_models
 
-    def _get_component_weight_paths(self, component_config: Any) -> list[Path]:
+    def _get_component_weight_paths(
+        self, component_config: Any, weight_path: list[Path]
+    ) -> list[Path]:
         """Resolve absolute weight paths for a single component.
 
-        Uses the component's own ``MAXModelConfig`` (which already has
-        ``weight_path`` and ``huggingface_weight_repo`` resolved after
-        ``ModelManifest.resolve()``).
+        Args:
+            component_config: The component's own ``MAXModelConfig``.
+            weight_path: The component's resolved weight path (see
+                :func:`_resolve_component_encoding_and_weights`).
         """
-        return component_config.resolved_weight_paths()
+        return component_config.resolved_weight_paths(weight_path)
 
     # -----------------------------------------------------------------
     # Denoising cache support (FBCache + TaylorSeer)
@@ -250,7 +233,6 @@ class DiffusionPipeline(ABC):
         """
         self._taylorseer = None
         if self.cache_config.taylorseer:
-            assert self.cache_config.taylorseer_max_order is not None
             self._taylorseer = TaylorSeer(
                 max_order=self.cache_config.taylorseer_max_order,
                 dtype=dtype,

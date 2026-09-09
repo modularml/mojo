@@ -21,13 +21,14 @@ from max._core import (
     InsertPoint,
     NamedAttribute,
     OpBuilder,
+    Operation,
     Pass,
     Type,
     lower,
 )
 from max._core.dialects import builtin, kgen, m, mo, mosh, rmo
 from max._core.dtype import DType
-from max.graph import DeviceRef, Graph, TensorType
+from max.graph import DeviceRef, Graph, TensorType, ops
 
 
 def test_mo_attr(mlir_context) -> None:  # noqa: ANN001
@@ -47,7 +48,7 @@ def test_mosh(mlir_context) -> None:  # noqa: ANN001
 def test_mosh_shapeattr(mlir_context) -> None:  # noqa: ANN001
     shape_type = mosh.ShapeType()
     attr = mosh.ShapeAttr([1, 2, 3], shape_type)
-    dims = list(kgen.CastToBuiltinAttr(d) for d in attr.values)
+    dims = [kgen.CastToBuiltinAttr(d) for d in attr.values]
     index_type = builtin.IntegerType(64, builtin.SignednessSemantics.signed)
     uint8_type = builtin.IntegerType(8, builtin.SignednessSemantics.unsigned)
     Index = functools.partial(builtin.IntegerAttr, index_type)
@@ -94,6 +95,35 @@ def test_mo_graph_op(mlir_context) -> None:  # noqa: ANN001
     assert graph.sym_name == "hello"
     assert list(graph.input_parameters) == []
     assert graph.function_type == builtin.FunctionType([], [])
+
+
+@pytest.mark.parametrize("dtype", [DType.float32, DType.float64])
+def test_operation_bytecode_round_trips_across_contexts(
+    mlir_context,  # noqa: ANN001
+    dtype: DType,
+) -> None:
+    """``Operation.bytecode`` / ``from_bytecode`` move IR between MLIRContexts
+    losslessly. f64 is the load-bearing case: the textual round-trip
+    (``parse_module``) mangles f64 float literals, so bytecode must not.
+    """
+    with Graph(
+        "round_trip",
+        input_types=[TensorType(dtype, [2], device=DeviceRef.CPU())],
+    ) as graph:
+        (x,) = graph.inputs
+        graph.output(ops.add(x, ops.constant(2.0, dtype, DeviceRef.CPU())))
+    module = graph._module
+
+    data = module.bytecode
+    assert isinstance(data, bytes)
+    assert data
+
+    # Re-serializing the module parsed into a fresh context yields byte-
+    # identical bytecode: the cross-context round-trip is lossless. The target
+    # context must outlive the parsed module, so bind it to a local.
+    target = mlir.Context()
+    restored = Operation.from_bytecode(data, target)
+    assert restored.bytecode == data
 
 
 def test_infer_type_op_adaptor() -> None:

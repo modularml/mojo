@@ -17,33 +17,40 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
+import json
 import logging
-import math
 import os
 import sys
 import threading
 import time
 import traceback
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 import aiohttp
+from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 from openai.types.chat.completion_create_params import ResponseFormat
 from pydantic import BaseModel
 from tqdm.asyncio import tqdm
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from typing_extensions import NotRequired, TypedDict
 
-from .config import PIXEL_GENERATION_TASKS, BenchmarkTask, SamplingConfig
+from .config import (
+    PIXEL_GENERATION_TASKS,
+    Backend,
+    BenchmarkTask,
+    SamplingConfig,
+)
 from .datasets.types import (
     ChatMessage,
     OpenAIImage,
     PixelGenerationImageOptions,
 )
 from .sse import iter_events
-from .tts_workloads_utils import SampleTTSRequest
+from .utils import deadline_passed, openai_bearer_auth_headers
 
 # 30 minute timeout per request session
 AIOHTTP_TIMEOUT = aiohttp.ClientTimeout(total=30 * 60)
@@ -86,6 +93,10 @@ class BaseRequestFuncInput(ABC):
 
     model: str
     session_id: str | None
+    # kw_only so this can default without disturbing the required-field
+    # ordering of subclasses (RequestFuncInput adds several fields with no
+    # default after inheriting from this base).
+    cache_salt: str | None = field(default=None, kw_only=True)
 
     @abstractmethod
     def get_output_type(self) -> type[BaseRequestFuncOutput]:
@@ -106,8 +117,28 @@ def _apply_sampling_to_request_payload(
         payload["top_p"] = sampling.top_p
 
 
-# TODO: We shouldn't have to maintain two separate RequestFuncInput classes for
-# text generation and TTS benchmarks respectively.
+def _build_final_payload(
+    base_payload: Mapping[str, Any], extra_body: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """Return a new payload: a shallow copy of *base_payload* with *extra_body*
+    merged on top, last-writer-wins (an *extra_body* key overrides the managed
+    field of the same name). Not mutated, so *base_payload* keeps its precise
+    type and the result is ``dict[str, Any]``.
+    """
+    payload: dict[str, Any] = dict(base_payload)
+    if not extra_body:
+        return payload
+    for key, value in extra_body.items():
+        if key in payload:
+            logger.warning(
+                "extra_body key %r overwrites managed request field; "
+                "last-writer-wins.",
+                key,
+            )
+        payload[key] = value
+    return payload
+
+
 @dataclass
 class RequestFuncInput(BaseRequestFuncInput):
     """Request function input for text generation benchmarks."""
@@ -143,22 +174,6 @@ class PixelGenerationRequestFuncInput(BaseRequestFuncInput):
 
 
 @dataclass
-class TTSRequestFuncInput(BaseRequestFuncInput):
-    """Request function input for TTS (text-to-speech) benchmarks."""
-
-    sampling: SamplingConfig
-    request_index: int
-    tts_request: SampleTTSRequest
-    is_streaming_mode: bool
-    frequency_penalty: float
-    repetition_penalty: float
-    seed: int = 0
-
-    def get_output_type(self) -> type[BaseRequestFuncOutput]:
-        return TTSRequestFuncOutput
-
-
-@dataclass
 class BaseRequestFuncOutput:
     """Base class for request function output with common fields."""
 
@@ -175,6 +190,35 @@ class BaseRequestFuncOutput:
         if self.request_submit_time is None:
             return None
         return self.request_submit_time + self.latency
+
+
+def mark_cancelled_if_past_deadline(
+    output: BaseRequestFuncOutput, end_time_ns: int | None
+) -> BaseRequestFuncOutput:
+    """Reclassify an end-of-benchmark cut-off as cancelled rather than failed.
+
+    When the benchmark duration deadline cancels an in-flight request, aiohttp
+    can surface the cancellation as a swallowed error inside the request driver
+    instead of propagating the ``wait_for`` timeout, leaving a ``success=False``
+    output. If the result is not a success and the benchmark deadline has
+    passed, treat it as cancelled (cut off by benchmark end) rather than a real
+    failure. Successful results are left untouched.
+
+    Args:
+        output: The request output to (possibly) reclassify, mutated in place.
+        end_time_ns: The benchmark ``perf_counter_ns`` deadline, or ``None`` if
+            the run is unbounded.
+
+    Returns:
+        The same ``output`` instance, for convenient inline use.
+    """
+    if not output.success and deadline_passed(end_time_ns):
+        output.cancelled = True
+        logger.info(
+            "Reclassifying request as cancelled (cut off by benchmark end): %s",
+            output.error or "<no error>",
+        )
+    return output
 
 
 def measured_window_duration(
@@ -219,8 +263,6 @@ class ServerTokenStats:
     cached_tokens: int = 0
 
 
-# TODO: We shouldn't have to maintain two separate RequestFuncOutput classes for
-# text generation and TTS benchmarks respectively.
 @dataclass
 class RequestFuncOutput(BaseRequestFuncOutput):
     """Request function output for text generation benchmarks."""
@@ -235,6 +277,10 @@ class RequestFuncOutput(BaseRequestFuncOutput):
     server_token_stats: ServerTokenStats = field(
         default_factory=ServerTokenStats
     )
+    # Multi-turn provenance, set by the conversation driver so per-turn cache
+    # retention can group/order turns within a session. None for single-turn.
+    session_id: str | None = None
+    turn_index: int | None = None
 
 
 @dataclass
@@ -244,115 +290,31 @@ class PixelGenerationRequestFuncOutput(BaseRequestFuncOutput):
     num_generated_outputs: int = 0
 
 
-@dataclass
-class TTSRequestFuncOutput(BaseRequestFuncOutput):
-    """Request function output for TTS (text-to-speech) benchmarks."""
-
-    request_index: int = 0
-    itl: list[float] = field(default_factory=list)
-    tpot: list[float] = field(default_factory=list)
-    # TODO: We have a torch.Tensor dependency here, but our benchmark_shared
-    # package doesn't "require" torch. For better or worse, this is only used
-    # in the TTS benchmarks, so we'll leave it as Any for now.
-    generated_chunk: list[Any] = field(
-        default_factory=list
-    )  # list[torch.Tensor]
-    ttft: float | None = None  # Time to first token (can be None for TTS)
-
-    def get_chunk_lens_in_samples(self) -> list[int]:
-        """Get lengths of audio chunks in samples."""
-        return [x.shape[-1] for x in self.generated_chunk]
-
-    def get_chunk_lens_in_seconds(self, tts_config: Any) -> list[float]:
-        """Get lengths of audio chunks in seconds.
-
-        Args:
-            tts_config: TTS configuration object with decoder_sample_rate attribute.
-        """
-        lens_in_samples = self.get_chunk_lens_in_samples()
-        return [samples_to_seconds(tts_config, x) for x in lens_in_samples]
-
-    def get_chunk_lens_in_tokens(self, tts_config: Any) -> list[int]:
-        """Get lengths of audio chunks in tokens.
-
-        Args:
-            tts_config: TTS configuration object with codec_tokens_per_sec attribute.
-        """
-        lens_in_samples = self.get_chunk_lens_in_samples()
-        return [samples_to_tokens(tts_config, x) for x in lens_in_samples]
-
-    def get_real_time_factors(self, tts_config: Any) -> list[float]:
-        """Calculate real-time factors (RTF).
-
-        RTF is the inter-chunk latency divided by the playback time of the
-        previous chunk. Anything over 100% would lead to a playback error.
-
-        Args:
-            tts_config: TTS configuration object.
-        """
-        lens_in_seconds = self.get_chunk_lens_in_seconds(tts_config)
-        assert len(lens_in_seconds) == len(self.itl) + 1, (
-            "Missing or extra ITLs?"
-        )
-        return [
-            x / y for x, y in zip(self.itl, lens_in_seconds[:-1], strict=True)
-        ]
-
-    def get_output_length_in_samples(self) -> int:
-        """Get total output length in samples."""
-        return sum(self.get_chunk_lens_in_samples())
-
-    def get_output_length_in_seconds(self, tts_config: Any) -> float:
-        """Get total output length in seconds.
-
-        Args:
-            tts_config: TTS configuration object.
-        """
-        return sum(self.get_chunk_lens_in_seconds(tts_config))
-
-    def get_output_length_in_tokens(self, tts_config: Any) -> int:
-        """Get total output length in tokens.
-
-        Args:
-            tts_config: TTS configuration object.
-        """
-        return sum(self.get_chunk_lens_in_tokens(tts_config))
-
-
-def samples_to_seconds(tts_config: Any, num_samples: int) -> float:
-    """Convert number of samples to seconds.
-
-    Args:
-        tts_config: TTS configuration object with decoder_sample_rate attribute.
-        num_samples: Number of audio samples.
-    """
-    return num_samples / tts_config.decoder_sample_rate
-
-
-def samples_to_tokens(tts_config: Any, num_samples: int) -> int:
-    """Convert number of samples to tokens.
-
-    Args:
-        tts_config: TTS configuration object with decoder_sample_rate and
-                   codec_tokens_per_sec attributes.
-        num_samples: Number of audio samples.
-    """
-    playback_time = samples_to_seconds(tts_config, num_samples)
-    return math.ceil(playback_time * tts_config.codec_tokens_per_sec)
-
-
 class RequestDriver(ABC):
     """Abstract base class for a driver that handles API requests to different backends."""
 
     def __init__(
-        self, tokenizer: PreTrainedTokenizerBase | None = None
+        self,
+        tokenizer: PreTrainedTokenizerBase | None = None,
+        extra_body: Mapping[str, Any] | None = None,
+        backend: Backend | None = None,
     ) -> None:
         """Initialize the request driver.
 
         Args:
             tokenizer: Optional tokenizer for per-chunk TPOT computation.
+            extra_body: Optional arbitrary top-level fields merged onto every
+                request payload (last-writer-wins). Consumed by the
+                text-generation drivers (chat completions, completions, and
+                TensorRT-LLM); other drivers ignore it.
+            backend: The inference backend. Used by
+                :class:`OpenAIChatCompletionsRequestDriver` to enable the ATOM
+                server-reported-timing workaround for the ``atom`` backend.
+                TODO(ATOM): remove once ATOM streams chat/completions correctly.
         """
         self.tokenizer = tokenizer
+        self.extra_body = extra_body
+        self.backend = backend
 
     @abstractmethod
     async def request(
@@ -366,7 +328,6 @@ class RequestDriver(ABC):
         Returns:
             RequestFuncOutput containing the response data and metrics.
         """
-        pass
 
 
 class ProgressBarRequestDriver(RequestDriver):
@@ -403,6 +364,39 @@ class ProgressBarRequestDriver(RequestDriver):
         return result
 
 
+@contextlib.contextmanager
+def progressbar_request_driver(
+    request_driver: RequestDriver,
+    total: int,
+    *,
+    disable_tqdm: bool = False,
+    desc: str | None = None,
+) -> Iterator[RequestDriver]:
+    """Yield a request driver that advances a progress bar per request.
+
+    When *disable_tqdm* is set, the driver is yielded unwrapped and no bar is
+    shown. Otherwise the driver is wrapped in a :class:`ProgressBarRequestDriver`
+    backed by a ``tqdm`` bar that is closed on exit.
+
+    Args:
+        request_driver: The underlying request driver to wrap.
+        total: Total number of requests the bar tracks.
+        disable_tqdm: If True, skip the progress bar entirely.
+        desc: Optional description shown alongside the bar.
+
+    Yields:
+        The (possibly progress-wrapped) request driver.
+    """
+    if disable_tqdm:
+        yield request_driver
+        return
+    pbar = tqdm(total=total, desc=desc)
+    try:
+        yield ProgressBarRequestDriver(request_driver, pbar)
+    finally:
+        pbar.close()
+
+
 class TRTLLMRequestDriver(RequestDriver):
     """Request driver for TensorRT-LLM backend."""
 
@@ -416,17 +410,20 @@ class TRTLLMRequestDriver(RequestDriver):
         assert api_url.endswith("generate_stream")
 
         async with aiohttp.ClientSession(timeout=AIOHTTP_TIMEOUT) as session:
-            payload: dict[str, bool | str | int | float | list[ChatMessage]] = {
+            base_payload: dict[
+                str, bool | str | int | float | list[ChatMessage]
+            ] = {
                 "text_input": request_func_input.prompt,
                 "ignore_eos": request_func_input.ignore_eos,
                 "stream": True,
             }
 
             if request_func_input.max_tokens is not None:
-                payload["max_tokens"] = request_func_input.max_tokens
+                base_payload["max_tokens"] = request_func_input.max_tokens
             _apply_sampling_to_request_payload(
-                payload, request_func_input.sampling
+                base_payload, request_func_input.sampling
             )
+            payload = _build_final_payload(base_payload, self.extra_body)
 
             output = RequestFuncOutput()
             output.prompt_len = request_func_input.prompt_len
@@ -509,6 +506,7 @@ class _ChatDelta(BaseModel):
     reasoning: str | None = None
     reasoning_content: str | None = None
     content: str | None = None
+    tool_calls: list[ChoiceDeltaToolCall] | None = None
 
 
 class _ChatChoice(BaseModel):
@@ -545,11 +543,38 @@ class _TRTLLMChunk(BaseModel):
 _ChunkT = TypeVar("_ChunkT", _ChatCompletionChunk, _CompletionChunk)
 
 
+def _extract_chat_delta_text(data: _ChatCompletionChunk) -> str:
+    """Extracts all generated text carried by a chat streaming chunk.
+
+    "reasoning" and "reasoning_content" are NOT official OpenAI fields.
+    Different model providers and serving frameworks may emit one or both to
+    stream chain-of-thought tokens separately from "content". These fields may
+    also be None in some chunks. We merge them here to preserve all streamed
+    text.
+
+    Tool-call fragments (function name and argument bytes) also count: a pure
+    tool-call turn has no ``content`` by design, and without this a successful
+    agentic response is misreported as "No text content captured".
+    """
+    delta = data.choices[0].delta
+    tool_call_text = "".join(
+        (tc.function.name or "") + (tc.function.arguments or "")
+        for tc in delta.tool_calls or []
+        if tc.function is not None
+    )
+    return (
+        (delta.reasoning or "")
+        + (delta.reasoning_content or "")
+        + (delta.content or "")
+        + tool_call_text
+    )
+
+
 async def _run_openai_stream_request(
     *,
     api_url: str,
     payload: dict[str, Any],
-    headers: dict[str, str],
+    headers: Mapping[str, str],
     prompt_len: int,
     chunk_type: type[_ChunkT],
     content_extractor: Callable[[_ChunkT], str],
@@ -601,12 +626,17 @@ async def _run_openai_stream_request(
                         if not data.choices:
                             continue
 
-                        # Any valid response chunk counts as having received content
-                        has_content = True
-
                         # Only track timing for chunks with actual text
                         text_content = content_extractor(data)
                         if text_content:
+                            # A response only counts as content-bearing once it
+                            # streams actual text or tool-call fragments.
+                            # Chunks that carry only a role or finish_reason,
+                            # or that put text in a delta field we don't model,
+                            # leave this False so the request is flagged rather
+                            # than recorded as a success with ttft=0 and no
+                            # tokens.
+                            has_content = True
                             timestamp = time.perf_counter()
                             # First token
                             if ttft == 0.0:
@@ -627,8 +657,11 @@ async def _run_openai_stream_request(
                             generated_text += text_content
                     if not has_content:
                         output.error = (
-                            "No content returned, there could be an issue with"
-                            " accuracy"
+                            "No text content captured from the response"
+                            " (choices were present but"
+                            " delta.reasoning/reasoning_content/content/"
+                            "tool_calls were all empty). The model may stream"
+                            " text in a field this client does not parse."
                         )
                         output.success = False
                     else:
@@ -662,7 +695,9 @@ class OpenAICompletionsRequestDriver(RequestDriver):
             "OpenAI Completions API URL must end with 'completions' or 'profile'."
         )
 
-        payload: dict[str, bool | str | int | float | list[ChatMessage]] = {
+        base_payload: dict[
+            str, bool | str | int | float | list[ChatMessage]
+        ] = {
             "model": request_func_input.model,
             "prompt": request_func_input.prompt,
             "best_of": 1,
@@ -671,12 +706,13 @@ class OpenAICompletionsRequestDriver(RequestDriver):
         }
 
         if request_func_input.max_tokens is not None:
-            payload["max_tokens"] = request_func_input.max_tokens
-        _apply_sampling_to_request_payload(payload, request_func_input.sampling)
+            base_payload["max_tokens"] = request_func_input.max_tokens
+        _apply_sampling_to_request_payload(
+            base_payload, request_func_input.sampling
+        )
+        payload = _build_final_payload(base_payload, self.extra_body)
 
-        headers = {
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"
-        }
+        headers = openai_bearer_auth_headers()
 
         return await _run_openai_stream_request(
             api_url=api_url,
@@ -687,6 +723,95 @@ class OpenAICompletionsRequestDriver(RequestDriver):
             content_extractor=lambda data: data.choices[0].text,
             tokenizer=self.tokenizer,
         )
+
+
+async def _run_atom_nonstream_chat_request(
+    *,
+    api_url: str,
+    payload: dict[str, Any],
+    headers: Mapping[str, str],
+    prompt_len: int,
+) -> RequestFuncOutput:
+    """ATOM workaround: non-streaming chat request using server-reported timing.
+
+    ATOM returns the whole chat completion in one SSE chunk, so client-side
+    stream timing is degenerate. Its non-streaming ``usage`` block reports
+    ``ttft_s``/``tpot_s``/``latency_s`` instead; we use those and set
+    ``generated_text`` so metrics derive TPOT as
+    ``(latency - ttft)/(output_len - 1)`` (== ``usage.tpot_s``).
+
+    TODO(ATOM): remove once ATOM streams chat/completions correctly.
+    """
+    output = RequestFuncOutput()
+    output.prompt_len = prompt_len
+    output.request_submit_time = time.perf_counter()
+
+    async with aiohttp.ClientSession(timeout=AIOHTTP_TIMEOUT) as session:
+        try:
+            async with session.post(
+                url=api_url, json=payload, headers=headers
+            ) as response:
+                if response.status != 200:
+                    output.error = response.reason or ""
+                    output.success = False
+                    return output
+                body = await response.json()
+        except Exception:
+            output.success = False
+            output.error = "".join(traceback.format_exception(*sys.exc_info()))
+            return output
+
+    try:
+        message = body["choices"][0].get("message") or {}
+    except (KeyError, IndexError, TypeError):
+        output.success = False
+        output.error = f"Malformed chat completion response: {body!r}"
+        return output
+
+    # Merge reasoning/reasoning_content/content (ATOM puts <mm:think> in content).
+    generated_text = (
+        (message.get("reasoning") or "")
+        + (message.get("reasoning_content") or "")
+        + (message.get("content") or "")
+    )
+    usage = body.get("usage") or {}
+    ttft_s = usage.get("ttft_s")
+    tpot_s = usage.get("tpot_s")
+    latency_s = usage.get("latency_s")
+
+    if ttft_s is None or latency_s is None:
+        output.success = False
+        output.error = (
+            "ATOM server-reported timing requested but the response 'usage' is"
+            " missing ttft_s/latency_s; this workaround only applies to an ATOM"
+            " server that reports server-side timing on non-streaming"
+            f" chat/completions. usage={usage!r}"
+        )
+        return output
+    if not generated_text:
+        output.success = False
+        output.error = "No text content in chat completion response."
+        return output
+
+    output.generated_text = generated_text
+    output.ttft = ttft_s
+    # Metrics derive TPOT from (latency - ttft)/(output_len - 1) == usage.tpot_s.
+    output.latency = latency_s
+    prompt_details = usage.get("prompt_tokens_details") or {}
+    completion_tokens = usage.get("completion_tokens")
+    output.server_token_stats = ServerTokenStats(
+        prompt_tokens=usage.get("prompt_tokens"),
+        completion_tokens=completion_tokens,
+        total_tokens=usage.get("total_tokens"),
+        cached_tokens=prompt_details.get("cached_tokens", 0),
+    )
+    # No per-token latencies: synthesize a flat ITL/TPOT series from the mean
+    # tpot_s so itl_ms/step_tpot_ms aren't NaN (headline TPOT still latency-based).
+    if tpot_s is not None and completion_tokens and completion_tokens > 1:
+        output.itl = [tpot_s] * (completion_tokens - 1)
+        output.tpot = [tpot_s] * (completion_tokens - 1)
+    output.success = True
+    return output
 
 
 class OpenAIChatCompletionsRequestDriver(RequestDriver):
@@ -715,7 +840,7 @@ class OpenAIChatCompletionsRequestDriver(RequestDriver):
                 msg.model_dump() for msg in request_func_input.prompt
             ]
 
-        payload: dict[
+        base_payload: dict[
             str,
             bool | str | int | float | list[dict[str, Any]] | dict[str, Any],
         ] = {
@@ -727,46 +852,53 @@ class OpenAIChatCompletionsRequestDriver(RequestDriver):
         }
 
         if request_func_input.max_tokens is not None:
-            payload["max_tokens"] = request_func_input.max_tokens
-        _apply_sampling_to_request_payload(payload, request_func_input.sampling)
+            base_payload["max_tokens"] = request_func_input.max_tokens
+        _apply_sampling_to_request_payload(
+            base_payload, request_func_input.sampling
+        )
         if request_func_input.response_format is not None:
             # Convert TypedDict to plain dict so mypy accepts the assignment into
-            # payload (since a TypedDict is stricter than a dict[str, Any]).
-            payload["response_format"] = dict(
+            # base_payload (since a TypedDict is stricter than a dict[str, Any]).
+            base_payload["response_format"] = dict(
                 request_func_input.response_format
             )
         if request_func_input.tools:
-            payload["tools"] = request_func_input.tools
+            base_payload["tools"] = request_func_input.tools
         for img in request_func_input.images:
             # TODO: Remove this type ignore
             # (error: Value of type "object" is not indexable)
-            payload["messages"][0]["content"].append(img)  # type: ignore[index, union-attr]
+            base_payload["messages"][0]["content"].append(img)  # type: ignore[index, union-attr]
+        payload = _build_final_payload(base_payload, self.extra_body)
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+            **openai_bearer_auth_headers(),
         }
         if request_func_input.session_id:
             headers["X-Session-ID"] = request_func_input.session_id
+        if request_func_input.cache_salt:
+            headers["X-Cache-Salt"] = request_func_input.cache_salt
+
+        if self.backend == "atom":
+            # ATOM doesn't per-token-stream chat/completions: send non-streaming
+            # and read timing from `usage`. TODO(ATOM): remove once it streams.
+            nonstream_payload = dict(payload)
+            nonstream_payload["stream"] = False
+            nonstream_payload.pop("stream_options", None)
+            return await _run_atom_nonstream_chat_request(
+                api_url=api_url,
+                payload=nonstream_payload,
+                headers=headers,
+                prompt_len=request_func_input.prompt_len,
+            )
 
         return await _run_openai_stream_request(
             api_url=api_url,
             payload=payload,
             headers=headers,
             prompt_len=request_func_input.prompt_len,
-            # NOTE:
-            # "reasoning" and "reasoning_content" are NOT official OpenAI fields.
-            # Different model providers and serving frameworks may emit one or both
-            # to stream chain-of-thought tokens separately from "content". These
-            # fields may also be None in some chunks.
-            #
-            # We merge them here to preserve all streamed text.
             chunk_type=_ChatCompletionChunk,
-            content_extractor=lambda data: (
-                (data.choices[0].delta.reasoning or "")
-                + (data.choices[0].delta.reasoning_content or "")
-                + (data.choices[0].delta.content or "")
-            ),
+            content_extractor=_extract_chat_delta_text,
             tokenizer=self.tokenizer,
         )
 
@@ -882,7 +1014,7 @@ class OpenResponsesRequestDriver(RequestDriver):
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+            **openai_bearer_auth_headers(),
         }
 
         output = PixelGenerationRequestFuncOutput()
@@ -973,7 +1105,7 @@ class SglangPixelGenerationRequestDriver(RequestDriver):
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+            **openai_bearer_auth_headers(),
         }
 
         output = PixelGenerationRequestFuncOutput()
@@ -1017,6 +1149,30 @@ class SglangPixelGenerationRequestDriver(RequestDriver):
                 return output
 
 
+def _add_input_reference(
+    form: aiohttp.FormData, input_image_paths: list[str] | None
+) -> None:
+    """Attach the i2v conditioning image to a multipart form as ``input_reference``.
+
+    vllm-omni (``/v1/videos[/sync]``) and sglang (``/v1/videos``) both take the
+    image-to-video conditioning image as a multipart ``input_reference`` file.
+    Only the first image is sent; both server APIs accept a single reference.
+    """
+    if not input_image_paths:
+        return
+    image_path = input_image_paths[0]
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Input image not found: {image_path}")
+    with open(image_path, "rb") as f:
+        image_bytes = f.read()
+    form.add_field(
+        "input_reference",
+        image_bytes,
+        filename=os.path.basename(image_path),
+        content_type="application/octet-stream",
+    )
+
+
 class SglangVideoPayload(TypedDict):
     model: str
     prompt: str
@@ -1058,6 +1214,42 @@ def _build_sglang_video_payload(
     return payload
 
 
+def _build_sglang_video_form(
+    request_func_input: PixelGenerationRequestFuncInput,
+) -> aiohttp.FormData:
+    """Build the multipart form for an image-to-video sglang ``/v1/videos`` request.
+
+    Mirrors sglang's reference ``multimodal_gen`` bench_serving: ``size=WxH``
+    and ``num_frames`` are top-level form fields, the remaining sampling knobs
+    are JSON-encoded under ``extra_body``, and the conditioning image is the
+    ``input_reference`` file.
+    """
+    form = aiohttp.FormData()
+    form.add_field("model", request_func_input.model)
+    form.add_field("prompt", request_func_input.prompt)
+
+    extra_body: dict[str, Any] = {}
+    opts = request_func_input.image_options
+    if opts is not None:
+        if opts.width is not None and opts.height is not None:
+            form.add_field("size", f"{opts.width}x{opts.height}")
+        if opts.num_frames is not None:
+            form.add_field("num_frames", str(opts.num_frames))
+        if opts.steps is not None:
+            extra_body["num_inference_steps"] = opts.steps
+        if opts.guidance_scale is not None:
+            extra_body["guidance_scale"] = opts.guidance_scale
+        if opts.seed is not None:
+            extra_body["seed"] = opts.seed
+        if opts.negative_prompt is not None:
+            extra_body["negative_prompt"] = opts.negative_prompt
+    if extra_body:
+        form.add_field("extra_body", json.dumps(extra_body))
+
+    _add_input_reference(form, request_func_input.input_image_paths)
+    return form
+
+
 _SGLANG_VIDEO_POLL_INTERVAL_S = 1.0
 
 
@@ -1081,12 +1273,19 @@ class SglangVideoRequestDriver(RequestDriver):
             raise ValueError("Sglang video URL must end with '/videos'.")
         base_url = api_url.rstrip("/")
 
-        payload = _build_sglang_video_payload(request_func_input)
-
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
-        }
+        # image-to-video uploads the conditioning image, which requires
+        # multipart/form-data; text-to-video stays JSON. Let aiohttp set the
+        # multipart Content-Type (with boundary) for the form path.
+        headers = dict(openai_bearer_auth_headers())
+        if request_func_input.input_image_paths:
+            post_kwargs: dict[str, Any] = {
+                "data": _build_sglang_video_form(request_func_input)
+            }
+        else:
+            headers["Content-Type"] = "application/json"
+            post_kwargs = {
+                "json": _build_sglang_video_payload(request_func_input)
+            }
 
         output = PixelGenerationRequestFuncOutput()
         start = time.perf_counter()
@@ -1095,7 +1294,7 @@ class SglangVideoRequestDriver(RequestDriver):
         async with aiohttp.ClientSession(timeout=AIOHTTP_TIMEOUT) as session:
             try:
                 async with session.post(
-                    url=base_url, json=payload, headers=headers
+                    url=base_url, headers=headers, **post_kwargs
                 ) as response:
                     if response.status != 200:
                         body = await response.text()
@@ -1224,7 +1423,7 @@ class VllmOmniPixelGenerationRequestDriver(RequestDriver):
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+            **openai_bearer_auth_headers(),
         }
 
         output = PixelGenerationRequestFuncOutput()
@@ -1328,11 +1527,20 @@ class VllmOmniVideoRequestDriver(RequestDriver):
                 "vllm-omni video generation URL must end with 'videos/sync'."
             )
 
+        # For image-to-video the conditioning image rides along as the
+        # `input_reference` file, which requires multipart/form-data. The
+        # text-to-video path keeps its existing form-encoded dict POST.
         payload = _build_vllm_omni_video_payload(request_func_input)
+        if request_func_input.input_image_paths:
+            form = aiohttp.FormData()
+            for field_name, value in payload.items():
+                form.add_field(field_name, value)
+            _add_input_reference(form, request_func_input.input_image_paths)
+            post_data: Any = form
+        else:
+            post_data = payload
 
-        headers = {
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
-        }
+        headers = openai_bearer_auth_headers()
 
         output = PixelGenerationRequestFuncOutput()
         start = time.perf_counter()
@@ -1341,7 +1549,7 @@ class VllmOmniVideoRequestDriver(RequestDriver):
         async with aiohttp.ClientSession(timeout=AIOHTTP_TIMEOUT) as session:
             try:
                 async with session.post(
-                    url=api_url, data=payload, headers=headers
+                    url=api_url, data=post_data, headers=headers
                 ) as response:
                     output.latency = time.perf_counter() - start
                     if response.status != 200:
@@ -1423,8 +1631,9 @@ class RequestCounter:
             self.total_sent_requests += 1
             if self.total_sent_requests == self.max_requests:
                 logger.info(
-                    f"Ending run: max requests {self.max_requests} have been"
-                    " sent"
+                    f"Request cap reached (--num-prompts={self.max_requests}):"
+                    " no new requests will start; waiting for queued and"
+                    " in-flight requests to complete."
                 )
             return True
 

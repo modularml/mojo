@@ -1,0 +1,473 @@
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("//bazel:api.bzl", "modular_cc_binary", "modular_cc_test")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_test(
+    name = "ADTTest",
+    srcs = glob(["ADT/*.cpp"]),
+    deps = [
+        "//Support:ADT",
+        "//Support:Base",
+        "//Support:Globals",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_test(
+    name = "BaseTest",
+    srcs = [
+        "AlignedAllocTest.cpp",
+        "AssertStreamTest.cpp",
+        "ErrorOrTest.cpp",
+        "ErrorTest.cpp",
+        "FunctionExtrasTest.cpp",
+        "MathExtras.cpp",
+        "ProcessTest.cpp",
+        "RandomTest.cpp",
+        "StringExtrasTest.cpp",
+        "ThreadingTest.cpp",
+    ],
+    deps = [
+        "//Support:Base",
+        "//Support:Buffer",
+        "//Support:Threading",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "LogTest",
+    srcs = [
+        "Log/LogTest.cpp",
+    ],
+    env = {
+        "MODULAR_LOG_STDOUT": "false",
+    },
+    deps = [
+        "//Support:Log",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "LogEdgeCasesTest",
+    srcs = [
+        "Log/LogEdgeCasesTest.cpp",
+    ],
+    deps = [
+        "//Support:Log",
+    ],
+)
+
+# Separate test because of global log file state
+modular_cc_test(
+    name = "LogConfigFileTest",
+    srcs = [
+        "Log/LogConfigFileTest.cpp",
+    ],
+    env = {
+        "MODULAR_LOG_STDOUT": "false",
+    },
+    deps = [
+        "//Support:Configuration",
+        "//Support:Log",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# Separate test because of global log file state
+modular_cc_test(
+    name = "LogChannelTest",
+    srcs = [
+        "Log/LogChannelTest.cpp",
+    ],
+    env = {
+        "MODULAR_LOG_STDOUT": "false",
+    },
+    deps = [
+        "//Support:Log",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# Separate test because of global log file state
+modular_cc_test(
+    name = "SpanGuardTest",
+    srcs = [
+        "Log/SpanGuardTest.cpp",
+    ],
+    env = {
+        "MODULAR_LOG_STDOUT": "false",
+    },
+    deps = [
+        "//Support:Log",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# Separate test because of global log file state
+modular_cc_test(
+    name = "LogKeyValueTest",
+    srcs = [
+        "Log/LogKeyValueTest.cpp",
+    ],
+    env = {
+        "MODULAR_LOG_STDOUT": "false",
+    },
+    deps = [
+        "//Support:Log",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# Separate test because of global log file state
+modular_cc_test(
+    name = "LogJSONOutputTest",
+    srcs = [
+        "Log/LogJSONOutputTest.cpp",
+    ],
+    env = {
+        "MODULAR_LOG_JSON": "true",
+        "MODULAR_LOG_LEVEL": "DEBUG",
+        "MODULAR_LOG_STDOUT": "false",
+    },
+    deps = [
+        "//Support:Configuration",
+        "//Support:Log",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "MpscRingBufferTest",
+    srcs = ["MpscRingBufferTest.cpp"],
+    deps = ["//Support:MpscRingBuffer"],
+)
+
+modular_cc_test(
+    name = "HashUtilsTest",
+    srcs = ["HashUtilsTest.cpp"],
+    deps = [
+        "//Support:HashUtils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_test(
+    name = "IPIntTest",
+    srcs = ["IPIntTest.cpp"],
+    deps = [
+        "//Support:IPInt",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "IPRationalTest",
+    srcs = ["IPRationalTest.cpp"],
+    deps = ["//Support:IPRational"],
+)
+
+modular_cc_test(
+    name = "BufferTest",
+    srcs = ["BufferTest.cpp"],
+    deps = [
+        "//Support:Buffer",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "Base64Test",
+    srcs = ["Base64Test.cpp"],
+    deps = [
+        "//Support:Base64",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "CompilerTest",
+    srcs = glob(["Compiler/*.cpp"]),
+    deps = [
+        "//Support:Compiler",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_test(
+    name = "ConfigurationTest",
+    srcs = ["ConfigurationTest.cpp"],
+    deps = [
+        "//Support:Configuration",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "ContextTest",
+    srcs = ["ContextTest.cpp"],
+    deps = [
+        "//Support:Context",
+        "//Support:Globals",
+    ],
+)
+
+modular_cc_test(
+    name = "DebugInfoDialectTest",
+    srcs = glob(["DebugInfoDialect/*.cpp"]),
+    deps = [
+        "//Support:Base",
+        "//Support:DebugInfoDialect",
+        "//Support:DebugInfoToLLVM",
+        "//Support:DebugInfoTransforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+    ],
+)
+
+modular_cc_test(
+    name = "DeviceSpecsTest",
+    srcs = ["DeviceSpecsTest.cpp"],
+    deps = ["//Support:DeviceSpecs"],
+)
+
+modular_cc_test(
+    name = "MicroBenchmarkTest",
+    srcs = ["MicroBenchmarkTest.cpp"],
+    deps = [
+        "//Support:MicroBenchmark",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "FilesystemTest",
+    srcs = ["FileSystemExtrasTest.cpp"],
+    deps = [
+        "//Support:Base",
+        "//Support:Buffer",
+        "//Support:Filesystem",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "URITest",
+    srcs = ["URITest.cpp"],
+    deps = ["//Support:URI"],
+)
+
+modular_cc_test(
+    name = "MLTest",
+    srcs = [
+        "DTypeTest.cpp",
+        "TensorShapeTest.cpp",
+        "TensorSpecTest.cpp",
+    ],
+    deps = [
+        "//Support:Base",
+        "//Support:ML",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_test(
+    name = "HostTest",
+    srcs = ["HostTest.cpp"],
+    deps = [
+        "//Support:MArchTarget",
+        "//Support:MArchTargetMinimal",
+        "//Support:Threading",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "ProfilingTest",
+    srcs = ["TimeProfilerTest.cpp"],
+    deps = [
+        "//Support:Globals",
+        "//Support:TimeProfiler",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "MArchTargetTest",
+    srcs = glob(["MArchTarget/*.cpp"]),
+    deps = [
+        "//Support:Base",
+        "//Support:Globals",
+        "//Support:MArchTarget",
+        "//Support:MDialect",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "TelemetryTest",
+    srcs = ["TelemetryTest.cpp"],
+    env = {"MODULAR_TELEMETRY_ENABLED": "true"},
+    deps = [
+        "//Support:Base",
+        "//Support:Configuration",
+        "//Support:Filesystem",
+        "//Support:Telemetry",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "FillTest",
+    srcs = ["ML/FillTest.cpp"],
+    deps = [
+        "//Support:ML",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_test(
+    name = "PermutationTest",
+    srcs = ["ML/Permutation.cpp"],
+    deps = ["//Support:ML"],
+)
+
+modular_cc_test(
+    name = "DiagnosticsTests",
+    srcs = glob(["Diagnostics/*.cpp"]),
+    deps = ["//Support:Diagnostics"],
+)
+
+modular_cc_test(
+    name = "MetricsTest",
+    srcs = ["MetricsTest.cpp"],
+    deps = [
+        "//Support:Metrics",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+# NIXL plugin-flavor resolution is Linux-x86-only, and the fixtures below rely on
+# ELF symbol versioning to reproduce the SONAME collision the preload guards
+# against.
+_NIXL_PLATFORM = [
+    "@platforms//cpu:x86_64",
+    "@platforms//os:linux",
+]
+
+# Two libfabric stand-ins sharing one SONAME: the EFA build we stage (exports
+# FABRIC_1.8) and an older distro build that stops at FABRIC_1.0.
+[
+    cc_binary(
+        name = "nixl_libfabric_{}_fixture.so".format(flavor),
+        srcs = ["NixlLibfabricFixture.cpp"],
+        additional_linker_inputs = ["nixl_libfabric_{}.map".format(flavor)],
+        defines = ["FIXTURE_HAS_FABRIC_1_8={}".format(1 if flavor == "efa" else 0)],
+        linkopts = [
+            "-Wl,-soname,libfabric.so.1",
+            "-Wl,--version-script,$(location nixl_libfabric_{}.map)".format(flavor),
+        ],
+        linkshared = True,
+        tags = ["manual"],
+        target_compatible_with = _NIXL_PLATFORM,
+    )
+    for flavor in [
+        "efa",
+        "distro",
+    ]
+]
+
+# Two libibverbs stand-ins sharing one SONAME: the EFA-patched build we stage
+# (exports IBVERBS_PRIVATE_59, which its provider libraries bind) and the distro
+# build with public symbols only.
+[
+    cc_binary(
+        name = "nixl_ibverbs_{}_fixture.so".format(flavor),
+        srcs = ["NixlIbverbsFixture.cpp"],
+        additional_linker_inputs = ["nixl_ibverbs_{}.map".format(flavor)],
+        defines = ["FIXTURE_HAS_IBVERBS_PRIVATE_59={}".format(1 if flavor == "efa" else 0)],
+        linkopts = [
+            "-Wl,-soname,libibverbs.so.1",
+            "-Wl,--version-script,$(location nixl_ibverbs_{}.map)".format(flavor),
+        ],
+        linkshared = True,
+        tags = ["manual"],
+        target_compatible_with = _NIXL_PLATFORM,
+    )
+    for flavor in [
+        "efa",
+        "distro",
+    ]
+]
+
+# libefa stand-in: the plugin's verbs library, one level below it, binding the
+# IBVERBS_PRIVATE_59 symbol only the EFA-patched libibverbs exports. Its own
+# rpath finds the staged libibverbs, so it is the already-resident distro copy —
+# not a missing file — that breaks it.
+modular_cc_binary(
+    name = "nixl_efa_fixture.so",
+    srcs = ["NixlEfaFixture.cpp"],
+    additional_linker_inputs = [":nixl_ibverbs_efa_fixture.so"],
+    linkopts = [
+        "-Wl,-soname,libefa.so.1",
+        "-Wl,-rpath,$$ORIGIN",
+        "$(location :nixl_ibverbs_efa_fixture.so)",
+    ],
+    linkshared = True,
+    tags = ["manual"],
+    target_compatible_with = _NIXL_PLATFORM,
+)
+
+# Plugin stand-in: binds a symbol only the EFA fixture exports at FABRIC_1.8, so
+# it loads against that copy and fails against the distro one, and one from
+# libefa so the transitive libibverbs requirement is recorded too.
+modular_cc_binary(
+    name = "libplugin_FIXTURE.so",
+    srcs = ["NixlPluginFixture.cpp"],
+    additional_linker_inputs = [
+        ":nixl_efa_fixture.so",
+        ":nixl_libfabric_efa_fixture.so",
+    ],
+    # Linked straight against the EFA fixtures so the DT_NEEDED entries and the
+    # symbol-version requirements are both recorded, like the real plugin's, and
+    # given the real plugin's rpath: the flavor dir is <prefix>/lib/nixl/<flavor>
+    # and the fabric stack is staged flat in <prefix>/lib.
+    linkopts = [
+        "-Wl,-rpath,$$ORIGIN/../..",
+        "$(location :nixl_efa_fixture.so)",
+        "$(location :nixl_libfabric_efa_fixture.so)",
+    ],
+    linkshared = True,
+    tags = ["manual"],
+    target_compatible_with = _NIXL_PLATFORM,
+)
+
+modular_cc_test(
+    name = "NixlPluginDirTest",
+    srcs = ["NixlPluginDirTest.cpp"],
+    data = [
+        ":libplugin_FIXTURE.so",
+        ":nixl_efa_fixture.so",
+        ":nixl_ibverbs_distro_fixture.so",
+        ":nixl_ibverbs_efa_fixture.so",
+        ":nixl_libfabric_distro_fixture.so",
+        ":nixl_libfabric_efa_fixture.so",
+    ],
+    target_compatible_with = _NIXL_PLATFORM,
+    deps = ["//Support:NixlPluginDir"],
+)

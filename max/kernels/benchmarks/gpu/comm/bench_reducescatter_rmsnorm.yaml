@@ -1,0 +1,26 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+name: bench_reducescatter_rmsnorm
+file: $KERNEL_BENCHMARKS_ROOT/gpu/comm/bench_reducescatter_rmsnorm.mojo
+
+# Two-launch reduce-scatter -> RMSNorm baseline (bf16 in/out, no FP8). Sweeps
+# the MiniMax-M3-MXFP4 TP4 shapes: H=6144, ngpus=4, decode M in {1,8,16,32}
+# and prefill M in {2048,4096}. Reports t_RS, t_norm(shard), the cold sum, and
+# the chained-warm RS->norm baseline the fused kernel must beat.
+params:
+  - in_dtype: [DType.bfloat16]
+    num_gpus: [4]
+    quantize: [False]
+    $num_rows: [1, 8, 16, 32, 2048, 4096]
+    num_cols: [6144]

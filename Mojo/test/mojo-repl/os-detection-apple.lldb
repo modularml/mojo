@@ -1,0 +1,16 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# REQUIRES: system-darwin
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+from std.sys.info import CompilationTarget
+# CHECK: True
+print(CompilationTarget.is_macos())
+# CHECK: False
+print(CompilationTarget.is_linux())

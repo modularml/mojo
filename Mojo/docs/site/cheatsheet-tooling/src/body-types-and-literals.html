@@ -1,0 +1,223 @@
+<!-- title: Mojo Types &amp; Literals -->
+<!-- subtitle: Numbers, SIMD, conversions, and how to write values -->
+<!-- layout: landscape -->
+<!-- width: 1300 -->
+<!-- Compiler verified: 2026-08-17, Mojo 1.0.0 (ed45d567) -->
+<!-- Last updated: 2026-08-17 (1.0.0 audit) -->
+
+<section class="panel">
+      <h2>SIMD is the foundation</h2>
+      <div class="body">
+<pre class="code"># Every fixed-width number is a 1-lane SIMD
+# Float32 = Scalar[DType.float32]
+#         = SIMD[DType.float32, 1]
+
+var v = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
+var d = v * 2.0 # [2, 4, 6, 8], all lanes
+v[0] = 5.0 # write one lane
+print(v.reduce_add()) # sum of lanes (14.0)</pre>
+        <p class="note">Width must be a power of two and is part of the type; its parameter type is <b>SIMDLength</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>DType: what a lane holds</h2>
+      <div class="body">
+<pre class="code">SIMD[DType.float32, 4] # DType picks the lane type
+Scalar[DType.int] # == Int</pre>
+        <p class="note">Names mirror the types: <b>DType.float32</b> ↔ <b>Float32</b>,
+          <b>DType.int8</b> ↔ <b>Int8</b>, <b>DType.bool</b> ↔ <b>Bool</b>. A
+          <b>DType</b> is a name, not a type. It parameterizes <b>SIMD</b>, which
+          stores the data.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Integers</h2>
+      <div class="body">
+<pre class="code">var n = 42 # Int: machine width
+var u: UInt = 42 # machine width
+var small: UInt8 = 255
+var big: Int64 = -9_000_000_000</pre>
+        <table>
+          <tr><td>Int / UInt</td><td>machine word (typically 64-bit)</td></tr>
+          <tr><td>Int8 … Int256</td><td>sized signed</td></tr>
+          <tr><td>UInt8 … UInt256</td><td>sized unsigned</td></tr>
+          <tr><td>Byte</td><td>alias for UInt8</td></tr>
+        </table>
+        <p class="note">Use <b>Int</b> for counts and indices; sized types when bit width is part of the contract. Each is an alias for a 1-lane SIMD.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Floating point</h2>
+      <div class="body">
+        <table>
+          <tr><td>Float64</td><td>IEEE double (default)</td></tr>
+          <tr><td>Float32</td><td>IEEE single</td></tr>
+          <tr><td>Float16</td><td>IEEE half</td></tr>
+          <tr><td>BFloat16</td><td>brain float (ML training)</td></tr>
+          <tr><td>Float8_e4m3fn …</td><td>8-bit (GPU, ML)</td></tr>
+          <tr><td>Float4_e2m1fn</td><td>4-bit (Blackwell+)</td></tr>
+        </table>
+        <p class="note">No bare <b>Float</b> type. Each is an alias for a 1-lane SIMD.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Bounds &amp; special values</h2>
+      <div class="body">
+        <table>
+          <tr><td>bit_width_of[Int]()</td><td>64 on most platforms (from std.sys.info)</td></tr>
+          <tr><td>UInt8.MAX</td><td>255</td></tr>
+          <tr><td>Int8.MIN</td><td>-128</td></tr>
+          <tr><td>Float32.MAX_FINITE</td><td>largest finite</td></tr>
+          <tr><td>Float32.MAX</td><td>may be inf</td></tr>
+        </table>
+        <p class="note">IEEE floats carry <b>inf</b>, <b>-inf</b>, <b>nan</b>, <b>-0.0</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Conversions are explicit</h2>
+      <div class="body">
+<pre class="code">var i = 42
+var f = Float64(i) # Int -> Float64
+var s = Int8(i) # Int -> Int8
+var back = Int(Int64(i)) # round trip
+
+# between SIMD-based types: .cast[]
+var g = f.cast[DType.int32]()</pre>
+        <p class="note">Variables never convert implicitly; the compiler enforces it. Literals
+          convert only when it can prove the result is exact.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Number literals</h2>
+      <div class="body">
+        <table>
+          <tr><td>42</td><td>decimal Int</td></tr>
+          <tr><td>0xFF  0o52  0b1010</td><td>hex, octal, binary</td></tr>
+          <tr><td>1_000_000</td><td>underscores group digits</td></tr>
+          <tr><td>3.14  .5  2.  2.5e-3</td><td>floats</td></tr>
+          <tr><td>2 ** 200</td><td>comptime IntLiteral, comptime arbitrary precision</td></tr>
+        </table>
+        <p class="note">Leading zeros on base-10 integers are rejected. At runtime literals
+          materialize to <b>Int</b> / <b>Float64</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Collection literals</h2>
+      <div class="body">
+<pre class="code">[1, 2, 3] # Array, length in the type
+{"id": 1, "qty": 9} # Dict
+(1, "a", 2.0) # Tuple, mixed types</pre>
+        <p class="note">Unannotated, a bracket literal defaults to <b>Array</b>. It adapts to the
+          type you ask for: <b>var x: List[Int] = [1, 2, 3]</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>String literals</h2>
+      <div class="body">
+<pre class="code">"double"   'single'
+
+# triple quotes: newlines and indentation included
+"""line one
+    line two"""
+
+r"C:\raw\path" # raw: no escape processing
+
+"\u20AC" # lowercase \u, 4 digits: € (EURO)
+"\U0001F44B" # uppercase \U, 8 digits: 👋 (above U+FFFF)
+
+# adjacent literals join, same line or across lines:
+"Hello" " world!" # -> "Hello world!"
+"Content of line 1. "
+"Content of line 2."</pre>
+        <p class="sublabel">Escapes:</p>
+        <table>
+          <tr><td>\n  \t</td><td>newline, tab</td></tr>
+          <tr><td>\"  \\</td><td>quote, backslash</td></tr>
+          <tr><td>\xHH</td><td>byte (2 hex digits)</td></tr>
+          <tr><td>\uHHHH</td><td>Unicode (4 hex digits)</td></tr>
+          <tr><td>\UHHHHHHHH</td><td>Unicode (8 hex digits)</td></tr>
+        </table>
+        <p class="note">Source is UTF-8. <b>\u</b> and <b>\U</b> reject surrogate code points (U+D800 to U+DFFF); code points above U+FFFF need <b>\U</b>, not a surrogate pair.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>T-strings</h2>
+      <div class="body">
+<pre class="code">var who = "Mojo"
+
+t"Hi, {who}!" # interpolation
+
+t"sum = {1 + 2}" # any expression
+
+t"{{literal braces}}" # -> {literal braces}
+
+rt"raw\path {who}" # raw t-string: \ literal, still interpolates
+
+String(t"x = {who}") # cast to String</pre>
+        <p class="note">Interpolations evaluate at runtime.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Other things</h2>
+      <div class="body">
+        <table>
+          <tr><td class="k">True False</td><td>boolean values</td></tr>
+          <tr><td class="k">None</td><td>the only NoneType value</td></tr>
+          <tr><td class="k">Self</td><td>the enclosing type</td></tr>
+          <tr><td>_</td><td>discard a value in assignment</td></tr>
+          <tr><td>...</td><td>marks a required trait method</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel py">
+      <h2>Sharp edges</h2>
+      <div class="body">
+        <ul>
+          <li><b>Int width is platform-dependent</b> — use Int64 for a fixed width.</li>
+          <li><b>Integer overflow wraps</b> — Int8(127) + 1 is -128.</li>
+          <li><b>Float-to-int truncates toward zero</b> — Int(Float64(3.9)) is 3.</li>
+          <li><b>nan == nan is False.</b></li>
+          <li><b>Float8 needs a GPU</b> — no runtime CPU arithmetic.</li>
+          <li><b>Int128 / Int256 are software-emulated.</b></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel py">
+      <h2>Coming from Python</h2>
+      <div class="body">
+        <ul>
+          <li>No implicit numeric conversion: <code>Int + Float64</code> is an error. Cast with
+            <code>Float64(n)</code>, <code>Int(x)</code>.</li>
+          <li>Numbers are fixed-width SIMD scalars, not arbitrary-precision <code>int</code>; only
+            a <b>comptime</b> <b>IntLiteral</b> is unbounded.</li>
+          <li>No bare <code>float</code> or <code>int</code> — pick <b>Int</b>, <b>Float64</b>, or a
+            sized type.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel py">
+      <h2>Coming from C++ / Rust</h2>
+      <div class="body">
+        <ul>
+          <li>Every scalar is a 1-lane <b>SIMD</b>; vectorizing widens the lane count, not a new
+            type.</li>
+          <li>Integer overflow <b>wraps</b> (defined), not C++ undefined behavior or a Rust debug
+            panic.</li>
+          <li><b>DType</b> is a value-level tag that parameterizes <b>SIMD</b>, not a type alias.</li>
+          <li><b>Int</b> is C++ <code>ssize_t</code> / Rust <code>isize</code>, not C++ <code>int</code>, which is usually 32-bit.</li>
+        </ul>
+      </div>
+    </section>

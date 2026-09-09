@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import logging
 import queue
 import sys
@@ -23,7 +22,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
 from typing import NoReturn
 
-from max.serve.config import MetricLevel, Settings
+from max.serve.config import Settings
 from max.serve.telemetry.metrics import MaxMeasurement, MetricClient
 
 logger = logging.getLogger("max.serve")
@@ -42,11 +41,8 @@ class NotStarted(Exception):
 
 
 class AsyncioMetricClient(MetricClient):
-    def __init__(
-        self, level: MetricLevel, q: asyncio.Queue[MaxMeasurement]
-    ) -> None:
+    def __init__(self, q: asyncio.Queue[MaxMeasurement]) -> None:
         self.q = q
-        self.level = level
 
     def __getstate__(self) -> NoReturn:
         raise TypeError(
@@ -54,9 +50,7 @@ class AsyncioMetricClient(MetricClient):
             "Use cross_process_factory to safely send across processes."
         )
 
-    def send_measurement(self, m: MaxMeasurement, level: MetricLevel) -> None:
-        if level > self.level:
-            return
+    def send_measurement(self, m: MaxMeasurement) -> None:
         try:
             self.q.put_nowait(m)
         except queue.Full:
@@ -68,7 +62,7 @@ class AsyncioMetricClient(MetricClient):
         self,
         settings: Settings,
     ) -> Callable[[], AbstractAsyncContextManager[MetricClient]]:
-        return functools.partial(start_asyncio_consumer, self.level)
+        return start_asyncio_consumer
 
 
 class AsyncioTelemetryController:
@@ -103,12 +97,12 @@ class AsyncioTelemetryController:
         finally:
             self.task = None
 
-    def Client(self, level: MetricLevel) -> AsyncioMetricClient:
+    def Client(self) -> AsyncioMetricClient:
         if self.task is None:
             raise NotStarted(
                 "AsyncioTelemetryController task not started. Cannot enqueue work."
             )
-        return AsyncioMetricClient(level, self.q)
+        return AsyncioMetricClient(self.q)
 
     @staticmethod
     async def _consume(q: asyncio.Queue[MaxMeasurement]) -> None:
@@ -144,8 +138,6 @@ class AsyncioTelemetryController:
 
 
 @asynccontextmanager
-async def start_asyncio_consumer(
-    level: MetricLevel,
-) -> AsyncGenerator[AsyncioMetricClient, None]:
+async def start_asyncio_consumer() -> AsyncGenerator[AsyncioMetricClient, None]:
     async with AsyncioTelemetryController() as controller:
-        yield controller.Client(level)
+        yield controller.Client()

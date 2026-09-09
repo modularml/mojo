@@ -1,0 +1,53 @@
+load("//bazel:api.bzl", "modular_cc_library", "modular_cc_test")
+
+package(default_visibility = ["//visibility:private"])
+
+modular_cc_library(
+    name = "Support",
+    testonly = True,
+    srcs = ["Support.cpp"],
+    hdrs = ["Support.h"],
+    deps = [
+        "//Mojo/tools/mojo-lsp-test-client",
+        "@llvm-project//lldb:liblldb.wrapper",
+        "@llvm-project//lldb:lldb24.0.0git",
+        "@llvm-project//third-party/unittest:gtest",
+    ],
+)
+
+modular_cc_test(
+    name = "unittests",
+    srcs = glob(
+        ["*.cpp"],
+        exclude = ["Support.cpp"],
+    ),
+    data = glob([
+        "inputs/*.mojo",
+    ]) + [
+        "//Mojo:MojoLLDB",
+        "//Mojo:gdb-server",
+        "//Mojo/tools/mojo",
+        "//Mojo/unittests:lit-lldb-init.in",
+    ],
+    env = {
+        # HACK: This test invokes "mojo build" in a subprocess, but it can't see modular.cfg, so we need to
+        # provide the run path here to find CompilerRT.
+        "MODULAR_MOJO_MAX_SHARED_LIBS": "-Xlinker,-rpath,-Xlinker,Mojo",
+        "MODULAR_PATH": ".",
+    },
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    tags = [
+        "resources:cpu:4",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:ubsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":Support",
+        "//Support:Globals",
+    ],
+)

@@ -51,6 +51,7 @@ class Gemma3Attention(Module[..., Tensor]):
         hidden_size: int,
         kv_params: KVCacheParams,
         layer_idx: int,
+        is_sliding: bool,
         sliding_window_pattern: int = 6,
         scale: float | None = None,
         has_bias: bool = False,
@@ -62,6 +63,7 @@ class Gemma3Attention(Module[..., Tensor]):
         self.rope_local = rope_local
         self.n_heads = num_attention_heads
         self.layer_idx = layer_idx
+        self.is_sliding = is_sliding
         self.has_bias = has_bias
         self.scale = (
             scale if scale is not None else math.sqrt(1.0 / kv_params.head_dim)
@@ -126,8 +128,6 @@ class Gemma3Attention(Module[..., Tensor]):
         kv_collection: PagedCacheValues,
         **kwargs,
     ) -> Tensor:
-        total_seq_len = x.shape[0]
-
         layer_idx = F.constant(self.layer_idx, DType.uint32, device=CPU())
 
         n_devices = kv_collection.n_devices
@@ -144,7 +144,9 @@ class Gemma3Attention(Module[..., Tensor]):
         if self.wqkv_bias is not None:
             qkv = qkv + self.wqkv_bias
 
-        # Split into Q, K, V and apply per-head QK norm.
+        # Split into Q, K, V and apply per-head QK norm. The reshape rule
+        # resolves `-1` per-shard via the placement's `local_dim`, so
+        # plain global sizes here produce correct per-shard targets.
         x_q, x_k, x_v = qkv.split([q_dim, kv_dim, kv_dim], axis=-1)
         x_q = self.q_norm(x_q.reshape((-1, self.n_heads, head_dim))).reshape(
             (-1, q_dim)
@@ -156,8 +158,7 @@ class Gemma3Attention(Module[..., Tensor]):
         # Re-concat and apply RoPE + KV cache store.
         qkv = F.concat([x_q, x_k, x_v], axis=-1)
 
-        use_local = bool((self.layer_idx + 1) % self.sliding_window_pattern)
-        rope = self.rope_local if use_local else self.rope_global
+        rope = self.rope_local if self.is_sliding else self.rope_global
 
         xq = rope_split_store_ragged(
             kv_params=self.kv_params,
@@ -169,11 +170,11 @@ class Gemma3Attention(Module[..., Tensor]):
             n_heads=per_device_n_heads,
             interleaved=rope.interleaved,
         )
-        xq = xq.reshape((-1, self.n_heads, self.kv_params.head_dim))
+        xq = xq.reshape((-1, self.n_heads, head_dim))
 
         mask_variant = (
             MHAMaskVariant.SLIDING_WINDOW_CAUSAL_MASK
-            if use_local
+            if self.is_sliding
             else MHAMaskVariant.CAUSAL_MASK
         )
         attn_out = flash_attention_ragged(
@@ -186,8 +187,5 @@ class Gemma3Attention(Module[..., Tensor]):
             scale=self.scale,
             local_window_size=self.local_window_size,
         )
-        # TODO: handle reshape with -1
-        # ValueError: reshape: cannot map sharded dim 1 (global size 8) from shape [Dim('total_seq_len'), Dim(8), Dim(256)] to [Dim('total_seq_len'), -1]
-        hidden_dim = self.n_heads * self.kv_params.head_dim
-        attn_out = F.reshape(attn_out, shape=[total_seq_len, hidden_dim])
+        attn_out = attn_out.reshape((-1, self.n_heads * head_dim))
         return self.o_proj(attn_out)

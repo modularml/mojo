@@ -11,15 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-import compiler
+import extensibility
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from extensibility import InputTensor, OutputTensor, foreach
 
+from std.utils.coord import Coord
 from std.utils.index import IndexList
 
 
-@compiler.register("add_constant_custom")
+@extensibility.register("add_constant_custom")
 struct AddConstantCustom[value: Int]:
     @staticmethod
     def execute[
@@ -29,11 +30,9 @@ struct AddConstantCustom[value: Int]:
         x: InputTensor[dtype=outp.dtype, rank=outp.rank, ...],
         ctx: DeviceContext,
     ) raises:
-        @parameter
+        @__parameter
         @always_inline
-        def add_constant[
-            width: Int
-        ](idx: IndexList[x.rank]) -> SIMD[x.dtype, width]:
+        def add_constant[width: Int](idx: Coord) -> SIMD[x.dtype, width]:
             return x.load[width](idx) + Scalar[outp.dtype](Self.value)
 
         foreach[add_constant, target=target](outp, ctx)

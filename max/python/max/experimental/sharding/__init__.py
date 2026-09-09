@@ -11,46 +11,103 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Placement types and sharding specifications for distributed tensors.
+"""Distributed-tensor sharding: how a tensor is laid out across a device mesh.
 
-This package is the single source of truth for describing how tensor data is
-distributed across a :class:`DeviceMesh`. It contains:
+Describes, for every op, what redistribution to perform before the op runs.
+The pipeline is deliberately local: per-op rules over a placement vocabulary
+(:class:`Replicated`, :class:`Sharded`, :class:`Partial`), scored by a single
+cost model, with one pluggable :class:`Solver` making the choice at each
+dispatch. There is no whole-graph trace.
 
-**Placement types** (mesh-axis-indexed primitives):
+A ``mode(...)`` block selects the solver for the ops inside it:
 
-* :class:`Replicated`: every device holds a full copy.
-* :class:`Sharded`: tensor is split along a dimension.
-* :class:`Partial`: each device holds a partial result needing reduction.
+.. code-block:: python
 
-**Sharding specifications** (high-level wrappers):
+    import numpy as np
+    from max.driver import CPU
+    from max.dtype import DType
+    from max.experimental.functional import full, matmul, relu, transfer_to
+    from max.experimental.sharding import (
+        DeviceMesh,
+        GreedyReshard,
+        PlacementMapping,
+        Sharded,
+        mode,
+    )
 
-* :class:`PlacementMapping`, **mesh-axis-indexed** (PyTorch DTensor style).
-  One :class:`Placement` per mesh axis. Suitable for eager dispatch.
-* :class:`NamedMapping`, **tensor-dimension-indexed** (JAX PartitionSpec
-  style). One entry per tensor dimension names the mesh axis that shards it.
-  Suitable for compiler-driven sharding propagation.
+    # A simulated two-device mesh (both slots are the same CPU).
+    mesh = DeviceMesh(devices=(CPU(), CPU()), mesh_shape=(2,), axis_names=("tp",))
 
-Both spec types share the same :class:`DeviceMesh` and can be converted to
-each other for the standard placement vocabulary. Conversions that would
-lose information raise :class:`ConversionError`.
+    # ``a`` is column-sharded, ``b`` is row-sharded: a @ b contracts the
+    # sharded dimension, so the picker resolves the result back to replicated.
+    a = transfer_to(
+        full([4, 8], 1.0, dtype=DType.float32, device=mesh.devices[0]),
+        PlacementMapping(mesh, (Sharded(1),)),
+    )
+    b = transfer_to(
+        full([8, 2], 1.0, dtype=DType.float32, device=mesh.devices[0]),
+        PlacementMapping(mesh, (Sharded(0),)),
+    )
+
+    with mode(GreedyReshard(on_reshard="warn")):
+        y = relu(matmul(a, b))
+
+.. invisible-code-block: python
+
+    import numpy as np
+
+    # full(4, 8) @ full(8, 2) = 8 * ones(4, 2), then relu is a no-op (positive).
+    assert np.allclose(y.to_numpy(), np.full((4, 2), 8.0))
+
+Shipped solvers: :class:`GreedyReshard` (cheapest feasible action),
+:class:`NoReshard` (passthrough only; errors on any reshard), and
+:class:`PartialsOnly` (only ``Partial -> Replicated`` resolutions).
+
+This module avoids the overloaded word "rank". A *device* is one accelerator;
+a *mesh axis* is one named dimension of the :class:`DeviceMesh` grid; a
+*shard* is one device's piece of a tensor; a *tensor axis* is a dimension of
+the tensor itself.
 """
 
+from .action import (
+    Action,
+    ActionSet,
+    AxisAssignment,
+    PerShard,
+)
+from .cost import (
+    P,
+    R,
+    build_action_set,
+    force_replicated_action_set,
+)
 from .mappings import (
     ConversionError,
     DeviceMapping,
     NamedMapping,
     PlacementMapping,
-    SpecEntry,
 )
-from .mesh import DeviceMesh
-from .placements import Partial, Placement, ReduceOp, Replicated, Sharded
-from .shapes import (
-    _shard_sizes_along_axis,
-    global_shape_from_local,
-    local_shard_shape_from_global,
-    shard_shape,
-    sharded_symbolic_dim,
+from .mesh import DeviceMesh, get_active_mesh, mesh_context
+
+# Re-export so ``sharding.mode(...)`` resolves to the function, not the submodule.
+from .mode import ShardingError, isolated_solver, mode
+from .per_shard_dim import PerShardDim
+from .picker import (
+    GreedyReshard,
+    NoReshard,
+    PartialsOnly,
+    ReshardBehavior,
+    Solver,
 )
+from .placements import (
+    Collective,
+    Partial,
+    Placement,
+    ReduceOp,
+    Replicated,
+    Sharded,
+)
+from .rules import *
 from .types import (
     DistributedBufferType,
     DistributedTensorType,
@@ -59,24 +116,38 @@ from .types import (
 )
 
 __all__ = [
+    "Action",
+    "ActionSet",
+    "AxisAssignment",
+    "Collective",
     "ConversionError",
     "DeviceMapping",
     "DeviceMesh",
     "DistributedBufferType",
     "DistributedTensorType",
     "DistributedType",
+    "GreedyReshard",
     "NamedMapping",
+    "NoReshard",
+    "P",
     "Partial",
+    "PartialsOnly",
+    "PerShard",
+    "PerShardDim",
     "Placement",
     "PlacementMapping",
+    "R",
     "ReduceOp",
     "Replicated",
+    "ReshardBehavior",
     "Sharded",
-    "SpecEntry",
+    "ShardingError",
+    "Solver",
     "TensorLayout",
-    "_shard_sizes_along_axis",
-    "global_shape_from_local",
-    "local_shard_shape_from_global",
-    "shard_shape",
-    "sharded_symbolic_dim",
+    "build_action_set",
+    "force_replicated_action_set",
+    "get_active_mesh",
+    "isolated_solver",
+    "mesh_context",
+    "mode",
 ]

@@ -19,11 +19,23 @@ All operations are no-ops that return immediately.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
+from max.nn.kv_cache import KVCacheGroupId
 from max.nn.kv_cache.metrics import KVCacheMetrics
+from max.pipelines.kv_cache.kv_connector import (
+    CompletedTransfer,
+    KVConnector,
+    KVConnectorTransfer,
+)
 
 
-class NullConnector:
+class NullConnector(KVConnector):
     """No-op connector for when external caching is disabled."""
+
+    @property
+    def leaves(self) -> Mapping[str, KVCacheGroupId]:
+        return {"full": KVCacheGroupId.full()}
 
     @property
     def name(self) -> str:
@@ -31,42 +43,20 @@ class NullConnector:
 
     def load(
         self,
-        device_block_ids: list[int],
-        block_hashes: list[int],
-    ) -> int:
-        return 0
+        block_ids: Mapping[str, Sequence[int]],
+        block_hashes: Sequence[bytes],
+        replica_idx: int = 0,
+        hint: bytes | None = None,
+    ) -> KVConnectorTransfer:
+        return CompletedTransfer.load()
 
     def offload(
         self,
-        block_ids: list[int],
-        block_hashes: list[int],
-    ) -> None:
-        pass
-
-    def sync(self) -> None:
-        pass
-
-    def shutdown(self) -> None:
-        pass
-
-    @property
-    def num_host_blocks(self) -> int:
-        return 0
-
-    @property
-    def num_used_host_blocks(self) -> int:
-        return 0
-
-    @property
-    def num_disk_blocks(self) -> int:
-        return 0
-
-    @property
-    def num_used_disk_blocks(self) -> int:
-        return 0
-
-    def reset_prefix_cache(self) -> None:
-        pass
+        block_ids: Mapping[str, Sequence[int]],
+        block_hashes: Sequence[bytes],
+        replica_idx: int = 0,
+    ) -> KVConnectorTransfer:
+        return CompletedTransfer.offload()
 
     @property
     def metrics(self) -> KVCacheMetrics:

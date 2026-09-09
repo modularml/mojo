@@ -12,10 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import barrier, warp_id, lane_id
-from std.gpu.host import DeviceContext
-from std.gpu import thread_idx
-from std.gpu.compute.mma import (
+from max.gpu import warp_id, lane_id
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import thread_idx
+from max.gpu.compute.mma import (
     wgmma_async,
     wgmma_commit_group_sync,
     wgmma_fence_aligned,
@@ -53,17 +54,17 @@ def wgmma_kernel_ss[
     c_gmem: LayoutTensor[c_type, c_layout, MutAnyOrigin],
 ):
     var a_smem_tile = LayoutTensor[
-        DType.bfloat16,
+        .bfloat16,
         a_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     var b_smem_tile = LayoutTensor[
-        DType.bfloat16,
+        .bfloat16,
         b_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     comptime num_output_regs = WMMA_M * WMMA_N // 128
@@ -128,18 +129,18 @@ def wgmma_bf16_bf16_f32[
         sep="",
     )
 
-    var a = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(M, K)](ctx)
+    var a = ManagedLayoutTensor[.bfloat16, Layout.row_major(M, K)](ctx)
     arange(a.tensor[update=False]())
 
-    var b = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(N, K)](ctx)
+    var b = ManagedLayoutTensor[.bfloat16, Layout.row_major(N, K)](ctx)
     arange(b.tensor[update=False]())
 
-    var c = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(M, N)](ctx)
-    var c_ref = ManagedLayoutTensor[DType.bfloat16, Layout.row_major(M, N)](ctx)
+    var c = ManagedLayoutTensor[.bfloat16, Layout.row_major(M, N)](ctx)
+    var c_ref = ManagedLayoutTensor[.bfloat16, Layout.row_major(M, N)](ctx)
 
-    comptime a_smem_layout = tile_layout_k_major[DType.bfloat16, BM=M, BK=16]()
+    comptime a_smem_layout = tile_layout_k_major[.bfloat16, BM=M, BK=16]()
 
-    comptime b_smem_layout = tile_layout_k_major[DType.bfloat16, BM=N, BK=16]()
+    comptime b_smem_layout = tile_layout_k_major[.bfloat16, BM=N, BK=16]()
 
     comptime kernel = wgmma_kernel_ss[
         DType.bfloat16,

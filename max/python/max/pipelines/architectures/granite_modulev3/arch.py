@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 from max.graph.weights import WeightsFormat
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
+from max.pipelines.kv_cache.memory_planner import PagedMemoryPlanner
 from max.pipelines.lib import (
     SupportedArchitecture,
     TextTokenizer,
@@ -39,10 +40,12 @@ granite_modulev3_arch = SupportedArchitecture(
     pipeline_model=Llama3Model,
     tokenizer=TextTokenizer,
     context_type=TextContext,
-    rope_type="normal",
     weight_adapters={
         WeightsFormat.safetensors: weight_adapters.convert_safetensor_state_dict,
         WeightsFormat.gguf: weight_adapters.convert_gguf_state_dict,
     },
     config=Llama3Config,
+    memory_planner=PagedMemoryPlanner,
+    supports_overlap_scheduler=False,
+    supports_device_graph_capture=False,
 )

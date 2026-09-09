@@ -1,0 +1,17 @@
+{
+  "target": "topk_topp_sampling_dist",
+  "spec": {
+    "rows": 192,
+    "d": 2,
+    "k": 0,
+    "top_p_milli": 1000,
+    "temp_milli": 1000,
+    "min_p_milli": 0,
+    "dist": 5,
+    "seed": 123
+  },
+  "verdict": "PASS",
+  "oracle": "ref",
+  "detail": "special-value rows at the narrowest cluster width: NaN/+Inf and all--Inf rows must emit a zero distribution with an in-range (but otherwise unconstrained) token",
+  "findings": []
+}

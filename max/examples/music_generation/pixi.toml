@@ -1,0 +1,18 @@
+[workspace]
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+description = "Generating music with MiniMax-Music3"
+name = "Music generation"
+platforms = ["linux-aarch64", "linux-64"]
+version = "0.1.0"
+
+[tasks]
+generate = "python generate_song.py --out song.wav"
+excerpt = "python generate_song.py --out excerpt.wav --duration 30"
+
+[dependencies]
+python = ">=3.9,<3.14"
+max = "*"
+numpy = ">=1.26"
+requests = ">=2.31"
+huggingface_hub = ">=0.28"

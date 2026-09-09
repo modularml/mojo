@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}} · Mojo cheat sheet</title>
+<style>
+  :root{
+    /* neutrals: Twilight */
+    --ink:#181c1f; --muted:#676d71; --line:#e5e9ef; --bg:#ffffff;
+    --code-bg:#f8f8f8; --code-line:#eef0f4;
+    /* accent + backdrops: Ember (matches mojolang.org) */
+    --accent:#c53713; --accent-soft:#fff7ee; --brand:#ff552a;
+    /* syntax: brand tokens where defined, brand-adjacent for the extra categories */
+    --c-comment:#676d86;  /* const-gray, readable in print */
+    --c-kw:#5b66c0;       /* keyword: toned down from Nebula #637bff */
+    --c-num:#9570ff;      /* number: purple */
+    --c-str:#d6273a;      /* string: redder than brand pink #f44771 */
+    --c-type:#0e7490;     /* type: teal; brand has no type token */
+    --c-builtin:#b45309;  /* built-in: amber */
+    --c-deco:#2e7d46;     /* decorator: green, kept clear of string-red */
+    --c-op:#353d42;       /* operator: Twilight70 dark-gray */
+    --c-lit:#9333ea;      /* True / False / None */
+  }
+  /* ---- dark mode (body.dark): Twilight surfaces + lightened syntax ---- */
+  body.dark{
+    --ink:#e5e9ef; --muted:#9aa0ab; --line:#353d42; --bg:#181c1f;
+    --code-bg:#11161a; --code-line:#2b3238;
+    --accent:#ff8f4d; --accent-soft:#2a201a; --brand:#ff552a;
+    --c-comment:#8a90a0; --c-kw:#a6b0ec; --c-num:#ae92ff; --c-str:#f56b6b;
+    --c-type:#5cc2d4; --c-builtin:#e9a44d; --c-deco:#5cc98a; --c-op:#aab0bb;
+    --c-lit:#c08bff;
+    background:#020c13;
+  }
+  html.dark{background:#020c13;}
+  body.dark .panel{background:#1e242a;}
+  body.dark table td,body.dark table.dec td{border-bottom-color:#2a3036;}
+  body.dark .panel.tr h2{color:#5cc2d4;background:#15262b;}
+  body.dark .panel.kw h2{color:#e3b341;background:#241f12;}
+  body.dark .yes{color:#5cc98a;} body.dark .no{color:#ff7a85;} body.dark .mid{color:#e9a44d;}
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#eceef1;color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:11px;line-height:1.45;}
+  .sheet{background:var(--bg);max-width:900px;margin:14px auto;padding:18px 20px 14px;}
+  header{display:flex;align-items:baseline;justify-content:space-between;
+    border-bottom:2px solid var(--brand);padding-bottom:7px;margin-bottom:12px;}
+  header h1{font-size:21px;margin:0;letter-spacing:-.01em;}
+  .brand{display:flex;align-items:center;gap:9px;}
+  .mark{width:30px;height:30px;flex:none;}
+  header .sub{font-size:11px;color:var(--muted);}
+  header .meta{font-size:9.5px;color:var(--muted);text-align:right;}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:9.5px;color:var(--muted);
+    margin:-4px 0 12px;}
+  .legend span b{font-weight:600;}
+  .cols{column-count:2;column-gap:16px;}
+  @media (max-width:840px){.cols{column-count:2;}}
+  @media (max-width:560px){.cols{column-count:1;}}
+  .panel{break-inside:avoid;margin:0 0 12px;border:1px solid var(--line);border-radius:6px;
+    overflow:hidden;background:#fff;}
+  .panel.wide{column-span:all;}
+  .panel.colbreak{break-before:column;}
+  .panel h2{font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin:0;
+    padding:5px 9px;color:var(--accent);background:var(--accent-soft);
+    border-bottom:1px solid var(--line);font-weight:700;}
+  .panel.tr h2{color:#0e7490;background:#ecfeff;}
+  .panel.kw h2{color:#a16207;background:#fefce8;}
+  .py ul{margin:2px 0 0;padding-left:1.1em;}
+  .py li{margin:3px 0 4px;}
+  .panel .body{padding:7px 9px 8px;}
+  p.note{margin:6px 0 0;font-size:10px;color:var(--muted);}
+  p.note b{color:var(--ink);font-weight:600;}
+  .sublabel{margin:9px 0 3px;font-size:10px;font-weight:700;color:var(--ink);}
+  .body > .sublabel:first-child{margin-top:0;}
+  /* shared: inline summary beside a name, category headers, sharp-edge warning.
+     Used by the traits, conversions, and compile-time cards. */
+  .sum{font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:9.5px;}
+  .cathead{break-inside:avoid;break-after:avoid;margin:12px 0 7px;padding-bottom:2px;
+    font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--brand);border-bottom:2px solid var(--brand);}
+  .cols > .cathead:first-child{margin-top:0;}
+  .edge{margin:6px 0 0;font-size:9.5px;line-height:1.45;color:var(--ink);}
+  .edge b{font-weight:600;}
+  code{font-family:'Roboto Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.92em;
+    background:var(--code-bg);border:1px solid var(--code-line);border-radius:3px;padding:0 2px;}
+  p.lead{margin:0;font-size:11px;}
+  p.lead b{color:var(--accent);}
+  /* code blocks: wrap as a safety net: never scroll, never clip */
+  pre{margin:0;background:var(--code-bg);border:1px solid var(--code-line);border-radius:5px;
+    padding:6px 8px;
+    font-family:'Roboto Mono',ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    font-size:10px;line-height:1.5;
+    white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;}
+  pre + pre{margin-top:6px;}
+  pre .cl{display:block;padding-left:4em;text-indent:-4em;}
+  pre .cl:empty::after{content:"\00a0";}
+  /* tables: cells wrap rather than overflow the panel */
+  table{border-collapse:collapse;width:100%;font-size:10px;}
+  table td{padding:2px 6px 2px 0;vertical-align:top;border-bottom:1px solid #f0f1f3;
+    white-space:normal;overflow-wrap:break-word;}
+  table tr:last-child td{border-bottom:none;}
+  table td:first-child{
+    font-family:'Roboto Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--c-type);}
+  table td.k:first-child{color:var(--c-kw);}
+  table.dun td:first-child{color:var(--c-op);font-weight:600;}
+  table.dun td{color:var(--c-type);}
+  table.prec td:first-child{color:var(--c-num);font-weight:600;}
+  table.ops td:first-child{color:var(--c-op);}
+  table.ops td.k:first-child{color:var(--c-kw);}
+  ol.rules{margin:2px 0 0;padding-left:16px;font-size:10px;}
+  ol.rules li{margin:3px 0;}
+  /* decision table */
+  table.dec{font-size:10px;}
+  table.dec th{text-align:left;padding:3px 8px 4px 0;border-bottom:2px solid var(--accent-soft);
+    font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);}
+  table.dec td{padding:4px 8px 4px 0;border-bottom:1px solid #f0f1f3;}
+  table.dec td:first-child{color:var(--c-kw);font-weight:700;}
+  .yes{color:#047857;font-weight:600;} .no{color:#b91c1c;font-weight:600;} .mid{color:#b45309;}
+  /* token colors */
+  .c{color:var(--c-comment);font-style:italic;}
+  .k{color:var(--c-kw);font-weight:600;}
+  .t{color:var(--c-type);}
+  .b{color:var(--c-builtin);}
+  .s{color:var(--c-str);}
+  .n{color:var(--c-num);}
+  .d{color:var(--c-deco);font-weight:600;}
+  .l{color:var(--c-lit);font-weight:600;}
+  .o{color:var(--c-op);}
+  @page{size:letter;margin:0;}
+  @media print{
+    html,body{background:#fff;font-size:9.3px;}
+    body.dark{background:#020c13;}
+    .sheet{box-shadow:none;margin:0;max-width:none;padding:0.35in;}
+    .cols{column-count:2;column-gap:12px;}
+    .panel{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header>
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M33.2382 16.9509C33.5737 18.2308 32.1448 19.5957 32.1448 19.5957C32.1448 19.5957 29.5399 21.2566 30.0481 14.1303C30.5562 7.004 18.8837 0 18.8837 0C18.8837 0 18.9502 0.679341 18.8804 5.37706C18.7928 11.2889 15.2659 9.26213 15.2659 9.26213C11.7355 12.9046 12.0565 21.1303 12.0565 21.1303C7.686 24.8528 7.53284 17.113 7.53284 17.113C7.53284 17.113 -0.788268 25.2067 8.11062 33.8775C8.11062 33.8775 9.41554 35.1338 7.33001 34.7339C5.84263 34.4491 5.50669 33.876 5.50669 33.876C5.50669 33.876 5.79048 37.4651 16.2837 39.7116C16.4873 39.7514 19.7486 40.3698 23.4321 39.6619C31.5155 37.9133 32.9267 34.6643 32.9267 34.6643C32.9267 34.6643 32.7555 34.9576 31.4143 35.0885C29.973 35.2294 31.2102 33.8908 31.2102 33.8908C40.7075 28.1472 32.9027 15.6709 33.2382 16.9509Z" fill="#FF4C1F"/>
+        <path d="M29.7812 28.7715C31.6731 25.9181 30.2252 23.7912 30.2252 23.7912C27.2612 25.2583 26.3754 24.2322 26.1128 23.4005C26.0089 23.0713 25.9914 22.7217 26.0517 22.3826C27.9753 11.5519 20.5365 5.69732 20.7226 7.1437C20.779 7.58098 20.7009 8.15492 20.5632 8.74427C20.2381 10.1396 19.6168 11.4537 18.7702 12.6277C17.6043 14.2447 15.4969 17.7133 14.3499 22.9314C12.708 30.4011 7.98615 24.9925 7.98615 24.9925C7.98615 24.9925 5.21943 34.0975 16.4936 39.7493C17.1575 39.8605 19.2586 40.1523 21.7917 39.8996C29.1995 36.5434 31.8594 29.9874 31.8594 29.9874C31.8594 29.9874 27.8893 31.6249 29.7812 28.7715Z" fill="#FF9C45"/>
+        <path d="M27.1979 26.8302C27.1595 26.9251 26.3652 28.7816 23.4184 29.2534C20.3944 29.7374 21.7234 19.5895 21.7234 19.5895C14.2876 22.9804 15.6685 30.9493 15.6685 30.9493C15.6685 30.9493 14.4805 32.053 12.9593 30.9476C12.4426 30.5724 13.5737 37.3506 18.4328 39.9599C19.3347 40.0145 20.4608 40.0256 21.6922 39.9089C25.0375 37.6701 26.8193 30.6521 26.8193 30.6521L25.2849 31.5643L27.1979 26.8302Z" fill="#FFDD56"/>
+        <path d="M5.84971 16.1239C5.84971 16.1239 5.41613 12.4504 7.54063 10.8289C7.8725 10.5755 8.09624 10.3699 8.26003 9.99345C8.39348 9.68751 8.60023 9.20132 8.49979 8.83735C8.2487 7.92577 11.3323 12.9689 5.84971 16.1239Z" fill="#FF4C1F"/>
+        <path d="M21.7151 39.9073C23.0662 38.5407 24.8699 33.0781 24.8699 33.0781C24.8699 33.0781 24.4792 34.1972 23.0215 34.0491C21.0165 33.845 19.9169 28.7022 19.9169 28.7022C19.9169 28.7022 18.2483 33.0742 17.8979 33.7218C17.1599 35.086 15.7978 33.7206 15.7978 33.7206C15.4362 35.9435 18.3098 39.13 19.1346 39.9918C19.8992 40.0126 20.7765 39.9972 21.7151 39.9073Z" fill="#FCFBCC"/>
+      </svg>
+      <div>
+        <h1>{{TITLE}}</h1>
+        <div class="sub">{{SUB}}</div>
+      </div>
+    </div>
+    <div class="meta">Mojo language reference<br>v{{VERSION}}</div>
+  </header>
+
+  <div class="legend">
+{{LEGEND}}
+  </div>
+
+  <div class="cols">

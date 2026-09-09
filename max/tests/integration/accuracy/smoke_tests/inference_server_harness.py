@@ -16,7 +16,7 @@ import logging
 import os
 import signal
 import time
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from subprocess import Popen, TimeoutExpired
@@ -74,6 +74,7 @@ def start_server(
     readiness_probe: Callable[[], bool] | None = None,
     poll_interval: float = 0.5,
     cwd: str | os.PathLike[str] | None = None,
+    env_overrides: Mapping[str, str] | None = None,
 ) -> Generator[RunningServer, None, None]:
     """Spawn the server command and wait until it accepts requests.
 
@@ -85,9 +86,13 @@ def start_server(
         poll_interval: Seconds between readiness checks.
         cwd: Working directory for the spawned process. Required when
             ``cmd`` references workspace-relative paths (e.g. ``./bazelw``).
+        env_overrides: Extra environment variables to set for the spawned
+            process, layered on top of the inherited environment.
     """
     probe = readiness_probe or _default_server_is_ready
     env = os.environ.copy()
+    if env_overrides:
+        env.update(env_overrides)
 
     if not _inside_bazel():
         # SGLang depends on ninja which is in the serve environment

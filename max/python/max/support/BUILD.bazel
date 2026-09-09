@@ -6,7 +6,7 @@ modular_py_library(
     name = "support",
     srcs = glob(
         ["**/*.py"],
-        exclude = ["taskgroups.py"],
+        exclude = ["_taskgroups.py"],
     ),
     ignore_unresolved_imports = [
         "boto3",  # Optional dependency for S3 operations, available in max[benchmark]
@@ -19,7 +19,7 @@ modular_py_library(
 
 modular_py_library(
     name = "taskgroups",
-    srcs = ["taskgroups.py"],
+    srcs = ["_taskgroups.py"],
     deps = [
         requirement("exceptiongroup"),  # only for python < 3.11
         requirement("taskgroup"),  # only for python < 3.11

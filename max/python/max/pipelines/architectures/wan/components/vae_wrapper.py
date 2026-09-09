@@ -23,6 +23,9 @@ from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.graph.weights import load_weights
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.profiler import Tracer, traced
 
@@ -56,11 +59,14 @@ class VaeWrapper:
 
         vae_config_entry = manifest["vae"]
         config_dict = vae_config_entry.huggingface_config.to_dict()
-        encoding = vae_config_entry.quantization_encoding or "bfloat16"
+        resolved_encoding, resolved_weight_path = (
+            _resolve_component_encoding_and_weights(vae_config_entry)
+        )
+        encoding = resolved_encoding or "bfloat16"
         devices = load_devices(vae_config_entry.device_specs)
 
         # Load the VAE using the existing ComponentModel.
-        paths = vae_config_entry.resolved_weight_paths()
+        paths = vae_config_entry.resolved_weight_paths(resolved_weight_path)
         weights = load_weights(paths)
         self._vae = AutoencoderKLWanModel(
             config=config_dict,

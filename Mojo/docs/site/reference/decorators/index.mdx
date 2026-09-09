@@ -1,0 +1,71 @@
+---
+title: Mojo decorators
+sidebar_label: Overview
+description: A reference of Mojo's built-in decorators
+hide_table_of_contents: true
+---
+
+A Mojo decorator modifies or extends the behavior of a struct, function, or
+other declaration at compile time. You place the decorator on the line
+above the declaration it applies to, prefixed with `@`.
+
+```mojo
+@fieldwise_init
+struct Point:
+    var x: Float64
+    var y: Float64
+```
+
+After the `@`, a decorator is followed by a name, with optional arguments
+in parentheses. Each decorator goes on its own line. You can stack multiple
+decorators on a single declaration:
+
+```mojo
+@fieldwise_init
+@align(64)
+struct CacheLine:
+    var data: SIMD[DType.float32, 16]
+```
+
+Decorators apply bottom-up: the one closest to the declaration
+is applied first.
+
+:::note No custom decorators
+Mojo doesn't support custom decorators. The decorators in this section
+are built into the compiler.
+:::
+
+## Decorators
+
+The following pages describe each built-in decorator with examples.
+
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList />
+
+## Decorator targets
+
+Not every decorator works on every declaration. This table shows
+which decorators are valid on which targets.
+
+<!-- rumdl-disable MD033 -->
+
+| Decorator                 | `struct` | `def`           | method | `trait` | `comptime` | `var` | field |
+|---------------------------|----------|-----------------|--------|---------|------------|-------|-------|
+| `@align`                  | yes      |                 |        |         |            |       |       |
+| `@always_inline`          |          | yes             | yes    |         |            |       |       |
+| `@extensibility.register` | yes      |                 |        |         |            |       |       |
+| `@__copy_capture`         |          | yes<sup>1</sup> |        |         |            |       |       |
+| `@deprecated`             | yes      | yes             | yes    | yes     | yes        |       |       |
+| `@doc_hidden`             | yes      | yes             | yes    |         | yes        |       | yes   |
+| `@export`                 |          | yes             |        |         |            |       |       |
+| `@fieldwise_init`         | yes      |                 |        |         |            |       |       |
+| `@implicit`               |          |                 | yes    |         |            |       |       |
+| `@no_inline`              |          | yes             | yes    |         |            |       |       |
+| `@__parameter`            |          | yes<sup>1</sup> |        |         |            |       |       |
+| `@staticmethod`           |          |                 | yes    |         |            |       |       |
+
+<sup>1</sup>`@__copy_capture` and `@__parameter` work only on *nested*
+functions.
+
+<!-- rumdl-enable MD033 -->

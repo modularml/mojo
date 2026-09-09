@@ -15,8 +15,8 @@ from std.math import ceildiv
 from std.sys import argv
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import block_dim, block_idx, thread_idx
-from std.gpu.host import DeviceContext
+from max.gpu import block_dim, block_idx, thread_idx
+from max.gpu.host import DeviceContext
 from layout import Layout, LayoutTensor
 from layout._fillers import random
 from layout._utils import ManagedLayoutTensor
@@ -39,9 +39,9 @@ def kernel_1[
     transpose_b: Bool = True,
     BLOCKSIZE: Int = 32,
 ](
-    c: LayoutTensor[DType.bfloat16, Layout.row_major(M, N), MutAnyOrigin],
-    a: LayoutTensor[DType.bfloat16, Layout.row_major(M, K), MutAnyOrigin],
-    b: LayoutTensor[DType.bfloat16, Layout.row_major(K, N), MutAnyOrigin],
+    c: LayoutTensor[.bfloat16, Layout.row_major(M, N), MutAnyOrigin],
+    a: LayoutTensor[.bfloat16, Layout.row_major(M, K), MutAnyOrigin],
+    b: LayoutTensor[.bfloat16, Layout.row_major(K, N), MutAnyOrigin],
 ):
     var row = block_dim.y * block_idx.y + thread_idx.y
     var col = block_dim.x * block_idx.x + thread_idx.x
@@ -51,11 +51,11 @@ def kernel_1[
         var acc: Float32 = 0
 
         for k in range(K):
-            var a_val = rebind[Float32](a[row, k].cast[DType.float32]())
-            var b_val = rebind[Float32](b[k, col].cast[DType.float32]())
+            var a_val = rebind[Float32](a[row, k].cast[.float32]())
+            var b_val = rebind[Float32](b[k, col].cast[.float32]())
             acc += a_val * b_val
 
-        c[row, col] = acc.cast[DType.bfloat16]()
+        c[row, col] = acc.cast[.bfloat16]()
 
 
 def test_kernel_1[
@@ -119,8 +119,7 @@ def test_kernel_1[
         comptime num_warmup = 20
 
         @always_inline
-        @parameter
-        def run_kernel(ctx: DeviceContext) raises:
+        def run_kernel(ctx: DeviceContext) raises {mut a, mut b, mut c, imm}:
             ctx.enqueue_function[kernel](
                 c.device_tensor[update=False](),
                 a.device_tensor[update=False](),
@@ -135,7 +134,7 @@ def test_kernel_1[
         print("finished warmup")
 
         var nstime = (
-            Float64(ctx.execution_time[run_kernel](num_runs)) / num_runs
+            Float64(ctx.execution_time(run_kernel, num_runs)) / num_runs
         )
         var sectime = nstime * 1e-9
         var TFlop = 2.0 * Float64(M) * Float64(N) * Float64(K) * 1e-12
@@ -155,8 +154,8 @@ def test_kernel_1[
 
         ctx.synchronize()
 
-        c_host = c.tensor()
-        c_host_ref = c_ref.tensor()
+        var c_host = c.tensor()
+        var c_host_ref = c_ref.tensor()
 
         for m in range(M):
             for n in range(N):
@@ -174,9 +173,9 @@ def main() raises:
     with DeviceContext() as ctx:
         if is_benchmark():
             test_kernel_1[
-                DType.bfloat16,
-                DType.bfloat16,
-                DType.bfloat16,
+                .bfloat16,
+                .bfloat16,
+                .bfloat16,
                 transpose_b=True,
                 prob_shape=IndexList[3](4096, 4096, 4096),
                 benchmark=True,
@@ -186,9 +185,9 @@ def main() raises:
         # Test with transpose_b=True
         print("Testing with transpose_b=True")
         test_kernel_1[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             transpose_b=True,
             prob_shape=IndexList[3](4096, 4096, 4096),
         ](ctx)

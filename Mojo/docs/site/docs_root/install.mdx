@@ -1,0 +1,155 @@
+---
+title: Install Mojo
+hide_table_of_contents: true
+description: You can install Mojo using pixi, uv, conda, pip, or other Python/Conda package managers.
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import ConditionalVersionDocs from '@site/src/components/ConditionalVersionDocs'
+import VersionSubheader from '@site/src/components/VersionSubheader';
+import Link from '@docusaurus/Link';
+
+<VersionSubheader />
+
+Mojo installs exactly like a Python or Conda package on
+macOS and Linux (see the [system requirements](/docs/requirements/)).
+
+<ConditionalVersionDocs version="nightly">
+
+<Tabs groupId="install">
+<TabItem value="uv" label="uv">
+
+1. If needed, install `uv`:
+
+   ```sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. Install Mojo:
+
+   ```sh
+   uv pip install mojo \
+     --index https://whl.modular.com/nightly/simple/ \
+     --prerelease allow
+   ```
+
+   Or create a project and install Mojo:
+
+   ```sh
+   uv init hello-world
+   cd hello-world
+   uv add mojo \
+       --index https://whl.modular.com/nightly/simple/ \
+       --prerelease allow
+   ```
+
+</TabItem>
+<TabItem value="pixi" label="pixi">
+
+1. If needed, install `pixi`:
+
+    ```sh
+    curl -fsSL https://pixi.sh/install.sh | sh
+    ```
+
+2. Create a project and install Mojo:
+
+   ```sh
+   pixi init hello-world \
+     -c https://conda.modular.com/max-nightly/ -c conda-forge
+   cd hello-world
+   pixi add mojo
+   ```
+
+</TabItem>
+</Tabs>
+
+These commands install the nightly build, which isn't complete and might have new bugs.
+If you instead want the stable build, <Link href="/install/">switch to the stable
+docs</Link>.
+
+</ConditionalVersionDocs>
+
+<ConditionalVersionDocs version="stable">
+
+<Tabs groupId="install">
+<TabItem value="uv" label="uv">
+1. If needed, install `uv`:
+
+   ```sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. Install Mojo:
+
+   ```sh
+   uv pip install mojo
+   ```
+
+   Or create a project and install Mojo:
+
+   ```sh
+   uv init hello-world
+   cd hello-world
+   uv add mojo
+   ```
+
+</TabItem>
+<TabItem value="pixi" label="pixi">
+
+1. If needed, install `pixi`:
+
+   ```sh
+   curl -fsSL https://pixi.sh/install.sh | sh
+   ```
+
+2. Create a project and install Mojo:
+
+   ```sh
+   pixi init hello-world \
+     -c https://conda.modular.com/max/ -c conda-forge
+   cd hello-world
+   pixi add mojo
+   ```
+
+</TabItem>
+</Tabs>
+
+If you instead want the latest nightly build, <Link
+href="/nightly/install/">switch to the nightly docs</Link>.
+
+</ConditionalVersionDocs>
+
+## Get the VS Code extension
+
+For syntax highlighting, code completion, and debugging support, install the
+Mojo extension from:
+
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo)
+- [Open VSX Registry](https://open-vsx.org/extension/modular-mojotools/vscode-mojo)
+
+## Get Mojo skills
+
+Mojo agent skills keep your AI coding assistants aligned with the latest
+language updates and best practices.
+
+Install with:
+
+```sh
+npx skills add modular/skills
+```
+
+## Get started
+
+import ListingCard from '@site/src/components/Listing/ListingCard';
+import ListingCards from '@site/src/components/Listing/ListingCards';
+
+<ListingCards className="docs-desktop:!grid-cols-2">
+  <ListingCard title="Quickstart"
+    url="/docs/manual/quickstart"
+    description="Quickly learn the Mojo programming basics with simple code examples" />
+  <ListingCard title="Beginner tutorial"
+    url="/docs/manual/get-started/"
+    description="Build a deeper understanding of Mojo in this tutorial to build the Game of Life" />
+</ListingCards>

@@ -14,18 +14,18 @@
 
 from __future__ import annotations
 
-import functools
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import msgspec
 import numpy as np
-from max.pipelines.modeling.types.eos_tracking import EOSTracker
-from max.pipelines.modeling.types.generation import GenerationOutput
+from max.pipelines.context.eos_tracking import EOSTracker
+from max.pipelines.context.outputs import GenerationOutput
 from max.pipelines.request.open_responses import (
     OpenResponsesRequest,
+    OutputAudioContent,
     OutputImageContent,
     OutputTextContent,
     OutputVideoContent,
@@ -56,6 +56,7 @@ def _build_type_registry() -> dict[str, type]:
     for cls in [
         EOSTracker,
         OpenResponsesRequest,
+        OutputAudioContent,
         OutputImageContent,
         OutputTextContent,
         OutputVideoContent,
@@ -73,6 +74,58 @@ def _build_type_registry() -> dict[str, type]:
 _PYDANTIC_TYPE_REGISTRY = _build_type_registry()
 
 _SHARED_MEMORY_THRESHOLD = 24000000
+
+# Minimum array size (bytes) at or above which an array is serialized
+# out-of-band (OOB): the raw buffer rides as its own ZMQ frame instead of being
+# copied into the msgpack stream. Below this size an OOB frame buys nothing --
+# pyzmq itself copies frames smaller than its ``zmq.COPY_THRESHOLD`` (64 KiB by
+# default) even on a ``copy=False`` send, so a sub-threshold array would pay a
+# copy *plus* the extra-frame and index-indirection overhead. Keeping small
+# arrays inline avoids the extra frame; large arrays (multi-megabyte
+# ``pixel_values``) are far above this and ride truly zero-copy.
+_OOB_SIZE_THRESHOLD = 64 * 1024
+
+
+def _encode_pydantic(obj: BaseModel) -> dict[str, Any]:
+    """Encode a Pydantic model into a msgpack-friendly tagged dict.
+
+    Shared by the inline and out-of-band encoder hooks so the two paths cannot
+    drift.
+
+    Args:
+        obj: The Pydantic model instance to encode.
+
+    Returns:
+        A dict tagged with ``__pydantic__`` carrying the model's type path and
+        dumped data.
+    """
+    return {
+        "__pydantic__": True,
+        "type": obj.__class__.__module__ + "." + obj.__class__.__qualname__,
+        "data": obj.model_dump(mode="python"),
+    }
+
+
+def _encode_inline_numpy(obj: np.ndarray) -> dict[str, Any]:
+    """Encode a numpy array inline (copied into the msgpack stream).
+
+    The single source of truth for the inline ``__np__`` wire format, shared by
+    the inline and out-of-band encoder hooks (the latter falls back to inline for
+    small/0-d/object arrays).
+
+    Args:
+        obj: The numpy array to encode inline.
+
+    Returns:
+        A dict tagged with ``__np__`` carrying the array's bytes, shape, and
+        dtype.
+    """
+    return {
+        "__np__": True,
+        "data": obj.tobytes(),
+        "shape": obj.shape,
+        "dtype": str(obj.dtype),
+    }
 
 
 def _numpy_encoder_hook(
@@ -100,13 +153,7 @@ def _numpy_encoder_hook(
         """Custom encoder that handles numpy arrays and Pydantic models with optional shared memory conversion."""
         # Handle Pydantic BaseModel instances
         if isinstance(obj, BaseModel):
-            return {
-                "__pydantic__": True,
-                "type": obj.__class__.__module__
-                + "."
-                + obj.__class__.__qualname__,
-                "data": obj.model_dump(mode="python"),
-            }
+            return _encode_pydantic(obj)
 
         if isinstance(obj, np.ndarray):
             # Try shared memory conversion if enabled and array meets threshold
@@ -123,12 +170,7 @@ def _numpy_encoder_hook(
                 }
 
             # Fall back to regular numpy encoding
-            return {
-                "__np__": True,
-                "data": obj.tobytes(),
-                "shape": obj.shape,
-                "dtype": str(obj.dtype),
-            }
+            return _encode_inline_numpy(obj)
 
         return obj
 
@@ -186,9 +228,6 @@ class _MsgpackNumpyEncoder:
         Returns:
             The encoded bytes
         """
-        if self._encoder is None:
-            self._create_encoder()
-
         assert self._encoder is not None
         return self._encoder.encode(obj)
 
@@ -224,6 +263,149 @@ def msgpack_numpy_encoder(
     return _MsgpackNumpyEncoder(use_shared_memory, shared_memory_threshold)
 
 
+def _numpy_oob_encoder_hook(
+    aux_buffers: list[Any], oob_threshold: int
+) -> Callable[[Any], Any]:
+    """Create an out-of-band (OOB) numpy encoding hook.
+
+    Large numpy arrays are appended to ``aux_buffers`` as zero-copy buffers and
+    replaced inline by a small ``__np_oob__`` placeholder carrying their index;
+    the caller transports the placeholder stream and the aux buffers as separate
+    ZMQ frames (see :class:`_MsgpackNumpyOOBEncoder`). Small/0-d/object arrays
+    stay inline.
+
+    Args:
+        aux_buffers: Mutable list the hook appends out-of-band buffers to. The
+            owning encoder clears it before each encode and reads it after.
+        oob_threshold: Minimum array size in bytes to send out-of-band.
+
+    Returns:
+        Encoding hook function for :class:`msgspec.msgpack.Encoder`.
+    """
+
+    def encode_hook(obj: Any) -> Any:
+        if isinstance(obj, BaseModel):
+            return _encode_pydantic(obj)
+
+        if isinstance(obj, np.ndarray):
+            # Plain-dtype arrays at/above the threshold ride out-of-band as
+            # their own frame (no copy into the msgpack stream). Object/void
+            # dtypes (whose bytes are not self-describing) and tiny/0-d arrays
+            # stay inline.
+            if (
+                obj.shape
+                and obj.nbytes >= oob_threshold
+                and obj.dtype.kind not in ("O", "V")
+            ):
+                # The wire format is always C-contiguous; coerce if needed (a
+                # copy, but rare -- pixel_values are produced contiguous).
+                contiguous = (
+                    obj
+                    if obj.flags["C_CONTIGUOUS"]
+                    else np.ascontiguousarray(obj)
+                )
+                index = len(aux_buffers)
+                # ``memoryview(...).cast("B")`` is a zero-copy 1-D byte view of
+                # the (contiguous) array; it keeps ``contiguous`` alive until the
+                # frame is sent.
+                aux_buffers.append(memoryview(contiguous).cast("B"))
+                return {
+                    "__np_oob__": True,
+                    "index": index,
+                    "shape": obj.shape,
+                    "dtype": str(obj.dtype),
+                }
+
+            return _encode_inline_numpy(obj)
+
+        return obj
+
+    return encode_hook
+
+
+class _MsgpackNumpyOOBEncoder:
+    """A pickleable msgpack encoder that emits out-of-band numpy buffers.
+
+    Unlike :class:`_MsgpackNumpyEncoder` (which returns a single ``bytes``),
+    calling this encoder returns a list of frames: frame 0 is the msgpack stream
+    (with ``__np_oob__`` placeholders) and frames 1..N are the raw, zero-copy
+    array buffers. Pair it with a multipart, ``copy=False`` ZMQ send and
+    :class:`_MsgpackNumpyOOBDecoder` on the receiver.
+
+    Not thread-safe: the per-call out-of-band buffer stash is shared mutable
+    state, so use one encoder instance per (single-producer) socket.
+    """
+
+    def __init__(self, oob_threshold: int = _OOB_SIZE_THRESHOLD) -> None:
+        """Initialize the encoder.
+
+        Args:
+            oob_threshold: Minimum array size in bytes to send out-of-band.
+        """
+        self._oob_threshold = oob_threshold
+        self._aux_buffers: list[Any] = []
+        self._encoder: msgspec.msgpack.Encoder | None = None
+        self._create_encoder()
+
+    def _create_encoder(self) -> None:
+        """Create the internal msgspec encoder bound to the aux-buffer stash."""
+        self._encoder = msgspec.msgpack.Encoder(
+            enc_hook=_numpy_oob_encoder_hook(
+                self._aux_buffers, self._oob_threshold
+            )
+        )
+
+    def __call__(self, obj: Any) -> list[Any]:
+        """Encode ``obj`` into a list of transport frames.
+
+        Args:
+            obj: The object to encode.
+
+        Returns:
+            ``[msgpack_stream, *out_of_band_buffers]``. The buffers alias the
+            source arrays (zero-copy); the caller must send them before the
+            source arrays are mutated or freed.
+        """
+        assert self._encoder is not None
+        try:
+            main = self._encoder.encode(obj)
+            # The splat copies the buffer references into ``frames``, which then
+            # solely owns them once the ``finally`` clears our stash.
+            return [main, *self._aux_buffers]
+        finally:
+            # Clear in place (not reassign) so the hook's closure stays bound;
+            # in ``finally`` so a failed encode cannot leak buffer references
+            # (which pin their source arrays) onto the next call.
+            self._aux_buffers.clear()
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Get state for pickling (excluding the non-pickleable encoder)."""
+        return {"_oob_threshold": self._oob_threshold}
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore state from pickling and recreate the encoder."""
+        self._oob_threshold = state["_oob_threshold"]
+        self._aux_buffers = []
+        self._encoder = None
+        self._create_encoder()
+
+
+def msgpack_numpy_oob_encoder(
+    oob_threshold: int = _OOB_SIZE_THRESHOLD,
+) -> _MsgpackNumpyOOBEncoder:
+    """Create an out-of-band (zero-copy) msgpack encoder for numpy arrays.
+
+    Args:
+        oob_threshold: Minimum array size in bytes to send out-of-band. Smaller
+            arrays are encoded inline.
+
+    Returns:
+        A pickleable encoder whose ``__call__`` returns a list of transport
+        frames (see :class:`_MsgpackNumpyOOBEncoder`).
+    """
+    return _MsgpackNumpyOOBEncoder(oob_threshold)
+
+
 class _MsgpackNumpyDecoder:
     """A pickleable decoder class for msgpack data with numpy arrays.
 
@@ -247,9 +429,11 @@ class _MsgpackNumpyDecoder:
     def _create_decoder(self) -> None:
         """Create the internal msgspec decoder."""
         self._decoder = msgspec.msgpack.Decoder(
-            type=self._type,
-            dec_hook=functools.partial(_decode_numpy_array, copy=self._copy),
+            type=self._type, dec_hook=self._dec_hook
         )
+
+    def _dec_hook(self, type_: type, obj: Any) -> Any:
+        return _decode_numpy_array(type_, obj, self._copy)
 
     def __call__(self, data: bytes) -> Any:
         """Decode bytes into the specified type.
@@ -260,9 +444,6 @@ class _MsgpackNumpyDecoder:
         Returns:
             The decoded object
         """
-        if self._decoder is None:
-            self._create_decoder()
-
         assert self._decoder is not None
         return self._decoder.decode(data)
 
@@ -300,13 +481,138 @@ def msgpack_numpy_decoder(
     return _MsgpackNumpyDecoder(type_, copy)
 
 
-def _decode_numpy_array(type_: type, obj: Any, copy: bool) -> Any:
+class _MsgpackNumpyOOBDecoder:
+    """A pickleable msgpack decoder for out-of-band numpy buffers.
+
+    Counterpart to :class:`_MsgpackNumpyOOBEncoder`. Calling it takes the list of
+    received frames ``[msgpack_stream, *out_of_band_buffers]`` (as produced by a
+    multipart, ``copy=False`` ZMQ receive) and reconstructs the object, resolving
+    each ``__np_oob__`` placeholder against its frame.
+
+    With ``copy=False`` (the default), out-of-band arrays are zero-copy views
+    over their frames; numpy's base chain keeps each frame mapped for exactly the
+    view's lifetime, so a view may safely outlive the receive call. These views
+    alias ZMQ-owned receive memory and are returned read-only so a stray write
+    cannot corrupt it; pass ``copy=True`` for an owned, mutable array. Not
+    thread-safe: use one decoder instance per (single-consumer) socket.
+    """
+
+    def __init__(self, type_: Any, copy: bool = False) -> None:
+        """Initialize the decoder.
+
+        Args:
+            type_: The type to decode into.
+            copy: Whether to copy numpy arrays out of their frames. Defaults to
+                False (zero-copy views).
+        """
+        self._type = type_
+        self._copy = copy
+        self._aux: Sequence[Any] = ()
+        self._decoder: msgspec.msgpack.Decoder[Any] | None = None
+        self._create_decoder()
+
+    def _create_decoder(self) -> None:
+        """Create the internal msgspec decoder."""
+        self._decoder = msgspec.msgpack.Decoder(
+            type=self._type, dec_hook=self._dec_hook
+        )
+
+    def _dec_hook(self, type_: type, obj: Any) -> Any:
+        return _decode_numpy_array(type_, obj, self._copy, self._aux)
+
+    def __call__(self, frames: Sequence[Any]) -> Any:
+        """Decode a list of received frames into the specified type.
+
+        Args:
+            frames: ``[msgpack_stream, *out_of_band_buffers]``. A single-element
+                sequence (no out-of-band arrays) is also accepted.
+
+        Returns:
+            The decoded object.
+        """
+        assert self._decoder is not None
+        # frame 0 is the msgpack stream; frames 1..N are out-of-band buffers.
+        # Skip the slice on the common no-out-of-band path (e.g. text requests).
+        self._aux = frames[1:] if len(frames) > 1 else ()
+        try:
+            return self._decoder.decode(frames[0])
+        finally:
+            # Release our reference to the frames. Decoded views (copy=False)
+            # keep their own frame alive via the ndarray base chain; copy=True
+            # results already own their data.
+            self._aux = ()
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Get state for pickling (excluding the non-pickleable decoder)."""
+        return {"_type": self._type, "_copy": self._copy}
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore state from pickling and recreate the decoder."""
+        self._type = state["_type"]
+        self._copy = state["_copy"]
+        self._aux = ()
+        self._decoder = None
+        self._create_decoder()
+
+
+def msgpack_numpy_oob_decoder(
+    type_: Any, copy: bool = False
+) -> _MsgpackNumpyOOBDecoder:
+    """Create an out-of-band (zero-copy) msgpack decoder for the given type.
+
+    Args:
+        type_: The type to decode into.
+        copy: Copy numpy arrays out of their frames if true. Defaults to False
+            (zero-copy views; see :func:`msgpack_numpy_decoder` for the rationale
+            behind defaulting to no-copy at this boundary).
+
+    Returns:
+        A pickleable decoder whose ``__call__`` takes a list of received frames
+        (see :class:`_MsgpackNumpyOOBDecoder`).
+    """
+    return _MsgpackNumpyOOBDecoder(type_, copy)
+
+
+def _array_from_buffer(
+    buffer: Any, dtype: str, shape: Any, *, copy: bool
+) -> np.ndarray:
+    """Reconstruct a numpy array from a raw buffer holding its bytes.
+
+    The single source of truth for materializing both the inline ``__np__`` and
+    out-of-band ``__np_oob__`` wire formats (the decode-side peer of
+    :func:`_encode_inline_numpy`).
+
+    Args:
+        buffer: A buffer-protocol object holding the array data -- an inline
+            ``bytes`` payload or a received out-of-band ZMQ frame.
+        dtype: The array's dtype string.
+        shape: The array's shape.
+        copy: If true, return a writable copy; otherwise a read-only zero-copy
+            view whose base chain retains ``buffer`` for the view's lifetime.
+
+    Returns:
+        The reconstructed numpy array.
+    """
+    arr = np.frombuffer(buffer, dtype=dtype).reshape(shape)
+    if copy:
+        return np.array(arr, copy=True)
+    # Read-only so a stray in-place write cannot corrupt buffer-owned memory
+    # (e.g. a ZMQ-owned receive frame whose lifetime is tied to this view).
+    arr.flags.writeable = False
+    return arr
+
+
+def _decode_numpy_array(
+    type_: type, obj: Any, copy: bool, aux: Sequence[Any] = ()
+) -> Any:
     """Custom decoder for numpy arrays and Pydantic models from msgspec.
 
     Args:
         type_: The expected type (not used in this implementation)
         obj: The object to decode
         copy: Whether to copy the array data.
+        aux: Out-of-band buffers (one per ``__np_oob__`` placeholder), indexed by
+            the placeholder's ``index``. Empty for the inline-only decoder.
 
     Raises:
         ValueError: If a Pydantic type is not registered in the type registry.
@@ -315,9 +621,10 @@ def _decode_numpy_array(type_: type, obj: Any, copy: bool) -> Any:
     def _decode_nested(value: Any) -> Any:
         if isinstance(value, dict):
             if any(
-                key in value for key in ("__pydantic__", "__np__", "__shm__")
+                key in value
+                for key in ("__pydantic__", "__np__", "__shm__", "__np_oob__")
             ):
-                return _decode_numpy_array(type_, value, copy)
+                return _decode_numpy_array(type_, value, copy, aux)
             return {k: _decode_nested(v) for k, v in value.items()}
         if isinstance(value, list):
             return [_decode_nested(item) for item in value]
@@ -334,7 +641,7 @@ def _decode_numpy_array(type_: type, obj: Any, copy: bool) -> Any:
             raise ValueError(
                 f"Pydantic type '{type_key}' is not registered in the type registry. "
                 f"Please add it to _build_type_registry() in "
-                f"max/python/max/interfaces/utils/serialization.py. "
+                f"max/python/max/pipelines/modeling/types/utils/serialization.py. "
                 f"Available types: {list(_PYDANTIC_TYPE_REGISTRY.keys())}"
             )
 
@@ -349,19 +656,20 @@ def _decode_numpy_array(type_: type, obj: Any, copy: bool) -> Any:
             raise
 
     if isinstance(obj, dict) and obj.get("__np__") is True:
-        # Wrapping the frombuffer in an array to avoid potential issues with data ownership across process boundaries.
-        return np.array(
-            np.frombuffer(obj["data"], dtype=obj["dtype"]).reshape(
-                obj["shape"]
-            ),
-            copy=copy,
+        return _array_from_buffer(
+            obj["data"], obj["dtype"], obj["shape"], copy=copy
+        )
+
+    if isinstance(obj, dict) and obj.get("__np_oob__") is True:
+        # Zero-copy view: the returned array's base chain retains the received
+        # ZMQ frame (``aux[index]``), so the frame stays mapped for exactly the
+        # view's lifetime -- mirroring the shared-memory path's
+        # weakref.finalize(arr, shm.close).
+        return _array_from_buffer(
+            aux[obj["index"]], obj["dtype"], obj["shape"], copy=copy
         )
 
     if isinstance(obj, dict) and obj.get("__shm__") is True:
-        try:
-            return _open_shm_array(obj)
-
-        except FileNotFoundError:
-            raise
+        return _open_shm_array(obj)
 
     return obj

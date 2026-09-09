@@ -16,7 +16,7 @@ from std.math import ceildiv
 from layout import Idx, TileTensor
 from layout.tile_layout import row_major
 from linalg.packing import pack_b
-from std.memory import memset_zero, stack_allocation
+from std.memory import unsafe_memset_zero, unsafe_stack_allocation
 
 
 # CHECK-LABEL: test_prepack
@@ -34,10 +34,12 @@ def test_prepack():
     comptime k_padded = ceildiv(k, tile_k) * tile_k
     comptime n_padded = ceildiv(n, tile_n) * tile_n
 
-    var src_ptr = stack_allocation[n * k, type, alignment=64]()
-    memset_zero(src_ptr, n * k)
-    var dst_ptr = stack_allocation[n_padded * k_padded, type, alignment=64]()
-    memset_zero(dst_ptr, n_padded * k_padded)
+    var src_ptr = unsafe_stack_allocation[n * k, type, alignment=64]()
+    unsafe_memset_zero(src_ptr, n * k)
+    var dst_ptr = unsafe_stack_allocation[
+        n_padded * k_padded, type, alignment=64
+    ]()
+    unsafe_memset_zero(dst_ptr, n_padded * k_padded)
 
     for i in range(n * k):
         src_ptr[i] = Float32(i)

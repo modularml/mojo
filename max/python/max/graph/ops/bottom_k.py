@@ -25,15 +25,42 @@ from .constant import constant
 def bottom_k(
     input: TensorValueLike, k: int, axis: int = -1
 ) -> tuple[TensorValue, TensorValue]:
-    """Returns tensor with only the bottom K values along given axis.
+    """Returns the ``k`` smallest values along an axis with their indices.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("bottom_k") as graph:
+            x = ops.constant(
+                [1.0, 3.0, 2.0, 5.0, 4.0], DType.float32, device=device
+            )
+            # The two smallest values are 1 and 2 at indices 0 and 2.
+            values, indices = ops.bottom_k(x, k=2, axis=-1)
+            graph.output(values, indices)
+
+        model = InferenceSession().load(graph)
+        values, indices = model.execute()
+
+    .. note::
+
+        On GPU, only the last axis is supported.
 
     Args:
-        input: The input tensor from which to select bottom k.
-        k: The number of values to select from input.
-        axis: The axis from which to select bottom k.
+        input: The input tensor from which to select the bottom ``k``.
+        k: The number of values to select from ``input``. Must be in the range
+            ``[0, input.shape[axis]]``.
+        axis: The axis along which to select the bottom ``k``. Defaults to
+            ``-1``.
 
     Returns:
-        Bottom K values (ascending), Bottom K indices.
+        A tuple of two ``TensorValue`` objects. The first holds the bottom ``k``
+        values along ``axis`` in ascending order, and the second holds their
+        ``int64`` indices in ``input``. Both have the shape of ``input`` with
+        the ``axis`` dimension set to ``k``.
     """
     input_tv = TensorValue(input)
     ndim = len(input_tv.shape)

@@ -245,7 +245,7 @@ def main() -> None:
     )
 
     result = run_case(cfg, args)
-    met_s, total_flops = result if result else [0, 0]
+    met_s, total_flops = result or [0, 0]
 
     flops = ThroughputMeasure(Bench.bytes, total_flops)
 

@@ -73,8 +73,9 @@ class QuantizationEncoding(enum.Enum):
 
     .. code-block:: python
 
+        from max.dtype import DType
+        from max.graph import DeviceRef, Weight
         from max.graph.quantization import QuantizationEncoding
-        from max.graph import Weight
 
         # Create a quantized weight using Q4_K encoding
         encoding = QuantizationEncoding.Q4_K

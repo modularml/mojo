@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # ===----------------------------------------------------------------------=== #
 # Copyright (c) 2026, Modular Inc. All rights reserved.
 #
@@ -131,7 +130,11 @@ Examples:
         help="Comma-separated tags to filter scenarios (runs scenarios matching ANY tag)",
     )
     p.add_argument(
-        "--exclude", help="Comma-separated scenario names to exclude"
+        "--exclude",
+        help=(
+            "Comma-separated scenarios to exclude. Use scenario:test to "
+            "exclude a single test instead of the whole scenario."
+        ),
     )
 
     p.add_argument(
@@ -226,6 +229,13 @@ Examples:
         help="Activate model-specific test scenarios (e.g. kimi-k2.5, glm-5.1, gemma4)",
     )
     profile_group.add_argument(
+        "--image-stress-nodes",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Scale image_stress concurrency for an N-node deployment (default: 1)",
+    )
+    profile_group.add_argument(
         "--k2vv-mode",
         choices=["quick", "full"],
         default="quick",
@@ -314,7 +324,22 @@ def list_scenarios() -> None:
     print()
 
 
-def select_scenarios(args: argparse.Namespace) -> list[Any]:
+def parse_exclude(spec: str | None) -> tuple[set[str], set[str]]:
+    """Split an --exclude value into whole-scenario names and scenario:test
+    names (the tokens containing a ":")."""
+    exclude_groups: set[str] = set()
+    exclude_tests: set[str] = set()
+    for token in (spec or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        (exclude_tests if ":" in token else exclude_groups).add(token)
+    return exclude_groups, exclude_tests
+
+
+def select_scenarios(
+    args: argparse.Namespace, exclude_groups: set[str]
+) -> list[Any]:
     """Select which scenarios to run based on CLI args."""
     all_scenarios = get_all_scenarios()
 
@@ -338,9 +363,8 @@ def select_scenarios(args: argparse.Namespace) -> list[Any]:
             print(f"{RED}No scenarios match tags: {args.tags}{RESET}")
             sys.exit(1)
 
-    if args.exclude:
-        exclude = {n.strip() for n in args.exclude.split(",")}
-        selected = [s for s in selected if s.name not in exclude]
+    if exclude_groups:
+        selected = [s for s in selected if s.name not in exclude_groups]
 
     # Filter by scenario type
     if args.fuzz_only:
@@ -380,9 +404,15 @@ async def run(args: argparse.Namespace) -> int:
         endurance_intensity=args.endurance_intensity,
         model_config=model_config,
         verbose=args.verbose,
+        image_stress_nodes=args.image_stress_nodes,
     )
 
-    scenario_classes = select_scenarios(args)
+    exclude_groups: set[str] = set()
+    exclude_tests: set[str] = set()
+    if args.exclude:
+        exclude_groups, exclude_tests = parse_exclude(args.exclude)
+
+    scenario_classes = select_scenarios(args, exclude_groups)
 
     # In endurance mode, only run scenarios tagged with "endurance"
     if args.endurance:
@@ -428,7 +458,7 @@ async def run(args: argparse.Namespace) -> int:
 
     try:
         return await _run_body(
-            args, config, scenario_classes, run_log, validator
+            args, config, scenario_classes, run_log, validator, exclude_tests
         )
     finally:
         if run_log:
@@ -437,12 +467,36 @@ async def run(args: argparse.Namespace) -> int:
             validator.close()
 
 
+async def _clear_prefix_cache(client: FuzzClient) -> None:
+    """Best-effort clear of the server KV/prefix cache between repeats.
+
+    Lets each ``--repeat`` run start from a clean cache so runs are independent:
+    prefix caching otherwise makes a repeated identical request hit the cache
+    and take a different path. Requires the server (or orchestrator) to expose
+    ``POST /reset_prefix_cache`` with prefix caching enabled; otherwise this is
+    a no-op with a note. Never fails the run.
+    """
+    try:
+        resp = await client.post_to_path("/reset_prefix_cache", {})
+    except Exception as exc:
+        print(f"  {DIM}prefix-cache reset skipped ({exc}){RESET}")
+        return
+    if 200 <= resp.status < 300:
+        print(f"  {DIM}cleared prefix cache before run{RESET}")
+    else:
+        print(
+            f"  {DIM}prefix-cache reset not applied "
+            f"(HTTP {resp.status or 'no response'}); continuing{RESET}"
+        )
+
+
 async def _run_body(
     args: argparse.Namespace,
     config: RunConfig,
     scenario_classes: list[Any],
     run_log: RunLog | None,
     validator: ValidatorClient | None,
+    exclude_tests: set[str],
 ) -> int:
     print(f"  Target:       {BOLD}{config.base_url}{RESET}")
     print(f"  Model:        {config.model}")
@@ -530,6 +584,11 @@ async def _run_body(
                 print(
                     f"\n  {BOLD}{CYAN}--- Run {run_idx + 1}/{repeat} ---{RESET}\n"
                 )
+                # Clear the server KV/prefix cache between repeats so each run
+                # is an independent sample (prefix caching otherwise carries
+                # state across runs).
+                if run_idx > 0:
+                    await _clear_prefix_cache(client)
 
             for scenario_cls in scenario_classes:
                 if circuit_breaker.tripped:
@@ -585,6 +644,13 @@ async def _run_body(
                                 error=health.error or "",
                             )
                         )
+                    if exclude_tests:
+                        scenario_results = [
+                            r
+                            for r in scenario_results
+                            if f"{r.scenario_name}:{r.test_name}"
+                            not in exclude_tests
+                        ]
                     all_results.extend(scenario_results)
                     s_pass = s_fail = 0
                     for r in scenario_results:

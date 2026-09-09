@@ -1,0 +1,17 @@
+load("//bazel:api.bzl", "lit_tests")
+
+package(default_visibility = ["//visibility:private"])
+
+lit_tests(
+    name = "lit_tests",
+    size = "large",
+    srcs = glob(["*.mojo"]),
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

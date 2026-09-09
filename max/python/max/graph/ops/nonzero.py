@@ -24,22 +24,34 @@ from .validation import _check_device_placement
 
 
 def nonzero(x: TensorValueLike, out_dim: DimLike) -> TensorValue:
-    """Returns the indices of all nozero elements in a tensor.
+    """Returns the indices of all nonzero elements of a tensor.
 
-    Returns a tensor of indices of the nonzero values in the given tensor. The
-    return value is a 2D tensor of shape ``[out_dim x rank_in]``, where
-    out_dim is the number of nonzero elements in the input tensor, and
-    rank_in is the rank of the input tensor. Indices are generated in
-    row-major order.
+    Each row is the multi-index of one nonzero element,
+    and the rows are generated in row-major order.
+
+    .. code-block:: python
+
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("nonzero") as graph:
+            x = ops.constant([[0, 1], [2, 0]], DType.int32, device=device)
+            # Nonzero elements at (0, 1) and (1, 0) produce [[0, 1], [1, 0]]
+            graph.output(ops.nonzero(x, out_dim="nonzero"))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
 
     Args:
         x: The input symbolic tensor.
-        out_dim:
-            The newly generated dimension that is sized for the number of
-            nonzero elements.
+        out_dim: The new data-dependent dimension for the number of nonzero
+            elements.
 
     Returns:
-        A symbolic tensor of indices
+        A ``TensorValue`` representing the indices of the nonzero elements of
+        ``x``, with shape ``[out_dim, x.rank]`` and ``int64`` dtype.
 
     Raises:
         ValueError: If ``x`` is scalar, or if ``x`` is on a non-CPU device and

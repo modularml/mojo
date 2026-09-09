@@ -221,13 +221,13 @@ def dispatch_fp8(
 
 
 # ---------------------------------------------------------------------------
-# NVFP4 Dispatch
+# NVFP4/MXFP4/MXFP8 Dispatch
 # ---------------------------------------------------------------------------
 
-_NVFP4_OUTPUT_GROUPS = 6
+_BLOCK_SCALED_NV_OUTPUT_GROUPS = 6
 
 
-def dispatch_nvfp4(
+def dispatch_block_scaled_nv(
     input_tokens: list[TensorValue],
     topk_ids: list[TensorValue],
     send_ptrs: TensorValue,
@@ -245,7 +245,7 @@ def dispatch_nvfp4(
     n_nodes: int,
     fused_shared_expert: bool,
 ) -> list[tuple[TensorValue, ...]]:
-    """Multi-device EP NVFP4 dispatch.
+    """Multi-device EP NVIDIA block-scaled dispatch.
 
     Returns per-device tuples of 6 tensors:
     (output_tokens, output_scales, row_offsets, scales_offsets,
@@ -269,7 +269,7 @@ def dispatch_nvfp4(
     in_chain = graph.device_chains.merge_for(devices)
 
     *results, out_chain = graph._add_op_generated(
-        mo.DistributedEpDispatchNvfp4Op,
+        mo.DistributedEpDispatchBlockScaledNvOp,
         output_tokens_types,
         output_scales_types,
         row_offsets_types,
@@ -300,7 +300,7 @@ def dispatch_nvfp4(
     for device in devices:
         graph.device_chains[device] = out_chain
 
-    return _unpack_results(results, num_devices, _NVFP4_OUTPUT_GROUPS)
+    return _unpack_results(results, num_devices, _BLOCK_SCALED_NV_OUTPUT_GROUPS)
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +326,9 @@ def dispatch_mxfp4(
     n_gpus_per_node: int,
     n_nodes: int,
     fused_shared_expert: bool,
+    fuse_a_scale_preshuffle: bool,
+    max_padded_m: int,
+    mx_format: str = "auto",
 ) -> list[tuple[TensorValue, ...]]:
     """Multi-device EP MXFP4 dispatch.
 
@@ -372,6 +375,9 @@ def dispatch_mxfp4(
             n_nodes,
             fused_shared_expert,
         ),
+        BoolAttr(fuse_a_scale_preshuffle),
+        IntegerAttr(IntegerType(64), max_padded_m),
+        StringAttr(mx_format),
     )
 
     graph._update_chain(out_chain)

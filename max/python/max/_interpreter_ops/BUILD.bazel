@@ -1,119 +1,20 @@
-load("//bazel:api.bzl", "modular_py_library", "mojo_library", "mojo_shared_library", "requirement")
+load("//bazel:api.bzl", "modular_py_library", "requirement")
 
 package(default_visibility = ["//max:consumers"])
-
-mojo_library(
-    name = "op_utils",
-    srcs = glob(["op_utils/*.mojo"]),
-    deps = [
-        "@mojo//:std",
-    ],
-)
-
-OPS = [file.removesuffix(".mojo") for file in glob(["*_ops.mojo"])]
-
-# These files and their dependencies take a while to compile, so we want
-# to be extra precise about dependency declarations. This helps frontload
-# as much of the compilation as possible.
-EXTRA_DEPS = {
-    "data_movement_ops": [
-        "//max:extensibility",
-        "//max:layout",
-        "//max:builtin_kernels",
-    ],
-    "elementwise_binary_ops": [
-        "//max:builtin_kernels",
-        "//max:extensibility",
-    ],
-    "elementwise_cast_ops": [
-        "//max:builtin_kernels",
-        "//max:extensibility",
-    ],
-    "elementwise_comparison_ops": [
-        "//max:builtin_kernels",
-        "//max:extensibility",
-    ],
-    "elementwise_unary_ops": [
-        "//max:extensibility",
-        "//max:builtin_kernels",
-    ],
-    "group_norm_ops": [
-        "//max:extensibility",
-        "//max:nn",
-    ],
-    "layer_norm_ops": [
-        "//max:nn",
-        "//max:extensibility",
-    ],
-    "matmul_ops": [
-        "//max:extensibility",
-        "//max:linalg",
-        "//max:builtin_kernels",
-        "//max:layout",
-    ],
-    "misc_ops": [
-        "//max:builtin_kernels",
-        "//max:extensibility",
-    ],
-    "resize_ops": [
-        "//max:nn",
-        "//max:layout",
-    ],
-    "rms_norm_ops": [
-        "//max:nn",
-        "//max:extensibility",
-    ],
-    "softmax_ops": [
-        "//max:nn",
-        "//max:layout",
-    ],
-}
-
-[
-    mojo_shared_library(
-        name = name,
-        srcs = [name + ".mojo"],
-        data = [
-            "@mojo//:python",
-        ],
-        shared_lib_name = name + ".so",
-        deps = [
-            ":op_utils",
-            "@mojo//:std",
-        ] + EXTRA_DEPS.get(name, []),
-    )
-    for name in OPS
-]
-
-_SHARED_LIBS = [":" + name for name in OPS]
-
-# Wrap .mojo sources in a filegroup for macOS runtime compilation.
-# On macOS (cross-compiled from Linux CI), the mojo_shared_library targets
-# crash with SIGILL, so we fall back to runtime compilation via mojo.importer.
-# Using a filegroup avoids the duplicate-srcs lint (find_duplicate_srcs.py
-# ignores filegroup targets).
-filegroup(
-    name = "_mojo_srcs",
-    srcs = glob(["**/*.mojo"]),
-)
 
 modular_py_library(
     name = "_interpreter_ops",
     srcs = glob(["**/*.py"]),
-    data = select({
-        "@platforms//os:macos": [
-            ":_mojo_srcs",
-            "//max:builtin_kernels",
-            "@mojo//:std",
-        ],
-        "//conditions:default": _SHARED_LIBS,
-    }),
     deps = [
         "//max/python/max:_core",
+        "//max/python/max:_eager_policy",
+        "//max/python/max:_mlir_context",
         "//max/python/max/driver",
         "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/experimental",
         "//max/python/max/graph",
-        "@mojo//:python",
+        "//max/python/max/mlir",
         requirement("numpy"),
     ],
 )

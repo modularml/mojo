@@ -7,10 +7,10 @@
 import enum
 import types
 from collections.abc import Callable, Iterator, Sequence
-from typing import Generic, TypeVar, overload
+from typing import ClassVar, Final, Generic, Self, TypeVar, overload
 
 import _mlir
-import typing_extensions
+from typing_extensions import Buffer
 
 class DiagnosticSeverity(enum.Enum):
     ERROR = 0
@@ -25,6 +25,22 @@ class WalkOrder(enum.Enum):
     PRE_ORDER = 0
 
     POST_ORDER = 1
+
+class OperationEquivalenceFlags(enum.IntFlag):
+    __str__ = __repr__
+
+    def __repr__(self, /):
+        """Return repr(self)."""
+
+    NONE = 0
+
+    IGNORE_LOCATIONS = 1
+
+    IGNORE_DISCARDABLE_ATTRS = 2
+
+    IGNORE_PROPERTIES = 4
+
+    IGNORE_COMMUTATIVITY = 8
 
 class WalkResult(enum.Enum):
     ADVANCE = 0
@@ -50,9 +66,6 @@ class Diagnostic:
     def notes(self) -> tuple[Diagnostic]:
         """Returns a tuple of attached note diagnostics."""
 
-    def __str__(self) -> str:
-        """Returns the diagnostic message as a string."""
-
 class DiagnosticInfo:
     def __init__(self, diag: Diagnostic) -> None:
         """Creates a DiagnosticInfo from a Diagnostic."""
@@ -72,9 +85,6 @@ class DiagnosticInfo:
     @property
     def notes(self) -> list[DiagnosticInfo]:
         """List of attached note diagnostics."""
-
-    def __str__(self) -> str:
-        """Returns the diagnostic message as a string."""
 
 class DiagnosticHandler:
     def detach(self) -> None:
@@ -128,7 +138,7 @@ class Context:
     ) -> None:
         """Exits the context manager."""
 
-    current: Context | None = ...
+    current: ClassVar[Final[Context | None]] = ...
     """
     Gets the Context bound to the current thread or returns None if no context is set.
     """
@@ -143,6 +153,9 @@ class Context:
 
     def get_dialect_descriptor(self, dialect_name: str) -> DialectDescriptor:
         """Gets or loads a dialect by name, returning its descriptor object."""
+
+    def is_dialect_loaded(self, dialect_name: str) -> bool:
+        """Checks if a dialect is loaded in the context."""
 
     @property
     def allow_unregistered_dialects(self) -> bool:
@@ -212,13 +225,34 @@ class Context:
         immediately available for use.
         """
 
+    def begin_transient_scope(self) -> None:
+        """
+        Begins a transient scope on the context, freezing the base layer.
+
+        All subsequently allocated types, attributes, and unregistered operations
+        are treated as transient and will be deallocated with end_transient_scope().
+        Raises a ValueError if the context is already in a transient scope.
+        """
+
+    def end_transient_scope(self) -> None:
+        """
+        Ends the transient scope and resets the context to the base state.
+
+        Prunes all transient types, attributes, affine expressions, distinct
+        attributes, and unregistered operations added during the transient scope.
+
+        Note: Any Python objects referencing transient IR entities become invalid
+        after this call and must not be accessed.
+        """
+
+    @property
+    def is_in_transient_scope(self) -> bool:
+        """Returns whether the context is currently in a transient scope."""
+
 class DialectDescriptor:
     @property
     def namespace(self) -> str:
         """Returns the namespace of the dialect."""
-
-    def __repr__(self) -> str:
-        """Returns a string representation of the dialect descriptor."""
 
 class Dialects:
     def __getitem__(self, arg: str, /) -> object:
@@ -234,9 +268,6 @@ class Dialect:
     @property
     def descriptor(self) -> object:
         """Returns the DialectDescriptor for this dialect."""
-
-    def __repr__(self) -> str:
-        """Returns a string representation of the dialect."""
 
 class DialectRegistry:
     def __init__(self) -> None:
@@ -262,7 +293,7 @@ class Location:
     def __eq__(self, arg: object, /) -> bool:
         """Compares location with non-location object (always returns False)."""
 
-    current: Location | None = ...
+    current: ClassVar[Final[Location | None]] = ...
     """Gets the Location bound to the current thread or raises ValueError."""
 
     @staticmethod
@@ -341,21 +372,14 @@ class Location:
           message: The error message to emit.
         """
 
-    def __str__(self) -> str:
-        """Returns the assembly form of the Location."""
-
-    def __repr__(self) -> str:
-        """Returns the assembly representation of the location."""
-
 class UnknownLoc(Location):
     def __init__(self, cast_from_loc: Location) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """
     (arg: object, /) -> mlir::python::MLIR_BINDINGS_PYTHON_DOMAIN::PyTypeID
     """
 
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(context: _mlir.ir.Context | None = None) -> UnknownLoc:
         """Gets a Location representing an unknown location."""
@@ -363,12 +387,11 @@ class UnknownLoc(Location):
 class FileLineColLoc(Location):
     def __init__(self, cast_from_loc: Location) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """
     (arg: object, /) -> mlir::python::MLIR_BINDINGS_PYTHON_DOMAIN::PyTypeID
     """
 
-    def __repr__(self) -> str: ...
     @overload
     @staticmethod
     def get(
@@ -414,12 +437,11 @@ class FileLineColLoc(Location):
 class NameLoc(Location):
     def __init__(self, cast_from_loc: Location) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """
     (arg: object, /) -> mlir::python::MLIR_BINDINGS_PYTHON_DOMAIN::PyTypeID
     """
 
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         name: str,
@@ -439,12 +461,11 @@ class NameLoc(Location):
 class CallSiteLoc(Location):
     def __init__(self, cast_from_loc: Location) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """
     (arg: object, /) -> mlir::python::MLIR_BINDINGS_PYTHON_DOMAIN::PyTypeID
     """
 
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         callee: Location,
@@ -464,12 +485,11 @@ class CallSiteLoc(Location):
 class FusedLoc(Location):
     def __init__(self, cast_from_loc: Location) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """
     (arg: object, /) -> mlir::python::MLIR_BINDINGS_PYTHON_DOMAIN::PyTypeID
     """
 
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         locations: Sequence[Location],
@@ -491,7 +511,10 @@ class FusedLoc(Location):
 class Module:
     @overload
     @staticmethod
-    def parse(asm: str, context: _mlir.ir.Context | None = None) -> Module:
+    def parse(asm: str, context: _mlir.ir.Context | None = None) -> Module: ...
+    @overload
+    @staticmethod
+    def parse(asm: bytes, context: _mlir.ir.Context | None = None) -> Module:
         """
         Parses a module's assembly format from a string.
 
@@ -500,11 +523,6 @@ class Module:
         See also: https://mlir.llvm.org/docs/LangRef/
         """
 
-    @overload
-    @staticmethod
-    def parse(
-        asm: bytes, context: _mlir.ir.Context | None = None
-    ) -> Module: ...
     @staticmethod
     def parseFile(path: str, context: _mlir.ir.Context | None = None) -> Module:
         """
@@ -533,15 +551,6 @@ class Module:
 
     def dump(self) -> None:
         """Dumps a debug representation of the object to stderr."""
-
-    def __str__(self) -> str:
-        """
-        Gets the assembly form of the operation with default options.
-
-        If more advanced control over the assembly formatting or I/O options is needed,
-        use the dedicated print or get_asm method, which supports keyword arguments to
-        customize behavior.
-        """
 
     def __eq__(self, other: Module) -> bool:
         """Compares two modules for equality."""
@@ -639,34 +648,38 @@ class OpView(_OperationBase):
     def operation(self) -> Operation: ...
     @property
     def opview(self) -> OpView: ...
-    def __str__(self) -> str: ...
     @property
     def successors(self) -> OpSuccessors:
         """Returns the list of Operation successors."""
 
     @classmethod
-    def build_generic(*args, **kwargs):
-        """
-        build_generic(cls, results: Sequence[Type] | None = None, operands: Sequence[Value] | None = None, attributes: dict[str, Attribute] | None = None, successors: Sequence[Block] | None = None, regions: int | None = None, loc: Location | None = None, ip: InsertionPoint | None = None) -> typing.Self
-
-        Builds a specific, generated OpView based on class level attributes.
-        """
-
-    @classmethod
-    def parse(*args, **kwargs):
-        r"""
-        parse(cls, source: str, *, source_name: str = \'\', context: Context | None = None) -> typing.Self
-
-        Parses a specific, generated OpView based on class level attributes.
-        """
+    def build_generic(
+        cls,
+        results: Sequence[Type] | None = None,
+        operands: Sequence[Value] | None = None,
+        attributes: dict[str, Attribute] | None = None,
+        successors: Sequence[Block] | None = None,
+        regions: int | None = None,
+        loc: Location | None = None,
+        ip: InsertionPoint | None = None,
+    ) -> Self:
+        """Builds a specific, generated OpView based on class level attributes."""
 
     @classmethod
-    def has_trait(*args, **kwargs):
-        """
-        (cls: object, trait_cls: type, context: _mlir.ir.Context | None = None) -> bool
+    def parse(
+        cls,
+        source: str,
+        *,
+        source_name: str = "",
+        context: Context | None = None,
+    ) -> Self:
+        """Parses a specific, generated OpView based on class level attributes."""
 
-        Checks if the operation has a given trait.
-        """
+    @classmethod
+    def has_trait(
+        cls, trait_cls: type, context: _mlir.ir.Context | None = None
+    ) -> bool:
+        """Checks if the operation has a given trait."""
 
 class OpAdaptor:
     @overload
@@ -792,9 +805,6 @@ class Block:
     def __hash__(self) -> int:
         """Returns the hash value of the block."""
 
-    def __str__(self) -> str:
-        """Returns the assembly form of the block."""
-
     def append(self, operation: _OperationBase) -> None:
         """
         Appends an operation to this block.
@@ -833,7 +843,7 @@ class InsertionPoint:
     ) -> None:
         """Exits the insertion point context manager."""
 
-    current: InsertionPoint = ...
+    current: ClassVar[Final[InsertionPoint]] = ...
     """
     Gets the InsertionPoint bound to the current thread or raises ValueError if none has been set.
     """
@@ -938,12 +948,6 @@ class Attribute:
     def dump(self) -> None:
         """Dumps a debug representation of the object to stderr."""
 
-    def __str__(self) -> str:
-        """Returns the assembly form of the Attribute."""
-
-    def __repr__(self) -> str:
-        """Returns a string representation of the attribute."""
-
     @property
     def typeid(self) -> TypeID:
         """Returns the `TypeID` of the attribute."""
@@ -952,9 +956,6 @@ class Attribute:
         """Downcasts the attribute to a more specific attribute if possible."""
 
 class NamedAttribute:
-    def __repr__(self) -> str:
-        """Returns a string representation of the named attribute."""
-
     @property
     def name(self) -> str:
         """The name of the `NamedAttribute` binding."""
@@ -994,12 +995,6 @@ class Type:
 
     def dump(self) -> None:
         """Dumps a debug representation of the object to stderr."""
-
-    def __str__(self) -> str:
-        """Returns the assembly form of the `Type`."""
-
-    def __repr__(self) -> str:
-        """Returns a string representation of the `Type`."""
 
     def maybe_downcast(self) -> Type:
         """Downcasts the Type to a more specific `Type` if possible."""
@@ -1056,15 +1051,6 @@ class Value(Generic[_T]):
     def __hash__(self) -> int:
         """Returns the hash value of the value."""
 
-    def __str__(self) -> str:
-        """
-        Returns the string form of the value.
-
-        If the value is a block argument, this is the assembly form of its type and the
-        position in the argument list. If the value is an operation result, this is
-        equivalent to printing the operation that produced it.
-        """
-
     @overload
     def get_name(
         self,
@@ -1101,6 +1087,10 @@ class Value(Generic[_T]):
     @overload
     def replace_all_uses_except(
         self, with_: Value, exceptions: Operation
+    ) -> None: ...
+    @overload
+    def replace_all_uses_except(
+        self, with_: Value, exceptions: Sequence[Operation]
     ) -> None:
         """
         Replace all uses of this value with the `with` value, except for those
@@ -1108,10 +1098,6 @@ class Value(Generic[_T]):
         operations.
         """
 
-    @overload
-    def replace_all_uses_except(
-        self, with_: Value, exceptions: Sequence[Operation]
-    ) -> None: ...
     def maybe_downcast(self) -> BlockArgument | OpResult | Value:
         """Downcasts the `Value` to a more specific kind if possible."""
 
@@ -1122,7 +1108,6 @@ class Value(Generic[_T]):
 class BlockArgument(Value[_T]):
     def __init__(self, value: Value) -> None: ...
     def maybe_downcast(self) -> BlockArgument: ...
-    def __str__(self) -> str: ...
     @property
     def owner(self) -> Block:
         """Returns the block that owns this argument."""
@@ -1140,7 +1125,6 @@ class BlockArgument(Value[_T]):
 class OpResult(Value[_T]):
     def __init__(self, value: Value) -> None: ...
     def maybe_downcast(self) -> OpResult: ...
-    def __str__(self) -> str: ...
     @property
     def owner(self) -> OpView:
         """Returns the operation that produces this result."""
@@ -1465,30 +1449,41 @@ class AttrBuilder:
 
 class DynamicOpTrait:
     @classmethod
-    def attach(*args, **kwargs):
-        """
-        (cls: object, op_name: object, target: object | None = None, context: _mlir.ir.Context | None = None) -> bool
-
-        Attach the dynamic op trait subclass to the given operation name.
-        """
+    def attach(
+        cls,
+        op_name: type | str,
+        target: object | None = None,
+        context: _mlir.ir.Context | None = None,
+    ) -> bool:
+        """Attach the dynamic op trait subclass to the given operation name."""
 
 class IsTerminatorTrait(DynamicOpTrait):
     @classmethod
-    def attach(*args, **kwargs):
-        """
-        (cls: object, op_name: object, context: _mlir.ir.Context | None = None) -> bool
-
-        Attach IsTerminator trait to the given operation name.
-        """
+    def attach(
+        cls, op_name: type | str, context: _mlir.ir.Context | None = None
+    ) -> bool:
+        """Attach IsTerminator trait to the given operation name."""
 
 class NoTerminatorTrait(DynamicOpTrait):
     @classmethod
-    def attach(*args, **kwargs):
-        """
-        (cls: object, op_name: object, context: _mlir.ir.Context | None = None) -> bool
+    def attach(
+        cls, op_name: type | str, context: _mlir.ir.Context | None = None
+    ) -> bool:
+        """Attach NoTerminator trait to the given operation name."""
 
-        Attach NoTerminator trait to the given operation name.
-        """
+class IsIsolatedFromAboveTrait(DynamicOpTrait):
+    @classmethod
+    def attach(
+        cls, op_name: type | str, context: _mlir.ir.Context | None = None
+    ) -> bool:
+        """Attach IsIsolatedFromAbove trait to the given operation name."""
+
+class RecursiveMemoryEffectsTrait(DynamicOpTrait):
+    @classmethod
+    def attach(
+        cls, op_name: type | str, context: _mlir.ir.Context | None = None
+    ) -> bool:
+        """Attach RecursiveMemoryEffects trait to the given operation name."""
 
 class MLIRError(Exception):
     @property
@@ -1521,8 +1516,6 @@ class AffineExpr:
     def __eq__(self, arg: AffineExpr, /) -> bool: ...
     @overload
     def __eq__(self, arg: object, /) -> bool: ...
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
     def __hash__(self) -> int: ...
     @property
     def context(self) -> Context: ...
@@ -1732,8 +1725,6 @@ class AffineMap:
     def __eq__(self, arg: AffineMap, /) -> bool: ...
     @overload
     def __eq__(self, arg: object, /) -> bool: ...
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
     def __hash__(self) -> int: ...
     @staticmethod
     def compress_unused_symbols(
@@ -1822,8 +1813,6 @@ class IntegerSet:
     def __eq__(self, arg: IntegerSet, /) -> bool: ...
     @overload
     def __eq__(self, arg: object, /) -> bool: ...
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
     def __hash__(self) -> int: ...
     @property
     def context(self) -> Context: ...
@@ -1886,14 +1875,13 @@ class AffineMapAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -1909,12 +1897,11 @@ class DenseBoolArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         values: Sequence, context: _mlir.ir.Context | None = None
@@ -1935,12 +1922,11 @@ class DenseI8ArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         values: Sequence[int], context: _mlir.ir.Context | None = None
@@ -1961,12 +1947,11 @@ class DenseI16ArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         values: Sequence[int], context: _mlir.ir.Context | None = None
@@ -1987,12 +1972,11 @@ class DenseI32ArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         values: Sequence[int], context: _mlir.ir.Context | None = None
@@ -2013,12 +1997,11 @@ class DenseI64ArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         values: Sequence[int], context: _mlir.ir.Context | None = None
@@ -2039,12 +2022,11 @@ class DenseF32ArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         values: Sequence[float], context: _mlir.ir.Context | None = None
@@ -2065,12 +2047,11 @@ class DenseF64ArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         values: Sequence[float], context: _mlir.ir.Context | None = None
@@ -2091,14 +2072,13 @@ class ArrayAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2121,12 +2101,11 @@ class BoolAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(value: bool, context: _mlir.ir.Context | None = None) -> BoolAttr:
         """Gets an uniqued bool attribute"""
@@ -2153,17 +2132,16 @@ class DenseElementsAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     def __len__(self) -> int: ...
     @overload
     @staticmethod
     def get(
-        array: typing_extensions.Buffer,
+        array: Buffer,
         signless: bool = True,
         type: Type | None = None,
         shape: Sequence[int] | None = None,
@@ -2249,16 +2227,15 @@ class DenseFPElementsAttr(DenseElementsAttr):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @overload
     @staticmethod
     def get(
-        array: typing_extensions.Buffer,
+        array: Buffer,
         signless: bool = True,
         type: Type | None = None,
         shape: Sequence[int] | None = None,
@@ -2342,16 +2319,15 @@ class DenseIntElementsAttr(DenseElementsAttr):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @overload
     @staticmethod
     def get(
-        array: typing_extensions.Buffer,
+        array: Buffer,
         signless: bool = True,
         type: Type | None = None,
         shape: Sequence[int] | None = None,
@@ -2435,19 +2411,18 @@ class DenseResourceElementsAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
     def get_from_buffer(
-        array: typing_extensions.Buffer,
+        array: Buffer,
         name: str,
         type: Type,
         alignment: int | None = None,
@@ -2485,14 +2460,13 @@ class DictAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     def __contains__(self, arg: str, /) -> bool: ...
@@ -2514,14 +2488,13 @@ class SymbolRefAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2539,14 +2512,13 @@ class FlatSymbolRefAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2564,20 +2536,19 @@ class OpaqueAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
     def get(
         dialect_namespace: str,
-        buffer: typing_extensions.Buffer,
+        buffer: Buffer,
         type: Type,
         context: Context | None = None,
     ) -> OpaqueAttr:
@@ -2596,14 +2567,13 @@ class FloatAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2642,14 +2612,13 @@ class IntegerAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2663,19 +2632,21 @@ class IntegerAttr(Attribute):
     def __int__(self) -> int:
         """Converts the value of the integer attribute to a Python int"""
 
+    def __index__(self) -> int:
+        """Converts the value of the integer attribute to a Python int"""
+
 class IntegerSetAttr(Attribute):
     def __init__(self, cast_from_attr: Attribute) -> None: ...
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2687,26 +2658,27 @@ class StringAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @overload
     @staticmethod
-    def get(value: str, context: _mlir.ir.Context | None = None) -> StringAttr:
-        """Gets a uniqued string attribute"""
-
+    def get(
+        value: str, context: _mlir.ir.Context | None = None
+    ) -> StringAttr: ...
     @overload
     @staticmethod
     def get(
         value: bytes, context: _mlir.ir.Context | None = None
-    ) -> StringAttr: ...
+    ) -> StringAttr:
+        """Gets a uniqued string attribute"""
+
     @staticmethod
     def get_typed(type: Type, value: str) -> StringAttr:
         """Gets a uniqued string attribute associated to a type"""
@@ -2724,14 +2696,13 @@ class TypeAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2746,14 +2717,13 @@ class UnitAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2765,14 +2735,13 @@ class StridedLayoutAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    attr_name: str = ...
+    attr_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -2804,12 +2773,11 @@ class DynamicAttr(Attribute):
     @property
     def type(self) -> Type: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         full_attr_name: str,
@@ -2839,8 +2807,79 @@ class Speculatability(enum.Enum):
 
     RecursivelySpeculatable = 2
 
-class MemoryEffectInstancesList:
-    pass
+class MemoryEffect:
+    """A memory effect."""
+
+    def __eq__(self, arg: MemoryEffect, /) -> bool:
+        """Compares two memory effects for equality."""
+
+    Allocate: ClassVar[Final[MemoryEffect]] = ...
+    """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.MemoryEffect"""
+
+    Free: ClassVar[Final[MemoryEffect]] = ...
+    """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.MemoryEffect"""
+
+    Read: ClassVar[Final[MemoryEffect]] = ...
+    """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.MemoryEffect"""
+
+    Write: ClassVar[Final[MemoryEffect]] = ...
+    """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.MemoryEffect"""
+
+class SideEffectResource:
+    """A side effect resource."""
+
+    Default: ClassVar[Final[SideEffectResource]] = ...
+    """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.SideEffectResource"""
+
+class MemoryEffectInstance:
+    """A concrete instance of a memory effect."""
+
+    def __init__(
+        self,
+        effect: MemoryEffect,
+        target: OpOperand
+        | OpResult
+        | BlockArgument
+        | SymbolRefAttr
+        | FlatSymbolRefAttr
+        | None = None,
+        *,
+        parameters: Attribute | None = None,
+        stage: int = 0,
+        effect_on_full_region: bool = False,
+        resource: SideEffectResource = ...,
+    ) -> None:
+        """
+        Creates a memory effect instance. The target may be an OpOperand, OpResult, BlockArgument, SymbolRefAttr, or None.
+        """
+
+    @property
+    def effect(self) -> MemoryEffect:
+        """Returns the kind of memory effect."""
+
+    @property
+    def resource(self) -> SideEffectResource:
+        """Returns the affected side effect resource."""
+
+    @property
+    def stage(self) -> int:
+        """Returns the stage at which the effect occurs."""
+
+    @property
+    def effect_on_full_region(self) -> bool:
+        """Returns whether the effect applies to the full resource."""
+
+    @property
+    def parameters(self) -> Attribute | None:
+        """Returns the effect parameters, if any."""
+
+    @property
+    def value(self) -> OpResult | BlockArgument | None:
+        """Returns the affected value, if any."""
+
+    @property
+    def symbol_ref(self) -> SymbolRefAttr | FlatSymbolRefAttr | None:
+        """Returns the affected symbol reference, if any."""
 
 class ConditionallySpeculatable:
     def __init__(
@@ -2864,12 +2903,14 @@ class ConditionallySpeculatable:
         """Returns the speculatability of the given operation."""
 
     @classmethod
-    def attach(*args, **kwargs):
-        """
-        (cls: object, op_name: object, *, target: object | None = None, context: _mlir.ir.Context | None = None) -> None
-
-        Attach the interface subclass to the given operation name.
-        """
+    def attach(
+        cls,
+        op_name: object,
+        *,
+        target: object | None = None,
+        context: _mlir.ir.Context | None = None,
+    ) -> None:
+        """Attach the interface subclass to the given operation name."""
 
 class InferShapedTypeOpInterface:
     def __init__(
@@ -2953,13 +2994,18 @@ class MemoryEffectsOpInterface:
         Returns an OpView subclass _instance_ for which the interface was constructed
         """
 
-    @classmethod
-    def attach(*args, **kwargs):
-        """
-        (cls: object, op_name: object, *, target: object | None = None, context: _mlir.ir.Context | None = None) -> None
+    def get_effects(self) -> list[MemoryEffectInstance]:
+        """Returns the memory effects of the operation."""
 
-        Attach the interface subclass to the given operation name.
-        """
+    @classmethod
+    def attach(
+        cls,
+        op_name: object,
+        *,
+        target: object | None = None,
+        context: _mlir.ir.Context | None = None,
+    ) -> None:
+        """Attach the interface subclass to the given operation name."""
 
 class ShapedTypeComponents:
     @property
@@ -3002,14 +3048,13 @@ class ShapedTypeComponents:
 class IntegerType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     class Signedness(enum.Enum):
@@ -3019,11 +3064,11 @@ class IntegerType(Type):
 
         UNSIGNED = 2
 
-    SIGNLESS: IntegerType.Signedness = IntegerType.Signedness.SIGNLESS
+    SIGNLESS: Signedness = ...
 
-    SIGNED: IntegerType.Signedness = IntegerType.Signedness.SIGNED
+    SIGNED: Signedness = ...
 
-    UNSIGNED: IntegerType.Signedness = IntegerType.Signedness.UNSIGNED
+    UNSIGNED: Signedness = ...
 
     @staticmethod
     def get_signless(
@@ -3046,7 +3091,7 @@ class IntegerType(Type):
     @staticmethod
     def get(
         width: int,
-        signedness: IntegerType.Signedness = IntegerType.Signedness.SIGNLESS,
+        signedness: Signedness = Signedness.SIGNLESS,
         context: _mlir.ir.Context | None = None,
     ) -> IntegerType:
         """Create an integer type"""
@@ -3072,12 +3117,11 @@ class IntegerType(Type):
 class FloatType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @property
     def width(self) -> int:
         """Returns the width of the floating-point type"""
@@ -3085,14 +3129,13 @@ class FloatType(Type):
 class IndexType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3102,14 +3145,13 @@ class IndexType(Type):
 class Float4E2M1FNType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3119,14 +3161,13 @@ class Float4E2M1FNType(FloatType):
 class Float6E2M3FNType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3136,14 +3177,13 @@ class Float6E2M3FNType(FloatType):
 class Float6E3M2FNType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3153,14 +3193,13 @@ class Float6E3M2FNType(FloatType):
 class Float8E4M3FNType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3170,14 +3209,13 @@ class Float8E4M3FNType(FloatType):
 class Float8E5M2Type(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3187,14 +3225,13 @@ class Float8E5M2Type(FloatType):
 class Float8E4M3Type(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3204,14 +3241,13 @@ class Float8E4M3Type(FloatType):
 class Float8E4M3FNUZType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3221,14 +3257,13 @@ class Float8E4M3FNUZType(FloatType):
 class Float8E4M3B11FNUZType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3238,14 +3273,13 @@ class Float8E4M3B11FNUZType(FloatType):
 class Float8E5M2FNUZType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3255,14 +3289,13 @@ class Float8E5M2FNUZType(FloatType):
 class Float8E3M4Type(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3272,31 +3305,41 @@ class Float8E3M4Type(FloatType):
 class Float8E8M0FNUType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
     def get(context: _mlir.ir.Context | None = None) -> Float8E8M0FNUType:
         """Create a float8_e8m0fnu type."""
 
-class BF16Type(FloatType):
+class Float8E5M3FNUType(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
+    @staticmethod
+    def get(context: _mlir.ir.Context | None = None) -> Float8E5M3FNUType:
+        """Create a float8_e5m3fnu type."""
 
-    type_name: str = ...
+class BF16Type(FloatType):
+    def __init__(self, cast_from_type: Type) -> None: ...
+
+    static_typeid: ClassVar[Final[TypeID]] = ...
+    """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
+
+    @property
+    def typeid(self) -> TypeID: ...
+
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3306,14 +3349,13 @@ class BF16Type(FloatType):
 class F16Type(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3323,14 +3365,13 @@ class F16Type(FloatType):
 class FloatTF32Type(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3340,14 +3381,13 @@ class FloatTF32Type(FloatType):
 class F32Type(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3357,14 +3397,13 @@ class F32Type(FloatType):
 class F64Type(FloatType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3374,14 +3413,13 @@ class F64Type(FloatType):
 class NoneType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3391,14 +3429,13 @@ class NoneType(Type):
 class ComplexType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3412,12 +3449,11 @@ class ComplexType(Type):
 class ShapedType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @property
     def element_type(self) -> Type:
         """Returns the element type of the shaped type."""
@@ -3484,14 +3520,13 @@ class ShapedType(Type):
 class VectorType(ShapedType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3524,14 +3559,13 @@ class VectorType(ShapedType):
 class RankedTensorType(ShapedType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3558,14 +3592,13 @@ class RankedTensorType(ShapedType):
 class UnrankedTensorType(ShapedType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3583,14 +3616,13 @@ class UnrankedTensorType(ShapedType):
 class MemRefType(ShapedType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3631,14 +3663,13 @@ class MemRefType(ShapedType):
 class UnrankedMemRefType(ShapedType):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3664,14 +3695,13 @@ class UnrankedMemRefType(ShapedType):
 class TupleType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3690,14 +3720,13 @@ class TupleType(Type):
 class FunctionType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3719,14 +3748,13 @@ class FunctionType(Type):
 class OpaqueType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
 
-    type_name: str = ...
+    type_name: ClassVar[Final[str]] = ...
     """(arg: object, /) -> str"""
 
     @staticmethod
@@ -3748,12 +3776,11 @@ class OpaqueType(Type):
 class DynamicType(Type):
     def __init__(self, cast_from_type: Type) -> None: ...
 
-    static_typeid: max._mlir._mlir_libs._mlir.ir.TypeID = ...
+    static_typeid: ClassVar[Final[TypeID]] = ...
     """(arg: object, /) -> max._mlir._mlir_libs._mlir.ir.TypeID"""
 
     @property
     def typeid(self) -> TypeID: ...
-    def __repr__(self) -> str: ...
     @staticmethod
     def get(
         full_type_name: str,

@@ -14,11 +14,11 @@
 from std.math import ceildiv, isclose
 from std.sys import argv
 
-from std.gpu import WARP_SIZE
-from std.gpu.host import DeviceContext
-from std.gpu import block_idx, warp_id
-from std.gpu.memory import async_copy_wait_all
-from std.gpu.sync import barrier
+from max.gpu import WARP_SIZE
+from max.gpu.host import DeviceContext
+from max.gpu import block_idx, warp_id
+from max.gpu.memory import async_copy_wait_all
+from max.gpu.sync import barrier
 from layout import (
     Coord,
     Idx,
@@ -72,14 +72,14 @@ def gemm_kernel[
         a_type,
         Layout.row_major(BM, BK),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     var b_tile_sram = LayoutTensor[
         b_type,
         Layout.row_major(BK, BN),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     var num_warps = NUM_THREADS // WARP_SIZE
@@ -93,20 +93,20 @@ def gemm_kernel[
         a_type,
         Layout.row_major(TN),
         MutAnyOrigin,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ].stack_allocation()
     var b_reg = LayoutTensor[
         b_type,
         Layout.row_major(TN),
         MutAnyOrigin,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ].stack_allocation()
     var c_reg = (
         LayoutTensor[
             c_type,
             Layout.row_major(TM, TN),
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ]
         .stack_allocation()
         .fill(0)
@@ -170,10 +170,10 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
     comptime N = 1024
     comptime K = 128
 
-    var a_host = ctx.enqueue_create_host_buffer[DType.float32](M * K)
-    var b_host = ctx.enqueue_create_host_buffer[DType.float32](K * N)
-    var c_host = ctx.enqueue_create_host_buffer[DType.float32](M * N)
-    var c_host_ref = ctx.enqueue_create_host_buffer[DType.float32](M * N)
+    var a_host = ctx.enqueue_create_host_buffer[.float32](M * K)
+    var b_host = ctx.enqueue_create_host_buffer[.float32](K * N)
+    var c_host = ctx.enqueue_create_host_buffer[.float32](M * N)
+    var c_host_ref = ctx.enqueue_create_host_buffer[.float32](M * N)
 
     for i in range(M * K):
         a_host[i] = Float32(i)
@@ -181,10 +181,10 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
     for i in range(K * N):
         b_host[i] = Float32(i)
 
-    var a_device = ctx.enqueue_create_buffer[DType.float32](M * K)
-    var b_device = ctx.enqueue_create_buffer[DType.float32](K * N)
-    var c_device = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var c_device_ref = ctx.enqueue_create_buffer[DType.float32](M * N)
+    var a_device = ctx.enqueue_create_buffer[.float32](M * K)
+    var b_device = ctx.enqueue_create_buffer[.float32](K * N)
+    var c_device = ctx.enqueue_create_buffer[.float32](M * N)
+    var c_device_ref = ctx.enqueue_create_buffer[.float32](M * N)
 
     ctx.enqueue_copy(a_device, a_host)
     ctx.enqueue_copy(b_device, b_host)
@@ -193,22 +193,16 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
     comptime b_layout = Layout.row_major(K, M)
     comptime c_layout = Layout.row_major(M, N)
 
-    var a_tensor = LayoutTensor[DType.float32, a_layout, MutAnyOrigin](
-        a_device.unsafe_ptr()
-    )
-    var b_tensor = LayoutTensor[DType.float32, b_layout, MutAnyOrigin](
-        b_device.unsafe_ptr()
-    )
-    var c_tensor = LayoutTensor[DType.float32, c_layout, MutAnyOrigin](
-        c_device.unsafe_ptr()
-    )
+    var a_tensor = LayoutTensor[.float32, a_layout, MutAnyOrigin](a_device)
+    var b_tensor = LayoutTensor[.float32, b_layout, MutAnyOrigin](b_device)
+    var c_tensor = LayoutTensor[.float32, c_layout, MutAnyOrigin](c_device)
 
     comptime kernel = gemm_kernel[
-        DType.float32,
+        .float32,
         c_tensor.layout,
-        DType.float32,
+        .float32,
         a_tensor.layout,
-        DType.float32,
+        .float32,
         b_tensor.layout,
         NUM_THREADS,
         BM,
@@ -234,20 +228,19 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
     # a/b are constructed as immutable to match the ImmutAnyOrigin
     # parameters that matmul_kernel_naive expects (enqueue_function
     # requires exact type matches).
-    from std.memory import UnsafePointer
 
     var c_ref_tt = TileTensor(
         c_device_ref,
         row_major(Coord(M, N)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin](
+        ImmPointer[Float32, ImmutAnyOrigin](
             unsafe_from_address=Int(a_device.unsafe_ptr())
         ),
         row_major(Coord(M, K)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin](
+        ImmPointer[Float32, ImmutAnyOrigin](
             unsafe_from_address=Int(b_device.unsafe_ptr())
         ),
         row_major(Coord(K, M)),
@@ -256,9 +249,9 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
     # Naive gemm.
     comptime BLOCK_DIM = 16
     comptime gemm_naive = matmul_kernel_naive[
-        DType.float32,
-        DType.float32,
-        DType.float32,
+        .float32,
+        .float32,
+        .float32,
         type_of(c_ref_tt).LayoutType,
         type_of(a_tt).LayoutType,
         type_of(b_tt).LayoutType,
@@ -269,9 +262,9 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
         c_ref_tt,
         a_tt,
         b_tt,
-        M,
-        N,
-        K,
+        Int32(M),
+        Int32(N),
+        Int32(K),
         grid_dim=(ceildiv(M, BLOCK_DIM), ceildiv(N, BLOCK_DIM), 1),
         block_dim=(BLOCK_DIM, BLOCK_DIM, 1),
     )
@@ -288,8 +281,7 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
         comptime nwarmup = 2
 
         @always_inline
-        @parameter
-        def run_func(ctx: DeviceContext) raises:
+        def run_func(ctx: DeviceContext) raises {imm}:
             ctx.enqueue_function[kernel](
                 c_tensor,
                 a_tensor,
@@ -307,7 +299,7 @@ def test_gemm_kernel_dynamic(ctx: DeviceContext) raises:
                 grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
                 block_dim=(NUM_THREADS),
             )
-        var nstime = Float64(ctx.execution_time[run_func](nrun)) / Float64(nrun)
+        var nstime = Float64(ctx.execution_time(run_func, nrun)) / Float64(nrun)
         var sectime = nstime * 1e-9
         var TFlop = 2.0 * M * N * K * 1e-12
         print(nrun, "runs avg(s)", sectime, "TFlops/s", TFlop / sectime)

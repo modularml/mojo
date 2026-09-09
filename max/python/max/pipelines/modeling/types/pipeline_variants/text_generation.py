@@ -17,23 +17,15 @@ from __future__ import annotations
 
 __all__ = [
     "BatchType",
-    "GrammarEnforcementSnapshot",
+    "CompletedBatchStats",
     "ImageContentPart",
-    "ImageMetadata",
     "MessageContent",
-    "SpecDecodingState",
     "TextContentPart",
-    "TextGenerationContext",
-    "TextGenerationContextType",
     "TextGenerationInputs",
-    "TextGenerationOutput",
     "TextGenerationRequest",
     "TextGenerationRequestFunction",
     "TextGenerationRequestMessage",
     "TextGenerationRequestTool",
-    "TextGenerationResponseFormat",
-    "VLMContextType",
-    "VLMTextGenerationContext",
     "VideoContentPart",
 ]
 
@@ -41,25 +33,23 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property
-from itertools import chain
 from typing import (
+    TYPE_CHECKING,
     Any,
     Generic,
     Literal,
-    Protocol,
     TypedDict,
-    TypeVar,
-    runtime_checkable,
 )
 
-import numpy as np
-import numpy.typing as npt
-from max.pipelines.modeling.types.context import BaseContext, SamplingParams
-from max.pipelines.modeling.types.eos_tracking import EOSTracker
-from max.pipelines.modeling.types.log_probabilities import LogProbabilities
-from max.pipelines.modeling.types.pipeline import PipelineInputs, PipelineOutput
-from max.pipelines.modeling.types.status import GenerationStatus
-from max.pipelines.modeling.types.tokens import TokenBuffer
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
+
+from max.pipelines.context import (
+    SamplingParams,
+    TextGenerationContextType,
+    TextGenerationResponseFormat,
+)
+from max.pipelines.modeling.types.pipeline import PipelineInputs
 from max.pipelines.request import RequestID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -85,53 +75,6 @@ class TextGenerationRequestTool(TypedDict):
 
     function: TextGenerationRequestFunction
     """The function definition associated with the tool, including its name, description, and parameters."""
-
-
-@dataclass
-class TextGenerationResponseFormat:
-    """Represents the response format specification for a text generation request."""
-
-    type: str
-    """The type of response format, for example, ``json_object`` or ``grammar``."""
-
-    json_schema: dict[str, Any] = field(default_factory=dict)
-    """A JSON schema dictionary that defines the structure and validation rules for the generated response."""
-
-    grammar: str | None = None
-    """Grammar for constrained decoding.
-
-    When set with ``type="grammar"``, this takes precedence over ``json_schema``.
-    Used for model-specific constrained decoding formats like Kimi's tool call grammar.
-    """
-
-    grammar_enforced: bool = False
-    """Whether to actively enforce grammar via bitmask.
-
-    When True from the start, enforce grammar from the first token.
-    When False initially (for tool_choice=auto without response_format), the
-    grammar is compiled but not enforced until a tool call start token is
-    detected.
-    """
-
-    tools_forced: bool = False
-    """Whether tool calling was forced (tool_choice=required or named function).
-
-    Controls whether ``grammar_enforced`` is ``True`` from the first generated
-    token. Independent of the ``--enable-structured-output`` flag (which only
-    gates user-supplied schemas; see ``requires_structured_output_flag``).
-    """
-
-    requires_structured_output_flag: bool = False
-    """Whether this request requires ``--enable-structured-output`` to be set.
-
-    True when the constraint includes a user-supplied JSON schema (from
-    ``response_format``). False for pure tool-call grammars derived from
-    the model's tool parser, which work without the operator flag because
-    the grammar is server-controlled, not user-controlled.
-    """
-
-    has_json_schema: bool = False
-    """Whether this request includes a JSON schema response format."""
 
 
 class _ContentPart(BaseModel):
@@ -163,6 +106,18 @@ class ImageContentPart(_MessageContentPart):
         default="image", description="Content type identifier"
     )
 
+    # Optional vendor sizing hints; ``None`` means unset and models may ignore
+    # them. ``detail`` is the OpenAI quality tier; models that honor it map the
+    # tier to a resolution.
+    detail: str | None = Field(
+        default=None,
+        description="Detail/quality tier hint for image preprocessing",
+    )
+    max_long_side_pixel: int | None = Field(
+        default=None,
+        description="Max long-side length in pixels for image preprocessing",
+    )
+
 
 class VideoContentPart(_MessageContentPart):
     """A video content part of a message."""
@@ -171,10 +126,32 @@ class VideoContentPart(_MessageContentPart):
         default="video", description="Content type identifier"
     )
 
+    # Optional vendor sampling/sizing hints; ``None`` means unset and models
+    # may ignore them.
+    fps: float | None = Field(
+        default=None,
+        description="Frames-per-second to sample the video at",
+    )
+    max_frames: int | None = Field(
+        default=None,
+        description="Maximum number of frames to sample from the video",
+    )
+    detail: str | None = Field(
+        default=None,
+        description="Detail/quality tier hint for video preprocessing",
+    )
+    max_long_side_pixel: int | None = Field(
+        default=None,
+        description="Max long-side length in pixels for video preprocessing",
+    )
+
 
 MessageContent = TextContentPart | ImageContentPart | VideoContentPart
 
-_MessageRole = Literal["system", "user", "assistant", "tool", "function"]
+# ``root`` is a vendor role; supporting chat templates order it above ``system``.
+_MessageRole = Literal[
+    "system", "user", "assistant", "tool", "function", "root"
+]
 
 
 class TextGenerationRequestMessage(BaseModel):
@@ -382,6 +359,16 @@ class TextGenerationRequest:
     A list of video byte arrays that can be included as part of the request.
     Each video is decoded into frames during preprocessing.
     """
+    decoded_images: list[PILImage] = field(default_factory=list)
+    """
+    Decoded ``PIL.Image`` objects corresponding 1:1 to :attr:`images`, decoded
+    once at request admission (the API server validates images by fully
+    decoding them, so the decoded result is carried here to avoid a second
+    decode in the tokenizer). API-process-only: this is never serialized across
+    the worker boundary, so it must stay populated only for the in-process
+    tokenization step. Empty when images were not pre-decoded (offline/test
+    callers); tokenizers fall back to decoding :attr:`images` in that case.
+    """
     tools: list[TextGenerationRequestTool] | None = None
     """
     A list of tools that can be invoked during the generation process. This
@@ -434,13 +421,34 @@ class TextGenerationRequest:
     dkv_cache_hint: dict[str, Any] | None = None
     """Cache hint from the Orchestrator for distributed KV cache.
 
-    When present, the serving layer converts this into
-    ``TextContext.external_block_metadata`` so the DKVConnector can
-    fetch cached blocks before the forward pass.
+    The serving layer never reads it: it re-serializes the object onto
+    ``TextContext.dkv_cache_hint`` and hands those bytes to the dKV connector,
+    which parses them in Rust to route each block to the instance that holds
+    it. See ``dkv/docs/cache-hint.md``.
+    """
+    cache_salt: str | None = None
+    """Optional per-request salt that isolates this prompt's prefix-cache
+    entries from other requests sharing the same tokens.
+
+    Combined with ``kv_cache_hash_seed`` via XOR to seed the block hash.
+    Works under any ``kv_cache_hash_algo``: a cryptographic guarantee
+    under ``sha256``/``sha256_64``, best-effort under ``ahash64``. Capped
+    at 512 chars at the OpenAI schema layer.
     """
 
     def __str__(self) -> str:
         return str(self.request_id)
+
+    def images_for_processing(self) -> list[bytes | PILImage]:
+        """Return the images for tokenizer preprocessing, decoded once.
+
+        Prefers the pre-decoded :attr:`decoded_images` (decoded and validated
+        once at the API server) and falls back to the raw :attr:`images` bytes
+        for offline and test callers. Tokenizers consume images through this so
+        the decode-once policy lives in one place rather than being repeated at
+        every per-model decode site.
+        """
+        return self.decoded_images or self.images
 
     def __post_init__(self) -> None:
         """Validates mutual exclusivity, image-messaging constraints, and message-image consistency after object initialization."""
@@ -511,519 +519,6 @@ class TextGenerationRequest:
         )
 
 
-def _check_text_generation_output_implements_pipeline_output(
-    x: TextGenerationOutput,
-) -> PipelineOutput:
-    return x
-
-
-@dataclass(kw_only=True)
-class TextGenerationOutput:
-    """Represents the output of a text generation operation.
-
-    Combines token IDs, final generation status, request ID, and optional log
-    probabilities for each token.
-    """
-
-    request_id: RequestID
-    """The unique identifier for the generation request."""
-
-    tokens: list[int]
-    """List of generated token IDs."""
-
-    final_status: GenerationStatus
-    """The final status of the generation process."""
-
-    log_probabilities: list[LogProbabilities] | None = None
-    """Optional list of log probabilities for each token."""
-
-    num_cached_tokens: int | None = None
-    """Number of prompt tokens served from the KV prefix cache."""
-
-    @property
-    def is_done(self) -> bool:
-        """Indicates whether the text generation process is complete.
-
-        Returns:
-            ``True`` if the generation is done, ``False`` otherwise.
-        """
-        return self.final_status.is_done
-
-    @classmethod
-    def merge(cls, outputs: list[TextGenerationOutput]) -> TextGenerationOutput:
-        """Combine many TextGenerationOutput chunks into a single TextGenerationOutput."""
-        if len(outputs) == 0:
-            raise ValueError("Cannot combine empty list of chunks")
-        if len(outputs) == 1:
-            return outputs[0]
-
-        if all(output.log_probabilities is not None for output in outputs):
-            log_probabilities = list(
-                chain.from_iterable(
-                    output.log_probabilities or [] for output in outputs
-                )
-            )
-        elif all(output.log_probabilities is None for output in outputs):
-            log_probabilities = None
-        else:
-            raise ValueError(
-                "Cannot combine TextGenerationOutput chunks with mixed None and non-None log_probabilities"
-            )
-
-        return cls(
-            request_id=outputs[0].request_id,
-            tokens=list(
-                chain.from_iterable(output.tokens for output in outputs)
-            ),
-            log_probabilities=log_probabilities,
-            final_status=outputs[-1].final_status,
-            num_cached_tokens=outputs[0].num_cached_tokens,
-        )
-
-
-@dataclass
-class GrammarEnforcementSnapshot:
-    """Captured grammar-enforcement state for rollback.
-
-    The speculative bitmask path walks the enforcement state through
-    draft tokens to compute downstream slot constraints and then
-    restores this snapshot so committed-token processing on the next
-    batch replays the same transitions from a clean state. Lives next
-    to :class:`TextGenerationContext` because the protocol exposes it
-    via :meth:`TextGenerationContext.snapshot_grammar_state` /
-    :meth:`TextGenerationContext.restore_grammar_state`; the concrete
-    implementation in ``max.pipelines.core.context`` constructs and
-    consumes instances.
-    """
-
-    in_thinking_region: bool
-    grammar_enforced: bool
-    tool_calling_match_buffer: list[int]
-    thinking_match_buffer: list[int]
-
-
-@runtime_checkable
-class TextGenerationContext(BaseContext, Protocol):
-    """Protocol defining the interface for text generation contexts in token generation.
-
-    A ``TextGenerationContext`` represents model inputs for text generation pipelines, managing
-    the state of tokens throughout the generation process. It handles token arrays,
-    generation status, sampling parameters, and various indices that track different
-    stages of token processing.
-    """
-
-    @property
-    def tokens(self) -> TokenBuffer:
-        """The token buffer for the context."""
-        ...
-
-    @property
-    def eos_tracker(self) -> EOSTracker:
-        """Holds EOS-related settings for this sequence and performs EOS/stop checks.
-
-        Returns:
-            The ``EOSTracker`` for this sequence.
-        """
-        ...
-
-    @property
-    def max_length(self) -> int | None:
-        """The maximum allowed length for this sequence.
-
-        When set, generation will stop when this length is reached, regardless
-        of other stopping criteria.
-
-        Returns:
-            The maximum sequence length limit, or ``None`` if no limit is set.
-        """
-        ...
-
-    def reset(self) -> None:
-        """Resets the context's state by combining all tokens into a new prompt.
-
-        This method is used when a request is evicted, meaning that the context
-        needed to be re-encoded in the following CE iteration.
-        """
-        ...
-
-    def compute_num_available_steps(
-        self,
-        max_seq_len: int,
-    ) -> int:
-        """Computes the maximum number of generation steps available.
-
-        This method calculates how many tokens can be generated without
-        exceeding the specified maximum sequence length limit.
-
-        Args:
-            max_seq_len: The maximum allowed sequence length for this context.
-
-        Returns:
-            The number of generation steps that can be executed before reaching
-            the sequence length limit.
-        """
-        ...
-
-    @property
-    def min_tokens(self) -> int:
-        """The minimum number of new tokens that must be generated.
-
-        Generation will continue until at least this many new tokens have been
-        produced, even if other stopping criteria are met (for example, EOS tokens).
-
-        Returns:
-            The minimum number of new tokens to generate.
-        """
-        ...
-
-    @property
-    def log_probabilities(self) -> int:
-        """The number of top tokens to return log probabilities for.
-
-        When greater than 0, the system returns log probabilities for the top N
-        most likely tokens at each generation step.
-
-        Returns:
-            The number of top tokens to include in log probability output.
-            Returns 0 if log probabilities are disabled.
-        """
-        ...
-
-    @property
-    def log_probabilities_echo(self) -> bool:
-        """Whether to include input tokens in the returned log probabilities.
-
-        When ``True``, log probabilities will be computed and returned for input
-        (prompt) tokens in addition to generated tokens.
-
-        Returns:
-            ``True`` if input tokens should be included in log probability output,
-            ``False`` otherwise.
-        """
-        ...
-
-    def get_min_token_logit_mask(
-        self, num_steps: int
-    ) -> list[npt.NDArray[np.int32]]:
-        """Returns the token indices that should be masked in the output logits.
-
-        This method is primarily used to implement the ``min_tokens`` constraint,
-        where certain tokens (typically EOS tokens) are masked to prevent early
-        termination before the minimum token count is reached.
-
-        Args:
-            num_steps: The number of generation steps to compute masks for.
-
-        Returns:
-            A list of NumPy arrays, where each array contains token indices
-            that should be masked (set to negative infinity) in the logits
-            for the corresponding generation step.
-        """
-        ...
-
-    def advance_token_buffer(
-        self,
-        new_token: int,
-        log_probabilities: LogProbabilities | None = None,
-    ) -> None:
-        """Advance the token buffer without touching FSM state.
-
-        This method handles token buffer mutations including log probability
-        storage, token buffer advancement, and EOS/max-length status updates.
-        It does NOT advance the FSM matcher.
-
-        Use ``advance_fsm()`` separately if FSM advancement is needed, or use
-        ``update()`` for the common case of advancing both together.
-
-        Args:
-            new_token: The token to append to the buffer.
-            log_probabilities: Optional log probabilities for this token.
-        """
-        ...
-
-    def advance_fsm(self, token: int) -> bool:
-        """Advance the FSM matcher state by one token.
-
-        This method advances only the FSM state for constrained decoding.
-        It does NOT modify the token buffer. Use ``advance_token_buffer()``
-        separately if token buffer advancement is needed, or use ``update()``
-        for the common case of advancing both together.
-
-        Args:
-            token: The token to consume in the FSM.
-
-        Returns:
-            True if the token was accepted by the matcher, False if no
-            matcher is present.
-        """
-        ...
-
-    def update(
-        self,
-        new_token: int,
-        log_probabilities: LogProbabilities | None = None,
-    ) -> None:
-        """Advance both token buffer and FSM state.
-
-        This is the standard single-step update that most callers should use.
-        It combines ``advance_token_buffer()`` and ``advance_fsm()`` for the
-        common case where both need to be advanced together.
-
-        For multi-step execution where FSM is advanced separately (e.g., to
-        compute bitmasks between steps), use the individual methods directly.
-
-        Args:
-            new_token: The token ID to add to the generation sequence.
-            log_probabilities: Optional log probability data for the new token
-                and alternatives. Used for analysis and debugging.
-        """
-        ...
-
-    def update_with_future_token(self) -> None:
-        """Append a placeholder future token to the generated tokens.
-
-        This is primarily used for overlap scheduling.
-        """
-        ...
-
-    def realize_future_token(
-        self, new_token: int, log_probabilities: LogProbabilities | None = None
-    ) -> None:
-        """Overwrite the placeholder future token with the actual token.
-
-        This is primarily used for overlap scheduling.
-        """
-        ...
-
-    @property
-    def matcher(self) -> Any | None:
-        """The grammar matcher for structured output generation, if configured.
-
-        The matcher enforces structural constraints (like JSON schema) during
-        generation to ensure valid formatted output.
-
-        Returns:
-            The grammar matcher instance, or ``None`` if no structured generation
-            is configured for this context.
-
-        Note:
-            The matcher type depends on the structured generation backend used
-            (for example, outlines, guidance, etc.). In the future, this should be
-            replaced with a Protocol for better type safety.
-        """
-        ...
-
-    @property
-    def json_schema(self) -> str | None:
-        """The JSON schema for constrained decoding, if configured.
-
-        When set, this schema constrains token generation to produce valid JSON
-        output that conforms to the specified structure.
-
-        Returns:
-            The JSON schema string, or ``None`` if no schema constraint is active.
-        """
-        ...
-
-    @property
-    def grammar(self) -> str | None:
-        """Grammar for constrained decoding, if configured."""
-        return None
-
-    def set_matcher(self, matcher: Any) -> None:
-        """Set a grammar matcher for constrained decoding.
-
-        This method configures structured output generation by installing a
-        grammar matcher that enforces format constraints during token generation.
-
-        Args:
-            matcher: The grammar matcher instance to use for constraining output.
-                The specific type depends on the structured generation backend.
-        """
-        ...
-
-    @property
-    def sampling_params(self) -> SamplingParams:
-        """The sampling parameters configured for this generation request.
-
-        These parameters control how tokens are selected during generation,
-        including temperature, top-k/top-p filtering, and stopping criteria.
-
-        Returns:
-            The :class:`~max.pipelines.modeling.types.SamplingParams` instance containing all sampling configuration
-            for this context.
-        """
-        ...
-
-    @property
-    def is_initial_prompt(self) -> bool:
-        """Whether this context contains only the initial prompt.
-
-        This property indicates if the context has not yet been updated with
-        any generated tokens and still contains only the original input.
-
-        Returns:
-            ``True`` if no tokens have been generated yet, ``False`` if generation
-            has begun and tokens have been added.
-        """
-        ...
-
-    def to_generation_output(self) -> TextGenerationOutput:
-        """Converts this context to a :class:`TextGenerationOutput` object.
-
-        Provides a standardized way to extract the final output of the text
-        generation process from the context, including generated text, tokens,
-        and any associated metadata.
-
-        Returns:
-            The output object containing the results of the text generation
-            for this context.
-        """
-        ...
-
-    @property
-    def spec_decoding_state(self) -> SpecDecodingState:
-        """Returns the speculative decoding state."""
-        ...
-
-    cached_prefix_length: int | None
-    """Prompt tokens served from the KV prefix cache on first admission.
-
-    Set by the block manager when a request is admitted to a CE batch (0
-    if the cache had no matching prefix). ``BatchMetrics.create`` consumes
-    the value to emit a per-request cache hit rate observation, then
-    resets it to ``None`` so chunked-prefill follow-up calls do not
-    re-emit.
-    """
-
-    in_reasoning_phase: bool
-    """Whether the latest committed tokens are inside a ``<think>...</think>``
-    block. Toggled host-side in the spec-decode commit step when a reasoning
-    parser is configured. Consumed by thinking-mode temperature scaling and
-    relaxed acceptance to gate per-row behavior."""
-
-    grammar_enforced: bool
-    """Whether grammar is currently being enforced via bitmask.
-
-    When True, the grammar matcher constrains token generation via bitmask.
-    When False with a matcher present, grammar is compiled but not enforced
-    (waiting for tool call start token to trigger enforcement).
-
-    For tool_choice=required or named function: True from start.
-    For tool_choice=auto: False initially, flipped to True when tool call
-    start token is detected.
-    """
-
-    tools_forced: bool
-    """Whether tool calling was forced (tool_choice=required or named function).
-
-    Controls whether ``grammar_enforced`` is ``True`` from the first generated
-    token. Independent of the ``--enable-structured-output`` flag (which only
-    gates user-supplied schemas; see ``requires_structured_output_flag``).
-    """
-
-    requires_structured_output_flag: bool
-    """Whether this request requires ``--enable-structured-output`` to be set.
-
-    True when the constraint includes a user-supplied JSON schema (from
-    ``response_format``). False for pure tool-call grammars derived from the
-    model's tool parser, which work without the operator flag.
-    """
-
-    def set_tool_region(
-        self,
-        start_token_ids: list[int] | None,
-        end_token_ids: list[int] | None,
-    ) -> None:
-        """Set token sequences for conditional tool call enforcement.
-
-        Args:
-            start_token_ids: Token IDs marking tool call start.
-            end_token_ids: Token IDs marking tool call end.
-        """
-        ...
-
-    def set_thinking_region(
-        self,
-        start_token_ids: list[int] | None,
-        end_token_ids: list[int] | None,
-    ) -> None:
-        """Configure thinking region for conditional grammar enforcement.
-
-        When a thinking region is configured and grammar enforcement starts
-        inside the thinking region, grammar is suspended until the end token
-        sequence is detected. This enables reasoning output during constrained
-        decoding (e.g., ``tool_choice=required`` with thinking enabled).
-
-        Args:
-            start_token_ids: Token IDs marking thinking start (can be ``None`` if
-                we start inside thinking, which is the case when chat template
-                already emits ``<think>``).
-            end_token_ids: Token IDs marking thinking end (e.g., ``</think>``).
-        """
-        ...
-
-    def update_enforcement_state(self, token: int) -> bool:
-        """Advance the grammar-enforcement state machine by one token.
-
-        Unlike ``advance_fsm``, this only updates the enforcement-state
-        machine (e.g., detecting tool-call boundary tokens) without
-        advancing the underlying matcher.
-
-        Args:
-            token: The newly committed token.
-
-        Returns:
-            True if the matcher should consume the token.
-        """
-        ...
-
-    def snapshot_grammar_state(self) -> GrammarEnforcementSnapshot:
-        """Capture enforcement state for a speculative rollback.
-
-        The speculative bitmask path walks the enforcement state through
-        draft tokens to compute downstream slot constraints, then
-        unwinds so that committed-token processing on the next batch
-        replays the same transitions from a clean state. The returned
-        snapshot is opaque to callers; pass it to
-        ``restore_grammar_state``.
-        """
-        ...
-
-    def restore_grammar_state(
-        self, snapshot: GrammarEnforcementSnapshot
-    ) -> None:
-        """Restore state captured by ``snapshot_grammar_state``."""
-        ...
-
-
-@dataclass
-class SpecDecodingState:
-    """Per-request state for speculative decoding."""
-
-    draft_tokens_to_verify: list[int] = field(default_factory=list)
-    """The draft tokens to verify in the next batch"""
-
-    maybe_accepted_draft_tokens: list[int] = field(default_factory=list)
-    """The draft tokens that are being verified in the current batch
-
-    We are unsure whether these tokens will be accepted or not. However, to ensure
-    that we allocate enough KV, we conservatively assume that they will all be
-    accepted.
-
-    This should only be present when running with overlap scheduler."""
-
-
-TextGenerationContextType = TypeVar(
-    "TextGenerationContextType", bound=TextGenerationContext
-)
-"""Type variable for text generation context types, constrained to TextGenerationContext.
-
-This allows generic typing of text generation pipeline components to accept any
-context type that implements the TextGenerationContext protocol.
-"""
-
-
 class BatchType(Enum):
     """Type of batch."""
 
@@ -1033,14 +528,80 @@ class BatchType(Enum):
     """Token generation batch."""
 
 
+@dataclass
+class CompletedBatchStats:
+    """Execution stats for a batch whose outputs have been synchronized."""
+
+    batch_type: BatchType
+    """Type of the completed batch."""
+
+    batch_size: int
+    """Number of requests in the completed batch."""
+
+    num_input_tokens: int
+    """Number of input tokens in the completed batch."""
+
+    num_context_tokens: int
+    """Number of context tokens in the completed batch."""
+
+    execution_time_s: float
+    """Execution time of the completed batch, in seconds."""
+
+    num_output_tokens: int | None = None
+    """Output tokens produced by the completed batch, when known (currently
+    only reported by speculative decoding). ``None`` otherwise."""
+
+    draft_tokens_generated: int = 0
+    """Draft tokens generated by the completed batch (speculative decoding)."""
+
+    draft_tokens_accepted: int = 0
+    """Draft tokens accepted by the completed batch (speculative decoding)."""
+
+    avg_acceptance_length: float = 0.0
+    """Average acceptance length for the completed batch (speculative
+    decoding)."""
+
+    max_acceptance_length: int = 0
+    """Maximum possible acceptance length, i.e. the configured number of
+    speculative tokens (speculative decoding)."""
+
+    acceptance_rate_per_position: list[float] = field(default_factory=list)
+    """Per-position draft acceptance rates for the completed batch
+    (speculative decoding)."""
+
+    early_sync_duration_s: float | None = None
+    """Wall-clock time spent in the early-sync guard's blocking
+    ``sync_and_process_outputs()`` call (see
+    ``_should_early_sync_prev_batch``), when it fired for this batch.
+    ``None`` when the guard did not fire."""
+
+    @property
+    def prompt_throughput(self) -> float:
+        """Prompt-side throughput of the completed batch in tokens/second."""
+        if self.execution_time_s <= 0.0:
+            return 0.0
+        return self.num_input_tokens / self.execution_time_s
+
+    @property
+    def generation_throughput(self) -> float:
+        """Generation throughput of the completed batch in tokens/second.
+
+        Uses the known output-token count when available (speculative
+        decoding, TG batches); otherwise counts one token per request.
+        """
+        if self.execution_time_s <= 0.0:
+            return 0.0
+        if (
+            self.num_output_tokens is not None
+            and self.batch_type == BatchType.TG
+        ):
+            return self.num_output_tokens / self.execution_time_s
+        return self.batch_size / self.execution_time_s
+
+
 @dataclass(eq=True)
 class TextGenerationInputs(PipelineInputs, Generic[TextGenerationContextType]):
-    """Input parameters for text generation pipeline operations.
-
-    This class encapsulates the batch of contexts and number of steps required
-    for token generation in a single input object, replacing the previous
-    pattern of passing batch and num_steps as separate parameters.
-    """
+    """Input parameters for text generation pipeline operations."""
 
     batches: list[list[TextGenerationContextType]]
     """Variable list of batches, with each batch being a list of contexts.
@@ -1049,14 +610,20 @@ class TextGenerationInputs(PipelineInputs, Generic[TextGenerationContextType]):
     batch is mapped to a different device replica.
     """
 
-    num_steps: int
-    """Number of steps to run for."""
-
     input_tokens: int = -1
     """Number of input tokens."""
 
     batch_type: BatchType = BatchType.TG
     """Type of batch."""
+
+    per_replica_input_tokens: list[int] = field(default_factory=list)
+    """Per-replica active-token sums, excluding DP padding dummies. Frozen at
+    construction: token windows mutate during scheduling, so later reads of
+    ``active_length`` no longer describe this batch."""
+
+    per_replica_context_tokens: list[int] = field(default_factory=list)
+    """Per-replica processed-token (context) sums, excluding DP padding
+    dummies. Frozen at construction like ``per_replica_input_tokens``."""
 
     def __post_init__(self) -> None:
         self.input_tokens = sum(
@@ -1065,6 +632,22 @@ class TextGenerationInputs(PipelineInputs, Generic[TextGenerationContextType]):
         self.context_tokens = sum(
             ctx.tokens.processed_length for ctx in self.flat_batch
         )
+        self.per_replica_input_tokens = [
+            sum(
+                ctx.tokens.active_length
+                for ctx in batch
+                if not getattr(ctx, "_is_padding_ctx", False)
+            )
+            for batch in self.batches
+        ]
+        self.per_replica_context_tokens = [
+            sum(
+                ctx.tokens.processed_length
+                for ctx in batch
+                if not getattr(ctx, "_is_padding_ctx", False)
+            )
+            for batch in self.batches
+        ]
         self.batch_type = BatchType.TG
         for context in self.flat_batch:
             if context.tokens.generated_length == 0:
@@ -1076,6 +659,13 @@ class TextGenerationInputs(PipelineInputs, Generic[TextGenerationContextType]):
         """Flattened list of contexts across all replicas."""
         return [context for batch in self.batches for context in batch]
 
+    @property
+    def batch_size(self) -> int:
+        """Number of requests in the batch."""
+        return sum(
+            1 for context in self.flat_batch if not context._is_padding_ctx
+        )
+
     def __bool__(self) -> bool:
         return len(self.flat_batch) > 0
 
@@ -1083,7 +673,6 @@ class TextGenerationInputs(PipelineInputs, Generic[TextGenerationContextType]):
         return (
             "TextGenerationInputs("
             f"batch_size={len(self.flat_batch)}, "
-            f"num_steps={self.num_steps}, "
             f"batch_type={self.batch_type.value}"
             ")"
         )
@@ -1107,100 +696,3 @@ class TextGenerationInputs(PipelineInputs, Generic[TextGenerationContextType]):
     def batch_echo(self) -> list[bool]:
         """List indicating whether echo is enabled for each context in the batch."""
         return [ctx.log_probabilities_echo for ctx in self.flat_batch]
-
-
-@dataclass(kw_only=True)
-class ImageMetadata:
-    """Metadata about an image in the prompt.
-
-    Each image corresponds to a range in the text token array [start_idx, end_idx).
-    """
-
-    start_idx: int
-    """Index of the first <vision_token_id> special token for the image"""
-
-    end_idx: int
-    """One after the index of the last <vision_token_id> special token for the image"""
-
-    pixel_values: npt.NDArray[Any]
-    """Pixel values for the image.
-
-    Can be various dtypes depending on the vision model:
-
-    - float32: Original precision
-    - uint16: BFloat16 bits stored as uint16 (workaround for NumPy's lack of
-      native bfloat16 support). Reinterpreted as bfloat16 on GPU.
-    """
-
-    image_hash: int | None = None
-    """Hash of the image, for use in prefix caching"""
-
-    def __post_init__(self) -> None:
-        if self.start_idx < 0:
-            raise ValueError("Images must have a valid start index")
-        if self.end_idx <= self.start_idx:
-            raise ValueError(
-                "Images must have a valid start and end index containing at least one <vision_token_id>"
-            )
-
-    def __repr__(self):
-        return f"ImageMetadata(start_idx={self.start_idx}, end_idx={self.end_idx}, pixel_values={self.pixel_values.shape})"
-
-
-@runtime_checkable
-class VLMTextGenerationContext(TextGenerationContext, Protocol):
-    """Protocol defining the interface for VLM input contexts."""
-
-    @property
-    def image_idx(self) -> int:
-        """Index of the next unencoded image in the prompt."""
-        ...
-
-    @property
-    def images(self) -> list[ImageMetadata]:
-        """The images in the context."""
-        ...
-
-    @property
-    def next_images(self) -> list[ImageMetadata]:
-        """The images that are not yet encoded."""
-        ...
-
-    @property
-    def needs_vision_encoding(self) -> bool:
-        """Whether vision encoding is needed for this context."""
-        ...
-
-    @property
-    def image_token_indices(self) -> npt.NDArray[np.int32]:
-        """Positions of image-placeholder tokens within this context's token buffer.
-
-        Offsets are relative to the start of the full token sequence (not the
-        active window).  Used by ``compute_multimodal_merge_indices`` to build
-        batch-level scatter indices that account for ``processed_length``.
-        """
-        ...
-
-    def compute_image_aligned_idx(self, idx: int) -> int:
-        """Aligns an index downward to avoid splitting an image token span.
-
-        If ``idx`` falls within the token range occupied by an image, this
-        method returns the ``start_idx`` of that image so that the split point
-        does not cut through image tokens. If ``idx`` does not land inside any
-        image span, it is returned unchanged.
-
-        Args:
-            idx: The candidate index into the token sequence.
-
-        Returns:
-            The adjusted index, guaranteed not to split an image token span.
-        """
-        ...
-
-
-VLMContextType = TypeVar("VLMContextType", bound=VLMTextGenerationContext)
-"""Type variable for VLM context types, constrained to VLMTextGenerationContext.
-
-This allows generic typing of VLM pipeline components to accept any
-context type that implements the VLMTextGenerationContext protocol.
-"""

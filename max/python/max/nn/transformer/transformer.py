@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from enum import Enum
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from max.dtype import DType
 from max.graph import (
@@ -23,13 +23,18 @@ from max.graph import (
     Graph,
     TensorValue,
     TensorValueLike,
-    Value,
     ops,
 )
 
 from ..embedding import Embedding
 from ..kv_cache import KVCacheParams, PagedCacheValues
-from ..layer import Layer, LayerList, Module
+from ..layer import (
+    Layer,
+    LayerList,
+    Module,
+    SubgraphInput,
+    _flatten_graph_inputs,
+)
 from ..linear import Linear
 from ..rotary_embedding import RotaryEmbedding
 
@@ -58,7 +63,7 @@ def forward_sharded_layers(
 
 def _call_layer_directly(
     layer: Module,
-    values: list[Value[Any] | Sequence[Value[Any]]],
+    values: Sequence[SubgraphInput],
 ) -> list[TensorValue]:
     result = layer(*values)
     if isinstance(result, tuple):
@@ -71,14 +76,14 @@ def forward_sequential_layers(
     *,
     inputs_for_layer: Callable[
         [int, list[TensorValue]],
-        list[Value[Any] | Sequence[Value[Any]]],
+        Sequence[SubgraphInput],
     ],
     initial_hidden_states: list[TensorValue],
     on_layer_output: Callable[[int, list[TensorValue]], None] | None = None,
     subgraph_layer_groups: list[list[int]] | None = None,
-    name_for_subgraph: Callable[
-        [int], str
-    ] = lambda i: f"transformer_block_{i}",
+    name_for_subgraph: Callable[[int], str] = lambda i: (
+        f"transformer_block_{i}"
+    ),
     weight_prefix_for_layer: Callable[[int], str] | None = None,
 ) -> list[TensorValue]:
     """Forward pass through sequential layers with optional subgraph groups.
@@ -148,20 +153,16 @@ def forward_sequential_layers(
             if group_idx not in group_idx_to_subgraph:
                 group_idx_to_subgraph[group_idx] = layer.build_subgraph(
                     name=name_for_subgraph(group_idx),
-                    input_types=[
-                        v.type if isinstance(v, Value) else [x.type for x in v]
-                        for v in values
-                    ],
+                    inputs=values,
                     weight_prefix=weight_prefix_for_layer(layer_idx),
                 )
 
+            flat_args = [
+                leaf for v in values for leaf in _flatten_graph_inputs(v)
+            ]
             call_results = ops.call(
                 group_idx_to_subgraph[group_idx],
-                *[
-                    x
-                    for v in values
-                    for x in (v if isinstance(v, list) else [v])
-                ],
+                *flat_args,
                 prefix=weight_prefix_for_layer(layer_idx),
             )
             h = [x.tensor for x in call_results]
@@ -176,7 +177,7 @@ def extract_hs(
     return_hidden_states: ReturnHiddenStates,
     last_token_hs_distributed: Sequence[TensorValue],
     all_hs_distributed: Sequence[TensorValue],
-    normalizer: Sequence[Callable[[TensorValue], TensorValue]],
+    normalizer: Sequence[Callable[[TensorValue], TensorValue]] | None = None,
     capture_hidden_states: list[list[TensorValue]] | None = None,
 ) -> tuple[TensorValue, ...]:
     """Extract hidden states from the model.
@@ -188,17 +189,17 @@ def extract_hs(
         all_hs_distributed: Per-device hidden states from all tokens — one
             entry per device (distinct batch shards in DP, identical
             replicas in TP/single-device).
-        normalizer: Per-device normalization functions.
+        normalizer: Per-device normalization functions. Required when
+            ``return_hidden_states`` is ``ALL_NORMALIZED``.
         capture_hidden_states: A list of per-layer captured hidden states at specific layer indices.  Each entry is a
-            per-device list of tensors. The entries are concatenated along the
-            feature dimension to produce a single fused hidden-state tensor
-            per device.
+            per-device list of tensors.
 
     Returns:
         Empty tuple for ``NONE``; ``(TensorValue,)`` for ``LAST``; for
-        ``ALL`` / ``ALL_NORMALIZED`` / ``SELECTED_LAYERS`` the per-device tensors are
-        returned as positional tuple elements (``N`` entries, one per
-        device).
+        ``ALL`` / ``ALL_NORMALIZED`` the per-device tensors are returned as
+        positional tuple elements (``N`` entries, one per device). For
+        ``SELECTED_LAYERS``, every capture separately —
+        ``N * len(capture_hidden_states)`` entries ordered device-major.
     """
     if return_hidden_states == ReturnHiddenStates.LAST:
         # Each entry in last_token_hs_distributed is identical.
@@ -209,6 +210,7 @@ def extract_hs(
     elif return_hidden_states == ReturnHiddenStates.ALL:
         return tuple(all_hs_distributed)
     elif return_hidden_states == ReturnHiddenStates.ALL_NORMALIZED:
+        assert normalizer is not None
         norm_hs = forward_sharded_layers(normalizer, all_hs_distributed)
         return tuple(norm_hs)
     elif return_hidden_states == ReturnHiddenStates.SELECTED_LAYERS:
@@ -216,16 +218,38 @@ def extract_hs(
             capture_hidden_states is not None and len(capture_hidden_states) > 0
         )
         num_devices = len(capture_hidden_states[0])
-        fused_per_dev = [
-            ops.concat(
-                [layer_hs[i] for layer_hs in capture_hidden_states],
-                axis=-1,
-            )
+        return tuple(
+            layer_hs[i]
             for i in range(num_devices)
-        ]
-        return tuple(fused_per_dev)
+            for layer_hs in capture_hidden_states
+        )
     else:
         return tuple()
+
+
+def captures_by_device(
+    values: Sequence[TensorValue], num_devices: int
+) -> list[list[TensorValue]]:
+    """Splits the device-major capture tail of `extract_hs()` into per-device lists."""
+    assert values and len(values) % num_devices == 0, (
+        f"expected a positive multiple of {num_devices} captured hidden "
+        f"states, got {len(values)}"
+    )
+    per_device = len(values) // num_devices
+    return [
+        list(values[d * per_device : (d + 1) * per_device])
+        for d in range(num_devices)
+    ]
+
+
+def fuse_captured_hidden_states(
+    captures_per_device: Sequence[Sequence[TensorValue]],
+) -> list[TensorValue]:
+    """Concatenates each device's captures, for a consumer with one wide matmul."""
+    return [
+        captures[0] if len(captures) == 1 else ops.concat(list(captures), -1)
+        for captures in captures_per_device
+    ]
 
 
 class TransformerBlock(Module):

@@ -31,27 +31,27 @@ SMEM), so no separate readback verification is needed for either.
 """
 
 from std.math import ceildiv
-from std.memory import UnsafePointer, alloc
+from std.memory import alloc
 from std.random import rand, randn, seed
 from std.sys import size_of
 
-from std.gpu import barrier, thread_idx, warp_id as get_warp_id
-from std.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import (
+from max.gpu import thread_idx, warp_id as get_warp_id
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceBuffer, DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import (
     TensorMapSwizzle,
     prefetch_tma_descriptor,
 )
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.memory import (
     external_memory,
 )
-from std.gpu.compute.arch.mma_nvidia_sm100 import (
+from max.gpu.compute.arch.mma_nvidia_sm100 import (
     MMASmemDescriptor,
     UMMAInsDescriptor,
     UMMAKind,
     mma_arrive,
 )
-from std.gpu.compute.arch.tcgen05 import (
+from max.gpu.compute.arch.tcgen05 import (
     tcgen05_alloc,
     tcgen05_cp,
     tcgen05_dealloc,
@@ -84,8 +84,7 @@ from layout.tma_async import (
 )
 from linalg.arch.sm100.mma import smem_descriptor
 from linalg.matmul.gpu import matmul_kernel_naive
-from nn.attention.gpu.nvidia.sm100.mla_decode_utils import bulk_mma_ws_ts
-from nn.attention.gpu.nvidia.sm100.attention_utils import elect
+from nn.attention.gpu.nvidia.sm100.attention_utils import bulk_mma_ws_ts, elect
 from std.testing import assert_almost_equal
 from std.utils.index import Index, IndexList
 
@@ -228,7 +227,7 @@ def dense_mma_ws_ts_kernel[
 
     # ---- Dynamic shared memory base pointer ----
     var smem_base = external_memory[
-        UInt8, address_space=AddressSpace.SHARED, alignment=128
+        UInt8, address_space=.SHARED, alignment=128
     ]()
 
     # ---- Q SMEM region ----
@@ -236,20 +235,18 @@ def dense_mma_ws_ts_kernel[
     var q_smem_tile = LayoutTensor[
         OP_TYPE,
         Q_SMEM_LAYOUT,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
-    ](q_smem_ptr)
+    ](q_smem_ptr.as_unsafe_any_origin())
 
     # ---- K SMEM region (starts after Q) ----
     var k_smem_ptr = (smem_base + K_SMEM_OFFSET).bitcast[Scalar[OP_TYPE]]()
     var k_smem_tile = LayoutTensor[
         OP_TYPE,
         K_SMEM_LAYOUT,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
-    ](k_smem_ptr)
+    ](k_smem_ptr.as_unsafe_any_origin())
 
     # ---- Metadata region (after both SMEM tiles) ----
     var metadata_ptr = (smem_base + METADATA_OFFSET).bitcast[UInt32]()
@@ -446,9 +443,9 @@ def sparse_mma_ws_ts_kernel[
     k_gather4_tma: TMATensorTile[
         op_type, k_tile_rank, k_tile_shape, k_desc_shape
     ],
-    d_indices: UnsafePointer[Int32, MutAnyOrigin],
+    d_indices: MutPointer[Int32, MutAnyOrigin],
     p_output: LayoutTensor[
-        DType.float32, Layout.row_major(rows, 2 * rows), MutAnyOrigin
+        .float32, Layout.row_major(rows, 2 * rows), MutAnyOrigin
     ],
 ):
     """Q [rows, cols]: TMA bulk -> SMEM (SWIZZLE_128B) -> TMEM.
@@ -509,7 +506,7 @@ def sparse_mma_ws_ts_kernel[
 
     # ---- Dynamic shared memory base pointer ----
     var smem_base = external_memory[
-        UInt8, address_space=AddressSpace.SHARED, alignment=128
+        UInt8, address_space=.SHARED, alignment=128
     ]()
 
     # ---- Q SMEM region ----
@@ -517,10 +514,9 @@ def sparse_mma_ws_ts_kernel[
     var q_smem_tile = LayoutTensor[
         op_type,
         q_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
-    ](q_smem_ptr)
+    ](q_smem_ptr.as_unsafe_any_origin())
 
     # ---- K SMEM region (starts after Q) ----
     var k_smem_ptr = (smem_base + k_smem_offset).bitcast[Scalar[op_type]]()
@@ -556,7 +552,7 @@ def sparse_mma_ws_ts_kernel[
 
         # Prefetch K gather4 descriptor into constant cache.
         prefetch_tma_descriptor(
-            UnsafePointer(to=k_gather4_tma.descriptor).bitcast[NoneType]()
+            Pointer(to=k_gather4_tma.descriptor).bitcast[NoneType]()
         )
 
     barrier()
@@ -606,10 +602,9 @@ def sparse_mma_ws_ts_kernel[
                 var smem_dst_tile = LayoutTensor[
                     op_type,
                     Layout.row_major(4, box_width),
-                    MutAnyOrigin,
-                    address_space=AddressSpace.SHARED,
+                    address_space=.SHARED,
                     alignment=128,
-                ](smem_dst_ptr)
+                ](smem_dst_ptr.as_unsafe_any_origin())
 
                 k_gather4_tma.async_copy_gather4(
                     smem_dst_tile,
@@ -780,7 +775,7 @@ def test_dense_mma_ws_ts(ctx: DeviceContext) raises:
     # Compute reference on GPU using the naive matmul kernel:
     #   P_ref[64,64] = Q[64,512] x K[64,512]^T (transpose_b=True).
     # Then compare against P[:, 0:64] + P[:, 64:128].
-    var p_ref_device = ctx.enqueue_create_buffer[DType.float32](
+    var p_ref_device = ctx.enqueue_create_buffer[.float32](
         P_REF_ROWS * P_REF_COLS
     )
 
@@ -795,13 +790,13 @@ def test_dense_mma_ws_ts(ctx: DeviceContext) raises:
         row_major(Coord(P_REF_ROWS, P_REF_COLS)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[OP_TYPE], ImmutAnyOrigin](
+        ImmPointer[Scalar[OP_TYPE], ImmutAnyOrigin](
             unsafe_from_address=Int(q_device_ptr)
         ),
         row_major(Coord(ROWS, COLS)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[OP_TYPE], ImmutAnyOrigin](
+        ImmPointer[Scalar[OP_TYPE], ImmutAnyOrigin](
             unsafe_from_address=Int(k_device_ptr)
         ),
         row_major(Coord(K_ROWS, K_COLS)),
@@ -822,9 +817,9 @@ def test_dense_mma_ws_ts(ctx: DeviceContext) raises:
         c_ref_tt,
         a_tt,
         b_tt,
-        P_REF_ROWS,  # m
-        P_REF_COLS,  # n
-        COLS,  # k
+        Int32(P_REF_ROWS),  # m
+        Int32(P_REF_COLS),  # n
+        Int32(COLS),  # k
         grid_dim=(
             ceildiv(P_REF_ROWS, NAIVE_BLOCK_DIM),
             ceildiv(P_REF_COLS, NAIVE_BLOCK_DIM),
@@ -833,7 +828,7 @@ def test_dense_mma_ws_ts(ctx: DeviceContext) raises:
         block_dim=(NAIVE_BLOCK_DIM, NAIVE_BLOCK_DIM, 1),
     )
 
-    var p_ref_host = ctx.enqueue_create_host_buffer[DType.float32](
+    var p_ref_host = ctx.enqueue_create_host_buffer[.float32](
         P_REF_ROWS * P_REF_COLS
     )
     ctx.enqueue_copy(p_ref_host, p_ref_device)
@@ -845,10 +840,8 @@ def test_dense_mma_ws_ts(ctx: DeviceContext) raises:
             var ref_val = p_ref_host[r * P_REF_COLS + c]
 
             # GPU result: sum of the two halves.
-            var gpu_half0 = Scalar[DType.float32](p_out_ptr[r * P_COLS + c])
-            var gpu_half1 = Scalar[DType.float32](
-                p_out_ptr[r * P_COLS + c + P_ROWS]
-            )
+            var gpu_half0 = Float32(p_out_ptr[r * P_COLS + c])
+            var gpu_half1 = Float32(p_out_ptr[r * P_COLS + c + P_ROWS])
             var gpu_val = gpu_half0 + gpu_half1
 
             var err = abs(gpu_val - ref_val) / max(abs(ref_val), Float32(1.0))
@@ -954,11 +947,11 @@ def test_sparse_mma_ws_ts[
     randn[op_type](k_full_host.ptr, total_tokens * cols)
 
     # ---- Build non-contiguous indices into the full K buffer ----
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](rows)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](rows)
     for i in range(rows):
         h_indices[i] = Int32((i * 37 + 13) % total_tokens)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](rows)
+    var d_indices = ctx.enqueue_create_buffer[.int32](rows)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # ---- Build reference K [rows, cols] from selected rows ----
@@ -973,7 +966,7 @@ def test_sparse_mma_ws_ts[
 
     # ---- Allocate P output buffer [rows, 2*rows] ----
     var p_out_buf = ManagedLayoutTensor[
-        DType.float32, Layout.row_major(p_rows, p_cols)
+        .float32, Layout.row_major(p_rows, p_cols)
     ](ctx)
 
     # ---- Create Q TMA descriptor ----
@@ -1031,7 +1024,7 @@ def test_sparse_mma_ws_ts[
     )
 
     # Compute reference: P_ref = Q x K_gathered^T.
-    var p_ref_device = ctx.enqueue_create_buffer[DType.float32](
+    var p_ref_device = ctx.enqueue_create_buffer[.float32](
         p_ref_rows * p_ref_cols
     )
 
@@ -1042,13 +1035,13 @@ def test_sparse_mma_ws_ts[
         row_major(Coord(p_ref_rows, p_ref_cols)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[op_type], ImmutAnyOrigin](
+        ImmPointer[Scalar[op_type], ImmutAnyOrigin](
             unsafe_from_address=Int(q_device_ptr)
         ),
         row_major(Coord(rows, cols)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[op_type], ImmutAnyOrigin](
+        ImmPointer[Scalar[op_type], ImmutAnyOrigin](
             unsafe_from_address=Int(k_ref_device.unsafe_ptr())
         ),
         row_major(Coord(rows, cols)),
@@ -1069,9 +1062,9 @@ def test_sparse_mma_ws_ts[
         c_ref_tt,
         a_tt,
         b_tt,
-        p_ref_rows,
-        p_ref_cols,
-        cols,
+        Int32(p_ref_rows),
+        Int32(p_ref_cols),
+        Int32(cols),
         grid_dim=(
             ceildiv(p_ref_rows, naive_block_dim),
             ceildiv(p_ref_cols, naive_block_dim),
@@ -1080,7 +1073,7 @@ def test_sparse_mma_ws_ts[
         block_dim=(naive_block_dim, naive_block_dim, 1),
     )
 
-    var p_ref_host = ctx.enqueue_create_host_buffer[DType.float32](
+    var p_ref_host = ctx.enqueue_create_host_buffer[.float32](
         p_ref_rows * p_ref_cols
     )
     ctx.enqueue_copy(p_ref_host, p_ref_device)
@@ -1091,10 +1084,8 @@ def test_sparse_mma_ws_ts[
         for c in range(p_ref_cols):
             var ref_val = p_ref_host[r * p_ref_cols + c]
 
-            var gpu_half0 = Scalar[DType.float32](p_out_ptr[r * p_cols + c])
-            var gpu_half1 = Scalar[DType.float32](
-                p_out_ptr[r * p_cols + c + p_rows]
-            )
+            var gpu_half0 = Float32(p_out_ptr[r * p_cols + c])
+            var gpu_half1 = Float32(p_out_ptr[r * p_cols + c + p_rows])
             var gpu_val = gpu_half0 + gpu_half1
 
             var err = abs(gpu_val - ref_val) / max(abs(ref_val), Float32(1.0))
@@ -1225,9 +1216,7 @@ def test_sparse_paged_mma_ws_ts[
 
     # ---- Build cache_lengths ----
     comptime cache_len_layout = Layout(UNKNOWN_VALUE)
-    var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_len_layout
-    ](
+    var cache_lengths_managed = ManagedLayoutTensor[.uint32, cache_len_layout](
         RuntimeLayout[cache_len_layout].row_major(IndexList[1](batch_size)),
         ctx,
     )
@@ -1238,7 +1227,7 @@ def test_sparse_paged_mma_ws_ts[
     # ---- Build lookup_table with shuffled page assignments ----
     comptime lut_layout = Layout.row_major[2]()
     var max_pages_per_seq = (total_tokens + page_size - 1) // page_size
-    var lut_managed = ManagedLayoutTensor[DType.uint32, lut_layout](
+    var lut_managed = ManagedLayoutTensor[.uint32, lut_layout](
         RuntimeLayout[lut_layout].row_major(
             IndexList[2](batch_size, num_blocks)
         ),
@@ -1272,7 +1261,7 @@ def test_sparse_paged_mma_ws_ts[
     randn[op_type](q_inp_host.ptr, rows * cols)
 
     # ---- Build gather indices from the paged cache ----
-    var h_indices = ctx.enqueue_create_host_buffer[DType.int32](topk)
+    var h_indices = ctx.enqueue_create_host_buffer[.int32](topk)
     for i in range(topk):
         var tok_idx = (i * 37 + 13) % total_tokens
         var page_within_seq = tok_idx // page_size
@@ -1281,7 +1270,7 @@ def test_sparse_paged_mma_ws_ts[
         var phys_row = phys_block * paged_stride + offset_in_page
         h_indices[i] = Int32(phys_row)
 
-    var d_indices = ctx.enqueue_create_buffer[DType.int32](topk)
+    var d_indices = ctx.enqueue_create_buffer[.int32](topk)
     ctx.enqueue_copy(d_indices, h_indices)
 
     # ---- Build reference K_gathered on host ----
@@ -1298,7 +1287,7 @@ def test_sparse_paged_mma_ws_ts[
 
     # ---- Allocate P output buffer [rows, 2*rows] ----
     var p_out_buf = ManagedLayoutTensor[
-        DType.float32, Layout.row_major(p_rows, p_cols)
+        .float32, Layout.row_major(p_rows, p_cols)
     ](ctx)
 
     # ---- Create Q TMA descriptor ----
@@ -1355,7 +1344,7 @@ def test_sparse_paged_mma_ws_ts[
     )
 
     # Compute reference: P_ref = Q x K_gathered^T.
-    var p_ref_device = ctx.enqueue_create_buffer[DType.float32](
+    var p_ref_device = ctx.enqueue_create_buffer[.float32](
         p_ref_rows * p_ref_cols
     )
 
@@ -1366,13 +1355,13 @@ def test_sparse_paged_mma_ws_ts[
         row_major(Coord(p_ref_rows, p_ref_cols)),
     )
     var a_tt = TileTensor(
-        UnsafePointer[Scalar[op_type], ImmutAnyOrigin](
+        ImmPointer[Scalar[op_type], ImmutAnyOrigin](
             unsafe_from_address=Int(q_device_ptr)
         ),
         row_major(Coord(rows, cols)),
     )
     var b_tt = TileTensor(
-        UnsafePointer[Scalar[op_type], ImmutAnyOrigin](
+        ImmPointer[Scalar[op_type], ImmutAnyOrigin](
             unsafe_from_address=Int(k_ref_device.unsafe_ptr())
         ),
         row_major(Coord(topk, row_width)),
@@ -1393,9 +1382,9 @@ def test_sparse_paged_mma_ws_ts[
         c_ref_tt,
         a_tt,
         b_tt,
-        p_ref_rows,
-        p_ref_cols,
-        cols,
+        Int32(p_ref_rows),
+        Int32(p_ref_cols),
+        Int32(cols),
         grid_dim=(
             ceildiv(p_ref_rows, naive_block_dim),
             ceildiv(p_ref_cols, naive_block_dim),
@@ -1404,7 +1393,7 @@ def test_sparse_paged_mma_ws_ts[
         block_dim=(naive_block_dim, naive_block_dim, 1),
     )
 
-    var p_ref_host = ctx.enqueue_create_host_buffer[DType.float32](
+    var p_ref_host = ctx.enqueue_create_host_buffer[.float32](
         p_ref_rows * p_ref_cols
     )
     ctx.enqueue_copy(p_ref_host, p_ref_device)
@@ -1415,10 +1404,8 @@ def test_sparse_paged_mma_ws_ts[
         for c in range(p_ref_cols):
             var ref_val = p_ref_host[r * p_ref_cols + c]
 
-            var gpu_half0 = Scalar[DType.float32](p_out_ptr[r * p_cols + c])
-            var gpu_half1 = Scalar[DType.float32](
-                p_out_ptr[r * p_cols + c + p_rows]
-            )
+            var gpu_half0 = Float32(p_out_ptr[r * p_cols + c])
+            var gpu_half1 = Float32(p_out_ptr[r * p_cols + c + p_rows])
             var gpu_val = gpu_half0 + gpu_half1
 
             var err = abs(gpu_val - ref_val) / max(abs(ref_val), Float32(1.0))

@@ -1,0 +1,14 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# CHECK: (StaticString) s1 = "hello"
+var s1: StaticString = "hello"
+
+# CHECK: (StaticString) s2 = ""
+var s2: StaticString = ""

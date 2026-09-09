@@ -26,13 +26,13 @@ from typing import cast
 
 import click
 from create_pipelines import PIPELINE_ORACLES, GenericOracle
+from max._entrypoints.cli.entrypoint import configure_cli_logging
 from max.driver import (
     calculate_virtual_device_count_from_cli,
     set_virtual_device_api,
     set_virtual_device_count,
     set_virtual_device_target_arch,
 )
-from max.entrypoints.cli.entrypoint import configure_cli_logging
 from max.pipelines.lib.device_specs import (
     device_specs_from_normalized_device_handle,
     normalize_device_specs_input,

@@ -22,6 +22,7 @@ from threading import Thread
 from typing import Any
 
 import numpy as np
+from _transfer_engine_helpers import kv_memory
 from max.driver import CPU, Buffer
 from max.pipelines.kv_cache import KVTransferEngine
 
@@ -51,10 +52,10 @@ def test_notification_delivery_is_prompt() -> None:
         ).to(acc)
 
         # DP=1, TP=1
+        total_num_pages = blocks.shape[0]
         engine = KVTransferEngine(
             name="latency_sender",
-            tensors=[[blocks]],
-            total_num_pages=blocks.shape[0],
+            memory=[[kv_memory(blocks, total_num_pages)]],
         )
 
         # Connect with receiver
@@ -91,10 +92,10 @@ def test_notification_delivery_is_prompt() -> None:
         ).to(acc)
 
         # DP=1, TP=1
+        total_num_pages = blocks.shape[0]
         engine = KVTransferEngine(
             name="latency_receiver",
-            tensors=[[blocks]],
-            total_num_pages=blocks.shape[0],
+            memory=[[kv_memory(blocks, total_num_pages)]],
         )
 
         # Connect with sender

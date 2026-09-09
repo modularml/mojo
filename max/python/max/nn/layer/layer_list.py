@@ -21,7 +21,13 @@ from .layer import Layer, Module
 class LayerList(Module):
     """Stores a list of layers.
 
-    Can be used as a regular python list.
+    Can be used as a regular Python list.
+
+    For a stack of layers where each layer consumes the previous layer's
+    output, prefer :class:`~max.nn.Sequential`, which subclasses this class.
+
+    Args:
+        layers: The layers to store in the list.
     """
 
     def __init__(self, layers: Sequence[Layer]) -> None:

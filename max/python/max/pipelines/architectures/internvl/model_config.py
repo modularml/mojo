@@ -15,21 +15,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import ClassVar, Literal
 
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.graph.weights import WeightData
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParamInterface
 from max.nn.transformer import ReturnLogits
 from max.pipelines.architectures.llama3.model_config import (
     Llama3Config as Qwen2Config,
 )
 from max.pipelines.architectures.qwen3.model_config import Qwen3Config
 from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
+from max.pipelines.lib.config.model_config import _select_quantization_encoding
 from max.pipelines.lib.interfaces.arch_config import (
     ArchConfigWithKVCache,
 )
+from max.pipelines.modeling.config_enums import SupportedEncoding
 from transformers import AutoConfig
 from typing_extensions import Self, override
 
@@ -57,7 +59,7 @@ class VisionConfig:
     intermediate_size: int
     """Intermediate size in the vision encoder's feed-forward layers."""
 
-    norm_type: Literal["rms_norm"] | Literal["layer_norm"]
+    norm_type: Literal["rms_norm", "layer_norm"]
     """Type of normalization used in the vision encoder."""
 
     image_size: int
@@ -141,6 +143,9 @@ class VisionConfig:
 class InternVLConfig(ArchConfigWithKVCache):
     """Configuration for InternVL models."""
 
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "bfloat16"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {"bfloat16"}
+
     devices: list[DeviceRef]
     """Devices that the InternVL model is parallelized over."""
 
@@ -159,7 +164,9 @@ class InternVLConfig(ArchConfigWithKVCache):
     llm_config: Qwen2Config | Qwen3Config
     """Language model configuration (Qwen2 or Qwen3)."""
 
-    def get_kv_params(self) -> KVCacheParams:
+    quantization_encoding: SupportedEncoding | None = None
+
+    def get_kv_params(self) -> KVCacheParamInterface:
         """Returns the KV cache parameters from the embedded LLM config."""
         return self.llm_config.get_kv_params()
 
@@ -174,7 +181,7 @@ class InternVLConfig(ArchConfigWithKVCache):
         devices: list[DeviceRef],
         kv_cache_config: KVCacheConfig,
         cache_dtype: DType,
-    ) -> KVCacheParams:
+    ) -> KVCacheParamInterface:
         # Delegate to the selected decoder family for language model parameters.
         llm_hf_cfg = getattr(
             huggingface_config, "llm_config", huggingface_config
@@ -197,9 +204,11 @@ class InternVLConfig(ArchConfigWithKVCache):
         ConfigCls = _select_llm_config_class(llm_hf_cfg)
         return ConfigCls.get_num_layers(llm_hf_cfg)
 
-    @staticmethod
+    @classmethod
     def calculate_max_seq_len(
-        pipeline_config: PipelineConfig, huggingface_config: AutoConfig
+        cls,
+        huggingface_config: AutoConfig,
+        model_config: MAXModelConfig,
     ) -> int:
         """Calculate maximum sequence length for InternVL."""
         # Delegate to the selected decoder family for language model parameters.
@@ -208,8 +217,8 @@ class InternVLConfig(ArchConfigWithKVCache):
         )
         ConfigCls = _select_llm_config_class(llm_hf_cfg)
         return ConfigCls.calculate_max_seq_len(
-            pipeline_config=pipeline_config,
             huggingface_config=llm_hf_cfg,
+            model_config=model_config,
         )
 
     @override
@@ -218,6 +227,8 @@ class InternVLConfig(ArchConfigWithKVCache):
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes an InternVLConfig instance from pipeline configuration.
 
@@ -229,12 +240,18 @@ class InternVLConfig(ArchConfigWithKVCache):
         """
         model_config = model_config or pipeline_config.model
         return cls.initialize_from_config(
-            pipeline_config, model_config.huggingface_config
+            pipeline_config,
+            model_config.huggingface_config,
+            max_seq_len=max_seq_len,
         )
 
     @classmethod
     def initialize_from_config(
-        cls, pipeline_config: PipelineConfig, huggingface_config: AutoConfig
+        cls,
+        pipeline_config: PipelineConfig,
+        huggingface_config: AutoConfig,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes an InternVLConfig from pipeline and HuggingFace configs.
 
@@ -265,13 +282,17 @@ class InternVLConfig(ArchConfigWithKVCache):
         llm_config: Qwen2Config | Qwen3Config
         if ConfigCls is Qwen3Config:
             llm_config = Qwen3Config.initialize_from_config(
-                pipeline_config, hf_llm_config
+                pipeline_config, hf_llm_config, max_seq_len=max_seq_len
             )
         else:
             # Qwen2 semantics (delegates to Llama3-style config under the hood)
             llm_config = Qwen2Config.initialize_from_config(
-                pipeline_config, hf_llm_config
+                pipeline_config, hf_llm_config, max_seq_len=max_seq_len
             )
+
+        quantization_encoding = _select_quantization_encoding(
+            pipeline_config.model, cls.DEFAULT_ENCODING
+        )
 
         return cls(
             devices=[
@@ -287,6 +308,7 @@ class InternVLConfig(ArchConfigWithKVCache):
             vision_config=vision_config,
             # Composed language model configuration
             llm_config=llm_config,
+            quantization_encoding=quantization_encoding,
         )
 
     def finalize(
@@ -296,7 +318,7 @@ class InternVLConfig(ArchConfigWithKVCache):
         vision_state_dict: dict[str, WeightData],
         dtype: DType,
         return_logits: ReturnLogits,
-        norm_method: Literal["rms_norm"] | Literal["layer_norm"] = "rms_norm",
+        norm_method: Literal["rms_norm", "layer_norm"] = "rms_norm",
     ) -> None:
         """Finalize the InternVLConfig instance with state_dict dependent fields.
 

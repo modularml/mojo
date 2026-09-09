@@ -1,0 +1,53 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# Kimi K2.6 NVFP4 + Eagle3 speculative decoding (TP attention + EP MoE,
+# allreduce, tiered KV-connector). ``data_parallel_degree: 1`` selects TP
+# attention on 8 GPUs; ``ep_use_allreduce: true`` uses allreduce for MoE
+# expert dispatch; ``kv_connector_config.type: tiered`` enables tiered KV cache offload.
+# Draft: nvidia/Kimi-K2.6-Eagle3 (MLA, 1-layer, BF16).
+model:
+  model_path: nvidia/Kimi-K2.6-NVFP4
+  device_specs: [0, 1, 2, 3, 4, 5, 6, 7]
+  data_parallel_degree: 1
+  max_length: 262144
+  trust_remote_code: true
+  kv_cache:
+    kv_cache_format: float8_e4m3fn
+    device_memory_utilization: 0.75
+    kv_connector_config:
+      type: tiered
+
+draft_model:
+  model_path: nvidia/Kimi-K2.6-Eagle3
+  trust_remote_code: true
+  device_specs: [0, 1, 2, 3, 4, 5, 6, 7]
+  quantization_encoding: bfloat16
+  # Override the draft sliding window (not declared in the K2.6 draft's HF
+  # config); matches the K2.6 NVFP4 production deployment.
+  sliding_window: 12288
+  kv_cache:
+    kv_cache_format: float8_e4m3fn
+    kv_connector_config:
+      type: tiered
+
+speculative:
+  speculative_method: eagle
+  num_speculative_tokens: 3
+
+sampling:
+  enable_structured_output: true
+
+runtime:
+  ep_size: 8
+  ep_use_allreduce: true
+  max_batch_input_tokens: 4096

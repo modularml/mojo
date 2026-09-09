@@ -18,13 +18,11 @@ import signal
 import sys
 from pathlib import Path
 
-import hf_repo_lock
 import pipelines_lm_eval
 from click.testing import CliRunner
 from max.pipelines.lib import generate_local_model_path
 
 REPO_ID = "HuggingFaceTB/SmolLM-135M"
-REVISION = hf_repo_lock.revision_for_hf_repo(REPO_ID)
 
 logger = logging.getLogger("max.pipelines")
 
@@ -33,11 +31,8 @@ def test_pipelines_lm_eval_smollm(tmp_path: Path) -> None:
     runner = CliRunner()
     output_dir = tmp_path / "lm-eval-output"
 
-    assert isinstance(REVISION, str), (
-        "REVISION must be a string and present in hf-repo-lock.tsv"
-    )
     try:
-        local_model_path = generate_local_model_path(REPO_ID, REVISION)
+        local_model_path = generate_local_model_path(REPO_ID)
     except FileNotFoundError as e:
         logger.warning(f"Failed to generate local model path: {str(e)}")
         logger.warning(

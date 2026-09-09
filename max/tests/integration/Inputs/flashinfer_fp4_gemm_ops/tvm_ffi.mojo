@@ -1,5 +1,5 @@
 # ===----------------------------------------------------------------------=== #
-# Copyright (c) 2025, Modular Inc. All rights reserved.
+# Copyright (c) 2026, Modular Inc. All rights reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions:
 # https://llvm.org/LICENSE.txt
@@ -18,6 +18,9 @@ All implementations are based on that reference material.
 """
 
 import std.format
+
+from std.ffi import OwnedDLHandle
+from std.os import abort
 
 from .dlpack import DLTensor
 
@@ -41,7 +44,7 @@ struct TVMFFIAny(Copyable, Movable):
 
     def __init__[
         rank: Int, dtype: DType
-    ](out self, tensor_ptr: UnsafePointer[DLTensor[rank, dtype], _],) raises:
+    ](out self, tensor_ptr: Pointer[DLTensor[rank, dtype], _],) raises:
         """Construct from a pointer to a DLTensor.
 
         The caller must ensure the pointed-to DLTensor outlives this
@@ -60,7 +63,7 @@ struct TVMFFIAny(Copyable, Movable):
 # ABI for TVMFFISafeCallType
 # https://tvm.apache.org/ffi/concepts/func_module.html#sec-function-calling-convention
 comptime SafeFunction = def(
-    module: Optional[UnsafePointer[NoneType, MutAnyOrigin]],
+    module: Optional[Pointer[NoneType, MutAnyOrigin]],
     args: Pointer[TVMFFIAny, MutAnyOrigin],
     nargs: Int32,
     result: Pointer[TVMFFIAny, MutAnyOrigin],
@@ -90,7 +93,7 @@ struct TVMFFIObject:
             abort(
                 "Invalid type: {} != {}".format(self.type_index, T.type_index)
             )
-        return (UnsafePointer(to=self) + 1).bitcast[T]()[]
+        return Pointer(to=self).unsafe_offset(1).unsafe_bitcast[T]()[]
 
 
 struct TVMFFIErrorCell(
@@ -98,8 +101,13 @@ struct TVMFFIErrorCell(
 ):
     comptime type_index: Int32 = Types.ERROR
 
+    @__allow_legacy_any_origin_fields
     var kind: TVMFFIByteArray
+
+    @__allow_legacy_any_origin_fields
     var message: TVMFFIByteArray
+
+    @__allow_legacy_any_origin_fields
     var backtrace: TVMFFIByteArray
     # Unused fields omitted (update_backtrace, cause_chain, extra_context)
 
@@ -115,24 +123,19 @@ struct TVMFFIErrorCell(
 
 
 def _tvm_ffi_error_move_from_raised(
-    mut result: Optional[UnsafePointer[TVMFFIObject, MutAnyOrigin]]
+    mut result: Optional[Pointer[TVMFFIObject, MutAnyOrigin]]
 ) raises:
     """Wraps TVMFFIErrorMoveFromRaised."""
     # Expects that `libtvm_ffi.so` is available, for instance loaded by python
     # importing `tvm_ffi`.
-    lib = OwnedDLHandle(path="libtvm_ffi.so")
-    comptime FnType = def(
-        UnsafePointer[
-            Optional[UnsafePointer[TVMFFIObject, MutAnyOrigin]], MutAnyOrigin
-        ]
-    ) thin abi("C") -> None
-    fn_ptr = lib.get_function[FnType]("TVMFFIErrorMoveFromRaised")
-    fn_ptr(UnsafePointer(to=result))
+    var lib = OwnedDLHandle(path="libtvm_ffi.so")
+    var fn_ptr = lib.get_function[NoneType]("TVMFFIErrorMoveFromRaised")
+    fn_ptr(Pointer(to=result))
 
 
 def take_latest_error() raises -> TVMFFIErrorCell:
     """Retrieves the last TVM FFI error message."""
-    var error_ptr = Optional[UnsafePointer[TVMFFIObject, MutAnyOrigin]]()
+    var error_ptr = Optional[Pointer[TVMFFIObject, MutAnyOrigin]]()
     _tvm_ffi_error_move_from_raised(error_ptr)
     if not error_ptr:
         raise Error("TVM FFI: No error.")

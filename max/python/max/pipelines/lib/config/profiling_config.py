@@ -14,23 +14,24 @@
 
 from __future__ import annotations
 
-import logging
 import os
-from typing import cast, get_args
+from typing import get_args
 
 from max.config import ConfigFileModel
 from max.engine import GPUProfilingMode
-from pydantic import Field, PrivateAttr, model_validator
-from typing_extensions import Self
-
-logger = logging.getLogger("max.pipelines")
+from pydantic import ConfigDict, Field, PrivateAttr, field_validator
 
 
 class ProfilingConfig(ConfigFileModel):
-    """Configuration for GPU profiling of pipeline models."""
+    """Configuration for the GPU (NVTX/Nsight) profiler."""
 
+    model_config = ConfigDict(frozen=True)
+
+    # validate_default so the MODULAR_ENABLE_PROFILING fallback below also
+    # applies when the field is not provided at all.
     gpu_profiling: GPUProfilingMode = Field(
         default="off",
+        validate_default=True,
         description="Whether to enable GPU profiling of the model.",
     )
     """Whether to enable GPU profiling of the model."""
@@ -40,17 +41,18 @@ class ProfilingConfig(ConfigFileModel):
     This is used to differentiate between different config sections in a single
     MAXConfig file."""
 
-    @model_validator(mode="after")
-    def _normalize_gpu_profiling(self) -> Self:
-        """Normalize gpu_profiling field after validation."""
-        gpu_profiling_env = os.environ.get("MODULAR_ENABLE_PROFILING", "off")
-
-        if self.gpu_profiling == "off":
+    @field_validator("gpu_profiling", mode="before")
+    @classmethod
+    def _normalize_gpu_profiling(cls, value: object) -> object:
+        """Applies MODULAR_ENABLE_PROFILING when the value is "off"."""
+        if value == "off":
+            gpu_profiling_env = os.environ.get(
+                "MODULAR_ENABLE_PROFILING", "off"
+            )
             valid_values = list(get_args(GPUProfilingMode))
-            if gpu_profiling_env in valid_values:
-                self.gpu_profiling = cast(GPUProfilingMode, gpu_profiling_env)
-            else:
+            if gpu_profiling_env not in valid_values:
                 raise ValueError(
                     "gpu_profiling must be one of: " + ", ".join(valid_values)
                 )
-        return self
+            return gpu_profiling_env
+        return value

@@ -17,11 +17,11 @@ from layout import TileTensor, row_major
 
 
 def main():
-    var src_data = InlineArray[Int32, 4](fill=0)
-    var dst_data = InlineArray[Int32, 6](fill=0)
+    var src_data = Array[Int32, 4](fill=0)
+    var dst_data = Array[Int32, 6](fill=0)
 
     var src = TileTensor(src_data, row_major[2, 2]())
     var dst = TileTensor(dst_data, row_major[2, 3]())
 
-    # CHECK: TileTensor.copy_from requires matching total element count
+    # CHECK: TensorEngine.copy_from requires matching total element count
     dst.copy_from(src)

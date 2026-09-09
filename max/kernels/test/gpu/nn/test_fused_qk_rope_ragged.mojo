@@ -15,7 +15,7 @@ from std.collections import Set
 from std.math import ceildiv
 from std.random import random_ui64
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import KVCacheStaticParams, PagedKVCacheCollection
 from layout import (
     Idx,
@@ -27,10 +27,9 @@ from layout import (
     row_major,
 )
 from layout._fillers import random
-from std.memory import memcpy
+from std.memory import unsafe_memcpy
 
 from nn.fused_qk_rope import fused_qk_rope_ragged
-from testdata.fused_qk_rope_goldens import freqs_cis_table_input
 from std.testing import assert_almost_equal
 
 from std.utils import Index, IndexList
@@ -150,16 +149,16 @@ def execute_fused_qk_rope_ragged(
     )
 
     # Create device buffers
-    var true_ce_row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
+    var true_ce_row_offsets_device = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
-    var mixed_ce_row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
+    var mixed_ce_row_offsets_device = ctx.enqueue_create_buffer[.uint32](
         batch_size + 1
     )
-    var true_ce_cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
+    var true_ce_cache_lengths_device = ctx.enqueue_create_buffer[.uint32](
         batch_size
     )
-    var mixed_ce_cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
+    var mixed_ce_cache_lengths_device = ctx.enqueue_create_buffer[.uint32](
         batch_size
     )
     var true_ce_q_ragged_device = ctx.enqueue_create_buffer[dtype](
@@ -180,7 +179,7 @@ def execute_fused_qk_rope_ragged(
     var mixed_ce_kv_block_device = ctx.enqueue_create_buffer[dtype](
         kv_block_shape.flattened_length()
     )
-    var paged_lut_device = ctx.enqueue_create_buffer[DType.uint32](
+    var paged_lut_device = ctx.enqueue_create_buffer[.uint32](
         paged_lut_shape.flattened_length()
     )
     var freqs_device = ctx.enqueue_create_buffer[dtype](
@@ -256,21 +255,25 @@ def execute_fused_qk_rope_ragged(
                 mixed_ce_q_ragged_host, mixed_ce_q_ragged_runtime_layout
             )
             for bs_idx in range(batch_size):
-                mixed_ce_prompt_len = mixed_ce_prompt_lens[bs_idx]
-                true_ce_row_offset = Int(true_ce_row_offsets_host_ptr[bs_idx])
-                mixed_ce_row_offset = Int(mixed_ce_row_offsets_host_ptr[bs_idx])
-                mixed_ce_cache_len = mixed_ce_cache_lens[bs_idx]
+                var mixed_ce_prompt_len = mixed_ce_prompt_lens[bs_idx]
+                var true_ce_row_offset = Int(
+                    true_ce_row_offsets_host_ptr[bs_idx]
+                )
+                var mixed_ce_row_offset = Int(
+                    mixed_ce_row_offsets_host_ptr[bs_idx]
+                )
+                var mixed_ce_cache_len = mixed_ce_cache_lens[bs_idx]
 
-                true_ce_src_offset = (
+                var true_ce_src_offset = (
                     (true_ce_row_offset + mixed_ce_cache_len)
                     * num_q_heads
                     * kv_params.head_size
                 )
-                mixed_ce_dest_offset = (
+                var mixed_ce_dest_offset = (
                     mixed_ce_row_offset * num_q_heads * kv_params.head_size
                 )
 
-                memcpy(
+                unsafe_memcpy(
                     dest=mixed_ce_q_ragged_tensor.ptr + mixed_ce_dest_offset,
                     src=true_ce_q_ragged_tensor.ptr + true_ce_src_offset,
                     count=mixed_ce_prompt_len
@@ -278,14 +281,18 @@ def execute_fused_qk_rope_ragged(
                     * kv_params.head_size,
                 )
 
-    # Initialize freqs_cis_table with golden values
-    freqs_input_buffer = freqs_cis_table_input[dtype]()
+    # Fill the whole freqs_cis buffer: the kernel reads row
+    # `cache_len + token`, not just the first rows. Unwritten rows are zero
+    # under the default allocator but NaN under `poison-all`. (KERN-3088)
+    comptime freqs_layout = Layout.row_major(max_seq_len, kv_params.head_size)
+    var freqs_runtime_layout = RuntimeLayout[freqs_layout].row_major(
+        freqs_shape
+    )
     with freqs_device.map_to_host() as freqs_host:
-        memcpy(
-            dest=freqs_host.unsafe_ptr(),
-            src=freqs_input_buffer.unsafe_ptr(),
-            count=len(freqs_input_buffer),
+        var freqs_init_tensor = LayoutTensor[dtype, freqs_layout](
+            freqs_host, freqs_runtime_layout
         )
+        random(freqs_init_tensor)
 
     # Initialize KV blocks with random data using regular host memory
     # (not host-pinned memory via map_to_host) to avoid exhausting
@@ -304,12 +311,12 @@ def execute_fused_qk_rope_ragged(
 
     # Initialize paged_lut
     with paged_lut_device.map_to_host() as paged_lut_host:
-        var paged_lut_tensor = LayoutTensor[DType.uint32, paged_lut_layout](
+        var paged_lut_tensor = LayoutTensor[.uint32, paged_lut_layout](
             paged_lut_host, paged_lut_runtime_layout
         )
-        paged_lut_set = Set[Int]()
+        var paged_lut_set = Set[Int]()
         for bs in range(batch_size):
-            seq_len = true_ce_cache_lens[bs] + true_ce_prompt_lens[bs]
+            var seq_len = true_ce_cache_lens[bs] + true_ce_prompt_lens[bs]
             for block_idx in range(0, ceildiv(seq_len, page_size)):
                 var randval = Int(random_ui64(0, num_paged_blocks - 1))
                 while randval in paged_lut_set:
@@ -368,17 +375,17 @@ def execute_fused_qk_rope_ragged(
 
     # Create LayoutTensors for KV cache (still uses LayoutTensor)
     var true_ce_cache_lengths_tensor = LayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE), ImmutAnyOrigin
+        mut=False, .uint32, Layout(UNKNOWN_VALUE)
     ](
-        true_ce_cache_lengths_device.unsafe_ptr(),
+        true_ce_cache_lengths_device,
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(
             true_ce_cache_lengths_shape
         ),
     )
     var mixed_ce_cache_lengths_tensor = LayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE), ImmutAnyOrigin
+        mut=False, .uint32, Layout(UNKNOWN_VALUE)
     ](
-        mixed_ce_cache_lengths_device.unsafe_ptr(),
+        mixed_ce_cache_lengths_device,
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(
             mixed_ce_cache_lengths_shape
         ),
@@ -390,16 +397,16 @@ def execute_fused_qk_rope_ragged(
         mixed_ce_kv_block_device, kv_block_runtime_layout
     )
     var paged_lut_tensor = LayoutTensor[
-        DType.uint32, Layout.row_major[2](), ImmutAnyOrigin
+        mut=False, .uint32, Layout.row_major[2]()
     ](
-        paged_lut_device.unsafe_ptr(),
+        paged_lut_device,
         RuntimeLayout[Layout.row_major[2]()].row_major(paged_lut_shape),
     )
 
     var true_ce_k_cache_collection = PagedKVCacheCollection[
         dtype, kv_params, page_size
     ](
-        LayoutTensor[dtype, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[dtype, Layout.row_major[6]()](
             true_ce_kv_block_tensor.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 true_ce_kv_block_tensor.runtime_layout.shape.value.canonicalize(),
@@ -415,7 +422,7 @@ def execute_fused_qk_rope_ragged(
     var mixed_ce_k_cache_collection = PagedKVCacheCollection[
         dtype, kv_params, page_size
     ](
-        LayoutTensor[dtype, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[dtype, Layout.row_major[6]()](
             mixed_ce_kv_block_tensor.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 mixed_ce_kv_block_tensor.runtime_layout.shape.value.canonicalize(),
@@ -472,13 +479,13 @@ def execute_fused_qk_rope_ragged(
 
             print("comparing Q")
             for bs_idx in range(batch_size):
-                true_ce_batch_start_idx = Int(
+                var true_ce_batch_start_idx = Int(
                     true_ce_row_offsets_host_ptr[bs_idx]
                 )
-                mixed_ce_batch_start_idx = Int(
+                var mixed_ce_batch_start_idx = Int(
                     mixed_ce_row_offsets_host_ptr[bs_idx]
                 )
-                mixed_ce_cache_len = Int(
+                var mixed_ce_cache_len = Int(
                     mixed_ce_cache_lengths_host_ptr[bs_idx]
                 )
 
@@ -508,7 +515,7 @@ def execute_fused_qk_rope_ragged(
     ctx.enqueue_copy(mixed_kv_block_host_ptr, mixed_ce_kv_block_device)
 
     # Also need paged_lut on host for K cache comparison
-    var paged_lut_host_ptr = ctx.enqueue_create_host_buffer[DType.uint32](
+    var paged_lut_host_ptr = ctx.enqueue_create_host_buffer[.uint32](
         paged_lut_shape.flattened_length()
     )
     ctx.enqueue_copy(paged_lut_host_ptr, paged_lut_device)
@@ -520,27 +527,27 @@ def execute_fused_qk_rope_ragged(
     var mixed_ce_kv_block_host_tensor = LayoutTensor[dtype, kv_block_layout](
         mixed_kv_block_host_ptr.unsafe_ptr(), kv_block_runtime_layout
     )
-    var paged_lut_host_tensor = LayoutTensor[DType.uint32, paged_lut_layout](
+    var paged_lut_host_tensor = LayoutTensor[.uint32, paged_lut_layout](
         paged_lut_host_ptr.unsafe_ptr(), paged_lut_runtime_layout
     )
 
     var true_ce_k_cache_collection_host = PagedKVCacheCollection[
         dtype, kv_params, page_size
     ](
-        LayoutTensor[dtype, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[dtype, Layout.row_major[6]()](
             true_ce_kv_block_host_tensor.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 true_ce_kv_block_host_tensor.runtime_layout.shape.value.canonicalize(),
                 true_ce_kv_block_host_tensor.runtime_layout.stride.value.canonicalize(),
             ),
         ),
-        LayoutTensor[DType.uint32, Layout(UNKNOWN_VALUE), ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, Layout(UNKNOWN_VALUE)](
             true_ce_cache_lengths_host_ptr.unsafe_ptr(),
             RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(
                 true_ce_cache_lengths_shape
             ),
         ),
-        LayoutTensor[DType.uint32, Layout.row_major[2](), ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, Layout.row_major[2]()](
             paged_lut_host_tensor.ptr,
             RuntimeLayout[Layout.row_major[2]()].row_major(paged_lut_shape),
         ),
@@ -554,20 +561,20 @@ def execute_fused_qk_rope_ragged(
     var mixed_ce_k_cache_collection_host = PagedKVCacheCollection[
         dtype, kv_params, page_size
     ](
-        LayoutTensor[dtype, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[dtype, Layout.row_major[6]()](
             mixed_ce_kv_block_host_tensor.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 mixed_ce_kv_block_host_tensor.runtime_layout.shape.value.canonicalize(),
                 mixed_ce_kv_block_host_tensor.runtime_layout.stride.value.canonicalize(),
             ),
         ),
-        LayoutTensor[DType.uint32, Layout(UNKNOWN_VALUE), ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, Layout(UNKNOWN_VALUE)](
             mixed_ce_cache_lengths_host_ptr.unsafe_ptr(),
             RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(
                 mixed_ce_cache_lengths_shape
             ),
         ),
-        LayoutTensor[DType.uint32, Layout.row_major[2](), ImmutAnyOrigin](
+        LayoutTensor[mut=False, .uint32, Layout.row_major[2]()](
             paged_lut_host_tensor.ptr,
             RuntimeLayout[Layout.row_major[2]()].row_major(paged_lut_shape),
         ),
@@ -580,7 +587,7 @@ def execute_fused_qk_rope_ragged(
 
     print("comparing K")
     for bs_idx in range(batch_size):
-        mixed_ce_cache_len = mixed_ce_cache_lens[bs_idx]
+        var mixed_ce_cache_len = mixed_ce_cache_lens[bs_idx]
 
         for tok_idx in range(mixed_ce_prompt_lens[bs_idx]):
             for head_idx in range(kv_params.num_heads):
@@ -731,15 +738,11 @@ def execute_fused_qk_rope_ragged_mla(ctx: DeviceContext) raises:
     var output_device_ref = ctx.enqueue_create_buffer[dtype](
         output_64_shape.flattened_length()
     )
-    var row_offsets_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size + 1
-    )
-    var paged_lut_device = ctx.enqueue_create_buffer[DType.uint32](
+    var row_offsets_device = ctx.enqueue_create_buffer[.uint32](batch_size + 1)
+    var paged_lut_device = ctx.enqueue_create_buffer[.uint32](
         paged_lut_shape.flattened_length()
     )
-    var cache_lengths_device = ctx.enqueue_create_buffer[DType.uint32](
-        batch_size
-    )
+    var cache_lengths_device = ctx.enqueue_create_buffer[.uint32](batch_size)
 
     # Define runtime layouts for q_ragged (used for random initialization)
     comptime q_ragged_layout = Layout.row_major(
@@ -781,7 +784,7 @@ def execute_fused_qk_rope_ragged_mla(ctx: DeviceContext) raises:
                 var dest_offset = (
                     seq_idx * num_q_heads * rope_dim + head_idx * rope_dim
                 )
-                memcpy(
+                unsafe_memcpy(
                     dest=q_ragged_64_tensor.ptr + dest_offset,
                     src=q_ragged_host_ptr.unsafe_ptr() + src_offset,
                     count=rope_dim,
@@ -849,7 +852,7 @@ def execute_fused_qk_rope_ragged_mla(ctx: DeviceContext) raises:
                                 + tok_idx * kv_params.num_heads * rope_dim
                                 + head_idx * rope_dim
                             )
-                            memcpy(
+                            unsafe_memcpy(
                                 dest=kv_block_64_tensor.ptr + dest_offset,
                                 src=kv_block_host_ptr.unsafe_ptr() + src_offset,
                                 count=rope_dim,
@@ -903,22 +906,22 @@ def execute_fused_qk_rope_ragged_mla(ctx: DeviceContext) raises:
         kv_block_device_64, kv_block_64_runtime_layout
     )
     var cache_lengths_tensor = LayoutTensor[
-        DType.uint32, Layout(UNKNOWN_VALUE), ImmutAnyOrigin
+        mut=False, .uint32, Layout(UNKNOWN_VALUE)
     ](
-        cache_lengths_device.unsafe_ptr(),
+        cache_lengths_device,
         RuntimeLayout[Layout(UNKNOWN_VALUE)].row_major(cache_lengths_shape),
     )
     var paged_lut_tensor = LayoutTensor[
-        DType.uint32, Layout.row_major[2](), ImmutAnyOrigin
+        mut=False, .uint32, Layout.row_major[2]()
     ](
-        paged_lut_device.unsafe_ptr(),
+        paged_lut_device,
         RuntimeLayout[Layout.row_major[2]()].row_major(paged_lut_shape),
     )
 
     var k_cache_collection = PagedKVCacheCollection[
         dtype, kv_params, page_size
     ](
-        LayoutTensor[dtype, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[dtype, Layout.row_major[6]()](
             kv_block_tensor.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 kv_block_tensor.runtime_layout.shape.value.canonicalize(),
@@ -934,7 +937,7 @@ def execute_fused_qk_rope_ragged_mla(ctx: DeviceContext) raises:
     var k_cache_collection_64 = PagedKVCacheCollection[
         dtype, kv_params_64, page_size
     ](
-        LayoutTensor[dtype, Layout.row_major[6](), MutAnyOrigin](
+        LayoutTensor[dtype, Layout.row_major[6]()](
             kv_block_64_tensor.ptr,
             RuntimeLayout[Layout.row_major[6]()](
                 kv_block_64_tensor.runtime_layout.shape.value.canonicalize(),
@@ -1087,6 +1090,9 @@ def execute_fused_qk_rope_ragged_mla(ctx: DeviceContext) raises:
                                         head_dim_idx,
                                     ],
                                 )
+
+    # FIXME(MSTDL-2742): HostBuffer is origin incorrect.
+    _ = Pointer(to=kv_block_out_host_ptr).as_unsafe_any_origin()[]
 
     # Explicitly free device buffers to return memory to the buffer cache
     _ = q_ragged_device^

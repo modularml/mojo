@@ -25,16 +25,16 @@ Example with DP=4, TP=2, 8 GPUs:
 Uses a pull-based approach: each GPU reads its chunk from root via P2P.
 """
 
-from layout import TileTensor
+from layout import TensorEngine, TileTensor
 from layout.tile_layout import TensorLayout
-from std.collections import InlineArray
-from std.gpu.host import DeviceContext, get_gpu_target
-from std.gpu import (
+from std.collections import Array
+from max.gpu.host import DeviceContext, get_gpu_target
+from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     global_idx,
     grid_dim,
 )
-from std.gpu.primitives.grid_controls import (
+from max.gpu.primitives.grid_controls import (
     PDL,
     PDLLevel,
     pdl_launch_attributes,
@@ -51,6 +51,7 @@ from .sync import (
     is_p2p_enabled,
 )
 
+
 # --- Pull kernel: each GPU reads its own chunk from root ---
 
 
@@ -66,30 +67,29 @@ def scatter_pull_kernel[
     dp_size: Int,
     simd_width: Int = simd_width_of[dtype, target=get_gpu_target()](),
 ](
-    output_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    input_ptrs: InlineArray[
-        UnsafePointer[Scalar[dtype], ImmutAnyOrigin], dp_size
-    ],
-    chunk_num_elems: InlineArray[Int, dp_size],
-    rank_sigs: InlineArray[UnsafePointer[Signal, MutAnyOrigin], MAX_GPUS],
-    my_rank: Int,
+    output_ptr: MutPointer[Scalar[dtype], MutAnyOrigin],
+    input_ptrs: Array[ImmPointer[Scalar[dtype], ImmutAnyOrigin], dp_size],
+    chunk_num_elems: Array[Int32, dp_size],
+    rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
+    my_rank: Int32,
 ):
     """Pull-based scatter+broadcast: each GPU reads its chunk from root.
 
     Each GPU determines its replica index (my_rank // tp_size), then copies
-    from input_ptrs[replica] on the root GPU to its own output buffer.
+    from `input_ptrs[replica]` on the root GPU to its own output buffer.
     """
-    var my_sig = rank_sigs[my_rank]
+    var _my_rank = Int(my_rank)
+    var my_sig = rank_sigs[_my_rank]
 
     var global_tid = global_idx.x
     var stride = grid_dim.x * BLOCK_SIZE
 
     with PDL():
-        _multi_gpu_barrier[ngpus, is_start=True](rank_sigs, my_sig, my_rank)
+        _multi_gpu_barrier[ngpus, is_start=True](rank_sigs, my_sig, _my_rank)
 
-        var dp_idx = my_rank // tp_size
+        var dp_idx = _my_rank // tp_size
         var data_ptr = input_ptrs[dp_idx]
-        var num_elems = chunk_num_elems[dp_idx]
+        var num_elems = Int(chunk_num_elems[dp_idx])
         var num_simd_vectors = num_elems // simd_width
 
         # Grid-strided vectorized copy.
@@ -109,14 +109,13 @@ def scatter_pull_kernel[
                 data_ptr.load[width=1](tail_idx),
             )
 
-        _multi_gpu_barrier[ngpus, is_start=False](rank_sigs, my_sig, my_rank)
+        _multi_gpu_barrier[ngpus, is_start=False](rank_sigs, my_sig, _my_rank)
 
 
 # --- Wrapper functions ---
 
 
 @always_inline
-@parameter
 def scatter[
     dtype: DType,
     //,
@@ -124,13 +123,14 @@ def scatter[
     dp_size: Int,
     in_layout: TensorLayout,
     in_origin: Origin,
+    in_engine: TensorEngine,
     pdl_level: PDLLevel = PDLLevel(),
 ](
-    input_buffers: InlineArray[
-        TileTensor[dtype, in_layout, in_origin], dp_size
+    input_buffers: Array[
+        TileTensor[dtype, in_layout, in_origin, Engine=in_engine], dp_size
     ],
     output_buffer: TileTensor[mut=True, dtype, ...],
-    rank_sigs: InlineArray[UnsafePointer[Signal, MutAnyOrigin], MAX_GPUS],
+    rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
 ) raises:
     """Pull-based scatter+broadcast.
@@ -144,6 +144,7 @@ def scatter[
         dp_size: Number of data-parallel replicas.
         in_layout: Layout of the input TileTensors.
         in_origin: Origin of the input TileTensors.
+        in_engine: Engine of the input TileTensors.
         pdl_level: Controls PDL behavior for P2P kernels.
 
     Args:
@@ -159,22 +160,23 @@ def scatter[
     if not is_p2p_enabled():
         raise Error("Scatter currently requires P2P access between GPUs")
 
-    # Extract raw pointers and sizes from TileTensors for the kernel.
-    var input_ptrs = InlineArray[
-        UnsafePointer[Scalar[dtype], ImmutAnyOrigin], dp_size
-    ](uninitialized=True)
-    var chunk_num_elems = InlineArray[Int, dp_size](fill=0)
+    comptime PtrType = ImmPointer[Scalar[dtype], ImmutAnyOrigin]
+    var input_ptrs = Array[_, dp_size](
+        fill_with=lambda (i: Int) -> PtrType: rebind[
+            ImmPointer[Scalar[dtype], ImmutAnyOrigin]
+        ](input_buffers[i].ptr)
+    )
+    var chunk_num_elems_int = Array[Int, dp_size](fill=0)
+    var chunk_num_elems = Array[Int32, dp_size](fill=Int32(0))
     for i in range(dp_size):
-        input_ptrs[i] = rebind[UnsafePointer[Scalar[dtype], ImmutAnyOrigin]](
-            input_buffers[i].ptr
-        )
-        chunk_num_elems[i] = input_buffers[i].num_elements()
+        chunk_num_elems_int[i] = input_buffers[i].num_elements()
+        chunk_num_elems[i] = Int32(chunk_num_elems_int[i])
 
     # Compute grid size from the largest chunk.
     var max_elems = 0
     for i in range(dp_size):
-        if chunk_num_elems[i] > max_elems:
-            max_elems = chunk_num_elems[i]
+        if chunk_num_elems_int[i] > max_elems:
+            max_elems = chunk_num_elems_int[i]
 
     comptime BLOCK_SIZE = 256
     comptime simd_width = simd_width_of[dtype, target=get_gpu_target()]()
@@ -189,11 +191,11 @@ def scatter[
     ]
 
     ctx.enqueue_function[kernel](
-        rebind[UnsafePointer[Scalar[dtype], MutAnyOrigin]](output_buffer.ptr),
+        rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](output_buffer.ptr),
         input_ptrs,
         chunk_num_elems,
         rank_sigs,
-        Int(ctx.id()),
+        Int32(ctx.id()),
         grid_dim=grid_size,
         block_dim=BLOCK_SIZE,
         attributes=pdl_launch_attributes(pdl_level),

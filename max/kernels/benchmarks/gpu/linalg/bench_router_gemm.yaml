@@ -1,0 +1,40 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# KERN-3076: the FP32 MoE router (gate) GEMM is memory-bandwidth bound at
+# decode (tiny M, small N, large K). This config drives the existing
+# bench_matmul.mojo (which calls the production _matmul_gpu dispatch and
+# verifies vs vendor BLAS) over the router shape, so no new bench code is
+# needed. Router shape: N = num_experts, K = hidden_size, FP32.
+
+name: bench_router_gemm
+file: $KERNEL_BENCHMARKS_ROOT/gpu/linalg/bench_matmul.mojo
+
+params:
+
+# FP32 router GEMM (the issue) — mojo dispatch vs vendor BLAS, decode M sweep.
+# M=12 is the bs=12 decode operating point.
+- dtype: float32
+  ctype: float32
+  $M: [1, 2, 4, 8, 12, 16, 32, 64, 128]
+  N: 128
+  K: 6144
+  use_vendor_blas: [False, True]
+
+# bf16 contrast at the same shape (shows the dtype the tile GEMM handles well).
+- dtype: bfloat16
+  ctype: bfloat16
+  $M: [1, 2, 4, 8, 12, 16, 32, 64, 128]
+  N: 128
+  K: 6144
+  use_vendor_blas: [False, True]

@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import barrier, block_idx, thread_idx
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
+from max.gpu import block_idx, thread_idx
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 from std.math import ceildiv
 from std.atomic import Atomic
 from std.random import random_ui64
@@ -26,7 +26,7 @@ comptime COARSE_FACTOR = 4
 
 # ========================== KERNEL CODE ==========================
 def histogram_kernel(
-    image: UnsafePointer[UInt8, MutAnyOrigin],
+    image: UnsafePointer[UInt8, ImmutAnyOrigin],
     bins: UnsafePointer[UInt32, MutAnyOrigin],
     width: UInt32,
     height: UInt32,
@@ -40,10 +40,10 @@ def histogram_kernel(
         height: Image height.
     """
     # Allocate shared memory for private bins
-    var bins_s = stack_allocation[
+    var bins_s = unsafe_stack_allocation[
         NUM_BINS,
         UInt32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # Initialize shared memory bins to zero
@@ -86,8 +86,8 @@ def histogram_kernel(
 
 # ========================== TEST CODE ==========================
 def cpu_histogram(
-    image: UnsafePointer[UInt8, MutAnyOrigin],
-    bins: UnsafePointer[UInt32, MutAnyOrigin],
+    image: UnsafePointer[mut=False, UInt8, _],
+    bins: UnsafePointer[mut=True, UInt32, _],
     width: UInt32,
     height: UInt32,
 ):
@@ -141,8 +141,8 @@ def main() raises:
 
     with DeviceContext() as ctx:
         # Device memory allocation
-        var d_image = ctx.enqueue_create_buffer[DType.uint8](total_pixels)
-        var d_bins = ctx.enqueue_create_buffer[DType.uint32](NUM_BINS)
+        var d_image = ctx.enqueue_create_buffer[.uint8](total_pixels)
+        var d_bins = ctx.enqueue_create_buffer[.uint32](NUM_BINS)
 
         # Copy data to device
         ctx.enqueue_copy(d_image, h_image)

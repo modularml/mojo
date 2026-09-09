@@ -1,0 +1,109 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+# CHECK: (Int) x = 12
+var x = 12
+
+# CHECK: (Float64) x = 4.2{{.*}}
+var x = 4.2
+
+# CHECK:  (SIMD[.int32, 8]) x = [5, 6, 7, 8, 9, 10, 11, 12]
+var x = SIMD[.int32, 8](5, 6, 7, 8, 9, 10, 11, 12)
+
+# CHECK:  (SIMD[.int64, 4]) x = [1, 2, 3, 4]
+var x = SIMD[.int64, 4](1, 2, 3, 4)
+
+# CHECK: (Int) v = -101
+var v = -101
+
+# CHECK: (SIMD[.int8, 2]) w = [-50, 31]
+var w = SIMD[.int8, 2](-50, 31)
+
+# CHECK: (SIMD[.uint8, 4]) u = [1, 2, 3, 255]
+var u = SIMD[.uint8, 4](1, 2, 3, 255)
+
+# Scalar[T] (i.e. SIMD[T, 1]) must still display as a plain value, not [42].
+# CHECK: (Int32) s = 42
+var s: Scalar[.int32] = 42
+
+
+# CHECK-LABEL: (Foo) f = {
+# CHECK:   (Int) v = -101
+# CHECK:   (SIMD[.int8, 2]) w = [-50, 31]
+# CHECK:   (Bool) x = True
+# CHECK:   (StaticString) y =
+# CHECK:   (SIMD[.float32, 4]) z = [1, 2, 3, 4]
+# CHECK: }
+@fieldwise_init
+struct Foo(TrivialRegisterPassable, Copyable):
+  var v: Int
+  var w: SIMD[.int8, 2]
+  var x: Bool
+  var y: StaticString
+  var z: SIMD[.float32, 4]
+  def __init__(out self):
+    self.v = -101
+    self.w = SIMD[.int8, 2](-50, 31)
+    self.x = True
+    self.y = "fofofo"
+    self.z =  SIMD[.float32, 4](1, 2, 3, 4)
+
+var f = Foo()
+
+# CHECK: (String) empty = ""
+# CHECK: (String) long = "abcdefghijklmnopqrstuvwxyz1234567890"
+# CHECK: (String) short = "123"
+var empty = ""
+var long = "abcdefghijklmnopqrstuvwxyz1234567890"
+var short = "123"
+
+
+# CHECK: (Bool) a_bool = True
+# CHECK-NEXT: (Bool) another_bool = False
+var a_bool = True
+var another_bool = False
+
+
+# CHECK: (List[Int]) z = (size 3)[1, 2, 3] {
+# CHECK:   (Int) [0] = 1
+# CHECK:   (Int) [1] = 2
+# CHECK:   (Int) [2] = 3
+# CHECK: }
+from std.collections import List
+var z = List[Int](capacity=2)
+z.append(1)
+z.append(2)
+z.append(3)
+
+
+# CHECK: (Tuple[Int, SIMD[.int8, 4]]) a = {
+# CHECK:   (Int) [0] = 1
+# CHECK:   (SIMD[.int8, 4]) [1] = [1, 2, 3, 0]
+# CHECK: }
+a = (1, SIMD[.int8, 4](1, 2, 3, 0))
+
+# CHECK: (String) s1 = "var_string"
+# CHECK: (String) s2 = "012345678910111213141
+# CHECK: (String) s3 = ""
+# CHECK: (String) s4 = "012345678910"
+var s1 = String("var_string")
+var s2 = String()
+var s4 = String()
+for var i in range(0, 100):
+    s2 += String(i)
+    if i < 11:
+        s4 += String(i)
+var s3 = String()
+
+# CHECK: (List[Int]) even = (size 3)[0, 2, 4] {
+# CHECK:   (Int) [0] = 0
+# CHECK:   (Int) [1] = 2
+# CHECK:   (Int) [2] = 4
+# CHECK: }
+var even = [idx for idx in range(5) if idx % 2 == 0]

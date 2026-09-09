@@ -13,8 +13,8 @@
 
 from std.collections import List
 from spmv_utils import CSCMatrix, generate_sparse_matrix, spmv_cpu, verify
-from std.gpu import block_idx, thread_idx, block_dim
-from std.gpu.host import DeviceContext
+from max.gpu import block_idx, thread_idx, block_dim
+from max.gpu.host import DeviceContext
 from std.atomic import Atomic
 
 
@@ -32,20 +32,10 @@ struct Element(Comparable, ImplicitlyCopyable):
     def __eq__(self, other: Self) -> Bool:
         return self.c == other.c and self.r == other.r
 
-    def __init__(out self, *, deinit take: Self):
-        self.r = take.r
-        self.c = take.c
-        self.v = take.v
-
-    def __init__(out self, *, copy: Self):
-        self.r = copy.r
-        self.c = copy.c
-        self.v = copy.v
-
 
 def spmv_csc_kernel(
     cscMatrix: CSCMatrix,
-    x: UnsafePointer[Float32, MutAnyOrigin],
+    x: UnsafePointer[Float32, ImmutAnyOrigin],
     y: UnsafePointer[Float32, MutAnyOrigin],
 ):
     var col = block_idx.x * block_dim.x + thread_idx.x
@@ -127,11 +117,11 @@ def main() raises:
     var ctx = DeviceContext()
 
     # Device allocation
-    var d_colPtrs_buf = ctx.enqueue_create_buffer[DType.uint32](cols + 1)
-    var d_rowIdxs_buf = ctx.enqueue_create_buffer[DType.uint32](numNonzeros)
-    var d_values_buf = ctx.enqueue_create_buffer[DType.float32](numNonzeros)
-    var d_x_buf = ctx.enqueue_create_buffer[DType.float32](cols)
-    var d_y_buf = ctx.enqueue_create_buffer[DType.float32](rows)
+    var d_colPtrs_buf = ctx.enqueue_create_buffer[.uint32](cols + 1)
+    var d_rowIdxs_buf = ctx.enqueue_create_buffer[.uint32](numNonzeros)
+    var d_values_buf = ctx.enqueue_create_buffer[.float32](numNonzeros)
+    var d_x_buf = ctx.enqueue_create_buffer[.float32](cols)
+    var d_y_buf = ctx.enqueue_create_buffer[.float32](rows)
 
     # Copy to device
     ctx.enqueue_copy(d_colPtrs_buf, h_colPtrs_ptr)
@@ -150,9 +140,9 @@ def main() raises:
         rows,
         cols,
         numNonzeros,
-        d_colPtrs_buf.unsafe_ptr(),
-        d_rowIdxs_buf.unsafe_ptr(),
-        d_values_buf.unsafe_ptr(),
+        d_colPtrs_buf.unsafe_ptr().as_unsafe_any_origin(),
+        d_rowIdxs_buf.unsafe_ptr().as_unsafe_any_origin(),
+        d_values_buf.unsafe_ptr().as_unsafe_any_origin(),
     )
 
     var blockSize = 256

@@ -1,0 +1,7 @@
+# Distro libibverbs: public symbols only, no IBVERBS_PRIVATE_59.
+IBVERBS_1.1 {
+  global:
+    ibv_fixture_open;
+  local:
+    *;
+};

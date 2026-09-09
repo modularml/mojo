@@ -23,6 +23,9 @@ from max.graph import Graph
 from max.graph import Module as GraphModule
 from max.graph.weights import Weights, load_weights
 from max.pipelines.lib.compiled_component import CompiledComponent
+from max.pipelines.lib.config.model_config import (
+    _resolve_component_encoding_and_weights,
+)
 from max.pipelines.lib.model_manifest import ModelManifest
 from max.profiler import traced
 
@@ -58,7 +61,10 @@ class TextEncoder(CompiledComponent):
 
         config = manifest["text_encoder"]
         config_dict = config.huggingface_config.to_dict()
-        encoding = config.quantization_encoding or "bfloat16"
+        resolved_encoding, resolved_weight_path = (
+            _resolve_component_encoding_and_weights(config)
+        )
+        encoding = resolved_encoding or "bfloat16"
         devices = load_devices(config.device_specs)
 
         mistral_config = Mistral3TextEncoderConfig.initialize_from_config(
@@ -67,7 +73,7 @@ class TextEncoder(CompiledComponent):
         # Pad outputs to static sequence length expected by denoiser.
         mistral_config.output_seq_len = FLUX2_TEXT_SEQ_LEN
 
-        paths = config.resolved_weight_paths()
+        paths = config.resolved_weight_paths(resolved_weight_path)
         weights = load_weights(paths)
         state_dict = self._adapt_state_dict(weights)
 

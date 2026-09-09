@@ -1,0 +1,11 @@
+# EFA-patched libibverbs: adds the private version its libefa provider binds.
+IBVERBS_1.1 {
+  global:
+    ibv_fixture_open;
+  local:
+    *;
+};
+IBVERBS_PRIVATE_59 {
+  global:
+    ibv_fixture_private;
+} IBVERBS_1.1;

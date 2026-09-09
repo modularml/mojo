@@ -358,7 +358,7 @@ class LFM2(Module):
         return_n_logits_type = TensorType(
             DType.int64, shape=["return_n_logits"], device=DeviceRef.CPU()
         )
-        kv_inputs = kv_params.get_symbolic_inputs().flatten()
+        kv_inputs = kv_params.flattened_kv_inputs()
         conv_state_types = [
             TensorType(
                 self.config.dtype,

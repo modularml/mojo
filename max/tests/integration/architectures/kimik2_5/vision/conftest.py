@@ -18,8 +18,8 @@ import math
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 def _torch_get_1d_sincos_pos_embed(embed_dim: int, t_size: int) -> np.ndarray:

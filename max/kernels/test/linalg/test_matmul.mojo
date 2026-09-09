@@ -63,7 +63,7 @@ def test_matmul[
 ](m: Int, n: Int, k: Int, kernel_type_m: Int) raises:
     var a_ptr = alloc[Scalar[a_type],](m * k, alignment=alignment)
     var b_ptr = alloc[Scalar[b_type],](k * n, alignment=alignment)
-    var b = TileTensor(b_ptr.as_any_origin(), row_major(Coord(k, n)))
+    var b = TileTensor(b_ptr.as_unsafe_any_origin(), row_major(Coord(k, n)))
 
     var padded_n_k = pack_matmul_b_shape_func[
         a_type,
@@ -80,12 +80,14 @@ def test_matmul[
     var c0_ptr = alloc[Scalar[c_type],](m * n, alignment=alignment)
     var c1_ptr = alloc[Scalar[c_type],](m * n, alignment=alignment)
 
-    var a = TileTensor(a_ptr.as_any_origin(), row_major(Coord(m, k)))
+    var a = TileTensor(a_ptr.as_unsafe_any_origin(), row_major(Coord(m, k)))
     var bp = TileTensor(
-        bp_ptr.as_any_origin(), row_major(Coord(padded_k, padded_n))
+        bp_ptr.as_unsafe_any_origin(), row_major(Coord(padded_k, padded_n))
     )
-    var c = TileTensor(c0_ptr.as_any_origin(), row_major(Coord(m, n)))
-    var golden = TileTensor(c1_ptr.as_any_origin(), row_major(Coord(m, n)))
+    var c = TileTensor(c0_ptr.as_unsafe_any_origin(), row_major(Coord(m, n)))
+    var golden = TileTensor(
+        c1_ptr.as_unsafe_any_origin(), row_major(Coord(m, n))
+    )
 
     # saturated VNNI only has a range [0,127] for the input a
     var vnni_range: Int = 128 if saturated else 256
@@ -183,7 +185,7 @@ def test_shapes[
     saturated: Bool,
     mixed_kernels: Bool,
 ]() raises:
-    @parameter
+    @__parameter
     def test_shapes_helper(m: Int, n: Int, k: Int) raises:
         test_matmul[
             a_type=a_type,

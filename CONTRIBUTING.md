@@ -52,11 +52,12 @@ code you're interested in.
 We accept contributions to the following sections, each of which has its own
 contribution guidelines:
 
-- [Mojo standard library](mojo/CONTRIBUTING.md)
+- [Mojo](Mojo/CONTRIBUTING.md)
 - [MAX API and models](/max/CONTRIBUTING.md)
-- [MAX AI kernels](/max/kernels/CONTRIBUTING.md)
-- [Code examples](examples#contributing)
-- [Mojo documentation](mojo/docs#contributing)
+- [MAX accelerator library](/max/kernels/CONTRIBUTING.md)
+- [Code examples](/max/examples#contributing) and
+  [Mojo/examples#contributing](Mojo/examples#contributing)
+- [Mojo documentation](Mojo/docs#contributing)
 
 #### Please open an issue before opening a pull request
 
@@ -65,13 +66,14 @@ the review it deserves. The best way to make both of those things happen is
 to talk with us *before* you start writing code.
 
 For anything beyond a small, obvious fix, please open a GitHub issue (or, for
-larger changes, a [proposal](mojo/CONTRIBUTING.md#proposals)) that describes
-the problem you're solving and the approach you have in mind. A maintainer
-will respond to let you know whether the change aligns with where we're
-headed, suggest alternatives, or flag anything you should know before
-investing the time. Once a maintainer has signaled that the change is a good
-fit — typically by adding the `accepted` label or by leaving a comment
-giving the go-ahead — you're clear to start work.
+larger changes, a
+[proposal](Mojo/docs/contributing/proposal-process.md))
+that describes the problem you're solving and the approach you have in mind. A
+maintainer will respond to let you know whether the change aligns with where
+we're headed, suggest alternatives, or flag anything you should know before
+investing the time. Once a maintainer has signaled that the change is a good fit
+— typically by adding the `accepted` label or by leaving a comment giving the
+go-ahead — you're clear to start work.
 
 What counts as a "small, obvious fix" where you can skip straight to a PR:
 
@@ -99,7 +101,7 @@ If you're experienced with GitHub, here's the basic process:
 2. Create a branch from `main`.
 
    If you're contributing to the Mojo standard library, see the
-   [Mojo standard library developer guide](mojo/stdlib/docs/development.md).
+   [Mojo standard library developer guide](Mojo/docs/contributing/stdlib/stdlib-development.md).
 
 3. Create a PR into the `main` branch of this repo.
 
@@ -138,7 +140,8 @@ Before submitting, make sure your changes are correct and complete:
 
 - **Run the relevant tests.** If you changed code, run the tests for the
   affected area. For the Mojo standard library, see the
-  [development guide](mojo/stdlib/docs/development.md) for instructions.
+  [development guide](Mojo/docs/contributing/stdlib/stdlib-development.md)
+  for instructions.
 - **Check for regressions.** Run a broader test pass if your change touches
   shared infrastructure or has wide impact.
 - **Assess quality.** Review your diff as a maintainer would. Is the logic
@@ -192,12 +195,12 @@ pull request:
     git checkout -b my-fix
     ```
 
-    Now start your work on the repo! If you're contributing to the Mojo
-    standard library, see the [Mojo standard library developer
-    guide](mojo/stdlib/docs/development.md).
+   Now start your work on the repo! If you're contributing to the Mojo
+   standard library, see the [Mojo standard library developer
+   guide](Mojo/docs/contributing/stdlib/stdlib-development.md).
 
-    Although not necessary right now, you should periodically make sure you have
-    the latest code, especially right before you create the pull request:
+   Although not necessary right now, you should periodically make sure you have
+   the latest code, especially right before you create the pull request:
 
     ```bash
     git fetch upstream
@@ -340,8 +343,8 @@ We look forward to working together with you in making Mojo better for everyone!
 To ensure quicker reviews:
 
 - **Ensure your PR is small and focused.** See the
-  [pull request size section](mojo/CONTRIBUTING.md#about-pull-request-sizes) for
-  more info.
+  [pull request size guidance](Mojo/docs/contributing/issue-pr-etiquette.md#keep-pull-requests-small)
+  for more info.
 - Write a good commit message/PR description outlining the motivation and
   describing the changes. Use the
   [pull request template](.github/PULL_REQUEST_TEMPLATE.md) as a guide.

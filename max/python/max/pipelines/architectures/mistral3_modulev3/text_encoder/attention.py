@@ -71,7 +71,11 @@ class EncoderAttention(Module[..., Tensor]):
         head_dim = x.shape[2]
         half_dim = head_dim // 2
 
-        freqs_cis = rope.freqs_cis
+        # ``rope.freqs_cis`` is precomputed on CPU (see the encoder's
+        # ``__init__``) to match the legacy graph API's ``max.nn``
+        # RotaryEmbedding precision; transfer the slice to ``x.device``
+        # so the bf16 multiplication below stays on-device.
+        freqs_cis = rope.freqs_cis.to(x.device)
         freqs = freqs_cis[:seq_len, :]
 
         if len(freqs.shape) == 2:

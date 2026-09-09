@@ -1,0 +1,167 @@
+---
+title: Mojo AI skills
+sidebar_position: 7
+description: >
+  Official AI agent skills for developing projects with Mojo and MAX.
+  Follows the Agent Skills Standard and encodes best practices for AI
+  coding agents.
+---
+
+Mojo is ideal for agentic programming because it has a concise language
+syntax and your agent will catch most of the coding errors at compile time.
+To make your token usage even more efficient, our Mojo skills ensure
+that you generate up-to-date and idiomatic Mojo code from the start.
+
+Many AI models are trained on older versions of Mojo and MAX.
+They aren't updated as quickly as the language evolves, so they
+often generate code that doesn't compile or reflects outdated
+usage.
+
+For best results, agents need accurate, up-to-date context.
+Mojo agent skills are designed to be compact and focused,
+providing only the most important guidance needed to avoid
+common code generation issues. This keeps token usage low and
+leaves more room for relevant context.
+
+[Modular skills](https://github.com/modular/skills/tree/main)
+provide current guidance on Mojo syntax, development patterns,
+and workflows so AI coding agents generate modern, working
+code that aligns with the language today.
+
+## What you can do with this
+
+- Start new Mojo or MAX projects without manual setup
+  ("I want to start a new Mojo project for image enhancement")
+- Generate modern Mojo syntax
+  ("Write a function that applies a transformation around the center")
+- Write GPU code using valid patterns
+  ("Convert this CPU function to run on GPU")
+- Use Python interoperability correctly
+  ("Update this Mojo code to use NumPy")
+- Port code from CUDA, Python, or C++
+  ("Convert this CUDA function to Mojo")
+
+You describe the goal. Your system handles the language.
+
+## Installation
+
+**Install all skills**:
+
+```text
+npx skills add modular/skills
+```
+
+**Install a specific skill**:
+
+```text
+npx skills add modular/skills --skill mojo-syntax
+```
+
+**Update skills**:
+
+```text
+npx skills update
+```
+
+### Manual installation
+
+**HTTPS:**
+
+```text
+git clone https://github.com/modular/skills.git
+```
+
+**SSH:**
+
+```text
+git clone git@github.com:modular/skills.git
+```
+
+**CLI:**
+
+```text
+gh repo clone modular/skills
+```
+
+### Configuration
+
+Copy or symlink individual skill files into your agent's configuration
+directory.
+
+## How it works
+
+Skills follow the
+[Agent Skills Standard](https://agentskills.io/specification).
+Each skill is self-contained, triggered by intent, and
+structured for reliable use by AI agents.
+
+At runtime:
+
+1. The agent interprets your request.
+2. It selects the right skill (for example, `mojo-syntax`
+   or `mojo-gpu-fundamentals`).
+3. The skill guides generation toward current Mojo and
+   MAX patterns.
+
+This isn't prompting. It's controlled code generation.
+
+## Connect to the docs MCP server
+
+Connect the docs
+[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server to give
+your AI assistant live access to Mojo's documentation. Your assistant can
+search Mojo's manual, API references, and code examples while it plans, writes,
+and debugs your code, so its answers stay grounded in the current
+documentation instead of its training data.
+
+Your assistant can usually set up the MCP server itself with a prompt like
+this:
+
+```text
+Add the Mojo docs MCP server at https://mojo-mcp.modular.com/mcp/ and verify it
+by searching the docs.
+```
+
+Or configure it manually in your tool's settings.
+
+With Claude Code, add the server from the command line:
+
+```sh
+claude mcp add --transport http mojo-docs https://mojo-mcp.modular.com/mcp/
+```
+
+With Cursor, add the server to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "mojo-docs": {
+      "url": "https://mojo-mcp.modular.com/mcp/"
+    }
+  }
+}
+```
+
+Any other client that supports MCP's streamable HTTP transport connects with
+the same URL. The server indexes both the stable and nightly documentation.
+
+## FAQ
+
+**Are the skills always up to date with the latest Mojo?**
+
+Skills are updated regularly to track changes in Mojo and MAX, but
+there will be lag between language changes and skill updates.
+
+**Can I select a skill version that matches my installed Mojo version?**
+
+Not currently. Skills aren't versioned by Mojo release, so there may be
+mismatches between the skill's guidance and your installed version.
+We recommend installing the latest version of Mojo to minimize this risk.
+
+**Do I have to install all the skills?**
+
+No. Install only what you need.
+
+**Are the skills licensed?**
+
+Yes. They're available under the Apache 2.0 license.

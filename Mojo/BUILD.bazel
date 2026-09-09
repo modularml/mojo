@@ -1,0 +1,1636 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load(
+    "//bazel:api.bzl",
+    "copy_files",
+    "dialect_checksum",
+    "gentbl_cc_library",
+    "gentbl_mlir_dialect",
+    "gentbl_modular_passes",
+    "mlir_nanobind",
+    "modular_cc_library",
+    "modular_py_binary",
+    "modular_shared_library",
+    "pkg_files",
+    "td_library",
+)
+load(
+    "//bazel:config.bzl",
+    "ALLOW_UNUSED_TAG",
+    "ASYNCRT_PROFILING_LOCAL_DEFINES",
+    "CONFIG_SECTION_LOCAL_DEFINES",
+    "KERNEL_PROFILING_LOCAL_DEFINES",
+    "TOP_LEVEL_TAG",
+)
+
+# gazelle:default_visibility //Mojo:consumers
+
+package(default_visibility = ["//Mojo:consumers"])
+
+package_group(
+    name = "consumers",
+    packages = [
+        "//",  # root BUILD.bazel
+        "//GraphCompiler/...",
+        "//Kernels/...",
+        "//Mojo/...",
+        "//Mojo/docs/site/...",
+        "//bazel/...",
+        "//docs/...",
+        "//max/python/max/_core/internal/...",
+        "//max/tests/internal/API/c/...",  # Only when testing internally
+        "//oss/modular/bazel/...",
+        "//oss/modular/docs/...",
+        "//oss/modular/max/python/max/_core/internal/...",  # Only when testing internally
+        "//plugins/...",
+        "//utils/...",
+    ],
+)
+
+package_group(
+    name = "plugin_consumers",
+    # TODO: Narrow to the plugin repo once Bazel supports external repo
+    # refs in package_group.packages.
+    packages = ["public"],
+)
+
+pkg_files(
+    name = "docs",
+    srcs = [
+        ":CODialect.doc",
+        ":HLCFDialect.doc",
+        ":INTERPDialect.doc",
+        ":KGENDialect.doc",
+        ":KGENPassesIncGen.doc",
+        ":LITDialect.doc",
+        ":POPDialect.doc",
+    ],
+    prefix = "Mojo/docs/compiler",
+)
+
+td_library(
+    name = "CODialectTdFiles",
+    srcs = glob(["include/Mojo/CODialect/*.td"]),
+    includes = ["include"],
+    deps = [
+        ":KGENDialectTdFiles",
+        "//Support:MTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "CODialectIncGen",
+    dialect = "co",
+    td_file = "include/Mojo/CODialect/CO.td",
+    deps = [
+        ":CODialectTdFiles",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "CODialectBytecodeIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-bytecode",
+                "-bytecode-dialect=co",
+            ],
+            "include/Mojo/CODialect/CODialectBytecode.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/CODialect/CODialectBytecode.td",
+    deps = [
+        ":CODialectIncGen",
+        ":CODialectTdFiles",
+        ":KGENDialectIncGen",
+    ],
+)
+
+modular_cc_library(
+    name = "CODialect",
+    srcs = glob(["lib/CODialect/*.cpp"]),
+    hdrs = glob(["include/Mojo/CODialect/*.h"]),
+    deps = [
+        ":CODialectBytecodeIncGen",
+        ":CODialectIncGen",
+        ":KGENDialect",
+        ":TransformUtils",
+        "//Support:Base",
+        "//Support:Compiler",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+td_library(
+    name = "HLCFDialectTdFiles",
+    srcs = glob(["include/Mojo/HLCFDialect/*.td"]),
+    includes = ["include"],
+    deps = [
+        ":InterpreterTdFiles",
+        "//Support:MTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "HLCFDialectIncGen",
+    dialect = "hlcf",
+    td_file = "include/Mojo/HLCFDialect/HLCF.td",
+    deps = [
+        ":HLCFDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "HLCFAttrsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-attrdef-decls"],
+            "include/Mojo/HLCFDialect/HLCFAttrs.h.inc",
+        ),
+        (
+            ["-gen-attrdef-defs"],
+            "include/Mojo/HLCFDialect/HLCFAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/HLCFDialect/HLCFAttrs.td",
+    deps = [
+        ":HLCFDialectIncGen",
+        ":HLCFDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "HLCFEnumsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-enum-decls"],
+            "include/Mojo/HLCFDialect/HLCFEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "include/Mojo/HLCFDialect/HLCFEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/HLCFDialect/HLCFAttrs.td",
+    deps = [
+        ":HLCFDialectIncGen",
+        ":HLCFDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "HLCFInterfacesIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "include/Mojo/HLCFDialect/HLCFInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "include/Mojo/HLCFDialect/HLCFInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/HLCFDialect/HLCFInterfaces.td",
+    deps = [
+        ":HLCFDialectIncGen",
+        ":HLCFDialectTdFiles",
+    ],
+)
+
+td_library(
+    name = "KGENPassTdFile",
+    srcs = ["include/Mojo/KGENPasses.td"],
+    includes = ["include"],
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_modular_passes(
+    name = "KGENPassesIncGen",
+    td_file = "include/Mojo/KGENPasses.td",
+    deps = [
+        ":KGENPassTdFile",
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+td_library(
+    name = "KGENDialectTdFiles",
+    srcs = glob(["include/Mojo/KGENDialect/*.td"]),
+    includes = ["include"],
+    deps = [
+        ":HLCFDialectTdFiles",
+        ":InterpreterTdFiles",
+        "//Support:DebugInfoTdFiles",
+        "//Support:MTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:FunctionInterfacesTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+    ],
+)
+
+mlir_nanobind(
+    name = "KGENDialectNanobindInc",
+    srcs = glob(["include/Mojo/KGENDialect/*.td"]),
+    allowlist = "//max/python/max/_core/internal/modules/dialects:allowlist.txt",
+    output_dir = "include/Mojo/KGENDialect/Nanobind",
+    deps = [
+        ":KGENDialectTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "KGENDialectIncGen",
+    dialect = "kgen",
+    td_file = "include/Mojo/KGENDialect/KGEN.td",
+    deps = [
+        ":HLCFDialectTdFiles",
+        ":InterpreterTdFiles",
+        ":KGENDialectTdFiles",
+        ":KGENEnumsIncGen",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:FunctionInterfacesTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "KGENAttrInterfacesIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-attr-interface-decls"],
+            "include/Mojo/KGENDialect/KGENAttrInterfaces.h.inc",
+        ),
+        (
+            ["-gen-attr-interface-defs"],
+            "include/Mojo/KGENDialect/KGENAttrInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/KGENDialect/KGENAttrInterfaces.td",
+    deps = [
+        ":KGENDialectIncGen",
+        ":KGENDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "KGENAttrsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-attrdef-decls"],
+            "include/Mojo/KGENDialect/KGENAttrs.h.inc",
+        ),
+        (
+            ["-gen-attrdef-defs"],
+            "include/Mojo/KGENDialect/KGENAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/KGENDialect/KGENAttrs.td",
+    deps = [
+        ":KGENDialectIncGen",
+        ":KGENDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "KGENDialectBytecodeIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-bytecode",
+                "-bytecode-dialect=kgen",
+            ],
+            "include/Mojo/KGENDialect/KGENDialectBytecode.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/KGENDialect/KGENDialectBytecode.td",
+    deps = [
+        ":KGENDialectIncGen",
+        ":KGENDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "KGENEnumsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-enum-decls"],
+            "include/Mojo/KGENDialect/KGENEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "include/Mojo/KGENDialect/KGENEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/KGENDialect/KGENAttrs.td",
+    deps = [
+        ":KGENDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "KGENInterfacesIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "include/Mojo/KGENDialect/KGENInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "include/Mojo/KGENDialect/KGENInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/KGENDialect/KGENInterfaces.td",
+    deps = [
+        ":KGENDialectIncGen",
+        ":KGENDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "KGENTypeInterfacesIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-type-interface-decls"],
+            "include/Mojo/KGENDialect/KGENTypeInterfaces.h.inc",
+        ),
+        (
+            ["-gen-type-interface-defs"],
+            "include/Mojo/KGENDialect/KGENTypeInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/KGENDialect/KGENTypeInterfaces.td",
+    deps = [
+        ":KGENDialectIncGen",
+        ":KGENDialectTdFiles",
+    ],
+)
+
+td_library(
+    name = "InterpreterTdFiles",
+    srcs = glob(["include/Mojo/Interpreter/*.td"]),
+    includes = ["include"],
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "InterpreterDialectIncGen",
+    dialect = "interp",
+    td_file = "include/Mojo/Interpreter/Interpreter.td",
+    deps = [
+        ":InterpreterTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "InterpreterAttrsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-attrdef-decls"],
+            "include/Mojo/Interpreter/InterpreterAttrs.h.inc",
+        ),
+        (
+            ["-gen-attrdef-defs"],
+            "include/Mojo/Interpreter/InterpreterAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/Interpreter/InterpreterAttrs.td",
+    deps = [
+        ":InterpreterDialectIncGen",
+        ":InterpreterTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "InterpreterDialectBytecodeIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-bytecode",
+                "-bytecode-dialect=interp",
+            ],
+            "include/Mojo/Interpreter/InterpreterDialectBytecode.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/Interpreter/InterpreterDialectBytecode.td",
+    deps = [
+        ":InterpreterDialectIncGen",
+        ":InterpreterTdFiles",
+        "//Support:MTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "InterpreterOpInterfaceIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "include/Mojo/Interpreter/InterpreterOpInterface.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "include/Mojo/Interpreter/InterpreterOpInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/Interpreter/InterpreterInterfaceGen.td",
+    deps = [
+        ":InterpreterDialectIncGen",
+        ":InterpreterTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "MemoryableTypeInterfaceIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-type-interface-decls"],
+            "include/Mojo/Interpreter/MemoryableTypeInterface.h.inc",
+        ),
+        (
+            ["-gen-type-interface-defs"],
+            "include/Mojo/Interpreter/MemoryableTypeInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/Interpreter/InterpreterInterfaceGen.td",
+    deps = [
+        ":InterpreterDialectIncGen",
+        ":InterpreterTdFiles",
+    ],
+)
+
+modular_cc_library(
+    name = "Interpreter",
+    srcs = glob([
+        "lib/Interpreter/*.cpp",
+    ]),
+    hdrs = glob(["include/Mojo/Interpreter/*.h"]),
+    deps = [
+        ":InterpreterAttrsIncGen",
+        ":InterpreterDialectBytecodeIncGen",
+        ":InterpreterDialectIncGen",
+        ":InterpreterOpInterfaceIncGen",
+        ":MemoryableTypeInterfaceIncGen",
+        ":Support",
+        "//Support:ADT",
+        "//Support:Base",
+        "//Support:Compiler",
+        "//Support:MDialect",
+        "//Support:Threading",
+        "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_library(
+    name = "HLCFDialect",
+    srcs = glob(["lib/HLCFDialect/*.cpp"]),
+    hdrs = glob(["include/Mojo/HLCFDialect/*.h"]),
+    deps = [
+        ":HLCFAttrsIncGen",
+        ":HLCFDialectIncGen",
+        ":HLCFEnumsIncGen",
+        ":HLCFInterfacesIncGen",
+        ":Interpreter",
+        ":KGENDialect.headers",
+        "//Support:ADT",
+        "//Support:Base",
+        "//Support:Compiler",
+        "//Support:DebugInfoDialect",
+        "//Support:IPInt",
+        "//Support:IPRational",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:InferTypeOpInterface",
+    ],
+)
+
+modular_cc_library(
+    name = "HLCFDialectAnalysis",
+    srcs = glob(["lib/HLCFDialect/Analysis/*.cpp"]),
+    hdrs = glob([
+        "include/Mojo/HLCFDialect/Analysis/*.h",
+    ]),
+    deps = [
+        ":HLCFDialect",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+td_library(
+    name = "LITDialectTdFiles",
+    srcs = glob(["include/Mojo/LITDialect/*.td"]),
+    includes = ["include"],
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "LITDialectIncGen",
+    dialect = "lit",
+    td_file = "include/Mojo/LITDialect/LIT.td",
+    deps = [
+        ":HLCFDialectTdFiles",
+        ":InterpreterTdFiles",
+        ":KGENDialectTdFiles",
+        ":LITDialectTdFiles",
+        ":POPDialectTdFiles",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:FunctionInterfacesTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LITDialectBytecodeIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-bytecode",
+                "-bytecode-dialect=lit",
+            ],
+            "include/Mojo/LITDialect/LITDialectBytecode.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/LITDialect/LITDialectBytecode.td",
+    deps = [
+        ":LITDialectIncGen",
+        ":LITDialectTdFiles",
+        "//Support:MTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LITAttrsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-attrdef-decls",
+                "-attrdefs-dialect=lit",
+            ],
+            "include/Mojo/LITDialect/LITAttrs.h.inc",
+        ),
+        (
+            [
+                "-gen-attrdef-defs",
+                "-attrdefs-dialect=lit",
+            ],
+            "include/Mojo/LITDialect/LITAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/LITDialect/LITAttrs.td",
+    deps = [
+        ":KGENDialectTdFiles",
+        ":LITDialectIncGen",
+        ":LITDialectTdFiles",
+        "//Support:MTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LITEnumsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-enum-decls"],
+            "include/Mojo/LITDialect/LITEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "include/Mojo/LITDialect/LITEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/LITDialect/LITEnums.td",
+    deps = [
+        ":LITDialectIncGen",
+        ":LITDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "LITInterfacesIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "include/Mojo/LITDialect/LITInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "include/Mojo/LITDialect/LITInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/LITDialect/LITInterfaces.td",
+    deps = [
+        ":LITDialectIncGen",
+        ":LITDialectTdFiles",
+    ],
+)
+
+modular_cc_library(
+    name = "LITDialect",
+    srcs = glob(["lib/LITDialect/*.cpp"]),
+    hdrs = glob([
+        "include/Mojo/LITDialect/*.h",
+        "include/Mojo/LITDialect/*.def",
+    ]),
+    tags = ["no-clang-tidy-headers"],
+    deps = [
+        ":CODialect",
+        ":CODialectIncGen",
+        ":Interpreter",
+        ":KGENDialect",
+        ":LITAttrsIncGen",
+        ":LITDialectBytecodeIncGen",
+        ":LITDialectIncGen",
+        ":LITEnumsIncGen",
+        ":LITInterfacesIncGen",
+        ":POPDialect",
+        "//Support:Base",
+        "//Support:DebugInfoDialect",
+        "//Support:IPInt",
+        "//Support:IPRational",
+        "//Support:MDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+td_library(
+    name = "POPDialectTdFiles",
+    srcs = glob(["include/Mojo/POPDialect/*.td"]),
+    includes = ["include"],
+    deps = [
+        ":CODialectTdFiles",
+        ":InterpreterTdFiles",
+        ":KGENDialectTdFiles",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+    ],
+)
+
+gentbl_mlir_dialect(
+    name = "POPDialectIncGen",
+    dialect = "pop",
+    td_file = "include/Mojo/POPDialect/POP.td",
+    deps = [
+        ":InterpreterTdFiles",
+        ":POPDialectTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "POPAttrsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-attrdef-decls",
+                "-attrdefs-dialect=pop",
+            ],
+            "include/Mojo/POPDialect/POPAttrs.h.inc",
+        ),
+        (
+            [
+                "-gen-attrdef-defs",
+                "-attrdefs-dialect=pop",
+            ],
+            "include/Mojo/POPDialect/POPAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/POPDialect/POP.td",
+    deps = [
+        ":POPDialectIncGen",
+        ":POPDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "POPInterfacesIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "include/Mojo/POPDialect/POPInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "include/Mojo/POPDialect/POPInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/POPDialect/POPInterfaces.td",
+    deps = [
+        ":POPDialectIncGen",
+        ":POPDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "POPDialectBytecodeIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            [
+                "-gen-bytecode",
+                "-bytecode-dialect=pop",
+            ],
+            "include/Mojo/POPDialect/POPDialectBytecode.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/POPDialect/POPDialectBytecode.td",
+    deps = [
+        ":POPDialectIncGen",
+        ":POPDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "POPEnumsIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-enum-decls"],
+            "include/Mojo/POPDialect/POPEnums.h.inc",
+        ),
+        (
+            ["-gen-enum-defs"],
+            "include/Mojo/POPDialect/POPEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/POPDialect/POPEnums.td",
+    deps = [
+        ":POPDialectIncGen",
+        ":POPDialectTdFiles",
+    ],
+)
+
+modular_cc_library(
+    name = "POPDialect",
+    srcs = glob(["lib/POPDialect/*.cpp"]),
+    hdrs = glob(["include/Mojo/POPDialect/*.h"]),
+    deps = [
+        ":CODialect",
+        ":CODialectIncGen",
+        ":Interpreter",
+        ":KGENDialect",
+        ":MemoryableTypeInterfaceIncGen",
+        ":POPAttrsIncGen",
+        ":POPDialectBytecodeIncGen",
+        ":POPDialectIncGen",
+        ":POPEnumsIncGen",
+        ":POPInterfacesIncGen",
+        ":TargetTraits",
+        ":ToolCommon.headers",
+        "//Support:ADT",
+        "//Support:Base",
+        "//Support:Compiler",
+        "//Support:DebugInfoDialect",
+        "//Support:IPInt",
+        "//Support:IPRational",
+        "//Support:MDialect",
+        "//Support:Threading",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+modular_cc_library(
+    name = "KGENDialect.headers",
+    hdrs = glob(["include/Mojo/KGENDialect/*.h"]),
+    tags = ["no-clang-tidy-headers"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":KGENAttrInterfacesIncGen",
+        ":KGENAttrsIncGen",
+        ":KGENDialectIncGen",
+        ":KGENEnumsIncGen",
+        ":KGENInterfacesIncGen",
+        ":KGENTypeInterfacesIncGen",
+        ":ToolCommon.headers",
+    ],
+)
+
+modular_cc_library(
+    name = "KGENDialect",
+    srcs = glob(["lib/KGENDialect/*.cpp"]),
+    hdrs = glob(["include/Mojo/KGENDialect/*.h"]),
+    local_defines = ASYNCRT_PROFILING_LOCAL_DEFINES + KERNEL_PROFILING_LOCAL_DEFINES + selects.with_or({
+        ("//:modular_config_debug_modular", "//:modular_config_debug_everything"): ["BUILD_TYPE=debug"],
+        ("//:modular_config_default", "//:modular_config_dev", "//:modular_config_asan", "//:modular_config_tsan", "//:modular_config_ubsan"): ["BUILD_TYPE=relwithdebinfo"],
+        ("//:modular_config_ci_build", "//:modular_config_release", "//:modular_config_production"): ["BUILD_TYPE=release"],
+    }),
+    deps = [
+        ":HLCFDialect",
+        ":Interpreter",
+        ":KGENAttrInterfacesIncGen",
+        ":KGENAttrsIncGen",
+        ":KGENDialectBytecodeIncGen",
+        ":KGENDialectIncGen",
+        ":KGENEnumsIncGen",
+        ":KGENInterfacesIncGen",
+        ":KGENTypeInterfacesIncGen",
+        ":Support",
+        "//AsyncRT:CompilerSupport",
+        "//Support:ADT",
+        "//Support:DebugInfoDialect",
+        "//Support:IPInt",
+        "//Support:MDialect",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:Transforms",
+    ],
+)
+
+modular_cc_library(
+    name = "ToolCommon.headers",
+    hdrs = glob(["include/Mojo/ToolCommon/*.h"]),
+    defines = ["MLRT_ACCELERATOR_SUPPORT=1"],
+    internal_deps = select({
+        # Under --config=hal-device-context we don't link the full DeviceContext,
+        # but we need CompilationDevice and the HAL-only CompilerDeviceArch.
+        "//:hal_device_context_enabled": ["//MLRT:Driver/DeviceContextAPI"],
+        "//conditions:default": ["//MLRT:Driver/DeviceContextImplCpp"],
+    }),
+    tags = ["no-clang-tidy-headers"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":KGENPassesIncGen",
+        "//AsyncRT:Runtime",
+        "//Support:CommonCLOptions",
+    ],
+)
+
+modular_cc_library(
+    name = "Compiler.headers",
+    hdrs = glob(["include/Mojo/Compiler/*.h"]),
+    tags = ["no-clang-tidy-headers"],
+    deps = [
+        ":ExecutionEngine.headers",
+    ],
+)
+
+modular_cc_library(
+    name = "Compiler",
+    srcs = glob(["lib/Compiler/*.cpp"]),
+    hdrs = glob(["include/Mojo/Compiler/*.h"]),
+    deps = [
+        ":ExecutionEngine.headers",
+        ":JIT",
+        ":KGENDialect",
+        ":KGENDialectIncGen",
+        ":KGENInterfacesIncGen",
+        ":ObjectCompiler.headers",
+        ":Pipeline",
+        ":TargetBackend.headers",
+        ":TargetTraits",
+        ":ToolCommon.headers",
+        ":TransformUtils",
+        "//AsyncRT:CompilerSupport",
+        "//Support:Context",
+        "//Support:DebugInfoTransforms",
+        "@llvm-project//llvm:OrcJIT",
+    ],
+)
+
+modular_shared_library(
+    name = "CompilerRT",
+    srcs = glob([
+        "lib/CompilerRT/*.cpp",
+        "lib/CompilerRT/*.h",
+    ]),
+    hdrs = glob([
+        "include/Mojo/CompilerRT/*.h",
+    ]),
+    internal_deps = [
+        "//MLRT:Core",
+        # The profiler host glue attaches the dlopen loader for
+        # libMAXProfilerPlugin.so to this DSO's //Support:ProfilingRanges copy, so the
+        # mo.profile bridge and Dynolog daemon registration work in mojo
+        # processes too. internal_deps: the OSS build drops it, so OSS mojo
+        # keeps the inert weak default and never compiles the loader.
+        "//Support:ProfilerHostGlue",
+        # Same wiring for the external profiler annotation sink: attaches the
+        # dlopen loader for libmax_profiler_shim.so so the
+        # ExternalProfilerAnnotationBridge entry points annotate external
+        # profiler traces (NVTX/roctx). OSS builds drop it and keep the inert
+        # weak default.
+        "//Support:ExternalProfilerAnnotationHostGlue",
+    ] + select({
+        # Under --config=hal-device-context we don't link the full DeviceContext,
+        # but we need CompilationDevice and the HAL-only CompilerDeviceArch.
+        "//:hal_device_context_enabled": [],
+        "//conditions:default": ["//MLRT:Driver/DeviceContextImplCpp"],
+    }) + select({
+        "//:tracy_enabled": ["@tracy//:Tracy"],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "MODULAR_BUILDING_COMPILERRT",
+        "MODULAR_KGEN_PROFILING_ENABLED=1",
+    ] + CONFIG_SECTION_LOCAL_DEFINES + select({
+        "//AsyncRT:alloc_logging_setting": ["MODULAR_ALLOC_LOGGING=1"],
+        "//conditions:default": ["MODULAR_ALLOC_LOGGING=0"],
+    }),
+    output_name = "KGENCompilerRTShared",
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo/stdlib/std:__pkg__",
+        "//Mojo/test/internal/profiling:__pkg__",
+        "//Mojo/test/tracy:__pkg__",
+        "//mojo/stdlib/std:__pkg__",
+    ],
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//AsyncRT:Support",
+        "//Support:Base",
+        "//Support:BinaryID",
+        "//Support:Configuration",
+        "//Support:Filesystem",
+        "//Support:Globals",
+        "//Support:Log",
+        "//Support:ML",
+        "//Support:Profiling",
+        "//Support:ProfilingRanges",
+        "//Support:Threading",
+        "//Support:TimeProfiler",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "Support",
+    srcs = glob(
+        ["lib/Support/**/*.cpp"],
+        exclude = ["lib/Support/ForceLinkMLIRC/**"],
+    ),
+    hdrs = glob(
+        ["include/Mojo/Support/**/*.h"],
+        exclude = ["include/Mojo/Support/ForceLinkMLIRC.h"],
+    ),
+    local_defines = CONFIG_SECTION_LOCAL_DEFINES + [
+        "MODULAR_KGEN_PROFILING_ENABLED=1",
+    ],
+    tags = ["no-clang-tidy-headers"],
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo:plugin_consumers",
+    ],
+    deps = [
+        ":DialectChecksum",
+        "//AsyncRT:Support",
+        "//Support:Base",
+        "//Support:BinaryID",
+        "//Support:Configuration",
+        "//Support:Context",
+        "//Support:ML",
+        "//Support:Profiling",
+        "//Support:ProfilingRanges",
+        "//Support:TimeProfiler",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ConversionPasses",
+        "@llvm-project//mlir:IR",
+        "@xxhash",
+    ],
+)
+
+modular_cc_library(
+    name = "SupportForceLinkMLIRC",
+    srcs = glob([
+        "lib/Support/ForceLinkMLIRC/*.cpp",
+        "lib/Support/ForceLinkMLIRC/*.cpp.inc",
+    ]),
+    hdrs = [
+        "include/Mojo/Support/ForceLinkMLIRC.h",
+    ],
+    tags = ["no-clang-tidy-headers"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:CAPIIR",
+        "@llvm-project//mlir:CAPITransforms",
+    ],
+)
+
+modular_cc_library(
+    name = "LowerLIT",
+    srcs = glob([
+        "lib/LowerLIT/*.cpp",
+        "lib/LowerLIT/*.h",
+    ]),
+    deps = [
+        ":KGENDialect",
+        ":LITDialect",
+        ":ToolCommon.headers",
+        "//Support:DebugInfoTransforms",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+# Per-target lowering interface and registry. Shared by KGENToLLVM, which
+# registers the target lowerings, and Transforms, which queries them.
+modular_cc_library(
+    name = "TargetLowering",
+    srcs = ["lib/Target/TargetLowering.cpp"],
+    hdrs = ["lib/Target/TargetLowering.h"],
+    strip_include_prefix = "lib",
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo:plugin_consumers",
+    ],
+    deps = [
+        ":KGENDialect",
+        ":TargetTraits",
+        "//Support:DebugInfoDialect",
+        "//Support:MDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+# Dependency-light per-target metadata (`TargetTraits`), dispatched by triple.
+# Lives below the codegen layer so any KGEN component can query a target's
+# metadata without linking `TargetBackend`. Each target self-registers from its
+# own source file; dropping a target's file drops it from the build.
+modular_cc_library(
+    name = "TargetTraits",
+    # TargetLowering.{cpp,h} live in this same directory but belong to the
+    # separate :TargetLowering target, so exclude them from this recursive glob.
+    srcs = glob(
+        ["lib/Target/**/*.cpp"],
+        exclude = ["lib/Target/TargetLowering.cpp"],
+    ),
+    hdrs = glob(
+        ["lib/Target/**/*.h"],
+        exclude = ["lib/Target/TargetLowering.h"],
+    ),
+    strip_include_prefix = "lib",
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo:plugin_consumers",
+    ],
+    deps = [
+        ":Support",
+        "//Support:Configuration",
+        "@llvm-project//llvm:Support",
+    ],
+    # TargetTraits implementations self-register via a static initializer and
+    # aren't referenced directly, so the linker would drop them. Force them to
+    # be linked.
+    alwayslink = True,
+)
+
+modular_cc_library(
+    name = "KGENToLLVM",
+    srcs = glob(
+        [
+            "lib/KGENToLLVM/*.cpp",
+            "lib/KGENToLLVM/Target/**/*.cpp",
+        ],
+        # For OSS
+        allow_empty = True,
+    ),
+    hdrs = glob(
+        [
+            "lib/KGENToLLVM/*.h",
+            "lib/KGENToLLVM/Target/**/*.h",
+        ],
+        # For OSS
+        allow_empty = True,
+    ),
+    strip_include_prefix = "lib",
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo:plugin_consumers",
+    ],
+    deps = [
+        ":HLCFDialectAnalysis",
+        ":KGENDialect",
+        ":ObjectCompiler.headers",  # For MetalAddressSpace.h
+        ":TargetLowering",
+        ":ToolCommon",
+        "//Support:DebugInfoTransforms",
+        "@llvm-project//llvm:Support",  # For llvm/ADT/Triple.h
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:IndexDialect",
+    ],
+    # TargetLowering implementations self-register via a static initializer and
+    # aren't referenced directly, so the linker would drop them. Force them to
+    # be linked.
+    alwayslink = True,
+)
+
+modular_cc_library(
+    name = "Transforms",
+    srcs = glob(["lib/Transforms/*.cpp"]),
+    deps = [
+        ":CODialect",
+        ":HLCFDialect",
+        ":HLCFDialectAnalysis",
+        ":KGENDialect",
+        ":LITDialect",
+        ":POPDialect",
+        ":TargetLowering",
+        ":ToolCommon.headers",
+        ":TransformUtils",
+        "//AsyncRT:CompilerSupport",
+        "//AsyncRT:Runtime",
+        "//Support:Context",
+        "//Support:DebugInfoDialect",
+        "//Support:DebugInfoTransforms",
+        "@llvm-project//mlir:CAPIIRHeaders",
+        "@llvm-project//mlir:CAPITransformsHeaders",
+        "@llvm-project//mlir:IndexDialect",
+        "@llvm-project//mlir:NVVMDialect",
+        "@llvm-project//mlir:ROCDLDialect",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
+modular_cc_library(
+    name = "Elaborator",
+    srcs = glob([
+        "lib/Elaborator/*.cpp",
+        "lib/Elaborator/*.h",
+    ]),
+    deps = [
+        ":KGENDialect",
+        ":LITDialect",
+        ":ToolCommon.headers",
+        "//AsyncRT:CompilerSupport",
+        "//Cache",
+        "@llvm-project//mlir:IndexDialect",
+        "@llvm-project//mlir:NVVMDialect",
+        "@llvm-project//mlir:ROCDLDialect",
+    ],
+)
+
+modular_cc_library(
+    name = "Pipeline",
+    srcs = glob(["lib/Compiler/Pipeline/*.cpp"]),
+    hdrs = glob(["lib/Compiler/Pipeline/*.h"]),
+    deps = [
+        ":Compiler.headers",
+        ":Elaborator",
+        ":KGENPassesIncGen",
+        ":LowerLIT",
+        ":Transforms",
+        "//Support:DebugInfoToLLVM",
+        "//Support:DebugInfoTransforms",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
+modular_cc_library(
+    name = "TransformUtils",
+    srcs = glob(["lib/TransformUtils/*.cpp"]),
+    hdrs = glob(["include/Mojo/TransformUtils/*.h"]),
+    tags = ["no-clang-tidy-headers"],
+    deps = [
+        ":HLCFDialect",
+        ":Support",
+        "//AsyncRT:Runtime",
+        "@llvm-project//llvm:OrcJIT",
+        "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
+    ],
+)
+
+modular_cc_library(
+    name = "ObjectCompiler.BitcodeWriter",
+    srcs = glob([
+        "lib/Compiler/ObjectCompiler/LLVM/Bitcode/**/*.cpp",
+        "lib/Compiler/ObjectCompiler/LLVM/Bitcode/**/*.h",
+    ]),
+    tags = ["no-clang-tidy"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":Compiler",
+        ":KGENToLLVM",
+        "//Support:Context",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_cc_library(
+    name = "ObjectCompiler.headers",
+    hdrs = glob(
+        [
+            "lib/Compiler/ObjectCompiler/*.h",
+            "lib/Compiler/ObjectCompiler/LLVM/Transforms/*.h",
+            "lib/Compiler/ObjectCompiler/Target/**/*.h",
+        ],
+        # Owned by :HostBackend.
+        exclude = ["lib/Compiler/ObjectCompiler/Target/Host/HostBackend.h"],
+    ),
+    strip_include_prefix = "lib/Compiler/ObjectCompiler",
+    tags = ["no-clang-tidy-headers"],
+    visibility = ["//visibility:private"],
+)
+
+# The `TargetBackend` base interface, separate from `:ObjectCompiler` so a
+# target implementing the interface need not depend on the full codegen stack.
+modular_cc_library(
+    name = "TargetBackend.headers",
+    hdrs = ["include/Mojo/Compiler/Target/TargetBackend.h"],
+    includes = ["include"],
+    tags = ["no-clang-tidy-headers"],
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo:plugin_consumers",
+    ],
+    deps = [
+        ":KGENDialect",
+        ":TargetTraits",
+        ":ToolCommon.headers",
+        "//Support:Buffer",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+# Base and host `TargetBackend` implementation. Host object emission goes
+# through `EmitContext` callbacks rather than the codegen stack, keeping this a
+# light dependency separate from `:ObjectCompiler`.
+modular_cc_library(
+    name = "HostBackend",
+    srcs = [
+        "lib/Compiler/ObjectCompiler/Target/Host/HostBackend.cpp",
+        "lib/Compiler/ObjectCompiler/Target/TargetBackend.cpp",
+    ],
+    hdrs = ["lib/Compiler/ObjectCompiler/Target/Host/HostBackend.h"],
+    strip_include_prefix = "lib/Compiler/ObjectCompiler",
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo:plugin_consumers",
+    ],
+    deps = [
+        ":Compiler.headers",
+        ":KGENDialect",
+        ":TargetBackend.headers",
+        ":TargetTraits",
+        ":ToolCommon.headers",
+        "//Support:Buffer",
+        "//Support:Configuration",
+        "@llvm-project//llvm:BitWriter",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Instrumentation",
+        "@llvm-project//llvm:MC",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
+        "@llvm-project//llvm:TargetParser",
+        "@llvm-project//mlir:IR",
+    ],
+    # Self-registered via static initializer, never referenced directly.
+    alwayslink = True,
+)
+
+modular_cc_library(
+    name = "ObjectCompiler",
+    srcs = glob(
+        [
+            "lib/Compiler/ObjectCompiler/LLVM/Transforms/*.cpp",
+            "lib/Compiler/ObjectCompiler/*.cpp",
+            "lib/Compiler/ObjectCompiler/*.h",
+            "lib/Compiler/ObjectCompiler/Target/**/*.cpp",
+            "lib/Compiler/ObjectCompiler/Target/**/*.h",
+        ],
+        # Owned by :HostBackend.
+        exclude = [
+            "lib/Compiler/ObjectCompiler/Target/TargetBackend.cpp",
+            "lib/Compiler/ObjectCompiler/Target/Host/HostBackend.cpp",
+            "lib/Compiler/ObjectCompiler/Target/Host/HostBackend.h",
+        ],
+    ),
+    data = [
+        "@llvm-project//lld:lld",
+    ],
+    deps = [
+        ":Compiler",
+        ":HostBackend",
+        ":KGENToLLVM",
+        ":ObjectCompiler.BitcodeWriter",
+        ":Pipeline",
+        ":TargetBackend.headers",
+        ":TargetTraits",
+        "//AsyncRT:CompilerSupport",
+        "//Support:CacheLog",
+        "//Support:Context",
+        "@llvm-project//mlir:BytecodeWriter",
+    ],
+    # TargetBackend implementations self-register via a
+    # static initializer and aren't referenced directly, so the linker would
+    # drop them. Force them to be linked.
+    alwayslink = True,
+)
+
+modular_cc_library(
+    name = "MojoParser",
+    srcs = glob([
+        "lib/MojoParser/*.cpp",
+        "lib/MojoParser/*.h",
+    ]),
+    hdrs = glob([
+        "include/Mojo/MojoParser/*.h",
+        "include/Mojo/MojoParser/*.def",
+    ]),
+    tags = ["no-clang-tidy-headers"],
+    deps = [
+        ":Compiler",
+        ":DialectChecksum",
+        ":ToolCommon",
+    ],
+)
+
+modular_cc_library(
+    name = "MojoTooling",
+    srcs = glob([
+        "lib/MojoTooling/*.cpp",
+        "lib/MojoTooling/*.h",
+    ]),
+    hdrs = glob(["include/Mojo/MojoTooling/*.h"]),
+    deps = [
+        ":MojoParser",
+        # DocGen.cpp uses getMojoVersionString() for the JSON version wrapper.
+        "//Config",
+        # DocGen.h exposes DiagnosticFormat in the DocGenConfig struct.
+        "//Support:Driver",
+    ],
+)
+
+modular_cc_library(
+    name = "ExecutionEngine.headers",
+    hdrs = glob(["include/Mojo/ExecutionEngine/*.h"]),
+    tags = ["no-clang-tidy-headers"],
+)
+
+modular_cc_library(
+    name = "ExecutionEngine",
+    srcs = glob(["lib/ExecutionEngine/*.cpp"]),
+    hdrs = glob(["include/Mojo/ExecutionEngine/*.h"]),
+    deps = [
+        ":JIT",
+        "//Cache",
+        "//Support:Buffer",
+        "//Support:Compiler",
+        "@llvm-project//llvm:OrcDebugging",
+        "@llvm-project//mlir:MlirLspServerSupportLib",
+    ],
+)
+
+modular_cc_library(
+    name = "JIT",
+    srcs = glob([
+        "lib/ExecutionEngine/JIT/*.cpp",
+    ]),
+    hdrs = glob(["include/Mojo/ExecutionEngine/JIT/*.h"]),
+    deps = [
+        ":Compiler.headers",
+        ":ExecutionEngine.headers",
+        ":KGENDialect",
+        ":ToolCommon.headers",
+        "//Cache",
+        "//Support:Buffer",
+        "@llvm-project//llvm:OrcDebugging",
+        "@llvm-project//llvm:OrcJIT",
+    ],
+)
+
+modular_cc_library(
+    name = "ToolCommon",
+    srcs = glob(["lib/ToolCommon/**/*.cpp"]),
+    hdrs = glob(["include/Mojo/ToolCommon/**/*.h"]),
+    visibility = [
+        "//Mojo:consumers",
+        "//Mojo:plugin_consumers",
+    ],
+    deps = [
+        ":CODialect",
+        ":ExecutionEngine",
+        ":HLCFDialect",
+        ":Interpreter",
+        ":KGENPassesIncGen",
+        ":LITDialect",
+        ":POPDialect",
+        ":TargetTraits",
+        ":ToolCommon.headers",
+        "//Cache",
+        "//Support:CommonCLOptions",
+        "//Support:DebugInfoDialect",
+        "//Support:DebugInfoToLLVM",
+        "@llvm-project//llvm:OrcJIT",
+        "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
+        "@llvm-project//mlir:BytecodeWriter",
+        "@llvm-project//mlir:ConversionPasses",
+        "@llvm-project//mlir:IndexDialect",
+        "@llvm-project//mlir:LLVMIRTransforms",
+        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
+        "@llvm-project//mlir:NVVMToLLVMIRTranslation",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:ROCDLToLLVMIRTranslation",
+    ],
+)
+
+copy_files(
+    name = "copy-lldb-visualizers",
+    srcs = [
+        "@llvm-project//llvm:utils/lldbDataFormatters.py",
+        "@llvm-project//mlir:utils/lldb-scripts/mlirDataFormatters.py",
+    ],
+    outs = [
+        "lldbDataFormatters.py",
+        "mlirDataFormatters.py",
+    ],
+    tags = [ALLOW_UNUSED_TAG],
+)
+
+# NOTE: These binaries must live beside the lldb binary to be discovered at runtime without an env var
+alias(
+    name = "gdb-server",
+    actual = "@llvm-project//lldb:gdb-server",
+)
+
+alias(
+    name = "mojo-lldb",
+    actual = "@llvm-project//lldb",
+)
+
+modular_cc_library(
+    name = "MojoLLDBPublicHeaders",
+    hdrs = glob(["include/Mojo/MojoLLDB/*.h"]),
+    tags = ["no-clang-tidy-headers"],
+)
+
+# Pure-C++ parser for the mangled Variant storage type-name, split out from
+# `MojoLLDB` so it can be unit-tested without pulling in LLDB.
+modular_cc_library(
+    name = "MojoVariantTypeNameParser",
+    srcs = ["lib/MojoLLDB/Language/Formatters/MojoVariantTypeNameParser.cpp"],
+    hdrs = ["lib/MojoLLDB/Language/Formatters/MojoVariantTypeNameParser.h"],
+    deps = [
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+modular_shared_library(
+    name = "MojoLLDB",
+    srcs = glob(
+        ["lib/MojoLLDB/**/*.cpp"],
+        exclude = ["lib/MojoLLDB/Language/Formatters/MojoVariantTypeNameParser.cpp"],
+    ),
+    hdrs = glob(["lib/MojoLLDB/**/*.h"]),
+    includes = [],
+    internal_deps = select({
+        # Under --config=hal-device-context we don't link the full DeviceContext,
+        # but we need CompilationDevice and the HAL-only CompilerDeviceArch.
+        "//:hal_device_context_enabled": [
+            "//MLRT:Driver/CompilationDeviceImpl",
+            "//MLRT:Driver/CompilerDeviceArch",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":ExecutionEngine",
+        ":KGENDialect",
+        ":MojoLLDBPublicHeaders",
+        ":MojoTooling",
+        ":MojoVariantTypeNameParser",
+        ":ObjectCompiler",
+        ":TransformUtils",
+        "//AsyncRT:RuntimeGlobals",
+        "//Init",
+        "//Support:Base",
+        "//Support:Context",
+        "//Support:CrashReporting",
+        "//Support:Globals",
+        "@llvm-project//lldb:liblldb.wrapper",
+        "@llvm-project//lldb:lldb24.0.0git",
+        "@llvm-project//llvm:ExecutionEngine",
+        "@llvm-project//llvm:MCJIT",
+    ],
+)
+
+genrule(
+    name = "gen_matplotlib_initialization_script",
+    outs = ["gen_matplotlib_initialization_tool.py"],
+    cmd = """
+cat > $(OUTS) <<EOF
+import sys
+
+print(
+    open(sys.argv[1]).read()
+    .replace("@ENABLE_MATPLOTLIB_STR@", open(sys.argv[2]).read())
+    .replace("@MATPLOTLIB_BACKEND_STR@", open(sys.argv[3]).read())
+)
+EOF
+""",
+)
+
+modular_py_binary(
+    name = "gen_matplotlib_initialization_tool",
+    srcs = [":gen_matplotlib_initialization_script"],
+)
+
+genrule(
+    name = "gen_matplotlib_initialization",
+    srcs = [
+        "lib/MojoJupyter/MatplotlibInitialization.h.in",
+        "lib/MojoJupyter/matplotlib_backend.py",
+        "lib/MojoJupyter/enable_matplotlib.py",
+    ],
+    outs = ["MojoJupyter/MatplotlibInitialization.h"],
+    cmd = """
+$(location :gen_matplotlib_initialization_tool) \
+    $(location :lib/MojoJupyter/MatplotlibInitialization.h.in) \
+    $(location :lib/MojoJupyter/enable_matplotlib.py) \
+    $(location :lib/MojoJupyter/matplotlib_backend.py) > $(OUTS)
+""",
+    tools = [":gen_matplotlib_initialization_tool"],
+)
+
+modular_shared_library(
+    name = "MojoJupyter",
+    srcs = glob(["lib/MojoJupyter/*.cpp"]) + [":gen_matplotlib_initialization"],
+    hdrs = glob(["include/Mojo/MojoJupyter/*.h"]),
+    deps = [
+        ":KGENDialect",
+        ":MojoLLDB",
+        ":MojoLLDBPublicHeaders",
+        ":MojoTooling",
+        "//Support:Context",
+        "@llvm-project//lldb:liblldb.wrapper",
+        "@llvm-project//lldb:lldb24.0.0git",
+    ],
+)
+
+dialect_checksum(
+    name = "gen_dialect_checksum",
+    srcs = [
+        ":CODialectTdFiles",
+        ":HLCFDialectTdFiles",
+        ":InterpreterTdFiles",
+        ":KGENDialectTdFiles",
+        ":LITDialectTdFiles",
+        ":POPDialectTdFiles",
+    ],
+)
+
+modular_cc_library(
+    name = "DialectChecksum",
+    srcs = [
+        "lib/DialectChecksum/DialectChecksum.cpp",
+        ":gen_dialect_checksum",
+    ],
+    hdrs = ["include/Mojo/DialectChecksum/DialectChecksum.h"],
+    copts = ["-I$(GENDIR)/Mojo"],
+)
+
+alias(
+    name = "mojo",
+    actual = "//Mojo/tools/mojo:mojo-full",
+    # Used as a run target
+    tags = [TOP_LEVEL_TAG],
+)

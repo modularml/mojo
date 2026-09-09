@@ -1,0 +1,9 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: not %repl -S missing-file <%s 2>&1 | FileCheck %s
+# CHECK: error: file specified in --source (-s) option doesn't exist: 'missing-file'
+

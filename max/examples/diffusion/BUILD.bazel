@@ -20,7 +20,7 @@ modular_py_binary(
     deps = [
         "//max/python/max/driver",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/diffusion",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
@@ -42,7 +42,7 @@ modular_py_binary(
     deps = [
         "//max/python/max/driver",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/wan",
         "//max/python/max/pipelines/diffusion",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
@@ -63,7 +63,7 @@ modular_py_binary(
     deps = [
         "//max/python/max/driver",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/wan",
         "//max/python/max/pipelines/diffusion",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
@@ -75,13 +75,12 @@ modular_py_binary(
 modular_py_binary(
     name = "vae_decode_timing",
     srcs = ["vae_decode_timing.py"],
-    tags = ["no-pydeps"],
     deps = [
         "//max/python/max/driver",
-        "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/autoencoders",
+        "//max/python/max/pipelines/lib",
         requirement("huggingface-hub"),
         requirement("numpy"),
     ],
@@ -94,7 +93,9 @@ modular_py_binary(
     deps = [
         ":profiler",
         "//max/python/max/pipelines",
-        "//max/python/max/pipelines/core",
+        "//max/python/max/pipelines/architectures/flux2",
+        "//max/python/max/pipelines/architectures/ideogram4",
+        "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         requirement("numpy"),

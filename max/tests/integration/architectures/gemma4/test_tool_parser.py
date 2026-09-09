@@ -12,17 +12,15 @@
 # ===----------------------------------------------------------------------=== #
 
 import json
-from typing import Any, cast
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
-from llguidance import LLMatcher, LLTokenizer
-from llguidance._tokenizer import TokenizerWrapper
+from max import _xgrammar as xgr
 from max.pipelines.architectures.gemma4.tool_parser import Gemma4ToolParser
+from max.pipelines.context.exceptions import InputError
 from max.pipelines.modeling.types import (
     ParsedToolCall,
     ParsedToolResponse,
-    PipelineTokenizer,
 )
 
 
@@ -200,6 +198,66 @@ def test_special_characters_in_arguments() -> None:
     }
 
 
+def test_json_escaped_tab_in_delimited_string() -> None:
+    """A grammar-escaped backslash-t in a delimited value decodes to a tab."""
+    parser = Gemma4ToolParser()
+
+    response = '<|tool_call>call:f{val:<|"|>' + "\\t" + '<|"|>}<tool_call|>'
+
+    result = parser.parse_complete(response)
+
+    assert len(result.tool_calls) == 1
+    assert json.loads(result.tool_calls[0].arguments)["val"] == "\t"
+
+
+def test_json_escaped_newline_in_delimited_string() -> None:
+    """A grammar-escaped backslash-n in a delimited value decodes to a newline."""
+    parser = Gemma4ToolParser()
+
+    response = '<|tool_call>call:f{val:<|"|>' + "\\n" + '<|"|>}<tool_call|>'
+
+    result = parser.parse_complete(response)
+
+    assert len(result.tool_calls) == 1
+    assert json.loads(result.tool_calls[0].arguments)["val"] == "\n"
+
+
+def test_json_escaped_backslash_in_delimited_string() -> None:
+    """A grammar-escaped double-backslash decodes to one backslash."""
+    parser = Gemma4ToolParser()
+
+    response = '<|tool_call>call:f{val:<|"|>' + "\\\\" + '<|"|>}<tool_call|>'
+
+    result = parser.parse_complete(response)
+
+    assert len(result.tool_calls) == 1
+    assert json.loads(result.tool_calls[0].arguments)["val"] == "\\"
+
+
+def test_json_escaped_unicode_in_delimited_string() -> None:
+    """A grammar-escaped backslash-u escape decodes to the char."""
+    parser = Gemma4ToolParser()
+
+    response = '<|tool_call>call:f{val:<|"|>' + "\\u00e9" + '<|"|>}<tool_call|>'
+
+    result = parser.parse_complete(response)
+
+    assert len(result.tool_calls) == 1
+    assert json.loads(result.tool_calls[0].arguments)["val"] == "\u00e9"
+
+
+def test_plain_char_in_delimited_string() -> None:
+    """A plain char in a delimited value stays unchanged."""
+    parser = Gemma4ToolParser()
+
+    response = '<|tool_call>call:f{val:<|"|>A<|"|>}<tool_call|>'
+
+    result = parser.parse_complete(response)
+
+    assert len(result.tool_calls) == 1
+    assert json.loads(result.tool_calls[0].arguments)["val"] == "A"
+
+
 def test_array_parameters() -> None:
     """Test parsing tool call with array parameters."""
     parser = Gemma4ToolParser()
@@ -310,23 +368,33 @@ def test_reset_clears_buffer() -> None:
 
 
 def test_parse_delta_accumulates() -> None:
-    """Test that parse_delta suppresses partial tool-call content."""
+    """Test that streamed deltas accumulate into the right id/name/arguments."""
     parser = Gemma4ToolParser()
 
     # First chunk opens the tool call — no name yet, so suppression only.
     result1 = parser.parse_delta("<|tool_call>")
     assert result1 == []
 
-    # Second chunk delivers the header (call:test{). The base class emits
-    # the name as soon as the header is parseable.
+    # Second chunk delivers the header (call:test{). Under the deferred-opener
+    # contract the opener (id + name) is withheld until the first non-empty
+    # args delta, so a header-only chunk (no args yet) yields no opener.
     result2 = parser.parse_delta("call:test{")
-    assert result2 is not None
-    assert len(result2) == 1
-    assert result2[0].name == "test"
-    assert result2[0].id is not None
-    assert result2[0].arguments is None
+    assert result2 == []
 
     assert parser._buffer == "<|tool_call>call:test{"
+
+    # Feeding enough to complete the call surfaces the opener (id + name)
+    # together with the arguments in the same flush.
+    result3 = parser.parse_delta('key:<|"|>value<|"|>}<tool_call|>')
+    assert result3 is not None
+
+    id_name_deltas = [d for d in result3 if d.name is not None]
+    assert len(id_name_deltas) == 1
+    assert id_name_deltas[0].name == "test"
+    assert id_name_deltas[0].id is not None
+
+    args = "".join(d.arguments for d in result3 if d.arguments is not None)
+    assert json.loads(args) == {"key": "value"}
 
 
 def test_parse_delta_returns_none_outside_tool_section() -> None:
@@ -346,32 +414,40 @@ def test_parse_delta_returns_none_outside_tool_section() -> None:
 
 
 def test_parse_delta_emits_complete_tool_call() -> None:
-    """parse_delta emits name early, then arguments on close marker."""
+    """parse_delta surfaces the opener (id + name) and arguments for a
+    complete call. Under the deferred-opener contract the opener rides with
+    the first non-empty args delta, so we assemble the deltas rather than
+    asserting name arrives strictly before any arguments."""
     parser = Gemma4ToolParser()
 
     assert parser.parse_delta("<|tool_call>") == []
 
-    # Name is emitted as soon as the header (call:NAME{) is parseable.
-    name_result = parser.parse_delta('call:get_weather{location:<|"|>Paris')
-    assert name_result is not None
-    assert len(name_result) == 1
-    assert name_result[0].name == "get_weather"
-    assert name_result[0].id is not None
+    # Header parses (name known) but arguments stay withheld until the close
+    # marker, so no opener is surfaced yet.
+    assert parser.parse_delta('call:get_weather{location:<|"|>Paris') == []
 
-    # Arguments are emitted atomically when the close marker arrives.
-    args_result = parser.parse_delta('<|"|>}<tool_call|>')
-    assert args_result is not None
-    assert len(args_result) == 1
-    assert args_result[0].index == 0
-    assert args_result[0].arguments is not None
-    assert json.loads(args_result[0].arguments) == {"location": "Paris"}
-    # Name/id not re-emitted on the args delta.
-    assert args_result[0].name is None
-    assert args_result[0].id is None
+    # The close marker completes the call: opener (id + name) and arguments
+    # surface together.
+    result = parser.parse_delta('<|"|>}<tool_call|>')
+    assert result is not None
+    assert all(d.index == 0 for d in result)
+
+    id_name_deltas = [d for d in result if d.name is not None]
+    assert len(id_name_deltas) == 1
+    assert id_name_deltas[0].name == "get_weather"
+    assert id_name_deltas[0].id is not None
+
+    args = "".join(d.arguments for d in result if d.arguments is not None)
+    assert json.loads(args) == {"location": "Paris"}
 
 
 def test_parse_delta_emits_content_before_tool_call() -> None:
-    """parse_delta emits leading plain content then enters tool mode."""
+    """parse_delta emits leading plain content, then surfaces a complete call.
+
+    Gemma-4 treats a call as complete only at the ``<tool_call|>`` close
+    marker, so the call body must include it for the opener + arguments to
+    surface.
+    """
     parser = Gemma4ToolParser()
 
     result = parser.parse_delta("preamble<|tool_call>")
@@ -379,11 +455,150 @@ def test_parse_delta_emits_content_before_tool_call() -> None:
     assert result is not None
     assert len(result) == 1
     assert result[0].content == "preamble"
-    # Next chunk delivers the header — name is emitted early.
-    name_result = parser.parse_delta("call:f{}")
-    assert name_result is not None
-    assert len(name_result) == 1
-    assert name_result[0].name == "f"
+
+    # A complete empty-args call (closed with <tool_call|>) surfaces the
+    # opener (id + name) and the empty-object arguments together.
+    call_result = parser.parse_delta("call:f{}<tool_call|>")
+    assert call_result is not None
+    assert any(d.name == "f" for d in call_result)
+
+    args = "".join(d.arguments for d in call_result if d.arguments is not None)
+    assert json.loads(args) == {}
+
+
+def test_streaming_args_openai_contract_full_stream() -> None:
+    """OpenAI streaming contract: accumulated arguments across all deltas
+    must form a single valid JSON object.
+
+    This is the end-to-end contract the fuzz scenario ``stream_tool_schema``
+    validates.  Splits the response token-by-token (as xgrammar constrained
+    decoding would emit), collects all ``arguments`` deltas, concatenates them,
+    and asserts the result is valid JSON matching the expected args object.
+    """
+    # Simulate xgrammar token-by-token output: special tokens are single tokens.
+    token_chunks = [
+        "<|tool_call>",  # CALL_BEGIN — single token
+        "call:get_weather{location:",  # header + brace + key prefix
+        '<|"|>',  # STRING_DELIM — single token
+        "Chicago",  # string value chars
+        '<|"|>',  # STRING_DELIM — single token
+        ",unit:",  # next key
+        '<|"|>',  # STRING_DELIM — single token
+        "fahrenheit",  # string value chars
+        '<|"|>',  # STRING_DELIM — single token
+        "}",  # close args brace
+        "<tool_call|>",  # CALL_END — single token
+    ]
+
+    parser = Gemma4ToolParser()
+    all_args: list[str] = []
+    for chunk in token_chunks:
+        result = parser.parse_delta(chunk)
+        if result:
+            for delta in result:
+                if delta.arguments is not None:
+                    all_args.append(delta.arguments)
+
+    accumulated = "".join(all_args)
+    assert accumulated, "accumulated arguments must be non-empty"
+    parsed = json.loads(accumulated)
+    assert parsed == {"location": "Chicago", "unit": "fahrenheit"}, (
+        f"accumulated arguments do not match expected: {accumulated!r}"
+    )
+
+
+def _assemble_streamed_tool_calls(
+    parser: Gemma4ToolParser, token_chunks: list[str]
+) -> list[dict[str, str]]:
+    """Feed ``token_chunks`` through ``parse_delta`` and reconstruct the
+    per-index tool calls a streaming client would see.
+
+    Mirrors how the serving layer assembles streamed tool calls: an opener
+    delta carries ``id``/``name``; subsequent deltas append ``arguments``.
+    Returns one dict per surfaced tool call with keys ``id``, ``name``,
+    ``arguments`` (arguments is the concatenation of all argument deltas,
+    ``""`` if none arrived).
+    """
+    calls: dict[int, dict[str, str]] = {}
+    for chunk in token_chunks:
+        result = parser.parse_delta(chunk)
+        if not result:
+            continue
+        for delta in result:
+            if (
+                delta.id is None
+                and delta.name is None
+                and delta.content is None
+            ):
+                if delta.arguments is None:
+                    continue
+            if delta.content is not None:
+                continue
+            call = calls.setdefault(
+                delta.index, {"id": "", "name": "", "arguments": ""}
+            )
+            if delta.id is not None:
+                call["id"] = delta.id
+            if delta.name is not None:
+                call["name"] = delta.name
+            if delta.arguments is not None:
+                call["arguments"] += delta.arguments
+    return [calls[i] for i in sorted(calls)]
+
+
+def test_streaming_incomplete_call_not_surfaced() -> None:
+    """A tool call that opens but is cut off before ``<tool_call|>`` must not
+    surface a dangling call with empty ``arguments``.
+
+    Simulates generation halting after the opener: the header ``call:emit{``
+    parses (name known) but the close marker never arrives, so no arguments are
+    ever emitted. Non-streaming discards such incomplete calls; streaming must
+    not leak a ``{id, name, arguments: ""}`` entry to the client.
+    """
+    parser = Gemma4ToolParser()
+
+    # Runaway with multiple emit calls; the LAST one opens then is cut off.
+    token_chunks = [
+        "<|tool_call>",
+        'call:emit{value:<|"|>a<|"|>}',
+        "<tool_call|>",
+        "<|tool_call>",
+        'call:emit{value:<|"|>b<|"|>}',
+        "<tool_call|>",
+        "<|tool_call>",
+        "call:emit{",  # opens but never closes — generation cut off here
+    ]
+
+    streamed = _assemble_streamed_tool_calls(parser, token_chunks)
+
+    dangling = [c for c in streamed if c["arguments"] == ""]
+    assert not dangling, (
+        "streaming surfaced tool call(s) with empty arguments (dangling "
+        f"incomplete call leaked): {dangling}"
+    )
+
+
+def test_streaming_complete_call_surfaces_name_and_args() -> None:
+    """A complete tool call streams its opener (id + name) AND arguments.
+
+    Guards that suppressing dangling incomplete calls does not suppress
+    legitimate, fully-closed tool calls.
+    """
+    parser = Gemma4ToolParser()
+
+    token_chunks = [
+        "<|tool_call>",
+        'call:emit{value:<|"|>hi<|"|>}',
+        "<tool_call|>",
+    ]
+
+    streamed = _assemble_streamed_tool_calls(parser, token_chunks)
+
+    assert len(streamed) == 1
+    call = streamed[0]
+    assert call["name"] == "emit"
+    assert call["id"]
+    assert json.loads(call["arguments"]) == {"value": "hi"}
 
 
 def test_number_parameters() -> None:
@@ -465,2017 +680,516 @@ def test_function_name_with_hyphens() -> None:
     assert result.tool_calls[0].name == "get-user-info"
 
 
-# ---------------------------------------------------------------------------
-# Grammar generation tests
-# ---------------------------------------------------------------------------
+# Vocab for stepping the matcher. The Gemma delimiters <|"|>, <|tool_call> and
+# <tool_call|> are SINGLE tokens (as the real tokenizer emits them) — the
+# "gemma" style references <|"|> by token ID with no byte-literal fallback, so
+# they must be single vocab entries, not spelled out as separate chars.
+_GEMMA_VOCAB = (
+    [chr(c) for c in range(32, 127)]
+    + ["<|tool_call>", "<tool_call|>", '<|"|>']
+    + ["<eos>"]
+)
+_GEMMA_SPECIALS = ("<|tool_call>", "<tool_call|>", '<|"|>')
+_CHAR_ID = {tok: i for i, tok in enumerate(_GEMMA_VOCAB)}
 
 
-class _MinimalTokenizer:
-    """Byte tokenizer extended with Gemma4 special tokens.
+def _gemma_encode(text: str) -> list[int]:
+    """Tokenize text, emitting the multi-char Gemma specials as single tokens."""
+    out: list[int] = []
+    i = 0
+    while i < len(text):
+        for sp in _GEMMA_SPECIALS:
+            if text.startswith(sp, i):
+                out.append(_CHAR_ID[sp])
+                i += len(sp)
+                break
+        else:
+            out.append(_CHAR_ID[text[i]])
+            i += 1
+    return out
 
-    Maps byte values 0-255 to token IDs 0-255, then assigns dedicated
-    IDs to each Gemma4 special token so that grammar generation can
-    resolve them via ``convert_tokens_to_ids``.
+
+_WEATHER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "location": {"type": "string"},
+        "days": {"type": "integer"},
+        "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+    },
+    "required": ["location"],
+}
+
+
+def _gemma_matcher(
+    tools: list[dict[str, Any]],
+    tool_choice: str | dict[str, Any] = "required",
+) -> xgr.GrammarMatcher:
+    """Compile the Gemma 4 tool-call tag and return a fresh matcher."""
+    tag = xgr.get_builtin_structural_tag(
+        "gemma_4", tools=tools, tool_choice=tool_choice, reasoning=False
+    )
+    info = xgr.TokenizerInfo(
+        _GEMMA_VOCAB,
+        vocab_type=xgr.VocabType.RAW,
+        stop_token_ids=[_CHAR_ID["<eos>"]],
+        special_token_ids=[_CHAR_ID[tok] for tok in _GEMMA_SPECIALS],
+    )
+    compiled = xgr.GrammarCompiler(info).compile_structural_tag(tag)
+    return xgr.GrammarMatcher(compiled)
+
+
+def _accepts(matcher: xgr.GrammarMatcher, text: str) -> bool:
+    """Feed text token by token (specials as single tokens); False at first reject."""
+    return all(matcher.accept_token(tid) for tid in _gemma_encode(text))
+
+
+def test_xgrammar_accepts_string_arg() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    good = '<|tool_call>call:get_weather{location:<|"|>Paris<|"|>}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
+
+
+def test_xgrammar_string_rejects_tool_call_end_marker() -> None:
+    """A string value must not admit the ``<tool_call|>`` end marker as content.
+
+    Regression for the runaway-string fail-open: the string-content wildcard
+    excluded only the ``<|"|>`` delimiter, so the model could emit the section
+    markers inside an unterminated string. The parser breaks at the first
+    ``<tool_call|>`` regardless of string state, so it then sees an unterminated
+    string and returns no tool calls ("no tool_calls in response"). The grammar
+    must forbid the section markers inside a string, forcing the closing
+    ``<|"|>`` before the tool call can end.
     """
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    # Open the `location` string value.
+    assert _accepts(matcher, '<|tool_call>call:get_weather{location:<|"|>Paris')
+    # The tool-call END marker is not string content: it must be rejected while
+    # the string is open (the model must emit the closing <|"|> first).
+    assert not matcher.accept_token(_CHAR_ID["<tool_call|>"])
 
-    _SPECIAL_TOKENS: dict[str, int] = {
-        "<|tool_call>": 256,
-        "<tool_call|>": 257,
-        "<|tool>": 258,
-        "<tool|>": 259,
-        "<|tool_response>": 260,
-        "<tool_response|>": 261,
-        '<|"|>': 262,
-        "<turn|>": 263,
+
+def test_xgrammar_string_rejects_tool_call_start_marker() -> None:
+    """A string value must not admit the ``<|tool_call>`` start marker either."""
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    assert _accepts(matcher, '<|tool_call>call:get_weather{location:<|"|>Paris')
+    assert not matcher.accept_token(_CHAR_ID["<|tool_call>"])
+
+
+def test_xgrammar_minlength_string_rejects_tool_call_end_marker() -> None:
+    """A ``minLength`` string's unbounded tail must not admit the end marker.
+
+    The ``minLength`` path builds a separate string-content body that counts
+    characters via a byte char-class rather than an ``ExcludeToken(...)`` tail:
+    an exact ``{min}`` char prefix followed by an unbounded byte char-class
+    tail. Excluding the section markers is delegated to the xgrammar
+    special-token machinery (the markers are registered as ``special_token_ids``
+    on ``TokenizerInfo``), so a runaway string past ``minLength`` cannot swallow
+    the end marker.
+    """
+    schema = {
+        "type": "object",
+        "properties": {"s": {"type": "string", "minLength": 3}},
+        "required": ["s"],
     }
-    _N_VOCAB: int = 264
-
-    eos_token_id: int = 0
-    bos_token_id: int | None = None
-    unk_token_id: int | None = None
-
-    def __init__(self) -> None:
-        self.tokens: list[bytes] = [bytes([i]) for i in range(256)]
-        self.tokens.extend(t.encode("utf-8") for t in self._SPECIAL_TOKENS)
-
-    def convert_tokens_to_ids(self, token: str) -> int | None:
-        return self._SPECIAL_TOKENS.get(token)
-
-    def __call__(self, s: bytes | str) -> list[int]:
-        if isinstance(s, str):
-            s = s.encode("utf-8")
-        result: list[int] = []
-        i = 0
-        while i < len(s):
-            for text, tid in sorted(
-                self._SPECIAL_TOKENS.items(), key=lambda x: -len(x[0])
-            ):
-                encoded = text.encode("utf-8")
-                if s[i : i + len(encoded)] == encoded:
-                    result.append(tid)
-                    i += len(encoded)
-                    break
-            else:
-                result.append(s[i])
-                i += 1
-        return result
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    # Open the string and satisfy minLength (3 chars), landing in the unbounded
+    # tail. The end marker must be rejected while the string is still open.
+    assert _accepts(matcher, '<|tool_call>call:f{s:<|"|>abcd')
+    assert not matcher.accept_token(_CHAR_ID["<tool_call|>"])
 
 
-@pytest.fixture(scope="module")
-def minimal_tokenizer() -> _MinimalTokenizer:
-    """Raw byte+special-token tokenizer for grammar validation tests."""
-    return _MinimalTokenizer()
+def test_xgrammar_rejects_json_quoted_key() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    # Gemma keys are bare; a JSON-quoted key must be rejected.
+    assert not _accepts(matcher, '<|tool_call>call:get_weather{"location"')
 
 
-@pytest.fixture(scope="module")
-def mock_tokenizer(
-    minimal_tokenizer: _MinimalTokenizer,
-) -> PipelineTokenizer[Any, Any, Any]:
-    """PipelineTokenizer stub whose ``.delegate`` is the minimal tokenizer."""
-    stub = cast(PipelineTokenizer[Any, Any, Any], MagicMock())
-    stub.delegate = minimal_tokenizer  # type: ignore[attr-defined]
-    return stub
-
-
-@pytest.fixture(scope="module")
-def ll_tokenizer(minimal_tokenizer: _MinimalTokenizer) -> LLTokenizer:
-    """Create a minimal LLTokenizer for grammar validation tests."""
-    wrapper = TokenizerWrapper(minimal_tokenizer)
-    return LLTokenizer(wrapper, n_vocab=_MinimalTokenizer._N_VOCAB)
-
-
-def test_generate_tool_call_grammar_with_tool_names(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test generating a Lark grammar for constrained decoding with specific tools."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather", "search"),
-        tokenizer=mock_tokenizer,
+def test_xgrammar_rejects_json_quoted_value() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    # String values must use <|"|> delimiters, not JSON double quotes.
+    assert not _accepts(
+        matcher, '<|tool_call>call:get_weather{location:"Paris"'
     )
 
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-    assert "tool_calls" in grammar
 
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
+def test_xgrammar_accepts_integer_arg() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    good = (
+        '<|tool_call>call:get_weather{location:<|"|>P<|"|>,days:42}<tool_call|>'
+    )
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
 
 
-def test_generate_tool_call_grammar_without_tool_names(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test generating a grammar that accepts any valid identifier."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=None, tokenizer=mock_tokenizer
+def test_xgrammar_accepts_enum_value() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    good = (
+        '<|tool_call>call:get_weather{location:<|"|>P<|"|>,'
+        'unit:<|"|>celsius<|"|>}<tool_call|>'
+    )
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
+
+
+def test_xgrammar_rejects_out_of_enum_value() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA})
+    )
+    # "kelvin" is not in the enum {celsius, fahrenheit}.
+    assert not _accepts(
+        matcher,
+        '<|tool_call>call:get_weather{location:<|"|>P<|"|>,unit:<|"|>k',
     )
 
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
 
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-def test_generate_tool_call_grammar_escapes_special_chars(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test that special regex characters in tool names are escaped."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather.v2", "search+plus", "tool[0]"),
-        tokenizer=mock_tokenizer,
-    )
-
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-def test_generate_tool_call_grammar_with_response_format_schema(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test generating a combined grammar with tools and response_format_schema."""
-    response_format_schema = {
+def test_xgrammar_accepts_nested_object() -> None:
+    schema = {
         "type": "object",
         "properties": {
-            "answer": {"type": "string"},
-            "confidence": {"type": "number"},
+            "opts": {
+                "type": "object",
+                "properties": {"verbose": {"type": "boolean"}},
+                "required": ["verbose"],
+            }
         },
-        "required": ["answer"],
+        "required": ["opts"],
     }
-
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather", "search"),
-        response_format_schema=response_format_schema,
-        tokenizer=mock_tokenizer,
-    )
-
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-
-    assert "tool_calls" in grammar
-    assert "json_response" in grammar
-    assert "%json" in grammar
-
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
+    matcher = _gemma_matcher(_tools_with_schemas({"configure": schema}))
+    good = "<|tool_call>call:configure{opts:{verbose:true}}<tool_call|>"
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
 
 
-def test_generate_tool_call_grammar_combined_accepts_json_object_type(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test combined grammar with json_object type (any valid JSON)."""
-    response_format_schema = {"type": "object"}
-
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("calculate"),
-        response_format_schema=response_format_schema,
-        tokenizer=mock_tokenizer,
-    )
-
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-    assert "json_response" in grammar
-
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-def test_generate_tool_call_grammar_no_schema_is_tool_only(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-) -> None:
-    """Test that without response_format_schema, grammar is tool-calls only."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        response_format_schema=None,
-        tokenizer=mock_tokenizer,
-    )
-
-    assert isinstance(grammar, str)
-    assert len(grammar) > 0
-    assert "%json" not in grammar
-    assert "tool_call" in grammar
-
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    assert matcher is not None
-
-
-def test_generate_tool_call_grammar_accepts_real_tool_call(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept a realistic Gemma4 tool call wire string."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = (
-        "<|tool_call>call:get_weather"
-        '{location:<|"|>San Francisco<|"|>,unit:<|"|>celsius<|"|>}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        f"Grammar rejected real Gemma4 tool call after {accepted}/{len(tokens)} tokens"
-    )
-
-
-def test_generate_tool_call_grammar_accepts_multiple_calls(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept a sequence of Gemma4 tool calls."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather", "get_time"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = (
-        '<|tool_call>call:get_weather{location:<|"|>NYC<|"|>}<tool_call|>'
-        '<|tool_call>call:get_time{tz:<|"|>UTC<|"|>}<tool_call|>'
-        "<turn|>"
-    )
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_generate_tool_call_grammar_accepts_nested_object_args(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept tool calls with nested ``{...}`` arg values."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("configure"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = (
-        "<|tool_call>call:configure"
-        '{settings:{theme:<|"|>dark<|"|>,size:12},flags:[true,false]}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        f"Grammar rejected nested-object tool call after {accepted}/{len(tokens)} tokens"
-    )
-
-
-def test_generate_tool_call_grammar_rejects_single_quoted_strings(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must reject tool calls using single quotes instead of <|"|>.
-
-    Regression guard: a permissive earlier grammar allowed any non-'<'
-    byte in args, which let the model use Python-style single quotes
-    and drift into freeform text.
-    """
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad_response = (
-        "<|tool_call>call:get_weather{location: 'Coquitlam, BC'}<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad_response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Grammar should reject single-quoted strings but accepted all tokens"
-    )
-
-
-def test_generate_tool_call_grammar_accepts_empty_args(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept tool calls with no arguments."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_time"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = "<|tool_call>call:get_time{}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_generate_tool_call_grammar_accepts_number_args(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept numeric argument values."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("set_temp"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = (
-        "<|tool_call>call:set_temp{value:22,precision:0.5}<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_generate_tool_call_grammar_accepts_boolean_args(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept boolean argument values."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("configure"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = (
-        "<|tool_call>call:configure{enabled:true,debug:false}<tool_call|>"
-        "<turn|>"
-    )
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_generate_tool_call_grammar_accepts_array_args(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept array argument values."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("process"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = (
-        "<|tool_call>call:process"
-        '{items:[<|"|>a<|"|>,<|"|>b<|"|>],counts:[1,2,3]}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_generate_tool_call_grammar_combined_accepts_json_branch(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The combined grammar must accept valid JSON objects on the JSON branch."""
-    response_format_schema = {
+def test_xgrammar_accepts_array_arg() -> None:
+    schema = {
         "type": "object",
-        "properties": {"answer": {"type": "string"}},
-        "required": ["answer"],
-        "additionalProperties": False,
+        "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
+        "required": ["tags"],
     }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        response_format_schema=response_format_schema,
-        tokenizer=mock_tokenizer,
+    matcher = _gemma_matcher(_tools_with_schemas({"label": schema}))
+    good = '<|tool_call>call:label{tags:[<|"|>a<|"|>,<|"|>b<|"|>]}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
+
+
+def test_xgrammar_accepts_named_tool_choice() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get_weather": _WEATHER_SCHEMA}),
+        tool_choice={
+            "type": "function",
+            "function": {"name": "get_weather"},
+        },
     )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    json_response = '{"answer":"hello"}'
-    tokens = minimal_tokenizer(json_response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
+    good = '<|tool_call>call:get_weather{location:<|"|>P<|"|>}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
 
 
-def test_generate_tool_call_grammar_combined_rejects_whitespace_json(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The combined grammar rejects structural whitespace (whitespace_pattern='')."""
-    response_format_schema = {
+def test_xgrammar_accepts_function_name_with_special_chars() -> None:
+    matcher = _gemma_matcher(
+        _tools_with_schemas({"get-weather.v2": _WEATHER_SCHEMA})
+    )
+    good = '<|tool_call>call:get-weather.v2{location:<|"|>P<|"|>}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
+
+
+def test_generate_tool_call_grammar_requires_xgrammar_backend() -> None:
+    with pytest.raises(InputError, match="xgrammar"):
+        Gemma4ToolParser.generate_tool_call_grammar(
+            tools=_tools("f"), backend="llguidance"
+        )
+
+
+def test_generate_tool_call_grammar_allows_response_format() -> None:
+    """With a ``response_format`` schema (tool_choice=auto), the grammar wraps
+    the tool-call envelope and the response schema in an ``OrFormat`` so the
+    model may emit either a tool call or a schema-conforming JSON response
+    (mirrors the Kimi xgrammar path)."""
+    grammar = Gemma4ToolParser.generate_tool_call_grammar(
+        response_format_schema=_WEATHER_SCHEMA,
+        tools=_tools_with_schemas({"get_weather": _WEATHER_SCHEMA}),
+        backend="xgrammar",
+        tool_choice="auto",
+    )
+    tag = xgr.StructuralTag.model_validate_json(grammar)
+    assert isinstance(tag, xgr.StructuralTag)
+    # The response_format branch is present: an OrFormat alternation between the
+    # tool-call envelope and the response schema.
+    assert '"type":"or"' in grammar.replace(" ", "")
+
+
+def test_generate_tool_call_grammar_returns_compilable_tag() -> None:
+    grammar = Gemma4ToolParser.generate_tool_call_grammar(
+        tools=_tools_with_schemas({"get_weather": _WEATHER_SCHEMA}),
+        backend="xgrammar",
+        tool_choice="required",
+    )
+    tag = xgr.StructuralTag.model_validate_json(grammar)
+    assert isinstance(tag, xgr.StructuralTag)
+    info = xgr.TokenizerInfo(
+        _GEMMA_VOCAB,
+        vocab_type=xgr.VocabType.RAW,
+        stop_token_ids=[_CHAR_ID["<eos>"]],
+    )
+    compiled = xgr.GrammarCompiler(info).compile_structural_tag(tag)
+    assert isinstance(compiled, xgr.CompiledGrammar)
+
+
+_FREEFORM_SCHEMA = {
+    "type": "object",
+    "properties": {"meta": {"type": "object", "additionalProperties": True}},
+    "required": ["meta"],
+}
+
+
+def test_xgrammar_freeform_object_uses_gemma_string() -> None:
+    # additionalProperties:true falls back to the freeform "any" rule; its
+    # nested string value must still use <|"|> (gemma_string), not JSON quotes.
+    matcher = _gemma_matcher(_tools_with_schemas({"f": _FREEFORM_SCHEMA}))
+    good = '<|tool_call>call:f{meta:{k:<|"|>v<|"|>}}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
+
+
+def test_xgrammar_freeform_object_rejects_json_quoted_value() -> None:
+    matcher = _gemma_matcher(_tools_with_schemas({"f": _FREEFORM_SCHEMA}))
+    # A JSON-quoted freeform value must be rejected (gemma_any has no "..." arm).
+    assert not _accepts(matcher, '<|tool_call>call:f{meta:{k:"v"')
+
+
+def test_xgrammar_freeform_array_uses_gemma_string() -> None:
+    schema = {
         "type": "object",
-        "properties": {"answer": {"type": "string"}},
-        "required": ["answer"],
-        "additionalProperties": False,
+        "properties": {"items": {"type": "array"}},
+        "required": ["items"],
     }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("get_weather"),
-        response_format_schema=response_format_schema,
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    padded = '{\n  "answer": "hello"\n}'
-    tokens = minimal_tokenizer(padded)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Grammar should reject whitespace-padded JSON"
-    )
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    good = '<|tool_call>call:f{items:[<|"|>a<|"|>,1,true]}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
 
 
-# ---------------------------------------------------------------------------
-# Schema-aware grammar tests
-# ---------------------------------------------------------------------------
-
-
-def test_generate_tool_call_grammar_schema_aware_accepts_correct_types(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts string values for string-typed properties."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-        },
+def test_xgrammar_string_pattern_enforced() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"code": {"type": "string", "pattern": "[0-9]+"}},
+        "required": ["code"],
     }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = (
-        "<|tool_call>call:get_weather"
-        '{location:<|"|>San Francisco<|"|>,unit:<|"|>celsius<|"|>}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "Schema-aware grammar should accept correct string types"
-    )
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    good = '<|tool_call>call:f{code:<|"|>123<|"|>}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
 
 
-def test_generate_tool_call_grammar_schema_aware_rejects_wrong_type(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar rejects numeric values for string-typed properties."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-            },
-        },
+def test_xgrammar_string_pattern_rejects_nonmatching() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"code": {"type": "string", "pattern": "[0-9]+"}},
+        "required": ["code"],
     }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = "<|tool_call>call:get_weather{location:-83.2}<tool_call|>"
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Schema-aware grammar should reject numeric value for string property"
-    )
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    # 'a' violates the digit pattern.
+    assert not _accepts(matcher, '<|tool_call>call:f{code:<|"|>12a')
 
 
-def test_generate_tool_call_grammar_schema_aware_mixed_types(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar constrains each property to its declared type."""
-    tool_schemas = {
-        "search": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "limit": {"type": "number"},
-                "verbose": {"type": "boolean"},
-            },
-        },
+def test_xgrammar_string_maxlength_enforced() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"s": {"type": "string", "maxLength": 3}},
+        "required": ["s"],
     }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = (
-        "<|tool_call>call:search"
-        '{query:<|"|>machine learning<|"|>,limit:10,verbose:true}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    good = '<|tool_call>call:f{s:<|"|>abc<|"|>}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
 
 
-def test_generate_tool_call_grammar_schema_aware_falls_back_without_properties(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Tools without property schemas fall back to generic args."""
-    tool_schemas = {
-        "get_time": {"type": "object"},
+def test_xgrammar_string_maxlength_rejects_overlong() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"s": {"type": "string", "maxLength": 3}},
+        "required": ["s"],
     }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = '<|tool_call>call:get_time{tz:<|"|>UTC<|"|>}<tool_call|><turn|>'
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    # A 4th content character exceeds maxLength=3 and must be rejected.
+    assert not _accepts(matcher, '<|tool_call>call:f{s:<|"|>abcd')
 
 
-def test_generate_tool_call_grammar_schema_aware_multiple_tools(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar handles multiple tools with different schemas."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-            },
-        },
-        "calculate": {
-            "type": "object",
-            "properties": {
-                "expression": {"type": "string"},
-                "precision": {"type": "number"},
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = (
-        "<|tool_call>call:get_weather"
-        '{location:<|"|>Tokyo<|"|>}'
-        "<tool_call|>"
-        "<|tool_call>call:calculate"
-        '{expression:<|"|>2+2<|"|>,precision:4}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-# ---------------------------------------------------------------------------
-# Null, scientific notation, and integer parsing tests
-# ---------------------------------------------------------------------------
-
-
-def test_null_parameter() -> None:
-    """Test parsing tool call with null parameter value."""
-    parser = Gemma4ToolParser()
-
-    response = "<|tool_call>call:check{value:null}<tool_call|>"
-
-    result = parser.parse_complete(response)
-
-    assert len(result.tool_calls) == 1
-    assert json.loads(result.tool_calls[0].arguments) == {"value": None}
-
-
-def test_scientific_notation_parameter() -> None:
-    """Test parsing tool call with scientific notation number."""
-    parser = Gemma4ToolParser()
-
-    response = "<|tool_call>call:calc{x:1.5e10,y:2E3}<tool_call|>"
-
-    result = parser.parse_complete(response)
-
-    assert len(result.tool_calls) == 1
-    parsed = json.loads(result.tool_calls[0].arguments)
-    assert parsed == {"x": 1.5e10, "y": 2e3}
-
-
-def test_grammar_accepts_null_value(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept null as a bare value."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("check"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    response = "<|tool_call>call:check{value:null}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(response)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_grammar_accepts_scientific_notation(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """The grammar must accept scientific notation numbers."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("calc"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    for wire in [
-        "<|tool_call>call:calc{x:1.5e10}<tool_call|><turn|>",
-        "<|tool_call>call:calc{x:2E3}<tool_call|><turn|>",
-        "<|tool_call>call:calc{x:-1.0e-5}<tool_call|><turn|>",
-    ]:
-        matcher = LLMatcher(ll_tokenizer, grammar)
-        tokens = minimal_tokenizer(wire)
-        accepted = matcher.validate_tokens(tokens)
-        assert accepted == len(tokens), f"Rejected: {wire}"
-
-
-# ---------------------------------------------------------------------------
-# Integer vs number type enforcement
-# ---------------------------------------------------------------------------
-
-
-def test_schema_aware_integer_accepts_integer(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts integer values for integer-typed properties."""
-    tool_schemas = {
-        "set_count": {
-            "type": "object",
-            "properties": {"count": {"type": "integer"}},
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = "<|tool_call>call:set_count{count:42}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_schema_aware_integer_rejects_decimal(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar rejects decimal values for integer-typed properties."""
-    tool_schemas = {
-        "set_count": {
-            "type": "object",
-            "properties": {"count": {"type": "integer"}},
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = "<|tool_call>call:set_count{count:1.5}<tool_call|>"
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens)
-
-
-def test_schema_aware_number_accepts_integer_and_float(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts both integer and float for number-typed properties."""
-    tool_schemas = {
-        "calc": {
-            "type": "object",
-            "properties": {"value": {"type": "number"}},
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
+def _compile_grammar(tools: list[dict[str, Any]]) -> str:
+    """Build and return the Gemma4 tool-call grammar string for the given tools."""
+    return Gemma4ToolParser.generate_tool_call_grammar(
+        tools=tools,
+        backend="xgrammar",
+        tool_choice="required",
     )
 
-    for wire in [
-        "<|tool_call>call:calc{value:42}<tool_call|><turn|>",
-        "<|tool_call>call:calc{value:3.14}<tool_call|><turn|>",
-    ]:
-        matcher = LLMatcher(ll_tokenizer, grammar)
-        tokens = minimal_tokenizer(wire)
-        accepted = matcher.validate_tokens(tokens)
-        assert accepted == len(tokens), f"Rejected: {wire}"
 
-
-# ---------------------------------------------------------------------------
-# Enum enforcement tests
-# ---------------------------------------------------------------------------
-
-
-def test_schema_aware_enum_accepts_valid_value(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts a value that is in the enum list."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "unit": {
-                    "type": "string",
-                    "enum": ["celsius", "fahrenheit"],
-                },
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
+def _gemma_compiler_for_tests() -> xgr.GrammarCompiler:
+    info = xgr.TokenizerInfo(
+        _GEMMA_VOCAB,
+        vocab_type=xgr.VocabType.RAW,
+        stop_token_ids=[_CHAR_ID["<eos>"]],
     )
-    matcher = LLMatcher(ll_tokenizer, grammar)
+    return xgr.GrammarCompiler(info)
 
-    good = (
-        '<|tool_call>call:get_weather{unit:<|"|>celsius<|"|>}'
-        "<tool_call|><turn|>"
+
+def _compile_structural_tag(grammar: str) -> xgr.CompiledGrammar:
+    """Compile the StructuralTag JSON string produced by generate_tool_call_grammar."""
+    tag = xgr.StructuralTag.model_validate_json(grammar)
+    return _gemma_compiler_for_tests().compile_structural_tag(tag)
+
+
+# (a) Non-object roots raise at compile.
+
+
+def test_non_object_root_string_type_raises() -> None:
+    """A tool with parameters type:string raises at xgrammar compile time."""
+    grammar = _compile_grammar(_tools_with_schemas({"f": {"type": "string"}}))
+    with pytest.raises(Exception):
+        _compile_structural_tag(grammar)
+
+
+def test_non_object_root_scalar_const_raises() -> None:
+    """A tool with parameters const:2 (non-object) raises at xgrammar compile time."""
+    grammar = _compile_grammar(_tools_with_schemas({"f": {"const": 2}}))
+    with pytest.raises(Exception):
+        _compile_structural_tag(grammar)
+
+
+def test_non_object_root_oneof_raises() -> None:
+    """A tool with oneOf (unsupported) raises at xgrammar compile time."""
+    grammar = _compile_grammar(
+        _tools_with_schemas(
+            {
+                "f": {
+                    "oneOf": [
+                        {"type": "object"},
+                        {"type": "object"},
+                    ]
+                }
+            }
+        )
     )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
+    with pytest.raises(Exception):
+        _compile_structural_tag(grammar)
 
 
-def test_schema_aware_enum_rejects_invalid_value(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar rejects a value not in the enum list."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "unit": {
-                    "type": "string",
-                    "enum": ["celsius", "fahrenheit"],
-                },
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = '<|tool_call>call:get_weather{unit:<|"|>kelvin<|"|>}<tool_call|>'
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens)
+# (b) Empty schema and typed-object schemas compile without error.
 
 
-def test_schema_aware_enum_with_null(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts null when it is in the enum list."""
-    tool_schemas = {
-        "check": {
-            "type": "object",
-            "properties": {
-                "status": {"enum": ["active", "inactive", None]},
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = "<|tool_call>call:check{status:null}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
+def test_empty_schema_compiles() -> None:
+    """A tool with an empty parameters schema ({}) compiles successfully."""
+    grammar = _compile_grammar(_tools_with_schemas({"f": {}}))
+    compiled = _compile_structural_tag(grammar)
+    assert isinstance(compiled, xgr.CompiledGrammar)
 
 
-# ---------------------------------------------------------------------------
-# Nested object and array type enforcement
-# ---------------------------------------------------------------------------
-
-
-def test_schema_aware_nested_object_typed(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar enforces types inside nested objects."""
-    tool_schemas = {
-        "send": {
-            "type": "object",
-            "properties": {
-                "address": {
+def test_typed_object_schema_compiles() -> None:
+    """A standard typed-object parameters schema compiles successfully."""
+    grammar = _compile_grammar(
+        _tools_with_schemas(
+            {
+                "get_weather": {
                     "type": "object",
-                    "properties": {
-                        "city": {"type": "string"},
-                        "zip": {"type": "integer"},
-                    },
-                },
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
+                    "properties": {"location": {"type": "string"}},
+                    "required": ["location"],
+                }
+            }
+        )
     )
-    matcher = LLMatcher(ll_tokenizer, grammar)
+    compiled = _compile_structural_tag(grammar)
+    assert isinstance(compiled, xgr.CompiledGrammar)
 
-    good = (
-        "<|tool_call>call:send"
-        '{address:{city:<|"|>NYC<|"|>,zip:10001}}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
 
+# (c) An unsupported keyword (multipleOf) raises at compile.
 
-def test_schema_aware_nested_array_typed_items(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar enforces item types inside arrays."""
-    tool_schemas = {
-        "process": {
-            "type": "object",
-            "properties": {
-                "tags": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
 
-    good = (
-        "<|tool_call>call:process"
-        '{tags:[<|"|>a<|"|>,<|"|>b<|"|>]}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_schema_aware_nested_array_rejects_wrong_item_type(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar rejects wrong item types inside arrays."""
-    tool_schemas = {
-        "process": {
-            "type": "object",
-            "properties": {
-                "tags": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = "<|tool_call>call:process{tags:[42,true]}<tool_call|>"
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens)
-
-
-# ---------------------------------------------------------------------------
-# Required / optional / ordering / duplicate enforcement
-# ---------------------------------------------------------------------------
-
-
-def test_schema_aware_required_rejects_missing(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar rejects when a required property is missing."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-            "required": ["location"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = '<|tool_call>call:get_weather{unit:<|"|>celsius<|"|>}<tool_call|>'
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens)
-
-
-def test_schema_aware_required_accepts_all_present(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts when all required properties are present."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-            "required": ["location"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = (
-        "<|tool_call>call:get_weather"
-        '{location:<|"|>Tokyo<|"|>,unit:<|"|>celsius<|"|>}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_schema_aware_rejects_wrong_order(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar rejects properties in non-schema order."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = (
-        "<|tool_call>call:get_weather"
-        '{unit:<|"|>celsius<|"|>,location:<|"|>Tokyo<|"|>}'
-        "<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens)
-
-
-def test_schema_aware_rejects_duplicate_property(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar rejects duplicate properties."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = (
-        "<|tool_call>call:get_weather"
-        '{location:<|"|>NYC<|"|>,location:<|"|>LA<|"|>}'
-        "<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens)
-
-
-def test_schema_aware_optional_can_be_skipped(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar allows skipping optional properties."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-            "required": ["location"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = (
-        "<|tool_call>call:get_weather"
-        '{location:<|"|>Tokyo<|"|>}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_schema_aware_all_optional_empty_args(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts empty args when all properties are optional."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = "<|tool_call>call:get_weather{}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_schema_aware_required_only_without_optional(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Schema-aware grammar accepts just the required property without optional."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-            "required": ["location"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    good = (
-        "<|tool_call>call:get_weather"
-        '{location:<|"|>Paris<|"|>}'
-        "<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_schema_aware_deep_nesting_fallback(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Nesting beyond max_depth falls back to generic value rule."""
-    # Build a schema nested 7 levels deep (exceeds max_depth=5).
-    schema: dict[str, Any] = {"type": "string"}
-    for i in range(7):
-        schema = {
-            "type": "object",
-            "properties": {f"level{i}": schema},
-            "required": [f"level{i}"],
-        }
-    tool_schemas = {"deep_fn": schema}
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    # At depth > 5 the grammar falls back to generic `value`, so any
-    # well-formed JSON value should be accepted in the innermost slot.
-    # Build a valid nested call with strings all the way down.
-    inner = '<|"|>hi<|"|>'
-    for i in range(7):
-        inner = "{" + f"level{i}:" + inner + "}"
-    wire = f"<|tool_call>call:deep_fn{inner}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_schema_aware_many_properties(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Fixed-order suffix rules work for a large number of properties."""
-    n = 20
-    props = {f"p{i}": {"type": "string"} for i in range(n)}
-    tool_schemas = {
-        "big_fn": {
-            "type": "object",
-            "properties": props,
-            "required": [f"p{i}" for i in range(n)],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    # All 20 properties in schema order
-    args = ",".join(f'p{i}:<|"|>v{i}<|"|>' for i in range(n))
-    wire = f"<|tool_call>call:big_fn{{{args}}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-# ---------------------------------------------------------------------------
-# Fail-closed fixes: newlines, hyphenated keys, enum objects, integer sci-not
-# ---------------------------------------------------------------------------
-
-
-def test_string_content_accepts_newlines(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """STRING_CONTENT must match newline characters."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("note"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    sd = '<|"|>'
-    wire = f"<|tool_call>call:note{{text:{sd}line1\nline2\nline3{sd}}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_key_terminal_accepts_hyphens_and_dots(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """KEY terminal must allow hyphens and dots in property names."""
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools("req"),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    for wire in [
-        '<|tool_call>call:req{Content-Type:<|"|>text/html<|"|>}<tool_call|><turn|>',
-        '<|tool_call>call:req{x.custom:<|"|>val<|"|>}<tool_call|><turn|>',
-        '<|tool_call>call:req{a-b.c_d:<|"|>ok<|"|>}<tool_call|><turn|>',
-    ]:
-        matcher = LLMatcher(ll_tokenizer, grammar)
-        tokens = minimal_tokenizer(wire)
-        accepted = matcher.validate_tokens(tokens)
-        assert accepted == len(tokens), f"Rejected: {wire}"
-
-
-def test_enum_with_object_value_accepted(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Enum containing object/array values must not silently drop them."""
-    tool_schemas = {
-        "apply": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "enum": [
-                        "default",
-                        {"mode": "advanced", "level": 3},
-                    ],
-                },
-            },
-            "required": ["config"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-
-    # String alternative still works
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    wire_str = (
-        '<|tool_call>call:apply{config:<|"|>default<|"|>}<tool_call|><turn|>'
-    )
-    tokens = minimal_tokenizer(wire_str)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), "String enum value rejected"
-
-    # Object alternative must also be accepted (via object_val fallback)
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-    wire_obj = f"<|tool_call>call:apply{{config:{{mode:{sd}advanced{sd},level:3}}}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire_obj)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), "Object enum value rejected"
-
-
-def test_integer_terminal_accepts_scientific_notation(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """INTEGER terminal must accept scientific notation like 1e9."""
-    tool_schemas = {
-        "alloc": {
-            "type": "object",
-            "properties": {
-                "count": {"type": "integer"},
-            },
-            "required": ["count"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-
-    for wire in [
-        "<|tool_call>call:alloc{count:1e9}<tool_call|><turn|>",
-        "<|tool_call>call:alloc{count:6E23}<tool_call|><turn|>",
-        "<|tool_call>call:alloc{count:1e+5}<tool_call|><turn|>",
-        "<|tool_call>call:alloc{count:42}<tool_call|><turn|>",
-    ]:
-        matcher = LLMatcher(ll_tokenizer, grammar)
-        tokens = minimal_tokenizer(wire)
-        accepted = matcher.validate_tokens(tokens)
-        assert accepted == len(tokens), f"Rejected: {wire}"
-
-
-# ---------------------------------------------------------------------------
-# Union type lists and null type handling
-# ---------------------------------------------------------------------------
-
-
-def test_nullable_type_list_accepts_string(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """type: ["string", "null"] must accept a string value."""
-    tool_schemas = {
-        "greet": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "nickname": {"type": ["string", "null"]},
-            },
-            "required": ["name", "nickname"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-    wire = f"<|tool_call>call:greet{{name:{sd}Alice{sd},nickname:{sd}Ali{sd}}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_nullable_type_list_accepts_null(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """type: ["string", "null"] must accept a null value."""
-    tool_schemas = {
-        "greet": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "nickname": {"type": ["string", "null"]},
-            },
-            "required": ["name", "nickname"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-    wire = f"<|tool_call>call:greet{{name:{sd}Alice{sd},nickname:null}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens)
-
-
-def test_nullable_type_list_rejects_wrong_type(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """type: ["string", "null"] must reject an integer value."""
-    tool_schemas = {
-        "greet": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "nickname": {"type": ["string", "null"]},
-            },
-            "required": ["name", "nickname"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-    wire = f"<|tool_call>call:greet{{name:{sd}Alice{sd},nickname:42}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Should reject integer for ['string', 'null']"
-    )
-
-
-def test_null_type_standalone_accepts_null(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """type: "null" must accept null and reject other values."""
-    tool_schemas = {
-        "cancel": {
-            "type": "object",
-            "properties": {
-                "action": {"type": "string"},
-                "reason": {"type": "null"},
-            },
-            "required": ["action", "reason"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    sd = '<|"|>'
-
-    # null value accepted
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    wire = f"<|tool_call>call:cancel{{action:{sd}cancel{sd},reason:null}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), "null value rejected for type 'null'"
-
-    # string value rejected
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    wire_str = f"<|tool_call>call:cancel{{action:{sd}cancel{sd},reason:{sd}none{sd}}}<tool_call|><turn|>"
-    tokens = minimal_tokenizer(wire_str)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), "string should be rejected for type 'null'"
-
-
-# ---------------------------------------------------------------------------
-# additionalProperties enforcement
-# ---------------------------------------------------------------------------
-
-
-def test_additional_properties_true_top_level_accepts_extra(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """additionalProperties: true at top level accepts undeclared properties."""
-    tool_schemas = {
-        "flexible": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-            },
-            "required": ["name"],
-            "additionalProperties": True,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    wire = (
-        f"<|tool_call>call:flexible"
-        f"{{name:{sd}Alice{sd},age:30,email:{sd}alice@example.com{sd}}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "additionalProperties:true should accept extra properties"
-    )
-
-
-def test_additional_properties_false_top_level_rejects_extra(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """additionalProperties: false at top level rejects undeclared properties."""
-    tool_schemas = {
-        "strict": {
-            "type": "object",
-            "properties": {
-                "city": {"type": "string"},
-                "country": {"type": "string"},
-            },
-            "required": ["city", "country"],
-            "additionalProperties": False,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    bad = (
-        f"<|tool_call>call:strict"
-        f"{{city:{sd}Tokyo{sd},country:{sd}Japan{sd},population:14000000}}"
-        f"<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "additionalProperties:false should reject extra properties"
-    )
-
-
-def test_additional_properties_true_nested_accepts_extra(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """additionalProperties: true on a nested object accepts extra properties."""
-    tool_schemas = {
-        "send": {
-            "type": "object",
-            "properties": {
-                "address": {
+def test_unsupported_keyword_multipleof_raises() -> None:
+    """A tool schema containing multipleOf raises at xgrammar compile time."""
+    grammar = _compile_grammar(
+        _tools_with_schemas(
+            {
+                "f": {
                     "type": "object",
-                    "properties": {
-                        "city": {"type": "string"},
-                    },
-                    "required": ["city"],
-                    "additionalProperties": True,
-                },
-            },
-            "required": ["address"],
-            "additionalProperties": False,
-        },
+                    "properties": {"n": {"type": "integer", "multipleOf": 2}},
+                }
+            }
+        )
+    )
+    with pytest.raises(Exception):
+        _compile_structural_tag(grammar)
+
+
+# (d) minLength bounds the string body.
+
+
+def test_minlength_rejects_short_string() -> None:
+    """A string shorter than minLength is rejected at decode time."""
+    schema = {
+        "type": "object",
+        "properties": {"s": {"type": "string", "minLength": 3}},
+        "required": ["s"],
     }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    wire = (
-        f"<|tool_call>call:send"
-        f"{{address:{{city:{sd}NYC{sd},zip:10001,state:{sd}NY{sd}}}}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "additionalProperties:true on nested object should accept extra props"
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    # "ab" is 2 chars — too short, the close delimiter must be rejected.
+    assert not _accepts(
+        matcher, '<|tool_call>call:f{s:<|"|>ab<|"|>}<tool_call|>'
     )
 
 
-def test_additional_properties_false_nested_rejects_extra(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """additionalProperties: false on a nested object rejects extra properties."""
-    tool_schemas = {
-        "send": {
-            "type": "object",
-            "properties": {
-                "address": {
+def test_minlength_accepts_exact_length() -> None:
+    """A string of exactly minLength is accepted."""
+    schema = {
+        "type": "object",
+        "properties": {"s": {"type": "string", "minLength": 3}},
+        "required": ["s"],
+    }
+    matcher = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    good = '<|tool_call>call:f{s:<|"|>abc<|"|>}<tool_call|>'
+    assert _accepts(matcher, good)
+    assert matcher.is_completed()
+
+
+# (e) Non-scalar const is enforced in gemma form; scalar const compiles.
+
+
+def test_non_scalar_const_object_enforced() -> None:
+    """A non-scalar (object) const value is rendered in gemma form and enforced:
+    the conforming rendering is accepted and a divergent value is rejected."""
+    schema = {"type": "object", "properties": {"c": {"const": {"a": 1}}}}
+    m = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    assert _accepts(m, "<|tool_call>call:f{c:{a:1}}<tool_call|>")
+    m2 = _gemma_matcher(_tools_with_schemas({"f": schema}))
+    assert not _accepts(m2, "<|tool_call>call:f{c:{a:2")
+
+
+def test_scalar_const_compiles() -> None:
+    """A tool schema with a scalar string const compiles successfully."""
+    grammar = _compile_grammar(
+        _tools_with_schemas(
+            {
+                "f": {
                     "type": "object",
-                    "properties": {
-                        "city": {"type": "string"},
-                    },
-                    "required": ["city"],
-                    "additionalProperties": False,
-                },
-            },
-            "required": ["address"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
+                    "properties": {"mode": {"const": "fast"}},
+                }
+            }
+        )
     )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    bad = (
-        f"<|tool_call>call:send"
-        f"{{address:{{city:{sd}NYC{sd},zip:10001}}}}"
-        f"<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "additionalProperties:false on nested object should reject extra props"
-    )
-
-
-def test_additional_properties_mixed_levels(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Top-level false + nested true: extras rejected at top, accepted in nested."""
-    tool_schemas = {
-        "update": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer"},
-                "metadata": {
-                    "type": "object",
-                    "properties": {
-                        "source": {"type": "string"},
-                    },
-                    "additionalProperties": True,
-                },
-            },
-            "required": ["id", "metadata"],
-            "additionalProperties": False,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    sd = '<|"|>'
-
-    # Extra props inside metadata: accepted
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    good = (
-        f"<|tool_call>call:update"
-        f"{{id:42,metadata:{{source:{sd}api{sd},version:3}}}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "Extra props inside nested object with additionalProperties:true should be accepted"
-    )
-
-    # Extra props at top level: rejected
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    bad = (
-        f"<|tool_call>call:update"
-        f"{{id:42,metadata:{{source:{sd}api{sd}}},extra:{sd}nope{sd}}}"
-        f"<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Extra props at top level with additionalProperties:false should be rejected"
-    )
-
-
-def test_additional_properties_true_only_extra(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """With additionalProperties:true and all-optional declared props, only extra props work."""
-    tool_schemas = {
-        "flex": {
-            "type": "object",
-            "properties": {
-                "tag": {"type": "string"},
-            },
-            "additionalProperties": True,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    # Skip the declared optional prop, provide only additional ones
-    wire = (
-        f"<|tool_call>call:flex"
-        f"{{custom:{sd}hello{sd},count:5}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "Should accept only-additional properties when declared props are optional"
-    )
-
-
-def test_additional_properties_true_no_extra_still_works(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """additionalProperties:true does not break normal schema-only usage."""
-    tool_schemas = {
-        "get_weather": {
-            "type": "object",
-            "properties": {
-                "location": {"type": "string"},
-                "unit": {"type": "string"},
-            },
-            "required": ["location"],
-            "additionalProperties": True,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    wire = (
-        f"<|tool_call>call:get_weather"
-        f"{{location:{sd}Tokyo{sd},unit:{sd}celsius{sd}}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "additionalProperties:true should not break normal usage"
-    )
-
-
-def test_additional_properties_schema_object(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """additionalProperties as a schema object constrains extra-property types."""
-    tool_schemas = {
-        "terminate_eval": {
-            "type": "object",
-            "properties": {
-                "status": {"type": "string"},
-                "details": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                    },
-                },
-                "summary": {"type": "string"},
-                "next_steps": {"type": "string"},
-            },
-            "required": ["status", "details", "summary", "next_steps"],
-            "additionalProperties": False,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    good = (
-        f"<|tool_call>call:terminate_eval"
-        f"{{status:{sd}failed{sd},"
-        f"details:[{{validator:[{sd}TypeError{sd},{sd}ValueError{sd}]}},"
-        f"{{scheduler:[{sd}TimeoutError{sd}]}}],"
-        f"summary:{sd}3 errors in 2 modules{sd},"
-        f"next_steps:{sd}Fix type errors and scheduler timeout{sd}}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "Schema-object additionalProperties should accept typed extras"
-    )
-
-    bad = (
-        f"<|tool_call>call:terminate_eval"
-        f"{{status:{sd}failed{sd},"
-        f"details:[{{validator:{sd}not_an_array{sd}}}],"
-        f"summary:{sd}err{sd},"
-        f"next_steps:{sd}fix{sd}}}"
-        f"<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Schema-object additionalProperties should reject wrong value type"
-    )
-
-
-def test_additional_properties_schema_object_top_level(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """additionalProperties as a schema object at top level constrains extra-property types."""
-    tool_schemas = {
-        "record": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-            },
-            "required": ["name"],
-            "additionalProperties": {"type": "integer"},
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    good = (
-        f"<|tool_call>call:record"
-        f"{{name:{sd}Alice{sd},age:30,score:100}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "Top-level schema-object additionalProperties should accept typed extras"
-    )
-
-    bad = (
-        f"<|tool_call>call:record"
-        f"{{name:{sd}Alice{sd},age:{sd}not_an_integer{sd}}}"
-        f"<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Top-level schema-object additionalProperties should reject wrong value type"
-    )
-
-
-def test_additional_properties_schema_object_no_properties(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Object with no declared properties, only schema-object additionalProperties."""
-    tool_schemas = {
-        "bag": {
-            "type": "object",
-            "additionalProperties": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    good = (
-        f"<|tool_call>call:bag"
-        f"{{tags:[{sd}a{sd},{sd}b{sd}],names:[{sd}Alice{sd}]}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "Properties-less object with schema-object AP should accept typed extras"
-    )
-
-    bad = f"<|tool_call>call:bag{{tags:{sd}not_an_array{sd}}}<tool_call|>"
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Properties-less object with schema-object AP should reject wrong value type"
-    )
-
-
-def test_additional_properties_default_rejects_extra(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Omitting additionalProperties defaults to false — rejects extras."""
-    tool_schemas = {
-        "lookup": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer"},
-            },
-            "required": ["id"],
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-
-    bad = "<|tool_call>call:lookup{id:42,extra:99}<tool_call|>"
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Omitted additionalProperties should default to false"
-    )
-
-
-def test_additional_properties_schema_object_nested_no_properties(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Nested object property with no declared properties, only schema-object AP."""
-    tool_schemas = {
-        "report": {
-            "type": "object",
-            "properties": {
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                    },
-                },
-            },
-            "required": ["metadata"],
-            "additionalProperties": False,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    good = (
-        f"<|tool_call>call:report"
-        f"{{metadata:{{errors:[{sd}TypeError{sd}],warnings:[{sd}deprecation{sd}]}}}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(good)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "Nested properties-less object with schema-object AP should accept typed extras"
-    )
-
-    bad = (
-        f"<|tool_call>call:report"
-        f"{{metadata:{{errors:{sd}not_an_array{sd}}}}}"
-        f"<tool_call|>"
-    )
-    tokens = minimal_tokenizer(bad)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted < len(tokens), (
-        "Nested properties-less object with schema-object AP should reject wrong type"
-    )
-
-
-def test_additional_properties_true_no_properties_top_level(
-    ll_tokenizer: LLTokenizer,
-    mock_tokenizer: PipelineTokenizer[Any, Any, Any],
-    minimal_tokenizer: _MinimalTokenizer,
-) -> None:
-    """Top-level object with additionalProperties:true and no declared properties."""
-    tool_schemas = {
-        "freeform": {
-            "type": "object",
-            "additionalProperties": True,
-        },
-    }
-    grammar = Gemma4ToolParser.generate_tool_call_grammar(
-        tools=_tools_with_schemas(tool_schemas),
-        tokenizer=mock_tokenizer,
-    )
-    matcher = LLMatcher(ll_tokenizer, grammar)
-    sd = '<|"|>'
-
-    wire = (
-        f"<|tool_call>call:freeform"
-        f"{{name:{sd}Alice{sd},age:30,active:true}}"
-        f"<tool_call|><turn|>"
-    )
-    tokens = minimal_tokenizer(wire)
-    accepted = matcher.validate_tokens(tokens)
-    assert accepted == len(tokens), (
-        "additionalProperties:true with no properties should accept any extras"
-    )
+    compiled = _compile_structural_tag(grammar)
+    assert isinstance(compiled, xgr.CompiledGrammar)

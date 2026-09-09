@@ -68,10 +68,8 @@ def convert_qwen3vl_model_state_dict(
         #     precision.
         #   * All other floating-point tensors → BF16.
         if weight_data.dtype.is_float():
-            is_scale = (
-                checkpoint_name.endswith(".weight_scale")
-                or checkpoint_name.endswith(".input_scale")
-                or checkpoint_name.endswith("_scale_inv")
+            is_scale = checkpoint_name.endswith(
+                (".weight_scale", ".input_scale", "_scale_inv")
             )
 
             if not weight_data.dtype.is_float8() and not is_scale:

@@ -15,6 +15,11 @@ depends-on = ["build"]
 env = { "GRAPH_EXECUTOR" = "graph_executor" }
 cmd = "python test_capi.py"
 
+[tasks.test-v3]
+depends-on = ["build"]
+env = { "GRAPH_EXECUTOR" = "graph_executor" }
+cmd = "python test_capi_v3.py"
+
 [tasks.test-weights]
 depends-on = ["build-weights"]
 env = { "WEIGHTS_EXECUTOR" = "weights_executor" }

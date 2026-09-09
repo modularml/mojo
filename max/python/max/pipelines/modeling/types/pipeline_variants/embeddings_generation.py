@@ -20,9 +20,9 @@ from typing import Any, Protocol, TypeVar, runtime_checkable
 import msgspec
 import numpy as np
 import numpy.typing as npt
-from max.pipelines.modeling.types.context import BaseContext
+from max.pipelines.context import BaseContext
+from max.pipelines.context.tokens import TokenBuffer
 from max.pipelines.modeling.types.pipeline import PipelineInputs, PipelineOutput
-from max.pipelines.modeling.types.tokens import TokenBuffer
 from max.pipelines.request import RequestID
 
 

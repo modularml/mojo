@@ -29,7 +29,8 @@ Two top-level adapters correspond to the two architectures in ``arch.py``:
 Both adapters share :func:`_convert_merged_state_dict`, which processes
 vision and language keys in a single loop over the raw checkpoint.
 
-For MXFP4 checkpoints the model calls :func:`preshuffle_mxfp4_b_experts`
+For MXFP4 checkpoints the model calls
+:func:`~max.pipelines.weights.block_scaled_preshuffle.preshuffle_block_scaled_b_experts`
 on the post-adapter state dict to lay expert ``B`` bytes out in
 ``Shuffler.b_5d_grouped_layout`` for the AMD preb grouped-matmul kernel.
 The preshuffle is pure-numpy on CPU.
@@ -40,13 +41,10 @@ from __future__ import annotations
 import dataclasses
 import logging
 import re
-import time
-from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 
-import numpy as np
 from max.dtype import DType
 from max.graph.weights import WeightData, Weights
+from max.pipelines.weights._fp8 import dequantize_rowwise_fp8
 from transformers.configuration_utils import PretrainedConfig
 
 logger = logging.getLogger("max.pipelines")
@@ -115,9 +113,7 @@ def _rename_vision_key(checkpoint_name: str) -> str:
 def _cast_vision_weight(checkpoint_name: str, weight: Weights) -> WeightData:
     """Return WeightData, casting floats (non-FP8, non-scale) to bfloat16."""
     weight_data = weight.data()
-    is_scale = checkpoint_name.endswith(
-        ".weight_scale"
-    ) or checkpoint_name.endswith(".input_scale")
+    is_scale = checkpoint_name.endswith((".weight_scale", ".input_scale"))
     if (
         weight_data.dtype.is_float()
         and not weight_data.dtype.is_float8()
@@ -134,93 +130,47 @@ _EXPERT_WEIGHT_RE = re.compile(
 )
 
 
-def _as_shuffleable_mxfp4_b(wd: WeightData) -> np.ndarray | None:
-    """Return ``wd`` as a numpy view if it's a shuffleable MXFP4 B weight.
-
-    A weight is shuffleable when its dtype is packed-MXFP4 (uint8) and its
-    dims are MFMA-tile-aligned: ``N % 16 == 0`` (NLane=16) and
-    ``K_BYTES % 64 == 0`` (4 KLane * 16 KPack). The shuffle reshape
-    hardcodes those factors, so non-aligned dims would crash on reshape.
-    Returns ``None`` when the weight isn't shuffleable.
-    """
-    if wd.dtype != DType.uint8:
-        return None
-    arr = np.from_dlpack(wd.data)
-    if arr.ndim != 2 or arr.shape[0] % 16 != 0 or arr.shape[1] % 64 != 0:
-        return None
-    return arr
-
-
-def _shuffle_b_5d(src: np.ndarray, dst: np.ndarray) -> None:
-    """Permute MXFP4 expert B bytes into ``Shuffler.b_5d_grouped_layout``.
-
-    Reshape ``[N, K_BYTES]`` row-major into the 5D tile structure
-    ``(N0, NLane=16, K0, KLane=4, KPack=16)`` and transpose into
-    ``(N0, K0, KLane, NLane, KPack)`` so C-order strides match
-    ``b_5d_grouped_layout`` in ``mxfp4_preshuffle_layouts.mojo``. ``dst``
-    is a contiguous ``(N, K_BYTES)`` slot the caller owns.
-    """
-    N, K_BYTES = src.shape
-    src_v = src.reshape(N // 16, 16, K_BYTES // 64, 4, 16).transpose(
-        0, 2, 3, 1, 4
-    )
-    dst_v = dst.reshape(N // 16, K_BYTES // 64, 4, 16, 16)
-    np.copyto(dst_v, src_v)
-
-
-def preshuffle_mxfp4_b_experts(
+def _dequantize_fp8_attention(
     state_dict: dict[str, WeightData],
-) -> None:
-    """MXFP4 B preshuffle of all per-expert weights in-place on CPU.
+) -> dict[str, WeightData]:
+    """Dequantize rowwise-FP8 attention projections to bfloat16.
 
-    Walks ``state_dict``, groups expert weights by ``(prefix, proj)``,
-    rewrites each group's WeightData entries with the bytes laid out in
-    ``b_5d_grouped_layout`` so the AMD ``mxfp4_grouped_matmul_amd_preb``
-    kernel reads them with coalesced DRAM->VGPR loads. Experts whose
-    dtype/shape isn't MXFP4-packed uint8 with tile-aligned dims are
-    silently skipped (they fall through to the row-major kernel).
-
-    One numpy buffer per ``(prefix, proj)`` group keeps allocation count
-    at ~180. Per-expert allocations would mean ~70k mmap chunks, blowing
-    past glibc's M_MMAP_MAX (65536).
+    Some MXFP4 Kimi checkpoints keep the MoE in MXFP4 but store the attention
+    projections as rowwise FP8. The MLA is built in bf16 when the MoE is FP4,
+    so fold each FP8 attention weight into bf16 and drop its scale. Only the
+    attention linears are FP8; the layernorms stay bf16. Runs only when the
+    checkpoint carries packed-MXFP4 experts, leaving pure-FP8 checkpoints for
+    the native FP8 path.
     """
-    groups: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
-    for name in state_dict:
-        if m := _EXPERT_WEIGHT_RE.match(name):
-            groups[m["prefix"], m["proj"]].append(name)
-
-    if not groups:
-        return
-
-    t0 = time.perf_counter()
-    n_total = 0
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        for names in groups.values():
-            shuffleable = [
-                (name, arr)
-                for name in names
-                if (arr := _as_shuffleable_mxfp4_b(state_dict[name]))
-                is not None
-            ]
-            if not shuffleable:
-                continue
-
-            kept_names, srcs = zip(*shuffleable, strict=True)
-            N, K_BYTES = srcs[0].shape
-            buf = np.empty((len(srcs), N, K_BYTES), dtype=np.uint8)
-            list(pool.map(_shuffle_b_5d, srcs, buf))
-            for name, slot in zip(kept_names, buf, strict=True):
-                state_dict[name] = WeightData.from_numpy(
-                    slot, name=state_dict[name].name
-                )
-            n_total += len(srcs)
-
-    logger.info(
-        "MXFP4 B preshuffle: %d experts across %d groups in %.1fs",
-        n_total,
-        len(groups),
-        time.perf_counter() - t0,
+    has_mxfp4_experts = any(
+        _EXPERT_WEIGHT_RE.match(name) and wd.dtype == DType.uint8
+        for name, wd in state_dict.items()
     )
+    if not has_mxfp4_experts:
+        return state_dict
+
+    converted: dict[str, WeightData] = {}
+    n_dequant = 0
+    for name, wd in state_dict.items():
+        if ".self_attn." not in name:
+            converted[name] = wd
+        elif name.endswith(".weight_scale"):
+            # Folded into the dequantized weight, so drop it.
+            pass
+        elif wd.dtype == DType.float8_e4m3fn:
+            scale = state_dict[name.removesuffix(".weight") + ".weight_scale"]
+            converted[name] = dequantize_rowwise_fp8(
+                wd, scale, wd.name, out_dtype=DType.bfloat16
+            )
+            n_dequant += 1
+        else:
+            converted[name] = wd
+
+    if n_dequant:
+        logger.info(
+            "FP8 attention dequant: %d projections to bfloat16", n_dequant
+        )
+    return converted
 
 
 def _convert_merged_state_dict(
@@ -276,9 +226,7 @@ def _convert_merged_state_dict(
             continue
         if name.endswith(".self_attn.rotary_emb.inv_freq"):
             continue
-        if drop_kv_scales and (
-            name.endswith(".k_scale") or name.endswith(".v_scale")
-        ):
+        if drop_kv_scales and (name.endswith((".k_scale", ".v_scale"))):
             continue
 
         data = weight.data()
@@ -287,7 +235,7 @@ def _convert_merged_state_dict(
             data = dataclasses.replace(data, dtype=DType.float8_e8m0fnu)
         result[name] = data
 
-    return result
+    return _dequantize_fp8_attention(result)
 
 
 # ---------------------------------------------------------------------------
@@ -396,13 +344,13 @@ def convert_eagle3_draft_state_dict(
         for before, after in _EAGLE3_KEY_MAP.items():
             if name.startswith(before):
                 new_name = after + name[len(before) :]
-                result[new_name] = weight.data()
+                result[new_name] = _cast_vision_weight(name, weight)
                 mapped = True
                 break
 
         if not mapped:
             # fc.*, norm.*, lm_head.* pass through directly
-            result[name] = weight.data()
+            result[name] = _cast_vision_weight(name, weight)
 
     return result
 
@@ -411,7 +359,7 @@ def convert_eagle3_draft_state_dict(
 # Llama-style Eagle3 draft checkpoint adapter
 # ---------------------------------------------------------------------------
 
-# Llama Eagle3 checkpoint key prefix -> Eagle3MHAKimiK25 module path.
+# Llama Eagle3 checkpoint key prefix -> Eagle3MHADraft module path.
 # The MHA draft module's layer is flat (single block, no ``decoder_layer``
 # namespace), so the mapping strips the single-layer prefix and inlines
 # norms.
@@ -443,7 +391,7 @@ def convert_llama_eagle3_draft_state_dict(
     state_dict: dict[str, Weights],
     **unused_kwargs,
 ) -> dict[str, WeightData]:
-    """Convert a ``LlamaForCausalLMEagle3`` checkpoint to ``Eagle3MHAKimiK25``.
+    """Convert a ``LlamaForCausalLMEagle3`` checkpoint to ``Eagle3MHADraft``.
 
     Handles both ``model.*``-prefixed (standard HF Llama) and
     ``layers.0.*``-prefixed (EAGLE-export) checkpoints. ``fc.*``,
@@ -455,10 +403,10 @@ def convert_llama_eagle3_draft_state_dict(
         for before, after in _LLAMA_EAGLE3_KEY_MAP.items():
             if name.startswith(before):
                 new_name = after + name[len(before) :]
-                result[new_name] = weight.data()
+                result[new_name] = _cast_vision_weight(name, weight)
                 mapped = True
                 break
         if not mapped:
             # fc.*, norm.*, lm_head.* and any other top-level keys.
-            result[name] = weight.data()
+            result[name] = _cast_vision_weight(name, weight)
     return result

@@ -64,8 +64,8 @@ MODULAR_DEBUG=source-tracebacks max serve --model modularai/Llama-3.1-8B-Instruc
 ```
 
 You can also enable this through the Python API on
-[`Graph`](/max/api/python/generated/max.graph.Graph). See the
-[overview](/max/develop/debugging#how-debug-options-are-applied) for how to
+[`Graph`](/api/python/generated/max.graph.Graph). See the
+[overview](/develop/debugging#how-debug-options-are-applied) for how to
 configure debug options in Python code.
 
 :::tip
@@ -81,9 +81,9 @@ source tracebacks map each op back to the code.
 Now that you can see what your model is doing at runtime, explore related
 debug options that use the same tracing data:
 
-- [Debug accuracy issues](/max/develop/debugging-accuracy): Combine
+- [Debug accuracy issues](/develop/debugging-accuracy): Combine
   `source-tracebacks` with `nan-check` for the most actionable accuracy
   error messages.
-- [Debug GPU errors](/max/develop/debugging-gpu): When tracing shows the
+- [Debug GPU errors](/develop/debugging-gpu): When tracing shows the
   failure originated on a GPU device, force synchronous dispatch to
   pinpoint the exact op.

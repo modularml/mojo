@@ -42,4 +42,4 @@ jobs:
 
       - name: Run lint
         run: |
-          ./bazelw run //:lint
+          ./bazelw run --config=prebuilt-mojo //:lint-all

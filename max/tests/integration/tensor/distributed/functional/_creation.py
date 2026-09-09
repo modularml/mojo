@@ -227,5 +227,3 @@ class _Properties:
 
 class CreationTests(_Full, _Distribute, _Properties):
     """Aggregates all creation test classes for thin subclassing."""
-
-    pass

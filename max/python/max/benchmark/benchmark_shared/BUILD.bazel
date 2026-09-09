@@ -16,21 +16,73 @@ modular_py_library(
     deps = [],
 )
 
+# Lightweight shared benchmark-result to CSV core (flattening + column
+# selection + streaming/type-driven writers). Carved out of the full
+# ``benchmark_shared`` library — like ``percentile_metrics`` — so dependency-
+# light consumers can build on it without pulling the heavy transitive tree:
+# the ``results_to_csv`` CLI binary and ``utils/benchmarking/results_publication``
+# depend on just this target.
+modular_py_library(
+    name = "model_csv",
+    srcs = ["model_csv.py"],
+    deps = [
+        requirement("pydantic"),
+        requirement("typing-extensions"),
+    ],
+)
+
+# Lightweight library containing just the canonical backend / framework
+# name literals. Carved out (deps = []) so MAX-free consumers -- notably
+# the config generator's ``:catalogs`` library -- can share the single
+# source of truth for backend name strings without pulling in the full
+# ``benchmark_shared`` library and its transitive deps.
+modular_py_library(
+    name = "backend_names",
+    srcs = ["backend_names.py"],
+    deps = [],
+)
+
+# Namespaced presentation schemas for ``BenchmarkResult.result_groups``.
+# Carved out (pydantic + ``:percentile_metrics`` only) so consumers that
+# only need the group type shapes — e.g. the benchmark-visibility
+# dashboard once uv/Docker packaging lands (MXTOOLS-45) — can import them
+# without pulling the full ``benchmark_shared`` runner tree. Public
+# visibility matches the intended non-MAX consumer path; the full
+# ``:benchmark_shared`` library depends on this target and excludes the
+# file from its own ``srcs`` glob.
+modular_py_library(
+    name = "result_groups",
+    srcs = ["result_groups.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":percentile_metrics",
+        requirement("pydantic"),
+    ],
+)
+
 modular_py_library(
     name = "benchmark_shared",
     srcs = glob(
         ["**/*.py"],
-        exclude = ["percentile_metrics.py"],
+        exclude = [
+            "backend_names.py",
+            "model_csv.py",
+            "percentile_metrics.py",
+            "result_groups.py",
+        ],
     ),
     data = glob(["datasets/packaged_data/**/*"]) + [
         "//max/python/max/benchmark:benchmark_config_yaml_files",
     ],
     deps = [
+        ":backend_names",
         ":percentile_metrics",
+        ":result_groups",
         "//max/python/max/config",
         "//max/python/max/profiler",
         "//max/python/max/serve:config",
         requirement("aiohttp"),
+        requirement("cyclopts"),
         requirement("datasets"),
         requirement("huggingface-hub"),
         requirement("msgspec"),
@@ -41,6 +93,7 @@ modular_py_library(
         requirement("pydantic"),
         requirement("pyyaml"),
         requirement("requests"),
+        requirement("tabulate"),
         requirement("taskgroup"),
         requirement("tqdm"),
         requirement("transformers"),

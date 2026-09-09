@@ -39,7 +39,7 @@ struct GridDim(TrivialRegisterPassable):
 
 
 def init_atoms(
-    atoms: UnsafePointer[Float32, MutAnyOrigin],
+    atoms: UnsafePointer[mut=True, Float32, _],
     num_atoms: Int,
     grid_spacing: Float32,
     grid_x: Int,
@@ -74,8 +74,8 @@ def init_atoms(
 
 
 def verify_grid(
-    grid_ref: UnsafePointer[Float32, MutAnyOrigin],
-    grid_test: UnsafePointer[Float32, MutAnyOrigin],
+    grid_ref: UnsafePointer[mut=False, Float32, _],
+    grid_test: UnsafePointer[mut=False, Float32, _],
     size: Int,
 ) -> Bool:
     """Verify computed energy grid against reference.
@@ -116,7 +116,7 @@ def verify_grid(
 
 
 def compute_total_energy(
-    energygrid: UnsafePointer[Float32, MutAnyOrigin], size: Int
+    energygrid: UnsafePointer[mut=False, Float32, _], size: Int
 ) -> Float64:
     """Compute total energy by summing all grid points.
 

@@ -24,26 +24,27 @@ from .types import DepEdge, OpDesc, ResourceKind
 struct OpNode(ImplicitlyCopyable, Movable):
     """An operation in the Loop Dependency Graph (LDG).
 
-    Enriches OpDesc with resource assignment and latency — the information
+    Enriches OpDesc with resource assignment and latency, the information
     needed for modulo scheduling (GAG96). Each OpNode represents one vertex
-    in the LDG:
-
-      - resource: which hardware unit executes this op (from OpDesc.resource)
-      - latency: estimated cycles until the result is available
-      - op: the underlying OpDesc with kind, stage, subtile, etc.
+    in the LDG.
 
     Latencies are approximate and used for scheduling heuristics (ASAP/ALAP
     priority), not for cycle-accurate simulation. Typical values:
 
-      GLOBAL_MEM (buffer_load → LDS): ~200 cycles
-      LDS (ds_read → register):       ~20 cycles
-      MMA_UNIT (MFMA execution):      ~16 cycles
-      SCALAR (barriers, fences):      ~0 cycles (sync, not compute)
+    ```text
+    GLOBAL_MEM (buffer_load → LDS): ~200 cycles
+    LDS (ds_read → register):       ~20 cycles
+    MMA_UNIT (MFMA execution):      ~16 cycles
+    SCALAR (barriers, fences):      ~0 cycles (sync, not compute)
+    ```
     """
 
     var op: OpDesc
+    """The underlying `OpDesc` with kind, stage, subtile, etc."""
     var resource: ResourceKind
+    """Hardware unit that executes this op (from `OpDesc.resource`)."""
     var latency: Int
+    """Estimated cycles until the result is available."""
 
     @always_inline
     def __init__(
@@ -142,8 +143,11 @@ struct LoopBody(Copyable, Movable):
         """Compute ASAP (As Soon As Possible) times for each operation.
 
         ASAP(op) = max over all predecessors p of:
-            ASAP(p) + latency(p)   if d == 0 (same iteration)
-            0                      if d >= 1 (loop-carried, skip)
+
+        ```text
+        ASAP(p) + latency(p)   if d == 0 (same iteration)
+        0                      if d >= 1 (loop-carried, skip)
+        ```
 
         Operations with no same-iteration predecessors get ASAP = 0.
         This is computed via a fixed-point iteration (handles any DAG order).
@@ -156,7 +160,10 @@ struct LoopBody(Copyable, Movable):
         """Compute ALAP (As Late As Possible) times for each operation.
 
         ALAP(op) = min over all same-iteration successors s of:
-            ALAP(s) - latency(op)
+
+        ```text
+        ALAP(s) - latency(op)
+        ```
 
         Operations with no same-iteration successors get
         ALAP = makespan - latency(op).
@@ -171,9 +178,10 @@ struct LoopBody(Copyable, Movable):
             makespan: Target schedule length to compute ALAP relative to.
                 Typically the ASAP critical path length.
         """
-        var alap = List[Int]()
-        for i in range(len(self.ops)):
-            alap.append(makespan - self.ops[i].latency)
+        var alap = List(
+            length=len(self.ops),
+            fill_with=lambda (i: Int) -> Int: makespan - self.ops[i].latency,
+        )
         self._propagate_times(alap, forward=False)
         return alap^
 

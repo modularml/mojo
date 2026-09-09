@@ -1,0 +1,23 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+%%python
+def foo():
+  return "this is sparta"
+# CHECK: (PythonObject) foo =
+
+%%python
+x = foo()
+# CHECK: (PythonObject) x =
+
+%%python
+print(x)
+# CHECK-NOT: lldb_python_module
+

@@ -20,18 +20,27 @@ modular_py_library(
     ],
     deps = [
         "//max/python/max/benchmark/benchmark_shared",
+        "//max/python/max/benchmark/benchmark_shared:model_csv",
         "//max/python/max/profiler",
         requirement("cyclopts"),
         requirement("jinja2"),
         requirement("numpy"),
         requirement("openai"),
+        requirement("psutil"),
         requirement("pydantic"),
         requirement("pyyaml"),
-        requirement("tqdm"),
         requirement("tiktoken"),
         requirement("transformers"),
         requirement("requests"),
-        requirement("typing-extensions"),
+    ],
+)
+
+modular_py_binary(
+    name = "results_to_csv",
+    srcs = ["results_to_csv.py"],
+    main = "results_to_csv.py",
+    deps = [
+        "//max/python/max/benchmark/benchmark_shared:model_csv",
     ],
 )
 
@@ -40,8 +49,8 @@ modular_py_binary(
     srcs = ["serve_replay.py"],
     visibility = [":__subpackages__"],
     deps = [
-        "//max/python/max/entrypoints:pipelines",
-        "//max/python/max/entrypoints:replay_recording",
+        "//max/python/max/_entrypoints:pipelines",
+        "//max/python/max/_entrypoints:replay_recording",
         requirement("click"),
         requirement("httpx"),
     ],

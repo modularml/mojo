@@ -16,31 +16,12 @@
 from __future__ import annotations
 
 import pytest
-from max.pipelines.modeling.types import TextGenerationContext
-from testbed.harnesses.gpt_oss_attention import (
-    GptOssAttentionHarness,
-    GptOssAttentionStaticParams,
-)
+from layer_mefs import create_runner
+from max.pipelines.context import TextContext
+from testbed.harnesses.gpt_oss_attention import GptOssAttentionStaticParams
 from testbed.harnesses.ragged_attention_harness import AttentionDynamicParams
-from testbed.runner import LayerTestRunner, create_session
-
-# openai/gpt-oss-120b config
-_STATIC_PARAMS = GptOssAttentionStaticParams(
-    hidden_size=2880,
-    n_heads=64,
-    n_kv_heads=8,
-    head_dim=64,
-    max_seq_len=131072,
-    rope_theta=150000.0,
-    has_bias=True,
-    layer_type="full_attention",
-    local_window_size=128,
-    rope_factor=32.0,
-    rope_beta_fast=32.0,
-    rope_beta_slow=1.0,
-    rope_original_max_pos=4096,
-    rope_truncate=False,
-)
+from testbed.runner import LayerTestRunner
+from testbed.specs import GPT_OSS_ATTENTION
 
 _SMOKE_SHAPES = [
     AttentionDynamicParams(batch_size=1, seq_len=8192, ctx_len=8192),
@@ -52,19 +33,16 @@ _SMOKE_SHAPES = [
 def runner() -> LayerTestRunner[
     GptOssAttentionStaticParams,
     AttentionDynamicParams,
-    list[TextGenerationContext],
+    list[TextContext],
 ]:
-    session, device = create_session()
-    return LayerTestRunner(
-        GptOssAttentionHarness(_STATIC_PARAMS, session, device)
-    )
+    return create_runner(GPT_OSS_ATTENTION)
 
 
 def test_benchmark_smoke(
     runner: LayerTestRunner[
         GptOssAttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     results = runner.benchmark(_SMOKE_SHAPES, iterations=1, warmup=1)
@@ -76,7 +54,7 @@ def test_correctness(
     runner: LayerTestRunner[
         GptOssAttentionStaticParams,
         AttentionDynamicParams,
-        list[TextGenerationContext],
+        list[TextContext],
     ],
 ) -> None:
     # Correctness only works for prefill (ctx_len=0), batch_size=1.

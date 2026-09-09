@@ -1,0 +1,12 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+mojo_test(
+    name = "test_bencher_iter_custom.mojo.test",
+    srcs = ["test_bencher_iter_custom.mojo"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)

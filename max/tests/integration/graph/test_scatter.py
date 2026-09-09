@@ -142,6 +142,155 @@ def test_scatter_nd(
     )
 
 
+def _reduce_updates(
+    np_reduce: np.ufunc, n_idx: int, cols: int, n_targets: int
+) -> np.ndarray:
+    """Builds update values that keep the reduction exact in float32 in any
+    application order: all ones for add; ones with four twos per target row
+    for mul (each target scaled by exactly 2**4); small modular integers for
+    max/min (order-independent)."""
+    if np_reduce is np.add:
+        return np.ones((n_idx, cols), dtype=np.float32)
+    if np_reduce is np.multiply:
+        updates = np.ones((n_idx, cols), dtype=np.float32)
+        updates[: 4 * n_targets] = 2.0
+        return updates
+    values = (np.arange(n_idx, dtype=np.float32) * 37) % 251
+    return np.broadcast_to(values[:, None], (n_idx, cols)).copy()
+
+
+_SCATTER_ND_REDUCE_OPS = [
+    (ops.scatter_nd_add, np.add),
+    (ops.scatter_nd_mul, np.multiply),
+    (ops.scatter_nd_max, np.maximum),
+    (ops.scatter_nd_min, np.minimum),
+]
+
+
+def test_scatter_nd_reduce_duplicate_indices(
+    session: InferenceSession,
+) -> None:
+    """Duplicate index vectors must reduce, not race: 8192 update rows
+    collide on 4 target rows, so on GPU thousands of threads reduce into the
+    same elements concurrently. Update values keep each reduction exact in
+    float32 in any application order, so each result must match the serial
+    numpy reference exactly. All four reduce ops share one graph so the
+    test compiles once.
+    """
+    rows, cols, n_idx, n_targets = 64, 16, 8192, 4
+
+    input_array = (np.arange(rows * cols, dtype=np.float32) % 7).reshape(
+        rows, cols
+    )
+    indices_data = ((np.arange(n_idx, dtype=np.int32) % n_targets) * 5 + 3)[
+        :, None
+    ]
+    all_updates = [
+        _reduce_updates(np_reduce, n_idx, cols, n_targets)
+        for _, np_reduce in _SCATTER_ND_REDUCE_OPS
+    ]
+
+    input_type = TensorType(DType.float32, input_array.shape, device_ref)
+    with Graph("scatter_nd_reduce_dup", input_types=[input_type]) as graph:
+        input_val = graph.inputs[0].tensor
+        indices = ops.constant(indices_data, DType.int32, device=device_ref)
+        graph.output(
+            *(
+                op(
+                    input_val,
+                    ops.constant(
+                        updates_data, DType.float32, device=device_ref
+                    ),
+                    indices,
+                )
+                for (op, _), updates_data in zip(
+                    _SCATTER_ND_REDUCE_OPS, all_updates, strict=False
+                )
+            )
+        )
+
+    model = session.load(graph)
+    input_tensor = Buffer.from_numpy(input_array).to(model.input_devices[0])
+
+    results = model.execute(input_tensor)
+    for (op, np_reduce), updates_data, result in zip(
+        _SCATTER_ND_REDUCE_OPS, all_updates, results, strict=False
+    ):
+        assert isinstance(result, Buffer)
+        expected = input_array.copy()
+        np_reduce.at(expected, indices_data.ravel(), updates_data)
+        np.testing.assert_equal(
+            result.to_numpy(), expected, err_msg=op.__name__
+        )
+
+
+_SCATTER_REDUCE_OPS = [
+    (ops.scatter_add, np.add),
+    (ops.scatter_mul, np.multiply),
+    (ops.scatter_max, np.maximum),
+    (ops.scatter_min, np.minimum),
+]
+
+
+def test_scatter_reduce_parallel_duplicate_indices(
+    session: InferenceSession,
+) -> None:
+    """The scatter-elements reduce ops run on CPU and split their updates
+    across worker threads once the update count exceeds the elementwise
+    grain size (32768); duplicate indices must still reduce atomically.
+    100k updates collide on 8 target rows; values keep each reduction exact
+    in float32 in any application order, so each result must match the
+    serial numpy reference exactly. All four reduce ops share one graph so
+    the test compiles once.
+    """
+    rows, n_idx, n_targets = 64, 100_000, 8
+
+    input_array = (np.arange(rows, dtype=np.float32) % 7)[:, None]
+    indices_data = ((np.arange(n_idx, dtype=np.int32) % n_targets) * 7 + 1)[
+        :, None
+    ]
+    all_updates = [
+        _reduce_updates(np_reduce, n_idx, 1, n_targets)
+        for _, np_reduce in _SCATTER_REDUCE_OPS
+    ]
+
+    input_type = TensorType(DType.float32, input_array.shape, DeviceRef.CPU())
+    with Graph("scatter_reduce_dup", input_types=[input_type]) as graph:
+        input_val = graph.inputs[0].tensor
+        indices = ops.constant(
+            indices_data, DType.int32, device=DeviceRef.CPU()
+        )
+        graph.output(
+            *(
+                op(
+                    input_val,
+                    ops.constant(
+                        updates_data, DType.float32, device=DeviceRef.CPU()
+                    ),
+                    indices,
+                    axis=0,
+                )
+                for (op, _), updates_data in zip(
+                    _SCATTER_REDUCE_OPS, all_updates, strict=False
+                )
+            )
+        )
+
+    model = session.load(graph)
+    input_tensor = Buffer.from_numpy(input_array).to(model.input_devices[0])
+
+    results = model.execute(input_tensor)
+    for (op, np_reduce), updates_data, result in zip(
+        _SCATTER_REDUCE_OPS, all_updates, results, strict=False
+    ):
+        assert isinstance(result, Buffer)
+        expected = input_array.copy()
+        np_reduce.at(expected[:, 0], indices_data.ravel(), updates_data[:, 0])
+        np.testing.assert_equal(
+            result.to_numpy(), expected, err_msg=op.__name__
+        )
+
+
 @pytest.mark.skipif(
     accelerator_count() == 0, reason="requires a GPU to test device check"
 )

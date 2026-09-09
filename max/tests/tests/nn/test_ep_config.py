@@ -12,7 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 
 import pytest
+from max.dtype import DType
 from max.nn.comm.ep import calculate_ep_max_tokens_per_rank
+from max.nn.comm.ep.ep_config import estimate_ep_memory_usage
 
 
 @pytest.mark.parametrize(
@@ -60,3 +62,42 @@ def test_calculate_ep_max_tokens_per_rank_allreduce_bypasses_tp() -> None:
         )
         == 4196
     )
+
+
+def _ep_memory_usage(
+    dispatch_dtype: DType, dispatch_element_dtype: DType | None
+) -> int:
+    return estimate_ep_memory_usage(
+        hidden_size=32,
+        dispatch_dtype=dispatch_dtype,
+        combine_dtype=DType.bfloat16,
+        max_tokens_per_rank=4,
+        n_experts=2,
+        n_nodes=1,
+        n_gpus_per_node=2,
+        top_k=1,
+        dispatch_element_dtype=dispatch_element_dtype,
+    )
+
+
+def test_estimate_ep_memory_usage_mxfp6_uses_three_quarter_byte_packing() -> (
+    None
+):
+    """MXFP6 packs four codes per three bytes, plus one E8M0 byte per 32-block.
+
+    ``uint8`` alone cannot tell MXFP4 from MXFP6, so a config that forgets
+    ``dispatch_element_dtype`` silently falls through to the FP4/NVFP4
+    packing ratio instead of failing loudly -- this pins the two to known,
+    distinct byte counts for the same logical shape.
+    """
+    assert (
+        _ep_memory_usage(DType.uint8, DType.float6_e2m3fn) == 556
+    )  # d_token_size = 32*3//4 + 32//32 = 25 bytes.
+    assert (
+        _ep_memory_usage(DType.uint8, DType.float6_e3m2fn) == 556
+    )  # Both FP6 encodings pack identically; only the codes differ.
+
+
+def test_estimate_ep_memory_usage_distinguishes_fp6_from_fp4_packing() -> None:
+    assert _ep_memory_usage(DType.uint8, None) == 472  # NVFP4/MXFP4 ratio.
+    assert _ep_memory_usage(DType.bfloat16, None) == 1024  # Unpacked.

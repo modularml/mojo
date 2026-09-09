@@ -11,21 +11,24 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.collections import Set
 from std.math import ceildiv, rsqrt
 from std.random import random_ui64, seed
 from std.sys.defines import get_defined_int
 from layout._utils import ManagedLayoutTensor
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from kv_cache.types import (
     ContinuousBatchingKVCacheCollection,
     KVCacheStaticParams,
     PagedKVCacheCollection,
 )
-from kv_cache_test_utils import assert_no_nan_inf, padded_lut_cols
+from kv_cache_test_utils import (
+    assert_no_nan_inf,
+    padded_lut_cols,
+    random_distinct,
+)
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
 from layout._fillers import random
-from std.memory import memcpy, memset_zero
+from std.memory import unsafe_memcpy, unsafe_memset_zero
 from nn.attention.gpu.mha import flash_attention
 from nn.attention.mha_mask import CausalMask, MHAMask, SlidingWindowCausalMask
 from std.testing import assert_almost_equal, assert_equal
@@ -48,7 +51,7 @@ def execute_ragged_flash_attention[
     ctx: DeviceContext,
 ) raises:
     # TODO(KERN-2666): float32 + depth=256 exceeds shared memory on H100/B200.
-    comptime if dtype == DType.float32 and kv_params.head_size == 256:
+    comptime if dtype == .float32 and kv_params.head_size == 256:
         return
 
     comptime page_size = get_defined_int["page_size", 256]()
@@ -110,14 +113,12 @@ def execute_ragged_flash_attention[
     ].row_major(cache_lengths_shape)
 
     # Create device buffers
-    var input_row_offsets = ManagedLayoutTensor[
-        DType.uint32, row_offsets_layout
-    ](
+    var input_row_offsets = ManagedLayoutTensor[.uint32, row_offsets_layout](
         row_offsets_runtime_layout,
         ctx,
     )
     var cache_lengths_managed = ManagedLayoutTensor[
-        DType.uint32, cache_lengths_layout
+        .uint32, cache_lengths_layout
     ](
         cache_lengths_runtime_layout,
         ctx,
@@ -194,11 +195,11 @@ def execute_ragged_flash_attention[
     var kv_block_paged = ManagedLayoutTensor[dtype, kv_block_6d_layout](
         kv_block_paged_runtime_layout, ctx
     )
-    var lookup_table = ManagedLayoutTensor[DType.uint32, lookup_table_layout](
+    var lookup_table = ManagedLayoutTensor[.uint32, lookup_table_layout](
         lookup_table_runtime_layout,
         ctx,
     )
-    var paged_lut = ManagedLayoutTensor[DType.uint32, paged_lut_layout](
+    var paged_lut = ManagedLayoutTensor[.uint32, paged_lut_layout](
         paged_lut_runtime_layout,
         ctx,
     )
@@ -211,24 +212,19 @@ def execute_ragged_flash_attention[
     random(kv_block_continuous_tensor)
     var lookup_table_host = lookup_table.tensor[update=False]()
 
-    # Hacky way to select random blocks for continuous batching
-    var block_idx_set = Set[Int]()
-    var idx = 0
-    while idx < batch_size:
-        var randval = Int(random_ui64(0, UInt64(num_continuous_blocks - 1)))
-        if randval in block_idx_set:
-            continue
-
-        block_idx_set.add(randval)
-        lookup_table_host[idx] = UInt32(randval)
-        idx += 1
+    # Assign each batch entry a distinct continuous block. `random_ui64` is
+    # inclusive, so the original draw range `[0, num_continuous_blocks - 1]`
+    # is a population of `num_continuous_blocks` blocks.
+    var continuous_blocks = random_distinct(num_continuous_blocks, batch_size)
+    for idx in range(batch_size):
+        lookup_table_host[idx] = UInt32(continuous_blocks[idx])
 
     # Create LayoutTensors for KV collection
     var kv_block_continuous_lt = kv_block_continuous.device_tensor()
     var cache_lengths_lt = cache_lengths_managed.device_tensor()
     var lookup_table_lt = lookup_table.device_tensor()
 
-    kv_collection_continuous_device = ContinuousBatchingKVCacheCollection[
+    var kv_collection_continuous_device = ContinuousBatchingKVCacheCollection[
         dtype, kv_params
     ](
         kv_block_continuous_lt,
@@ -245,19 +241,24 @@ def execute_ragged_flash_attention[
     )
     var paged_lut_tensor = paged_lut.tensor[update=False]()
 
-    paged_lut_set = Set[Int]()
+    # Sample one distinct paged block per page across the whole batch up
+    # front, then hand them out in iteration order. Total pages needed is the
+    # sum of per-sequence page counts and is <= num_paged_blocks by
+    # construction.
+    var total_pages = 0
     for bs in range(batch_size):
-        seq_len = cache_lengths[bs] + valid_lengths[bs]
-        continuous_idx = Int(lookup_table_host[bs])
+        total_pages += ceildiv(cache_lengths[bs] + valid_lengths[bs], page_size)
+    var paged_blocks = random_distinct(num_paged_blocks, total_pages)
+    var page_pos = 0
+    for bs in range(batch_size):
+        var seq_len = cache_lengths[bs] + valid_lengths[bs]
+        var continuous_idx = Int(lookup_table_host[bs])
 
         for block_idx in range(0, ceildiv(seq_len, page_size)):
-            var randval = Int(random_ui64(0, UInt64(num_paged_blocks - 1)))
-            while randval in paged_lut_set:
-                randval = Int(random_ui64(0, UInt64(num_paged_blocks - 1)))
-
-            paged_lut_set.add(randval)
+            var randval = paged_blocks[page_pos]
+            page_pos += 1
             paged_lut_tensor[bs, block_idx] = UInt32(randval)
-            block_sz = min(page_size, seq_len - block_idx * page_size)
+            var block_sz = min(page_size, seq_len - block_idx * page_size)
 
             for kv_idx in range(2):
                 # Calculate offsets manually for the 6D tensors
@@ -300,13 +301,13 @@ def execute_ragged_flash_attention[
                     * kv_block_continuous_shape[5]
                 )
                 var n_cpy = block_sz * kv_params.num_heads * kv_params.head_size
-                memcpy(
+                unsafe_memcpy(
                     dest=kv_block_paged_tensor.ptr + paged_offset,
                     src=kv_block_continuous_tensor.ptr + continuous_offset,
                     count=n_cpy,
                 )
                 if block_sz < page_size:
-                    memset_zero(
+                    unsafe_memset_zero(
                         kv_block_paged_tensor.ptr + paged_offset + n_cpy,
                         (page_size - block_sz)
                         * kv_params.num_heads
@@ -317,7 +318,7 @@ def execute_ragged_flash_attention[
     var kv_block_paged_lt = kv_block_paged.device_tensor()
     var paged_lut_lt = paged_lut.device_tensor()
 
-    kv_collection_paged_device = PagedKVCacheCollection[
+    var kv_collection_paged_device = PagedKVCacheCollection[
         dtype, kv_params, page_size
     ](
         kv_block_paged_lt,
@@ -364,10 +365,10 @@ def execute_ragged_flash_attention[
     var ref_out = ref_output.tensor()
     var test_out = test_output.tensor()
 
-    input_row_offsets_tensor = input_row_offsets.tensor()
+    var input_row_offsets_tensor = input_row_offsets.tensor()
     for bs in range(batch_size):
-        prompt_len = valid_lengths[bs]
-        ragged_offset = Int(input_row_offsets_tensor[bs])
+        var prompt_len = valid_lengths[bs]
+        var ragged_offset = Int(input_row_offsets_tensor[bs])
         for s in range(prompt_len):
             for h in range(num_q_heads):
                 for hd in range(kv_params.head_size):
@@ -404,13 +405,13 @@ def execute_ragged_flash_attention[
         ref_out = ref_output.tensor()
         input_row_offsets_tensor = input_row_offsets.tensor()
         for bs in range(batch_size):
-            prompt_len = valid_lengths[bs]
-            ragged_offset = Int(input_row_offsets_tensor[bs])
+            var prompt_len = valid_lengths[bs]
+            var ragged_offset = Int(input_row_offsets_tensor[bs])
             for s in range(prompt_len):
                 for h in range(num_q_heads):
                     for d in range(kv_params.head_size):
-                        rep = ref_out[ragged_offset + s, h, d]
-                        orig = test_out[ragged_offset + s, h, d]
+                        var rep = ref_out[ragged_offset + s, h, d]
+                        var orig = test_out[ragged_offset + s, h, d]
                         if rep != orig:
                             print("repeat s h d =", repeat, s, h, d)
                         assert_equal(rep, orig)
@@ -426,11 +427,12 @@ def execute_flash_attention_suite[
 
     for bs in [1, 4, 16]:
         comptime for type_idx in range(len(types)):
-            comptime type = types[type_idx]
-            ce_cache_sizes = List[Int]()
-            ce_seq_lens = List[Int]()
-            tg_cache_sizes = List[Int]()
-            tg_seq_lens = List[Int]()
+            comptime type = rebind[DType](types[type_idx])
+            var ce_cache_sizes = List[Int]()
+            var ce_seq_lens = List[Int]()
+            var tg_cache_sizes = List[Int]()
+            var tg_seq_lens = List[Int]()
+
             for _ in range(bs):
                 tg_seq_lens.append(1)
                 tg_cache_sizes.append(Int(random_ui64(1, 1024)))
@@ -484,15 +486,15 @@ def execute_flash_attention_suite[
     # edge cases
     print("CE", 1, DType.bfloat16, "depth=", kv_params.head_size)
     for len in [2, 27]:
-        var short_ce_seq_len = [len]
-        var short_ce_cache_size = [0]
+        var short_ce_seq_len: List = [len]
+        var short_ce_cache_size: List = [0]
         execute_ragged_flash_attention[num_q_heads, DType.bfloat16, kv_params](
             short_ce_seq_len, short_ce_cache_size, 2, 1, mask, ctx
         )
 
     print("TG", 2, DType.bfloat16, "depth=", kv_params.head_size)
-    tg_seq_lens = [1, 1]
-    tg_variable_cache_lens = [1024, 11]
+    var tg_seq_lens: List = [1, 1]
+    var tg_variable_cache_lens: List = [1024, 11]
     execute_ragged_flash_attention[num_q_heads, DType.bfloat16, kv_params](
         tg_seq_lens, tg_variable_cache_lens, 2, 0, mask, ctx
     )
@@ -518,8 +520,8 @@ def main() raises:
         )
         for s in range(20):
             seed(s)
-            tg_cache_sizes = List[Int]()
-            tg_seq_lens = List[Int]()
+            var tg_cache_sizes = List[Int]()
+            var tg_seq_lens = List[Int]()
             for _ in range(4):
                 tg_seq_lens.append(1)
                 tg_cache_sizes.append(Int(random_ui64(1, 1024)))
@@ -552,7 +554,7 @@ def main() raises:
         # in-page mask boundary since it is well below page_size=256.
         comptime sliding_windows = (32, 1024)
         comptime for ws_idx in range(len(sliding_windows)):
-            comptime window_size = sliding_windows[ws_idx]
+            comptime window_size = rebind[Int](sliding_windows[ws_idx])
             seed(42 + window_size)
             print(
                 "Sliding-window suite [window_size=",

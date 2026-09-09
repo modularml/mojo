@@ -1,0 +1,402 @@
+---
+title: Weight adapters
+description: Load a checkpoint into a MAX model by writing a weight adapter that reconciles names, dtypes, and key sets.
+---
+
+Nearly all model architectures require a weight adapter. Write a weight adapter
+to convert checkpoint weights (most often published on Hugging Face) into the
+format expected by your MAX
+[`Module`](/api/python/generated/max.nn.Module/). Then, integrate the weight
+adapter into the [model pipeline](/develop/pipelines/).
+
+:::note
+
+You should be familiar with the `Module` class before writing a weight adapter.
+To learn more, see [Build a model graph with Module](/develop/modules/).
+
+:::
+
+## What a weight adapter does
+
+A weight adapter is a function you define in `weight_adapters.py` that converts
+checkpoint weights into a state dictionary that you can load into a MAX
+`Module`.
+
+Depending on how the checkpoint differs from your implementation, a weight
+adapter can perform one or more of the following transformations:
+
+- Rename keys to match the parameter names expected by the `Module`. In many
+  architectures, renaming keys is the only transformation required.
+- Cast dtypes to the types expected by the model.
+- Remove weights that exist only in the checkpoint and not in the
+  `Module`.
+- Transform tensor layouts by reshaping, reordering, or repacking tensors into
+  the format expected by the model.
+
+We'll give more information on how to implement these transformations in the
+following sections.
+
+## When the weight adapter runs
+
+The following steps show when the weight adapter runs within the
+entire weight loading flow:
+
+1. The pipeline calls
+   [`weights_format()`](/api/python/generated/max.graph.weights.weights_format/#max.graph.weights.weights_format)
+   to detect the checkpoint format from the weight file extensions.
+2. The pipeline retrieves the
+   [registered weight adapter](#registering-the-weight-adapter).
+3. The pipeline calls
+   [`load_weights()`](/api/python/generated/max.graph.weights.load_weights/#max.graph.weights.load_weights)
+   to load the checkpoint into a `Weights` object.
+4. The pipeline constructs your
+   [pipeline model](/api/python/generated/max.pipelines.PipelineModel/) with
+   `weights` and `adapter` as arguments.
+5. The pipeline model builds a state dictionary from the `Weights` object.
+6. The weight adapter renames and converts the tensors and returns a
+   `dict[str, WeightData]`.
+7. Your model passes that result to
+   [`load_state_dict()`](/api/python/generated/max.nn.Module/#max.nn.Module.load_state_dict),
+   which loads the converted tensors into the `Module` hierarchy.
+
+This is how the checkpoint weights become compatible with your `Module` when
+you run `max serve`.
+
+## Checkpoint and module weight formats
+
+Before you write a weight adapter, inspect both the checkpoint and your `Module`
+to understand what transformations you need to implement to make the checkpoint
+compatible.
+
+:::note
+
+Inspecting the checkpoint and module identifies most of the transformations
+your weight adapter must perform. However, it doesn't reveal tensor layout
+mismatches (which are uncommon). See [Tensor
+transformations](#tensor-transformations) to learn more.
+
+:::
+
+### Inspect the checkpoint
+
+To inspect the checkpoint, pass its path to
+[`load_weights()`](/api/python/generated/max.graph.weights.load_weights/)
+and iterate over the entries to print each tensor's name, shape, and dtype:
+
+```python
+from pathlib import Path
+from max.graph.weights import load_weights
+
+weights = load_weights([Path("/path/to/model.safetensors")])  # or .gguf
+for name, weight in weights.items():
+    data = weight.data()
+    shape = list(int(d) for d in data.shape)
+    print(f"{name}: {shape} {data.dtype}")
+```
+
+The output may look similar to the following:
+
+```text
+model.embed_tokens.weight: [vocab_size, hidden_size] DType.bfloat16
+model.layers.0.input_layernorm.weight: [hidden_size] DType.bfloat16
+model.layers.0.self_attn.q_proj.weight: [hidden_size, hidden_size] DType.bfloat16
+...
+```
+
+Some checkpoints are sharded across multiple files. Inspect
+the shards by passing multiple paths to `load_weights()`:
+
+```python
+sharded_paths = [
+            Path("model-00001-of-00003.safetensors"),
+            Path("model-00002-of-00003.safetensors"),
+            Path("model-00003-of-00003.safetensors")
+        ]
+
+weights = load_weights(sharded_paths)
+```
+
+Note that during serving, MAX finds and merges shards for you.
+
+### Inspect the module state dictionary
+
+To inspect the target format your `Module` expects, call
+[`raw_state_dict()`](/api/python/generated/max.nn.Module/#max.nn.Module.raw_state_dict)
+on your module instance (often named `model`). This returns each
+[`Weight`](/api/python/generated/max.graph.Weight/) in the `Module`, including
+its shape, dtype, and quantization encoding:
+
+```python
+for name, weight in model.raw_state_dict().items():
+    print(f"{name}: {weight.shape} {weight.dtype} {weight.quantization_encoding}")
+```
+
+The output may look similar to the following:
+
+```text
+layers.0.fc1.weight: [ffn_size, hidden_size] DType.bfloat16 None
+layers.0.fc2.weight: [hidden_size, ffn_size] DType.bfloat16 None
+layers.0.attention.q_proj.weight: [hidden_size, hidden_size] DType.bfloat16 None
+...
+```
+
+## Name mapping
+
+The most common job of the weight adapter is to map checkpoint parameter names
+to the names expected by your MAX `Module`.
+
+To do this, define a weight adapter function that:
+
+1. Accepts the checkpoint state dictionary.
+2. Iterates over the checkpoint state dictionary.
+3. Computes the parameter name to match your `Module`.
+4. Builds and returns a new state dictionary that maps the new parameter names
+   to the original weight tensors.
+
+In many cases, the mapping is straightforward because both Hugging Face and MAX
+derive parameter names from a module hierarchy. If the model architectures are
+similar, the adapter may only need to remove a common prefix or rename a small
+number of modules.
+
+For example, many Hugging Face safetensors checkpoints store weights under a
+top-level `model.` prefix that doesn't exist in your MAX `Module`. You could
+write a weight adapter function called `convert_safetensor_state_dict()` to
+remove that prefix:
+
+```python
+from max.graph.weights import WeightData, Weights
+
+SAFETENSOR_MAPPING = {
+    "model.": "",                            # Strip this string
+    "self_attn.q_proj": "attention.q_proj",  # Rename this string
+}
+
+
+def convert_safetensor_state_dict(
+    state_dict: dict[str, Weights], **unused_kwargs
+) -> dict[str, WeightData]:
+    new_state_dict: dict[str, WeightData] = {}
+    for checkpoint_name, value in state_dict.items():
+        max_name = checkpoint_name
+        for before, after in SAFETENSOR_MAPPING.items():
+            max_name = max_name.replace(before, after)
+        new_state_dict[max_name] = value.data()
+    return new_state_dict
+```
+
+## Dtype casting
+
+{/* TODO: When this page moves to max.experimental.nn.Module, document
+MODULAR_AUTO_CAST_WEIGHTS env variable as an alternative to manual casting. */}
+
+Every weight in a `Module` has an expected dtype. You set that dtype when you
+construct the `Module`, matching what is required by the MAX kernel that
+consumes the weight. A checkpoint might store the same weight in a different
+dtype than the kernel expects.
+
+When the dtypes differ, cast the weight in your weight adapter before you load
+it into the `Module`. If you don't, `load_state_dict()` raises a `ValueError`.
+
+The following weight adapter casts the weights that need converting and leaves
+auxiliary tensors untouched:
+
+```python
+from max.dtype import DType
+from max.graph.weights import WeightData, Weights
+
+
+def convert_safetensor_state_dict(
+    state_dict: dict[str, Weights], **unused_kwargs
+) -> dict[str, WeightData]:
+    new_state_dict: dict[str, WeightData] = {}
+    for checkpoint_name, value in state_dict.items():
+        max_name = checkpoint_name
+        for before, after in SAFETENSOR_MAPPING.items():  # defined earlier
+            max_name = max_name.replace(before, after)
+        new_state_dict[max_name] = value.data()
+
+    # Cast weights to a dtype the kernel supports
+    for key, weight_data in new_state_dict.items():
+        if weight_data.dtype == DType.float16 and not (
+            key.endswith("bias") or key.endswith("scales")
+        ):
+            new_state_dict[key] = weight_data.astype(DType.bfloat16)
+
+    return new_state_dict
+```
+
+Perform the conversion in the weight adapter for tensor-level dtype casts. Defer
+layer-level encoding decisions to
+[`QuantFormat`](/api/python/generated/max.nn.QuantFormat/) and
+[`QuantConfig`](/api/python/generated/max.nn.QuantConfig/) instead.
+
+## Removing unused weights
+
+A checkpoint and your `Module` don't always contain the same set of weights. A
+mismatch can occur in two ways:
+
+- The checkpoint contains weights that your `Module` doesn't
+  declare. Remove these in the weight adapter.
+- Your `Module` declares weights that aren't present in the
+  checkpoint. These values typically come from somewhere other than the
+  checkpoint, so you usually don't handle them in the weight adapter.
+
+For example, FP8 checkpoints often include `.k_scale` and `.v_scale` tensors
+used to quantize the key and value caches. MAX computes these scales at runtime,
+so you should remove them from the checkpoint:
+
+```python
+from max.graph.weights import WeightData, Weights
+
+UNUSED_SUFFIXES = (".k_scale", ".v_scale")
+
+
+def convert_safetensor_state_dict(
+    state_dict: dict[str, Weights], **unused_kwargs
+) -> dict[str, WeightData]:
+    new_state_dict: dict[str, WeightData] = {}
+    for checkpoint_name, value in state_dict.items():
+        max_name = checkpoint_name
+        for before, after in SAFETENSOR_MAPPING.items():  # defined earlier
+            max_name = max_name.replace(before, after)
+        new_state_dict[max_name] = value.data()
+
+    # Drop FP8 KV-cache scales
+    for key in list(new_state_dict):
+        if key.endswith(UNUSED_SUFFIXES):
+            del new_state_dict[key]
+
+    return new_state_dict
+```
+
+:::note
+
+If you call `model.load_state_dict(..., strict=False)`, MAX ignores missing and
+unexpected keys. However, we strongly recommend keeping the default
+`strict=True` so you can catch bugs that wouldn't surface otherwise.
+
+:::
+
+## Tensor transformations
+
+Transform tensor values only when the checkpoint representation differs from the
+format expected by a MAX kernel. When possible, adapt your `Module` instead of
+modifying checkpoint data. Tensor transformations encode assumptions about a
+specific kernel implementation, and you may need to update them if the kernel
+interface changes.
+
+Common cases include:
+
+- Partial-RoPE permutation. Some models use a partial-RoPE layout where only a
+  subset of attention dimensions participate in rotary embeddings. If the
+  checkpoint layout differs from the layout expected by the MAX kernel, the
+  adapter must permute the query and key projection weights before loading.
+- Quantization-specific transformations. Quantized checkpoints may store weights
+  in a layout that differs from the dequantization kernel's expected format. For
+  example, MXFP4 checkpoints require weight repacking, and GPTQ checkpoints
+  store a `g_idx` permutation that you must convert to the inverse `perm_idx`
+  representation expected by the kernel.
+
+This example permutes the query and key projection weights so their layout
+matches what the MAX RoPE kernel expects:
+
+```python
+import numpy as np
+from max.graph.weights import WeightData, Weights
+from transformers import AutoConfig
+
+
+def convert_safetensor_state_dict(
+    state_dict: dict[str, Weights],
+    huggingface_config: AutoConfig,
+    **unused_kwargs,
+) -> dict[str, WeightData]:
+    num_heads = huggingface_config.num_attention_heads
+    head_dim = huggingface_config.hidden_size // num_heads
+    num_kv_heads = getattr(
+        huggingface_config, "num_key_value_heads", num_heads
+    )
+    rope_perm = build_rope_perm(head_dim)  # architecture-specific helper
+
+    new_state_dict: dict[str, WeightData] = {}
+    for checkpoint_name, value in state_dict.items():
+        max_name = checkpoint_name
+        for before, after in SAFETENSOR_MAPPING.items():  # defined earlier
+            max_name = max_name.replace(before, after)
+        new_state_dict[max_name] = value.data()
+
+    # Permute weights
+    for key, weight_data in new_state_dict.items():
+        if key.endswith("q_proj.weight"):
+            heads = num_heads
+        elif key.endswith("k_proj.weight"):
+            heads = num_kv_heads
+        else:
+            continue
+        arr = np.from_dlpack(weight_data.data)
+        arr = arr.reshape(heads, head_dim, -1)
+        arr = arr[:, rope_perm, :]
+        arr = np.ascontiguousarray(arr.reshape(heads * head_dim, -1))
+        new_state_dict[key] = WeightData.from_numpy(arr, key)
+
+    return new_state_dict
+```
+
+## Correctness checks
+
+Compare the keys produced by the weight adapter with the keys your `Module`
+expects:
+
+```python
+from pathlib import Path
+
+from max.graph.weights import load_weights
+from transformers import AutoConfig
+
+from my_arch.weight_adapters import convert_safetensor_state_dict
+
+weights = load_weights([Path("/path/to/model.safetensors")])
+hf_config = AutoConfig.from_pretrained("org/model-id")
+
+adapted = convert_safetensor_state_dict(
+    dict(weights.items()),
+    huggingface_config=hf_config,
+)
+for name in sorted(adapted):
+    print(name)
+```
+
+Compare the output against your `Module`'s weights.
+Intentional differences may include:
+
+- Tensors removed because MAX computes the value at runtime.
+- Parameters omitted because MAX derives them from other weights.
+- Format-specific tensors that your `Module` doesn't use.
+
+## Registering the weight adapter
+
+To wire the weight adapter function into the pipeline, add it to the
+[`SupportedArchitecture`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture/)
+definition in `arch.py`, keyed by the corresponding
+[`WeightsFormat`](/api/python/generated/max.graph.weights.WeightsFormat/):
+
+```python
+weight_adapters={
+    WeightsFormat.safetensors: weight_adapters.convert_safetensor_state_dict,
+    WeightsFormat.gguf: weight_adapters.convert_gguf_state_dict,
+},
+```
+
+## Next steps
+
+Once your adapter loads successfully, complete the remaining model bring-up
+steps:
+
+- [Implement the pipeline model](/develop/pipelines/): The pipeline model
+  class connects weight loading, graph construction, compilation, and execution.
+- [Configure quantization support](/develop/quantize/): If your checkpoint
+  uses a quantized format, implement the corresponding `QuantConfig` and
+  `QuantFormat` integration.
+
+For the complete workflow, see
+[Model bring-up workflow](/develop/model-bringup-workflow/).

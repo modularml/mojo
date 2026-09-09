@@ -1,0 +1,47 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# PERF-2718: two-step (RMSNorm + RoPE) vs fused kernel.
+#
+# MiniMax-M3 decode shapes (per TP4 device, 4×B200 recipe):
+#   - Main attention: q=16, kv=1, head_dim=128, rope_dim=128 (full rope)
+#   - Indexer:        q=1,  kv=1, head_dim=128, rope_dim=64  (partial rope)
+#
+# For each shape, the benchmark emits two rows:
+#   two_step(bfloat16) ...  — baseline (rms_norm kernel + rope kernel)
+#   fused(bfloat16) ...     — PERF-2718 fused kernel
+##===----------------------------------------------------------------------===##
+
+name: bench_fused_qk_rms_norm_rope
+file: $KERNEL_BENCHMARKS_ROOT/gpu/nn/bench_fused_qk_rms_norm_rope.mojo
+
+params:
+
+# M3 main-attention decode (TP4: 64Q/4=16, 4KV/4=1, full RoPE)
+- num_q_heads: 16
+  num_kv_heads: 1
+  head_dim: 128
+  rope_dim: 128
+  $seq_len: 1
+  $batch_size: [1, 4, 8, 12, 16, 20]
+  metadata:
+    MODEL: minimax_m3_main_attn_tp4
+
+# M3 sparse-indexer decode (TP4: 4Q/4=1, 1KV shared, partial RoPE=64)
+- num_q_heads: 1
+  num_kv_heads: 1
+  head_dim: 128
+  rope_dim: 64
+  $seq_len: 1
+  $batch_size: [1, 4, 8, 12, 16, 20]
+  metadata:
+    MODEL: minimax_m3_indexer_tp4

@@ -1,0 +1,380 @@
+<!-- title: Mojo traits -->
+<!-- subtitle: What each standard library trait does, when you need it, and where it bites -->
+<!-- layout: landscape -->
+<!-- width: 1950 -->
+<!-- columns: 3 -->
+<!-- Compiler verified: 2026-08-17, Mojo 1.0.0 (ed45d567) -->
+<!-- Last updated: 2026-08-17 (1.0.0 audit) -->
+
+<style>
+  .sheet .panel h2{font-size:13px;text-transform:none;letter-spacing:0;display:flex;align-items:baseline;gap:6px;}
+  .sheet .panel h2 .src{margin-left:auto;flex:none;font-weight:400;font-size:10px;color:var(--accent);white-space:nowrap;padding-left:12px;font-family:'Roboto Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  .sheet .sum{font-size:12px;}
+  /* .meta is used only by this card */
+  .meta{margin:0 0 4px;color:var(--muted);}
+  .meta b{color:var(--ink);font-weight:600;}
+  .sheet .meta{font-size:11px;}
+  .sheet table{font-size:12.5px;}
+  .sheet p.note{font-size:12.5px;}
+  .sheet .edge{font-size:12px;}
+  .sheet .cathead{font-size:16px;}
+  .sheet .mtag{text-transform:uppercase;font-weight:700;letter-spacing:.03em;color:var(--muted);font-size:.85em;}
+  .sheet .mtag::before{content:"(";}
+  .sheet .mtag::after{content:")";}
+  .sheet .req{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:3px 0;border-top:1px solid var(--code-line);}
+  .sheet .reqs .req:first-child{border-top:none;}
+  .sheet .sig{font-family:'Roboto Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;color:var(--c-type);overflow-wrap:break-word;min-width:0;}
+  .sheet .rmk{flex:none;color:var(--muted);white-space:nowrap;font-size:11px;}
+  .sheet .cathead.colbreak{break-before:column;}
+</style>
+
+<div class="cathead">Lifecycle</div>
+
+    <section class="panel">
+      <h2>AnyType <span class="sum">the root; every type conforms automatically</span> <span class="src">traits/anytype.mojo</span></h2>
+      <div class="body">
+        <p class="meta">no requirements</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Deinitable <span class="sum">has an implicit destructor, called at last use</span> <span class="src">traits/deinitable.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__deinit__(deinit self, /)</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">comptime __del__is_trivial: Bool</span><span class="rmk">compile-time flag</span></div>
+        </div>
+        <p class="note">Automatically added to every eligible type (all fields are also <b>Deinitable</b>). When the type is trivial, Mojo skips the destructor.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Movable <span class="sum">transfer ownership; enables the ^ operator</span> <span class="src">traits/movable.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__init__(out self, *, deinit move: Self)</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">comptime __move_ctor_is_trivial: Bool</span><span class="rmk">compile-time flag</span></div>
+        </div>
+        <p class="edge">Required to store a type in <b>List</b>, <b>Optional</b>, or <b>Variant</b>, or to return it by move.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Copyable <span class="sum">explicit copy</span> <span class="src">traits/copyable.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Movable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">__init__(out self, *, copy: Self)</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">copy(self) -&gt; Self</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">comptime __copy_ctor_is_trivial: Bool</span><span class="rmk">compile-time flag</span></div>
+        </div>
+        <p class="note">The copy constructor is synthesized if all fields are <b>Copyable</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>ImplicitlyCopyable <span class="sum"><b class="mtag">marker</b> lets copies be inserted implicitly</span> <span class="src">traits/copyable.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Copyable &lt; Movable &nbsp;·&nbsp; no new requirements</p>
+        <p class="edge">Can mask logical errors and hide code reasoning. Prefer <b>Movable</b> or <b>Copyable</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Defaultable <span class="sum">create with no arguments</span> <span class="src">builtin/value.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__init__(out self)</span></div>
+        </div>
+        <p class="note">Reach for this when you need parameterized default-construction without arguments.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>RegisterPassable <span class="sum"><b class="mtag">marker</b> stored in registers, not memory; no stable address or identity</span> <span class="src">builtin/value.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Movable &nbsp;·&nbsp; no requirements (marker)</p>
+        <p class="edge">No stable address: you can't take the address of <b>self</b> in imm-convention methods. <b>Identifiable</b> is meaningless for these types.</p>
+        <p class="note">Moved trivially; all fields must also conform.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>TrivialRegisterPassable <span class="sum"><b class="mtag">marker</b> register-passable, copyable by moving bits, no side effects</span> <span class="src">builtin/value.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> ImplicitlyCopyable &lt; Copyable &lt; Movable, Deinitable, RegisterPassable &nbsp;·&nbsp; no requirements (marker)</p>
+        <p class="note">A type whose values are treated as basic bit patterns. No constructors or destructors needed. All fields must also conform.</p>
+      </div>
+    </section>
+
+    <div class="cathead">Format</div>
+
+    <section class="panel">
+      <h2>Writable <span class="sum">format itself as text; works with print(), String(), format strings</span> <span class="src">format/__init__.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">write_to(self, mut writer: Some[Writer])</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">write_repr_to(self, mut writer: Some[Writer])</span><span class="rmk">provided</span></div>
+        </div>
+        <p class="note">If all fields conform, you inherit both methods through reflection.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Writer <span class="sum">a destination for a custom output target</span> <span class="src">format/__init__.mojo</span></h2>
+      <div class="body">
+        <p class="meta">String, FileHandle, FileDescriptor conform</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">write_string(mut self, string: StringSpan)</span></div>
+          <div class="req"><span class="sig">write[*Ts: Writable](mut self, *args: *Ts)</span><span class="rmk">provided</span></div>
+        </div>
+        <p class="note">Use for loggers, network streams, string builders, etc.</p>
+      </div>
+    </section>
+
+    <div class="cathead">Testing</div>
+
+    <section class="panel">
+      <h2>Strategy <span class="sum">produces random inputs for property-based tests</span> <span class="src">testing/prop/strategy/__init__.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Deinitable, Movable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">Value: Copyable &amp; Deinitable</span><span class="rmk">associated type</span></div>
+          <div class="req"><span class="sig">value(mut self, mut rng: Rng) raises -&gt; Self.Value</span></div>
+        </div>
+        <p class="note">Allows strategies to carry and advance state between draws. <b>value()</b> draws one sample from the random number generator.</p>
+      </div>
+    </section>
+
+    <div class="cathead">Accelerator traits</div>
+
+    <section class="panel">
+      <h2>DevicePassable <span class="sum">marks a type as passable to an accelerator</span> <span class="src">builtin/device_passable.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">comptime device_type: AnyType</span><span class="rmk">the on-device type</span></div>
+          <div class="req"><span class="sig">_to_device_type(self, mut enc, ...)</span><span class="rmk">DeviceContext hook</span></div>
+        </div>
+        <p class="note">A host type implements this so it can be handed to a GPU or other accelerator. <b>DeviceContext</b> calls the conversion hook to turn host into device at kernel launch.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>DeviceTypeEncoder <span class="sum">encodes host values into device layout</span> <span class="src">builtin/device_passable.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">target() -&gt; _TargetType</span><span class="rmk">device target</span></div>
+          <div class="req"><span class="sig">encode_device_ptr(mut self, ...)</span><span class="rmk">required</span></div>
+          <div class="req"><span class="sig">encode[T](mut self, value, dst)</span><span class="rmk">provided (+ fields, tuple, array)</span></div>
+        </div>
+        <p class="note">Encodes a value's fields into the accelerator's data layout.</p>
+      </div>
+    </section>
+
+    <div class="cathead">Compare &amp; hash</div>
+
+    <section class="panel">
+      <h2>Equatable <span class="sum">equality; enables == and !=</span> <span class="src">builtin/comparable.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__eq__(self, other: Self) -&gt; Bool</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">__ne__(self, other: Self) -&gt; Bool</span><span class="rmk">provided</span></div>
+        </div>
+        <p class="edge">Don't use with floating-point values (use <b>isclose()</b>). <b>NaN != NaN</b>.</p>
+        <p class="note">Mojo provides a fieldwise default. Override for caches, internal metadata, and custom behavior.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Comparable <span class="sum">ordered comparison; &lt; &gt; &le; &ge;, and sort()</span> <span class="src">builtin/comparable.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Equatable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">__lt__(self, rhs: Self) -&gt; Bool</span></div>
+          <div class="req"><span class="sig">__gt__(self, rhs: Self) -&gt; Bool</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">__le__(self, rhs: Self) -&gt; Bool</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">__ge__(self, rhs: Self) -&gt; Bool</span><span class="rmk">provided</span></div>
+        </div>
+        <p class="note">Implement <b>__lt__()</b> unless it's expensive. If so, override all four.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Hashable <span class="sum">produces a hash; needed for Dict keys and Set elements</span> <span class="src">hashlib/hash.mojo</span></h2>
+      <div class="body">
+        <p class="meta">KeyElement = Hashable + Equatable + Movable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">__hash__(self, mut hasher: Some[Hasher])</span><span class="rmk">provided</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Hasher <span class="sum">implements a hash algorithm (the algorithm, not a hashable type)</span> <span class="src">hashlib/hasher.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__init__(out self)</span></div>
+          <div class="req"><span class="sig">_update_with_bytes(mut self, data: Span[Byte, _])</span></div>
+          <div class="req"><span class="sig">_update_with_simd(mut self, value: SIMD[_, _])</span></div>
+          <div class="req"><span class="sig">update(mut self, value: Some[Hashable])</span></div>
+          <div class="req"><span class="sig">finish(var self) -&gt; UInt64</span></div>
+        </div>
+        <p class="edge">Hashers remain alive after finalization. All three update methods are required.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Identifiable <span class="sum">identity; same-object test, enables is / is not</span> <span class="src">builtin/identifiable.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__is__(self, rhs: Self) -&gt; Bool</span></div>
+          <div class="req"><span class="sig">__isnot__(self, rhs: Self) -&gt; Bool</span><span class="rmk">provided</span></div>
+        </div>
+        <p class="edge">Excludes register-passable types, which don't have stable addresses.</p>
+      </div>
+    </section>
+
+    <div class="cathead">Convert</div>
+
+    <section class="panel">
+      <h2>Boolable, Intable, Floatable <span class="sum">convert with Bool(), Int(), Float64()</span> <span class="src">builtin/bool.mojo · builtin/int.mojo · builtin/floatable.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__bool__(self) -&gt; Bool</span><span class="rmk">Boolable</span></div>
+          <div class="req"><span class="sig">__int__(self) -&gt; Int</span><span class="rmk">Intable</span></div>
+          <div class="req"><span class="sig">__int__(self) raises -&gt; Int</span><span class="rmk">IntableRaising</span></div>
+          <div class="req"><span class="sig">__float__(self) -&gt; Float64</span><span class="rmk">Floatable</span></div>
+          <div class="req"><span class="sig">__float__(self) raises -&gt; Float64</span><span class="rmk">FloatableRaising</span></div>
+        </div>
+        <p class="edge">If the method raises, use the Raising variant.</p>
+        <p class="note">Boolable unlocks if / while / and / or usage.</p>
+      </div>
+    </section>
+
+    <div class="cathead">Math</div>
+
+    <section class="panel">
+      <h2>Absable, Powable, Roundable <span class="sum">unary math operators</span> <span class="src">math/math.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__abs__(self) -&gt; Self</span><span class="rmk"><b>Absable</b> · abs()</span></div>
+          <div class="req"><span class="sig">__pow__(self, exp: Self) -&gt; Self</span><span class="rmk"><b>Powable</b> · pow(), **</span></div>
+          <div class="req"><span class="sig">__round__(self) -&gt; Self</span><span class="rmk"><b>Roundable</b> · round()</span></div>
+          <div class="req"><span class="sig">__round__(self, ndigits: Int) -&gt; Self</span><span class="rmk"><b>Roundable</b> · round(), precision</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Ceilable, Floorable, Truncable <span class="sum">round toward a bound</span> <span class="src">math/math.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__ceil__(self) -&gt; Self</span><span class="rmk"><b>Ceilable</b> · ceil()</span></div>
+          <div class="req"><span class="sig">__floor__(self) -&gt; Self</span><span class="rmk"><b>Floorable</b> · floor()</span></div>
+          <div class="req"><span class="sig">__trunc__(self) -&gt; Self</span><span class="rmk"><b>Truncable</b> · trunc()</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>CeilDivable, CeilDivableRaising <span class="sum">ceiling division (rounds up instead of down)</span> <span class="src">math/math.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__ceildiv__(self, denominator: Self) -&gt; Self</span><span class="rmk">CeilDivable</span></div>
+          <div class="req"><span class="sig">__ceildiv__(self, denominator: Self) raises -&gt; Self</span><span class="rmk">CeilDivableRaising</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>DivModable <span class="sum">combined division and modulo; enables divmod()</span> <span class="src">math/math.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> ImplicitlyCopyable &lt; Copyable &lt; Movable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">__divmod__(self, denominator: Self) -&gt; Tuple[Self, Self]</span></div>
+        </div>
+        <p class="edge">Math outlier. The tuple is (quotient, remainder).</p>
+      </div>
+    </section>
+
+    <div class="cathead">Iterate</div>
+
+    <section class="panel">
+      <h2>Sized, SizedRaising <span class="sum">has a length; enables len()</span> <span class="src">builtin/len.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">__len__(self) -&gt; Int</span><span class="rmk">Sized</span></div>
+          <div class="req"><span class="sig">__len__(self) raises -&gt; Int</span><span class="rmk">SizedRaising</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Iterable <span class="sum">iterate by borrowing</span> <span class="src">iter/__init__.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]]: Iterator</span><span class="rmk">associated type</span></div>
+          <div class="req"><span class="sig">__iter__(ref self) -&gt; Self.IteratorType[origin_of(self)]</span></div>
+        </div>
+        <p class="note">Parameterized on mutability and origin. Yields references tied to the source lifetime.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>IterableOwned <span class="sum">iterate by consuming and owning</span> <span class="src">iter/__init__.mojo</span></h2>
+      <div class="body">
+        <div class="reqs">
+          <div class="req"><span class="sig">IteratorOwnedType: Iterator</span><span class="rmk">associated type</span></div>
+          <div class="req"><span class="sig">__iter__(var self) -&gt; Self.IteratorOwnedType</span></div>
+        </div>
+        <p class="note">No origin tracking.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Iterator <span class="sum">produces elements one at a time; the for-loop workhorse</span> <span class="src">iter/__init__.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Deinitable, Movable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">Element: Movable</span><span class="rmk">associated type</span></div>
+          <div class="req"><span class="sig">__next__(mut self) raises StopIteration -&gt; Self.Element</span></div>
+          <div class="req"><span class="sig">bounds(self) -&gt; Tuple[Int, Optional[Int]]</span><span class="rmk">provided</span></div>
+          <div class="req"><span class="sig">nth(var self, n: Int) -&gt; Optional[Self.Element]</span><span class="rmk">provided</span></div>
+        </div>
+        <p class="edge">Requires an <b>Iterable</b> on the collection, and <b>Iterator</b> on the iterator. Don't rely on <b>bounds()</b> for safety checks. It's a hint.</p>
+        <p class="note">Typed raises (<b>StopIteration</b>).</p>
+      </div>
+    </section>
+
+
+    <div class="cathead">Interop</div>
+
+    <section class="panel">
+      <h2>PathLike <span class="sum">represents a file system path</span> <span class="src">os/pathlike.mojo</span></h2>
+      <div class="body">
+        <p class="meta">Path conforms</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">__fspath__(self) -&gt; String</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>ConvertibleToPython <span class="sum">can be sent to Python</span> <span class="src">python/conversions.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Deinitable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">to_python_object(var self) raises -&gt; PythonObject</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>ConvertibleFromPython <span class="sum">can be created from a Python object</span> <span class="src">python/conversions.mojo</span></h2>
+      <div class="body">
+        <p class="meta"><b>Refines:</b> Copyable &lt; Movable, Deinitable</p>
+        <div class="reqs">
+          <div class="req"><span class="sig">__init__(out self, *, py: PythonObject) raises</span></div>
+        </div>
+      </div>
+    </section>

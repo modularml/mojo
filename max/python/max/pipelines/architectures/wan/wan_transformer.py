@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import os
 from math import prod
 
 from max.dtype import DType
@@ -21,6 +22,13 @@ from max.nn.attention.mask_config import MHAMaskVariant
 from max.nn.kernels import flash_attention_gpu
 from max.nn.layer import LayerList, Module
 from max.nn.linear import Linear
+from max.nn.quant_config import QuantConfig
+from max.nn.stacked_linear import StackedLinear
+
+# Set to "1" to keep the FP8 cross-attn K/V as two separate matmuls instead
+# of one fused (dequant -> concat -> requant) matmul. Mirrors the
+# MAX_DISABLE_FUSED_SWIGLU_NVFP4 env toggle used for the NVFP4 MoE SwiGLU.
+_DISABLE_FP8_KV_FUSION = os.environ.get("MAX_WAN_DISABLE_FP8_KV_FUSION") == "1"
 
 from .embeddings import (
     TimestepEmbedding,
@@ -28,6 +36,33 @@ from .embeddings import (
     apply_rotary_emb_fused,
 )
 from .model_config import WanConfigBase
+
+
+def _make_linear(
+    *,
+    in_dim: int,
+    out_dim: int,
+    dtype: DType,
+    device: DeviceRef,
+    has_bias: bool,
+    quant_config: QuantConfig | None,
+) -> Linear:
+    """Build a Linear that is FP8-quantized when ``quant_config`` is set.
+
+    Under FP8 the weight is stored as ``float8_e4m3fn`` with scalar
+    ``weight_scale`` / ``input_scale`` (static per-tensor); the bias stays
+    in ``bfloat16`` (via ``quant_config.bias_dtype``). With no quant config
+    the layer is a plain ``dtype`` Linear.
+    """
+    weight_dtype = DType.float8_e4m3fn if quant_config is not None else dtype
+    return Linear(
+        in_dim=in_dim,
+        out_dim=out_dim,
+        dtype=weight_dtype,
+        device=device,
+        has_bias=has_bias,
+        quant_config=quant_config,
+    )
 
 
 class WanConv3d(Module):
@@ -73,7 +108,7 @@ class WanLayerNorm(Module):
         elementwise_affine: bool = True,
         use_bias: bool = True,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> None:
         super().__init__()
         self.dim = dim
@@ -116,7 +151,7 @@ class WanRMSNorm(Module):
         eps: float = 1e-6,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> None:
         super().__init__()
         self.weight = Weight("weight", dtype, [dim], device)
@@ -133,22 +168,25 @@ class WanTextProjection(Module):
         hidden_size: int,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ) -> None:
         super().__init__()
-        self.linear_1 = Linear(
+        self.linear_1 = _make_linear(
             in_dim=in_features,
             out_dim=hidden_size,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
-        self.linear_2 = Linear(
+        self.linear_2 = _make_linear(
             in_dim=hidden_size,
             out_dim=hidden_size,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
 
     def __call__(self, caption: TensorValue) -> TensorValue:
@@ -176,7 +214,8 @@ class WanImageEmbedder(Module):
         out_dim: int,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ) -> None:
         super().__init__()
         # Matches diffusers FeedForward(image_dim, out_dim, mult=1, activation_fn="gelu"):
@@ -189,19 +228,21 @@ class WanImageEmbedder(Module):
             dtype=dtype,
             device=device,
         )
-        self.ff_proj = Linear(
+        self.ff_proj = _make_linear(
             in_dim=image_dim,
             out_dim=image_dim,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
-        self.ff_out = Linear(
+        self.ff_out = _make_linear(
             in_dim=image_dim,
             out_dim=out_dim,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
         self.norm2 = WanLayerNorm(
             out_dim,
@@ -228,7 +269,8 @@ class WanTimeTextImageEmbedding(Module):
         *,
         image_dim: int | None = None,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ) -> None:
         super().__init__()
         self.timesteps_proj = Timesteps(
@@ -241,20 +283,23 @@ class WanTimeTextImageEmbedding(Module):
             time_embed_dim=dim,
             dtype=dtype,
             device=device,
+            quant_config=quant_config,
         )
         # Projects SiLU(temb) to 6 modulation params per block
-        self.time_proj = Linear(
+        self.time_proj = _make_linear(
             in_dim=dim,
             out_dim=dim * 6,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
         self.text_embedder = WanTextProjection(
             in_features=text_dim,
             hidden_size=dim,
             dtype=dtype,
             device=device,
+            quant_config=quant_config,
         )
         # Optional image embedder (Wan 2.1 I2V)
         self.image_embedder: WanImageEmbedder | None = None
@@ -264,6 +309,7 @@ class WanTimeTextImageEmbedding(Module):
                 out_dim=dim,
                 dtype=dtype,
                 device=device,
+                quant_config=quant_config,
             )
 
     def __call__(
@@ -301,26 +347,47 @@ class WanSelfAttention(Module):
         eps: float,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ) -> None:
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = head_dim
         self.inner_dim = dim
 
-        self.to_q = Linear(
-            in_dim=dim, out_dim=dim, dtype=dtype, device=device, has_bias=True
+        self.to_q = _make_linear(
+            in_dim=dim,
+            out_dim=dim,
+            dtype=dtype,
+            device=device,
+            has_bias=True,
+            quant_config=quant_config,
         )
-        self.to_k = Linear(
-            in_dim=dim, out_dim=dim, dtype=dtype, device=device, has_bias=True
+        self.to_k = _make_linear(
+            in_dim=dim,
+            out_dim=dim,
+            dtype=dtype,
+            device=device,
+            has_bias=True,
+            quant_config=quant_config,
         )
-        self.to_v = Linear(
-            in_dim=dim, out_dim=dim, dtype=dtype, device=device, has_bias=True
+        self.to_v = _make_linear(
+            in_dim=dim,
+            out_dim=dim,
+            dtype=dtype,
+            device=device,
+            has_bias=True,
+            quant_config=quant_config,
         )
         self.norm_q = WanRMSNorm(dim, eps=eps, dtype=dtype, device=device)
         self.norm_k = WanRMSNorm(dim, eps=eps, dtype=dtype, device=device)
-        self.to_out = Linear(
-            in_dim=dim, out_dim=dim, dtype=dtype, device=device, has_bias=True
+        self.to_out = _make_linear(
+            in_dim=dim,
+            out_dim=dim,
+            dtype=dtype,
+            device=device,
+            has_bias=True,
+            quant_config=quant_config,
         )
 
     def __call__(
@@ -382,46 +449,95 @@ class WanCrossAttention(Module):
         *,
         added_kv_proj_dim: int | None = None,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ) -> None:
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = head_dim
         self.inner_dim = dim
         self._has_added_kv = added_kv_proj_dim is not None
+        self._fp8 = quant_config is not None
+        self._fuse_kv = not (self._fp8 and _DISABLE_FP8_KV_FUSION)
 
-        self.to_q = Linear(
-            in_dim=dim, out_dim=dim, dtype=dtype, device=device, has_bias=True
-        )
-        # Fused K+V projection from text embeddings
-        self.to_kv = Linear(
-            in_dim=text_dim,
-            out_dim=dim * 2,
+        self.to_q = _make_linear(
+            in_dim=dim,
+            out_dim=dim,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
+        if not self._fp8:
+            # bfloat16: K+V fused into one weight at load time.
+            self.to_kv = _make_linear(
+                in_dim=text_dim,
+                out_dim=dim * 2,
+                dtype=dtype,
+                device=device,
+                has_bias=True,
+                quant_config=quant_config,
+            )
+        elif self._fuse_kv:
+            # FP8 default: StackedLinear holds per-scale to_k/to_v children and
+            # fuses them (dequant -> concat -> requant) into one matmul in its
+            # __call__. Weight names stay at attn2.to_k / attn2.to_v.
+            self.kv_proj = StackedLinear(
+                in_dim=text_dim,
+                out_dims=[dim, dim],
+                names=["to_k", "to_v"],
+                dtype=DType.float8_e4m3fn,
+                device=device,
+                stacked=False,
+                has_bias=True,
+                quant_config=quant_config,
+            )
+        else:
+            # FP8, fusion disabled: two standalone per-projection matmuls.
+            self.to_k = _make_linear(
+                in_dim=text_dim,
+                out_dim=dim,
+                dtype=dtype,
+                device=device,
+                has_bias=True,
+                quant_config=quant_config,
+            )
+            self.to_v = _make_linear(
+                in_dim=text_dim,
+                out_dim=dim,
+                dtype=dtype,
+                device=device,
+                has_bias=True,
+                quant_config=quant_config,
+            )
         self.norm_q = WanRMSNorm(dim, eps=eps, dtype=dtype, device=device)
         self.norm_k = WanRMSNorm(dim, eps=eps, dtype=dtype, device=device)
-        self.to_out = Linear(
-            in_dim=dim, out_dim=dim, dtype=dtype, device=device, has_bias=True
+        self.to_out = _make_linear(
+            in_dim=dim,
+            out_dim=dim,
+            dtype=dtype,
+            device=device,
+            has_bias=True,
+            quant_config=quant_config,
         )
 
         # Optional added KV projections for image conditioning (Wan 2.1 I2V)
         if added_kv_proj_dim is not None:
-            self.add_k_proj = Linear(
+            self.add_k_proj = _make_linear(
                 in_dim=added_kv_proj_dim,
                 out_dim=dim,
                 dtype=dtype,
                 device=device,
                 has_bias=True,
+                quant_config=quant_config,
             )
-            self.add_v_proj = Linear(
+            self.add_v_proj = _make_linear(
                 in_dim=added_kv_proj_dim,
                 out_dim=dim,
                 dtype=dtype,
                 device=device,
                 has_bias=True,
+                quant_config=quant_config,
             )
             self.norm_added_q = WanRMSNorm(
                 dim, eps=eps, dtype=dtype, device=device
@@ -438,10 +554,19 @@ class WanCrossAttention(Module):
     ) -> TensorValue:
         query = self.to_q(hidden_states)
 
-        # Fused KV from text - use explicit slicing instead of chunk
-        kv = self.to_kv(encoder_hidden_states)
-        key = kv[:, :, : self.inner_dim]
-        value = kv[:, :, self.inner_dim :]
+        if not self._fp8:
+            kv = self.to_kv(encoder_hidden_states)
+            key = kv[:, :, : self.inner_dim]
+            value = kv[:, :, self.inner_dim :]
+        elif self._fuse_kv:
+            # FP8 default: one fused matmul, sliced into K/V.
+            kv = self.kv_proj(encoder_hidden_states)
+            key = kv[:, :, : self.inner_dim]
+            value = kv[:, :, self.inner_dim :]
+        else:
+            # FP8, fusion disabled: two per-projection matmuls.
+            key = self.to_k(encoder_hidden_states)
+            value = self.to_v(encoder_hidden_states)
 
         # QK-norm across all heads (before reshape)
         query = self.norm_q(query)
@@ -495,24 +620,27 @@ class WanFeedForward(Module):
         ffn_dim: int,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ) -> None:
         super().__init__()
         # WAN uses "gelu-approximate" (simple GELU), NOT GEGLU.
         # ffn_dim is the direct projection output size (no 2x expansion).
-        self.proj = Linear(
+        self.proj = _make_linear(
             in_dim=dim,
             out_dim=ffn_dim,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
-        self.linear_out = Linear(
+        self.linear_out = _make_linear(
             in_dim=ffn_dim,
             out_dim=dim,
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=quant_config,
         )
 
     def __call__(self, x: TensorValue) -> TensorValue:
@@ -565,7 +693,8 @@ class WanTransformerBlock(Module):
         *,
         added_kv_proj_dim: int | None = None,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
+        quant_config: QuantConfig | None = None,
     ) -> None:
         super().__init__()
         self.scale_shift_table = Weight(
@@ -579,7 +708,13 @@ class WanTransformerBlock(Module):
             device=device,
         )
         self.attn1 = WanSelfAttention(
-            dim, num_heads, head_dim, eps, dtype=dtype, device=device
+            dim,
+            num_heads,
+            head_dim,
+            eps,
+            dtype=dtype,
+            device=device,
+            quant_config=quant_config,
         )
         self.norm2 = WanLayerNorm(
             dim,
@@ -598,6 +733,7 @@ class WanTransformerBlock(Module):
             added_kv_proj_dim=added_kv_proj_dim,
             dtype=dtype,
             device=device,
+            quant_config=quant_config,
         )
         self.norm3 = WanLayerNorm(
             dim,
@@ -606,7 +742,9 @@ class WanTransformerBlock(Module):
             dtype=dtype,
             device=device,
         )
-        self.ffn = WanFeedForward(dim, ffn_dim, dtype=dtype, device=device)
+        self.ffn = WanFeedForward(
+            dim, ffn_dim, dtype=dtype, device=device, quant_config=quant_config
+        )
 
     def __call__(
         self,
@@ -667,7 +805,7 @@ class WanTransformerPreProcess(Module):
         config: WanConfigBase,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> None:
         super().__init__()
         dim = config.num_attention_heads * config.attention_head_dim
@@ -690,6 +828,7 @@ class WanTransformerPreProcess(Module):
             image_dim=getattr(config, "image_dim", None),
             dtype=dtype,
             device=device,
+            quant_config=config.quant_config,
         )
 
     def __call__(
@@ -748,7 +887,7 @@ class WanTransformerPostProcess(Module):
         config: WanConfigBase,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> None:
         super().__init__()
         dim = config.num_attention_heads * config.attention_head_dim
@@ -766,12 +905,13 @@ class WanTransformerPostProcess(Module):
             dtype=dtype,
             device=device,
         )
-        self.proj_out = Linear(
+        self.proj_out = _make_linear(
             in_dim=dim,
             out_dim=config.out_channels * prod(config.patch_size),
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=config.quant_config,
         )
 
     def __call__(
@@ -822,7 +962,7 @@ class WanTransformer3DModel(Module):
         config: WanConfigBase,
         *,
         dtype: DType = DType.bfloat16,
-        device: DeviceRef = DeviceRef.CPU(),
+        device: DeviceRef = DeviceRef.CPU(),  # noqa: B008
     ) -> None:
         super().__init__()
         self.config = config
@@ -849,6 +989,7 @@ class WanTransformer3DModel(Module):
             image_dim=getattr(config, "image_dim", None),
             dtype=dtype,
             device=device,
+            quant_config=config.quant_config,
         )
         self.blocks = LayerList(
             [
@@ -862,6 +1003,7 @@ class WanTransformer3DModel(Module):
                     eps=config.eps,
                     dtype=dtype,
                     device=device,
+                    quant_config=config.quant_config,
                 )
                 for _ in range(config.num_layers)
             ]
@@ -876,12 +1018,13 @@ class WanTransformer3DModel(Module):
             dtype=dtype,
             device=device,
         )
-        self.proj_out = Linear(
+        self.proj_out = _make_linear(
             in_dim=dim,
             out_dim=config.out_channels * prod(config.patch_size),
             dtype=dtype,
             device=device,
             has_bias=True,
+            quant_config=config.quant_config,
         )
 
     def __call__(

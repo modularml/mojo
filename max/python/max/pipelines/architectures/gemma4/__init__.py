@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Gemma 4 vision-language architecture for multimodal text generation."""
 
-from .arch import gemma4_arch
+from .arch import gemma4_arch, gemma4_unified_arch
 from .model import Gemma3_MultiModalModel, Gemma3MultiModalModelInputs
 from .model_config import (
     Gemma4ForConditionalGenerationConfig,
@@ -31,4 +31,5 @@ __all__ = [
     "Gemma4ToolParser",
     "Gemma4VisionConfig",
     "gemma4_arch",
+    "gemma4_unified_arch",
 ]

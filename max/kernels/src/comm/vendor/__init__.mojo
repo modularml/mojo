@@ -10,3 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Vendor CCL bindings for multi-GPU collective operations.
+
+Provides Mojo wrappers around NCCL (NVIDIA) and RCCL (AMD) collective
+communication libraries. The library is loaded at runtime from standard system
+paths; the `is_allreduce_available()`, `is_allgather_available()`, and
+`is_broadcast_available()` probes can be used to check availability before
+calling into a collective.
+"""

@@ -11,24 +11,24 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
-from std.gpu import block_idx
+from max.gpu.host import DeviceContext
+from max.gpu import block_idx
 from linalg.matmul.gpu.tile_scheduler import TileScheduler
 
 from std.utils.index import Index
 
 
 def test_kernel():
-    problem_shape = Index(12, 12, 20)
+    var problem_shape = Index(12, 12, 20)
 
-    scheduler = TileScheduler[
+    var scheduler = TileScheduler[
         problem_shape=Index(12, 12, 20),
         tile_shape=Index(4, 4, 4),
         grid_shape=Index(2, 2),
     ](problem_shape)
 
-    num_output_tiles = scheduler.num_output_tiles()
-    work_info = scheduler.get_current_work_info()
+    var num_output_tiles = scheduler.num_output_tiles()
+    var work_info = scheduler.get_current_work_info()
 
     for _ in range(num_output_tiles):
         print(block_idx.x, work_info)

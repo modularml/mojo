@@ -1,0 +1,17 @@
+{
+  "IsLabelArg": {
+    "mojo_deps": true
+  },
+  "LabelDenylist": {},
+  "IsListArg": {
+    "mojo_deps": true
+  },
+  "IsSortableListArg": {
+    "mojo_deps": true
+  },
+  "SortableDenylist": {},
+  "SortableAllowlist": {},
+  "NamePriority": {},
+  "StripLabelLeadingSlashes": false,
+  "ShortenAbsoluteLabelsToRelative": false
+}

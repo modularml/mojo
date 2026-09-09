@@ -18,14 +18,17 @@ from collections.abc import MutableSequence
 from typing import Any
 
 import numpy as np
-from max.driver import accelerator_architecture_name
+from max._core.dialects import builtin, kgen, mo
+from max.driver import accelerator_api, accelerator_architecture_name
 from max.dtype import DType
 from max.graph import (
+    AlgebraicDim,
     BufferValue,
     BufferValueLike,
     DeviceKind,
     DeviceRef,
     Dim,
+    Graph,
     StaticDim,
     TensorType,
     TensorValue,
@@ -40,7 +43,12 @@ from max.graph.quantization import QuantizationConfig, QuantizationEncoding
 from max.nn.quant_config import InputScaleSpec, QuantConfig, WeightScaleSpec
 
 from .attention.mask_config import AttentionMaskVariant, MHAMaskVariant
-from .kv_cache import KVCacheParams, PagedCacheValues
+from .kv_cache import KVCacheParams, MHAKVCacheParams, PagedCacheValues
+
+# Elements sharing one MX block scale, matching `MXFP8_SF_VECTOR_SIZE` /
+# `MXFP4_SF_VECTOR_SIZE` in `linalg` and the `sf_vector_size=32` the MX
+# quantize wrappers take.
+_MX_SF_VECTOR_SIZE = 32
 
 _MHA_MASK_VARIANT_TO_ATTENTION_MASK = {
     MHAMaskVariant.CAUSAL_MASK: AttentionMaskVariant.CAUSAL_MASK,
@@ -50,6 +58,9 @@ _MHA_MASK_VARIANT_TO_ATTENTION_MASK = {
     ),
     MHAMaskVariant.SLIDING_WINDOW_CAUSAL_MASK: (
         AttentionMaskVariant.SLIDING_WINDOW_CAUSAL_MASK
+    ),
+    MHAMaskVariant.SLIDING_WINDOW_NONCAUSAL_MASK: (
+        AttentionMaskVariant.SLIDING_WINDOW_NONCAUSAL_MASK
     ),
 }
 
@@ -92,6 +103,20 @@ def _check_same_dtype(**tensors: TensorValue | BufferValue) -> None:
             raise ValueError(
                 f"expected {first_name} and {name} to have the same dtype, "
                 f"but got {first.dtype} and {t.dtype}, respectively."
+            )
+
+
+def _check_same_device(**tensors: TensorValue | BufferValue) -> None:
+    """Raises ``ValueError`` unless all tensor kwargs share the same device;
+
+    Note: The kwarg names are used in the error message, so naming matters.
+    """
+    first_name, first = next(iter(tensors.items()))
+    for name, t in list(tensors.items())[1:]:
+        if t.device != first.device:
+            raise ValueError(
+                f"expected {first_name} and {name} to have the same device, "
+                f"but got {first.device} and {t.device}, respectively."
             )
 
 
@@ -268,6 +293,11 @@ def rope_split_store_ragged(
     position_ids: TensorValue | None = None,
     mrope_section: list[int] | None = None,
     fuse: bool = True,
+    q_out_dtype: DType | None = None,
+    q_norm_weight: TensorValue | None = None,
+    k_norm_weight: TensorValue | None = None,
+    rms_norm_eps: float | None = None,
+    k_eq_v: bool = False,
 ) -> TensorValue:
     """Apply rope to Q and K from flat QKV buffer, store K/V to cache.
 
@@ -292,6 +322,20 @@ def rope_split_store_ragged(
         fuse: If True (default), emit a single fused custom op. If False,
             emit separate split, rope, and store ops for testing graph
             compiler fusion.
+        q_out_dtype: Dtype for the roped Q output. Defaults to ``qkv.dtype``.
+        q_norm_weight: Optional per-head RMSNorm gamma ``[head_dim]`` for Q. When
+            given (with ``k_norm_weight`` and ``rms_norm_eps``), the per-head
+            Q/K/V RMS-norm is fused into the op (q/k use their gammas, v is a bare
+            norm), removing the separate norm ops. Mutually exclusive with
+            ``position_ids``.
+        k_norm_weight: Per-head RMSNorm gamma ``[head_dim]`` for K (see
+            ``q_norm_weight``).
+        rms_norm_eps: Epsilon for the fused qk-norm; required when
+            ``q_norm_weight`` is set.
+        k_eq_v: When True (only valid with ``q_norm_weight``), V has no own
+            projection and reuses K's: ``qkv`` is ``[q|k]`` (no V region) and the
+            kernel reads the K head for both the K and V stores, sharing the norm
+            reduction. When False (default), ``qkv`` is ``[q|k|v]``.
 
     Returns:
         Roped Q output [total_seq_len, n_heads * head_dim].
@@ -303,56 +347,12 @@ def rope_split_store_ragged(
     )
 
     if kv_params.quantized_kv_cache:
-        # FP8 KV cache with float32 blockwise scales is supported via the
-        # fp8_quantized op variant. All other quantized configs are still
-        # unsupported and will raise below.
-        if not (
-            kv_params.kvcache_quant_config is not None
-            and kv_params.kvcache_quant_config.scale_dtype == DType.float32
-            and kv_params.dtype == DType.float8_e4m3fn
-        ):
-            raise ValueError(
-                "rope_split_store does not support this quantized KV cache"
-                f" configuration: dtype={kv_params.dtype},"
-                f" scale_dtype={kv_params.kvcache_quant_config.scale_dtype if kv_params.kvcache_quant_config else None}"
-            )
-        # FP8 path: route to a fused rope+quantize+store op that writes
-        # fp8-quantized K/V and fp32 per-block scales to the paged cache.
-        _check_rank(2, freqs_cis=freqs_cis)
-        head_dim = kv_params.head_dim
-        q_dim = n_heads * head_dim
-        quant_gran = kv_params.kvcache_quant_config.quantization_granularity
-
-        parameters_fp8: dict[str, bool | int | str | DType] = {
-            "interleaved": interleaved,
-            "quantization_granularity": quant_gran,
-        }
-
-        if kv_collection.kv_scales is None:
-            raise ValueError(
-                "kv_collection.kv_scales is required for fp8 quantized"
-                " rope_split_store"
-            )
-
-        return ops.inplace_custom(
-            "mo.rope_split_store.ragged.paged.fp8_quantized",
-            device=qkv.device,
-            values=[
-                qkv,
-                input_row_offsets,
-                freqs_cis,
-                *kv_collection.flatten_without_attention_dispatch_metadata(),
-                layer_idx,
-            ],
-            out_types=[
-                TensorType(
-                    dtype=DType.bfloat16,
-                    shape=qkv.shape[:-1] + [q_dim],
-                    device=qkv.device,
-                )
-            ],
-            parameters=parameters_fp8,
-        )[0].tensor
+        assert kv_params.kvcache_quant_config is not None
+        raise ValueError(
+            "rope_split_store_ragged does not support a scaled quantized KV"
+            f" cache (dtype={kv_params.dtype},"
+            f" scale_dtype={kv_params.kvcache_quant_config.scale_dtype})."
+        )
 
     _check_rank(2, freqs_cis=freqs_cis)
 
@@ -384,7 +384,7 @@ def rope_split_store_ragged(
         if mrope_section is not None:
             if len(mrope_section) != position_ids.shape[0]:
                 raise ValueError(
-                    f"expected mrope_section to have length"
+                    "expected mrope_section to have length"
                     f" {position_ids.shape[0]}, was {len(mrope_section)}"
                 )
             scaled = [x * 2 for x in mrope_section]
@@ -392,6 +392,15 @@ def rope_split_store_ragged(
             parameters["mrope_section"] = "_".join(str(x) for x in prefix_sums)
         else:
             parameters["mrope_section"] = ""
+
+    if (q_norm_weight is None) != (k_norm_weight is None):
+        raise ValueError(
+            "q_norm_weight and k_norm_weight must be provided together"
+        )
+    if q_norm_weight is not None and position_ids is not None:
+        raise ValueError(
+            "qk-norm fusion and position_ids are not supported together"
+        )
 
     if position_ids is not None:
         op_name = "mo.rope_split_store.ragged.paged.with_position_id"
@@ -401,6 +410,29 @@ def rope_split_store_ragged(
             freqs_cis,
             *kv_collection.flatten_without_attention_dispatch_metadata(),
             position_ids,
+            layer_idx,
+        ]
+    elif q_norm_weight is not None:
+        # Fused per-head Q/K/V RMS-norm folded into the RoPE+store op: q/k use
+        # the learned gammas, v is a bare norm. `eps` is passed as its integer
+        # reciprocal (custom-op params reject float; eps is negligible vs
+        # mean(x^2), so this is ample precision).
+        assert k_norm_weight is not None
+        if rms_norm_eps is None:
+            raise ValueError("rms_norm_eps is required with q_norm_weight")
+        op_name = "mo.rope_split_store.ragged.paged.with_qk_norm"
+        parameters["eps_recip"] = round(1.0 / rms_norm_eps)
+        # When `k_eq_v`, V has no projection: `qkv` is `[q|k]` and the kernel
+        # reads the K region for both K and V (sharing one norm reduction)
+        # rather than a duplicated V region.
+        parameters["k_eq_v"] = k_eq_v
+        values = [
+            qkv,
+            input_row_offsets,
+            freqs_cis,
+            q_norm_weight,
+            k_norm_weight,
+            *kv_collection.flatten_without_attention_dispatch_metadata(),
             layer_idx,
         ]
     else:
@@ -419,7 +451,7 @@ def rope_split_store_ragged(
         values=values,
         out_types=[
             TensorType(
-                dtype=qkv.dtype,
+                dtype=q_out_dtype if q_out_dtype is not None else qkv.dtype,
                 shape=qkv.shape[:-1] + [q_dim],
                 device=qkv.device,
             )
@@ -449,58 +481,10 @@ def store_k_scale_cache_ragged(
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             input_row_offsets,
-            kv_collection.max_lengths,
+            kv_collection.max_prompt_length,
+            kv_collection.max_cache_length,
             kv_collection.kv_scales,
-            layer_idx,
-        ],
-        parameters={
-            "quantization_granularity": quantization_granularity,
-        },
-    )
-
-
-def store_v_scale_cache_ragged(
-    kv_collection: PagedCacheValues,
-    x_v_scale: TensorValue,
-    input_row_offsets: TensorValue,
-    layer_idx: TensorValue,
-    quantization_granularity: int,
-) -> None:
-    """Store value scale tensor into the paged KV cache.
-
-    Mirrors ``store_k_scale_cache_ragged`` but writes to the V side
-    (kv_idx=1) of the shared scales buffer.  This is the second half
-    of the two-call pattern that stores fp8 KV scales for models that
-    quantize K and V separately (e.g. Gemma4 FP8 KV path):
-
-    - K scales are written by the ``mo.rope_split_store.ragged.paged.fp8_quantized``
-      fused op (which runs rope → quantize → store for K) or by
-      ``store_k_scale_cache_ragged`` directly.
-    - V scales are written here via ``mo.kv_cache.store_v_scales.paged.ragged``.
-
-    Args:
-        kv_collection: Paged KV cache collection carrying the scale buffer.
-        x_v_scale: Per-token, per-head, per-block V scale tensor.
-        input_row_offsets: Ragged row offsets [batch_size + 1].
-        layer_idx: Layer index (uint32).
-        quantization_granularity: Block size along head_dim used for
-            quantization (e.g. 64).
-    """
-    if kv_collection.kv_scales is None:
-        raise ValueError(
-            "kv_collection.kv_scales is None, expected a buffer value"
-        )
-    ops.inplace_custom(
-        "mo.kv_cache.store_v_scales.paged.ragged",
-        device=x_v_scale.device,
-        values=[
-            x_v_scale,
-            kv_collection.kv_blocks,
-            kv_collection.cache_lengths,
-            kv_collection.lookup_table,
-            input_row_offsets,
-            kv_collection.max_lengths,
-            kv_collection.kv_scales,
+            kv_collection.scales_lookup_table or kv_collection.lookup_table,
             layer_idx,
         ],
         parameters={
@@ -525,6 +509,7 @@ def _rope_split_store_ragged_unfused(
     custom op, so the graph compiler can attempt to fuse them.
     """
     head_dim = kv_params.head_dim
+    assert isinstance(kv_params, MHAKVCacheParams)
     n_kv_heads = kv_params.n_kv_heads
     q_dim = n_heads * head_dim
     kv_dim = n_kv_heads * head_dim
@@ -557,7 +542,8 @@ def _rope_split_store_ragged_unfused(
     kv_blocks = kv_collection.kv_blocks
     cache_lengths = kv_collection.cache_lengths
     lookup_table = kv_collection.lookup_table
-    max_lengths = kv_collection.max_lengths
+    max_prompt_length = kv_collection.max_prompt_length
+    max_cache_length = kv_collection.max_cache_length
     ops.inplace_custom(
         "mo.kv_cache.store.paged.ragged",
         device=xk_rope.device,
@@ -567,7 +553,8 @@ def _rope_split_store_ragged_unfused(
             cache_lengths,
             lookup_table,
             input_row_offsets,
-            max_lengths,
+            max_prompt_length,
+            max_cache_length,
             layer_idx,
         ],
         parameters={"key_or_value": 0},
@@ -581,7 +568,8 @@ def _rope_split_store_ragged_unfused(
             cache_lengths,
             lookup_table,
             input_row_offsets,
-            max_lengths,
+            max_prompt_length,
+            max_cache_length,
             layer_idx,
         ],
         parameters={"key_or_value": 1},
@@ -649,19 +637,19 @@ def _fused_qkv_ragged_matmul_scaled_float8(
 
     if not all(t.device == input.device for t in tensors_to_check):
         raise ValueError(
-            f"expected all tensors to be on the same device as input ({input.device}), "
-            f"but got:\n"
-            f"  wqkv={wqkv.device}\n"
-            f"  input_row_offsets={input_row_offsets.device}\n"
-            f"  input_scale={input_scale.device}\n"
-            f"  weight_scale={weight_scale.device}"
+            "expected all tensors to be on the same device as input"
+            f" ({input.device}), but got:\n  wqkv={wqkv.device}\n "
+            f" input_row_offsets={input_row_offsets.device}\n "
+            f" input_scale={input_scale.device}\n "
+            f" weight_scale={weight_scale.device}"
             + ("" if bias is None else f"\n  bias={bias.device}")
         )
 
     # layer_idx must be a scalar on CPU as it's used for indexing
     if layer_idx.device != DeviceRef.CPU():
         raise ValueError(
-            f"expected layer_idx to be on CPU device, but got {layer_idx.device}"
+            "expected layer_idx to be on CPU device, but got"
+            f" {layer_idx.device}"
         )
 
     # for per-tensor quantization, the scale is a scalar. We view it as a 1x1
@@ -690,7 +678,10 @@ def _fused_qkv_ragged_matmul_scaled_float8(
             scales_granularity_mnk = (1, 1, -1)  # per-channel quantization
         else:
             raise ValueError(
-                "Can not infer the quantization config from the input tensor shapes",
+                (
+                    "Can not infer the quantization config from the input"
+                    " tensor shapes"
+                ),
                 "Please provide a quant_config",
             )
 
@@ -790,18 +781,18 @@ def _fused_qkv_ragged_matmul_scaled_float4(
 
     if not all(t.device == input.device for t in tensors_to_check):
         raise ValueError(
-            f"expected all tensors to be on the same device as input ({input.device}), "
-            f"but got:\n"
-            f"  wqkv={wqkv.device}\n"
-            f"  input_row_offsets={input_row_offsets.device}\n"
-            f"  input_scale={input_scale.device}\n"
-            f"  weight_scale={weight_scale.device}"
+            "expected all tensors to be on the same device as input"
+            f" ({input.device}), but got:\n  wqkv={wqkv.device}\n "
+            f" input_row_offsets={input_row_offsets.device}\n "
+            f" input_scale={input_scale.device}\n "
+            f" weight_scale={weight_scale.device}"
         )
 
     # layer_idx must be a scalar on CPU as it's used for indexing
     if layer_idx.device != DeviceRef.CPU():
         raise ValueError(
-            f"expected layer_idx to be on CPU device, but got {layer_idx.device}"
+            "expected layer_idx to be on CPU device, but got"
+            f" {layer_idx.device}"
         )
 
     # tensor_sf must be a scalar on CPU as it's used for per-tensor scaling
@@ -857,6 +848,383 @@ def _fused_qkv_ragged_matmul_scaled_float4(
     )[0].tensor
 
 
+def _fused_qkv_ragged_matmul_scaled_mxfp8(
+    kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    wqkv: TensorValue,
+    kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    n_heads: int,
+    input_scale: TensorValue,
+    weight_scale: TensorValue,
+    _output_dim: int | None = None,
+) -> TensorValue:
+    """Computes fused QKV projections with MXFP8 block-scaled input and weights.
+
+    The MXFP8 sibling of :func:`_fused_qkv_ragged_matmul_scaled_float4`:
+    ``input`` and ``wqkv`` carry ``float8_e4m3fn`` data with E8M0
+    (``float8_e8m0fnu``) block scales over 32-element K blocks. The Q
+    projection is returned, while K and V are written in place into
+    ``kv_collection``.
+
+    Args:
+        kv_params: KVCacheParams object containing key-value cache parameters.
+        input: Activation tensor, ``float8_e4m3fn`` with shape
+            [M=total_seq_len, K=hidden_dim].
+        input_row_offsets: TensorValue indicating the start and end of each
+            batch in the input tensor with shape [batch_size + 1].
+        wqkv: Weight tensor, ``float8_e4m3fn`` with shape
+            [N=(num_heads + 2 * num_kv_heads) * head_dim, K=hidden_dim].
+        kv_collection: PagedCacheValues object for managing key-value cache.
+        layer_idx: Layer index, expected to have dtype uint32 and live on CPU.
+        n_heads: Number of attention heads.
+        input_scale: E8M0 input block scales; rank-5 SF-atom layout on SM100,
+            rank-2 ``[M, K // 32]`` on CDNA4.
+        weight_scale: E8M0 weight block scales; rank-5 SF-atom layout on SM100,
+            rank-2 ``[N, K // 32]`` on CDNA4.
+        _output_dim: Optional output dimension. Defaults to
+            ``n_heads * head_dim``.
+
+    Raises:
+        ValueError: on input shapes/dtypes that are invalid for the kernel.
+    """
+    _check_same_dtype(input=input, wqkv=wqkv)
+
+    input_rank_expected = 2
+    _check_rank(input_rank_expected, input=input)
+
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+
+    tensors_to_check = [wqkv, input_row_offsets, input_scale, weight_scale]
+    if not all(t.device == input.device for t in tensors_to_check):
+        raise ValueError(
+            "expected all tensors to be on the same device as input"
+            f" ({input.device}), but got:\n  wqkv={wqkv.device}\n "
+            f" input_row_offsets={input_row_offsets.device}\n "
+            f" input_scale={input_scale.device}\n "
+            f" weight_scale={weight_scale.device}"
+        )
+
+    if layer_idx.device != DeviceRef.CPU():
+        raise ValueError(
+            "expected layer_idx to be on CPU device, but got"
+            f" {layer_idx.device}"
+        )
+
+    # MXFP8 block scales fully describe the quantization, but the kernel still
+    # multiplies by a per-tensor scale, so pass an identity scale on CPU.
+    tensor_sf = ops.constant(1.0, DType.float32, device=DeviceRef.CPU())
+
+    assert kv_params.page_size is not None
+    parameters: dict[str, int | str | DType] = {
+        "dtype": DType.float8_e4m3fn,
+        "scale_type": DType.float8_e8m0fnu,
+        "kv_type": kv_params.dtype,
+        "SF_VECTOR_SIZE": 32,
+    }
+
+    # The two ops share every operand but the scale layout: SM100 takes the
+    # rank-5 SF-atom interleave, CDNA4 the checkpoint's rank-2 E8M0 scales.
+    op_name = (
+        "mo.fused_qkv_matmul.ragged.paged.scale.mxfp8.amd"
+        if _is_amd_gpu()
+        else "mo.fused_qkv_matmul.ragged.paged.scale.mxfp8"
+    )
+    values = [
+        input,
+        input_row_offsets,
+        wqkv,
+        input_scale,
+        weight_scale,
+        tensor_sf,
+        *kv_collection.flatten_without_attention_dispatch_metadata(),
+        layer_idx,
+    ]
+
+    output_dim = (
+        _output_dim if _output_dim is not None else n_heads * kv_params.head_dim
+    )
+
+    return ops.inplace_custom(
+        op_name,
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=input.shape[:-1] + [output_dim],
+                device=input.device,
+            )
+        ],
+        parameters=parameters,
+    )[0].tensor
+
+
+def _fused_qkv_index_ragged_matmul_scaled_mxfp8(
+    kv_params: KVCacheParams,
+    index_kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    wqkv: TensorValue,
+    kv_collection: PagedCacheValues,
+    index_kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    n_heads: int,
+    num_index_heads: int,
+    idx_head_dim: int,
+    input_scale: TensorValue,
+    weight_scale: TensorValue,
+) -> tuple[TensorValue, TensorValue]:
+    """Computes MiniMax-M3's fused QKV + index-QK projections in one MXFP8 GEMM.
+
+    A 5-way fusion: ``input`` and ``wqkv`` carry ``float8_e4m3fn`` data with
+    E8M0 (``float8_e8m0fnu``) block scales over 32-element K blocks. ``wqkv`` is
+    the concatenation ``[Wq | Wk | Wv | Wiq | Wik]`` along the output dimension.
+    The single matmul output columns route as:
+
+    - ``Q``       -> returned as the first output, shape ``[M, q_dim]``.
+    - ``K`` / ``V`` -> scattered in place into the MAIN ``kv_collection``.
+    - ``IndexQ``  -> returned as the second output, shape ``[M, iq_dim]``.
+    - ``IndexK``  -> scattered in place into the INDEX ``index_kv_collection``
+      (MLA cache: single latent head, head 0, K only).
+
+    The fusion is bit-exact to separate QKV and IndexQK matmuls because every
+    band boundary lands on a 128-element scale-block boundary for M3.
+
+    Args:
+        kv_params: KVCacheParams for the MAIN (K, V) cache (GQA/MHA, non-MLA).
+        index_kv_params: KVCacheParams for the INDEX (IndexK) cache; MLA with a
+            single latent head (``is_mla=True``, ``n_kv_heads=1`` for M3).
+        input: Activation tensor, ``float8_e4m3fn`` with shape
+            [M=total_seq_len, K=hidden_dim].
+        input_row_offsets: Ragged offsets ``[batch_size + 1]``, uint32.
+        wqkv: Concatenated weight ``[Wq | Wk | Wv | Wiq | Wik]``,
+            ``float8_e4m3fn``, shape [N_total, K=hidden_dim] where
+            ``N_total = q_dim + 2 * kv_dim + iq_dim + ik_dim``.
+        kv_collection: PagedCacheValues for the MAIN cache.
+        index_kv_collection: PagedCacheValues for the INDEX cache.
+        layer_idx: Layer index, uint32 on CPU.
+        n_heads: Number of (main) attention heads. ``q_dim = n_heads *
+            head_dim``.
+        num_index_heads: Number of index Q heads. ``iq_dim = num_index_heads *
+            idx_head_dim``.
+        idx_head_dim: Index head dimension; also the single-head IndexK width.
+        input_scale: E8M0 input block scales in the rank-5 SF-atom layout.
+        weight_scale: E8M0 weight block scales in the rank-5 SF-atom layout.
+
+    Returns:
+        A tuple ``(q, index_q)`` of bf16 tensors: ``q`` is ``[M, q_dim]`` and
+        ``index_q`` is ``[M, iq_dim]``.
+
+    Raises:
+        ValueError: on input shapes/dtypes that are invalid for the kernel.
+    """
+    _check_same_dtype(input=input, wqkv=wqkv)
+
+    input_rank_expected = 2
+    _check_rank(input_rank_expected, input=input)
+
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+
+    tensors_to_check = [wqkv, input_row_offsets, input_scale, weight_scale]
+    if not all(t.device == input.device for t in tensors_to_check):
+        raise ValueError(
+            "expected all tensors to be on the same device as input"
+            f" ({input.device}), but got:\n  wqkv={wqkv.device}\n "
+            f" input_row_offsets={input_row_offsets.device}\n "
+            f" input_scale={input_scale.device}\n "
+            f" weight_scale={weight_scale.device}"
+        )
+
+    if layer_idx.device != DeviceRef.CPU():
+        raise ValueError(
+            "expected layer_idx to be on CPU device, but got"
+            f" {layer_idx.device}"
+        )
+
+    # MXFP8 block scales fully describe the quantization, but the kernel still
+    # multiplies by a per-tensor scale, so pass an identity scale on CPU.
+    tensor_sf = ops.constant(1.0, DType.float32, device=DeviceRef.CPU())
+
+    assert kv_params.page_size is not None
+    assert index_kv_params.page_size is not None
+    iq_dim = num_index_heads * idx_head_dim
+    parameters: dict[str, int | str | DType] = {
+        "dtype": DType.float8_e4m3fn,
+        "scale_type": DType.float8_e8m0fnu,
+        "kv_type": kv_params.dtype,
+        "index_kv_type": index_kv_params.dtype,
+        "SF_VECTOR_SIZE": 32,
+        "IQ_DIM": iq_dim,
+    }
+
+    # The two ops share every operand but the scale layout: SM100 takes the
+    # rank-5 SF-atom interleave, CDNA4 the checkpoint's rank-2 E8M0 scales.
+    op_name = (
+        "mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp8.amd"
+        if _is_amd_gpu()
+        else "mo.fused_qkv_index_matmul.ragged.paged.scale.mxfp8"
+    )
+    values = [
+        input,
+        input_row_offsets,
+        wqkv,
+        input_scale,
+        weight_scale,
+        tensor_sf,
+        *kv_collection.flatten_without_attention_dispatch_metadata(),
+        *index_kv_collection.flatten_without_attention_dispatch_metadata(),
+        layer_idx,
+    ]
+
+    # Two separate outputs: Q [M, q_dim] and IndexQ [M, iq_dim]. The kernel's
+    # store-redirect epilogue routes the Q band to the first output and the
+    # IndexQ band to the second, so the downstream reshapes stay contiguous
+    # views (no split/copy).
+    q_dim = n_heads * kv_params.head_dim
+
+    results = ops.inplace_custom(
+        op_name,
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=input.shape[:-1] + [q_dim],
+                device=input.device,
+            ),
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=input.shape[:-1] + [iq_dim],
+                device=input.device,
+            ),
+        ],
+        parameters=parameters,
+    )
+    return (results[0].tensor, results[1].tensor)
+
+
+def _fused_qkv_index_ragged_matmul(
+    kv_params: KVCacheParams,
+    index_kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    wqkv: TensorValue,
+    kv_collection: PagedCacheValues,
+    index_kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    n_heads: int,
+    num_index_heads: int,
+    idx_head_dim: int,
+) -> TensorValue:
+    """Computes MiniMax-M3's fused QKV + index-QK projections in one BF16 GEMM.
+
+    Non-scaled BF16 analog of ``_fused_qkv_index_ragged_matmul_scaled_mxfp8``: a
+    5-way fusion over the concatenated weight ``[Wq | Wk | Wv | Wiq | Wik]``
+    (along the output dimension), with no block-scaling operands. ``input`` and
+    ``wqkv`` are uniform ``bfloat16`` (attention in M3 is not quantized). The
+    single matmul output columns route as:
+
+    - ``Q``       -> returned combined output, columns ``[0, q_dim)``.
+    - ``K`` / ``V`` -> scattered in place into the MAIN ``kv_collection``.
+    - ``IndexQ``  -> returned combined output, columns
+      ``[q_dim, q_dim + iq_dim)`` (packed right after ``Q``).
+    - ``IndexK``  -> scattered in place into the INDEX ``index_kv_collection``
+      (MLA cache: single latent head, head 0, K only).
+
+    The model code splits the returned tensor into ``Q`` and ``IndexQ`` via
+    ``ops.split``.
+
+    Args:
+        kv_params: KVCacheParams for the MAIN (K, V) cache (GQA/MHA, non-MLA).
+        index_kv_params: KVCacheParams for the INDEX (IndexK) cache; MLA with a
+            single latent head (``is_mla=True``, ``n_kv_heads=1`` for M3).
+        input: Activation tensor, ``bfloat16`` with shape
+            [M=total_seq_len, K=hidden_dim].
+        input_row_offsets: Ragged offsets ``[batch_size + 1]``, uint32.
+        wqkv: Concatenated weight ``[Wq | Wk | Wv | Wiq | Wik]``, ``bfloat16``,
+            shape [N_total, K=hidden_dim] where
+            ``N_total = q_dim + 2 * kv_dim + iq_dim + ik_dim``.
+        kv_collection: PagedCacheValues for the MAIN cache.
+        index_kv_collection: PagedCacheValues for the INDEX cache.
+        layer_idx: Layer index, uint32 on CPU.
+        n_heads: Number of (main) attention heads. ``q_dim = n_heads *
+            head_dim``.
+        num_index_heads: Number of index Q heads. ``iq_dim = num_index_heads *
+            idx_head_dim``.
+        idx_head_dim: Index head dimension; also the single-head IndexK width.
+
+    Returns:
+        Combined ``[M, q_dim + iq_dim]`` tensor (Q then IndexQ), dtype = input's.
+
+    Raises:
+        ValueError: on input shapes/dtypes that are invalid for the kernel.
+    """
+    _check_same_dtype(input=input, wqkv=wqkv)
+
+    input_rank_expected = 2
+    _check_rank(input_rank_expected, input=input)
+
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+
+    tensors_to_check = [wqkv, input_row_offsets]
+    if not all(t.device == input.device for t in tensors_to_check):
+        raise ValueError(
+            "expected all tensors to be on the same device as input"
+            f" ({input.device}), but got:\n  wqkv={wqkv.device}\n "
+            f" input_row_offsets={input_row_offsets.device}"
+        )
+
+    if layer_idx.device != DeviceRef.CPU():
+        raise ValueError(
+            "expected layer_idx to be on CPU device, but got"
+            f" {layer_idx.device}"
+        )
+
+    assert kv_params.page_size is not None
+    assert index_kv_params.page_size is not None
+    iq_dim = num_index_heads * idx_head_dim
+    parameters: dict[str, int | str | DType] = {
+        "kv_type": kv_params.dtype,
+        "index_kv_type": index_kv_params.dtype,
+        "IQ_DIM": iq_dim,
+    }
+
+    op_name = "mo.fused_qkv_index_matmul.ragged.paged"
+    values = [
+        input,
+        input_row_offsets,
+        wqkv,
+        *kv_collection.flatten_without_attention_dispatch_metadata(),
+        *index_kv_collection.flatten_without_attention_dispatch_metadata(),
+        layer_idx,
+    ]
+
+    # Combined output: Q (n_heads * head_dim) then IndexQ (iq_dim).
+    output_dim = n_heads * kv_params.head_dim + iq_dim
+
+    return ops.inplace_custom(
+        op_name,
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=input.dtype,
+                shape=input.shape[:-1] + [output_dim],
+                device=input.device,
+            )
+        ],
+        parameters=parameters,
+    )[0].tensor
+
+
 def unfused_qkv_ragged_matmul_gguf_quantized(
     kv_params: KVCacheParams,
     input: TensorValue,
@@ -896,7 +1264,10 @@ def unfused_qkv_ragged_matmul_gguf_quantized(
         or not quantization_encoding_v.is_gguf
     ):
         raise ValueError(
-            f"expected quantization_encoding_q, quantization_encoding_k, and quantization_encoding_v to be gguf, was {quantization_encoding_q}, {quantization_encoding_k}, and {quantization_encoding_v}"
+            "expected quantization_encoding_q, quantization_encoding_k, and"
+            " quantization_encoding_v to be gguf, was"
+            f" {quantization_encoding_q}, {quantization_encoding_k}, and"
+            f" {quantization_encoding_v}"
         )
 
     assert kv_params.page_size is not None
@@ -974,7 +1345,7 @@ def fused_qkv_ragged_matmul_quantized(
         wqkv = ops.custom(
             "GPTQ_gpu_repack_b4_g128_desc_act",
             wqkv.device,
-            list((wqkv, perm_idx)),
+            [wqkv, perm_idx],
             out_types=[
                 TensorType(
                     DType.uint8,
@@ -987,7 +1358,9 @@ def fused_qkv_ragged_matmul_quantized(
         wqkv = ops.custom(
             "GPTQ_gpu_repack_b4_g128",
             wqkv.device,
-            list((wqkv,)),
+            [
+                wqkv,
+            ],
             out_types=[
                 TensorType(
                     DType.uint8,
@@ -1219,8 +1592,8 @@ def fused_qk_ragged_rope(
         if mrope_section is not None:
             if len(mrope_section) != position_ids.shape[0]:
                 raise ValueError(
-                    f"expected mrope_section to have length {position_ids.shape[0]}, "
-                    f"was {len(mrope_section)}"
+                    "expected mrope_section to have length"
+                    f" {position_ids.shape[0]}, was {len(mrope_section)}"
                 )
             # multiplied by 2 because the kernel expects the section to be in terms of head_dim,
             # then calculate the prefix sum of the section
@@ -1266,6 +1639,401 @@ def fused_qk_ragged_rope(
         ],
         parameters=parameters,
     )[0].tensor
+
+
+def fused_qk_ragged_rms_norm(
+    kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    kv_collection: PagedCacheValues,
+    q_gamma: TensorValue,
+    k_gamma: TensorValue,
+    epsilon: float | np.floating[Any],
+    layer_idx: TensorValue,
+    weight_offset: float | np.floating[Any],
+    multiply_before_cast: bool = True,
+) -> TensorValue:
+    """Computes fused query-key RMSNorm with ragged inputs and paged KV cache.
+
+    This function applies per-head RMSNorm to the query tensor and to the new
+    key entries already written into the paged KV cache. The query tensor is
+    returned as a new tensor with the same shape and dtype as ``input``. The key
+    cache is normalized in place for only the newly written entries described by
+    ``input_row_offsets``.
+
+    Args:
+        kv_params: The KV cache parameters.
+        input: The query tensor of shape ``[total_seq_len, n_heads, head_dim]``.
+        input_row_offsets: The ragged tensor offsets indicating where each
+            batch starts and ends in ``input``. Must have dtype ``uint32``.
+        kv_collection: The paged KV cache collection containing the key cache.
+        q_gamma: The rank-1 query RMSNorm weight. Its size must match
+            ``kv_params.head_dim``.
+        k_gamma: The rank-1 key RMSNorm weight. Its size must match
+            ``q_gamma`` and ``kv_params.head_dim``.
+        epsilon: The RMSNorm epsilon value.
+        layer_idx: The layer index for the KV cache. Must have dtype ``uint32``.
+        weight_offset: The constant offset added to each RMSNorm weight.
+        multiply_before_cast: Whether to multiply by the effective weight before
+            casting to the output dtype.
+
+    Returns:
+        The normalized query tensor with the same shape and dtype as ``input``.
+
+    Raises:
+        ValueError: This includes when the input ranks are invalid, the row
+            offset or layer index dtypes are invalid, the gamma weights have
+            different sizes, or the gamma size does not match the head
+            dimension.
+    """
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+    _check_rank(3, input=input)
+    _check_rank(1, q_gamma=q_gamma, k_gamma=k_gamma)
+
+    if q_gamma.shape[0] != k_gamma.shape[0]:
+        raise ValueError(
+            "expected q_gamma and k_gamma to have the same size, got"
+            f" {q_gamma.shape[0]} and {k_gamma.shape[0]}"
+        )
+    if q_gamma.shape[0] != kv_params.head_dim:
+        raise ValueError(
+            "fused_qk_ragged_rms_norm requires full per-head normalization;"
+            f" expected gamma size {kv_params.head_dim} but got"
+            f" {q_gamma.shape[0]}"
+        )
+    if input.shape[2] != kv_params.head_dim:
+        raise ValueError(
+            "expected input head_dim to match kv_params.head_dim, got"
+            f" {input.shape[2]} and {kv_params.head_dim}"
+        )
+
+    parameters: dict[str, int | str | DType | bool] = {
+        "multiply_before_cast": multiply_before_cast,
+    }
+    assert kv_params.page_size is not None
+
+    return ops.inplace_custom(
+        "mo.fused_qk_rms_norm.ragged.paged",
+        device=input.device,
+        values=[
+            input,
+            input_row_offsets,
+            *kv_collection.flatten_without_attention_dispatch_metadata(),
+            q_gamma,
+            k_gamma,
+            ops.constant(epsilon, DType.float32, device=DeviceRef.CPU()),
+            layer_idx,
+            ops.constant(weight_offset, input.dtype, device=DeviceRef.CPU()),
+        ],
+        out_types=[
+            TensorType(
+                dtype=input.dtype, shape=input.shape, device=input.device
+            )
+        ],
+        parameters=parameters,
+    )[0].tensor
+
+
+def fused_qk_rms_norm_rope_ragged(
+    kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    kv_collection: PagedCacheValues,
+    q_gamma: TensorValue,
+    k_gamma: TensorValue,
+    freqs_cis: TensorValue,
+    epsilon: float | np.floating[Any],
+    layer_idx: TensorValue,
+    weight_offset: float | np.floating[Any],
+    interleaved: bool = True,
+    multiply_before_cast: bool = True,
+    q_out_dtype: DType | None = None,
+) -> TensorValue:
+    """Computes fused per-head RMSNorm and RoPE with ragged inputs and paged KV cache.
+
+    This fuses :obj:`fused_qk_ragged_rms_norm` and :obj:`fused_qk_ragged_rope`
+    into a single GPU launch. It applies per-head RMSNorm to the query tensor
+    and to the new key entries written into the paged KV cache, then applies
+    RoPE to the normalized values. The query tensor is returned as a new tensor
+    with the same shape as ``input``, at ``q_out_dtype`` (default
+    ``input.dtype``); the key cache is updated in place for the newly written
+    entries.
+
+    The RoPE dimension is taken from ``freqs_cis.shape[1]``. When it is smaller
+    than the head dimension, RoPE is applied only to the prefix
+    ``[0, rope_dim)`` of each head (non-interleaved layout) and the suffix is
+    left un-roped, matching :obj:`fused_qk_ragged_rope`.
+
+    Args:
+        kv_params: The KV cache parameters.
+        input: The query tensor of shape ``[total_seq_len, n_heads, head_dim]``.
+        input_row_offsets: The ragged tensor offsets indicating where each
+            batch starts and ends in ``input``. Must have dtype ``uint32``.
+        kv_collection: The paged KV cache collection containing the key cache.
+        q_gamma: The rank-1 query RMSNorm weight. Its size must match
+            ``kv_params.head_dim``.
+        k_gamma: The rank-1 key RMSNorm weight. Its size must match ``q_gamma``
+            and ``kv_params.head_dim``.
+        freqs_cis: The RoPE frequency tensor. Its second dimension determines
+            the RoPE dimension. Must share ``input``'s dtype, or be
+            ``float32`` (the kernel upcasts freqs to the fp32 accumulator, so a
+            higher-precision table is consumed losslessly).
+        epsilon: The RMSNorm epsilon value.
+        layer_idx: The layer index for the KV cache. Must have dtype ``uint32``.
+        weight_offset: The constant offset added to each RMSNorm weight.
+        interleaved: Whether to use the interleaved RoPE pattern.
+        multiply_before_cast: Whether to multiply by the effective weight
+            before rounding the RMSNorm result to ``input``'s dtype. Governs
+            that round only, not the ``q_out_dtype`` cast.
+        q_out_dtype: Dtype of the returned query tensor (default
+            ``input.dtype``). Q rounds to ``input.dtype`` first, so this equals
+            a separate ``ops.cast`` bit for bit.
+
+    Returns:
+        The normalized and RoPE-applied query tensor with the same shape as
+        ``input``, at ``q_out_dtype``.
+
+    Raises:
+        ValueError: If the input ranks are invalid, the row offset or layer
+            index dtypes are invalid, the gamma weights have different sizes,
+            the gamma size does not match the head dimension, or ``freqs_cis``
+            dtype neither matches ``input`` nor is ``float32``.
+    """
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+    _check_rank(3, input=input)
+    _check_rank(1, q_gamma=q_gamma, k_gamma=k_gamma)
+    _check_rank(2, freqs_cis=freqs_cis)
+
+    if q_gamma.shape[0] != k_gamma.shape[0]:
+        raise ValueError(
+            "expected q_gamma and k_gamma to have the same size, got"
+            f" {q_gamma.shape[0]} and {k_gamma.shape[0]}"
+        )
+    if q_gamma.shape[0] != kv_params.head_dim:
+        raise ValueError(
+            "fused_qk_rms_norm_rope_ragged requires full per-head"
+            f" normalization; expected gamma size {kv_params.head_dim} but got"
+            f" {q_gamma.shape[0]}"
+        )
+    if input.shape[2] != kv_params.head_dim:
+        raise ValueError(
+            "expected input head_dim to match kv_params.head_dim, got"
+            f" {input.shape[2]} and {kv_params.head_dim}"
+        )
+    # The kernel is freq-dtype-parametric: it loads freqs_cis and upcasts to
+    # the fp32 accumulator before the RoPE rotation, so a higher-precision
+    # (fp32) freqs table is consumed losslessly regardless of the input dtype.
+    # Allow fp32 freqs with a lower-precision input; otherwise require a match.
+    if freqs_cis.dtype != input.dtype and freqs_cis.dtype != DType.float32:
+        raise ValueError(
+            "expected freqs_cis dtype to match input dtype (or be float32),"
+            f" got {freqs_cis.dtype} and {input.dtype}"
+        )
+
+    parameters: dict[str, bool | int | str | DType] = {
+        "interleaved": interleaved,
+        "multiply_before_cast": multiply_before_cast,
+        "cache_dtype": kv_params.dtype,
+    }
+    assert kv_params.page_size is not None
+
+    return ops.inplace_custom(
+        "mo.fused_qk_rms_norm_rope.ragged.paged",
+        device=input.device,
+        values=[
+            input,
+            input_row_offsets,
+            *kv_collection.flatten_without_attention_dispatch_metadata(),
+            q_gamma,
+            k_gamma,
+            freqs_cis,
+            ops.constant(epsilon, DType.float32, device=DeviceRef.CPU()),
+            layer_idx,
+            ops.constant(weight_offset, input.dtype, device=DeviceRef.CPU()),
+        ],
+        out_types=[
+            TensorType(
+                dtype=q_out_dtype or input.dtype,
+                shape=input.shape,
+                device=input.device,
+            )
+        ],
+        parameters=parameters,
+    )[0].tensor
+
+
+def fused_dual_qk_rms_norm_rope_ragged(
+    main_kv_params: KVCacheParams,
+    index_kv_params: KVCacheParams,
+    main_input: TensorValue,
+    index_input: TensorValue,
+    input_row_offsets: TensorValue,
+    main_kv_collection: PagedCacheValues,
+    index_kv_collection: PagedCacheValues,
+    q_main_gamma: TensorValue,
+    k_main_gamma: TensorValue,
+    q_index_gamma: TensorValue,
+    k_index_gamma: TensorValue,
+    freqs_cis: TensorValue,
+    main_epsilon: float | np.floating[Any],
+    index_epsilon: float | np.floating[Any],
+    layer_idx: TensorValue,
+    weight_offset: float | np.floating[Any],
+    interleaved: bool = True,
+    multiply_before_cast: bool = True,
+    q_main_out_dtype: DType | None = None,
+) -> tuple[TensorValue, TensorValue]:
+    """Fuses two :obj:`fused_qk_rms_norm_rope_ragged` launches into one.
+
+    MiniMax-M3 sparse layers apply the fused per-head RMSNorm+RoPE op twice back
+    to back: once for the main GQA Q / K cache and once for the lightning
+    indexer's IndexQ / index-K cache. Both bands read (disjoint) slices of the
+    same combined QKV+IndexQ matmul output, share ``input_row_offsets``, and
+    share ``freqs_cis``, so this runs them in a single GPU launch. Each band's Q
+    is returned as a separate tensor; each band's key cache is updated in place.
+
+    All per-head RoPE geometry (dtype, ``freqs_cis.shape[1]`` rope dim,
+    ``interleaved``, head dim) must be identical across the two bands; a
+    divergence trips a compile-time assert in the kernel rather than silently
+    mis-roping a band. The two caches may differ in KV-head count, so this is
+    bit-exact to two separate :obj:`fused_qk_rms_norm_rope_ragged` calls,
+    including when ``q_main_out_dtype`` narrows the main band.
+
+    Args:
+        main_kv_params: KV cache parameters for the main (GQA) cache.
+        index_kv_params: KV cache parameters for the index-K cache.
+        main_input: The main Q tensor ``[total_seq_len, n_heads, head_dim]``.
+        index_input: The indexer Q tensor
+            ``[total_seq_len, num_index_heads, head_dim]``.
+        input_row_offsets: Ragged offsets shared by both bands. Dtype ``uint32``.
+        main_kv_collection: Paged cache holding the main key cache.
+        index_kv_collection: Paged cache holding the index-K cache.
+        q_main_gamma: Rank-1 main-Q RMSNorm weight (size ``head_dim``).
+        k_main_gamma: Rank-1 main-K RMSNorm weight (size ``head_dim``).
+        q_index_gamma: Rank-1 index-Q RMSNorm weight (size ``head_dim``).
+        k_index_gamma: Rank-1 index-K RMSNorm weight (size ``head_dim``).
+        freqs_cis: The shared RoPE frequency table. Its second dimension is the
+            RoPE dim. Must share the input dtype or be ``float32``.
+        main_epsilon: RMSNorm epsilon for the main band.
+        index_epsilon: RMSNorm epsilon for the indexer band.
+        layer_idx: The layer index for both caches. Dtype ``uint32``.
+        weight_offset: Constant offset added to each RMSNorm weight.
+        interleaved: Whether to use the interleaved RoPE pattern (both bands).
+        multiply_before_cast: Whether to multiply by the effective weight
+            before rounding the RMSNorm result to ``input``'s dtype. Governs
+            that round only, not the ``q_main_out_dtype`` cast.
+        q_main_out_dtype: Dtype of the returned main query tensor (default
+            ``main_input.dtype``); the index band is not retypable. Q rounds to
+            ``main_input.dtype`` first, so this equals a separate ``ops.cast``.
+
+    Returns:
+        A tuple ``(q_main, q_index)`` of the normalized + RoPE-applied query
+        tensors, shaped like ``main_input`` / ``index_input``. ``q_index`` keeps
+        ``index_input``'s dtype; ``q_main`` is at ``q_main_out_dtype``.
+
+    Raises:
+        ValueError: On invalid ranks/dtypes, mismatched gamma sizes, a gamma
+            size that does not match its head dim, a head-dim mismatch between
+            the two bands, or a ``freqs_cis`` dtype that neither matches the
+            input nor is ``float32``.
+    """
+    _check_dtype(
+        DType.uint32, input_row_offsets=input_row_offsets, layer_idx=layer_idx
+    )
+    _check_rank(3, main_input=main_input, index_input=index_input)
+    _check_rank(
+        1,
+        q_main_gamma=q_main_gamma,
+        k_main_gamma=k_main_gamma,
+        q_index_gamma=q_index_gamma,
+        k_index_gamma=k_index_gamma,
+    )
+    _check_rank(2, freqs_cis=freqs_cis)
+
+    for name, q_gamma, k_gamma, kv_params, input in (
+        ("main", q_main_gamma, k_main_gamma, main_kv_params, main_input),
+        ("index", q_index_gamma, k_index_gamma, index_kv_params, index_input),
+    ):
+        if q_gamma.shape[0] != k_gamma.shape[0]:
+            raise ValueError(
+                f"expected {name} q_gamma and k_gamma to have the same size,"
+                f" got {q_gamma.shape[0]} and {k_gamma.shape[0]}"
+            )
+        if q_gamma.shape[0] != kv_params.head_dim:
+            raise ValueError(
+                "fused_dual_qk_rms_norm_rope_ragged requires full per-head"
+                f" normalization; expected {name} gamma size"
+                f" {kv_params.head_dim} but got {q_gamma.shape[0]}"
+            )
+        if input.shape[2] != kv_params.head_dim:
+            raise ValueError(
+                f"expected {name} input head_dim to match kv_params.head_dim,"
+                f" got {input.shape[2]} and {kv_params.head_dim}"
+            )
+
+    if main_kv_params.head_dim != index_kv_params.head_dim:
+        raise ValueError(
+            "fused_dual_qk_rms_norm_rope_ragged requires both bands to share"
+            f" head_dim, got {main_kv_params.head_dim} (main) and"
+            f" {index_kv_params.head_dim} (index)"
+        )
+    # The kernel loads freqs_cis and upcasts to the fp32 accumulator, so an fp32
+    # table is consumed losslessly regardless of the input dtype.
+    if freqs_cis.dtype != main_input.dtype and freqs_cis.dtype != DType.float32:
+        raise ValueError(
+            "expected freqs_cis dtype to match input dtype (or be float32),"
+            f" got {freqs_cis.dtype} and {main_input.dtype}"
+        )
+
+    parameters: dict[str, bool | int | str | DType] = {
+        "interleaved": interleaved,
+        "multiply_before_cast": multiply_before_cast,
+        "main_cache_dtype": main_kv_params.dtype,
+        "index_cache_dtype": index_kv_params.dtype,
+    }
+    assert main_kv_params.page_size is not None
+    assert index_kv_params.page_size is not None
+
+    results = ops.inplace_custom(
+        "mo.fused_qk_rms_norm_rope.ragged.paged.dual",
+        device=main_input.device,
+        values=[
+            main_input,
+            index_input,
+            input_row_offsets,
+            *main_kv_collection.flatten_without_attention_dispatch_metadata(),
+            *index_kv_collection.flatten_without_attention_dispatch_metadata(),
+            q_main_gamma,
+            k_main_gamma,
+            q_index_gamma,
+            k_index_gamma,
+            freqs_cis,
+            ops.constant(main_epsilon, DType.float32, device=DeviceRef.CPU()),
+            ops.constant(index_epsilon, DType.float32, device=DeviceRef.CPU()),
+            layer_idx,
+            ops.constant(
+                weight_offset, main_input.dtype, device=DeviceRef.CPU()
+            ),
+        ],
+        out_types=[
+            TensorType(
+                dtype=q_main_out_dtype or main_input.dtype,
+                shape=main_input.shape,
+                device=main_input.device,
+            ),
+            TensorType(
+                dtype=index_input.dtype,
+                shape=index_input.shape,
+                device=index_input.device,
+            ),
+        ],
+        parameters=parameters,
+    )
+    return (results[0].tensor, results[1].tensor)
 
 
 def fused_qk_padded_rope(
@@ -1341,10 +2109,11 @@ def _validate_kv_cache_store_common(
     _check_rank(0, layer_idx=layer_idx)
     _check_rank(6, kv_blocks=kv_collection.kv_blocks)
     _check_rank(1, cache_lengths=kv_collection.cache_lengths)
+    _check_rank(2, lookup_table=kv_collection.lookup_table)
     _check_rank(
-        2,
-        lookup_table=kv_collection.lookup_table,
-        max_lengths=kv_collection.max_lengths,
+        1,
+        max_prompt_length=kv_collection.max_prompt_length,
+        max_cache_length=kv_collection.max_cache_length,
     )
     if key_or_value not in (KEY_CACHE_INDEX, VALUE_CACHE_INDEX):
         raise ValueError(
@@ -1380,7 +2149,8 @@ def kv_cache_store_paged_ragged(
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             input_row_offsets,
-            kv_collection.max_lengths,
+            kv_collection.max_prompt_length,
+            kv_collection.max_cache_length,
             layer_idx,
         ],
         parameters=parameters,
@@ -1466,7 +2236,8 @@ def kv_cache_store_paged_padded(
             kv_collection.cache_lengths,
             kv_collection.lookup_table,
             valid_lengths,
-            kv_collection.max_lengths,
+            kv_collection.max_prompt_length,
+            kv_collection.max_cache_length,
             layer_idx,
         ],
         parameters=parameters,
@@ -1532,8 +2303,16 @@ def rope_ragged(
     freqs_cis: TensorValue,
     *,
     interleaved: bool = True,
+    rope_first: bool = False,
+    output_dtype: DType | None = None,
 ) -> TensorValue:
-    """Applies RoPE to ragged input using the standard rope kernel."""
+    """Applies RoPE to ragged input using the standard rope kernel.
+
+    When ``freqs_cis`` is narrower than ``input``'s head dimension, only that
+    many columns of each head are rotated and the rest pass through. Those
+    rotated columns are the trailing ones by default; set ``rope_first`` to
+    rotate the leading ones instead.
+    """
     _check_dtype(
         DType.uint32, input_row_offsets=input_row_offsets, start_pos=start_pos
     )
@@ -1541,25 +2320,32 @@ def rope_ragged(
     _check_rank(1, input_row_offsets=input_row_offsets, start_pos=start_pos)
     _check_rank(2, freqs_cis=freqs_cis)
 
-    parameters: dict[str, bool | int | str | DType] = {
-        "interleaved": interleaved,
-    }
+    # The rope kernel runs on ``input.device`` (a GPU). If ``freqs_cis`` lives
+    # on a different device -- commonly a CPU-resident frequency table that the
+    # caller sliced (e.g. ``freqs_cis[:seq_len]``) before passing it in --
+    # handing the cross-device value straight to ``ops.custom`` lets the graph
+    # compiler fuse the CPU view (the ``mo.slice``) directly into the GPU
+    # consumer. That fused view races on the implicit transfer's lifetime and
+    # intermittently reads out of bounds under host-side timing jitter. Insert
+    # an explicit transfer so the device crossing is a hard fusion barrier and
+    # the kernel reads a materialized on-device buffer instead of a fused view.
+    if freqs_cis.device != input.device:
+        freqs_cis = freqs_cis.to(input.device)
 
-    return ops.custom(
-        "mo.rope.ragged",
-        device=input.device,
-        values=[
-            input,
-            input_row_offsets,
-            start_pos,
-            freqs_cis,
-        ],
-        out_types=[
-            TensorType(
-                dtype=input.dtype, shape=input.shape, device=input.device
-            )
-        ],
-        parameters=parameters,
+    return Graph.current._add_op_generated(
+        mo.CompositeRopeRaggedOp,
+        result=TensorType(
+            dtype=output_dtype if output_dtype is not None else input.dtype,
+            shape=input.shape,
+            device=input.device,
+        ),
+        input=input,
+        input_row_offsets=input_row_offsets,
+        start_pos=start_pos,
+        freqs_cis=freqs_cis,
+        interleaved=builtin.BoolAttr(interleaved),
+        rope_first=builtin.BoolAttr(rope_first),
+        output_param_decls=kgen.ParamDeclArrayAttr([]),
     )[0].tensor
 
 
@@ -1610,14 +2396,16 @@ def _freqs_cis_from_position_ids(
         position_ids = ops.unsqueeze(position_ids, 0)
     if position_ids.rank != 2:
         raise ValueError(
-            f"expected position_ids to be 1D or 2D, got rank {position_ids.rank}"
+            "expected position_ids to be 1D or 2D, got rank"
+            f" {position_ids.rank}"
         )
 
     freqs_by_section = ops.gather(input=freqs_cis, indices=position_ids, axis=0)
     if mrope_section is None:
         if position_ids.shape[0] != 1:
             raise ValueError(
-                "mrope_section must be provided when position_ids has multiple sections"
+                "mrope_section must be provided when position_ids has multiple"
+                " sections"
             )
         return freqs_by_section[0]
 
@@ -1700,11 +2488,18 @@ def rope_ragged_with_position_ids(
         position_ids = ops.unsqueeze(position_ids, 0)
     if position_ids.rank != 2:
         raise ValueError(
-            f"expected position_ids to be 1D or 2D, got rank {position_ids.rank}"
+            "expected position_ids to be 1D or 2D, got rank"
+            f" {position_ids.rank}"
         )
 
     # Fast path: invoke kernel directly when mrope_section is not used.
     if mrope_section is None:
+        # Materialize freqs_cis on the kernel's device before handing it to
+        # ``ops.custom``; see the note in ``rope_ragged``. A cross-device
+        # (e.g. CPU-resident, sliced) freqs_cis fused into the GPU consumer
+        # races on the implicit transfer and reads out of bounds.
+        if freqs_cis.device != input.device:
+            freqs_cis = freqs_cis.to(input.device)
         total_tokens = ops.cast(
             ops.shape_to_tensor(input.shape)[0], DType.uint32
         ).to(input.device)
@@ -1835,7 +2630,8 @@ def _validate_argument_tensor(
         )
     if device_type is not None and tensor.device.device_type != device_type:
         errors.append(
-            f"{name}'s device type was expected to be {device_type} but got {tensor.device.device_type}"
+            f"{name}'s device type was expected to be {device_type} but got"
+            f" {tensor.device.device_type}"
         )
     if errors:
         raise ValueError("\n".join(errors))
@@ -1850,6 +2646,7 @@ def mla_fp8_index_top_k(
     top_k: int,
     quantization_granularity: int,
     mask_variant: MHAMaskVariant = MHAMaskVariant.CAUSAL_MASK,
+    kpool: int = 1,
 ) -> TensorValue:
     """Computes top-k indices for MLA FP8 indexed attention scores.
 
@@ -1866,11 +2663,21 @@ def mla_fp8_index_top_k(
         top_k: Requested number of top indices per token.
         quantization_granularity: Quantization granularity for the K cache.
         mask_variant: The mask variant to use (NULL or CAUSAL_MASK).
+        kpool: Tokens per row of ``k_collection``. ``1`` scores one row per
+            cached token. ``k > 1`` means the cache holds one pooled key per
+            ``k`` consecutive tokens, so ``top_k`` counts pools and the
+            returned indices are pool ids that the caller expands back to
+            token positions.
 
     Returns:
         Output tensor of shape [total_seq_len, effective_k] containing top-k key
         indices per token, where effective_k = min(top_k, max_num_keys).
-        Invalid positions are filled with -1.
+        Invalid positions are filled with -1. With ``kpool > 1`` the entries are
+        pool ids rather than token positions.
+
+    Raises:
+        ValueError: If ``top_k`` or ``kpool`` is not positive, or if
+            ``mask_variant`` is neither NULL nor CAUSAL.
     """
     _validate_argument_tensor(
         "q", q, dtype=DType.float8_e4m3fn, rank=3, device_type=DeviceKind.GPU
@@ -1909,6 +2716,8 @@ def mla_fp8_index_top_k(
     )
     if top_k <= 0:
         raise ValueError(f"top_k must be greater than 0, got {top_k}")
+    if kpool < 1:
+        raise ValueError(f"kpool must be at least 1, got {kpool}")
 
     # Validate mask_variant is supported
     if mask_variant not in (
@@ -1943,10 +2752,490 @@ def mla_fp8_index_top_k(
             "k": top_k,
             "quantization_granularity": quantization_granularity,
             "mask_str": mask_str,
+            "kpool": kpool,
         },
     )[0].tensor
 
     return result
+
+
+def msa_sparse_indexer(
+    kv_params: KVCacheParams,
+    index_q: TensorValue,
+    input_row_offsets: TensorValue,
+    prefix_lens: TensorValue,
+    index_kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    score_scratch: BufferValue,
+    *,
+    num_index_heads: int,
+    idx_head_dim: int,
+    block_size: int,
+    topk: int,
+    init_blocks: int,
+    local_blocks: int,
+    scale: float,
+) -> TensorValue:
+    """Selects the top-k key *blocks* per token for MiniMax-M3 sparse attention.
+
+    Computes per-block QK scores against the index-K paged cache (BF16 or
+    scale-free FP8 e4m3) and returns, for each (index head, query token), the
+    ids of the ``topk`` highest-scoring 128-token blocks. The forward
+    sparse-attention op consumes these block ids to gather a sparse KV band.
+    The op selects the prefill or decode kernel at runtime from the index-K
+    cache's ``max_seq_length``, so the same call serves both paths.
+
+    Args:
+        kv_params: Key-value cache parameters for the index-K cache.
+        index_q: Index queries. Prefill: ``[total_q, num_index_heads,
+            idx_head_dim]``; decode: ``[batch, num_index_heads, idx_head_dim]``.
+            BF16.
+        input_row_offsets: Ragged query offsets ``[batch + 1]`` uint32 (used on
+            the prefill path; on decode it is ``[0, 1, ..., batch]``).
+        prefix_lens: Per-row cached-key count ``[batch]`` (the index-K
+            ``cache_lengths``). uint32.
+        index_kv_collection: Paged index-K cache (BF16 or scale-free e4m3, no
+            scales).
+        layer_idx: Layer index, uint32, on CPU.
+        score_scratch: Persistent FP32 scratch buffer for decode scoring, shape
+            ``[num_index_heads, max_rows, MAX_NUM_BLOCKS]``. ``max_rows`` must
+            cover ``total_q`` for every decode step served: ``max_batch`` for
+            single-token decode, and ``max_batch * (num_draft_tokens + 1)`` for
+            the multi-token (MTP / speculative) routes, which write at the
+            ragged row ``input_row_offsets[b] + t``. It is persistent because
+            decode runs inside the graph-capture region, so the kernel cannot
+            allocate a correctly sized buffer per step; a scratch too narrow for
+            a multi-token route makes that step fall back to the prefill
+            indexer, while single-token decode raises.
+        num_index_heads: Number of index (query) heads.
+        idx_head_dim: Index head dimension.
+        block_size: KV block size in tokens (== page size).
+        topk: Number of blocks to select per token.
+        init_blocks: Always-keep leading blocks.
+        local_blocks: Always-keep trailing/local blocks.
+        scale: QK scale.
+
+    Returns:
+        Block indices, int32, ``-1``-padded. Prefill: ``[num_index_heads,
+        total_q, topk]``; decode: ``[num_index_heads, batch, topk]``.
+    """
+    _validate_argument_tensor(
+        "index_q",
+        index_q,
+        dtype=DType.bfloat16,
+        rank=3,
+        device_type=DeviceKind.GPU,
+    )
+    _validate_argument_tensor(
+        "input_row_offsets",
+        input_row_offsets,
+        dtype=DType.uint32,
+        rank=1,
+        device=index_q.device,
+    )
+    _validate_argument_tensor(
+        "prefix_lens",
+        prefix_lens,
+        dtype=DType.uint32,
+        rank=1,
+        device=index_q.device,
+    )
+    k_dtype = index_kv_collection.kv_blocks.dtype
+    if k_dtype not in (DType.bfloat16, DType.float8_e4m3fn):
+        raise ValueError(
+            "index_kv_collection.kv_blocks must be bfloat16 or "
+            f"float8_e4m3fn, got {k_dtype}"
+        )
+    _validate_argument_tensor(
+        "index_kv_collection.kv_blocks",
+        index_kv_collection.kv_blocks,
+        rank=6,
+        device=index_q.device,
+    )
+    _validate_argument_tensor(
+        "layer_idx", layer_idx, dtype=DType.uint32, device=DeviceRef.CPU()
+    )
+    _validate_argument_tensor(
+        "score_scratch",
+        score_scratch,
+        dtype=DType.float32,
+        rank=3,
+        device=index_q.device,
+    )
+    scratch_heads = score_scratch.shape[0]
+    if int(scratch_heads) != num_index_heads:
+        raise ValueError(
+            "score_scratch must carry one plane per index head: expected "
+            f"shape[0] == {num_index_heads}, got {int(scratch_heads)}"
+        )
+    if topk <= 0:
+        raise ValueError(f"topk must be greater than 0, got {topk}")
+
+    num_rows = index_q.shape[0]
+
+    parameters: dict[str, int | str | DType] = {
+        "num_index_heads": num_index_heads,
+        "idx_head_dim": idx_head_dim,
+        "block_size": block_size,
+        "topk": topk,
+        "init_blocks": init_blocks,
+        "local_blocks": local_blocks,
+    }
+
+    if index_kv_collection.attention_dispatch_metadata is None:
+        raise ValueError(
+            "msa_sparse_indexer requires attention_dispatch_metadata on the"
+            " index-K cache: it carries the kernel's msa_scalar_args input."
+        )
+
+    # The kernel's operand list ends at msa_scalar_args (fed from
+    # attention_dispatch_metadata), so append the metadata explicitly rather
+    # than using flatten(), which also emits optional fields the kernel does
+    # not take (e.g. draft_attention_dispatch_metadata under speculative
+    # decoding) and would shift every operand after them.
+    values: list[Value[Any]] = [
+        index_q,
+        input_row_offsets,
+        prefix_lens,
+        *index_kv_collection.flatten_without_attention_dispatch_metadata(),
+        index_kv_collection.attention_dispatch_metadata,
+        layer_idx,
+        score_scratch,
+        ops.constant(scale, dtype=DType.float32, device=DeviceRef.CPU()),
+    ]
+
+    return ops.inplace_custom(
+        "mo.msa.indexer.ragged.paged",
+        device=index_q.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.int32,
+                shape=(num_index_heads, num_rows, topk),
+                device=index_q.device,
+            )
+        ],
+        parameters=parameters,
+    )[0].tensor
+
+
+def _kv_cache_row_offsets_ragged(
+    input_row_offsets: TensorValue,
+    kv_collection: PagedCacheValues,
+) -> TensorValue:
+    """Builds cumulative valid-cache row offsets for a ragged prefill batch.
+
+    Args:
+        input_row_offsets: Ragged query offsets ``[batch + 1]`` uint32.
+        kv_collection: Paged KV cache collection.
+
+    Returns:
+        ``uint32[batch + 1]`` cumulative offsets for the valid K/V rows read by
+        sparse attention prefill.
+    """
+    _validate_argument_tensor(
+        "input_row_offsets",
+        input_row_offsets,
+        dtype=DType.uint32,
+        rank=1,
+        device_type=DeviceKind.GPU,
+    )
+
+    return ops.custom(
+        "mo.kv_cache.row_offsets.ragged.paged",
+        device=input_row_offsets.device,
+        values=[
+            input_row_offsets,
+            kv_collection.cache_lengths,
+        ],
+        out_types=[
+            TensorType(
+                dtype=DType.uint32,
+                shape=input_row_offsets.shape,
+                device=input_row_offsets.device,
+            )
+        ],
+    )[0].tensor
+
+
+def msa_sparse_attention_ragged(
+    kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    cache_row_offsets: TensorValue,
+    total_context_length: TensorValue,
+    kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    block_indices: TensorValue,
+    *,
+    group: int,
+    topk: int,
+    sparse_block_size: int,
+    scale: float,
+) -> TensorValue:
+    """Computes MiniMax-M3 block-sparse attention over the main paged KV cache.
+
+    Gathers ``topk`` 128-token KV blocks per (kv head, query token) using the
+    block ids produced by :func:`msa_sparse_indexer`, then runs SM100
+    block-sparse MHA. The main KV cache is BF16 or native FP8 e4m3; ``input``
+    (the query) must match its dtype, and the output is always BF16.
+    ``head_dim`` is 128. The op selects the prefill or decode kernel at runtime
+    from the main KV cache's ``max_seq_length``, so the same call serves both
+    paths.
+
+    Args:
+        kv_params: Key-value cache parameters for the main KV cache.
+        input: Query tensor ``[total_q, n_heads, head_dim]`` (prefill) or
+            ``[batch, n_heads, head_dim]`` (decode); dtype matches the KV cache
+            (BF16 or FP8 e4m3).
+        input_row_offsets: Ragged query offsets ``[batch + 1]`` uint32.
+        cache_row_offsets: Ragged valid-cache offsets ``[batch + 1]`` uint32.
+        total_context_length: Total padded cache length for the batch, CPU
+            scalar ``[1]`` uint32.
+        kv_collection: Main paged KV cache (BF16 or FP8 e4m3, no scales).
+        layer_idx: Layer index, uint32, on CPU.
+        block_indices: Selected block ids. Prefill: ``[n_kv_heads, total_q,
+            topk]``; decode: ``[n_kv_heads, batch, topk]``. int32.
+        group: Query heads per kv-head (``n_heads // n_kv_heads``).
+        topk: Number of gathered KV blocks per token.
+        sparse_block_size: KV block size in tokens; the model's
+            ``sparse_attention_config.sparse_block_size``. Must equal the
+            KV cache page size and the kernel's ``BN``.
+        scale: QK scale.
+
+    Returns:
+        Output tensor ``[total_q, n_heads, head_dim]`` (prefill) or
+        ``[batch, n_heads, head_dim]`` (decode), BF16.
+    """
+    values = _msa_sparse_attention_ragged_values(
+        input=input,
+        input_row_offsets=input_row_offsets,
+        cache_row_offsets=cache_row_offsets,
+        total_context_length=total_context_length,
+        kv_collection=kv_collection,
+        layer_idx=layer_idx,
+        block_indices=block_indices,
+        topk=topk,
+        scale=scale,
+    )
+
+    return ops.inplace_custom(
+        "mo.msa.attention.ragged.paged",
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=input.shape,
+                device=input.device,
+            )
+        ],
+        parameters={
+            "group": group,
+            "topk": topk,
+            "sparse_block_size": sparse_block_size,
+        },
+    )[0].tensor
+
+
+def msa_sparse_attention_ragged_mxfp8(
+    kv_params: KVCacheParams,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    cache_row_offsets: TensorValue,
+    total_context_length: TensorValue,
+    kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    block_indices: TensorValue,
+    *,
+    group: int,
+    topk: int,
+    sparse_block_size: int,
+    scale: float,
+) -> tuple[TensorValue, TensorValue]:
+    """Computes MiniMax-M3 block-sparse attention, emitting MXFP8 + scales.
+
+    AMD (gfx950) variant of :func:`msa_sparse_attention_ragged` whose output
+    is the o_proj-ready MXFP8 activation instead of BF16: quantized data
+    ``[num_rows, n_heads, head_dim]`` in ``float8_e4m3fn`` plus E8M0 block
+    scales ``[num_rows, n_heads * head_dim // 32]`` -- the same pair
+    :func:`quantize_dynamic_block_scaled` produces from the BF16 output, so
+    it feeds :func:`dynamic_block_scaled_matmul_amd` directly and the
+    separate quantize dispatch is skipped. Bit-identical to that unfused
+    pair; on split-K decode shapes the quantize fuses into the reduce and
+    saves a dispatch.
+
+    Args:
+        kv_params: Key-value cache parameters for the main KV cache.
+        input: Query tensor ``[total_q, n_heads, head_dim]`` (prefill) or
+            ``[batch, n_heads, head_dim]`` (decode); dtype matches the KV
+            cache (BF16 or FP8 e4m3).
+        input_row_offsets: Ragged query offsets ``[batch + 1]`` uint32.
+        cache_row_offsets: Ragged valid-cache offsets ``[batch + 1]`` uint32.
+        total_context_length: Total padded cache length for the batch, CPU
+            scalar ``[1]`` uint32.
+        kv_collection: Main paged KV cache (BF16 or FP8 e4m3, no scales).
+        layer_idx: Layer index, uint32, on CPU.
+        block_indices: Selected block ids. Prefill: ``[n_kv_heads, total_q,
+            topk]``; decode: ``[n_kv_heads, batch, topk]``. int32.
+        group: Query heads per kv-head (``n_heads // n_kv_heads``).
+        topk: Number of gathered KV blocks per token.
+        sparse_block_size: KV block size in tokens; the model's
+            ``sparse_attention_config.sparse_block_size``. Must equal the
+            KV cache page size and the kernel's ``BN``.
+        scale: QK scale.
+
+    Returns:
+        The quantized attention output ``[total_q, n_heads, head_dim]``
+        ``float8_e4m3fn`` and its E8M0 block scales ``[total_q,
+        n_heads * head_dim // 32]``.
+    """
+    values = _msa_sparse_attention_ragged_values(
+        input=input,
+        input_row_offsets=input_row_offsets,
+        cache_row_offsets=cache_row_offsets,
+        total_context_length=total_context_length,
+        kv_collection=kv_collection,
+        layer_idx=layer_idx,
+        block_indices=block_indices,
+        topk=topk,
+        scale=scale,
+    )
+
+    # One E8M0 scale per block of the flattened [n_heads * head_dim] row,
+    # matching `quantize_dynamic_block_scaled`'s rank-2 AMD layout.
+    row_width = input.shape[1] * input.shape[2]
+    if int(row_width) % _MX_SF_VECTOR_SIZE != 0:
+        raise ValueError(
+            "n_heads * head_dim must be a multiple of"
+            f" {_MX_SF_VECTOR_SIZE}, got {row_width}"
+        )
+
+    results = ops.inplace_custom(
+        "mo.msa.attention.ragged.paged.mxfp8",
+        device=input.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=DType.float8_e4m3fn,
+                shape=input.shape,
+                device=input.device,
+            ),
+            TensorType(
+                dtype=DType.float8_e8m0fnu,
+                shape=[input.shape[0], row_width // _MX_SF_VECTOR_SIZE],
+                device=input.device,
+            ),
+        ],
+        parameters={
+            "group": group,
+            "topk": topk,
+            "sparse_block_size": sparse_block_size,
+        },
+    )
+    return results[0].tensor, results[1].tensor
+
+
+def _msa_sparse_attention_ragged_values(
+    *,
+    input: TensorValue,
+    input_row_offsets: TensorValue,
+    cache_row_offsets: TensorValue,
+    total_context_length: TensorValue,
+    kv_collection: PagedCacheValues,
+    layer_idx: TensorValue,
+    block_indices: TensorValue,
+    topk: int,
+    scale: float,
+) -> list[Value[Any]]:
+    """Validates and builds the shared operand list for the MSA attention ops.
+
+    ``mo.msa.attention.ragged.paged`` and its ``.mxfp8`` variant take the
+    identical input operands in the identical order; only their outputs
+    differ. Keeping the list in one place keeps them from drifting.
+    """
+    # The KV cache dtype selects the kernel's compute dtype. `input` (the query)
+    # must match `kv_collection.kv_blocks`: BF16, or native FP8 e4m3 for an FP8
+    # KV cache. The kernel infers `kv_type` from these operands.
+    if input.dtype not in (DType.bfloat16, DType.float8_e4m3fn):
+        raise ValueError(
+            f"input must be bfloat16 or float8_e4m3fn, got {input.dtype}"
+        )
+    _validate_argument_tensor(
+        "input",
+        input,
+        rank=3,
+        device_type=DeviceKind.GPU,
+    )
+    _validate_argument_tensor(
+        "input_row_offsets",
+        input_row_offsets,
+        dtype=DType.uint32,
+        rank=1,
+        device=input.device,
+    )
+    _validate_argument_tensor(
+        "cache_row_offsets",
+        cache_row_offsets,
+        dtype=DType.uint32,
+        rank=1,
+        device=input.device,
+    )
+    _validate_argument_tensor(
+        "total_context_length",
+        total_context_length,
+        dtype=DType.uint32,
+        rank=1,
+        device=DeviceRef.CPU(),
+    )
+    if kv_collection.kv_blocks.dtype != input.dtype:
+        raise ValueError(
+            "kv_collection.kv_blocks must have the same dtype as input"
+            f" ({input.dtype}), got {kv_collection.kv_blocks.dtype}"
+        )
+    _validate_argument_tensor(
+        "kv_collection.kv_blocks",
+        kv_collection.kv_blocks,
+        rank=6,
+        device=input.device,
+    )
+    _validate_argument_tensor(
+        "block_indices",
+        block_indices,
+        dtype=DType.int32,
+        rank=3,
+        device=input.device,
+    )
+    _validate_argument_tensor(
+        "layer_idx", layer_idx, dtype=DType.uint32, device=DeviceRef.CPU()
+    )
+    if topk <= 0:
+        raise ValueError(f"topk must be greater than 0, got {topk}")
+
+    if kv_collection.attention_dispatch_metadata is None:
+        raise ValueError(
+            "msa_sparse_attention_ragged requires"
+            " attention_dispatch_metadata on the KV cache: it carries the"
+            " kernel's msa_scalar_args input."
+        )
+
+    # The kernel's operand list ends at msa_scalar_args (fed from
+    # attention_dispatch_metadata), so append the metadata explicitly rather
+    # than using flatten(), which also emits optional fields the kernel does
+    # not take (e.g. draft_attention_dispatch_metadata under speculative
+    # decoding) and would shift every operand after them.
+    values: list[Value[Any]] = [
+        input,
+        input_row_offsets,
+        cache_row_offsets,
+        total_context_length,
+        *kv_collection.flatten_without_attention_dispatch_metadata(),
+        kv_collection.attention_dispatch_metadata,
+        layer_idx,
+        block_indices,
+        ops.constant(scale, dtype=DType.float32, device=DeviceRef.CPU()),
+    ]
+    return values
 
 
 def flash_attention_gpu(
@@ -2084,7 +3373,8 @@ def masked_flash_attention_gpu(
 
     if mask.shape[0] != q.shape[0]:
         raise ValueError(
-            f"mask batch size ({mask.shape[0]}) must match q batch size ({q.shape[0]})"
+            f"mask batch size ({mask.shape[0]}) must match q batch size"
+            f" ({q.shape[0]})"
         )
 
     # Rank-4 masks are per-head: validate num_heads dim matches q.
@@ -2122,17 +3412,23 @@ def masked_flash_attention_gpu(
     _validate_argument_tensor("v", v, device=q.device)
     _validate_argument_tensor("mask", mask, device=q.device)
 
-    return ops.custom(
-        "masked_flash_attention_gpu",
-        values=[
-            q,
-            k,
-            v,
-            mask,
-            ops.constant(scale, dtype=DType.float32, device=DeviceRef.CPU()),
-        ],
-        out_types=[TensorType(dtype=q.dtype, shape=q.shape, device=q.device)],
-        device=q.device,
+    out_type = TensorType(dtype=q.dtype, shape=q.shape, device=q.device)
+    scale_const = ops.constant(
+        scale, dtype=DType.float32, device=DeviceRef.CPU()
+    )
+    # ``_add_op_generated`` passes operands straight to the generated op
+    # constructor without coercing ``HasTensorValue`` inputs (unlike
+    # ``ops.custom``). Under the experimental ``functional`` dispatch the
+    # q/k/v/mask arrive as ``max.experimental.tensor.Tensor`` rather than
+    # ``TensorValue``, so coerce them explicitly to match ``scale_const``.
+    return Graph.current._add_op_generated(
+        mo.CompositeMaskedFlashAttentionGpuOp,
+        out_type,
+        TensorValue(q),
+        TensorValue(k),
+        TensorValue(v),
+        TensorValue(mask),
+        scale_const,
     )[0].tensor
 
 
@@ -2146,29 +3442,52 @@ def flash_attention_ragged(
     scale: float,
     local_window_size: int = -1,
     sink_weights: TensorValue | None = None,
+    rel_logits: TensorValue | None = None,
+    output_dtype: DType | None = None,
 ) -> TensorValue:
-    """Computes flash (self) attention provided the `!mo.opaque` KV Cache.
+    """Computes flash (self) attention provided the ``!mo.opaque`` KV Cache.
 
-    Notably, this materializes the attention mask (dependent on MHAMaskVariant)
-    within the kernel.
-    `input` and `input_row_offsets` are used together to implement the ragged
-    tensor.
-    `input_row_offsets` indicates where each batch starts and ends in `input`
+    Notably, this materializes the attention mask (dependent on
+    :class:`MHAMaskVariant`) within the kernel. ``input`` and
+    ``input_row_offsets`` are used together to implement the ragged tensor.
+    ``input_row_offsets`` indicates where each batch starts and ends in
+    ``input``.
 
-    Note that this is self attention and the KV sequence length is
-    assumed to be equal to the Q sequence length.
-    For KV sequence length != Q sequence length, use `cross_attention_ragged`.
+    Note that this is self attention and the KV sequence length is assumed to
+    be equal to the Q sequence length. For KV sequence length != Q sequence
+    length, use :func:`cross_attention_ragged`.
+
+    When ``rel_logits`` is set, the kernel gathers an additive
+    relative-position bias by ``rel_dist = q_pos - k_pos`` from a
+    ``(total_q_tokens, heads, extent)`` table and adds it on every visible
+    position, selecting ``mo.mha.ragged.paged.rel_logits``. This path only
+    supports ``mask_variant`` values ``CAUSAL_MASK`` (with
+    ``local_window_size == -1``) and ``SLIDING_WINDOW_CAUSAL_MASK`` (with a
+    positive ``local_window_size``); ``sink_weights`` and ``rel_logits`` are
+    mutually exclusive.
 
     Args:
         kv_params: KVCacheParams object containing key-value cache parameters.
-        input: TensorValue representing the input tensor with shape [total_seq_len, hidden_dim].
-        input_row_offsets: TensorValue indicating the start and end of each batch in the input tensor with shape [batch_size + 1].
+        input: TensorValue representing the input tensor with shape
+            ``[total_seq_len, num_heads, head_dim]``.
+        input_row_offsets: TensorValue indicating the start and end of each
+            batch in the input tensor with shape ``[batch_size + 1]``.
         kv_collection: PagedCacheValues object for managing key-value cache.
-        layer_idx: TensorValue representing the layer index, expected to have dtype uint32.
-        mask_variant: MHAMaskVariant specifying the type of attention mask to use.
+        layer_idx: TensorValue representing the layer index, expected to have
+            dtype uint32.
+        mask_variant: MHAMaskVariant specifying the type of attention mask to
+            use. With ``rel_logits``, only ``CAUSAL_MASK`` and
+            ``SLIDING_WINDOW_CAUSAL_MASK`` are supported.
         scale: float value used to scale the attention scores.
-        local_window_size: int specifying the size of the local attention window, default is -1 for no local window.
-        sink_weights: Optional tensor of shape [num_heads] containing learnable sink weights for each attention head.
+        local_window_size: int specifying the size of the local attention
+            window, default is -1 for no local window.
+        sink_weights: Optional tensor of shape ``[num_heads]`` containing
+            learnable sink weights for each attention head.
+        rel_logits: Optional relative-position bias table with shape
+            ``[total_seq_len, num_heads, extent]``; row ``r`` matches
+            ``input``'s own ragged-flat row convention.
+        output_dtype: Dtype for the attention output. Defaults to
+            ``input.dtype``.
     """
     input_rank_expected = 3
     if input.rank != input_rank_expected:
@@ -2176,15 +3495,7 @@ def flash_attention_ragged(
             f"expected input of rank {input_rank_expected} but got {input.rank}"
         )
 
-    # Allow the FP8 KV cache pairing: bf16 Q input with fp8_e4m3fn KV cache.
-    # The dequant-staging path handles this in the MHA kernel by
-    # materialising a bf16 staging buffer before attention.
-    _fp8_kv_pairing = (
-        kv_params.quantized_kv_cache
-        and input.dtype == DType.bfloat16
-        and kv_params.dtype == DType.float8_e4m3fn
-    )
-    if input.dtype != kv_params.dtype and not _fp8_kv_pairing:
+    if input.dtype != kv_params.dtype:
         raise ValueError(
             f"expected input to be dtype: {kv_params.dtype}, got {input.dtype}"
         )
@@ -2194,7 +3505,13 @@ def flash_attention_ragged(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
+        )
+
+    if sink_weights is not None and rel_logits is not None:
+        raise ValueError(
+            "sink_weights and rel_logits are mutually exclusive; pass at most one"
         )
 
     dispatch_metadata = kv_collection.attention_dispatch_metadata
@@ -2212,45 +3529,52 @@ def flash_attention_ragged(
                 f"got {sink_weights.shape}"
             )
 
-    parameters = _mha_parameters(
-        mask_variant, local_window_size=local_window_size
-    )
-
-    # Select kernel based on whether sink_weights is provided and whether this
-    # is the bf16-Q + fp8-KV dequant-staging path.
-    op_name = "mo.mha.ragged.paged"
-
-    if _fp8_kv_pairing:
-        if kv_params.kvcache_quant_config is None:
-            raise ValueError(
-                "kvcache_quant_config is required for fp8_kv flash attention"
-            )
-        fp8_kv_parameters = {
-            **parameters,
-            "quantization_granularity": kv_params.kvcache_quant_config.quantization_granularity,
-        }
-        fp8_kv_values: MutableSequence[Value[Any]] = [
-            input,
-            input_row_offsets,
-            *kv_collection.flatten_without_attention_dispatch_metadata(),
-            layer_idx,
-            ops.constant(scale, dtype=DType.float32, device=DeviceRef.CPU()),
-            dispatch_metadata.tensor,
-        ]
-        return ops.inplace_custom(
-            "mo.mha.ragged.paged.fp8_kv",
-            device=input.device,
-            values=fp8_kv_values,
-            out_types=[
-                TensorType(
-                    dtype=input.dtype, shape=input.shape, device=input.device
+    if rel_logits is not None:
+        if mask_variant == MHAMaskVariant.CAUSAL_MASK:
+            if local_window_size != -1:
+                raise ValueError(
+                    "rel_logits with MHAMaskVariant.CAUSAL_MASK requires "
+                    f"local_window_size == -1, got {local_window_size}"
                 )
-            ],
-            parameters=fp8_kv_parameters,
-        )[0].tensor
+        elif mask_variant == MHAMaskVariant.SLIDING_WINDOW_CAUSAL_MASK:
+            if local_window_size <= 0:
+                raise ValueError(
+                    "rel_logits with MHAMaskVariant.SLIDING_WINDOW_CAUSAL_MASK "
+                    "requires a positive local_window_size, got "
+                    f"{local_window_size}"
+                )
+        else:
+            raise ValueError(
+                "rel_logits requires mask_variant to be CAUSAL_MASK or "
+                f"SLIDING_WINDOW_CAUSAL_MASK, got {mask_variant}"
+            )
+        _check_rank(3, rel_logits=rel_logits)
+        _check_same_dtype(input=input, rel_logits=rel_logits)
+        if rel_logits.shape[0] != input.shape[0]:
+            raise ValueError(
+                f"expected rel_logits to hold {input.shape[0]} rows, matching "
+                f"input's ragged-flat rows, but got {rel_logits.shape[0]}"
+            )
+        if rel_logits.shape[1] != input.shape[1]:
+            raise ValueError(
+                f"expected rel_logits to hold {input.shape[1]} heads, matching "
+                f"input's, but got {rel_logits.shape[1]}"
+            )
 
-    if sink_weights is not None:
-        op_name = "mo.mha.ragged.paged.sink_weights"
+        parameters: dict[str, int | str | DType] = (
+            {"local_window_size": local_window_size}
+            if local_window_size != -1
+            else {}
+        )
+        op_name = "mo.mha.ragged.paged.rel_logits"
+    else:
+        parameters = _mha_parameters(
+            mask_variant, local_window_size=local_window_size
+        )
+        op_name = "mo.mha.ragged.paged"
+        if sink_weights is not None:
+            op_name = "mo.mha.ragged.paged.sink_weights"
+
     values: MutableSequence[Value[Any]] = [
         input,
         input_row_offsets,
@@ -2259,7 +3583,9 @@ def flash_attention_ragged(
         # NOTE: The scale argument to flash attention is constrained to float32.
         ops.constant(scale, dtype=DType.float32, device=DeviceRef.CPU()),
     ]
-    if sink_weights is not None:
+    if rel_logits is not None:
+        values.append(rel_logits)
+    elif sink_weights is not None:
         values.append(sink_weights)
     values.append(dispatch_metadata.tensor)
 
@@ -2269,7 +3595,9 @@ def flash_attention_ragged(
         values=values,
         out_types=[
             TensorType(
-                dtype=input.dtype, shape=input.shape, device=input.device
+                dtype=output_dtype if output_dtype is not None else input.dtype,
+                shape=input.shape,
+                device=input.device,
             )
         ],
         parameters=parameters,
@@ -2277,11 +3605,11 @@ def flash_attention_ragged(
 
 
 def flash_attention_ragged_gpu(
-    q: TensorValue,
-    k: TensorValue,
-    v: TensorValue,
-    input_row_offsets: TensorValue,
-    max_seq_len: TensorValue,
+    q: TensorValueLike,
+    k: TensorValueLike,
+    v: TensorValueLike,
+    input_row_offsets: TensorValueLike,
+    max_seq_len: TensorValueLike,
     mask_variant: MHAMaskVariant,
     scale: float,
     local_window_size: int = -1,
@@ -2303,6 +3631,12 @@ def flash_attention_ragged_gpu(
     Returns:
         Output tensor of shape [total_seq_len, num_heads, head_dim]
     """
+    q = TensorValue(q)
+    k = TensorValue(k)
+    v = TensorValue(v)
+    input_row_offsets = TensorValue(input_row_offsets)
+    max_seq_len = TensorValue(max_seq_len)
+
     if q.dtype != k.dtype or q.dtype != v.dtype:
         raise ValueError(
             "q, k, v must have matching dtypes. Got "
@@ -2341,7 +3675,8 @@ def flash_attention_ragged_gpu(
     # Validate input_row_offsets
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"input_row_offsets must have dtype uint32, got {input_row_offsets.dtype}"
+            "input_row_offsets must have dtype uint32, got"
+            f" {input_row_offsets.dtype}"
         )
 
     if input_row_offsets.rank != 1:
@@ -2417,12 +3752,14 @@ def flare_mla_decode_ragged(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
 
     if kv_collection.kv_blocks.shape[1] != 1:
         raise ValueError(
-            f"expected kv_collection.kv_blocks.shape[1] to be 1, got {kv_collection.kv_blocks.shape[1]}"
+            "expected kv_collection.kv_blocks.shape[1] to be 1, got"
+            f" {kv_collection.kv_blocks.shape[1]}"
         )
 
     assert kv_params.page_size is not None
@@ -2430,9 +3767,7 @@ def flare_mla_decode_ragged(
 
     # Output dtype: always bfloat16 for FP8 Q (native FP8 path produces
     # bfloat16 output), same as input dtype otherwise.
-    output_dtype = (
-        DType.bfloat16 if input.dtype == DType.float8_e4m3fn else input.dtype
-    )
+    output_dtype = DType.bfloat16 if input.dtype.is_float8() else input.dtype
 
     input_values: MutableSequence[Value[Any]] = [
         input,
@@ -2515,12 +3850,13 @@ def flare_mla_decode_ragged_scaled(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
 
     if kv_collection.kv_blocks.shape[1] != 1:
         raise ValueError(
-            f"expected kv_collection.kv_blocks.shape[1] to be 1, got"
+            "expected kv_collection.kv_blocks.shape[1] to be 1, got"
             f" {kv_collection.kv_blocks.shape[1]}"
         )
 
@@ -2530,9 +3866,7 @@ def flare_mla_decode_ragged_scaled(
         parameters["per_token_scale_rope_aware"] = 1
     parameters["quantization_granularity"] = quantization_granularity
 
-    output_dtype = (
-        DType.bfloat16 if input.dtype == DType.float8_e4m3fn else input.dtype
-    )
+    output_dtype = DType.bfloat16 if input.dtype.is_float8() else input.dtype
 
     if per_token_scale_rope_aware:
         output_last_dim = input.shape[2] - qk_rope_dim * 2
@@ -2547,6 +3881,7 @@ def flare_mla_decode_ragged_scaled(
             input_row_offsets,
             *kv_collection.flatten_without_attention_dispatch_metadata(),
             kv_scales,
+            kv_collection.scales_lookup_table or kv_collection.lookup_table,
             q_scales,
             layer_idx,
             ops.constant(scale, dtype=DType.float32, device=DeviceRef.CPU()),
@@ -2580,6 +3915,7 @@ def flare_mla_prefill_ragged(
     mask_variant: MHAMaskVariant,
     scale: float,
     qk_rope_dim: int = 64,
+    output_dtype: DType | None = None,
 ) -> TensorValue:
     """Performs MLA prefill. In the MLA prefill, we need to decompress
     the KV tensors, as we store the latent representations in the KV cache.
@@ -2605,6 +3941,9 @@ def flare_mla_prefill_ragged(
         mask_variant: Mask variant
         scale: Scale
         qk_rope_dim: QK rope dimension
+        output_dtype: Dtype for the attention output. Defaults to ``input.dtype``.
+            FP8 inputs typically pass ``bfloat16`` since the MFMA pipeline
+            accumulates in f32 and stores bf16.
 
     Returns:
         The output tensor for this iteration
@@ -2620,7 +3959,8 @@ def flare_mla_prefill_ragged(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
 
     assert kv_params.page_size is not None
@@ -2644,7 +3984,7 @@ def flare_mla_prefill_ragged(
         values=input_values,
         out_types=[
             TensorType(
-                dtype=input.dtype,
+                dtype=output_dtype if output_dtype is not None else input.dtype,
                 shape=[
                     input.shape[0],
                     input.shape[1],
@@ -2683,7 +4023,8 @@ def flare_mla_prefill_plan(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
 
     assert kv_params.page_size is not None
@@ -2738,7 +4079,8 @@ def _validate_mla_prefill_decode_graph_inputs(
     input_rank_expected = 3
     if q.rank != input_rank_expected:
         raise ValueError(
-            f"expected {tensor_name} of rank {input_rank_expected} but got {q.rank}"
+            f"expected {tensor_name} of rank {input_rank_expected} but got"
+            f" {q.rank}"
         )
 
     if kv.rank != 2:
@@ -2749,7 +4091,8 @@ def _validate_mla_prefill_decode_graph_inputs(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
 
     assert kv_params.page_size is not None
@@ -3006,6 +4349,7 @@ def mla_decode_graph(
     epsilon: float,
     v_head_dim: int,
     scalar_args: TensorValue,
+    num_partitions_scalar: TensorValue,
     *,
     w_uk_scale: TensorValue | None = None,
     w_uv_scale: TensorValue | None = None,
@@ -3015,6 +4359,7 @@ def mla_decode_graph(
     sparse_topk_lengths: TensorValue | None = None,
     sparse_attn_sink: TensorValue | None = None,
     sparse_indices_stride: int | None = None,
+    index_share: bool = False,
 ) -> TensorValue:
     """This is a manually fused kernel that performs the following operations:
 
@@ -3056,8 +4401,8 @@ def mla_decode_graph(
         w_uv_scale: Optional FP8 scale tensor for `w_uv`.
         quant_config: Optional quantization config. When set, scales are required.
         sparse_indices: Optional ``int32`` tensor of shape ``[total_seq_len, max_topk]``
-            with logical token indices into each sequence's KV (FP8 path only); MOGG
-            remaps them to physical ``block * page_size + offset`` rows before the kernel.
+            with logical token indices into each sequence's KV; MOGG remaps them to
+            physical ``block * page_size + offset`` rows before the kernel.
         sparse_topk_lengths: Per-batch valid top-k counts, ``int32`` rank-1.
         sparse_attn_sink: Per-batch attention sink weights, ``float32`` rank-1.
         sparse_indices_stride: Row stride in ``sparse_indices`` (max top-k across
@@ -3103,18 +4448,14 @@ def mla_decode_graph(
     input_values.append(scalar_args)
 
     if sparse_indices is not None:
-        if quant_config is None:
-            raise ValueError(
-                "mla_decode_graph sparse path requires FP8 (quant_config and scales)."
-            )
         if (
             sparse_topk_lengths is None
             or sparse_attn_sink is None
             or sparse_indices_stride is None
         ):
             raise ValueError(
-                "sparse_indices requires sparse_topk_lengths, sparse_attn_sink, "
-                "and sparse_indices_stride."
+                "sparse_indices requires sparse_topk_lengths, sparse_attn_sink,"
+                " and sparse_indices_stride."
             )
         if sparse_indices.dtype != DType.int32:
             raise ValueError(
@@ -3122,11 +4463,13 @@ def mla_decode_graph(
             )
         if sparse_topk_lengths.dtype != DType.int32:
             raise ValueError(
-                f"sparse_topk_lengths must be int32, got {sparse_topk_lengths.dtype}"
+                "sparse_topk_lengths must be int32, got"
+                f" {sparse_topk_lengths.dtype}"
             )
         if sparse_attn_sink.dtype != DType.float32:
             raise ValueError(
-                f"sparse_attn_sink must be float32, got {sparse_attn_sink.dtype}"
+                "sparse_attn_sink must be float32, got"
+                f" {sparse_attn_sink.dtype}"
             )
         parameters["indices_stride"] = sparse_indices_stride
         op_name += ".sparse"
@@ -3135,6 +4478,21 @@ def mla_decode_graph(
             sparse_topk_lengths,
             sparse_attn_sink,
         ]
+        if index_share:
+            if quant_config is None:
+                raise ValueError(
+                    "index_share (read-once shared-KV MTP fold) is only"
+                    " supported on the fp8 sparse MLA decode path."
+                )
+            # Read-once shared-index fold (KERN-3141): the folded q positions
+            # share one identical top-k list, so the decode kernel gathers it
+            # once. Only emitted when True -> the off path is byte-identical.
+            parameters["index_share"] = True
+
+    # Capturable-graph scalar is appended after the optional sparse
+    # tensors so the input order matches the MoGG op signature
+    # (see graph_compiler/builtin_kernels/attention.mojo).
+    input_values += [num_partitions_scalar]
 
     return ops.inplace_custom(
         op_name,
@@ -3165,6 +4523,7 @@ def mla_prefill_decode_graph(
     epsilon: float,
     v_head_dim: int,
     scalar_args: TensorValue,
+    num_partitions_scalar: TensorValue,
     *,
     w_k_scale: TensorValue | None = None,
     w_uk_scale: TensorValue | None = None,
@@ -3175,6 +4534,7 @@ def mla_prefill_decode_graph(
     sparse_topk_lengths: TensorValue | None = None,
     sparse_attn_sink: TensorValue | None = None,
     sparse_indices_stride: int | None = None,
+    index_share: bool = False,
 ) -> TensorValue:
     """Fused MLA prefill/decode kernel for FP8.
 
@@ -3261,18 +4621,14 @@ def mla_prefill_decode_graph(
     input_values.append(scalar_args)
 
     if sparse_indices is not None:
-        if quant_config is None:
-            raise ValueError(
-                "mla_prefill_decode_graph sparse path requires FP8 (quant_config)."
-            )
         if (
             sparse_topk_lengths is None
             or sparse_attn_sink is None
             or sparse_indices_stride is None
         ):
             raise ValueError(
-                "sparse_indices requires sparse_topk_lengths, sparse_attn_sink, "
-                "and sparse_indices_stride."
+                "sparse_indices requires sparse_topk_lengths, sparse_attn_sink,"
+                " and sparse_indices_stride."
             )
         if sparse_indices.dtype != DType.int32:
             raise ValueError(
@@ -3280,11 +4636,13 @@ def mla_prefill_decode_graph(
             )
         if sparse_topk_lengths.dtype != DType.int32:
             raise ValueError(
-                f"sparse_topk_lengths must be int32, got {sparse_topk_lengths.dtype}"
+                "sparse_topk_lengths must be int32, got"
+                f" {sparse_topk_lengths.dtype}"
             )
         if sparse_attn_sink.dtype != DType.float32:
             raise ValueError(
-                f"sparse_attn_sink must be float32, got {sparse_attn_sink.dtype}"
+                "sparse_attn_sink must be float32, got"
+                f" {sparse_attn_sink.dtype}"
             )
         parameters["indices_stride"] = sparse_indices_stride
         op_name += ".sparse"
@@ -3293,6 +4651,14 @@ def mla_prefill_decode_graph(
             sparse_topk_lengths,
             sparse_attn_sink,
         ]
+        if index_share:
+            # Read-once shared-index fold (KERN-3141); the sparse branch here
+            # already requires fp8. Only emitted when True -> off is
+            # byte-identical.
+            parameters["index_share"] = True
+
+    # Capturable-graph scalar appended last (see MoGG op signature).
+    input_values += [num_partitions_scalar]
 
     return ops.inplace_custom(
         op_name,
@@ -3375,6 +4741,7 @@ def cross_attention_ragged(
     q_max_seq_len: TensorValue,
     scale: float,
     local_window_size: int = -1,
+    output_dtype: DType | None = None,
 ) -> TensorValue:
     """Computes cross attention provided the `!mo.opaque` KV Cache.
 
@@ -3402,7 +4769,8 @@ def cross_attention_ragged(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
 
     _validate_argument_tensor(
@@ -3434,7 +4802,9 @@ def cross_attention_ragged(
         ],
         out_types=[
             TensorType(
-                dtype=input.dtype, shape=input.shape, device=input.device
+                dtype=output_dtype if output_dtype is not None else input.dtype,
+                shape=input.shape,
+                device=input.device,
             )
         ],
         parameters=parameters,
@@ -3526,25 +4896,28 @@ def rms_norm_key_cache(
 
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
 
     if gamma.shape[0] != kv_params.head_dim and per_head_norm:
         if rms_norm_cols is None:
             raise ValueError(
-                "Size of gamma doesn't match head_dim. Please pass rms_norm_cols "
-                "explicitly if you intend to apply RMSNorm to only a subset of "
-                "head dimensions"
+                "Size of gamma doesn't match head_dim. Please pass"
+                " rms_norm_cols explicitly if you intend to apply RMSNorm to"
+                " only a subset of head dimensions"
             )
         elif rms_norm_cols != gamma.shape[0]:
             raise ValueError(
-                f"expected gamma of size {rms_norm_cols} but got {gamma.shape[0]}"
+                f"expected gamma of size {rms_norm_cols} but got"
+                f" {gamma.shape[0]}"
             )
 
     # TODO: Remove this check once FP8 KVCache is supported (KERN-2394).
     if gamma.dtype != kv_params.dtype:
         raise TypeError(
-            f"expected gamma dtype {gamma.dtype} to match KV dtype {kv_params.dtype}"
+            f"expected gamma dtype {gamma.dtype} to match KV dtype"
+            f" {kv_params.dtype}"
         )
 
     parameters: dict[str, int | str | DType | bool] = {
@@ -3559,7 +4932,7 @@ def rms_norm_key_cache(
         values=[
             *kv_collection.flatten_without_attention_dispatch_metadata(),
             gamma,
-            ops.constant(epsilon, gamma.dtype, device=DeviceRef.CPU()),
+            ops.constant(epsilon, DType.float32, device=DeviceRef.CPU()),
             layer_idx,
             ops.cast(TensorValue(total_seq_len), DType.uint32),
             input_row_offsets,
@@ -3593,22 +4966,25 @@ def rms_norm_value_cache(
         )
     if input_row_offsets.dtype != DType.uint32:
         raise ValueError(
-            f"expected uint32 input_row_offsets but got {input_row_offsets.dtype}"
+            "expected uint32 input_row_offsets but got"
+            f" {input_row_offsets.dtype}"
         )
     if gamma.shape[0] != kv_params.head_dim and per_head_norm:
         if rms_norm_cols is None:
             raise ValueError(
-                "Size of gamma doesn't match head_dim. Please pass rms_norm_cols "
-                "explicitly if you intend to apply RMSNorm to only a subset of "
-                "head dimensions"
+                "Size of gamma doesn't match head_dim. Please pass"
+                " rms_norm_cols explicitly if you intend to apply RMSNorm to"
+                " only a subset of head dimensions"
             )
         elif rms_norm_cols != gamma.shape[0]:
             raise ValueError(
-                f"expected gamma of size {rms_norm_cols} but got {gamma.shape[0]}"
+                f"expected gamma of size {rms_norm_cols} but got"
+                f" {gamma.shape[0]}"
             )
     if gamma.dtype != kv_params.dtype:
         raise TypeError(
-            f"expected gamma dtype {gamma.dtype} to match KV dtype {kv_params.dtype}"
+            f"expected gamma dtype {gamma.dtype} to match KV dtype"
+            f" {kv_params.dtype}"
         )
     parameters: dict[str, int | str | DType | bool] = {
         "multiply_before_cast": multiply_before_cast,
@@ -3621,7 +4997,7 @@ def rms_norm_value_cache(
         values=[
             *kv_collection.flatten_without_attention_dispatch_metadata(),
             gamma,
-            ops.constant(epsilon, gamma.dtype, device=DeviceRef.CPU()),
+            ops.constant(epsilon, DType.float32, device=DeviceRef.CPU()),
             layer_idx,
             ops.cast(TensorValue(total_seq_len), DType.uint32),
             input_row_offsets,
@@ -3765,7 +5141,8 @@ def moe_router_group_limited(
         )
     if expert_bias.shape[0] != expert_scores.shape[1]:
         raise ValueError(
-            f"expected expert_bias of shape [num_experts] but got {expert_bias.shape}"
+            "expected expert_bias of shape [num_experts] but got"
+            f" {expert_bias.shape}"
         )
 
     if n_groups == 1:
@@ -3813,12 +5190,461 @@ def moe_router_group_limited(
     return (results[0].tensor, results[1].tensor)
 
 
+def moe_sink_gate_router(
+    logits: TensorValue,
+    expert_bias: TensorValue,
+    global_scale: TensorValue,
+    n_routed_experts: int,
+    n_experts_per_tok: int,
+    n_shared_experts: int,
+    route_scale: float,
+) -> tuple[TensorValue, TensorValue, TensorValue]:
+    """Fused sigmoid-gate MoE router with always-on sink experts.
+
+    Sink experts are gated shared experts, not attention sinks.
+
+    Selects the top ``n_experts_per_tok`` routed experts by
+    ``sigmoid(logits) + expert_bias``, then softmax-normalizes the
+    log-sigmoid of those experts' raw logits together with
+    ``n_shared_experts`` always-selected sink logits, scaled by
+    ``route_scale * global_scale``. This is the Inkling gate formula, run on
+    the GPU as a single kernel (``mo.moe.sink.gate.router``, implemented as
+    ``sink_gate_router`` in Mojo).
+
+    Args:
+        logits: Raw (pre-sigmoid) gate logits, routed experts followed by
+            sink experts. Must be float32, which is the only dtype the
+            kernel's joint softmax has been validated at. Shape:
+            [num_tokens, n_routed_experts + n_shared_experts].
+        expert_bias: Per-routed-expert selection bias. Shape: [n_routed_experts].
+        global_scale: Scalar output-scaling weight. Shape: [1].
+        n_routed_experts: Total number of routed experts. Must be a positive
+            multiple of the target's warp width, no greater than 1024: the
+            kernel runs one thread per routed expert.
+        n_experts_per_tok: Number of routed experts selected per token.
+            Bounded jointly with ``n_routed_experts`` by the top-k's
+            surviving candidates having to fit one warp, so the ceiling
+            falls as the expert count rises: at a warp width of 32, 256
+            experts admit up to 10 per token and 512 up to 8, while at 64
+            the same 256 experts admit up to 32.
+        n_shared_experts: Number of always-selected sink experts.
+            ``n_experts_per_tok + n_shared_experts`` must be a power of two
+            no greater than the target's warp width, since the two are
+            jointly normalized by a single warp-level reduction.
+        route_scale: Scalar output-scaling factor.
+
+    Returns:
+        A tuple of three tensors:
+        - expert_ids: Selected routed-expert indices. Shape:
+            [num_tokens, n_experts_per_tok].
+        - expert_weights: Routing weight per selected routed expert. Shape:
+            [num_tokens, n_experts_per_tok].
+        - sink_weights: Routing weight per sink expert. Shape:
+            [num_tokens, n_shared_experts].
+
+    Raises:
+        ValueError: If the routing shape is one the kernel cannot compile.
+    """
+    _check_rank(2, logits=logits)
+    _check_rank(1, expert_bias=expert_bias, global_scale=global_scale)
+    _check_same_dtype(logits=logits, global_scale=global_scale)
+    if logits.dtype != DType.float32:
+        raise ValueError(f"expected float32 logits but got {logits.dtype}")
+
+    # The kernel runs one thread per routed expert and normalizes the
+    # selected-plus-sink weights with a single warp-level reduction, so both
+    # counts are bounded by the target's warp width. Check here so an
+    # unsupported checkpoint fails before the Mojo compiler sees it.
+    warp_size = 64 if _is_amd_gpu() else 32
+    if (
+        n_routed_experts <= 0
+        or n_routed_experts % warp_size
+        or n_routed_experts > 1024
+    ):
+        raise ValueError(
+            f"n_routed_experts must be a positive multiple of {warp_size} and"
+            f" fit in one block (<= 1024) but got {n_routed_experts}"
+        )
+    k_total = n_experts_per_tok + n_shared_experts
+    if k_total <= 0 or k_total & (k_total - 1) or k_total > warp_size:
+        raise ValueError(
+            "n_experts_per_tok + n_shared_experts must be a positive power of"
+            f" two no greater than {warp_size} but got {n_experts_per_tok} +"
+            f" {n_shared_experts} = {k_total}"
+        )
+    # The top-k reduces in phases, and warp 0 sorts the last round, so the
+    # survivors of the round before it must fit one warp. Rules out shapes
+    # like 1024/30/2 that clear the two bounds above.
+    num_warps = n_routed_experts // warp_size
+    phase2_warps = -(-(num_warps * n_experts_per_tok) // warp_size)
+    if phase2_warps * n_experts_per_tok > warp_size:
+        raise ValueError(
+            f"{n_routed_experts} routed experts with n_experts_per_tok"
+            f" {n_experts_per_tok} leaves"
+            f" {phase2_warps * n_experts_per_tok} top-k survivors, which"
+            f" exceeds the target's warp width of {warp_size}; lower"
+            " n_experts_per_tok or n_routed_experts"
+        )
+
+    if logits.shape[1] != n_routed_experts + n_shared_experts:
+        raise ValueError(
+            "expected logits of shape [num_tokens, n_routed_experts +"
+            f" n_shared_experts] but got {logits.shape}"
+        )
+    if expert_bias.shape[0] != n_routed_experts:
+        raise ValueError(
+            f"expected expert_bias of shape [{n_routed_experts}] but got"
+            f" {expert_bias.shape}"
+        )
+    if global_scale.shape[0] != 1:
+        raise ValueError(
+            f"expected global_scale of shape [1] but got {global_scale.shape}"
+        )
+
+    results = ops.custom(
+        "mo.moe.sink.gate.router",
+        device=logits.device,
+        values=[
+            logits,
+            expert_bias,
+            global_scale,
+            ops.constant(route_scale, DType.float32, device=DeviceRef.CPU()),
+        ],
+        out_types=[
+            TensorType(
+                dtype=DType.int32,
+                shape=[logits.shape[0], n_experts_per_tok],
+                device=logits.device,
+            ),  # expert_ids
+            TensorType(
+                dtype=logits.dtype,
+                shape=[logits.shape[0], n_experts_per_tok],
+                device=logits.device,
+            ),  # expert_weights
+            TensorType(
+                dtype=logits.dtype,
+                shape=[logits.shape[0], n_shared_experts],
+                device=logits.device,
+            ),  # sink_weights
+        ],
+        parameters={
+            "n_routed_experts": n_routed_experts,
+            "n_experts_per_tok": n_experts_per_tok,
+            "n_shared_experts": n_shared_experts,
+        },
+    )
+
+    return (results[0].tensor, results[1].tensor, results[2].tensor)
+
+
+def _router_gate_mixed_gemv(
+    hidden_states: TensorValue,
+    gate_weight: TensorValue,
+) -> TensorValue:
+    """Computes mixed-input MiniMax router logits."""
+    _check_rank(2, hidden_states=hidden_states, gate_weight=gate_weight)
+    _check_dtype(DType.bfloat16, hidden_states=hidden_states)
+    _check_dtype(DType.float32, gate_weight=gate_weight)
+    _check_same_device(hidden_states=hidden_states, gate_weight=gate_weight)
+
+    n_dim = gate_weight.shape[0]
+    k_dim = gate_weight.shape[1]
+    # N/K are inferred from the static gate-weight layout inside the op, so the
+    # shape must be known here (the op also asserts this at compile time).
+    if not isinstance(n_dim, StaticDim) or not isinstance(k_dim, StaticDim):
+        raise ValueError(
+            "_router_gate_mixed_gemv requires a static gate-weight shape, got"
+            f" {gate_weight.shape}"
+        )
+    if hidden_states.shape[1] != k_dim:
+        raise ValueError(
+            "hidden_states K must match gate_weight K, got"
+            f" {hidden_states.shape[1]} and {k_dim}"
+        )
+
+    return ops.custom(
+        "mo.router.gate.mixed.gemv",
+        device=hidden_states.device,
+        values=[hidden_states, gate_weight],
+        out_types=[
+            TensorType(
+                dtype=DType.float32,
+                shape=[hidden_states.shape[0], n_dim],
+                device=hidden_states.device,
+            )
+        ],
+    )[0].tensor
+
+
+def smallm_streaming_matmul(
+    a: TensorValue,
+    b_shuffled: TensorValue,
+    b: TensorValue,
+) -> TensorValue:
+    """Computes bf16 ``a @ b^T`` over a smallm-preshuffled weight.
+
+    ``b_shuffled`` must already be in the fragment-major layout produced by
+    :func:`max.pipelines.weights.smallm_preshuffle.preshuffle_smallm_b` (a
+    one-time CPU permutation at weight-load time); the layout is private to
+    this op pair and a row-major weight here computes garbage. ``b`` is the
+    same weight row-major: the streaming kernel serves ``M <= 32`` (its
+    measured win band) and larger batches fall back to generic matmul
+    dispatch over ``b`` at execute time, so the op is never worse than the
+    dispatch it replaces. MiniMax-M3's MTP draft emits this op explicitly on
+    MI355X for its decode-band vocab projections; nothing routes here through
+    generic matmul dispatch.
+    """
+    _check_rank(2, a=a, b_shuffled=b_shuffled, b=b)
+    _check_dtype(DType.bfloat16, a=a, b_shuffled=b_shuffled, b=b)
+    _check_same_device(a=a, b_shuffled=b_shuffled, b=b)
+
+    n_dim = b_shuffled.shape[0]
+    k_dim = b_shuffled.shape[1]
+    if not isinstance(n_dim, StaticDim) or not isinstance(k_dim, StaticDim):
+        raise ValueError(
+            "smallm_streaming_matmul requires a static weight shape, got"
+            f" {b_shuffled.shape}"
+        )
+    if int(n_dim) % 16 != 0 or int(k_dim) % 256 != 0:
+        raise ValueError(
+            "smallm_streaming_matmul requires N % 16 == 0 and K % 256 == 0,"
+            f" got [{n_dim}, {k_dim}]"
+        )
+    if a.shape[1] != k_dim:
+        raise ValueError(
+            f"activation K must match weight K, got {a.shape[1]} and {k_dim}"
+        )
+    if b.shape != b_shuffled.shape:
+        raise ValueError(
+            "the row-major weight must match the shuffled weight shape, got"
+            f" {b.shape} and {b_shuffled.shape}"
+        )
+
+    # The second output is a graph-managed workspace for the op's activation
+    # shuffle (32 rows covers every streaming band; m > 32 falls back and
+    # ignores it). Graph memory keeps captured launch pointers valid across
+    # device-graph replays, unlike an execute-time transient allocation.
+    return ops.custom(
+        "mo.smallm.streaming.matmul",
+        device=a.device,
+        values=[a, b_shuffled, b],
+        out_types=[
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=[a.shape[0], n_dim],
+                device=a.device,
+            ),
+            TensorType(
+                dtype=DType.bfloat16,
+                shape=[32, k_dim],
+                device=a.device,
+            ),
+        ],
+    )[0].tensor
+
+
+def moe_eplb_remap(
+    router_idx: TensorValue,
+    logcnt: TensorValue,
+    log2phy: TensorValue,
+    layer_idx: TensorValue,
+    *,
+    num_log: int,
+    max_replicas: int,
+    n_experts_per_tok: int,
+    hash_decorrelate: bool = False,
+) -> TensorValue:
+    """Fused EPLB logical-to-physical id remap.
+    single Mojo kernel that caches the per-layer slice of logcnt and
+    log2phy in shared memory and writes physical ids in one launch.
+
+    The replica picker is deterministic position-mod
+    (``r = (n*K + k) % logcnt[layer, log]``), bit-identical to the legacy
+    chain when ``hash_decorrelate=False``. With ``hash_decorrelate=True``
+    the flat position is xor-hashed with a Knuth multiplicative hash of the
+    logical id before the modulo, breaking structured position-vs-cnt
+    alignment without warp primitives.
+
+    Args:
+        router_idx: [num_tokens, n_experts_per_tok] int32 logical
+            expert ids from the gate.
+        logcnt: [num_moe_layers, num_log] int32 replica count per
+            (layer, logical id).
+        log2phy: [num_moe_layers, num_log, max_replicas] int32
+            physical-id table.
+        layer_idx: Rank-0 or rank-1 [1] int32 scalar tensor on the same
+            device as router_idx. Rank-0 is reshaped to [1] to match
+            the kernel signature.
+        num_log: Number of logical experts (comptime).
+        max_replicas: Maximum replicas per logical expert (comptime).
+        n_experts_per_tok: Top-K experts per token (comptime). Must be a
+            power of two.
+        hash_decorrelate: If True, xor-hash position before the modulo.
+            Defaults to False to preserve legacy routing distribution.
+
+    Returns:
+        [num_tokens, n_experts_per_tok] int32 physical expert ids.
+    """
+    _check_dtype(
+        DType.int32,
+        router_idx=router_idx,
+        logcnt=logcnt,
+        log2phy=log2phy,
+        layer_idx=layer_idx,
+    )
+    _check_rank(2, router_idx=router_idx, logcnt=logcnt)
+    _check_rank(3, log2phy=log2phy)
+
+    if layer_idx.rank not in (0, 1):
+        raise ValueError(
+            f"expected layer_idx of rank 0 or 1 but got {layer_idx.rank}"
+        )
+
+    # Kernel expects rank-1 [1] — reshape rank-0 scalar without copy.
+    if layer_idx.rank == 0:
+        layer_idx = ops.reshape(layer_idx, [1])
+
+    if router_idx.shape[1] != n_experts_per_tok:
+        raise ValueError(
+            "expected router_idx of shape [num_tokens, n_experts_per_tok], "
+            f"got shape {router_idx.shape} with n_experts_per_tok="
+            f"{n_experts_per_tok}"
+        )
+
+    if logcnt.shape[1] != num_log:
+        raise ValueError(
+            "expected logcnt of shape [num_moe_layers, num_log], "
+            f"got shape {logcnt.shape} with num_log={num_log}"
+        )
+
+    if log2phy.shape[1] != num_log or log2phy.shape[2] != max_replicas:
+        raise ValueError(
+            "expected log2phy of shape "
+            "[num_moe_layers, num_log, max_replicas], "
+            f"got shape {log2phy.shape} with num_log={num_log}, "
+            f"max_replicas={max_replicas}"
+        )
+
+    parameters: dict[str, bool | int | str | DType] = {
+        "num_log": num_log,
+        "max_replicas": max_replicas,
+        "K": n_experts_per_tok,
+        "hash_decorrelate": hash_decorrelate,
+    }
+
+    return ops.custom(
+        "mo.moe.eplb.remap",
+        device=router_idx.device,
+        values=[router_idx, logcnt, log2phy, layer_idx],
+        out_types=[
+            TensorType(
+                dtype=DType.int32,
+                shape=router_idx.shape,
+                device=router_idx.device,
+            ),
+        ],
+        parameters=parameters,
+    )[0].tensor
+
+
+def moe_router_single_group_eplb(
+    expert_scores: TensorValue,
+    expert_bias: TensorValue,
+    logcnt: TensorValue,
+    log2phy: TensorValue,
+    layer_idx: TensorValue,
+    *,
+    n_routed_experts: int,
+    n_experts_per_tok: int,
+    norm_weights: bool,
+    num_log: int,
+    max_replicas: int,
+    hash_decorrelate: bool,
+    routed_scaling_factor: float,
+) -> tuple[TensorValue, TensorValue, TensorValue]:
+    """Fused single-group MoE router + EPLB log->phy remap.
+
+    Replaces the chained ``moe_router_group_limited`` (n_groups==1) →
+    ``moe_eplb_remap`` for the single-group path. Returns physical
+    expert ids, logical expert ids (kept for the EPLB stats histogram),
+    and routing weights in one launch.
+    """
+    if expert_bias.rank != 1:
+        raise ValueError(
+            f"expected expert_bias of rank 1 but got {expert_bias.rank}"
+        )
+    if expert_bias.shape[0] != expert_scores.shape[1]:
+        raise ValueError(
+            f"expected expert_bias of shape [num_experts] but got {expert_bias.shape}"
+        )
+
+    _check_dtype(
+        DType.int32, logcnt=logcnt, log2phy=log2phy, layer_idx=layer_idx
+    )
+    _check_rank(2, logcnt=logcnt)
+    _check_rank(3, log2phy=log2phy)
+    if layer_idx.rank == 0:
+        layer_idx = ops.reshape(layer_idx, [1])
+    if logcnt.shape[1] != num_log:
+        raise ValueError(
+            f"expected logcnt of shape [L, num_log], got {logcnt.shape} num_log={num_log}"
+        )
+    if log2phy.shape[1] != num_log or log2phy.shape[2] != max_replicas:
+        raise ValueError(
+            f"expected log2phy of shape [L, num_log, max_replicas], got {log2phy.shape}"
+        )
+
+    parameters: dict[str, int | str | DType | bool] = {
+        "n_routed_experts": n_routed_experts,
+        "n_experts_per_tok": n_experts_per_tok,
+        "norm_weights": norm_weights,
+        "num_log": num_log,
+        "max_replicas": max_replicas,
+        "hash_decorrelate": hash_decorrelate,
+    }
+
+    results = ops.custom(
+        "mo.moe.single.group.router.eplb",
+        device=expert_scores.device,
+        values=[
+            expert_scores,
+            expert_bias,
+            logcnt,
+            log2phy,
+            layer_idx,
+            ops.constant(
+                routed_scaling_factor, DType.float32, device=DeviceRef.CPU()
+            ),
+        ],
+        out_types=[
+            TensorType(  # expert_indices_phy
+                dtype=DType.int32,
+                shape=[expert_scores.shape[0], n_experts_per_tok],
+                device=expert_scores.device,
+            ),
+            TensorType(  # expert_indices_log
+                dtype=DType.int32,
+                shape=[expert_scores.shape[0], n_experts_per_tok],
+                device=expert_scores.device,
+            ),
+            TensorType(  # expert_weights
+                dtype=expert_scores.dtype,
+                shape=[expert_scores.shape[0], n_experts_per_tok],
+                device=expert_scores.device,
+            ),
+        ],
+        parameters=parameters,
+    )
+
+    return (results[0].tensor, results[1].tensor, results[2].tensor)
+
+
 def grouped_matmul_ragged(
     hidden_states: TensorValue,
     weight: TensorValue,
     expert_start_indices: TensorValue,
     expert_ids: TensorValue,
-    expert_usage_stats_host: TensorValue,
+    expert_usage_stats: TensorValue,
 ) -> TensorValue:
     """Grouped matmul used in MoE layer.
 
@@ -3828,9 +5654,9 @@ def grouped_matmul_ragged(
 
     `expert_ids` is the id of the expert for each group in `hidden_states`
 
-    `expert_usage_stats_host` is the maximum number of tokens assigned to any
-    expert, and the number of active experts.
-
+    `expert_usage_stats` is a rank-1 ``uint32`` tensor laid out as
+    ``[max_tokens_per_expert, num_active_experts]`` (the output of
+    ``moe_create_indices``).
     """
     if weight.rank != 3:
         raise ValueError(f"expected weight of rank 3 but got {weight.rank}")
@@ -3845,8 +5671,29 @@ def grouped_matmul_ragged(
         or weight.shape[0] != expert_ids.shape[0]
     ):
         raise ValueError(
-            f"expected weight is of shape [num_experts, *, {hidden_states.shape[1]}] but got {weight.shape}"
+            "expected weight is of shape [num_experts, *,"
+            f" {hidden_states.shape[1]}] but got {weight.shape}"
         )
+
+    if expert_usage_stats.device != hidden_states.device:
+        # This is a graph DeviceRef (``is_cpu()`` method) when building a Graph
+        # and a driver Device (``is_host`` property) on the experimental-tensor
+        # path.
+        src_device = expert_usage_stats.device
+        src_is_cpu = (
+            src_device.is_cpu()
+            if isinstance(src_device, DeviceRef)
+            else src_device.is_host
+        )
+        if not src_is_cpu:
+            raise ValueError(
+                "grouped_matmul_ragged expected expert_usage_stats to be"
+                " host-resident (CPU) or already on the compute device, but got"
+                f" {src_device} with hidden_states on {hidden_states.device}; a"
+                " device-to-device transfer of the expert-usage metadata is not"
+                " supported."
+            )
+        expert_usage_stats = expert_usage_stats.to(hidden_states.device)
 
     output = ops.custom(
         "mo.grouped.matmul.ragged",
@@ -3856,8 +5703,7 @@ def grouped_matmul_ragged(
             weight,
             expert_start_indices,
             expert_ids,
-            expert_usage_stats_host[0],
-            expert_usage_stats_host[1],
+            expert_usage_stats,
         ],
         out_types=[
             TensorType(
@@ -3871,7 +5717,7 @@ def grouped_matmul_ragged(
     return output
 
 
-def grouped_dynamic_scaled_mxfp4_matmul(
+def grouped_dynamic_block_scaled_matmul_amd(
     hidden_states: TensorValue,
     weight: TensorValue,
     a_scales: TensorValue,
@@ -3882,6 +5728,10 @@ def grouped_dynamic_scaled_mxfp4_matmul(
     out_type: DType = DType.bfloat16,
     estimated_total_m: TensorValue | None = None,
     preshuffled_b: bool = False,
+    a_scales_preshuffled: bool = False,
+    a_scales_max_padded_m: int = 0,
+    decode_grid_m_cap: int = 0,
+    decode_grid_m_rows: int = 0,
 ) -> TensorValue:
     """Performs grouped NVFP4 matmul for MoE layers.
 
@@ -3894,11 +5744,12 @@ def grouped_dynamic_scaled_mxfp4_matmul(
     tensor representation for variable-length expert inputs.
 
     Args:
-        hidden_states: The input activations with shape ``[total_tokens, K/2]``
-            where K is the unpacked hidden dimension. Dtype must be uint8
-            (packed MXFP4).
-        weight: The expert weights with shape ``[num_experts, N, K/2]``.
-            Dtype must be uint8 (packed MXFP4).
+        hidden_states: The input activations with shape
+            ``[total_tokens, K/2]`` at MXFP4 or ``[total_tokens, K]`` at MXFP8,
+            where K is the unpacked hidden dimension.
+        weight: The expert weights, shaped ``[num_experts, N, K/2]`` at MXFP4
+            or ``[num_experts, N, K]`` at MXFP8. Must share ``hidden_states``'
+            dtype: uint8 (packed MXFP4) or float8_e4m3fn (MXFP8).
         a_scales: Scaling factors for inputs with shape
             ``[num_scale_rows, K/32]``. Dtype must be float8_e8m0fnu.
         b_scales: Scaling factors for weights with shape
@@ -3910,6 +5761,10 @@ def grouped_dynamic_scaled_mxfp4_matmul(
             num_active_experts].
         out_type: Output dtype. Defaults to bfloat16.
         estimated_total_m: The estimated total number of tokens.
+        decode_grid_m_cap: Decode-band gate on the AMD preb path; 0 disables.
+            Selects the band; `decode_grid_m_rows` bounds the grid.
+        decode_grid_m_rows: Rows grid.y must cover per expert on the decode
+            bands. Ignored unless ``preshuffled_b``.
 
     Returns:
         The matmul result with shape ``[total_tokens, N]`` and dtype ``out_type``.
@@ -3930,9 +5785,15 @@ def grouped_dynamic_scaled_mxfp4_matmul(
             f"{hidden_k}] but got {weight.shape}"
         )
 
-    if (hidden_states.dtype != DType.uint8) or (weight.dtype != DType.uint8):
+    # The kernel infers the packing from the shapes, so both operands need only
+    # agree on one MX dtype: uint8 (MXFP4) or float8_e4m3fn (MXFP8).
+    if hidden_states.dtype != weight.dtype or hidden_states.dtype not in (
+        DType.uint8,
+        DType.float8_e4m3fn,
+    ):
         raise TypeError(
-            "hidden_states and weight dtypes must be uint8 for MXFP4, but got "
+            "hidden_states and weight must share one MX dtype, either uint8 "
+            "(MXFP4) or float8_e4m3fn (MXFP8), but got "
             f"{hidden_states.dtype}, {weight.dtype}"
         )
 
@@ -3972,8 +5833,12 @@ def grouped_dynamic_scaled_mxfp4_matmul(
 
     MXFP4_SF_VECTOR_SIZE = 32
 
+    # Shapes are in BYTES, so recover the element count before counting scale
+    # groups: MXFP4 stores two elements per byte, MXFP8 one.
+    elems_per_byte = 2 if hidden_states.dtype == DType.uint8 else 1
+
     a_scales_dim_1 = ceildiv(
-        hidden_states.shape[1] * 2, Dim(MXFP4_SF_VECTOR_SIZE)
+        hidden_states.shape[1] * elems_per_byte, Dim(MXFP4_SF_VECTOR_SIZE)
     )
     if a_scales.shape[1] != a_scales_dim_1:
         raise ValueError(
@@ -3982,15 +5847,17 @@ def grouped_dynamic_scaled_mxfp4_matmul(
             f" but got {a_scales.shape}"
         )
 
-    b_scales_dim_2 = ceildiv(weight.shape[2] * 2, Dim(MXFP4_SF_VECTOR_SIZE))
+    b_scales_dim_2 = ceildiv(
+        weight.shape[2] * elems_per_byte, Dim(MXFP4_SF_VECTOR_SIZE)
+    )
     if (
         b_scales.shape[0] != weight.shape[0]
         or b_scales.shape[1] != weight.shape[1]
         or b_scales.shape[2] != b_scales_dim_2
     ):
         raise ValueError(
-            "b_scales shape must be "
-            f"[{weight.shape[0]}, {weight.shape[1]}, {b_scales_dim_2}] but got {b_scales.shape}"
+            f"b_scales shape must be [{weight.shape[0]}, {weight.shape[1]},"
+            f" {b_scales_dim_2}] but got {b_scales.shape}"
         )
 
     # `estimated_total_m` defaults to 0 (unknown). When `preshuffled_b` is
@@ -4003,8 +5870,57 @@ def grouped_dynamic_scaled_mxfp4_matmul(
     else:
         estimated_total_m_arg = estimated_total_m.cast(DType.uint32)
 
+    # The preb kernel expects A-scales in `Shuffler.scale_4d_grouped_layout`
+    # (i32 cells of 2x2 E8M0 bytes). Activations are quantized row-major by
+    # `quantize_dynamic_block_scaled_mxfp4` upstream, so insert the per-step
+    # preshuffle here. B-scales are static and preshuffled once at load.
+    #
+    # When `a_scales_preshuffled=True` (KS64 down-proj fusion), the
+    # upstream `ep.fused_silu.mxfp4` kernel already wrote the scale directly
+    # into the slot layout, so we skip the standalone preshuffle entirely.
+    # Preshuffle must run exactly once: non-EP + up-proj keep `a_scales_preshuffled=False`.
+    if preshuffled_b and not a_scales_preshuffled:
+        a_scales = block_scaled_preshuffle_grouped_scale_4d(
+            a_scales,
+            expert_start_indices,
+            expert_usage_stats_host[0].cast(DType.uint32),
+            expert_usage_stats_host[1].cast(DType.uint32),
+            num_experts=int(weight.shape[0]),
+        )
+
+    # The matmul derives the A-scale per-expert slot stride as
+    # `align_up(max_num_tokens_per_expert, 32)`. On the non-fused path the
+    # standalone preshuffle used the same runtime `expert_usage_stats[0]`, so
+    # the writer and reader slot strides agree. On the fused path
+    # (`a_scales_preshuffled`), the producer (`ep.fused_silu.mxfp4`) wrote the
+    # slots with the *graph-build-time* stride `align_up(a_scales_max_padded_m,
+    # 32)`; the matmul MUST read with that same constant — NOT the runtime max
+    # — or, when the runtime max is below the build-time bound (the common
+    # decode case), it reads the wrong expert's scale slot.
+    if a_scales_preshuffled:
+        if a_scales_max_padded_m <= 0:
+            raise ValueError(
+                "a_scales_max_padded_m must be > 0 when"
+                " a_scales_preshuffled=True"
+            )
+        max_num_tokens_arg = ops.constant(
+            a_scales_max_padded_m,
+            dtype=expert_usage_stats_host.dtype,
+            device=expert_usage_stats_host.device,
+        )
+    else:
+        max_num_tokens_arg = expert_usage_stats_host[0]
+
+    decode_grid_m_cap_arg = ops.constant(
+        decode_grid_m_cap, dtype=DType.uint32, device=DeviceRef.CPU()
+    )
+
+    decode_grid_m_rows_arg = ops.constant(
+        decode_grid_m_rows, dtype=DType.uint32, device=DeviceRef.CPU()
+    )
+
     output = ops.custom(
-        "mo.grouped.matmul.block.scaled.mxfp4",
+        "mo.grouped.matmul.block.scaled.amd",
         device=hidden_states.device,
         values=[
             hidden_states,
@@ -4013,9 +5929,11 @@ def grouped_dynamic_scaled_mxfp4_matmul(
             b_scales,
             expert_start_indices,
             expert_ids,
-            expert_usage_stats_host[0],
+            max_num_tokens_arg,
             expert_usage_stats_host[1],
             estimated_total_m_arg,
+            decode_grid_m_cap_arg,
+            decode_grid_m_rows_arg,
         ],
         out_types=[
             TensorType(
@@ -4024,46 +5942,244 @@ def grouped_dynamic_scaled_mxfp4_matmul(
                 device=hidden_states.device,
             ),
         ],
-        parameters={"preshuffled_b": preshuffled_b},
+        parameters={
+            "preshuffled_b": preshuffled_b,
+            # Both formats reach the kernel as raw bytes, so this is what tells
+            # them apart: 16 bytes per lane at MXFP4, 32 at MXFP8.
+            "lane_bytes": 32 // elems_per_byte,
+        },
     )[0].tensor
 
     return output
 
 
-def grouped_matmul_block_scaled(
+def grouped_dynamic_scaled_mxfp6_matmul(
     hidden_states: TensorValue,
     weight: TensorValue,
     a_scales: TensorValue,
     b_scales: TensorValue,
     expert_start_indices: TensorValue,
-    a_scale_offsets: TensorValue,
     expert_ids: TensorValue,
-    expert_scales: TensorValue,
     expert_usage_stats_host: TensorValue,
+    fp6_format: str = "e2m3",
     out_type: DType = DType.bfloat16,
     estimated_total_m: TensorValue | None = None,
+    decode_grid_m_cap: int = 0,
+    decode_grid_m_rows: int = 0,
+    a_scales_preshuffled: bool = False,
+    a_scales_max_padded_m: int = 0,
 ) -> TensorValue:
-    """Performs grouped NVFP4 matmul for MoE layers.
+    """Performs a grouped MXFP6 matmul for MoE layers.
 
-    Performs a grouped matmul with NVFP4 (4-bit) quantized inputs and weights.
-    The inputs are packed as uint8 (2 NVFP4 values per byte) with float8_e4m3fn
-    scaling factors. NVFP4 uses fixed 1D block scaling with 16 elements per
-    scale factor along the K dimension.
+    The FP6 sibling of :func:`grouped_dynamic_scaled_mxfp4_matmul`. Both
+    operands are packed FP6 bytes (four codes per three bytes) with E8M0 scales
+    over 32-element K blocks.
+
+    Preshuffled-B only: an FP6 lane fragment is 24 bytes and reaches the MFMA
+    plane-split, a layout the dense row-major grouped kernel has no path for.
+    ``weight`` must therefore already carry the plane-split permutation from
+    ``preshuffle_mxfp4_b_experts(..., lane_bytes=MXFP6_LANE_BYTES)``.
+
+    Args:
+        hidden_states: Packed activations ``[total_tokens, K * 3 // 4]``.
+        weight: Plane-split preshuffled expert weights
+            ``[num_experts, N, K * 3 // 4]``.
+        a_scales: E8M0 activation scales ``[num_scale_rows, K // 32]``.
+        b_scales: E8M0 weight scales ``[num_experts, N, K // 32]``.
+        expert_start_indices: Where each expert's tokens start.
+        expert_ids: The expert ID for each group.
+        expert_usage_stats_host: ``[max_tokens_per_expert, num_active_experts]``.
+        fp6_format: The FP6 element encoding, ``"e2m3"`` or ``"e3m2"``.
+        out_type: Output dtype.
+        estimated_total_m: Estimated total token count, used to pick the
+            persistent vs direct kernel band.
+        decode_grid_m_cap: Decode-band gate; 0 disables.
+        decode_grid_m_rows: Rows grid.y must cover per expert on the decode
+            bands.
+
+    Returns:
+        The matmul result, ``[total_tokens, N]``.
+    """
+    if not _is_amd_gpu():
+        raise ValueError(
+            "MXFP6 is supported on AMD CDNA4 (gfx950) only: the kernels issue"
+            " through the f8f6f4 MFMA, which has no NVIDIA equivalent. Use"
+            " float8_e4m3fn or float4_e2m1fnx2 on NVIDIA."
+        )
+    fp6_code = _fp6_format_code(fp6_format)
+
+    if weight.rank != 3:
+        raise ValueError(f"expected weight of rank 3 but got {weight.rank}")
+    if hidden_states.rank != 2:
+        raise ValueError(
+            f"expected hidden_states of rank 2 but got {hidden_states.rank}"
+        )
+    if weight.shape[2] != hidden_states.shape[1]:
+        raise ValueError(
+            "expected weight of shape [num_experts, *, "
+            f"{hidden_states.shape[1]}] but got {weight.shape}"
+        )
+    if hidden_states.dtype != DType.uint8 or weight.dtype != DType.uint8:
+        raise TypeError(
+            "MXFP6 operands are packed into uint8 (four codes per three "
+            f"bytes), got {hidden_states.dtype}, {weight.dtype}"
+        )
+    if (
+        a_scales.dtype != DType.float8_e8m0fnu
+        or b_scales.dtype != DType.float8_e8m0fnu
+    ):
+        raise TypeError(
+            "a_scales and b_scales dtypes must be float8_e8m0fnu, but got "
+            f"{a_scales.dtype}, {b_scales.dtype}"
+        )
+    if expert_ids.dtype != DType.int32:
+        raise TypeError(
+            f"expert_ids dtype must be int32, but got {expert_ids.dtype}"
+        )
+    if expert_start_indices.dtype != DType.uint32:
+        raise TypeError(
+            "expert_start_indices dtype must be uint32, but got"
+            f" {expert_start_indices.dtype}"
+        )
+    if a_scales.rank != 2 or b_scales.rank != 3:
+        raise ValueError(
+            "expected a_scales of rank 2 and b_scales of rank 3 but got"
+            f" {a_scales.rank} and {b_scales.rank}"
+        )
+
+    MX_SF_VECTOR_SIZE = 32
+    a_scales_dim_1 = ceildiv(
+        hidden_states.shape[1] * 4 // 3, Dim(MX_SF_VECTOR_SIZE)
+    )
+    if a_scales.shape[1] != a_scales_dim_1:
+        raise ValueError(
+            f"a_scales shape must be [*, {a_scales_dim_1}] but got "
+            f"{a_scales.shape}"
+        )
+    b_scales_dim_2 = ceildiv(weight.shape[2] * 4 // 3, Dim(MX_SF_VECTOR_SIZE))
+    if (
+        b_scales.shape[0] != weight.shape[0]
+        or b_scales.shape[1] != weight.shape[1]
+        or b_scales.shape[2] != b_scales_dim_2
+    ):
+        raise ValueError(
+            f"b_scales shape must be [{weight.shape[0]}, {weight.shape[1]},"
+            f" {b_scales_dim_2}] but got {b_scales.shape}"
+        )
+
+    if estimated_total_m is None:
+        estimated_total_m_arg = ops.constant(
+            0, dtype=DType.uint32, device=hidden_states.device
+        )
+    else:
+        estimated_total_m_arg = estimated_total_m.cast(DType.uint32)
+
+    if a_scales_preshuffled:
+        if a_scales_max_padded_m <= 0:
+            raise ValueError(
+                "a_scales_max_padded_m must be > 0 when"
+                " a_scales_preshuffled=True"
+            )
+        max_num_tokens_arg = ops.constant(
+            a_scales_max_padded_m,
+            dtype=expert_usage_stats_host.dtype,
+            device=expert_usage_stats_host.device,
+        )
+    else:
+        a_scales = block_scaled_preshuffle_grouped_scale_4d(
+            a_scales,
+            expert_start_indices,
+            expert_usage_stats_host[0].cast(DType.uint32),
+            expert_usage_stats_host[1].cast(DType.uint32),
+            num_experts=int(weight.shape[0]),
+        )
+        max_num_tokens_arg = expert_usage_stats_host[0]
+
+    return ops.custom(
+        "mo.grouped.matmul.block.scaled.mxfp6",
+        device=hidden_states.device,
+        values=[
+            hidden_states,
+            weight,
+            a_scales,
+            b_scales,
+            expert_start_indices,
+            expert_ids,
+            max_num_tokens_arg,
+            expert_usage_stats_host[1],
+            estimated_total_m_arg,
+            ops.constant(
+                decode_grid_m_cap, dtype=DType.uint32, device=DeviceRef.CPU()
+            ),
+            ops.constant(
+                decode_grid_m_rows, dtype=DType.uint32, device=DeviceRef.CPU()
+            ),
+        ],
+        out_types=[
+            TensorType(
+                dtype=out_type,
+                shape=[hidden_states.shape[0], weight.shape[1]],
+                device=hidden_states.device,
+            ),
+        ],
+        parameters={"FP6_FORMAT": fp6_code},
+    )[0].tensor
+
+
+def grouped_matmul_block_scaled(
+    hidden_states: TensorValueLike,
+    weight: TensorValueLike,
+    a_scales: TensorValueLike,
+    b_scales: TensorValueLike,
+    expert_start_indices: TensorValueLike,
+    a_scale_offsets: TensorValueLike,
+    expert_ids: TensorValueLike,
+    expert_scales: TensorValueLike,
+    expert_usage_stats_host: TensorValueLike,
+    out_type: DType = DType.bfloat16,
+    estimated_total_m: TensorValueLike | None = None,
+) -> TensorValue:
+    """Performs a grouped block-scaled matmul for MoE layers.
+
+    Supports four operand/scale combinations, which the op tells apart from the
+    operand and scale dtypes alone. Every one uses fixed 1D block scaling along
+    the K dimension:
+
+    - NVFP4: both operands packed ``uint8``, ``float8_e4m3fn`` scales over
+      16-element K groups.
+    - MXFP4: both operands packed ``uint8``, ``float8_e8m0fnu`` scales over
+      32-element K groups.
+    - MXFP8: both operands ``float8_e4m3fn``, ``float8_e8m0fnu`` scales over
+      32-element K groups.
+    - W4A8: ``float8_e4m3fn`` activations against packed ``uint8`` weights,
+      ``float8_e8m0fnu`` scales over 32-element K groups.
+
+    Packed ``uint8`` carries 2 4-bit E2M1 values per byte, so a packed operand's
+    row is ``K/2`` wide. W4A8 is the one combination whose two operands differ,
+    and it pairs an unpacked activation row with a packed weight row. It also
+    requires ``K`` to be a multiple of 128, which the padded FP4 TMA copy that
+    feeds the weights into shared memory imposes.
 
     ``hidden_states`` and ``expert_start_indices`` together implement the ragged
     tensor representation for variable-length expert inputs.
 
     Args:
         hidden_states: The input activations with shape ``[total_tokens, K/2]``
-            where K is the unpacked hidden dimension. Dtype must be uint8
-            (packed NVFP4).
-        weight: The expert weights with shape ``[num_experts, N, K/2]``.
-            Dtype must be uint8 (packed NVFP4).
+            for packed ``uint8`` or ``[total_tokens, K]`` for
+            ``float8_e4m3fn``, where K is the unpacked hidden dimension.
+        weight: The expert weights with shape ``[num_experts, N, K/2]`` for
+            packed ``uint8`` or ``[num_experts, N, K]`` for
+            ``float8_e4m3fn``. Sized independently of ``hidden_states``, so
+            W4A8 combines a ``[total_tokens, K]`` activation with a
+            ``[num_experts, N, K/2]`` weight.
         a_scales: Scaling factors for inputs with shape
-            ``[num_scale_rows, K_groups, 32, 4, 4]``. Dtype must be float8_e4m3fn.
+            ``[num_scale_rows, K_groups, 32, 4, 4]``, where ``K_groups`` is
+            ``ceildiv(K, 4 * group_size)`` for the combination's K group size.
+            Dtype must be float8_e4m3fn (NVFP4) or float8_e8m0fnu
+            (MXFP4/MXFP8/W4A8).
         b_scales: Scaling factors for weights with shape
-            ``[num_experts, N_groups, K_groups, 32, 4, 4]``. Dtype must be
-            float8_e4m3fn.
+            ``[num_experts, N_groups, K_groups, 32, 4, 4]``. Dtype must match
+            ``a_scales``.
         expert_start_indices: Indices indicating where each expert's tokens
             start in ``hidden_states``.
         a_scale_offsets: The offsets of the input scale tiles for each expert.
@@ -4079,82 +6195,88 @@ def grouped_matmul_block_scaled(
     Returns:
         The matmul result with shape ``[total_tokens, N]`` and dtype ``out_type``.
     """
-    if weight.rank != 3:
-        raise ValueError(f"expected weight of rank 3 but got {weight.rank}")
+    hidden_states = TensorValue(hidden_states)
+    weight = TensorValue(weight)
+    a_scales = TensorValue(a_scales)
+    b_scales = TensorValue(b_scales)
+    expert_start_indices = TensorValue(expert_start_indices)
+    a_scale_offsets = TensorValue(a_scale_offsets)
+    expert_ids = TensorValue(expert_ids)
+    expert_scales = TensorValue(expert_scales)
+    expert_usage_stats_host = TensorValue(expert_usage_stats_host)
+    if estimated_total_m:
+        estimated_total_m = TensorValue(estimated_total_m)
 
-    if hidden_states.rank != 2:
-        raise ValueError(
-            f"expected hidden_states of rank 2 but got {hidden_states.rank}"
+    _check_rank(2, hidden_states=hidden_states)
+    _check_rank(3, weight=weight)
+    _check_rank(5, a_scales=a_scales)
+    _check_rank(6, b_scales=b_scales)
+    _check_rank(1, expert_start_indices=expert_start_indices)
+    _check_rank(1, a_scale_offsets=a_scale_offsets)
+    _check_rank(1, expert_ids=expert_ids)
+
+    _check_dtype(DType.int32, expert_ids=expert_ids)
+    _check_dtype(DType.uint32, expert_start_indices=expert_start_indices)
+
+    # W4A8 is the one pair whose operands differ: E4M3 activations against
+    # nibble-packed E2M1 weights, which the FP4 TMA copy pads into shared
+    # memory. The scale dtype is part of the pair, not incidental: the kernel
+    # only implements it on E8M0 group-32 scales, so admitting the mixed pair
+    # under NVFP4 scales would trade this graph-build error for a Mojo
+    # comptime failure partway through graph compilation.
+    is_w4a8 = (
+        hidden_states.dtype == DType.float8_e4m3fn
+        and weight.dtype == DType.uint8
+        and a_scales.dtype == DType.float8_e8m0fnu
+    )
+    if not is_w4a8:
+        _check_same_dtype(hidden_states=hidden_states, weight=weight)
+    _check_same_dtype(a_scales=a_scales, b_scales=b_scales)
+
+    _check_same_device(
+        hidden_states=hidden_states,
+        weight=weight,
+        a_scales=a_scales,
+        b_scales=b_scales,
+        expert_start_indices=expert_start_indices,
+        a_scale_offsets=a_scale_offsets,
+        expert_ids=expert_ids,
+        expert_scales=expert_scales,
+    )
+
+    if hidden_states.dtype not in (DType.uint8, DType.float8_e4m3fn):
+        raise TypeError(
+            "hidden_states dtype must be uint8 (NVFP4/MXFP4) or "
+            f"float8_e4m3fn (MXFP8), but got {hidden_states.dtype}"
         )
 
-    weight_k = weight.shape[2]
+    if a_scales.dtype not in (DType.float8_e4m3fn, DType.float8_e8m0fnu):
+        raise TypeError(
+            "a_scales dtype must be float8_e4m3fn (NVFP4) or "
+            f"float8_e8m0fnu (MXFP4/MXFP8), but got {a_scales.dtype}"
+        )
+
+    # Row lengths are in storage bytes, so a nibble-packed weight row is half
+    # the activations'. Compare in elements.
+    weight_k_factor = 2 if is_w4a8 else 1
+    weight_k = weight.shape[2] * weight_k_factor
     hidden_k = hidden_states.shape[1]
     if weight_k != hidden_k or weight.shape[0] != expert_ids.shape[0]:
         raise ValueError(
             "expected weight is of shape [num_experts, *, "
-            f"{hidden_k}] but got {weight.shape}"
-        )
-
-    if (hidden_states.dtype != DType.uint8) or (weight.dtype != DType.uint8):
-        raise TypeError(
-            "hidden_states and weight dtypes must be uint8 for NVFP4, but got "
-            f"{hidden_states.dtype}, {weight.dtype}"
-        )
-
-    if a_scales.dtype != b_scales.dtype:
-        raise TypeError(
-            "a_scales and b_scales dtypes must match, "
-            f"but got {a_scales.dtype}, {b_scales.dtype}"
-        )
-    if a_scales.dtype not in (DType.float8_e4m3fn, DType.float8_e8m0fnu):
-        raise TypeError(
-            "a_scales dtype must be float8_e4m3fn (NVFP4) or"
-            f" float8_e8m0fnu (MXFP4), but got {a_scales.dtype}"
-        )
-
-    if expert_ids.dtype != DType.int32:
-        raise TypeError(
-            f"expert_ids dtype must be int32, but got {expert_ids.dtype}"
-        )
-
-    if expert_ids.rank != 1:
-        raise ValueError(
-            f"expected expert_ids of rank 1 but got {expert_ids.rank}"
-        )
-    if expert_start_indices.dtype != DType.uint32:
-        raise TypeError(
-            "expert_start_indices dtype must be uint32, but got"
-            f" {expert_start_indices.dtype}"
-        )
-    if expert_start_indices.rank != 1:
-        raise ValueError(
-            "expected expert_start_indices of rank 1 but got"
-            f" {expert_start_indices.rank}"
-        )
-
-    if a_scales.rank != 5 or b_scales.rank != 6:
-        raise ValueError(
-            "expected a_scales of rank 5 and b_scales of rank 6 but got"
-            f" {a_scales.rank} and {b_scales.rank}"
-        )
-
-    if expert_scales.dtype != DType.float32:
-        raise TypeError(
-            f"expert_scales dtype must be float32, but got {expert_scales.dtype}"
-        )
-    if expert_scales.rank != 1:
-        raise ValueError(
-            f"expected expert_scales of rank 1 but got {expert_scales.rank}"
+            f"{hidden_k // weight_k_factor}] but got {weight.shape}"
         )
 
     SF_ATOM_M = [32, 4]
     SF_ATOM_K = 4
-    # Infer SF_VECTOR_SIZE from scale dtype: NVFP4=16, MXFP4=32
+    # Infer SF_VECTOR_SIZE from scale dtype: NVFP4=16, MXFP4/MXFP8=32.
     SF_VECTOR_SIZE = 32 if a_scales.dtype == DType.float8_e8m0fnu else 16
     SF_MN_GROUP_SIZE = SF_ATOM_M[0] * SF_ATOM_M[1]  # 128
     SF_K_GROUP_SIZE = SF_ATOM_K * SF_VECTOR_SIZE
+    packed_k_factor = 2 if hidden_states.dtype == DType.uint8 else 1
+    unpacked_hidden_k = hidden_states.shape[1] * packed_k_factor
 
-    a_scales_dim_1 = ceildiv(hidden_states.shape[1] * 2, Dim(SF_K_GROUP_SIZE))
+    a_scales_dim_1 = ceildiv(unpacked_hidden_k, Dim(SF_K_GROUP_SIZE))
     if (
         a_scales.shape[1] != a_scales_dim_1
         or a_scales.shape[2] != SF_ATOM_M[0]
@@ -4162,13 +6284,15 @@ def grouped_matmul_block_scaled(
         or a_scales.shape[4] != SF_ATOM_K
     ):
         raise ValueError(
-            "a_scales shape must be "
-            f"[*, {a_scales_dim_1}, {SF_ATOM_M[0]}, {SF_ATOM_M[1]}, {SF_ATOM_K}]"
-            f" but got {a_scales.shape}"
+            f"a_scales shape must be [*, {a_scales_dim_1}, {SF_ATOM_M[0]},"
+            f" {SF_ATOM_M[1]}, {SF_ATOM_K}] but got {a_scales.shape}"
         )
 
     b_scales_dim_1 = ceildiv(weight.shape[1], Dim(SF_MN_GROUP_SIZE))
-    b_scales_dim_2 = ceildiv(weight.shape[2] * 2, Dim(SF_K_GROUP_SIZE))
+    b_scales_dim_2 = ceildiv(
+        weight.shape[2] * weight_k_factor * packed_k_factor,
+        Dim(SF_K_GROUP_SIZE),
+    )
     if (
         b_scales.shape[0] != weight.shape[0]
         or b_scales.shape[1] != b_scales_dim_1
@@ -4178,39 +6302,38 @@ def grouped_matmul_block_scaled(
         or b_scales.shape[5] != SF_ATOM_K
     ):
         raise ValueError(
-            "b_scales shape must be "
-            f"[{weight.shape[0]}, {b_scales_dim_1}, {b_scales_dim_2}, "
-            f"{SF_ATOM_M[0]}, {SF_ATOM_M[1]}, {SF_ATOM_K}] but got {b_scales.shape}"
+            f"b_scales shape must be [{weight.shape[0]}, {b_scales_dim_1},"
+            f" {b_scales_dim_2}, {SF_ATOM_M[0]}, {SF_ATOM_M[1]}, {SF_ATOM_K}]"
+            f" but got {b_scales.shape}"
         )
 
-    output = ops.custom(
-        "mo.grouped.matmul.block.scaled",
+    output_type = TensorType(
+        dtype=out_type,
+        shape=[hidden_states.shape[0], weight.shape[1]],
         device=hidden_states.device,
-        values=[
-            hidden_states,
-            weight,
-            a_scales,
-            b_scales,
-            expert_start_indices,
-            expert_ids,
-            a_scale_offsets,
-            expert_scales,
-            estimated_total_m or expert_usage_stats_host[0],
-            expert_usage_stats_host[1],
-        ],
-        out_types=[
-            TensorType(
-                dtype=out_type,
-                shape=[hidden_states.shape[0], weight.shape[1]],
-                device=hidden_states.device,
-            ),
-        ],
+    )
+    # Emitted as a first-class composite op (lowers 1:1 to the
+    # `mo.composite.grouped_matmul_block_scaled` kernel) so the MegaFFN fusion
+    # can match a typed op rather than a string-keyed `mo.custom`.
+    output = Graph.current._add_op_generated(
+        mo.CompositeGroupedMatmulBlockScaledOp,
+        output_type,
+        hidden_states,
+        weight,
+        a_scales,
+        b_scales,
+        expert_start_indices,
+        expert_ids,
+        a_scale_offsets,
+        expert_scales,
+        estimated_total_m or expert_usage_stats_host[0],
+        expert_usage_stats_host[1],
     )[0].tensor
 
     return output
 
 
-def _grouped_matmul_swiglu_nvfp4(
+def grouped_matmul_blocked_swiglu(
     hidden_states: TensorValue,
     weight: TensorValue,
     a_scales: TensorValue,
@@ -4218,16 +6341,19 @@ def _grouped_matmul_swiglu_nvfp4(
     expert_start_indices: TensorValue,
     a_scale_offsets: TensorValue,
     expert_ids: TensorValue,
-    expert_scales: TensorValue,
-    c_input_scales: TensorValue,
     expert_usage_stats_host: TensorValue,
+    expert_scales: TensorValue | None = None,
+    c_input_scales: TensorValue | None = None,
     estimated_total_m: TensorValue | None = None,
+    clamp_activation: bool = False,
+    swiglu_alpha: float = 0.0,
+    swiglu_limit: float = 0.0,
 ) -> tuple[TensorValue, TensorValue]:
-    """Performs fused grouped NVFP4 matmul + SwiGLU + NVFP4 quantization for MoE.
+    """Performs fused grouped block-scaled matmul + SwiGLU for NVIDIA MoE.
 
     Replaces the two-step chain ``grouped_matmul_block_scaled`` (BF16) ->
-    ``fused_silu_quantized`` (NVFP4) with a single SM100 kernel whose
-    epilogue produces packed NVFP4 + a 5D FP8 scale tile directly.
+    ``fused_silu_quantized`` with a single SM100 kernel whose epilogue produces
+    NVFP4 or MXFP8 activations and a 5D scale tile directly.
 
     The caller must pre-permute ``weight`` and ``b_scales`` on the N axis
     with ``sigma(2i)=i, sigma(2i+1)=D+i`` (``D = moe_dim``, ``N = 2D``) so
@@ -4236,44 +6362,82 @@ def _grouped_matmul_swiglu_nvfp4(
     kernel's default ``match_bf16=True`` setting.
 
     Args:
-        hidden_states: The input activations with shape ``[total_tokens, K/2]``
-            where K is the unpacked hidden dimension. Dtype must be uint8
-            (packed NVFP4).
+        hidden_states: The input activations. Dtype must be ``uint8`` for packed
+            NVFP4 or ``float8_e4m3fn`` for MXFP8.
         weight: The sigma-permuted expert weights with shape
-            ``[num_experts, 2D, K/2]``. Dtype must be uint8 (packed NVFP4).
+            ``[num_experts, 2D, K]`` using the same storage dtype and packed K
+            convention as ``hidden_states``.
         a_scales: Scaling factors for inputs with shape
-            ``[num_scale_rows, K_groups, 32, 4, 4]``. Dtype must be float8_e4m3fn.
+            ``[num_scale_rows, K_groups, 32, 4, 4]``. Dtype must be
+            ``float8_e4m3fn`` for NVFP4 or ``float8_e8m0fnu`` for MXFP8.
         b_scales: Scaling factors for weights with shape
             ``[num_experts, N_groups, K_groups, 32, 4, 4]``, with the
-            matching sigma permutation already applied on the N axis. Dtype
-            must be float8_e4m3fn.
+            matching sigma permutation already applied on the N axis.
         expert_start_indices: Per-expert token-prefix offsets (uint32, rank 1).
         a_scale_offsets: The offsets of the input scale tiles for each expert.
         expert_ids: The expert ID for each group.
         expert_scales: Per-expert scaling factors with shape ``[num_experts]``.
             Dtype must be float32. Multiplied with the matmul output in the
             epilogue.
-        c_input_scales: Per-active-expert SiLU input scale used by the
-            NVFP4 quant epilogue. Shape ``[num_active_experts]``, dtype
-            float32.
+        c_input_scales: Per-active-expert SiLU input scale used by the NVFP4
+            quant epilogue. MXFP8 ignores this value.
         expert_usage_stats_host: A tensor containing [max_tokens_per_expert,
             num_active_experts].
         estimated_total_m: The estimated total number of tokens.
 
     Returns:
-        Tuple ``(c_packed, c_swiglu_scales)`` where ``c_packed`` is the
-        packed NVFP4 output of shape ``[total_tokens, D/2]`` (uint8) and
-        ``c_swiglu_scales`` is the 5D tcgen05 FP8 SF tile of shape
-        ``[a_scales.shape[0], ceildiv(D, 64), 32, 4, 4]``. The SF tile's
+        Tuple ``(c_packed, c_swiglu_scales)`` where ``c_packed`` is packed
+        NVFP4 ``uint8`` with shape ``[total_tokens, D/2]`` or MXFP8
+        ``float8_e4m3fn`` with shape ``[total_tokens, D]``. The scale tile's
         first dim matches ``a_scales``'s first dim since the kernel re-uses
         ``a_scale_offsets`` as the per-expert SF offset for the output.
     """
-    if weight.rank != 3:
-        raise ValueError(f"expected weight of rank 3 but got {weight.rank}")
 
-    if hidden_states.rank != 2:
-        raise ValueError(
-            f"expected hidden_states of rank 2 but got {hidden_states.rank}"
+    _check_rank(2, hidden_states=hidden_states)
+    _check_rank(3, weight=weight)
+    _check_rank(5, a_scales=a_scales)
+    _check_rank(6, b_scales=b_scales)
+    _check_rank(1, expert_start_indices=expert_start_indices)
+    _check_rank(1, a_scale_offsets=a_scale_offsets)
+    _check_rank(1, expert_ids=expert_ids)
+
+    _check_dtype(DType.int32, expert_ids=expert_ids)
+    _check_dtype(DType.uint32, expert_start_indices=expert_start_indices)
+
+    _check_same_dtype(hidden_states=hidden_states, weight=weight)
+    _check_same_dtype(a_scales=a_scales, b_scales=b_scales)
+
+    dummy_scale = ops.broadcast_to(
+        ops.constant(1.0, DType.float32, device=hidden_states.device),
+        expert_ids.shape,
+    )
+    if expert_scales is None:
+        expert_scales = dummy_scale
+    if c_input_scales is None:
+        c_input_scales = dummy_scale
+
+    _check_same_device(
+        hidden_states=hidden_states,
+        weight=weight,
+        a_scales=a_scales,
+        b_scales=b_scales,
+        expert_start_indices=expert_start_indices,
+        a_scale_offsets=a_scale_offsets,
+        expert_ids=expert_ids,
+        expert_scales=expert_scales,
+        c_input_scales=c_input_scales,
+    )
+
+    if hidden_states.dtype not in (DType.uint8, DType.float8_e4m3fn):
+        raise TypeError(
+            "hidden_states dtype must be uint8 (NVFP4/MXFP4) or "
+            f"float8_e4m3fn (MXFP8), but got {hidden_states.dtype}"
+        )
+
+    if a_scales.dtype not in (DType.float8_e4m3fn, DType.float8_e8m0fnu):
+        raise TypeError(
+            "a_scales dtype must be float8_e4m3fn (NVFP4) or "
+            f"float8_e8m0fnu (MXFP4/MXFP8), but got {a_scales.dtype}"
         )
 
     weight_k = weight.shape[2]
@@ -4284,64 +6448,11 @@ def _grouped_matmul_swiglu_nvfp4(
             f"{hidden_k}] but got {weight.shape}"
         )
 
-    if (hidden_states.dtype != DType.uint8) or (weight.dtype != DType.uint8):
-        raise TypeError(
-            "hidden_states and weight dtypes must be uint8 for NVFP4, but got "
-            f"{hidden_states.dtype}, {weight.dtype}"
-        )
-
-    if (
-        a_scales.dtype != DType.float8_e4m3fn
-        or b_scales.dtype != DType.float8_e4m3fn
-    ):
-        raise TypeError(
-            "a_scales and b_scales must be float8_e4m3fn for NVFP4, but got "
-            f"{a_scales.dtype}, {b_scales.dtype}"
-        )
-
-    if expert_ids.dtype != DType.int32:
-        raise TypeError(
-            f"expert_ids dtype must be int32, but got {expert_ids.dtype}"
-        )
-    if expert_ids.rank != 1:
-        raise ValueError(
-            f"expected expert_ids of rank 1 but got {expert_ids.rank}"
-        )
-    if expert_start_indices.dtype != DType.uint32:
-        raise TypeError(
-            "expert_start_indices dtype must be uint32, but got"
-            f" {expert_start_indices.dtype}"
-        )
-    if expert_start_indices.rank != 1:
-        raise ValueError(
-            "expected expert_start_indices of rank 1 but got"
-            f" {expert_start_indices.rank}"
-        )
-
-    if a_scales.rank != 5 or b_scales.rank != 6:
-        raise ValueError(
-            "expected a_scales of rank 5 and b_scales of rank 6 but got"
-            f" {a_scales.rank} and {b_scales.rank}"
-        )
-
-    if expert_scales.dtype != DType.float32:
-        raise TypeError(
-            f"expert_scales dtype must be float32, but got {expert_scales.dtype}"
-        )
-    if expert_scales.rank != 1:
-        raise ValueError(
-            f"expected expert_scales of rank 1 but got {expert_scales.rank}"
-        )
-
-    if c_input_scales.dtype != DType.float32:
-        raise TypeError(
-            "c_input_scales dtype must be float32, but got "
-            f"{c_input_scales.dtype}"
-        )
-    if c_input_scales.rank != 1:
-        raise ValueError(
-            f"expected c_input_scales of rank 1 but got {c_input_scales.rank}"
-        )
+    if clamp_activation:
+        if swiglu_alpha == 0.0 or swiglu_limit == 0.0:
+            raise ValueError(
+                "swiglu_alpha and swiglu_limit must be set when clamp_activation is True"
+            )
 
     # N = 2D, so weight.shape[1] must be even and D = N // 2.
     n_dim = weight.shape[1]
@@ -4351,9 +6462,10 @@ def _grouped_matmul_swiglu_nvfp4(
         )
     d_dim = n_dim // 2
 
+    is_mxfp8 = hidden_states.dtype == DType.float8_e4m3fn
     c_packed_type = TensorType(
-        dtype=DType.uint8,
-        shape=[hidden_states.shape[0], d_dim // 2],
+        dtype=DType.float8_e4m3fn if is_mxfp8 else DType.uint8,
+        shape=[hidden_states.shape[0], d_dim if is_mxfp8 else d_dim // 2],
         device=hidden_states.device,
     )
     # c_swiglu_scales shares its per-expert SF tile geometry with a_scales
@@ -4362,10 +6474,10 @@ def _grouped_matmul_swiglu_nvfp4(
     # un-packed inner dim.
     SF_ATOM_M = [32, 4]
     SF_ATOM_K = 4
-    SF_VECTOR_SIZE = 16
+    SF_VECTOR_SIZE = 32 if is_mxfp8 else 16
     SF_K_GROUP_SIZE = SF_ATOM_K * SF_VECTOR_SIZE
     c_swiglu_scales_type = TensorType(
-        dtype=DType.float8_e4m3fn,
+        dtype=a_scales.dtype,
         shape=[
             a_scales.shape[0],
             ceildiv(d_dim, Dim(SF_K_GROUP_SIZE)),
@@ -4376,23 +6488,29 @@ def _grouped_matmul_swiglu_nvfp4(
         device=hidden_states.device,
     )
 
-    results = ops.custom(
-        "mo.grouped.matmul.swiglu.nvfp4",
-        device=hidden_states.device,
-        values=[
-            hidden_states,
-            weight,
-            a_scales,
-            b_scales,
-            expert_start_indices,
-            expert_ids,
-            a_scale_offsets,
-            expert_scales,
-            c_input_scales,
-            estimated_total_m or expert_usage_stats_host[0],
-            expert_usage_stats_host[1],
-        ],
-        out_types=[c_packed_type, c_swiglu_scales_type],
+    # Emitted as a first-class composite op (lowers 1:1 to the
+    # `mo.composite.grouped_matmul_swiglu_nvfp4` kernel) so the MegaFFN fusion
+    # can match a typed op rather than a string-keyed `mo.custom`. The SwiGLU
+    # clamp params (`swiglu_alpha`/`swiglu_limit`) are host-scalar operands and
+    # `clamp_activation` a comptime attribute, matching the kernel signature.
+    results = Graph.current._add_op_generated(
+        mo.CompositeGroupedMatmulSwigluNvfp4Op,
+        c_packed_type,
+        c_swiglu_scales_type,
+        hidden_states,
+        weight,
+        a_scales,
+        b_scales,
+        expert_start_indices,
+        expert_ids,
+        a_scale_offsets,
+        expert_scales,
+        c_input_scales,
+        estimated_total_m or expert_usage_stats_host[0],
+        expert_usage_stats_host[1],
+        ops.constant(swiglu_alpha, DType.float32, device=DeviceRef.CPU()),
+        ops.constant(swiglu_limit, DType.float32, device=DeviceRef.CPU()),
+        clamp_activation=builtin.BoolAttr(clamp_activation),
     )
 
     return results[0].tensor, results[1].tensor
@@ -4443,21 +6561,24 @@ def grouped_dynamic_scaled_fp8_matmul(
         or weight.shape[0] != expert_ids.shape[0]
     ):
         raise ValueError(
-            f"expected weight is of shape [num_experts, *, {hidden_states.shape[1]}] but got {weight.shape}"
+            "expected weight is of shape [num_experts, *,"
+            f" {hidden_states.shape[1]}] but got {weight.shape}"
         )
 
     if (hidden_states.dtype != weight.dtype) or (
         hidden_states.dtype != DType.float8_e4m3fn
     ):
         raise TypeError(
-            f"hidden_states and weight dtypes must be float8_e4m3fn, but got {hidden_states.dtype}, {weight.dtype}"
+            "hidden_states and weight dtypes must be float8_e4m3fn, but got"
+            f" {hidden_states.dtype}, {weight.dtype}"
         )
 
     if (a_scales.dtype != b_scales.dtype) or (
         a_scales.dtype not in (DType.float32, DType.bfloat16)
     ):
         raise TypeError(
-            f"a_scales and b_scales dtypes must be float32 or bfloat16 and match, but got {a_scales.dtype}, {b_scales.dtype}"
+            "a_scales and b_scales dtypes must be float32 or bfloat16 and"
+            f" match, but got {a_scales.dtype}, {b_scales.dtype}"
         )
 
     if expert_ids.dtype != DType.int32:
@@ -4471,16 +6592,19 @@ def grouped_dynamic_scaled_fp8_matmul(
         )
     if expert_start_indices.dtype != DType.uint32:
         raise TypeError(
-            f"expert_start_indices dtype must be uint32, but got {expert_start_indices.dtype}"
+            "expert_start_indices dtype must be uint32, but got"
+            f" {expert_start_indices.dtype}"
         )
     if expert_start_indices.rank != 1:
         raise ValueError(
-            f"expected expert_start_indices of rank 1 but got {expert_start_indices.rank}"
+            "expected expert_start_indices of rank 1 but got"
+            f" {expert_start_indices.rank}"
         )
 
     if a_scales.rank != 2 or b_scales.rank != 3:
         raise ValueError(
-            f"expected a_scales of rank 2 and b_scales of rank 3 but got {a_scales.rank} and {b_scales.rank}"
+            "expected a_scales of rank 2 and b_scales of rank 3 but got"
+            f" {a_scales.rank} and {b_scales.rank}"
         )
 
     if input_scale_spec.is_block and weight_scale_spec.is_block:
@@ -4500,7 +6624,8 @@ def grouped_dynamic_scaled_fp8_matmul(
             or weight_scale_spec.block_size is None
         ):
             raise ValueError(
-                "both input block_size and weight block_size must be set for grouped blockwise scaling"
+                "both input block_size and weight block_size must be set for"
+                " grouped blockwise scaling"
             )
 
         if (
@@ -4508,14 +6633,16 @@ def grouped_dynamic_scaled_fp8_matmul(
             or input_scale_spec.block_size[1] != 128
         ):
             raise ValueError(
-                "grouped blockwise scaling only supports (1,128) granularity for input"
+                "grouped blockwise scaling only supports (1,128) granularity"
+                " for input"
             )
         if (
             weight_scale_spec.block_size[0] != 128
             or weight_scale_spec.block_size[1] != 128
         ):
             raise ValueError(
-                "grouped blockwise scaling only supports (128,128) granularity for weight"
+                "grouped blockwise scaling only supports (128,128) granularity"
+                " for weight"
             )
     else:
         raise ValueError("grouped FP8 matmul only supports blockwise scaling")
@@ -4552,6 +6679,158 @@ def grouped_dynamic_scaled_fp8_matmul(
     return output
 
 
+def _grouped_matmul_rowwise_dynamic_scaled_fp8(
+    hidden_states: TensorValue,
+    weight: TensorValue,
+    a_scales: TensorValue,
+    b_scales: TensorValue,
+    expert_start_indices: TensorValue,
+    expert_ids: TensorValue,
+    expert_usage_stats_host: TensorValue,
+    out_type: DType = DType.bfloat16,
+) -> TensorValue:
+    """Grouped (ragged MoE) FP8 matmul with rowwise weight + per-token scales.
+
+    Drives ``mo.grouped.matmul.rowwise.dynamic.scaled.fp8`` (NVIDIA SM100 /
+    B200). Computes, for each token ``t`` in expert group ``g`` and each output
+    channel ``n``::
+
+        out[t, n] = (sum_k a[t, k] * b[expert_ids[g], n, k])
+                    * a_scale[t] * b_scale[expert_ids[g], n]
+
+    This is the compressed-tensors FP8-dynamic layout (per-output-channel
+    weight scale + per-token dynamic activation scale), e.g.
+    ``RedHatAI/Llama-4-Scout-17B-16E-Instruct-FP8-dynamic``. It is distinct
+    from :func:`grouped_dynamic_scaled_fp8_matmul`, which handles the
+    blockwise (1x128 act / 128x128 weight) layout.
+
+    The kernel applies ``transpose_b=True``: ``weight`` must already be in
+    ``[num_experts, N, K]`` orientation (K innermost), and the weight scale is
+    per output channel ``N``.
+
+    Args:
+        hidden_states: The activations, ``float8_e4m3fn`` rank-2
+            ``[total_tokens, K]``.
+        weight: The expert weights, ``float8_e4m3fn`` rank-3
+            ``[num_experts, N, K]`` (already transposed; K innermost).
+        a_scales: Per-token activation scales, ``float32`` rank-2
+            ``[total_tokens, 1]``.
+        b_scales: Per-output-channel weight scales, ``float32`` rank-3
+            ``[num_experts, N, 1]``.
+        expert_start_indices: Where each group starts/ends in ``hidden_states``,
+            ``uint32`` rank-1.
+        expert_ids: The expert id for each group, ``int32`` rank-1.
+        expert_usage_stats_host: ``[max_num_tokens_per_expert, num_active_experts]``
+            on the host (CPU).
+        out_type: The output dtype.
+
+    Returns:
+        The matmul output, ``[total_tokens, N]`` in ``out_type``.
+    """
+    if hidden_states.rank != 2:
+        raise ValueError(
+            f"expected hidden_states of rank 2 but got {hidden_states.rank}"
+        )
+
+    if weight.rank != 3:
+        raise ValueError(f"expected weight of rank 3 but got {weight.rank}")
+
+    # transpose_b=True: weight is [E, N, K], so its K dim (axis 2) must match
+    # the activation K dim (axis 1).
+    if (
+        weight.shape[2] != hidden_states.shape[1]
+        or weight.shape[0] != expert_ids.shape[0]
+    ):
+        raise ValueError(
+            "expected weight of shape [num_experts, N,"
+            f" {hidden_states.shape[1]}] with num_experts ="
+            f" {expert_ids.shape[0]} but got {weight.shape}"
+        )
+
+    if (hidden_states.dtype != weight.dtype) or (
+        hidden_states.dtype != DType.float8_e4m3fn
+    ):
+        raise TypeError(
+            "hidden_states and weight dtypes must be float8_e4m3fn, but got"
+            f" {hidden_states.dtype}, {weight.dtype}"
+        )
+
+    if a_scales.rank != 2 or b_scales.rank != 3:
+        raise ValueError(
+            "expected a_scales of rank 2 and b_scales of rank 3 but got"
+            f" {a_scales.rank} and {b_scales.rank}"
+        )
+
+    if a_scales.dtype != DType.float32 or b_scales.dtype != DType.float32:
+        raise TypeError(
+            "a_scales and b_scales dtypes must both be float32 for rowwise /"
+            f" per-token granularity, but got {a_scales.dtype},"
+            f" {b_scales.dtype}"
+        )
+
+    # Per-token activation scale: [total_tokens, 1]; per-channel weight scale:
+    # [num_experts, N, 1].
+    if a_scales.shape[1] != 1:
+        raise ValueError(
+            "expected per-token a_scales of shape [total_tokens, 1] but got"
+            f" {a_scales.shape}"
+        )
+    if (
+        b_scales.shape[2] != 1
+        or b_scales.shape[0] != weight.shape[0]
+        or b_scales.shape[1] != weight.shape[1]
+    ):
+        raise ValueError(
+            "expected per-channel b_scales of shape [num_experts, N, 1]"
+            f" matching weight [num_experts, N, K], but got b_scales"
+            f" {b_scales.shape} and weight {weight.shape}"
+        )
+
+    if expert_ids.dtype != DType.int32:
+        raise TypeError(
+            f"expert_ids dtype must be int32, but got {expert_ids.dtype}"
+        )
+
+    if expert_ids.rank != 1:
+        raise ValueError(
+            f"expected expert_ids of rank 1 but got {expert_ids.rank}"
+        )
+
+    if expert_start_indices.dtype != DType.uint32:
+        raise TypeError(
+            "expert_start_indices dtype must be uint32, but got"
+            f" {expert_start_indices.dtype}"
+        )
+
+    if expert_start_indices.rank != 1:
+        raise ValueError(
+            "expected expert_start_indices of rank 1 but got"
+            f" {expert_start_indices.rank}"
+        )
+
+    return ops.custom(
+        "mo.grouped.matmul.rowwise.dynamic.scaled.fp8",
+        device=hidden_states.device,
+        values=[
+            hidden_states,
+            weight,
+            a_scales,
+            b_scales,
+            expert_start_indices,
+            expert_ids,
+            expert_usage_stats_host[0],
+            expert_usage_stats_host[1],
+        ],
+        out_types=[
+            TensorType(
+                dtype=out_type,
+                shape=[hidden_states.shape[0], weight.shape[1]],
+                device=hidden_states.device,
+            ),
+        ],
+    )[0].tensor
+
+
 def batched_dynamic_scaled_fp8_matmul(
     a: TensorValue,
     b: TensorValue,
@@ -4579,7 +6858,8 @@ def batched_dynamic_scaled_fp8_matmul(
 
     if a_scales.dtype != b_scales.dtype or a_scales.dtype != DType.float32:
         raise TypeError(
-            f"a_scales and b_scales dtypes must be float32, but got {a_scales.dtype}, {b_scales.dtype}"
+            "a_scales and b_scales dtypes must be float32, but got"
+            f" {a_scales.dtype}, {b_scales.dtype}"
         )
 
     if a.rank != 3 or b.rank != 3:
@@ -4598,7 +6878,8 @@ def batched_dynamic_scaled_fp8_matmul(
 
     if a.dtype != b.dtype or a.dtype != DType.float8_e4m3fn:
         raise TypeError(
-            f"a and b dtypes must be float8_e4m3fn, but got {a.dtype}, {b.dtype}"
+            f"a and b dtypes must be float8_e4m3fn, but got {a.dtype},"
+            f" {b.dtype}"
         )
 
     if input_scale_spec.is_block and weight_scale_spec.is_block:
@@ -4606,7 +6887,8 @@ def batched_dynamic_scaled_fp8_matmul(
         # b_scale is of shape [batch_size, ceildiv(N, BLOCK_SIZE), ceildiv(K, BLOCK_SIZE)]
         if a_scales.shape[0] != b_scales.shape[0]:
             raise ValueError(
-                "both a_scales and b_scales must have the same shape on the batch dimension"
+                "both a_scales and b_scales must have the same shape on the"
+                " batch dimension"
             )
 
         if (
@@ -4614,7 +6896,8 @@ def batched_dynamic_scaled_fp8_matmul(
             or weight_scale_spec.block_size is None
         ):
             raise ValueError(
-                "both input scale_granularity and weight scale_granularity must be set for batched blockwise scaling"
+                "both input scale_granularity and weight scale_granularity must"
+                " be set for batched blockwise scaling"
             )
 
         if (
@@ -4622,14 +6905,16 @@ def batched_dynamic_scaled_fp8_matmul(
             or input_scale_spec.block_size[1] != 128
         ):
             raise ValueError(
-                "batched blockwise scaling only supports (1,128) granularity for input"
+                "batched blockwise scaling only supports (1,128) granularity"
+                " for input"
             )
         if (
             weight_scale_spec.block_size[0] != 128
             or weight_scale_spec.block_size[1] != 128
         ):
             raise ValueError(
-                "batched blockwise scaling only supports (128,128) granularity for weight"
+                "batched blockwise scaling only supports (128,128) granularity"
+                " for weight"
             )
     else:
         raise ValueError("unsupported FP8 scaling granularity")
@@ -4689,7 +6974,8 @@ def quantize_static_scaled_float8(
 
     if x.dtype not in [DType.float16, DType.bfloat16, DType.float32]:
         raise ValueError(
-            f"expected input dtype to be float16, bfloat16, or float32, but got {x.dtype}"
+            "expected input dtype to be float16, bfloat16, or float32, but got"
+            f" {x.dtype}"
         )
 
     if x.rank != 2:
@@ -4732,12 +7018,13 @@ def quantize_tensor_dynamic_scaled_float8(
     if input.rank != 2:
         raise ValueError("input must be rank 2 tensor")
 
-    if out_type not in (DType.float8_e4m3fn,):
+    if out_type != DType.float8_e4m3fn:
         raise ValueError("out_type must be float8_e4m3fn")
 
     if not isinstance(input.shape[1], StaticDim):
         raise ValueError(
-            f"input.shape[1] must be a statically known dimension. Input shape received: {input.shape}"
+            "input.shape[1] must be a statically known dimension. Input shape"
+            f" received: {input.shape}"
         )
 
     if not (input_scale_spec.is_tensor and weight_scale_spec.is_tensor):
@@ -4747,7 +7034,8 @@ def quantize_tensor_dynamic_scaled_float8(
 
     if group_size_or_per_token != -1:
         raise ValueError(
-            "group_size_or_per_token should be -1 for dynamic tensor scaling so group_size == num_cols == input.shape[1]"
+            "group_size_or_per_token should be -1 for dynamic tensor scaling so"
+            " group_size == num_cols == input.shape[1]"
         )
 
     result = ops.custom(
@@ -4807,7 +7095,8 @@ def quantize_dynamic_scaled_float8(
 
     if not isinstance(input.shape[1], StaticDim):
         raise ValueError(
-            f"input.shape[1] must be a statically known dimension. Input shape received: {input.shape}"
+            "input.shape[1] must be a statically known dimension. Input shape"
+            f" received: {input.shape}"
         )
 
     if group_size_or_per_token == -1:
@@ -4823,7 +7112,8 @@ def quantize_dynamic_scaled_float8(
     if input_scale_spec.is_block or weight_scale_spec.is_block:
         if not (input_scale_spec.is_block and weight_scale_spec.is_block):
             raise ValueError(
-                "both input and weight must be blockwise scaled for blockwise scaling"
+                "both input and weight must be blockwise scaled for blockwise"
+                " scaling"
             )
 
         # For blockwise scaling pad the a_scales to 16 Bytes. This is required by NVIDIA SM90+ TMA instructions
@@ -4892,7 +7182,8 @@ def dynamic_scaled_matmul(
         if input_scale_spec.origin.is_dynamic:
             if not (b_scales.shape[0] == b_scales.shape[1] == 1):
                 raise ValueError(
-                    "scaler weight tensors must be of shape [1, 1] for dynamic tensor scaling"
+                    "scaler weight tensors must be of shape [1, 1] for dynamic"
+                    " tensor scaling"
                 )
         else:
             if not (
@@ -4919,24 +7210,28 @@ def dynamic_scaled_matmul(
             or weight_scale_spec.block_size is None
         ):
             raise ValueError(
-                "both input and weight block size must be set for blockwise scaling"
+                "both input and weight block size must be set for blockwise"
+                " scaling"
             )
         if not (input_scale_spec.is_block and weight_scale_spec.is_block):
             raise ValueError(
-                "both input and weight must be blockwise scaled for blockwise scaling"
+                "both input and weight must be blockwise scaled for blockwise"
+                " scaling"
             )
 
         if a_scales.dtype != b_scales.dtype or a_scales.dtype != DType.float32:
             raise TypeError(
-                f"a_scales and b_scales dtypes must be float32, but got {a_scales.dtype}, {b_scales.dtype}"
+                "a_scales and b_scales dtypes must be float32, but got"
+                f" {a_scales.dtype}, {b_scales.dtype}"
             )
 
         # a_scale is of shape [ceildiv(K, BLOCK_SIZE), M-padded]
         # b_scale is of shape [ceildiv(N, BLOCK_SIZE), ceildiv(K, BLOCK_SIZE)]
         if a_scales.shape[0] != b_scales.shape[1]:
             raise ValueError(
-                "both a_scales and b_scales must have the same shape on the K dimension."
-                f" got a_scales.shape={a_scales.shape} and b_scales.shape={b_scales.shape}"
+                "both a_scales and b_scales must have the same shape on the K"
+                f" dimension. got a_scales.shape={a_scales.shape} and"
+                f" b_scales.shape={b_scales.shape}"
             )
 
     else:
@@ -4975,26 +7270,40 @@ def dynamic_scaled_matmul(
     return result
 
 
-def dynamic_block_scaled_matmul_fp4(
+def dynamic_block_scaled_matmul(
     a: TensorValue,
     b: TensorValue,
     a_scales: TensorValue,
     b_scales: TensorValue,
-    tensor_sf: TensorValue | float,
+    tensor_sf: TensorValue | float = 1.0,
     sf_vector_size: int = 16,
     out_type: DType = DType.bfloat16,
 ) -> TensorValue:
-    """Performs a matmul of two FP4 tensors with 1D-block scaled scaling factors.
+    """Performs a block-scaled matmul of two NVFP4 or MXFP8 tensors.
+
+    Both formats drive the same SM100 tensor-core block-scaled MMA kernel
+    (``UMMAKind.KIND_MXF8F6F4``) via the ``mo.matmul.dynamic.block.scaled`` op;
+    the format is selected from ``a.dtype``:
+
+    - NVFP4: ``a``/``b`` are ``uint8`` (two ``e2m1`` values packed per byte)
+      with ``float8_e4m3fn`` scales and ``sf_vector_size=16``.
+    - MXFP8: ``a``/``b`` are ``float8_e4m3fn`` (unpacked) with
+      ``float8_e8m0fnu`` scales and ``sf_vector_size=32``.
 
     Args:
-        a: The first tensor to multiply.
-        b: The second tensor to multiply, must be transposed.
-        a_scales: The scaling factors for the first tensor.
-        b_scales: The scaling factors for the second tensor.
-        tensor_sf: Buffer-wise scaling factor equal to weight_scale_2 * input_scale (non-inverted).
+        a: The first tensor to multiply, rank 2 ``[M, K]``.
+        b: The second tensor to multiply, rank 2 ``[N, K]`` (transposed).
+        a_scales: The rank-5 SF-atom scaling factors for ``a``.
+        b_scales: The rank-5 SF-atom scaling factors for ``b``.
+        tensor_sf: Buffer-wise scaling factor applied to the output. For NVFP4
+            this is ``weight_scale_2 * input_scale`` (non-inverted); MXFP8 uses
+            pure block scaling, so it defaults to ``1.0`` (identity).
+        sf_vector_size: K-block size for the scaling factors: 16 for NVFP4 or
+            32 for MXFP8.
+        out_type: The output dtype.
 
     Returns:
-        The result of the matmul operation.
+        The result of the matmul operation, shape ``[M, N]``.
     """
     if a.rank != 2 or b.rank != 2:
         raise ValueError("Both a and b must be rank 2 tensors")
@@ -5012,29 +7321,39 @@ def dynamic_block_scaled_matmul_fp4(
             f"as do a and b scales dtypes {a_scales.dtype}, {b_scales.dtype}"
         )
 
-    if a.dtype != DType.uint8:
-        raise ValueError("A dtype must be uint8 (fp4-e2m1fnX2)")
-
-    if a_scales.dtype != DType.float8_e4m3fn:
-        raise ValueError("a_scales dtype must be float8_e4m3fn")
-
-    if sf_vector_size != 16:
-        raise ValueError("sf_vector_size must be 16 for NVFP4")
+    # Select the quantization format from the operand dtype.
+    if a.dtype == DType.uint8:
+        # NVFP4: two e2m1 values packed per uint8, so the logical K is doubled
+        # relative to the stored K when sizing the scales.
+        if a_scales.dtype != DType.float8_e4m3fn:
+            raise ValueError("a_scales dtype must be float8_e4m3fn for NVFP4")
+        if sf_vector_size != 16:
+            raise ValueError("sf_vector_size must be 16 for NVFP4")
+        k_packing = 2
+    elif a.dtype == DType.float8_e4m3fn:
+        # MXFP8: data is not packed, so the stored K is used directly.
+        if a_scales.dtype != DType.float8_e8m0fnu:
+            raise ValueError("a_scales dtype must be float8_e8m0fnu for MXFP8")
+        if sf_vector_size != 32:
+            raise ValueError("sf_vector_size must be 32 for MXFP8")
+        k_packing = 1
+    else:
+        raise ValueError(
+            "a dtype must be uint8 (NVFP4) or float8_e4m3fn (MXFP8), got"
+            f" {a.dtype}"
+        )
 
     SF_ATOM_M = [32, 4]
     SF_ATOM_K = 4
     SF_MN_GROUP_SIZE = SF_ATOM_M[0] * SF_ATOM_M[1]  # 128
     SF_K_GROUP_SIZE = SF_ATOM_K * sf_vector_size
 
-    # scales tensor shape: [ceildiv(M, SF_MN_GROUP_SIZE), ceildiv(N, sf_vector_size * 4), SF_ATOM_M[0], SF_ATOM_M[1], SF_ATOM_K]
-    # a_scales_dim_0 = (a.shape[0] + SF_MN_GROUP_SIZE - 1) // SF_MN_GROUP_SIZE
-    a_scales_dim_1 = ceildiv(
-        a.shape[1] * 2, Dim(SF_K_GROUP_SIZE)
-    )  # each output element (uint8) is 2 fp4-e2m1fn values
+    # scales tensor shape: [ceildiv(MN, SF_MN_GROUP_SIZE),
+    #   ceildiv(K, SF_K_GROUP_SIZE), SF_ATOM_M[0], SF_ATOM_M[1], SF_ATOM_K].
+    # For NVFP4 each uint8 packs two values, so the logical K is K * k_packing.
+    a_scales_dim_1 = ceildiv(a.shape[1] * k_packing, Dim(SF_K_GROUP_SIZE))
     b_scales_dim_0 = ceildiv(b.shape[0], Dim(SF_MN_GROUP_SIZE))
-    b_scales_dim_1 = ceildiv(
-        b.shape[1] * 2, Dim(SF_K_GROUP_SIZE)
-    )  # each output element (uint8) is 2 fp4-e2m1fn values
+    b_scales_dim_1 = ceildiv(b.shape[1] * k_packing, Dim(SF_K_GROUP_SIZE))
     scales_dim_2 = SF_ATOM_M[0]
     scales_dim_3 = SF_ATOM_M[1]
     scales_dim_4 = SF_ATOM_K
@@ -5046,7 +7365,9 @@ def dynamic_block_scaled_matmul_fp4(
         or a_scales.shape[4] != scales_dim_4
     ):
         raise ValueError(
-            f"a_scales shape must be {a_scales_dim_1, scales_dim_2, scales_dim_3, scales_dim_4}, but got {a_scales.shape}"
+            "a_scales shape must be"
+            f" {a_scales_dim_1, scales_dim_2, scales_dim_3, scales_dim_4}, but"
+            f" got {a_scales.shape}"
         )
 
     if (
@@ -5057,13 +7378,16 @@ def dynamic_block_scaled_matmul_fp4(
         or b_scales.shape[4] != scales_dim_4
     ):
         raise ValueError(
-            f"b_scales shape must be {b_scales_dim_0, b_scales_dim_1, scales_dim_2, scales_dim_3, scales_dim_4}, but got {b_scales.shape}"
+            "b_scales shape must be"
+            f" {b_scales_dim_0, b_scales_dim_1, scales_dim_2, scales_dim_3, scales_dim_4},"
+            f" but got {b_scales.shape}"
         )
 
     if a_scales.shape[1] != b_scales.shape[1]:
         raise ValueError(
-            "a_scales and b_scales must have the same shape on the K dimension."
-            f" got a_scales.shape={a_scales.shape} and b_scales.shape={b_scales.shape}"
+            "a_scales and b_scales must have the same shape on the K"
+            f" dimension. got a_scales.shape={a_scales.shape} and"
+            f" b_scales.shape={b_scales.shape}"
         )
 
     tensor_sf_value: TensorValue
@@ -5097,7 +7421,199 @@ def dynamic_block_scaled_matmul_fp4(
     return result
 
 
-def dynamic_block_scaled_matmul_mxfp4(
+def _apple_weight_only_block_scaled_matmul(
+    a: TensorValue,
+    b: TensorValue,
+    b_scales: TensorValue,
+    out_type: DType = DType.bfloat16,
+) -> TensorValue:
+    """Apple M5 weight-only NVFP4 (W4A16) matmul: ``out = a @ dequant(b).T``.
+
+    The Apple sibling of :func:`dynamic_block_scaled_matmul`. Unlike the NVIDIA
+    SM100 path, the activation ``a`` stays in ``bfloat16`` (it is *not*
+    dynamically quantized to FP4) and the weight block scales are plain rank-2
+    ``[N, K // 16]`` (not the SM100 rank-5 TCGEN05 interleave). The FP4 weight
+    is dequantized to bf16 in-register at the MMA loader seam; weights stay
+    packed in DRAM.
+
+    The NVFP4 per-tensor ``weight_scale_2`` scalar is *not* an argument here —
+    the caller applies it as a post-matmul graph-level multiply.
+
+    Args:
+        a: The bf16 activation, shape ``[M, K]``.
+        b: The packed FP4 weight, ``uint8`` shape ``[N, K // 2]`` (two ``e2m1``
+            nibbles per byte, low nibble first).
+        b_scales: The FP8-E4M3 block scales, ``float8_e4m3fn`` shape
+            ``[N, K // 16]`` (block size 16 along K).
+        out_type: The output dtype (``bfloat16``, ``float16``, or ``float32``).
+
+    Returns:
+        The matmul result, shape ``[M, N]``.
+    """
+    if a.rank != 2 or b.rank != 2:
+        raise ValueError("Both a and b must be rank 2 tensors")
+    if b_scales.rank != 2:
+        raise ValueError("b_scales must be a rank 2 tensor")
+    if a.dtype != DType.bfloat16:
+        raise ValueError(f"activation a must be bfloat16, got {a.dtype}")
+    if b.dtype != DType.uint8:
+        raise ValueError(
+            f"weight b must be uint8 (fp4-e2m1fnX2), got {b.dtype}"
+        )
+    if b_scales.dtype != DType.float8_e4m3fn:
+        raise ValueError(
+            f"b_scales must be float8_e4m3fn, got {b_scales.dtype}"
+        )
+
+    result = ops.custom(
+        "mo.matmul.weight.only.block.scaled.apple",
+        device=a.device,
+        values=[a, b, b_scales],
+        out_types=[
+            TensorType(
+                dtype=out_type, shape=[a.shape[0], b.shape[0]], device=a.device
+            )
+        ],
+    )[0].tensor
+
+    return result
+
+
+def _apple_weight_only_scaled_float8_matmul(
+    a: TensorValue,
+    b: TensorValue,
+    out_type: DType = DType.bfloat16,
+) -> TensorValue:
+    """Apple M5 weight-only FP8 (W8A16) matmul: ``out = a @ dequant(b).T``.
+
+    The FP8 sibling of :func:`_apple_weight_only_block_scaled_matmul`. The
+    activation ``a`` stays in ``bfloat16`` (it is *not* dynamically quantized to
+    FP8) and the FP8-E4M3 weight ``b`` is widened to f32/bf16 at the point of
+    consumption; weights stay ``float8_e4m3fn`` in DRAM. Unlike the NVFP4 sibling
+    there is no per-block weight scale to pass -- modelopt static FP8 carries one
+    per-tensor scalar ``weight_scale``, which the caller applies as a post-matmul
+    graph-level multiply (the FP8 analog of NVFP4's ``weight_scale_2``). So this
+    op takes neither a scale nor ``input_scale`` (``input_scale`` cancels for a
+    bf16 activation).
+
+    Args:
+        a: The bf16 activation, shape ``[M, K]``.
+        b: The FP8 weight, ``float8_e4m3fn`` shape ``[N, K]`` (``transpose_b``).
+        out_type: The output dtype (``bfloat16``, ``float16``, or ``float32``).
+
+    Returns:
+        The raw (unscaled) matmul result, shape ``[M, N]``.
+    """
+    if a.rank != 2 or b.rank != 2:
+        raise ValueError("Both a and b must be rank 2 tensors")
+    if a.dtype != DType.bfloat16:
+        raise ValueError(f"activation a must be bfloat16, got {a.dtype}")
+    if b.dtype != DType.float8_e4m3fn:
+        raise ValueError(f"weight b must be float8_e4m3fn, got {b.dtype}")
+    if a.shape[1] != b.shape[1]:
+        raise ValueError("a and b must share the K dimension (a[M,K], b[N,K])")
+
+    result = ops.custom(
+        "mo.matmul.weight.only.scaled.float8.apple",
+        device=a.device,
+        values=[a, b],
+        out_types=[
+            TensorType(
+                dtype=out_type, shape=[a.shape[0], b.shape[0]], device=a.device
+            )
+        ],
+    )[0].tensor
+
+    return result
+
+
+def _apple_int8_w8a8_matmul(
+    a: TensorValue,
+    b: TensorValue,
+    b_scale: TensorValue,
+    bias: TensorValue | None = None,
+    out_type: DType = DType.bfloat16,
+) -> TensorValue:
+    """Apple M5 int8 W8A8 matmul: ``out = dequant(quant(a) @ b^T)``.
+
+    Fused single graph op wrapping ``int8_matmul.mojo``: the bf16 activation
+    ``a`` is dynamically quantized to int8 (symmetric per-token absmax/127)
+    *inside* the op, matmul'd against the pre-quantized int8 weight ``b`` on the
+    int8 widening-MMA datapath (int32 accumulate), then dequantized by the
+    per-token activation scale times the per-output-channel weight scale (with
+    an optional bias added after dequant). Keeping the activation quant inside
+    the op avoids materializing the int8 activation + its scales as separate
+    graph values (and the extra per-Linear dispatches that entails).
+
+    Args:
+        a: The bf16 activation, shape ``[M, K]``.
+        b: The int8 weight, shape ``[N, K]`` (``transpose_b``; RTN-quantized
+            per output channel at load).
+        b_scale: The fp32 per-output-channel weight scale, shape ``[N, 1]`` or
+            ``[N]``.
+        bias: Optional bias in ``out_type``, shape ``[N]``; added after dequant.
+        out_type: The output dtype (``bfloat16``, ``float16``, or ``float32``).
+
+    Returns:
+        The matmul result, shape ``[M, N]``.
+    """
+    if a.rank != 2 or b.rank != 2:
+        raise ValueError("Both a and b must be rank 2 tensors")
+    if a.dtype != DType.bfloat16:
+        raise ValueError(f"activation a must be bfloat16, got {a.dtype}")
+    if b.dtype != DType.int8:
+        raise ValueError(f"weight b must be int8, got {b.dtype}")
+    if a.shape[1] != b.shape[1]:
+        raise ValueError("a and b must share the K dimension (a[M,K], b[N,K])")
+
+    # The kernel narrows the B row stride (K) and the tile-count math (N) to
+    # UInt16 (``MmaOpApple``); K or N > 65535 silently overflows and corrupts
+    # the output. The in-kernel ``debug_assert`` is a release no-op, so gate it
+    # here at graph build (always on). K and N are static for FLUX Linears.
+    n_dim, k_dim = b.shape[0], b.shape[1]
+    if isinstance(k_dim, StaticDim) and int(k_dim) > 65535:
+        raise ValueError(
+            "Apple int8 W8A8 matmul: K (b.shape[1]) must be <= 65535 "
+            f"(UInt16 stride limit), got {int(k_dim)}"
+        )
+    if isinstance(n_dim, StaticDim) and int(n_dim) > 65535:
+        raise ValueError(
+            "Apple int8 W8A8 matmul: N (b.shape[0]) must be <= 65535 "
+            f"(UInt16 stride limit), got {int(n_dim)}"
+        )
+
+    # The kernel reads a flat per-channel scale ``[N]``; accept the rowwise
+    # ``[N, 1]`` weight-scale layout and squeeze it.
+    b_scale = b_scale.to(a.device)
+    if b_scale.rank == 2:
+        b_scale = ops.reshape(b_scale, [b_scale.shape[0]])
+    if b_scale.dtype != DType.float32:
+        b_scale = ops.cast(b_scale, DType.float32)
+
+    # Custom-op input arity is fixed per registration, so the optional bias is
+    # a separate op name (`.bias`), the same idiom as the FP8 fused-QKV op --
+    # not a comptime flag on one op.
+    op_name = "mo.matmul.int8.w8a8.apple"
+    values = [a, b, b_scale]
+    if bias is not None:
+        op_name += ".bias"
+        values.append(ops.cast(bias.to(a.device), out_type))
+
+    result = ops.custom(
+        op_name,
+        device=a.device,
+        values=values,
+        out_types=[
+            TensorType(
+                dtype=out_type, shape=[a.shape[0], b.shape[0]], device=a.device
+            )
+        ],
+    )[0].tensor
+
+    return result
+
+
+def dynamic_block_scaled_matmul_amd(
     a: TensorValue,
     b: TensorValue,
     a_scales: TensorValue,
@@ -5131,14 +7647,40 @@ def dynamic_block_scaled_matmul_mxfp4(
             f"as do a and b scales dtypes {a_scales.dtype}, {b_scales.dtype}"
         )
 
-    if a.dtype != DType.uint8:
-        raise ValueError("A dtype must be uint8 (fp4-e2m1fnX2)")
+    # The kernel reads raw bytes and takes the packing as a parameter.
+    if a.dtype not in (DType.uint8, DType.float8_e4m3fn):
+        raise ValueError(
+            "A dtype must be uint8 (MXFP4) or float8_e4m3fn (MXFP8), got "
+            f"{a.dtype}"
+        )
 
     if a_scales.dtype != DType.float8_e8m0fnu:
-        raise ValueError("a_scales dtype must be float8_e4m3fn")
+        raise ValueError("a_scales dtype must be float8_e8m0fnu")
+
+    elems_per_byte = 2 if a.dtype == DType.uint8 else 1
+
+    # Validate the scale extents here rather than letting a mis-sized tensor
+    # reach the kernel, where it reads out of bounds instead of raising.
+    MX_SF_VECTOR_SIZE = 32
+    expected_a_scales_k = ceildiv(
+        a.shape[1] * elems_per_byte, Dim(MX_SF_VECTOR_SIZE)
+    )
+    if a_scales.shape[1] != expected_a_scales_k:
+        raise ValueError(
+            f"a_scales shape must be [*, {expected_a_scales_k}] but got "
+            f"{a_scales.shape}"
+        )
+    expected_b_scales_k = ceildiv(
+        b.shape[1] * elems_per_byte, Dim(MX_SF_VECTOR_SIZE)
+    )
+    if b_scales.shape[1] != expected_b_scales_k:
+        raise ValueError(
+            f"b_scales shape must be [*, {expected_b_scales_k}] but got "
+            f"{b_scales.shape}"
+        )
 
     result = ops.custom(
-        "mo.matmul.dynamic.block.scaled.mxfp4",
+        "mo.matmul.dynamic.block.scaled.amd",
         device=a.device,
         values=[
             a,
@@ -5151,9 +7693,183 @@ def dynamic_block_scaled_matmul_mxfp4(
                 dtype=out_type, shape=[a.shape[0], b.shape[0]], device=a.device
             )
         ],
+        parameters={"lane_bytes": 32 // elems_per_byte},
     )[0].tensor
 
     return result
+
+
+_FP6_FORMAT_CODE = {"e2m3": 0, "e3m2": 1}
+"""Maps an FP6 element encoding name to the ``FP6_FORMAT`` op parameter."""
+
+
+def _fp6_format_code(fp6_format: str) -> int:
+    """Validates an FP6 encoding name and returns its op parameter value."""
+    try:
+        return _FP6_FORMAT_CODE[fp6_format]
+    except KeyError:
+        raise ValueError(
+            f"fp6_format must be one of {sorted(_FP6_FORMAT_CODE)}, got "
+            f"{fp6_format!r}"
+        ) from None
+
+
+def dynamic_block_scaled_matmul_mxfp6(
+    a: TensorValue,
+    b: TensorValue,
+    a_scales: TensorValue,
+    b_scales: TensorValue,
+    fp6_format: str = "e2m3",
+    out_type: DType = DType.bfloat16,
+    preshuffled_b: bool = False,
+) -> TensorValue:
+    """Performs a matmul of two MXFP6 tensors with E8M0 block scales.
+
+    The FP6 sibling of :func:`dynamic_block_scaled_matmul_amd`. It is a
+    separate op rather than another ``lane_bytes`` value because both FP6
+    encodings put 24 bytes in a lane, so the byte count cannot choose between
+    them -- the encoding travels as its own parameter.
+
+    AMD CDNA4 (gfx950) only.
+
+    Args:
+        a: The activations, packed FP6 bytes ``[M, K * 3 // 4]``.
+        b: The weights, packed FP6 bytes ``[N, K * 3 // 4]`` (transposed).
+        a_scales: E8M0 activation scales ``[M, K // 32]``.
+        b_scales: E8M0 weight scales ``[N, K // 32]``.
+        fp6_format: The FP6 element encoding, ``"e2m3"`` or ``"e3m2"``.
+        out_type: The dtype of the result.
+        preshuffled_b: When True, ``b`` and ``b_scales`` must already be in
+            the plane-split / packed-scale layouts produced by
+            ``preshuffle_block_scaled_b_dense`` (a one-time, load-time cost
+            for the static weight). Ignored (falls back to the row-major
+            kernel) for small ``M`` -- see ``mxfp6_block_scaled_matmul_amd``.
+
+    Returns:
+        The result of the matmul operation, ``[M, N]``.
+    """
+    if not _is_amd_gpu():
+        raise ValueError(
+            "MXFP6 is supported on AMD CDNA4 (gfx950) only: the kernels issue"
+            " through the f8f6f4 MFMA, which has no NVIDIA equivalent. Use"
+            " float8_e4m3fn or float4_e2m1fnx2 on NVIDIA."
+        )
+    fp6_code = _fp6_format_code(fp6_format)
+
+    if a.rank != 2 or b.rank != 2:
+        raise ValueError("Both a and b must be rank 2 tensors")
+    if a_scales.rank != 2 or b_scales.rank != 2:
+        raise ValueError("Both a_scales and b_scales must be rank 2 tensors")
+    if a.shape[1] != b.shape[1]:
+        raise ValueError(
+            "MXFP6 matmul operands disagree on packed K: "
+            f"a={list(a.shape)} b={list(b.shape)} "
+            f"a_scales={list(a_scales.shape)} b_scales={list(b_scales.shape)}. "
+            "Both operands are byte-packed (four 6-bit codes per three "
+            "bytes), so a logical K of n is n * 3 // 4 columns; a mismatch "
+            "usually means one side was sized or sharded on the logical width."
+        )
+    if a.dtype != DType.uint8 or b.dtype != DType.uint8:
+        raise ValueError(
+            "MXFP6 operands are packed into uint8 (four codes per three "
+            f"bytes), got a={a.dtype}, b={b.dtype}"
+        )
+    if (
+        a_scales.dtype != DType.float8_e8m0fnu
+        or b_scales.dtype != DType.float8_e8m0fnu
+    ):
+        raise ValueError("a_scales and b_scales dtypes must be float8_e8m0fnu")
+
+    MX_SF_VECTOR_SIZE = 32
+    expected_scales_k = ceildiv(a.shape[1] * 4 // 3, Dim(MX_SF_VECTOR_SIZE))
+    if a_scales.shape[1] != expected_scales_k:
+        raise ValueError(
+            f"a_scales shape must be [*, {expected_scales_k}] but got "
+            f"{a_scales.shape}"
+        )
+    if b_scales.shape[1] != expected_scales_k:
+        raise ValueError(
+            f"b_scales shape must be [*, {expected_scales_k}] but got "
+            f"{b_scales.shape}"
+        )
+
+    return ops.custom(
+        "mo.matmul.dynamic.block.scaled.mxfp6",
+        device=a.device,
+        values=[a, b, a_scales, b_scales],
+        out_types=[
+            TensorType(
+                dtype=out_type, shape=[a.shape[0], b.shape[0]], device=a.device
+            )
+        ],
+        parameters={"FP6_FORMAT": fp6_code, "preshuffled_b": preshuffled_b},
+    )[0].tensor
+
+
+def quantize_dynamic_block_scaled_mxfp6(
+    input: TensorValue,
+    fp6_format: str = "e2m3",
+    scales_type: DType = DType.float8_e8m0fnu,
+    out_type: DType = DType.uint8,
+) -> tuple[TensorValue, TensorValue]:
+    """Dynamically quantizes the input tensor to MXFP6.
+
+    Args:
+        input: The tensor to quantize, ``[seq_len, hidden_size]`` bf16.
+        fp6_format: The FP6 element encoding, ``"e2m3"`` or ``"e3m2"``.
+        scales_type: The dtype of the scales tensor.
+        out_type: The dtype of the packed output.
+
+    Returns:
+        The packed tensor in ``[seq_len, hidden_size * 3 // 4]`` and the scales
+        in ``[seq_len, hidden_size // 32]``.
+    """
+    if not _is_amd_gpu():
+        raise ValueError(
+            "MXFP6 is supported on AMD CDNA4 (gfx950) only: the kernels issue"
+            " through the f8f6f4 MFMA, which has no NVIDIA equivalent. Use"
+            " float8_e4m3fn or float4_e2m1fnx2 on NVIDIA."
+        )
+    fp6_code = _fp6_format_code(fp6_format)
+
+    if input.rank != 2:
+        raise ValueError("input tensor must be rank 2 tensor")
+    if input.dtype != DType.bfloat16:
+        raise ValueError("input tensor dtype must be bfloat16")
+    if out_type != DType.uint8:
+        raise ValueError("out_type must be uint8 (packed FP6)")
+    if scales_type != DType.float8_e8m0fnu:
+        raise ValueError("scales_type must be float8_e8m0fnu for MXFP6")
+
+    MX_SF_VECTOR_SIZE = 32
+    if int(input.shape[1]) % MX_SF_VECTOR_SIZE != 0:
+        raise ValueError(
+            "input.shape[1] must be a multiple of the 32-element MX block"
+        )
+
+    result = ops.custom(
+        "mo.quantize.dynamic.block.scaled.mxfp6",
+        device=input.device,
+        values=[input],
+        out_types=[
+            TensorType(
+                dtype=out_type,
+                shape=[input.shape[0], input.shape[1] * 3 // 4],
+                device=input.device,
+            ),
+            TensorType(
+                dtype=scales_type,
+                shape=[
+                    input.shape[0],
+                    ceildiv(input.shape[1], Dim(MX_SF_VECTOR_SIZE)),
+                ],
+                device=input.device,
+            ),
+        ],
+        parameters={"FP6_FORMAT": fp6_code},
+    )
+
+    return result[0].tensor, result[1].tensor
 
 
 def mxfp4_dequant(
@@ -5222,6 +7938,80 @@ def mxfp4_dequant(
     return result
 
 
+def mxfp6_dequant(
+    packed_weights: TensorValue,
+    scales: TensorValue,
+    fp6_format: str = "e2m3",
+    out_type: DType = DType.bfloat16,
+) -> TensorValue:
+    """Dequantizes MXFP6 packed weights to BF16 or FP8 on GPU.
+
+    The FP6 sibling of :func:`mxfp4_dequant`. Supports rank 2
+    ``[N, K * 3 // 4]`` and rank 3 ``[E, N, K * 3 // 4]`` inputs; for rank 3
+    the leading dims are flattened, dequantized, and reshaped back.
+
+    Args:
+        packed_weights: Packed FP6 bytes, four codes per three bytes.
+        scales: Block scales in ``float8_e8m0fnu``, ``[..., N, K // 32]``.
+        fp6_format: The FP6 element encoding, ``"e2m3"`` or ``"e3m2"``.
+        out_type: Output dtype (``bfloat16`` or ``float8_e4m3fn``).
+
+    Returns:
+        The dequantized tensor, ``[N, K]`` or ``[E, N, K]``.
+    """
+    if not _is_amd_gpu():
+        raise ValueError(
+            "MXFP6 is supported on AMD CDNA4 (gfx950) only: the kernels issue"
+            " through the f8f6f4 MFMA, which has no NVIDIA equivalent. Use"
+            " float8_e4m3fn or float4_e2m1fnx2 on NVIDIA."
+        )
+    fp6_code = _fp6_format_code(fp6_format)
+
+    if packed_weights.rank not in (2, 3):
+        raise ValueError(
+            f"packed_weights must be rank 2 or 3, got {packed_weights.rank}"
+        )
+    if scales.rank != packed_weights.rank:
+        raise ValueError(
+            f"scales rank ({scales.rank}) must match packed_weights rank"
+            f" ({packed_weights.rank})"
+        )
+    if packed_weights.dtype != DType.uint8:
+        raise ValueError(
+            f"packed_weights must be uint8, got {packed_weights.dtype}"
+        )
+
+    is_batched_weights = packed_weights.rank == 3
+    if is_batched_weights:
+        e = packed_weights.shape[0]
+        n = packed_weights.shape[1]
+        k_packed = packed_weights.shape[2]
+        packed_weights = ops.reshape(packed_weights, [e * n, k_packed])
+        scales = ops.reshape(scales, [e * n, scales.shape[2]])
+
+    rows = packed_weights.shape[0]
+    k = packed_weights.shape[1] * 4 // 3  # Unpacked column count
+
+    result = ops.custom(
+        "mo.dequant.mxfp6",
+        device=packed_weights.device,
+        values=[packed_weights, scales],
+        out_types=[
+            TensorType(
+                dtype=out_type,
+                shape=[rows, k],
+                device=packed_weights.device,
+            )
+        ],
+        parameters={"FP6_FORMAT": fp6_code},
+    )[0].tensor
+
+    if is_batched_weights:
+        result = ops.reshape(result, [e, n, k])
+
+    return result
+
+
 def _is_sm10x_gpu() -> bool:
     """Checks if the current accelerator is NVIDIA SM100+ (Blackwell)."""
     try:
@@ -5230,24 +8020,59 @@ def _is_sm10x_gpu() -> bool:
         return False
 
 
-def quantize_dynamic_block_scaled_fp4(
+def _is_sm12x_gpu() -> bool:
+    """Checks if the current accelerator is NVIDIA SM120/SM121 (consumer Blackwell)."""
+    try:
+        return accelerator_architecture_name().startswith("sm_12")
+    except Exception:
+        return False
+
+
+def _is_apple_gpu() -> bool:
+    """Checks if the current accelerator is an Apple (Metal) GPU."""
+    try:
+        return accelerator_api() == "metal"
+    except Exception:
+        return False
+
+
+def _is_amd_gpu() -> bool:
+    """Checks if the current accelerator is an AMD (HIP) GPU."""
+    try:
+        return accelerator_api() == "hip"
+    except Exception:
+        return False
+
+
+def quantize_dynamic_block_scaled(
     input: TensorValue,
-    tensor_sf: TensorValue | float,
+    tensor_sf: TensorValue | float = 1.0,
     sf_vector_size: int = 16,
     scales_type: DType = DType.float8_e4m3fn,
     out_type: DType = DType.uint8,  # fp4-e2m1fnX2
 ) -> tuple[TensorValue, TensorValue]:
-    """Dynamically quantize the input tensor to fp4-e2m1fn.
+    """Dynamically quantize a bf16 tensor to NVFP4 or MXFP8 with block scales.
+
+    Both formats go through the ``mo.quantize.dynamic.block.scaled`` op; the
+    format is selected from ``out_type``:
+
+    - NVFP4 (``out_type=uint8``): two ``e2m1`` values packed per output byte,
+      with ``float8_e4m3fn`` (NVFP4) or ``float8_e8m0fnu`` (MXFP4) scales and
+      ``sf_vector_size`` 16 or 32.
+    - MXFP8 (``out_type=float8_e4m3fn``): unpacked ``float8_e4m3fn`` data with
+      ``float8_e8m0fnu`` scales and ``sf_vector_size=32``. MXFP8 uses pure
+      block scaling, so ``tensor_sf`` defaults to ``1.0`` (identity).
 
     Args:
-        input: The input tensor to quantize. Shape: [seq_len, hidden_size]
-        tensor_sf: The tensor-wise scale factor (inverted as per
-            quantization kernel requirement).
+        input: The input tensor to quantize. Shape: [seq_len, hidden_size].
+        tensor_sf: The tensor-wise scale factor (inverted as per the
+            quantization kernel requirement for NVFP4; identity for MXFP8).
         sf_vector_size: The block size for the scaling factors.
-            16 for NVFP4, 32 for MXFP4.
-        out_type: The type of the output tensor.
+            16 for NVFP4, 32 for MXFP4/MXFP8.
         scales_type: The type of the scales tensor.
-            ``float8_e4m3fn`` for NVFP4, ``float8_e8m0fnu`` for MXFP4.
+            ``float8_e4m3fn`` for NVFP4, ``float8_e8m0fnu`` for MXFP4/MXFP8.
+        out_type: The type of the output tensor. ``uint8`` for packed FP4 or
+            ``float8_e4m3fn`` for MXFP8.
 
     Returns:
         The quantized tensor and scales. Scales layout depends on hardware:
@@ -5260,18 +8085,31 @@ def quantize_dynamic_block_scaled_fp4(
     if input.dtype != DType.bfloat16:
         raise ValueError("input tensor dtype must be bfloat16")
 
-    if out_type not in (DType.uint8,):
-        raise ValueError("out_type must be uint8 (fp4-e2m1fnX2)")
-
-    if scales_type not in (DType.float8_e4m3fn, DType.float8_e8m0fnu):
+    # Select the quantization format from the output dtype.
+    if out_type == DType.uint8:
+        # NVFP4 / MXFP4: two e2m1 values packed per output byte.
+        if scales_type not in (DType.float8_e4m3fn, DType.float8_e8m0fnu):
+            raise ValueError(
+                "scales_type must be float8_e4m3fn (NVFP4) or float8_e8m0fnu"
+                " (MXFP4)"
+            )
+        if sf_vector_size not in (16, 32):
+            raise ValueError("sf_vector_size must be 16 (NVFP4) or 32 (MXFP4)")
+        is_packed = True
+    elif out_type == DType.float8_e4m3fn:
+        # MXFP8: float8 data, not packed.
+        if scales_type != DType.float8_e8m0fnu:
+            raise ValueError("scales_type must be float8_e8m0fnu for MXFP8")
+        if sf_vector_size != 32:
+            raise ValueError("sf_vector_size must be 32 for MXFP8")
+        is_packed = False
+    else:
         raise ValueError(
-            "scales_type must be float8_e4m3fn (NVFP4) or float8_e8m0fnu (MXFP4)"
+            "out_type must be uint8 (FP4) or float8_e4m3fn (MXFP8), got"
+            f" {out_type}"
         )
 
-    if sf_vector_size not in (16, 32):
-        raise ValueError("sf_vector_size must be 16 (NVFP4) or 32 (MXFP4)")
-
-    # MXFP4 (sf_vector_size=32) requires K % 32 because the kernel's
+    # MXFP4/MXFP8 (sf_vector_size=32) requires K % 32 because the kernel's
     # 4-thread cooperative scale reduction operates on 32-element groups.
     # NVFP4 (sf_vector_size=16) only requires K % 8.
     k_alignment = (
@@ -5280,8 +8118,8 @@ def quantize_dynamic_block_scaled_fp4(
     if int(input.shape[1]) % k_alignment != 0:
         raise ValueError(f"input.shape[1] must be a multiple of {k_alignment}")
 
-    if _is_sm10x_gpu():
-        # SM100 TCGEN05: rank-5 interleaved scales layout.
+    if _is_sm10x_gpu() or _is_sm12x_gpu():
+        # SM100 / SM120 TCGEN05: rank-5 interleaved scales layout.
         SF_ATOM_M = [32, 4]
         SF_ATOM_K = 4
         SF_MN_GROUP_SIZE = SF_ATOM_M[0] * SF_ATOM_M[1]  # 128
@@ -5302,6 +8140,9 @@ def quantize_dynamic_block_scaled_fp4(
             ceildiv(input.shape[1], Dim(sf_vector_size)),
         ]
 
+    # FP4 packs two values per output byte; MXFP8 stores one value per element.
+    quantized_k = input.shape[1] // 2 if is_packed else input.shape[1]
+
     tensor_sf_value: TensorValue
     if isinstance(tensor_sf, float):
         tensor_sf_value = ops.constant(
@@ -5317,10 +8158,7 @@ def quantize_dynamic_block_scaled_fp4(
         out_types=[
             TensorType(
                 dtype=out_type,
-                shape=[
-                    input.shape[0],
-                    input.shape[1] // 2,  # each uint8 packs 2 fp4 values
-                ],
+                shape=[input.shape[0], quantized_k],
                 device=input.device,
             ),
             TensorType(
@@ -5337,7 +8175,7 @@ def quantize_dynamic_block_scaled_fp4(
     return result[0].tensor, result[1].tensor
 
 
-def grouped_quantize_dynamic_block_scaled_fp4(
+def grouped_quantize_dynamic_block_scaled(
     input: TensorValue,
     row_offsets: TensorValue,
     scales_offsets: TensorValue,
@@ -5347,7 +8185,7 @@ def grouped_quantize_dynamic_block_scaled_fp4(
     scales_type: DType = DType.float8_e4m3fn,
     out_type: DType = DType.uint8,
 ) -> tuple[TensorValue, TensorValue]:
-    """Grouped dynamic FP4 quantization for MoE experts.
+    """Grouped dynamic NVFP4/MXFP4/MXFP8 quantization for MoE experts.
 
     Quantizes a concatenated token tensor where different row ranges belong
     to different experts, each with its own tensor-wise scale factor.
@@ -5378,19 +8216,28 @@ def grouped_quantize_dynamic_block_scaled_fp4(
     if input.dtype != DType.bfloat16:
         raise ValueError("input tensor dtype must be bfloat16")
 
+    if out_type not in (DType.uint8, DType.float8_e4m3fn):
+        raise ValueError("out_type must be uint8 (FP4x2) or float8_e4m3fn")
+
     if not _is_sm10x_gpu():
         # route to the fallback kernel
-        return quantize_dynamic_block_scaled_fp4(
+        return quantize_dynamic_block_scaled(
             input, sf_tensor[0], sf_vector_size, scales_type, out_type
         )
 
     SF_ATOM_M = [32, 4]
     SF_ATOM_K = 4
     SF_MN_GROUP_SIZE = SF_ATOM_M[0] * SF_ATOM_M[1]  # 128
-    SF_K_GROUP_SIZE = SF_ATOM_K * 16
+    SF_K_GROUP_SIZE = SF_ATOM_K * sf_vector_size
 
     total_m_tiles = ceildiv(input.shape[0], Dim(SF_MN_GROUP_SIZE))
-    total_m_tiles += expert_ids.shape[0]  # add one padding tile for each group
+    # A row belongs to exactly one group, so the number of non-empty groups
+    # is bounded by both the group count and the row count; padding one tile
+    # per group beyond that bound is wasted work at low occupancy (e.g.
+    # single-token decode routed across hundreds of experts).
+    total_m_tiles += AlgebraicDim.apply(
+        kgen.POC.min, expert_ids.shape[0], input.shape[0]
+    )
     scales_shape: list[Dim | int] = [
         total_m_tiles,
         ceildiv(input.shape[1], Dim(SF_K_GROUP_SIZE)),
@@ -5406,7 +8253,12 @@ def grouped_quantize_dynamic_block_scaled_fp4(
         out_types=[
             TensorType(
                 dtype=out_type,
-                shape=[input.shape[0], input.shape[1] // 2],
+                shape=[
+                    input.shape[0],
+                    input.shape[1]
+                    if out_type == DType.float8_e4m3fn
+                    else input.shape[1] // 2,
+                ],
                 device=input.device,
             ),
             TensorType(
@@ -5442,10 +8294,10 @@ def quantize_dynamic_block_scaled_mxfp4(
     if input.dtype != DType.bfloat16:
         raise ValueError("input tensor dtype must be bfloat16")
 
-    if out_type not in (DType.uint8,):
+    if out_type != DType.uint8:
         raise ValueError("out_type must be uint8 (fp4-e2m1fnX2)")
 
-    if scales_type not in (DType.float8_e8m0fnu,):
+    if scales_type != DType.float8_e8m0fnu:
         raise ValueError("scales_type must be float8_e8m0fnu for MXFP4")
 
     MXFP4_SF_VECTOR_SIZE = 32
@@ -5503,7 +8355,8 @@ def block_scales_interleave(
 
     if scales.dtype not in (DType.float8_e4m3fn, DType.float8_e8m0fnu):
         raise ValueError(
-            "scales dtype must be float8_e4m3fn (NVFP4) or float8_e8m0fnu (MXFP4)"
+            "scales dtype must be float8_e4m3fn (NVFP4) or float8_e8m0fnu"
+            " (MXFP4)"
         )
 
     expected_sf_vector_size = 32 if scales.dtype == DType.float8_e8m0fnu else 16
@@ -5551,12 +8404,83 @@ def block_scales_interleave(
     return result
 
 
-def mxfp4_preshuffle_b_5d(b: TensorValue) -> TensorValue:
+def block_scaled_preshuffle_grouped_scale_4d(
+    a_scales: TensorValue,
+    expert_start_indices: TensorValue,
+    max_num_tokens_per_expert: TensorValue,
+    num_active_experts: TensorValue,
+    num_experts: int,
+) -> TensorValue:
+    """Applies the per-step A-scale preshuffle for the AMD CDNA4 preb kernel.
+
+    Takes row-major E8M0 A-scales ``[total_tokens, K_SCALES]`` and writes
+    cell-packed scales into per-expert fixed-stride slots of stride
+    ``align_up(max_num_tokens_per_expert, 32)``. Output slot ``e`` holds
+    expert slot ``e``'s scales; the preb matmul reads from
+    ``e * max_padded_M`` directly.
+
+    Intended to be inserted before ``block_scaled_grouped_matmul_amd_preb`` when
+    ``preshuffled_b=True`` so the matmul sees the cell layout it expects.
+
+    Args:
+        a_scales: Rank-2 ``float8_e8m0fnu`` tensor ``[total_tokens, K_SCALES]``
+            from ``quantize_dynamic_block_scaled_mxfp4``. ``K_SCALES`` must
+            be a multiple of 8.
+        expert_start_indices: Rank-1 ``uint32`` cumulative token offsets,
+            length ``num_active_experts + 1``.
+        max_num_tokens_per_expert: Scalar ``uint32`` upper bound on
+            per-expert token count this step.
+        num_active_experts: Scalar ``uint32`` number of active expert slots.
+        num_experts: Graph-build-time upper bound on ``num_active_experts``
+            (e.g. ``weight.shape[0]``). Used to size the output buffer.
+
+    Returns:
+        Rank-2 ``float8_e8m0fnu`` tensor ``[num_experts * total_tokens,
+        K_SCALES]``. The first ``num_active_experts * max_padded_M`` rows
+        are written; the rest is left untouched but accessible.
+    """
+    if a_scales.rank != 2:
+        raise ValueError(
+            f"a_scales must be rank 2 [total_tokens, K_SCALES], got rank"
+            f" {a_scales.rank}"
+        )
+    if a_scales.dtype != DType.float8_e8m0fnu:
+        raise ValueError(
+            f"a_scales must be float8_e8m0fnu, got {a_scales.dtype}"
+        )
+    if expert_start_indices.rank != 1:
+        raise ValueError(
+            "expert_start_indices must be rank 1, got rank"
+            f" {expert_start_indices.rank}"
+        )
+
+    out_rows = num_experts * a_scales.shape[0]
+
+    return ops.custom(
+        "mo.block.scaled.preshuffle.scale.4d_per_expert",
+        device=a_scales.device,
+        values=[
+            a_scales,
+            expert_start_indices,
+            max_num_tokens_per_expert,
+            num_active_experts,
+        ],
+        out_types=[
+            TensorType(
+                dtype=DType.float8_e8m0fnu,
+                shape=[out_rows, a_scales.shape[1]],
+                device=a_scales.device,
+            ),
+        ],
+    )[0].tensor
+
+
+def block_scaled_preshuffle_b_5d(b: TensorValue) -> TensorValue:
     """Applies the AMD CDNA4 MXFP4 B 5D preshuffle to a rank-3 weight.
 
     Reorders the packed-FP4 bytes from ``[E, N, K_BYTES]`` row-major into the
     5D ``(E, N0, K0, KLane=4, NLane=16, KPack=16)`` byte layout expected by
-    the ``mxfp4_grouped_matmul_amd_preb`` reader. Output is byte-identical to
+    the ``block_scaled_grouped_matmul_amd_preb`` reader. Output is byte-identical to
     ``Shuffler[E].preshuffle_b_5d`` running on the same input.
 
     Intended for eager invocation from weight adapters (one-shot graph), not
@@ -5577,7 +8501,7 @@ def mxfp4_preshuffle_b_5d(b: TensorValue) -> TensorValue:
         raise ValueError(f"b must be uint8 (packed MXFP4), got {b.dtype}")
 
     return ops.custom(
-        "mo.mxfp4.preshuffle.b.5d",
+        "mo.block.scaled.preshuffle.b.5d",
         device=b.device,
         values=[b],
         out_types=[
@@ -5622,20 +8546,24 @@ def matmul_static_scaled_float8(
     """
     if input_scale.shape not in [[], [1]]:
         raise ValueError(
-            f"expected input_scale to be a scalar, but got shape of {input_scale.shape}"
+            "expected input_scale to be a scalar, but got shape of"
+            f" {input_scale.shape}"
         )
     if weight_scale.shape not in [[], [1]]:
         raise ValueError(
-            f"expected weight_scale to be a scalar, but got shape of {weight_scale.shape}"
+            "expected weight_scale to be a scalar, but got shape of"
+            f" {weight_scale.shape}"
         )
 
     if input.dtype not in (DType.float8_e4m3fn, DType.float8_e4m3fnuz):
         raise ValueError(
-            f"expected input dtype to be float8_e4m3fn or float8_e4m3fnuz, but got {input.dtype}"
+            "expected input dtype to be float8_e4m3fn or float8_e4m3fnuz, but"
+            f" got {input.dtype}"
         )
     if weight.dtype not in (DType.float8_e4m3fn, DType.float8_e4m3fnuz):
         raise ValueError(
-            f"expected weight dtype to be float8_e4m3fn or float8_e4m3fnuz, but got {weight.dtype}"
+            "expected weight dtype to be float8_e4m3fn or float8_e4m3fnuz, but"
+            f" got {weight.dtype}"
         )
 
     if input.rank != 2:
@@ -5787,18 +8715,35 @@ def merge_ragged_tensors(
                 [total_a_rows + total_b_rows, ...].
             - The merged row offsets with the same shape as input row offsets.
 
+    The following example interleaves two ragged tensors that share a batch
+    size of 2. Row ``a = [1, 2, 3, 4, 5, 6]`` with offsets ``[0, 2, 6]`` and
+    row ``b = [7, 8, 9, 10]`` with offsets ``[0, 3, 4]`` merge into
+    ``[1, 2, 7, 8, 9, 3, 4, 5, 6, 10]`` with offsets ``[0, 5, 10]``:
+
     .. code-block:: python
 
-        a = [1, 2, 3, 4, 5, 6]
-        a_row_offsets = [0, 2, 6]
-        b = [7, 8, 9, 10]
-        b_row_offsets = [0, 3, 4]
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType
+        from max.nn.kernels import merge_ragged_tensors
 
-        merged_tensor, merged_row_offsets = merge_ragged_tensors(
-            a, a_row_offsets, b, b_row_offsets)
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
 
-        merged_tensor = [1, 2, 7, 8, 9, 3, 4, 5, 6, 10]
-        merged_row_offsets = [0, 5, 10]
+        with Graph(
+            "merge_ragged_tensors_example",
+            input_types=(
+                TensorType(DType.int32, ["a_seq_len"], device=device_ref),
+                TensorType(DType.uint32, ["offsets_len"], device=device_ref),
+                TensorType(DType.int32, ["b_seq_len"], device=device_ref),
+                TensorType(DType.uint32, ["offsets_len"], device=device_ref),
+            ),
+        ) as graph:
+            a, a_row_offsets, b, b_row_offsets = (v.tensor for v in graph.inputs)
+            merged_tensor, merged_row_offsets = merge_ragged_tensors(
+                a, a_row_offsets, b, b_row_offsets
+            )
+            graph.output(merged_tensor, merged_row_offsets)
     """
     if a.dtype != b.dtype:
         raise ValueError("a and b must have the same dtype")
@@ -5823,6 +8768,124 @@ def merge_ragged_tensors(
     )
 
     return results[0].tensor, results[1].tensor
+
+
+def mtp_eh_norm(
+    embed: TensorValue,
+    prev_hidden: TensorValue,
+    enorm_weight: TensorValue,
+    hnorm_weight: TensorValue,
+    epsilon: float,
+    block_threads: int = 256,
+) -> TensorValue:
+    """Normalizes both inputs of an MTP draft layer into one projection input.
+
+    A multi-token-prediction draft predicts a token two ahead from the
+    embedding of the token the target just produced and the target's hidden
+    state. Each is RMS-normalized with its own weight, and the pair is
+    projected back to one hidden width. This returns that projection's input
+    in a single pass.
+
+    Normalization matches :func:`~max.graph.ops.rms_norm` in its Llama-style
+    configuration -- ``weight_offset=0`` and ``multiply_before_cast=False``.
+    Do not use this with the Gemma-style configuration.
+
+    Args:
+        embed: Token embeddings ``[num_tokens, hidden_size]``.
+        prev_hidden: Target hidden states, same shape and dtype as ``embed``.
+        enorm_weight: Embedding norm weight ``[hidden_size]``.
+        hnorm_weight: Hidden-state norm weight ``[hidden_size]``.
+        epsilon: Added inside the square root.
+        block_threads: Threads per block; must be a whole number of warps.
+
+    Returns:
+        ``[num_tokens, 2 * hidden_size]`` with the normalized embedding in the
+        leading columns and the normalized hidden state in the trailing ones.
+
+    Raises:
+        ValueError: If the inputs disagree in shape, dtype or device, if the
+            hidden size is not statically known, if the dtype is float8, or if
+            ``block_threads`` is not a positive multiple of 32 no greater than
+            1024.
+    """
+    if embed.shape != prev_hidden.shape:
+        raise ValueError(
+            "embed and prev_hidden must have the same shape, got"
+            f" {embed.shape} and {prev_hidden.shape}"
+        )
+    if embed.dtype != prev_hidden.dtype:
+        raise ValueError(
+            "embed and prev_hidden must have the same dtype, got"
+            f" {embed.dtype} and {prev_hidden.dtype}"
+        )
+    if embed.device != prev_hidden.device:
+        raise ValueError(
+            "embed and prev_hidden must be on the same device, got"
+            f" {embed.device} and {prev_hidden.device}"
+        )
+    for name, w in (
+        ("enorm_weight", enorm_weight),
+        ("hnorm_weight", hnorm_weight),
+    ):
+        if w.dtype != embed.dtype:
+            raise ValueError(
+                f"{name} must match embed's dtype {embed.dtype}, got {w.dtype}"
+            )
+        if w.device != embed.device:
+            raise ValueError(
+                f"{name} must be on embed's device {embed.device}, got"
+                f" {w.device}"
+            )
+        if w.shape[0] != embed.shape[1]:
+            raise ValueError(
+                f"{name} length {w.shape[0]} must equal the hidden size"
+                f" {embed.shape[1]}"
+            )
+    if embed.dtype in (DType.float8_e4m3fn, DType.float8_e5m2):
+        raise ValueError(
+            f"mtp_eh_norm does not support {embed.dtype}: it accumulates in"
+            " float32, where ops.rms_norm reduces float8 in float16"
+        )
+    if block_threads <= 0 or block_threads % 32 != 0:
+        raise ValueError(
+            "block_threads must be a positive multiple of 32, got"
+            f" {block_threads}"
+        )
+    if block_threads > 1024:
+        raise ValueError(
+            "block_threads must not exceed 1024, the largest block any"
+            f" supported GPU allows, got {block_threads}"
+        )
+
+    if not isinstance(embed.shape[1], StaticDim):
+        raise ValueError(
+            "the hidden size (embed.shape[1]) must be statically known, got"
+            f" {embed.shape[1]}"
+        )
+    hidden_size = int(embed.shape[1])
+
+    return ops.custom(
+        "mo.mtp.eh_norm",
+        device=embed.device,
+        values=[
+            embed,
+            prev_hidden,
+            enorm_weight,
+            hnorm_weight,
+            ops.constant(epsilon, dtype=DType.float32, device=DeviceRef.CPU()),
+        ],
+        out_types=[
+            TensorType(
+                dtype=embed.dtype,
+                shape=(embed.shape[0], 2 * hidden_size),
+                device=embed.device,
+            )
+        ],
+        parameters={
+            "hidden_size": hidden_size,
+            "block_threads": block_threads,
+        },
+    )[0].tensor
 
 
 def eagle_prefill_shift_tokens(
@@ -5907,7 +8970,9 @@ def apply_penalties_to_logits(
         frequency_penalty_tensor = TensorValue(frequency_penalty)
         if frequency_penalty_tensor.shape[0] != logits_buffer.shape[0]:
             raise ValueError(
-                f"frequency_penalty tensor shape {frequency_penalty_tensor.shape} does not match logits_buffer shape {logits_buffer.shape}"
+                "frequency_penalty tensor shape"
+                f" {frequency_penalty_tensor.shape} does not match"
+                f" logits_buffer shape {logits_buffer.shape}"
             )
 
     if isinstance(presence_penalty, float):
@@ -5923,7 +8988,9 @@ def apply_penalties_to_logits(
         presence_penalty_tensor = TensorValue(presence_penalty)
         if presence_penalty_tensor.shape[0] != logits_buffer.shape[0]:
             raise ValueError(
-                f"presence_penalty tensor shape {presence_penalty_tensor.shape} does not match logits_buffer shape {logits_buffer.shape}"
+                "presence_penalty tensor shape"
+                f" {presence_penalty_tensor.shape} does not match logits_buffer"
+                f" shape {logits_buffer.shape}"
             )
 
     if isinstance(repetition_penalty, float):
@@ -5939,7 +9006,9 @@ def apply_penalties_to_logits(
         repetition_penalty_tensor = TensorValue(repetition_penalty)
         if repetition_penalty_tensor.shape[0] != logits_buffer.shape[0]:
             raise ValueError(
-                f"repetition_penalty tensor shape {repetition_penalty_tensor.shape} does not match logits_buffer shape {logits_buffer.shape}"
+                "repetition_penalty tensor shape"
+                f" {repetition_penalty_tensor.shape} does not match"
+                f" logits_buffer shape {logits_buffer.shape}"
             )
 
     ops.inplace_custom(
@@ -6010,6 +9079,16 @@ def scatter_set_constant(
             "scatter_set_constant currently only supports 2d indices"
         )
 
+    # Each indices row is a (row, col) coordinate into `data`. The kernel
+    # reads indices[i, 1] unconditionally, so a statically-known inner
+    # dimension other than 2 would read out of bounds.
+    coords_per_index = indices.shape[1]
+    if isinstance(coords_per_index, StaticDim) and int(coords_per_index) != 2:
+        raise ValueError(
+            "scatter_set_constant indices must have shape [num_indices, 2] "
+            f"of (row, col) coordinates, got inner dimension {coords_per_index}"
+        )
+
     ops.inplace_custom(
         "mo.scatter_set_constant",
         device=data.device,
@@ -6019,6 +9098,81 @@ def scatter_set_constant(
             ops.constant(fill_val, data.dtype, device=DeviceRef.CPU()),
         ],
     )
+
+
+def apply_packed_bitmask(
+    logits: TensorValueLike,
+    packed: TensorValueLike,
+    fill_val: float = -10000.0,
+) -> TensorValue:
+    """Masks logits with a packed-int32 grammar bitmask in one fused GPU pass.
+
+    Unpacks a packed bitmask (1 bit per token, 32 tokens per ``int32`` word) and
+    applies it to ``logits`` without materializing an intermediate bool tensor:
+    a token is kept when its bit is set, otherwise its logit is replaced with
+    ``fill_val``.
+
+    Args:
+        logits: Logits tensor of shape ``[batch, vocab]`` or
+            ``[batch, num_positions, vocab]``.
+        packed: Packed ``int32`` bitmask of shape ``[..., ceil(vocab / 32)]``
+            with leading dims matching ``logits``. A set bit means the token is
+            grammar-valid. Trailing 32-bit alignment padding beyond ``vocab`` is
+            never read.
+        fill_val: Value written for masked-out (grammar-invalid) tokens.
+
+    Returns:
+        Masked logits, same shape and dtype as ``logits``.
+    """
+    logits = TensorValue(logits)
+    packed = TensorValue(packed)
+
+    if packed.dtype != DType.int32:
+        raise ValueError(
+            f"apply_packed_bitmask requires an int32 bitmask, got {packed.dtype}"
+        )
+    if logits.rank != packed.rank:
+        raise ValueError(
+            "apply_packed_bitmask requires logits and packed bitmask of equal "
+            f"rank, got {logits.rank} and {packed.rank}"
+        )
+    if logits.rank not in (2, 3):
+        raise ValueError(
+            f"apply_packed_bitmask requires 2d or 3d logits, got {logits.rank}"
+        )
+
+    # The kernel is rank-2 ([rows, vocab]); collapse any leading dims into a
+    # single row dimension so a [batch, num_positions, vocab] acceptance-sampler
+    # tensor and a [batch, vocab] token-sampler tensor share one code path.
+    orig_shape = logits.shape
+    if logits.rank == 3:
+        rows = logits.shape[0] * logits.shape[1]
+        logits_2d = ops.reshape(logits, [rows, logits.shape[2]])
+        packed_2d = ops.reshape(packed, [rows, packed.shape[2]])
+    else:
+        logits_2d = logits
+        packed_2d = packed
+
+    masked = ops.custom(
+        "mo.apply_packed_bitmask",
+        device=logits.device,
+        values=[
+            logits_2d,
+            packed_2d,
+            ops.constant(fill_val, logits.dtype, device=DeviceRef.CPU()),
+        ],
+        out_types=[
+            TensorType(
+                dtype=logits.dtype,
+                shape=logits_2d.shape,
+                device=logits.device,
+            )
+        ],
+    )[0].tensor
+
+    if logits.rank == 3:
+        return ops.reshape(masked, orig_shape)
+    return masked
 
 
 def scatter_nd_skip_oob_indices(
@@ -6054,7 +9208,8 @@ def scatter_nd_skip_oob_indices(
 
     if indices.dtype not in (DType.int32, DType.int64):
         raise ValueError(
-            f"Invalid indices dtype: '{indices.dtype}'. Indices must be of type int32 or int64."
+            f"Invalid indices dtype: '{indices.dtype}'. Indices must be of type"
+            " int32 or int64."
         )
 
     assert_same_device(input=input, updates=updates, indices=indices)
@@ -6119,13 +9274,15 @@ def topk_fused_sampling(
         )
     else:
         top_k_tensor = TensorValue(top_k)
+        top_k_tensor = ops.where(top_k_tensor == 0, -1, top_k_tensor)
         if max_k_tensor is None:
             raise ValueError(
                 "max_k must be explicitly set when top_k is a tensor"
             )
         if top_k_tensor.shape[0] != batch_size:
             raise ValueError(
-                f"top_k tensor shape {top_k_tensor.shape} does not match batch_size {batch_size}"
+                f"top_k tensor shape {top_k_tensor.shape} does not match"
+                f" batch_size {batch_size}"
             )
         max_k_tensor = TensorValue(max_k_tensor)
 
@@ -6138,7 +9295,8 @@ def topk_fused_sampling(
         temperature_tensor = TensorValue(temperature)
         if temperature_tensor.shape[0] != batch_size:
             raise ValueError(
-                f"temperature tensor shape {temperature_tensor.shape} does not match batch_size {batch_size}"
+                f"temperature tensor shape {temperature_tensor.shape} does not"
+                f" match batch_size {batch_size}"
             )
 
     # Handle top_p parameter - can be scalar or tensor
@@ -6160,7 +9318,8 @@ def topk_fused_sampling(
         top_p_tensor = TensorValue(top_p)
         if top_p_tensor.shape[0] != batch_size:
             raise ValueError(
-                f"top_p tensor shape {top_p_tensor.shape} does not match batch_size {batch_size}"
+                f"top_p tensor shape {top_p_tensor.shape} does not match"
+                f" batch_size {batch_size}"
             )
         # When top_p is a tensor, min_top_p must be provided
         if min_top_p is None:
@@ -6179,7 +9338,8 @@ def topk_fused_sampling(
         min_p_tensor = TensorValue(min_p)
         if min_p_tensor.shape[0] != batch_size:
             raise ValueError(
-                f"min_p tensor shape {min_p_tensor.shape} does not match batch_size {batch_size}"
+                f"min_p tensor shape {min_p_tensor.shape} does not match"
+                f" batch_size {batch_size}"
             )
 
     # Handle seed parameter - can be scalar or tensor
@@ -6191,7 +9351,8 @@ def topk_fused_sampling(
         seed_tensor = TensorValue(seed)
         if seed_tensor.shape[0] != batch_size:
             raise ValueError(
-                f"seed tensor shape {seed_tensor.shape} does not match batch_size {batch_size}"
+                f"seed tensor shape {seed_tensor.shape} does not match"
+                f" batch_size {batch_size}"
             )
 
     batch_shape = logits.shape[:-1]
@@ -6212,6 +9373,184 @@ def topk_fused_sampling(
         out_types=[
             TensorType(
                 dtype=DType.int64, shape=batch_shape + [1], device=device
+            )
+        ],
+    )[0].tensor
+
+
+def topk_fused_sampling_with_dist(
+    logits: TensorValue,
+    *,
+    top_k: TensorValue,
+    temperature: TensorValue,
+    top_p: TensorValue,
+    seed: TensorValue,
+) -> tuple[TensorValue, TensorValue]:
+    """Samples a token per row and returns the distribution it came from.
+
+    Applies per-row temperature, top-k and top-p to ``logits``, samples one
+    token per row, and also returns the masked, renormalized distribution the
+    token was drawn from. Speculative decoding subtracts that distribution to
+    build its rejection residual, and reads the sampled token's own
+    probability out of it -- a value the sampler must agree with, so it comes
+    from the sampling kernel rather than a separate softmax.
+
+    This is the same kernel and the same code path as
+    :func:`topk_fused_sampling`, with the distribution write enabled.
+    GPU-only.
+
+    Args:
+        logits: Raw logits ``[rows, vocab_size]``. Softmax is fused in.
+        top_k: Per-row top-k ``[rows]``, int64. ``-1`` disables top-k, which
+            is the production sentinel (``SamplingParams`` normalizes ``0``
+            to ``-1``).
+        temperature: Per-row temperature ``[rows]``, float32. ``0`` is
+            clamped, collapsing the row to its argmax.
+        top_p: Per-row nucleus threshold ``[rows]``, float32.
+        seed: Per-row RNG seed ``[rows]``, uint64.
+
+    Returns:
+        ``(token_ids, distribution)``: int64 ``[rows]`` and float32
+        ``[rows, vocab_size]``.
+
+    Raises:
+        ValueError: If the logits are not rank-2 on GPU, or a per-row
+            parameter does not carry exactly one entry per logits row.
+    """
+    if logits.rank != 2:
+        raise ValueError(
+            "topk_fused_sampling_with_dist requires rank-2 logits, got "
+            f"{logits.rank}"
+        )
+    if logits.device == DeviceRef.CPU():
+        raise ValueError("topk_fused_sampling_with_dist is GPU-only")
+
+    rows = logits.shape[0]
+    device = logits.device
+
+    # The kernel indexes all four per row, so a short one is an out-of-bounds
+    # device read rather than a graph-construction error.
+    for name, param in (
+        ("top_k", top_k),
+        ("temperature", temperature),
+        ("top_p", top_p),
+        ("seed", seed),
+    ):
+        if param.rank != 1 or param.shape[0] != rows:
+            raise ValueError(
+                f"{name} must be rank-1 with shape [{rows}] to match the"
+                f" logits rows, got {param.shape}"
+            )
+
+    # The kernel resolves a per-row ``-1`` against this default and then
+    # clamps a non-positive k to the vocabulary, so forwarding the sentinel
+    # keeps every token for the rows that asked for no top-k. Passing the
+    # vocabulary size instead would work but requires a static dimension.
+    max_k = ops.constant(-1, DType.int64, DeviceRef.CPU())
+
+    results = ops.custom(
+        "sampler.fused_token_sampling_with_dist",
+        device=device,
+        values=[top_k, max_k, temperature, top_p, seed, logits],
+        out_types=[
+            TensorType(dtype=DType.int64, shape=[rows], device=device),
+            TensorType(dtype=DType.float32, shape=logits.shape, device=device),
+        ],
+    )
+    return results[0].tensor, results[1].tensor
+
+
+def topk_topp_masked_probs(
+    logits: TensorValue,
+    *,
+    top_k: TensorValue,
+    temperature: TensorValue,
+    top_p: TensorValue,
+) -> TensorValue:
+    """Computes each row's top-k/top-p masked softmax, without sampling.
+
+    A token survives the joint constraint iff
+    ``e_i = exp((logit_i - row_max) / temperature)`` exceeds the row's
+    cutoff, with masked probability ``e_i / kept_mass``; everything else is
+    zero. Each output row is that masked renormalized distribution -- the
+    same form :func:`topk_fused_sampling_with_dist` emits for the draft, so
+    speculative verification reads target probabilities and builds its
+    rejection residual from this one tensor with no in-graph rebuild.
+
+    GPU-only, with the same top-k sentinel and tie handling as
+    :func:`topk_fused_sampling_with_dist`.
+
+    Args:
+        logits: Raw logits ``[rows, vocab_size]``.
+        top_k: Per-row top-k ``[rows]``, int64.
+        temperature: Per-row temperature ``[rows]``, float32.
+        top_p: Per-row nucleus threshold ``[rows]``, float32.
+
+    Returns:
+        The masked distribution, float32 ``[rows, vocab_size]``.
+
+    Raises:
+        ValueError: If the logits are not rank-2 on GPU.
+    """
+    if logits.rank != 2:
+        raise ValueError(
+            f"topk_topp_masked_probs requires rank-2 logits, got {logits.rank}"
+        )
+    if logits.device == DeviceRef.CPU():
+        raise ValueError("topk_topp_masked_probs is GPU-only")
+
+    device = logits.device
+    return ops.custom(
+        "sampler.topk_topp_masked_probs",
+        device=device,
+        values=[top_k, temperature, top_p, logits],
+        out_types=[
+            TensorType(
+                dtype=DType.float32,
+                shape=logits.shape,
+                device=device,
+            ),
+        ],
+    )[0].tensor
+
+
+def gumbel_argmax_from_probs(
+    probs: TensorValue, *, seed: TensorValue
+) -> TensorValue:
+    """Draws one token per row, proportionally to unnormalized probabilities.
+
+    Gumbel-max over ``ln(p)``: a zero probability can never win while the row
+    has any positive mass, and row normalization does not matter. The Gumbel
+    noise is generated inside the kernel from the per-row ``seed``, so rows
+    with equal seeds draw with equal noise -- speculative decoding passes one
+    seed per request, repeated across its draft positions, to share one noise
+    row per request. GPU-only, and not supported on Apple GPUs, where the
+    kernel's block reduction cannot cover a full-sized block.
+
+    Args:
+        probs: Unnormalized probabilities ``[rows, vocab_size]``, float32.
+        seed: Per-row RNG seed ``[rows]``, uint64.
+
+    Returns:
+        The drawn token id per row, ``int64 [rows]``.
+
+    Raises:
+        ValueError: If the probabilities are not rank-2 on GPU.
+    """
+    if probs.rank != 2:
+        raise ValueError(
+            f"gumbel_argmax_from_probs requires rank-2 probs, got {probs.rank}"
+        )
+    if probs.device == DeviceRef.CPU():
+        raise ValueError("gumbel_argmax_from_probs is GPU-only")
+
+    return ops.custom(
+        "sampler.gumbel_argmax_from_probs",
+        device=probs.device,
+        values=[seed, probs],
+        out_types=[
+            TensorType(
+                dtype=DType.int64, shape=[probs.shape[0]], device=probs.device
             )
         ],
     )[0].tensor
@@ -6419,70 +9758,143 @@ def sgmv_lora_qkv_shrink(
     )[0].tensor
 
 
+def _sgmv_qkv_expand(
+    p: TensorValue,
+    lora_b: TensorValue,
+    lora_ids: TensorValue,
+    lora_grouped_offsets: TensorValue,
+    q_dim: int,
+    kv_dim: int,
+    max_lora_seq_len: int,
+) -> tuple[TensorValue, TensorValue]:
+    """Boundary-aware single-launch LoRA-B expand for fused Q/K/V projections.
+
+    Performs the LoRA 'expand' (up-projection) for routed tokens in ONE grouped
+    matmul over a single fused weight, and is correct under grouped-query
+    attention (``q_dim != kv_dim``). The kernel selects the Q/K/V boundary
+    natively, so no separate K/V offset/id arrays are needed.
+
+    Args:
+        p: Planar shrink output, shape (3, M, R) where plane 0/1/2 hold the
+            q/k/v low-rank projections.
+        lora_b: Fused LoRA-B weight, shape (G, q_dim + 2*kv_dim, R), with output
+            rows concatenated along the projection dimension as Q | K | V.
+        lora_ids: Adapter indices for each active group, shape (num_active,).
+            ``-1`` marks an inactive group.
+        lora_grouped_offsets: Inclusive prefix sums of tokens per active adapter,
+            shape (num_active + 1,). The same grouping used by the shrink.
+        q_dim: Output dimension of the Q projection.
+        kv_dim: Output dimension of the K (and V) projection.
+        max_lora_seq_len: Upper bound on tokens for any active adapter.
+
+    Returns:
+        A tuple ``(q_out, kv_out)`` where ``q_out`` has shape (M, q_dim) and
+        ``kv_out`` has shape (2*M, kv_dim) with K rows in [0, M) and V rows in
+        [M, 2M) -- the layout consumed by ``kv_cache_ragged_2m_iadd``.
+
+    Raises:
+        ValueError: on input shapes/dtypes that are invalid for the kernel.
+    """
+    _check_rank(3, p=p, lora_b=lora_b)
+
+    _check_same_dtype(p=p, lora_b=lora_b)
+
+    _check_dtype(DType.uint32, lora_grouped_offsets=lora_grouped_offsets)
+
+    m_dim = p.shape[1]
+
+    results = ops.custom(
+        "mo.lora_sgmv.qkv_expand.ragged",
+        device=p.device,
+        values=[
+            p,
+            lora_b,
+            lora_grouped_offsets,
+            lora_ids,
+            ops.constant(
+                max_lora_seq_len,
+                DType.uint32,
+                device=DeviceRef.CPU(),
+            ),
+        ],
+        out_types=[
+            TensorType(
+                dtype=p.dtype,
+                shape=[m_dim, q_dim],
+                device=p.device,
+            ),
+            TensorType(
+                dtype=p.dtype,
+                shape=[m_dim * 2, kv_dim],
+                device=p.device,
+            ),
+        ],
+    )
+
+    return results[0].tensor, results[1].tensor
+
+
 def sgmv_qkv_lora_kernel(
     input: TensorValue,
     lora_a: TensorValue,
-    lora_b_q: TensorValue,
-    lora_b_kv: TensorValue,
+    lora_b: TensorValue,
     lora_ids: TensorValue,
-    lora_ranks: TensorValue,
     input_row_offsets: TensorValue,
     lora_grouped_offsets: TensorValue,
     lora_end_idx: TensorValue,
     batch_seq_len: TensorValue,
-    lora_ids_kv: TensorValue,
-    lora_grouped_offsets_kv: TensorValue,
     kv_collection: PagedCacheValues,
     kv_params: KVCacheParams,
     layer_idx: TensorValue,
+    q_dim: int,
+    kv_dim: int,
     max_lora_seq_len: int,
     max_rank: int,
-    bias: TensorValue | None = None,
 ) -> TensorValue:
     """Computes the SGMV QKV LoRA kernel for Q, K, V projections with LoRA.
 
+    The LoRA 'expand' (up-projection) is a single boundary-aware grouped matmul
+    over one fused LoRA-B weight, correct under grouped-query attention
+    (``q_dim != kv_dim``). The K/V projections are written directly into the
+    paged KV cache; the Q projection is returned.
+
     Args:
         input: The input tensor.
-        lora_a: The LoRA A tensor.
-        lora_b_q: The LoRA B tensor for Q projection.
-        lora_b_kv: The LoRA B tensor for K and V projections (stacked).
+        lora_a: The fused LoRA A tensor, shape (G, 3*R, K) (q/k/v stacked on
+            the rank dim).
+        lora_b: The fused LoRA B tensor, shape (G, q_dim + 2*kv_dim, R), with
+            output rows concatenated along the projection dimension as Q | K | V.
         lora_ids: IDs of the LoRAs used for each sequence.
-        lora_ranks: The ranks of the LoRAs in the batch.
         input_row_offsets: The sequence offsets that use LoRA.
         lora_grouped_offsets: Grouped offsets for LoRA sequences.
         lora_end_idx: End index of LoRA tokens in the batch.
         batch_seq_len: Total sequence length of the batch.
-        lora_ids_kv: LoRA IDs for KV projections (with offset for V portion).
-        lora_grouped_offsets_kv: Grouped offsets for KV LoRA sequences.
         kv_collection: The KV cache.
         kv_params: The key-value cache configuration parameters.
         layer_idx: The layer index to retrieve the KV cache.
+        q_dim: Output dimension of the Q projection.
+        kv_dim: Output dimension of the K (and V) projection.
         max_lora_seq_len: The maximum sequence length of any given LoRA in the batch.
         max_rank: The maximum rank for the LoRAs.
-        bias: Optional LoRA bias.
 
     Raises:
         ValueError: on input shapes/dtypes that are invalid for the kernel.
     """
     _check_rank(2, input=input)
 
-    _check_rank(3, lora_a=lora_a, lora_b_q=lora_b_q, lora_b_kv=lora_b_kv)
+    _check_rank(3, lora_a=lora_a, lora_b=lora_b)
 
-    _check_same_dtype(
-        input=input, lora_a=lora_a, lora_b_q=lora_b_q, lora_b_kv=lora_b_kv
-    )
+    _check_same_dtype(input=input, lora_a=lora_a, lora_b=lora_b)
 
     _check_dtype(
         DType.uint32,
         input_row_offsets=input_row_offsets,
         lora_grouped_offsets=lora_grouped_offsets,
-        lora_grouped_offsets_kv=lora_grouped_offsets_kv,
         layer_idx=layer_idx,
     )
 
-    # shrink GMM:      [M, K] @ [G, 3*N, K]     // unchanged
-    # transpose:       [M, 3, N] => [3, M, N]   // shall be fused into above
-    v_qkv = sgmv_lora_qkv_shrink(
+    # shrink GMM: [M, K] @ [G, 3*R, K] -> planar [3, M, R].
+    p = sgmv_lora_qkv_shrink(
         input=input,
         lora_a=lora_a,
         lora_ids=lora_ids,
@@ -6492,38 +9904,19 @@ def sgmv_qkv_lora_kernel(
         max_rank=max_rank,
     )
 
-    # slice for Q:     [0, M, N] (not materialized)
-    # slice for KV:    [1:,M, N] (not materialized)
-    # reshape and slices get fused into the input of the
-    # grouped-matmuls.
-    v_qkv = ops.reshape(v_qkv, [3 * lora_end_idx.shape[0], -1])
-
-    # expand GMM-Q:    [M, N]  @ [G, Qdim, N]
-    v_q = v_qkv[: lora_end_idx.shape[0], :]
-    q_out = sgmv_kernel(
-        v_q,
-        lora_b_q,
-        lora_ids,
-        lora_ranks,
-        lora_grouped_offsets,
-        max_lora_seq_len,
-        lora_end_idx=lora_end_idx,
-        bias=bias,
+    # expand GMM: single boundary-aware launch over the fused LoRA-B weight.
+    # q_out: [M, q_dim]; kv_out: [2M, kv_dim] (K rows [0, M), V rows [M, 2M)).
+    q_out, kv_out = _sgmv_qkv_expand(
+        p=p,
+        lora_b=lora_b,
+        lora_ids=lora_ids,
+        lora_grouped_offsets=lora_grouped_offsets,
+        q_dim=q_dim,
+        kv_dim=kv_dim,
+        max_lora_seq_len=max_lora_seq_len,
     )
 
-    v_kv = v_qkv[lora_end_idx.shape[0] :, :]
-    # expand GMM-KV:   [2M, N] @ [2G, KVdim, N] // KV stacked in dim 0
-    kv_out = sgmv_kernel(
-        v_kv,
-        lora_b_kv,
-        lora_ids_kv,
-        lora_ranks,
-        lora_grouped_offsets_kv,
-        max_lora_seq_len,
-        bias=bias,
-    )
-
-    # write to cache:  write [2M, KVdim] directly w/o transforming to [M, 2*KVdim]
+    # write [2M, KVdim] directly to the paged cache.
     kv_cache_ragged_2m_iadd(
         kv_params=kv_params,
         a=kv_out,
@@ -6535,6 +9928,79 @@ def sgmv_qkv_lora_kernel(
     )
 
     return q_out
+
+
+def sgmv_qkv_lora_fused(
+    input: TensorValue,
+    lora_a: TensorValue,
+    lora_b: TensorValue,
+    lora_ids: TensorValue,
+    lora_grouped_offsets: TensorValue,
+    lora_end_idx: TensorValue,
+    q_dim: int,
+    kv_dim: int,
+    max_lora_seq_len: int,
+    max_rank: int,
+) -> TensorValue:
+    """Returns the fused ``[q|k|v]`` LoRA contribution for a QKV projection.
+
+    Same shrink + single boundary-aware expand as :func:`sgmv_qkv_lora_kernel`,
+    but returns the full ``[q|k|v]`` output of shape ``[M, q_dim + 2*kv_dim]``
+    (for the ``M`` LoRA tokens) instead of writing K/V into the cache. The
+    caller adds it to the ``qkv`` projection before the fused rope + KV store.
+
+    Args:
+        input: The input tensor.
+        lora_a: The fused LoRA A tensor, shape (G, 3*R, K) (q/k/v stacked on
+            the rank dim).
+        lora_b: The fused LoRA B tensor, shape (G, q_dim + 2*kv_dim, R), with
+            output rows concatenated along the projection dimension as Q | K | V.
+        lora_ids: IDs of the LoRAs used for each sequence.
+        lora_grouped_offsets: Grouped offsets for LoRA sequences.
+        lora_end_idx: End index of LoRA tokens in the batch.
+        q_dim: Output dimension of the Q projection.
+        kv_dim: Output dimension of the K (and V) projection.
+        max_lora_seq_len: The maximum sequence length of any LoRA in the batch.
+        max_rank: The maximum rank for the LoRAs.
+
+    Raises:
+        ValueError: on input shapes/dtypes that are invalid for the kernel.
+    """
+    _check_rank(2, input=input)
+    _check_rank(3, lora_a=lora_a, lora_b=lora_b)
+    _check_same_dtype(input=input, lora_a=lora_a, lora_b=lora_b)
+    _check_dtype(
+        DType.uint32,
+        lora_grouped_offsets=lora_grouped_offsets,
+    )
+
+    m = lora_end_idx.shape[0]
+
+    # shrink GMM: [M, K] @ [G, 3*R, K] -> planar [3, M, R].
+    p = sgmv_lora_qkv_shrink(
+        input=input,
+        lora_a=lora_a,
+        lora_ids=lora_ids,
+        lora_grouped_offsets=lora_grouped_offsets,
+        lora_end_idx=lora_end_idx,
+        max_lora_seq_len=max_lora_seq_len,
+        max_rank=max_rank,
+    )
+
+    # expand GMM: single boundary-aware launch over the fused LoRA-B weight.
+    # q_out: [M, q_dim]; kv_out: [2M, kv_dim] (K rows [0, M), V rows [M, 2M)).
+    q_out, kv_out = _sgmv_qkv_expand(
+        p=p,
+        lora_b=lora_b,
+        lora_ids=lora_ids,
+        lora_grouped_offsets=lora_grouped_offsets,
+        q_dim=q_dim,
+        kv_dim=kv_dim,
+        max_lora_seq_len=max_lora_seq_len,
+    )
+
+    # kv_out is [2M, kv_dim] (K then V on dim 0); fold into [M, q_dim+2*kv_dim].
+    return ops.concat([q_out, kv_out[:m, :], kv_out[m:, :]], axis=-1)
 
 
 def kv_cache_ragged_2m_iadd(
@@ -6651,10 +10117,10 @@ def spatial_merge(
 
 
 def learnable_2d_interp_pos_emb(
-    x: TensorValue,
-    weight: TensorValue,
-    grid_thws: TensorValue,
-    time_weight: TensorValue,
+    x: TensorValueLike,
+    weight: TensorValueLike,
+    grid_thws: TensorValueLike,
+    time_weight: TensorValueLike,
 ) -> TensorValue:
     """Applies learnable 2D interpolated position embedding (Kimi K2.5).
 
@@ -6675,6 +10141,11 @@ def learnable_2d_interp_pos_emb(
     Raises:
         ValueError: On invalid input shapes or dtypes.
     """
+    x = TensorValue(x)
+    weight = TensorValue(weight)
+    grid_thws = TensorValue(grid_thws)
+    time_weight = TensorValue(time_weight)
+
     _check_rank(2, x=x)
     _check_rank(3, weight=weight)
     if grid_thws.rank != 2 or grid_thws.shape[1] != 3:
@@ -6902,12 +10373,13 @@ def wait_host_value_with_dep(
 def wait_host_value(payload: BufferValue, device: DeviceRef) -> None:
     """Stalls the device stream until a host-visible flag reaches a value.
 
-    Wraps the ``mo.wait_host_value`` custom op, which lowers to CUDA's
-    ``cuStreamWaitValue64`` via ``DeviceStream.wait_for_host_value``.
-    Captures cleanly into a CUDA graph as a wait-value (batch-mem-op)
-    node, so it can sit inside a captured forward graph to gate a
-    downstream consumer kernel on CPU-produced data while the rest of
-    the forward body runs concurrently.
+    Wraps the ``mo.wait_host_value`` custom op, which lowers to
+    ``cuStreamWaitValue64`` / ``hipStreamWaitValue64`` via
+    ``DeviceQueue.wait_for_host_value``. Records into a captured device
+    graph as a wait-value (batch-mem-op) node, so it can sit inside a
+    captured forward graph to gate a downstream consumer kernel on
+    CPU-produced data while the rest of the forward body runs
+    concurrently.
 
     The payload buffer must be a CPU-resident ``int64[2]``:
 
@@ -6929,7 +10401,7 @@ def wait_host_value(payload: BufferValue, device: DeviceRef) -> None:
     signals the flag, and this op gates the consumer kernel on that
     signal.
 
-    Only supported on CUDA devices.
+    Only supported on CUDA and HIP devices.
 
     Args:
         payload: CPU buffer of shape ``[2]`` and dtype ``int64`` holding
@@ -6964,11 +10436,13 @@ def sleep(duration_sec: BufferValue, device_ref: DeviceRef) -> None:
     # We currently use 1-d buffer to prevent sleep op from being DCE'd away.
     if duration_sec.shape.static_dims != [1]:
         raise ValueError(
-            f"Expected duration_sec to have shape [1] but got {duration_sec.shape.static_dims}"
+            "Expected duration_sec to have shape [1] but got"
+            f" {duration_sec.shape.static_dims}"
         )
     if duration_sec.dtype != DType.float64:
         raise ValueError(
-            f"Expected duration_sec to have DType.float64 but got {duration_sec.dtype}"
+            "Expected duration_sec to have DType.float64 but got"
+            f" {duration_sec.dtype}"
         )
     if duration_sec.device != DeviceRef.CPU():
         raise ValueError(
@@ -6984,12 +10458,12 @@ def sleep(duration_sec: BufferValue, device_ref: DeviceRef) -> None:
 
 
 def tpool_patch_merger(
-    input: TensorValue,
-    grid_thws: TensorValue,
+    input: TensorValueLike,
+    grid_thws: TensorValueLike,
     kH: int,
     kW: int,
-    max_h: int | TensorValue,
-    max_w: int | TensorValue,
+    max_h: int | TensorValueLike,
+    max_w: int | TensorValueLike,
 ) -> TensorValue:
     """Performs temporal pooling patch merger on ragged video tokens.
 
@@ -7016,6 +10490,9 @@ def tpool_patch_merger(
     Raises:
         ValueError: On invalid input shapes or dtypes.
     """
+    input = TensorValue(input)
+    grid_thws = TensorValue(grid_thws)
+
     _check_rank(2, input=input)
 
     _check_dtype(DType.int64, grid_thws=grid_thws)
@@ -7031,12 +10508,12 @@ def tpool_patch_merger(
     max_h_val = (
         ops.constant(max_h, dtype=DType.int32, device=DeviceRef.CPU())
         if isinstance(max_h, int)
-        else max_h
+        else TensorValue(max_h)
     )
     max_w_val = (
         ops.constant(max_w, dtype=DType.int32, device=DeviceRef.CPU())
         if isinstance(max_w, int)
-        else max_w
+        else TensorValue(max_w)
     )
     # Compute exact merged row count dynamically and feed it to the custom-op
     # shape function as an integer scalar tensor.
@@ -7069,3 +10546,213 @@ def tpool_patch_merger(
             )
         ],
     )[0].tensor
+
+
+def row_mean_of_squares(x: TensorValue) -> TensorValue:
+    """Computes the per-row mean of squares over the last axis.
+
+    For an input ``x`` flattened to ``[M, N]`` over its last axis, computes
+    ``out[m] = sum_n(float32(x[m, n]) ** 2) / N``. The square and accumulation
+    always run in ``float32`` regardless of the input dtype, and the result is
+    always ``float32``. The output preserves the leading axes with a trailing
+    size-1 reduction axis, matching ``ops.mean(x * x, axis=-1)``.
+
+    This is a fused, single-pass replacement for ``ops.mean(x * x, axis=-1)``
+    used in QK-RMSNorm-style variance computations. The generic reduce path
+    over-provisions the grid for small ``M`` (decode); this op launches exactly
+    one block per row.
+
+    Args:
+        x: The input tensor. Reduction runs over the last axis. Accepts
+            ``bfloat16`` or ``float32`` (any rank >= 1).
+
+    Returns:
+        A ``float32`` :class:`~max.graph.TensorValue` whose shape matches
+        ``x`` with the last axis replaced by ``1``.
+
+    Raises:
+        ValueError: If ``x`` dtype is not ``bfloat16`` or ``float32``.
+    """
+    if x.dtype not in (DType.bfloat16, DType.float32):
+        raise ValueError(
+            f"row_mean_of_squares expects bfloat16 or float32 input, got "
+            f"{x.dtype}"
+        )
+
+    # Flatten leading axes to a single rows dimension so the kernel sees [M, N].
+    rows = x.shape[:-1]
+    cols = x.shape[-1]
+    x_2d = x.reshape([-1, cols]) if x.rank != 2 else x
+
+    out_2d = ops.custom(
+        "mo.reduce.row_mean_of_squares",
+        device=x.device,
+        values=[x_2d],
+        out_types=[
+            TensorType(
+                dtype=DType.float32,
+                shape=[x_2d.shape[0], 1],
+                device=x.device,
+            )
+        ],
+    )[0].tensor
+
+    # Restore the leading axes with a trailing size-1 reduction axis.
+    return out_2d.reshape([*rows, 1])
+
+
+def row_mean_of_squares_qk(q: TensorValue, k: TensorValue) -> TensorValue:
+    """Fused per-row mean of squares for two operands ``q`` and ``k``.
+
+    For ``q`` of shape ``[M, Nq]`` and ``k`` of shape ``[M, Nk]`` (sharing the
+    leading rows dimension but with possibly different column counts), computes
+    a ``[M, 2]`` ``float32`` result where column 0 is ``mean_n(q[m, n] ** 2)``
+    and column 1 is ``mean_n(k[m, n] ** 2)``. The square and accumulation always
+    run in ``float32`` regardless of input dtype.
+
+    This is a single-kernel fusion of two :func:`row_mean_of_squares` calls plus
+    a concat, equivalent to
+    ``ops.concat([row_mean_of_squares(q), row_mean_of_squares(k)], axis=-1)``
+    but with one launch instead of two plus the concat. It is used for the
+    cross-head QK-RMSNorm variance statistics in tensor-parallel attention.
+
+    Args:
+        q: The Q projection, ``[M, Nq]``. Reduction runs over the last axis.
+        k: The K projection, ``[M, Nk]``. Must share ``q``'s rows dim and dtype.
+
+    Returns:
+        A ``float32`` :class:`~max.graph.TensorValue` of shape ``[M, 2]``.
+
+    Raises:
+        ValueError: If ``q``/``k`` are not rank 2, have mismatched dtypes or
+            rows, or use a dtype other than ``bfloat16`` or ``float32``.
+    """
+    if q.dtype not in (DType.bfloat16, DType.float32):
+        raise ValueError(
+            f"row_mean_of_squares_qk expects bfloat16 or float32 input, got "
+            f"{q.dtype}"
+        )
+    if q.dtype != k.dtype:
+        raise ValueError(
+            f"row_mean_of_squares_qk requires matching dtypes, got {q.dtype} "
+            f"(q) and {k.dtype} (k)"
+        )
+    if q.rank != 2 or k.rank != 2:
+        raise ValueError(
+            f"row_mean_of_squares_qk requires rank-2 inputs, got ranks "
+            f"{q.rank} (q) and {k.rank} (k)"
+        )
+
+    return ops.custom(
+        "mo.reduce.row_mean_of_squares_qk",
+        device=q.device,
+        values=[q, k],
+        out_types=[
+            TensorType(
+                dtype=DType.float32,
+                shape=[q.shape[0], 2],
+                device=q.device,
+            )
+        ],
+    )[0].tensor
+
+
+def apply_qk_rms_norm(
+    q: TensorValue,
+    k: TensorValue,
+    qk_var: TensorValue,
+    gamma_q: TensorValue,
+    gamma_k: TensorValue,
+    epsilon: float | np.floating[Any],
+) -> tuple[TensorValue, TensorValue]:
+    """Applies QK-RMSNorm to ``q`` and ``k`` from precomputed variance.
+
+    Given the already cross-rank-reduced per-row statistics ``qk_var`` of shape
+    ``[M, 2]`` (column 0 = ``mean_n(q[m, n] ** 2)``, column 1 =
+    ``mean_n(k[m, n] ** 2)``, ``float32``) and per-column ``float32`` scales
+    ``gamma_q``/``gamma_k``, computes in a single kernel launch::
+
+        q_out[m, c] = cast((cast(q[m, c], f32) * rsqrt(qk_var[m, 0] + eps))
+                           * gamma_q[c], q.dtype)
+        k_out[m, c] = cast((cast(k[m, c], f32) * rsqrt(qk_var[m, 1] + eps))
+                           * gamma_k[c], k.dtype)
+
+    This is a single-kernel fusion of the QK-RMSNorm apply chain
+    (``rsqrt`` scale, ``gamma`` multiply, and downcast for both Q and K),
+    equivalent to::
+
+        qf = ops.cast(q, DType.float32) * ops.rsqrt(qk_var[:, 0:1] + epsilon)
+        kf = ops.cast(k, DType.float32) * ops.rsqrt(qk_var[:, 1:2] + epsilon)
+        q_out = ops.cast(qf * gamma_q, q.dtype)
+        k_out = ops.cast(kf * gamma_k, k.dtype)
+
+    but with one launch instead of ~7 elementwise/slice kernels. The float
+    grouping ``((x * rs) * gamma)`` then cast matches the unfused form above. It
+    is used for the cross-head QK-RMSNorm apply in tensor-parallel attention,
+    where the variance is all-reduced across ranks between its computation
+    (:func:`row_mean_of_squares_qk`) and this apply.
+
+    Args:
+        q: The Q projection, ``[M, Nq]``. ``bfloat16`` or ``float32``.
+        k: The K projection, ``[M, Nk]``. Must share ``q``'s rows dim and dtype.
+        qk_var: The reduced variance statistics, ``[M, 2]`` ``float32``.
+        gamma_q: The Q norm scale, ``[Nq]`` ``float32``.
+        gamma_k: The K norm scale, ``[Nk]`` ``float32``.
+        epsilon: The RMSNorm epsilon added to the variance before ``rsqrt``.
+
+    Returns:
+        A tuple ``(q_out, k_out)`` of normalized tensors matching the shapes and
+        dtype of ``q`` and ``k`` respectively.
+
+    Raises:
+        ValueError: If ``q``/``k`` are not rank 2, have mismatched dtypes or
+            rows, use a dtype other than ``bfloat16`` or ``float32``, or if the
+            ``qk_var``/``gamma_q``/``gamma_k`` shapes or dtypes do not match.
+    """
+    if q.dtype not in (DType.bfloat16, DType.float32):
+        raise ValueError(
+            f"apply_qk_rms_norm expects bfloat16 or float32 input, got {q.dtype}"
+        )
+    if q.dtype != k.dtype:
+        raise ValueError(
+            f"apply_qk_rms_norm requires matching q/k dtypes, got {q.dtype} "
+            f"(q) and {k.dtype} (k)"
+        )
+    if q.rank != 2 or k.rank != 2:
+        raise ValueError(
+            f"apply_qk_rms_norm requires rank-2 q/k, got ranks {q.rank} (q) "
+            f"and {k.rank} (k)"
+        )
+    if qk_var.dtype != DType.float32 or qk_var.rank != 2:
+        raise ValueError(
+            f"apply_qk_rms_norm requires a rank-2 float32 qk_var, got dtype "
+            f"{qk_var.dtype} rank {qk_var.rank}"
+        )
+    if gamma_q.dtype != DType.float32 or gamma_k.dtype != DType.float32:
+        raise ValueError(
+            f"apply_qk_rms_norm requires float32 gamma, got {gamma_q.dtype} "
+            f"(gamma_q) and {gamma_k.dtype} (gamma_k)"
+        )
+    if gamma_q.rank != 1 or gamma_k.rank != 1:
+        raise ValueError(
+            f"apply_qk_rms_norm requires rank-1 gamma, got ranks "
+            f"{gamma_q.rank} (gamma_q) and {gamma_k.rank} (gamma_k)"
+        )
+
+    q_out, k_out = ops.custom(
+        "mo.norm.apply_qk_rms_norm",
+        device=q.device,
+        values=[
+            q,
+            k,
+            qk_var,
+            gamma_q,
+            gamma_k,
+            ops.constant(epsilon, DType.float32, device=DeviceRef.CPU()),
+        ],
+        out_types=[
+            TensorType(dtype=q.dtype, shape=q.shape, device=q.device),
+            TensorType(dtype=k.dtype, shape=k.shape, device=k.device),
+        ],
+    )
+    return q_out.tensor, k_out.tensor

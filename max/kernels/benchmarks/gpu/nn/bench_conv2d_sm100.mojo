@@ -28,7 +28,7 @@ The benchmark reports:
 - Comparison ratio (SM100 / cuDNN)
 """
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from layout import Coord, TileTensor, row_major
 from nn.conv.gpu.nvidia.sm100.conv2d import (
     conv2d_fprop,
@@ -239,21 +239,22 @@ def bench_conv2d[
     ctx.synchronize()
 
     # ==================== Benchmark SM100 implicit im2col ====================
-    @parameter
-    @__copy_capture(input_tt, filter_tt, output_sm100_tt)
-    def sm100_implicit_kernel() raises:
+    def sm100_implicit_kernel() raises {
+        var input_tt, var filter_tt, var output_sm100_tt, imm
+    }:
         conv2d_fprop(output_sm100_tt, input_tt, filter_tt, problem, ctx)
 
-    var sm100_time_ns = ctx.execution_time[sm100_implicit_kernel](num_iters)
+    var sm100_time_ns = ctx.execution_time(sm100_implicit_kernel, num_iters)
     var sm100_time_ms = Float64(sm100_time_ns) / 1e6 / Float64(num_iters)
     var sm100_tflops = Float64(flops) / (sm100_time_ms / 1000) / 1e12
 
     # ==================== Benchmark cuDNN ====================
-    @parameter
-    @__copy_capture(
-        input_dev_tensor, filter_nchw_dev_tensor, output_cudnn_dev_tensor
-    )
-    def cudnn_kernel() raises:
+    def cudnn_kernel() raises {
+        var input_dev_tensor,
+        var filter_nchw_dev_tensor,
+        var output_cudnn_dev_tensor,
+        imm,
+    }:
         conv_cudnn[dtype, dtype, dtype](
             input_dev_tensor,
             filter_nchw_dev_tensor,
@@ -265,7 +266,7 @@ def bench_conv2d[
             ctx,
         )
 
-    var cudnn_time_ns = ctx.execution_time[cudnn_kernel](num_iters)
+    var cudnn_time_ns = ctx.execution_time(cudnn_kernel, num_iters)
     var cudnn_time_ms = Float64(cudnn_time_ns) / 1e6 / Float64(num_iters)
     var cudnn_tflops = Float64(flops) / (cudnn_time_ms / 1000) / 1e12
 
@@ -279,8 +280,8 @@ def bench_conv2d[
     var max_diff: Float32 = 0.0
     for i in range(output_size):
         var diff = abs(
-            output_sm100_host_ptr[i].cast[DType.float32]()
-            - output_cudnn_host_ptr[i].cast[DType.float32]()
+            output_sm100_host_ptr[i].cast[.float32]()
+            - output_cudnn_host_ptr[i].cast[.float32]()
         )
         if diff > max_diff:
             max_diff = diff
@@ -491,35 +492,36 @@ def bench_all_configs[
     ctx.synchronize()
 
     # Benchmark 1-SM
-    @parameter
-    @__copy_capture(input_tt, filter_tt, output_1sm_tt)
-    def kernel_1sm() raises:
+    def kernel_1sm() raises {
+        var input_tt, var filter_tt, var output_1sm_tt, imm
+    }:
         conv2d_fprop[config=config_1sm](
             output_1sm_tt, input_tt, filter_tt, problem, ctx
         )
 
-    var time_1sm_ns = ctx.execution_time[kernel_1sm](num_iters)
+    var time_1sm_ns = ctx.execution_time(kernel_1sm, num_iters)
     var time_1sm_ms = Float64(time_1sm_ns) / 1e6 / Float64(num_iters)
     var tflops_1sm = Float64(flops) / (time_1sm_ms / 1000) / 1e12
 
     # Benchmark 2-SM
-    @parameter
-    @__copy_capture(input_tt, filter_tt, output_2sm_tt)
-    def kernel_2sm() raises:
+    def kernel_2sm() raises {
+        var input_tt, var filter_tt, var output_2sm_tt, imm
+    }:
         conv2d_fprop[config=config_2sm](
             output_2sm_tt, input_tt, filter_tt, problem, ctx
         )
 
-    var time_2sm_ns = ctx.execution_time[kernel_2sm](num_iters)
+    var time_2sm_ns = ctx.execution_time(kernel_2sm, num_iters)
     var time_2sm_ms = Float64(time_2sm_ns) / 1e6 / Float64(num_iters)
     var tflops_2sm = Float64(flops) / (time_2sm_ms / 1000) / 1e12
 
     # Benchmark cuDNN
-    @parameter
-    @__copy_capture(
-        input_dev_tensor, filter_nchw_dev_tensor, output_cudnn_dev_tensor
-    )
-    def cudnn_kernel() raises:
+    def cudnn_kernel() raises {
+        var input_dev_tensor,
+        var filter_nchw_dev_tensor,
+        var output_cudnn_dev_tensor,
+        imm,
+    }:
         conv_cudnn[dtype, dtype, dtype](
             input_dev_tensor,
             filter_nchw_dev_tensor,
@@ -531,7 +533,7 @@ def bench_all_configs[
             ctx,
         )
 
-    var cudnn_time_ns = ctx.execution_time[cudnn_kernel](num_iters)
+    var cudnn_time_ns = ctx.execution_time(cudnn_kernel, num_iters)
     var cudnn_time_ms = Float64(cudnn_time_ns) / 1e6 / Float64(num_iters)
     var cudnn_tflops = Float64(flops) / (cudnn_time_ms / 1000) / 1e12
 
@@ -705,21 +707,19 @@ def bench_residual[
     ctx.synchronize()
 
     # Benchmark conv2d only
-    @parameter
-    @__copy_capture(input_tt, filter_tt, output_tt)
-    def kernel_conv() raises:
+    def kernel_conv() raises {var input_tt, var filter_tt, var output_tt, imm}:
         conv2d_fprop[config=config_1sm](
             output_tt, input_tt, filter_tt, problem, ctx
         )
 
-    var time_conv_ns = ctx.execution_time[kernel_conv](num_iters)
+    var time_conv_ns = ctx.execution_time(kernel_conv, num_iters)
     var time_conv_ms = Float64(time_conv_ns) / 1e6 / Float64(num_iters)
     var tflops_conv = Float64(flops) / (time_conv_ms / 1000) / 1e12
 
     # Benchmark conv2d + fused residual
-    @parameter
-    @__copy_capture(input_tt, filter_tt, output_res_tt, source_tt)
-    def kernel_residual() raises:
+    def kernel_residual() raises {
+        var input_tt, var filter_tt, var output_res_tt, var source_tt, imm
+    }:
         conv2d_fprop_with_residual[config=config_1sm, has_residual=True](
             output_res_tt,
             input_tt,
@@ -730,7 +730,7 @@ def bench_residual[
             ctx,
         )
 
-    var time_res_ns = ctx.execution_time[kernel_residual](num_iters)
+    var time_res_ns = ctx.execution_time(kernel_residual, num_iters)
     var time_res_ms = Float64(time_res_ns) / 1e6 / Float64(num_iters)
     var tflops_res = Float64(flops) / (time_res_ms / 1000) / 1e12
 

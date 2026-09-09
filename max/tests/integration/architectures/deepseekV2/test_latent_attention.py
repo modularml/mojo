@@ -72,3 +72,23 @@ def test_latent_attention_prefill(
     )
     tol = TOLERANCES[kv_dtype]
     torch.testing.assert_close(torch_output, max_output, **tol)
+
+
+def test_latent_attention_short_prefill(
+    config: DeepseekV2Config,
+    input_tensor: torch.Tensor,
+    attention_mask: torch.Tensor,
+    attention_weights: dict[str, torch.Tensor],
+    generate_latent_attention_max_outputs: typing.Callable[..., torch.Tensor],
+    kv_dtype: DType,
+) -> None:
+    short_input = input_tensor[:, :3, :].contiguous()
+    short_mask = attention_mask[..., :3, :3].contiguous()
+    torch_output = generate_torch_outputs(
+        config, short_input, short_mask, attention_weights
+    )
+    max_output = generate_latent_attention_max_outputs(
+        config, short_input, attention_weights, use_prefill=True
+    )
+    tol = TOLERANCES[kv_dtype]
+    torch.testing.assert_close(torch_output, max_output, **tol)

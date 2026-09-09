@@ -14,25 +14,26 @@
 from std.sys import size_of
 from std.math.uutils import umod, udivmod
 
-from std.gpu import barrier, thread_idx
-from std.gpu import warp_id as get_warp_id
-from std.gpu.host import DeviceContext
-from std.gpu.memory import async_copy
-from std.gpu.sync import async_copy_arrive
+from max.gpu import thread_idx
+from max.gpu.sync import barrier
+from max.gpu import warp_id as get_warp_id
+from max.gpu.host import DeviceContext
+from max.gpu.memory import async_copy
+from max.gpu.sync import async_copy_arrive
 from layout.tma_async import PipelineState, SharedMemBarrier
 from layout import Layout, LayoutTensor, RuntimeLayout, UNKNOWN_VALUE
 from layout._fillers import random
-from std.memory import stack_allocation
+from std.memory import unsafe_stack_allocation
 from std.testing import assert_equal
 from std.utils import IndexList
 
 
 def producer_consumer_kernel[NUM_THREADS: Int]():
     var warp_id = get_warp_id()
-    var mbar = stack_allocation[
+    var mbar = unsafe_stack_allocation[
         1,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
@@ -69,16 +70,16 @@ def test_producer_consumer_kernel(ctx: DeviceContext) raises:
 def producer_consumer_pipeline_kernel[Q_SIZE: Int](num_iters: Int):
     var k_tile_iters = num_iters
 
-    var producer_mbar = stack_allocation[
+    var producer_mbar = unsafe_stack_allocation[
         Q_SIZE,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
-    var consumer_mbar = stack_allocation[
+    var consumer_mbar = unsafe_stack_allocation[
         Q_SIZE,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
@@ -152,35 +153,35 @@ def cpaysnc_producer_consumer_pipeline_kernel[
     comptime size_per_copy = 16 // size_of[DType.float32]()
     comptime size_per_stage = size_per_copy * 128
 
-    warpgroup_idx, warpgroup_tid = udivmod(thread_idx.x, 128)
+    var warpgroup_idx, warpgroup_tid = udivmod(thread_idx.x, 128)
 
-    smem = stack_allocation[
+    var smem = unsafe_stack_allocation[
         size_per_stage * num_stages,
         DType.float32,
         alignment=16,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     # Initialize smem buffer
     if warpgroup_idx == 0:
         for i in range(num_stages):
-            offset = i * size_per_stage + thread_idx.x * size_per_copy
+            var offset = i * size_per_stage + thread_idx.x * size_per_copy
 
             comptime for j in range(size_per_copy):
                 smem[offset + j] = -1000.0
 
     barrier()
 
-    var produced_mbar = stack_allocation[
+    var produced_mbar = unsafe_stack_allocation[
         num_stages,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
-    var consumed_mbar = stack_allocation[
+    var consumed_mbar = unsafe_stack_allocation[
         num_stages,
         SharedMemBarrier,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=8,
     ]()
 
@@ -195,11 +196,9 @@ def cpaysnc_producer_consumer_pipeline_kernel[
     # producer group
     if warpgroup_idx == 0:
         for i in range(num_stages):
-            offset = i * size_per_stage + thread_idx.x * size_per_copy
+            var offset = i * size_per_stage + thread_idx.x * size_per_copy
             async_copy[16](
-                (src.unsafe_ptr() + offset).address_space_cast[
-                    AddressSpace.GLOBAL
-                ](),
+                (src.unsafe_ptr() + offset).address_space_cast[.GLOBAL](),
                 smem + offset,
             )
             async_copy_arrive(produced_mbar[i].unsafe_ptr())
@@ -212,7 +211,7 @@ def cpaysnc_producer_consumer_pipeline_kernel[
         for i in range(num_stages):
             produced_mbar[i].wait(read_pipeline_states.phase())
 
-            offset = i * size_per_stage + warpgroup_tid * size_per_copy
+            var offset = i * size_per_stage + warpgroup_tid * size_per_copy
 
             comptime for j in range(size_per_copy):
                 smem[offset + j] += Float32(i)
@@ -221,7 +220,7 @@ def cpaysnc_producer_consumer_pipeline_kernel[
 
         # write back to global memory.
         for i in range(num_stages):
-            offset = i * size_per_stage + warpgroup_tid * size_per_copy
+            var offset = i * size_per_stage + warpgroup_tid * size_per_copy
 
             comptime for j in range(size_per_copy):
                 dst[offset + j] = smem[offset + j]
@@ -235,26 +234,26 @@ def test_cpasync_producer_consumer_pipeline[
     comptime shape1d = IndexList[1](size)
 
     comptime layout_1d = Layout(UNKNOWN_VALUE)
-    var src_device_buffer = ctx.enqueue_create_buffer[DType.float32](size)
-    var src_device = LayoutTensor[DType.float32, layout_1d](
+    var src_device_buffer = ctx.enqueue_create_buffer[.float32](size)
+    var src_device = LayoutTensor[.float32, layout_1d](
         src_device_buffer, RuntimeLayout[layout_1d].row_major(shape1d)
     )
     with src_device_buffer.map_to_host() as src_host_buffer:
         random(
-            LayoutTensor[DType.float32, layout_1d](
+            LayoutTensor[.float32, layout_1d](
                 src_host_buffer, RuntimeLayout[layout_1d].row_major(shape1d)
             )
         )
 
-    var dst_device_buffer = ctx.enqueue_create_buffer[DType.float32](size)
-    var dst_device = LayoutTensor[DType.float32, layout_1d](
+    var dst_device_buffer = ctx.enqueue_create_buffer[.float32](size)
+    var dst_device = LayoutTensor[.float32, layout_1d](
         dst_device_buffer, RuntimeLayout[layout_1d].row_major(shape1d)
     )
 
     comptime kernel = cpaysnc_producer_consumer_pipeline_kernel[num_stages]
     ctx.enqueue_function[kernel](
-        Span[Float32](ptr=src_device.ptr, length=size).get_immutable(),
-        Span[Float32](ptr=dst_device.ptr, length=size),
+        Span[Float32](unsafe_ptr=src_device.ptr, length=size).as_imm(),
+        Span[Float32](unsafe_ptr=dst_device.ptr, length=size),
         grid_dim=(1),
         block_dim=(256),
     )
@@ -266,7 +265,7 @@ def test_cpasync_producer_consumer_pipeline[
         with dst_device_buffer.map_to_host() as dst:
             for i in range(num_stages):
                 for j in range(size_per_stage):
-                    idx = i * size_per_stage + j
+                    var idx = i * size_per_stage + j
                     if src[idx] + Float32(i) != dst[idx]:
                         print(idx, src[idx], dst[idx])
                         return

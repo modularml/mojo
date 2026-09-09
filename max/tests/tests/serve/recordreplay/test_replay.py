@@ -42,6 +42,7 @@ async def test_replay() -> None:
             request=schema.Request(
                 method="POST",
                 path="/post-example",
+                headers=[(b"content-type", b"application/json")],
                 body=example_post_data.model_dump_json().encode(),
             ),
         ),

@@ -1,0 +1,7 @@
+# Older distro libfabric: FABRIC_1.0 only.
+FABRIC_1.0 {
+  global:
+    fi_fixture_open;
+  local:
+    *;
+};

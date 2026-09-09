@@ -44,7 +44,14 @@ struct ProducerTile[
     ring_buffer_type: type_of(RingBuffer),
     warps_processed_per_producer: Int,
 ](TrivialRegisterPassable):
-    """Context manager for producer access to a single ring buffer tile."""
+    """Context manager for producer access to a single ring buffer tile.
+
+    Parameters:
+        origin: Memory origin for pointers to the underlying ring buffer.
+        ring_buffer_type: The `RingBuffer` type accessed through this tile.
+        warps_processed_per_producer: Number of warps each producer processes
+            per pipeline stage.
+    """
 
     comptime ProducerViewType = ProducerView[
         Self.origin,
@@ -89,7 +96,14 @@ struct ConsumerTile[
     ring_buffer_type: type_of(RingBuffer),
     warps_computed_per_consumer: Int,
 ](TrivialRegisterPassable):
-    """Context manager for consumer access to a single ring buffer tile."""
+    """Context manager for consumer access to a single ring buffer tile.
+
+    Parameters:
+        origin: Memory origin for pointers to the underlying ring buffer.
+        ring_buffer_type: The `RingBuffer` type accessed through this tile.
+        warps_computed_per_consumer: Number of warps each consumer computes
+            per pipeline stage.
+    """
 
     comptime ConsumerViewType = ConsumerView[
         Self.origin,
@@ -139,7 +153,14 @@ struct ProducerView[
     ring_buffer_type: type_of(RingBuffer),
     warps_processed_per_producer: Int,
 ](TrivialRegisterPassable):
-    """Producer view of the unified ring buffer."""
+    """Producer view of the unified ring buffer.
+
+    Parameters:
+        origin: Memory origin for pointers to the underlying ring buffer.
+        ring_buffer_type: The `RingBuffer` type accessed through this view.
+        warps_processed_per_producer: Number of warps each producer processes
+            per pipeline stage.
+    """
 
     comptime RingBufferPtrType = Pointer[Self.ring_buffer_type, Self.origin]
 
@@ -207,7 +228,12 @@ struct ProducerView[
 
     @always_inline
     def release_tiles(mut self, stage: Int, warp_tile_idx: Int):
-        """Signal to consumers that tile is ready."""
+        """Signal to consumers that tile is ready.
+
+        Args:
+            stage: Pipeline stage of the tile to release.
+            warp_tile_idx: Index of the warp tile within the stage to release.
+        """
         self.ring_buffer_ptr[].signal_producer_release(warp_tile_idx, stage)
 
     comptime ProducerTileType = ProducerTile[
@@ -241,7 +267,14 @@ struct ConsumerView[
     ring_buffer_type: type_of(RingBuffer),
     warps_computed_per_consumer: Int,
 ](TrivialRegisterPassable):
-    """Consumer view of the unified ring buffer."""
+    """Consumer view of the unified ring buffer.
+
+    Parameters:
+        origin: Memory origin for pointers to the underlying ring buffer.
+        ring_buffer_type: The `RingBuffer` type accessed through this view.
+        warps_computed_per_consumer: Number of warps each consumer computes
+            per pipeline stage.
+    """
 
     comptime RingBufferPtrType = Pointer[Self.ring_buffer_type, Self.origin]
 
@@ -308,7 +341,12 @@ struct ConsumerView[
 
     @always_inline
     def release_tiles(mut self, stage: Int, warp_tile_idx: Int):
-        """Signal to producers that tile is free."""
+        """Signal to producers that tile is free.
+
+        Args:
+            stage: Pipeline stage of the tile to release.
+            warp_tile_idx: Index of the warp tile within the stage to release.
+        """
         self.ring_buffer_ptr[].signal_consumer_release(warp_tile_idx, stage)
 
     comptime ConsumerTileType = ConsumerTile[
@@ -414,7 +452,12 @@ struct RingBuffer[
     def get_tiles(
         self, stage: Int, warp_tile_idx: Int
     ) -> Self.WarpTileTupleType:
-        """Get tiles from shared memory."""
+        """Get tiles from shared memory.
+
+        Args:
+            stage: Pipeline stage to read tiles from.
+            warp_tile_idx: Index of the warp tile within the stage to read.
+        """
         var result = Self.WarpTileTupleType()
 
         comptime for i in range(Self.tile_buffers):
@@ -434,7 +477,12 @@ struct RingBuffer[
         type_of(self),
         warps_processed_per_producer,
     ]:
-        """Create a producer view of this ring buffer."""
+        """Create a producer view of this ring buffer.
+
+        Parameters:
+            warps_processed_per_producer: Number of warps each producer processes
+                per pipeline stage.
+        """
         return ProducerView[
             origin_of(self),
             type_of(self),
@@ -449,7 +497,12 @@ struct RingBuffer[
         type_of(self),
         warps_computed_per_consumer,
     ]:
-        """Create a consumer view of this ring buffer."""
+        """Create a consumer view of this ring buffer.
+
+        Parameters:
+            warps_computed_per_consumer: Number of warps each consumer
+                computes per pipeline stage.
+        """
         return ConsumerView[
             origin_of(self),
             type_of(self),
@@ -458,27 +511,54 @@ struct RingBuffer[
 
     @always_inline
     def get_staged_idx(self, tile_idx: Int, stage: Int) -> Int:
-        """Get the staged index for a tile and stage."""
+        """Get the staged index for a tile and stage.
+
+        Args:
+            tile_idx: Index of the warp tile within the block.
+            stage: Pipeline stage of the tile.
+        """
         return self.sync_strategy.get_staged_idx(tile_idx, stage)
 
     @always_inline
     def wait_producer_acquire(self, tile_idx: Int, stage: Int, phase: Int32):
-        """Producer waits to acquire a tile."""
+        """Producer waits to acquire a tile.
+
+        Args:
+            tile_idx: Index of the warp tile within the block to acquire.
+            stage: Pipeline stage of the tile to acquire.
+            phase: Synchronization phase counter for this tile and stage.
+        """
         self.sync_strategy.wait_producer_acquire(tile_idx, stage, phase)
 
     @always_inline
     def signal_producer_release(mut self, tile_idx: Int, stage: Int):
-        """Producer signals it has released a tile."""
+        """Producer signals it has released a tile.
+
+        Args:
+            tile_idx: Index of the warp tile within the block to release.
+            stage: Pipeline stage of the tile to release.
+        """
         self.sync_strategy.signal_producer_release(tile_idx, stage)
 
     @always_inline
     def wait_consumer_acquire(self, tile_idx: Int, stage: Int, phase: Int32):
-        """Consumer waits to acquire a tile."""
+        """Consumer waits to acquire a tile.
+
+        Args:
+            tile_idx: Index of the warp tile within the block to acquire.
+            stage: Pipeline stage of the tile to acquire.
+            phase: Synchronization phase counter for this tile and stage.
+        """
         self.sync_strategy.wait_consumer_acquire(tile_idx, stage, phase)
 
     @always_inline
     def signal_consumer_release(mut self, tile_idx: Int, stage: Int):
-        """Consumer signals it has released a tile."""
+        """Consumer signals it has released a tile.
+
+        Args:
+            tile_idx: Index of the warp tile within the block to release.
+            stage: Pipeline stage of the tile to release.
+        """
         self.sync_strategy.signal_consumer_release(tile_idx, stage)
 
     @always_inline

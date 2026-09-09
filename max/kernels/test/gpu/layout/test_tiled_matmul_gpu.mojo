@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu.host import DeviceContext
-from std.gpu import block_dim, block_idx, thread_idx
-from std.gpu.compute.mma import mma
-from std.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import block_dim, block_idx, thread_idx
+from max.gpu.compute.mma import mma
+from max.gpu.sync import barrier
 from layout import *
 from layout.layout_tensor import copy_dram_to_sram, copy_local_to_dram
 from layout._fillers import arange
@@ -29,9 +29,9 @@ def naive_matmul[
     BM: Int,
     BN: Int,
 ](
-    dst: LayoutTensor[DType.float32, layout_dst, MutAnyOrigin],
-    lhs: LayoutTensor[DType.float32, layout_dst, MutAnyOrigin],
-    rhs: LayoutTensor[DType.float32, layout_dst, MutAnyOrigin],
+    dst: LayoutTensor[.float32, layout_dst, MutAnyOrigin],
+    lhs: LayoutTensor[.float32, layout_dst, MutAnyOrigin],
+    rhs: LayoutTensor[.float32, layout_dst, MutAnyOrigin],
 ):
     var dst_tile = dst.tile[BM, BN](block_idx.y, block_idx.x)
     dst_tile[thread_idx.y, thread_idx.x] = 0
@@ -55,9 +55,9 @@ def test_naive_matmul_kernel(ctx: DeviceContext) raises:
     comptime layout_b = Layout(IntTuple(K, N), IntTuple(N, 1))
     comptime layout_c = Layout(IntTuple(M, N), IntTuple(N, 1))
 
-    var mat_a = ManagedLayoutTensor[DType.float32, layout_a](ctx)
-    var mat_b = ManagedLayoutTensor[DType.float32, layout_b](ctx)
-    var mat_c = ManagedLayoutTensor[DType.float32, layout_c](ctx)
+    var mat_a = ManagedLayoutTensor[.float32, layout_a](ctx)
+    var mat_b = ManagedLayoutTensor[.float32, layout_b](ctx)
+    var mat_c = ManagedLayoutTensor[.float32, layout_c](ctx)
 
     arange(mat_a.tensor())
     arange(mat_b.tensor())
@@ -91,25 +91,25 @@ def sram_blocked_matmul[
     BN: Int,
     BK: Int,
 ](
-    dst: LayoutTensor[DType.float32, layout_dst, MutAnyOrigin],
-    lhs: LayoutTensor[DType.float32, layout_lhs, MutAnyOrigin],
-    rhs: LayoutTensor[DType.float32, layout_rhs, MutAnyOrigin],
+    dst: LayoutTensor[.float32, layout_dst, MutAnyOrigin],
+    lhs: LayoutTensor[.float32, layout_lhs, MutAnyOrigin],
+    rhs: LayoutTensor[.float32, layout_rhs, MutAnyOrigin],
 ):
     # Allocate an SRAM tile of (BM, BK) size with row-major layout for the l.h.s.
     var lhs_sram_tile = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(IntTuple(BM, BK)),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     # Allocate an SRAM tile of (BK, BN) size with row-major layout for
     # the r.h.s.
     var rhs_sram_tile = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(IntTuple(BK, BN)),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     # Block the dst matrix with [BM, BN] tile size.
@@ -191,9 +191,9 @@ def test_sram_blocked_matmul(ctx: DeviceContext) raises:
 
     comptime thread_layout = Layout(IntTuple(TH_M, TH_N), IntTuple(TH_N, 1))
 
-    var mat_a = ManagedLayoutTensor[DType.float32, layout_a](ctx)
-    var mat_b = ManagedLayoutTensor[DType.float32, layout_b](ctx)
-    var mat_c = ManagedLayoutTensor[DType.float32, layout_c](ctx)
+    var mat_a = ManagedLayoutTensor[.float32, layout_a](ctx)
+    var mat_b = ManagedLayoutTensor[.float32, layout_b](ctx)
+    var mat_c = ManagedLayoutTensor[.float32, layout_c](ctx)
 
     arange(mat_a.tensor())
     arange(mat_b.tensor())
@@ -223,9 +223,9 @@ def single_warp_mma_sync_m16n8k8[
     layout_a_mma: Layout,
     layout_b_mma: Layout,
 ](
-    mat_c: LayoutTensor[DType.float32, layout_c, MutAnyOrigin],
-    mat_a: LayoutTensor[DType.float32, layout_a, MutAnyOrigin],
-    mat_b: LayoutTensor[DType.float32, layout_b, MutAnyOrigin],
+    mat_c: LayoutTensor[.float32, layout_c, MutAnyOrigin],
+    mat_a: LayoutTensor[.float32, layout_a, MutAnyOrigin],
+    mat_b: LayoutTensor[.float32, layout_b, MutAnyOrigin],
 ):
     var mat_a_mma = mat_a.composition[layout_a_mma]()
     # Note: CUTLASS layout above assumes the same layout as the instruction itself, l.h.s row-major and r.h.s col-major.
@@ -234,19 +234,19 @@ def single_warp_mma_sync_m16n8k8[
 
     var thread_y, thread_x = divmod(thread_idx.x, 4)
 
-    var vec_a_layout = SIMD[DType.float32, 4](
+    var vec_a_layout = SIMD[.float32, 4](
         rebind[Float32](mat_a_mma[thread_x, thread_y, 0, 0]),
         rebind[Float32](mat_a_mma[thread_x, thread_y, 1, 0]),
         rebind[Float32](mat_a_mma[thread_x, thread_y, 0, 1]),
         rebind[Float32](mat_a_mma[thread_x, thread_y, 1, 1]),
     )
-    var vec_b_layout = SIMD[DType.float32, 2](
+    var vec_b_layout = SIMD[.float32, 2](
         rebind[Float32](mat_b_mma[thread_x, thread_y, 0]),
         rebind[Float32](mat_b_mma[thread_x, thread_y, 1]),
     )
 
-    var vec_d = SIMD[DType.float32, 4](0)
-    var vec_c = SIMD[DType.float32, 4](0)
+    var vec_d = SIMD[.float32, 4](0)
+    var vec_c = SIMD[.float32, 4](0)
 
     mma(vec_d, vec_a_layout, vec_b_layout, vec_c)
 
@@ -269,9 +269,9 @@ def test_single_warp_tf32_m16n8k8_matmul(ctx: DeviceContext) raises:
     comptime layout_b = Layout.col_major(K, N)
     comptime layout_c = Layout.row_major(M, N)
 
-    var mat_a = ManagedLayoutTensor[DType.float32, layout_a](ctx)
-    var mat_b = ManagedLayoutTensor[DType.float32, layout_b](ctx)
-    var mat_c = ManagedLayoutTensor[DType.float32, layout_c](ctx)
+    var mat_a = ManagedLayoutTensor[.float32, layout_a](ctx)
+    var mat_b = ManagedLayoutTensor[.float32, layout_b](ctx)
+    var mat_c = ManagedLayoutTensor[.float32, layout_c](ctx)
 
     arange(mat_a.tensor())
     arange(mat_b.tensor())
@@ -319,25 +319,25 @@ def sram_blocked_matmul_dynamic_nd_buffer[
     BN: Int,
     BK: Int,
 ](
-    dst: TileTensor[DType.float32, DstLayoutType, MutAnyOrigin],
-    lhs: TileTensor[DType.float32, LhsLayoutType, MutAnyOrigin],
-    rhs: TileTensor[DType.float32, RhsLayoutType, MutAnyOrigin],
+    dst: TileTensor[.float32, DstLayoutType, MutAnyOrigin],
+    lhs: TileTensor[.float32, LhsLayoutType, MutAnyOrigin],
+    rhs: TileTensor[.float32, RhsLayoutType, MutAnyOrigin],
 ):
     # Allocate an SRAM tile of (BM, BK) size with row-major layout for the l.h.s.
     var lhs_sram_tile = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(IntTuple(BM, BK)),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     # Allocate an SRAM tile of (BK, BN) size with row-major layout for
     # the r.h.s.
     var rhs_sram_tile = LayoutTensor[
-        DType.float32,
+        .float32,
         Layout(IntTuple(BK, BN)),
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     # Block the dst matrix with [BM, BN] tile size.
@@ -361,10 +361,10 @@ def sram_blocked_matmul_dynamic_nd_buffer[
     # TODO: Is it useful to have stack_allocation_like[thread_layout](nd_buffer) ? We can do this if needed.
     var dst_register_tile = (
         LayoutTensor[
-            DType.float32,
+            .float32,
             Layout.row_major(2, 2),
             MutAnyOrigin,
-            address_space=AddressSpace.LOCAL,
+            address_space=.LOCAL,
         ]
         .stack_allocation()
         .fill(0)
@@ -430,9 +430,9 @@ def test_sram_blocked_matmul_dynamic_nd_buffer(ctx: DeviceContext) raises:
     for i in range(M * N):
         mat_c_ptr[i] = 0
 
-    var mat_c_dev = ctx.enqueue_create_buffer[DType.float32](M * N)
-    var mat_a_dev = ctx.enqueue_create_buffer[DType.float32](M * K)
-    var mat_b_dev = ctx.enqueue_create_buffer[DType.float32](K * N)
+    var mat_c_dev = ctx.enqueue_create_buffer[.float32](M * N)
+    var mat_a_dev = ctx.enqueue_create_buffer[.float32](M * K)
+    var mat_b_dev = ctx.enqueue_create_buffer[.float32](K * N)
 
     ctx.enqueue_copy(mat_c_dev, mat_c_ptr)
     ctx.enqueue_copy(mat_a_dev, mat_a_ptr)
@@ -453,14 +453,15 @@ def test_sram_blocked_matmul_dynamic_nd_buffer(ctx: DeviceContext) raises:
     ]
 
     ctx.enqueue_function[sram_blocked_matmul_dynamic_nd_buffer_kernel](
-        mat_c.as_any_origin(),
-        mat_a.as_any_origin(),
-        mat_b.as_any_origin(),
+        mat_c.as_unsafe_any_origin(),
+        mat_a.as_unsafe_any_origin(),
+        mat_b.as_unsafe_any_origin(),
         grid_dim=(N // BN, M // BM),
         block_dim=(comptime (thread_layout.size())),
     )
 
     ctx.enqueue_copy(mat_c_ptr, mat_c_dev)
+    ctx.synchronize()
 
     for m in range(M):
         for n in range(N):

@@ -120,7 +120,7 @@ class ValidationResultCollection:
         """Returns a combined failure message for all entries in the collection."""
         message = ""
         num_failures = 0
-        for name, result in self._results.items():  # noqa: B007
+        for result in self._results.values():
             if result.success:
                 continue
 
@@ -170,7 +170,6 @@ class ValidatorBase(ABC):
         """The name to reference this validator in the CLI args.
         Must be unique per Validator.
         """
-        pass
 
     @staticmethod
     @abstractmethod
@@ -449,14 +448,12 @@ class ToleranceValidator(ValidatorBase):
         max_atol = self._atol
         for abs_diff in metrics[self._ATOL_IDX]:
             temp_max_atol = abs_diff.max()
-            if temp_max_atol > max_atol:
-                max_atol = temp_max_atol
+            max_atol = max(max_atol, temp_max_atol)
 
         max_rtol = self._rtol
         for rel_diff in metrics[self._RTOL_IDX]:
             temp_max_rtol = rel_diff.max()
-            if temp_max_rtol > max_rtol:
-                max_rtol = temp_max_rtol
+            max_rtol = max(max_rtol, temp_max_rtol)
 
         _print_pareto_tolerances(
             target,

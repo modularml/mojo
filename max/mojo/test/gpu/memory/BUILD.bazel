@@ -1,0 +1,22 @@
+load("//bazel:api.bzl", "mojo_filecheck_test")
+
+package(default_visibility = ["//max:consumers"])
+
+mojo_filecheck_test(
+    name = "test_shared_address_space_cast_bitcast.mojo.test",
+    srcs = ["test_shared_address_space_cast_bitcast.mojo"],
+    copts = [
+        "--debug-level",
+        "full",
+    ],
+    tags = ["gpu"],
+    # PointerRewriter (the pass under test) is Metal/AIR-only.
+    target_compatible_with = ["//:has_gpu"] + select({
+        "//:apple_gpu": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)

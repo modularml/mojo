@@ -2,7 +2,7 @@
 
 # **MAX full container**
 
-The [Modular](https://docs.modular.com/max/intro) platform, powered by the MAX
+The [Modular](https://max.modular.com/intro) platform, powered by the MAX
 framework and Mojo programming language, helps developers accelerate model
 serving and scale GenAI deployments across diverse hardware architectures
 without modifying a single line of code.
@@ -19,7 +19,7 @@ additional setup.
 
 The MAX container is compatible with the OpenAI API specification and optimized
 for GPU deployment. For details on container contents and hardware
-compatibility, see [MAX containers](https://docs.modular.com/max/container) in
+compatibility, see [MAX containers](https://max.modular.com/container) in
 the MAX documentation.
 
 ### **Quickstart**
@@ -66,7 +66,7 @@ referencing its HuggingFace model ID. For example,
 [`google/gemma-3-1b-it`](https://builds.modular.com/models/gemma-3-it/1B).
 
 For more information on deploying popular models with MAX, see the [model
-support](https://docs.modular.com/max/model-formats) documentation.
+support](https://max.modular.com/model-formats) documentation.
 
 ### **Tags**
 
@@ -86,7 +86,7 @@ Nightlies
 ### **Documentation**
 
 For more information on Modular and its products, visit the [Modular
-documentation site⁠⁠](https://docs.modular.com/).
+documentation site⁠⁠](https://max.modular.com/).
 
 ### **Community**
 

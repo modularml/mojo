@@ -1,0 +1,31 @@
+load("//bazel:api.bzl", "modular_cc_binary", "modular_cc_test")
+
+# gazelle:default_visibility //visibility:private
+
+package(
+    default_visibility = ["//visibility:private"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_test(
+    name = "QueueBenchmark",
+    srcs = ["QueueBenchmark.cpp"],
+    deps = [
+        "//AsyncRT:Support",
+        "@google_benchmark//:benchmark_main",
+    ],
+)
+
+modular_cc_binary(
+    name = "bench_allocator",
+    srcs = ["bench_allocator.cpp"],
+    deps = [
+        "//AsyncRT:Runtime",
+        "//AsyncRT:RuntimeGlobals",
+        "//Support:MicroBenchmark",
+        "@llvm-project//llvm:Support",
+    ],
+)

@@ -1,0 +1,13 @@
+[workspace]
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+description = "Introduction to Mojo Tutorial: Conway's Game of Life"
+name = "gpu-intro"
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+version = "0.1.0"
+
+[dependencies]
+max = "*"
+
+[tasks]
+vector_addition = "mojo run vector_addition.mojo"

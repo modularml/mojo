@@ -1,0 +1,24 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+
+# RUN: %repl <%s 2>&1 | FileCheck %s
+
+# Note: in REPL mode, expressions are delimited by empty lines.
+
+%%python
+num = 13
+num = 12
+import sys as module
+import os as module
+def foo():
+  pass
+def foo():
+  pass
+
+# CHECK-DAG: (PythonObject) foo
+# CHECK-DAG: (PythonObject) module
+# CHECK-DAG: (PythonObject) num
+

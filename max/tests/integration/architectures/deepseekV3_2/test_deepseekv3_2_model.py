@@ -24,15 +24,16 @@ from max.nn import (
     ScaleOrigin,
     WeightScaleSpec,
 )
-from max.nn.kv_cache import KVCacheParams, MultiKVCacheParams
+from max.nn.kv_cache import MHAKVCacheParams, MultiKVCacheParams
 from max.pipelines.architectures.deepseekV3_2.deepseekV3_2 import DeepseekV3_2
 from max.pipelines.architectures.deepseekV3_2.model_config import (
     DeepseekV3_2Config,
 )
-from transformers import PretrainedConfig
+from max.pipelines.lib.pipeline_variants.utils import get_rope_theta
+from transformers import DeepseekV32Config
 
 
-def make_test_huggingface_config() -> PretrainedConfig:
+def make_test_huggingface_config() -> DeepseekV32Config:
     """Create a minimal HuggingFace config for testing DeepSeekV3.2."""
     config_dict = {
         "architectures": ["DeepseekV32ForCausalLM"],
@@ -87,7 +88,7 @@ def make_test_huggingface_config() -> PretrainedConfig:
         "v_head_dim": 64,
         "vocab_size": 1024,
     }
-    return PretrainedConfig.from_dict(config_dict)
+    return DeepseekV32Config.from_dict(config_dict)
 
 
 def make_test_config() -> DeepseekV3_2Config:
@@ -95,21 +96,23 @@ def make_test_config() -> DeepseekV3_2Config:
     hf_config = make_test_huggingface_config()
     device = DeviceRef.CPU()
 
-    mla_kv_params = KVCacheParams(
+    mla_kv_params = MHAKVCacheParams(
         dtype=DType.bfloat16,
         n_kv_heads=hf_config.num_key_value_heads,
         head_dim=hf_config.v_head_dim,
         num_layers=hf_config.num_hidden_layers,
         devices=[device],
     )
-    indexer_kv_params = KVCacheParams(
+    indexer_kv_params = MHAKVCacheParams(
         dtype=DType.float8_e4m3fn,
         n_kv_heads=1,
         head_dim=hf_config.index_head_dim,
         num_layers=hf_config.num_hidden_layers,
         devices=[device],
     )
-    kv_params = MultiKVCacheParams.from_params(mla_kv_params, indexer_kv_params)
+    kv_params = MultiKVCacheParams.from_params(
+        {"mla": mla_kv_params, "indexer": indexer_kv_params}
+    )
 
     return DeepseekV3_2Config(
         dtype=DType.float8_e4m3fn,
@@ -157,9 +160,10 @@ def make_test_config() -> DeepseekV3_2Config:
         norm_topk_prob=hf_config.norm_topk_prob,
         hidden_act=hf_config.hidden_act,
         max_position_embeddings=hf_config.max_position_embeddings,
+        max_seq_len=hf_config.max_position_embeddings,
         rms_norm_eps=hf_config.rms_norm_eps,
         tie_word_embeddings=hf_config.tie_word_embeddings,
-        rope_theta=hf_config.rope_theta,
+        rope_theta=get_rope_theta(hf_config),
         rope_scaling=hf_config.rope_scaling,
         scoring_func=hf_config.scoring_func,
         attention_bias=hf_config.attention_bias,

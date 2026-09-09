@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_t
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -36,32 +35,27 @@ modular_py_binary(
     name = "smoke_test",
     testonly = True,
     srcs = ["smoke_test.py"],
-    data = ["//max/python/max/pipelines/architectures:recipe_configs"],
     imports = [".."],
     tags = ["no-pydeps"],  # TODO: Fix and re-enable
+    # Mirror the package default plus //max_private so private archs (e.g.
+    # //max_private/minimax_m3:smoke_test_m3) can host their own smoke-test
+    # entrypoints that reuse this driver. Mirrors verify_pipelines.
+    # //max/internal covers the kernel-model-map graph tooling.
+    visibility = [
+        "//:__pkg__",
+        "//SDK/integration-test:__subpackages__",
+        "//max/internal:__subpackages__",
+        "//max/tests:__subpackages__",
+        "//max_private:__subpackages__",
+        "//oss/modular/max/tests:__subpackages__",
+    ],
     deps = [
         ":eval_runner",
         ":inference_server_harness",
         requirement("click"),
         requirement("pydantic"),
         requirement("pyyaml"),
-        "//max/python/max/entrypoints:pipelines",
-        "//max/tests/integration:hf_repo_lock",
-    ],
-)
-
-modular_py_binary(
-    name = "di_smoke_test",
-    testonly = True,
-    srcs = ["di_smoke_test.py"],
-    imports = [".."],
-    tags = ["no-pydeps"],  # TODO: Fix and re-enable
-    deps = [
-        ":eval_runner",
-        ":inference_server_harness",
-        requirement("click"),
-        requirement("pyyaml"),
-        requirement("requests"),
+        "//max/python/max/_entrypoints:pipelines",
     ],
 )
 
@@ -69,20 +63,16 @@ modular_py_binary(
     name = "smoke_test_github_matrix",
     srcs = ["smoke_test_github_matrix.py"],
     imports = [".."],
-    deps = [
-        requirement("click"),
+    visibility = [
+        "//:__pkg__",
+        "//SDK/integration-test:__subpackages__",
+        "//ci/serve_smoke_tests_workflow:__pkg__",
+        "//max/internal:__subpackages__",
+        "//max/tests:__subpackages__",
+        "//oss/modular/max/tests:__subpackages__",
     ],
-)
-
-modular_py_library(
-    name = "check_golden_eligibility",
-    srcs = ["check_golden_eligibility.py"],
-    data = ["golden_ignore_list.yaml"],
-    imports = [".."],
     deps = [
         requirement("click"),
-        requirement("pyyaml"),
-        requirement("requests"),
     ],
 )
 
@@ -106,47 +96,6 @@ modular_py_binary(
     imports = [".."],
 )
 
-modular_py_binary(
-    name = "upload_smoke_test_results",
-    srcs = ["upload_smoke_test_results.py"],
-    imports = [".."],
-    tags = ["no-pydeps"],
-    deps = [
-        requirement("google-cloud-bigquery"),
-    ],
-)
-
-modular_py_library(
-    name = "compute_accuracy_status",
-    srcs = [
-        "accuracy_windows_config.py",
-        "compute_accuracy_status.py",
-    ],
-    imports = [".."],
-    tags = ["no-pydeps"],
-    deps = [
-        ":smoke_test_github_matrix",
-        requirement("click"),
-        requirement("google-cloud-bigquery"),
-    ],
-)
-
-modular_py_test(
-    name = "test_compute_accuracy_status",
-    size = "small",
-    srcs = [
-        "conftest.py",
-        "test_compute_accuracy_status.py",
-    ],
-    imports = [".."],
-    tags = ["no-pydeps"],
-    deps = [
-        ":compute_accuracy_status",
-        ":smoke_test_github_matrix",
-        requirement("click"),
-    ],
-)
-
 modular_py_test(
     name = "test_smoke_test",
     size = "small",
@@ -163,6 +112,25 @@ modular_py_test(
     }),
     deps = [
         ":smoke_test",
+    ],
+)
+
+modular_py_test(
+    name = "test_prefetch_hf_repos",
+    size = "small",
+    srcs = [
+        "conftest.py",
+        "test_prefetch_hf_repos.py",
+    ],
+    imports = [".."],
+    tags = ["no-pydeps"],  # Depends on :prefetch_hf_repos binary for imports
+    # TODO(MODELS-994): Investigate and enable on macOS
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":prefetch_hf_repos",
     ],
 )
 
@@ -203,25 +171,6 @@ modular_py_test(
     deps = [
         ":smoke_test",
         ":smoke_test_github_matrix",
-        requirement("click"),
-    ],
-)
-
-modular_py_test(
-    name = "test_check_golden_eligibility",
-    size = "small",
-    srcs = [
-        "conftest.py",
-        "test_check_golden_eligibility.py",
-    ],
-    imports = [".."],
-    # TODO(MODELS-994): Investigate and enable on macOS
-    target_compatible_with = select({
-        "@platforms//os:macos": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":check_golden_eligibility",
         requirement("click"),
     ],
 )

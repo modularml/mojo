@@ -1,4 +1,5 @@
 load("//bazel:api.bzl", "mojo_filecheck_test", "mojo_test")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS_COPTS")
 
 package(default_visibility = ["//max:consumers"])
 
@@ -47,17 +48,30 @@ _CONSTRAINTS = {
     "test_top_k.mojo": ["@platforms//os:linux"],  # TODO: Fix on macOS
 }
 
+_FILECHECK_EXTRA_DEPS = {
+    "test_arange.mojo": ["//max:max_mojo"],
+    "test_buffer_slice.mojo": ["//max:max_mojo"],
+    "test_buffer_slice_dim.mojo": ["//max:max_mojo"],
+}
+
+_EXTRA_DEPS = {
+    "test_rms_norm_fused_residual_add.mojo": ["//max:max_mojo"],
+    "test_subvolume_start_indices_static.mojo": ["//max:max_mojo"],
+    "test_toppminp.mojo": ["//max:max_mojo"],
+}
+
 [
     mojo_filecheck_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         target_compatible_with = _CONSTRAINTS.get(src, []),
         deps = [
             "//max:internal_utils",
             "//max:nn",
             "@mojo//:std",
             "@mojo//:test_utils",
-        ],
+        ] + _FILECHECK_EXTRA_DEPS.get(src, []),
     )
     for src in _FILECHECK_TESTS
 ]
@@ -66,13 +80,14 @@ _CONSTRAINTS = {
     mojo_test(
         name = src + ".test",
         srcs = [src],
+        copts = IGNORED_POINTER_DEPRECATIONS_COPTS,
         target_compatible_with = _CONSTRAINTS.get(src, []),
         deps = [
             "//max:internal_utils",
             "//max:nn",
             "//max:testdata",
             "@mojo//:std",
-        ],
+        ] + _EXTRA_DEPS.get(src, []),
     )
     for src in glob(
         ["**/*.mojo"],

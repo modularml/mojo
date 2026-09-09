@@ -16,15 +16,15 @@
 Helper functions for Expert Parallelism (EP) Communication Kernels.
 """
 
-from std.gpu.primitives.grid_controls import PDLLevel, pdl_launch_attributes
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.info import is_gpu
+from max.gpu.primitives.grid_controls import PDLLevel, pdl_launch_attributes
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.host.info import is_gpu
 from std.math import ceildiv
-from layout import TensorLayout, TileTensor, Idx
+from layout import DefaultEngine, TensorLayout, TileTensor, Idx
 from layout.tile_tensor import row_major
-from std.runtime.tracing import Trace, TraceLevel, get_safe_task_id
+from max.runtime.tracing import Trace, TraceLevel, get_safe_task_id
 from std.sys.info import has_amd_gpu_accelerator, simd_width_of, size_of
-from std.gpu import WARP_SIZE
+from max.gpu import WARP_SIZE
 from std.ffi import external_call, _get_global_or_null
 
 from shmem import shmem_module_init, shmem_my_pe
@@ -45,6 +45,18 @@ from shmem.ep_comm import (
 
 @always_inline
 def global_cache_insert(key: String, value: OpaquePointer[mut=True, _]):
+    """Inserts a pointer into the process-wide compiler runtime global cache.
+
+    Stores `value` under `key` in the KGEN compiler runtime's global
+    dictionary. Subsequent calls with the same `key` can retrieve the pointer
+    via `_get_global_or_null`. Used to cache lazily-initialized resources
+    (such as EP communicator handles) across kernel invocations without
+    re-initialization overhead.
+
+    Args:
+        key: The string key to store `value` under.
+        value: An opaque pointer to the resource to cache.
+    """
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringSlice(key),
         value,
@@ -97,27 +109,48 @@ def pack_ptrs_array[
         0
     ],
 ](
-    _ptrs: TileTensor[DType.uint64, ptrs_layout, ...],
+    _ptrs: TileTensor[.uint64, ptrs_layout, ...],
     my_rank: Int32,
-    out result: InlineArray[
-        UnsafePointer[Scalar[ptr_type], MutExternalOrigin], n_gpus_per_node
+    out result: Array[
+        UnsafePointer[Scalar[ptr_type], MutUntrackedOrigin], n_gpus_per_node
     ],
 ):
-    """Pack the pointers into an inline array."""
-    comptime assert _ptrs.flat_rank == 1, "Pointers must be a 1D tensor."
-    var ptr_arr = InlineArray[
-        UnsafePointer[Scalar[ptr_type], MutExternalOrigin], n_gpus_per_node
-    ](uninitialized=True)
+    """Pack the pointers into an inline array.
 
-    comptime for i in range(n_gpus_per_node):
+    Reads device addresses from `_ptrs` and produces an `Array` of
+    `Pointer[Scalar[ptr_type]]` entries to pass to an EP kernel. When
+    `local_rank_only` is set, every entry is filled with the address at
+    `my_rank` instead of one address per rank.
+
+    Parameters:
+        ptrs_layout: Layout of the `_ptrs` input tensor (inferred).
+        ptr_type: Element `DType` the packed pointers point to.
+        local_rank_only: Whether to replicate only the local rank's pointer
+            across all entries (defaults to `False`).
+        n_gpus_per_node: Number of entries in the output array, one per local
+            GPU (defaults to `1` when `local_rank_only` is set, otherwise
+            `ptrs_layout.static_shape[0]`).
+
+    Args:
+        _ptrs: 1D `uint64` tensor of device addresses, one per rank.
+        my_rank: Rank index of the calling device within the communicator.
+    """
+    comptime assert _ptrs.flat_rank == 1, "Pointers must be a 1D tensor."
+
+    @always_inline
+    def ptr_arr_init(
+        i: Int,
+    ) {imm} -> UnsafePointer[Scalar[ptr_type], MutUntrackedOrigin]:
         comptime if local_rank_only:
-            ptr_arr[i] = UnsafePointer[Scalar[ptr_type], MutExternalOrigin](
+            return UnsafePointer[Scalar[ptr_type], MutUntrackedOrigin](
                 unsafe_from_address=Int(_ptrs[my_rank])
             )
         else:
-            ptr_arr[i] = UnsafePointer[Scalar[ptr_type], MutExternalOrigin](
+            return UnsafePointer[Scalar[ptr_type], MutUntrackedOrigin](
                 unsafe_from_address=Int(_ptrs[i])
             )
+
+    var ptr_arr = Array[_, n_gpus_per_node](fill_with=ptr_arr_init)
 
     return ptr_arr^
 
@@ -138,12 +171,12 @@ def ep_dispatch_async_kernel_api[
     input_scales_wrapper: Optional[input_scales_wrapper_type] = None,
     use_shmem: Bool = (n_nodes > 1),
 ](
-    atomic_counters: TileTensor[DType.int32, ...],
-    input_tokens: TileTensor[mut=False, ...],
-    topk_ids: TileTensor[mut=False, DType.int32, ...],
-    send_ptrs: TileTensor[DType.uint64, ...],
-    recv_ptrs: TileTensor[DType.uint64, ...],
-    recv_count_ptrs: TileTensor[DType.uint64, ...],
+    atomic_counters: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    input_tokens: TileTensor[mut=False, Engine=DefaultEngine[], ...],
+    topk_ids: TileTensor[mut=False, .int32, Engine=DefaultEngine[], ...],
+    send_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_count_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
     context: DeviceContext,
 ) raises:
     """Execute the Expert Parallelism async dispatch kernel.
@@ -219,8 +252,7 @@ def ep_dispatch_async_kernel_api[
     ]
 
     @always_inline
-    @parameter
-    def description_fn() -> String:
+    def description_fn() {imm} -> String:
         # fmt: off
         return String(
             "input_dtype=", input_tokens.dtype,
@@ -235,7 +267,7 @@ def ep_dispatch_async_kernel_api[
 
     with Trace[TraceLevel.OP, target=target](
         "ep.dispatch_async",
-        Trace[TraceLevel.OP]._get_detail_str[description_fn](),
+        Trace[TraceLevel.OP]._get_detail_str(description_fn),
         task_id=get_safe_task_id(context),
     ):
         var func = gpu_ctx.compile_function[dispatch_async]()
@@ -248,21 +280,21 @@ def ep_dispatch_async_kernel_api[
                 shmem_module_init(func)
                 global_cache_insert(
                     cached_module_key,
-                    UnsafePointer[NoneType, MutExternalOrigin](
+                    UnsafePointer[NoneType, MutUntrackedOrigin](
                         unsafe_from_address=1
                     ),
                 )
 
-        var send_ptr = UnsafePointer[UInt8, MutExternalOrigin](
+        var send_ptr = UnsafePointer[UInt8, MutUntrackedOrigin](
             unsafe_from_address=Int(send_ptrs[gpu_id])
         )
-        var recv_ptrs_arr = pack_ptrs_array[DType.uint8](recv_ptrs, my_rank)
-        var recv_count_ptrs_arr = pack_ptrs_array[DType.uint64](
+        var recv_ptrs_arr = pack_ptrs_array[.uint8](recv_ptrs, my_rank)
+        var recv_count_ptrs_arr = pack_ptrs_array[.uint64](
             recv_count_ptrs, my_rank
         )
         var ep_counters = EPLocalSyncCounters[n_experts](
-            UnsafePointer[Int32, MutExternalOrigin](
-                unsafe_from_address=Int(atomic_counters.ptr)
+            UnsafePointer[Int32, MutUntrackedOrigin](
+                unsafe_from_address=Int(atomic_counters._storage)
             )
         )
 
@@ -297,12 +329,12 @@ def ep_dispatch_wait_kernel_api[
     input_scales_wrapper: Optional[input_scales_wrapper_type] = None,
 ](
     token_handler: token_fmt_type,
-    row_offsets: TileTensor[DType.uint32, ...],
-    expert_ids: TileTensor[DType.int32, ...],
-    src_info: TileTensor[DType.int32, ...],
-    recv_ptrs: TileTensor[DType.uint64, ...],
-    recv_count_ptrs: TileTensor[DType.uint64, ...],
-    atomic_counters: TileTensor[DType.int32, ...],
+    row_offsets: TileTensor[.uint32, Engine=DefaultEngine[], ...],
+    expert_ids: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    src_info: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    recv_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_count_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    atomic_counters: TileTensor[.int32, Engine=DefaultEngine[], ...],
     context: DeviceContext,
     num_input_tokens: Int = -1,
 ) raises:
@@ -327,9 +359,9 @@ def ep_dispatch_wait_kernel_api[
         row_offsets: Cumulative token counts for grouped matmul.
         expert_ids: Local expert IDs for grouped matmul.
         src_info: Source routing information for combine phase.
-        atomic_counters: EP kernel synchronization counters.
         recv_ptrs: Receive buffer pointers for each local GPU.
         recv_count_ptrs: Receive count buffer pointers for each local GPU.
+        atomic_counters: EP kernel synchronization counters.
         context: Device context pointer.
         num_input_tokens: Per-rank input token count for this layer. When >= 0
             enables the decode-fast-path grid sizing. Default `-1` keeps the
@@ -370,8 +402,7 @@ def ep_dispatch_wait_kernel_api[
     ]
 
     @always_inline
-    @parameter
-    def description_fn() -> String:
+    def description_fn() {imm} -> String:
         # fmt: off
         return String(
             "token_fmt_type=", token_fmt_type.get_type_name(),
@@ -385,18 +416,18 @@ def ep_dispatch_wait_kernel_api[
 
     with Trace[TraceLevel.OP, target=target](
         "ep.dispatch_wait",
-        Trace[TraceLevel.OP]._get_detail_str[description_fn](),
+        Trace[TraceLevel.OP]._get_detail_str(description_fn),
         task_id=get_safe_task_id(context),
     ):
-        var recv_buf_ptr = UnsafePointer[UInt8, MutExternalOrigin](
+        var recv_buf_ptr = UnsafePointer[UInt8, MutUntrackedOrigin](
             unsafe_from_address=Int(recv_ptrs[gpu_id])
         )
-        var recv_count_ptr = UnsafePointer[UInt64, MutExternalOrigin](
+        var recv_count_ptr = UnsafePointer[UInt64, MutUntrackedOrigin](
             unsafe_from_address=Int(recv_count_ptrs[gpu_id])
         )
         var ep_counters = EPLocalSyncCounters[n_experts](
-            UnsafePointer[Int32, MutExternalOrigin](
-                unsafe_from_address=Int(atomic_counters.ptr)
+            UnsafePointer[Int32, MutUntrackedOrigin](
+                unsafe_from_address=Int(atomic_counters._storage)
             )
         )
 
@@ -451,15 +482,17 @@ def ep_fused_dispatch_kernel_api[
     allreduce_world_size: Int = 1,
 ](
     token_handler: token_fmt_type,
-    row_offsets: TileTensor[DType.uint32, ...],
-    expert_ids: TileTensor[DType.int32, ...],
-    src_info: TileTensor[DType.int32, ...],
-    atomic_counters: TileTensor[DType.int32, ...],
-    input_tokens: TileTensor[mut=False, dispatch_dtype, ...],
-    topk_ids: TileTensor[mut=False, DType.int32, ...],
-    send_ptrs: TileTensor[DType.uint64, ...],
-    recv_ptrs: TileTensor[DType.uint64, ...],
-    recv_count_ptrs: TileTensor[DType.uint64, ...],
+    row_offsets: TileTensor[.uint32, Engine=DefaultEngine[], ...],
+    expert_ids: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    src_info: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    atomic_counters: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    input_tokens: TileTensor[
+        mut=False, dispatch_dtype, Engine=DefaultEngine[], ...
+    ],
+    topk_ids: TileTensor[mut=False, .int32, Engine=DefaultEngine[], ...],
+    send_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_count_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
     context: DeviceContext,
 ) raises:
     """Execute the fused Expert Parallelism dispatch kernel.
@@ -504,7 +537,7 @@ def ep_fused_dispatch_kernel_api[
 
     # Ensure this kernel only runs on GPU targets
     comptime assert is_gpu[target](), "EP is only supported on GPU."
-    comptime assert dispatch_dtype == DType.bfloat16
+    comptime assert dispatch_dtype == .bfloat16
     comptime assert (
         send_ptrs.flat_rank == 1
     ), "Send pointers must be a 1D tensor."
@@ -557,8 +590,7 @@ def ep_fused_dispatch_kernel_api[
     ]
 
     @always_inline
-    @parameter
-    def description_fn() -> String:
+    def description_fn() {imm} -> String:
         # fmt: off
         return String(
             "token_fmt_type=", token_fmt_type.get_type_name(),
@@ -572,7 +604,7 @@ def ep_fused_dispatch_kernel_api[
 
     with Trace[TraceLevel.OP, target=target](
         "ep.dispatch",
-        Trace[TraceLevel.OP]._get_detail_str[description_fn](),
+        Trace[TraceLevel.OP]._get_detail_str(description_fn),
         task_id=get_safe_task_id(context),
     ):
         var smem_size = UInt32(token_fmt_type.dispatch_smem_size)
@@ -592,12 +624,12 @@ def ep_fused_dispatch_kernel_api[
                 shmem_module_init(func)
                 global_cache_insert(
                     cached_module_key,
-                    UnsafePointer[NoneType, MutExternalOrigin](
+                    UnsafePointer[NoneType, MutUntrackedOrigin](
                         unsafe_from_address=1
                     ),
                 )
 
-        var send_ptr = UnsafePointer[UInt8, MutExternalOrigin](
+        var send_ptr = UnsafePointer[UInt8, MutUntrackedOrigin](
             unsafe_from_address=Int(send_ptrs[gpu_id])
         )
         # Create inline arrays to store all the p2p accessible pointers
@@ -608,8 +640,8 @@ def ep_fused_dispatch_kernel_api[
             DType.uint64, local_rank_only=skip_a2a
         ](recv_count_ptrs, my_rank)
         var ep_counters = EPLocalSyncCounters[n_experts](
-            UnsafePointer[Int32, MutExternalOrigin](
-                unsafe_from_address=Int(atomic_counters.ptr)
+            UnsafePointer[Int32, MutUntrackedOrigin](
+                unsafe_from_address=Int(atomic_counters._storage)
             )
         )
 
@@ -662,12 +694,14 @@ def ep_combine_async_kernel_api[
     target: StaticString,
     use_shmem: Bool = (n_nodes > 1),
 ](
-    atomic_counters: TileTensor[DType.int32, ...],
-    input_tokens: TileTensor[mut=False, combine_dtype, ...],
-    src_info: TileTensor[mut=False, DType.int32, ...],
-    send_ptrs: TileTensor[DType.uint64, ...],
-    recv_ptrs: TileTensor[DType.uint64, ...],
-    recv_count_ptrs: TileTensor[DType.uint64, ...],
+    atomic_counters: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    input_tokens: TileTensor[
+        mut=False, combine_dtype, Engine=DefaultEngine[], ...
+    ],
+    src_info: TileTensor[mut=False, .int32, Engine=DefaultEngine[], ...],
+    send_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_count_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
     context: DeviceContext,
 ) raises:
     """Execute the Expert Parallelism combine kernel.
@@ -738,8 +772,7 @@ def ep_combine_async_kernel_api[
     ]
 
     @always_inline
-    @parameter
-    def description_fn() -> String:
+    def description_fn() {imm} -> String:
         # fmt: off
         return String(
             "combine_dtype=", combine_dtype,
@@ -755,7 +788,7 @@ def ep_combine_async_kernel_api[
 
     with Trace[TraceLevel.OP, target=target](
         "ep.combine",
-        Trace[TraceLevel.OP]._get_detail_str[description_fn](),
+        Trace[TraceLevel.OP]._get_detail_str(description_fn),
         task_id=get_safe_task_id(context),
     ):
         var func = gpu_ctx.compile_function[combine_async]()
@@ -768,22 +801,22 @@ def ep_combine_async_kernel_api[
                 shmem_module_init(func)
                 global_cache_insert(
                     cached_module_key,
-                    UnsafePointer[NoneType, MutExternalOrigin](
+                    UnsafePointer[NoneType, MutUntrackedOrigin](
                         unsafe_from_address=1
                     ),
                 )
 
-        var send_ptr = UnsafePointer[UInt8, MutExternalOrigin](
+        var send_ptr = UnsafePointer[UInt8, MutUntrackedOrigin](
             unsafe_from_address=Int(send_ptrs[gpu_id])
         )
         # Create inline arrays to store all the p2p accessible pointers
-        var recv_ptrs_arr = pack_ptrs_array[DType.uint8](recv_ptrs, my_rank)
-        var recv_count_ptrs_arr = pack_ptrs_array[DType.uint64](
+        var recv_ptrs_arr = pack_ptrs_array[.uint8](recv_ptrs, my_rank)
+        var recv_count_ptrs_arr = pack_ptrs_array[.uint64](
             recv_count_ptrs, my_rank
         )
         var ep_counters = EPLocalSyncCounters[n_experts](
-            UnsafePointer[Int32, MutExternalOrigin](
-                unsafe_from_address=Int(atomic_counters.ptr)
+            UnsafePointer[Int32, MutUntrackedOrigin](
+                unsafe_from_address=Int(atomic_counters._storage)
             )
         )
 
@@ -820,10 +853,10 @@ def ep_combine_wait_kernel_api[
     router_weights_wrapper: Optional[router_weights_wrapper_type] = None,
     epilogue_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    output_tokens: TileTensor[combine_dtype, ...],
-    atomic_counters: TileTensor[DType.int32, ...],
-    recv_ptrs: TileTensor[DType.uint64, ...],
-    recv_count_ptrs: TileTensor[DType.uint64, ...],
+    output_tokens: TileTensor[combine_dtype, Engine=DefaultEngine[], ...],
+    atomic_counters: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    recv_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_count_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
     context: DeviceContext,
     num_input_tokens: Int = -1,
 ) raises:
@@ -854,6 +887,9 @@ def ep_combine_wait_kernel_api[
         recv_ptrs: Receive buffer pointers for each local GPU.
         recv_count_ptrs: Receive count buffer pointers for each local GPU.
         context: Device context pointer.
+        num_input_tokens: Per-rank input token count for this layer. When
+            >= 0 enables the decode-fast-path grid sizing. Default `-1`
+            keeps the full-`sm_count` grid for backwards compatibility.
     """
 
     # Ensure this kernel only runs on GPU targets
@@ -895,8 +931,7 @@ def ep_combine_wait_kernel_api[
     ]
 
     @always_inline
-    @parameter
-    def description_fn() -> String:
+    def description_fn() {imm} -> String:
         # fmt: off
         return String(
             "combine_dtype=", combine_dtype,
@@ -912,18 +947,18 @@ def ep_combine_wait_kernel_api[
 
     with Trace[TraceLevel.OP, target=target](
         "ep.combine_wait",
-        Trace[TraceLevel.OP]._get_detail_str[description_fn](),
+        Trace[TraceLevel.OP]._get_detail_str(description_fn),
         task_id=get_safe_task_id(context),
     ):
-        var recv_buf_ptr = UnsafePointer[UInt8, MutExternalOrigin](
+        var recv_buf_ptr = UnsafePointer[UInt8, MutUntrackedOrigin](
             unsafe_from_address=Int(recv_ptrs[gpu_id])
         )
-        var recv_count_ptr = UnsafePointer[UInt64, MutExternalOrigin](
+        var recv_count_ptr = UnsafePointer[UInt64, MutUntrackedOrigin](
             unsafe_from_address=Int(recv_count_ptrs[gpu_id])
         )
         var ep_counters = EPLocalSyncCounters[n_experts](
-            UnsafePointer[Int32, MutExternalOrigin](
-                unsafe_from_address=Int(atomic_counters.ptr)
+            UnsafePointer[Int32, MutUntrackedOrigin](
+                unsafe_from_address=Int(atomic_counters._storage)
             )
         )
 
@@ -979,15 +1014,17 @@ def ep_fused_combine_kernel_api[
     use_shmem: Bool = (n_nodes > 1),
     allreduce_world_size: Int = 1,
 ](
-    output_tokens: TileTensor[combine_dtype, ...],
-    atomic_counters: TileTensor[DType.int32, ...],
-    input_tokens: TileTensor[mut=False, combine_dtype, ...],
-    src_info: TileTensor[mut=False, DType.int32, ...],
-    send_ptrs: TileTensor[DType.uint64, ...],
-    recv_ptrs: TileTensor[DType.uint64, ...],
-    recv_count_ptrs: TileTensor[DType.uint64, ...],
+    output_tokens: TileTensor[combine_dtype, Engine=DefaultEngine[], ...],
+    atomic_counters: TileTensor[.int32, Engine=DefaultEngine[], ...],
+    input_tokens: TileTensor[
+        mut=False, combine_dtype, Engine=DefaultEngine[], ...
+    ],
+    src_info: TileTensor[mut=False, .int32, Engine=DefaultEngine[], ...],
+    send_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
+    recv_count_ptrs: TileTensor[.uint64, Engine=DefaultEngine[], ...],
     context: DeviceContext,
-    topk_ids_p: Optional[UnsafePointer[Int32, ImmutExternalOrigin]] = None,
+    topk_ids_p: Optional[UnsafePointer[Int32, ImmUntrackedOrigin]] = None,
 ) raises:
     """Execute the fused Expert Parallelism combine kernel.
 
@@ -1083,8 +1120,7 @@ def ep_fused_combine_kernel_api[
     ]
 
     @always_inline
-    @parameter
-    def description_fn() -> String:
+    def description_fn() {imm} -> String:
         # fmt: off
         return String(
             "combine_dtype=", combine_dtype,
@@ -1100,7 +1136,7 @@ def ep_fused_combine_kernel_api[
 
     with Trace[TraceLevel.OP, target=target](
         "ep.combine",
-        Trace[TraceLevel.OP]._get_detail_str[description_fn](),
+        Trace[TraceLevel.OP]._get_detail_str(description_fn),
         task_id=get_safe_task_id(context),
     ):
         var func = gpu_ctx.compile_function[fused_combine]()
@@ -1115,12 +1151,12 @@ def ep_fused_combine_kernel_api[
                 shmem_module_init(func)
                 global_cache_insert(
                     cached_module_key,
-                    UnsafePointer[NoneType, MutExternalOrigin](
+                    UnsafePointer[NoneType, MutUntrackedOrigin](
                         unsafe_from_address=1
                     ),
                 )
 
-        var send_ptr = UnsafePointer[UInt8, MutExternalOrigin](
+        var send_ptr = UnsafePointer[UInt8, MutUntrackedOrigin](
             unsafe_from_address=Int(send_ptrs[gpu_id])
         )
         # Create inline arrays to store all the p2p accessible pointers
@@ -1131,8 +1167,8 @@ def ep_fused_combine_kernel_api[
             DType.uint64, local_rank_only=skip_a2a
         ](recv_count_ptrs, my_rank)
         var ep_counters = EPLocalSyncCounters[n_experts](
-            UnsafePointer[Int32, MutExternalOrigin](
-                unsafe_from_address=Int(atomic_counters.ptr)
+            UnsafePointer[Int32, MutUntrackedOrigin](
+                unsafe_from_address=Int(atomic_counters._storage)
             )
         )
 

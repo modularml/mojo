@@ -1,0 +1,580 @@
+---
+title: Mojo struct declarations reference
+sidebar_label: Struct declarations
+sidebar_position: 8
+description: >
+  Reference for Mojo struct declarations, fields, methods,
+  parameters, trait conformance, initializers, and lifecycle
+  methods.
+---
+
+<!-- Sources:
+ParserStmts.cpp (parseStructStmt, parseVarStmt, parseClassStmt, parseSuite,
+parseComptimeCompoundStmt, parseAliasDeclStmtBody), DeclResolution.cpp
+(resolveSignature(StructDeclOp), resolveBody(StructDeclOp),
+resolveSignature(StructFieldOp), parseOptionalInheritanceList,
+verifyDerivedAncestorImplication, defSigDecorators), DeclResolver.cpp
+(resolveSignature dispatch, resolveBody dispatch), Signatures.cpp
+(TypeCheckeddefSignature::verifyFunctionNameBinding, checkSelfArgument,
+synthesizeFieldwiseInit), Signatures.h (ParsedArgument conventions,
+KWArgHandling, ParsedParamList), StructEmitter.cpp
+(synthesizeFieldwiseInit, synthesizeEmptyDtor,
+synthesizeEmptyMoveOrCopyInit, populateMoveCopy), StructEmitter.h,
+Traits.cpp (verifyAndBuildConformance,
+signatureResolveDefaultTraitdefStubs, checkMethodConstraintStatus),
+Traits.h, ASTDecl.h (traitConformanceLineage, computeSelfTypeForStruct,
+doesNominalTypeConformTo), ASTType.h, TokenKinds.def, ExprNode.h,
+MojoDiags.h, ParserBase.h
+-->
+
+A struct defines a custom type with fields and methods.
+Structs are value types: each variable holds its own
+independent copy rather than a reference to shared data.
+
+<!-- VERIFIED: From ParserStmts.cpp parseStructStmt() -->
+
+```text
+struct Name:
+    body
+
+struct Name[parameter-list]:
+    body
+
+struct Name(TraitA, TraitB):
+    body
+
+struct Name[parameter-list](TraitA, TraitB):
+    body
+```
+
+By convention, struct names use `PascalCase`. `Self` (capital S) refers to
+the struct's own type inside the body. `self` (lowercase) is a conventional
+argument name for the instance.
+
+```mojo
+from std.math import sqrt
+
+struct Point:
+    var x: Int
+    var y: Int
+
+    def __init__(out self, x: Int, y: Int):
+        self.x = x
+        self.y = y
+
+    def distance(self) -> Float64:
+        return sqrt(
+            Float64(self.x * self.x + self.y * self.y)
+        )
+
+def main():
+    var p = Point(3, 4)
+    print(p.distance()) # 5.0
+```
+
+## Struct body elements
+
+A struct body can contain these elements:
+
+<!-- markdownlint-disable MD013 -->
+
+| Element               | Syntax                        | Role                       |
+|-----------------------|-------------------------------|----------------------------|
+| Field                 | `var name: Type`              | Instance data              |
+| Method                | `def name(self, ...)`         | Instance behavior          |
+| Static method         | `@staticmethod def name(...)` | Type-level behavior        |
+| Compile-time constant | `comptime name = value`       | Evaluated at compile time  |
+| Initializer           | `def __init__(out self, ...)` | Constructs an instance     |
+| Deinitializer         | `def __deinit__(deinit self)` | Cleanup at end of lifetime |
+
+<!-- markdownlint-enable MD013 -->
+
+The most minimal struct uses `pass` for an empty body:
+
+```mojo
+struct ValidationError:
+    pass
+```
+
+Structs can't be nested inside other structs, traits, or functions:
+
+```mojo
+struct Outer:
+    struct Inner:  # Error: nested struct not supported here
+        pass
+```
+
+## Fields
+
+Declare each field with `var` and a type annotation. Fields can't have
+default values. All fields must be initialized in `__init__()`:
+
+```mojo
+struct Color:
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8
+
+    def __init__(out self, r: UInt8, g: UInt8, b: UInt8):
+        (self.r, self.g, self.b) = (r, g, b)
+```
+
+Every field requires a type annotation:
+
+```mojo
+struct Unsound:
+    var x  # Error: struct field declaration must have a type
+```
+
+Field types must be concrete, not traits. A struct parameter
+establishes a concrete type at compile time:
+
+```mojo
+struct Unsound:
+    var item: Writable  # Error because dynamic traits not supported
+
+@fieldwise_init
+struct Sound[T: Writable & Copyable & Deinitable]:
+    var item: Self.T    # OK: concrete at compile time
+
+def main():
+    var g = Sound[Int](item=42)
+    print(g.item)       # 42
+```
+
+### Synthesized initializers
+
+The `@fieldwise_init` decorator synthesizes an `__init__()`
+from the struct's fields:
+
+```mojo
+@fieldwise_init
+struct Color:
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8
+
+def main():
+    var color = Color(255, 0, 0)
+    print(color.r, color.g, color.b)  # 255, 0, 0
+```
+
+Synthesis fails if any field is non-copyable and non-movable:
+
+```mojo
+@fieldwise_init
+struct Alpha:
+    var a: UInt8
+
+@fieldwise_init
+struct Color:
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8
+    var alpha: Alpha
+
+    # Error: cannot synthesize fieldwise init because field
+    # 'alpha' has non-copyable and non-movable type 'Alpha'
+```
+
+### Recursive references
+
+Structs can't point to themselves. Mojo won't let you build a type that
+stores another instance of itself, even when nested within an Optional:
+
+```mojo
+struct Node:
+    var value: String
+    var next: Optional[Node]  # Error about this being a recursive
+                              # reference
+```
+
+To build recursive data structures such as linked lists and trees, you must
+use unsafe pointers.
+
+## Parameters
+
+Structs accept compile-time parameters in square brackets.
+Parameters are accessed through `Self` inside the struct
+body. `Self.T` refers to the parameter `T`. Bare `T` isn't
+valid in the struct body:
+
+```mojo
+@fieldwise_init
+struct Pair[T: Copyable & Deinitable]:
+    var first: Self.T
+    var second: Self.T
+```
+
+## Trait conformance
+
+Declare conformance in parentheses after the name or parameter list.
+Separate multiple traits with commas or compose them with `&`:
+
+```mojo
+@fieldwise_init
+struct MyInt(Writable, Copyable):
+    var value: Int
+
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write(self.value)
+
+def main():
+    var my_int = MyInt(42)
+    print(my_int)  # 42
+```
+
+Conformance commits the struct to implementing every method and associated
+type the trait requires. Missing items produce errors:
+
+```mojo
+@fieldwise_init
+struct Incomplete(Sized):
+    var value: Int
+    # Error: 'Incomplete' does not implement all requirements
+    # for 'Sized'
+    # Note: required function '__len__' is not implemented
+```
+
+### Conformance lists
+
+A conformance list accepts traits and conditional `where` clauses:
+
+```mojo
+@fieldwise_init
+struct Pair[T: Copyable & Deinitable](
+    Equatable where conforms_to(T, Equatable)
+):
+    var first: Self.T
+    var second: Self.T
+```
+
+### Implicit conformances
+
+The compiler automatically conforms every struct to `AnyType` and
+`Deinitable` when all members are also `Deinitable`. With
+parameterized types, the parameter's traits must include `Deinitable`
+for this to apply:
+
+```mojo
+@fieldwise_init
+struct Box[T: Copyable & Deinitable](
+    Equatable where conforms_to(T, Equatable)
+):
+    var item: Self.T
+
+def main():
+    var box = Box(42)
+    print(box.item)  # OK
+```
+
+Without `Deinitable`, the compiler can't verify that the struct
+is safe to destroy using the built-in `__deinit__()` deinitializer:
+
+```mojo
+@fieldwise_init
+struct Box[T: Copyable](
+    Equatable where conforms_to(T, Equatable)
+):
+    var item: Self.T
+
+def main():
+    var box = Box(42)
+    print(box.item)
+    # Error about the 'box' being abandoned without being destroyed.
+```
+
+### Synthesized lifecycle methods
+
+If a struct conforms to `Movable` but doesn't define `__init__(move:)`, the
+compiler synthesizes one that moves each field. The same applies to
+`Copyable` and `__init__(copy:)`. Synthesis fails if any field can't
+support the operation:
+
+```mojo
+struct Unsound(Copyable):
+    var item: SomeMoveOnlyType
+    # Error about synthesizing the copy initializer because
+    # field 'item' has non-copyable type SomeMoveOnlyType
+```
+
+### Default method conflicts
+
+When two traits provide conflicting defaults for the same method, the
+struct must implement it manually:
+
+```mojo
+trait A:
+    def foo(self) -> Int:
+        return 42
+
+trait B:
+    def foo(self) -> Int:
+        return 1024
+
+@fieldwise_init
+struct S(A & B):
+    pass
+
+# Error about conflicting default implementations in two traits
+# reminding you to implement the implementation manually
+```
+
+### Conditional conformance
+
+Conditional conformance lets a struct conform to a trait when certain
+conditions are met. For example, the following structs conform to a set of
+(mostly hypothetical) traits when their parameters meet specific criteria:
+
+```mojo
+from std.sys import is_gpu
+
+@fieldwise_init
+struct Mathematical(
+    GPUComputable where is_gpu()
+):
+    # conforms only on GPU targets
+
+@fieldwise_init
+struct FixedBuffer[T: Copyable, N: Int](
+    Iterable where N > 0
+):
+    # conforms if N is one or more, but not if N is zero or negative
+
+@fieldwise_init
+struct Tensor[dtype: DType](
+    FloatMath where dtype.is_floating_point()
+):
+    # conforms when dtype is a floating point type
+
+@fieldwise_init
+struct Tagged[kind: StringLiteral](
+    Printable where kind == "debug"
+):
+    # only conforms in debug mode
+
+@fieldwise_init
+struct Box[T: Copyable](
+    Equatable where conforms_to(T, Equatable)
+):
+    # conforms to Equatable only when T does
+```
+
+### Conditional conformance and compile-time values
+
+Conditional conformance can depend only on information known at compile
+time. While it often uses traits to constrain conformance, conditional
+conformance isn't limited to traits. A condition can use any compile-time
+value that can be evaluated in a clear and consistent way.
+
+For example, a type might conform to a trait only on a specific platform
+(such as NVIDIA GPUs or Apple Silicon with Metal) or when a compile-time
+constant has a given value. If the condition can be fully resolved at
+compile time, it can restrict conformance.
+
+That said, conformance can't depend on a computed compile-time member.
+Trait conformance is part of the type's signature, and the signature is
+needed to resolve members. Depending on a computed member would create a
+circular dependency.
+
+### Conditional conformance and default implementations
+
+Conditional conformance and default implementations are independent
+features, but they often work together.
+
+The `Writable` trait offers a default implementation that uses reflection
+to automatically write struct fields. Declare the trait conformance after
+ensuring that all fields are `Writable`:
+
+```mojo
+@fieldwise_init
+struct Point(Writable):
+    var x: Float64
+    var y: Float64
+```
+
+Consider a parameterized version of this `Pair` type:
+
+```mojo
+@fieldwise_init
+struct Pair[T: Copyable & Deinitable]:
+    var first: Self.T
+    var second: Self.T
+```
+
+If `T` isn't `Writable`, the struct can still declare `Writable`
+conformance by providing its own implementation of `Writable`'s
+required methods. This is impractical without an API surface that describes
+`T` instances.
+
+A better solution is to use conditional conformance. Ensure `Pair`
+conforms to `Writable` only when its fields do. Test the `T` type with
+`conforms_to()` in a `where` clause in the struct's conformance list:
+
+```mojo
+@fieldwise_init
+struct Pair[T: Copyable & Deinitable](
+    Writable where conforms_to(T, Writable)
+):
+    var first: Self.T
+    var second: Self.T
+```
+
+You can print `Pair[Int]` because `Int` is `Writable`, but not
+`Pair[NotWritable]`, which doesn't conform to `Writable`:
+
+```mojo
+@fieldwise_init
+struct NotWritable(ImplicitlyCopyable & Deinitable):
+    var item: Int
+
+def main():
+    var not_writable = NotWritable(42)
+    var pair = Pair(not_writable, not_writable)
+    print(pair) # Error regarding 'Writable' nonconformance
+```
+
+### Mixed trait lists
+
+You can combine conditional and non-conditional traits in the same
+conformance list:
+
+```mojo
+@fieldwise_init
+struct Pair[T: Copyable & Deinitable](
+    Equatable where conforms_to(T, Equatable),
+    Writable where conforms_to(T, Writable),
+    Copyable
+):
+    var first: Self.T
+    var second: Self.T
+
+def main():
+    var pair1 = Pair(first=1, second=2)
+    var pair2 = Pair(first=1, second=2)
+    var pair3 = Pair(first=3, second=4)
+
+    print(pair1 == pair2)  # True
+    print(pair1 == pair3)  # False
+
+    var pair4 = pair1.copy() # OK: Copyable conformance doesn't depend on T
+    _ = pair4
+```
+
+## Methods
+
+Instance methods take `self` as the first argument. The convention on
+`self` determines access:
+
+- Bare `self`: immutable reference.
+- `mut self`: allows modification.
+- `out`, `deinit`: used by lifecycle methods.
+- `out`: also used to specify a named result slot.
+- `ref`: used to declare an argument with parametric mutability, and which
+  must be passed in memory regardless of its type.
+
+A method without `self` is an error unless it's marked `@staticmethod`:
+
+```mojo
+struct Unsound:
+    def broken():
+        pass
+    # Error: self argument must be present in instance method
+
+struct OK:
+    @staticmethod
+    def utility():  # No self required
+        pass
+```
+
+`@staticmethod` marks a method that belongs to the type, not to instances.
+
+It can access type parameters and comptime members, can call other static
+methods, has no `self`, and has no access to instance fields and instance
+methods.
+
+Use static methods for utility functions related to the
+struct's mission that don't need an instance to work, such as factory
+methods and general-purpose helpers.
+
+### Dunder methods
+
+*Dunder methods* (double-underscored names) let a struct work with
+operators, built-in functions, and lifecycle events: `__init__()`,
+`__add__()`, `__str__()`, and so on.
+
+## Instance creation with initializers
+
+`__init__()` uses the `out self` convention to produce the newly initialized
+value. Every field must be assigned before `__init__()` returns:
+
+```mojo
+struct Point:
+    var x: Float64
+    var y: Float64
+
+    def __init__(out self, x: Float64, y: Float64):
+        (self.x, self.y) = (x, y)
+
+def main():
+    var p = Point(3.0, 4.0)
+    print(p.x, p.y)  # 3.0 4.0
+```
+
+Omitting `out self` is an error:
+
+```mojo
+struct Unsound:
+    var value: Int
+
+    def __init__(self):
+        pass
+    # Error: __init__ method must return Self type with
+    # 'out' argument
+```
+
+`__init__()` is implicitly static. Structs can define multiple `__init__()`
+overloads.
+
+## Instance tear-down with deinitializers
+
+`__deinit__()` runs when the compiler detects no further access to an
+instance. Its `self` uses the `deinit` convention:
+
+```mojo
+def __deinit__(deinit self):
+    print("cleaning up")
+```
+
+Implicitly deinitable structs get a default `__deinit__()`. A custom
+`__deinit__()` overrides the default. `__deinit__()` can't be overloaded.
+
+:::note
+Explicitly destroyed structs write their own cleanup logic, using a
+consuming method with `deinit self`.
+
+Opt out with `Deinitable where False`.
+:::
+
+## `comptime` members
+
+`comptime` declares type-level members inside a struct. They're evaluated
+at compile time and can't be modified at runtime. Use them for constants,
+type aliases, and computed members:
+
+```mojo
+@fieldwise_init
+struct Matrix2D[dtype: DType, w: Int, h: Int]:
+    pass
+
+struct Test[dtype: DType]:
+    comptime default_size = 1024
+    comptime DefaultMatrixType = Matrix2D[Self.dtype, Self.default_size, Self.default_size]
+    comptime SquareMatrixType[size: Int] = Matrix2D[Self.dtype, size, size]
+
+def main():
+    print(Test[.int32].default_size) # 1024
+```
+
+Access these constants on the instance or the type. For example,
+`Test[.int32]().default_size` and `Test[.int32].default_size`.

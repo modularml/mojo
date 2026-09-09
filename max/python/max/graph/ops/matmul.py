@@ -29,10 +29,28 @@ def matmul(lhs: TensorValueLike, rhs: TensorValueLike) -> TensorValue:
 
     .. code-block:: python
 
-        lhs = ops.constant([[1.0, 2.0], [3.0, 4.0]], DType.float32, device=device)
-        rhs = ops.constant([[5.0, 6.0], [7.0, 8.0]], DType.float32, device=device)
-        result = ops.matmul(lhs, rhs)
-        # result has shape (2, 2): [[19.0, 22.0], [43.0, 50.0]]
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
+
+        device = DeviceRef.CPU()
+        with Graph("matmul_example") as graph:
+            lhs = ops.constant(
+                [[1.0, 2.0], [3.0, 4.0]], DType.float32, device=device
+            )
+            rhs = ops.constant(
+                [[5.0, 6.0], [7.0, 8.0]], DType.float32, device=device
+            )
+            graph.output(ops.matmul(lhs, rhs))
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.allclose(result.to_numpy(), [[19.0, 22.0], [43.0, 50.0]])
 
     The innermost two dimensions of each input are treated as a matrix.
     In the example above ``lhs`` has shape ``(M, K) = (2, 2)`` and ``rhs``

@@ -331,15 +331,17 @@ cc_args(
 cc_args(
     name = "generate_dsym",
     actions = ["@rules_cc//cc/toolchains/actions:link_actions"],
-    env = {
-        "MODULAR_BINARY_PATH": "{output_execpath}",
-        "MODULAR_DSYM_PATH": "{dsym_path}",
-    },
-    format = {
-        "dsym_path": "@rules_cc//cc/toolchains/variables:dsym_path",
-        "output_execpath": "@rules_cc//cc/toolchains/variables:output_execpath",
-    },
+    args = ["--modular-dsym-path={dsym_path}"],
+    format = {"dsym_path": "@rules_cc//cc/toolchains/variables:dsym_path"},
     requires_not_none = "@rules_cc//cc/toolchains/variables:dsym_path",
+)
+
+cc_args(
+    name = "output_exec_path",
+    actions = ["@rules_cc//cc/toolchains/actions:link_actions"],
+    args = ["--modular-binary-path={output_execpath}"],
+    format = {"output_execpath": "@rules_cc//cc/toolchains/variables:output_execpath"},
+    requires_not_none = "@rules_cc//cc/toolchains/variables:output_execpath",
 )
 
 # TODO: Try to replace with https://github.com/bazelbuild/rules_cc/pull/529

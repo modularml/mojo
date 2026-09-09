@@ -28,7 +28,7 @@ from typing import Any, TextIO
 
 import httpx
 import scipy.special
-from max.support.taskgroups import TaskGroup
+from max.support._taskgroups import TaskGroup
 
 from . import schema
 
@@ -300,15 +300,12 @@ class BaseProgressNotifier:
 
     def adjust_total_tasks(self, delta: int) -> None:
         """Notify of a change in the number of tasks."""
-        pass
 
     def worker_start_item(self, worker: int, item: int) -> None:
         """Notify that a worker has picked up an item."""
-        pass
 
     def worker_finish_item(self, worker: int, item: int) -> None:
         """Notify that a worker has finished an item."""
-        pass
 
 
 class TrackingProgressNotifier(BaseProgressNotifier):
@@ -392,7 +389,6 @@ class TrackingProgressNotifier(BaseProgressNotifier):
 
         Subclasses should implement this to be notified of progress changes.
         """
-        pass
 
 
 class TerminalProgressNotifier(TrackingProgressNotifier):

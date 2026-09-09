@@ -16,11 +16,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import ClassVar
 
 from max.dtype import DType
 from max.graph import DeviceRef
 from max.nn.comm.ep import EPConfig
+from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.lib.config.model_config import _select_quantization_encoding
+from max.pipelines.modeling.config_enums import SupportedEncoding
 from transformers.models.auto.configuration_auto import AutoConfig
 from typing_extensions import Self, override
 
@@ -34,6 +38,12 @@ class MiniMaxM2Config(Llama3Config):
     Extends Llama3Config with MoE-specific parameters including sigmoid
     routing with expert score correction bias.
     """
+
+    DEFAULT_ENCODING: ClassVar[SupportedEncoding] = "float8_e4m3fn"
+    SUPPORTED_ENCODINGS: ClassVar[set[SupportedEncoding]] = {
+        "float8_e4m3fn",
+        "float4_e2m1fnx2",
+    }
 
     # MoE parameters
     num_local_experts: int = 256
@@ -90,6 +100,8 @@ class MiniMaxM2Config(Llama3Config):
         cls,
         pipeline_config: PipelineConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a MiniMaxM2Config from pipeline configuration.
 
@@ -107,7 +119,9 @@ class MiniMaxM2Config(Llama3Config):
                 "but config could not be loaded. "
                 "Please ensure the model repository contains a valid config.json file."
             )
-        return cls.initialize_from_config(pipeline_config, huggingface_config)
+        return cls.initialize_from_config(
+            pipeline_config, huggingface_config, max_seq_len=max_seq_len
+        )
 
     @override
     @classmethod
@@ -116,6 +130,8 @@ class MiniMaxM2Config(Llama3Config):
         pipeline_config: PipelineConfig,
         huggingface_config: AutoConfig,
         model_config: MAXModelConfig | None = None,
+        *,
+        max_seq_len: int,
     ) -> Self:
         """Initializes a MiniMaxM2Config from pipeline and HuggingFace configs.
 
@@ -129,11 +145,20 @@ class MiniMaxM2Config(Llama3Config):
         """
         # Get base config from Llama3Config
         base_config = Llama3Config.initialize_from_config(
-            pipeline_config, huggingface_config, model_config
+            pipeline_config,
+            huggingface_config,
+            model_config,
+            max_seq_len=max_seq_len,
         )
 
         kv_cache_config = pipeline_config.model.kv_cache
-        cache_dtype = pipeline_config.model.kv_cache.cache_dtype
+        quantization_encoding = _select_quantization_encoding(
+            pipeline_config.model, cls.DEFAULT_ENCODING
+        )
+        cache_dtype = cache_dtype_for_encoding(
+            quantization_encoding,
+            pipeline_config.model.kv_cache.kv_cache_format,
+        )
         n_devices = len(pipeline_config.model.device_specs)
 
         device_refs = [
@@ -198,4 +223,5 @@ class MiniMaxM2Config(Llama3Config):
             num_local_experts=num_local_experts,
             num_experts_per_tok=num_experts_per_tok,
             partial_rotary_factor=partial_rotary_factor,
+            quantization_encoding=quantization_encoding,
         )

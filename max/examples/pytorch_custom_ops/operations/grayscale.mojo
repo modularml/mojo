@@ -13,15 +13,16 @@
 
 # DOC: max/develop/custom-kernels-pytorch.mdx
 
-import compiler
+import extensibility
 
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from extensibility import InputTensor, OutputTensor, foreach
 
+from std.utils.coord import Coord, coord_to_index_list
 from std.utils.index import IndexList
 
 
-@compiler.register("grayscale")
+@extensibility.register("grayscale")
 struct Grayscale:
     """Convert RGB image tensor to grayscale using weighted formula."""
 
@@ -29,8 +30,8 @@ struct Grayscale:
     def execute[
         target: StaticString,  # "cpu" or "gpu"
     ](
-        img_out: OutputTensor[dtype=DType.uint8, rank=2, ...],
-        img_in: InputTensor[dtype=DType.uint8, rank=3, ...],
+        img_out: OutputTensor[dtype=.uint8, rank=2, ...],
+        img_in: InputTensor[dtype=.uint8, rank=3, ...],
         ctx: DeviceContext,
     ) raises:
         """Execute grayscale conversion on the input image tensor.
@@ -41,11 +42,11 @@ struct Grayscale:
             ctx: Device context for execution.
         """
 
-        @parameter
+        @__parameter
         @always_inline
         def color_to_grayscale[
             simd_width: Int
-        ](idx: IndexList[img_out.rank]) -> SIMD[DType.uint8, simd_width]:
+        ](idx: Coord) -> SIMD[.uint8, simd_width]:
             """Convert RGB pixel to grayscale using perceptual weighting.
 
             Args:
@@ -55,14 +56,15 @@ struct Grayscale:
                 Grayscale value as SIMD vector.
             """
 
-            @parameter
+            @__parameter
             def load(
                 idx: IndexList[img_in.rank],
-            ) -> SIMD[DType.float32, simd_width]:
-                return img_in.load[simd_width](idx).cast[DType.float32]()
+            ) -> SIMD[.float32, simd_width]:
+                return img_in.load[simd_width](idx).cast[.float32]()
 
-            var row = idx[0]
-            var col = idx[1]
+            var idx_l = coord_to_index_list(idx)
+            var row = idx_l[0]
+            var col = idx_l[1]
 
             # Load RGB values from input tensor
             var r = load(IndexList[3](row, col, 0))
@@ -74,7 +76,7 @@ struct Grayscale:
             var gray = 0.21 * r + 0.71 * g + 0.07 * b
 
             # Clamp to valid uint8 range and convert back
-            return min(gray, 255).cast[DType.uint8]()
+            return min(gray, 255).cast[.uint8]()
 
         # Execute the conversion using parallel foreach
         foreach[color_to_grayscale, target=target, simd_width=1](img_out, ctx)

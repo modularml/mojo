@@ -11,11 +11,12 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.gpu import barrier, warp_id, lane_id
-from std.gpu.host import DeviceContext
-from std.gpu import thread_idx
-from std.gpu.intrinsics import threadfence
-from std.gpu.compute.mma import (
+from max.gpu import warp_id, lane_id
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu import thread_idx
+from max.gpu.intrinsics import threadfence
+from max.gpu.compute.mma import (
     WGMMADescriptor,
     wgmma_async,
     wgmma_commit_group_sync,
@@ -42,23 +43,23 @@ def wgmma_kernel[
 ](
     operand_a: LayoutTensor[a_type, Layout.row_major(M, K), MutAnyOrigin],
     operand_b: LayoutTensor[b_type, Layout.row_major(K, N), MutAnyOrigin],
-    result_c: LayoutTensor[DType.int32, Layout.row_major(M, N), MutAnyOrigin],
+    result_c: LayoutTensor[.int32, Layout.row_major(M, N), MutAnyOrigin],
 ):
     var smem_operand_a = LayoutTensor[
         a_type,
         smem_operand_a_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
     var smem_operand_b = LayoutTensor[
         b_type,
         smem_operand_b_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ].stack_allocation()
 
-    var c_reg = SIMD[DType.uint32, 4](0)
+    var c_reg = SIMD[.uint32, 4](0)
 
     for k_i in range(K // WMMA_K):
         var operand_a_tile = operand_a.tile[M, WMMA_K](0, k_i)
@@ -94,7 +95,7 @@ def wgmma_kernel[
     # Each warp updates a 16x8 tile, and within each tile,
     # every thread updates a 1x2 vector. The resulting distribution layout
     # is as follows:
-    c0 = bitcast[DType.int32, 4](c_reg)
+    var c0 = bitcast[.int32, 4](c_reg)
     var th_local_res = (
         result_c.tile[16, 8](warp_id(), 0)
         .vectorize[1, 2]()
@@ -187,7 +188,7 @@ def wgmma_s8_s8_s32_64x8x32(ctx: DeviceContext) raises:
     arange(rhs.tensor(), end=5)
     # print(rhs.tensor())
 
-    var res = ManagedLayoutTensor[DType.int32, Layout.row_major(M, N)](ctx)
+    var res = ManagedLayoutTensor[.int32, Layout.row_major(M, N)](ctx)
 
     # https://docs.nvidia.com/cuda/parallel-thread-execution/_images/wgmma-64N32-core-matrices-A.png
     comptime a_smem_layout = Layout(
@@ -308,7 +309,7 @@ def wgmma_u8_u8_s32_64x8x32(ctx: DeviceContext) raises:
     arange(rhs.tensor(), end=5)
     # print(rhs.tensor())
 
-    var res = ManagedLayoutTensor[DType.int32, Layout.row_major(M, N)](ctx)
+    var res = ManagedLayoutTensor[.int32, Layout.row_major(M, N)](ctx)
 
     # https://docs.nvidia.com/cuda/parallel-thread-execution/_images/wgmma-64N32-core-matrices-A.png
     comptime a_smem_layout = Layout(
@@ -431,7 +432,7 @@ def wgmma_s8_u8_s32_64x8x32(ctx: DeviceContext) raises:
     arange(rhs_tensor, end=5)
     print(rhs_tensor)
 
-    var res = ManagedLayoutTensor[DType.int32, Layout.row_major(M, N)](ctx)
+    var res = ManagedLayoutTensor[.int32, Layout.row_major(M, N)](ctx)
 
     # https://docs.nvidia.com/cuda/parallel-thread-execution/_images/wgmma-64N32-core-matrices-A.png
     comptime a_smem_layout = Layout(
@@ -554,7 +555,7 @@ def wgmma_u8_s8_s32_64x8x32(ctx: DeviceContext) raises:
     arange(rhs_tensor, end=5)
     print(rhs_tensor)
 
-    var res = ManagedLayoutTensor[DType.int32, Layout.row_major(M, N)](ctx)
+    var res = ManagedLayoutTensor[.int32, Layout.row_major(M, N)](ctx)
 
     # https://docs.nvidia.com/cuda/parallel-thread-execution/_images/wgmma-64N32-core-matrices-A.png
     comptime a_smem_layout = Layout(

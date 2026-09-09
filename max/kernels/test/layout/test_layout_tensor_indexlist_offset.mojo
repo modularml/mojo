@@ -36,13 +36,11 @@ def test_ptr_at_offset_static_2d() raises:
     comptime layout = Layout.row_major(10, 20)
     comptime total_elems = 10 * 20
 
-    var data = InlineArray[Int32, total_elems](uninitialized=True)
-    for i in range(total_elems):
-        data[i] = Int32(i)
-
-    var tensor = LayoutTensor[DType.int32, layout, MutAnyOrigin](
-        data.unsafe_ptr()
+    var data = Array[Int32, total_elems](
+        fill_with=lambda (i: Int) -> Int32: Int32(i)
     )
+
+    var tensor = LayoutTensor[.int32, layout](data.unsafe_ptr())
 
     # Test pointer at (2, 3) -> offset = 2 * 20 + 3 = 43
     var ptr = tensor.ptr_at_offset(Index(2, 3))
@@ -59,13 +57,11 @@ def test_ptr_at_offset_static_3d() raises:
     comptime layout = Layout.row_major(5, 10, 20)
     comptime total_elems = 5 * 10 * 20
 
-    var data = InlineArray[Int32, total_elems](uninitialized=True)
-    for i in range(total_elems):
-        data[i] = Int32(i)
-
-    var tensor = LayoutTensor[DType.int32, layout, MutAnyOrigin](
-        data.unsafe_ptr()
+    var data = Array[Int32, total_elems](
+        fill_with=lambda (i: Int) -> Int32: Int32(i)
     )
+
+    var tensor = LayoutTensor[.int32, layout](data.unsafe_ptr())
 
     # Test pointer at (1, 2, 3) -> offset = 1*200 + 2*20 + 3 = 243
     var ptr = tensor.ptr_at_offset(Index(1, 2, 3))
@@ -78,13 +74,11 @@ def test_ptr_at_offset_static_4d() raises:
     comptime layout = Layout.row_major(2, 4, 8, 16)
     comptime total_elems = 2 * 4 * 8 * 16
 
-    var data = InlineArray[Int32, total_elems](uninitialized=True)
-    for i in range(total_elems):
-        data[i] = Int32(i)
-
-    var tensor = LayoutTensor[DType.int32, layout, MutAnyOrigin](
-        data.unsafe_ptr()
+    var data = Array[Int32, total_elems](
+        fill_with=lambda (i: Int) -> Int32: Int32(i)
     )
+
+    var tensor = LayoutTensor[.int32, layout](data.unsafe_ptr())
 
     # Test pointer at (1, 2, 3, 4) -> offset = 1*512 + 2*128 + 3*16 + 4 = 820
     var ptr = tensor.ptr_at_offset(Index(1, 2, 3, 4))
@@ -97,13 +91,11 @@ def test_ptr_at_offset_col_major() raises:
     comptime layout = Layout.col_major(10, 20)
     comptime total_elems = 10 * 20
 
-    var data = InlineArray[Int32, total_elems](uninitialized=True)
-    for i in range(total_elems):
-        data[i] = Int32(i)
-
-    var tensor = LayoutTensor[DType.int32, layout, MutAnyOrigin](
-        data.unsafe_ptr()
+    var data = Array[Int32, total_elems](
+        fill_with=lambda (i: Int) -> Int32: Int32(i)
     )
+
+    var tensor = LayoutTensor[.int32, layout](data.unsafe_ptr())
 
     # Col-major: stride = (1, 10), offset = 2*1 + 3*10 = 32
     var ptr = tensor.ptr_at_offset(Index(2, 3))
@@ -127,16 +119,16 @@ def test_ptr_at_offset_with_unknown_stride() raises:
 
     # Allocate test data
     comptime total_elems = 4 * d1 * d2  # 4 * 8 * 16 = 512
-    var data = InlineArray[Int32, total_elems](uninitialized=True)
-    for i in range(total_elems):
-        data[i] = Int32(i)
+    var data = Array[Int32, total_elems](
+        fill_with=lambda (i: Int) -> Int32: Int32(i)
+    )
 
     # Create tensor with runtime stride[0] = 128
     var runtime_stride_0 = d1 * d2  # = 128
     var runtime_shape = IndexList[3](4, d1, d2)
     var runtime_strides = IndexList[3](runtime_stride_0, d2, 1)
 
-    var tensor = LayoutTensor[DType.int32, layout, MutAnyOrigin](
+    var tensor = LayoutTensor[.int32, layout](
         data.unsafe_ptr(),
         RuntimeLayout[layout](runtime_shape, runtime_strides),
     )
@@ -160,16 +152,16 @@ def test_ptr_at_offset_view_tensor() raises:
     comptime child_layout = Layout(child_shape, child_strides)
 
     comptime total_elems = 24
-    var data = InlineArray[Int32, total_elems](uninitialized=True)
-    for i in range(total_elems):
-        data[i] = Int32(i)
+    var data = Array[Int32, total_elems](
+        fill_with=lambda (i: Int) -> Int32: Int32(i)
+    )
 
     # Create view with runtime stride[0] = 8 (different from shape[1] = 4)
     var runtime_stride_0 = 8
     var runtime_shape = IndexList[2](3, 4)
     var runtime_strides = IndexList[2](runtime_stride_0, 1)
 
-    var child = LayoutTensor[DType.int32, child_layout, MutAnyOrigin](
+    var child = LayoutTensor[.int32, child_layout](
         data.unsafe_ptr(),
         RuntimeLayout[child_layout](runtime_shape, runtime_strides),
     )

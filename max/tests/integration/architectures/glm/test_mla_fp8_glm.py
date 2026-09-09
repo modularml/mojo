@@ -36,7 +36,7 @@ from max.nn.attention.multi_latent_attention import LatentAttentionWithRope
 from max.nn.attention.multi_latent_attention_fp8 import (
     LatentAttentionWithRopeFp8,
 )
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import KVCacheParams, MLAKVCacheParams
 from max.nn.quant_config import (
     InputScaleSpec,
     QuantConfig,
@@ -200,14 +200,12 @@ def _make_rope() -> DeepseekYarnRotaryEmbedding:
 
 
 def _kv_params() -> KVCacheParams:
-    return KVCacheParams(
+    return MLAKVCacheParams(
         dtype=DType.bfloat16,
-        n_kv_heads=1,
         head_dim=KV_LORA_RANK + QK_ROPE_HEAD_DIM,
         num_layers=1,
         devices=[DeviceRef.GPU()],
         page_size=128,
-        is_mla=True,
         num_q_heads=H_HEADS,
     )
 
@@ -254,7 +252,7 @@ def _run_layer(
         input_types=(
             hidden_state_type,
             input_row_offsets_type,
-            *kv_params.get_symbolic_inputs().flatten(),
+            *kv_params.flattened_kv_inputs(),
         ),
     ) as graph:
         hidden_states = graph.inputs[0].tensor
@@ -278,9 +276,9 @@ def _run_layer(
         params=kv_params, total_num_pages=8, session=session, max_batch_size=4
     )
     ctx = create_text_context(np.empty(SEQ_LEN))
-    kv_manager.claim(ctx.request_id, replica_idx=0)
-    kv_manager.alloc(ctx, replica_idx=0, num_steps=1)
-    kv_inputs = kv_manager.runtime_inputs([[ctx]]).inputs[0]
+    kv_manager.claim(ctx)
+    kv_manager.alloc(ctx)
+    kv_inputs = kv_manager.runtime_inputs_for_leaf([[ctx]]).inputs[0]
     row_offsets_buf = Buffer(DType.uint32, [2])
     row_offsets_buf[0] = 0
     row_offsets_buf[1] = SEQ_LEN

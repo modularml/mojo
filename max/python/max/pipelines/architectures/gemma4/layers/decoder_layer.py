@@ -22,7 +22,6 @@ from max.graph import (
     ShardingStrategy,
     TensorValue,
     Weight,
-    ops,
 )
 from max.nn.comm.allreduce import Allreduce
 from max.nn.kv_cache import PagedCacheValues
@@ -116,6 +115,12 @@ class Gemma4TextDecoderLayer(Module):
         self.moe_block = moe_block
 
         if self.enable_moe_block:
+            assert self.moe_block is not None
+            self.moe_block.sharding_strategy = ShardingStrategy.tensor_parallel(
+                len(devices)
+            )
+            self.moe_block_shards = self.moe_block.shard(devices)
+
             self.post_feedforward_layernorm_1 = Gemma4RMSNorm(
                 hidden_size, unquantized_dtype, eps=rms_norm_eps
             )
@@ -184,15 +189,12 @@ class Gemma4TextDecoderLayer(Module):
                 self.post_feedforward_layernorm_1_shards, mlp_out
             )
 
-            # TODO: shard moe_block and use forward_sharded_layers.
-            assert self.moe_block is not None
-            moe_out = []
-            for h in hidden_states:
-                orig_shape = h.shape
-                h_flat = ops.reshape(h, [-1, orig_shape[-1]])
-                h_flat = self.moe_block(h_flat)
-                h_out = ops.reshape(h_flat, orig_shape)
-                moe_out.append(h_out)
+            # Experts are tensor-parallel sharded, so each device computes
+            # a partial result; allreduce sums them into the full output.
+            moe_out = forward_sharded_layers(
+                self.moe_block_shards, hidden_states
+            )
+            moe_out = self.allreduce(moe_out, signal_buffers)
             moe_out = forward_sharded_layers(
                 self.post_feedforward_layernorm_2_shards, moe_out
             )

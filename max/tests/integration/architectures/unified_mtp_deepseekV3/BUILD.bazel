@@ -2,7 +2,6 @@ load("//bazel:api.bzl", "modular_py_test", "requirement")
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -10,9 +9,22 @@ package(default_visibility = [
 modular_py_test(
     name = "test_weight_adapter",
     size = "large",
-    srcs = glob(["*.py"]),
+    srcs = ["test_weight_adapter.py"],
     deps = [
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/unified_mtp_deepseekV3",
         requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_draft_config_ep_dispatch_dtype",
+    size = "large",
+    srcs = ["test_draft_config_ep_dispatch_dtype.py"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/deepseekV3",
+        "//max/python/max/pipelines/architectures/unified_mtp_deepseekV3",
     ],
 )

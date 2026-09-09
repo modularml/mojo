@@ -110,7 +110,7 @@ def _symlink_files(
         assert not src.is_dir(), (
             f"error: data_files cannot be directories: '{src}'"
         )
-        if src.suffix in (".mojoc", ".mojopkg"):
+        if src.suffix == ".mojoc":
             _create_symlink(src, venv_path / "lib/mojo" / src.name)
         elif _is_shared_lib(src):
             _create_symlink(src, venv_path / "lib" / src.name)
@@ -119,8 +119,6 @@ def _symlink_files(
             continue
         else:
             _create_symlink(src, venv_path / "bin" / src.name)
-            if src.name == "mojo-compiler-only":
-                _create_symlink(src, venv_path / "bin/mojo")
 
 
 def _create_venv(manifest: dict[str, Any], venv_path: Path) -> None:

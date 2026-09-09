@@ -15,8 +15,5 @@
 # they're not tests.
 collect_ignore = [
     "bisect_smoke_test.py",
-    "compute_accuracy_status.py",
-    "di_smoke_test.py",
     "smoke_test.py",
-    "upload_smoke_test_results.py",
 ]

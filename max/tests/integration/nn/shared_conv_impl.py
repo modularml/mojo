@@ -16,12 +16,12 @@
 
 import numpy as np
 import torch
-import torch.nn as nn
 from max.driver import Buffer
 from max.dtype import DType
 from max.engine.api import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType
 from max.nn import Conv1D, Conv2d, Conv3D
+from torch import nn
 
 # On some newer CUDA architectures (e.g. Ampere / Hopper) cuDNN may internally
 ACCURACY_RTOL = 2.5e-3

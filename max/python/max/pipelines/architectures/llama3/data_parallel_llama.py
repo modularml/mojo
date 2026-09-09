@@ -28,9 +28,8 @@ from max.graph import (
     ops,
 )
 from max.nn.data_parallelism import split_batch
-from max.nn.kv_cache import KVCacheParamInterface
+from max.nn.kv_cache import KVCacheInputs, KVCacheParamInterface
 from max.nn.layer import Module
-from max.pipelines.lib.lora import LoRAManager
 
 from .llama3 import Llama3
 from .model_config import Llama3Config
@@ -77,7 +76,6 @@ class DataParallelLlama(Module):
     def input_types(
         self,
         kv_params: KVCacheParamInterface,
-        lora_manager: LoRAManager | None,
     ) -> tuple[TensorType | BufferType, ...]:
         """Creates input tensor types used for building the graph.
 
@@ -101,7 +99,7 @@ class DataParallelLlama(Module):
         tokens and input_row_offsets into data parallel splits.
         """
         inputs = []
-        single_model_inputs = self.model.input_types(kv_params, lora_manager)
+        single_model_inputs = self.model.input_types(kv_params)
         (
             token_type,
             input_row_offsets_type,
@@ -110,7 +108,7 @@ class DataParallelLlama(Module):
         ) = single_model_inputs
         del single_model_kv_cache_inputs
 
-        flat_kv_cache_inputs = kv_params.get_symbolic_inputs().flatten()
+        flat_kv_cache_inputs = kv_params.flattened_kv_inputs()
 
         data_parallel_split_type = TensorType(
             DType.int64,
@@ -147,11 +145,11 @@ class DataParallelLlama(Module):
 
         all_model_args = []
 
-        kv_collections = (
-            kv_params.get_symbolic_inputs()
-            .unflatten(iter(all_kv_cache_inputs))
-            .inputs
+        symbolic_inputs = kv_params.unflatten_kv_inputs(
+            iter(all_kv_cache_inputs)
         )
+        assert isinstance(symbolic_inputs, KVCacheInputs)
+        kv_collections = symbolic_inputs.inputs
 
         for i in range(len(self.config.devices)):
             all_model_args.append(
@@ -244,7 +242,7 @@ def create_graph(
         weight_alignment=1,
         strict=True,
     )
-    inputs = model.input_types(kv_params, None)
+    inputs = model.input_types(kv_params)
     with Graph("llama3", input_types=inputs) as graph:
         outputs = model._call_flat(kv_params, *graph.inputs)
         graph.output(*outputs)

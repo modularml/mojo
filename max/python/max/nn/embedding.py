@@ -45,17 +45,26 @@ class Embedding(Module):
 
     .. code-block:: python
 
+        from max.driver import Accelerator, CPU, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef, Graph, TensorType
+        from max.nn import Embedding
+
+        device = Accelerator() if accelerator_count() > 0 else CPU()
+        device_ref = DeviceRef.from_device(device)
+
         embedding_layer = Embedding(
             vocab_size=1000,
             hidden_dim=256,
             dtype=DType.float32,
-            device=DeviceRef.GPU(),
+            device=device_ref,
             name="embeddings",
         )
 
-        # Token indices of shape: [batch, ..., num_indices].
-        token_indices: TensorValueLike
-        embeddings = embedding_layer(token_indices)
+        indices_type = TensorType(DType.uint32, [1, 8], device=device_ref)
+        with Graph("embedding", input_types=[indices_type]) as graph:
+            embeddings = embedding_layer(graph.inputs[0])
+            graph.output(embeddings)
     """
 
     weight: Weight
@@ -130,17 +139,22 @@ class VocabParallelEmbedding(Module):
 
     .. code-block:: python
 
-        embedding_layer = VocabParallelEmbedding(
-            vocab_size=1000,
-            hidden_dim=256,
-            dtype=DType.float32,
-            device=[DeviceRef.GPU(0), DeviceRef.GPU(1)],
-            name="embeddings",
-        )
+        from max.driver import Accelerator, accelerator_count
+        from max.dtype import DType
+        from max.graph import DeviceRef
+        from max.nn import VocabParallelEmbedding
 
-        # Token indices of shape: [batch, ..., num_indices].
-        token_indices: TensorValueLike
-        embeddings = embedding_layer(token_indices)
+        # VocabParallelEmbedding shards the vocabulary across accelerators and
+        # builds an Allreduce, so it requires at least one GPU.
+        if accelerator_count() > 0:
+            device_ref = DeviceRef.from_device(Accelerator())
+            embedding_layer = VocabParallelEmbedding(
+                vocab_size=1000,
+                hidden_dim=256,
+                dtype=DType.float32,
+                devices=[device_ref],
+                name="embeddings",
+            )
     """
 
     def __init__(

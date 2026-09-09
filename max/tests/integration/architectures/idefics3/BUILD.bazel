@@ -7,7 +7,6 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -30,7 +29,7 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/idefics3",
         requirement("torch"),
         requirement("transformers"),
     ],
@@ -43,7 +42,7 @@ modular_py_test(
         "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
     },
     exec_properties = {
-        "test.resources:gpu-memory": "1",
+        "test.resources:gpu-memory": "2",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
@@ -53,19 +52,15 @@ modular_py_test(
     tags = [
         "gpu",
         "manual",
-        "no-pydeps",  # TODO: Fix and re-enable
     ],
     deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
         "//max/python/max/engine",
-        "//max/python/max/nn",
-        "//max/python/max/pipelines",
-        "//max/python/max/serve",
-        "//max/tests/integration/graph:modular_graph_test",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/idefics3",
         requirement("torch"),
         requirement("transformers"),
-        requirement("hypothesis"),
-        requirement("gguf"),
-        requirement("pytest-asyncio"),
     ],
 )
 
@@ -77,7 +72,7 @@ modular_py_test(
         "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
     },
     exec_properties = {
-        "test.resources:gpu-memory": "1",
+        "test.resources:gpu-memory": "2",
     },
     gpu_constraints = ["//:has_gpu"] + select({
         "//:apple_gpu": ["@platforms//:incompatible"],
@@ -92,7 +87,7 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/idefics3",
         requirement("torch"),
         requirement("transformers"),
     ],
@@ -119,7 +114,7 @@ modular_py_test(
         "//max/python/max/dtype",
         "//max/python/max/engine",
         "//max/python/max/graph",
-        "//max/python/max/pipelines/architectures",
+        "//max/python/max/pipelines/architectures/idefics3",
         requirement("torch"),
         requirement("transformers"),
     ],

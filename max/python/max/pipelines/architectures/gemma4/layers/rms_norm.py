@@ -73,8 +73,13 @@ class Gemma4RMSNorm(Module, Shardable):
             result=TensorType(dtype=x.dtype, shape=x.shape, device=x.device),
             input=x,
             weight=w,
+            # epsilon is a float32 host-scalar operand of the generated
+            # `mo.reduce.rms_norm` op: the kernel (and `ops.rms_norm`) carry it
+            # in float32. Constructing it at `x.dtype` (e.g. bf16) makes KGEN
+            # reject the operand against the Float32 `ReduceRMSNorm.execute`
+            # signature at graph-compile time.
             epsilon=ops.constant(
-                self.eps, dtype=x.dtype, device=DeviceRef.CPU()
+                self.eps, dtype=DType.float32, device=DeviceRef.CPU()
             ),
             weight_offset=ops.constant(
                 0.0,

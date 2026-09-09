@@ -15,17 +15,19 @@
 
 from std.ffi import c_int, c_size_t
 
-from std.gpu.host import DeviceBuffer
+from max.gpu.host import DeviceBuffer
 from shmem import *
 from std.testing import assert_equal
 
 
 def ring_bcast(
-    data: UnsafePointer[c_int, MutAnyOrigin],
-    nelem: Int,
+    data: Pointer[c_int, MutAnyOrigin],
+    nelem_dev: Int32,
     root: c_int,
-    psync: UnsafePointer[UInt64, MutAnyOrigin],
+    psync: Pointer[UInt64, MutAnyOrigin],
 ):
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var nelem = Int(nelem_dev)
     var mype = shmem_my_pe()
     var npes = shmem_n_pes()
     var peer = (mype + 1) % npes
@@ -47,11 +49,11 @@ def ring_bcast(
 
 def test_ring_bcast(ctx: SHMEMContext) raises:
     comptime data_len = 32
-    var destination = ctx.enqueue_create_buffer[DType.int32](1)
+    var destination = ctx.enqueue_create_buffer[.int32](1)
 
-    var data = ctx.enqueue_create_buffer[DType.int32](data_len)
+    var data = ctx.enqueue_create_buffer[.int32](data_len)
     var data_h = alloc[Int32](data_len)
-    var psync = shmem_calloc[DType.uint64](1)
+    var psync = shmem_calloc[.uint64](1)
 
     for i in range(data_len):
         data_h[i] = shmem_my_pe() + Int32(i)
@@ -62,9 +64,9 @@ def test_ring_bcast(ctx: SHMEMContext) raises:
     ctx.barrier_all()
     ctx.enqueue_function_collective_checked[ring_bcast](
         data,
-        data_len,
+        Int32(data_len),
         root,
-        DeviceBuffer[DType.uint64](ctx._ctx, psync, 1, owning=False),
+        DeviceBuffer[.uint64](ctx._ctx, psync, 1, owning=False),
         grid_dim=1,
         block_dim=1,
     )

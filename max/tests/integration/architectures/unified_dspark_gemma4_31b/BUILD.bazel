@@ -1,0 +1,270 @@
+load("//bazel:api.bzl", "modular_py_library", "modular_py_test", "requirement")
+
+package(default_visibility = [
+    "//:__pkg__",
+    "//max/tests:__subpackages__",
+    "//oss/modular/max/tests:__subpackages__",
+])
+
+modular_py_library(
+    name = "speculators_reference",
+    testonly = True,
+    srcs = ["speculators_reference.py"],
+    imports = ["."],
+    deps = [
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_arch_registration",
+    size = "medium",
+    srcs = ["test_arch_registration.py"],
+    deps = [
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/speculators_common",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_31b",
+        "//max/python/max/pipelines/lib",
+    ],
+)
+
+modular_py_test(
+    name = "test_model_config",
+    size = "medium",
+    srcs = ["test_model_config.py"],
+    data = ["//max/tests/integration/architectures/unified_dspark_gemma4_31b/testdata"],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/speculators_common",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_31b",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/weights",
+        requirement("numpy"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_weight_audit",
+    size = "large",
+    srcs = ["test_weight_audit.py"],
+    data = ["//max/tests/integration/architectures/unified_dspark_gemma4_31b/testdata"],
+    env = {
+        # Reuse the host HF cache: only the safetensors header and the tiny
+        # d2t table are read, but the cached snapshot is 8.4 GB.
+        "HF_ESCAPES_SANDBOX": "1",
+    },
+    env_inherit = [
+        "HF_TOKEN",
+        "HF_HOME",
+    ],
+    # Reads the 8.4 GB checkpoint snapshot on every run — too costly
+    # per-submission; the load-time audits in the pipeline model cover the
+    # wiring. Run explicitly, like the unified-graph compile tests.
+    tags = [
+        "manual",
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/dspark_draft",
+        "//max/python/max/pipelines/architectures/speculators_common",
+        requirement("huggingface-hub"),
+        requirement("numpy"),
+        requirement("safetensors"),
+    ],
+)
+
+modular_py_test(
+    name = "test_unified_graph_compile",
+    size = "enormous",
+    srcs = ["test_unified_graph_compile.py"],
+    data = ["//max/tests/integration/architectures/unified_dspark_gemma4_31b/testdata"],
+    exec_properties = {
+        # Zero-filled weights at real 31B dims: ~63 GiB target + ~9 GiB
+        # draft on the device, plus compile working set.
+        "test.resources:gpu-memory": "100",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # Compiles the 60-layer unified graph at real dims — tens of minutes on
+    # one B200. Run explicitly, like the 12B unified-graph compile test.
+    tags = [
+        "gpu",
+        "manual",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/speculators_common",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_31b",
+        "//max/python/max/pipelines/lib",
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_dspark_speculators_module",
+    size = "enormous",
+    srcs = ["test_dspark_speculators_module.py"],
+    env = {
+        # The torch references hold ~8 GiB of checkpoint weights.
+        "MODULAR_TORCH_MEMORY_PERCENT": "0.5",
+    },
+    env_inherit = ["HF_TOKEN"],
+    exec_properties = {
+        "test.resources:gpu-memory": "24",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # Downloads the full speculators checkpoint and runs the GPU logit
+    # verify — too costly per-submission; the smoke matrix covers serving.
+    # Run explicitly, like the unified-graph compile tests.
+    tags = [
+        "gpu",
+        "manual",
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [
+        ":speculators_reference",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/dspark_draft",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/integration/test_common:context_utils",
+        requirement("huggingface-hub"),
+        requirement("numpy"),
+        requirement("safetensors"),
+        requirement("torch"),
+    ],
+)
+
+modular_py_test(
+    name = "test_unified_step_parity",
+    size = "enormous",
+    srcs = ["test_unified_step_parity.py"],
+    env = {
+        # The torch draft reference holds a few GiB; MAX's DeviceContext
+        # takes the rest for the ~71 GiB unified weights + compile.
+        "MODULAR_TORCH_MEMORY_PERCENT": "0.1",
+        # Reuse the host HF cache: the 31B target is far too large to
+        # re-download into TEST_TMPDIR on every run.
+        "HF_ESCAPES_SANDBOX": "1",
+    },
+    env_inherit = [
+        "HF_TOKEN",
+        "HF_HOME",
+    ],
+    exec_properties = {
+        "test.resources:gpu-memory": "140",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # Loads the real google/gemma-4-31B-it weights and compiles the unified
+    # 60-layer graph at real dims — tens of minutes on one B200. Run
+    # explicitly, like the unified-graph compile test.
+    tags = [
+        "gpu",
+        "manual",
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [
+        ":speculators_reference",
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/speculators_common",
+        "//max/python/max/pipelines/architectures/unified_dspark_gemma4_31b",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/python/max/pipelines/lib",
+        "//max/tests/integration/test_common:context_utils",
+        requirement("huggingface-hub"),
+        requirement("numpy"),
+        requirement("safetensors"),
+        requirement("torch"),
+        requirement("transformers"),
+    ],
+)
+
+modular_py_test(
+    name = "test_target_tap_parity",
+    size = "enormous",
+    srcs = ["test_target_tap_parity.py"],
+    env = {
+        # The runner statically splits the gpu-memory request: torch gets
+        # this fraction (the bf16 31B checkpoint needs ~62 GiB; the fp32
+        # oracle runs on host RAM) and MAX's DeviceContext the remainder
+        # (~62 GiB weights + KV pages).
+        "MODULAR_TORCH_MEMORY_PERCENT": "0.45",
+        # Reuse the host HF cache: the 31B checkpoint is far too large to
+        # re-download into TEST_TMPDIR on every run.
+        "HF_ESCAPES_SANDBOX": "1",
+    },
+    env_inherit = [
+        "HF_TOKEN",
+        "HF_HOME",
+    ],
+    exec_properties = {
+        "test.resources:gpu-memory": "160",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # transformers loads the checkpoint with device_map=..., which needs
+    # accelerate at runtime without importing it directly.
+    ignore_extra_deps = [requirement("accelerate")],
+    # Loads the real google/gemma-4-31B-it weights three times and compiles
+    # the 60-layer target graph at real dims — tens of minutes on one B200.
+    # Run explicitly, like the unified-graph compile tests.
+    tags = [
+        "gpu",
+        "manual",
+        "no-sandbox",
+        "requires-network",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/engine",
+        "//max/python/max/graph",
+        "//max/python/max/nn",
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/kv_cache",
+        "//max/tests/integration/test_common:context_utils",
+        requirement("accelerate"),
+        requirement("huggingface-hub"),
+        requirement("numpy"),
+        requirement("torch"),
+        requirement("transformers"),
+    ],
+)

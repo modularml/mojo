@@ -7,8 +7,50 @@ if [[ "$BAZEL_REAL" != *bazelisk* && "$BAZEL_REAL" != *bazel-bin* ]]; then
   exit 1
 fi
 
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+is_build_test_or_run=false
+for arg in "$@"; do
+  case "$arg" in
+    # Any config flag: skip
+    --*) ;;
+    build) is_build_test_or_run=true; break ;;
+    test) is_build_test_or_run=true; break ;;
+    run) is_build_test_or_run=true; break ;;
+  esac
+done
+
+# If doing bazel build/test/run, require a config
+if [[ "$is_build_test_or_run" == "true" ]]; then
+  has_mojo_or_max_config=false
+  for arg in "$@"; do
+    case "$arg" in
+      --config=prebuilt-mojo) has_mojo_or_max_config="true" ;;
+      --config=build-mojo) has_mojo_or_max_config="true" ;;
+    esac
+  done
+
+  if [[ -f "$script_root/../local.bazelrc" ]]; then
+    if grep -E 'config\=prebuilt-mojo|config\=build-mojo' < "$script_root/../local.bazelrc" > /dev/null; then
+      has_mojo_or_max_config="true"
+    fi
+  fi
+
+  if [[ $has_mojo_or_max_config == "false" ]]; then
+    echo "Please add either \`--config=prebuilt-mojo\` or \`--config=build-mojo\` to your command line."
+    echo "Use \`--config=build-mojo\` if you are modifying the Mojo compiler."
+    echo "Otherwise, use \`--config=prebuilt-mojo\`."
+    echo "You can add \`build --config=<your choice>\` to a \`local.bazelrc\` file to have it apply to all Bazel calls."
+    exit 1
+  fi
+fi
+
 bazelrc_lines=("# Generated from tools/bazel, do not edit.")
 bazelrc_lines+=("build --build_metadata=USER=${GITHUB_ACTOR:-${USER:-unknown}}")
+
+if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
+  bazelrc_lines+=("build --config=disk-cache")
+fi
 
 if [[ $OSTYPE == darwin* ]]; then
   if (( EUID == 0 )); then
@@ -38,10 +80,16 @@ if [[ -z "${GITHUB_REPOSITORY:-}" && $OSTYPE != darwin* && -d /dev/shm && ! -e /
   bazelrc_lines+=("common --sandbox_base=/dev/shm")
 fi
 
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly bazelrc_root="$script_root/../build"
 readonly logs_dir="$bazelrc_root/logs"
 mkdir -p "$logs_dir"
+
+# Cache resource results
+if [[ ! -f "$bazelrc_root/local-resources.bazelrc" ]]; then
+  "$script_root/../bazel/internal/detect_local_resources.sh" > "$bazelrc_root/local-resources.bazelrc"
+fi
+
+bazelrc_lines+=("import %workspace%/build/local-resources.bazelrc")
 
 printf "%s\n" "${bazelrc_lines[@]}" > "$bazelrc_root/wrapper.bazelrc"
 

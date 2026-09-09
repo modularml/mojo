@@ -11,18 +11,20 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from std.builtin._closure import __ownership_keepalive
 from std.math import ceildiv
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import WARP_SIZE, barrier
-from std.gpu import block_idx, lane_id, thread_idx, warp_id
-from std.gpu.primitives.cluster import block_rank_in_cluster
-from std.gpu.host import DeviceContext, FuncAttribute
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu.memory import external_memory
-from std.gpu.compute.arch.mma_nvidia_sm100 import *
-from std.gpu.compute.arch.tcgen05 import *
+from max.gpu import WARP_SIZE
+from max.gpu.sync import barrier
+from max.gpu import block_idx, lane_id, thread_idx, warp_id
+from max.gpu.primitives.cluster import block_rank_in_cluster
+from max.gpu.host import DeviceContext, FuncAttribute
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.memory import external_memory
+from max.gpu.compute.arch.mma_nvidia_sm100 import *
+from max.gpu.compute.arch.tcgen05 import *
 
 # Additional imports for testing
 from internal_utils import assert_almost_equal
@@ -76,8 +78,9 @@ def kernel_3[
     a_tma_op: TMATensorTile[a_type, a_tma_rank, a_tile_shape, a_desc_shape],
     b_tma_op: TMATensorTile[b_type, b_tma_rank, b_tile_shape, b_desc_shape],
     c: LayoutTensor[c_type, c_layout, MutAnyOrigin],
-    num_iters: Int,
+    num_iters_dev: Int32,
 ):
+    var num_iters = Int(num_iters_dev)
     comptime assert num_threads == 128 or num_threads == 256
     comptime BM = block_tile_shape[0]
     comptime BN = block_tile_shape[1]
@@ -109,16 +112,12 @@ def kernel_3[
         b_type, BN, 64, swizzle_mode=b_swizzle
     ]()
 
-    a_smem = rebind[
-        UnsafePointer[
-            Scalar[a_type],
-            address_space=AddressSpace.SHARED,
-            ExternalOrigin[mut=True],
-        ]
+    var a_smem = rebind[
+        MutPointer[Scalar[a_type], address_space=.SHARED, MutUntrackedOrigin]
     ](
         external_memory[
             Scalar[a_type],
-            address_space=AddressSpace.SHARED,
+            address_space=.SHARED,
             alignment=128,
             name="tmem_test_dynamic_shared_memory",
         ]()
@@ -128,29 +127,29 @@ def kernel_3[
     comptime a_smem_tile_t = LayoutTensor[
         a_type,
         a_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        _,
+        address_space=.SHARED,
         alignment=128,
     ]
     comptime b_smem_tile_t = LayoutTensor[
         b_type,
         b_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        _,
+        address_space=.SHARED,
         alignment=128,
     ]
     comptime sub_a_smem_tile_t = LayoutTensor[
         a_type,
         sub_a_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        _,
+        address_space=.SHARED,
         alignment=128,
     ]
     comptime sub_b_smem_tile_t = LayoutTensor[
         b_type,
         sub_b_smem_layout,
-        MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        _,
+        address_space=.SHARED,
         alignment=128,
     ]
     comptime a_size = a_smem_layout.size()
@@ -170,7 +169,7 @@ def kernel_3[
     comptime accum_type = get_accum_type[a_type]()
 
     comptime c_frag_size = MMA_M * MMA_N // num_threads  # MMA_M * MMA_N is the size of the accumulator, num_threads is the number of threads in the warp, c_frag_size is the num of elements in the accumulator per thread
-    var c_frag: InlineArray[
+    var c_frag: Array[
         Scalar[accum_type], c_frag_size
     ]  # array of accumulator elements
 
@@ -178,8 +177,8 @@ def kernel_3[
     comptime b_expected_bytes = b_size * size_of[b_type]()
     comptime expected_bytes = a_expected_bytes + b_expected_bytes
 
-    tma_mbar = (b_smem + b_size).bitcast[SharedMemBarrier]()
-    mma_mbar = tma_mbar + 1
+    var tma_mbar = (b_smem + b_size).bitcast[SharedMemBarrier]()
+    var mma_mbar = tma_mbar + 1
 
     var ptr_tmem_addr = (mma_mbar + 1).bitcast[UInt32]()
 
@@ -203,7 +202,7 @@ def kernel_3[
     # tensor memory allocation
     barrier()
 
-    tmem_addr = ptr_tmem_addr[0]
+    var tmem_addr = ptr_tmem_addr[0]
 
     # give me a tensor for matrices A and B, sliced down to the portion that this CTA is responsible for, and referring to original global tensor
     # so it's the 128 x 64 portion the CTA will copy from global tensor into smem tile A and B
@@ -222,14 +221,14 @@ def kernel_3[
         b_type
     ]()
 
-    adesc = MMASmemDescriptor.create[aSBO, aLBO, a_swizzle](a_smem_tile.ptr)
-    bdesc = MMASmemDescriptor.create[bSBO, bLBO, b_swizzle](b_smem_tile.ptr)
+    var adesc = MMASmemDescriptor.create[aSBO, aLBO, a_swizzle](a_smem_tile.ptr)
+    var bdesc = MMASmemDescriptor.create[bSBO, bLBO, b_swizzle](b_smem_tile.ptr)
 
-    idesc = UMMAInsDescriptor[UMMAKind.KIND_F16].create[
+    var idesc = UMMAInsDescriptor[UMMAKind.KIND_F16].create[
         accum_type,
         a_type,
         b_type,
-        Index[dtype=DType.uint32](mma_shape[0], mma_shape[1]),
+        Index[dtype=.uint32](mma_shape[0], mma_shape[1]),
         transpose_b=transpose_b,
     ]()
 
@@ -248,7 +247,7 @@ def kernel_3[
                 comptime b_offset = b_smem_layout(IntTuple(0, k))
                 comptime assert ((a_offset * size_of[a_type]()) % 128) == 0
                 comptime assert ((b_offset * size_of[b_type]()) % 128) == 0
-                sub_a_smem_tile = sub_a_smem_tile_t(a_smem + a_offset)
+                var sub_a_smem_tile = sub_a_smem_tile_t(a_smem + a_offset)
                 # the answer to the above comment. # The descriptor layout i.e. data per copy can be smaller than the shared memory
                 # tile shape due to WGMMA requirement. E.g. k-major no swizzle WGMMA BM x 16B to be
                 # one continuous chunk in shared memory. We need to break down tile shape in K by 16B.
@@ -258,7 +257,7 @@ def kernel_3[
                     tma_mbar[0],
                     (i * BK + k, block_idx.y * BM),
                 )
-                sub_b_smem_tile = sub_b_smem_tile_t(b_smem + b_offset)
+                var sub_b_smem_tile = sub_b_smem_tile_t(b_smem + b_offset)
                 b_tma_op.async_copy(
                     sub_b_smem_tile,
                     tma_mbar[0],
@@ -318,17 +317,17 @@ def kernel_3[
 
     comptime num_warps = num_threads // WARP_SIZE
 
-    ctile = c.tile[BM, BN](block_idx.y, block_idx.x)
+    var ctile = c.tile[BM, BN](block_idx.y, block_idx.x)
 
     comptime for m_mma in range(num_m_mmas):
         comptime for n_mma in range(num_n_mmas):
             comptime mma_id = n_mma * num_m_mmas + m_mma
 
-            c_gmem_warp_tile = ctile.tile[MMA_M // num_warps, MMA_N](
+            var c_gmem_warp_tile = ctile.tile[MMA_M // num_warps, MMA_N](
                 4 * m_mma + warp_id(), n_mma
             )
 
-            c_gmem_frag = c_gmem_warp_tile.vectorize[1, 2]().distribute[
+            var c_gmem_frag = c_gmem_warp_tile.vectorize[1, 2]().distribute[
                 Layout.row_major(8, 4)
             ](lane_id())
 
@@ -362,9 +361,9 @@ def blackwell_kernel_3[
     a_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
     b_swizzle: TensorMapSwizzle = TensorMapSwizzle.SWIZZLE_128B,
 ](
-    c: LayoutTensor[c_type, c_layout, MutAnyOrigin],
-    a: LayoutTensor[a_type, a_layout, MutAnyOrigin],
-    b: LayoutTensor[b_type, b_layout, MutAnyOrigin],
+    c: LayoutTensor[mut=True, c_type, c_layout, _],
+    a: LayoutTensor[mut=True, a_type, a_layout, _],
+    b: LayoutTensor[mut=True, b_type, b_layout, _],
     ctx: DeviceContext,
 ) raises:
     var M = c.dim[0]()
@@ -380,8 +379,10 @@ def blackwell_kernel_3[
     # hard coded 64 for BK
 
     # equivalent of cutlass tma atom a, it is a handle that is passed to async_copy, to accurately tell the TMA engine how to copy from global tensor a into smem tile A
-    a_tma_op = create_tensor_tile[Index(BM, 64), swizzle_mode=a_swizzle](ctx, a)
-    b_tma_op = create_tensor_tile[
+    var a_tma_op = create_tensor_tile[Index(BM, 64), swizzle_mode=a_swizzle](
+        ctx, a
+    )
+    var b_tma_op = create_tensor_tile[
         Index(BN, 64) if transpose_b else Index(64, BN),
         swizzle_mode=b_swizzle,
     ](ctx, b)
@@ -415,7 +416,7 @@ def blackwell_kernel_3[
         a_tma_op,
         b_tma_op,
         c,
-        K // BK,
+        Int32(K // BK),
         grid_dim=(ceildiv(N, BN), ceildiv(M, BM)),
         block_dim=(block_dim),
         shared_mem_bytes=smem_use,
@@ -570,8 +571,7 @@ def test_blackwell_kernel_3[
         comptime num_warmup = 10
 
         @always_inline
-        @parameter
-        def run_kernel(ctx: DeviceContext) raises:
+        def run_kernel(ctx: DeviceContext) raises {imm}:
             blackwell_kernel_3[
                 transpose_b=transpose_b,
                 umma_shape=umma_shape,  # 64, 128, 16
@@ -590,7 +590,7 @@ def test_blackwell_kernel_3[
         print("finished warmup")
 
         var nstime = (
-            Float64(ctx.execution_time[run_kernel](num_runs)) / num_runs
+            Float64(ctx.execution_time(run_kernel, num_runs)) / num_runs
         )
         var sectime = nstime * 1e-9
         var TFlop = 2.0 * Float64(M) * Float64(N) * Float64(K) * 1e-12
@@ -622,6 +622,10 @@ def test_blackwell_kernel_3[
             rtol=rtol,
         )
 
+    # `a_device_lt` / `b_device_lt` are raw pointer views, so past the copies
+    # above nothing else refers to the buffers backing them.
+    __ownership_keepalive(a_device, b_device)
+
 
 def main() raises:
     with DeviceContext() as ctx:
@@ -631,9 +635,9 @@ def main() raises:
             benchmark_blackwell_matmul(ctx)
 
         test_blackwell_kernel_3[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             umma_shape=Index(64, 256, 16),
             transpose_b=True,
             BK=64,

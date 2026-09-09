@@ -14,8 +14,8 @@
 from std.sys import argv, size_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.memory import alloc
 from linalg.utils import elementwise_epilogue_type
 
@@ -153,8 +153,8 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
             for k in range(Int(k.value())):
                 b_host[Coord(n, k)] = Float32(1 if n == k else 0).cast[b_type]()
     else:
-        rand(a_host.ptr, a_host.num_elements())
-        rand(b_host.ptr, b_host.num_elements())
+        rand(a_host._storage, a_host.num_elements())
+        rand(b_host._storage, b_host.num_elements())
 
     # Move operands to the Device
     ctx.enqueue_copy(a_device, a_host_ptr)
@@ -173,16 +173,16 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
 
     var c_tensor_lt = c_tensor.to_layout_tensor()
 
-    @parameter
+    @__parameter
     @always_inline
     @__copy_capture(c_tensor_lt)
     def epilogue_fn[
         _dtype: DType,
-        width: SIMDSize,
+        width: SIMDLength,
         *,
         alignment: Int = 1,
     ](idx: IndexList[2], val: SIMD[_dtype, width]) capturing -> None:
-        c_tensor_lt.store[alignment=alignment * size_of[c_type](),](
+        c_tensor_lt.store[store_alignment=alignment * size_of[c_type](),](
             idx, rebind[SIMD[c_type, width]](val)
         )
 
@@ -201,7 +201,7 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
         ctx,
     )
 
-    comptime assert a_type != DType.float8_e4m3fn or transpose_b, (
+    comptime assert a_type != .float8_e4m3fn or transpose_b, (
         "Testing is only supported for transposed_b==True when"
         " a_type==float8_e4m3fn. Add the non-transposed case if needed."
     )
@@ -227,8 +227,8 @@ def test_blackwell_matmul_tma_umma_warp_specialized[
 
     comptime rtol = 1e-2
     assert_almost_equal(
-        c_host.ptr,
-        c_host_ref.ptr,
+        c_host._storage,
+        c_host_ref._storage,
         c_host.num_elements(),
         atol=0.0001,
         rtol=rtol,
@@ -271,7 +271,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -290,7 +290,7 @@ def main() raises:
                         test_blackwell_matmul_tma_umma_warp_specialized[
                             dtype,
                             dtype,
-                            DType.bfloat16,
+                            .bfloat16,
                             block_tile_shape,
                             umma_shape,
                             cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -309,7 +309,7 @@ def main() raises:
                         test_blackwell_matmul_tma_umma_warp_specialized[
                             dtype,
                             dtype,
-                            DType.bfloat16,
+                            .bfloat16,
                             block_tile_shape,
                             umma_shape,
                             cluster_shape=StaticTuple[Int32, 3](4, 4, 1),
@@ -329,7 +329,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](8, 2, 1),
@@ -347,7 +347,7 @@ def main() raises:
                     test_blackwell_matmul_tma_umma_warp_specialized[
                         dtype,
                         dtype,
-                        DType.bfloat16,
+                        .bfloat16,
                         block_tile_shape,
                         umma_shape,
                         cluster_shape=StaticTuple[Int32, 3](4, 4, 1),

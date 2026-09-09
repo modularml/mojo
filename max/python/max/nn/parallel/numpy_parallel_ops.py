@@ -38,6 +38,13 @@ class ParallelArrayOps:
 
     .. code-block:: python
 
+        import numpy as np
+        from max.nn.parallel.numpy_parallel_ops import ParallelArrayOps
+
+        arr1 = np.ones((2, 4), dtype=np.float32)
+        arr2 = np.zeros((3, 4), dtype=np.float32)
+        arr3 = np.ones((1, 4), dtype=np.float32)
+
         ops = ParallelArrayOps(max_workers=20)
         result = ops.concatenate([arr1, arr2, arr3], axis=0)
     """

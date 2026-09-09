@@ -54,8 +54,8 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.kernels import (
-    _grouped_matmul_swiglu_nvfp4,
     block_scales_interleave,
+    grouped_matmul_blocked_swiglu,
 )
 from torch.utils.dlpack import from_dlpack
 
@@ -204,7 +204,7 @@ def _build_graph(
             / raw_input_scales_t
         )
 
-        packed_b, sf_b = _grouped_matmul_swiglu_nvfp4(
+        packed_b, sf_b = grouped_matmul_blocked_swiglu(
             hidden_t,
             w_b_t,
             a_scales_t,
@@ -212,9 +212,9 @@ def _build_graph(
             expert_start_t,
             a_scale_offsets_t,
             expert_ids_t,
-            expert_scales_t,
-            inv_input_scales,
             usage_stats_t,
+            expert_scales=expert_scales_t,
+            c_input_scales=inv_input_scales,
         )
 
         graph.output(packed_b, sf_b)

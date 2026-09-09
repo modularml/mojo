@@ -59,24 +59,51 @@ def constant(
     dtype: DType | None = None,
     device: Device | DeviceRef | None = None,
 ) -> TensorValue:
-    """Adds a node representing a constant operation.
+    """Creates a constant tensor from a Python literal or array-like value.
 
-    The value of this constant will have the type `TensorType` with the
-    same shape as `value`. If `value` is a scalar type, it will create a `TensorType` with 0 dimensions.
+    .. code-block:: python
 
-    The constant will be loaded with the specified dtype.
-    If the constant does not fit within the specified dtype, an error is raised.
+        from max.dtype import DType
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
 
-    Warning: Loading the constant could result in precision loss.
-    For example, loading `16777217` as a `float32` will result in `16777216.0`.
+        device = DeviceRef.CPU()
+        with Graph("constant_example") as graph:
+            x = ops.constant(
+                [[1.0, 2.0], [3.0, 4.0]], DType.float32, device=device
+            )
+            graph.output(x)
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+        # result holds [[1.0, 2.0], [3.0, 4.0]].
+
+    .. caution::
+
+        Loading a constant can lose precision. For example, loading
+        ``16777217`` as a ``float32`` produces ``16777216.0``.
 
     Args:
-        value: The constant's value.
-        dtype: The constant tensor's element type.
-        device: The device the constant lives on.
+        value: The value to embed. A Python scalar, a (nested) sequence of
+            numbers, or an array-like object that supports DLPack, such as a
+            NumPy array.
+        dtype: The constant tensor's element type. Required when ``value`` is a
+            Python scalar or sequence. For an array-like ``value``, defaults to
+            the array's dtype.
+        device: The device the constant lives on. Required when ``value`` is a
+            Python scalar or sequence. For an array-like ``value``, defaults to
+            the array's device.
 
     Returns:
-        A graph value containing the constant data as an attribute.
+        A ``TensorValue`` representing the constant, with the same shape as
+        ``value``. A scalar ``value`` produces a rank-0 tensor.
+
+    Raises:
+        TypeError: If ``dtype`` is a sub-byte type, or if ``value`` is a Python
+            scalar or sequence and ``dtype`` or ``device`` isn't set.
+        ValueError: If ``value`` is a nested sequence that isn't rectangular,
+            if an integer in ``value`` is out of range for ``dtype``, or if
+            ``dtype`` doesn't match the dtype of an array-like ``value``.
     """
     if dtype is not None and dtype.size_in_bits < 8:
         raise TypeError(
@@ -119,10 +146,19 @@ def constant(
 
     type = TensorType(dtype, value.shape, device=device)
     attr = _graph.array_attr(value, type.to_mlir())
-    return Graph.current._add_op_generated(_mo.ConstantOp, type, attr)[0].tensor
+    # See constant_external() below for why constants never carry a
+    # profile_scope label.
+    return Graph.current._add_op_generated(
+        _mo.ConstantOp, type, attr, attach_profile_scopes=False
+    )[0].tensor
 
 
-def constant_external(name: str, type: TensorType) -> TensorValue:
+def constant_external(
+    name: str,
+    type: TensorType,
+    align: int | None = None,
+    is_placeholder: bool = False,
+) -> TensorValue:
     """Registers an external constant (weight) in the graph of a given type.
 
     Two external constants with the same name and type refer to the same weight.
@@ -134,22 +170,32 @@ def constant_external(name: str, type: TensorType) -> TensorValue:
         name: The name of the external constant.
             This should be the fully-qualified weight name and must be unique.
         type: The type of the constant value.
+        align: The alignment of the constant. If not provided,
+            the default alignment for the type's dtype will be used.
+        is_placeholder: When :obj:`True`, marks the constant as a placeholder
+            whose name is resolved at :func:`~max.graph.ops.call` time by the
+            call's ``prefix``.
 
     Returns:
-        A tensor value of the specified type, representing the weight value
+        A ``TensorValue`` of the specified type, representing the weight value
         associated with the name at compile time.
     """
+    # Constants/weights are compile-time data that later passes are free to
+    # batch/dedupe/hoist; a shared allocation op inheriting one constant's
+    # scope label would misdirect anything that searches for "the first op
+    # tagged with scope S".
     return Graph.current._add_op_generated(
         _mo.ConstantExternalOp,
         result=type,
         name=name,
         align=_builtin.IntegerAttr(
             _builtin.IntegerType(64, _builtin.SignednessSemantics.unsigned),
-            type.dtype.align,
+            align or type.dtype.align,
         ),
         device=type.device,
         has_alias=False,
-        is_placeholder=False,
+        is_placeholder=is_placeholder,
+        attach_profile_scopes=False,
     )[0]
 
 
@@ -167,6 +213,8 @@ _DTYPE_MIN_AND_MAX = {
     DType.uint32: (0, 2**32 - 1),
     DType.uint64: (0, 2**64 - 1),
     DType.float4_e2m1fn: (-0b0111, 0b0111),
+    DType.float6_e2m3fn: (-7.5, 7.5),
+    DType.float6_e3m2fn: (-28, 28),
     DType.float8_e8m0fnu: (2**-127, 2**127),
     DType.float8_e5m2: (float("-inf"), float("inf")),
     DType.float8_e5m2fnuz: (-57344, 57344),

@@ -134,7 +134,7 @@ def test_zipped_divide_layout() raises:
 
 def test_tile_tensor_reshape_static() raises:
     """Test reshaping a TileTensor with compile-time dimensions."""
-    var storage = InlineArray[Float32, 12](uninitialized=True)
+    var storage = Array[Float32, 12](fill={})
     var tensor = TileTensor(storage, row_major[3, 4]()).fill(1.0)
 
     # Verify original shape
@@ -169,7 +169,7 @@ def test_tile_tensor_reshape_static() raises:
 
 def test_tile_tensor_reshape_preserves_data() raises:
     """Test that reshape preserves the underlying data."""
-    var storage = InlineArray[Float32, 6](uninitialized=True)
+    var storage = Array[Float32, 6](fill={})
     var tensor = TileTensor(storage, row_major[2, 3]())
 
     # Fill with distinct values
@@ -203,7 +203,7 @@ def test_tile_tensor_reshape_preserves_data() raises:
 
 def test_tile_tensor_reshape_with_coord() raises:
     """Test reshaping with a Coord argument (potentially runtime dims)."""
-    var storage = InlineArray[Float32, 12](uninitialized=True)
+    var storage = Array[Float32, 12](fill={})
     var tensor = TileTensor(storage, row_major[3, 4]()).fill(2.0)
 
     # Reshape using Coord with compile-time dimensions
@@ -223,7 +223,7 @@ def test_tile_tensor_reshape_with_coord() raises:
 
 def test_tile_tensor_reshape_strides() raises:
     """Test that reshaped tensor has correct row-major strides."""
-    var storage = InlineArray[Float32, 24](uninitialized=True)
+    var storage = Array[Float32, 24](fill={})
     var tensor = TileTensor(storage, row_major[4, 6]()).fill(0.0)
 
     # Reshape to (2, 3, 4)
@@ -237,7 +237,7 @@ def test_tile_tensor_reshape_strides() raises:
 
 def test_tile_tensor_reshape_is_view() raises:
     """Test that reshape creates a view, not a copy."""
-    var storage = InlineArray[Float32, 6](uninitialized=True)
+    var storage = Array[Float32, 6](fill={})
     var tensor = TileTensor(storage, row_major[2, 3]()).fill(0.0)
 
     var reshaped = tensor.reshape[3, 2]()
@@ -258,7 +258,7 @@ def test_tile_tensor_reshape_is_view() raises:
 def test_tile_tensor_tile_with_int_coords() raises:
     """Test tile method with variadic Int coordinates (LayoutTensor compatible).
     """
-    var storage = InlineArray[Float32, 16](uninitialized=True)
+    var storage = Array[Float32, 16](fill={})
     var tensor = TileTensor(storage, row_major[4, 4]())
 
     # Fill with distinct values
@@ -292,7 +292,7 @@ def test_tile_tensor_tile_with_int_coords() raises:
 
 def test_tile_tensor_tile_is_view() raises:
     """Test that tile creates a view, not a copy."""
-    var storage = InlineArray[Float32, 16](uninitialized=True)
+    var storage = Array[Float32, 16](fill={})
     var tensor = TileTensor(storage, row_major[4, 4]()).fill(0.0)
 
     var tile = tensor.tile[2, 2](1, 0)
@@ -639,7 +639,7 @@ def test_tile_tensor_flat_rank() raises:
     """
     # Non-nested layout: flat_rank == rank
     comptime tensor1 = TileTensor[
-        DType.float32, type_of(row_major[3, 4]()), MutAnyOrigin
+        .float32, type_of(row_major[3, 4]()), MutAnyOrigin
     ]
     comptime assert tensor1.rank == 2
     comptime assert tensor1.flat_rank == 2
@@ -650,7 +650,7 @@ def test_tile_tensor_flat_rank() raises:
     comptime blocked_layout = blocked_product(block, tiler)
 
     comptime tensor2 = TileTensor[
-        DType.float32, type_of(blocked_layout), MutAnyOrigin
+        .float32, type_of(blocked_layout), MutAnyOrigin
     ]
     comptime assert tensor2.rank == 2  # Two top-level Coords
     comptime assert tensor2.flat_rank == 4  # Four scalar dimensions
@@ -664,7 +664,7 @@ def test_tile_tensor_flat_indexing_blocked() raises:
     var tiler = row_major[2, 3]()
     var blocked_layout = blocked_product(block, tiler)
 
-    var storage = InlineArray[Float32, 24](uninitialized=True)
+    var storage = Array[Float32, 24](fill={})
     var tensor = TileTensor(storage, blocked_layout)
 
     # Initialize using flat indices
@@ -762,7 +762,7 @@ def test_layout_transpose() raises:
 
 def test_tile_tensor_transpose() raises:
     """Test TileTensor.transpose() creates a transposed view."""
-    var storage = InlineArray[Float32, 6](uninitialized=True)
+    var storage = Array[Float32, 6](fill={})
     var tensor = TileTensor(storage, row_major[2, 3]())
 
     # Fill with distinct values
@@ -790,7 +790,7 @@ def test_tile_tensor_transpose() raises:
 
 def test_tile_tensor_transpose_is_view() raises:
     """Test that transpose creates a view, not a copy."""
-    var storage = InlineArray[Float32, 6](uninitialized=True)
+    var storage = Array[Float32, 6](fill={})
     var tensor = TileTensor(storage, row_major[2, 3]()).fill(0.0)
 
     var trans = tensor.transpose()
@@ -809,7 +809,7 @@ def test_tile_tensor_hierarchical_indexing_with_coord() raises:
     var tiler = row_major[2, 3]()
     var blocked_layout = blocked_product(block, tiler)
 
-    var storage = InlineArray[Float32, 24](fill=0.0)
+    var storage = Array[Float32, 24](fill=0.0)
     var tensor = TileTensor(storage, blocked_layout)
 
     # Use nested Coord matching layout shape ((2,2),(2,3))
@@ -975,7 +975,7 @@ def test_tile_tensor_hierarchical_load_store() raises:
     var tiler = row_major[2, 3]()
     var blocked_layout = blocked_product(block, tiler)
 
-    var storage = InlineArray[Float32, 24](fill=0.0)
+    var storage = Array[Float32, 24](fill=0.0)
     var tensor = TileTensor(storage, blocked_layout)
 
     # Write using exact-match hierarchical coord: ((1, 0), (0, 2))
@@ -1001,7 +1001,7 @@ def test_tile_tensor_hierarchical_load_store() raises:
 
 def test_tile_tensor_hierarchical_getitem_setitem() raises:
     """Test TileTensor __getitem__/__setitem__ with hierarchical Coord."""
-    var storage = InlineArray[Float32, 24](fill=0.0)
+    var storage = Array[Float32, 24](fill=0.0)
 
     # Layout shape (4, (3, 2)), stride (6, (2, 1))
     var inner_shape = Coord(Idx[3], Idx[2])
@@ -1023,7 +1023,7 @@ def test_tile_tensor_hierarchical_getitem_setitem() raises:
 
 def test_tile_tensor_hierarchical_scalar_index() raises:
     """Test TileTensor load with a single scalar coord."""
-    var storage = InlineArray[Float32, 24](fill=0.0)
+    var storage = Array[Float32, 24](fill=0.0)
 
     # Layout shape (4, (3, 2)), stride (6, (2, 1))
     var inner_shape = Coord(Idx[3], Idx[2])

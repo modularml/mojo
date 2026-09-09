@@ -1,0 +1,7 @@
+@LIT_SITE_CFG_IN_HEADER@
+
+lit_config.load_config(
+    config, "./bazel/internal/llvm-lit/lit.common.configured"
+)
+
+lit_config.load_config(config, "./Mojo/test/mojo-parser/lit.cfg.py")

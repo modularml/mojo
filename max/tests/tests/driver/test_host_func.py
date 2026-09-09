@@ -26,10 +26,10 @@ def accelerator() -> driver.Accelerator:
 def test_unsafe_enqueue_host_func_runs_callback(
     accelerator: driver.Accelerator,
 ) -> None:
-    """Callback runs on a CUDA device after preceding work completes."""
-    if accelerator.api != "cuda":
+    """Callback runs on an accelerator after preceding work completes."""
+    if accelerator.api not in ("cuda", "hip"):
         pytest.skip(
-            "__unsafe_enqueue_py_host_func is only implemented for CUDA devices"
+            "__unsafe_enqueue_py_host_func is only implemented for CUDA/HIP devices"
         )
 
     calls: list[str] = []
@@ -49,9 +49,9 @@ def test_unsafe_enqueue_host_func_with_raising_callback(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Callback raises an exception."""
-    if accelerator.api != "cuda":
+    if accelerator.api not in ("cuda", "hip"):
         pytest.skip(
-            "__unsafe_enqueue_py_host_func is only implemented for CUDA devices"
+            "__unsafe_enqueue_py_host_func is only implemented for CUDA/HIP devices"
         )
 
     def cb() -> None:
@@ -69,8 +69,8 @@ def test_unsafe_enqueue_host_func_with_raising_callback(
 def test_unsafe_enqueue_host_func_on_non_cuda_accelerator_raises(
     accelerator: driver.Accelerator,
 ) -> None:
-    """Non-CUDA accelerators (e.g., AMD/HIP) raise until we add support."""
-    if accelerator.api == "cuda":
+    """Non-CUDA/HIP accelerators raise until we add support."""
+    if accelerator.api in ("cuda", "hip"):
         pytest.skip("Covered by test_unsafe_enqueue_host_func_runs_callback")
 
     with pytest.raises(RuntimeError):

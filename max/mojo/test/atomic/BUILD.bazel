@@ -1,0 +1,28 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        # `test_compile_atomic.mojo` invokes `compile_info[...]` 14 times, 7 of
+        # which retarget to NVPTX/AMDGPU backends. Under asan on aarch64 the
+        # comptime compiler invocations blow past the remote-executor timeout.
+        # Tracked in MOCO-3794.
+        target_compatible_with = select({
+            "//:asan": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }) if src == "test_compile_atomic.mojo" else [],
+        deps = [
+            "//max:max_mojo",
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(["*.mojo"])
+]

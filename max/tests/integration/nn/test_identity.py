@@ -23,7 +23,10 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType
 from max.nn import Identity
-from modular_graph_test import are_all_tensor_values, modular_graph_test
+from test_common.modular_graph_test import (
+    are_all_tensor_values,
+    modular_graph_test,
+)
 
 
 def test_identity_passthrough() -> None:

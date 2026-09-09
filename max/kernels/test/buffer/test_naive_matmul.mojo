@@ -69,9 +69,9 @@ from std.testing import TestSuite
 def _test_my_naive_matmul[
     size: Int, dtype: DType
 ](
-    c: UnsafePointer[mut=True, Scalar[dtype], _],
-    a: UnsafePointer[Scalar[dtype], _],
-    b: UnsafePointer[Scalar[dtype], _],
+    c: MutPointer[Scalar[dtype], _],
+    a: ImmPointer[Scalar[dtype], _],
+    b: ImmPointer[Scalar[dtype], _],
 ):
     """Computes matrix multiplication with a naive algorithm.
 
@@ -88,7 +88,7 @@ def _test_my_naive_matmul[
             c[m * size + n] = c_val
 
 
-def fill_a[size: Int](buf: UnsafePointer[mut=True, Float32, _]):
+def fill_a[size: Int](buf: MutPointer[Float32, _]):
     """Fills the matrix with the values `row + 2*col`."""
 
     for i in range(size):
@@ -96,7 +96,7 @@ def fill_a[size: Int](buf: UnsafePointer[mut=True, Float32, _]):
             buf[i * size + j] = Float32(i + 2 * j)
 
 
-def fill_b[size: Int](buf: UnsafePointer[mut=True, Float32, _]):
+def fill_b[size: Int](buf: MutPointer[Float32, _]):
     """Fills the matrix with the values `row/(col + 1) + col`."""
 
     for i in range(size):
@@ -104,7 +104,7 @@ def fill_b[size: Int](buf: UnsafePointer[mut=True, Float32, _]):
             buf[i * size + j] = Float32(i // (j + 1) + j)
 
 
-def print_matrix[size: Int](buf: UnsafePointer[Float32, _]):
+def print_matrix[size: Int](buf: ImmPointer[Float32, _]):
     """Prints each element of the input matrix, element-wise."""
     for i in range(size):
         for j in range(size):
@@ -114,15 +114,15 @@ def print_matrix[size: Int](buf: UnsafePointer[Float32, _]):
 # CHECK-LABEL: _test_naive_matmul
 def _test_naive_matmul[size: Int]():
     print("== _test_naive_matmul")
-    var c_stack = InlineArray[Float32, size * size](fill=0)
-    var c = c_stack.unsafe_ptr().mut_cast[True]()
+    var c_stack = Array[Float32, size * size](fill=0)
+    var c = c_stack.unsafe_ptr()
 
-    var b_stack = InlineArray[Float32, size * size](uninitialized=True)
-    var b = b_stack.unsafe_ptr().mut_cast[True]()
+    var b_stack = Array[Float32, size * size](fill={})
+    var b = b_stack.unsafe_ptr()
     fill_b[size](b)
 
-    var a_stack = InlineArray[Float32, size * size](uninitialized=True)
-    var a = a_stack.unsafe_ptr().mut_cast[True]()
+    var a_stack = Array[Float32, size * size](fill={})
+    var a = a_stack.unsafe_ptr()
     fill_a[size](a)
 
     _test_my_naive_matmul[size, DType.float32](c, a, b)

@@ -1,0 +1,19 @@
+load("//bazel:api.bzl", "mojo_test")
+
+package(default_visibility = ["//max:consumers"])
+
+# Real GPU launch test for `Span`'s `address_space` parameter: a kernel writes
+# GPU shared memory through `Span` indexing and reads it back through an
+# address-space-generic helper. Vendor-agnostic: `//:has_gpu` excludes CPU-only
+# build configs (where `DeviceContext` fails the compile-time GPU-arch
+# constraint) without pinning to a single toolchain.
+mojo_test(
+    name = "test_span_address_space.mojo.test",
+    srcs = ["test_span_address_space.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:has_gpu"],
+    deps = [
+        "//max:max_mojo",
+        "@mojo//:std",
+    ],
+)

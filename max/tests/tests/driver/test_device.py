@@ -29,6 +29,11 @@ def test_accelerator_device_creation_error() -> None:
         _ = Accelerator()
 
 
+def test_cpu_is_host_unified() -> None:
+    # The CPU device is the host, so there is no second pool to unify with.
+    assert CPU().is_host_unified
+
+
 def test_equality() -> None:
     # We should be able to validate that two devices are the same.
     cpu_one = CPU()

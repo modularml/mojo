@@ -1,0 +1,83 @@
+load("//bazel:api.bzl", "lit_tests", "mojo_test")
+
+package(default_visibility = ["//visibility:private"])
+
+_NO_ASAN = [
+    "test_string.mojo",
+    "test_string_span.mojo",  # TODO(MOCO-2316): Takes too long to compile
+    "test_utf8.mojo",  # TODO(MSTDL-1881): materialization leak
+]
+
+_PLATFORM_CONSTRAINTS = {
+    src: select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    })
+    for src in _NO_ASAN
+}
+
+_LIT_TESTS = [
+    "test_number_parsing_lut_optimization.mojo",
+    "test_string_unicode_panic.mojo",
+    "test_string_span_bounds_abort.mojo",
+    "test_string_span_codepoint_grapheme_bounds_abort.mojo",
+]
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ] + [
+            "--warn-on-unstable-apis",
+            "-Werror",
+        ] if src.endswith("_stable.mojo") else [],
+        data = [src],  # NOTE: some tests attempt to read their source files
+        target_compatible_with = _PLATFORM_CONSTRAINTS.get(src, []),
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in glob(
+        ["**/*.mojo"],
+        exclude = _LIT_TESTS + [
+            # Bundled as a helper src into the conformance test below.
+            "_grapheme_conformance_data.mojo",
+            "test_grapheme_conformance.mojo",
+        ],
+    )
+]
+
+mojo_test(
+    name = "test_grapheme_conformance.mojo.test",
+    srcs = [
+        "_grapheme_conformance_data.mojo",
+        "test_grapheme_conformance.mojo",
+    ],
+    copts = [
+        "--debug-level",
+        "full",
+    ],
+    main = "test_grapheme_conformance.mojo",
+    deps = [
+        "@mojo//:std",
+        "@mojo//:test_utils",
+    ],
+)
+
+lit_tests(
+    name = "lit_tests",
+    size = "large",
+    srcs = _LIT_TESTS,
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

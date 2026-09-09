@@ -1,0 +1,28 @@
+load("//bazel:api.bzl", "modular_cc_binary")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = [
+        "layering_check",
+        "parse_headers",
+    ],
+)
+
+modular_cc_binary(
+    name = "support-dialect-opt",
+    srcs = glob(["*.cpp"]),
+    deps = [
+        "//Support:Base",
+        "//Support:DebugInfoDialect",
+        "//Support:DebugInfoToLLVM",
+        "//Support:DebugInfoTransforms",
+        "//Support:Globals",
+        "//Support:MDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IndexDialect",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:UBDialect",
+    ],
+)

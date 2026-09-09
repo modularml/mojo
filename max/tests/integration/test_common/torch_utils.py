@@ -108,6 +108,23 @@ def run_text_generation(  # noqa: ANN201
                 text=request.prompt,
                 return_tensors="pt",
             ).to(device)
+        elif request.messages:
+            encoded = data_processor.apply_chat_template(
+                request.messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_tensors="pt",
+                return_dict=True,
+            ).to(device)
+            attention_mask = (
+                encoded["attention_mask"]
+                if "attention_mask" in encoded
+                else torch.ones_like(encoded["input_ids"])
+            )
+            return {
+                "input_ids": encoded["input_ids"],
+                "attention_mask": attention_mask,
+            }
         else:
             encoded_prompt = data_processor.encode(
                 request.prompt, return_tensors="pt"

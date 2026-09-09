@@ -67,7 +67,7 @@ def _get_returned_type[bitwidth: Int, unsigned: Bool]() -> DType:
 
 
 struct RuntimeTuple[
-    S: IntTuple = UNKNOWN_VALUE, /, *, element_type: DType = DType.int64
+    S: IntTuple = UNKNOWN_VALUE, /, *, element_type: DType = .int64
 ](Defaultable, Intable, Sized, TrivialRegisterPassable, Writable):
     """A struct representing tuple-like data with compile-time and runtime elements.
     RuntimeTuple combines static (compile-time) and dynamic (runtime) handling of
@@ -493,7 +493,7 @@ def crd2idx[
     crd_t: IntTuple,
     shape_t: IntTuple,
     stride_t: IntTuple,
-    out_type: DType = DType.uint64,
+    out_type: DType = .uint64,
 ](
     crd: RuntimeTuple[crd_t, ...],
     shape: RuntimeTuple[shape_t, ...],

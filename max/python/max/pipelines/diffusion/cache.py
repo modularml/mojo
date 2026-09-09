@@ -14,8 +14,11 @@
 """Caching types and utilities for diffusion pipelines.
 
 This module merges two formerly separate modules:
-- cache_mixin.py: pipeline-level config, state, and FBCache conditional execution
+- cache_mixin.py: pipeline-level state and FBCache conditional execution
 - denoising_cache.py: buffer-based TaylorSeerCache for executor-style pipelines
+
+Settings, resolved config, and architecture defaults live in
+:mod:`max.pipelines.diffusion.config`.
 """
 
 from __future__ import annotations
@@ -25,87 +28,22 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from max.config import ConfigFileModel
 from max.driver import Buffer, Device
 from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.experimental import functional as F
 from max.experimental.tensor import Tensor
 from max.graph import DeviceRef, Graph, TensorType, TensorValue
-from pydantic import ConfigDict, Field, model_validator
 
+from .config import DenoisingCacheConfig
 from .taylorseer import TaylorSeer, _TaylorPredictModule, _TaylorUpdateModule
 
-
-class DenoisingCacheConfig(ConfigFileModel):
-    """Pipeline-level cache configuration for diffusion model denoising.
-
-    Controls First-Block Cache (step cache) and TaylorSeer optimizations
-    that skip redundant transformer passes during the denoising loop.
-    """
-
-    model_config = ConfigDict(frozen=False)
-
-    first_block_caching: bool = Field(
-        default=False,
-        description=(
-            "Enable First-Block Cache (FBCache) for step-cache denoising. "
-            "When enabled, the transformer skips remaining blocks if the "
-            "first-block residual is similar to the previous step."
-        ),
-    )
-
-    taylorseer: bool = Field(
-        default=False,
-        description=(
-            "Enable TaylorSeer cache optimization. Uses Taylor series "
-            "prediction to skip full transformer passes on certain "
-            "denoising steps."
-        ),
-    )
-
-    taylorseer_cache_interval: int | None = Field(
-        default=None,
-        description=(
-            "Steps between full TaylorSeer computations. "
-            "None uses the model-specific default (typically 5)."
-        ),
-    )
-
-    taylorseer_warmup_steps: int | None = Field(
-        default=None,
-        description=(
-            "Number of warmup steps before TaylorSeer prediction begins. "
-            "None uses the model-specific default (typically 4)."
-        ),
-    )
-
-    taylorseer_max_order: int | None = Field(
-        default=None,
-        description=(
-            "Taylor expansion order (1 or 2). Higher order uses second "
-            "derivatives for more accurate prediction. "
-            "None uses the model-specific default (typically 1)."
-        ),
-    )
-
-    @model_validator(mode="after")
-    def _validate_cache_mode(self) -> DenoisingCacheConfig:
-        if (
-            self.taylorseer_cache_interval is not None
-            and self.taylorseer_cache_interval < 1
-        ):
-            raise ValueError("taylorseer_cache_interval must be >= 1.")
-        if (
-            self.taylorseer_warmup_steps is not None
-            and self.taylorseer_warmup_steps < 1
-        ):
-            raise ValueError("taylorseer_warmup_steps must be >= 1.")
-        if self.taylorseer_max_order is not None and (
-            self.taylorseer_max_order not in (1, 2)
-        ):
-            raise ValueError("taylorseer_max_order must be 1 or 2.")
-        return self
+__all__ = [
+    "DenoisingCacheState",
+    "TaylorSeerBufferState",
+    "TaylorSeerCache",
+    "fbcache_conditional_execution",
+]
 
 
 @dataclass
@@ -249,8 +187,8 @@ class TaylorSeerCache:
     driver-level API.
 
     Args:
-        config: Denoising cache configuration (must have ``taylorseer=True``
-            and resolved non-None fields for interval/warmup/order).
+        config: Resolved denoising cache configuration (must have
+            ``taylorseer=True``).
         dtype: Model compute dtype (e.g. ``DType.bfloat16``).
         device: Target device for graph execution.
         session: The executor's shared inference session.
@@ -265,10 +203,6 @@ class TaylorSeerCache:
     ) -> None:
         self._dtype = dtype
         self._device = device
-
-        assert config.taylorseer_cache_interval is not None
-        assert config.taylorseer_warmup_steps is not None
-        assert config.taylorseer_max_order is not None
 
         self._cache_interval: int = config.taylorseer_cache_interval
         self._warmup_steps: int = config.taylorseer_warmup_steps

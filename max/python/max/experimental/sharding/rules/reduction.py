@@ -11,56 +11,73 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Placement rules for reduction ops.
-
-- ``reduce_rule`` — nonlinear (softmax, argmax, etc.)
-- ``linear_reduce_rule`` — linear (sum, cumsum)
-"""
+"""Placement rules for reduction ops (``reduce``, ``softmax``, ``sum``, ``mean``)."""
 
 from __future__ import annotations
 
-from max.experimental.sharding.mappings import PlacementMapping
-from max.experimental.sharding.placements import Partial, Replicated, Sharded
+from typing import Any
+
+from max.experimental.sharding import Partial, ReduceOp, Sharded
 from max.experimental.sharding.types import TensorLayout
 
-from ._common import RuleSignature
+from ..action import ActionSet, AxisAssignment
+from ..cost import P, R, build_action_set
+
+_AVG = Partial(ReduceOp.AVG)
 
 
-def _reduce_impl(
-    x: TensorLayout,
-    axis: int = -1,
-    linear: bool = False,
-) -> RuleSignature:
-    placements = x.mapping.to_placements()
-    mesh = x.mapping.mesh
-    norm_axis = axis % x.rank
-
-    if not linear:
-        suggested_p = tuple(
-            Replicated() if isinstance(p, Partial) else p for p in placements
-        )
-    else:
-        suggested_p = placements
-
-    for p in suggested_p:
-        if isinstance(p, Sharded) and p.axis == norm_axis:
-            raise ValueError(
-                f"reduce: cannot reduce along sharded axis {norm_axis}."
-            )
-
-    m = PlacementMapping(mesh, suggested_p)
-    return (m, axis), (m,)
+def _non_reduction_axis_rows(
+    x: TensorLayout, axis: int
+) -> list[AxisAssignment]:
+    """``Sharded(d) -> Sharded(d)`` rows over every non-reduction axis."""
+    norm = axis % x.rank
+    return [
+        AxisAssignment((Sharded(d),), Sharded(d))
+        for d in range(x.rank)
+        if d != norm
+    ]
 
 
-def reduce_rule(x: TensorLayout, axis: int = -1) -> RuleSignature:
-    """Nonlinear reduction: resolves Partials."""
-    return _reduce_impl(x, axis=axis, linear=False)
+def reduce_rule(x: TensorLayout, axis: int = -1, *extra: Any) -> ActionSet:
+    """Non-linear reduction: shard any non-reduction axis.
+
+    Shared by ``prod``, ``argmax``, ``argmin``, ``max``, ``min``;
+    ``*extra`` absorbs op-specific trailing args.
+    """
+    rows = [AxisAssignment((R,), R), *_non_reduction_axis_rows(x, axis)]
+    return build_action_set(rows, layouts=(x,), extras=(axis, *extra))
 
 
-def linear_reduce_rule(x: TensorLayout, axis: int = -1) -> RuleSignature:
-    """Linear reduction: Partials pass through."""
-    return _reduce_impl(x, axis=axis, linear=True)
+def softmax_rule(value: TensorLayout, axis: int = -1) -> ActionSet:
+    """Strategies for ``softmax`` / ``logsoftmax``: shard any non-softmax axis."""
+    rows = [AxisAssignment((R,), R), *_non_reduction_axis_rows(value, axis)]
+    return build_action_set(rows, layouts=(value,), extras=(axis,))
 
 
-# Backward compatibility
-reduce_single_axis = reduce_rule
+def linear_reduce_rule(
+    x: TensorLayout, axis: int = -1, *extra: Any
+) -> ActionSet:
+    """Linear reduction: ``S(reduced_axis) -> Partial(SUM)``; ``P -> P``.
+
+    Shared by ``sum`` and ``cumsum``.
+    """
+    norm = axis % x.rank
+    rows = [
+        AxisAssignment((R,), R),
+        *_non_reduction_axis_rows(x, axis),
+        AxisAssignment((Sharded(norm),), P),
+        AxisAssignment((P,), P),
+    ]
+    return build_action_set(rows, layouts=(x,), extras=(axis, *extra))
+
+
+def mean_rule(x: TensorLayout, axis: int = -1) -> ActionSet:
+    """Mean is linear with reduction op AVG."""
+    norm = axis % x.rank
+    rows = [
+        AxisAssignment((R,), R),
+        *_non_reduction_axis_rows(x, axis),
+        AxisAssignment((Sharded(norm),), _AVG),
+        AxisAssignment((_AVG,), _AVG),
+    ]
+    return build_action_set(rows, layouts=(x,), extras=(axis,))

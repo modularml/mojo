@@ -14,12 +14,11 @@
 from std.sys import align_of
 
 import linalg.matmul.vendor.blas as vendor_blas
-from std.gpu import barrier
-from std.gpu.host import DeviceContext
-from std.gpu.host.nvidia.tma import TensorMapSwizzle
-from std.gpu import block_idx, thread_idx
-from std.gpu.memory import (
-    AddressSpace,
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from max.gpu.host.nvidia.tma import TensorMapSwizzle
+from max.gpu import block_idx, thread_idx
+from max.gpu.memory import (
     async_copy_commit_group,
     async_copy_wait_group,
 )
@@ -55,10 +54,12 @@ def cpasync_wgmma_kernel[
     a: LayoutTensor[a_type, a_layout, MutAnyOrigin],
     b: LayoutTensor[b_type, b_layout, MutAnyOrigin],
     c: LayoutTensor[c_type, c_layout, MutAnyOrigin],
-    num_iters: Int,
+    num_iters_dev: Int32,
 ):
     """Test k_major @ mn_major with cp.async to simulate the 2nd matmul in mha.
     """
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var num_iters = Int(num_iters_dev)
     comptime BM = block_tile_shape[0]
     comptime BN = block_tile_shape[1]
     comptime BK = block_tile_shape[2]
@@ -68,7 +69,7 @@ def cpasync_wgmma_kernel[
         a_type,
         a_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
@@ -79,12 +80,12 @@ def cpasync_wgmma_kernel[
         b_type,
         b_smem_layout,
         MutAnyOrigin,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
         alignment=128,
     ].stack_allocation()
 
     comptime accum_type = get_accum_type[a_type]()
-    wgmma_op = TensorCoreAsync[
+    var wgmma_op = TensorCoreAsync[
         accum_type,
         a_type,
         b_type,
@@ -97,7 +98,7 @@ def cpasync_wgmma_kernel[
     comptime num_m_mmas = BM // wgmma_shape[0]
     comptime num_n_mmas = BN // wgmma_shape[1]
 
-    a_gmem_iter = a.tiled_iterator[BM, BK, axis=1](block_idx.y, 0)
+    var a_gmem_iter = a.tiled_iterator[BM, BK, axis=1](block_idx.y, 0)
 
     comptime b_dim0 = BN if transpose_b else BK
     comptime b_dim1 = BK if transpose_b else BN
@@ -112,7 +113,7 @@ def cpasync_wgmma_kernel[
         accum_type,
         Layout.row_major(num_m_mmas * num_n_mmas, c_frag_size),
         MutAnyOrigin,
-        address_space=AddressSpace.LOCAL,
+        address_space=.LOCAL,
     ].stack_allocation()
 
     _ = c_reg_tile.fill(0.0)
@@ -138,7 +139,7 @@ def cpasync_wgmma_kernel[
         a_gmem_iter._incr()
         b_gmem_iter._incr()
 
-    c_gmem_tile = c.tile[BM, BN](block_idx.y, block_idx.x)
+    var c_gmem_tile = c.tile[BM, BN](block_idx.y, block_idx.x)
     comptime c_layouts = wgmma_c_layout[
         wgmma_shape[0], wgmma_shape[1], c_gmem_tile.layout
     ]()
@@ -147,12 +148,12 @@ def cpasync_wgmma_kernel[
     comptime tile_to_idx = tv_tile_to_idx_const[1]
     comptime t_to_idx_const = tv_to_idx[0]
     comptime v_to_idx = tv_to_idx[1]
-    t_to_idx = RuntimeLayout[t_to_idx_const]()
-    t_idx = t_to_idx(thread_idx.x)
+    var t_to_idx = RuntimeLayout[t_to_idx_const]()
+    var t_idx = t_to_idx(thread_idx.x)
 
-    c_reg_tile_vec2 = c_reg_tile.vectorize[1, 2]()
+    var c_reg_tile_vec2 = c_reg_tile.vectorize[1, 2]()
     comptime T = c_reg_tile_vec2.element_type
-    c_gmem_ptr = c_gmem_tile.ptr + t_idx
+    var c_gmem_ptr = c_gmem_tile.ptr + t_idx
 
     comptime for mma_id in range(tile_to_idx.size()):
         comptime mma_idx = tile_to_idx(mma_id)
@@ -161,7 +162,9 @@ def cpasync_wgmma_kernel[
             comptime local_idx = local_idx_v2 * 2
             comptime v_idx = v_to_idx(local_idx)
             comptime c_idx = v_idx + mma_idx
-            casted_vec = c_reg_tile_vec2[mma_id, local_idx_v2].cast[c_type]()
+            var casted_vec = c_reg_tile_vec2[mma_id, local_idx_v2].cast[
+                c_type
+            ]()
             (c_gmem_ptr + c_idx).store[alignment=align_of[T]()](casted_vec)
 
 
@@ -241,7 +244,7 @@ def test_cpasync_wgmma[
         a.device_tensor(),
         b.device_tensor(),
         c.device_tensor(),
-        K // BK,
+        Int32(K // BK),
         grid_dim=(1, 1),
         block_dim=(128),
     )
@@ -257,8 +260,8 @@ def test_cpasync_wgmma[
 
     ctx.synchronize()
 
-    c_host = c.tensor()
-    c_host_ref = c_ref.tensor()
+    var c_host = c.tensor()
+    var c_host_ref = c_ref.tensor()
 
     for m in range(M):
         for n in range(N):
@@ -272,9 +275,9 @@ def test_cpasync_wgmma[
 def main() raises:
     with DeviceContext() as ctx:
         test_cpasync_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(64, 64, 64),
             Index(64, 64, 64),
             Index(64, 64, 16),
@@ -284,9 +287,9 @@ def main() raises:
         ](ctx)
 
         test_cpasync_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(64, 128, 128),
             Index(64, 128, 128),
             Index(64, 128, 16),
@@ -296,9 +299,9 @@ def main() raises:
         ](ctx)
 
         test_cpasync_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(64, 64, 64),
             Index(64, 64, 64),
             Index(64, 64, 16),
@@ -308,9 +311,9 @@ def main() raises:
         ](ctx)
 
         test_cpasync_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(64, 128, 128),
             Index(64, 128, 128),
             Index(64, 128, 16),
@@ -320,9 +323,9 @@ def main() raises:
         ](ctx)
 
         test_cpasync_wgmma[
-            DType.bfloat16,
-            DType.bfloat16,
-            DType.bfloat16,
+            .bfloat16,
+            .bfloat16,
+            .bfloat16,
             Index(128, 64, 128),
             Index(128, 64, 128),
             Index(64, 64, 16),

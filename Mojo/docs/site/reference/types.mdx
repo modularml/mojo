@@ -1,0 +1,268 @@
+---
+title: Mojo types reference
+sidebar_label: Types
+sidebar_position: 1
+description: >-
+  Reference for Mojo's built-in types: the numeric, string,
+  collection, memory, and other types every program can use without
+  an import.
+---
+
+<!-- VERIFIED: prelude/__init__.mojo (auto-import set; the compiler imports
+     std.prelude per MojoParser/SharedState.cpp). builtin/bool.mojo (1-bit
+     backing), builtin/type_aliases.mojo (Never), builtin/none.mojo
+     (NoneType is a struct), builtin/builtin_slice.mojo (Slice fields),
+     collections/string/string_span.mojo (StaticString, StringSpan),
+     memory/span.mojo (non-owning view), collections/optional.mojo
+     (value() aborts on empty), collections/array.mojo,
+     utils/variant.mojo, os/os.mojo (abort -> Never). Set and Variant are
+     NOT in the prelude. -->
+
+Mojo is statically typed. Every value has a type that is known at compile
+time. This page catalogs built-in types that are available in every
+program without an import.
+
+## Built-in types and the prelude
+
+Built-in types come from the standard library *prelude*, which the compiler
+imports into every program. The prelude consists of the `builtin` package
+(`Int`, `Bool`, `Error`, and core traits) plus selected types from
+`collections`, `memory`, and `math`.
+
+Although they feel like part of the language itself, built-in types are
+ordinary structs defined in the standard library, just like a type you
+might write yourself.
+
+The prelude and compiler syntax are separate concerns. Some language
+constructs have *syntax* without a corresponding name in scope. For example,
+a set *display* doesn't require an import but the `Set` type does:
+
+```mojo
+var primes = {2, 3, 5, 7}   # set display: compiler syntax, no import
+
+from std.collections import Set
+var empty = Set[Int]()      # the name Set must be imported
+```
+
+## Numeric types
+
+Mojo's numeric types are built on `SIMD`, a fixed-size, homogeneous vector
+of primitive values. `Int`, the sized integer types (`Int8` through
+`Int256` and `UInt8` through `UInt256`), and the floating-point types
+(`Float16` through `Float64`, `BFloat16`, and the `Float8_*` formats) are
+all available through the prelude.
+
+For details on sizes, precision, overflow behavior, and conversions, see
+[Numeric types](/docs/reference/numeric-types/).
+
+## String types
+
+All string types hold UTF-8 encoded text. Their bytes are guaranteed to be
+valid UTF-8. Construction enforces this. `String(from_utf8_lossy=...)`
+replaces invalid bytes, and `String(unsafe_from_utf8=...)` requires the
+caller to guarantee validity.
+
+<!-- markdownlint-disable MD013 -->
+
+| Type                                                                     | What it is                                   |
+|--------------------------------------------------------------------------|----------------------------------------------|
+| [`String`](/docs/std/collections/string/string/String/)                  | Owned, mutable, heap-allocated UTF-8 string. |
+| [`StringSpan`](/docs/std/collections/string/string_span/StringSpan/)     | Non-owning view into existing UTF-8 data.    |
+| [`StaticString`](/docs/std/collections/string/string_span/#staticstring) | A `StringSpan` over static, read-only data.  |
+| [`StringLiteral`](/docs/std/builtin/string_literal/StringLiteral/)       | Compile-time string constant from source.    |
+| [`Codepoint`](/docs/std/collections/string/codepoint/Codepoint/)         | A single Unicode codepoint.                  |
+
+<!-- markdownlint-enable MD013 -->
+
+A string literal in source is a `StringLiteral`. It materializes to a
+`String` at runtime, or to a `StringSpan` when the context requires a view.
+`StringSlice` remains available as a compatibility alias for `StringSpan`.
+For details, see [String
+literals](/docs/reference/literals/#string-literals).
+
+Length has three measurements, and they disagree for non-ASCII text:
+
+```mojo
+var wave = String("👋🏽")          # waving hand + skin-tone modifier
+print(wave.byte_length())        # 8
+print(wave.count_codepoints())   # 2
+print(wave.count_graphemes())    # 1
+```
+
+`byte_length()` counts UTF-8 bytes, `count_codepoints()` counts
+Unicode codepoints, and `count_graphemes()` counts user-perceived
+characters. Pick the count that matches the question being asked.
+
+## Collection types
+
+Mojo includes a flexible set of collection types.
+
+<!-- markdownlint-disable MD013 -->
+
+| Type                                                             | What it is                                                  |
+|------------------------------------------------------------------|-------------------------------------------------------------|
+| [`List`](/docs/std/collections/list/List/)                       | Dynamically sized, growable sequence.                       |
+| [`Dict`](/docs/std/collections/dict/Dict/)                       | Key-value mapping.                                          |
+| [`Set`](/docs/std/collections/set/Set/)                          | Unordered collection of unique values. Requires an import.  |
+| [`Optional`](/docs/std/collections/optional/Optional/)           | A value that may or may not be present.                     |
+| [`Tuple`](/docs/std/builtin/tuple/Tuple/)                        | Fixed-size, heterogeneous group of values.                  |
+| [`Array`](/docs/std/collections/array/Array/)                    | Fixed-size array stored inline, with no heap allocation.    |
+| [`Variant`](/docs/std/utils/variant/Variant/)                    | Holds one value from a fixed set of types. Requires import. |
+
+<!-- markdownlint-enable MD013 -->
+
+`List`, `Dict`, `Set`, and `Tuple` support display syntax, as described in
+[Expressions](/docs/reference/expressions/#collection-displays).
+
+`Set` and `Variant` aren't in the prelude. Import `Set` from
+`std.collections` and `Variant` from `std.utils`.
+
+### Optional
+
+An `Optional[T]` holds a `T` or nothing. It's truthy when a value is
+present:
+
+```mojo
+var maybe: Optional[Int] = 5
+if maybe:
+    print(maybe.value())     # 5
+```
+
+`value()` aborts on empty `Optional`s. Guard it with a truthiness check, or
+call `or_else()` to supply a default:
+
+```mojo
+var empty: Optional[Int] = None
+# empty.value()              # aborts: the Optional is empty
+print(empty.or_else(0))      # 0
+```
+
+### Variant
+
+A `Variant` holds one value from a fixed set of types, tracked at
+runtime. Test the active type with `isa[T]()`, and read it by
+indexing with that type:
+
+```mojo
+from std.utils import Variant
+
+var v = Variant[Int, String](5)
+print(v[Int])                # 5
+v.set[String]("text")
+print(v[String])             # text
+```
+
+## Memory types
+
+Mojo memory types are pointers and views that provide non-owning access to
+memory. A single `Pointer` type covers both safe and unsafe use: rather than
+splitting the guarantees across two types, Mojo marks unsafety on the individual
+*operation*. Dereferencing a pointer is safe, while operations with requirements
+the compiler can't check for you, such as unchecked offsets, aliasing casts, and
+overwriting memory, carry an `unsafe_` prefix. Every `Pointer` is non-nullable;
+use `Optional[Pointer]` to model a pointer that may be absent.
+
+<!-- markdownlint-disable MD013 -->
+
+| Type                                                           | What it is                                         |
+|----------------------------------------------------------------|----------------------------------------------------|
+| [`Pointer`](/docs/std/memory/pointer/Pointer/)                 | Non-nullable pointer to one or more values.        |
+| [`Span`](/docs/std/collections/span/Span/)                     | Non-owning view of contiguous data.                |
+| [`AddressSpace`](/docs/std/memory/address_space/AddressSpace/) | Identifies where memory lives, such as CPU or GPU. |
+
+<!-- markdownlint-enable MD013 -->
+
+`OpaquePointer`, `OptionalPointer`, and the `MutX` and `ImmX` forms are
+aliases of `Pointer`. `UnsafePointer` is a deprecated alias for `Pointer`, kept
+for code written before the two types were unified.
+
+For an overview of pointer types, see
+[Intro to pointers](/docs/manual/pointers/). For memory allocation and pointer
+usage, see [Using pointers](/docs/manual/pointers/using-pointers).
+
+## Other built-in types
+
+Mojo includes several built-in types that don't fit into the above
+categories but are still fundamental to the language:
+
+<!-- markdownlint-disable MD013 -->
+
+| Type                                              | What it is                                                |
+|---------------------------------------------------|-----------------------------------------------------------|
+| [`Bool`](/docs/std/builtin/bool/Bool/)            | Boolean value, `True` or `False`. Backed by a 1-bit type. |
+| [`Error`](/docs/std/builtin/error/Error/)         | A runtime error raised by a `raises` function.            |
+| [`Never`](/docs/std/builtin/type_aliases/#never)  | The type of an expression that never produces a value.    |
+| [`NoneType`](/docs/std/builtin/none/NoneType/)    | The type whose only value is `None`.                      |
+| [`Slice`](/docs/std/builtin/builtin_slice/Slice/) | The `start:end:step` descriptor a subscript produces.     |
+
+<!-- markdownlint-enable MD013 -->
+
+### Bool
+
+A `Bool` struct is backed by a 1-bit value, not a `SIMD` alias. Its
+literals are `True` and `False`. Any type that conforms to `Boolable`
+provides a `Bool` representation that can act as a condition:
+
+```mojo
+var flag = True
+if flag:
+    print("yes")             # yes
+```
+
+### Error
+
+`Error` is Mojo's default error type. A function marked `raises` raises
+`Error` unless it declares another type (`raises T`):
+
+```mojo
+def parse(s: String) raises -> Int:
+    raise Error("invalid input")
+```
+
+### Never
+
+`Never` is the type of an expression that never produces a value, such as a
+call that always aborts or a loop that never terminates. Values of type
+`Never` can't exist. The compiler treats any code that follows as
+unreachable. `Never` is a compiler type (`!kgen.never`), not a `struct`.
+
+```mojo
+from std.os import abort
+
+def fatal() -> Never:
+    abort()  # never returns
+```
+
+### None
+
+`None` is the only value of type `NoneType`. A function with no
+declared return type returns `None`:
+
+```mojo
+def implicit_greet(name: String):
+    print("hello", name)
+    # returns None implicitly
+
+def explicit_greet(name: String) -> None:
+    print("hello", name)
+    # returns None explicitly
+```
+
+### Slice
+
+A `Slice` holds `start`, `end`, and `step`, each an `Optional[Int]`.
+It's the descriptor that subscript syntax with colons produces; it
+carries no data of its own.
+
+What subscripting returns depends on the type being indexed. A
+contiguous `List` slice yields a `Span` view; a strided slice yields a
+new `List`.
+
+```mojo
+var items: List[Int] = [0, 1, 2, 3, 4, 5]
+var middle = items[1:4]      # Span view, [1, 2, 3]
+var strided = items[::2]     # new List, [0, 2, 4]
+```
+
+For slice syntax, see
+[Expressions](/docs/reference/expressions/#slices).

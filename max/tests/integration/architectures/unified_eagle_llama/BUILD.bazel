@@ -5,7 +5,6 @@ load(
 
 package(default_visibility = [
     "//:__pkg__",
-    "//SDK/integration-test:__subpackages__",
     "//max/tests:__subpackages__",
     "//oss/modular/max/tests:__subpackages__",
 ])
@@ -19,7 +18,8 @@ package(default_visibility = [
             "//max/python/max/dtype",
             "//max/python/max/graph",
             "//max/python/max/nn",
-            "//max/python/max/pipelines/architectures",
+            "//max/python/max/pipelines/architectures/llama3",
+            "//max/python/max/pipelines/architectures/unified_eagle_llama3",
             "//max/python/max/pipelines/lib",
         ],
     )

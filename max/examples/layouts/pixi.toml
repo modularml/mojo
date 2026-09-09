@@ -1,0 +1,14 @@
+[workspace]
+name = "Layout examples"
+version = "0.1.0"
+description = "Examples of using the Layout struct"
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+
+[dependencies]
+max = "*"
+
+[tasks]
+basic_layouts = "mojo run basic_layouts.mojo"
+tiled_layouts = "mojo run tiled_layouts.mojo"

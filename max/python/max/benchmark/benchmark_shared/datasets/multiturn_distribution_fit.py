@@ -68,6 +68,11 @@ class _SessionResult:
 
     session: ChatSession | None
     observations: list[tuple[int, SharedContext]]
+    # Number of turns kept before context overflow forced an early stop, or
+    # ``None`` when the session used all its planned turns. The parent
+    # aggregates these into a single summary line instead of logging per
+    # session.
+    truncated_at_turn: int | None = None
 
 
 logger = logging.getLogger(__name__)
@@ -262,21 +267,25 @@ def _build_session(args: _SessionArgs) -> _SessionResult:
     """Worker-side per-session build, run in spawn Pool processes.
 
     Uses the worker-local tokenizer loaded by `_tokenizer_pool._init_encoder`
-    so the slow Kimi tokenizer is exercised in parallel across cores. The
-    initializer also replays the parent's logging config, so the overflow
-    log below lands in the same handlers as the rest of the benchmark output.
+    so the slow Kimi tokenizer is exercised in parallel across cores.
+
+    Context overflow is reported back to the parent (``truncated_at_turn``)
+    rather than logged here, so the parent can emit one aggregate summary
+    instead of a per-session line for every truncated session.
     """
     tokenizer = worker_tokenizer()
     messages: list[SessionMessage] = []
     context_tokens = 0
     observations: list[tuple[int, SharedContext]] = []
+    truncated_at_turn: int | None = None
 
     for turn_i, turn in enumerate(args.turns):
+        sys_prompt_ratio = args.sys_prompt_ratio if turn_i == 0 else 0.0
         msg = build_scaled_user_message(
             tokenizer,
             turn.prompt_text,
             turn.target_in,
-            args.sys_prompt_ratio,
+            sys_prompt_ratio,
             turn.sys_variant,
             args.min_input_len,
             unique_marker=turn.unique_marker,
@@ -285,18 +294,7 @@ def _build_session(args: _SessionArgs) -> _SessionResult:
             context_tokens + msg.num_tokens + turn.target_out
             > args.max_context_length
         ):
-            logger.info(
-                "%s session %s: stopping at turn %s (planned %s): "
-                "context %s + turn %s+%s exceeds max %s",
-                args.log_prefix,
-                args.session_id,
-                turn_i,
-                len(args.turns),
-                context_tokens,
-                msg.num_tokens,
-                turn.target_out,
-                args.max_context_length,
-            )
+            truncated_at_turn = turn_i
             break
         if msg.sys_prefix is not None:
             observations.append((turn.sys_variant, msg.sys_prefix))
@@ -320,7 +318,11 @@ def _build_session(args: _SessionArgs) -> _SessionResult:
     session = (
         ChatSession(args.session_id, messages) if len(messages) >= 2 else None
     )
-    return _SessionResult(session=session, observations=observations)
+    return _SessionResult(
+        session=session,
+        observations=observations,
+        truncated_at_turn=truncated_at_turn,
+    )
 
 
 def build_chat_samples_from_user_text_pool(
@@ -435,7 +437,7 @@ def build_chat_samples_from_user_text_pool(
     max_variant = max(1, max_num_unique_sys_prompt)
     session_args_list: list[_SessionArgs] = []
     cursor = 0
-    pass_count = 0
+    draw_index = 0
     for session_id in range(num_sessions):
         n_planned = num_turns_per_session[session_id]
 
@@ -443,7 +445,6 @@ def build_chat_samples_from_user_text_pool(
         for turn_i in range(n_planned):
             if cursor >= len(filtered):
                 cursor = 0
-                pass_count += 1
             in_dist = in_first_dist if turn_i == 0 else in_rest_dist
             out_dist = out_first_dist if turn_i == 0 else out_rest_dist
             target_in = max(round(in_dist.sample_value()), min_input_len)
@@ -454,7 +455,8 @@ def build_chat_samples_from_user_text_pool(
                 if delay_dist
                 else None
             )
-            marker = f"[{pass_count}] " if pass_count > 0 else ""
+            # Marked unconditionally: avoids unintended shared prefixes.
+            marker = f"[{draw_index}] "
             turns.append(
                 _TurnSpec(
                     prompt_text=filtered[cursor],
@@ -466,6 +468,7 @@ def build_chat_samples_from_user_text_pool(
                 )
             )
             cursor += 1
+            draw_index += 1
 
         session_args_list.append(
             _SessionArgs(
@@ -479,11 +482,28 @@ def build_chat_samples_from_user_text_pool(
         )
 
     sessions: list[ChatSession] = []
+    truncated_turns: list[int] = []
     for result in pool.map(_build_session, session_args_list):
         if result.session is not None:
             sessions.append(result.session)
+        if result.truncated_at_turn is not None:
+            truncated_turns.append(result.truncated_at_turn)
         for sys_variant, sys_prefix in result.observations:
             _register_longest_sys_prompt(warmup_dict, sys_variant, sys_prefix)
+
+    if truncated_turns:
+        # One aggregate line instead of a per-session log for each truncated
+        # session, which otherwise floods the terminal.
+        logger.info(
+            "%s: %d/%d sessions truncated to fit the model's max context "
+            "(%d tokens); kept turns ranged %d-%d.",
+            log_prefix,
+            len(truncated_turns),
+            num_sessions,
+            max_context_length,
+            min(truncated_turns),
+            max(truncated_turns),
+        )
 
     if len(sessions) < num_sessions:
         logger.warning(

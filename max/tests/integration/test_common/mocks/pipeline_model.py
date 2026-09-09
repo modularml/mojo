@@ -22,18 +22,27 @@ from max.dtype import DType
 from max.engine import InferenceSession
 from max.graph import DeviceRef
 from max.graph.weights import Weights, WeightsAdapter
-from max.nn.kv_cache import KVCacheInputs, KVCacheParams
+from max.nn.kv_cache import (
+    KVCacheInputsInterface,
+    KVCacheParams,
+    MHAKVCacheParams,
+)
 from max.nn.transformer import ReturnHiddenStates, ReturnLogits
-from max.pipelines.core import TextContext
+from max.pipelines.context import TextContext
 from max.pipelines.lib import (
     KVCacheConfig,
-    LoRAManager,
     ModelInputs,
     ModelOutputs,
     PipelineConfig,
     PipelineModelWithKVCache,
 )
+from max.pipelines.lib.memory_estimation import MemoryPlan
+from max.pipelines.lora import LoRAManagerV3
 from transformers import AutoConfig
+
+# The mock model's sequence-length clamp; plan builders use it to populate
+# mock plans the way the estimator would.
+MOCK_MODEL_MAX_SEQ_LEN = 1200
 
 
 class MockModelInputs(ModelInputs):
@@ -41,7 +50,7 @@ class MockModelInputs(ModelInputs):
         self,
         active_batch_size: int,
         eos_prob: float,
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
+        kv_cache_inputs: KVCacheInputsInterface[Buffer, Buffer] | None = None,
         return_n_logits: int | Buffer = 1,
     ) -> None:
         self.active_batch_size = active_batch_size
@@ -53,7 +62,7 @@ class MockModelInputs(ModelInputs):
             np.array([0, max(active_batch_size, 1)], dtype=np.uint32)
         )
         self.signal_buffers: list[Buffer] = []
-        self.kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = (
+        self.kv_cache_inputs: KVCacheInputsInterface[Buffer, Buffer] | None = (
             kv_cache_inputs
         )
         if isinstance(return_n_logits, Buffer):
@@ -81,12 +90,17 @@ class MockPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
         session: InferenceSession,
         kv_cache_config: KVCacheConfig,
         weights: Weights,
+        *,
+        memory_plan: MemoryPlan,
         devices: list[Device] = [],  # noqa: B006
         adapter: WeightsAdapter | None = None,
         return_logits: ReturnLogits = ReturnLogits.LAST_TOKEN,
         return_hidden_states: ReturnHiddenStates = ReturnHiddenStates.NONE,
+        max_batch_size: int = 1,
     ) -> None:
         self.pipeline_config = pipeline_config
+        self.memory_plan = memory_plan
+        self.max_batch_size = max_batch_size
         self.vocab_size = pipeline_config.vocab_size  # type: ignore
         self.eos_token = pipeline_config.eos_token  # type: ignore
         self.kv_cache_config = kv_cache_config
@@ -107,17 +121,15 @@ class MockPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
         # These mypy ignores, are needed to smuggle in these settings without
         # reworking these globally.
         self.eos_prob = pipeline_config.eos_prob  # type: ignore
-        self.max_seq_len = self.calculate_max_seq_len(
-            pipeline_config, self.huggingface_config
-        )
         self._lora_manager = (
-            LoRAManager(
+            LoRAManagerV3(
                 config=self.pipeline_config.lora,
                 base_model_path=pipeline_config.model.model_path,
                 base_dtype=self.dtype,
                 n_heads=self.huggingface_config.num_attention_heads,
                 n_kv_heads=self.huggingface_config.num_key_value_heads,
                 head_dim=self.huggingface_config.head_dim,
+                max_lora_seq_len=self.max_seq_len,
             )
             if self.pipeline_config.lora
             and self.pipeline_config.lora.enable_lora
@@ -136,16 +148,6 @@ class MockPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
         return config
 
     @classmethod
-    def calculate_max_seq_len(
-        cls, pipeline_config: PipelineConfig, huggingface_config: AutoConfig
-    ) -> int:
-        MAX_LENGTH = 1200
-        if pipeline_config.model.max_length:
-            return min(MAX_LENGTH, pipeline_config.model.max_length)
-
-        return MAX_LENGTH
-
-    @classmethod
     def get_kv_params(
         cls,
         huggingface_config: AutoConfig,
@@ -154,7 +156,7 @@ class MockPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
         kv_cache_config: KVCacheConfig,
         cache_dtype: DType,
     ) -> KVCacheParams:
-        return KVCacheParams(
+        return MHAKVCacheParams(
             dtype=cache_dtype,
             n_kv_heads=1,
             head_dim=1,
@@ -204,7 +206,7 @@ class MockPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
     def prepare_initial_token_inputs(
         self,
         replica_batches: Sequence[Sequence[TextContext]],
-        kv_cache_inputs: KVCacheInputs[Buffer, Buffer] | None = None,
+        kv_cache_inputs: KVCacheInputsInterface[Buffer, Buffer] | None = None,
         return_n_logits: int = 1,
     ) -> ModelInputs:
         actual_batch_size = sum(len(batch) for batch in replica_batches)
@@ -213,17 +215,4 @@ class MockPipelineModel(PipelineModelWithKVCache):  # type: ignore[type-arg]
             eos_prob=self.eos_prob,
             kv_cache_inputs=kv_cache_inputs,
             return_n_logits=return_n_logits,
-        )
-
-    def prepare_next_token_inputs(
-        self,
-        next_tokens: Buffer,
-        prev_model_inputs: ModelInputs,
-    ) -> ModelInputs:
-        prev_model_inputs = cast(MockModelInputs, prev_model_inputs)
-        return MockModelInputs(
-            active_batch_size=prev_model_inputs.active_batch_size,
-            eos_prob=self.eos_prob,
-            kv_cache_inputs=prev_model_inputs.kv_cache_inputs,
-            return_n_logits=prev_model_inputs.return_n_logits,
         )

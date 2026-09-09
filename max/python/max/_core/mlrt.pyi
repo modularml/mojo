@@ -21,7 +21,7 @@ class AsyncValue(Generic[T]):
     """
     Reference-counted handle to an asynchronous value.
 
-    Maps to `MLRT::AsyncValueRef<T>`, but duck-types like
+    Maps to `AsyncRT::AsyncValueRef<T>`, but duck-types like
     `asyncio.Future`: `done()` / `result()` / `exception()`,
     `set_result()` / `set_exception()`, `add_done_callback()`,
     and `await` are all supported.
@@ -73,6 +73,9 @@ class AsyncValue(Generic[T]):
         Return the held value. Raises `asyncio.InvalidStateError` if not yet done; re-raises the stored exception (or a synthesized `RuntimeError` for C++-side errors) if errored. Mirrors `asyncio.Future.result`.
         """
 
+    def wait(self) -> None:
+        """Block the calling thread until this AsyncValue is done."""
+
     def __await__(self) -> Generator[Any, None, T]:
         """Yield control to the event loop until this AsyncValue resolves."""
 
@@ -91,9 +94,14 @@ class AsyncValue(Generic[T]):
         Mark this AsyncValue as errored with the given exception. Raises `asyncio.InvalidStateError` if already done.
         """
 
+    def and_then(self, fn: object, /) -> AsyncValue:
+        """
+        Run fn(self) when this AsyncValue resolves (promptly if already resolved) and return a new AsyncValue that resolves to the callback's return value, or to the exception it raises. The callback is invoked with the GIL held on a runtime worker thread (not the registering thread), concurrently with other Python threads.
+        """
+
     def add_done_callback(self, arg: object, /) -> None:
         """
-        Schedule fn(self) to run when this AsyncValue resolves. Must be called from a context with a running asyncio event loop; the callback is dispatched via `loop.call_soon_threadsafe`, so any exception it raises flows through the loop's standard `call_exception_handler`. Raises `RuntimeError` if no loop is running.
+        Run fn(self) when this AsyncValue resolves, like `concurrent.futures.Future.add_done_callback`. The callback is invoked with the GIL held on a runtime worker thread (not the registering thread), concurrently with other Python threads. Exceptions it raises are reported via `sys.unraisablehook`.
         """
 
     @staticmethod

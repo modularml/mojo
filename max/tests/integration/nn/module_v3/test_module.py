@@ -20,16 +20,27 @@ import weakref
 
 import pytest
 from max import driver
-from max.driver import CPU, Accelerator, accelerator_count
+from max.driver import CPU
 from max.dtype import DType
 from max.experimental import functional as F
 from max.experimental import random
+from max.experimental.nn._compile_utils import (
+    prepare_weight_for_parameter,
+    prepare_weights_registry,
+)
 from max.experimental.nn.module import (
     Module,
-    PinnedDeviceTensor,
     module_dataclass,
 )
+from max.experimental.sharding import (
+    DeviceMesh,
+    PlacementMapping,
+    Replicated,
+    Sharded,
+)
+from max.experimental.sharding.types import DistributedTensorType
 from max.experimental.tensor import Tensor, TensorType, defaults
+from max.experimental.testing import assert_all_close
 
 
 @module_dataclass
@@ -559,96 +570,6 @@ def test_load_state_dict_unwhitelisted_float_dtype_still_raises() -> None:
         module.load_state_dict(weights)
 
 
-@pytest.mark.skipif(not accelerator_count(), reason="requires multiple devices")
-def test_to(test_module: TestModule) -> None:
-    assert all(t.device == Accelerator() for _, t in test_module.parameters)
-    module = test_module.to(CPU())
-    assert module is test_module
-    assert all(t.device == CPU() for _, t in test_module.parameters)
-
-
-@pytest.mark.skipif(not accelerator_count(), reason="requires accelerator")
-def test_pinned_device_tensor_unchanged_by_to() -> None:
-    """`PinnedDeviceTensor` fields are not moved by `Module.to`."""
-
-    @module_dataclass
-    class ScaledModule(Module[[Tensor], Tensor]):
-        weight: Tensor
-        scale: PinnedDeviceTensor
-
-        def forward(self, x: Tensor) -> Tensor:
-            return x + self.weight
-
-    module = ScaledModule(
-        weight=Tensor.ones([3, 3]),
-        scale=Tensor.full([], 1.0, dtype=DType.float32),
-    )
-    original_scale_device = module.scale.device
-    module.to(Accelerator())
-
-    assert module.weight.device == Accelerator()
-    assert module.scale.device == original_scale_device
-
-
-@pytest.mark.skipif(not accelerator_count(), reason="requires accelerator")
-def test_pinned_device_tensor_in_child_module() -> None:
-    """`PinnedDeviceTensor` fields in child modules are not moved by `Module.to`."""
-
-    @module_dataclass
-    class Inner(Module[[Tensor], Tensor]):
-        weight: Tensor
-        scale: PinnedDeviceTensor
-
-        def forward(self, x: Tensor) -> Tensor:
-            return x + self.weight
-
-    @module_dataclass
-    class Outer(Module[[Tensor], Tensor]):
-        inner: Inner
-
-        def forward(self, x: Tensor) -> Tensor:
-            return self.inner(x)
-
-    module = Outer(
-        inner=Inner(
-            weight=Tensor.ones([3, 3]),
-            scale=Tensor.full([], 2.0, dtype=DType.float32),
-        )
-    )
-    original_scale_device = module.inner.scale.device
-    module.to(Accelerator())
-
-    assert module.inner.weight.device == Accelerator()
-    assert module.inner.scale.device == original_scale_device
-
-
-@pytest.mark.skipif(not accelerator_count(), reason="requires accelerator")
-def test_pinned_device_tensor_inherited() -> None:
-    """`PinnedDeviceTensor` annotations are respected through inheritance."""
-
-    @module_dataclass
-    class Base(Module[[Tensor], Tensor]):
-        weight: Tensor
-        scale: PinnedDeviceTensor
-
-        def forward(self, x: Tensor) -> Tensor:
-            return x + self.weight
-
-    @module_dataclass
-    class Child(Base):
-        pass
-
-    module = Child(
-        weight=Tensor.ones([3, 3]),
-        scale=Tensor.full([], 1.0, dtype=DType.float32),
-    )
-    original_scale_device = module.scale.device
-    module.to(Accelerator())
-
-    assert module.weight.device == Accelerator()
-    assert module.scale.device == original_scale_device
-
-
 def test_compile(test_module: TestModule) -> None:
     dtype, device = defaults()
     type = TensorType(dtype, ["batch", "n"], device=device)
@@ -796,6 +717,191 @@ def test_compile_with_weights_never_realized(
 
     assert not any(param.real for param in parameters.values())
     assert not any(param.real for _, param in test_module.parameters)
+
+
+# ---------------------------------------------------------------------------
+# Sharding and transferring provided weights inside the compiled graph.
+#
+# Covers the weight-loading path that shards/transfers a single-device weight
+# for a distributed parameter in-graph, and the preserved path where an
+# already-sharded weight passes through untouched. A two-way mesh on CPU
+# matches the trace shape and numerics of a real two-GPU mesh.
+# ---------------------------------------------------------------------------
+
+_F32 = DType.float32
+_MESH = DeviceMesh(devices=(CPU(), CPU()), mesh_shape=(2,), axis_names=("tp",))
+_REPLICATED = PlacementMapping(_MESH, (Replicated(),))
+_COLUMN = PlacementMapping(_MESH, (Sharded(1),))
+_ROW = PlacementMapping(_MESH, (Sharded(0),))
+
+
+def cpu_tensor(*shape: int) -> Tensor:
+    return Tensor.zeros(list(shape), dtype=_F32, device=CPU())
+
+
+def test_prepare_weight_single_device_for_distributed_needs_transfer() -> None:
+    """A single-device weight for a distributed parameter defers the transfer.
+
+    The prepared tensor stays single-device (the transfer happens in-graph),
+    and ``transfer_needed`` is True.
+    """
+    param = F.transfer_to(cpu_tensor(4, 8), _COLUMN)
+    weight = cpu_tensor(4, 8)
+
+    prepared, cast_record, transfer_needed = prepare_weight_for_parameter(
+        "w", weight, param, auto_cast=False
+    )
+
+    assert transfer_needed
+    assert cast_record is None
+    assert not prepared.is_distributed
+
+
+def test_prepare_weight_matching_distribution_no_transfer() -> None:
+    """An already-sharded weight matching the parameter's mapping is untouched."""
+    param = F.transfer_to(cpu_tensor(4, 8), _COLUMN)
+    weight = F.transfer_to(cpu_tensor(4, 8), _COLUMN)
+
+    prepared, _, transfer_needed = prepare_weight_for_parameter(
+        "w", weight, param, auto_cast=False
+    )
+
+    assert not transfer_needed
+    assert prepared.is_distributed
+    assert prepared.mapping == param.mapping
+
+
+def test_prepare_weight_incompatible_distribution_raises() -> None:
+    """A sharded weight whose mapping differs from the parameter's is rejected."""
+    param = F.transfer_to(cpu_tensor(4, 8), _COLUMN)
+    weight = F.transfer_to(cpu_tensor(4, 8), _ROW)
+
+    with pytest.raises(ValueError, match="incompatible distribution"):
+        prepare_weight_for_parameter("w", weight, param, auto_cast=False)
+
+
+def test_prepare_weight_non_distributed_no_transfer() -> None:
+    """A single-device weight for a single-device parameter never transfers."""
+    param = cpu_tensor(4, 8)
+    weight = cpu_tensor(4, 8)
+
+    prepared, _, transfer_needed = prepare_weight_for_parameter(
+        "w", weight, param, auto_cast=False
+    )
+
+    assert not transfer_needed
+    assert not prepared.is_distributed
+
+
+def test_load_state_dict_single_device_weight_keeps_distribution() -> None:
+    """Loading a single-device weight into a distributed parameter keeps it distributed."""
+    module = SubModule(b=F.transfer_to(cpu_tensor(4, 8), _COLUMN))
+    assert module.b.is_distributed
+    assert module.b.mapping == _COLUMN
+
+    module.load_state_dict({"b": cpu_tensor(4, 8)})
+
+    assert module.b.is_distributed
+    assert module.b.mapping == _COLUMN
+
+
+def test_prepare_weights_registry_registers_plain_name() -> None:
+    """The transfer path registers the whole unsharded weight under its name.
+
+    Sharding is deferred to the graph, so the registry holds one plain-named
+    entry (not per-shard entries) and the weight is recorded for in-graph
+    transfer.
+    """
+    param = F.transfer_to(cpu_tensor(4, 8), _COLUMN)
+    weight = cpu_tensor(4, 8)
+
+    registry, to_transfer = prepare_weights_registry(
+        {"w": weight}, [("w", param)], auto_cast=False
+    )
+
+    assert set(registry) == {"w"}
+    w = registry["w"]
+    assert isinstance(w, Tensor)
+    assert list(w.shape) == [4, 8]
+    assert set(to_transfer) == {"w"}
+
+
+def test_prepare_weights_registry_presharded_registers_shard_keys() -> None:
+    """An already-sharded weight is registered per-shard with no in-graph transfer."""
+    param = F.transfer_to(cpu_tensor(4, 8), _COLUMN)
+    weight = F.transfer_to(cpu_tensor(4, 8), _COLUMN)
+
+    registry, to_transfer = prepare_weights_registry(
+        {"w": weight}, [("w", param)], auto_cast=False
+    )
+
+    assert set(registry) == {"w._shard.0", "w._shard.1"}
+    assert not to_transfer
+
+
+def test_prepare_weights_registry_non_distributed_passthrough() -> None:
+    """Single-device parameters pass through unchanged with no transfer."""
+    param = cpu_tensor(4, 8)
+    weight = cpu_tensor(4, 8)
+
+    registry, to_transfer = prepare_weights_registry(
+        {"w": weight}, [("w", param)], auto_cast=False
+    )
+
+    assert set(registry) == {"w"}
+    assert not to_transfer
+
+
+@module_dataclass
+class _ColumnParallelLinear(Module[[Tensor], Tensor]):
+    """Column-parallel matmul, all-gathered back to a replicated output."""
+
+    w: Tensor  # [D, H], column-parallel
+
+    def forward(self, x: Tensor) -> Tensor:  # x replicated [batch, D]
+        return F.transfer_to(x @ self.w, _REPLICATED)
+
+
+def test_compile_shards_single_device_weight_in_graph() -> None:
+    """A single-device weight provided for a sharded parameter is sharded and
+    transferred inside the compiled graph, and produces correct numerics.
+
+    Loading the same weight pre-sharded must produce identical results,
+    confirming the in-graph transfer matches the previously-eager behavior.
+    """
+    random.set_seed(0)
+    w = random.normal([4, 8], dtype=_F32, device=CPU())
+    x = random.normal([2, 4], dtype=_F32, device=CPU())
+    # Eager (non-compile) reference. Flattened to 1-D so `assert_all_close`
+    # reduces over every element rather than only the last axis.
+    expected = (x @ w).reshape([16])
+
+    input_type = DistributedTensorType(
+        _F32, ["batch", 4], _MESH, (Replicated(),)
+    )
+    replicated_x = F.transfer_to(x, _REPLICATED)
+
+    # Placeholder distributed parameter; the real weight arrives via compile().
+    module = _ColumnParallelLinear(w=F.transfer_to(cpu_tensor(4, 8), _COLUMN))
+
+    # Single-device weight: sharded and transferred in-graph. `materialize`
+    # gathers the replicated result back to a single local tensor to compare.
+    compiled = module.compile(input_type, weights={"w": w})
+    single_device = compiled(replicated_x)
+    assert single_device.placements == (Replicated(),)
+    single_device_local = single_device.materialize().reshape([16])
+    assert_all_close(expected, single_device_local, rtol=1e-4, atol=1e-4)
+
+    # Pre-sharded weight: preserved path, must match.
+    compiled_presharded = module.compile(
+        input_type,
+        weights={"w": F.transfer_to(w, _COLUMN)},
+    )
+    presharded = compiled_presharded(replicated_x)
+    presharded_local = presharded.materialize().reshape([16])
+    assert_all_close(
+        single_device_local, presharded_local, rtol=1e-6, atol=1e-6
+    )
 
 
 # ---------------------------------------------------------------------------

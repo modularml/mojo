@@ -36,27 +36,38 @@ def group_norm(
     transform. Useful when the batch axis is small enough that batch
     normalization is unstable.
 
-    For example:
-
     .. code-block:: python
 
         from max.dtype import DType
-        from max.graph import DeviceRef, Graph, TensorType, ops
+        from max.engine import InferenceSession
+        from max.graph import DeviceRef, Graph, ops
 
-        with Graph(
-            "gn",
-            input_types=[
-                TensorType(DType.float32, ("batch", 128, 32, 32), DeviceRef.GPU()),
-                TensorType(DType.float32, (128,), DeviceRef.GPU()),
-                TensorType(DType.float32, (128,), DeviceRef.GPU()),
-            ],
-        ) as g:
-            x, gamma, beta = g.inputs
-            y = ops.group_norm(
-                x.tensor, gamma.tensor, beta.tensor,
-                num_groups=32, epsilon=1e-5,
+        device = DeviceRef.CPU()
+        with Graph("group_norm_example") as graph:
+            # Shape (batch=1, channels=4, spatial=1, 1); 2 groups of 2 channels.
+            x = ops.constant(
+                [[[[1.0]], [[3.0]], [[1.0]], [[3.0]]]],
+                DType.float32,
+                device=device,
             )
-            g.output(y)
+            gamma = ops.constant([1.0, 1.0, 1.0, 1.0], DType.float32, device=device)
+            beta = ops.constant([0.0, 0.0, 0.0, 0.0], DType.float32, device=device)
+            graph.output(
+                ops.group_norm(x, gamma, beta, num_groups=2, epsilon=1e-5)
+            )
+
+        model = InferenceSession().load(graph)
+        result = model.execute()[0]
+        # Each group (channels 0-1 and 2-3) is normalized to zero mean and
+        # approximately unit variance.
+
+    .. invisible-code-block: python
+
+        import numpy as np
+
+        assert np.allclose(
+            result.to_numpy(), [[[[-1.0]], [[1.0]], [[-1.0]], [[1.0]]]], atol=1e-3
+        )
 
     Args:
         input: The tensor to normalize, of shape
@@ -71,7 +82,7 @@ def group_norm(
             numerical stability.
 
     Returns:
-        A tensor with the same shape and dtype as ``input``.
+        A ``TensorValue`` with the same shape and dtype as ``input``.
 
     Raises:
         ValueError: If ``input`` has fewer than 2 dimensions.
@@ -82,7 +93,7 @@ def group_norm(
 
     if len(input.shape) < 2:
         raise ValueError(
-            f"Expected input tensor with >=2 dimensions, got shape"
+            "Expected input tensor with >=2 dimensions, got shape"
             f" {input.shape}"
         )
 
@@ -94,7 +105,7 @@ def group_norm(
         input=input,
         gamma=gamma,
         beta=beta,
-        epsilon=constant(epsilon, input.dtype, DeviceRef.CPU()),
+        epsilon=constant(epsilon, DType.float32, DeviceRef.CPU()),
         num_groups=constant(num_groups, DType.int32, DeviceRef.CPU()),
         output_param_decls=kgen.ParamDeclArrayAttr([]),
     )[0].tensor

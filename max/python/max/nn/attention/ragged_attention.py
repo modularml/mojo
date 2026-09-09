@@ -28,6 +28,7 @@ from ..kernels import (
 )
 from ..kv_cache import (
     KVCacheParams,
+    MHAKVCacheParams,
     PagedCacheValues,
 )
 from ..layer import Module
@@ -132,11 +133,13 @@ class RaggedAttention(Module):
 
         # Split into Q, K, V and store K/V to cache.
         head_dim = self.kv_params.head_dim
+        assert isinstance(self.kv_params, MHAKVCacheParams)
+        n_kv_heads = self.kv_params.n_kv_heads
         q_dim = self.n_heads * head_dim
-        kv_dim = self.kv_params.n_kv_heads * head_dim
+        kv_dim = n_kv_heads * head_dim
         x_q, x_k, x_v = ops.split(qkv, [q_dim, kv_dim, kv_dim], axis=-1)
-        x_k = x_k.reshape((-1, self.kv_params.n_kv_heads, head_dim))
-        x_v = x_v.reshape((-1, self.kv_params.n_kv_heads, head_dim))
+        x_k = x_k.reshape((-1, n_kv_heads, head_dim))
+        x_v = x_v.reshape((-1, n_kv_heads, head_dim))
         store_k_cache_ragged(
             kv_collection, x_k, kwargs["input_row_offsets"], layer_idx
         )

@@ -31,7 +31,7 @@ acc += a[row, k].cast[DType.float32]() * b[col, k].cast[DType.float32]()
 ```
 
 Each Fused Multiply Add (FMA) operation requires two
-[global](https://docs.modular.com/glossary/gpu/memory) loads and one memory
+[global](https://max.modular.com/glossary/gpu/memory) loads and one memory
 write. The issue with global memory is that, while abundant, it's considerably
 slower than other kinds of memory. Therefore the craft of optimizing matmul is
 how to avoid or hide the memory loads and stores by leveraging the [memory
@@ -129,7 +129,7 @@ write_c_tile_to_global_memory()   # store C tile from registers to gmem
 
 We will store our `B` matrix in its transposed form to ensure coalesced layout
 when accessing. This can be done via a
-[Layout](https://docs.modular.com/mojo/layout/layout/) transform:
+[Layout](https://max.modular.com/api/mojo/layout/layout/) transform:
 
 ```mojo
 alias a_layout = Layout.row_major(M, K)
@@ -147,12 +147,12 @@ a specialized hardware unit that transfers data between the GPU’s global memor
 (GMEM) and shared memory (SMEM) asynchronously.
 
 To use the TMA, we need to first create a [tensor
-tile](https://docs.modular.com/mojo/layout/tma_async/create_tma_tile)
+tile](https://max.modular.com/api/mojo/layout/tma_async/create_tma_tile)
 on the host and pass it to the kernel. The tensor map is a 128B data chunk
 encoding the input tensor's shape, the stride, and the global memory address.
 (The tensor map can also encode a *swizzling pattern*, an optimization we’ll
 discuss a little later.) You can easily create a TMA tile in Mojo using the
-provided [APIs](https://docs.modular.com/mojo/layout/tma_async/):
+provided [APIs](https://max.modular.com/api/mojo/layout/tma_async/):
 
 ```mojo
 # Rank 2 matrix
@@ -352,8 +352,7 @@ This is how we make use of `tcgen05.mma` and tensor memory in our code:
 for i in range(num_iters):
   load_tiles_ab()  #section 1
   if elect_one_thread:
-      @parameter
-      for j in range(num_k_mmas):
+      comptime for j in range(num_k_mmas):
           alias idx = IntTuple(0, MMA_K * j)
           alias a_offset = a_smem_layout(idx) * sizeof[a_type]()
           alias b_offset = b_smem_layout(idx) * sizeof[b_type]()
@@ -599,10 +598,8 @@ loop:
 alias num_vecs_m = c_gmem_frag.shape[0]()
 alias num_vecs_n = c_gmem_frag.shape[1]()
 
-@parameter
-for n_vec in range(num_vecs_n):
-    @parameter
-    for m_vec in range(num_vecs_m):
+comptime for n_vec in range(num_vecs_n):
+    comptime for m_vec in range(num_vecs_m):
         alias i_vec = n_vec * num_vecs_m + m_vec
         c_gmem_frag[m_vec, n_vec] = [c_frag[2 * i_vec], c_frag[2 * i_vec + 1]]
 ```
@@ -991,7 +988,7 @@ is `8x16B = 128B`.
 The UMMA descriptor `idesc` follows a similar pattern, except it’s 32 bits and
 encodes other information about the sparsity, data type, whether the matrices
 are transposed or not, and other information. We refer the readers to our
-[source code](https://github.com/modular/modular/blob/386dba7051e1455b145ff2d33bcadfeb971ac7ed/mojo/stdlib/std/gpu/mma_sm100.mojo#L737)
+[source code](https://github.com/modular/modular/blob/386dba7051e1455b145ff2d33bcadfeb971ac7ed/Mojo/stdlib/std/gpu/mma_sm100.mojo#L737)
 for the detailed encoding.
 
 ### Swizzling mathematics

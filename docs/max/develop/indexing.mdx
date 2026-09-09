@@ -10,13 +10,13 @@ to use depends on what's known at write time. A fixed position or range, like
 the last token in a sequence or a window of attention heads, uses Python slice
 syntax directly. Positions computed at runtime, like token IDs from a sampler or
 expert assignments from a router, require
-[`F.gather`](/max/api/python/experimental.functional#max.experimental.functional.gather),
+[`F.gather`](/api/python/experimental.functional#max.experimental.functional.gather),
 which takes a tensor of indices and returns the selected values. When a boolean
 condition determines which values to keep,
-[`F.where`](/max/api/python/experimental.functional#max.experimental.functional.where)
+[`F.where`](/api/python/experimental.functional#max.experimental.functional.where)
 selects element-wise from two tensors based on a mask. To write values back to
 specific positions,
-[`F.scatter`](/max/api/python/experimental.functional#max.experimental.functional.scatter)
+[`F.scatter`](/api/python/experimental.functional#max.experimental.functional.scatter)
 is the inverse of `F.gather`.
 
 :::note Coming from PyTorch or NumPy?
@@ -53,12 +53,12 @@ expert assignments from a router, use `F.gather`.
 ## Select elements by index
 
 When positions are data rather than literals,
-[`F.gather(input, indices, axis)`](/max/api/python/experimental.functional#max.experimental.functional.gather)
+[`F.gather(input, indices, axis)`](/api/python/experimental.functional#max.experimental.functional.gather)
 selects elements from `input` at the positions given by `indices`, along `axis`.
 The following example uses it for a vocabulary lookup: each token ID selects one
 row from an embedding table:
 
-{/* @sync: _examples/indexing/gather.py */}
+{/* @sync: ../../code/develop/indexing/gather.py */}
 
 ```python
 import max.experimental.functional as F
@@ -89,7 +89,7 @@ which values to keep, use `F.where` instead.
 
 ## Select elements by condition
 
-[`F.where(condition, x, y)`](/max/api/python/experimental.functional#max.experimental.functional.where)
+[`F.where(condition, x, y)`](/api/python/experimental.functional#max.experimental.functional.where)
 takes from `x` where `condition` is `True` and from `y` where it's `False`,
 element-wise. The `condition` argument must be boolean dtype.
 
@@ -101,7 +101,7 @@ After `F.where`, softmax drives the masked positions toward zero.
 The following example applies a causal mask to attention scores of shape
 `(batch, seq_len, seq_len)`, setting masked positions to `-1e9`:
 
-{/* @sync: _examples/indexing/where.py */}
+{/* @sync: ../../code/develop/indexing/where.py */}
 
 ```python
 import max.experimental.functional as F
@@ -127,7 +127,7 @@ The expected output is:
 
 In this example, `mask` has shape `(4, 4)` and `scores` has shape `(2, 4, 4)`.
 Because `F.where` follows the same
-[broadcasting rules](/max/develop/broadcasting) as arithmetic operations, the
+[broadcasting rules](/develop/broadcasting) as arithmetic operations, the
 mask applies to every sequence in the batch without any reshaping. Positions
 above the diagonal receive `-1e9`; after softmax, their contribution to the
 attention weights is negligible. All three arguments to `F.where` must be
@@ -136,7 +136,7 @@ positions rather than reading from them, `F.scatter` is the inverse operation.
 
 ## Place values by index
 
-[`F.scatter`](/max/api/python/experimental.functional#max.experimental.functional.scatter)
+[`F.scatter`](/api/python/experimental.functional#max.experimental.functional.scatter)
 is the inverse of `F.gather`: where `gather` reads values at positions given by
 an index tensor, `scatter` writes values back to those positions. The signature
 is `F.scatter(input, updates, indices, axis=-1)`. `updates` comes before
@@ -146,11 +146,11 @@ tensor must have the same shape as `updates`.
 `F.scatter` currently runs on CPU only.
 
 The following example writes 4 expert outputs back into an 8-token sequence.
-[`F.tile`](/max/api/python/experimental.functional#max.experimental.functional.tile)
+[`F.tile`](/api/python/experimental.functional#max.experimental.functional.tile)
 repeats the route indices across all 64 feature positions so that `indices` has
 the same shape as `expert_out`:
 
-{/* @sync: _examples/indexing/scatter.py */}
+{/* @sync: ../../code/develop/indexing/scatter.py */}
 
 ```python
 import max.experimental.functional as F
@@ -183,8 +183,8 @@ elementwise operations. When masks need to align with logits, the rules are the
 same ones from broadcasting:
 
 - **Review broadcasting for `F.where` and elementwise alignment**:
-  [Broadcasting](/max/develop/broadcasting)
+  [Broadcasting](/develop/broadcasting)
 - **Compare eager execution and explicit graph construction**:
-  [Eager execution](/max/develop/eager-execution)
+  [Eager execution](/develop/eager-execution)
 - **Follow an end-to-end model workflow**:
-  [Model bring-up workflow](/max/develop/model-bringup-workflow)
+  [Model bring-up workflow](/develop/model-bringup-workflow)

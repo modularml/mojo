@@ -14,8 +14,8 @@
 
 from std.random import seed
 
-from std.gpu import *
-from std.gpu.host import DeviceContext
+from max.gpu import *
+from max.gpu.host import DeviceContext
 from internal_utils import InitializationType, Timer, init_vector_launch
 
 from std.testing import assert_equal

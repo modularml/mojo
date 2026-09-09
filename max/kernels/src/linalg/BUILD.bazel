@@ -1,11 +1,47 @@
 load("//bazel:api.bzl", "mojo_library")
+load("//max/kernels/src:deprecations.bzl", "IGNORED_POINTER_DEPRECATIONS")
 
 package(default_visibility = ["//max:consumers"])
+
+exports_files(
+    [
+        "matmul/gpu/sm90/tuning.mojo.snippet",
+        "matmul/gpu/sm90/tuning_configs.mojo",
+        "matmul/gpu/sm90/tuning_custom.mojo.snippet",
+        "matmul/gpu/sm90/tuning_custom_grid.mojo.snippet",
+        "matmul/gpu/sm90/tuning_custom_scaled.mojo.snippet",
+        "matmul/gpu/sm90/tuning_custom_scaled_grid.mojo.snippet",
+        "matmul/gpu/sm90/tuning_table_bf16.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_configs.mojo",
+        "matmul/gpu/sm100_structured/default/tuning_fp8.mojo.snippet",
+        "matmul/gpu/sm100_structured/default/tuning_fp8_ranged.mojo.snippet",
+        "matmul/gpu/sm100_structured/default/tuning_small_mn.mojo.snippet",
+        "matmul/gpu/sm100_structured/default/tuning_sm100.mojo.snippet",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_batched_bf16.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_batched_fp8.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_bf16.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_fp8.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_mxfp4.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_mxfp8.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_nvfp4.yaml",
+        "matmul/gpu/sm100_structured/default/tuning_table_sm100_small_mn_bf16.yaml",
+    ],
+    visibility = ["//max/kernels/benchmarks/autotune:__pkg__"],
+)
+
+# Raw sources for the LSP parse-smoke test.
+filegroup(
+    name = "srcs",
+    srcs = glob(["**/*.mojo"]),
+    visibility = ["//Mojo/test/mojo-lsp-server/parse-tree:__pkg__"],
+)
 
 mojo_library(
     name = "linalg",
     srcs = glob(["**/*.mojo"]),
     docs_base_path = "kernels",
+    ignore_deprecated = IGNORED_POINTER_DEPRECATIONS,
+    use_production_compiler_for_asan = True,
     validate_missing_docs = False,
     deps = [
         "//max:_cublas",
@@ -13,6 +49,7 @@ mojo_library(
         "//max:comm",
         "//max:internal_utils",
         "//max:layout",
+        "//max:max_mojo",
         "//max:pipeline",
         "//max:structured_kernels",
         "@mojo//:std",

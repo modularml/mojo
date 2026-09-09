@@ -1,0 +1,32 @@
+# LLDB init file for the LIT tests.
+
+# Without this setting, on Linux, the personality syscall is used when launching
+# the inferior, which is forbidden by the security settings of our CI.
+settings set target.disable-aslr false
+
+# Disable Spotlight lookup. The testsuite creates
+# different binaries with the same UUID, because they only
+# differ in the debug info, which is not being hashed.
+settings set symbols.enable-external-lookup false
+
+# Testsuite runs in parallel and the host can have also other load.
+settings set plugin.process.gdb-remote.packet-timeout 300
+
+# Prevent comments in LLDB commands to be echoed.
+settings set interpreter.echo-comment-commands false
+
+# Use a cache dir inside the build folder instead of using the system one.
+settings set symbols.clang-modules-cache-path "@LLDB_TEST_MODULE_CACHE_LLDB@"
+
+# Inherit the TCC permissions from the inferior's parent.
+settings set target.inherit-tcc true
+
+# Kill rather than detach from the inferior if something goes wrong.
+settings set target.detach-on-error false
+
+# Prevent .lldbinit files in the current working directory from being loaded.
+settings set target.load-cwd-lldbinit false
+
+# Maintain the original limit of children items to display before change
+# https://github.com/llvm/llvm-project/pull/139826
+settings set target.max-children-count 256

@@ -21,18 +21,25 @@ multiplication), as well as convenience methods like
 :func:`~max.graph.ops.constant` can also add constant values to your graph.
 
 When an operation receives inputs with different data types
-(:class:`~max.dtype.DType`), MAX promotes the output to a common type by
-picking the higher-ranked category (``bool < unsigned int < signed int <
-float``) and the larger bit width. The result is always one of the input types.
-Plainly, the promotion rule for two values ``x`` and ``y`` is:
+(:class:`~max.dtype.DType`), MAX promotes them to a common type before
+computing the result. To avoid silently widening a type and hurting
+performance, the common type is always one of the input types; MAX never
+invents a new, wider type.
 
-.. code-block:: python
+To choose between the input types, MAX ranks each one along two axes:
 
-    max(category(x), category(y)), max(bitwidth(x), bitwidth(y))
+- Category, ordered ``bool < unsigned int < signed int < float``.
+- Bit width (for example, ``8``, ``16``, ``32``, or ``64`` bits).
 
-If any input can't be safely represented in the chosen type, MAX raises an
-error. For example, MAX fails to promote ``uint8`` and ``int8`` to ``int8``,
-since ``int8`` can't represent all ``uint8`` values.
+The common type is the input type with the highest category and the largest
+bit width. For example, promoting ``int8`` and ``float16`` yields ``float16``:
+``float`` outranks ``signed int``, and ``16`` bits is wider than ``8``.
+
+If an input can't be safely represented in the chosen type, MAX raises an
+error rather than widening to a different type. For example, promoting
+``uint8`` and ``int8`` selects ``int8`` (``signed int`` outranks
+``unsigned int`` at the same bit width), but ``int8`` can't represent the
+largest ``uint8`` values, so MAX raises an error.
 
 When inputs have different shapes, MAX broadcasts them to a common shape.
 Shapes are aligned from the trailing dimension, and each pair of dimensions
@@ -53,6 +60,10 @@ from . import (
     reducescatter,
 )
 from .allgather import allgather
+from .allgather_rms_norm import (
+    allgather_rms_norm,
+    allgather_rms_norm_quant_mxfp8,
+)
 from .argsort import argsort
 from .band_part import band_part
 from .bottom_k import bottom_k
@@ -73,6 +84,10 @@ from .custom import custom, inplace_custom
 from .debug import print
 from .distributed_scatter import distributed_scatter
 from .elementwise import *
+
+# `floor_div` is re-exported by name (not only via the `*` above) to make its
+# public-API visibility explicit; `elementwise` defines no `__all__`.
+from .elementwise import floor_div
 from .elementwise import max as _elementwise_max
 from .elementwise import min as _elementwise_min
 from .flatten import flatten
@@ -93,6 +108,7 @@ from .pooling import avg_pool2d, max_pool2d, roi_align
 from .quantized import dequantize, qmatmul
 from .range import range
 from .rebind import rebind
+from .reduce_scatter_rms_norm import reduce_scatter_rms_norm
 from .reduction import argmax, argmin, mean, prod, sum
 from .reduction import max as _reduce_max
 from .reduction import min as _reduce_min
@@ -119,6 +135,7 @@ from .scatter import (
     scatter_nd_min,
     scatter_nd_mul,
 )
+from .sequence import side_stream
 from .shape_to_tensor import shape_to_tensor
 from .shard_and_stack import shard_and_stack
 from .slice_tensor import slice_tensor

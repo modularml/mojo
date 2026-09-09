@@ -22,7 +22,7 @@ from std.sys.info import size_of
 
 @fieldwise_init
 struct Handle(Defaultable, Equatable, TrivialRegisterPassable):
-    var _value: OptionalReg[OpaquePointer[MutAnyOrigin]]
+    var _value: OptionalReg[OpaquePointer[MutUntrackedOrigin]]
 
     def __init__(out self):
         self._value = None
@@ -30,7 +30,7 @@ struct Handle(Defaultable, Equatable, TrivialRegisterPassable):
 
 @fieldwise_init
 struct TensorDescriptor(Defaultable, Equatable, TrivialRegisterPassable):
-    var _value: OptionalReg[OpaquePointer[MutAnyOrigin]]
+    var _value: OptionalReg[OpaquePointer[MutUntrackedOrigin]]
 
     def __init__(out self):
         self._value = None
@@ -38,7 +38,7 @@ struct TensorDescriptor(Defaultable, Equatable, TrivialRegisterPassable):
 
 @fieldwise_init
 struct ConvolutionDescriptor(Defaultable, Equatable, TrivialRegisterPassable):
-    var _value: OptionalReg[OpaquePointer[MutAnyOrigin]]
+    var _value: OptionalReg[OpaquePointer[MutUntrackedOrigin]]
 
     def __init__(out self):
         self._value = None
@@ -102,11 +102,11 @@ struct DataType(Equatable, TrivialRegisterPassable):
         self._value = Int32(value)
 
     def __init__(out self, dtype: DType) raises:
-        if dtype == DType.float32:
+        if dtype == .float32:
             self = Self.FLOAT
-        elif dtype == DType.float16:
+        elif dtype == .float16:
             self = Self.HALF
-        elif dtype == DType.bfloat16:
+        elif dtype == .bfloat16:
             self = Self.BFLOAT16
         else:
             raise Error(
@@ -223,7 +223,7 @@ struct ConvSolution(RegisterPassable):
 
 @fieldwise_init
 struct Problem(Defaultable, Equatable, TrivialRegisterPassable):
-    var _value: OptionalReg[OpaquePointer[MutAnyOrigin]]
+    var _value: OptionalReg[OpaquePointer[MutUntrackedOrigin]]
 
     def __init__(out self):
         self._value = None
@@ -231,7 +231,7 @@ struct Problem(Defaultable, Equatable, TrivialRegisterPassable):
 
 @fieldwise_init
 struct Solution(Defaultable, Equatable, TrivialRegisterPassable):
-    var _value: OptionalReg[OpaquePointer[MutAnyOrigin]]
+    var _value: OptionalReg[OpaquePointer[MutUntrackedOrigin]]
 
     def __init__(out self):
         self._value = None
@@ -239,7 +239,7 @@ struct Solution(Defaultable, Equatable, TrivialRegisterPassable):
 
 @fieldwise_init
 struct FindOptions(Defaultable, Equatable, TrivialRegisterPassable):
-    var _value: OptionalReg[OpaquePointer[MutAnyOrigin]]
+    var _value: OptionalReg[OpaquePointer[MutUntrackedOrigin]]
 
     def __init__(out self):
         self._value = None

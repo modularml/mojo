@@ -16,10 +16,10 @@
 Note: Original CUDA uses grid sync; this uses multi-launch instead.
 """
 
-from std.gpu import block_idx, thread_idx, block_dim, grid_dim, barrier
-from std.gpu.host import DeviceContext
-from std.gpu.memory import AddressSpace
-from std.memory import stack_allocation
+from max.gpu import block_idx, thread_idx, block_dim, grid_dim
+from max.gpu.sync import barrier
+from max.gpu.host import DeviceContext
+from std.memory import unsafe_stack_allocation
 from std.atomic import Atomic
 from std.collections import List
 
@@ -40,20 +40,22 @@ def bfs_kernel(
     level: UnsafePointer[UInt32, MutAnyOrigin],
     prev_frontier: UnsafePointer[UInt32, MutAnyOrigin],
     curr_frontier: UnsafePointer[UInt32, MutAnyOrigin],
-    num_prev_frontier: Int,
+    num_prev_frontier_dev: Int32,
     num_curr_frontier: UnsafePointer[UInt32, MutAnyOrigin],
     curr_level: UInt32,
 ):
     """BFS kernel with private frontier and grid-strided loop."""
-    var curr_frontier_s = stack_allocation[
+    # `Int` is not device-passable; widen the fixed-width arg.
+    var num_prev_frontier = Int(num_prev_frontier_dev)
+    var curr_frontier_s = unsafe_stack_allocation[
         PRIVATE_FRONTIER_CAPACITY,
         UInt32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
-    var num_curr_frontier_s = stack_allocation[
+    var num_curr_frontier_s = unsafe_stack_allocation[
         1,
         UInt32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
 
     if thread_idx.x == 0:
@@ -98,10 +100,10 @@ def bfs_kernel(
 
     barrier()
 
-    var start_idx_ptr = stack_allocation[
+    var start_idx_ptr = unsafe_stack_allocation[
         1,
         UInt32,
-        address_space=AddressSpace.SHARED,
+        address_space=.SHARED,
     ]()
     if thread_idx.x == 0:
         var local_count = Int(num_curr_frontier_s[0])
@@ -143,16 +145,12 @@ def main() raises:
     var start_vertex = 0
     h_level[start_vertex] = 0
 
-    var d_src_ptrs = ctx.enqueue_create_buffer[DType.uint32](NUM_VERTICES + 1)
-    var d_dst = ctx.enqueue_create_buffer[DType.uint32](num_edges)
-    var d_level = ctx.enqueue_create_buffer[DType.uint32](NUM_VERTICES)
-    var d_prev_frontier = ctx.enqueue_create_buffer[DType.uint32](
-        NUM_VERTICES * 2
-    )
-    var d_curr_frontier = ctx.enqueue_create_buffer[DType.uint32](
-        NUM_VERTICES * 2
-    )
-    var d_num_curr_frontier = ctx.enqueue_create_buffer[DType.uint32](1)
+    var d_src_ptrs = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES + 1)
+    var d_dst = ctx.enqueue_create_buffer[.uint32](num_edges)
+    var d_level = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES)
+    var d_prev_frontier = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES * 2)
+    var d_curr_frontier = ctx.enqueue_create_buffer[.uint32](NUM_VERTICES * 2)
+    var d_num_curr_frontier = ctx.enqueue_create_buffer[.uint32](1)
 
     var h_src_ptrs = alloc[UInt32](NUM_VERTICES + 1)
     var h_dst = alloc[UInt32](num_edges)
@@ -188,7 +186,7 @@ def main() raises:
             d_level,
             d_prev_frontier,
             d_curr_frontier,
-            num_prev_frontier,
+            Int32(num_prev_frontier),
             d_num_curr_frontier,
             curr_level,
             grid_dim=(fixed_grid_size, 1, 1),

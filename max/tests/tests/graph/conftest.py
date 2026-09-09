@@ -68,6 +68,8 @@ dtypes = st.sampled_from(
         if d
         not in (
             DType.float4_e2m1fn,
+            DType.float6_e2m3fn,
+            DType.float6_e3m2fn,
             DType.float8_e8m0fnu,
             DType.float8_e5m2,
             DType.float8_e5m2fnuz,
@@ -201,8 +203,8 @@ def valid_broadcast_rank(shape_st, max_size: int | None = None):  # noqa: ANN001
 
 def tensor_types(
     dtypes=dtypes,  # noqa: ANN001
-    shapes=shapes(),  # noqa: ANN001
-    device=DeviceRef.CPU(),  # noqa: ANN001
+    shapes=shapes(),  # noqa: ANN001, B008
+    device=DeviceRef.CPU(),  # noqa: ANN001, B008
 ) -> st.Strategy[TensorType]:  # type: ignore
     return st.builds(TensorType, dtypes, shapes, st.just(device))
 
@@ -224,8 +226,8 @@ def opaque_types():  # noqa: ANN201
 
 def buffer_types(
     dtypes=dtypes,  # noqa: ANN001
-    shapes=shapes(),  # noqa: ANN001
-    device=DeviceRef.CPU(),  # noqa: ANN001
+    shapes=shapes(),  # noqa: ANN001, B008
+    device=DeviceRef.CPU(),  # noqa: ANN001, B008
 ) -> st.Strategy[BufferType]:  # type: ignore
     return st.builds(BufferType, dtypes, shapes, st.just(device))
 

@@ -1,0 +1,150 @@
+load("@mojo//:mojo.bzl", "PROD_MOJOPKGS")
+load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "requirement")
+load("//max/python/max/pipelines/architectures:all_arches.bzl", "ALL_ARCHITECTURES")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "_entrypoints",
+    srcs = glob(
+        ["**/*.py"],
+        exclude = [
+            "gpu_query.py",
+            "pipelines.py",
+            "replay_recording.py",
+        ],
+    ),
+    ignore_extra_deps = [
+        # Leaving these two alone for now, occasionally they are silently used by things.
+        # TODO: Likely these should be pushed closer to where they specifically are used.
+        requirement("gguf"),  # Needed for loading gguf files
+        requirement("sentencepiece"),  # Very few select models use this
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines:logging_utils",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/diffusion",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+        "//max/python/max/profiler",
+        "//max/python/max/serve",
+        "//max/python/max/serve:config",
+        "//max/python/max/serve:process_control",
+        "//max/python/max/serve/pipelines",
+        "//max/python/max/serve/telemetry",
+        "//max/python/max/serve/worker_interface",
+        requirement("click"),
+        requirement("gguf"),
+        requirement("psutil"),
+        requirement("pydantic"),
+        requirement("pydantic-core"),
+        requirement("requests"),
+        requirement("sentencepiece"),
+        requirement("sse-starlette"),
+        requirement("typing-extensions"),
+        requirement("tqdm"),
+        requirement("pyyaml"),
+        requirement("uvicorn"),
+        requirement("uvloop"),
+    ],
+)
+
+modular_py_library(
+    name = "_pipelines",
+    srcs = [
+        "pipelines.py",
+    ],
+    deps = [
+        "//max/python/max/_entrypoints",
+        "//max/python/max:_core",
+        "//max/python/max:_eager_policy",
+        "//max/python/max/profiler",
+        "//max/python/max/serve/telemetry",
+        "//max/python/max/serve:config",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        # These all point to the symlinked version of the benchmark directory.
+        "//max/python/max/benchmark:benchmark_serving_lib",
+        requirement("click"),
+        requirement("exceptiongroup"),  # only for python < 3.11
+        requirement("rich"),
+        requirement("typing-extensions"),
+    ],
+)
+
+modular_py_binary(
+    name = "pipelines",
+    srcs = [
+        "pipelines.py",
+    ],
+    data = [
+        "@nvshmem_prebuilt//:host",
+    ],
+    env = {
+        "OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION": "base2_exponential_bucket_histogram",
+        "MODULAR_SHMEM_LIB_DIR": "../+http_archive+nvshmem_prebuilt",
+    },
+    # ALL_ARCHITECTURES: users can select arbitrary arches on the CLI.
+    # _interpreter_ops: Mojo-backed optional dep imported dynamically (see
+    # warm-interpreter-cache), so it's in the runfiles but not a static import.
+    ignore_extra_deps = ALL_ARCHITECTURES + [
+        "//max/python/max/_interpreter_ops",
+        requirement("exceptiongroup"),  # only for python < 3.11
+    ],
+    mojo_deps = PROD_MOJOPKGS,
+    deps = ALL_ARCHITECTURES + [
+        ":_entrypoints",
+        "//max/python/max:_core",
+        "//max/python/max:_eager_policy",
+        "//max/python/max/_interpreter_ops",
+        "//max/python/max/benchmark:benchmark_serving_lib",
+        "//max/python/max/pipelines",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/profiler",
+        "//max/python/max/serve:config",
+        "//max/python/max/serve/telemetry",
+        requirement("click"),
+        requirement("exceptiongroup"),  # only for python < 3.11
+        requirement("rich"),
+        requirement("typing-extensions"),
+    ],
+)
+
+modular_py_binary(
+    name = "benchmark",
+    srcs = [
+        "cli/entrypoint.py",
+        "pipelines.py",
+    ],
+    main = "pipelines.py",
+    tags = [
+        # Tons of lazy imports
+        "no-mypy",
+        "no-pydeps",
+    ],
+    deps = [
+        "//max/python/max:_eager_policy",
+        "//max/python/max/benchmark:benchmark_serving_lib",
+        requirement("rich"),
+    ],
+)
+
+modular_py_binary(
+    name = "replay_recording",
+    srcs = ["replay_recording.py"],
+    deps = [
+        "//max/python/max/serve/recordreplay",
+        requirement("click"),
+        requirement("httpx"),
+    ],
+)
+
+modular_py_library(
+    name = "gpu-query",
+    srcs = ["gpu_query.py"],
+    deps = ["@mojo//:python"],
+)
