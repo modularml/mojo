@@ -26,13 +26,13 @@ parts of a tuple and bind others:
 ```mojo
 def inspect(point: Tuple[Int, Int]):
     match point:
-    case (0, 0):
+    case 0, 0:
         print("origin")
-    case (var x, 0):
+    case x, 0:
         print("on the x axis:", x)
-    case (0, var y):
+    case 0, y:
         print("on the y axis:", y)
-    case (var x, var y):
+    case x, y:
         print("point:", x, y)
 ```
 
@@ -113,7 +113,8 @@ destructuring doesn't even require parentheses in contexts where the grammar is
 unambiguous.
 
 Mojo also supports destructuring in other assignment-like contexts, such as
-`for` loop targets:
+`for` loop targets. Note that `for` loop targets default to implicitly binding
+names with "imm" bindings:
 
 ```mojo
 for key, value in entries:
@@ -148,11 +149,11 @@ introduce bindings when it does:
 ```mojo
 match get_pair():
     # Bind x, check against 0.
-    case (var x, 0):
+    case x, 0:
         use(x)
 
     # Error: arbitrary expressions/lvalues aren't value patterns.
-    case (var x, a[2]):
+    case var x, a[2]:
 ```
 
 Match patterns intentionally use a restricted grammar rather than treating
@@ -171,10 +172,6 @@ Ordinary assignment continues to use Mojo's existing assignment-target rules:
 a[2] = get_value()        # assignment into generalized lvalue is ok.
 ```
 
-This distinction ensures that adding pattern matching does not change the
-meaning of existing assignments. In particular, `a[2] = value` always means
-"store into `a[2]`," never "match against the current value of `a[2]`."
-
 Despite this difference, destructuring targets and match patterns share much of
 the same recursive structure: tuple decomposition, `var`/`ref` bindings,
 wildcards, sequence decomposition, and other forms can reuse the same underlying
@@ -191,10 +188,10 @@ match values:
 case []:
     print("empty")
 
-case var [x]:
+case [x]:
     print("one element:", x)
 
-case var [x, y]:
+case [x, y]:
     print("two elements:", x, y)
 
 case _:
@@ -216,7 +213,8 @@ An irrefutable pattern is statically guaranteed to match every value of its
 input type. For example:
 
 ```mojo
-case var x:
+case x:
+case var y:  # Copy into a mutable local var.
 case _:
 ```
 
@@ -224,7 +222,7 @@ A refutable pattern may or may not match depending on the runtime value. A
 fixed-length sequence pattern is one simple example:
 
 ```mojo
-case var [x, y]:
+case [x, y]:
 ```
 
 If the subject is a dynamically-sized list, this succeeds only when it contains
@@ -234,29 +232,30 @@ Value patterns are another important refutable form:
 
 ```mojo
 match point:
-case (0, 0):
+case 0, 0:
     print("origin")
 
-case (var x, 0):
+case x, 0:
     print("on the x axis:", x)
 ```
 
-Here `(var x, 0)` first decomposes the tuple, binds its first element to `x`,
+Here `var x, 0` first decomposes the tuple, binds its first element to `x`,
 and requires its second element to match `0`. Failure of either requirement
-means that the next case is considered.
+means that the next case is considered. Like Python, Mojo only supports constant
+value patterns - constant integers, floating point, bool, strings, etc.
 
 Patterns compose recursively, so refutability naturally composes as well:
 
 ```mojo
 match values:
-case [(var x, 0), var z]:
-    handle_special_value(x, z)
+case [(x, 0), a_pair]:
+    handle_special_value(x, a_pair)
 
-case [var x]:
+case [x]:
     handle_one_value(x)
 
 case _:
-    handle_other(values)
+    handle_other_lengths(values)
 ```
 
 A pattern is therefore **irrefutable when the compiler can prove that it matches
@@ -285,7 +284,7 @@ final irrefutable pattern such as `_` is present:
 match values:
 case []:
     ...
-case var [x]:
+case [x]:
     ...
 case _:
     ...
@@ -310,27 +309,27 @@ and can be extended independently over time.
 Mojo already has several building blocks that naturally carry over into match
 patterns: `var` / `ref` bindings, `_` wildcards, tuple decomposition, and
 recursive nesting. We should extend this foundation with the following pattern
-forms.
+forms to follow Python's precedent:
 
 1. **Value patterns** match against a literal:
 
     ```mojo
     case 0:
     case "hello":
-    case (0, 1):
+    case 0, 1:  # two values in a tuple pattern
     ```
 
     Arbitrary expressions are not supported by Python and therefore, we
-    shouldn’t accept them as part of the initial implementation. See “Future
-    Directions” for why we don’t want to accept `case x:` where `x` is an
-    existing value as part of this proposal.
+    shouldn’t accept them as part of the initial implementation. Notably,
+    `case Int:` would bind a new value named `Int`, not test against the type
+    `Int`. See “Future Directions” for how we can address that.
 
 2. **Sequence patterns** decompose sequence-like values:
 
     ```mojo
     case []:
-    case var [x]:
-    case var [x, y]:
+    case [x]:
+    case [x, y]:
     ```
 
     These are refutable when the runtime sequence may have a different length.
@@ -339,11 +338,11 @@ forms.
     collection conforms to.
 
 3. **Variable-length sequence patterns** capture a prefix, suffix, or remainder,
-   tied into the same trait:
+   tied into the same trait (only a single `*` pattern is allowed):
 
     ```mojo
-    case var [first, *rest]:
-    case var [first, *middle, last]:
+    case [first, *rest]:
+    case [first, *middle, last]:
     ```
 
 4. **OR patterns** match when any of several alternatives match:
@@ -353,45 +352,39 @@ forms.
     case [var x, 0] | [var x, 1]:
     ```
 
-    Alternatives that introduce bindings should be required to introduce
-    compatible bindings.
+    Alternatives that introduce bindings must introduce compatible bindings on
+    each path.
 
 5. **AS patterns** apply a pattern while also retaining the complete matched
-   value:
+   value, producing an `imm` binding:
 
     ```mojo
     case [var x, var y] as value:
         ...
     ```
 
-    The exact ownership convention for the `value` binding needs to be
-    determined.
-
 6. **Struct patterns** decompose struct-like values:
 
     ```mojo
-    case Point(x=var x, y=var y):
-        ...
+    case Point(x=x_value, y=y_value):
+        print(x_value, y_value)
     ```
 
 7. **Mapping patterns** match particular keys and decompose their values:
 
     ```mojo
-    case {"name": var name, "age": var age}:
+    case {"name": name, "age": age}:
         ...
     ```
 
-    These are useful, but likely lower priority than sequence and struct
-    patterns.
-
 Other language features may add additional pattern forms. In particular, the
-separate enum/sum-type proposal adds patterns for selecting and decomposing
+separate enum/`EnumLike` proposal adds patterns for selecting and decomposing
 sum-type alternatives through the same underlying machinery.
 
 Finally, **match guards** are useful but are not themselves patterns:
 
 ```mojo
-case [var x, var y] if x < y:
+case [x, y] if x < y:
     ...
 ```
 
@@ -407,13 +400,13 @@ A useful property of Mojo here is that `=` is already a **statement**, rather
 than an expression.
 
 We can extend the grammar of `if` conditions to accept either boolean
-expressions or `pattern = value` conditional-match clauses:
+expressions or `pattern = expression` conditional-match clauses:
 
 ```mojo
-if condition:
+if expression:
     ...
 
-if pattern = value:
+if pattern = expression:
     ...
 ```
 
@@ -574,8 +567,8 @@ Other pieces likewise decompose naturally into relatively independent projects:
   protocol.
 - **Match guards** add boolean filtering after a pattern has successfully
   matched.
-- The separate enum/sum-type proposal adds another family of patterns using the
-  same infrastructure.
+- The separate enum/`EnumLike` proposal adds another family of patterns using
+  the same infrastructure.
 - Exhaustiveness and redundancy analysis can become progressively more
   sophisticated as additional pattern forms land.
 
@@ -583,51 +576,13 @@ The important architectural point is that these features should compose through
 common pattern and decomposition infrastructure without requiring one
 coordinated implementation effort.
 
-### Future Direction: Implicit Bindings
-
-The initial design should require bindings in match patterns to be explicit:
-
-```mojo
-case var x, y: ...
-```
-
-This is verbose, and users will likely ask for the more natural spelling:
-
-```mojo
-case x, y:    ...
-```
-
-There is good precedent for this in Mojo itself. A `for` loop already implicitly
-introduces its iteration variable, implicitly defaulting to an `imm` reference
-binding:
-
-```mojo
-# x and y are an "imm" binding implicitly.
-for x, y in values:  ...
-
-# var and ref are also allowed, the later infers mutability
-for var x in values: ...
-for ref x in values: ...
-```
-
-We should therefore leave bare identifiers in match-pattern position available
-for a future extension where they implicitly introduce bindings.
-
-This is also why the initial pattern grammar should **not** interpret a bare
-identifier as "match against the existing value with this name." Doing so would
-consume the syntax we are likely to want for implicit bindings and produce the
-same capture-vs-value ambiguity that Python has to work around.
-
-Starting with explicit `var` bindings therefore keeps the initial feature
-unambiguous while preserving an obvious ergonomic improvement for the future.
-
 ### Future Direction: Arbitrary Value Matching
 
-If we eventually allow bare identifiers in patterns to implicitly introduce
-bindings:
+Bare identifiers in patterns introduce bindings, like in Python and following
+the precedent of `for` statements in Mojo:
 
 ```mojo
-case (x, y):  # Declare a new value "x" and "y"
+case (x, y):  # Declare a new imm bindings "x" and "y"
 ```
 
 then a bare name can no longer also mean “match against the existing value with

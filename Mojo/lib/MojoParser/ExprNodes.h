@@ -378,6 +378,12 @@ struct CallNode final : public ExprNode {
   CValue emitMatch(IREmitter &emitter, CValue subject,
                    PatternDeclKind patternKind) const override;
   void print(mlir::raw_indented_ostream &os) const override;
+
+private:
+  /// Match `Type.Case(payload...)` against an `EnumLike` subject: check the
+  /// active discriminant, then deep-match payload subpatterns.
+  CValue emitEnumMatch(IREmitter &emitter, CValue subject,
+                       PatternDeclKind patternKind) const;
 };
 
 /// This represents `A[i,j]`.  In the case of slices (e.g. `A[i, ::]`), the

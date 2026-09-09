@@ -18,6 +18,7 @@ import time
 from typing import Any
 
 import psutil
+from max.support.human_readable_formatter import to_human_readable_bytes
 
 
 class TextGenerationMetrics:
@@ -32,7 +33,7 @@ class TextGenerationMetrics:
 
     _start_time: float
     _signposts: dict[str, float]
-    _mem_usage_marker: dict[str, float]
+    _mem_usage_bytes_marker: dict[str, int]
     _should_print_report: bool
     _process: psutil.Process
     _print_raw: bool
@@ -41,7 +42,7 @@ class TextGenerationMetrics:
         self, print_report: bool = False, print_raw: bool = False
     ) -> None:
         self._signposts = {}
-        self._mem_usage_marker = {}
+        self._mem_usage_bytes_marker = {}
         self.batch_size = 1
         self.prompt_size = 0
         self.output_size = 0
@@ -61,9 +62,7 @@ class TextGenerationMetrics:
     def signpost(self, name: str) -> None:
         """Measure the current time and memory usage, tagging it with a name for later reporting."""
         self._signposts[name] = time.time()
-        self._mem_usage_marker[name] = (self._process.memory_info().rss) / (
-            1024 * 1024 * 1024
-        )
+        self._mem_usage_bytes_marker[name] = self._process.memory_info().rss
 
     def new_token(self) -> None:
         """Report that a new token has been generated."""
@@ -150,7 +149,7 @@ class TextGenerationMetrics:
             for k, v in self._signposts.items():
                 print(
                     f"Started {k} at {v} with memory"
-                    f" {self._mem_usage_marker[k]} GB"
+                    f" {to_human_readable_bytes(self._mem_usage_bytes_marker[k])}"
                 )
 
 
@@ -160,7 +159,7 @@ class EmbeddingsMetrics:
 
     _start_time: float
     _signposts: dict[str, float]
-    _mem_usage_marker: dict[str, float]
+    _mem_usage_bytes_marker: dict[str, int]
     _should_print_report: bool
     _process: psutil.Process
     _print_raw: bool
@@ -169,7 +168,7 @@ class EmbeddingsMetrics:
         self, print_report: bool = False, print_raw: bool = False
     ) -> None:
         self._signposts = {}
-        self._mem_usage_marker = {}
+        self._mem_usage_bytes_marker = {}
         self.batch_size = 1
         self.prompt_size = 0
         self._should_print_report = print_report
@@ -188,9 +187,7 @@ class EmbeddingsMetrics:
     def signpost(self, name: str) -> None:
         """Measure the current time and memory usage, tagging it with a name for later reporting."""
         self._signposts[name] = time.time()
-        self._mem_usage_marker[name] = (self._process.memory_info().rss) / (
-            1024 * 1024 * 1024
-        )
+        self._mem_usage_bytes_marker[name] = self._process.memory_info().rss
 
     def _calculate_results(self) -> None:
         begin_encoding = self._signposts.get("begin_encoding")
@@ -220,5 +217,5 @@ class EmbeddingsMetrics:
             for k, v in self._signposts.items():
                 print(
                     f"Started {k} at {v} with memory"
-                    f" {self._mem_usage_marker[k]} GB"
+                    f" {to_human_readable_bytes(self._mem_usage_bytes_marker[k])}"
                 )

@@ -147,7 +147,7 @@ struct AHasher[key: U256](Defaultable, Hasher):
         var combined = _folded_multiply(xored[0], xored[1])
         self.buffer = rotate_bits_left[ROT]((self.buffer + self.pad) ^ combined)
 
-    def _update_with_bytes(mut self, data: Span[Byte, _]):
+    def update(mut self, data: ImmSpan[Byte, _]):
         """Consume provided data to update the internal buffer.
 
         Args:
@@ -222,14 +222,6 @@ struct AHasher[key: U256](Defaultable, Hasher):
                     ).cast[.uint64]()
                     self._large_update(U128(u64_1, u64_2))
 
-    def update(mut self, value: ImmSpan[Byte, _]):
-        """Update the buffer value with new hashable value.
-
-        Args:
-            value: Value used for update.
-        """
-        self._update_with_bytes(value)
-
     @always_inline
     def finish(var self) -> UInt64:
         """Computes the hash value based on all the previously provided data.
@@ -258,7 +250,7 @@ def hash_seeded_bytes(data: ImmPointer[UInt8, _], n: Int, seed: U256) -> UInt64:
         A 64-bit integer hash value.
     """
     var hasher = AHasher[U256(0)](seed)
-    hasher._update_with_bytes(Span(unsafe_ptr=data, length=n))
+    hasher.update(Span(unsafe_ptr=data, length=n))
     var value = hasher^.finish()
     return value
 

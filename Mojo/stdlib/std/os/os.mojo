@@ -261,15 +261,15 @@ def abort() -> Never:
     _abort_base()
 
 
-@always_inline
-def _abort_impl[
+@no_inline
+def _abort_report[
     *, prefix: StaticString
-](
-    message: Some[Writable],
-    *,
-    location: Optional[SourceLocation] = {},
-) -> Never:
-    var loc = location.or_else(call_location[inline_count=2]())
+](loc: SourceLocation, message: Some[Writable]):
+    """Prints an abort message.
+
+    Kept out of line so the wide `print` call below is emitted once per message
+    type rather than inlined into every `abort` call site.
+    """
 
     comptime if is_apple_gpu():
         # FIXME: Remove after MOCO-3697 is fixed.
@@ -317,6 +317,21 @@ def _abort_impl[
             flush=True,
         )
 
+
+@always_inline
+def _abort_impl[
+    *, prefix: StaticString
+](
+    message: Some[Writable],
+    *,
+    location: Optional[SourceLocation] = {},
+) -> Never:
+    var loc = location.or_else(call_location[inline_count=2]())
+
+    # Apple GPU has no print path at all (see `_abort_report`), so its body
+    # folds to nothing.
+    comptime if not is_apple_gpu():
+        _abort_report[prefix=prefix](loc, message)
     abort()
 
 

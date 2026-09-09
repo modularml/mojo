@@ -10,17 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Requantizes a HuggingFace checkpoint to OCP MXFP6.
+"""Requantizes a HuggingFace checkpoint to MXFP6 or NVFP4.
 
-MX weight quantization is round-to-nearest over 32-element blocks -- a pure
+Weight quantization is round-to-nearest over fixed-size blocks -- a pure
 function of the weight tensor, with no calibration set and no activation
-statistics -- so this is a batch weight transform, not a data pipeline. The
-element encoder lives in :mod:`fp6_quantization` and is pinned bit-for-bit
-against the Mojo kernel's decoder.
+statistics -- so this is a batch weight transform, not a data pipeline.
 
-Reads one shard at a time and writes one shard at a time, so peak memory is a
-couple of shards rather than the whole model. See
-``max/docs/internal/MXFP6Checkpoints.md`` for the operator manual.
+MXFP6 encoding lives in :mod:`fp6_quantization`; NVFP4 encoding lives in
+:mod:`fp4_quantization`. Reads one shard at a time and writes one shard at a
+time, so peak memory is a couple of shards rather than the whole model. See
+``max/docs/internal/MXFP6Checkpoints.md`` and
+``max/docs/internal/NVFP4Checkpoints.md`` for the operator manuals.
 """
 
 from __future__ import annotations
@@ -36,12 +36,17 @@ from pathlib import Path
 
 import numpy as np
 import torch  # type: ignore
+from max.pipelines.weights.fp4_quantization import (
+    FP4Format,
+    nvfp4_quantization_config,
+    quantize_nvfp4,
+)
 from max.pipelines.weights.fp6_quantization import (
-    MX_BLOCK_SIZE,
     FP6Format,
+    mxfp6_quantization_config,
     quantize_mxfp6,
 )
-from numpy.typing import NDArray
+from max.support.human_readable_formatter import to_human_readable_bytes
 
 # The torch backend, not the numpy one: numpy has no bfloat16, and safetensors
 # refuses a BF16 tensor on both read and write through it. Source checkpoints
@@ -51,7 +56,14 @@ from safetensors.torch import safe_open, save_file
 
 logger = logging.getLogger("max.pipelines")
 
+QuantFormat = FP4Format | FP6Format
+
 _WEIGHT_INDEX = "model.safetensors.index.json"
+
+_ALL_FORMATS: tuple[QuantFormat, ...] = (
+    *FP6Format,
+    *FP4Format,
+)
 
 _DEFAULT_TARGETS = (
     r"\.block_sparse_moe\.experts\.\d+\.w[123]\.weight$",
@@ -84,6 +96,17 @@ Router gates and norms are tiny but numerically load-bearing -- quantizing a
 router changes which experts fire, which is a far larger error than anything
 the weights themselves contribute.
 """
+_ALREADY_QUANTIZED_FLOATS = frozenset(
+    dt
+    for name in (
+        "float8_e4m3fn",
+        "float8_e5m2",
+        "float8_e4m3fnuz",
+        "float8_e5m2fnuz",
+    )
+    if (dt := getattr(torch, name, None)) is not None
+)
+"""Narrow float dtypes that only ever appear as an already-quantized payload."""
 
 
 def _load_shards(src: Path) -> list[Path]:
@@ -111,10 +134,20 @@ def _should_quantize(
     return any(p.search(name) for p in targets)
 
 
+def _parse_format(value: str) -> QuantFormat:
+    """Resolves a CLI ``--format`` string to an FP4 or FP6 encoding."""
+    for enum in (FP4Format, FP6Format):
+        try:
+            return enum(value)
+        except ValueError:
+            continue
+    raise ValueError(f"unknown quantization format {value!r}")
+
+
 def _quantize_tensor(
-    tensor: torch.Tensor, fmt: FP6Format
-) -> tuple[NDArray[np.uint8], NDArray[np.uint8]] | None:
-    """Quantizes one 2D weight, or returns ``None`` if it is not eligible.
+    name: str, tensor: torch.Tensor, fmt: QuantFormat
+) -> dict[str, torch.Tensor] | None:
+    """Quantizes one 2D weight onto checkpoint keys, or returns ``None``.
 
     An already-quantized or integer tensor is rejected rather than reinterpreted
     as floats, which is what quantizing a source checkpoint twice would look
@@ -122,49 +155,48 @@ def _quantize_tensor(
     """
     if not tensor.dtype.is_floating_point:
         return None
-    if tensor.ndim != 2 or tensor.shape[-1] % MX_BLOCK_SIZE:
+    if tensor.dtype in _ALREADY_QUANTIZED_FLOATS:
+        return None
+    if tensor.ndim != 2 or tensor.shape[-1] % fmt.block_size:
         return None
     # float32 first: the encoder is numpy, which cannot represent bfloat16, and
     # the widening is exact.
-    return quantize_mxfp6(tensor.to(torch.float32).numpy(), fmt)
+    values = tensor.to(torch.float32).numpy()
+    if isinstance(fmt, FP4Format):
+        packed, block_scales, decode_scale = quantize_nvfp4(values, fmt)
+        # ModelOpt stores E4M3 block scales as float8_e4m3fn, not uint8.
+        # The bits are the same; serving keys off the dtype.
+        scales = torch.from_numpy(
+            np.ascontiguousarray(np.squeeze(block_scales, axis=-1))
+        ).view(torch.float8_e4m3fn)
+        return {
+            name: torch.from_numpy(np.ascontiguousarray(packed)),
+            f"{name}_scale": scales,
+            f"{name}_scale_2": torch.tensor(
+                [float(decode_scale)], dtype=torch.float32
+            ),
+            # Sibling of `.weight`, not `{name}_scale`. Offline encode has no
+            # activation stats; 1.0 is the identity ModelOpt default.
+            f"{name.removesuffix('.weight')}.input_scale": torch.tensor(
+                1.0, dtype=torch.float32
+            ),
+        }
+
+    # MXFP6: packed E2M3/E3M2 codes plus one E8M0 scale per 32-element block.
+    packed, scales = quantize_mxfp6(values, fmt)
+    return {
+        name: torch.from_numpy(packed),
+        f"{name}_scale": torch.from_numpy(scales),
+    }
 
 
 def _quantization_config(
-    fmt: FP6Format, ignored: Sequence[str]
+    fmt: QuantFormat, ignored: Sequence[str]
 ) -> dict[str, object]:
-    """Builds the ``quantization_config`` block for the output config.json.
-
-    Written in the Quark shape the MXFP4 checkpoints use so that
-    ``_is_mxfp6_config`` recognizes it, with ``fp6_format`` carried explicitly:
-    both FP6 encodings occupy 6 bits, so the tensor shapes cannot record which
-    one the bytes hold.
-    """
-    return {
-        "quant_method": "mxfp6",
-        "fp6_format": fmt.value,
-        "activation_scheme": "dynamic",
-        "weight_block_size": [1, MX_BLOCK_SIZE],
-        "ignored_layers": list(ignored),
-        "global_quant_config": {
-            "weight": {
-                "dtype": f"fp6_{fmt.value}",
-                "qscheme": "per_group",
-                "group_size": MX_BLOCK_SIZE,
-                "is_dynamic": False,
-                "scale_format": "e8m0",
-                "scale_calculation_mode": "even",
-                "round_method": "half_even",
-            },
-            "input_tensors": {
-                "dtype": f"fp6_{fmt.value}",
-                "qscheme": "per_group",
-                "group_size": MX_BLOCK_SIZE,
-                "is_dynamic": True,
-                "scale_format": "e8m0",
-                "scale_calculation_mode": "even",
-            },
-        },
-    }
+    """Builds the ``quantization_config`` block for the output config.json."""
+    if isinstance(fmt, FP4Format):
+        return nvfp4_quantization_config(fmt, ignored)
+    return mxfp6_quantization_config(fmt, ignored)
 
 
 def _copy_auxiliary_files(src: Path, dst: Path) -> None:
@@ -189,20 +221,20 @@ def _iter_shard_tensors(
 def quantize_checkpoint(
     src: Path,
     dst: Path,
-    fmt: FP6Format = FP6Format.E2M3,
+    fmt: QuantFormat = FP6Format.E2M3,
     *,
     include_qkv: bool = False,
     extra_targets: Sequence[str] = (),
     dry_run: bool = False,
 ) -> dict[str, int]:
-    """Requantizes a checkpoint to MXFP6, shard by shard.
+    """Requantizes a checkpoint to MXFP6 or NVFP4, shard by shard.
 
     Args:
         src: The source checkpoint directory. bf16 is strongly preferred;
-            requantizing an MXFP4 checkpoint would only re-encode information
-            that is already gone.
+            requantizing an already-quantized checkpoint would only re-encode
+            information that is already gone.
         dst: The output directory, created if absent.
-        fmt: The FP6 element encoding to write.
+        fmt: The element encoding to write (``FP6Format`` or ``FP4Format``).
         include_qkv: Also quantize the attention Q/K/V projections.
         extra_targets: Additional regexes matching tensors to quantize.
         dry_run: Report what would be written without writing weights.
@@ -241,27 +273,28 @@ def quantize_checkpoint(
         out_tensors: dict[str, torch.Tensor] = {}
 
         for name, array in _iter_shard_tensors(shard):
-            quantized = None
+            written = None
             if _should_quantize(name, patterns, ignored):
-                quantized = _quantize_tensor(array, fmt)
-                if quantized is None:
+                written = _quantize_tensor(name, array, fmt)
+                if written is None:
                     logger.warning(
                         "%s matched a target pattern but its shape %s is not "
-                        "MXFP6-quantizable; copying verbatim",
+                        "%s-quantizable; copying verbatim",
                         name,
                         tuple(array.shape),
+                        fmt.value,
                     )
 
-            if quantized is None:
+            if written is None:
                 out_tensors[name] = array
                 stats["copied"] += 1
                 continue
 
-            packed, scales = quantized
-            out_tensors[name] = torch.from_numpy(packed)
-            out_tensors[f"{name}_scale"] = torch.from_numpy(scales)
+            out_tensors.update(written)
             stats["quantized"] += 1
-            stats["bytes_saved"] += array.nbytes - packed.nbytes - scales.nbytes
+            stats["bytes_saved"] += array.nbytes - sum(
+                tensor.nbytes for tensor in written.values()
+            )
 
         for name, array in out_tensors.items():
             weight_map[name] = out_name
@@ -309,17 +342,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Runs the requantizer from the command line."""
     parser = argparse.ArgumentParser(
         prog="quantize_checkpoint",
-        description="Requantize a HuggingFace checkpoint to OCP MXFP6.",
+        description="Requantize a HuggingFace checkpoint to MXFP6 or NVFP4.",
     )
     parser.add_argument("src", type=Path, help="source checkpoint directory")
     parser.add_argument("dst", type=Path, help="output checkpoint directory")
     parser.add_argument(
         "--format",
-        choices=[f.value for f in FP6Format],
+        choices=[f.value for f in _ALL_FORMATS],
         default=FP6Format.E2M3.value,
         help=(
-            "FP6 element encoding. e2m3 (default) has 3 mantissa bits, the "
-            "same as FP8 e4m3, and is the right choice for weights."
+            "Element encoding to write. e2m3/e3m2 select MXFP6; nvfp4 "
+            "selects NVFP4. e2m3 (default) is the right MXFP6 choice for "
+            "weights."
         ),
     )
     parser.add_argument(
@@ -345,21 +379,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
 
+    fmt = _parse_format(args.format)
     stats = quantize_checkpoint(
         args.src,
         args.dst,
-        FP6Format(args.format),
+        fmt,
         include_qkv=args.include_qkv,
         extra_targets=args.target,
         dry_run=args.dry_run,
     )
 
+    label = "NVFP4" if isinstance(fmt, FP4Format) else f"MXFP6 ({fmt.value})"
     logger.info(
-        "MXFP6 (%s): %d tensors quantized, %d copied, %.1f GiB saved",
-        args.format,
+        "%s: %d tensors quantized, %d copied, %s saved",
+        label,
         stats["quantized"],
         stats["copied"],
-        stats["bytes_saved"] / 2**30,
+        to_human_readable_bytes(stats["bytes_saved"]),
     )
     return 0
 

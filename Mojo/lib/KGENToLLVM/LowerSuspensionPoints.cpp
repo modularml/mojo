@@ -47,6 +47,16 @@ struct LowerSuspensionPointsPass
 };
 } // namespace
 
+/// Ops safe to re-execute on every resume entry (constants, address
+/// arithmetic, and fixed-size allocas that must span the coroutine).
+static bool canHoistToResumeEntry(Operation *op) {
+  if (auto alloca = dyn_cast<AllocaOp>(op))
+    return isa_and_present<ConstantOp>(alloca.getArraySize().getDefiningOp());
+  return isa<ConstantOp, UndefOp, ZeroOp, GEPOp, AddressOfOp, BitcastOp,
+             AddrSpaceCastOp, IntToPtrOp, PtrToIntOp, TruncOp, ZExtOp, SExtOp>(
+      op);
+}
+
 struct BuildContext {
   BuildContext(LLVMBuilder &builder, Type continuationType)
       : builder(builder), continuationType(continuationType) {}
@@ -194,6 +204,30 @@ static LogicalResult lowerSuspensionPoints(LLVMFuncOp funcOp,
             buildContext.resumeValues),
         /*caseDestinations=*/buildContext.blockList,
         /*caseOperands=*/operands);
+
+    // `initialBlock` is now only reachable for state 0. Resume cases jump here
+    // without going through it, so SSA values defined there no longer dominate
+    // resume uses. Hoist rematerializable entry ops (and their deps) to the
+    // dispatcher so every path sees them.
+    Operation *switchOp = controlBlock->getTerminator();
+    auto operandsDominate = [&](Operation *op) {
+      return llvm::all_of(op->getOperands(), [&](Value value) {
+        if (auto blockArg = dyn_cast<BlockArgument>(value))
+          return blockArg.getOwner() == controlBlock;
+        return value.getDefiningOp()->getBlock() == controlBlock;
+      });
+    };
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (Operation &op :
+           llvm::make_early_inc_range(initialBlock.without_terminator())) {
+        if (!canHoistToResumeEntry(&op) || !operandsDominate(&op))
+          continue;
+        op.moveBefore(switchOp);
+        changed = true;
+      }
+    }
   }
 
   // Invoke callback in final block before return.

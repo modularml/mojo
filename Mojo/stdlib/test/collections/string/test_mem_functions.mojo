@@ -76,6 +76,23 @@ def test_memchr_vectorized() raises:
     assert_equal(Int(r2[]) - Int(span2.unsafe_ptr()), 202)
 
 
+def test_memchr_past_the_mask_width() raises:
+    # A single-byte needle beyond 2**simd_width_of[DType.bool]() bytes must
+    # still report its true index. The vectorized offset used to be computed as
+    # `Int(type_of(mask)(i) + count_trailing_zeros(mask))`, which narrowed the
+    # byte offset `i` to the width of the pack_bits mask before the addition, so
+    # any match at or beyond 2**mask_width came back as `index % 2**mask_width`
+    # (e.g. index 65536 reported as 0 on a 16-lane-bool target). The fix mirrors
+    # `_memmem_impl`: keep `i` an `Int` and only widen the lane offset.
+    for at in materialize[[65535, 65536, 70000, 200000]]():
+        var buf = List[UInt8](length=at + 40, fill=0x61)  # "a"
+        buf[at] = 0x0A  # "\n"
+        var span = Span(buf)
+        var r = _memchr(span, Byte(0x0A))
+        assert_true(Bool(r))
+        assert_equal(Int(r[]) - Int(span.unsafe_ptr()), at)
+
+
 # ===----------------------------------------------------------------------=== #
 # _memmem
 # ===----------------------------------------------------------------------=== #

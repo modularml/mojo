@@ -69,6 +69,7 @@ class UnifiedMTPInklingInputs(UnifiedSpecDecodeInputs, InklingInputs):
             *self.signal_buffers,
             *self.kv_cache_inputs.flatten(),
             *self.slot_idx,
+            *self.has_initial_state,
             *self.conv_pools,
             *self.draft_conv_pools,
         )
@@ -265,6 +266,9 @@ class UnifiedMTPInklingModel(_UnifiedSpecDecodeModelMixin, InklingModel):
             target_kv = kv_collections_by_key(target_tree)
             draft_kv = kv_collections_by_key(draft_tree)
             slot_idx = [next(variadic_iter).tensor for _ in range(n_devs)]
+            has_initial_state = [
+                next(variadic_iter).tensor for _ in range(n_devs)
+            ]
             target_conv_pools = nn_model.target.conv_layout.take_pools(
                 variadic_iter, n_devs
             )
@@ -302,6 +306,7 @@ class UnifiedMTPInklingModel(_UnifiedSpecDecodeModelMixin, InklingModel):
                 return_n_logits=return_n_logits.tensor,
                 host_input_row_offsets=host_input_row_offsets.tensor,
                 slot_idx=slot_idx,
+                has_initial_state=has_initial_state,
                 target_conv_pools=target_conv_pools,
                 draft_conv_pools=draft_conv_pools,
                 seed=seed,

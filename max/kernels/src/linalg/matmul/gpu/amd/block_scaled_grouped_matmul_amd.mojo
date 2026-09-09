@@ -1513,13 +1513,13 @@ def block_scaled_grouped_matmul_amd_preb[
         else:
             return run_kernel[
                 128,
-                128,
+                256,
                 256,
                 64,
                 True,
                 cluster_drain_sched=True,
-                scale_group=4,
                 b_addr_split=True,
+                wg_per_cu=1,
             ]()
 
     comptime if LB == 32 and N == 6144 and packed_K == 3072:  # down, K=3072
@@ -1546,7 +1546,16 @@ def block_scaled_grouped_matmul_amd_preb[
             # 6.9%-23.3% win over the prior tile here.
             return run_kernel[64, 64, 256, 16, False]()
         else:
-            return run_kernel[128, 128, 256, 64, True, waves_per_eu=2]()
+            return run_kernel[
+                128,
+                256,
+                256,
+                64,
+                True,
+                cluster_drain_sched=True,
+                b_addr_split=True,
+                wg_per_cu=1,
+            ]()
 
     comptime if LB == 24 and N == 4096 and K_LOGICAL == 7168:  # gate+up
         if etm <= 20:

@@ -60,7 +60,8 @@ def some_fn():
 def some_fn_2():
         # expected-error @below {{decorator must be followed by a definition on the next line; remove any blank lines between them}}
         @decorator
-    if True: # expected-error {{unknown tokens at the end of a declaration}}
+    # expected-error @+1 {{statement indentation must match the rest of the block; adjust to align}}
+    if True: # expected-warning {{'if' condition always evaluates to 'True'; 'else' branch is unreachable}}
         pass
 
 @decorator[]  # expected-error {{invalid expression in decorator}}

@@ -189,6 +189,42 @@ def _modelopt_ignore_patterns(
     return [_normalize_modelopt_ignore_pattern(str(entry)) for entry in ignore]
 
 
+_ATTENTION_SUBTREES = ("self_attn", "linear_attn")
+"""Module names a layer's attention block can go by.
+
+A hybrid checkpoint carries only one of them per layer -- Qwen3.8-Flash-Next
+alternates three ``linear_attn`` layers with one ``self_attn`` -- and
+``layer_types`` says which. This pair is the fallback for a config that does
+not say, where either spelling being ignored has to count for the layer:
+reading ``self_attn`` alone would mark a linear-attention layer quantized and
+build FP4 projections over bf16 weights.
+"""
+
+
+def _attention_subtree_per_layer(
+    huggingface_config: AutoConfig, num_hidden_layers: int
+) -> list[tuple[str, ...]]:
+    """Which attention module name each layer actually carries.
+
+    Reading both names for every layer conflates the two: a checkpoint that
+    ignores ``*.linear_attn.*`` while quantizing full attention would lose its
+    ``self_attn`` layers too, and their packed weights would then be read as
+    bf16. ``layer_types`` is what separates them, and it is the same field the
+    hybrid architectures build their own layer stack from.
+    """
+    text_config = getattr(huggingface_config, "text_config", huggingface_config)
+    layer_types = getattr(text_config, "layer_types", None) or []
+    if len(layer_types) != num_hidden_layers:
+        return [_ATTENTION_SUBTREES] * num_hidden_layers
+    # Every non-linear entry -- ``full_attention``, ``sliding_attention``, and
+    # the ``qwen_sparse_attention`` a Flash-Next config rewrites it to -- names
+    # a layer whose tensors live under ``self_attn``.
+    return [
+        ("linear_attn",) if "linear" in str(layer_type) else ("self_attn",)
+        for layer_type in layer_types
+    ]
+
+
 def _modelopt_layer_subtree_ignored(
     layer_idx: int,
     subtree: str,
@@ -196,27 +232,27 @@ def _modelopt_layer_subtree_ignored(
     *,
     modules_prefix: str = "model.",
 ) -> bool:
-    """Return whether an entire layer subtree (``mlp`` or ``self_attn``) is ignored.
+    """Return whether a whole layer subtree (MLP or attention) is ignored.
 
-    Matches modelopt-style globs such as ``model.layers.3.self_attn*`` from
-    https://huggingface.co/lukealonso/GLM-5.1-NVFP4/blob/main/config.json.
+    Matches modelopt-style globs, both the ``model.layers.3.self_attn*``
+    shape of https://huggingface.co/lukealonso/GLM-5.1-NVFP4 and the
+    ``*.self_attn.*`` shape of
+    https://huggingface.co/RadixArk/Qwen3.8-Flash-Next-NVFP4.
     """
     layered = f"layers.{layer_idx}.{subtree}"
-    prefix_path = f"{modules_prefix}{layered}"
-    candidate_paths = (
-        (prefix_path, f"{prefix_path}*"),
-        (layered, f"{layered}*"),
-    )
+    candidate_paths = (f"{modules_prefix}{layered}", layered)
     for pattern in ignore_patterns:
-        for module_path, wildcard_path in candidate_paths:
-            if pattern in (module_path, wildcard_path):
-                return True
-            if fnmatch.fnmatch(module_path, pattern):
-                return True
-            # Only glob patterns (containing ``*``) ignore an entire subtree.
-            # Exact paths such as ``layers.0.mlp.gate_up_proj`` skip one module
-            # but leave the rest of the MLP quantized (e.g. ``down_proj``).
-            if "*" in pattern and fnmatch.fnmatch(wildcard_path, pattern):
+        # A glob ending in ``.*`` names every descendant of the subtree without
+        # matching the subtree itself, so it has to be tested against the head.
+        # The distinction is the whole point: ``*.self_attn.*`` leaves the
+        # layer's attention entirely bf16, while ``*.mlp.gate*`` names only the
+        # router and must leave the routed experts quantized. Both end in
+        # ``*``; only the character before it tells them apart.
+        heads = [pattern]
+        if pattern.endswith(".*"):
+            heads.append(pattern.removesuffix(".*"))
+        for module_path in candidate_paths:
+            if any(fnmatch.fnmatch(module_path, head) for head in heads):
                 return True
     return False
 
@@ -229,6 +265,9 @@ def _quantized_layers_from_modelopt_ignore(
 ) -> tuple[set[int], set[int]]:
     """Derive per-layer MLP/attention quantization from modelopt ``ignore`` globs."""
     num_hidden_layers = _get_num_hidden_layers(huggingface_config)
+    attention_subtrees = _attention_subtree_per_layer(
+        huggingface_config, num_hidden_layers
+    )
     mlp_quantized_layers: set[int] = set()
     attn_quantized_layers: set[int] = set()
 
@@ -237,15 +276,27 @@ def _quantized_layers_from_modelopt_ignore(
             layer_idx, "mlp", ignore_patterns, modules_prefix=modules_prefix
         ):
             mlp_quantized_layers.add(layer_idx)
-        if not _modelopt_layer_subtree_ignored(
-            layer_idx,
-            "self_attn",
-            ignore_patterns,
-            modules_prefix=modules_prefix,
+        if not any(
+            _modelopt_layer_subtree_ignored(
+                layer_idx,
+                subtree,
+                ignore_patterns,
+                modules_prefix=modules_prefix,
+            )
+            for subtree in attention_subtrees[layer_idx]
         ):
             attn_quantized_layers.add(layer_idx)
 
     return mlp_quantized_layers, attn_quantized_layers
+
+
+_SHARED_EXPERT_NAMES = ("shared_expert", "shared_experts")
+"""Module names a MoE shared expert goes by.
+
+Qwen writes the singular (``*.mlp.shared_expert.*``); DeepSeek and GLM write
+the plural. Reading only one spelling leaves the other's bf16 shared expert
+marked quantized, which mis-types the weights silently rather than failing.
+"""
 
 
 def _modelopt_shared_experts_quantized_dtype(
@@ -253,12 +304,25 @@ def _modelopt_shared_experts_quantized_dtype(
 ) -> DType | None:
     """Return quant dtype if MoE shared experts are quantized (not in ``ignore``)."""
     # modelopt leaves unquantized modules in ``ignore`` as per-layer globs like
-    # ``layers.3.mlp.shared_experts*``, so any ignore entry naming shared_experts
-    # means they stay bf16. A substring test sidesteps the ``model.`` prefix that
-    # ``_normalize_modelopt_ignore_pattern`` strips from ``layers.*`` globs.
+    # ``layers.3.mlp.shared_experts*``, so any ignore entry naming a shared
+    # expert means it stays bf16. Testing one path segment at a time sidesteps
+    # the ``model.`` prefix that ``_normalize_modelopt_ignore_pattern`` strips
+    # from ``layers.*`` globs, and the per-layer index that makes a glob match
+    # no single representative path.
+    #
+    # The segment boundary is what separates the shared expert from
+    # ``shared_expert_gate``, a separate one-column gating projection that a
+    # checkpoint can leave bf16 while quantizing the expert itself. A substring
+    # test reads that config as a bf16 shared expert and mis-types its packed
+    # weights.
     for pattern in ignore_patterns:
-        if "shared_experts" in pattern:
-            return DType.bfloat16
+        for segment in pattern.split("."):
+            if "shared_expert" not in segment:
+                continue
+            if any(
+                fnmatch.fnmatch(name, segment) for name in _SHARED_EXPERT_NAMES
+            ):
+                return DType.bfloat16
     return None
 
 

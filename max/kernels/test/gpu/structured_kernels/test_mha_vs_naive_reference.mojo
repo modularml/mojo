@@ -132,6 +132,8 @@ def _mha_prefill_v2_launch[
         o.dtype,
         q.LayoutType,
         o.LayoutType,
+        q.Engine,
+        o.Engine,
         ragged=False,
     ]
 

@@ -110,6 +110,7 @@ class InklingMTPDepthLayer(Module):
         log_scaling: Sequence[TensorValue],
         conv_pools: Sequence[Sequence[BufferValue]],
         slot_idx: Sequence[TensorValue],
+        has_initial_state: Sequence[TensorValue],
         signal_buffers: Sequence[BufferValue],
         hidden_states_first: bool,
     ) -> list[TensorValue]:
@@ -135,6 +136,7 @@ class InklingMTPDepthLayer(Module):
             log_scaling,
             conv_pools,
             slot_idx,
+            has_initial_state,
             cache_idx,
             signal_buffers,
         )
@@ -247,6 +249,7 @@ class InklingMultiTokenPredictor(Module):
         positions: TensorValue,
         conv_pools: Sequence[Sequence[BufferValue]],
         slot_idx: Sequence[TensorValue],
+        has_initial_state: Sequence[TensorValue],
         signal_buffers: Sequence[BufferValue],
     ) -> list[TensorValue]:
         """Runs MTP depth ``depth_idx`` and optionally applies chain_norm."""
@@ -266,6 +269,7 @@ class InklingMultiTokenPredictor(Module):
             log_scaling,
             self.depth_conv_pools(conv_pools, depth_idx),
             slot_idx,
+            has_initial_state,
             signal_buffers,
             self.hidden_states_first,
         )

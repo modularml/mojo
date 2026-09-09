@@ -72,6 +72,21 @@ To confirm an edit reached codegen, round-trip a visible asm marker (for
 example an `s_sleep`/`s_setprio` instruction); comments and scheduler hints
 leave no asm trace.
 
+Two things about that mode cost a lane real time:
+
+- **Invoke mojo as `mojo -I $PWD/max/mojo file.mojo`.** `//:install-kernel-dev`
+  strips the prebuilt `max` package without adding `max/mojo` to the import
+  path, so a plain `mojo file.mojo` fails with `unable to locate module 'max'`
+  and nothing compiles at all.
+- **The two install modes do not compose.** Running `//:install` again
+  mid-session re-arms the shadowing this mode exists to avoid: the next `mojo`
+  run reads the freshly built `nn.mojoc` and can pass against pre-edit code.
+  `mojo -I max/kernels/src` does not override the package. Pick one mode per
+  phase of work and stay in it.
+
+`bazel test` builds its own target's runfiles rather than the shared package,
+so test runs do not disturb either mode.
+
 ## Code Architecture
 
 ### Directory Structure

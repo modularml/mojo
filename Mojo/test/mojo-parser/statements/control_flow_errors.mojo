@@ -30,7 +30,8 @@ return 32 # expected-error {{'return' must be inside a function; move this into 
 def elif_parse_error(a: Bool) raises:
   if a:
     pass
- elif a: # expected-error {{unknown tokens at the end of a declaration}}
+ # expected-error @+1 {{unexpected token in expression}}
+ elif a: # expected-error {{statement indentation must match the rest of the block; adjust to align}}
     pass
  else:
     pass

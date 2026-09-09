@@ -21,7 +21,15 @@ import numpy as np
 from max.driver import Buffer, load_devices
 from max.dtype import DType
 from max.engine import InferenceSession, Model
-from max.graph import DeviceRef, Graph, TensorType, TensorValue, Weight, ops
+from max.graph import (
+    DeviceRef,
+    Graph,
+    ProfileScopeColor,
+    TensorType,
+    TensorValue,
+    Weight,
+    ops,
+)
 from max.graph import Module as GraphModule
 from max.graph.weights import Weights, load_weights
 from max.nn.layer import Module
@@ -107,51 +115,54 @@ class PostprocessAndDecode(Module):
         h = h_carrier.shape[0]
         w = w_carrier.shape[0]
 
-        # Reshape packed (B, S, C) -> spatial (B, H, W, C).
-        latents_bsc = ops.rebind(latents_bsc, [batch, h * w, c])
-        latents_bhwc = ops.reshape(latents_bsc, (batch, h, w, c))
+        with Graph.current.profile_scope(
+            "flux2_decode_vae", color=ProfileScopeColor.GREEN
+        ):
+            # Reshape packed (B, S, C) -> spatial (B, H, W, C).
+            latents_bsc = ops.rebind(latents_bsc, [batch, h * w, c])
+            latents_bhwc = ops.reshape(latents_bsc, (batch, h, w, c))
 
-        # (B, H, W, C) -> (B, C, H, W)
-        latents = ops.permute(latents_bhwc, [0, 3, 1, 2])
+            # (B, H, W, C) -> (B, C, H, W)
+            latents = ops.permute(latents_bhwc, [0, 3, 1, 2])
 
-        # BN denormalization: x = x * sqrt(var + eps) + mean
-        bn_mean = self.decoder_bn_mean.to(self._device)
-        bn_var = self.decoder_bn_var.to(self._device)
-        bn_mean_r = ops.reshape(bn_mean, (1, self._num_channels, 1, 1))
-        bn_var_r = ops.reshape(bn_var, (1, self._num_channels, 1, 1))
-        bn_std = ops.sqrt(
-            bn_var_r
-            + ops.constant(
-                self._batch_norm_eps, self._dtype, device=self._device
+            # BN denormalization: x = x * sqrt(var + eps) + mean
+            bn_mean = self.decoder_bn_mean.to(self._device)
+            bn_var = self.decoder_bn_var.to(self._device)
+            bn_mean_r = ops.reshape(bn_mean, (1, self._num_channels, 1, 1))
+            bn_var_r = ops.reshape(bn_var, (1, self._num_channels, 1, 1))
+            bn_std = ops.sqrt(
+                bn_var_r
+                + ops.constant(
+                    self._batch_norm_eps, self._dtype, device=self._device
+                )
             )
-        )
-        latents = latents * bn_std + bn_mean_r
+            latents = latents * bn_std + bn_mean_r
 
-        # Unpatchify: (B, C, H, W) -> (B, C//4, H*2, W*2)
-        latents = ops.reshape(latents, (batch, c // 4, 2, 2, h, w))
-        latents = ops.permute(latents, [0, 1, 4, 2, 5, 3])
-        latents = ops.reshape(latents, (batch, c // 4, h * 2, w * 2))
+            # Unpatchify: (B, C, H, W) -> (B, C//4, H*2, W*2)
+            latents = ops.reshape(latents, (batch, c // 4, 2, 2, h, w))
+            latents = ops.permute(latents, [0, 1, 4, 2, 5, 3])
+            latents = ops.reshape(latents, (batch, c // 4, h * 2, w * 2))
 
-        # VAE decode.
-        decoded = self.decoder(latents, None)
+            # VAE decode.
+            decoded = self.decoder(latents, None)
 
-        # (B, C, H, W) -> (B, H, W, C)
-        decoded = ops.permute(decoded, [0, 2, 3, 1])
+            # (B, C, H, W) -> (B, H, W, C)
+            decoded = ops.permute(decoded, [0, 2, 3, 1])
 
-        # Normalize [-1, 1] -> [0, 255] and cast to uint8.
-        # Upcast to float32 for the normalization + scaling so that the
-        # x255 multiplication doesn't amplify bfloat16 rounding errors
-        # into +-1-2 pixel differences.  This matches the precision path
-        # used by diffusers (AutoencoderKL outputs float32 by default).
-        # Round before the uint8 cast so the truncating cast doesn't bias
-        # every pixel down by ~0.5; diffusers' image processor does
-        # `(x * 255).round().astype(uint8)`.
-        decoded = ops.cast(decoded, DType.float32)
-        decoded = decoded * 0.5 + 0.5
-        decoded = ops.max(decoded, 0.0)
-        decoded = ops.min(decoded, 1.0)
-        decoded = decoded * 255.0
-        decoded = ops.round(decoded)
+            # Normalize [-1, 1] -> [0, 255] and cast to uint8.
+            # Upcast to float32 for the normalization + scaling so that the
+            # x255 multiplication doesn't amplify bfloat16 rounding errors
+            # into +-1-2 pixel differences.  This matches the precision path
+            # used by diffusers (AutoencoderKL outputs float32 by default).
+            # Round before the uint8 cast so the truncating cast doesn't bias
+            # every pixel down by ~0.5; diffusers' image processor does
+            # `(x * 255).round().astype(uint8)`.
+            decoded = ops.cast(decoded, DType.float32)
+            decoded = decoded * 0.5 + 0.5
+            decoded = ops.max(decoded, 0.0)
+            decoded = ops.min(decoded, 1.0)
+            decoded = decoded * 255.0
+            decoded = ops.round(decoded)
 
         return ops.transfer_to(ops.cast(decoded, DType.uint8), DeviceRef.CPU())
 

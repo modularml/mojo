@@ -20,9 +20,8 @@ struct WeirdArray(Movable where False):
         return x
 
 
-def test_getitem(var a: WeirdArray, f: float, x: Int):
-    # expected-error @+2 {{invalid call to '__getitem__': value passed to 'x' cannot be converted from 'float' to 'Int'}}
-    # expected-note @+1 {{'float' is aka '__mlir_type.`!kgen.scalar<f64>`'}}
+def test_getitem(var a: WeirdArray, f: String, x: Int):
+    # expected-error @+1 {{invalid call to '__getitem__': value passed to 'x' cannot be converted from 'String' to 'Int'}}
     _ = a[f]
 
     # expected-error @+1 {{invalid call to '__getitem__': unexpected argument}}

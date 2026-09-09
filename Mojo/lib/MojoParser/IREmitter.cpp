@@ -1491,29 +1491,6 @@ RValue IREmitter::emitExprScalarBool(const ExprNode *condExpr,
   return emitScalarBool({emitExprCValue(condExpr, context), condExpr}, context);
 }
 
-Operation *IREmitter::emitIfThen(Location loc, Value cond,
-                                 TypeRange resultTypes,
-                                 llvm::function_ref<LogicalResult()> emitThen,
-                                 llvm::function_ref<LogicalResult()> emitElse) {
-  assert(builder && "emitIfThen requires a dynamic builder");
-  OpBuilder &b = *builder;
-
-  HLCF::ElifOp elifOp = HLCF::ElifOp::create(b, loc, resultTypes, cond);
-
-  auto &thenBlock = elifOp.getThenRegion().emplaceBlock();
-  b.setInsertionPointToStart(&thenBlock);
-  if (failed(emitThen()))
-    return nullptr;
-
-  auto &elseBlock = elifOp.getElseRegion().emplaceBlock();
-  b.setInsertionPointToStart(&elseBlock);
-  if (failed(emitElse()))
-    return nullptr;
-
-  b.setInsertionPointAfter(elifOp);
-  return elifOp;
-}
-
 CValue IREmitter::emitAndMatchPredicates(
     ASTExprAnd<CValue> lhs, llvm::function_ref<ASTExprAnd<CValue>()> emitRhs,
     bool evaluateRhsEvenIfLhsFalse) {
@@ -1537,8 +1514,8 @@ CValue IREmitter::emitAndMatchPredicates(
     return {};
 
   auto boolType = SIMDType::getScalarBoolType(getContext());
-  Operation *elifOp = emitIfThen(
-      loc, lhsSR, TypeRange{boolType},
+  HLCF::ElifOp elifOp = HLCF::ElifOp::create(
+      *builder, loc, TypeRange{boolType}, lhsSR,
       [&]() -> LogicalResult {
         ASTExprAnd<CValue> rhs = emitRhs();
         if (!rhs.ir)
@@ -1557,7 +1534,7 @@ CValue IREmitter::emitAndMatchPredicates(
       });
   if (!elifOp)
     return {};
-  return SRValue(elifOp->getResult(0));
+  return SRValue(elifOp.getResult(0));
 }
 
 CValue IREmitter::emitOrMatchPredicates(
@@ -1577,8 +1554,8 @@ CValue IREmitter::emitOrMatchPredicates(
     return {};
 
   auto boolType = SIMDType::getScalarBoolType(getContext());
-  Operation *elifOp = emitIfThen(
-      loc, lhsSR, TypeRange{boolType},
+  HLCF::ElifOp elifOp = HLCF::ElifOp::create(
+      *builder, loc, TypeRange{boolType}, lhsSR,
       [&]() -> LogicalResult {
         Value trueVal = ParamConstantOp::create(
             *builder, loc, SIMDAttr::getScalarBool(getContext(), true));
@@ -1597,7 +1574,7 @@ CValue IREmitter::emitOrMatchPredicates(
       });
   if (!elifOp)
     return {};
-  return SRValue(elifOp->getResult(0));
+  return SRValue(elifOp.getResult(0));
 }
 
 CValue IREmitter::emitIndex(ASTExprAnd<AnyValue> value, ExprContext context) {

@@ -206,6 +206,26 @@ void ASTDecl::takeDecls(ASTDecl &src) {
   knownAssumptions = std::move(src.knownAssumptions);
 }
 
+/// Append the children decls of `src` into this scope (updating their
+/// `parentDecl`), without replacing existing names already in this scope.
+/// Used when promoting temporary pattern-binding scopes into a case scope.
+void ASTDecl::mergeDeclsFrom(ASTDecl &src) {
+  if (src.isErroneous())
+    setErroneous();
+  if (!src.declsInScope)
+    return;
+  if (!declsInScope)
+    declsInScope.reset(new DeclInScopeType());
+  for (auto &[name, children] : *src.declsInScope) {
+    TinyPtrVector<ASTDecl *> &entries = (*declsInScope)[name];
+    for (ASTDecl *child : children) {
+      child->parentDecl = this;
+      entries.push_back(child);
+    }
+  }
+  src.declsInScope.reset();
+}
+
 DenseMap<TraitSymbolAttr, std::pair<TraitSymbolAttr, SMLoc>> *
 ASTDecl::getTraitConformanceLineage(bool createIfMissing) {
   if (!traitConformanceLineage && createIfMissing)

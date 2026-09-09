@@ -783,6 +783,23 @@ ElifOp::parametric_interpret(ArrayRef<Attribute> operands,
   return interpret(operands, state);
 }
 
+ElifOp ElifOp::create(OpBuilder &builder, Location loc, TypeRange resultTypes,
+                      Value cond, function_ref<LogicalResult()> emitThen,
+                      function_ref<LogicalResult()> emitElse) {
+  ElifOp elifOp = ElifOp::create(builder, loc, resultTypes, cond);
+
+  builder.setInsertionPointToStart(&elifOp.getThenRegion().emplaceBlock());
+  if (failed(emitThen()))
+    return {};
+
+  builder.setInsertionPointToStart(&elifOp.getElseRegion().emplaceBlock());
+  if (failed(emitElse()))
+    return {};
+
+  builder.setInsertionPointAfter(elifOp);
+  return elifOp;
+}
+
 OpBuilder ElifOp::getThenBodyBuilder() {
   assert(!getThenRegion().empty() && "Need a then block");
   return OpBuilder::atBlockEnd(&getThenRegion().front());
@@ -796,6 +813,14 @@ OpBuilder ElifOp::getElseBodyBuilder() {
 Block &ElifOp::getThenBlock() { return getThenRegion().front(); }
 
 Block &ElifOp::getElseBlock() { return getElseRegion().front(); }
+
+Operation *ElifOp::getThenTerminator() {
+  return getThenBlock().getTerminator();
+}
+
+Operation *ElifOp::getElseTerminator() {
+  return getElseBlock().getTerminator();
+}
 
 //===----------------------------------------------------------------------===//
 // ElifYieldOp

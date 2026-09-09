@@ -421,10 +421,10 @@ def test_field_offset_by_index_matches_by_name() raises:
 
 
 def test_field_offset_iteration() raises:
-    var offsets = Array[Int, 4](uninitialized=True)
     comptime r = reflect[OffsetTestStruct]
-    comptime for i in range(r.field_count()):
-        offsets[i] = r.field_offset[index=i]()
+    var offsets = Array[Int, 4](
+        fill_with_unrolled=lambda [i: Int]() -> Int: r.field_offset[index=i]()
+    )
     assert_equal(offsets[0], 0)
     assert_equal(offsets[1], 8)
     assert_equal(offsets[2], 16)

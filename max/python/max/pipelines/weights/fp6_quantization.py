@@ -26,6 +26,7 @@ checking this encoder against the 64-entry reference tables that
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import Enum
 
 import numpy as np
@@ -78,6 +79,11 @@ class FP6Format(Enum):
     def max_value(self) -> float:
         """The largest finite magnitude the encoding represents."""
         return 7.5 if self is FP6Format.E2M3 else 28.0
+
+    @property
+    def block_size(self) -> int:
+        """Elements sharing one E8M0 scale."""
+        return MX_BLOCK_SIZE
 
 
 def encode_f32_to_fp6(
@@ -350,6 +356,44 @@ def dequantize_mxfp6(
         blocks, (scales.astype(np.int32) - np.int32(127))[..., None]
     )
     return scaled.reshape(*values.shape).astype(np.float32)
+
+
+def mxfp6_quantization_config(
+    fmt: FP6Format, ignored: Sequence[str]
+) -> dict[str, object]:
+    """Builds the ``quantization_config`` block for an MXFP6 checkpoint.
+
+    Written in the Quark shape the MXFP4 checkpoints use so that
+    ``_is_mxfp6_config`` recognizes it, with ``fp6_format`` carried explicitly:
+    both FP6 encodings occupy 6 bits, so the tensor shapes cannot record which
+    one the bytes hold.
+    """
+    return {
+        "quant_method": "mxfp6",
+        "fp6_format": fmt.value,
+        "activation_scheme": "dynamic",
+        "weight_block_size": [1, fmt.block_size],
+        "ignored_layers": list(ignored),
+        "global_quant_config": {
+            "weight": {
+                "dtype": f"fp6_{fmt.value}",
+                "qscheme": "per_group",
+                "group_size": fmt.block_size,
+                "is_dynamic": False,
+                "scale_format": "e8m0",
+                "scale_calculation_mode": "even",
+                "round_method": "half_even",
+            },
+            "input_tensors": {
+                "dtype": f"fp6_{fmt.value}",
+                "qscheme": "per_group",
+                "group_size": fmt.block_size,
+                "is_dynamic": True,
+                "scale_format": "e8m0",
+                "scale_calculation_mode": "even",
+            },
+        },
+    }
 
 
 def _f32_from_bits(bits: np.uint32) -> np.float32:

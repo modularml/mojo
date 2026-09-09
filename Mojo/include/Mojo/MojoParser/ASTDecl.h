@@ -371,6 +371,11 @@ public:
   /// resolved.
   void takeDecls(ASTDecl &src);
 
+  /// Append the children decls of `src` into this scope (updating their
+  /// `parentDecl`), without replacing existing names already in this scope.
+  /// Used when promoting temporary pattern-binding scopes into a case scope.
+  void mergeDeclsFrom(ASTDecl &src);
+
   /// Anonymous origins, closure impl structs, and potentially other names are
   /// uniqued to avoid collisions. This returns an ID that is unique to this
   /// ASTDecl instance and help generate such names.

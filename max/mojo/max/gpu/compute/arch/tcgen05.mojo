@@ -237,9 +237,11 @@ def tcgen05_ld[
             has_side_effect=True,
         ](tmem_addr)
         var ptr = Pointer(to=r).unsafe_bitcast[Scalar[dtype]]()
-        var result = Array[Scalar[dtype], width](uninitialized=True)
-        comptime for i in range(width):
-            result[i] = ptr[unsafe_offset=i]
+        var result = Array[Scalar[dtype], width](
+            fill_with_unrolled=lambda [i: Int]() -> Scalar[dtype]: ptr[
+                unsafe_offset=i
+            ]
+        )
         return result^
 
     # fmt: off

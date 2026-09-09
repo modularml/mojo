@@ -308,6 +308,8 @@ def run_mla_prefill_v2[
             _o0.dtype,
             _q0.LayoutType,
             _o0.LayoutType,
+            _q0.Engine,
+            _o0.Engine,
             ragged=False,
         ]
         comptime _DUMP_ASM: StaticString = get_defined_string["dump_asm", ""]()

@@ -117,7 +117,7 @@ from std.sys.intrinsics import (
 )
 from std.utils import StaticTuple
 
-from layout import TensorLayout, TileTensor, DefaultEngine
+from layout import TensorEngine, TensorLayout, TileTensor
 from layout._utils import make_amd_buffer_resource
 from layout.coord import Coord
 from layout.swizzle import Swizzle
@@ -467,10 +467,10 @@ struct MhaPrefillV2[config: MhaConfigV2]:
     def load_q[
         layout: TensorLayout
     ](
-        q_warp_2d: TileTensor[
-            Self.config.dtype, layout, Engine=DefaultEngine[], ...
-        ],
-    ) -> RegTile[Self.config.dtype, Self._Q_LAYOUT_T, MutUntrackedOrigin]:
+        q_warp_2d: TileTensor[Self.config.dtype, layout, ...],
+    ) -> RegTile[
+        Self.config.dtype, Self._Q_LAYOUT_T, MutUntrackedOrigin
+    ]:
         """Loads the warp's Q sub-tile from gmem into a row_l register
         tile via `RegTileLoader`.
 
@@ -569,9 +569,7 @@ struct MhaPrefillV2[config: MhaConfigV2]:
     def _load_q_and_scale[
         layout: TensorLayout
     ](
-        q_warp_2d: TileTensor[
-            Self.config.dtype, layout, Engine=DefaultEngine[], ...
-        ],
+        q_warp_2d: TileTensor[Self.config.dtype, layout, ...],
         scale_log2e: Float32,
     ) -> RegTile[Self.config.dtype, Self._Q_LAYOUT_T, MutUntrackedOrigin]:
         """Loads Q from gmem and (when `Self.prescale_q` is True) prescales
@@ -1330,13 +1328,15 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         output_dtype: DType,
         q_layout: TensorLayout,
         o_layout: TensorLayout,
+        q_engine: TensorEngine,
+        o_engine: TensorEngine,
         ragged: Bool = False,
         sink: Bool = False,
     ](
-        q: TileTensor[q_dtype, q_layout, ImmutAnyOrigin],
+        q: TileTensor[q_dtype, q_layout, ImmutAnyOrigin, Engine=q_engine],
         k: k_t,
         v: v_t,
-        o: TileTensor[output_dtype, o_layout, MutAnyOrigin],
+        o: TileTensor[output_dtype, o_layout, MutAnyOrigin, Engine=o_engine],
         mask_functor: mask_t,
         scale: Float32,
         num_keys: Int32,
@@ -1381,6 +1381,8 @@ struct MhaPrefillV2[config: MhaConfigV2]:
                 equal `config.output_dtype`.
             q_layout: Layout of the `q` TileTensor (inferred).
             o_layout: Layout of the `o` TileTensor (inferred).
+            q_engine: Engine of the `q` TileTensor (inferred).
+            o_engine: Engine of the `o` TileTensor (inferred).
             ragged: Whether `q` is a per-sequence slice in a packed
                 ragged batch (defaults to False).
             sink: Whether to seed the online softmax with
@@ -1428,7 +1430,9 @@ struct MhaPrefillV2[config: MhaConfigV2]:
             output_dtype == Self.config.output_dtype
         ), "MhaPrefillV2.run: `o.dtype` must equal `config.output_dtype`"
         var q_bf16 = rebind[
-            TileTensor[Self.config.dtype, q_layout, ImmutAnyOrigin]
+            TileTensor[
+                Self.config.dtype, q_layout, ImmutAnyOrigin, Engine=q_engine
+            ]
         ](q)
         # `seq_len` from the layout's runtime dim and `num_tiles` from
         # the runtime `_num_keys` arg are wave-uniform by construction.
@@ -2369,6 +2373,8 @@ struct MhaPrefillV2[config: MhaConfigV2]:
             output_dtype,
             type_of(q_tt).LayoutType,
             type_of(o_tt).LayoutType,
+            type_of(q_tt).Engine,
+            type_of(o_tt).Engine,
             ragged=True,
             sink=sink,
         ](
@@ -2608,6 +2614,8 @@ def mha_prefill_v2[
         o.dtype,
         q.LayoutType,
         o.LayoutType,
+        q.Engine,
+        o.Engine,
         ragged=False,
         sink=sink,
     ]

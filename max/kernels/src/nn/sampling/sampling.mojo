@@ -21,7 +21,7 @@ from max.algorithm.functional import elementwise
 from max.gpu import block_idx, thread_idx
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import is_gpu
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from nn._ragged_utils import get_batch_from_row_offsets
 
 from std.utils import IndexList
@@ -148,14 +148,25 @@ def update_frequency_data_kernel[
     NewTokensLayoutType: TensorLayout,
     token_type: DType,
     block_size: Int,
+    FreqDataEngine: TensorEngine,
+    FreqOffsetsEngine: TensorEngine,
+    NewTokensEngine: TensorEngine,
 ](
     compressed_frequency_data: TileTensor[
-        .int32, FreqDataLayoutType, freq_data_origin
+        .int32, FreqDataLayoutType, freq_data_origin, Engine=FreqDataEngine
     ],
     frequency_offsets: TileTensor[
-        .uint32, FreqOffsetsLayoutType, freq_offsets_origin
+        .uint32,
+        FreqOffsetsLayoutType,
+        freq_offsets_origin,
+        Engine=FreqOffsetsEngine,
     ],
-    new_tokens: TileTensor[token_type, NewTokensLayoutType, new_tokens_origin],
+    new_tokens: TileTensor[
+        token_type,
+        NewTokensLayoutType,
+        new_tokens_origin,
+        Engine=NewTokensEngine,
+    ],
 ):
     """
     GPU kernel to update token frequency data in CSR format.
@@ -176,6 +187,10 @@ def update_frequency_data_kernel[
         token_type: Element type of the `new_tokens` tensor.
         block_size: Number of threads per GPU block used to scan a sequence's
             frequency entries.
+        FreqDataEngine: Engine policy of the `compressed_frequency_data`
+            tensor.
+        FreqOffsetsEngine: Engine policy of the `frequency_offsets` tensor.
+        NewTokensEngine: Engine policy of the `new_tokens` tensor.
 
     Args:
         compressed_frequency_data: 2D CSR frequency data where column 0 is the
@@ -190,15 +205,19 @@ def update_frequency_data_kernel[
     comptime assert compressed_frequency_data.flat_rank == 2
     comptime assert new_tokens.flat_rank == 1
 
+    comptime assert FreqDataEngine.element_size == 1
+    comptime assert FreqOffsetsEngine.element_size == 1
+    comptime assert NewTokensEngine.element_size == 1
+
     comptime simd_width = simd_width_of[DType.int32]()
     comptime PADDING_TOKEN = -1
 
     var tid = thread_idx.x
     var batch_id = block_idx.x
 
-    var tok_start = Int(frequency_offsets[batch_id])
-    var tok_end = Int(frequency_offsets[batch_id + 1])
-    var new_token = new_tokens[batch_id].cast[.int32]()
+    var tok_start = Int(frequency_offsets.load[width=1](Coord(batch_id)))
+    var tok_end = Int(frequency_offsets.load[width=1](Coord(batch_id + 1)))
+    var new_token = new_tokens.load[width=1](Coord(batch_id)).cast[.int32]()
 
     var num_scans = ceildiv(tok_end - tok_start, block_size * simd_width)
 
@@ -210,7 +229,9 @@ def update_frequency_data_kernel[
 
         comptime for i in range(simd_width):
             if tok_idx + i < tok_end:
-                val[i] = compressed_frequency_data[tok_idx + i, 0]
+                val[i] = compressed_frequency_data.load[width=1](
+                    Coord(tok_idx + i, 0)
+                )[0]
             else:
                 val[i] = Int32.MAX_FINITE
 
@@ -238,7 +259,10 @@ def update_frequency_data_kernel[
         elif padding_token_idx != Int32.MAX_FINITE:
             # we don't find the target token, but we found a padding token
             if tid == 0:
-                compressed_frequency_data[Int(padding_token_idx), 0] = new_token
+                var tidx = Int(padding_token_idx)
+                compressed_frequency_data.store[width=1](
+                    Coord(tidx, 0), SIMD[new_token.dtype, 1](new_token)
+                )
                 compressed_frequency_data[Int(padding_token_idx), 1] = 1
             return
 
@@ -295,6 +319,9 @@ def update_frequency_data[
             NewTokensLayoutType=new_tokens.LayoutType,
             token_type=token_type,
             block_size=block_size,
+            FreqDataEngine=compressed_frequency_data.Engine,
+            FreqOffsetsEngine=frequency_offsets.Engine,
+            NewTokensEngine=new_tokens.Engine,
         ]
         dev_ctx.enqueue_function[kernel](
             compressed_frequency_data,
@@ -314,21 +341,36 @@ def update_frequency_data[
                 idx.rank == 1
             ), "update_frequency_data_fn: rank must be 1"
 
-            var tok_start = frequency_offsets[idx]
-            var tok_end = frequency_offsets[idx[0].value() + 1]
+            var tok_start = Int(frequency_offsets.load[width=1](idx)[0])
+            var tok_end = Int(
+                frequency_offsets.load[width=1](Coord(idx[0].value() + 1))[0]
+            )
 
-            var new_token = new_tokens[idx[0]][0].cast[.int32]()
+            var new_token = new_tokens.load[width=1](idx)[0].cast[.int32]()
 
             for tok_id in range(tok_start, tok_end):
-                if compressed_frequency_data[tok_id, 0] == new_token:
-                    compressed_frequency_data[tok_id, 1] += 1
+                var cur_tok = compressed_frequency_data.load[width=1](
+                    Coord(tok_id, 0)
+                )[0]
+                if cur_tok == new_token:
+                    var cur_count = compressed_frequency_data.load[width=1](
+                        Coord(tok_id, 1)
+                    )[0]
+                    compressed_frequency_data.store[width=1](
+                        Coord(tok_id, 1),
+                        SIMD[.int32, 1](Int32(cur_count) + 1),
+                    )
                     break
 
                 # if we encounter a padding token, add the new token to the
                 # occurrences tensor
-                elif compressed_frequency_data[tok_id, 0] == -1:
-                    compressed_frequency_data[tok_id, 0] = new_token
-                    compressed_frequency_data[tok_id, 1] = 1
+                elif cur_tok == Int32(-1):
+                    compressed_frequency_data.store[width=1](
+                        Coord(tok_id, 0), SIMD[.int32, 1](new_token)
+                    )
+                    compressed_frequency_data.store[width=1](
+                        Coord(tok_id, 1), SIMD[.int32, 1](Int32(1))
+                    )
                     break
 
         var dispatch_shape = Coord(new_tokens.num_elements())

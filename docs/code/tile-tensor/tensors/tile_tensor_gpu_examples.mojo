@@ -105,9 +105,9 @@ def tile_tensor_vectorized_example() raises:
     comptime rows = 64
     comptime columns = 64
     comptime layout = row_major[rows, columns]()
-    var storage = Array[Scalar[dtype], rows * columns](uninitialized=True)
-    for i in range(rows * columns):
-        storage[i] = Int32(i)
+    var storage = Array[Scalar[dtype], rows * columns](
+        fill_with=lambda (i: Int) -> Scalar[dtype]: Int32(i)
+    )
     var tensor = TileTensor(storage, layout)
     # start-vectorize-tensor-example
     var vectorized_tensor = tensor.vectorize[1, 4]()

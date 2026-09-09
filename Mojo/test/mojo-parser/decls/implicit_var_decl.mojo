@@ -382,3 +382,12 @@ def comprehension_target(items: List[Int]):
 
 def discard():
     _ = one()
+
+struct StructWithField(ImplicitlyCopyable):
+    # expected-note @+1 {{'f' declared here}}
+    var f: Int
+
+    def set_it(self):
+    # expected-error @+2 {{implicit declaration of 'f' is not allowed; add 'var' to declare a new name}}
+    # expected-note @+1 {{'f' is also a struct field; did you mean 'self.'?}}
+        f = 1

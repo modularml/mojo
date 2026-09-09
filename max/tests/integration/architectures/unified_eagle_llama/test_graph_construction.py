@@ -106,6 +106,17 @@ def test_graph_construction() -> None:
         assert len(outputs) == 3, f"Expected 3 outputs, got {len(outputs)}"
         graph.output(*outputs)
 
+    # Verify profile_scope labels and colors are present in the built IR.
+    asm = graph._mlir_op.get_asm(enable_debug_info=True)
+    for needle in (
+        'profile_scope<"target_forward"',
+        'profile_scope<"verify_and_sample"',
+        'profile_scope<"draft_forward"',
+        'profile_scope<"draft_step_0"',
+        'color = "orange"',
+    ):
+        assert needle in asm, f"missing profile scope marker: {needle}"
+
 
 def test_input_types_with_structured_output() -> None:
     """Test that input types include the bitmask triple when structured

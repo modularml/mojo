@@ -131,8 +131,9 @@ def mla_dispatch_args_scalar(
         is_fp8_kv,
         device_ctx,
     )
-    var result = Array[Int, 3](uninitialized=True)
-    result[0] = scalars[0]
-    result[1] = scalars[1]
-    result[2] = scalars[2]
+    var result: Array[Int, 3] = [
+        scalars[0],
+        scalars[1],
+        scalars[2],
+    ]
     return _make_int_list(result)

@@ -69,6 +69,14 @@ class KVCacheMetrics:
     """Cumulative NIXL READ transfer latency in milliseconds."""
     nixl_read_latency_count: int = 0
     """Number of NIXL READ transfer completions."""
+    nixl_read_latency_max_ms: float = 0.0
+    """Longest single dKV READ transfer in milliseconds.
+
+    The tail the total/count pair above cannot show, since that pair only ever
+    yields a mean. Combined across replicas by taking the max, not by adding.
+    The connector's ``ConnectorMetrics::read_transfer_latency_max_ms`` is the
+    canonical account of what the figure does and does not mean.
+    """
     nixl_write_latency_total_ms: float = 0.0
     """Cumulative NIXL WRITE transfer latency in milliseconds."""
     nixl_write_latency_count: int = 0
@@ -189,13 +197,16 @@ class KVCacheMetrics:
         )
 
     def __add__(self, other: Self) -> Self:
-        """Combine two KVCacheMetrics by summing their respective fields.
+        """Combines two KVCacheMetrics field by field.
+
+        Counters sum; ``nixl_read_latency_max_ms`` takes the max, since a peak
+        latency is a property of one transfer rather than a quantity to pool.
 
         Args:
             other: Another KVCacheMetrics instance to add.
 
         Returns:
-            A new KVCacheMetrics instance with summed values.
+            A new KVCacheMetrics instance with the combined values.
         """
         return type(self)(
             input_tokens=self.input_tokens + other.input_tokens,
@@ -218,6 +229,12 @@ class KVCacheMetrics:
             + other.nixl_read_latency_total_ms,
             nixl_read_latency_count=self.nixl_read_latency_count
             + other.nixl_read_latency_count,
+            # A max, not a sum: the slowest read across the replicas is still
+            # one read, and adding two replicas' peaks would invent a latency
+            # neither of them saw.
+            nixl_read_latency_max_ms=max(
+                self.nixl_read_latency_max_ms, other.nixl_read_latency_max_ms
+            ),
             nixl_write_latency_total_ms=self.nixl_write_latency_total_ms
             + other.nixl_write_latency_total_ms,
             nixl_write_latency_count=self.nixl_write_latency_count

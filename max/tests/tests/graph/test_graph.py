@@ -22,7 +22,15 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 from max import mlir
 from max.dtype import DType
-from max.graph import DeviceRef, Graph, TensorType, TensorValue, Weight, ops
+from max.graph import (
+    DeviceRef,
+    Graph,
+    ProfileScopeColor,
+    TensorType,
+    TensorValue,
+    Weight,
+    ops,
+)
 from max.graph.graph import _location
 from max.mlir.dialects import rmo
 
@@ -178,7 +186,7 @@ def test_profile_scope_color() -> None:
         dtype=DType.float32, shape=[4], device=DeviceRef.CPU()
     )
     with Graph("profile_scope_color", input_types=[input_type]) as graph:
-        with graph.profile_scope("outer", color="orange"):
+        with graph.profile_scope("outer", color=ProfileScopeColor.ORANGE):
             with graph.profile_scope("inner"):
                 y = ops.add(graph.inputs[0], graph.inputs[0])
         graph.output(y)

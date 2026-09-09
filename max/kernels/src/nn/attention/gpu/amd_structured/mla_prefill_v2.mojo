@@ -116,7 +116,7 @@ from std.sys import get_defined_bool, get_defined_int, size_of
 from std.sys.intrinsics import readfirstlane
 from std.utils import StaticTuple
 
-from layout import TensorLayout, TileTensor, DefaultEngine
+from layout import TensorEngine, TensorLayout, TileTensor
 from layout.coord import Coord, Idx
 from layout.tile_layout import row_major
 from layout._utils import make_amd_buffer_resource
@@ -417,9 +417,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
     def _load_q_lds_exact[
         layout: TensorLayout,
     ](
-        q_warp_2d: TileTensor[
-            Self.config.dtype, layout, Engine=DefaultEngine[], ...
-        ],
+        q_warp_2d: TileTensor[Self.config.dtype, layout, ...],
         q_lds: SMemTile[Self.config.dtype, _, MutUntrackedOrigin, ...],
         w_id: Int,
         scale_log2e: Float32,
@@ -574,6 +572,7 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         mask_t: MHAMask,
         out_dtype: DType,
         o_layout: TensorLayout,
+        o_engine: TensorEngine,
         //,
     ](
         mut q_reg: RegTile[
@@ -589,7 +588,9 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         v_ring: SMemTile[Self.config.dtype, _, MutUntrackedOrigin, ...],
         k_op: k_t,
         v_op: v_t,
-        o_warp_2d: TileTensor[out_dtype, o_layout, MutAnyOrigin],
+        o_warp_2d: TileTensor[
+            out_dtype, o_layout, MutAnyOrigin, Engine=o_engine
+        ],
         num_tiles: Int,
         max_num_tiles_local: Int,
         tile_idx: Int,
@@ -1774,13 +1775,15 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         output_dtype: DType,
         q_layout: TensorLayout,
         o_layout: TensorLayout,
+        q_engine: TensorEngine,
+        o_engine: TensorEngine,
         ragged: Bool = False,
     ](
-        q: TileTensor[q_dtype, q_layout, ImmutAnyOrigin],
+        q: TileTensor[q_dtype, q_layout, ImmutAnyOrigin, Engine=q_engine],
         k_nope_op: k_nope_t,
         k_rope_op: k_rope_t,
         v_op: v_t,
-        o: TileTensor[output_dtype, o_layout, MutAnyOrigin],
+        o: TileTensor[output_dtype, o_layout, MutAnyOrigin, Engine=o_engine],
         mask_functor: mask_t,
         scale: Float32,
         num_keys_dev: Int32,
@@ -1814,6 +1817,8 @@ struct MlaPrefillV2[config: MlaConfigV2]:
                 equal `config.output_dtype`.
             q_layout: Memory layout of the Q tile tensor.
             o_layout: Memory layout of the output tile tensor.
+            q_engine: Engine of the Q tile tensor.
+            o_engine: Engine of the output tile tensor.
             ragged: Whether the batch uses ragged variable-length
                 sequences (defaults to `False`).
 
@@ -1867,7 +1872,9 @@ struct MlaPrefillV2[config: MlaConfigV2]:
         _ = num_works
 
         var q_typed = rebind[
-            TileTensor[Self.config.dtype, q_layout, ImmutAnyOrigin]
+            TileTensor[
+                Self.config.dtype, q_layout, ImmutAnyOrigin, Engine=q_engine
+            ]
         ](q)
 
         var seq_len = Int(readfirstlane(Int32(q.dim[1]())))
@@ -2201,6 +2208,8 @@ struct MlaPrefillV2[config: MlaConfigV2]:
             output_dtype,
             type_of(q_tt).LayoutType,
             type_of(o_tt).LayoutType,
+            type_of(q_tt).Engine,
+            type_of(o_tt).Engine,
             ragged=True,
         ](
             q_tt,

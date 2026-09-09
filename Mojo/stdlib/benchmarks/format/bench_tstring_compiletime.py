@@ -94,6 +94,7 @@ def run_timed_build(
                 "build",
                 "--emit=object",
                 "--mlir-timing",
+                "--llvm-timing",
                 str(source_path),
                 "-o",
                 str(object_path),
@@ -121,6 +122,9 @@ def report_binary_size(object_path: Path) -> None:
             " PATH)"
         )
         return
+    # The tool writes straight to the shared stdout fd instead of going
+    # through Python's buffer, so drain ours first to keep the order.
+    sys.stdout.flush()
     subprocess.run([tool, str(object_path)], check=False)
     print(f"object file size on disk: {object_path.stat().st_size:,} bytes")
 
@@ -137,11 +141,6 @@ def main() -> int:
         help="number of distinct t-string literals to generate (default: 1000)",
     )
     args = parser.parse_args()
-
-    # Line-buffer so our prints interleave correctly with the llvm-size
-    # subprocess, which writes straight to the shared stdout fd instead of
-    # going through Python's buffer.
-    sys.stdout.reconfigure(line_buffering=True)
 
     mojo_bin = _find_mojo()
 

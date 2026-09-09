@@ -61,7 +61,14 @@ from std.utils.index import Index
 from std.utils.numerics import get_accum_type
 
 
-from layout import UNKNOWN_VALUE, Idx, Layout, LayoutTensor, TileTensor
+from layout import (
+    UNKNOWN_VALUE,
+    Idx,
+    Layout,
+    LayoutTensor,
+    TensorEngine,
+    TileTensor,
+)
 from layout.coord import Coord
 from layout.tile_layout import (
     Layout as TileLayout,
@@ -304,6 +311,10 @@ def fa_prefill_apple_core[
     output_layout: TensorLayout,
     valid_length_layout: TensorLayout,
     sink_layout: TensorLayout,
+    output_engine: TensorEngine,
+    q_engine: TensorEngine,
+    valid_length_engine: TensorEngine,
+    sink_engine: TensorEngine,
     ragged: Bool = False,
     sink: Bool = False,
     _use_valid_length: Bool = False,
@@ -313,13 +324,19 @@ def fa_prefill_apple_core[
     NumNMmas: Int,
     NumSimdgroups: Int = 1,
 ](
-    output: TileTensor[output_type, output_layout, MutAnyOrigin],
-    q: TileTensor[q_type, q_layout, ImmutAnyOrigin],
+    output: TileTensor[
+        output_type, output_layout, MutAnyOrigin, Engine=output_engine
+    ],
+    q: TileTensor[q_type, q_layout, ImmutAnyOrigin, Engine=q_engine],
     k: k_t,
     v: v_t,
     mask_functor: mask_t,
-    valid_length: TileTensor[.uint32, valid_length_layout, ImmutAnyOrigin],
-    sink_weights: OptionalReg[TileTensor[q_type, sink_layout, ImmutAnyOrigin]],
+    valid_length: TileTensor[
+        .uint32, valid_length_layout, ImmutAnyOrigin, Engine=valid_length_engine
+    ],
+    sink_weights: OptionalReg[
+        TileTensor[q_type, sink_layout, ImmutAnyOrigin, Engine=sink_engine]
+    ],
     scale: Float32,
     batch_size: Int32,
     max_prompt_len: Int32,
@@ -355,6 +372,11 @@ def fa_prefill_apple_core[
         valid_length_layout: The `TensorLayout` of the flattened
             `valid_length` `TileTensor`.
         sink_layout: The `TensorLayout` of the sink weights `TileTensor`.
+        output_engine: The `TensorEngine` of the `output` `TileTensor`.
+        q_engine: The `TensorEngine` of the `q` `TileTensor`.
+        valid_length_engine: The `TensorEngine` of the `valid_length`
+            `TileTensor`.
+        sink_engine: The `TensorEngine` of the sink weights `TileTensor`.
         ragged: If True, `valid_length` is a cumulative offset buffer
             over variable-length sequences in the batch (defaults to
             False).
@@ -1012,6 +1034,10 @@ def fa_prefill_apple[
                     type_of(output_flat).LayoutType,
                     type_of(valid_length_flat).LayoutType,
                     type_of(sink_layout_val),
+                    type_of(output_flat).Engine,
+                    type_of(q_flat).Engine,
+                    type_of(valid_length_flat).Engine,
+                    SinkTile.Engine,
                     ragged=ragged,
                     sink=sink,
                     _use_valid_length=_use_valid_length,

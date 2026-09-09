@@ -90,6 +90,18 @@ modular_py_binary(
     target_compatible_with = _TARGET_COMPATIBLE_WITH,
 )
 
+modular_py_binary(
+    name = "format/bench_tstring_compiletime.py.bench",
+    srcs = ["format/bench_tstring_compiletime.py"],
+    main = "format/bench_tstring_compiletime.py",
+    mojo_deps = ["@mojo//:std"],
+    tags = [
+        "manual",
+        "stdlib-benchmark",
+    ],
+    target_compatible_with = _TARGET_COMPATIBLE_WITH,
+)
+
 # Named entry point for running every benchmark in full measurement mode. The
 # test_suite itself is `manual` so it is not swept in by `//...`, but
 # referring to it explicitly expands to every `.bench`.

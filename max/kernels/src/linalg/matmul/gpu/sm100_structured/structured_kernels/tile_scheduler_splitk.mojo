@@ -20,7 +20,15 @@ synchronization across CTAs that contribute to the same output tile.
 from .tile_scheduler import TileScheduler as B200TileScheduler
 from .tile_scheduler import WorkInfo as B200WorkInfo
 from linalg.matmul.gpu.tile_scheduler import RasterOrder
-from layout import Coord, Idx, Layout, TensorLayout, TileTensor, row_major
+from layout import (
+    Coord,
+    Idx,
+    Layout,
+    TensorEngine,
+    TensorLayout,
+    TileTensor,
+    row_major,
+)
 from std.math import align_up, ceildiv
 from layout.tma_async import SharedMemBarrier, PipelineState
 from std.utils.static_tuple import StaticTuple
@@ -580,19 +588,29 @@ struct TileScheduler[
 
     @always_inline
     def _get_workspace_tile[
-        accum_type: DType, workspace_layout: TensorLayout
+        accum_type: DType,
+        workspace_layout: TensorLayout,
+        workspace_engine: TensorEngine,
     ](
         self,
         reduction_workspace: TileTensor[
-            accum_type, workspace_layout, MutAnyOrigin
+            accum_type,
+            workspace_layout,
+            MutAnyOrigin,
+            Engine=workspace_engine,
         ],
         reduction_tile_idx: UInt32,
-    ) -> TileTensor[accum_type, Self.WorkspaceTileLayout, MutAnyOrigin]:
+    ) -> TileTensor[
+        accum_type,
+        Self.WorkspaceTileLayout,
+        MutAnyOrigin,
+        Engine=workspace_engine.OffsetResultType[TypeList.of[Int]()],
+    ]:
         var offset = reduction_tile_idx * UInt32(Self.BM) * UInt32(Self.MMA_N)
-        return TileTensor[accum_type, Self.WorkspaceTileLayout, MutAnyOrigin](
-            reduction_workspace._storage + Int(offset),
+        return {
+            reduction_workspace._offset_storage(Int(offset)),
             row_major[Self.BM, Self.MMA_N](),
-        )
+        }
 
     @always_inline
     @staticmethod
@@ -624,12 +642,15 @@ struct TileScheduler[
     def _to_next_subtile[
         accum_type: DType,
         tile_layout: TensorLayout,
+        tile_engine: TensorEngine,
         /,
         *,
         widths: Array[Int, 4],
         curr_stage: Int,
     ](
-        tensor: TileTensor[accum_type, tile_layout, MutAnyOrigin],
+        tensor: TileTensor[
+            accum_type, tile_layout, MutAnyOrigin, Engine=tile_engine
+        ],
     ) -> TileTensor[
         accum_type,
         # Shape narrows to [height, stage_width], but stride is preserved
@@ -641,6 +662,7 @@ struct TileScheduler[
             tile_layout.static_stride[0],
         ],
         MutAnyOrigin,
+        Engine=tile_engine.OffsetResultType[TypeList.of[Int]()],
     ]:
         @__parameter
         def _get_current_width(widths: Array[Int, 4], curr_stage: Int) -> Int:
@@ -651,27 +673,20 @@ struct TileScheduler[
 
         comptime current_width = _get_current_width(widths, curr_stage)
 
-        return TileTensor[
-            accum_type,
-            _StridedLayout[
-                tile_layout.static_shape[0],
-                widths[curr_stage],
-                tile_layout.static_stride[0],
-            ],
-            MutAnyOrigin,
-        ](
-            tensor._storage + current_width,
+        return {
+            tensor._offset_storage(current_width),
             _strided_layout[
                 tile_layout.static_shape[0],
                 widths[curr_stage],
                 tile_layout.static_stride[0],
             ](),
-        )
+        }
 
     @always_inline
     def store_to_workspace[
         accum_type: DType,
         workspace_layout: TensorLayout,
+        workspace_engine: TensorEngine,
         /,
         *,
         do_reduction: Bool = False,
@@ -680,7 +695,10 @@ struct TileScheduler[
         self,
         tmem: TmemAddress,
         reduction_workspace: TileTensor[
-            accum_type, workspace_layout, MutAnyOrigin
+            accum_type,
+            workspace_layout,
+            MutAnyOrigin,
+            Engine=workspace_engine,
         ],
         epilogue_thread_idx: Int,
         reduction_tile_idx: UInt32,
@@ -788,10 +806,14 @@ struct TileScheduler[
     def reduction[
         accum_type: DType,
         workspace_layout: TensorLayout,
+        workspace_engine: TensorEngine,
     ](
         self,
         reduction_workspace: TileTensor[
-            accum_type, workspace_layout, MutAnyOrigin
+            accum_type,
+            workspace_layout,
+            MutAnyOrigin,
+            Engine=workspace_engine,
         ],
         tmem: TmemAddress,
         epilogue_thread_idx: Int,

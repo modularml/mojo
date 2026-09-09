@@ -310,8 +310,11 @@ def TopKTopPMaskedProbsClusterKernel[
     LogitsLayoutType: TensorLayout,
     logits_origin: ImmOrigin,
     cluster_size: Int,
+    LogitsEngine: TensorEngine,
 ](
-    logits: TileTensor[dtype, LogitsLayoutType, logits_origin],
+    logits: TileTensor[
+        dtype, LogitsLayoutType, logits_origin, Engine=LogitsEngine
+    ],
     probs_ptr: UnsafePointer[Float32, MutAnyOrigin],
     top_k_arr: Optional[UnsafePointer[Int64, ImmutAnyOrigin]],
     top_k_val: Int32,
@@ -509,6 +512,9 @@ def topk_topp_masked_probs_cluster[
         shape_types=Coord[Int64, Int64].element_types,
         stride_types=Coord[Int64, ComptimeInt[1]].element_types,
     ],
+    TopKArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPArrEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     ctx: DeviceContext,
     logits: TileTensor[mut=False, dtype, ...],
@@ -516,13 +522,22 @@ def topk_topp_masked_probs_cluster[
     top_k_val: Int,
     top_p_val: Float32 = 1.0,
     top_k_arr: Optional[
-        TileTensor[.int64, TopKArrLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .int64, TopKArrLayoutType, ImmutAnyOrigin, Engine=TopKArrEngine
+        ]
     ] = None,
     top_p_arr: Optional[
-        TileTensor[.float32, TopPArrLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32, TopPArrLayoutType, ImmutAnyOrigin, Engine=TopPArrEngine
+        ]
     ] = None,
     temperature: Optional[
-        TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TemperatureLayoutType,
+            ImmutAnyOrigin,
+            Engine=TemperatureEngine,
+        ]
     ] = None,
 ) raises:
     """Computes per-row top-k/top-p masked softmax on a cluster device.
@@ -539,6 +554,9 @@ def topk_topp_masked_probs_cluster[
         TopPArrLayoutType: Memory layout of `top_p_arr`.
         TemperatureLayoutType: Memory layout of `temperature`.
         ProbsLayoutType: Memory layout of `probs`.
+        TopKArrEngine: Engine policy of `top_k_arr`.
+        TopPArrEngine: Engine policy of `top_p_arr`.
+        TemperatureEngine: Engine policy of `temperature`.
 
     Args:
         ctx: Device context.
@@ -621,6 +639,7 @@ def topk_topp_masked_probs_cluster[
                 logits.LayoutType,
                 ImmOrigin(logits.origin),
                 cluster_size,
+                LogitsEngine=logits.Engine,
             ]
             var smem_bytes = _stage_smem_bytes(d, vec_size, cluster_size)
             ctx.enqueue_function[kernel](

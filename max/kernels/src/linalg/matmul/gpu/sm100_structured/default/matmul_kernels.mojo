@@ -65,6 +65,7 @@ from layout import (
     Idx,
     Layout,
     RowMajorLayout,
+    TensorEngine,
     TensorLayout,
     TileTensor,
     coord,
@@ -2222,12 +2223,16 @@ struct BlackwellMatmulSM100Kernel[
     )
     def run_splitk[
         reduction_layout: TensorLayout,
+        reduction_engine: TensorEngine,
     ](
         a_tma_op: Self.ATmaOp_splitk,
         b_tma_op: Self.BTmaOp_splitk,
         c_tma_op: Self.CTmaOp_splitk,
         reduction_tensor: TileTensor[
-            Self.config.accum_type, reduction_layout, MutAnyOrigin
+            Self.config.accum_type,
+            reduction_layout,
+            MutAnyOrigin,
+            Engine=reduction_engine,
         ],
         lock_ptr: UnsafePointer[UInt8, AnyOrigin[mut=True]],
         cluster_dim: StaticTuple[Int32, 3],
@@ -2242,6 +2247,7 @@ struct BlackwellMatmulSM100Kernel[
         Parameters:
             reduction_layout: Memory layout of the reduction workspace tensor,
                 must match the layout of `reduction_tensor`.
+            reduction_engine: Engine of the reduction workspace tensor.
 
         Args:
             a_tma_op: TMA descriptor for matrix A.
@@ -2506,6 +2512,7 @@ struct BlackwellMatmulSM100FallbackKernel[
     b_type: DType,
     c_type: DType,
     c_layout: TensorLayout,
+    c_engine: TensorEngine,
     block_tile_shape: IndexList[3],
     mma_shape: IndexList[3],
     transpose_b: Bool = True,
@@ -2532,6 +2539,7 @@ struct BlackwellMatmulSM100FallbackKernel[
         c_type: Element type of the C output matrix.
         c_layout: Memory layout of the C output tensor in global memory, used
             for output tiling and static stride computation.
+        c_engine: Engine of the C output tensor in global memory.
         block_tile_shape: Block tile dimensions `(BM, BN, BK)` for
             CTA-level tiling of the output and reduction dimensions.
         mma_shape: MMA instruction dimensions `(MMA_M, MMA_N, MMA_K)` for
@@ -2626,7 +2634,9 @@ struct BlackwellMatmulSM100FallbackKernel[
     def run(
         a_tma_op: Self.ATmaOp,
         b_tma_op: Self.BTmaOp,
-        c: TileTensor[Self.c_type, Self.c_layout, MutAnyOrigin],
+        c: TileTensor[
+            Self.c_type, Self.c_layout, MutAnyOrigin, Engine=Self.c_engine
+        ],
         num_iters: Int32,
     ):
         """Run the fallback matmul kernel.

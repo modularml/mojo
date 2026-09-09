@@ -44,18 +44,6 @@ def match_missing_cases(x: Int):
     case foo(): # expected-error {{use of unknown declaration 'foo'}}
         pass
 
-
-def match_bare_identifier(x: Int, y: Int):
-    __match x:
-    # Bare names are reserved for a future implicit-binding syntax; they are
-    # not "match against the existing value named y".
-    # expected-error @below {{bare identifier 'y' is not a valid match pattern; use 'var y' or 'ref y' to bind a name}}
-    case y:
-        pass
-    case _:
-        pass
-
-
 # expected-error @+1 {{'__match' must be contained in a function}}
 __match 1:
     case 0:
@@ -95,14 +83,6 @@ def various_match_issues(a: Int, point: Tuple[Int, Int], value: String):
     case _:
         pass
 
-    # Use of a name without var/ref should be an error (for now).
-    __match value:
-    # expected-error @+1 {{bare identifier 'x' is not a valid match pattern; use 'var x' or 'ref x' to bind a name}}
-    case x:
-        pass
-    case _:
-        pass
-
     __match a:
     # expected-error @+1 {{expected a name after 'as'}}
     case 0 as 1:
@@ -125,6 +105,59 @@ def various_match_issues(a: Int, point: Tuple[Int, Int], value: String):
     __match a:
     # expected-error @+1 {{expected a tuple type to match against, got 'Int'}}
     case 0 | (1, 2):
+        pass
+    case _:
+        pass
+
+
+def match_or_pattern_binding_diags(var point: Tuple[Int, Int],
+                                   mixed: Tuple[Int, String]):
+    # Binding only on the left alternative.
+    __match point:
+    # expected-error @+1 {{or-pattern alternatives must bind the same names; 'x' is bound in one alternative but not the other}}
+    case (0, var x) | (1, 2):
+        pass
+    case _:
+        pass
+
+    # Binding only on the right alternative.
+    __match point:
+    # expected-error @+1 {{or-pattern alternatives must bind the same names; 'x' is bound in one alternative but not the other}}
+    case (0, 1) | (var x, 2):
+        pass
+    case _:
+        pass
+
+    # Same name, but `var` vs `ref`.
+    __match point:
+    # expected-error @+1 {{or-pattern binding 'x' must use the same 'var'/'ref' kind in each alternative}}
+    case (0, var x) | (ref x, 1):
+        pass
+    case _:
+        pass
+
+    # Different binding names across alternatives.
+    __match point:
+    # expected-error @+1 {{or-pattern alternatives must bind the same names; 'x' is bound in one alternative but not the other}}
+    case (var x, 0) | (var y, 1):
+        pass
+    case _:
+        pass
+
+    # Different number of bindings. Leading literals keep both arms live so
+    # the or does not constant-fold away the RHS.
+    __match point:
+    # expected-error @+1 {{or-pattern alternatives must bind the same names}}
+    case (0, var x) | (var x, var y):
+        pass
+    case _:
+        pass
+
+    # Same name and kind, but incompatible types (String vs Int).
+    __match mixed:
+    # expected-error @+2 {{or-pattern binding 'x' has incompatible types across alternatives}}
+    # expected-note @+1 {{left alternative has type 'String', right has type 'Int'}}
+    case (0, var x) | (var x, _):
         pass
     case _:
         pass
@@ -172,4 +205,51 @@ def match_struct_pattern_diags(v: Vec3):
     case Vec3(0, 0, 0, 0):
         pass
     case _:
+        pass
+
+
+def match_enum_pattern_diags(opt: Optional[Int], someEnum: Some[EnumLike]):
+    # No-payload cases must be written without parentheses.
+    __match opt:
+    # expected-error @+1 {{enum case 'None' has no associated value}}
+    case Optional.None():
+        pass
+    case _:
+        pass
+
+    # Cannot destructure a case whose payload is NoneType.
+    __match opt:
+    # expected-error @+1 {{enum case 'None' has no associated value}}
+    case Optional.None(value):
+        pass
+    case _:
+        pass
+
+    # Payload cases require a subpattern inside the parentheses.
+    __match opt:
+    # expected-error @+1 {{enum case 'Some' requires a payload pattern inside the parentheses}}
+    case Optional.Some():
+        pass
+    case _:
+        pass
+
+    # Unknown case name (attribute form).
+    __match opt:
+    # expected-error @+1 {{'Nope' is not a case of 'Optional[Int]'}}
+    case Optional.Nope:
+        pass
+    case _:
+        pass
+
+    # Unknown case name (call form).
+    __match opt:
+    # expected-error @+1 {{'Nope' is not a case of 'Optional[Int]'}}
+    case Optional.Nope(ref x):
+        pass
+    case _:
+        pass
+
+    # Can only pattern match on concrete types.
+    __match someEnum:
+    case .What: # expected-error {{cannot match on a parametric enum type}}
         pass

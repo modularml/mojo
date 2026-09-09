@@ -143,6 +143,31 @@ bool KGEN::isParameterizedType(Type type) {
 
 ParameterEvaluationContext::~ParameterEvaluationContext() {}
 
+/// The depth is a property of one call stack, not of the context; a single
+/// context is shared by parallel workers.
+static size_t &getFunctionInterpretationDepthStorage() {
+  static thread_local size_t depth = 0;
+  return depth;
+}
+
+size_t ParameterEvaluationContext::getFunctionInterpretationDepth() const {
+  return getFunctionInterpretationDepthStorage();
+}
+
+ParameterEvaluationContext::FunctionInterpretationFrame::
+    FunctionInterpretationFrame(ParameterEvaluationContext &context)
+    : entered(context.getFunctionInterpretationDepth() <
+              kMaxFunctionInterpretationDepth) {
+  if (entered)
+    ++getFunctionInterpretationDepthStorage();
+}
+
+ParameterEvaluationContext::FunctionInterpretationFrame::
+    ~FunctionInterpretationFrame() {
+  if (entered)
+    --getFunctionInterpretationDepthStorage();
+}
+
 FailureOr<TypedAttr> ParameterEvaluationContext::evaluateContextSpecific(
     ContextuallyEvaluatedAttrInterface /*attr*/) {
   // Default implementation - no context-specific handling.
@@ -235,6 +260,34 @@ FailureOr<TypedAttr> SymTabEvaluationContext::evaluateContextSpecific(
   return failure();
 }
 
+// A marked generator can reach an apply of itself, so expanding its inlined
+// form terminates only once the `cond` guarding its base case folds, and that
+// fold needs concrete parameters. While a parameter stays symbolic - as it is
+// when rewriting the generator's own body - each level expands into
+// `f[n - 1]`, `f[n - 2]`, ...: distinct applies that no cycle check catches,
+// growing the parameter expression until the walk overflows the stack.
+//
+// An unmarked generator cannot reach itself, so its expansion descends an
+// acyclic call graph and bottoms out on its own.
+bool KGEN::canExpandInlinedForm(GeneratorOp generator,
+                                ArrayRef<TypedAttr> paramValues) {
+  if (!generator->hasAttr(kRecursiveInlinedFormAttrName))
+    return true;
+
+  // Only the parameters are inspected below, so an argument-taking generator
+  // cannot be judged here: its arguments are bound from the apply's operands,
+  // which would have to be constant too. `ApplyInliner` only marks
+  // argument-less generators.
+  if (generator.getFunctionType().getNumInputs() != 0)
+    return false;
+
+  // No parameters at all leaves nothing to distinguish one level from the
+  // next, so the recursion has no way to reach its base case.
+  return !paramValues.empty() && llvm::all_of(paramValues, [](TypedAttr value) {
+    return ParameterAttr::isSimpleConstant(value);
+  });
+}
+
 FailureOr<TypedAttr>
 SymTabEvaluationContext::inlineApply(ParamOperatorAttr apply) {
   // if there is any generator that is marked to have an inlined form, we inline
@@ -255,6 +308,13 @@ SymTabEvaluationContext::inlineApply(ParamOperatorAttr apply) {
   //"always_inline("builtin")" (e.g., via trait method) function.
   if (auto func = dyn_cast_or_null<GeneratorOp>(op);
       func && func.getInlinedFormAttr()) {
+    if (!canExpandInlinedForm(func, cst.getParamValues()))
+      return failure();
+
+    FunctionInterpretationFrame frame(*this);
+    if (!frame)
+      return failure();
+
     TypedAttr inlinedExpr = func.getInlinedFormAttr();
     // Drop the symbol to get the parameter binding;
     ArrayRef<TypedAttr> paramBinding = apply.getOperands().drop_front();

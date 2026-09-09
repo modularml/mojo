@@ -152,11 +152,99 @@ std::optional<FunctionTrait> FunctionTrait::identify(GeneratorOp func) {
   return {};
 }
 
+/// The generators whose bodies can reach an apply of themselves, directly or
+/// around a cycle of other generators.
+static DenseSet<StringAttr>
+findRecursiveGenerators(const DenseMap<StringAttr, FunctionTrait> &traits) {
+  DenseMap<StringAttr, SmallVector<StringAttr>> callees;
+  for (const auto &[name, trait] : traits) {
+    if (!isa<FunctionTrait::RegConstant>(trait.impl))
+      continue;
+    mlir::AttrTypeWalker walker;
+    walker.addWalk([&, name = name](ParamOperatorAttr op) {
+      // Only applies are considered for inlining
+      if (op.getOpcode() != POC::Apply &&
+          op.getOpcode() != POC::ApplyResultSlot)
+        return;
+      auto cst = dyn_cast<SymbolConstantAttr>(op.getOperand(0));
+      // Skip non-constant symbols; we don't follow those during inlining
+      if (!cst)
+        return;
+      StringAttr callee = cst.getSymbol().getLeafReference();
+      if (traits.contains(callee))
+        callees[name].push_back(callee);
+    });
+    walker.walk(cast<FunctionTrait::RegConstant>(trait.impl).value);
+  }
+
+  auto succsOf = [&callees](StringAttr node) -> ArrayRef<StringAttr> {
+    auto it = callees.find(node);
+    return it == callees.end() ? ArrayRef<StringAttr>() : it->second;
+  };
+
+  // A generator is recursive when it shares a component with another or applies
+  // itself directly.
+  DenseSet<StringAttr> recursive;
+  DenseMap<StringAttr, unsigned> index, lowlink;
+  DenseSet<StringAttr> onStack;
+  SmallVector<StringAttr> stack;
+  SmallVector<std::pair<StringAttr, unsigned>> worklist;
+  unsigned nextIndex = 0;
+
+  for (const auto &[root, unused] : traits) {
+    if (index.contains(root))
+      continue;
+    worklist.push_back({root, 0});
+    while (!worklist.empty()) {
+      StringAttr node = worklist.back().first;
+      if (worklist.back().second == 0) {
+        index[node] = lowlink[node] = nextIndex++;
+        stack.push_back(node);
+        onStack.insert(node);
+      }
+      ArrayRef<StringAttr> succs = succsOf(node);
+      if (worklist.back().second < succs.size()) {
+        StringAttr next = succs[worklist.back().second++];
+        if (!index.contains(next))
+          worklist.push_back({next, 0});
+        else if (onStack.contains(next))
+          lowlink[node] = std::min(lowlink[node], index[next]);
+        continue;
+      }
+
+      if (lowlink[node] == index[node]) {
+        SmallVector<StringAttr> component;
+        StringAttr member;
+        do {
+          member = stack.pop_back_val();
+          onStack.erase(member);
+          component.push_back(member);
+        } while (member != node);
+        if (component.size() > 1 || llvm::is_contained(succs, node))
+          recursive.insert(component.begin(), component.end());
+      }
+      worklist.pop_back();
+      if (!worklist.empty()) {
+        StringAttr parent = worklist.back().first;
+        lowlink[parent] = std::min(lowlink[parent], lowlink[node]);
+      }
+    }
+  }
+  return recursive;
+}
+
 void ApplyInlinerPass::runOnOperation() {
   DenseMap<StringAttr, FunctionTrait> funcTraits;
   for (auto func : getOperation().getOps<GeneratorOp>())
     if (std::optional<FunctionTrait> trait = FunctionTrait::identify(func))
       funcTraits.try_emplace(func.getSymNameAttr(), std::move(*trait));
+
+  DenseSet<StringAttr> recursiveGenerators =
+      findRecursiveGenerators(funcTraits);
+  for (StringAttr name : recursiveGenerators) {
+    funcTraits.find(name)->second.generatorOp->setAttr(
+        kRecursiveInlinedFormAttrName, mlir::UnitAttr::get(&getContext()));
+  }
 
   mlir::SymbolTableAnalysis symTabAnalysis(getOperation());
   mlir::LockedSymbolTableCollection symtabs(symTabAnalysis.getSymbolTables());
@@ -201,6 +289,10 @@ void ApplyInlinerPass::runOnOperation() {
     assert(func.getFunctionType().getNumInputs() == 0);
     auto regCst = cast<FunctionTrait::RegConstant>(trait.impl);
     func.setInlinedFormAttr(cast<TypedAttr>(regCst.value));
+
+    if (!canExpandInlinedForm(func, cst.getParamValues()))
+      return apply;
+
     ParameterEvaluator evaluator(func.getInputParams(), cst.getParamValues());
     evaluator.setEvaluationContext(&context);
 

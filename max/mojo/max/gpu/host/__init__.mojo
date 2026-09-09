@@ -12,6 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the gpu host package."""
 
+
+@__doc_inline
 from std._gpu.host import get_gpu_target
 
 from .constant_memory_mapping import ConstantMemoryMapping

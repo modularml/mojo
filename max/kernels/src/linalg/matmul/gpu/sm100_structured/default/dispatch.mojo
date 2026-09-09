@@ -1304,6 +1304,9 @@ def _vendor_blas_matmul_sm100[
                 BLOCK_DIM,
                 transpose_b,
                 elementwise_lambda_fn=elementwise_lambda_wrapper,
+                c_engine=type_of(c).Engine,
+                a_engine=type_of(a).Engine,
+                b_engine=type_of(b).Engine,
             ]
 
             ctx.enqueue_function[kernel](

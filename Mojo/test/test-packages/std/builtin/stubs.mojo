@@ -11,12 +11,6 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# FIXME: "string" and "float" are not part of the standard library - they are
-# ancient relics of Mojo bringup. These should be removed from stubs.mojo and
-# the dependent tests should be migrated off of them.
-comptime string = __mlir_type.`!kgen.string`
-comptime float = __mlir_type.`!kgen.scalar<f64>`
-
 
 struct _MLIR:
     comptime KGENTypeType = __mlir_type.`!kgen.type`
@@ -529,7 +523,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
 
     @implicit
     def __init__(out self: StaticString, lit: StringLiteral):
-        pass
+        self._slice = {}
 
     @always_inline
     def __init__(out self: StaticString, _kgen: __mlir_type.`!kgen.string`):
@@ -836,10 +830,6 @@ struct Dict[K: Copyable & Deinitable, V: Copyable & Deinitable]:
 # ===----------------------------------------------------------------------=== #
 
 
-# A linear type, see
-# https://www.notion.so/modularai/Linear-Types-14a1044d37bb809ab074c990fe1a84e3.
-
-
 @stable
 trait AnyType:
     pass
@@ -899,6 +889,34 @@ trait Deinitable:
     comptime __del__is_trivial: Bool
 
 
+# ===----------------------------------------------------------------------=== #
+# Pattern matching support
+# ===----------------------------------------------------------------------=== #
+
+comptime KGENString = __mlir_type.`!kgen.string`
+
+
+trait EnumLike:
+    comptime _enum_case_length: Int
+    comptime _enum_case_names: _MLIR.KGENParamListType[KGENString]
+    comptime _enum_case_types: _MLIR.KGENParamListType[AnyType]
+
+    comptime _enum_elt_type_for_case[id: Int]: AnyType = TypeList[
+        Self._enum_case_types
+    ]()[id]
+
+    def _get_enum_discriminant(self) -> Int:
+        ...
+
+    # FIXME: Use an interior origin.
+    # Return type uses TypeList directly (not `_enum_elt_type_for_case`) to
+    # avoid a recursive alias cycle when specializing this method.
+    def _unsafe_get_enum_payload[
+        id: Int
+    ](ref self) -> ref[self] TypeList[Self._enum_case_types]()[id]:
+        ...
+
+
 # ===-----------------------------------------------------------------------===#
 # ParameterList
 # ===-----------------------------------------------------------------------===#
@@ -916,6 +934,10 @@ struct ParameterList[type: AnyType, //, values: _MLIR.KGENParamListType[type]](
             `> : index`,
         ]
     )
+
+    comptime of[type: AnyType, //, *values: type] = ParameterList[
+        type=type, values.values
+    ]
 
     def __init__(out self):
         pass
@@ -1617,7 +1639,7 @@ def paramfor_next_value[
         abort()
 
 
-struct Optional[T: Movable](Copyable):
+struct Optional[T: Movable](Copyable, EnumLike):
     def __deinit__(deinit self):
         pass
 
@@ -1641,6 +1663,25 @@ struct Optional[T: Movable](Copyable):
     def value(ref self) -> ref[self] Self.T:
         while True:
             pass
+
+    # Enable pattern matching on Optional.
+    comptime _enum_case_length = 2
+    comptime _enum_case_names = ParameterList.of[
+        "None".value, "Some".value
+    ].values
+    comptime _enum_case_types: _MLIR.KGENParamListType[AnyType] = TypeList.of[
+        NoneType, Self.T
+    ].values
+
+    def _get_enum_discriminant(self) -> Int:
+        return 0
+
+    def _unsafe_get_enum_payload[
+        id: Int
+    ](ref self) -> ref[self] TypeList[Self._enum_case_types]()[id]:
+        comptime assert id != 0, "cannot get payload for None case"
+        comptime elt_type = TypeList[Self._enum_case_types]()[id]
+        return rebind[elt_type](self.value())
 
 
 # ===-----------------------------------------------------------------------===#

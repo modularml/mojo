@@ -464,6 +464,22 @@ the [container](/container) page now links to the new page.
   now resolve on this path, folded into the handshake's `kv_config_hash`. A
   single-tenant node spanning more than one GPU must set the dKV server's
   `--fair-share-partitions` to its GPU count.
+- The dKV external KV-cache connector now requires a NIXL transport
+  (`MODULAR_NIXL_TRANSFER_BACKEND`, one of `ucx`, `libfabric`, or `uccl`) and
+  fails model load when it is unset, empty, or `auto`. dKV's auto-selection
+  mode is removed: it activated the first discovered transport plugin, which
+  is plugin-name order, so it resolved to libfabric on every host — including
+  InfiniBand hosts, where UCX is the correct transport and the resulting
+  configuration silently underperformed or failed at transfer time. Inferring
+  the transport from what a host happens to have staged is not fixable by
+  reordering, so the mode is gone rather than corrected. Every deployment that
+  runs the dKV connector already sets the variable and is unaffected; a local
+  or test run that relied on the default must now name a transport. The dKV
+  server's `--memxfer-backend` / `DKV_MEMXFER_BACKEND` became required for the
+  same reason, and it too rejects `auto`. The failure mode differs by engine:
+  MAX refuses to load the model, while mach logs the failure and serves on
+  without the external KV tier, because a failed dKV bring-up is non-fatal
+  there.
 - The dKV external KV-cache connector now waits out a busy node instead of
   failing model load on it. dKV refuses a handshake when it has no room for
   another share, which is a transient condition that clears once a departing
@@ -550,6 +566,10 @@ the [container](/container) page now links to the new page.
   device addresses rather than raw host bytes.
 - Added `max.nn.state_space.kda_decode`, a wrapper over the Kimi Delta
   Attention recurrence op.
+- Added `Graph.profile_scope`, a context manager that labels every op
+  for profiling. The scope name is appended to the op name in profile
+  output. Profiler ranges are also created from sequential ops with the same
+  scope, which is enabled with `MODULAR_MAX_DEBUG_PROFILE_SCOPE_TRACING=1`.
 
 ### Inference server
 
@@ -725,6 +745,32 @@ the [container](/container) page now links to the new page.
   On a dKV deployment the two track each other for every load that lands, and
   comparing them needs the server's `--kv-cache-page-size`, since one is in
   blocks and the other in tokens.
+- `maxserve_dkv_rpc_read_latency` and `maxserve_dkv_rpc_acquire_latency` now
+  report. Both were declared and published on a positive value, but nothing
+  ever measured the underlying RPCs, so neither series ever appeared and the
+  per-batch server log printed `acquire 0.0ms, pin 0.0ms` on every line, which
+  reads as an instant lookup rather than an unmeasured one. The connector now
+  times both round trips. They bracket the RPC rather than the transfer, so
+  they include work the transfer latencies cannot see, most importantly the
+  disk-tier restage the server awaits inside its read handler.
+- Added `maxserve_dkv_nixl_read_latency_max`, the slowest single dKV read in
+  the window a batch samples, next to the existing
+  `maxserve_dkv_nixl_read_latency` average. An average cannot separate one
+  slow read from a uniformly slow batch, and it is the slow read that costs a
+  request its time to first token. The peak also appears on the per-batch
+  server log line and in the structured log, and it combines across
+  data-parallel replicas by taking the maximum rather than by summing.
+- The per-batch dKV log clause now reports the blocks that landed and the
+  bytes read, alongside the read average and the new peak. The block count was
+  already in the structured log but missing from the human-readable line, and
+  the byte count was not recoverable from either: the reported throughput
+  divides by the transfer-time total, both surfaces carry only the average,
+  and the sample count that bridges them is published nowhere. The clause is
+  also emitted whenever a batch transferred blocks, where it was previously
+  emitted only when a latency sample survived, so a read whose timing sample
+  was dropped no longer drops the whole clause, and its block count with it.
+  Such a batch reports its counts without the read timings rather than beside
+  a row of zeros, which would read as an instant read.
 - Fixed the speculative-decoding per-position acceptance-rate histogram
   (`maxserve_spec_decode_acceptance_rate_per_position`) understating
   acceptance: decode batches that performed zero verifications published a
@@ -748,6 +794,13 @@ the [container](/container) page now links to the new page.
   now also disables LoRA that a recipe enabled, instead of being ignored.
 
 ### Python API
+
+- `max.nn.kernels.msa_sparse_attention_ragged` and
+  `msa_sparse_attention_ragged_mxfp8` take a required
+  `sparse_block_size`: the KV block size in tokens from the model's
+  `sparse_attention_config`. It must equal the KV cache page size, and
+  the kernel now asserts that rather than inferring a block size from
+  the attention tile-width default.
 
 - `max.experimental.nn.Module.compile` reuses precompiled MEFs when the session
   has them, so a ModuleV3 model can be compiled where no accelerator is attached

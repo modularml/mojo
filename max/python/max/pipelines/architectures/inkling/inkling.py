@@ -194,6 +194,7 @@ class InklingDecoderLayer(Module):
         log_scaling: Sequence[TensorValue],
         conv_pools: Sequence[Sequence[BufferValue]],
         slot_idx: Sequence[TensorValue],
+        has_initial_state: Sequence[TensorValue],
         cache_layer_idx: TensorValue,
         signal_buffers: Sequence[BufferValue],
     ) -> list[TensorValue]:
@@ -208,6 +209,7 @@ class InklingDecoderLayer(Module):
                 k_conv_pool=conv_pools[rank][ConvSite.K],
                 v_conv_pool=conv_pools[rank][ConvSite.V],
                 slot_idx=slot_idx[rank],
+                has_initial_state=has_initial_state[rank],
                 cache_layer_idx=cache_layer_idx,
             )
             for rank, shard in enumerate(self.attn_shards)
@@ -218,6 +220,7 @@ class InklingDecoderLayer(Module):
             attention,
             [pools[ConvSite.ATTN_OUT] for pools in conv_pools],
             slot_idx,
+            has_initial_state,
             input_row_offsets,
             signal_buffers,
         )
@@ -229,6 +232,7 @@ class InklingDecoderLayer(Module):
             self._feed_forward(norm_outs),
             [pools[ConvSite.MLP_OUT] for pools in conv_pools],
             slot_idx,
+            has_initial_state,
             input_row_offsets,
             signal_buffers,
         )
@@ -259,6 +263,7 @@ class InklingDecoderLayer(Module):
         partials: Sequence[TensorValue],
         pools: Sequence[BufferValue],
         slot_idx: Sequence[TensorValue],
+        has_initial_state: Sequence[TensorValue],
         input_row_offsets: Sequence[TensorValue],
         signal_buffers: Sequence[BufferValue],
     ) -> list[TensorValue]:
@@ -273,6 +278,7 @@ class InklingDecoderLayer(Module):
                 pools[rank],
                 slot_idx[rank],
                 input_row_offsets[rank],
+                has_initial_state[rank],
             )
             for rank, conv in enumerate(convs)
         ]
@@ -452,6 +458,7 @@ class Inkling(Module):
         signal_buffers: list[BufferValue],
         kv_collections: dict[str, list[PagedCacheValues]],
         slot_idx: list[TensorValue],
+        has_initial_state: list[TensorValue],
         conv_pools: list[list[BufferValue]],
     ) -> tuple[TensorValue, ...]:
         """Runs the whole text model over one ragged batch."""
@@ -494,6 +501,7 @@ class Inkling(Module):
                     for rank in range(num_devices)
                 ],
                 slot_idx,
+                has_initial_state,
                 ops.constant(
                     self.layer_cache_indices[layer_idx],
                     DType.uint32,
@@ -624,6 +632,10 @@ class Inkling(Module):
                 )
                 for slot_device in self.devices
             ),
+            *(
+                TensorType(DType.bool, shape=["batch_size"], device=slot_device)
+                for slot_device in self.devices
+            ),
             *self.conv_layout.buffer_types(self.devices),
         )
 
@@ -647,6 +659,7 @@ class Inkling(Module):
         list[BufferValue],
         dict[str, list[PagedCacheValues]],
         list[TensorValue],
+        list[TensorValue],
         list[list[BufferValue]],
     ]:
         """Splits a graph's positional inputs into the arguments of ``__call__``."""
@@ -665,8 +678,10 @@ class Inkling(Module):
         ) = inputs
         signals = rest[:num_signals]
         rest = rest[num_signals:]
-        kv_inputs = rest[: -(num_devices + num_pools)]
-        slot_idx = rest[-(num_devices + num_pools) : -num_pools]
+        tail = 2 * num_devices + num_pools
+        kv_inputs = rest[:-tail]
+        slot_idx = rest[-tail : -tail + num_devices]
+        has_initial_state = rest[-tail + num_devices : -num_pools]
         pools = [value.buffer for value in rest[-num_pools:]]
         return (
             tokens.tensor,
@@ -678,6 +693,7 @@ class Inkling(Module):
             [value.buffer for value in signals],
             self.unflatten_kv_inputs(kv_inputs),
             [value.tensor for value in slot_idx],
+            [value.tensor for value in has_initial_state],
             [
                 pools[rank * pools_per_device : (rank + 1) * pools_per_device]
                 for rank in range(num_devices)

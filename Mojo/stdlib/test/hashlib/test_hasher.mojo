@@ -26,15 +26,12 @@ struct DummyHasher(Hasher):
     def __init__(out self):
         self._dummy_value = 0
 
-    def _update_with_bytes(mut self, data: Span[Byte, _]):
+    def update(mut self, data: ImmSpan[Byte, _]):
         for i in range(len(data)):
             self._dummy_value += data[i].cast[.uint64]()
 
     def _update_with_simd(mut self, value: SIMD[_, _]):
         self._dummy_value += value.cast[.uint64]().reduce_add()
-
-    def update(mut self, value: ImmSpan[Byte, _]):
-        value.__hash__(self)
 
     def finish(var self) -> UInt64:
         return self._dummy_value
@@ -94,7 +91,7 @@ struct ComplexHashableStructWithList(Hashable):
         self._value2.__hash__(hasher)
         # This is okay because self is passed as read-only so the pointer will
         # be valid until at least the end of the function
-        hasher._update_with_bytes(
+        hasher.update(
             Span(unsafe_ptr=self._value3.unsafe_ptr(), length=len(self._value3))
         )
 
@@ -111,7 +108,7 @@ struct ComplexHashableStructWithListAndWideSIMD(Hashable):
         self._value2.__hash__(hasher)
         # This is okay because self is passed as read-only so the pointer will
         # be valid until at least the end of the function
-        hasher._update_with_bytes(
+        hasher.update(
             Span(unsafe_ptr=self._value3.unsafe_ptr(), length=len(self._value3))
         )
         self._value4.__hash__(hasher)

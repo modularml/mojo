@@ -25,6 +25,7 @@ namespace {
 /// that it reads are global, and one thread owns both.
 struct RegionState {
   bool enabled = false;
+  bool asJSON = false;
   /// The label of the pipeline whose times the timers hold now. LLVM work
   /// outside every region, which no path does today, keeps the first value.
   std::string currentLabel = "other";
@@ -48,9 +49,14 @@ void closeCurrentPart() {
   RegionState &state = getRegionState();
   std::string report;
   llvm::raw_string_ostream os(report);
-  // `printAll` drains the queued records of the timers that already ended, and
-  // it reads, without clearing, the totals of the timers that are still alive.
-  llvm::TimerGroup::printAll(os);
+  // Either call drains the queued records of timers that already ended, and
+  // reads the totals of live timers without clearing them. The empty
+  // separator leaves the JSON fragment without a leading comma, so the caller
+  // can drop it straight into braces of its own.
+  if (state.asJSON)
+    llvm::TimerGroup::printAllJSONValues(os, /*delim=*/"");
+  else
+    llvm::TimerGroup::printAll(os);
   // `clearAll` resets the live totals, so that a group does not write them
   // again when the process deletes it, and so that the next part holds only
   // the times of the next pipeline.
@@ -87,7 +93,11 @@ std::string M::KGEN::pipelineTimingLabel(const CompilationOptions &options) {
   return label;
 }
 
-void M::KGEN::enableLLVMTimingRegions() { getRegionState().enabled = true; }
+void M::KGEN::enableLLVMTimingRegions(bool asJSON) {
+  RegionState &state = getRegionState();
+  state.enabled = true;
+  state.asJSON = asJSON;
+}
 
 llvm::SmallVector<LLVMTimingReportPart> M::KGEN::takeLLVMTimingReport() {
   RegionState &state = getRegionState();
@@ -95,14 +105,12 @@ llvm::SmallVector<LLVMTimingReportPart> M::KGEN::takeLLVMTimingReport() {
     return {};
   // The last pipeline has no region after it to close its part.
   closeCurrentPart();
-  state.enabled = false;
-  // Reset the label and the thread pin, so that a later collection in the
-  // same process starts fresh.
-  state.currentLabel = "other";
-#ifndef NDEBUG
-  state.threadId = 0;
-#endif
-  return std::move(state.parts);
+  // Back to blank, so a later collection in the same process starts fresh. It
+  // has to call `enableLLVMTimingRegions` again, which arms `enabled` and the
+  // format together, so this cannot strip the format from a live request.
+  llvm::SmallVector<LLVMTimingReportPart> parts = std::move(state.parts);
+  state = RegionState{};
+  return parts;
 }
 
 LLVMTimingRegion::LLVMTimingRegion(const CompilationOptions &options)
@@ -152,10 +160,16 @@ mlir::TimingScope *&getMLIRTimingRoot() {
   static mlir::TimingScope *root = nullptr;
   return root;
 }
+
+bool &getMLIRDecorateNames() {
+  static bool decorate = true;
+  return decorate;
+}
 } // namespace
 
-void M::KGEN::setMLIRTimingRoot(mlir::TimingScope *root) {
+void M::KGEN::setMLIRTimingRoot(mlir::TimingScope *root, bool decorateNames) {
   getMLIRTimingRoot() = root;
+  getMLIRDecorateNames() = decorateNames;
 }
 
 mlir::TimingScope
@@ -172,14 +186,15 @@ M::KGEN::nestMLIROffloadScope(const CompilationOptions &options) {
   // this scope is also part of that host pass. The two rows are siblings in
   // the report, but the times are not separate. The words in the label tell
   // the reader not to add the two rows together.
-  std::string name =
-      "===--- " + pipelineTimingLabel(options) + " (also in host) ";
-  // Each scope gets a rule of the same width. Thus the rules look like
-  // dividers between the parts of the report. A label that is longer than the
-  // rule keeps its own length.
-  if (name.size() < kOffloadScopeRuleWidth - 3)
-    name.append(kOffloadScopeRuleWidth - 3 - name.size(), '-');
-  name += "===";
+  std::string name = pipelineTimingLabel(options) + " (also in host)";
+  if (getMLIRDecorateNames()) {
+    name = "===--- " + name + " ";
+    // A uniform width makes the rules read as dividers between parts; an
+    // over-long label simply keeps its own length.
+    if (name.size() < kOffloadScopeRuleWidth - 3)
+      name.append(kOffloadScopeRuleWidth - 3 - name.size(), '-');
+    name += "===";
+  }
   // `nest` takes a lock if the thread is not the thread of the root.
   // Thus elaboration can run this function on a worker thread.
   //

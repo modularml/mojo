@@ -180,6 +180,7 @@ NIGHTLY_MODELS = frozenset(
         "nvidia/GLM-5.2-NVFP4__mtp_tpep",
         "amd/Kimi-K2.7-Code-MXFP4",
         "nvidia/Kimi-K2.7-Code-NVFP4",
+        "thinkingmachines/Inkling-Small-NVFP4__mtp",
     }
 )
 

@@ -24,7 +24,7 @@ struct WeirdArray(Movable where False):
     def __getitem__(self, x: Int, y: Int, z: Int) -> Int:
         return x
 
-    def __getitem__(self, x: float, *ints: Int) -> Int:
+    def __getitem__(self, x: SIMDLength, *ints: Int) -> Int:
         return 1
 
     def __setitem__(self, x: Int, y: Int, value: Int):
@@ -35,7 +35,7 @@ struct WeirdArray(Movable where False):
 
 
 # CHECK-LABEL: lit.fn @"test_getitem
-def test_getitem(a: WeirdArray, idx: Int, f: float):
+def test_getitem(a: WeirdArray, idx: Int, f: SIMDLength):
     # CHECK: lit.call {{.*}}@WeirdArray::@"__getitem__{{.*}}(%a, %idx)
     _ = a[idx]
 

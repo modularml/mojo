@@ -253,41 +253,41 @@ module attributes {M.target_info = #M.target<triple="", arch="", features="", da
 module attributes {M.target_info = #M.target<triple="", arch="", features="", data_layout="", simd_bit_width=128>} {
 
 // CHECK-LABEL: llvm.func internal @exec_async
-// CHECK:     llvm.switch {{.*}} : i32, ^bb1 [
-// CHECK-NEXT:  1: ^bb5,
-// CHECK-NEXT:  0: ^bb1
-// CHECK-NEXT: ]
+// Rematerializable entry GEPs are hoisted before the resume switch.
+// CHECK:       [[V2:%.*]] = llvm.getelementptr %arg0[0, 9]
+// CHECK-NEXT:  llvm.switch {{.*}} : i32, ^bb1 [
+// CHECK-NEXT:    1: ^bb5,
+// CHECK-NEXT:    0: ^bb1
+// CHECK-NEXT:  ]
 
-// First block contains original entry code + update state + first block of suspension body.
-// CHECK-NEXT: ^bb1:  // 2 preds: ^bb0, ^bb0
-// CHECK-NEXT:   [[V2:%.*]] = llvm.getelementptr %arg0[0, 9]
-// CHECK-NEXT:   [[V3:%.*]] = llvm.load [[V2]]
-
-// CHECK-NEXT: llvm.cond_br [[V3]], ^bb2, ^bb3
+// First block contains original entry code + first block of suspension body.
+// CHECK-NEXT:  ^bb1:  // 2 preds: ^bb0, ^bb0
+// CHECK-NEXT:    [[V3:%.*]] = llvm.load [[V2]]
+// CHECK-NEXT:    llvm.cond_br [[V3]], ^bb2, ^bb3
 
 // Blocks 2 through 4 are lifted from suspension body
-// CHECK-NEXT: ^bb2:  // pred: ^bb1
-// CHECK-NEXT:   [[V8:%.*]] = llvm.getelementptr %arg0[0, 8]
-// CHECK-NEXT:   [[V9:%.*]] = llvm.load [[V8]]
-// CHECK-NEXT:   llvm.call @print([[V9]]) : (f32) -> ()
-// CHECK-NEXT:   llvm.br ^bb4
-// CHECK-NEXT: ^bb3:  // pred: ^bb1
-// CHECK-NEXT:   [[V10:%.*]] = llvm.getelementptr %arg0[0, 7]
-// CHECK-NEXT:   [[V11:%.*]] = llvm.load [[V10]]
-// CHECK-NEXT:   llvm.call @print([[V11]]) : (f32) -> ()
-// CHECK-NEXT:   llvm.br ^bb4
-// CHECK-NEXT: ^bb4:  // 2 preds: ^bb2, ^bb3
-// CHECK-NEXT:   llvm.return
+// CHECK-NEXT:  ^bb2:  // pred: ^bb1
+// CHECK-NEXT:    [[V8:%.*]] = llvm.getelementptr %arg0[0, 8]
+// CHECK-NEXT:    [[V9:%.*]] = llvm.load [[V8]]
+// CHECK-NEXT:    llvm.call @print([[V9]]) : (f32) -> ()
+// CHECK-NEXT:    llvm.br ^bb4
+// CHECK-NEXT:  ^bb3:  // pred: ^bb1
+// CHECK-NEXT:    [[V10:%.*]] = llvm.getelementptr %arg0[0, 7]
+// CHECK-NEXT:    [[V11:%.*]] = llvm.load [[V10]]
+// CHECK-NEXT:    llvm.call @print([[V11]]) : (f32) -> ()
+// CHECK-NEXT:    llvm.br ^bb4
+// CHECK-NEXT:  ^bb4:  // 2 preds: ^bb2, ^bb3
+// CHECK-NEXT:    llvm.return
 
 // Final block is the code following the suspension point.
-// CHECK-NEXT: ^bb5:  // pred: ^bb0
-// CHECK-NEXT:   [[V12:%.*]] = llvm.getelementptr %arg0[0, 2]
-// CHECK-NEXT:   [[V13:%.*]] = llvm.load [[V12]] : !llvm.ptr -> !llvm.ptr
-// CHECK-NEXT:   [[V14:%.*]] = llvm.getelementptr %arg0[0, 3]
-// CHECK-NEXT:   [[V15:%.*]] = llvm.load [[V14]] : !llvm.ptr -> !llvm.ptr
-// CHECK-NEXT:   llvm.call musttail [[V13]]([[V15]]) : !llvm.ptr, (!llvm.ptr) -> ()
-// CHECK-NEXT:   llvm.return
-// CHECK-NEXT: }
+// CHECK-NEXT:  ^bb5:  // pred: ^bb0
+// CHECK-NEXT:    [[V12:%.*]] = llvm.getelementptr %arg0[0, 2]
+// CHECK-NEXT:    [[V13:%.*]] = llvm.load [[V12]] : !llvm.ptr -> !llvm.ptr
+// CHECK-NEXT:    [[V14:%.*]] = llvm.getelementptr %arg0[0, 3]
+// CHECK-NEXT:    [[V15:%.*]] = llvm.load [[V14]] : !llvm.ptr -> !llvm.ptr
+// CHECK-NEXT:    llvm.call musttail [[V13]]([[V15]]) : !llvm.ptr, (!llvm.ptr) -> ()
+// CHECK-NEXT:    llvm.return
+// CHECK-NEXT:  }
 llvm.func internal @exec_async_closure_0_resume(%arg0: !llvm.ptr) attributes {coroutineType = !llvm.struct<(i32, ptr, ptr, ptr, ptr, ptr, struct<(i1)>, f32, f32, i1)>} {
   %2 = llvm.getelementptr %arg0[0, 9] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i32, ptr, ptr, ptr, ptr, ptr, struct<(i1)>, f32, f32, i1)>
   %3 = llvm.load %2 {alignment = 4 : i64} : !llvm.ptr -> i1
@@ -322,18 +322,23 @@ module attributes {M.target_info = #M.target<triple="", arch="", features="", da
     %0 = llvm.mlir.constant(0 : i64) : i64
     %1 = llvm.mlir.constant(1 : i64) : i64
     %2 = llvm.mlir.constant(20 : i64) : i64
-    // CHECK:     ^bb1:  // 2 preds: ^bb0, ^bb0
-    // CHECK:  llvm.br ^bb2({{.*}} : i64)
+    // Constants are hoisted into the resume dispatcher entry.
+    // CHECK:      [[C0:%.*]] = llvm.mlir.constant(0 : i64) : i64
+    // CHECK-NEXT: [[C1:%.*]] = llvm.mlir.constant(1 : i64) : i64
+    // CHECK-NEXT: [[C20:%.*]] = llvm.mlir.constant(20 : i64) : i64
+    // CHECK-NEXT: llvm.switch {{.*}} : i32, ^bb1 [
+    // CHECK:      ^bb1:  // 2 preds: ^bb0, ^bb0
+    // CHECK-NEXT:   llvm.br ^bb2([[C0]] : i64)
 
     // CHECK:      ^bb2([[ARG:%.*]]: i64):  // 2 preds: ^bb1, ^bb5
-    // CHECK-NEXT:   [[V10:%.*]] = llvm.icmp "slt" [[ARG]], {{.*}} : i64
+    // CHECK-NEXT:   [[V10:%.*]] = llvm.icmp "slt" [[ARG]], [[C20]] : i64
     // CHECK-NEXT:   llvm.cond_br [[V10]], ^bb3, ^bb4
     // CHECK-NEXT: ^bb3:  // pred: ^bb2
     // CHECK-NEXT:   llvm.br ^bb5
     // CHECK-NEXT: ^bb4:  // pred: ^bb2
     // CHECK-NEXT:   llvm.br ^bb6
     // CHECK-NEXT: ^bb5:  // pred: ^bb3
-    // CHECK-NEXT:   [[V11:%.*]] = llvm.add [[ARG]], {{.*}} : i64
+    // CHECK-NEXT:   [[V11:%.*]] = llvm.add [[ARG]], [[C1]] : i64
     // CHECK-NEXT:   llvm.br ^bb2([[V11]] : i64)
     // CHECK-NEXT: ^bb6:  // pred: ^bb4
     // CHECK-NEXT:   llvm.return

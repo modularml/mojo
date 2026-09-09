@@ -223,7 +223,7 @@ inferLoopCount(LoopOp loop, ContinueOp continueOp, BreakOp breakOp,
   // This is pretty limited assumption to bootstrap loop unrolling.
   // This can be improved to support more general for loops.
 
-  // Infer loop start and end from BreakOp's parent IfOp's operand expression.
+  // Infer loop start and end from BreakOp's parent if/elif operand expression.
   // For example:
   // %index1 = kgen.param.constant = <1>
   // %index2 = kgen.param.constant = <2>
@@ -232,7 +232,7 @@ inferLoopCount(LoopOp loop, ContinueOp continueOp, BreakOp breakOp,
   // %0 = hlcf.loop (%arg0 = %index1 : index, %arg1 = %index2: index, %arg2 =
   // %index6) {
   //    %1 = index.cmp slt(%arg0, %index9) # start = 1, end = 9
-  //    hlcf.if %1 {
+  //    hlcf.elif %1 {
   //      hlcf.yield
   //    } else {
   //      hlcf.break %arg1
@@ -242,12 +242,26 @@ inferLoopCount(LoopOp loop, ContinueOp continueOp, BreakOp breakOp,
   //    hlcf.continue %1 : index
   // }
   //
-  // From hlcf.if %1, we can infer that %arg0 is the induction variable
+  // From hlcf.elif %1, we can infer that %arg0 is the induction variable
   // (inductionVarArgNumber = 0)
   // From hlcf.break %arg1, we know that %arg1 is the return value, and the
   // rest will be other loop carried variable
-  IfOp ifOp = cast<IfOp>(breakOp->getParentOp());
-  Value ifCond = ifOp.getOperand();
+  Operation *parent = breakOp->getParentOp();
+  Value ifCond;
+  Region *thenRegion = nullptr;
+  if (auto ifOp = dyn_cast<IfOp>(parent)) {
+    ifCond = ifOp.getCond();
+    thenRegion = &ifOp.getThenRegion();
+  } else if (auto elifOp = dyn_cast<ElifOp>(parent)) {
+    // Multi-arm elif is expanded before this pass; only 2-region if/else shape
+    // is recognized as a loop exit test.
+    if (elifOp.getNumRegions() != 2)
+      return {};
+    ifCond = elifOp.getCond();
+    thenRegion = &elifOp.getThenRegion();
+  } else {
+    return {};
+  }
 
   // `pop.cast_from_builtin`. Look through that cast to recognize  `index.cmp`
   // TODO: we won't need this after migrating scalar<int>, but the pattern
@@ -266,7 +280,7 @@ inferLoopCount(LoopOp loop, ContinueOp continueOp, BreakOp breakOp,
   HLCF::ForLoopBoundCmpPredicate cmpPredicate;
   HLCF::ForLoopIndVarCompute indVarCompute;
 
-  bool invertPred = (&ifOp.getThenRegion() == breakOp->getParentRegion());
+  bool invertPred = (thenRegion == breakOp->getParentRegion());
 
   if (matcher.match(ifCond.getDefiningOp())) {
     mlir::index::CmpOp cmp = matcher.cmpOp;
@@ -399,8 +413,10 @@ reorderValueIntoGroups(ValueRange values,
   return result;
 }
 
-/// Return whether the IfOp has complex logic that is not supported for raising.
-static bool hasComplexExitLogic(LoopOp loop, IfOp ifOp) {
+/// Return whether the if/elif exit test has complex logic that is not supported
+/// for raising.
+template <typename IfLikeOp>
+static bool hasComplexExitLogic(LoopOp loop, IfLikeOp ifOp) {
   // The if op is known to have one yield and one break.
   Block *breakBlock = &ifOp.getThenRegion().getBlocks().front();
   Block *yieldBlock = &ifOp.getElseRegion().getBlocks().front();
@@ -517,14 +533,17 @@ LogicalResult RaiseForLoops::raiseForLoops(LoopOp loop,
            << "cannot infer loop bounds and steps";
   }
 
-  IfOp ifOp = dyn_cast<IfOp>(breakOp->getParentOp());
-
-  if (!ifOp) {
+  Operation *ifLikeParent = breakOp->getParentOp();
+  auto ifOp = dyn_cast<IfOp>(ifLikeParent);
+  auto elifOp = dyn_cast<ElifOp>(ifLikeParent);
+  if (!ifOp && !(elifOp && elifOp.getNumRegions() == 2)) {
     return diag.attachNote(loop->getLoc())
            << "cannot infer loop bounds and steps";
   }
 
-  if (hasComplexExitLogic(loop, ifOp)) {
+  bool complexExit = ifOp ? hasComplexExitLogic(loop, ifOp)
+                          : hasComplexExitLogic(loop, elifOp);
+  if (complexExit) {
     // TODO: handle exit logic in loop unrolling and lower loops, which requires
     // raise ForOp to keep track of the exit block.
     return diag.attachNote(loop->getLoc()) << "loop has complex exit logic";
@@ -627,8 +646,8 @@ LogicalResult RaiseForLoops::raiseForLoops(LoopOp loop,
 
   Operation *prevOp = nullptr;
   for (Operation &op : llvm::make_early_inc_range(body.getOperations())) {
-    if (&op == breakOp->getParentOp() && isa<IfOp>(op)) {
-      // Don't move the parent IfOp of the break to the ForOp body.
+    if (&op == breakOp->getParentOp() && isa<IfOp, ElifOp>(op)) {
+      // Don't move the parent if/elif of the break to the ForOp body.
       continue;
     }
 

@@ -1129,11 +1129,11 @@ def flash_attention_dispatch[
                         DynamicInt(max_prompt_len),
                         max_cache_valid_length,
                         scale,
-                        kv_input_row_offsets,
+                        _optional_lt_to_tt(kv_input_row_offsets),
                         batch_size,
                         NoPartition[get_accum_type[q.dtype]()](),
                         ctx,
-                        sink_weights,
+                        _optional_lt_to_tt(sink_weights),
                     )
                 else:
                     comptime assert is_sm100
@@ -1813,11 +1813,11 @@ def flash_attention_dispatch[
                                     StaticInt[1](),
                                     max_cache_valid_length_value,
                                     scale,
-                                    kv_input_row_offsets,
+                                    _optional_lt_to_tt(kv_input_row_offsets),
                                     batch_size,
                                     NoPartition[accum_type](),
                                     ctx,
-                                    sink_weights,
+                                    _optional_lt_to_tt(sink_weights),
                                 )
                         else:
                             var nullptr_device = DeviceBuffer[accum_type].empty(
@@ -1935,7 +1935,7 @@ def flash_attention_dispatch[
                                     StaticInt[1](),
                                     max_cache_valid_length_value,
                                     scale,
-                                    kv_input_row_offsets,
+                                    _optional_lt_to_tt(kv_input_row_offsets),
                                     batch_size,
                                     SplitKPartition(
                                         exp_sum_qk_max_data.unsafe_ptr().as_unsafe_any_origin(),
@@ -1944,7 +1944,7 @@ def flash_attention_dispatch[
                                         UInt32(num_partitions_value),
                                     ),
                                     ctx,
-                                    sink_weights,
+                                    _optional_lt_to_tt(sink_weights),
                                 )
                         else:
                             # Same ladder, on the intermediate dtype and writing
@@ -7131,28 +7131,16 @@ def _naive_attention_with_transpose[
     )
 
     # BSHD -> BHSD
-    var q_perm_stack = Array[Int, 4](uninitialized=True)
+    var q_perm_stack: Array[Int, 4] = [0, 2, 1, 3]
     var q_perm = TileTensor(q_perm_stack, row_major[4]())
-    q_perm[0] = 0
-    q_perm[1] = 2
-    q_perm[2] = 1
-    q_perm[3] = 3
 
     # BSHD -> BHDS
-    var k_perm_stack = Array[Int, 4](uninitialized=True)
+    var k_perm_stack: Array[Int, 4] = [0, 2, 3, 1]
     var k_perm = TileTensor(k_perm_stack, row_major[4]())
-    k_perm[0] = 0
-    k_perm[1] = 2
-    k_perm[2] = 3
-    k_perm[3] = 1
 
     # BHSD -> BSHD
-    var o_perm_stack = Array[Int, 4](uninitialized=True)
+    var o_perm_stack: Array[Int, 4] = [0, 2, 1, 3]
     var o_perm = TileTensor(o_perm_stack, row_major[4]())
-    o_perm[0] = 0
-    o_perm[1] = 2
-    o_perm[2] = 1
-    o_perm[3] = 3
 
     var q_tt = TileTensor(
         q.ptr,

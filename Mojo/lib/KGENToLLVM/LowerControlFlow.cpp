@@ -141,6 +141,19 @@ LogicalResult ControlFlowConverter::lowerNode(ControlFlowNode node,
                            entries.front(), ValueRange(), entries.back(),
                            ValueRange());
     b.eraseOp(node);
+  } else if (auto elif = dyn_cast<ElifOp>(node.getOperation())) {
+    // Multi-arm elif is expanded to nested 2-arm elifs before this pass.
+    if (elif.getNumRegions() != 2)
+      return elif.emitOpError("expected 2-region elif for LLVM lowering");
+    Type condType = typeConverter.convertType(elif.getCond().getType());
+    if (!condType)
+      return mlir::emitError(elif.getLoc(), "failed to convert condition type");
+    auto condCast = mlir::UnrealizedConversionCastOp::create(
+        b, node->getLoc(), condType, elif.getCond());
+    LLVM::CondBrOp::create(b, node->getLoc(), condCast.getResult(0),
+                           entries.front(), ValueRange(), entries.back(),
+                           ValueRange());
+    b.eraseOp(node);
   } else if (auto sw = dyn_cast<SwitchOp>(node.getOperation())) {
     auto arg = mlir::UnrealizedConversionCastOp::create(
         b, node->getLoc(), typeConverter.getIndexType(), sw.getArg());

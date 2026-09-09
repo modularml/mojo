@@ -187,3 +187,32 @@ def test_cast_in_chain_fuses(
     assert out.dtype == np.float64
     ref = np.maximum((a + b).astype(np.float64), 0)
     np.testing.assert_allclose(out, ref, rtol=1e-9, atol=1e-9)
+
+
+def test_constant_folds_into_kernel_body(
+    session: InferenceSession, adv_fusion_enabled: None
+) -> None:
+    """`add(x, const)` folds the constant into the fused kernel's body.
+
+    `FuseConstantIterOpaqueInputs` turns a constant operand into a constant
+    resource baked into the kernel body rather than a runtime input, so the
+    kernel keeps `x` as its only real operand. This pins the mixed case (a
+    real input alongside the folded constant) and checks the constant's bytes
+    survive to execution -- the numeric result is only correct if they do.
+    """
+    with Graph(
+        "constant_folds_into_kernel_body",
+        input_types=[TensorType(DType.float32, [2, 2], device=DeviceRef.CPU())],
+    ) as graph:
+        (x,) = (v.tensor for v in graph.inputs)
+        bias = ops.constant(
+            np.array([[10.0, 20.0], [30.0, 40.0]], dtype=np.float32),
+            dtype=DType.float32,
+            device=DeviceRef.CPU(),
+        )
+        graph.output(x + bias)
+
+    a = np.random.randn(2, 2).astype(np.float32)
+    bias_np = np.array([[10.0, 20.0], [30.0, 40.0]], dtype=np.float32)
+    (out,) = run_and_verify_fusion(session, graph, a, fused=r"mo\.add")
+    np.testing.assert_allclose(out, a + bias_np, rtol=1e-5, atol=1e-5)

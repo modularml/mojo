@@ -50,7 +50,7 @@ gather/scatter loop.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import NamedTuple
 
 from max.dtype import DType
@@ -106,6 +106,20 @@ def _projection(stack: StackedLinear, name: str) -> Linear:
     return child
 
 
+_OUTPUT_GATE_ACTIVATIONS: dict[str, Callable[[TensorValue], TensorValue]] = {
+    "swish": ops.silu,
+    "silu": ops.silu,
+    "sigmoid": ops.sigmoid,
+}
+"""Activations `output_gate_type` can name.
+
+Qwen3.5 says `swish`, which is `silu`, so a hardcoded `silu` was accidentally
+right; Qwen3.8-Flash-Next says `sigmoid`, where it is silently wrong -- the
+model runs and answers plausibly. Hence the config read and the rejection of
+an unknown value.
+"""
+
+
 class GatedDeltaNet(Module, Shardable):
     """Gated DeltaNet linear attention layer.
 
@@ -146,6 +160,7 @@ class GatedDeltaNet(Module, Shardable):
         ssm_dtype: DType = DType.float32,
         proj_dtype: DType | None = None,
         quant_config: QuantConfig | None = None,
+        output_gate_type: str = "swish",
     ) -> None:
         super().__init__()
         self.hidden_size = hidden_size
@@ -159,6 +174,12 @@ class GatedDeltaNet(Module, Shardable):
         self.ssm_dtype = ssm_dtype
         self.rms_norm_eps = rms_norm_eps
         self.quant_config = quant_config
+        if output_gate_type not in _OUTPUT_GATE_ACTIVATIONS:
+            raise ValueError(
+                f"unsupported output_gate_type {output_gate_type!r}; expected "
+                f"one of {sorted(_OUTPUT_GATE_ACTIVATIONS)}"
+            )
+        self.output_gate_type = output_gate_type
         self._sharding_strategy: ShardingStrategy | None = None
         # Only in_proj_qkv, in_proj_z and out_proj are quantized; conv1d, the
         # b/a gates, the norm and every activation stay at `dtype`.
@@ -393,6 +414,7 @@ class GatedDeltaNet(Module, Shardable):
                 ssm_dtype=self.ssm_dtype,
                 proj_dtype=self.proj_dtype,
                 quant_config=self.quant_config,
+                output_gate_type=self.output_gate_type,
             )
             shard.in_proj = in_proj_shards[i]
             if ba_shards is not None:
@@ -534,7 +556,9 @@ class GatedDeltaNet(Module, Shardable):
         output_normed = self.norm(output_3d)  # [N, nv, vd]
 
         z_reshaped = ops.reshape(z, [-1, nv, vd])
-        z_gate = ops.silu(ops.cast(z_reshaped, DType.float32))
+        z_gate = _OUTPUT_GATE_ACTIVATIONS[self.output_gate_type](
+            ops.cast(z_reshaped, DType.float32)
+        )
         output_gated = ops.cast(output_normed, DType.float32) * z_gate
         output_gated = ops.cast(output_gated, x.dtype)
 
