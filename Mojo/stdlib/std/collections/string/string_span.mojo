@@ -1911,6 +1911,54 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
 
         return Int(loc.unsafe_value()) - Int(self.unsafe_ptr())
 
+    def partition(self, sep: StringSlice) -> Tuple[String, String, String]:
+        """Splits the string at the first occurrence of `sep`.
+
+        Splits `self` at the first occurrence of `sep`, and returns a
+        3-tuple of the form `(before, sep, after)`. If `sep` is not in `self`,
+        returns `(self, "", "")`.
+
+        Args:
+            sep: The separator to partition on.
+
+        Returns:
+            A `Tuple[String, String, String]` containing the part before `sep`,
+            `sep` itself, and the part after `sep`. If `sep` is not found,
+            returns `(self, "", "")`.
+
+        """
+        var idx = self.find(sep)
+        if idx == -1:
+            return (String(self), String(""), String(""))
+        var sep_len = sep.byte_length()
+        var before = self[byte=:idx]
+        var after = self[byte = idx + sep_len :]
+        return (String(before), String(sep), String(after))
+
+    def rpartition(self, sep: StringSlice) -> Tuple[String, String, String]:
+        """Splits the string at the last occurrence of `sep`.
+
+        Splits `self` at the last occurrence of `sep`, and returns a
+        3-tuple of the form `(before, sep, after)`. If `sep` is not in `self`,
+        returns `("", "", self)`.
+
+        Args:
+            sep: The separator to partition on.
+
+        Returns:
+            A `Tuple[String, String, String]` containing the part before `sep`,
+            `sep` itself, and the part after `sep`. If `sep` is not found,
+            returns `("", "", self)`.
+
+        """
+        var idx = self.rfind(sep)
+        if idx == -1:
+            return (String(""), String(""), String(self))
+        var sep_len = sep.byte_length()
+        var before = self[byte=:idx]
+        var after = self[byte = idx + sep_len :]
+        return (String(before), String(sep), String(after))
+
     def isspace[single_character: Bool = False](self) -> Bool:
         """Determines whether every character in the given StringSpan is a
         python whitespace String. This corresponds to Python's

@@ -706,6 +706,94 @@ def test_rfind() raises:
     # assert_equal(String("🔥🔥").rfind("🔥"), 1)
 
 
+def test_partition() raises:
+    # Normal case: sep in middle.
+    var before, sep, after = String("hello world hello").partition("world")
+    assert_equal(before, "hello ")
+    assert_equal(sep, "world")
+    assert_equal(after, " hello")
+
+    # Sep at start.
+    var b2, s2, a2 = String("worldhello").partition("world")
+    assert_equal(b2, "")
+    assert_equal(s2, "world")
+    assert_equal(a2, "hello")
+
+    # Sep at end.
+    var b3, s3, a3 = String("helloworld").partition("world")
+    assert_equal(b3, "hello")
+    assert_equal(s3, "world")
+    assert_equal(a3, "")
+
+    # Sep not found.
+    var b4, s4, a4 = String("hello").partition("xyz")
+    assert_equal(b4, "hello")
+    assert_equal(s4, "")
+    assert_equal(a4, "")
+
+    # Multiple occurrences: partition takes first.
+    var b5, s5, a5 = String("aXbXc").partition("X")
+    assert_equal(b5, "a")
+    assert_equal(s5, "X")
+    assert_equal(a5, "bXc")
+
+    # Empty string.
+    var b6, s6, a6 = String("").partition("x")
+    assert_equal(b6, "")
+    assert_equal(s6, "")
+    assert_equal(a6, "")
+
+    # Unicode string.
+    var b7, s7, a7 = String("héllo wörld").partition("wörld")
+    assert_equal(b7, "héllo ")
+    assert_equal(s7, "wörld")
+    assert_equal(a7, "")
+
+
+def test_rpartition() raises:
+    # Normal case: sep in middle.
+    var before, sep, after = String("hello world hello").rpartition("hello")
+    assert_equal(before, "hello world ")
+    assert_equal(sep, "hello")
+    assert_equal(after, "")
+
+    # Sep at start.
+    var b2, s2, a2 = String("worldhello").rpartition("world")
+    assert_equal(b2, "")
+    assert_equal(s2, "world")
+    assert_equal(a2, "hello")
+
+    # Sep at end.
+    var b3, s3, a3 = String("helloworld").rpartition("world")
+    assert_equal(b3, "hello")
+    assert_equal(s3, "world")
+    assert_equal(a3, "")
+
+    # Sep not found: returns ("", "", self).
+    var b4, s4, a4 = String("hello").rpartition("xyz")
+    assert_equal(b4, "")
+    assert_equal(s4, "")
+    assert_equal(a4, "hello")
+
+    # Multiple occurrences: rpartition takes last.
+    var b5, s5, a5 = String("aXbXc").rpartition("X")
+    assert_equal(b5, "aXb")
+    assert_equal(s5, "X")
+    assert_equal(a5, "c")
+
+    # Empty string.
+    var b6, s6, a6 = String("").rpartition("x")
+    assert_equal(b6, "")
+    assert_equal(s6, "")
+    assert_equal(a6, "")
+
+    # Unicode string.
+    var b7, s7, a7 = String("héllo wörld héllo").rpartition("héllo")
+    assert_equal(b7, "héllo wörld ")
+    assert_equal(s7, "héllo")
+    assert_equal(a7, "")
+
+
 def test_split() raises:
     comptime S = StaticString
 
