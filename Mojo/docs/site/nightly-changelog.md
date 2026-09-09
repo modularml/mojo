@@ -18,7 +18,7 @@ This version is still a work in progress.
 
 - Unknown declaration errors now suggest a unique near-miss spelling from the
   enclosing scopes (for example `coun` → `count`), with a replace-token fixit.
-
+  
 - Mojo now supports contextually inferred member references: a leading-dot form
   such as `.red` or `.float64` resolves against the expected type of the
   expression, so you can omit a redundant type name when context already
@@ -143,7 +143,7 @@ This version is still a work in progress.
 - `Counter` can now be constructed from any iterable of values, not just a
   `List`, e.g. `Counter(["a", "a", "b"])` or `Counter(String("aaab").bytes())`.
   This replaces the previous `Counter(items: List[V])` constructor.
-  
+
 - [`OwnedDLHandle`](/docs/std/ffi/OwnedDLHandle/) now conforms to `Boolable`.
 
 - `Coord` has a new `replace[at](value)` method that returns a `Coord` with
