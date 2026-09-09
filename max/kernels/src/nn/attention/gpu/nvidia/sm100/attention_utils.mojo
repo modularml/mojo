@@ -42,6 +42,7 @@ from layout import (
     IntTuple,
     Layout,
     LayoutTensor,
+    TensorEngine,
     TileTensor,
     row_major,
 )
@@ -85,6 +86,7 @@ comptime FP32_EXP_BIAS = 127
 comptime LocalTensor[
     dtype: DType,
     layout: InternalLayout,
+    Engine: TensorEngine,
 ] = TileTensor[
     dtype,
     InternalLayout[
@@ -92,15 +94,21 @@ comptime LocalTensor[
         stride_types=layout.stride_types,
     ],
     MutUntrackedOrigin,
+    Engine=Engine,
     address_space=.LOCAL,
 ]
-comptime SharedMemTensor[dtype: DType, layout: InternalLayout] = TileTensor[
+comptime SharedMemTensor[
+    dtype: DType,
+    layout: InternalLayout,
+    Engine: TensorEngine,
+] = TileTensor[
     dtype,
     InternalLayout[
         shape_types=layout.shape_types,
         stride_types=layout.stride_types,
     ],
     MutUntrackedOrigin,
+    Engine=Engine,
     address_space=.SHARED,
 ]
 
@@ -890,7 +898,7 @@ struct TMemTile[
     @always_inline
     def store_async[
         src_type: DType
-    ](self, src: LocalTensor[src_type, row_major[Self.BN]()]):
+    ](self, src: LocalTensor[src_type, row_major[Self.BN](), _]):
         @__parameter
         @always_inline
         def store_fn[pow_two: Int, offset: Int]():
@@ -931,7 +939,9 @@ struct TMemTile[
                         comptime for _i in range(frag_width):
                             frag[_i] = packed[_i]
                 else:
-                    frag[0] = bitcast[.uint32](src[0].cast[Self.dtype]())
+                    frag[0] = bitcast[.uint32](
+                        src.raw_load[width=1](0).cast[Self.dtype]()
+                    )
 
                 tcgen05_st[
                     datapaths=32,  # first dimension of the shape
@@ -2934,7 +2944,7 @@ def maximum(x: StaticTuple[Float32, 8], init: Float32) -> Float32:
 @always_inline
 def sum[
     dtype: DType, BN: Int, //, *, width: Int = 8
-](x: LocalTensor[dtype, row_major[BN]()]) -> SIMD[dtype, 2]:
+](x: LocalTensor[dtype, row_major[BN](), _]) -> SIMD[dtype, 2]:
     """Reduces a `BN`-element local tensor into a width-2 SIMD vector via vectorized accumulation.
 
     Parameters:

@@ -615,7 +615,12 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         kv_head_idx: UInt32,
         t: Int,
         num_keys: Int,
-    ) -> TileTensor[Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin]:
+    ) -> TileTensor[
+        Self.config.dtype,
+        Self._KvPerTileLayoutT,
+        ImmutAnyOrigin,
+        Engine=k_t.Engine,
+    ]:
         """Builds the per-tile K gmem TileTensor at `(batch, t*KV_BLOCK,
         kv_head, 0)` via `MHAOperand.block_paged_tile`. For
         LayoutTensorMHAOperand this resolves to a pointer-arithmetic
@@ -634,7 +639,10 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         # config.dtype.
         return rebind[
             TileTensor[
-                Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin
+                Self.config.dtype,
+                Self._KvPerTileLayoutT,
+                ImmutAnyOrigin,
+                Engine=k_t.Engine,
             ]
         ](
             k_op.block_paged_tile[Self.KV_BLOCK](
@@ -659,7 +667,12 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         kv_head_idx: UInt32,
         t: Int,
         num_keys: Int,
-    ) -> TileTensor[Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin]:
+    ) -> TileTensor[
+        Self.config.dtype,
+        Self._KvPerTileLayoutT,
+        ImmutAnyOrigin,
+        Engine=v_t.Engine,
+    ]:
         """Builds the per-tile V gmem TileTensor (see `_make_k_tile`).
 
         `num_keys` clamps the runtime `dim[0]` identically to
@@ -671,7 +684,10 @@ struct MhaPrefillV2[config: MhaConfigV2]:
         var valid_rows = min(Self.KV_BLOCK, num_keys - t * Self.KV_BLOCK)
         return rebind[
             TileTensor[
-                Self.config.dtype, Self._KvPerTileLayoutT, ImmutAnyOrigin
+                Self.config.dtype,
+                Self._KvPerTileLayoutT,
+                ImmutAnyOrigin,
+                Engine=v_t.Engine,
             ]
         ](
             v_op.block_paged_tile[Self.KV_BLOCK](

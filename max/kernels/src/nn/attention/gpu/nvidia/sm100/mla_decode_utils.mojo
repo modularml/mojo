@@ -2982,7 +2982,7 @@ def write_bf16x2_row_to_smem_chunked[
     shared_mem: UnsafePointer[
         Scalar[out_dtype], MutAnyOrigin, address_space=.SHARED
     ],
-    local_mem: LocalTensor[in_dtype, row_major[local_tile_size]()],
+    local_mem: LocalTensor[in_dtype, row_major[local_tile_size](), _],
     col_start: Int,
     row_start: Int,
     scale: Scalar[in_dtype] = 1.0,
@@ -3070,7 +3070,7 @@ def write_fp8_row_to_smem_chunked[
     shared_mem: UnsafePointer[
         Scalar[out_dtype], MutAnyOrigin, address_space=.SHARED
     ],
-    local_mem: LocalTensor[in_dtype, row_major[local_tile_size]()],
+    local_mem: LocalTensor[in_dtype, row_major[local_tile_size](), _],
     col_start: Int,
     row_start: Int,
     scale: Scalar[in_dtype] = 1.0,
@@ -3558,7 +3558,7 @@ struct MLA_SM100_Decode_Common[
         tiles_done: Int,
         col0: Int,
         num_keys: Int,
-        s_row: LocalTensor[Self.AccumType, row_major[half_load]()],
+        s_row: LocalTensor[Self.AccumType, row_major[half_load](), _],
         mask: Self.MaskType,
         prompt_idx: UInt32,
         q_head_idx: UInt32,

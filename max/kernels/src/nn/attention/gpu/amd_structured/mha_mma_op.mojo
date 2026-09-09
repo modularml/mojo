@@ -562,7 +562,7 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
         //,
     ](
         mut dst: RegTile[Self.T, layout_dst, MutUntrackedOrigin],
-        src: SMemTile[Self.T, layout_src, MutAnyOrigin],
+        src: SMemTile[Self.T, layout_src, MutAnyOrigin, _],
     ):
         """Loads the whole `(KV_BLOCK, DEPTH)` K tile from SMEM into the
         row_l register tile (32×MMA_K base tiles), unswizzling on the way.
@@ -779,7 +779,7 @@ struct MhaMmaOp[T: DType, config: MhaConfigV2]:
         //,
     ](
         mut dst: RegTile[Self.T, layout_dst, MutUntrackedOrigin],
-        src: SMemTile[Self.T, layout_src, MutAnyOrigin],
+        src: SMemTile[Self.T, layout_src, MutAnyOrigin, _],
     ):
         """Loads the whole V tile from SMEM into the col_l register tile.
 
@@ -1412,7 +1412,11 @@ struct MlaMmaOp[T: DType, config: MhaConfigV2]:
     @always_inline
     def load_K_frag[
         sub_id: Int,
-    ](src: SMemTile[Self.T, _, MutAnyOrigin],) -> SIMD[Self.T, Self.FRAG_ELTS]:
+    ](
+        src: SMemTile[Self.T, _, MutAnyOrigin, _],
+    ) -> SIMD[
+        Self.T, Self.FRAG_ELTS
+    ]:
         """Loads ONE K MFMA fragment (`sub_id`) from the K SMEM sub-view
         `src` and returns it as a SIMD value: the single-fragment
         factoring of the FP8 32x32x64 K-load inner loop.

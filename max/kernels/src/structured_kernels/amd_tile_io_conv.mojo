@@ -837,7 +837,7 @@ struct TileLoaderLDSIm2col[
     @always_inline
     def load_tile(
         self,
-        dst: SMemTile[Self.dtype, _, _],
+        dst: SMemTile[Self.dtype, _, _, ...],
         m_offset: Int,
         k_offset: Int,
     ):

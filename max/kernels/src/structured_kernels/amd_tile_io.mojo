@@ -91,7 +91,7 @@ from layout.coord import crd2idx
 from layout._utils import make_amd_buffer_resource
 from layout.tile_layout import Layout, row_major, col_major
 from layout.swizzle import Swizzle
-from layout.tensor_engine import DefaultEngine
+from layout.tensor_engine import DefaultEngine, TensorEngine
 from layout.tile_tensor import stack_allocation as tt_stack_allocation
 from std.itertools import product
 
@@ -977,7 +977,7 @@ def load_lds_fragment[
     MMA_K: Int,
     swizzle: Optional[Swizzle] = Optional[Swizzle](),
 ](
-    smem_tile: SMemTile[mut=False, _, smem_layout, _],
+    smem_tile: SMemTile[mut=False, _, smem_layout, _, ...],
     reg_tile: RegTile[mut=True, smem_tile.dtype, reg_layout, _],
 ):
     """Load MMA fragments from SMEM to registers using hardware access pattern.
@@ -1115,14 +1115,16 @@ def smem_subtile[
     BN: Int,
     BK: Int,
     dtype: DType,
+    Engine: TensorEngine,
 ](
-    smem_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin, address_space=.SHARED],
+    smem_storage: Engine.StorageType[dtype, MutAnyOrigin, .SHARED],
     tile_row: Int,
     tile_col: Int,
 ) -> TileTensor[
     dtype,
     type_of(row_major[tile_rows, tile_cols]()),
     MutAnyOrigin,
+    Engine=Engine.OffsetResultType[TypeList.of[Int]()],
     address_space=.SHARED,
 ]:
     """Creates a flat TileTensor sub-view of a blocked SMEM layout.
@@ -1140,9 +1142,10 @@ def smem_subtile[
         BN: Number of rows per block (full block height).
         BK: Number of columns per block (full block width).
         dtype: Element data type.
+        Engine: `TensorEngine` of the SMEM storage handle.
 
     Args:
-        smem_ptr: Base pointer to the SMEM allocation.
+        smem_storage: Storage handle for the SMEM allocation.
         tile_row: Tile row index (0-based, in units of tile_rows).
         tile_col: Tile column index (0-based, in units of tile_cols).
 
@@ -1151,12 +1154,10 @@ def smem_subtile[
     """
     comptime block_size = BN * BK
     var offset = tile_row * tile_rows * BK + tile_col * block_size
-    return TileTensor[
-        dtype,
-        type_of(row_major[tile_rows, tile_cols]()),
-        MutAnyOrigin,
-        address_space=.SHARED,
-    ](smem_ptr + offset, row_major[tile_rows, tile_cols]())
+    return {
+        Engine.offset(smem_storage, Coord(offset)),
+        row_major[tile_rows, tile_cols](),
+    }
 
 
 @always_inline
@@ -1195,8 +1196,9 @@ def smem_mma_subtile[
     BN: Int,
     BK: Int,
     dtype: DType,
+    Engine: TensorEngine,
 ](
-    smem_ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin, address_space=.SHARED],
+    smem_storage: Engine.StorageType[dtype, MutAnyOrigin, .SHARED],
     bk_tile: Int,
     k_sub: Int,
     mma_idx: Int,
@@ -1204,6 +1206,7 @@ def smem_mma_subtile[
     dtype,
     type_of(row_major[mma_rows, mma_cols]()),
     MutAnyOrigin,
+    Engine=Engine.OffsetResultType[TypeList.of[Int]()],
     address_space=.SHARED,
 ]:
     """Creates a flat TileTensor for an MMA-sized sub-tile in blocked SMEM.
@@ -1223,9 +1226,11 @@ def smem_mma_subtile[
         BN: Block height.
         BK: Block width.
         dtype: Element data type.
+        Engine: `TensorEngine` of the SMEM storage handle.
 
     Args:
-        smem_ptr: Base pointer to the SMEM allocation for this buffer stage.
+        smem_storage: Storage handle for the SMEM allocation for this
+            buffer stage.
         bk_tile: Which BK-tall row group (0..depth/BK-1).
         k_sub: Which MMA_K sub-row within the BK group (0..BK/MMA_K-1).
         mma_idx: Linear MMA tile index across the full depth dimension.
@@ -1236,12 +1241,10 @@ def smem_mma_subtile[
     var offset = smem_mma_subtile_offset[mma_rows, mma_cols, BN, BK](
         bk_tile, k_sub, mma_idx
     )
-    return TileTensor[
-        dtype,
-        type_of(row_major[mma_rows, mma_cols]()),
-        MutAnyOrigin,
-        address_space=.SHARED,
-    ](smem_ptr + offset, row_major[mma_rows, mma_cols]())
+    return {
+        Engine.offset(smem_storage, Coord(offset)),
+        row_major[mma_rows, mma_cols](),
+    }
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1282,7 +1285,7 @@ trait TileLoader(TrivialRegisterPassable):
     @always_inline
     def load_tile(
         self,
-        dst: SMemTile[Self.dtype, _, _],
+        dst: SMemTile[Self.dtype, _, _, ...],
         m_offset: Int,
         k_offset: Int,
     ):
@@ -1520,7 +1523,7 @@ struct TileLoaderLDS[
     @always_inline
     def load_tile(
         self,
-        dst: SMemTile[Self.dtype, _, _],
+        dst: SMemTile[Self.dtype, _, _, ...],
         m_offset: Int,
         k_offset: Int,
     ):
@@ -2876,7 +2879,7 @@ struct RegTileWriterLDS[
     @always_inline
     def copy_blocked[
         block_cols: Int,
-    ](dst: SMemTile[mut=True, _, _, _], src: RegTile[dst.dtype, _, _]):
+    ](dst: SMemTile[mut=True, _, _, _, ...], src: RegTile[dst.dtype, _, _]):
         """Copy register tile to blocked_product SMEM layout.
 
         Handles structural mismatches between `thread_layout` and SMEM
@@ -2964,7 +2967,8 @@ comptime GMemTile[
     dtype: DType,
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
-] = TileTensor[dtype, LayoutType, origin]
+    Engine: TensorEngine,
+] = TileTensor[dtype, LayoutType, origin, Engine=Engine]
 """Global memory tile. Alias for TileTensor in default (GENERIC) address space."""
 
 
@@ -2974,7 +2978,8 @@ comptime SMemTile[
     dtype: DType,
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
-] = TileTensor[dtype, LayoutType, origin, address_space=.SHARED]
+    Engine: TensorEngine,
+] = TileTensor[dtype, LayoutType, origin, Engine=Engine, address_space=.SHARED]
 """Shared memory tile. Alias for TileTensor in SHARED address space."""
 
 
@@ -3019,7 +3024,10 @@ def smem_alloc[
     dtype: DType,
     alignment: Int = align_of[dtype](),
 ](var layout: LayoutType) -> SMemTile[
-    dtype, LayoutType, MutUntrackedOrigin
+    dtype,
+    LayoutType,
+    MutUntrackedOrigin,
+    DefaultEngine[element_width=1],
 ] where LayoutType.all_dims_known:
     """Stack-allocate a shared memory tile (SHARED address space) with the given layout.
     """

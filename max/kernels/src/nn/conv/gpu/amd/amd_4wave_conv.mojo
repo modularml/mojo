@@ -376,6 +376,9 @@ def amd_4wave_conv[
             a.LayoutType,
             b.LayoutType,
             c.LayoutType,
+            a.Engine,
+            b.Engine,
+            c.Engine,
             has_residual=has_residual,
             elementwise_compute_lambda_fn=elementwise_compute_lambda_fn,
         ]

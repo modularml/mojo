@@ -153,7 +153,7 @@ struct QuadrantMmaOp[
     @always_inline
     def load_a_quadrant[
         which: Int
-    ](self, smem_tile: SMemTile[Self.in_type, _, _],):
+    ](self, smem_tile: SMemTile[Self.in_type, _, _, _],):
         """Load A quadrant `which` from SMEM sub-tile to registers.
 
         Tiles a_reg as [quad_m, reg_cols](which, 0) to get the register
@@ -177,7 +177,7 @@ struct QuadrantMmaOp[
     @always_inline
     def load_b_quadrant[
         which: Int
-    ](self, smem_tile: SMemTile[Self.in_type, _, _],):
+    ](self, smem_tile: SMemTile[Self.in_type, _, _, _],):
         """Load B quadrant `which` from SMEM sub-tile to registers.
 
         Parameters:
@@ -424,8 +424,8 @@ struct MmaOp[
         k_tile_idx: Int
     ](
         self,
-        a_smem_warp: SMemTile[Self.in_type, _, _],
-        b_smem_warp: SMemTile[Self.in_type, _, _],
+        a_smem_warp: SMemTile[Self.in_type, _, _, _],
+        b_smem_warp: SMemTile[Self.in_type, _, _, _],
     ):
         """Load A and B MMA fragments for k-tile k_tile_idx from SMEM.
 

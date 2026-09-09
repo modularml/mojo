@@ -1252,6 +1252,9 @@ struct AMD4WaveMatmul[
         a_layout: TensorLayout,
         b_layout: TensorLayout,
         c_layout: TensorLayout,
+        a_engine: TensorEngine,
+        b_engine: TensorEngine,
+        c_engine: TensorEngine,
         has_residual: Bool = False,
         # Pre-residual fused compute lambda (SM100 reference:
         # `D = lambda(Conv(A,B)) + beta * C`). Fires on the post-cast
@@ -1265,9 +1268,9 @@ struct AMD4WaveMatmul[
             elementwise_compute_lambda_type
         ] = None,
     ](
-        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin],
-        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin],
-        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin],
+        a: TileTensor[Self.a_type, a_layout, ImmutAnyOrigin, Engine=a_engine],
+        b: TileTensor[Self.b_type, b_layout, ImmutAnyOrigin, Engine=b_engine],
+        c: TileTensor[Self.c_type, c_layout, MutAnyOrigin, Engine=c_engine],
         source_ptr: UnsafePointer[Scalar[Self.c_type], ImmutAnyOrigin],
         source_row_stride: Int32,
         beta: Float32,
@@ -1299,6 +1302,9 @@ struct AMD4WaveMatmul[
             a_layout: Logical layout of `a` (4D NHWC).
             b_layout: Logical layout of `b` (2D `[C_out, K]` filter).
             c_layout: Logical layout of `c` (2D `[M, C_out]` output).
+            a_engine: `TensorEngine` of `a`.
+            b_engine: `TensorEngine` of `b`.
+            c_engine: `TensorEngine` of `c`.
             has_residual: When True, prefetch + FMA in `source * beta`
                 during the epilogue. When False, the residual args are
                 unused and the epilogue is identical to the no-residual
