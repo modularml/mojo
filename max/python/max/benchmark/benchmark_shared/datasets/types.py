@@ -134,6 +134,8 @@ class SessionMessage:
     content: str
     num_tokens: int
     delay_until_next_message: float | None = None
+    # An agent-loop round; the wire role is still "user".
+    is_agentic: bool = False
 
 
 @dataclass
@@ -144,7 +146,7 @@ class ChatSession:
 
     @property
     def num_turns(self) -> int:
-        """Number of user-initiated turns (model invocations) in the session."""
+        """Model invocations, agent-loop rounds included: the request count."""
         return sum(1 for m in self.messages if m.source == "user")
 
 

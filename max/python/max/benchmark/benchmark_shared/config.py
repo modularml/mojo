@@ -730,6 +730,32 @@ class ServingBenchmarkConfig(BaseServingBenchmarkConfig):
         description="Ratio to determine the system prompt length, used only for random sampling.",
         json_schema_extra={"group": "Dataset-Specific Parameters"},
     )
+    agentic_tool_profiles: str | None = Field(
+        default=None,
+        description=(
+            "Load shapes for the agent-loop rounds that follow each human"
+            " turn, synthesized rather than replayed. These are not tool"
+            " definitions: nothing here is sent as the OpenAI 'tools' field."
+            " Either a path to a YAML file, or an inline YAML/JSON mapping;"
+            " both hold a 'tools' list, e.g."
+            ' \'{"tools":[{"input-len":"N(200,80)",'
+            '"output-len":"N(190,60)"}]}\'. Each round is one request'
+            " carrying one tool result. Requires --fit-distributions,"
+            " --agentic-rounds-per-turn, and --dataset-name instruct-coder,"
+            " agentic-code, or nemotron-opencode."
+        ),
+        json_schema_extra={"group": "Dataset-Specific Parameters"},
+    )
+    agentic_rounds_per_turn: DistributionParameter | None = Field(
+        default=None,
+        description=(
+            "Number of agent-loop rounds following each human turn,"
+            " sampled once per turn. Accepts a constant or a distribution"
+            " string (same format as --random-input-len). Requires"
+            " --agentic-tool-profiles."
+        ),
+        json_schema_extra={"group": "Dataset-Specific Parameters"},
+    )
     fit_distributions: bool = Field(
         default=False,
         description=(

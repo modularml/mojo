@@ -22,6 +22,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from ._hf_download import hf_hub_download_with_retry
 from ._tokenizer_pool import TokenizerPool
+from .agentic_tools import ToolConfig
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
 from .multiturn_distribution_fit import build_fitted_chat_samples
@@ -173,6 +174,8 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
         sys_prompt_ratio: float = 0.0,
         max_num_unique_sys_prompt: int = 1,
         min_input_len: int = 4,
+        tools: Sequence[ToolConfig] | None = None,
+        agentic_rounds_per_turn: DistributionParameter | None = None,
         min_output_len: int = 1,
     ) -> ChatSamples:
         """Generate multi-turn chat sessions from InstructCoder entries.
@@ -240,6 +243,8 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
                 max_num_unique_sys_prompt=max_num_unique_sys_prompt,
                 min_input_len=min_input_len,
                 min_output_len=min_output_len,
+                tools=tools,
+                agentic_rounds_per_turn=agentic_rounds_per_turn,
             )
 
         # Pre-tokenize to get lengths and filter unusable entries.
@@ -307,6 +312,8 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
         max_num_unique_sys_prompt: int,
         min_input_len: int,
         min_output_len: int,
+        tools: Sequence[ToolConfig] | None,
+        agentic_rounds_per_turn: DistributionParameter | None,
     ) -> ChatSamples:
         """Build multiturn sessions with sampled lengths (see ``gen_multiturn_sessions``)."""
         return build_fitted_chat_samples(
@@ -322,5 +329,7 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
             min_input_len=min_input_len,
             min_output_len=min_output_len,
             shuffle_pool=False,
+            tools=tools,
+            agentic_rounds_per_turn=agentic_rounds_per_turn,
             log_prefix="instruct-coder",
         )

@@ -23,13 +23,14 @@ from __future__ import annotations
 import itertools
 import logging
 import random
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Iterator, Sequence
+from dataclasses import dataclass, replace
 
 import numpy as np
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from ._tokenizer_pool import TokenizerPool, worker_tokenizer
+from .agentic_tools import ToolConfig
 from .distribution import BaseDistribution, DistributionParameter
 from .turn_profile import TurnProfile
 from .types import (
@@ -43,14 +44,19 @@ from .types import (
 
 @dataclass(frozen=True)
 class _TurnSpec:
-    """Pre-sampled inputs for one request: a user message and its reply."""
+    """Pre-sampled inputs for one request: a user message and its reply.
+
+    ``is_agentic`` describes the user half -- a tool result, not a question.
+    """
 
     prompt_text: str
     target_in: int
     target_out: int
     sys_variant: int
-    # The delay that precedes this turn: the user's think-time before asking.
+    # The delay that precedes this turn: a tool's latency before a round,
+    # the user's think-time before a question.
     preceding_delay_ms: float | None
+    is_agentic: bool = False
     unique_marker: str = ""
 
 
@@ -307,6 +313,7 @@ def _build_session(args: _SessionArgs) -> _SessionResult:
                 source="user",
                 content=msg.content,
                 num_tokens=msg.num_tokens,
+                is_agentic=turn.is_agentic,
             )
         )
         # The driver sleeps after each reply, so this one carries the
@@ -346,9 +353,12 @@ def _build_sessions(
     *,
     pool: TokenizerPool,
     user_text_pool: Sequence[str],
+    tool_text_pool: Sequence[str],
     session_turn_counts: Sequence[int],
     first_turn_profile: TurnProfile,
     later_turn_profile: TurnProfile,
+    tools: Sequence[ToolConfig] | None,
+    rounds: BaseDistribution | None,
     min_output_len: int,
     sys_prompt_ratio: float,
     max_num_unique_sys_prompt: int,
@@ -356,7 +366,11 @@ def _build_sessions(
     shuffle_pool: bool,
     log_prefix: str,
 ) -> ChatSamples:
-    """Draw each session's turns and build them from the pool."""
+    """Draw each session's turns and build them from the pools.
+
+    A human turn and an agent-loop round are the same draw from different
+    distributions, so both go through one loop.
+    """
     model_max_length = min(
         pool.tokenizer.model_max_length, np.iinfo(np.int64).max
     )
@@ -388,33 +402,49 @@ def _build_sessions(
             total_turns_needed,
         )
 
+    # A real tool result can be a token or two, so no min-length filter here.
+    # Datasets with no recorded tool messages fall back to the user pool; the
+    # copy keeps the two shuffled and cycled independently below.
+    tool_texts = list(tool_text_pool or filtered_user_texts)
     if shuffle_pool:
         random.shuffle(filtered_user_texts)
+        random.shuffle(tool_texts)
 
     warmup_dict: dict[int, SharedContext] = {}
     max_variant = max(1, max_num_unique_sys_prompt)
     session_args_list: list[_SessionArgs] = []
+    # One cycle per pool, so one wrapping does not disturb the other.
     user_body_cycle = itertools.cycle(filtered_user_texts)
+    tool_body_cycle = itertools.cycle(tool_texts)
     draw_counter = itertools.count()
+    tool_list = list(tools) if tools else []
+    tool_weights = [tool.weight for tool in tool_list]
 
     def add_turn(
         turns: list[_TurnSpec],
         profile: TurnProfile,
+        body_cycle: Iterator[str],
         *,
         session_id: int,
         turn_i: int,
+        is_agentic: bool,
     ) -> None:
-        """Draw one turn and append it, taking its body from the pool."""
+        """Draw one spec and append it, taking its body from ``body_cycle``.
+
+        A spec is a human turn or an agent-loop round; both draw the same
+        way, from different profiles.
+        """
         targets = profile.draw(
             min_input_len=min_input_len, min_output_len=min_output_len
         )
         turns.append(
             _TurnSpec(
-                prompt_text=next(user_body_cycle),
+                prompt_text=next(body_cycle),
                 target_in=targets.input_len,
                 target_out=targets.output_len,
                 sys_variant=(session_id + turn_i) % max_variant,
                 preceding_delay_ms=targets.delay_ms,
+                is_agentic=is_agentic,
                 # Marked unconditionally: avoids unintended shared prefixes.
                 unique_marker=f"[{next(draw_counter)}] ",
             )
@@ -423,12 +453,42 @@ def _build_sessions(
     for session_id, n_turns in enumerate(session_turn_counts):
         turn_specs: list[_TurnSpec] = []
         for turn_i in range(n_turns):
+            block_start = len(turn_specs)
             add_turn(
                 turn_specs,
                 first_turn_profile if turn_i == 0 else later_turn_profile,
+                user_body_cycle,
                 session_id=session_id,
                 turn_i=turn_i,
+                is_agentic=False,
             )
+            if tool_list and rounds is not None:
+                for tool in random.choices(
+                    tool_list,
+                    weights=tool_weights,
+                    k=max(round(rounds.sample_value()), 0),
+                ):
+                    add_turn(
+                        turn_specs,
+                        tool.profile,
+                        tool_body_cycle,
+                        session_id=session_id,
+                        turn_i=turn_i,
+                        is_agentic=True,
+                    )
+
+            # Each spec goes on the wire as a user message and a reply. In
+            # the agent loop a reply is the call to the NEXT tool rather than
+            # an answer to what just arrived, so every round displaces the
+            # human's answer one slot further right. Rotating target_out one
+            # slot left restores call-before-result, and the modulo wrap
+            # leaves the human's answer on the block's last reply.
+            block = turn_specs[block_start:]
+            outs = [spec.target_out for spec in block]
+            turn_specs[block_start:] = [
+                replace(spec, target_out=outs[(i + 1) % len(outs)])
+                for i, spec in enumerate(block)
+            ]
 
         session_args_list.append(
             _SessionArgs(
@@ -491,6 +551,9 @@ def build_fitted_chat_samples(
     min_output_len: int = 1,
     *,
     shuffle_pool: bool = False,
+    tools: Sequence[ToolConfig] | None = None,
+    agentic_rounds_per_turn: DistributionParameter | None = None,
+    tool_text_pool: Sequence[str] | None = None,
     log_prefix: str = "multiturn-fit",
 ) -> ChatSamples:
     """Assemble :class:`ChatSamples` by grouping pooled user strings into sessions.
@@ -517,9 +580,16 @@ def build_fitted_chat_samples(
         delay_between_turns_dist: Optional per-assistant-message delay (ms).
         sys_prompt_ratio: Fraction of user message token budget for system prefix.
         max_num_unique_sys_prompt: Cycle count for system-prefix variants.
-        min_input_len: Floor for sampled input lengths.
+        min_input_len: Floor for sampled input lengths, human turns and
+            agent-loop rounds alike. A round also carries the ``[N] `` marker,
+            so a sub-floor tool profile cannot reach the wire either way.
         min_output_len: Floor for sampled output lengths.
-        shuffle_pool: Whether to shuffle ``user_text_pool`` in place before use.
+        shuffle_pool: Whether to randomize the draw order of the text pools.
+        tools: Optional tool profiles for an agent loop after each turn.
+        agentic_rounds_per_turn: How many rounds follow each turn. Given with
+            ``tools``, or neither.
+        tool_text_pool: Optional body pool for agent-loop rounds; defaults to
+            ``user_text_pool``.
         log_prefix: Logger prefix for warnings.
 
     Returns:
@@ -540,6 +610,16 @@ def build_fitted_chat_samples(
         input_len=rest_in, output_len=rest_out, delay=delay_between_turns_dist
     )
 
+    rounds_dist = BaseDistribution.from_distribution_parameter(
+        agentic_rounds_per_turn
+    )
+    if (tools is None) != (rounds_dist is None):
+        raise ValueError(
+            "tools and agentic_rounds_per_turn must be given together: one"
+            " says what a round costs, the other how many rounds run per"
+            " turn."
+        )
+
     # Turn counts are drawn up front, before any per-turn target, matching the
     # original sampling order so a fixed seed reproduces earlier runs.
     num_turns_dist = BaseDistribution.from_distribution_parameter_or_raise(
@@ -553,9 +633,12 @@ def build_fitted_chat_samples(
     return _build_sessions(
         pool=pool,
         user_text_pool=user_text_pool,
+        tool_text_pool=tool_text_pool or [],
         session_turn_counts=session_turn_counts,
         first_turn_profile=first_turn_profile,
         later_turn_profile=later_turn_profile,
+        tools=tools,
+        rounds=rounds_dist,
         min_input_len=min_input_len,
         min_output_len=min_output_len,
         sys_prompt_ratio=sys_prompt_ratio,

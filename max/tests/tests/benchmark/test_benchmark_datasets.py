@@ -24,6 +24,7 @@ from unittest.mock import Mock, mock_open, patch
 import msgspec
 import pytest
 from huggingface_hub import errors as hf_hub_errors
+from max.benchmark.benchmark_shared.config import ServingBenchmarkConfig
 from max.benchmark.benchmark_shared.datasets import (
     DATASET_REGISTRY,
     ArtificialAnalysisBenchmarkDataset,
@@ -54,6 +55,12 @@ from max.benchmark.benchmark_shared.datasets._tokenizer_pool import (
     TokenizerPool,
     _init_encoder,
 )
+from max.benchmark.benchmark_shared.datasets.agentic_tools import (
+    ToolConfig,
+)
+from max.benchmark.benchmark_shared.datasets.all import (
+    _resolve_agentic_tool_profiles,
+)
 from max.benchmark.benchmark_shared.datasets.chat_judge import (
     ChatJudgeBenchmarkDataset,
 )
@@ -68,6 +75,7 @@ from max.benchmark.benchmark_shared.datasets.nemotron_opencode import (
     AnthropicTool,
     _anthropic_tool_to_openai,
 )
+from max.benchmark.benchmark_shared.datasets.types import ChatSamples
 from PIL import Image
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
@@ -112,6 +120,33 @@ def _fake_loader(
     revision: str | None,
 ) -> _FakeTokenizer:
     return _FakeTokenizer(model_max_length=model_max_length or 4096)
+
+
+class _RoundTripTokenizer(_FakeTokenizer):
+    """Fake tokenizer whose decode(encode(x)) == x.
+
+    `_FakeTokenizer.decode` returns filler, which hides which pool a body came
+    from.
+    """
+
+    def encode(
+        self, text: str, add_special_tokens: bool = False, **_: object
+    ) -> list[int]:
+        return [ord(c) for c in text] or [32]
+
+    def decode(
+        self, ids: list[int], skip_special_tokens: bool = False, **_: object
+    ) -> str:
+        return "".join(chr(i) for i in ids)
+
+
+def _round_trip_loader(
+    name_or_path: str,
+    model_max_length: int | None,
+    trust_remote_code: bool,
+    revision: str | None,
+) -> _RoundTripTokenizer:
+    return _RoundTripTokenizer(model_max_length=model_max_length or 4096)
 
 
 def _raising_loader(
@@ -1725,3 +1760,297 @@ def test_system_prefix_lands_on_the_first_turn_only() -> None:
 
     # The prefix must still reach warmup now that only turn 0 carries one.
     assert samples.shared_contexts
+
+
+# ---------------------------------------------------------------------------
+# Agent rounds and text pools
+# ---------------------------------------------------------------------------
+
+
+def _tools(input_len: str = "40") -> list[ToolConfig]:
+    return [
+        ToolConfig.model_validate({"input-len": input_len, "output-len": "10"})
+    ]
+
+
+def _build(
+    tok: object,
+    loader: object,
+    *,
+    user_pool: list[str],
+    tool_pool: list[str] | None = None,
+    num_turns: str = "2",
+    rounds: str | None = "3",
+    sessions: int = 3,
+) -> ChatSamples:
+    with TokenizerPool(tok, loader=loader) as pool:  # type: ignore[arg-type]
+        return build_fitted_chat_samples(
+            pool=pool,
+            user_text_pool=user_pool,
+            num_sessions=sessions,
+            num_turns=num_turns,
+            input_len="40",
+            output_len="10",
+            delay_between_turns_dist=None,
+            sys_prompt_ratio=0.0,
+            max_num_unique_sys_prompt=1,
+            min_input_len=4,
+            tools=_tools() if rounds is not None else None,
+            agentic_rounds_per_turn=rounds,
+            tool_text_pool=tool_pool,
+            log_prefix="test",
+        )
+
+
+def test_agent_rounds_draw_from_the_tool_pool() -> None:
+    """Rounds take their bodies from the tool pool, human turns from theirs.
+
+    The tool entries are all under ``min_input_len``: a real result can be one
+    or two tokens, so the pool filter that guards the human pool must not run
+    here. If it did, these would be dropped and the human pool silently reused.
+    """
+    tok = _RoundTripTokenizer(model_max_length=100_000)
+    samples = _build(
+        tok,
+        _round_trip_loader,
+        user_pool=[f"HUMAN-{i} " * 20 for i in range(8)],
+        tool_pool=["ok", "0", "ab", "xy"],
+    )
+    assert samples.chat_sessions
+    for session in samples.chat_sessions:
+        users = [m for m in session.messages if m.source == "user"]
+        assert len(users) == 8, "2 human turns, each followed by 3 rounds"
+        assert sum("HUMAN-" in m.content for m in users) == 2
+        assert [m.is_agentic for m in users].count(True) == 6
+        # Round-trip tokenizer scales by repeating, so the seed text survives.
+        rounds = [m.content for m in users if m.is_agentic]
+        assert all("HUMAN-" not in body for body in rounds)
+        assert all(
+            any(seed in body for seed in ("ok", "0", "ab", "xy"))
+            for body in rounds
+        )
+
+
+def test_tool_cycle_is_independent_of_the_human_cycle() -> None:
+    """A shared cycle would perturb the tool pool as the human pool wraps."""
+    tok = _RoundTripTokenizer(model_max_length=100_000)
+    samples = _build(
+        tok,
+        _round_trip_loader,
+        user_pool=[f"HUMAN-{i} " * 20 for i in range(2)],  # wraps at once
+        tool_pool=[f"TOOL-{i} " * 20 for i in range(500)],  # never wraps
+        sessions=6,
+    )
+    drawn = [
+        m.content.split("TOOL-")[1].split()[0]
+        for s in samples.chat_sessions
+        for m in s.messages
+        if m.source == "user" and "TOOL-" in m.content
+    ]
+    # 6 sessions x 2 turns x 3 rounds against a 500-entry pool, so the tool
+    # cycle never wraps and every round takes a fresh entry -- which a cycle
+    # shared with the fast-wrapping human pool could not do.
+    assert len(drawn) == 36
+    assert len(set(drawn)) == len(drawn)
+
+
+def test_full_flag_path_builds_the_documented_shape() -> None:
+    """S U A (U* A* ...) U A (U* A* ...), driven the way the CLI drives it."""
+    args = ServingBenchmarkConfig(
+        model="m",
+        dataset_name="instruct-coder",
+        fit_distributions=True,
+        num_chat_sessions=2,
+        agentic_tool_profiles=(
+            '{"tools":[{"input-len":"40","output-len":"10","delay":"250"}]}'
+        ),
+        agentic_rounds_per_turn="3",
+    )
+    tools = _resolve_agentic_tool_profiles(args)
+    assert tools is not None
+
+    tok = _RoundTripTokenizer(model_max_length=100_000)
+    with TokenizerPool(tok, loader=_round_trip_loader) as pool:
+        samples = build_fitted_chat_samples(
+            pool=pool,
+            user_text_pool=[f"HUMAN-{i} " * 20 for i in range(8)],
+            num_sessions=2,
+            num_turns="2",
+            input_len="40",
+            output_len="10",
+            delay_between_turns_dist="30000",
+            sys_prompt_ratio=0.0,
+            max_num_unique_sys_prompt=1,
+            min_input_len=4,
+            tools=tools,
+            agentic_rounds_per_turn=args.agentic_rounds_per_turn,
+            tool_text_pool=[f"TOOL-{i} " * 20 for i in range(60)],
+            log_prefix="test",
+        )
+
+    for session in samples.chat_sessions:
+        kinds = [
+            "U*" if m.is_agentic else "U"
+            for m in session.messages
+            if m.source == "user"
+        ]
+        assert kinds == ["U", "U*", "U*", "U*", "U", "U*", "U*", "U*"]
+        # Only the reply that closes a block waits on the human.
+        delays = [
+            m.delay_until_next_message
+            for m in session.messages
+            if m.source == "assistant"
+        ]
+        # Each reply carries the delay before whatever follows it: tool
+        # latency inside a block, human think-time before the next
+        # question. The session's last reply has nothing to follow it.
+        assert delays == [
+            250.0,
+            250.0,
+            250.0,
+            30000.0,
+            250.0,
+            250.0,
+            250.0,
+            None,
+        ]
+
+
+def _round_input_lens(samples: ChatSamples) -> list[int]:
+    return [
+        m.num_tokens
+        for s in samples.chat_sessions
+        for m in s.messages
+        if m.source == "user" and m.is_agentic
+    ]
+
+
+def _weighted_tools() -> list[ToolConfig]:
+    """Two tools whose input lengths tell them apart, 3:1 by weight."""
+    return [
+        ToolConfig.model_validate(
+            {"weight": 3, "input-len": "40", "output-len": "10"}
+        ),
+        ToolConfig.model_validate(
+            {"weight": 1, "input-len": "400", "output-len": "10"}
+        ),
+    ]
+
+
+def test_block_output_lengths_rotate_onto_the_calls() -> None:
+    """The block's decodes are tool calls; its answer to the human is last.
+
+    An assistant message inside the loop is the call to the *next* tool, so it
+    takes that tool's ``output-len``. Only the block's final assistant is the
+    prose answer, which is what ``--random-output-len`` describes.
+    """
+    tools = [
+        ToolConfig.model_validate(
+            {"input-len": "40", "output-len": "11", "delay": "200"}
+        )
+    ]
+    tok = _RoundTripTokenizer(model_max_length=1_000_000)
+    with TokenizerPool(tok, loader=_round_trip_loader) as pool:
+        samples = build_fitted_chat_samples(
+            pool=pool,
+            user_text_pool=[f"HUMAN-{i} " * 30 for i in range(12)],
+            num_sessions=1,
+            num_turns="1",
+            input_len="50",
+            output_len="333",
+            delay_between_turns_dist="4000",
+            sys_prompt_ratio=0.0,
+            max_num_unique_sys_prompt=1,
+            min_input_len=4,
+            tools=tools,
+            agentic_rounds_per_turn="2",
+            tool_text_pool=[f"TOOL-{i} " * 25 for i in range(12)],
+            log_prefix="test",
+        )
+    decodes = [
+        m.num_tokens
+        for m in samples.chat_sessions[0].messages
+        if m.source == "assistant"
+    ]
+    assert decodes == [11, 11, 333], (
+        "each in-loop decode is a tool call sized by its tool; the human's"
+        " output-len belongs to the final answer"
+    )
+
+
+def test_a_block_without_rounds_keeps_its_own_output_len() -> None:
+    """The rotation is the identity with no rounds, so S U A U A is intact."""
+    tok = _RoundTripTokenizer(model_max_length=1_000_000)
+    with TokenizerPool(tok, loader=_round_trip_loader) as pool:
+        samples = build_fitted_chat_samples(
+            pool=pool,
+            user_text_pool=[f"HUMAN-{i} " * 30 for i in range(12)],
+            num_sessions=1,
+            num_turns="3",
+            input_len="50",
+            output_len="333",
+            delay_between_turns_dist="4000",
+            sys_prompt_ratio=0.0,
+            max_num_unique_sys_prompt=1,
+            min_input_len=4,
+            log_prefix="test",
+        )
+    decodes = [
+        m.num_tokens
+        for m in samples.chat_sessions[0].messages
+        if m.source == "assistant"
+    ]
+    assert decodes == [333, 333, 333]
+
+
+@pytest.mark.parametrize(
+    ("tools", "rounds"),
+    [(None, "3"), (_tools(), None)],
+    ids=["rounds-without-tools", "tools-without-rounds"],
+)
+def test_agentic_arguments_are_required_together(
+    tools: list[ToolConfig] | None, rounds: str | None
+) -> None:
+    """Half a pair used to parse and then build a plain multiturn workload."""
+    tok = _RoundTripTokenizer(model_max_length=100_000)
+    with TokenizerPool(tok, loader=_round_trip_loader) as pool:
+        with pytest.raises(ValueError, match="must be given together"):
+            build_fitted_chat_samples(
+                pool=pool,
+                user_text_pool=["BODY " * 20],
+                num_sessions=1,
+                num_turns="1",
+                input_len="40",
+                output_len="10",
+                delay_between_turns_dist=None,
+                sys_prompt_ratio=0.0,
+                max_num_unique_sys_prompt=1,
+                tools=tools,
+                agentic_rounds_per_turn=rounds,
+            )
+
+
+def test_round_tool_mix_follows_the_weights() -> None:
+    tok = _RoundTripTokenizer(model_max_length=1_000_000)
+    with TokenizerPool(tok, loader=_round_trip_loader) as pool:
+        samples = build_fitted_chat_samples(
+            pool=pool,
+            user_text_pool=[f"BODY-{i} " * 40 for i in range(50)],
+            num_sessions=40,
+            num_turns="2",
+            input_len="40",
+            output_len="10",
+            delay_between_turns_dist=None,
+            sys_prompt_ratio=0.0,
+            max_num_unique_sys_prompt=1,
+            min_input_len=4,
+            tools=_weighted_tools(),
+            agentic_rounds_per_turn="25",
+            log_prefix="test",
+        )
+
+    lens = _round_input_lens(samples)
+    assert len(lens) == 40 * 2 * 25
+    light = sum(1 for n in lens if n < 100)
+    # 3:1 over 2000 draws; binomial sd is ~20, so this is generous.
+    assert 0.70 < light / len(lens) < 0.80

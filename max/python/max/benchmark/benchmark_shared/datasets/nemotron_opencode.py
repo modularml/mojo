@@ -23,6 +23,7 @@ from huggingface_hub import HfFileSystem
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from ._tokenizer_pool import TokenizerPool
+from .agentic_tools import ToolConfig
 from .distribution import DistributionParameter
 from .huggingface import HuggingFaceBenchmarkDataset
 from .multiturn_distribution_fit import build_fitted_chat_samples
@@ -462,6 +463,8 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
         max_num_unique_sys_prompt: int = 1,
         min_input_len: int = 4,
         min_output_len: int = 1,
+        tools: Sequence[ToolConfig] | None = None,
+        agentic_rounds_per_turn: DistributionParameter | None = None,
         enable_tool_calls: bool = True,
     ) -> ChatSamples:
         """Build :class:`ChatSamples` from streamed rows.
@@ -512,6 +515,8 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
                 min_input_len=min_input_len,
                 min_output_len=min_output_len,
                 shuffle_pool=False,
+                tools=tools,
+                agentic_rounds_per_turn=agentic_rounds_per_turn,
                 log_prefix="nemotron-opencode",
             )
 

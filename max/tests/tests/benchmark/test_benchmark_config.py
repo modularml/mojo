@@ -30,6 +30,10 @@ from max.benchmark.benchmark_shared.config import (
     DEFAULT_BENCHMARK_SEED,
     ServingBenchmarkConfig,
 )
+from max.benchmark.benchmark_shared.datasets import DistributionParameter
+from max.benchmark.benchmark_shared.datasets.all import (
+    _resolve_agentic_tool_profiles,
+)
 
 
 class TestServingSweepFields:
@@ -449,3 +453,86 @@ class TestExtraBodyValidator:
         """A path that does not exist surfaces a clear, dual-cause error."""
         with pytest.raises(ValueError, match="not a readable file path"):
             self._build_with_extra("/nonexistent/payload.yaml")
+
+
+# ---------------------------------------------------------------------------
+# --agentic-tool-profiles validation
+# ---------------------------------------------------------------------------
+
+_INLINE = '{"tools":[{"input-len":"10","output-len":"5"}]}'
+
+
+def _fitted_config(
+    *,
+    agentic_tool_profiles: str | None = None,
+    agentic_rounds_per_turn: DistributionParameter | None = None,
+) -> ServingBenchmarkConfig:
+    """A fitted multiturn run, the only shape that reaches the agent loop."""
+    return ServingBenchmarkConfig(
+        model="m",
+        dataset_name="instruct-coder",
+        fit_distributions=True,
+        num_chat_sessions=4,
+        agentic_tool_profiles=agentic_tool_profiles,
+        agentic_rounds_per_turn=agentic_rounds_per_turn,
+    )
+
+
+def test_agentic_absent_by_default() -> None:
+    assert (
+        _resolve_agentic_tool_profiles(ServingBenchmarkConfig(model="m"))
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("tool_profiles", "rounds_per_turn"),
+    [(_INLINE, None), (None, 3)],
+    ids=["tools-without-rounds", "rounds-without-tools"],
+)
+def test_agentic_flags_must_be_set_together(
+    tool_profiles: str | None,
+    rounds_per_turn: DistributionParameter | None,
+) -> None:
+    args = _fitted_config(
+        agentic_tool_profiles=tool_profiles,
+        agentic_rounds_per_turn=rounds_per_turn,
+    )
+    with pytest.raises(ValueError, match="must be set together"):
+        _resolve_agentic_tool_profiles(args)
+
+
+@pytest.mark.parametrize(
+    ("dataset_name", "fit_distributions", "num_chat_sessions"),
+    [
+        ("instruct-coder", False, 4),
+        # Any dataset off the fitted list takes the same branch.
+        ("random", True, 4),
+        # The agent loop lives on the multiturn path; a single-turn run would
+        # otherwise accept the flags and silently send plain requests.
+        ("instruct-coder", True, None),
+    ],
+)
+def test_agentic_needs_a_run_that_reaches_the_builder(
+    dataset_name: str, fit_distributions: bool, num_chat_sessions: int | None
+) -> None:
+    """Only a fitted multiturn run on the three datasets assembles it."""
+    args = ServingBenchmarkConfig(
+        model="m",
+        dataset_name=dataset_name,
+        fit_distributions=fit_distributions,
+        num_chat_sessions=num_chat_sessions,
+        agentic_tool_profiles=_INLINE,
+        agentic_rounds_per_turn=3,
+    )
+    with pytest.raises(ValueError, match="needs --fit-distributions with"):
+        _resolve_agentic_tool_profiles(args)
+
+
+def test_agentic_resolves_when_fully_specified() -> None:
+    args = _fitted_config(
+        agentic_tool_profiles=_INLINE,
+        agentic_rounds_per_turn="NB(33,0.3)",
+    )
+    tools = _resolve_agentic_tool_profiles(args)
+    assert tools is not None and len(tools) == 1

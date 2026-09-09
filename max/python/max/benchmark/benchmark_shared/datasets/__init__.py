@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from .agentic_code import AgenticCodeBenchmarkDataset
+from .agentic_tools import ToolConfig, parse_agentic_tool_profiles
 from .artificial_analysis import ArtificialAnalysisBenchmarkDataset
 from .arxiv_summarization import ArxivSummarizationBenchmarkDataset
 from .axolotl import AxolotlBenchmarkDataset
@@ -86,7 +87,9 @@ __all__ = [
     "SonnetBenchmarkDataset",
     "SyntheticBenchmarkDataset",
     "SyntheticPixelBenchmarkDataset",
+    "ToolConfig",
     "TurnProfile",
     "TurnTargets",
     "VisionArenaBenchmarkDataset",
+    "parse_agentic_tool_profiles",
 ]
