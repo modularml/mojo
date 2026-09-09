@@ -33,6 +33,7 @@ from std.random import Random
 from std.utils import IndexList
 
 
+@fieldwise_init
 struct InitializationType(DevicePassable, Equatable, TrivialRegisterPassable):
     var _value: Int
     comptime zero = InitializationType(0)
@@ -52,17 +53,8 @@ struct InitializationType(DevicePassable, Equatable, TrivialRegisterPassable):
     def get_type_name() -> String:
         return "InitializationType"
 
-    def __init__(out self, value: Int):
-        self._value = value
-
     def __init__(out self, value: Float64):
         self._value = Int(value)
-
-    def __eq__(self, other: Self) -> Bool:
-        return self._value == other._value
-
-    def __ne__(self, other: Self) -> Bool:
-        return self._value != other._value
 
     @staticmethod
     def from_str(str: String) raises -> Self:
