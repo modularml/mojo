@@ -11,12 +11,18 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from std.math import isfinite
 from std.math.math import _Expable, exp
 from std.random import randn_float64, seed
 from std.sys import CompilationTarget
 
 from test_utils import libm_call
-from std.testing import assert_almost_equal, assert_equal, TestSuite
+from std.testing import (
+    assert_almost_equal,
+    assert_equal,
+    assert_true,
+    TestSuite,
+)
 
 
 def test_exp_bfloat16() raises:
@@ -48,6 +54,27 @@ def test_exp_float64() raises:
     # FIXME (40568) should remove str
     assert_equal(String(exp(Float64(89))), String(4.4896128193366053e38))
     assert_equal(String(exp(Float64(108.5230))), String(1.3518859659123633e47))
+
+
+def test_exp_float32_extremes() raises:
+    # Underflow is gradual, so results below the smallest normal are subnormal
+    # rather than zero.
+    assert_true(exp(Float32(-103.0)) > 0)
+    assert_equal(exp(Float32(-104.0)), 0)
+    assert_true(isfinite(exp(Float32(88.72))))
+    assert_equal(String(exp(Float32(89))), "inf")
+
+
+def test_exp_float64_extremes() raises:
+    assert_almost_equal(
+        exp(Float64(-708.745)), 1.570208859696427e-308, atol=0, rtol=1e-9
+    )
+    assert_equal(exp(Float64(-745.0)), 5e-324)
+    assert_equal(exp(Float64(-745.2)), 0)
+    assert_almost_equal(
+        exp(Float64(709.4365)), 1.2716195926832784e308, atol=0, rtol=1e-9
+    )
+    assert_equal(String(exp(Float64(710))), "inf")
 
 
 @always_inline

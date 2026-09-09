@@ -497,6 +497,13 @@ This release completes the removal of APIs deprecated during the v1.0 cycle.
 
 ## Fixed
 
+- [`exp()`](/docs/std/math/math/exp/) no longer flushes subnormal results to
+  zero, and no longer overflows to infinity just short of the true overflow
+  point. `exp(-708.745)` returned `0.0` and `exp(709.4365)` returned `inf`;
+  both now match the C library. [`ldexp()`](/docs/std/math/math/ldexp/) is
+  likewise correct for exponents outside the range a single biased exponent
+  field can hold.
+
 - `unsafe_uninit_move_n()` and `unsafe_uninit_copy_n()` with `overlapping=True`
   now handle an overlap in either direction when `T` is not trivially movable
   or copyable. They always walked front-to-back, so a `dest` above `src`

@@ -519,14 +519,22 @@ def _ldexp_impl[
         return res
 
     comptime integral_type = FPUtils[dtype].integral_type
-    var m = exp.cast[integral_type]() + SIMD[integral_type, width](
-        FPUtils[dtype].exponent_bias()
-    )
 
-    return x * type_of(x)(
-        from_bits=m
-        << SIMD[integral_type, width](FPUtils[dtype].mantissa_width())
-    )
+    @always_inline
+    def pow2(e: SIMD[dtype, width]) -> SIMD[dtype, width]:
+        var m = e.cast[integral_type]() + SIMD[integral_type, width](
+            FPUtils[dtype].exponent_bias()
+        )
+        return SIMD[dtype, width](
+            from_bits=m
+            << SIMD[integral_type, width](FPUtils[dtype].mantissa_width())
+        )
+
+    # Halving keeps both factors within the representable exponent range, so
+    # exponents that would encode as 0 or as the inf/nan pattern still scale
+    # correctly and underflow stays gradual.
+    var half = floor(exp * 0.5)
+    return x * pow2(half) * pow2(exp - half)
 
 
 @always_inline
@@ -645,11 +653,11 @@ def exp[
     var max_val: SIMD[dtype, width]
 
     comptime if dtype == .float64:
-        min_val = -709.436139303
-        max_val = 709.437
+        min_val = -745.2
+        max_val = 709.79
     else:
-        min_val = -88.3762626647949
-        max_val = 88.3762626647950
+        min_val = -104.0
+        max_val = 88.73
 
     var xc = x.clamp(min_val, max_val)
     var k = floor(xc.fma(log2e, 0.5))

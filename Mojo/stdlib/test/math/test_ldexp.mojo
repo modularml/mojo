@@ -42,6 +42,13 @@ def test_ldexp_vector() raises:
     )
 
 
+def test_ldexp_out_of_range_exponent() raises:
+    # The exponent does not have to fit a single biased exponent field.
+    assert_equal(ldexp(Float64(1.0), Int32(-1074)), 5e-324)
+    assert_equal(ldexp(Float64(1.0), Int32(-1075)), 0)
+    assert_equal(ldexp(Float64(0.5), Int32(1024)), 8.98846567431158e307)
+
+
 def ldexp_libm[
     dtype: DType, simd_width: SIMDLength
 ](arg: SIMD[dtype, simd_width], e: SIMD[.int32, simd_width]) -> SIMD[
