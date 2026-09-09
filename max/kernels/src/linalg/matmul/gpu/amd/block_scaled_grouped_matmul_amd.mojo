@@ -1623,13 +1623,24 @@ def block_scaled_grouped_matmul_amd_preb[
                 mfma_cluster=2,
                 b_addr_split=True,
             ]()
-        else:
+        elif etm <= 1023:
             return run_kernel[
                 32,
                 128,
                 256,
                 64,
                 False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+                b_addr_split=True,
+            ]()
+        else:
+            return run_kernel[
+                128,
+                128,
+                256,
+                64,
+                True,
                 cluster_drain_sched=True,
                 mfma_cluster=2,
                 b_addr_split=True,
@@ -1691,13 +1702,24 @@ def block_scaled_grouped_matmul_amd_preb[
                 mfma_cluster=2,
                 b_addr_split=True,
             ]()
-        else:
+        elif etm <= 1023:
             return run_kernel[
                 32,
                 128,
                 256,
                 64,
                 False,
+                cluster_drain_sched=True,
+                mfma_cluster=2,
+                b_addr_split=True,
+            ]()
+        else:
+            return run_kernel[
+                128,
+                128,
+                256,
+                64,
+                True,
                 cluster_drain_sched=True,
                 mfma_cluster=2,
                 b_addr_split=True,
