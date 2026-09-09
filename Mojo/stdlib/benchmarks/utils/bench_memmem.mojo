@@ -172,7 +172,7 @@ def _memmem_baseline[
         )
         var mask = pack_bits(bool_mask)
         while mask:
-            var offset = Int(type_of(mask)(i) + count_trailing_zeros(mask))
+            var offset = i + Int(count_trailing_zeros(mask))
             if (
                 unsafe_memcmp(
                     haystack.unsafe_ptr().unsafe_offset(offset + 1),
