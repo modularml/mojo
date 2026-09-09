@@ -77,6 +77,17 @@ class TestStaticDimAlgebraNoContext:
         assert isinstance(result, StaticDim)
         assert int(result) == 3
 
+    def test_static_dim_rfloordiv_int(self) -> None:
+        """Ints can be floor divided by static dims outside Graph context."""
+        result = 12 // Dim(5)
+        assert isinstance(result, StaticDim)
+        assert int(result) == 2
+
+    def test_static_dim_rfloordiv_zero_division_raises(self) -> None:
+        """Reverse floor division by zero static dim raises ZeroDivisionError."""
+        with pytest.raises(ZeroDivisionError):
+            _ = 12 // Dim(0)
+
     def test_static_dim_neg(self) -> None:
         """Static dims can be negated outside Graph context."""
         result = -Dim(5)

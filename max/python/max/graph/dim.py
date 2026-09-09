@@ -169,7 +169,7 @@ class Dim:
     def __rfloordiv__(self, lhs: DimLike) -> Dim:
         if not isinstance(lhs, DimLike):
             return NotImplemented
-        return lhs // self
+        return Dim(lhs) // self
 
     def to_mlir(self) -> builtin.TypedAttr:
         """Creates an ``mlir.Attribute`` representing this dimension.
