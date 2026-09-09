@@ -5473,7 +5473,9 @@ def moe_sink_gate_router(
         logits: Raw (pre-sigmoid) gate logits, routed experts followed by
             sink experts. Must be float32, which is the only dtype the
             kernel's joint softmax has been validated at. Shape:
-            [num_tokens, n_routed_experts + n_shared_experts].
+            [num_tokens, at least n_routed_experts + n_shared_experts]; a
+            wider row's tail is not read, so a gate weight padded for
+            alignment needs no slice.
         expert_bias: Per-routed-expert selection bias. Shape: [n_routed_experts].
         global_scale: Scalar output-scaling weight. Shape: [1].
         n_routed_experts: Total number of routed experts. Must be a positive
@@ -5544,9 +5546,13 @@ def moe_sink_gate_router(
             " n_experts_per_tok or n_routed_experts"
         )
 
-    if logits.shape[1] != n_routed_experts + n_shared_experts:
+    logits_width = logits.shape[1]
+    if (
+        not isinstance(logits_width, StaticDim)
+        or int(logits_width) < n_routed_experts + n_shared_experts
+    ):
         raise ValueError(
-            "expected logits of shape [num_tokens, n_routed_experts +"
+            "expected logits of shape [num_tokens, at least n_routed_experts +"
             f" n_shared_experts] but got {logits.shape}"
         )
     if expert_bias.shape[0] != n_routed_experts:

@@ -1333,7 +1333,8 @@ def sink_gate_router_kernel[
         sink_weights: Output routing weight per sink expert. Shape
             [num_tokens, n_shared_experts].
         logits: Input raw (pre-sigmoid) gate logits, routed experts followed
-            by sink experts. Shape [num_tokens, n_routed_experts + n_shared_experts].
+            by sink experts. Shape [num_tokens, at least n_routed_experts +
+            n_shared_experts]; a wider row's tail is not read.
         expert_bias: Per-routed-expert bias added during selection only.
             Shape [n_routed_experts].
         global_scale: Single scalar multiplied into every weight. Shape [1].
@@ -1355,8 +1356,11 @@ def sink_gate_router_kernel[
     comptime assert global_scale.flat_rank == 1
 
     comptime assert (
-        logits.static_shape[1] == n_routed_experts + n_shared_experts
-    ), "logits.static_shape[1] must be n_routed_experts + n_shared_experts"
+        logits.static_shape[1] >= n_routed_experts + n_shared_experts
+    ), (
+        "logits.static_shape[1] must be at least n_routed_experts +"
+        " n_shared_experts"
+    )
     comptime assert (
         expert_weights.static_shape[1] == n_experts_per_tok
     ), "expert_weights.static_shape[1] must be equal to n_experts_per_tok"
@@ -1484,7 +1488,8 @@ def sink_gate_router[
         sink_weights: Output sink-expert weights. Shape:
             [num_tokens, n_shared_experts].
         logits: Input raw gate logits (routed then sink columns). Shape:
-            [num_tokens, n_routed_experts + n_shared_experts].
+            [num_tokens, at least n_routed_experts + n_shared_experts]; a
+            wider row's tail is not read.
         expert_bias: Per-routed-expert selection bias.
         global_scale: Scalar output-scaling weight.
         route_scale: Scalar output-scaling factor.

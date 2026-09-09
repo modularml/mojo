@@ -30,9 +30,24 @@ from max.nn.kernels import moe_sink_gate_router
 from max.nn.layer import LayerList
 from max.nn.moe import MoEGate, MoEQuantized
 from max.nn.quant_config import fp4_packed_k
+from max.support.math import ceildiv
 from typing_extensions import Self
 
 _ROUTER_DTYPE = DType.float32
+
+# Inkling's 256 routed + 2 sink rows are the router GEMM's N, 2 short of the
+# 16-byte alignment a bf16 TMA epilogue needs. Padding to 264 costs 2.3% of
+# this narrow projection and keeps every batch size on the aligned path.
+_ROUTER_ROW_ALIGN = 8
+
+
+def padded_router_rows(num_rows: int) -> int:
+    """Returns the gate's row count, aligned for the router GEMM.
+
+    The padded rows hold no expert: the router reads only the leading
+    ``n_routed_experts + n_shared_experts`` logits.
+    """
+    return ceildiv(num_rows, _ROUTER_ROW_ALIGN) * _ROUTER_ROW_ALIGN
 
 
 class InklingRouting(NamedTuple):
@@ -50,7 +65,7 @@ class InklingGate(MoEGate):
     """Sigmoid gate with a selection bias, sink lanes, and a global scale.
 
     ``num_experts`` counts routed experts only; ``weight`` covers
-    ``num_experts + n_shared_experts`` rows, ``bias`` the routed range alone.
+    ``router_dim`` rows, ``bias`` the routed range alone.
     """
 
     def __init__(
@@ -77,12 +92,13 @@ class InklingGate(MoEGate):
         self.n_routed_experts = num_experts
         self.n_shared_experts = n_shared_experts
         self.route_scale = route_scale
+        self.router_dim = padded_router_rows(num_experts + n_shared_experts)
 
         if not is_sharding:
             self.weight = Weight(
                 "weight",
                 dtype,
-                [num_experts + n_shared_experts, hidden_dim],
+                [self.router_dim, hidden_dim],
                 device=devices[0],
             )
             self.bias = Weight(
@@ -104,6 +120,8 @@ class InklingGate(MoEGate):
         # Only the score math needs float32; the GEMM runs in the activation
         # dtype, as in the minimax/deepseek gate pattern.
         weight = ops.cast(self.weight, hidden_states.dtype).to(device)
+        # The router reads only the routed and sink columns, so the padded
+        # tail needs no slice to trim it.
         logits = ops.cast(hidden_states @ weight.T, _ROUTER_DTYPE)
 
         return InklingRouting(
