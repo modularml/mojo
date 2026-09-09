@@ -18,7 +18,7 @@ This version is still a work in progress.
 
 - Unknown declaration errors now suggest a unique near-miss spelling from the
   enclosing scopes (for example `coun` → `count`), with a replace-token fixit.
-  
+
 - Mojo now supports contextually inferred member references: a leading-dot form
   such as `.red` or `.float64` resolves against the expected type of the
   expression, so you can omit a redundant type name when context already
