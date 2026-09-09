@@ -98,6 +98,7 @@ from .registry import (
     PIPELINE_REGISTRY,
     PipelineModelType,
     RetrievedPipeline,
+    Speculator,
     SupportedArchitecture,
 )
 from .tokenizer import (
@@ -157,6 +158,7 @@ __all__ = [
     "RopeType",
     "SamplingConfig",
     "SpeculativeConfig",
+    "Speculator",
     "SupportedArchitecture",
     "SupportedEncoding",
     "SupportsSSMStateWarmup",

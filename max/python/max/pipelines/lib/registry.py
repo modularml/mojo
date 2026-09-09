@@ -59,12 +59,13 @@ from .arch_lookup import (
     ARCH_LOOKUP,
     ArchLookup,
     SupportedArchitecture,
+    select_speculator,
 )
 
-# PipelineModelType and SupportedArchitecture are re-exported here so existing
-# import paths (`from max.pipelines.lib.registry import SupportedArchitecture`)
-# keep working after their move to the arch_lookup leaf module.
+# The public arch_lookup names reach `max.pipelines.lib` through here rather
+# than directly
 from .arch_lookup import PipelineModelType as PipelineModelType
+from .arch_lookup import Speculator as Speculator
 from .embeddings_pipeline import EmbeddingsPipeline
 from .interfaces import PipelineModel
 from .pipeline_variants.overlap_text_generation import (
@@ -393,7 +394,7 @@ class PipelineRegistry:
 
     def register(
         self,
-        architecture: SupportedArchitecture,
+        architecture: SupportedArchitecture | Speculator,
         *,
         allow_override: bool = False,
     ) -> None:
@@ -401,6 +402,7 @@ class PipelineRegistry:
 
         If multiple architectures share the same name but have different tasks,
         they are registered in a secondary lookup table keyed by (name, task).
+        A :class:`Speculator` registers the architecture it derives.
         """
         self._arch_lookup.register(architecture, allow_override=allow_override)
 
@@ -411,6 +413,7 @@ class PipelineRegistry:
         symbol: str,
         *,
         package: str | None = None,
+        speculates_on: str | None = None,
     ) -> None:
         """Records *how* to import an architecture without importing it yet.
 
@@ -426,10 +429,19 @@ class PipelineRegistry:
             module: Dotted module path to import the architecture from. May be
                 ``.``-relative, resolved against ``package``.
             symbol: The attribute on ``module`` holding the
-                :class:`SupportedArchitecture`.
+                :class:`SupportedArchitecture`, or the :class:`Speculator`
+                that derives it.
             package: Anchor package used to resolve a relative ``module`` path.
+            speculates_on: For a :class:`Speculator`, the name of the target
+                architecture it speculates on.
         """
-        self._arch_lookup.register_lazy(name, module, symbol, package=package)
+        self._arch_lookup.register_lazy(
+            name,
+            module,
+            symbol,
+            package=package,
+            speculates_on=speculates_on,
+        )
 
     def _materialize_lazy(self, name: str) -> None:
         """Imports and registers any architectures deferred under ``name``.
@@ -474,6 +486,33 @@ class PipelineRegistry:
         return self._arch_lookup.find(
             architecture_name, prefer_module_v3=prefer_module_v3, task=task
         )
+
+    def architecture_for_config(
+        self,
+        pipeline_config: PipelineConfig,
+        task: PipelineTask | None = None,
+    ) -> SupportedArchitecture | None:
+        """Retrieves the architecture a resolved config actually runs."""
+        name = pipeline_config.models.main_architecture_name
+        arch = self.retrieve_architecture(
+            architecture_name=name,
+            prefer_module_v3=pipeline_config.runtime.prefer_module_v3,
+            task=task,
+        )
+        if arch is None or not pipeline_config.speculative:
+            return arch
+        draft = pipeline_config.models.get("draft")
+        draft_archs = (
+            draft.huggingface_config.architectures
+            if draft is not None
+            else None
+        )
+        speculator = select_speculator(
+            name,
+            pipeline_config.speculative.speculative_method,
+            draft_archs[0] if draft_archs else None,
+        )
+        return arch if speculator is None else speculator.derive()
 
     def get_active_huggingface_config(
         self,
@@ -577,11 +616,7 @@ class PipelineRegistry:
         if override_architecture:
             arch = self._resolve_architecture(override_architecture, task)
         else:
-            arch = self.retrieve_architecture(
-                architecture_name=pipeline_config.models.main_architecture_name,
-                prefer_module_v3=pipeline_config.runtime.prefer_module_v3,
-                task=task,
-            )
+            arch = self.architecture_for_config(pipeline_config, task=task)
 
         if arch is None:
             raise ValueError(
@@ -672,11 +707,7 @@ class PipelineRegistry:
         if override_architecture:
             arch = self._resolve_architecture(override_architecture, task)
         else:
-            arch = self.retrieve_architecture(
-                architecture_name=pipeline_config.models.main_architecture_name,
-                prefer_module_v3=pipeline_config.runtime.prefer_module_v3,
-                task=task,
-            )
+            arch = self.architecture_for_config(pipeline_config, task=task)
 
         # Architecture should not be None here, as the engine is MAX.
         if arch is None:
@@ -976,11 +1007,7 @@ class PipelineRegistry:
         if override_architecture:
             arch = self._resolve_architecture(override_architecture, task)
         else:
-            arch = self.retrieve_architecture(
-                architecture_name=pipeline_config.models.main_architecture_name,
-                prefer_module_v3=pipeline_config.runtime.prefer_module_v3,
-                task=task,
-            )
+            arch = self.architecture_for_config(pipeline_config, task=task)
 
         if arch:
             return arch.context_type
