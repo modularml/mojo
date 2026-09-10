@@ -41,8 +41,8 @@ def hex_encode(input_bytes: Span[mut=False, Byte, _], mut result: String):
     var hex_chars = _HEX_CHARS.unsafe_ptr()
     for i in range(len(input_bytes)):
         var b = Int(input_bytes[i])
-        dest[2 * i] = hex_chars[b >> 4]
-        dest[2 * i + 1] = hex_chars[b & 0xF]
+        dest[unsafe_offset=2 * i] = hex_chars[unsafe_offset=b >> 4]
+        dest[unsafe_offset=2 * i + 1] = hex_chars[unsafe_offset=b & 0xF]
 
 
 @always_inline
@@ -81,12 +81,12 @@ def hex_decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
 
 @always_inline
 def hex_decode[
-    LEN: Int
-](str: StringSlice[mut=False, _]) raises -> InlineArray[Byte, LEN]:
+    length: Int
+](str: StringSlice[mut=False, _]) raises -> Array[Byte, length]:
     """Performs hex decoding on the input string.
 
     Parameters:
-        LEN: Resulting fixed-sized array length.
+        length: Resulting fixed-sized array length.
 
     Args:
         str: A hex encoded string.
@@ -98,7 +98,7 @@ def hex_decode[
         If the operation fails.
     """
 
-    var result = InlineArray[Byte, LEN](uninitialized=True)
+    var result = Array[Byte, length](uninitialized=True)
     hex_decode(str, result)
     return result^
 
@@ -126,7 +126,9 @@ def hex_decode(
 
     var ptr = str.unsafe_ptr()
     for i in range(len(result)):
-        result[i] = _decode_hex_byte(ptr[2 * i], ptr[2 * i + 1], 2 * i)
+        var hi = ptr[unsafe_offset=2 * i]
+        var lo = ptr[unsafe_offset=2 * i + 1]
+        result[i] = _decode_hex_byte(hi, lo, 2 * i)
 
 
 @always_inline

@@ -44,7 +44,7 @@ def test_hex_decode() raises:
     ]
     assert_equal(hex_decode("012356789abcdeff"), random_bytes)
 
-    var random_bytes_fixed: InlineArray[Byte, 8] = [
+    var random_bytes_fixed: Array[Byte, 8] = [
         0x01,
         0x23,
         0x56,
