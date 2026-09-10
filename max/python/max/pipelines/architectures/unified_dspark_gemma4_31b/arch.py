@@ -43,6 +43,7 @@ unified_dspark_gemma4_31b_arch = SupportedArchitecture(
     task=PipelineTask.TEXT_GENERATION,
     config=UnifiedDSparkGemma4_31BConfig,
     memory_planner=Gemma4MemoryPlanner,
+    supports_spec_decode_mixed_batches=True,
     # Capture-safe including structured output: the graph binds the shared
     # (pinned_bitmask, wait_payload, device_bitmask_scratch) triple whose
     # in-graph wait + H2D replay against process-lifetime pinned buffers

@@ -1053,10 +1053,15 @@ def test_batch_metrics_create_tg_with_spec_decode() -> None:
     )
 
 
-def test_batch_metrics_create_ce_with_spec_decode_uses_standard_formula() -> (
-    None
-):
-    """CE batch uses standard throughput formula even when stale spec_metrics leak from a previous TG batch."""
+def test_batch_metrics_create_ce_reports_verified_spec_metrics() -> None:
+    """A CE-labeled iteration reports spec metrics that carry verifications.
+
+    Under the overlap pipeline the spec metrics describe the previously
+    synced batch, not this iteration's batch. Gating on the current batch's
+    type dropped every verify observation followed by a CE iteration, and
+    mixed prefill+decode batches (labeled CE) that verified drafts were
+    never counted at all.
+    """
     inputs = _mock_inputs(batch_size=2, batch_type=BatchType.CE)
     spec_metrics = _make_spec_metrics(
         num_speculative_tokens=3,
@@ -1074,12 +1079,35 @@ def test_batch_metrics_create_ce_with_spec_decode_uses_standard_formula() -> (
         total_preemption_count=0,
         batch_spec_decode_metrics=spec_metrics,
     )
-    assert metrics.generation_throughput == 2 * 1 / 0.1
+    # output_tokens = 8 accepted + 4 bonus = 12
+    assert metrics.generation_throughput == 12 / 0.1
+    assert metrics.draft_tokens_generated == spec_metrics.draft_tokens_generated
+    assert metrics.draft_tokens_accepted == spec_metrics.draft_tokens_accepted
+    assert metrics.avg_acceptance_length == spec_metrics.avg_acceptance_length
+    assert metrics.max_acceptance_length == 3
 
-    # Acceptance metrics describe the decode/verify step, so a CE batch must
-    # not report them even when stale spec_metrics leak from a previous TG
-    # batch. The zeroed draft fields make every downstream consumer drop the
-    # spec-decode info.
+
+def test_batch_metrics_create_unverified_spec_metrics_stay_zeroed() -> None:
+    """Metrics without verifications (pure-prefill producing batch) stay
+    zeroed even on a TG iteration, and throughput falls back to batch_size."""
+    inputs = _mock_inputs(batch_size=2, batch_type=BatchType.TG)
+    spec_metrics = _make_spec_metrics(
+        num_speculative_tokens=3,
+        accepted_per_position=[0, 0, 0],
+        num_verifications=0,
+    )
+    metrics = BatchMetrics.create(
+        sch_config=_mock_sch_config(),
+        inputs=inputs,
+        kv_cache=None,
+        batch_creation_time_s=0.001,
+        batch_execution_time_s=0.1,
+        num_pending_reqs=0,
+        num_terminated_reqs=0,
+        total_preemption_count=0,
+        batch_spec_decode_metrics=spec_metrics,
+    )
+    assert metrics.generation_throughput == 2 * 1 / 0.1
     assert metrics.draft_tokens_generated == 0
     assert metrics.draft_tokens_accepted == 0
     assert metrics.avg_acceptance_length == 0.0

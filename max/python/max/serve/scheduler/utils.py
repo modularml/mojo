@@ -272,7 +272,7 @@ class BatchMetrics:
         prompt_throughput = num_input_tokens / batch_execution_time_s
         if (
             batch_spec_decode_metrics is not None
-            and inputs.batch_type == BatchType.TG
+            and batch_spec_decode_metrics.num_verifications > 0
         ):
             generation_throughput = (
                 batch_spec_decode_metrics.output_tokens / batch_execution_time_s
@@ -446,7 +446,7 @@ class BatchMetrics:
         # gate on batch type to avoid mis-attributing them to CE batches.
         if (
             batch_spec_decode_metrics is not None
-            and inputs.batch_type == BatchType.TG
+            and batch_spec_decode_metrics.num_verifications > 0
         ):
             draft_tokens_generated = (
                 batch_spec_decode_metrics.draft_tokens_generated

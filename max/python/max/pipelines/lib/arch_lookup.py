@@ -371,6 +371,14 @@ class SupportedArchitecture:
     via ``--device-graph-capture --force``.
     """
 
+    supports_spec_decode_mixed_batches: bool = False
+    """Whether this architecture's speculative graph is per-row correct on
+    mixed prefill+decode verify batches.
+
+    When ``False``, ``--enable-spec-decode-mixed-batches`` falls back to
+    plain in-flight batching for this architecture.
+    """
+
     memory_planner: type[MemoryPlanner] | None = None
     """Optional :class:`~max.pipelines.kv_cache.MemoryPlanner` subclass for
     this architecture.

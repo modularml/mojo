@@ -42,6 +42,7 @@ from max.pipelines.lib.config.config import (
     _resolve_default_structured_output_backend,
     _resolve_default_tool_parser,
     _resolve_overlap_and_device_graph_capture,
+    _resolve_spec_decode_mixed_batches,
 )
 from max.pipelines.lib.config.model_config import (
     _build_model_config,
@@ -77,6 +78,7 @@ def _serve_optimization_arch(
     *,
     supports_overlap_scheduler: bool = True,
     supports_device_graph_capture: bool = True,
+    supports_spec_decode_mixed_batches: bool = False,
     task: PipelineTask = PipelineTask.TEXT_GENERATION,
 ) -> SimpleNamespace:
     """Minimal architecture stub for serve-optimization resolution tests."""
@@ -85,6 +87,7 @@ def _serve_optimization_arch(
         task=task,
         supports_overlap_scheduler=supports_overlap_scheduler,
         supports_device_graph_capture=supports_device_graph_capture,
+        supports_spec_decode_mixed_batches=supports_spec_decode_mixed_batches,
     )
 
 
@@ -1695,6 +1698,50 @@ def test_validate_and_resolve_overlap_scheduler__auto_enable_device_graph_captur
     assert device_graph_capture is expected_device_graph_capture
     if expected_device_graph_capture:
         assert enable_overlap_scheduler is True
+
+
+@pytest.mark.parametrize(
+    (
+        "requested",
+        "user_in_flight",
+        "supported",
+        "expected_mixed",
+        "expected_in_flight",
+    ),
+    [
+        (False, False, True, False, False),
+        (False, True, True, False, True),
+        (True, False, True, True, True),
+        (True, True, True, True, True),
+        (True, False, False, False, True),
+        (True, True, False, False, True),
+    ],
+)
+def test_resolve_spec_decode_mixed_batches(
+    requested: bool,
+    user_in_flight: bool,
+    supported: bool,
+    expected_mixed: bool,
+    expected_in_flight: bool,
+) -> None:
+    """Requesting mixed batches turns in-flight batching on either way.
+
+    An architecture that cannot commit per row loses draft verification but
+    still gets the in-flight batching the flag implies, so the resolved pair
+    is the effective one and nothing downstream has to re-derive it.
+    """
+    runtime = PipelineRuntimeConfig(
+        enable_spec_decode_mixed_batches=requested,
+        enable_in_flight_batching=user_in_flight,
+    )
+    arch = _serve_optimization_arch(
+        "test-arch", supports_spec_decode_mixed_batches=supported
+    )
+
+    mixed, in_flight = _resolve_spec_decode_mixed_batches(runtime, arch)
+
+    assert mixed is expected_mixed
+    assert in_flight is expected_in_flight
 
 
 @mock_pipeline_config_resolve

@@ -401,6 +401,32 @@ def _resolve_overlap_and_device_graph_capture(
     return device_graph_capture, enable_overlap_scheduler
 
 
+def _resolve_spec_decode_mixed_batches(
+    runtime: PipelineRuntimeConfig, arch: Any
+) -> tuple[bool, bool]:
+    """Returns the effective (mixed-batch verify, in-flight batching) pair.
+
+    Keeping draft verification alive across a mixed prefill+decode batch
+    needs a unified speculative graph that commits per row
+    (``supports_spec_decode_mixed_batches``). An architecture that does not
+    declare it keeps the documented fallback: plain in-flight batching, with
+    mixed batches advancing draft-less.
+    """
+    requested = runtime.enable_spec_decode_mixed_batches
+    if not requested:
+        return False, runtime.enable_in_flight_batching
+    if arch is None or not arch.supports_spec_decode_mixed_batches:
+        logger.warning(
+            "enable_spec_decode_mixed_batches is set but architecture '%s' "
+            "does not support per-row mixed-batch commits; falling back to "
+            "in-flight batching without draft verification for mixed "
+            "batches.",
+            arch.name if arch is not None else "<unresolved>",
+        )
+        return False, True
+    return True, True
+
+
 def _resolve_preprocess_cache_budgets(
     runtime: PipelineRuntimeConfig, model: MAXModelConfig, arch: Any
 ) -> tuple[int, int]:
@@ -531,8 +557,13 @@ def _resolved_runtime_and_sampling(
     capped_image_bytes, capped_video_bytes = _resolve_preprocess_cache_budgets(
         runtime, model, arch
     )
+    mixed_batches, in_flight_batching = _resolve_spec_decode_mixed_batches(
+        runtime, arch
+    )
     runtime_changes = _resolved_field_changes(
         runtime,
+        enable_spec_decode_mixed_batches=mixed_batches,
+        enable_in_flight_batching=in_flight_batching,
         reasoning_parser=_resolve_default_reasoning_parser(runtime, arch),
         tool_parser=_resolve_default_tool_parser(runtime, model, arch),
         device_graph_capture=device_graph_capture,

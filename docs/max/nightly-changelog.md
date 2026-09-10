@@ -538,6 +538,12 @@ the [container](/container) page now links to the new page.
   `chat_template_kwargs.reasoning_effort` had any effect and the standard
   fields were silently ignored. An effort of `none` disables thinking, and
   values set directly in `chat_template_kwargs` still win.
+- Added `--enable-spec-decode-mixed-batches` (default off): with speculative
+  decoding, prefill requests are batched into decode steps (implies in-flight
+  batching) and the riding decode rows keep verifying their draft tokens
+  instead of advancing one token at a time. Supported by the Gemma 4 DSpark
+  architectures; other architectures fall back to plain in-flight batching, as
+  do batches containing grammar-constrained rows.
 - `--num-speculative-tokens` is now unset by default, and each speculative
   method resolves its own default: `eagle` and `mtp` keep drafting 2 tokens
   per step, while `dflash`-style block drafters (DFlash, DSpark) derive the

@@ -30,6 +30,9 @@ from max.pipelines.lib.pipeline_variants.overlap_text_generation import (
     _host_mirror_realized_drafts,
     _verify_width_lookup,
 )
+from max.pipelines.modeling.types.pipeline_variants.text_generation import (
+    BatchType,
+)
 from max.pipelines.speculative.config import (
     SpeculativeConfig,
     VerifyWidthRange,
@@ -44,6 +47,11 @@ class _Tokens:
 @dataclass
 class _Ctx:
     tokens: _Tokens
+    # ``_should_verify_drafts`` reads these directly, so a fake without them
+    # raises instead of reporting an unconstrained row.
+    matcher: object | None = None
+    grammar: object | None = None
+    json_schema: object | None = None
 
 
 @dataclass
@@ -54,6 +62,15 @@ class _Inputs:
     def flat_batch(self) -> list[_Ctx]:
         return [ctx for batch in self.batches for ctx in batch]
 
+    @property
+    def batch_type(self) -> BatchType:
+        """Mirrors ``TextGenerationInputs``: one prefill row makes it CE."""
+        return (
+            BatchType.CE
+            if any(c.tokens.generated_length == 0 for c in self.flat_batch)
+            else BatchType.TG
+        )
+
 
 def _decode_batches(*sizes: int) -> _Inputs:
     """Replica batches whose every row has already generated a token."""
@@ -61,12 +78,17 @@ def _decode_batches(*sizes: int) -> _Inputs:
 
 
 def _width(
-    inputs: _Inputs, *, configured: int, lookup: list[int] | None
+    inputs: _Inputs,
+    *,
+    configured: int,
+    lookup: list[int] | None,
+    allow_mixed: bool = False,
 ) -> int:
     pipeline = object.__new__(OverlapTextGenerationPipeline)
     spec_state = type("_S", (), {"num_speculative_tokens": configured})()
     pipeline._spec_decode_state = spec_state
     pipeline._width_lookup = lookup
+    pipeline._allow_mixed_verify = allow_mixed
     return OverlapTextGenerationPipeline._verify_width(
         pipeline, cast(Any, inputs)
     )

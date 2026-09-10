@@ -175,6 +175,18 @@ class PipelineRuntimeConfig(ConfigFileModel):
         ),
     )
 
+    enable_spec_decode_mixed_batches: bool = Field(
+        default=False,
+        description=(
+            "When enabled with speculative decoding, prefill requests are "
+            "batched into decode steps (implies in-flight batching) and the "
+            "decode rows keep verifying their draft tokens instead of "
+            "advancing draft-less. Architectures that do not declare "
+            "``supports_spec_decode_mixed_batches`` fall back to plain "
+            "in-flight batching."
+        ),
+    )
+
     eplb_replicas_per_gpu: int = Field(
         default=0,
         description=(

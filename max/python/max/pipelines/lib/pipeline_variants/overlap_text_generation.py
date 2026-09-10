@@ -346,6 +346,28 @@ def _host_mirror_realized_drafts(
     return realized
 
 
+def _should_verify_drafts(
+    inputs: TextGenerationInputs[TextGenerationContextType],
+    *,
+    allow_mixed_batches: bool,
+) -> bool:
+    """Whether this batch runs the K>0 draft-verification path."""
+    if inputs.batch_type == BatchType.TG:
+        return True
+    if not allow_mixed_batches:
+        return False
+    has_decode_row = False
+    for ctx in inputs.flat_batch:
+        if (
+            ctx.matcher is not None
+            or ctx.grammar is not None
+            or ctx.json_schema is not None
+        ):
+            return False
+        has_decode_row = has_decode_row or ctx.tokens.generated_length > 0
+    return has_decode_row
+
+
 def _resolve_thinking_token_ids(
     tokenizer: ReasoningPipelineTokenizer[Any, Any, Any],
 ) -> tuple[int, int]:
@@ -1931,6 +1953,11 @@ class OverlapTextGenerationPipeline(
                     self._pipeline_config.speculative.synthetic_acceptance_rate,
                 )
 
+        self._allow_mixed_verify = (
+            self._spec_decode_state is not None
+            and pipeline_config.runtime.enable_spec_decode_mixed_batches
+        )
+
         self._encoder_cache: VisionEncoderCache[TextAndVisionContext] | None = (
             None
         )
@@ -2660,8 +2687,8 @@ class OverlapTextGenerationPipeline(
 
         """
         assert self._spec_decode_state is not None
-        if not all(
-            ctx.tokens.generated_length > 0 for ctx in inputs.flat_batch
+        if not _should_verify_drafts(
+            inputs, allow_mixed_batches=self._allow_mixed_verify
         ):
             return 0
         if self._width_lookup is None:

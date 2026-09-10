@@ -87,6 +87,10 @@ def log_pipeline_info(
                 "in_flight_batching",
                 pipeline_config.runtime.enable_in_flight_batching,
             ),
+            (
+                "spec_decode_mixed_batches",
+                pipeline_config.runtime.enable_spec_decode_mixed_batches,
+            ),
         ]
     )
 
