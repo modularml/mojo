@@ -28,6 +28,7 @@ _EXTRA_CONSTRAINTS = {
         "//conditions:default": [],
     }),  # No multi-GPU Metal machines exist
     "gpu/comm/bench_allgather_relay.mojo": ["//:amd_gpu"],  # The relay path is gated to CDNA4; needs 8 GPUs and P2P
+    "gpu/comm/bench_reducescatter_relay.mojo": ["//:amd_gpu"],  # The relay path is gated to CDNA4; needs 8 GPUs and P2P
     "gpu/comm/bench_allgather_rmsnorm.mojo": select({
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],

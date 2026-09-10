@@ -415,20 +415,58 @@ def reducescatter_test[
     _ = host_in^
 
 
-def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
-    """Test grouped reduce-scatter with group-local ranks and shapes."""
+@always_inline
+def _residual_value[
+    dtype: DType
+](group_id: Int, flat_idx: Int) -> Scalar[dtype]:
+    """Residual pattern: replicated within a group, distinct between groups.
+
+    The group term is what makes a relay folding its own residual instead of
+    the destination's a test failure rather than a coincidence.
+    """
+    return Scalar[dtype]((flat_idx % 7) + 1 + 8 * group_id)
+
+
+def grouped_reducescatter_test[
+    ngpus: Int = 4,
+    group_size: Int = 2,
+    axis: Int = 0,
+    rows_first: Int = 5,
+    rows_second: Int = 3,
+    D: Int = 128,
+    with_residual: Bool = False,
+](list_of_ctx: List[DeviceContext]) raises:
+    """Test grouped reduce-scatter with group-local ranks and shapes.
+
+    With exactly two groups this also exercises the relay-assisted path, which
+    `reducescatter` selects on its own where the interconnect makes it pay: the
+    other group's GPUs reduce a trailing slice of each destination's partition
+    and write the finished values in. Ragged row counts -- differing between
+    the groups, and not dividing evenly inside one -- are the interesting case
+    there, since every partition is split on its own length.
+    """
     comptime dtype = DType.float32
-    comptime ngpus = 4
-    comptime group_size = 2
-    comptime D = 128
-    comptime axis = 0
     comptime rank = 2
 
-    print("====grouped-reducescatter-axis0-float32-4gpus-group2")
+    print(
+        "====grouped-reducescatter-axis",
+        axis,
+        "-float32-",
+        ngpus,
+        "gpus-group",
+        group_size,
+        "-rows",
+        rows_first,
+        "/",
+        rows_second,
+        sep="",
+    )
 
     var in_bufs_list = List[DeviceBuffer[dtype]](capacity=ngpus)
     var out_bufs_list = List[DeviceBuffer[dtype]](capacity=ngpus)
+    var res_bufs_list = List[DeviceBuffer[dtype]](capacity=ngpus)
     var host_in = List[HostBuffer[dtype]](capacity=ngpus)
+    var host_res = List[HostBuffer[dtype]](capacity=ngpus)
 
     var signal_buffers = List[DeviceBuffer[.uint8]](capacity=ngpus)
     var rank_sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
@@ -436,7 +474,7 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
     )
 
     for gpu_idx in range(ngpus):
-        var group_rows = 5 if gpu_idx < group_size else 3
+        var group_rows = rows_first if gpu_idx < group_size else rows_second
         var num_elements = group_rows * D
         in_bufs_list.append(
             list_of_ctx[gpu_idx].enqueue_create_buffer[dtype](num_elements)
@@ -457,6 +495,20 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
             h[j] = test_value_for_gpu_element[dtype](gpu_idx, j)
         list_of_ctx[gpu_idx].enqueue_copy(in_bufs_list[gpu_idx], h)
         host_in.append(h^)
+
+        # Replicated within a group, but NOT across groups -- which is why
+        # the collective takes a world view of it.
+        comptime if with_residual:
+            res_bufs_list.append(
+                list_of_ctx[gpu_idx].enqueue_create_buffer[dtype](num_elements)
+            )
+            var rh = list_of_ctx[gpu_idx].enqueue_create_host_buffer[dtype](
+                num_elements
+            )
+            for j in range(num_elements):
+                rh[j] = _residual_value[dtype](gpu_idx // group_size, j)
+            list_of_ctx[gpu_idx].enqueue_copy(res_bufs_list[gpu_idx], rh)
+            host_res.append(rh^)
 
         signal_buffers.append(
             list_of_ctx[gpu_idx].create_buffer_sync[.uint8](size_of[Signal]())
@@ -489,7 +541,7 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
     var out_bufs = Array[OutputTileType, ngpus](uninitialized=True)
 
     for gpu_idx in range(ngpus):
-        var group_rows = 5 if gpu_idx < group_size else 3
+        var group_rows = rows_first if gpu_idx < group_size else rows_second
         var local_rank = gpu_idx % group_size
         var config = ReduceScatterConfig[dtype, group_size](group_rows, D, 0)
 
@@ -520,25 +572,48 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
         fill_with=lambda (i: Int) -> InputTileType: in_bufs[i]
     )
 
+    comptime ResPtrType = ImmPointer[Scalar[dtype], ImmutAnyOrigin]
+    var world_res_ptrs = Array[ResPtrType, ngpus](uninitialized=True)
+    comptime if with_residual:
+        for i in range(ngpus):
+            world_res_ptrs[i] = rebind[ResPtrType](
+                res_bufs_list[i].unsafe_ptr()
+            )
+
     comptime for gpu_idx in range(ngpus):
-        reducescatter[
-            ngpus=ngpus,
-            group_size=group_size,
-            axis=axis,
-        ](
-            world_in_bufs,
-            out_bufs,
-            rank_sigs,
-            list_of_ctx[gpu_idx],
-            my_rank=Optional[Int](gpu_idx),
-        )
+        comptime if with_residual:
+            reducescatter[
+                ngpus=ngpus,
+                group_size=group_size,
+                axis=axis,
+                has_residual=True,
+            ](
+                world_in_bufs,
+                out_bufs,
+                rank_sigs,
+                list_of_ctx[gpu_idx],
+                my_rank=Optional[Int](gpu_idx),
+                residuals=Optional(world_res_ptrs.copy()),
+            )
+        else:
+            reducescatter[
+                ngpus=ngpus,
+                group_size=group_size,
+                axis=axis,
+            ](
+                world_in_bufs,
+                out_bufs,
+                rank_sigs,
+                list_of_ctx[gpu_idx],
+                my_rank=Optional[Int](gpu_idx),
+            )
 
     comptime for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
     for gpu_idx in range(ngpus):
         var group_start = ualign_down(gpu_idx, group_size)
-        var group_rows = 5 if gpu_idx < group_size else 3
+        var group_rows = rows_first if gpu_idx < group_size else rows_second
         var local_rank = gpu_idx % group_size
         var config = ReduceScatterConfig[dtype, group_size](group_rows, D, 0)
         var out_size = config.rank_num_elements(local_rank)
@@ -561,6 +636,16 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
                             group_start + local_input_idx, global_flat
                         )
                     )
+                comptime if with_residual:
+                    # Matches the kernel's order: round the reduction to
+                    # `dtype`, then add the residual and round once more.
+                    accum = Scalar[accum_t](Scalar[dtype](accum)) + Scalar[
+                        accum_t
+                    ](
+                        _residual_value[dtype](
+                            group_start // group_size, global_flat
+                        )
+                    )
                 assert_almost_equal(
                     result_host[r * D + c],
                     Scalar[dtype](accum),
@@ -576,6 +661,8 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
                 )
 
     _ = host_in^
+    _ = host_res^
+    _ = res_bufs_list^
 
 
 @__parameter
@@ -676,6 +763,62 @@ def main() raises:
         var list_of_ctx = List[DeviceContext](capacity=MAX_GPUS)
         for i in range(DeviceContext.number_of_devices()):
             list_of_ctx.append(DeviceContext(i))
+        # Two groups of two: ragged between the groups (5 vs 3 rows) and
+        # inside one (5 rows over 2 ranks), which is the shape the relay path
+        # splits per partition.
         grouped_reducescatter_test(list_of_ctx)
+        # A partition small enough that the tuning table declines to relay,
+        # so the pair takes the plain path.
+        grouped_reducescatter_test[rows_first=2, rows_second=2, D=8](
+            list_of_ctx
+        )
+        # A whole group empty while its partner is not. Only this shape
+        # reaches the pair-widened emptiness scan: the empty group has
+        # nothing of its own to reduce but still has to launch, on the same
+        # grid and into the same barrier, because its GPUs act as reduce
+        # relays for the partner. Returning early there hangs the node.
+        grouped_reducescatter_test[rows_first=1024, rows_second=0](list_of_ctx)
+        # The same with the empty group first, so the relay role is driven
+        # from both sides of the pair.
+        grouped_reducescatter_test[rows_first=0, rows_second=1024](list_of_ctx)
+        # Residual fold at a relay-active size: a relay folds the replicated
+        # residual from its OWN copy at the destination's offset, so this is
+        # the case that would catch it reading the wrong slice.
+        grouped_reducescatter_test[rows_first=1024, rows_second=1024](
+            list_of_ctx
+        )
+        grouped_reducescatter_test[
+            rows_first=1024, rows_second=1024, with_residual=True
+        ](list_of_ctx)
+        # And ragged, so the relays' residual offsets differ per destination.
+        grouped_reducescatter_test[rows_first=1024, rows_second=768](
+            list_of_ctx
+        )
+        grouped_reducescatter_test[
+            rows_first=1024, rows_second=768, with_residual=True
+        ](list_of_ctx)
+
+    if DeviceContext.number_of_devices() == 8:
+        var list_of_ctx = List[DeviceContext](capacity=MAX_GPUS)
+        for i in range(8):
+            list_of_ctx.append(DeviceContext(i))
+        # Two groups of four: the shape the relay recipe targets, and the one
+        # where the pair spans the whole node, so its barrier takes the
+        # full-world counter bank rather than a grouped one.
+        grouped_reducescatter_test[ngpus=8, group_size=4](list_of_ctx)
+        grouped_reducescatter_test[
+            ngpus=8, group_size=4, rows_first=9, rows_second=7, D=512
+        ](list_of_ctx)
+        # One whole group of four empty, relaying for a non-empty partner.
+        grouped_reducescatter_test[
+            ngpus=8, group_size=4, rows_first=4096, rows_second=0
+        ](list_of_ctx)
+        grouped_reducescatter_test[
+            ngpus=8,
+            group_size=4,
+            rows_first=4096,
+            rows_second=4096,
+            with_residual=True,
+        ](list_of_ctx)
 
     print("All reduce-scatter tests passed!")

@@ -206,6 +206,19 @@ def _run_case[
             ),
             row_major(Coord(Index(num_cols))),
         )
+        # `reducescatter`'s output is a world-view array (every device's own
+        # shard, indexed by global rank). Every slot has to name a real shard,
+        # not just this device's: a grouped reduce-scatter may hand part of a
+        # shard to the other group, whose GPUs then write it directly. Built
+        # here rather than inside the closure below, which only borrows
+        # `sum_shard` and so cannot take mutable pointers into it.
+        var world_sum = Array[OutShardType, ngpus](uninitialized=True)
+        for d in range(ngpus):
+            world_sum[d] = OutShardType(
+                sum_shard[d].unsafe_ptr().as_unsafe_any_origin(),
+                row_major(Coord(Index(config.rank_units(d), num_cols))),
+            )
+
         comptime if use_dispatch:
             # Production two-launch fallback (== the op's closure): standalone
             # reduce-scatter into `sum_view`, then `rms_norm_gpu` into
@@ -213,12 +226,6 @@ def _run_case[
             @__parameter
             @always_inline
             def two_launch() raises:
-                # `reducescatter`'s output is a world-view array (every
-                # device's own shard, indexed by global rank); only THIS
-                # device's slot is ever read back, so the rest is left
-                # uninitialized.
-                var world_sum = Array[OutShardType, ngpus](uninitialized=True)
-                world_sum[i] = sum_view
                 reducescatter[dtype=in_dtype, ngpus=ngpus, axis=0](
                     in_bufs, world_sum, rank_sigs, list_of_ctx[i], my_rank=i
                 )
@@ -272,7 +279,11 @@ def _run_case[
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
         var world_rs = Array[OutShardType, ngpus](uninitialized=True)
-        world_rs[i] = rs_view
+        for d in range(ngpus):
+            world_rs[d] = OutShardType(
+                rs_ref[d].unsafe_ptr().as_unsafe_any_origin(),
+                row_major(Coord(Index(config.rank_units(d), num_cols))),
+            )
         reducescatter[dtype=in_dtype, ngpus=ngpus, axis=0](
             in_bufs, world_rs, rank_sigs, list_of_ctx[i], my_rank=i
         )
@@ -664,6 +675,21 @@ def _run_prod_oracle_case[
             ),
             row_major(Coord(Index(num_cols))),
         )
+        # `reducescatter`'s output is a world-view array (every device's own
+        # shard, indexed by global rank). Every slot has to name a real shard,
+        # not just this device's: a grouped reduce-scatter may hand part of a
+        # shard to the other group, whose GPUs then write it directly. Built
+        # here rather than inside the closure below, which only borrows
+        # `sum_shard` and so cannot take mutable pointers into it.
+        var world_sum = Array[OutShardType, ngpus](uninitialized=True)
+        for d in range(ngpus):
+            world_sum[d] = OutShardType(
+                sum_shard[d].unsafe_ptr().as_unsafe_any_origin(),
+                row_major(
+                    Coord(Index(config.rank_units(d % group_size), num_cols))
+                ),
+            )
+
         comptime if use_dispatch:
             # Mirror the graph op's fallback (distributed.mojo): standalone
             # reduce-scatter into `sum_view`, then `rms_norm_gpu` into
@@ -671,12 +697,6 @@ def _run_prod_oracle_case[
             @__parameter
             @always_inline
             def two_launch() raises:
-                # `reducescatter`'s output is a world-view array (every
-                # device's own shard, indexed by global rank); only THIS
-                # device's slot is ever read back, so the rest is left
-                # uninitialized.
-                var world_sum = Array[OutShardType, ngpus](uninitialized=True)
-                world_sum[i] = sum_view
                 reducescatter[
                     dtype=in_dtype,
                     ngpus=ngpus,
@@ -739,7 +759,13 @@ def _run_prod_oracle_case[
             row_major(Coord(Index(config.rank_units(local), num_cols))),
         )
         var world_rs = Array[OutShardType, ngpus](uninitialized=True)
-        world_rs[i] = rs_view
+        for d in range(ngpus):
+            world_rs[d] = OutShardType(
+                rs_ref[d].unsafe_ptr().as_unsafe_any_origin(),
+                row_major(
+                    Coord(Index(config.rank_units(d % group_size), num_cols))
+                ),
+            )
         reducescatter[
             dtype=in_dtype, ngpus=ngpus, group_size=group_size, axis=0
         ](world_bufs, world_rs, rank_sigs, list_of_ctx[i], my_rank=i)

@@ -988,12 +988,38 @@ struct DistributedReduceScatterRMSNorm:
                 signal_buffers[i]._ptr.bitcast[Signal]().as_unsafe_any_origin()
             )
 
+        # `reducescatter`'s output and residual are world views too (every
+        # device's own shard, indexed by global rank). Every slot has to name
+        # a real buffer, not just this device's: a grouped reduce-scatter may
+        # hand part of a shard to the paired group, whose GPUs then finish it
+        # and write it directly, folding that group's residual as they go.
+        # Nothing in either depends on which device is launching.
+        comptime SumTensorType = type_of(
+            outputs_sum[0].to_tile_tensor[.int64]()
+        )
+        comptime ResPtrType = ImmPointer[Scalar[dtype], ImmutAnyOrigin]
+        var world_sum_bufs = Array[SumTensorType, num_devices](
+            uninitialized=True
+        )
+        var world_res_ptrs = Array[ResPtrType, num_devices](uninitialized=True)
+        comptime for i in range(num_devices):
+            world_sum_bufs[i] = rebind[SumTensorType](
+                outputs_sum[i].to_tile_tensor[.int64]()
+            )
+            # The op's variadic groups match in size whether or not the
+            # residual is read, so this is always a real tensor.
+            world_res_ptrs[i] = rebind[ResPtrType](
+                residuals[i].to_tile_tensor[.int64]().as_immut().ptr
+            )
+
         @always_inline
         def launch_fused_rs_norm[
             index: Int
         ]() raises {
             imm in_tensors,
             imm rank_sigs,
+            imm world_sum_bufs,
+            imm world_res_ptrs,
             imm dev_ctxs,
             imm gammas,
             imm epsilons,
@@ -1016,67 +1042,28 @@ struct DistributedReduceScatterRMSNorm:
             var residual_buf = rebind[InputTensorType](
                 residuals[index].to_tile_tensor[.int64]().as_immut()
             )
-            # Windowed from THIS DEVICE'S GROUP's input, not `residual_buf`:
-            # `reducescatter` bins its rows from `in_tensors[group_start]`
-            # (groups may carry different ragged shapes), so the residual
-            # cannot redefine it.
-            var res_cols = Int(in_tensors[group_start].dim[rank - 1]())
-            var res_config = ReduceScatterConfig[dtype, group_size](
-                axis_size=in_tensors[group_start].num_elements() // res_cols,
-                unit_numel=res_cols,
-                threads_per_gpu=0,
-            )
-            var res_row_start = res_config.rank_unit_start(local_rank)
-
-            # Fold in the reduce-scatter's OWN epilogue, not a third launch:
-            # the lambda is caller-supplied, so `reducescatter` is untouched.
-            # Both tensors are contiguous row-major over the same `cols`, so the
-            # global flat index is the local one plus a constant (no `Coord`).
-            var res_flat_offset = res_row_start * res_cols
-
-            @__copy_capture(residual_buf, sum_buf, res_flat_offset)
-            @__parameter
-            @always_inline
-            def rs_residual_lambda[
-                _dtype: DType, _width: SIMDLength, *, _alignment: Int
-            ](coords: Coord, val: SIMD[_dtype, _width]) -> None:
-                var local_flat = Int(sum_buf.layout(coords))
-                var res = residual_buf.raw_load[width=_width](
-                    local_flat + res_flat_offset
-                )
-                # `val` arrives already rounded to `dtype` from `_load_reduce`,
-                # so add in f32 and round once -- the fused kernel's fold.
-                var summed = (val.cast[.float32]() + res.cast[.float32]()).cast[
-                    dtype
-                ]()
-                sum_buf.raw_store[width=_width, alignment=_alignment](
-                    sum_buf.layout(coords), summed
-                )
 
             @__parameter
             @always_inline
             def two_launch() raises:
-                # `reducescatter`'s output is a world-view array (every
-                # device's own shard, indexed by global rank); only THIS
-                # device's slot is ever read back, so the rest is left
-                # uninitialized.
-                var world_sum_bufs = Array[type_of(sum_buf), num_devices](
-                    uninitialized=True
-                )
-                world_sum_bufs[index] = sum_buf
                 comptime if has_residual:
+                    # Handed to `reducescatter` as a residual rather than as
+                    # an epilogue: an epilogue would rule out the relay path,
+                    # which cannot run a caller's closure on a peer's behalf,
+                    # whereas a residual fold it can reproduce.
                     reducescatter[
                         dtype=dtype,
                         ngpus=num_devices,
                         group_size=group_size,
                         axis=0,
-                        output_lambda=rs_residual_lambda,
+                        has_residual=True,
                     ](
                         in_tensors,
                         world_sum_bufs,
                         rank_sigs,
                         dev_ctxs[index],
                         my_rank=index,
+                        residuals=Optional(world_res_ptrs.copy()),
                     )
                 else:
                     reducescatter[

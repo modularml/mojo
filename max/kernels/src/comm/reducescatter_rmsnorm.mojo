@@ -58,6 +58,7 @@ from std.utils.numerics import get_accum_type
 from .allreduce import allreduce_tuning_table
 from .device_query import dispatch_select_comm_config, get_sm_version
 from .reducescatter import ReduceScatterConfig, _target_address_space
+from .relay import _relay_pairs
 from .sync import MAX_GPUS, Signal, _multi_gpu_barrier, is_p2p_enabled
 
 
@@ -733,20 +734,36 @@ def _dispatch_rs_norm[
     var global_rank = my_rank.value() if my_rank else Int(ctx.id())
     var group_start = ualign_down(global_rank, group_size)
 
-    # Fuse-vs-two-launch MUST be group-invariant: the paths issue different
-    # barrier sequences on shared `rank_sigs`, so disagreement deadlocks. Gate
-    # on group-rank 0's shard, NEVER `rank_units(local_rank)` -- under a ragged
-    # partition low ranks own an extra row and could straddle the threshold.
-    # Invariance is per-GROUP: sibling groups may legitimately diverge, their
-    # `rank_sigs` being disjoint, so do not "fix" this to a world-wide gate.
+    # Fuse-vs-two-launch MUST be invariant across every group sharing a barrier
+    # domain: the paths issue different barrier sequences on shared
+    # `rank_sigs`, so disagreement deadlocks. That is one group normally, but a
+    # whole relay pair where the relay may engage, since only the two-launch
+    # arm reaches its pair-wide barrier. Within a group, gate on group-rank 0's
+    # shard, NEVER `rank_units(local_rank)` -- under a ragged partition low
+    # ranks own an extra row and could straddle the threshold.
     comptime last_dim_idx = in_layout.rank - 1
     var cols = Int(input_buffers[group_start].dim[last_dim_idx]())
     var rows = input_buffers[group_start].num_elements() // cols
-    var config = ReduceScatterConfig[in_dtype, group_size](
-        axis_size=rows, unit_numel=cols, threads_per_gpu=0
-    )
-    var per_rank_bytes = config.rank_units(0) * cols * size_of[in_dtype]()
-    var use_fused = per_rank_bytes <= threshold
+
+    comptime gate_groups = 2 if _relay_pairs[ngpus, group_size](
+        ctx.default_device_info.version
+    ) else 1
+    comptime gate_width = gate_groups * group_size
+    var gate_start = ualign_down(global_rank, gate_width)
+
+    var use_fused = True
+    comptime for g in range(gate_groups):
+        var group_rows = (
+            input_buffers[gate_start + g * group_size].num_elements() // cols
+        )
+        var group_config = ReduceScatterConfig[in_dtype, group_size](
+            axis_size=group_rows, unit_numel=cols, threads_per_gpu=0
+        )
+        var per_rank_bytes = (
+            group_config.rank_units(0) * cols * size_of[in_dtype]()
+        )
+        if per_rank_bytes > threshold:
+            use_fused = False
 
     # Before branching: `two_launch` folds against the same global-row
     # partition, so a bad residual is wrong on both arms, not just the fused.
