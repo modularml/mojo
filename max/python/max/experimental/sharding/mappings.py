@@ -15,8 +15,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sized
 from dataclasses import dataclass
+
+from max.driver import Device
+from max.graph import DeviceRef
 
 from .mesh import DeviceMesh, get_active_mesh
 from .placements import (
@@ -72,6 +75,24 @@ class DeviceMapping:
         """Back-compat alias for :attr:`placements`."""
         return self.placements
 
+    def check_shape(self, shape: Sized) -> None:
+        """Raises if this mapping shards an axis ``shape`` does not have.
+
+        Args:
+            shape: The global shape to check against.
+
+        Raises:
+            ValueError: If a :class:`Sharded` axis is out of range.
+        """
+        for placement in self.placements:
+            if isinstance(placement, Sharded) and not (
+                0 <= placement.axis < len(shape)
+            ):
+                raise ValueError(
+                    f"Sharded(axis={placement.axis}) is out of range for a "
+                    f"rank-{len(shape)} shape."
+                )
+
     @property
     def is_fully_replicated(self) -> bool:
         """``True`` when every mesh axis is :class:`Replicated`."""
@@ -102,6 +123,34 @@ class DeviceMapping:
 
 PlacementMapping = DeviceMapping
 """Back-compat alias for :class:`DeviceMapping`."""
+
+
+def as_device_mapping(
+    device: Device | DeviceRef | DeviceMesh | DeviceMapping,
+) -> DeviceMapping:
+    """Coerces any way of naming where a value sits into a mapping.
+
+    Args:
+        device: A single device, a mesh to replicate over, or a mapping.
+
+    Returns:
+        The equivalent :class:`DeviceMapping`.
+
+    Raises:
+        TypeError: If ``device`` is none of those.
+    """
+    if isinstance(device, DeviceMapping):
+        return device
+    if isinstance(device, DeviceRef):
+        device = device.to_device()
+    if isinstance(device, Device):
+        device = DeviceMesh.single(device)
+    if isinstance(device, DeviceMesh):
+        return DeviceMapping(device, (Replicated(),) * device.ndim)
+    raise TypeError(
+        f"expected a Device, DeviceRef, DeviceMesh or DeviceMapping, got "
+        f"{type(device).__name__}: {device!r}"
+    )
 
 
 def is_fully_replicated(mapping: DeviceMapping) -> bool:

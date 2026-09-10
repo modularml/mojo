@@ -846,6 +846,13 @@ the [container](/container) page now links to the new page.
   along without being handed a mesh. Its `original_spec` and
   `original_unreduced` properties are removed.
 
+- Unified the four types that described a tensor argument in
+  `max.experimental` (`TensorType`, `BufferType`, `DistributedTensorType` and
+  `DistributedBufferType`) into two, both built from a dtype, a shape and a
+  device: `max.experimental.sharding.TensorLayout`, which a tensor backs with a
+  graph value, and `BufferLayout`, which it backs with a buffer a compiled
+  callable may store through.
+
 - Added `max.experimental.tree_utils`, pytree utilities over nested `list` /
   `tuple` / `namedtuple` / `dict` and any class declaring the tree protocol:
   `__tree_flatten__` with either `__tree_unflatten__` or `__tree_empty__`, and

@@ -40,9 +40,10 @@ from max.engine import InferenceSession
 from max.experimental import functional as F
 from max.experimental.nn import CompiledModel
 from max.experimental.sharding import (
+    DeviceMapping,
     DeviceMesh,
-    DistributedTensorType,
     Replicated,
+    TensorLayout,
 )
 from max.experimental.tensor import default_dtype
 from max.graph import DeviceRef, TensorType
@@ -468,17 +469,15 @@ class KimiK2_5Model(
         tokens_t, return_n_logits_t, input_row_offsets_t, *kv_types = (
             base_inputs
         )
-        image_embeddings_type = DistributedTensorType(
+        image_embeddings_type = TensorLayout(
             DType.bfloat16,
-            shape=["vision_merged_seq_len", llm.hidden_size],
-            mesh=llm.mesh,
-            placements=(Replicated(),),
+            ["vision_merged_seq_len", llm.hidden_size],
+            DeviceMapping(llm.mesh, (Replicated(),)),
         )
-        image_token_indices_type = DistributedTensorType(
+        image_token_indices_type = TensorLayout(
             DType.int32,
-            shape=["total_image_tokens"],
-            mesh=llm.mesh,
-            placements=(Replicated(),),
+            ["total_image_tokens"],
+            DeviceMapping(llm.mesh, (Replicated(),)),
         )
 
         # Host per-replica KV context lengths, and (under data parallelism) the

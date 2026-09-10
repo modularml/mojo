@@ -39,26 +39,25 @@ from max.experimental.functional import (
 )
 from max.experimental.nn.module import Module, module_dataclass
 from max.experimental.sharding import (
+    DeviceMapping,
     DeviceMesh,
     PlacementMapping,
     Replicated,
     Sharded,
+    TensorLayout,
 )
-from max.experimental.sharding.types import DistributedTensorType
-from max.experimental.tensor import Tensor, TensorType
+from max.experimental.tensor import Tensor
 
 F32 = DType.float32
 H = 4
 
 
-def _sym_cpu_input() -> TensorType:
-    return TensorType(F32, ["batch", H], device=CPU())
+def _sym_cpu_input() -> TensorLayout:
+    return TensorLayout(F32, ["batch", H], device=CPU())
 
 
-def _sym_dp_input(mesh: DeviceMesh) -> DistributedTensorType:
-    return DistributedTensorType(
-        dtype=F32, shape=["batch", H], mesh=mesh, placements=(Sharded(0),)
-    )
+def _sym_dp_input(mesh: DeviceMesh) -> TensorLayout:
+    return TensorLayout(F32, ["batch", H], DeviceMapping(mesh, (Sharded(0),)))
 
 
 def _replicated_w(mesh: DeviceMesh, data: np.ndarray) -> Tensor:

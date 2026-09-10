@@ -31,7 +31,7 @@ from max.dtype import DType
 from max.experimental import compilation
 from max.experimental import functional as F
 from max.experimental.compilation import (
-    _SPEC_TYPES,
+    _LAYOUT_TYPES,
     StagedGraph,
     as_layout,
     as_subgraph,
@@ -40,8 +40,9 @@ from max.experimental.compilation import (
 )
 from max.experimental.nn.common_layers.kv_cache import PagedCacheValues
 from max.experimental.sharding import (
+    BufferLayout,
+    DeviceMapping,
     DeviceMesh,
-    DistributedBufferType,
     PlacementMapping,
     Replicated,
     Sharded,
@@ -128,14 +129,20 @@ class TestAsLayout:
         assert layout.mesh.num_devices == 1
         assert not layout.mesh.num_devices > 1
 
-    def test_a_tensor_reads_as_its_own_layout(self) -> None:
-        layout = as_layout(_tensor(1.0, 2.0, 3.0))
+    def test_a_tensor_is_a_value_and_not_a_layout(self) -> None:
+        """Its dims are whatever it holds, so reading a boundary off one
+        would fix every dimension to that size by accident."""
+        with pytest.raises(TypeError, match="is a value, not a layout"):
+            as_layout(_tensor(1.0, 2.0, 3.0))
+
+    def test_a_tensors_own_layout_says_it_on_purpose(self) -> None:
+        layout = as_layout(_tensor(1.0, 2.0, 3.0).layout)
         assert isinstance(layout, TensorLayout)
         assert layout.dtype == _F32
         assert [int(d) for d in layout.shape] == [3]
 
-    def test_a_sharded_tensor_keeps_its_distribution(self) -> None:
-        layout = as_layout(_sharded_tensor(1.0, 2.0))
+    def test_a_sharded_tensors_layout_keeps_its_distribution(self) -> None:
+        layout = as_layout(_sharded_tensor(1.0, 2.0).layout)
         assert isinstance(layout, TensorLayout)
         assert layout.mesh.num_devices == 2
 
@@ -153,8 +160,8 @@ class TestStage:
         assert staged._signature.out_structure.num_leaves == 1
         assert staged._signal_device_ids == ()
 
-    def test_an_example_tensor_serves_as_a_spec(self) -> None:
-        staged = stage(lambda x: x * 2)(_tensor(1.0, 2.0))
+    def test_an_example_tensors_layout_serves_as_a_spec(self) -> None:
+        staged = stage(lambda x: x * 2)(_tensor(1.0, 2.0).layout)
         assert len(staged.graph.inputs) == 1
 
     def test_keyword_arguments_are_traced(self) -> None:
@@ -292,7 +299,7 @@ class TestWeights:
     def test_a_weight_is_external_and_computes(self) -> None:
         def layer(x: Tensor) -> Tensor:
             return x * F.constant_external(
-                "w", TensorType(_F32, [2], DeviceRef.CPU())
+                "w", TensorLayout(_F32, [2], DeviceRef.CPU())
             )
 
         assert "mo.constant.external" in str(stage(layer)(_spec(2)))
@@ -387,7 +394,7 @@ class TestSubgraphable:
         def body(x: Tensor) -> Tensor:
             return x * F.constant_external(
                 "w",
-                TensorType(_F32, [1], DeviceRef.CPU()),
+                TensorLayout(_F32, [1], DeviceRef.CPU()),
                 is_placeholder=True,
             )
 
@@ -412,7 +419,7 @@ class TestSubgraphable:
         def body(x: Tensor) -> Tensor:
             return x * F.constant_external(
                 "shared.w",
-                TensorType(_F32, [1], DeviceRef.CPU()),
+                TensorLayout(_F32, [1], DeviceRef.CPU()),
                 is_placeholder=False,
             )
 
@@ -649,7 +656,7 @@ class TestTheHardestSignature:
         args, kwargs = _gnarly_specs(_spec)
         staged = stage(_gnarly)(*args, **kwargs)
         assert (
-            list(tree_paths(staged._signature.in_specs, leaf=_SPEC_TYPES))
+            list(tree_paths(staged._signature.in_specs, leaf=_LAYOUT_TYPES))
             == _GNARLY_ROUTES
         )
 
@@ -662,9 +669,10 @@ class TestTheHardestSignature:
         assert out["arity"] == 2
         assert out["tags"] == ("alpha", "beta")
 
-    def test_example_tensors_serve_as_specs(self) -> None:
+    def test_example_tensors_layouts_serve_as_specs(self) -> None:
         args, kwargs = _gnarly_call(_tensor)
-        run = compile(_gnarly)(*args, **kwargs)
+        spec_args, spec_kwargs = _gnarly_call(lambda *v: _tensor(*v).layout)
+        run = compile(_gnarly)(*spec_args, **spec_kwargs)
         np.testing.assert_allclose(
             run(*args, **kwargs)["out"].to_numpy(), _GNARLY_EXPECTED
         )
@@ -750,7 +758,7 @@ def _block(x, /, pair, *rest, gain, **extras):  # noqa: ANN001, ANN202
 
 def _stack(x, /, table, *, scale, **tails):  # noqa: ANN001, ANN202
     out = x * F.constant_external(
-        "blk.w", TensorType(_F32, [2], DeviceRef.CPU())
+        "blk.w", TensorLayout(_F32, [2], DeviceRef.CPU())
     )
     for name in sorted(tails):
         out = _block(
@@ -812,9 +820,9 @@ class Projections:
     under test here as much as the round trip.
     """
 
-    a: Tensor
-    b: Tensor
-    bias: Tensor | None = None
+    a: Tensor | TensorLayout
+    b: Tensor | TensorLayout
+    bias: Tensor | TensorLayout | None = None
 
     def __tree_flatten__(self) -> tuple[dict[str, Any], None]:
         return {f.name: getattr(self, f.name) for f in fields(self)}, None
@@ -831,7 +839,7 @@ class TestARecordArgumentSurvivesTheRoundTrip:
     """A pytree record as an argument, all the way through execution.
 
     Tracing one was already covered; *calling* the result was not, and the two
-    walks are different -- specs flatten under ``leaf=_SPEC_TYPES`` and a call
+    walks are different -- specs flatten under ``leaf=_LAYOUT_TYPES`` and a call
     flattens under ``_one_slot``. When those disagreed about a record the
     symptom was not a mismatch error: the record became one static slot, and
     checking it against its own spec ran ``Tensor.__eq__`` against a
@@ -839,25 +847,19 @@ class TestARecordArgumentSurvivesTheRoundTrip:
     """
 
     def test_a_record_of_tensors_round_trips_compiled(self) -> None:
-        run = compile(lambda p: p.a * p.b)(
-            Projections(a=_tensor(0.0, 0.0), b=_tensor(0.0, 0.0))
-        )
+        run = compile(lambda p: p.a * p.b)(Projections(a=_spec(2), b=_spec(2)))
 
         out = run(Projections(a=_tensor(2.0, 3.0), b=_tensor(4.0, 5.0)))
 
         np.testing.assert_allclose(out.to_numpy(), [8.0, 15.0])
 
     def test_each_of_a_records_tensors_is_its_own_input(self) -> None:
-        staged = stage(lambda p: p.a * p.b)(
-            Projections(a=_tensor(0.0, 0.0), b=_tensor(0.0, 0.0))
-        )
+        staged = stage(lambda p: p.a * p.b)(Projections(a=_spec(2), b=_spec(2)))
 
         assert len(staged.graph.inputs) == 2, "not one slot for the record"
 
     def test_a_wrong_shape_inside_a_record_names_its_field(self) -> None:
-        run = compile(lambda p: p.a * p.b)(
-            Projections(a=_tensor(0.0, 0.0), b=_tensor(0.0, 0.0))
-        )
+        run = compile(lambda p: p.a * p.b)(Projections(a=_spec(2), b=_spec(2)))
 
         with pytest.raises(ValueError, match=r"argument 0\.a: expected"):
             run(Projections(a=_tensor(1.0), b=_tensor(4.0, 5.0)))
@@ -904,7 +906,9 @@ class TestBufferSpecs:
         mesh = DeviceMesh(
             devices=(CPU(), CPU()), mesh_shape=(2,), axis_names=("tp",)
         )
-        spec = DistributedBufferType(DType.float32, [4, 8], mesh, (Sharded(0),))
+        spec = BufferLayout(
+            DType.float32, [4, 8], DeviceMapping(mesh, (Sharded(0),))
+        )
 
         def read_first(b: Tensor) -> TensorValue:
             return ops.buffer_load(b.local_shards[0].__buffervalue__())
@@ -945,7 +949,7 @@ class TestBufferSpecs:
             return x * 2
 
         run = compile(fill)(
-            DistributedBufferType(_F32, [4], mesh, (Sharded(0),)),
+            BufferLayout(_F32, [4], DeviceMapping(mesh, (Sharded(0),))),
             TensorLayout(_F32, [4], PlacementMapping(mesh, (Sharded(0),))),
         )
         cache = Tensor._from_shards(
@@ -1165,7 +1169,7 @@ class TestAPagedKVCache:
         def projection(name: str) -> Tensor:
             return F.constant_external(
                 name,
-                TensorType(_F32, [hidden, hidden], device=DeviceRef.CPU()),
+                TensorLayout(_F32, [hidden, hidden], device=DeviceRef.CPU()),
                 is_placeholder=True,
             )
 

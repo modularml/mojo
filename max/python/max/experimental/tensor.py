@@ -76,8 +76,8 @@ with randomly initialized weights before loading weights
 
     from max.experimental import functional as F
     from max.experimental.nn import Linear
+    from max.experimental.sharding import TensorLayout
     from max.experimental.tensor import Tensor, defaults
-    from max.graph import TensorType
 
     with F.lazy():
         model = Linear(2, 3)
@@ -95,8 +95,8 @@ with randomly initialized weights before loading weights
     # Derive the input type from the same defaults the module used, so the
     # module, its weights, and the input type agree on dtype and device.
     dtype, device = defaults()
-    input_type = TensorType(dtype, ["batch", 2], device)
-    model = model.compile(input_type, weights=weights)
+    input_spec = TensorLayout(dtype, ["batch", 2], device)
+    model = model.compile(input_spec, weights=weights)
 """
 
 from __future__ import annotations
@@ -115,12 +115,12 @@ from max.dtype import DType
 from max.experimental.sharding import (
     DeviceMapping,
     DeviceMesh,
-    DistributedTensorType,
     NamedMapping,
     Placement,
     PlacementMapping,
     Replicated,
     Sharded,
+    TensorLayout,
 )
 from max.experimental.sharding.mappings import is_fully_replicated
 from max.experimental.sharding.per_shard_dim import (
@@ -134,10 +134,10 @@ from max.graph import (
     DimLike,
     ShapeLike,
     StaticDim,
-    TensorType,
     TensorValueLike,
     ops,
 )
+from max.graph import TensorType as TensorType  # re-exported
 from max.graph.ops.constant import NestedArray, Number
 from max.graph.value import HasTensorValue
 from rich.pretty import pretty_repr
@@ -502,7 +502,7 @@ def default_dtype(dtype: DType) -> contextlib.AbstractContextManager[DType]:
 
 
 @contextlib.contextmanager
-def defaults_like(like: Tensor | TensorType) -> Generator[None]:
+def defaults_like(like: Tensor) -> Generator[None]:
     """Context manager setting the default dtype and device for tensor creation.
 
     Sets the default data type and device used for tensor creation within the
@@ -522,7 +522,7 @@ def defaults_like(like: Tensor | TensorType) -> Generator[None]:
             z = tensor.Tensor.zeros((2, 3), dtype=DType.float32)  # float32, cpu
 
     Args:
-        like: Tensor or tensor type whose dtype and device to use as defaults.
+        like: The tensor whose dtype and device to use as defaults.
 
     Returns:
         A context manager that sets the default dtype and device.
@@ -827,8 +827,9 @@ class Tensor(DLPackArray, HasTensorValue):
             from max.dtype import DType
             from max.experimental import functional as F
             from max.experimental.nn import Module
+            from max.experimental.sharding import TensorLayout
             from max.experimental.tensor import Tensor
-            from max.graph import DeviceRef, TensorType
+            from max.graph import TensorType
 
             class ScaleByBatch(Module):
                 def forward(self, x: Tensor) -> Tensor:
@@ -839,7 +840,7 @@ class Tensor(DLPackArray, HasTensorValue):
                     return out
 
             model = ScaleByBatch().compile(
-                TensorType(DType.float32, ["batch", 4], device=DeviceRef.CPU())
+                TensorLayout(DType.float32, ["batch", 4], CPU())
             )
             result = model(Tensor.ones([1, 4], dtype=DType.float32, device=CPU()))
 
@@ -1091,9 +1092,9 @@ class Tensor(DLPackArray, HasTensorValue):
             external data.
         """
         if not self.is_distributed:
-            stype = TensorType(self.dtype, self.shape, CPU())
+            spec = TensorLayout(self.dtype, self.shape, CPU())
             return F.constant_external(
-                name, stype, align=align, is_placeholder=is_placeholder
+                name, spec, align=align, is_placeholder=is_placeholder
             ).to(self.device)
         assert self._mapping is not None
         _mesh = self._mapping.mesh
@@ -1101,10 +1102,10 @@ class Tensor(DLPackArray, HasTensorValue):
         shape = self.shape
         for i in range(_mesh.num_devices):
             local = local_shape_at(shape, i)
-            stype = TensorType(self.dtype, local, CPU())
+            spec = TensorLayout(self.dtype, local, CPU())
             t = F.constant_external(
                 f"{name}._shard.{i}",
-                stype,
+                spec,
                 align=align,
                 is_placeholder=is_placeholder,
             )
@@ -1226,7 +1227,7 @@ class Tensor(DLPackArray, HasTensorValue):
         return F.full(shape, value, dtype=dtype, device=device)
 
     @classmethod
-    def full_like(cls, input: Tensor | TensorType, value: Number) -> Tensor:
+    def full_like(cls, input: Tensor, value: Number) -> Tensor:
         """Creates a tensor filled with a value, matching a given tensor's properties.
 
         Returns a new tensor filled with the specified value that matches the
@@ -1244,20 +1245,17 @@ class Tensor(DLPackArray, HasTensorValue):
             x = tensor.Tensor.full_like(ref, value=5.0)
 
         Args:
-            input: The tensor or tensor type to match. The returned tensor will
-                have the same shape, dtype, and device as this input.
+            input: The tensor to match. The returned tensor will have the same
+                shape, dtype, and placement as it.
             value: The scalar value to fill the tensor with.
 
         Returns:
             Tensor: A new tensor filled with the specified value, matching the
                 properties of the input.
         """
-        tensor_type = input.type if isinstance(input, Tensor) else input
+        spec = input.layout
         return cls.full(
-            tensor_type.shape,
-            value=value,
-            dtype=tensor_type.dtype,
-            device=tensor_type.device.to_device(),
+            spec.shape, value=value, dtype=spec.dtype, device=spec.mapping
         )
 
     @classmethod
@@ -1302,7 +1300,7 @@ class Tensor(DLPackArray, HasTensorValue):
         return cls.full(shape, value=0, dtype=dtype, device=device)
 
     @classmethod
-    def zeros_like(cls, input: Tensor | TensorType) -> Tensor:
+    def zeros_like(cls, input: Tensor) -> Tensor:
         """Creates a tensor of zeros matching a given tensor's properties.
 
         Returns a new tensor filled with zeros that matches the shape, data type,
@@ -1321,19 +1319,15 @@ class Tensor(DLPackArray, HasTensorValue):
             # Result: 3x4 tensor of zeros with dtype float32
 
         Args:
-            input: The tensor or tensor type to match. The returned tensor will
-                have the same shape, dtype, and device as this input.
+            input: The tensor to match. The returned tensor will have the same
+                shape, dtype, and placement as it.
 
         Returns:
             Tensor: A new tensor filled with zeros matching the properties of the
                 input.
         """
-        tensor_type = input.type if isinstance(input, Tensor) else input
-        return cls.zeros(
-            tensor_type.shape,
-            dtype=tensor_type.dtype,
-            device=tensor_type.device.to_device(),
-        )
+        spec = input.layout
+        return cls.zeros(spec.shape, dtype=spec.dtype, device=spec.mapping)
 
     @classmethod
     def ones(
@@ -1370,7 +1364,7 @@ class Tensor(DLPackArray, HasTensorValue):
         return cls.full(shape, value=1, dtype=dtype, device=device)
 
     @classmethod
-    def ones_like(cls, input: Tensor | TensorType) -> Tensor:
+    def ones_like(cls, input: Tensor) -> Tensor:
         """Creates a tensor of ones matching a given tensor's properties.
 
         Returns a new tensor filled with ones that matches the shape, data type,
@@ -1389,19 +1383,15 @@ class Tensor(DLPackArray, HasTensorValue):
             # Result: 3x4 tensor of ones with dtype float32
 
         Args:
-            input: The tensor or tensor type to match. The returned tensor will
-                have the same shape, dtype, and device as this input.
+            input: The tensor to match. The returned tensor will have the same
+                shape, dtype, and placement as it.
 
         Returns:
             Tensor: A new tensor filled with ones matching the properties of the
                 input.
         """
-        tensor_type = input.type if isinstance(input, Tensor) else input
-        return cls.ones(
-            tensor_type.shape,
-            dtype=tensor_type.dtype,
-            device=tensor_type.device.to_device(),
-        )
+        spec = input.layout
+        return cls.ones(spec.shape, dtype=spec.dtype, device=spec.mapping)
 
     @classmethod
     def arange(
@@ -1490,47 +1480,48 @@ class Tensor(DLPackArray, HasTensorValue):
         )
 
     @classmethod
-    def range_like(cls, type: TensorType) -> Tensor:
-        """Creates a range tensor matching a given type's properties.
+    def range_like(cls, input: Tensor) -> Tensor:
+        """Creates a range tensor matching a given tensor's properties.
 
         Returns a new tensor containing sequential indices along the last
-        dimension, broadcasted to match the shape of the specified tensor type.
+        dimension, broadcasted to match the shape of the given tensor.
         Each row (along the last dimension) contains values from 0 to the
         dimension size minus one. This is useful for creating position indices
         or coordinate tensors.
 
         .. code-block:: python
 
+            from max.driver import CPU
             from max.experimental import tensor
-            from max.graph import DeviceRef, TensorType
             from max.dtype import DType
 
-            # Create a reference tensor type with shape (2, 4)
-            ref_type = TensorType(DType.int32, (2, 4), device=DeviceRef.CPU())
+            # Create a reference tensor with shape (2, 4)
+            ref = tensor.Tensor.zeros((2, 4), dtype=DType.int32, device=CPU())
 
-            # Create range tensor matching the reference type
-            x = tensor.Tensor.range_like(ref_type)
+            # Create range tensor matching the reference tensor
+            x = tensor.Tensor.range_like(ref)
             # Result: [[0, 1, 2, 3],
             #          [0, 1, 2, 3]]
 
         Args:
-            type: The tensor type to match. The returned tensor will have the
-                same shape, dtype, and device as this type, with values
+            input: The tensor to match. The returned tensor will have the
+                same shape, dtype, and placement as it, with values
                 representing indices along the last dimension.
 
         Returns:
             Tensor: A new tensor with sequential indices broadcasted to match
-                the input type's shape.
+                the input's shape.
         """
-        dim = type.shape[-1]
+        layout = input.layout
+        dim = layout.shape[-1]
         range = F.arange(
             start=0,
             stop=dim,
             out_dim=dim,
-            dtype=type.dtype,
-            device=type.device.to_device(),
+            dtype=layout.dtype,
+            device=layout.mapping,
         )
-        return F.broadcast_to(range, type.shape)
+        return F.broadcast_to(range, layout.shape)
 
     @property
     def real(self) -> bool:
@@ -1583,6 +1574,18 @@ class Tensor(DLPackArray, HasTensorValue):
         return self._storages
 
     @property
+    def layout(self) -> TensorLayout:
+        """This tensor's dtype, global shape and distribution.
+
+        Immutable, so it says nothing about whether a callable may write to
+        this tensor: that is declared where the tensor becomes an argument,
+        by giving it a
+        :class:`~max.experimental.sharding.BufferLayout` instead.
+        Defined for a distributed tensor too, unlike :attr:`type`.
+        """
+        return TensorLayout(self.dtype, self.shape, self._mapping)
+
+    @property
     def type(self) -> graph.TensorType:
         """Gets the tensor type information.
 
@@ -1593,15 +1596,9 @@ class Tensor(DLPackArray, HasTensorValue):
             TypeError: If the tensor is distributed.
         """
         if self.is_distributed:
-            # self.shape already reports the global, so no fold is needed.
-            dist_type = DistributedTensorType(
-                self.dtype, self.shape, self.mesh, self.placements
-            )
             raise TypeError(
-                f"Cannot get a single TensorType for a distributed tensor. "
-                f"The distributed type is: {dist_type!r}. "
-                f"This API may change in the future to return "
-                f"DistributedTensorType directly."
+                f"{self.layout!r} spans {self.mesh.num_devices} devices, so "
+                "it has no single type. Read tensor.layout instead."
             )
         type = (
             driver_tensor_type(self.driver_tensor)
@@ -1803,8 +1800,8 @@ class Tensor(DLPackArray, HasTensorValue):
         ):
             raise TypeError(
                 "cannot mutate a tensor argument that was staged as a tensor. "
-                "Stage it as a buffer instead, by passing a BufferType "
-                "or DistributedBufferType as its spec."
+                "Stage it as a buffer instead, by passing a BufferLayout "
+                "as its spec."
             )
 
         buffer = self._as_mutable()._backing_value

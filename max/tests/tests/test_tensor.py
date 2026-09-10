@@ -140,9 +140,8 @@ def test_tensor_dlpack() -> None:
 
 
 def test_tensor_lazy_dlpack() -> None:
-    expected_type = TensorType(DType.float32, [5, 5], DeviceRef.CPU())
     with F.lazy():
-        t = random.normal_like(expected_type)
+        t = random.normal([5, 5], dtype=DType.float32, device=CPU())
     npt = np.from_dlpack(t)
     assert npt.dtype == t.dtype.to_numpy()
     assert list(npt.shape) == t.shape
@@ -207,7 +206,7 @@ def test_defaults_like() -> None:
     with defaults_like(t):
         t2 = Tensor(1)
         assert t.type == t2.type
-    with defaults_like(t.type):
+    with defaults_like(t):
         t3 = Tensor(1)
         assert t.type == t3.type
 
@@ -241,7 +240,7 @@ def test_realized_tensor_as_buffer() -> None:
     DEVICE = Accelerator() if accelerator_count() else CPU()
     a_data = Buffer.zeros([5, 5], DType.float32, DEVICE)
     a = Tensor(storage=a_data)
-    b = Tensor.ones_like(a.type)
+    b = Tensor.ones_like(a)
     F.buffer_store(a, b)
     assert a.real
 
@@ -252,7 +251,7 @@ def test_realized_tensor_as_buffer_lazy() -> None:
     a = Tensor(storage=a_data)
     assert a.real
     with F.lazy():
-        b = Tensor.ones_like(a.type)
+        b = Tensor.ones_like(a)
         # Woof. `a` is a `Tensor`, not a `LazyTensor`. What does this do?
         F.buffer_store(a, b)
     assert not a.real
@@ -263,7 +262,7 @@ def test_realized_tensor_as_buffer_lazy() -> None:
 def test_unrealized_value_as_buffer() -> None:
     with F.lazy():
         a = Tensor.zeros([5, 5])
-        b = Tensor.ones_like(a.type)
+        b = Tensor.ones_like(a)
         assert not a.real
         F.buffer_store(a, b)
         assert not a.real
@@ -287,7 +286,7 @@ def test_buffervalue_on_realized_tensor() -> None:
 
 def test_mutation_op_order() -> None:
     a = Tensor.zeros([1])
-    b = Tensor.ones_like(a.type)
+    b = Tensor.ones_like(a)
     c = a + b
     F.buffer_store(a, b)
     d = a + b
@@ -301,7 +300,7 @@ def test_mutation_op_order() -> None:
 def test_mutation_op_order_lazy() -> None:
     with F.lazy():
         a = Tensor.zeros([1])
-        b = Tensor.ones_like(a.type)
+        b = Tensor.ones_like(a)
         c = a + b
         F.buffer_store(a, b)
         d = a + b

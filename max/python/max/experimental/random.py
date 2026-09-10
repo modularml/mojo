@@ -43,16 +43,10 @@ from max.graph import DeviceRef, ShapeLike, ops
 __all__ = ["gaussian", "normal", "seed", "set_seed", "uniform"]
 
 
-#: Generates random values from a uniform distribution for tensors of a given type.
-#: See :func:`max.graph.ops.random.uniform` for details.
-uniform_like = functional(ops.random.uniform)
-
-#: Generates random values from a Gaussian (normal) distribution for tensors of a given type.
-#: See :func:`max.graph.ops.random.gaussian` for details.
-gaussian_like = functional(ops.random.gaussian)
-
-#: Alias for :func:`gaussian_like`.
-normal_like = gaussian_like
+# The graph ops take a ``TensorType``, so these stay private: a creation op's
+# signature describes a shape, and the graph type is built on the way down.
+_uniform_like = functional(ops.random.uniform)
+_gaussian_like = functional(ops.random.gaussian)
 
 
 def uniform(  # noqa: ANN201
@@ -101,7 +95,7 @@ def uniform(  # noqa: ANN201
     """
     dtype, device = defaults(dtype, device)
     type = TensorType(dtype, shape, device=DeviceRef.from_device(device))
-    return uniform_like(type, range=range)
+    return _uniform_like(type, range=range)
 
 
 def gaussian(  # noqa: ANN201
@@ -150,7 +144,7 @@ def gaussian(  # noqa: ANN201
     """
     dtype, device = defaults(dtype, device)
     type = TensorType(dtype, shape, device=DeviceRef.from_device(device))
-    return gaussian_like(type, mean=mean, std=std)
+    return _gaussian_like(type, mean=mean, std=std)
 
 
 #: Alias for :func:`gaussian`.

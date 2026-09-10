@@ -37,15 +37,16 @@ from max.experimental.nn.module import (
     module_dataclass,
 )
 from max.experimental.sharding import (
+    BufferLayout,
+    DeviceMapping,
     DeviceMesh,
-    DistributedBufferType,
-    DistributedTensorType,
     PlacementMapping,
     Replicated,
     Sharded,
+    TensorLayout,
 )
 from max.experimental.tensor import Tensor
-from max.graph import BufferType, TensorType
+from max.graph import BufferType, DeviceRef, TensorType
 
 # ── Inline mesh helpers (no conftest dependency) ──────────────────────
 
@@ -131,7 +132,7 @@ class TestSlotDescriptors:
 
 class TestFlattenInputTypes:
     def test_non_distributed_passthrough(self) -> None:
-        tt = TensorType(DType.float32, [4, 8], CPU())
+        tt = TensorType(DType.float32, [4, 8], DeviceRef.CPU())
         flat, slots = _flatten_input_types([tt])
         assert len(flat) == 1
         assert flat[0] is tt
@@ -140,7 +141,9 @@ class TestFlattenInputTypes:
 
     def test_distributed_expands(self) -> None:
         mesh = mesh_1d(4)
-        dt = DistributedTensorType(DType.float32, [8, 16], mesh, [Sharded(0)])
+        dt = TensorLayout(
+            DType.float32, [8, 16], DeviceMapping(mesh, (Sharded(0),))
+        )
         flat, slots = _flatten_input_types([dt])
         assert len(flat) == 4
         assert slots[0].count == 4
@@ -148,8 +151,10 @@ class TestFlattenInputTypes:
 
     def test_mixed_inputs(self) -> None:
         mesh = mesh_1d(2)
-        tt = TensorType(DType.float32, [4, 8], CPU())
-        dt = DistributedTensorType(DType.float32, [8, 16], mesh, [Sharded(0)])
+        tt = TensorType(DType.float32, [4, 8], DeviceRef.CPU())
+        dt = TensorLayout(
+            DType.float32, [8, 16], DeviceMapping(mesh, (Sharded(0),))
+        )
         flat, slots = _flatten_input_types([tt, dt])
         assert len(flat) == 3  # 1 + 2
         assert slots[0].count == 1
@@ -164,8 +169,12 @@ class TestFlattenInputTypes:
 
     def test_multiple_distributed(self) -> None:
         mesh = mesh_1d(2)
-        dt1 = DistributedTensorType(DType.float32, [4, 8], mesh, [Sharded(0)])
-        dt2 = DistributedTensorType(DType.float32, [6, 8], mesh, [Sharded(0)])
+        dt1 = TensorLayout(
+            DType.float32, [4, 8], DeviceMapping(mesh, (Sharded(0),))
+        )
+        dt2 = TensorLayout(
+            DType.float32, [6, 8], DeviceMapping(mesh, (Sharded(0),))
+        )
         flat, slots = _flatten_input_types([dt1, dt2])
         assert len(flat) == 4  # 2 + 2
         assert slots[0].start == 0
@@ -175,7 +184,9 @@ class TestFlattenInputTypes:
 
     def test_buffer_type_distributed(self) -> None:
         mesh = mesh_1d(2)
-        dt = DistributedBufferType(DType.float32, [8, 4], mesh, [Sharded(0)])
+        dt = BufferLayout(
+            DType.float32, [8, 4], DeviceMapping(mesh, (Sharded(0),))
+        )
         flat, _ = _flatten_input_types([dt])
         assert len(flat) == 2
         for lt in flat:
@@ -360,7 +371,7 @@ class TestModuleCompileDistributed:
         """Module with sharded weight compiles and executes."""
         W = _make_realized_sharded([4, 8], 2, shard_axis=0)
         model = _IdentityModule(W=W)
-        input_type = TensorType(DType.float32, [3, 8], CPU())
+        input_type = TensorLayout(DType.float32, [3, 8], CPU())
         compiled = model.compile(input_type)
         x = Tensor.ones([3, 8], dtype=DType.float32, device=CPU())
         result = compiled(x)
@@ -368,12 +379,12 @@ class TestModuleCompileDistributed:
         np.testing.assert_allclose(np.from_dlpack(result), 1.0)
 
     def test_compile_with_distributed_input_type(self) -> None:
-        """DistributedTensorType input is flattened and reconstructed."""
+        """TensorLayout input is flattened and reconstructed."""
         mesh = mesh_1d(2)
         W = Tensor.ones([4], dtype=DType.float32, device=CPU())
         model = _IdentityModule(W=W)
-        input_type = DistributedTensorType(
-            DType.float32, [8, 4], mesh, [Sharded(0)]
+        input_type = TensorLayout(
+            DType.float32, [8, 4], DeviceMapping(mesh, (Sharded(0),))
         )
         compiled = model.compile(input_type)
         x = _make_realized_sharded([4, 4], 2, shard_axis=0)
@@ -387,8 +398,8 @@ class TestModuleCompileDistributed:
         mesh = mesh_1d(2)
         W = Tensor.ones([4], dtype=DType.float32, device=CPU())
         model = _IdentityModule(W=W)
-        input_type = DistributedTensorType(
-            DType.float32, [8, 4], mesh, [Sharded(0)]
+        input_type = TensorLayout(
+            DType.float32, [8, 4], DeviceMapping(mesh, (Sharded(0),))
         )
         compiled = model.compile(input_type)
         x = _make_realized_sharded([4, 4], 2, shard_axis=0)
@@ -414,7 +425,7 @@ class TestCompiledModelAPI:
     def _compile_identity(self) -> CompiledModel[[Tensor], Tensor]:
         W = Tensor.ones([4], dtype=DType.float32, device=CPU())
         model = _IdentityModule(W=W)
-        input_type = TensorType(DType.float32, [3, 8], CPU())
+        input_type = TensorLayout(DType.float32, [3, 8], CPU())
         return model.compile(input_type)
 
     def test_returns_compiled_model(self) -> None:

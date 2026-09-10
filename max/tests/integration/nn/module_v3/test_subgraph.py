@@ -48,15 +48,15 @@ from max.experimental.nn import (
     subgraphable,
 )
 from max.experimental.sharding import (
+    DeviceMapping,
     DeviceMesh,
     PlacementMapping,
     Replicated,
     Sharded,
+    TensorLayout,
 )
-from max.experimental.sharding.types import DistributedTensorType
 from max.experimental.tensor import (
     Tensor,
-    TensorType,
     current_realization_context,
 )
 from max.graph import DeviceRef
@@ -66,8 +66,8 @@ D = 4
 H = 8
 
 
-def default_type() -> TensorType:
-    return TensorType(F32, ["batch", D], device=DeviceRef.CPU())
+def default_type() -> TensorLayout:
+    return TensorLayout(F32, ["batch", D], device=DeviceRef.CPU())
 
 
 def zeros(*shape: int) -> Tensor:
@@ -486,7 +486,9 @@ def test_tensor_parallel_block_shares_one_subgraph() -> None:
     all-reduce runs inside the body. Two layers share one ``@TPBlock``, each
     weight registers one external constant per shard, and numerics hold."""
     rng = np.random.default_rng(1)
-    input_type = DistributedTensorType(F32, ["batch", D], MESH, (Replicated(),))
+    input_type = TensorLayout(
+        F32, ["batch", D], DeviceMapping(MESH, (Replicated(),))
+    )
     stack = Stack(layers=ModuleList([_tp_block() for _ in range(2)]))
 
     weights: dict[str, np.ndarray] = {}

@@ -225,7 +225,7 @@ class GPTModel(Module[[Tensor], Tensor]):
 
     def forward(self, in_idx: Tensor) -> Tensor:
         tok_embeds = self.token_embedding(in_idx)
-        pos_embeds = self.positional_embedding(Tensor.range_like(in_idx.type))
+        pos_embeds = self.positional_embedding(Tensor.range_like(in_idx))
         x = tok_embeds + pos_embeds  # Shape [batch_size, num_tokens, emb_size]
         return Sequential(
             self.layers,

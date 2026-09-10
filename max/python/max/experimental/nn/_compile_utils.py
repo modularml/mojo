@@ -35,8 +35,7 @@ from max.experimental.realization_context import (
 )
 from max.experimental.sharding import (
     DeviceMapping,
-    DistributedType,
-    PlacementMapping,
+    TensorLayout,
 )
 from max.experimental.tensor import (
     GraphValue,
@@ -50,7 +49,7 @@ _logger = logging.getLogger(__name__)
 
 # ─── Type aliases ──────────────────────────────────────────────────────
 
-InputType = graph.Type[Any] | DistributedType[Any]
+InputType = graph.Type[Any] | TensorLayout
 
 CastRecord = tuple[DType, DType]
 
@@ -117,13 +116,13 @@ def _flatten_input_types(
     graph_types: list[graph.Type[Any]] = []
     slots: list[_InputSlot] = []
     for t in input_types:
-        if isinstance(t, DistributedType):
+        if isinstance(t, TensorLayout):
             local = t.local_types
             slots.append(
                 _InputSlot(
                     len(graph_types),
                     len(local),
-                    PlacementMapping(t.mesh, t.placements),
+                    t.mapping,
                 )
             )
             graph_types.extend(local)
@@ -747,7 +746,7 @@ def _detect_signals(
     gpu_refs: list[DeviceRef] = []
     seen: set[int] = set()
     for t in input_types:
-        if not isinstance(t, DistributedType):
+        if not isinstance(t, TensorLayout):
             continue
         for dev in t.mesh.devices:
             if isinstance(dev, Accelerator) and dev.id not in seen:

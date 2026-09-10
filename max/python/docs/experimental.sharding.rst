@@ -44,15 +44,15 @@ Placements
    Sharded
    Collective
 
-Distributed types
------------------
+Layouts
+-------
 
 .. autosummary::
    :nosignatures:
    :toctree: generated
    :template: autosummary/class.rst
 
-   DistributedTensorType
+   BufferLayout
    TensorLayout
 
 Per-op decisions
@@ -100,6 +100,8 @@ Functions
    :toctree: generated
    :template: autosummary/function.rst
 
+   as_device_mapping
+   as_layout
    build_action_set
    force_replicated_action_set
    mode
