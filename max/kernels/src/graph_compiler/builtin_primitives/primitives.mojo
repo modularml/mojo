@@ -2016,6 +2016,213 @@ def insert_index[
     return out
 
 
+@always_inline
+def _reshape_num_non_ones(shape: IntTuple, upto: Int) -> Int:
+    # Count of non-1 dims in shape[0:upto].
+    var n = 0
+    for i in range(upto):
+        if Int(shape[i]) != 1:
+            n += 1
+    return n
+
+
+@always_inline
+def _reshape_nth_non_one_pos(shape: IntTuple, k: Int) -> Int:
+    # Position of the k-th (0-indexed) non-1 dim in shape.
+    var count = 0
+    for i in range(len(shape)):
+        if Int(shape[i]) != 1:
+            if count == k:
+                return i
+            count += 1
+    return len(shape)
+
+
+@always_inline
+def _reshape_same_dropping_ones(a: IntTuple, b: IntTuple) -> Bool:
+    # True iff a and b have identical non-1 dims in the same order, i.e. the
+    # reshape only inserts/removes size-1 dims. Bounded loop (comptime-safe):
+    # each iteration consumes at least one non-1 dim from each side.
+    var ai = 0
+    var bi = 0
+    for _iter in range(len(a) + len(b) + 1):
+        while ai < len(a) and Int(a[ai]) == 1:
+            ai += 1
+        while bi < len(b) and Int(b[bi]) == 1:
+            bi += 1
+        if ai >= len(a) or bi >= len(b):
+            return ai >= len(a) and bi >= len(b)
+        if Int(a[ai]) != Int(b[bi]):
+            return False
+        ai += 1
+        bi += 1
+    return True
+
+
+@always_inline
+def _reshape_common_prefix(a: IntTuple, b: IntTuple) -> Int:
+    # Length of the leading run of dims STATICALLY equal in both shapes. A
+    # dynamic dim (`-1`, `UNKNOWN_VALUE`) never matches -- two distinct dynamic
+    # dims both print as -1 but are not known equal -- so it ends the run.
+    var m = len(a) if len(a) < len(b) else len(b)
+    var n = 0
+    for i in range(m):
+        var av = Int(a[i])
+        var bv = Int(b[i])
+        if av < 0 or bv < 0 or av != bv:
+            break
+        n += 1
+    return n
+
+
+@always_inline
+def _reshape_common_suffix(a: IntTuple, b: IntTuple, avoid: Int) -> Int:
+    # Length of the trailing run of dims statically equal in both shapes, not
+    # overlapping the `avoid` dims already claimed as a common prefix.
+    var la = len(a)
+    var lb = len(b)
+    var m = (la if la < lb else lb) - avoid
+    var n = 0
+    for i in range(m):
+        var av = Int(a[la - 1 - i])
+        var bv = Int(b[lb - 1 - i])
+        if av < 0 or bv < 0 or av != bv:
+            break
+        n += 1
+    return n
+
+
+@always_inline
+def _reshape_num_dynamic_non_ones(shape: IntTuple) -> Int:
+    # Count of dynamic (`-1`, `UNKNOWN_VALUE`) dims among the non-1 dims.
+    var n = 0
+    for i in range(len(shape)):
+        var v = Int(shape[i])
+        if v != 1 and v < 0:
+            n += 1
+    return n
+
+
+@always_inline
+def _reshape_static_index_list[rank: Int, shape: IntTuple]() -> IndexList[rank]:
+    # The comptime `shape` as a runtime `IndexList` (a dynamic dim becomes -1).
+    # Only used as the default when a caller omits the runtime shape, which the
+    # graph compiler does exactly when the shape is fully static, so no -1
+    # survives into a computation.
+    var result = IndexList[rank]()
+    comptime for i in range(rank):
+        result[i] = Int(shape[i])
+    return result
+
+
+@register_internal("mogg.index.reshape")
+@always_inline
+def mogg_index_reshape[
+    from_rank: Int,
+    //,
+    to_rank: Int,
+    from_static_shape: IntTuple,
+    to_static_shape: IntTuple,
+](
+    index: IndexList[from_rank],
+    from_shape: IndexList[from_rank] = _reshape_static_index_list[
+        from_rank, from_static_shape
+    ](),
+    to_shape: IndexList[to_rank] = _reshape_static_index_list[
+        to_rank, to_static_shape
+    ](),
+) -> IndexList[to_rank]:
+    # Reindex `index` (a point in the from-shape) to the point in the to-shape
+    # with the same row-major linear offset. Backs `mogg.index.reshape`: the
+    # per-index (store-side) counterpart of the whole-tensor
+    # `mogg._tensor.create.reshape` view, used for a reshape fused into an
+    # epilogue's store. `from_static_shape`/`to_static_shape` are the compile-time
+    # shapes (a dim is `-1`, `UNKNOWN_VALUE`, where dynamic); `from_shape`/
+    # `to_shape` are their runtime values, read only where a dim is dynamic.
+    #
+    # A single primitive serves both the static and dynamic reshape: a comptime
+    # check picks the cheapest reindexing the static shapes allow, and any path
+    # they fully determine leaves the runtime shapes unread, so the backend DCEs
+    # them down to exactly the static code -- there is no separate primitive.
+    #
+    # Fast path: identity -- no remap. Guarded like the unit-shuffle path below:
+    # with two or more dynamic non-1 dims, equal STATIC shapes don't imply equal
+    # runtime shapes (`[A, B]` and `[B, A]` both read as `[-1, -1]`), so a
+    # reorder would be mistaken for a no-op. With at most one, the static dims
+    # match and element-count forces the lone dynamic dim equal, so it is a true
+    # identity.
+    comptime if from_static_shape == to_static_shape and (
+        _reshape_num_dynamic_non_ones(from_static_shape) <= 1
+    ):
+        return rebind[IndexList[to_rank]](index)
+
+    # Fast path: from and to differ only by inserted/removed size-1 dims -- a
+    # pure positional remap (the k-th non-1 dim of `to` takes the k-th non-1 dim
+    # of `from`; every size-1 dim of `to` is index 0), with none of the
+    # (de)linearize arithmetic below and no shape extents read at all. Guarded to
+    # at most one dynamic non-1 dim: two or more distinct dynamic dims are
+    # indistinguishable in the static shape (all read as -1), so a genuine
+    # reorder like [A, B] -> [B, A] would be misread as a no-op; those fall
+    # through to the general path, which relinearizes them correctly.
+    comptime if _reshape_same_dropping_ones(
+        from_static_shape, to_static_shape
+    ) and _reshape_num_dynamic_non_ones(from_static_shape) <= 1:
+        var squeezed = IndexList[to_rank]()
+        comptime for j in range(to_rank):
+            comptime if Int(to_static_shape[j]) == 1:
+                squeezed[j] = 0
+            else:
+                comptime k = _reshape_num_non_ones(to_static_shape, j)
+                comptime fp = _reshape_nth_non_one_pos(from_static_shape, k)
+                squeezed[j] = index[fp]
+        return squeezed
+
+    # General case, restricted to the DIFFERING middle: a collapse (merge) or
+    # expand (split) touches only a contiguous run of dims, so a leading and
+    # trailing run of statically-identical dims passes straight through and only
+    # the merged/split dims are (de)linearized. Each extent uses the static dim
+    # where known (comptime, so it folds) and the runtime dim only where it is
+    # `-1`; a fully static -- or outermost-only-dynamic -- reshape reads no
+    # runtime extent, so the backend drops `from_shape`/`to_shape`.
+    comptime p = _reshape_common_prefix(from_static_shape, to_static_shape)
+    comptime s = _reshape_common_suffix(from_static_shape, to_static_shape, p)
+
+    var out = IndexList[to_rank]()
+    comptime for i in range(p):
+        out[i] = index[i]
+    comptime for i in range(s):
+        out[to_rank - 1 - i] = index[from_rank - 1 - i]
+
+    # Ravel the middle `from` dims to their shared row-major linear offset. The
+    # inner dims scale the stride (static extent where known, else the runtime
+    # one); the outermost middle dim only contributes its index, so its extent --
+    # even if dynamic -- is never read.
+    var linear: Int = 0
+    var from_stride: Int = 1
+    comptime for i in range(from_rank - s - 1, p, -1):
+        linear += index[i] * from_stride
+        comptime sd = Int(from_static_shape[i])
+        comptime if sd >= 0:
+            from_stride *= sd
+        else:
+            from_stride *= from_shape[i]
+    linear += index[p] * from_stride
+
+    # Unravel onto the middle `to` dims; the outermost takes the remaining
+    # quotient with no (redundant) modulo, so its extent is never read.
+    var to_stride: Int = 1
+    comptime for j in range(to_rank - s - 1, p, -1):
+        comptime sd = Int(to_static_shape[j])
+        comptime if sd >= 0:
+            out[j] = (linear // to_stride) % sd
+            to_stride *= sd
+        else:
+            out[j] = (linear // to_stride) % to_shape[j]
+            to_stride *= to_shape[j]
+    out[p] = linear // to_stride
+    return out
+
+
 # ===----------------------------------------------------------------------===#
 # POP operations
 # ===----------------------------------------------------------------------===#
