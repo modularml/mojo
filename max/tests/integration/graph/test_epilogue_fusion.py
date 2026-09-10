@@ -26,11 +26,13 @@ needed: its epilogue binds through the store-lambda path (`FusedOutputTensor`
 + `_bind_to_fused_output`).
 
 Several of that suite's cases are NOT ported here (see the trailing
-comment): `matmul_add`/`chain`/`no_fuse_matmul_cast` because `mo.matmul`'s
-epilogue currently fails to compile under `MAX_GC_USE_ADV_FUSION=1` at all
+comment): `matmul_add`/`chain` because `mo.matmul`'s same-dtype (compute
+lambda) epilogue currently fails to compile under `MAX_GC_USE_ADV_FUSION=1`
 (a separate, already-tracked compute-lambda gap -- see
 `test_view_fusion.py`'s `test_broadcast_fuses_into_existing_epilogue`
-docstring); `fuse_in_if`/`no_fuse_across_blocks` because of a newly-found,
+docstring). A dtype-CHANGING matmul epilogue does compile now -- the
+mixed-precision accumulating path (`AllocateAccumulatingBuffers`) gives it a
+pre-cast scratch buffer -- so `cast(matmul(...))` is exercised below; `fuse_in_if`/`no_fuse_across_blocks` because of a newly-found,
 currently-unreported gap: any epilogue-fusible op inside an `ops.cond`
 (`mo.if`) branch fails the same way, with `'map.index.reshape' op MAPToMOGG:
 unsupported op` -- reproduces even with both branches already the same
@@ -71,6 +73,35 @@ def test_reduce_max_epilogue_fuses_cast(
     assert out.dtype == np.int32
     ref = np.max(x_np, axis=0, keepdims=True).astype(np.int32)
     np.testing.assert_allclose(out, ref)
+
+
+def test_matmul_epilogue_fuses_cast(
+    session: InferenceSession, adv_fusion_enabled: None
+) -> None:
+    """`cast(matmul(a, b))` fuses the cast into the matmul's epilogue. A
+    dtype-changing (mixed-precision) accumulating kernel: the matmul must
+    accumulate in f32, so `AllocateAccumulatingBuffers` gives the epilogue a
+    pre-cast f32 scratch buffer to accumulate through while the store lands in
+    the si32 output. Without it the kernel would accumulate f32 through the si32
+    buffer. Mirrors `matmul-cast-epilogue-fusion.mlir`.
+    """
+    with Graph(
+        "matmul_epilogue_fuses_cast",
+        input_types=[
+            TensorType(DType.float32, [2, 2], device=DeviceRef.CPU()),
+            TensorType(DType.float32, [2, 2], device=DeviceRef.CPU()),
+        ],
+    ) as graph:
+        a, b = (v.tensor for v in graph.inputs)
+        graph.output(ops.matmul(a, b).cast(DType.int32))
+
+    a_np = np.random.randn(2, 2).astype(np.float32)
+    b_np = np.random.randn(2, 2).astype(np.float32)
+    (out,) = run_and_verify_fusion(
+        session, graph, a_np, b_np, fused=r"mo\.matmul.*mo\.cast"
+    )
+    assert out.dtype == np.int32
+    np.testing.assert_array_equal(out, (a_np @ b_np).astype(np.int32))
 
 
 def test_no_fuse_multi_use(
