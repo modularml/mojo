@@ -237,13 +237,51 @@ def _reachable_verify_widths(
     num_speculative_tokens: int,
     max_batch_size: int,
 ) -> list[int]:
-    """Every number of carried drafts a step could verify."""
+    """Every number of carried drafts a step could verify.
+
+    Includes the mixed-batch width, which is reachable at any batch size and so
+    is not in the batch-size lookup. The constrained-decoding bitmask allocates
+    one buffer per width from this, and a width missing here fails the step with
+    "no allocated buffer" rather than degrading.
+    """
     lookup = _verify_width_lookup(
         spec_config, num_speculative_tokens, max_batch_size
     )
-    if lookup is None:
-        return [num_speculative_tokens]
-    return sorted(set(lookup[1:]))
+    widths = (
+        [num_speculative_tokens] if lookup is None else sorted(set(lookup[1:]))
+    )
+    mixed = _mixed_verify_width(spec_config, num_speculative_tokens)
+    if mixed is not None:
+        widths.append(mixed)
+    return sorted(set(widths))
+
+
+def _mixed_verify_width(
+    spec_config: SpeculativeConfig | None,
+    num_speculative_tokens: int,
+) -> int | None:
+    """Drafts a mixed prefill+decode step verifies; ``None`` to not narrow.
+
+    Clamped here rather than at config validation because ``dflash`` leaves
+    ``num_speculative_tokens`` for the architecture to resolve from the draft
+    checkpoint, so the ceiling does not exist yet when the config is read.
+
+    Args:
+        spec_config: The pipeline's speculative config, which carries the
+            width.
+        num_speculative_tokens: The configured draft depth, which caps the
+            width. A step cannot verify more drafts than it carries.
+
+    Returns:
+        The mixed-batch width, or ``None`` when mixed steps should stay on the
+        batch-size schedule.
+    """
+    if spec_config is None or num_speculative_tokens <= 0:
+        return None
+    width = spec_config.num_speculative_tokens_mixed_batch
+    if width is None:
+        return None
+    return min(width, num_speculative_tokens)
 
 
 def _contiguous_prefix_3d(
@@ -1765,6 +1803,10 @@ class OverlapTextGenerationPipeline(
     """``batch_size -> drafts to verify``, set only under speculative decoding
     with a schedule configured. ``None`` verifies every carried draft."""
 
+    _mixed_verify_width: int | None = None
+    """Drafts a mixed prefill+decode step verifies, overriding the schedule.
+    ``None`` leaves mixed steps on the batch-size schedule."""
+
     def __init__(
         self,
         pipeline_config: PipelineConfig,
@@ -1941,6 +1983,17 @@ class OverlapTextGenerationPipeline(
                     sorted(set(self._width_lookup[1:])),
                     self._spec_decode_state.num_speculative_tokens,
                 )
+            self._mixed_verify_width = _mixed_verify_width(
+                self._pipeline_config.speculative,
+                self._spec_decode_state.num_speculative_tokens,
+            )
+            if self._mixed_verify_width is not None:
+                logger.info(
+                    "Verifying %d of %d drafted tokens on mixed "
+                    "prefill+decode batches.",
+                    self._mixed_verify_width,
+                    self._spec_decode_state.num_speculative_tokens,
+                )
             if (
                 self._pipeline_config.speculative is not None
                 and self._pipeline_config.speculative.synthetic_acceptance_rate
@@ -1957,6 +2010,14 @@ class OverlapTextGenerationPipeline(
             self._spec_decode_state is not None
             and pipeline_config.runtime.enable_spec_decode_mixed_batches
         )
+        if (
+            self._mixed_verify_width is not None
+            and not self._allow_mixed_verify
+        ):
+            logger.warning(
+                "num_speculative_tokens_mixed_batch is set but mixed batches "
+                "do not verify drafts here, so it has no effect."
+            )
 
         self._encoder_cache: VisionEncoderCache[TextAndVisionContext] | None = (
             None
@@ -2463,6 +2524,8 @@ class OverlapTextGenerationPipeline(
             else 0
         )
 
+        # Pure-decode widths only. A mixed batch is CE, replay is TG-only, so a
+        # mixed step never reaches a captured graph.
         width_lookup = self._width_lookup
         verify_widths = (
             sorted(set(width_lookup[1 : max_capture_batch_size + 1]))
@@ -2691,6 +2754,13 @@ class OverlapTextGenerationPipeline(
             inputs, allow_mixed_batches=self._allow_mixed_verify
         ):
             return 0
+        # Past the gate above, a CE batch is a mixed prefill+decode batch: a
+        # pure prefill batch does not verify at all.
+        if (
+            self._mixed_verify_width is not None
+            and inputs.batch_type == BatchType.CE
+        ):
+            return self._mixed_verify_width
         if self._width_lookup is None:
             return self._spec_decode_state.num_speculative_tokens
         batch_size = max((len(b) for b in inputs.batches), default=0)

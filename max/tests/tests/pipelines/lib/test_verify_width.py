@@ -28,6 +28,8 @@ import pytest
 from max.pipelines.lib.pipeline_variants.overlap_text_generation import (
     OverlapTextGenerationPipeline,
     _host_mirror_realized_drafts,
+    _mixed_verify_width,
+    _reachable_verify_widths,
     _verify_width_lookup,
 )
 from max.pipelines.modeling.types.pipeline_variants.text_generation import (
@@ -77,17 +79,29 @@ def _decode_batches(*sizes: int) -> _Inputs:
     return _Inputs([[_Ctx(_Tokens(1)) for _ in range(n)] for n in sizes])
 
 
+def _mixed_batch(decode_rows: int, prefill_rows: int = 1) -> _Inputs:
+    """One replica batch carrying both decode and freshly prefilled rows."""
+    return _Inputs(
+        [
+            [_Ctx(_Tokens(1)) for _ in range(decode_rows)]
+            + [_Ctx(_Tokens(0)) for _ in range(prefill_rows)]
+        ]
+    )
+
+
 def _width(
     inputs: _Inputs,
     *,
     configured: int,
     lookup: list[int] | None,
+    mixed_width: int | None = None,
     allow_mixed: bool = False,
 ) -> int:
     pipeline = object.__new__(OverlapTextGenerationPipeline)
     spec_state = type("_S", (), {"num_speculative_tokens": configured})()
     pipeline._spec_decode_state = spec_state
     pipeline._width_lookup = lookup
+    pipeline._mixed_verify_width = mixed_width
     pipeline._allow_mixed_verify = allow_mixed
     return OverlapTextGenerationPipeline._verify_width(
         pipeline, cast(Any, inputs)
@@ -130,16 +144,150 @@ def test_width_is_the_per_replica_maximum_not_the_total() -> None:
 
 
 # ---------------------------------------------------------------------------
+# narrowing a mixed prefill+decode step
+# ---------------------------------------------------------------------------
+#
+# A mixed step's width is on the critical path of every prompt in it, and
+# unlike a pure decode step it runs eager -- graph replay is TG-only, and one
+# prefill row makes the batch CE -- so narrowing it costs no captured graph.
+
+
+def test_mixed_batch_takes_the_mixed_width() -> None:
+    assert (
+        _width(
+            _mixed_batch(8),
+            configured=7,
+            lookup=None,
+            mixed_width=3,
+            allow_mixed=True,
+        )
+        == 3
+    )
+
+
+def test_mixed_width_leaves_pure_decode_at_full_depth() -> None:
+    """The point of the knob: only the prefill-carrying steps narrow."""
+    assert (
+        _width(
+            _decode_batches(9),
+            configured=7,
+            lookup=None,
+            mixed_width=3,
+            allow_mixed=True,
+        )
+        == 7
+    )
+
+
+def test_mixed_width_overrides_the_batch_size_schedule() -> None:
+    """The two narrowings answer different questions, so mixed wins on a
+    mixed step regardless of what the batch size would have selected."""
+    lookup = [0] + [7] * 4 + [5] * 5
+    assert (
+        _width(
+            _mixed_batch(8),
+            configured=7,
+            lookup=lookup,
+            mixed_width=3,
+            allow_mixed=True,
+        )
+        == 3
+    )
+    assert (
+        _width(
+            _decode_batches(9),
+            configured=7,
+            lookup=lookup,
+            mixed_width=3,
+            allow_mixed=True,
+        )
+        == 5
+    )
+
+
+def test_unset_mixed_width_leaves_mixed_batches_on_the_schedule() -> None:
+    lookup = [0] + [7] * 4 + [5] * 5
+    assert (
+        _width(_mixed_batch(8), configured=7, lookup=lookup, allow_mixed=True)
+        == 5
+    )
+
+
+def test_mixed_width_does_not_resurrect_a_batch_that_cannot_verify() -> None:
+    """The width knob sits behind the verify gate, not in front of it."""
+    # Mixed verification switched off: the batch verifies nothing at all.
+    assert (
+        _width(
+            _mixed_batch(8),
+            configured=7,
+            lookup=None,
+            mixed_width=3,
+            allow_mixed=False,
+        )
+        == 0
+    )
+    # Pure prefill carries no proposals no matter what is configured.
+    pure_prefill = _Inputs([[_Ctx(_Tokens(0)) for _ in range(4)]])
+    assert (
+        _width(
+            pure_prefill,
+            configured=7,
+            lookup=None,
+            mixed_width=3,
+            allow_mixed=True,
+        )
+        == 0
+    )
+
+
+def test_mixed_width_is_capped_at_the_configured_depth() -> None:
+    """``dflash`` resolves its depth from the checkpoint after config
+    validation, so the ceiling is applied here rather than by the config."""
+    assert _mixed_verify_width(_config(None, mixed_width=9), 3) == 3
+    assert _mixed_verify_width(_config(None, mixed_width=1), 3) == 1
+
+
+def test_reachable_widths_include_the_mixed_width() -> None:
+    """The constrained-decoding bitmask allocates one pinned buffer per
+    reachable width. A mixed width absent from this set killed the model worker
+    with "prime() num_positions 2 has no allocated buffer" on the first mixed
+    batch, rather than degrading, so the set has to cover it.
+    """
+    # No schedule: the only batch-size width is the full depth.
+    assert _reachable_verify_widths(_config(None, mixed_width=1), 3, 8) == [
+        1,
+        3,
+    ]
+    # With a schedule, the mixed width joins the scheduled widths.
+    scheduled = _config([(1, 2, 3), (3, 8, 2)], mixed_width=1)
+    assert _reachable_verify_widths(scheduled, 3, 8) == [1, 2, 3]
+    # A mixed width that clamps to the full depth adds nothing new.
+    assert _reachable_verify_widths(_config(None, mixed_width=9), 3, 8) == [3]
+    # Unset leaves the reachable set exactly as it was.
+    assert _reachable_verify_widths(_config(None), 3, 8) == [3]
+
+
+def test_no_mixed_width_configured_is_none() -> None:
+    assert _mixed_verify_width(_config(None), 3) is None
+    # Set, but on a pipeline that does not speculate at all.
+    assert _mixed_verify_width(_config(None, mixed_width=3), 0) is None
+
+
+# ---------------------------------------------------------------------------
 # the schedule as it arrives from SpeculativeConfig
 # ---------------------------------------------------------------------------
 
 
 def _config(
-    schedule: list[tuple[int, int, int]] | None, *, method: str = "eagle"
+    schedule: list[tuple[int, int, int]] | None,
+    *,
+    method: str = "eagle",
+    mixed_width: int | None = None,
 ) -> SpeculativeConfig:
     return SpeculativeConfig(
         speculative_method=cast(Any, method),
         num_speculative_tokens=3,
+        num_speculative_tokens_mixed_batch=mixed_width,
         num_speculative_tokens_per_batch_size=(
             None
             if schedule is None

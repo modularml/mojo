@@ -117,6 +117,7 @@ class SpeculativeConfig(ConfigFileModel):
     The CLI surfaces these fields as ``--speculative-method``,
     ``--num-speculative-tokens``,
     ``--num-speculative-tokens-per-batch-size``,
+    ``--num-speculative-tokens-mixed-batch``,
     ``--rejection-sampling-strategy``, and ``--synthetic-acceptance-rate``.
     Construct the config directly when configuring a pipeline
     programmatically:
@@ -232,6 +233,33 @@ class SpeculativeConfig(ConfigFileModel):
             VerifyWidthRange(batch_start=start, batch_end=end, num_tokens=count)
             for start, end, count in normalized
         ]
+
+    num_speculative_tokens_mixed_batch: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "How many drafted tokens the target verifies on a mixed "
+            "prefill+decode batch. Unset uses the count a pure decode batch "
+            "of the same size would."
+        ),
+    )
+    """How many of the drafted tokens the target verifies on a mixed batch.
+
+    Narrows for a different reason than
+    :attr:`num_speculative_tokens_per_batch_size`: that schedule trades
+    acceptance for decode throughput at large batch sizes, while this trades it
+    for the latency of the prefill rows sharing the step, which sit on the
+    critical path of a prompt's time to first token.
+
+    Capped at :attr:`num_speculative_tokens` where it is read, not here:
+    ``dflash`` leaves that width for the architecture to resolve from the draft
+    checkpoint, so the ceiling is not yet known at config-validation time.
+
+    ``None`` leaves mixed batches on the batch-size schedule, which is the
+    behavior when the field is unset. Reachable only alongside
+    ``--enable-spec-decode-mixed-batches``; without it a mixed batch verifies
+    nothing at all.
+    """
 
     rejection_sampling_strategy: RejectionSamplingStrategy | None = Field(
         default=None,
