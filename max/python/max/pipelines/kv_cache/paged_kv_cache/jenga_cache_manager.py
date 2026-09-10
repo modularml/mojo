@@ -326,6 +326,7 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
             enable_dp_cross_replica_prefix_copy=(
                 self.params.enable_dp_cross_replica_prefix_copy
             ),
+            leaves=params.leaves(),
         )
 
     # ============================================================================

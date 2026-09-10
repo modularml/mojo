@@ -28,7 +28,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from max.driver import Buffer, batch_inplace_copy
-from max.nn.kv_cache import KVCacheGroupId
+from max.nn.kv_cache import KVCacheGroupId, KVLeafRegion
 from max.nn.kv_cache.cache_params import KVCacheMemory
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext
@@ -105,18 +105,6 @@ def create_kv_group_coordinator(
 
 
 @dataclass(frozen=True)
-class KVLeaf:
-    """One cache's share of the pool, and the pages each request holds in it.
-
-    Every leaf of a group is written in lockstep, so a request's row is the
-    same length in all of them.
-    """
-
-    leaf_id: str
-    group_id: KVCacheGroupId
-
-
-@dataclass(frozen=True)
 class KVLeafInfo:
     """How one cache tiles a huge block, and which group it belongs to.
 
@@ -145,7 +133,14 @@ class JengaBlockManager:
         connector: KVConnector | None = None,
         replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]] | None = None,
         enable_dp_cross_replica_prefix_copy: bool = True,
+        *,
+        leaves: Mapping[str, KVLeafRegion],
     ) -> None:
+        """Assigns blocks out of pools sized from ``leaf_infos``.
+
+        ``leaves`` says what a block of each cache costs and how many of them
+        a request draws; ``block_size`` is in tokens.
+        """
         self._block_size = block_size
         self._enable_prefix_caching = enable_prefix_caching
         self._only_use_kv_connector_last_level_cache = (
@@ -173,13 +168,7 @@ class JengaBlockManager:
             JengaBlockPool(num_huge_blocks, ratios) for _ in range(num_replicas)
         ]
 
-        self._leaves = {
-            leaf_id: KVLeaf(
-                leaf_id,
-                group_id=leaf_info.group_id,
-            )
-            for leaf_id, leaf_info in leaf_infos.items()
-        }
+        self._leaves = dict(leaves)
 
         # Deduplicate in first-appearance order rather than through a set:
         # groups are claimed and scanned in this order, so a set would make
@@ -316,9 +305,8 @@ class JengaBlockManager:
     def step(self, ctx: TextContext) -> None:
         """Records what the forward just wrote, and slides every window."""
         replica_idx = self._replica_of(ctx)
-        pool = self.pools[replica_idx]
         if self._enable_prefix_caching:
-            self._commit_blocks_into_prefix_cache(ctx, pool)
+            self._commit_blocks_into_prefix_cache(ctx, replica_idx)
 
         num_filled_blocks = self._num_filled_blocks(ctx)
         for group in self._groups.values():
@@ -643,25 +631,18 @@ class JengaBlockManager:
         )
         return (idx - 1) if idx < search_space else None
 
-    def _blocks_demanded(self, seq_len: int) -> dict[str, int]:
-        """Returns the pages each leaf holds for a ``seq_len``-token request."""
-        demand = {}
-        for leaf_id, leaf in self._leaves.items():
-            num_blocks = ceildiv(seq_len, self._block_size)
-            if leaf.group_id.is_sliding_window():
-                # A window only keeps its most recent tokens resident, so its
-                # demand stops growing once the window itself is covered.
-                num_blocks = min(
-                    num_blocks,
-                    ceildiv(leaf.group_id.window_size, self._block_size),
-                )
-            demand[leaf_id] = num_blocks
-        return demand
+    def _blocks_to_reserve(self, seq_len: int) -> dict[str, int]:
+        """Returns the blocks each leaf draws for a ``seq_len``-token request."""
+        num_blocks = ceildiv(seq_len, self._block_size)
+        return {
+            leaf_id: leaf.blocks_to_reserve(num_blocks)
+            for leaf_id, leaf in self._leaves.items()
+        }
 
     def _fits_in_cache(self, seq_len: int) -> bool:
         """Whether an empty pool could serve one ``seq_len``-token request."""
         return self.pools[0].can_satisfy_demand(
-            self._blocks_demanded(seq_len), at_capacity=True
+            self._blocks_to_reserve(seq_len), at_capacity=True
         )
 
     def get_req_blocks_per_leaf(self, ctx: TextContext) -> dict[str, list[int]]:
@@ -728,7 +709,7 @@ class JengaBlockManager:
         return replica_idx
 
     def _num_required_blocks(self, ctx: TextContext) -> int:
-        """Returns how many pages the next forward needs the request to hold."""
+        """Returns how far into a request's row the next forward reaches."""
         seq_len = _compute_seq_len(
             ctx,
             num_draft_tokens=self._num_draft_tokens,
@@ -1008,9 +989,9 @@ class JengaBlockManager:
             ctx.tokens.skip_processing(-delta)
 
     def _commit_blocks_into_prefix_cache(
-        self, ctx: TextContext, pool: JengaBlockPool
+        self, ctx: TextContext, replica_idx: int
     ) -> None:
-        """Publishes the blocks the forward filled to the prefix caches."""
+        """Publishes the request's newly filled blocks into the prefix caches."""
         req_hashes = self._compute_hashes_for_request(ctx)
         first_block = (
             self._req_to_committed_idx[ctx.request_id] // self._block_size
@@ -1018,20 +999,8 @@ class JengaBlockManager:
 
         last_block = min(self._num_filled_blocks(ctx), len(req_hashes))
 
-        for leaf in self._leaves.values():
-            paged = self._groups.get(leaf.group_id)
-            if paged is None:
-                continue
-            req_blocks = paged.blocks_of(ctx.request_id)[leaf.leaf_id]
-            for block_idx in range(first_block, last_block):
-                block = req_blocks[block_idx]
-                # A twin block already serving this hash means the bytes are
-                # already published, so the request adopts it and drops its own.
-                twin = pool.get_or_commit_into_prefix_cache(
-                    req_hashes[block_idx], block
-                )
-                if twin is not None:
-                    req_blocks[block_idx] = twin
+        for group in self._groups.values():
+            group.commit(ctx.request_id, req_hashes, last_block, replica_idx)
 
         self._req_to_committed_idx[ctx.request_id] = (
             last_block * self._block_size

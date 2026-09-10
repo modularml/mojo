@@ -19,7 +19,7 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pytest
 from max.driver import Buffer
-from max.nn.kv_cache import KVCacheGroupId
+from max.nn.kv_cache import KVCacheGroupId, PagedKVLeafRegion
 from max.nn.kv_cache.cache_params import KVCacheMemory
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext, TokenBuffer
@@ -82,6 +82,15 @@ def make_manager(
         num_draft_tokens_per_step=num_draft_tokens_per_step,
         replica_kv_memory=replica_kv_memory,
         enable_dp_cross_replica_prefix_copy=enable_dp_cross_replica_prefix_copy,
+        leaves={
+            leaf_id: PagedKVLeafRegion(
+                leaf_id=leaf_id,
+                group_id=info.group_id,
+                bytes_per_page=1,
+                page_size=block_size,
+            )
+            for leaf_id, info in leaf_infos.items()
+        },
     )
 
 

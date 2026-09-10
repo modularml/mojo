@@ -579,9 +579,35 @@ class KVCacheAssignments:
 
 @dataclass(frozen=True)
 class KVLeafRegion:
+    """One addressable region of the cache pool."""
+
     leaf_id: str
     group_id: KVCacheGroupId
     bytes_per_page: int
+
+    def blocks_to_reserve(self, num_blocks: int) -> int:
+        """Returns how many blocks one request draws to fill ``num_blocks`` slots.
+
+        Fewer than ``num_blocks`` when some slots hold the null block: a
+        sliding window keeps only its span, and a state keeps only its live
+        block and one checkpoint.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
+
+@dataclass(frozen=True)
+class PagedKVLeafRegion(KVLeafRegion):
+    """A leaf the graph reaches through a per-forward page table."""
+
+    page_size: int
+
+    def blocks_to_reserve(self, num_blocks: int) -> int:
+        """Returns ``num_blocks``, capped by the window when the leaf has one."""
+        if self.group_id.is_full():
+            return num_blocks
+        return min(
+            num_blocks, ceildiv(self.group_id.window_size, self.page_size)
+        )
 
 
 @runtime_checkable
@@ -1354,18 +1380,22 @@ class KVCacheParams(KVCacheParamInterface):
     def leaves(self, _prefix: str = "") -> Mapping[str, KVLeafRegion]:
         """Returns the leaves of the KV cache."""
         leaves = {
-            _prefix + str(self.group_id): KVLeafRegion(
+            _prefix + str(self.group_id): PagedKVLeafRegion(
                 leaf_id=_prefix + str(self.group_id),
                 group_id=self.group_id,
                 bytes_per_page=self.bytes_per_value_block,
+                page_size=self.page_size,
             )
         }
 
         if self.quantized_kv_cache:
-            leaves[_prefix + str(self.group_id) + "/scales"] = KVLeafRegion(
-                leaf_id=_prefix + str(self.group_id) + "/scales",
-                group_id=self.group_id,
-                bytes_per_page=self.bytes_per_scale_block,
+            leaves[_prefix + str(self.group_id) + "/scales"] = (
+                PagedKVLeafRegion(
+                    leaf_id=_prefix + str(self.group_id) + "/scales",
+                    group_id=self.group_id,
+                    bytes_per_page=self.bytes_per_scale_block,
+                    page_size=self.page_size,
+                )
             )
 
         return leaves

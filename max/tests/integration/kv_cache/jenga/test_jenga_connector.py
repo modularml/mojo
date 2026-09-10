@@ -25,7 +25,7 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pytest
-from max.nn.kv_cache import KVCacheGroupId
+from max.nn.kv_cache import KVCacheGroupId, PagedKVLeafRegion
 from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext, TokenBuffer
 from max.pipelines.kv_cache import InsufficientBlocksError
@@ -198,9 +198,11 @@ def make_manager(
     num_huge_blocks: int = 16,
     leaf_infos: Mapping[str, KVLeafInfo] | None = None,
 ) -> JengaBlockManager:
+    leaf_infos = leaf_infos or {
+        leaf: KVLeafInfo(1, KVCacheGroupId.full()) for leaf in leaves
+    }
     return JengaBlockManager(
-        leaf_infos
-        or {leaf: KVLeafInfo(1, KVCacheGroupId.full()) for leaf in leaves},
+        leaf_infos,
         num_huge_blocks=num_huge_blocks,
         block_size=1,
         enable_prefix_caching=True,
@@ -209,6 +211,15 @@ def make_manager(
         num_draft_tokens=0,
         num_draft_tokens_per_step=0,
         connector=connector,
+        leaves={
+            leaf_id: PagedKVLeafRegion(
+                leaf_id=leaf_id,
+                group_id=info.group_id,
+                bytes_per_page=1,
+                page_size=1,
+            )
+            for leaf_id, info in leaf_infos.items()
+        },
     )
 
 

@@ -223,6 +223,43 @@ class KVGroupCoordinatorInterface:
             ):
                 req_blocks.append(pool.alloc_block(leaf_id))
 
+    def _is_committable(
+        self, row: Sequence[LittleKVCacheBlock], block_idx: int
+    ) -> bool:
+        """Whether the block at ``block_idx`` may be published."""
+        block = row[block_idx]
+        return not block.is_null and block.block_hash is None
+
+    def commit(
+        self,
+        req_id: RequestID,
+        hashes: Sequence[bytes],
+        last_block: int,
+        replica_idx: int,
+    ) -> None:
+        """Commits every block below ``last_block`` not committed yet.
+
+        Scans from the start of the row, not just this forward's blocks: a
+        group can hold a block whose hash the chain only reaches later.
+
+        Args:
+            req_id: The request whose blocks to commit.
+            hashes: The request's block hashes, by block index.
+            last_block: One past the last block index to commit.
+            replica_idx: Which pool the blocks belong to.
+        """
+        pool = self.pools[replica_idx]
+        for leaf_id in self.leaf_ids:
+            req_blocks = self.rows[req_id][leaf_id]
+            for block_idx in range(min(last_block, len(req_blocks))):
+                if not self._is_committable(req_blocks, block_idx):
+                    continue
+                twin = pool.get_or_commit_into_prefix_cache(
+                    hashes[block_idx], req_blocks[block_idx]
+                )
+                if twin is not None:
+                    req_blocks[block_idx] = twin
+
     def advance(
         self,
         req_id: RequestID,
