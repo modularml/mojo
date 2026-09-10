@@ -27,6 +27,7 @@ from std.os import abort, getenv, setenv
 from std.os.path import dirname
 from std.pathlib import Path
 from std.sys.arg import argv
+from std.sys import stderr
 from std.ffi import (
     external_call,
     _DLHandle,
@@ -1988,8 +1989,14 @@ struct CPython(Defaultable, Movable):
         pass
 
     def destroy(mut self):
+        if self.init_error:
+            return
         # https://docs.python.org/3/c-api/init.html#c.Py_FinalizeEx
-        self.lib.call["Py_FinalizeEx"]()
+        if self.lib.call["Py_FinalizeEx", Int32]() < 0:
+            print(
+                "warning: Python interpreter finalization failed",
+                file=stderr,
+            )
         # Note: self.lib will be automatically closed when CPython is destroyed
         # due to OwnedDLHandle's RAII semantics
 
