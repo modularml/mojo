@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from .agentic_code import AgenticCodeBenchmarkDataset
-from .agentic_tools import ToolConfig, parse_agentic_tool_profiles
+from .agentic_tools import ToolConfig, tool_profiles_from_mapping
 from .artificial_analysis import ArtificialAnalysisBenchmarkDataset
 from .arxiv_summarization import ArxivSummarizationBenchmarkDataset
 from .axolotl import AxolotlBenchmarkDataset
@@ -91,5 +91,5 @@ __all__ = [
     "TurnProfile",
     "TurnTargets",
     "VisionArenaBenchmarkDataset",
-    "parse_agentic_tool_profiles",
+    "tool_profiles_from_mapping",
 ]

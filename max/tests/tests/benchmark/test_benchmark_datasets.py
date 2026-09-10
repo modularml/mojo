@@ -1861,9 +1861,9 @@ def test_full_flag_path_builds_the_documented_shape() -> None:
         dataset_name="instruct-coder",
         fit_distributions=True,
         num_chat_sessions=2,
-        agentic_tool_profiles=(
-            '{"tools":[{"input-len":"40","output-len":"10","delay":"250"}]}'
-        ),
+        agentic_tool_profiles={
+            "tools": [{"input-len": "40", "output-len": "10", "delay": "250"}]
+        },
         agentic_rounds_per_turn="3",
     )
     tools = _resolve_agentic_tool_profiles(args)

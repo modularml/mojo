@@ -15,12 +15,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from max.benchmark.benchmark_shared.datasets.agentic_tools import (
     ToolConfig,
-    parse_agentic_tool_profiles,
+    tool_profiles_from_mapping,
 )
 from pydantic import ValidationError
 
@@ -39,70 +37,51 @@ def test_tool_spec_rejects_two_part_spec(field: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# --agentic-tool-profiles resolution
+# tool_profiles_from_mapping
 # ---------------------------------------------------------------------------
 
 
-def test_inline_json_builds_the_tool_list() -> None:
-    tools = parse_agentic_tool_profiles(
-        '{"tools":[{"input-len":"N(200,80)","output-len":"N(190,60)",'
-        '"delay":"N(200,50)"}]}'
+def test_mapping_builds_the_tool_list() -> None:
+    """The kebab keys the docs show, with the defaults they omit."""
+    tools = tool_profiles_from_mapping(
+        {
+            "tools": [
+                {
+                    "weight": 5,
+                    "input-len": "N(30,20)",
+                    "output-len": "N(60,30)",
+                    "delay": "N(50,20)",
+                },
+                {"input-len": "LN(7.5,1.2)", "output-len": "N(190,60)"},
+            ]
+        }
     )
-    assert len(tools) == 1
-    tool = tools[0]
-    assert tool.input_len == "N(200,80)"
-    assert tool.delay == "N(200,50)"
-    assert tool.weight == 1.0, "a lone tool needs no weight"
-
-
-def test_yaml_path_builds_the_tool_list(tmp_path: Path) -> None:
-    """The file form, with the kebab keys the docs show."""
-    config = tmp_path / "loop.yaml"
-    config.write_text(
-        "tools:\n"
-        "  - weight: 5\n"
-        "    input-len: N(30,20)\n"
-        "    output-len: N(60,30)\n"
-        "    delay: N(50,20)\n"
-        "  - weight: 2\n"
-        "    input-len: LN(7.5,1.2)\n"
-        "    output-len: N(190,60)\n"
-    )
-    tools = parse_agentic_tool_profiles(str(config))
-    assert [t.weight for t in tools] == [5.0, 2.0]
-    assert tools[0].input_len == "N(30,20)"
+    assert [t.weight for t in tools] == [5.0, 1.0]
     assert tools[0].delay == "N(50,20)"
     assert tools[1].delay == 0, "omitting delay means instant"
 
 
 @pytest.mark.parametrize(
-    ("value", "message"),
+    ("profiles", "message"),
     [
-        ("/nonexistent/loop.yaml", "readable YAML/JSON file"),
-        ('{"tools":[]}', "at least one tool"),
+        ({"tools": []}, "at least one tool"),
         (
-            '{"tools":[{"weight":0,"input-len":"10","output-len":"5"}]}',
+            {"tools": [{"weight": 0, "input-len": "10", "output-len": "5"}]},
             "weight > 0",
         ),
         (
-            '{"tools":[{"input-len":"10","output-len":"5"}],"round":3}',
+            {
+                "tools": [{"input-len": "10", "output-len": "5"}],
+                "round": 3,
+            },
             "unexpected key",
         ),
-        (
-            "tools:\n  - weight: .inf\n    input-len: '10'\n"
-            "    output-len: '5'\n",
-            "finite",
-        ),
     ],
-    ids=[
-        "missing-file",
-        "empty-list",
-        "all-zero-weights",
-        "typo'd-key",
-        "infinite-weight",
-    ],
+    ids=["empty-list", "all-zero-weights", "typo'd-key"],
 )
-def test_rejected_input_names_the_problem(value: str, message: str) -> None:
+def test_rejected_mapping_names_the_problem(
+    profiles: dict[str, object], message: str
+) -> None:
     """Each rejection names the flag and what to fix, never a bare traceback."""
     with pytest.raises(ValueError, match=message):
-        parse_agentic_tool_profiles(value)
+        tool_profiles_from_mapping(profiles)

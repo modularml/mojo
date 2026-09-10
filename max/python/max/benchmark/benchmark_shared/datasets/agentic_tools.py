@@ -19,10 +19,8 @@ invoke: nothing here reaches the wire as an OpenAI ``tools=[...]`` definition.
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
+from collections.abc import Mapping
 
-import yaml
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -91,33 +89,22 @@ class ToolConfig(BaseModel):
         return value
 
 
-def parse_agentic_tool_profiles(value: str) -> list[ToolConfig]:
-    """Resolve ``--agentic-tool-profiles`` from a path or an inline mapping.
-
-    The inline form is the file's own content, so JSON and YAML both go
-    through one loader.
+def tool_profiles_from_mapping(
+    profiles: Mapping[str, object],
+) -> list[ToolConfig]:
+    """Build the per-tool load profiles from a ``tools`` mapping.
 
     Args:
-        value: A path to a YAML file, or an inline YAML/JSON mapping holding
-            a ``tools`` list.
+        profiles: A mapping holding a ``tools`` list.
 
     Returns:
         The tools each round draws from, biased by ``weight``.
 
     Raises:
-        ValueError: If the content is not a mapping, or no tool can ever be
-            selected. Read and parse errors surface from ``pathlib``/``yaml``,
-            which already name the file and the position.
+        ValueError: If the mapping holds keys other than ``tools``, or no tool
+            that can ever be selected.
     """
-    loaded = yaml.safe_load(
-        Path(value).read_text() if os.path.exists(value) else value
-    )
-    if not isinstance(loaded, dict):
-        raise ValueError(
-            "--agentic-tool-profiles: expected a readable YAML/JSON file or"
-            f" an inline mapping holding a 'tools' list; got {value!r}."
-        )
-
+    loaded = dict(profiles)
     raw = loaded.pop("tools", None)
     if extra := sorted(loaded):
         raise ValueError(

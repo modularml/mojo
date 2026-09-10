@@ -487,12 +487,12 @@ class TestExtraBodyValidator:
 # --agentic-tool-profiles validation
 # ---------------------------------------------------------------------------
 
-_INLINE = '{"tools":[{"input-len":"10","output-len":"5"}]}'
+_PROFILES: dict[str, Any] = {"tools": [{"input-len": "10", "output-len": "5"}]}
 
 
 def _fitted_config(
     *,
-    agentic_tool_profiles: str | None = None,
+    agentic_tool_profiles: dict[str, Any] | None = None,
     agentic_rounds_per_turn: DistributionParameter | None = None,
 ) -> ServingBenchmarkConfig:
     """A fitted multiturn run, the only shape that reaches the agent loop."""
@@ -506,6 +506,30 @@ def _fitted_config(
     )
 
 
+def test_agentic_tool_profiles_accepts_every_spelling(tmp_path: Path) -> None:
+    """A mapping, an inline JSON string and a file path resolve alike."""
+    profiles = {"tools": [{"input-len": "10", "output-len": "5"}]}
+    config = tmp_path / "tools.yaml"
+    _write_yaml(config, profiles)
+    for value in (profiles, json.dumps(profiles), str(config)):
+        # model_validate takes Any, so the str forms reach the validator the
+        # way cyclopts hands it the raw token.
+        args = ServingBenchmarkConfig.model_validate(
+            {"model": "m", "agentic_tool_profiles": value}
+        )
+        assert args.agentic_tool_profiles == profiles
+
+
+def test_agentic_tool_profiles_missing_file_is_reported() -> None:
+    """A path that does not exist names the field, not a bare parse error."""
+    with pytest.raises(
+        ValueError, match=r"agentic_tool_profiles .* not a readable file path"
+    ):
+        ServingBenchmarkConfig.model_validate(
+            {"model": "m", "agentic_tool_profiles": "/nonexistent/tools.yaml"}
+        )
+
+
 def test_agentic_absent_by_default() -> None:
     assert (
         _resolve_agentic_tool_profiles(ServingBenchmarkConfig(model="m"))
@@ -515,11 +539,11 @@ def test_agentic_absent_by_default() -> None:
 
 @pytest.mark.parametrize(
     ("tool_profiles", "rounds_per_turn"),
-    [(_INLINE, None), (None, 3)],
+    [(_PROFILES, None), (None, 3)],
     ids=["tools-without-rounds", "rounds-without-tools"],
 )
 def test_agentic_flags_must_be_set_together(
-    tool_profiles: str | None,
+    tool_profiles: dict[str, Any] | None,
     rounds_per_turn: DistributionParameter | None,
 ) -> None:
     args = _fitted_config(
@@ -550,7 +574,7 @@ def test_agentic_needs_a_run_that_reaches_the_builder(
         dataset_name=dataset_name,
         fit_distributions=fit_distributions,
         num_chat_sessions=num_chat_sessions,
-        agentic_tool_profiles=_INLINE,
+        agentic_tool_profiles=_PROFILES,
         agentic_rounds_per_turn=3,
     )
     with pytest.raises(ValueError, match="needs --fit-distributions with"):
@@ -559,8 +583,83 @@ def test_agentic_needs_a_run_that_reaches_the_builder(
 
 def test_agentic_resolves_when_fully_specified() -> None:
     args = _fitted_config(
-        agentic_tool_profiles=_INLINE,
+        agentic_tool_profiles=_PROFILES,
         agentic_rounds_per_turn="NB(33,0.3)",
     )
     tools = _resolve_agentic_tool_profiles(args)
     assert tools is not None and len(tools) == 1
+
+
+# ---------------------------------------------------------------------------
+# The agent loop in a workload YAML
+# ---------------------------------------------------------------------------
+
+_WORKLOAD_BASE = (
+    "dataset-name: instruct-coder\n"
+    "fit-distributions: true\n"
+    "num-chat-sessions: 4\n"
+    "agentic-rounds-per-turn: '3'\n"
+)
+
+_NESTED = """agentic-tool-profiles:
+  tools:
+    - weight: 5
+      input-len: 'N(30,20)'
+      output-len: 'N(25,8)'
+"""
+_QUOTED = (
+    "agentic-tool-profiles:"
+    ' \'{"tools":[{"weight":5,"input-len":"N(30,20)",'
+    '"output-len":"N(25,8)"}]}\'\n'
+)
+_BY_FILENAME = "agentic-tool-profiles: agentic_tools.yaml\n"
+_BY_FILENAME_NO_EXT = "agentic-tool-profiles: agentic_tools\n"
+
+
+def _workload(tmp_path: Path, profiles: str) -> Path:
+    """A workload file, with a tool file beside it for the by-filename form."""
+    body = (
+        "tools:\n"
+        "  - weight: 5\n"
+        "    input-len: N(30,20)\n"
+        "    output-len: N(25,8)\n"
+    )
+    (tmp_path / "agentic_tools.yaml").write_text(body)
+    # A tool file need not be named for its format to be found.
+    (tmp_path / "agentic_tools").write_text(body)
+    workload = tmp_path / "workload.yaml"
+    workload.write_text(_WORKLOAD_BASE + profiles)
+    return workload
+
+
+@pytest.mark.parametrize(
+    "profiles",
+    [_NESTED, _QUOTED, _BY_FILENAME, _BY_FILENAME_NO_EXT],
+    ids=[
+        "nested-mapping",
+        "quoted-string",
+        "by-filename",
+        "by-filename-no-extension",
+    ],
+)
+def test_workload_yaml_spellings_agree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profiles: str
+) -> None:
+    """Three ways to write one tool resolve to that one tool.
+
+    Run from an unrelated directory, so the by-filename form is resolved
+    against the workload file rather than the caller's cwd.
+    """
+    workload = _workload(tmp_path, profiles)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    args = ServingBenchmarkConfig(model="m", workload_config=str(workload))
+    _load_workload_yaml(args)
+    tools = _resolve_agentic_tool_profiles(args)
+
+    assert tools is not None
+    assert [(t.weight, t.input_len, t.output_len) for t in tools] == [
+        (5.0, "N(30,20)", "N(25,8)")
+    ]

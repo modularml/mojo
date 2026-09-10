@@ -31,7 +31,7 @@ from max.benchmark.benchmark_shared.datasets.agentic_code import (
 )
 from max.benchmark.benchmark_shared.datasets.agentic_tools import (
     ToolConfig,
-    parse_agentic_tool_profiles,
+    tool_profiles_from_mapping,
 )
 from max.benchmark.benchmark_shared.datasets.artificial_analysis import (
     ArtificialAnalysisBenchmarkDataset,
@@ -132,7 +132,7 @@ def _resolve_agentic_tool_profiles(
             f" num_chat_sessions={args.num_chat_sessions},"
             f" dataset_name={args.dataset_name!r}."
         )
-    return parse_agentic_tool_profiles(tools)
+    return tool_profiles_from_mapping(tools)
 
 
 def _inflated_chat_session_count(

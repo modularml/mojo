@@ -1057,6 +1057,7 @@ _PATH_SUPPORTING_WORKLOAD_KEYS = (
     "dataset-path",
     "output-lengths",
     "extra-body",
+    "agentic-tool-profiles",
 )
 """Workload keys whose value may name a file rather than hold content."""
 
