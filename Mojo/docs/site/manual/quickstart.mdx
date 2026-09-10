@@ -4,149 +4,35 @@ description: Get up and running fast with the Mojo programming language
 sidebar_label: Quickstart
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-import ConditionalVersionDocs from '@site/src/components/ConditionalVersionDocs'
-import Tooltip from '@site/src/components/Tooltip/tooltip';
+Welcome to Mojo, a systems language for the AI era.
 
-export const tooltipNightly = (<Tooltip
-  parent="nightly build"
-  content="To get the stable build, change the version in the website header."
-/>);
-export const tooltipStable = (<Tooltip
-  parent="stable build"
-  content="To get the nightly build, change the version in the website header."
-/>);
+Mojo offers rich ways to express compile-time intent, runtime
+behavior, and hardware-specific optimization in a single language.
 
-This page quickly teaches you Mojo's syntax by focusing on code.
+Other languages struggle to span those layers without fragmenting the
+stack. With Mojo, take your code with you to your next chip. And the one
+after that.
 
-For more explanation of the language features, see the [Mojo get
-started tutorial](/docs/manual/get-started) or [Mojo language
-basics](/docs/manual/basics).
+This tutorial offers a quick tour of Mojo language fundamentals. Build a
+simple temperature application as you learn core Mojo syntax.
 
-:::note System requirements
+It should take about 15-30 minutes if you stop to explore, or less if you
+work straight through. The focus is syntax, not concepts.
 
-You can use Mac, Linux, or Windows with WSL. For details, see the
-[system requirements](/docs/requirements/).
+You'll get a taste of Mojo's syntax and enough familiarity to start writing
+simple Mojo code.
 
-:::
+## Setup
 
-## Project setup
+Before starting:
 
-You can install Mojo using any Python or Conda package manager,
-but we recommend either `pixi` or `uv`.
+- Check the [system requirements](/docs/requirements/).
+- Choose `pixi` (recommended) or `uv` as your package manager.
+- [Install Mojo](/install/).
+- Open a terminal and make sure `mojo` is in your path or environment.
 
-<ConditionalVersionDocs version="nightly">
-
-Use the following command to install the {tooltipNightly}:
-
-<Tabs groupId="install">
-<TabItem value="uv" label="uv">
-
-1. If needed, install `uv`:
-
-   ```sh
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-2. Install Mojo:
-
-   ```sh
-   uv pip install mojo \
-        --index https://whl.modular.com/nightly/simple/ \
-        --prerelease allow
-   ```
-
-   Or create a project and install Mojo:
-
-   ```sh
-   uv init temperature-analyzer
-   cd temperature-analyzer
-   uv add mojo \
-       --index https://whl.modular.com/nightly/simple/ \
-       --prerelease allow
-   ```
-
-These commands install the nightly build, which isn't complete and might
-have new bugs.
-
-</TabItem>
-
-<TabItem value="pixi" label="pixi">
-
-1. If needed, install `pixi`:
-
-   ```sh
-   curl -fsSL https://pixi.sh/install.sh | sh
-   ```
-
-2. Create a project and install Mojo:
-
-   ```sh
-   pixi init temperature-analyzer \
-       -c https://conda.modular.com/max-nightly/ \
-       -c conda-forge
-   cd temperature-analyzer
-   pixi add mojo
-   pixi shell
-   ```
-
-</TabItem>
-</Tabs>
-
-</ConditionalVersionDocs>
-
-<ConditionalVersionDocs version="stable">
-
-Use the following command to install the {tooltipStable}:
-
-<Tabs groupId="install">
-<TabItem value="uv" label="uv">
-
-1. If needed, install `uv`:
-
-   ```sh
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-2. Install Mojo:
-
-   ```sh
-   uv pip install mojo
-   ```
-
-   Or create a project and install Mojo:
-
-   ```sh
-   uv init temperature-analyzer
-   cd temperature-analyzer
-   uv add mojo
-   ```
-
-</TabItem>
-<TabItem value="pixi" label="pixi">
-
-1. If needed, install `pixi`:
-
-   ```sh
-   curl -fsSL https://pixi.sh/install.sh | sh
-   ```
-
-2. Create a project and install Mojo:
-
-   ```sh
-   pixi init temperature-analyzer \
-       -c https://conda.modular.com/max/ \
-       -c conda-forge
-   cd temperature-analyzer
-   pixi add mojo
-   pixi shell
-   ```
-
-</TabItem>
-</Tabs>
-
-</ConditionalVersionDocs>
+As you work through this tour, look for *Checkpoint* items. They connect
+new Mojo syntax to concepts you may already know from other languages.
 
 ## Hello Mojo
 
@@ -165,7 +51,7 @@ Run it:
 mojo analyzer.mojo
 ```
 
-Insights:
+### Checkpoint
 
 - If you see "Temperature Analyzer", your setup works.
 - All Mojo executables use `main()` as their entry point.
@@ -178,7 +64,7 @@ Update your file to add temperature data:
 def main():
     print("Temperature Analyzer")
 
-    # [Float64] tells Mojo the `List` type at compile time
+    # [Float64] sets the List element type at compile time
     var temps: List[Float64] = [20.5, 22.3, 19.8, 25.1]
 
     print("Recorded", len(temps), "temperatures")
@@ -186,7 +72,7 @@ def main():
 
 ## Loops
 
-Print each temperature. Add to `main()` under the print statement:
+Print each temperature. Add to the end of `main()`:
 
 ```mojo
 def main():
@@ -196,20 +82,21 @@ def main():
         print(t"  Day {index + 1}: {temps[index]}°C")
 ```
 
-Insights:
+### Checkpoint
 
-- The day is offset by 1 because the range uses zero-based indexing.
-- The `t"..."` prefix creates a *template string*: braces `{}` interpolate
-  expressions directly into the output. This is useful because it avoids
-  memory allocations for the intermediate values.
+- This loop uses indexes. Normally you iterate over elements.
+- The `t"..."` prefix creates a *template string*. Braces `{}` interpolate
+  expressions into the output. This avoids memory allocations for
+  intermediate values.
+- Mojo also has a `while` loop.
 
 ## Functions
 
-Add this function above `main()` to calculate the average temperature:
+Add a function above `main()` to calculate the average temperature:
 
 ```mojo
 def calculate_average(temps: List[Float64]) -> Float64:
-    # The 0.0 floating point literal defaults to Float64
+    # A literal with a decimal component defaults to Float64
     var total = 0.0
     for temp in temps:
         total += temp
@@ -219,14 +106,17 @@ def main():
     # ... existing code ...
 ```
 
-Add to the end of `main()` to call the function:
+Call the function by adding this to the end of `main()`:
 
 ```mojo
     var avg = calculate_average(temps)
     print(t"Average: {round(avg, 2)}°C")
 ```
 
-This code uses `round()` to limit the average to two decimal places.
+### Checkpoint
+
+- Mojo's `def` functions don't raise by default.
+- `round()` returns `avg` rounded to two decimal places.
 
 ## Conditionals
 
@@ -243,12 +133,16 @@ Classify the average temperature. Add to the end of `main()`:
 
 ## Raise errors
 
-Handle empty data by updating `calculate_average`. Now the function
-can raise an error.
+Empty data means no average. Update `calculate_average()` to handle the
+error:
+
+- Add `raises` before the return arrow.
+- Add an empty list check.
+- Raise an `Error` if it's empty.
 
 ```mojo
 def calculate_average(temps: List[Float64]) raises -> Float64:
-    if len(temps) == 0:  # Empty list of temperatures
+    if len(temps) == 0:
         raise Error("No temperature data")
 
     var total = 0.0
@@ -257,23 +151,14 @@ def calculate_average(temps: List[Float64]) raises -> Float64:
     return total / Float64(len(temps))
 ```
 
-What changed:
+After updating, your app will no longer compile.
 
-- You add `raises` before the return arrow.
-- You add the check for an empty list.
-- You raise an `Error` if it's empty.
-
-:::note
-
-After this change, your app won't compile yet. Because `calculate_average()`
-can now raise, the call to it in `main()` must handle the error. You add that
-handling in the next step.
-
-:::
+Once `calculate_average()` can raise, its callers must handle or propagate
+the error. You do that in the next step.
 
 ## Handle errors
 
-In `main()`, wrap your code in `try-except` for error handling:
+Wrap failable code in `try-except` for error handling:
 
 ```mojo
     try:
@@ -293,34 +178,49 @@ In `main()`, wrap your code in `try-except` for error handling:
 To test the error, replace `temps` with `[]`.
 Confirm that your app errors with "No temperature data".
 
-## Python integration
+### Checkpoint
 
-Add statistics with Python's numpy. First, install it:
-
-<Tabs groupId="install">
-
-<TabItem value="uv" label="uv" default>
-```sh
-uv pip install numpy
-```
-</TabItem>
-
-<TabItem value="pixi" label="pixi">
-```sh
-pixi add numpy
-```
-</TabItem>
-
-</Tabs>
-
-Then, add the following imports at the top of your file:
+- Each `try` statement requires at least one `except` or `finally` clause.
+- An `else` clause runs only if no error occurs.
+- A `finally` clause always runs.
 
 ```mojo
-from std.python import Python, PythonObject
+try:
+    operation()
+except e:
+    handle_error(e)   # Runs if an error occurs
+else:
+    on_success()      # Runs only if no error occurred
+finally:
+    cleanup()         # Always runs
+```
+
+## Python integration
+
+Mojo integrates with libraries written in other languages. Use Python's NumPy
+to calculate the standard deviation.
+
+Install NumPy with your package manager:
+
+```bash
+pixi add numpy
+```
+
+or:
+
+```bash
+uv pip install numpy
+```
+
+Add these imports at the top of your file:
+
+```mojo
+from std.python import Python
 from std.python.numpy import copy_to_numpy_array
 ```
 
-Now, calculate Python stats at the end of the `try` block in `main()`:
+Then calculate the standard deviation at the end of the `try` block in
+`main()`:
 
 ```mojo
 var np = Python.import_module("numpy")
@@ -334,7 +234,7 @@ print("Temperature standard deviation:", std_dev)
 Your complete `analyzer.mojo`:
 
 ```mojo
-from std.python import Python, PythonObject
+from std.python import Python
 from std.python.numpy import copy_to_numpy_array
 
 
@@ -377,24 +277,38 @@ def main():
 
 ## What you touched
 
-Mojo variables, lists, loops, functions, conditionals, error handling, and
-Python integration, all in one working program.
+You just used: Mojo variables, lists, loops, functions, conditionals, error
+handling, and Python integration in one working program.
+
+## Your first day? Try these
+
+- Build Conway's Game of Life with the [get started
+  tutorial](/docs/manual/get-started). It normally takes about 45-60
+  minutes.
+- Keep the [language reference](/docs/reference/) handy for syntax,
+  keywords, and more.
+- Download the [cheat sheets](/docs/reference/cheat-sheets/) for printable
+  reference cards that bring entire concepts together.
+- Play [Mojo Quest](https://quest.mojolang.org/) to practice Mojo syntax
+  with coding challenges.
 
 ## Use Mojo with AI coding assistants
 
-If you use AI coding assistants, the `mojo-syntax` skill keeps you aligned
-with the latest nightly language releases. Stay up to date with Mojo's
-rapid development:
+If you use an AI coding assistant, install the Mojo agent skills to give it
+up-to-date information about the rapidly evolving language:
 
 ```sh
 npx skills add modular/skills
 ```
 
-This installs all four [Mojo agent skills](/docs/tools/skills), including
-`mojo-syntax`.
+This installs all [Mojo agent skills](/docs/tools/skills), including the
+`mojo-syntax` skill for the latest nightly language releases.
 
 ## Keep going
 
-**Build something bigger:** [Tutorial: Game of Life](/docs/manual/get-started)
-**Language guide:** [Mojo Manual](/docs/manual)
-**API docs:** [Standard Library](/docs/std)
+- Learn Mojo in depth with the [Mojo Manual](/docs/manual).
+- Look up APIs in the [Standard Library](/docs/std).
+- Ask questions and connect with other Mojo developers on the
+  [Discourse forums](https://forum.modular.com/docs/community) and
+  [Discord](https://discord.com/invite/modular).
+- Follow Mojo development on the [Mojo Blog](https://www.modular.com/blog).
