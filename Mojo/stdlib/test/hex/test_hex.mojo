@@ -29,8 +29,12 @@ def test_hex_encode() raises:
         0xFF,
     ]
     assert_equal(hex_encode(random_bytes[:]), "012356789abcdeff")
-    assert_equal(hex_encode[is_lowercase=True](random_bytes[:]), "012356789abcdeff")
-    assert_equal(hex_encode[is_lowercase=False](random_bytes[:]), "012356789ABCDEFF")
+    assert_equal(
+        hex_encode[is_lowercase=True](random_bytes[:]), "012356789abcdeff"
+    )
+    assert_equal(
+        hex_encode[is_lowercase=False](random_bytes[:]), "012356789ABCDEFF"
+    )
 
 
 def test_hex_decode() raises:
@@ -45,9 +49,12 @@ def test_hex_decode() raises:
         0xFF,
     ]
     assert_equal(hex_decode("012356789abcdeff"), random_bytes)
-    assert_equal(hex_decode[is_lowercase=True]("012356789abcdeff"), random_bytes)
-    assert_equal(hex_decode[is_lowercase=False]("012356789ABCDEFF"), random_bytes)
-
+    assert_equal(
+        hex_decode[is_lowercase=True]("012356789abcdeff"), random_bytes
+    )
+    assert_equal(
+        hex_decode[is_lowercase=False]("012356789ABCDEFF"), random_bytes
+    )
 
     var random_bytes_fixed: Array[Byte, 8] = [
         0x01,
@@ -60,8 +67,13 @@ def test_hex_decode() raises:
         0xFF,
     ]
     assert_equal(hex_decode[8]("012356789abcdeff"), random_bytes_fixed)
-    assert_equal(hex_decode[8, is_lowercase=True]("012356789abcdeff"), random_bytes_fixed)
-    assert_equal(hex_decode[8, is_lowercase=False]("012356789ABCDEFF"), random_bytes_fixed)
+    assert_equal(
+        hex_decode[8, is_lowercase=True]("012356789abcdeff"), random_bytes_fixed
+    )
+    assert_equal(
+        hex_decode[8, is_lowercase=False]("012356789ABCDEFF"),
+        random_bytes_fixed,
+    )
 
 
 def test_ivalid_hex_decode() raises:
@@ -84,7 +96,9 @@ def test_ivalid_hex_decode() raises:
         _ = hex_decode("00AB")  # uppercase, expected lowercase
 
     with assert_raises():
-        _ = hex_decode[is_lowercase=False]("00ab")  # lowercase, expected uppercase
+        _ = hex_decode[is_lowercase=False](
+            "00ab"
+        )  # lowercase, expected uppercase
 
 
 def main() raises:

@@ -25,8 +25,7 @@ comptime _HEX_CHARS_UPPER: StaticString = "0123456789ABCDEF"
 
 @always_inline
 def hex_encode[
-    *,
-    is_lowercase: Bool = True
+    *, is_lowercase: Bool = True
 ](input_bytes: Span[mut=False, Byte, _], mut result: String):
     """Performs hex encoding on the input bytes.
 
@@ -59,8 +58,7 @@ def hex_encode[
 
 @always_inline
 def hex_encode[
-    *,
-    is_lowercase: Bool = True
+    *, is_lowercase: Bool = True
 ](input_bytes: Span[mut=False, Byte, _]) -> String:
     """Performs hex encoding on the input bytes.
 
@@ -81,8 +79,7 @@ def hex_encode[
 
 @always_inline
 def hex_decode[
-    *,
-    is_lowercase: Bool = True
+    *, is_lowercase: Bool = True
 ](str: StringSlice[mut=False, _]) raises -> List[Byte]:
     """Performs hex decoding on the input string.
 
@@ -108,9 +105,7 @@ def hex_decode[
 
 @always_inline
 def hex_decode[
-    length: Int,
-    *,
-    is_lowercase: Bool = True
+    length: Int, *, is_lowercase: Bool = True
 ](str: StringSlice[mut=False, _]) raises -> Array[Byte, length]:
     """Performs hex decoding on the input string.
 
@@ -137,11 +132,8 @@ def hex_decode[
 
 @always_inline
 def hex_decode[
-    *,
-    is_lowercase: Bool = True
-](
-    str: StringSlice[mut=False, _], result: Span[mut=True, Byte, _]
-) raises:
+    *, is_lowercase: Bool = True
+](str: StringSlice[mut=False, _], result: Span[mut=True, Byte, _]) raises:
     """Performs hex decoding on the input string.
 
     Parameters:
@@ -175,7 +167,9 @@ def hex_decode[
 def _decode_hex_byte[
     is_lowercase: Bool
 ](hi: Byte, lo: Byte, pos: Int) raises -> Byte:
-    return (_nibble[is_lowercase](hi, pos) << 4) | _nibble[is_lowercase](lo, pos + 1)
+    return (_nibble[is_lowercase](hi, pos) << 4) | _nibble[is_lowercase](
+        lo, pos + 1
+    )
 
 
 @always_inline
