@@ -1201,8 +1201,13 @@ def _sample_for_seed(
         if isinstance(samples, RequestSamples):
             for request in samples.requests:
                 request.response_format = response_format
+                # A constrained response ends at its schema; pinning it to a
+                # drawn length only forces generation past that point.
+                request.ignore_eos = False
             logger.info(
-                f"Injected response_format into {len(samples.requests)} requests"
+                f"Injected response_format into {len(samples.requests)} "
+                "requests; cleared ignore_eos, so drawn output lengths now "
+                "cap rather than pin"
             )
         else:
             logger.warning(

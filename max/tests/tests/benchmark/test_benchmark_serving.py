@@ -20,8 +20,13 @@ from unittest.mock import patch
 import pytest
 from max.benchmark.benchmark_serving import (
     _resolve_skip_counts,
+    _sample_for_seed,
     _seed_for_concurrency,
     parse_args,
+)
+from max.benchmark.benchmark_shared.datasets.types import (
+    RequestSamples,
+    SampledRequest,
 )
 
 
@@ -115,3 +120,52 @@ def test_benchmark_serving_help(capsys: pytest.CaptureFixture[str]) -> None:
         # Capture and verify the help output
         captured = capsys.readouterr()
         assert "usage:" in captured.out.lower()
+
+
+def _one_request_sample() -> tuple[SampledRequest, RequestSamples]:
+    request = SampledRequest(
+        prompt_formatted="hi",
+        prompt_len=1,
+        output_len=64,
+        encoded_images=[],
+        ignore_eos=True,
+    )
+    return request, RequestSamples(requests=[request], shared_contexts=[])
+
+
+def test_response_format_injection_clears_ignore_eos() -> None:
+    """A constrained response ends where its schema is satisfied, so the drawn
+    output length caps it rather than pinning it. Leaving ``ignore_eos`` set
+    asks the server to keep generating past the end of the response, which it
+    can only do unconstrained."""
+    request, samples = _one_request_sample()
+    args = parse_args(
+        [
+            "--model",
+            "myorg/model",
+            "--response-format",
+            '{"type": "json_object"}',
+        ]
+    )
+
+    with patch(
+        "max.benchmark.benchmark_serving.sample_requests", return_value=samples
+    ):
+        _sample_for_seed(args, "text-generation", None, False, 0)
+
+    assert request.response_format is not None
+    assert not request.ignore_eos
+
+
+def test_ignore_eos_survives_without_a_response_format() -> None:
+    """Control: an unconstrained request still honours its drawn length."""
+    request, samples = _one_request_sample()
+    args = parse_args(["--model", "myorg/model"])
+
+    with patch(
+        "max.benchmark.benchmark_serving.sample_requests", return_value=samples
+    ):
+        _sample_for_seed(args, "text-generation", None, False, 0)
+
+    assert request.response_format is None
+    assert request.ignore_eos
