@@ -92,7 +92,7 @@ def KGEN_FuncOp : KGENOp<"func", [
     OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<KGEN_FuncTypeGeneratorType>:$funcTypeGenerator,
     KGEN_DecoratorsAttr:$decorators,
-    KGEN_InlineLevelAttr:$inlineLevel,
+    TypedAttrInterface:$inlineLevel,
     KGEN_ExportKindAttr:$exportKind,
     UnitAttr:$external, UnitAttr:$convergent,
     DefaultValuedAttr<DictionaryAttr, "{}">:$LLVMMetadata,
@@ -146,7 +146,7 @@ def KGEN_FuncOp : KGENOp<"func", [
         llvmArgMetadata = ArrayAttr::get(name.getContext(), {});
       auto sigGen = GeneratorType::get(/*inputParamTypes=*/{}, type);
       build($_builder, $_state, name, /*sym_visibility=*/nullptr, sigGen,
-            decorators, inlineLevel,
+            decorators, KGEN::getInlineLevelAttr($_builder.getContext(), inlineLevel),
             exportKind, external, convergent, llvmMetadata, llvmArgMetadata,
             /*crossDeviceCaptures=*/{}, /*coroutineType=*/{}, linkageName);
     }]>,
@@ -193,7 +193,7 @@ def KGEN_GeneratorOp : KGENOp<"generator", [
     TypeAttrOf<FunctionType>:$functionType,
     KGEN_ParamDeclArrayAttr:$inputParams,
     KGEN_DecoratorsAttr:$decorators,
-    KGEN_InlineLevelAttr:$inlineLevel,
+    TypedAttrInterface:$inlineLevel,
     KGEN_ExportKindAttr:$exportKind,
     UnitAttr:$external,
     // Annotating a generator as if it is an "always_inline("builtin")", this
@@ -271,7 +271,9 @@ def KGEN_GeneratorOp : KGENOp<"generator", [
       build($_builder, $_state,
             symName, /*sym_visibility=*/nullptr, sourceName, type,
             functionType, inputParams,
-            /*decorators=*/{}, inlineLevel, ExportKind::NotExported,
+            /*decorators=*/{},
+            KGEN::getInlineLevelAttr($_builder.getContext(), inlineLevel),
+            ExportKind::NotExported,
             /*external=*/false, inlinedForm, linkageNameAttr, llvmMetadataArray,
             llvmArgMetadataArray, /*sourceParamList=*/PogListAttr(),
             /*sourceFuncTypeGenerator=*/TypedAttr());
@@ -318,7 +320,8 @@ def KGEN_ExternGeneratorOp : KGENOp<"extern.generator", [
   let regions = (region SizedRegion<0>:$body);
 
   let extraClassDeclaration = [{
-    InlineLevel getInlineLevel() { return InlineLevel::Never; }
+    /// This op is never inlined.
+    TypedAttr getInlineLevel();
     Region *getCallableRegion() { return &getBody(); }
 
     ArrayAttr getArgAttrsAttr() { return nullptr; }
@@ -884,7 +887,7 @@ def KGEN_ParamDeclareRegionOp : KGENOp<"param.declare.region", [
     TypeAttrOf<KGEN_FuncTypeGeneratorType>:$funcTypeGenerator,
     TypeAttrOf<FunctionType>:$functionType,
     KGEN_ParamDeclArrayAttr:$inputParams,
-    KGEN_InlineLevelAttr:$inlineLevel,
+    TypedAttrInterface:$inlineLevel,
     OptionalAttr<KGEN_LinkageNameAttr>:$linkageName,
     // To be able to store pre-elaborated names of the `llvm_metadata`,
     // decompose LLVM metadata into array of attributes of even size.

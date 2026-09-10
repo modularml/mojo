@@ -543,6 +543,21 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
 comptime StaticString = StringSlice[ImmStaticOrigin]
 
 
+struct InlineLevel(ImplicitlyCopyable, TrivialRegisterPassable):
+    """The levels the `@inline` decorator accepts."""
+
+    var _value: Int
+
+    @always_inline("builtin")
+    def __init__(out self, *, value: Int):
+        self._value = value
+
+    comptime automatic = Self(value=0)
+    comptime always = Self(value=1)
+    comptime nodebug = Self(value=2)
+    comptime never = Self(value=4)
+
+
 @always_inline("builtin")
 def _get_kgen_string[
     string: StaticString, *extra: StaticString

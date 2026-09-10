@@ -369,7 +369,7 @@ static FnOp generateConversionThunk(Attribute key, ASTDecl &moduleDecl,
   // Always inline the thunk. The calling convention conversion overhead is
   // guaranteed to be optimized away.
   attrs.set(thunk.getInlineLevelAttrName(),
-            InlineLevelAttr::get(ctx, InlineLevel::AlwaysNoDebug));
+            getInlineLevelAttr(ctx, InlineLevel::AlwaysNoDebug));
 
   // Set the attributes.
   thunk->setAttrs(attrs.getDictionary(ctx));

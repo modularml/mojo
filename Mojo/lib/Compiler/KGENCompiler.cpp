@@ -108,7 +108,8 @@ generateInstantiateStub(GeneratorOp func, SymbolConstantAttr symbol,
   auto linkageNameAttr = sliced.getLinkageNameAttr();
 
   sliced.setNotExported();
-  sliced.setInlineLevel(InlineLevel::Always);
+  sliced.setInlineLevelAttr(
+      getInlineLevelAttr(sliced.getContext(), InlineLevel::Always));
   if (symtab) {
     // Clone first so the original retains its linkage name for any subsequent
     // stubs generated from the same generator (e.g. two instantiations of the

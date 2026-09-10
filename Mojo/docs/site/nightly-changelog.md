@@ -16,6 +16,36 @@ This version is still a work in progress.
 
 ## Language enhancements
 
+- The new `@inline(value)` decorator selects a function's inline level. Name
+  one with the new prelude `InlineLevel` struct — `.always`, `.nodebug`,
+  `.never` or `.automatic`, where `nodebug` matches
+  `@always_inline("nodebug")` in also dropping the inlined debug info. Spell
+  the struct out, as in `InlineLevel.never`, where there is no contextual type
+  to infer it from.
+
+  The value need not be a constant: any comptime expression works, including a
+  parameter, so one definition can be inlined or not per instantiation.
+
+  ```mojo
+  @inline(.always)
+  def doubled(x: Int) -> Int:
+      return x * 2
+
+  @inline(policy)
+  def scaled[policy: InlineLevel](x: Int) -> Int:
+      return x * 3
+
+  def main():
+      print(doubled(1) + scaled[.never](2))
+  ```
+
+  A constant is resolved when the decorator is parsed; a value that depends on
+  a parameter is resolved once the compiler binds it.
+
+- Two inline decorators that disagree are now an error rather than one
+  silently winning. `@always_inline` together with `@no_inline` previously
+  compiled, picking whichever came first; write only the one you mean.
+
 - Unknown declaration errors now suggest a unique near-miss spelling from the
   enclosing scopes (for example `coun` → `count`), with a replace-token fixit.
 

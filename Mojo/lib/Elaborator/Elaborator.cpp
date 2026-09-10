@@ -1631,7 +1631,7 @@ LogicalResult Elaborator::processImplNode(ImplNode *inode) {
     // Advance indicates the current work item's operation list was exhausted.
     assert(inode->stack.size() == size && "new frame with no skip");
     assert(item.ops.empty() && "advance did not exhaust worklist");
-    if (failed(item.onComplete(inode))) {
+    if (item.onComplete && failed(item.onComplete(inode))) {
       assert(inode->error && "callback failed but no error set");
       return success();
     }
@@ -1811,10 +1811,12 @@ ElaborationState Elaborator::specializeGenerator(ImplNode *inode,
             generatorOp.getFunctionType(),
             generatorOp.getFuncTypeGenerator().getBody().getArgConventions(),
             generatorOp.getFuncTypeGenerator().getBody().getFnEffects()),
-        generatorOp.getInlineLevel(), generatorOp.getExportKind(),
-        generatorOp.getExternal(), /*convergent=*/false,
-        generatorOp.getLinkageNameAttr(), generatorOp.getDecorators(),
-        DictionaryAttr::get(b.getContext())));
+        inlineLevelOrAutomatic(generatorOp.getInlineLevel()),
+        generatorOp.getExportKind(), generatorOp.getExternal(),
+        /*convergent=*/false, generatorOp.getLinkageNameAttr(),
+        generatorOp.getDecorators(), DictionaryAttr::get(b.getContext())));
+    cast<FuncOp>(*instance).setInlineLevelAttr(
+        generatorOp.getInlineLevelAttr());
     // Process LLVM metadata recorded in the generator by fusing names and
     // values from the LLVMetadataName and LLVMMetadataValue dictionaries.
     auto newFunc = cast<FuncOp>(*instance);
@@ -1922,13 +1924,8 @@ ElaborationState Elaborator::specializeGenerator(ImplNode *inode,
     onComplete = [](ImplNode *inode) -> LogicalResult {
       if (failed(concretizeLocOf(*inode->inst, inode)))
         return failure();
-      if (failed(concretizeLocsInScope(inode->inst.getBodyRegion().front(),
-                                       inode)))
-        return failure();
-      return success();
+      return concretizeLocsInScope(inode->inst.getBodyRegion().front(), inode);
     };
-  } else {
-    onComplete = [](ImplNode *) { return success(); };
   }
 
   IREvaluator evaluator(*this, newFuncNode);

@@ -42,9 +42,11 @@ using namespace M;
 using namespace KGEN;
 
 static bool isAlwaysInlineFunction(FuncOp func) {
-  return func.getInlineLevel() == InlineLevel::AlwaysNoDebug ||
-         func.getInlineLevel() == InlineLevel::AlwaysBuiltin ||
-         func.getInlineLevel() == InlineLevel::Always;
+  return inlineLevelOrAutomatic(func.getInlineLevel()) ==
+             InlineLevel::AlwaysNoDebug ||
+         inlineLevelOrAutomatic(func.getInlineLevel()) ==
+             InlineLevel::AlwaysBuiltin ||
+         inlineLevelOrAutomatic(func.getInlineLevel()) == InlineLevel::Always;
 }
 
 namespace {
@@ -336,7 +338,8 @@ bool CallGraphNode::shouldInlineCallee(CallGraphNode *callee,
     return true;
 
   // Don't handle functions that are not annotated as automatic.
-  if (callee->func.getInlineLevel() != InlineLevel::Automatic)
+  if (inlineLevelOrAutomatic(callee->func.getInlineLevel()) !=
+      InlineLevel::Automatic)
     return false;
 
   // Don't inline callee who is in the same scc as current node (caller).

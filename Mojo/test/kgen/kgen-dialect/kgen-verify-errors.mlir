@@ -221,3 +221,18 @@ kgen.generator @two_params<a, b>() {
   kgen.return
 }
 
+
+// -----
+
+// expected-error @below {{'inlineLevel' must be an integer expression naming an InlineLevel}}
+kgen.generator @bad_inline_spec<policy: !kgen.scalar<f32>>()
+    inline<#kgen.param.decl.ref<"policy"> : !kgen.scalar<f32>> {
+  kgen.return
+}
+
+// -----
+
+// expected-error @below {{'inlineLevel' names no InlineLevel: 7}}
+kgen.generator @inline_level_out_of_range() inline<7 : index> {
+  kgen.return
+}

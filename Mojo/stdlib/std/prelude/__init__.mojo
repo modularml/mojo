@@ -66,6 +66,7 @@ from std.builtin.builtin_slice import Slice, slice
 from std.builtin.comparable import Comparable, Equatable
 from std.builtin.debug_assert import debug_assert
 from std.builtin.dtype import DType
+from std.builtin.inline_level import InlineLevel
 from std.builtin.error import Error
 from std.builtin.float_literal import FloatLiteral
 from std.builtin.floatable import Floatable, FloatableRaising

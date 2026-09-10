@@ -162,9 +162,9 @@ def FuncInterface : OpInterface<"FuncInterface"> {
       Return the function's body argument and result types.
     }], "FunctionType", "getFunctionType", (ins)>,
     InterfaceMethod<[{
-      Return whether the function should be always_inline'd, and whether it
-      should maintain debug info when inlined.
-    }], "InlineLevel", "getInlineLevel", (ins)>,
+      Return the value `@inline` named, which is an `InlineLevel` once it no
+      longer depends on a parameter. `inlineLevelOf` reads it back.
+    }], "TypedAttr", "getInlineLevel", (ins)>,
     InterfaceMethod<[{
       Return the decorators attached to this function.
     }], "ArrayRef<TypedAttr>", "getDecorators", (ins), [{}], [{ return {}; }]>,

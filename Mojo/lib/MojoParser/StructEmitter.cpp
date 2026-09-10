@@ -188,7 +188,7 @@ createFunction(ASTDecl &parent, StringRef name, ArrayRef<ParamDeclAttr> params,
   attrs.set(fnOp.getSyntheticAttrName(), UnitAttr::get(ctx)); // True.
   attrs.set(fnOp.getFunctionTypeAttrName(), TypeAttr::get(functionType));
   attrs.set(fnOp.getInlineLevelAttrName(),
-            InlineLevelAttr::get(ctx, inlineLevel));
+            getInlineLevelAttr(ctx, inlineLevel));
   fnOp->setAttrs(attrs.getDictionary(ctx));
 
   // Generate a debug subprogram for this function.
@@ -364,7 +364,8 @@ FnOp StructEmitter::synthesizeDefaultTraitMethodWrapper(
   if (!traitFn.getLLVMArgMetadataArray().empty())
     funcOp.setLLVMArgMetadataArrayAttr(traitFn.getLLVMArgMetadataArrayAttr());
 
-  funcOp.setInlineLevel(KGEN::InlineLevel::AlwaysNoDebug);
+  funcOp.setInlineLevelAttr(getInlineLevelAttr(
+      funcOp.getContext(), KGEN::InlineLevel::AlwaysNoDebug));
 
   // When we're in the LSP we may not fully body resolve the wrapper
   // functions. Add a EndFnOp with unresolved=True so we can still verify
@@ -593,7 +594,8 @@ FnOp StructEmitter::synthesizeFieldwiseInit(
       "__init__", argTypes, argConventions, argListAttrs, litReturnType,
       SpecialFunctionKind::kInit);
   assert(funcOp && "couldn't synthesize method or had a conflict?");
-  funcOp.setInlineLevel(InlineLevel::AlwaysNoDebug);
+  funcOp.setInlineLevelAttr(
+      getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysNoDebug));
 
   // Set up the body.
   ImplicitLocOpBuilder builder =
@@ -708,7 +710,8 @@ FnOp StructEmitter::synthesizeEmptyDtor(ConstraintAttr conformanceConstraint) {
       shared.getNoneType(), SpecialFunctionKind::kDeinit);
   if (!funcOp)
     return {};
-  funcOp.setInlineLevel(InlineLevel::AlwaysNoDebug);
+  funcOp.setInlineLevelAttr(
+      getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysNoDebug));
 
   DebugInfo::DIBuilder::ScopeGuard diScopeGuard;
   if (shared.diBuilder)
@@ -789,7 +792,8 @@ FnOp StructEmitter::synthesizeEmptyMoveOrCopyInit(
                   /*unresolved=*/true);
 
   // TODO: Should only do this if the type is RP or small?
-  resultFn.setInlineLevel(InlineLevel::AlwaysNoDebug);
+  resultFn.setInlineLevelAttr(
+      getInlineLevelAttr(resultFn.getContext(), InlineLevel::AlwaysNoDebug));
   return resultFn;
 }
 

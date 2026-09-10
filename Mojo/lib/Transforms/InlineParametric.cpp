@@ -444,7 +444,11 @@ struct ParametricInliningGraphNode
     : public CallGraphNodeBase<ParametricInliningGraphNode, GeneratorOp,
                                CallOp> {
   explicit ParametricInliningGraphNode(GeneratorOp func)
-      : CallGraphNodeBase(func), level(func.getInlineLevel()),
+      // An `@inline(expr)` that elaboration has not folded yet arrives as
+      // Automatic, whose threshold is 0, so this pass leaves it alone. Such a
+      // function is inlined later by AutomaticInline, once the level is known.
+      : CallGraphNodeBase(func),
+        level(inlineLevelOrAutomatic(func.getInlineLevel())),
         calleeParamGraph(func.getBodyRegion()) {}
   ParametricInliningGraphNode(ParametricInliningGraphNode &&other)
       : CallGraphNodeBase(other.func), level(other.level),
@@ -499,7 +503,7 @@ struct ParametricInliningGraph
 
   /// Only inline functions that satisfy the inlining level.
   bool shouldInline(ParametricInliningGraphNode *node) const {
-    assert(node->level == node->func.getInlineLevel());
+    assert(node->level == inlineLevelOrAutomatic(node->func.getInlineLevel()));
 
     // Even if we've not been told to, inline some 'always_inline' functions if
     // they're not too big.

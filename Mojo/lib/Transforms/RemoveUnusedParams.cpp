@@ -191,6 +191,11 @@ private:
         // The linkage name might contain parameter references.
         if (auto linkageName = oldFunction.getLinkageNameAttr())
           walker.walk(linkageName);
+        // So might a deferred `@inline` expression, which is the only use of
+        // its parameter until the elaborator folds it.
+        if (TypedAttr level = oldFunction.getInlineLevelAttr();
+            level && !inlineLevelOf(level))
+          walker.walk(level);
         // Most function attrs will only contain false positives, types on the
         // arguments / results are the real source of truth.
         walker.walk(oldFunction.getDecoratorsAttr());

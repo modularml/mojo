@@ -16,6 +16,7 @@
 
 include "Mojo/KGENDialect/KGENDialect.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // POCAttr
@@ -147,6 +148,9 @@ def KGEN_InlineLevelAttr : I32EnumAttr<"InlineLevel",
   I32EnumAttrCase<"Never", 4, "never">,
 ]> {
   let cppNamespace = "M::KGEN";
+  // Functions carry the level as an integer, so nothing builds an attribute
+  // out of this enum.
+  let genSpecializedAttr = 0;
 }
 
 //===----------------------------------------------------------------------===//

@@ -31,6 +31,7 @@
 #include "Mojo/KGENDialect/KGENOps.h"
 #include "Mojo/KGENDialect/KGENParameters.h"
 #include "Mojo/KGENDialect/KGENUtils.h"
+#include "Mojo/KGENDialect/ParameterEvaluator.h"
 #include "Mojo/LITDialect/LITOps.h"
 #include "Mojo/POPDialect/POPOps.h"
 #include "Mojo/ToolCommon/CompilationOptions.h"
@@ -643,7 +644,12 @@ private:
   void applyExtern(SMLoc decoratorLoc, const CallNode *node);
   void applyExportLike(SMLoc loc, bool isExport, const CallNode *node,
                        IREmitter &emitter);
-  void applyAlwaysInline(const CallNode *node);
+  void applyAlwaysInline(SMLoc decoratorLoc, const CallNode *node);
+  void applyInline(SMLoc decoratorLoc, const CallNode *node);
+
+  /// Set the function's inline spec, diagnosing a second inline decorator that
+  /// disagrees with the one already applied.
+  void trySetInlineLevel(SMLoc loc, StringRef spelling, TypedAttr spec);
   void applyLLVMMetadata(SMLoc decoratorLoc, const CallNode *node);
 
   void applyArgumentless(StringRef spelling, const CallNode *callNode,
@@ -669,6 +675,9 @@ private:
 
   /// The working vector of the LLVMMetadata.
   SmallVector<Attribute> llvmMetadata;
+
+  /// The inline decorator already applied, empty until one is.
+  StringRef inlineSpelling;
 };
 } // namespace
 
@@ -753,10 +762,15 @@ LogicalResult FnSigDecorators::applyOne(ExprNode *decorator) {
     // clear, and this will suppress errors about missing self arguments.
     funcOp.setIsStatic(true);
   } else if (spelling == "always_inline") {
-    applyAlwaysInline(callNode);
+    applyAlwaysInline(decorator->getLoc(), callNode);
+  } else if (spelling == "inline") {
+    applyInline(decorator->getLoc(), callNode);
   } else if (spelling == "no_inline") {
-    applyArgumentless(spelling, callNode,
-                      [&]() { funcOp.setInlineLevel(InlineLevel::Never); });
+    applyArgumentless(spelling, callNode, [&]() {
+      trySetInlineLevel(
+          decorator->getLoc(), spelling,
+          getInlineLevelAttr(funcOp.getContext(), InlineLevel::Never));
+    });
   } else if (spelling == "__parameter" || spelling == "parameter") {
     // Temporarily accept the legacy `@parameter` spelling with a deprecation
     // warning so the rename to `@__parameter` can land without breaking
@@ -1137,11 +1151,26 @@ void FnSigDecorators::applyExportLike(SMLoc loc, bool isExport,
     getDeclResolver().registerAndCheckExport(*simpleLinkageName, loc);
 }
 
-void FnSigDecorators::applyAlwaysInline(const CallNode *callNode) {
+void FnSigDecorators::trySetInlineLevel(SMLoc loc, StringRef spelling,
+                                        TypedAttr spec) {
+  if (!inlineSpelling.empty() && spec != funcOp.getInlineLevelAttr()) {
+    emitError(loc) << "function has conflicting inline level from a previous '@"
+                   << inlineSpelling << "' decorator";
+    return;
+  }
+  inlineSpelling = spelling;
+  funcOp.setInlineLevelAttr(spec);
+}
+
+void FnSigDecorators::applyAlwaysInline(SMLoc decoratorLoc,
+                                        const CallNode *callNode) {
+  StringRef spelling = "always_inline";
   size_t numOperands = callNode ? callNode->operands.size() : 0;
   if (numOperands == 0) {
     // `@always_inline` and `@always_inline()` are both allowed.
-    funcOp.setInlineLevel(InlineLevel::Always);
+    trySetInlineLevel(
+        decoratorLoc, spelling,
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::Always));
     return;
   }
 
@@ -1154,13 +1183,101 @@ void FnSigDecorators::applyAlwaysInline(const CallNode *callNode) {
 
   const Operand &operand = callNode->operands[0];
   if (operand.isPositionalStringLiteral("nodebug")) {
-    funcOp.setInlineLevel(InlineLevel::AlwaysNoDebug);
+    trySetInlineLevel(
+        decoratorLoc, spelling,
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysNoDebug));
   } else if (operand.isPositionalStringLiteral("builtin")) {
-    funcOp.setInlineLevel(InlineLevel::AlwaysBuiltin);
+    trySetInlineLevel(
+        decoratorLoc, spelling,
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysBuiltin));
   } else {
     emitError(callNode->getLoc())
         << "'@always_inline' operand must be \"nodebug\" or \"builtin\"";
   }
+}
+
+/// The level `@inline` takes from `spec`: an error if `spec` folded to a value
+/// the decorator does not accept, or nullopt while it still depends on a
+/// parameter.
+static ErrorOr<std::optional<InlineLevel>>
+inlineDecoratorLevel(TypedAttr spec) {
+  std::optional<int64_t> value = inlineLevelValueOf(spec);
+  if (!value)
+    return std::optional<InlineLevel>();
+  // AlwaysBuiltin is excluded: it also needs the foldability checks
+  // `@always_inline("builtin")` performs.
+  if (std::optional<InlineLevel> level = inlineLevelOf(spec);
+      level && *level != InlineLevel::AlwaysBuiltin)
+    return level;
+  return Error("'@inline' argument " + llvm::Twine(*value) +
+               " is not an InlineLevel; use '.always', '.nodebug', '.never' or "
+               "'.automatic'");
+}
+
+void FnSigDecorators::applyInline(SMLoc decoratorLoc,
+                                  const CallNode *callNode) {
+  size_t numOperands = callNode ? callNode->operands.size() : 0;
+  if (numOperands != 1) {
+    emitError(callNode ? callNode->getLoc() : decoratorLoc)
+        << "'@inline' decorator takes exactly 1 argument, found "
+        << numOperands;
+    return;
+  }
+
+  const Operand &operand = callNode->operands[0];
+  if (!operand.isPositional()) {
+    emitError(operand.getLoc()) << "'@inline' argument must be positional";
+    return;
+  }
+
+  // Strings were the old spelling; say so instead of failing in emitIndex.
+  if (isa<StringLiteralNode>(operand.expr)) {
+    emitError(operand.getLoc())
+        << "'@inline' argument must be an InlineLevel, not a string; use "
+           "'.always', '.nodebug', '.never' or '.automatic'";
+    return;
+  }
+
+  // The contextual type is what lets the argument be written as `.always`,
+  // and makes anything else a type error at its own location.
+  ASTType levelType =
+      shared.lookupBuiltinType("InlineLevel", decl, operand.getLoc());
+  if (levelType.isTypeCheckErrorType())
+    return;
+
+  IREmitter emitter(sigDecl, EC_Decorator);
+  PValue pvalue = emitter.emitExprPValue(operand.expr, EC_Decorator, levelType);
+  // `emitExprPValue` has already said why.
+  if (!pvalue)
+    return;
+
+  // `InlineLevel` holds an `Int`, which is a SIMD scalar, so the level sits
+  // two fields deep.
+  SMLoc loc = operand.getLoc();
+  TypedAttr boxed =
+      ASTType::extractStructField(pvalue.get(), "_value", loc, shared);
+  if (!boxed)
+    return;
+  // The first field read leaves a rebind wrapper, which the second one cannot
+  // see through.
+  TypedAttr level = ASTType::extractStructField(stripIdentityWrappers(boxed),
+                                                "_mlir_value", loc, shared);
+  if (!level)
+    return;
+
+  // Recording a known level as itself keeps two decorators that agree from
+  // reading as a conflict.
+  ErrorOr<std::optional<InlineLevel>> known = inlineDecoratorLevel(level);
+  if (const char *rejection = known.getError()) {
+    emitError(operand.getLoc()) << rejection;
+    return;
+  }
+  if (*known) {
+    trySetInlineLevel(decoratorLoc, "inline",
+                      getInlineLevelAttr(funcOp.getContext(), **known));
+    return;
+  }
+  trySetInlineLevel(decoratorLoc, "inline", level);
 }
 
 void FnSigDecorators::applyArgumentless(StringRef spelling,
@@ -1319,12 +1436,14 @@ void FnSigDecorators::applyLLVMArgMetadata(SMLoc decoratorLoc,
 
 void FnSigDecorators::finalize() {
   if (funcOp.isExternal()) {
-    if (funcOp.getInlineLevel() != InlineLevel::Never &&
-        funcOp.getInlineLevel() != InlineLevel::Automatic) {
+    if (inlineLevelOrAutomatic(funcOp.getInlineLevel()) != InlineLevel::Never &&
+        inlineLevelOrAutomatic(funcOp.getInlineLevel()) !=
+            InlineLevel::Automatic) {
       emitError(funcOp.getLoc(), "extern functions cannot be inlined");
       return;
     }
-    funcOp.setInlineLevel(InlineLevel::Never);
+    funcOp.setInlineLevelAttr(
+        getInlineLevelAttr(funcOp.getContext(), InlineLevel::Never));
   }
 
   // If we've an exported function with no explicit linkage name, set it now.
@@ -2566,9 +2685,11 @@ ParseResult DeclResolver::resolveBody(FnOp funcOp, Lexer &lexer,
 
   // If this function is @always_inline("builtin"), check that its body obeys
   // the right invariants.
-  if (funcOp.getInlineLevel() == InlineLevel::AlwaysBuiltin) {
+  if (inlineLevelOrAutomatic(funcOp.getInlineLevel()) ==
+      InlineLevel::AlwaysBuiltin) {
     if (failed(FnSigDecorators::checkAlwaysInlineBuiltin(funcOp, shared)))
-      funcOp.setInlineLevel(InlineLevel::AlwaysNoDebug);
+      funcOp.setInlineLevelAttr(
+          getInlineLevelAttr(funcOp.getContext(), InlineLevel::AlwaysNoDebug));
   }
 
   if (funcOp.isExternal()) {

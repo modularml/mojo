@@ -17,6 +17,7 @@
 
 #include "ClosureEmitter.h"
 #include "IREmitter.h"
+#include "Mojo/KGENDialect/KGENUtils.h"
 #include "Mojo/MojoParser/ASTDecl.h"
 #include "Mojo/MojoParser/ASTType.h"
 #include "Mojo/MojoParser/DeclResolver.h"
@@ -275,7 +276,7 @@ ClosureEmitter::ClosureParent::ClosureParent(SharedState &shared,
   assert(definingFn && "missing function in closure parent trait");
   witnessName = definingFn.getSymNameAttr();
   signature = definingFn.getFullSignature();
-  inlineLevel = definingFn.getInlineLevel();
+  inlineLevel = inlineLevelOrAutomatic(definingFn.getInlineLevel());
 }
 
 static StructFieldOp addFieldOpAndDecl(StringAttr name, Type type,
@@ -674,7 +675,8 @@ static FnOp emitStorageCallWitness(
   ASTDecl *callWitnessDecl = shared.declResolver->getDeclForFuncSymbol(
       getFullyResolvedSymbolRef(callWitness));
   callWitnessDecl->resolvedness = DeclResolvedness::body;
-  callWitness.setInlineLevel(InlineLevel::Always);
+  callWitness.setInlineLevelAttr(
+      getInlineLevelAttr(callWitness.getContext(), InlineLevel::Always));
 
   const size_t promotedParams = explicitParamCount(promotedCall);
   assert(
@@ -1129,7 +1131,8 @@ ClosureEmitter::createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
       callParent.getSignature(), structDecl, /*synthetic=*/false,
       StringAttr::get(shared.getContext(), "__call__"),
       SpecialFunctionKind::kNormal, callParent.getInlineLevel());
-  callMethod.setInlineLevel(InlineLevel::Always);
+  callMethod.setInlineLevelAttr(
+      getInlineLevelAttr(callMethod.getContext(), InlineLevel::Always));
   addWitnessEntry(callParent, callMethod);
 
   // Marker parents (AnyType, ImplicitlyCopyable, RegisterPassable,
@@ -3764,7 +3767,8 @@ void ClosureEmitter::buildCallAdaptorAndAddWitness(
       StringAttr::get(ctx, "__call__$" + getFlattenedSymbolName(traitSymbol));
   auto [adaptorFnOp, _, adaptorResult] = pushBackTraitFunctionImpl(
       traitCallFn.getFullSignature(), structDecl, true, adaptorNameAttr,
-      traitCallFn.getSpecialFunctionKind(), traitCallFn.getInlineLevel(),
+      traitCallFn.getSpecialFunctionKind(),
+      inlineLevelOrAutomatic(traitCallFn.getInlineLevel()),
       redirectWitnessToImplParam, selfTypeOverride);
   mlir::AttrTypeReplacer replacer;
   replacer.addReplacement([&](ParamDeclRefAttr ref) -> TypedAttr {
@@ -4358,7 +4362,7 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
     auto [implementation, parameters, result] = pushBackTraitFunctionImpl(
         function.getFullSignature(), structDecl, /*synthetic=*/true,
         function.getSourceNameAttr(), function.getSpecialFunctionKind(),
-        function.getInlineLevel(),
+        inlineLevelOrAutomatic(function.getInlineLevel()),
         /*redirectWitnessToImplParam=*/false);
     DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
         pushFnDebugScope(shared, implementation);
@@ -4371,7 +4375,8 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
     auto [implementation, parameters, result] = pushBackTraitFunctionImpl(
         function.getFullSignature(), structDecl,
         /*synthetic=*/true, function.getSymNameAttr(),
-        function.getSpecialFunctionKind(), function.getInlineLevel(),
+        function.getSpecialFunctionKind(),
+        inlineLevelOrAutomatic(function.getInlineLevel()),
         /*redirectWitnessToImplParam=*/false);
     DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
         pushFnDebugScope(shared, implementation);
@@ -4383,7 +4388,7 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
     auto [toDevice, params, result] = pushBackTraitFunctionImpl(
         function.getFullSignature(), structDecl, /*synthetic=*/true,
         function.getSourceNameAttr(), function.getSpecialFunctionKind(),
-        function.getInlineLevel(),
+        inlineLevelOrAutomatic(function.getInlineLevel()),
         /*redirectWitnessToImplParam=*/false);
     DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
         pushFnDebugScope(shared, toDevice);
@@ -4426,7 +4431,7 @@ void ClosureEmitter::addStorageConformanceToDevicePassable(
     auto [implementation, _, result] = pushBackTraitFunctionImpl(
         function.getFullSignature(), structDecl, /*synthetic=*/true,
         function.getSourceNameAttr(), function.getSpecialFunctionKind(),
-        function.getInlineLevel(),
+        inlineLevelOrAutomatic(function.getInlineLevel()),
         /*redirectWitnessToImplParam=*/false);
     DebugInfo::DIBuilder::ScopeGuard diScopeGuard =
         pushFnDebugScope(shared, implementation);

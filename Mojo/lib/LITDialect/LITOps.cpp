@@ -1039,7 +1039,7 @@ ParseResult FnOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   // Parse additional function attributes.
-  InlineLevelAttr inlineLevel;
+  Attribute inlineLevel;
   DecoratorsAttr decorators;
   if (parseOptionalInline(parser, inlineLevel) ||
       parseOptionalDecorators(parser, decorators))
@@ -1096,7 +1096,7 @@ void FnOp::print(OpAsmPrinter &p) {
   // Print the function arguments. Here we need all the use defined names.
   printLITFunctionSignature(p, &getBodyRegion(), getParams(), getFunctionType(),
                             getFuncTypeGenerator());
-  printOptionalInline(p, getInlineLevel());
+  printOptionalInline(p, getInlineLevelAttr());
   printOptionalDecorators(p, *this, getDecorators());
 
   // Don't print the following in lit.fn.
@@ -1128,6 +1128,9 @@ void FnOp::getAsmBlockArgumentNames(
 }
 
 LogicalResult FnOp::verify() {
+  if (failed(verifyInlineLevel(*this, getInlineLevelAttr())))
+    return failure();
+
   if ((getLLVMMetadataArray().size() & 1) != 0)
     return emitOpError("expected an even number elements in LLVMMetadataArray");
   if (ArrayAttr argsArray = getLLVMArgMetadataArray();
@@ -1217,9 +1220,10 @@ void FnOp::build(OpBuilder &builder, OperationState &result, StringAttr name,
         /*isExtern=*/none,
         /*isDefaultedTraitFn=*/none,
         ExportKindAttr::get(ctx, ExportKind::NotExported),
-        InlineLevelAttr::get(ctx, InlineLevel::Automatic),
+        KGEN::getInlineLevelAttr(ctx, InlineLevel::Automatic),
         builder.getI8IntegerAttr(uint8_t(SpecialFunctionKind::kNormal)),
-        /*linkageName=*/LinkageNameAttr(), sourceName, /*inheritedFrom=*/{},
+        /*linkageName=*/LinkageNameAttr(), sourceName,
+        /*inheritedFrom=*/{},
         /*defaultFnRef=*/{}, StringAttr(), DocStringAttr(),
         /*deprecationInfo=*/{}, /*unavailableInfo=*/{},
         /*hasStableDecorator=*/none, /*stableSinceVersion=*/{},

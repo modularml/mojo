@@ -2187,8 +2187,17 @@ void KGEN::printOptionalDecorators(OpAsmPrinter &p, Operation *op,
 }
 
 /// Parse the always_inline related keywords if present.
-ParseResult KGEN::parseOptionalInline(OpAsmParser &parser,
-                                      InlineLevelAttr &attr) {
+ParseResult KGEN::parseOptionalInline(OpAsmParser &parser, Attribute &attr) {
+  // `inline<expr>` is an `@inline(expr)` the elaborator has not folded yet.
+  if (succeeded(parser.parseOptionalKeyword("inline"))) {
+    TypedAttr expr;
+    if (parser.parseLess() || parser.parseAttribute(expr) ||
+        parser.parseGreater())
+      return failure();
+    attr = expr;
+    return success();
+  }
+
   // Handle always_inline.
   InlineLevel inlineLevel;
   if (succeeded(parser.parseOptionalKeyword("always_inline")))
@@ -2201,12 +2210,86 @@ ParseResult KGEN::parseOptionalInline(OpAsmParser &parser,
     inlineLevel = InlineLevel::Never;
   else
     inlineLevel = InlineLevel::Automatic;
-  attr = InlineLevelAttr::get(parser.getContext(), inlineLevel);
+  attr = getInlineLevelAttr(parser.getContext(), inlineLevel);
   return success();
 }
 
-void KGEN::printOptionalInline(AsmPrinter &p, InlineLevel level) {
-  switch (level) {
+/// The level `value` names. `@inline` forbids AlwaysBuiltin: it also needs the
+/// foldability checks `@always_inline("builtin")` performs.
+static std::optional<InlineLevel> inlineLevelFromValue(int64_t value,
+                                                       bool allowBuiltin) {
+  switch (value) {
+  case static_cast<int64_t>(InlineLevel::Automatic):
+  case static_cast<int64_t>(InlineLevel::Always):
+  case static_cast<int64_t>(InlineLevel::AlwaysNoDebug):
+  case static_cast<int64_t>(InlineLevel::Never):
+    return static_cast<InlineLevel>(value);
+  case static_cast<int64_t>(InlineLevel::AlwaysBuiltin):
+    if (allowBuiltin)
+      return InlineLevel::AlwaysBuiltin;
+    return std::nullopt;
+  default:
+    return std::nullopt;
+  }
+}
+
+std::optional<int64_t> KGEN::inlineLevelValueOf(TypedAttr spec) {
+  if (auto intAttr = sugarDynCastIfPresent<IntegerAttr>(spec))
+    return intAttr.getInt();
+  // `@inline` names a level with `InlineLevel`, whose `Int` is a SIMD scalar.
+  if (auto simdAttr = sugarDynCastIfPresent<SIMDAttr>(spec);
+      simdAttr && simdAttr.getValues().size() == 1 &&
+      simdAttr.getValues().front().getDType().isIntLike())
+    return simdAttr.getValues().front().getIntVal().getExtValue();
+  return std::nullopt;
+}
+
+std::optional<InlineLevel> KGEN::inlineLevelOf(TypedAttr spec) {
+  if (std::optional<int64_t> value = inlineLevelValueOf(spec))
+    return inlineLevelFromValue(*value, /*allowBuiltin=*/true);
+  return std::nullopt;
+}
+
+InlineLevel KGEN::inlineLevelOrAutomatic(TypedAttr spec) {
+  return inlineLevelOf(spec).value_or(InlineLevel::Automatic);
+}
+
+TypedAttr KGEN::getInlineLevelAttr(MLIRContext *ctx, InlineLevel level) {
+  return IntegerAttr::get(IndexType::get(ctx), static_cast<int64_t>(level));
+}
+
+LogicalResult KGEN::verifyInlineLevel(Operation *op, Attribute spec) {
+  auto expr = dyn_cast_if_present<TypedAttr>(spec);
+  bool integral = expr && expr.getType().isIntOrIndex();
+  if (auto simd = dyn_cast_if_present<SIMDType>(expr ? expr.getType() : Type{}))
+    if (std::optional<KGENDType> dtype = simd.getResolvedDType())
+      integral = dtype->isIntLike();
+  if (!integral)
+    return op->emitOpError(
+        "'inlineLevel' must be an integer expression naming an InlineLevel");
+
+  // A level is only a value once elaboration has folded it. One `@inline`
+  // wrote is held to what that decorator accepts; a level the compiler set
+  // itself is a plain integer and may be any of them.
+  if (std::optional<int64_t> value = inlineLevelValueOf(expr)) {
+    bool compilerSet = sugarDynCastIfPresent<IntegerAttr>(expr) != nullptr;
+    if (!inlineLevelFromValue(*value, /*allowBuiltin=*/compilerSet))
+      return op->emitOpError("'inlineLevel' names no InlineLevel: ") << *value;
+  }
+  return success();
+}
+
+void KGEN::printOptionalInline(AsmPrinter &p, Attribute attr) {
+  auto typedAttr = dyn_cast_if_present<TypedAttr>(attr);
+  std::optional<InlineLevel> level =
+      typedAttr ? inlineLevelOf(typedAttr) : std::nullopt;
+  if (!level) {
+    // Printers run on invalid IR too, so a missing spec must not crash.
+    if (attr)
+      p << " inline<" << attr << ">";
+    return;
+  }
+  switch (*level) {
   case InlineLevel::Automatic:
     break;
   case InlineLevel::Always:

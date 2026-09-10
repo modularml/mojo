@@ -426,8 +426,24 @@ void printFunctionFuncTypeGenerator(OpAsmPrinter &p, Region *region,
                                     ParamDeclPrintHookTy printResultElt = {});
 
 /// Parse the always_inline related keywords if present.
-ParseResult parseOptionalInline(OpAsmParser &parser, InlineLevelAttr &attr);
-void printOptionalInline(AsmPrinter &p, InlineLevel level);
+ParseResult parseOptionalInline(OpAsmParser &parser, Attribute &attr);
+void printOptionalInline(AsmPrinter &p, Attribute attr);
+
+/// The integer `spec` holds, in either the plain or the `InlineLevel` form.
+std::optional<int64_t> inlineLevelValueOf(TypedAttr spec);
+
+/// The level `spec` names, or nullopt while it still depends on a parameter.
+std::optional<InlineLevel> inlineLevelOf(TypedAttr spec);
+
+/// The level `spec` names, or Automatic while it depends on a parameter.
+InlineLevel inlineLevelOrAutomatic(TypedAttr spec);
+
+/// Builds the stored form of `level`; an op's own accessor reads one.
+TypedAttr getInlineLevelAttr(MLIRContext *ctx, InlineLevel level);
+
+/// Diagnose an `inlineLevel` that is not integral, or that folded to a value
+/// naming no level.
+LogicalResult verifyInlineLevel(Operation *op, Attribute spec);
 
 /// Parse and print a decorator list if present.
 ParseResult parseOptionalDecorators(AsmParser &p, DecoratorsAttr &decorators);
