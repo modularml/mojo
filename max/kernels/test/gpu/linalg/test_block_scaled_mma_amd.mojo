@@ -22,7 +22,7 @@ FP6 operands hold 24 payload bytes inside a 32-byte fragment, so a second test
 confirms on hardware that the trailing bytes never reach the MFMA.
 """
 
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from max.gpu import MAX_THREADS_PER_BLOCK_METADATA, WARP_SIZE, lane_id
 from max.gpu.host import DeviceContext
 from max.gpu.host.info import MI355X

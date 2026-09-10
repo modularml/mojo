@@ -14,8 +14,8 @@
 
 The standard library provides nearly everything you'll need for
 writing Mojo programs, including basic data types like
-[`Int`](/docs/std/builtin/simd/#int) and
-[`SIMD`](/docs/std/builtin/simd/SIMD/), collection types like
+[`Int`](/docs/std/simd/#int) and
+[`SIMD`](/docs/std/simd/SIMD/), collection types like
 [`List`](/docs/std/collections/list/List/), reusable
 [algorithms](/docs/std/algorithm/), and modules to support
 [GPU programming](https://max.modular.com/api/mojo/max/gpu/)."""

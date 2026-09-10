@@ -232,7 +232,7 @@ specified by keyword (see
 Variadic arguments fall into two categories:
 
 - Homogeneous variadic arguments, where all of the passed arguments are the same
-  type—all [`Int`](/docs/std/builtin/simd/#int), or all
+  type—all [`Int`](/docs/std/simd/#int), or all
   [`String`](/docs/std/collections/string/string/String/), for example.
 - Heterogeneous variadic arguments, which can accept a set of different argument
   types.
@@ -446,7 +446,7 @@ def sort(*values: Float64, ascending: Bool = True): ...
 ```
 
 In this example, you can pass any number of
-[`Float64`](/docs/std/builtin/simd/#float64) values, optionally
+[`Float64`](/docs/std/simd/#float64) values, optionally
 followed by the keyword `ascending` argument:
 
 ```mojo

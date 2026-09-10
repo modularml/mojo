@@ -39,7 +39,7 @@ import extensibility
 # ===-----------------------------------------------------------------------===#
 # Kernel imports
 # ===-----------------------------------------------------------------------===#
-from std.builtin.simd import _pow
+from std.simd import _pow
 
 from nn.activations import (
     gelu,

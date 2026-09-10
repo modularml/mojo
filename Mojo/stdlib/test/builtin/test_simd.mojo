@@ -18,7 +18,7 @@ from std.bit import count_leading_zeros
 from std.memory import alloc, dealloc, ThinAllocation, Layout
 from std.memory.unsafe import bitcast
 from std.builtin._format_float import _write_float
-from std.builtin.simd import _modf
+from std.simd import _modf
 from std.itertools import product
 from std.random import randn, seed
 from std.testing import (

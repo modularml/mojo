@@ -42,7 +42,7 @@ from std.sys.intrinsics import (
 
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.builtin.format_int import _write_int
-from std.builtin.simd import _simd_construction_checks
+from std.simd import _simd_construction_checks
 from std.format._utils import FormatStruct, Named, TypeNames
 from std.reflection import reflect
 from std.traits import IsTriviallyDeinitable, IsTriviallyMovable

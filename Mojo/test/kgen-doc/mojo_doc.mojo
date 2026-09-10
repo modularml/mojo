@@ -28,7 +28,7 @@ spills over to the next line."""
 from layout.int_tuple import *
 from std.sys.info import is_nvidia_gpu
 from std.memory import Pointer
-from std.builtin.simd import Float4_e2m1fn, Float8_e4m3fn
+from std.simd import Float4_e2m1fn, Float8_e4m3fn
 
 
 # CHECK:  "aliases": [
@@ -153,7 +153,7 @@ comptime __double_underscore_private_member = ""
 # CHECK:      "async": true
 # CHECK:      "returns": {
 # CHECK:        "doc": "An Int.",
-# CHECK:        "path": "/std/builtin/simd/#int",
+# CHECK:        "path": "/std/simd/#int",
 # CHECK:        "type": "Int"
 # CHECK:      },
 # CHECK:      "signature": "def fn_that_async() -> Int"
@@ -178,7 +178,7 @@ async def fn_that_async() -> Int:
 # CHECK:      "raisesDoc": "Raises an exception when it wants to.\n"
 # CHECK:      "returns": {
 # CHECK:        "doc": "An Int.",
-# CHECK:        "path": "/std/builtin/simd/#int",
+# CHECK:        "path": "/std/simd/#int",
 # CHECK:        "type": "Int"
 # CHECK:      },
 # CHECK:      "signature": "def fn_that_raises() -> Int"
@@ -205,22 +205,22 @@ def fn_that_raises() raises -> Int:
 # CHECK:      "args":
 # CHECK:          "description": "This is an argument."
 # CHECK:          "name": "arg"
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 # CHECK:          "type": "Int"
 # CHECK:          "convention": "mut"
 # CHECK:          "description": "This is an mut arg."
 # CHECK:          "name": "inoutArg"
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 # CHECK:          "type": "Int"
 # CHECK:          "convention": "var"
 # CHECK:          "description": "This is an owned arg."
 # CHECK:          "name": "ownedArg"
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 # CHECK:          "type": "Int"
 # CHECK:          "convention": "imm"
 # CHECK:          "description": "This is a borrowedArg."
 # CHECK:          "name": "borrowedArg"
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 # CHECK:          "type": "Int"
 # CHECK:      "signature": "def fn_with_args(arg: Int, mut inoutArg: Int, var ownedArg: Int, borrowedArg: Int)",
 # CHECK:      "summary": "This is a function summary."
@@ -322,11 +322,11 @@ def fn_with_params[
 # CHECK:     "args":
 # CHECK:         "description": "This is an argument."
 # CHECK:         "name": "arg"
-# CHECK:         "path": "/std/builtin/simd/#int"
+# CHECK:         "path": "/std/simd/#int"
 # CHECK:         "type": "Int"
 # CHECK:     "returns": {
 # CHECK:       "doc": "This is a return value.",
-# CHECK:       "path": "/std/builtin/simd/#int",
+# CHECK:       "path": "/std/simd/#int",
 # CHECK:       "type": "Int"
 # CHECK:     },
 # CHECK:     "signature": "def fn_with_params_and_return(arg: Int) -> Int"
@@ -442,7 +442,7 @@ struct MyStruct[x: Int]:
 # CHECK:     "description": "Explicitly declared function parameter.",
 # CHECK:     "kind": "parameter",
 # CHECK:     "name": "p",
-# CHECK:     "path": "/std/builtin/simd/#int",
+# CHECK:     "path": "/std/simd/#int",
 # CHECK:     "type": "Int"
 # CHECK: }
 # CHECK: "signature": "def fn_with_implicit_params[p: Int](arg: MyStruct)"
@@ -491,15 +491,15 @@ def pos_only_print(x: String, /, sep: String):
 # CHECK:      "args":
 # CHECK:          "name": "a"
 # CHECK:          "passingKind": "pos",
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 
 # CHECK:          "name": "b"
 # CHECK:          "passingKind": "pos",
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 
 # CHECK:          "name": "offset"
 # CHECK:          "passingKind": "kw",
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 # CHECK:      "signature": "def keyword_only_prod(a: Int, b: Int, /, *, offset: Int)",
 
 
@@ -519,16 +519,16 @@ def keyword_only_prod(a: Int, b: Int, /, *, offset: Int):
 # CHECK:      "args":
 # CHECK:          "default": "Int(2)",
 # CHECK:          "name": "b"
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 
 # CHECK:          "default": "Int(3)",
 # CHECK:          "name": "c"
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 
 # CHECK:      "parameters":
 # CHECK:          "default": "Int(1)",
 # CHECK:          "name": "a"
-# CHECK:          "path": "/std/builtin/simd/#int"
+# CHECK:          "path": "/std/simd/#int"
 # CHECK:      "signature": "def default_args_and_params[a: Int = Int(1)](b: Int = Int(2), /, *, c: Int = Int(3))",
 
 
@@ -578,7 +578,7 @@ def variadic_pack[*Ts: AnyType](*vals: *Ts):
 # CHECK:     "args":
 # CHECK:         "name": "*vals",
 # CHECK:         "passingKind": "pos_or_kw",
-# CHECK:         "path": "/std/builtin/simd/#int",
+# CHECK:         "path": "/std/simd/#int",
 # CHECK:         "type": "Int"
 
 # CHECK:         "name": "**kwargs",
@@ -949,7 +949,7 @@ struct ParameterClass[_type: __mlir_type.`!kgen.dtype`](RegisterPassable):
 # CHECK:  "parameters":
 # CHECK:      "default": "Int(1)",
 # CHECK:      "name": "a",
-# CHECK:      "path": "/std/builtin/simd/#int"
+# CHECK:      "path": "/std/simd/#int"
 
 
 struct StructWithDefault[a: Int = 1]:

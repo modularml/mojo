@@ -36,7 +36,7 @@ from linalg.fp4_utils import (
     set_batched_scale_factor,
 )
 from std.random import random_ui64
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from layout import (
     Coord,
     CoordLike,

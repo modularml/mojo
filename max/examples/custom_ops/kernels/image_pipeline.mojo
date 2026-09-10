@@ -14,7 +14,7 @@
 import extensibility
 
 from max.gpu.host import DeviceContext
-from std.builtin.simd import SIMD
+from std.simd import SIMD
 
 from extensibility import InputTensor, OutputTensor, foreach
 

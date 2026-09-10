@@ -96,7 +96,7 @@ from std.builtin.range import range
 from std.builtin.rebind import rebind, rebind_var
 from std.builtin.reversed import ReversibleRange, reversed
 from std.builtin.simd_length import SIMDLength
-from std.builtin.simd import (
+from std.simd import (
     SIMD,
     BFloat16,
     Byte,

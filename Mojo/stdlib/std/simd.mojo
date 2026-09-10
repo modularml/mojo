@@ -103,7 +103,7 @@ from std.utils.numerics import min_finite as _min_finite
 from std.utils.numerics import min_or_neg_inf as _min_or_neg_inf
 from std.utils.numerics import nan as _nan
 
-from .dtype import (
+from std.builtin.dtype import (
     _integral_type_of,
     _uint_type_of_width,
     _unsigned_integral_type_of,
@@ -359,7 +359,7 @@ struct FastMathFlag(Equatable, ImplicitlyCopyable, RegisterPassable):
 
     Examples:
         ```mojo
-        from std.builtin.simd import FastMathFlag
+        from std.simd import FastMathFlag
         var value = Float32(2.0)
         var multiplier = Float32(3.0)
         var accumulator = Float32(1.0)

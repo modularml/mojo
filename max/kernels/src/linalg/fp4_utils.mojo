@@ -20,7 +20,7 @@ from std.utils.numerics import FPUtils
 from std.utils.index import IndexList
 from std.memory import bitcast
 from layout import Coord, CoordLike, Idx, Layout, LayoutTensor, TileTensor
-from std.builtin.simd import _convert_f32_to_float8_ue8m0
+from std.simd import _convert_f32_to_float8_ue8m0
 from max.gpu.compute.arch.mma_nvidia_sm100 import UMMAKind
 
 comptime SF_ATOM_M = (32, 4)

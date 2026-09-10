@@ -751,7 +751,7 @@ void IREvaluatorContext::printParamValue(raw_ostream &os, ParamDeclAttr decl,
         if (!isScalarOf<KGENDType::kBool>(simdAttr.getType())) {
           os << " : ";
           if (qualifiedBuiltins)
-            os << "std.builtin.simd.";
+            os << "std.simd.";
           os << "SIMD[";
           printDType(os, dType, qualifiedBuiltins);
           os << ", " << values.size() << "]";
@@ -770,7 +770,7 @@ IREvaluatorContext::stringifyTypeInstanceRef(TypeInstanceRefAttr instanceRef,
       {"std::builtin::bool::Bool", "Bool"},
       {"std::builtin::int::Int", "Int"},
       {"std::collections::list::List", "List"},
-      {"std::builtin::simd::SIMD", "SIMD"},
+      {"std::simd::SIMD", "SIMD"},
       {"std::collections::string::string::String", "String"},
       {"std::builtin::uint::UInt", "UInt"},
   };

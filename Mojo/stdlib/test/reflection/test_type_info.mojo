@@ -128,7 +128,7 @@ def test_get_type_name() raises:
     assert_equal(name, "SIMD[DType.int, 1]")
 
     name = reflect[Int].name[qualified_builtins=True]()
-    assert_equal(name, "std.builtin.simd.SIMD[std.builtin.dtype.DType.int, 1]")
+    assert_equal(name, "std.simd.SIMD[std.builtin.dtype.DType.int, 1]")
 
 
 def test_get_type_name_nested() raises:
@@ -144,9 +144,7 @@ def test_get_type_name_simd() raises:
     assert_equal(name, "SIMD[DType.float32, 1]")
 
     name = reflect[SIMD[.uint16, 4]].name[qualified_builtins=True]()
-    assert_equal(
-        name, "std.builtin.simd.SIMD[std.builtin.dtype.DType.uint16, 4]"
-    )
+    assert_equal(name, "std.simd.SIMD[std.builtin.dtype.DType.uint16, 4]")
 
 
 @fieldwise_init

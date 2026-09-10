@@ -37,7 +37,7 @@ from std.sys.info import _is_sm_9x_or_newer, is_32bit
 from std.algorithm import vectorize
 from std.bit import count_trailing_zeros
 from std.builtin.dtype import _integral_type_of
-from std.builtin.simd import _modf, _simd_apply
+from std.simd import _modf, _simd_apply
 from std.collections import Span
 from . import pi, inf, isfinite, isinf, isnan, nan, nextafter
 

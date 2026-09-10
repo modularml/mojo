@@ -14,7 +14,7 @@
 
 from . import Strategy
 from std.testing.prop.random import Rng
-from std.builtin.simd import SIMD
+from std.simd import SIMD
 from std.collections import List
 
 

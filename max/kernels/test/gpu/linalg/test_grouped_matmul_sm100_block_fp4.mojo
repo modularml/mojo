@@ -42,7 +42,7 @@ from linalg.fp4_utils import (
     set_scale_factor,
 )
 from std.random import random_ui64, seed, rand
-from std.builtin.simd import (
+from std.simd import (
     _convert_f32_to_float8_scalar,
     _convert_f32_to_float8_ue8m0,
 )

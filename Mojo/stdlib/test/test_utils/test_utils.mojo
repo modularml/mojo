@@ -14,7 +14,7 @@
 
 from std.ffi import external_call
 
-from std.builtin.simd import _simd_apply
+from std.simd import _simd_apply
 from std.testing import assert_equal, assert_true
 
 

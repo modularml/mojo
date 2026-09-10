@@ -170,6 +170,11 @@ This version is still a work in progress.
 
 ## Library changes
 
+- The `simd` module has moved from `std.builtin` to the top level of `std`, so
+  `SIMD` and its aliases now live in [`std.simd`](/docs/std/simd/). Nothing
+  changes for code that relies on the prelude; an explicit
+  `from std.builtin.simd import ...` becomes `from std.simd import ...`.
+
 - `CStringSlice` has been renamed to `CStringSpan`, matching the `Span`-based
   naming of the other non-owning view types (`StringSpan`, `Span`). The old
   `CStringSlice` name remains available as a compatibility alias. Likewise,

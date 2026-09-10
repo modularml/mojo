@@ -37,7 +37,7 @@ from max.gpu.host import DeviceContext
 from std.memory import alloc
 from std.memory.unsafe import bitcast
 from std.random import random_ui64, seed, rand
-from std.builtin.simd import _convert_f32_to_float8_scalar
+from std.simd import _convert_f32_to_float8_scalar
 from max.gpu import (
     MAX_THREADS_PER_BLOCK_METADATA,
     WARP_SIZE,

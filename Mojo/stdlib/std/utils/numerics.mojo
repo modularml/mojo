@@ -24,7 +24,7 @@ from std.sys._assembly import inlined_assembly
 from std.ffi import _external_call_const
 
 from std.builtin.dtype import _integral_type_of, _unsigned_integral_type_of
-from std.builtin.simd import _simd_apply
+from std.simd import _simd_apply
 from std.memory import bitcast
 
 # ===----------------------------------------------------------------------=== #
