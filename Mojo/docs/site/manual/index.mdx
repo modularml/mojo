@@ -4,51 +4,101 @@ sidebar_label: "The Mojo Manual"
 description: A comprehensive guide to the Mojo programming language.
 ---
 
-Welcome to the Mojo Manual, your guide to the Mojo🔥 programming language.
-From getting started to advanced systems programming topics, the Mojo Manual
-helps you write high-performance Mojo code for CPUs and GPUs.
+Welcome to the Mojo Manual, the authoritative learning path for Mojo.
 
-If you see anything that can be improved, please
-[file an issue](https://github.com/modular/modular/issues/new?assignees=&labels=documentation%2Cmodular-repo%2Cmojo&projects=&template=doc_issue.yaml&title=%5BDocs%5D)
-or send a pull request for the
-[docs on GitHub](https://github.com/modular/modular/tree/main/Mojo/docs).
+Mojo is the systems language for the AI era. It's a general-purpose
+language for building the software that makes that world work: from
+libraries and runtimes to databases, compilers, robotics, high-performance
+computing, simulation, and systems that reach across hardware types. It's
+built for a world of heterogeneous hardware and increasingly specialized
+compute.
 
-## Get started
+This manual is for developers and researchers who know how to program and
+want to build those systems. You don't need experience with any particular
+language. Bring your programming experience, your problem domain, and your
+goals. This manual provides the path into Mojo.
 
-import ListingCard from '@site/src/components/Listing/ListingCard';
-import ListingCards from '@site/src/components/Listing/ListingCards';
+## What you'll find here
 
-<ListingCards>
-  <ListingCard title="Quickstart"
-    url="/docs/manual/quickstart/"
-    description="Install Mojo and get started with a quick hands-on overview of Mojo" />
-  <ListingCard title="Get started with Mojo"
-    url="/docs/manual/get-started/"
-    description="Learn the language basics by building a complete Mojo program" />
-  <ListingCard title="Get started with GPU programming"
-    url="https://max.modular.com/gpu/intro-tutorial/"
-    description="Learn the basics of GPU programming with Mojo" />
-</ListingCards>
+The Mojo Manual starts with enough of the language to get you working
+quickly, then goes deeper into the ideas that give Mojo its range.
 
-:::tip
+Explore a programming model designed for reuse across types, workloads, and
+hardware. See how compile-time parameters and constraints let one
+abstraction describe whole families of use cases while preserving the
+information needed to specialize each one. Mojo lets you work from
+high-level abstractions down to direct control of values, memory, and
+hardware, depending on what your problem demands.
 
-**Tip:** To use AI coding assistants with Mojo, see our guide for
-[using Mojo AI skills](/docs/tools/skills/).
+The path continues into building systems with Mojo, including libraries and
+infrastructure that other developers can build on.
 
-:::
+Mojo is open source under the Apache License v2.0 with LLVM Exceptions.
+There's lots of room to contribute. We welcome collaborators and value our
+community.
 
-## More resources
+## First day? First week? Start here
 
-Learning Mojo? There's more to explore outside the Mojo Manual.
+Ready to write some code? [Quickstart](/docs/manual/quickstart/) gives you
+a fast tour of Mojo syntax and other fundamentals. It gives you just enough
+context that you're ready to start exploring Mojo's conceptual material.
+You can easily finish within 15-30 minutes, or take more time to savor the
+syntax.
 
-<ListingCards>
-  <ListingCard title="Language reference"
-    url="/docs/reference/"
-    description="A concise reference for the Mojo language syntax, keywords, and more" />
-  <ListingCard title="Code examples"
-    url="https://github.com/modular/modular/tree/main/Mojo/examples"
-    description="Browse a wide range of Mojo code examples on GitHub" />
-  <ListingCard title="GPU Puzzles"
-    url="https://puzzles.modular.com/"
-    description="Learn to program GPUs by solving a variety of coding challenges" />
-</ListingCards>
+- Keep the [language reference](/docs/reference/) handy for syntax,
+  keywords, and more.
+- Download [cheat sheets](/docs/reference/cheat-sheets/) for printable
+  reference cards that bring entire concepts together.
+
+For a bigger project, build Conway's Game of Life with the [get started
+tutorial](/docs/manual/get-started). It normally takes about 45-60 minutes.
+[Mojo Quest](https://quest.mojolang.org/) lets you practice Mojo syntax
+with tiny incremental coding challenges.
+
+## Explore the Manual
+
+- [Language basics](/docs/manual/basics/): Learn the core language:
+  functions, variables, types, operators, control flow, error handling,
+  structs, modules, and packages.
+- [Value ownership](/docs/manual/values/ownership/): Understand how Mojo
+  manages values, from value semantics and ownership to lifetimes, origins,
+  and references.
+- [Value lifecycle](/docs/manual/lifecycle/life/): Discover how to create
+  and initialize values, and work with explicit and implicit destruction.
+- [Metaprogramming](/docs/manual/metaprogramming/): Explore Mojo's
+  compile-time model, including compile-time evaluation, parameterization,
+  traits, constraints, materialization, and reflection.
+- [Pointers](/docs/manual/pointers/): Work directly with memory when your
+  program requires it, including Mojo's unsafe pointer types.
+- Advanced functions: Create [closures](/docs/manual/functions/closures/)
+  that capture local state and lightweight anonymous functions with [lambda
+  expressions](/docs/manual/functions/lambda/).
+- Interoperability: Learn how to call external code in
+  [C](/docs/manual/c-ffi/) and [Python](/docs/manual/python/), and work
+  with existing libraries and runtimes.
+- Mojo tools: Set up projects, [compile and target different
+  hardware](/docs/tools/compilation/), [test](/docs/tools/testing/), and
+  [debug](/docs/tools/debugging/) programs, work in
+  [notebooks](/docs/tools/notebooks/), and [package your
+  code](/docs/tools/packaging/).
+
+## Use Mojo with AI coding assistants
+
+Many developers use AI coding assistants. To install the Mojo agent skills
+for up-to-date information about the rapidly evolving language, use:
+
+```bash
+npx skills add modular/skills
+```
+
+This installs all [Mojo agent skills](/docs/tools/skills/), including the
+`mojo-syntax` skill, which stays current with the latest nightly language
+release.
+
+## Explore further
+
+- Look up APIs in the [Standard Library](/docs/std/).
+- Ask questions and connect with other Mojo developers on the [Discourse
+  forums](https://forum.modular.com/docs/community) and
+  [Discord](https://discord.com/invite/modular).
+- Follow Mojo development on the [Mojo Blog](https://www.modular.com/blog).
