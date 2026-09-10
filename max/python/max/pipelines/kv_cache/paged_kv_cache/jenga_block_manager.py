@@ -104,6 +104,25 @@ def create_kv_group_coordinator(
     )
 
 
+def _leaf_ids_by_group_id(
+    leaf_infos: Mapping[str, KVLeafInfo],
+) -> dict[KVCacheGroupId, list[str]]:
+    """Returns each group's leaf ids, in first-appearance order.
+
+    The order must not vary with the run's hash seed, hence the dict rather
+    than a set.
+    """
+    group_ids = dict.fromkeys(leaf.group_id for leaf in leaf_infos.values())
+    return {
+        group_id: [
+            leaf_id
+            for leaf_id, leaf in leaf_infos.items()
+            if leaf.group_id == group_id
+        ]
+        for group_id in group_ids
+    }
+
+
 @dataclass(frozen=True)
 class KVLeafInfo:
     """How one cache tiles a huge block, and which group it belongs to.
@@ -169,25 +188,15 @@ class JengaBlockManager:
         ]
 
         self._leaves = dict(leaves)
+        self._leaf_ids = list(leaf_infos)
 
-        # Deduplicate in first-appearance order rather than through a set:
-        # groups are claimed and scanned in this order, so a set would make
-        # which cache gets which page depend on the run's hash seed.
-        group_ids = dict.fromkeys(
-            leaf.group_id for leaf in self._leaves.values()
-        )
         self._groups: dict[KVCacheGroupId, KVGroupCoordinatorInterface] = {
             group_id: create_kv_group_coordinator(
-                self.pools,
-                [
-                    leaf.leaf_id
-                    for leaf in self._leaves.values()
-                    if leaf.group_id == group_id
-                ],
-                group_id,
-                self._block_size,
+                self.pools, group_leaves, group_id, self._block_size
             )
-            for group_id in group_ids
+            for group_id, group_leaves in _leaf_ids_by_group_id(
+                leaf_infos
+            ).items()
         }
 
         self._req_to_hashes: dict[RequestID, list[bytes]] = {}
@@ -366,18 +375,18 @@ class JengaBlockManager:
         pool = self.pools[replica_idx]
         for hashes in self._pending_offloads[replica_idx]:
             src: dict[str, list[LittleKVCacheBlock]] = {
-                leaf_id: [] for leaf_id in self._leaves
+                leaf_id: [] for leaf_id in self._leaf_ids
             }
             block_hashes: list[bytes] = []
             for block_hash in hashes:
                 if any(
                     block_hash not in pool.prefix_caches[leaf_id]
-                    for leaf_id in self._leaves
+                    for leaf_id in self._leaf_ids
                 ):
                     # Evicted from at least one leaf since it was committed, so
                     # the row is no longer whole: truncate the run here.
                     break
-                for leaf_id in self._leaves:
+                for leaf_id in self._leaf_ids:
                     block = pool.prefix_caches[leaf_id][block_hash]
                     src[leaf_id].append(block)
                 block_hashes.append(block_hash)
@@ -464,10 +473,10 @@ class JengaBlockManager:
         """
         connector = self._connector
         empty: dict[str, list[LittleKVCacheBlock]] = {
-            leaf_id: [] for leaf_id in self._leaves
+            leaf_id: [] for leaf_id in self._leaf_ids
         }
         if connector is None or not desired:
-            return 0, empty, CompletedTransfer.load(list(self._leaves))
+            return 0, empty, CompletedTransfer.load(self._leaf_ids)
 
         pool = self.pools[replica_idx]
 
@@ -482,7 +491,7 @@ class JengaBlockManager:
         # this request. Return zero connector cache hits and let the caller raise
         # InsufficientBlocksError after releasing all resources owned by this request.
         if not pool.can_satisfy_demand(num_blocks_needed):
-            return 0, empty, CompletedTransfer.load(list(self._leaves))
+            return 0, empty, CompletedTransfer.load(self._leaf_ids)
 
         staging_blocks = {
             leaf_id: [pool.alloc_block(leaf_id) for _ in range(num_blocks)]
@@ -511,7 +520,7 @@ class JengaBlockManager:
         num_loaded = unique_num_loaded.pop()
 
         # Give the surplus blocks back.
-        for leaf_id in self._leaves:
+        for leaf_id in self._leaf_ids:
             all_bids = {b.bid for b in staging_blocks[leaf_id]}
             loaded_bids = {bid for bid in event.g0_blocks_per_leaf[leaf_id]}
             unused = all_bids - loaded_bids
@@ -520,7 +529,7 @@ class JengaBlockManager:
                 pool.free_block(block)
 
         if num_loaded == 0:
-            return 0, empty, CompletedTransfer.load(list(self._leaves))
+            return 0, empty, CompletedTransfer.load(self._leaf_ids)
 
         logger.debug(
             f"KVConnector loaded {num_loaded} / {len(desired)} hashes. Blocks: {event.g0_blocks_per_leaf}"
@@ -654,14 +663,9 @@ class JengaBlockManager:
         """
         self._replica_of(ctx)
         return {
-            leaf_id: [
-                block.bid
-                for block in self._groups[leaf.group_id].blocks_of(
-                    ctx.request_id
-                )[leaf_id]
-            ]
-            for leaf_id, leaf in self._leaves.items()
-            if leaf.group_id in self._groups
+            leaf_id: [block.bid for block in blocks]
+            for group in self._groups.values()
+            for leaf_id, blocks in group.blocks_of(ctx.request_id).items()
         }
 
     def get_req_blocks(self, ctx: TextContext) -> list[int]:
@@ -691,7 +695,7 @@ class JengaBlockManager:
                 free=pool.num_free_blocks(leaf_id),
                 total=total_huge_blocks * pool.cache_ratios[leaf_id],
             )
-            for leaf_id in self._leaves
+            for leaf_id in self._leaf_ids
         }
 
     # ============================================================================
@@ -777,7 +781,7 @@ class JengaBlockManager:
             The caller splices the pages onto the request.
         """
         if self._only_use_kv_connector_last_level_cache:
-            return {leaf_id: [] for leaf_id in self._leaves}, 0
+            return {leaf_id: [] for leaf_id in self._leaf_ids}, 0
 
         num_hit_blocks = self._find_longest_device_prefix_cache_hit(
             desired_hashes, replica_idx, self._cross_replica_copy_enabled
@@ -918,7 +922,7 @@ class JengaBlockManager:
         """
         # Only try to reuse blocks if the ctx is fresh (ie: no tokens are processed)
         if not self._enable_prefix_caching or ctx.tokens.processed_length != 0:
-            return CompletedTransfer.load(list(self._leaves))
+            return CompletedTransfer.load(self._leaf_ids)
 
         self._compute_hashes_for_request(ctx)
 
