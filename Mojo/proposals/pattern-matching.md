@@ -370,6 +370,9 @@ forms to follow Python's precedent:
         print(x_value, y_value)
     ```
 
+    Each element of the pattern must be a keyword argument denoting a valid
+    field name of the struct. Field names may be omitted but not duplicated.
+
 7. **Mapping patterns** match particular keys and decompose their values:
 
     ```mojo

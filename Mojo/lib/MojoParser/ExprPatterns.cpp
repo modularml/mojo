@@ -623,50 +623,35 @@ CValue CallNode::emitMatch(IREmitter &emitter, CValue subject,
   };
   SmallVector<FieldPattern, 8> fieldPatterns;
   llvm::SmallPtrSet<Attribute, 8> seenFields;
-  unsigned nextPositional = 0;
 
   for (const Operand &operand : operands) {
-    if (operand.unpackStyle != ArgUnpackStyle::kPositional &&
-        operand.unpackStyle != ArgUnpackStyle::kKeyword) {
-      emitter.emitError(operand.getLoc(),
-                        "struct patterns do not support unpacked arguments")
+    if (!operand.isKeyword()) {
+      emitter.emitError(
+          operand.getLoc(),
+          "struct patterns do not support positional or unpacked arguments")
           << operand.expr->getRange();
       return {};
     }
 
-    StructFieldOp fieldOp;
-    StringAttr fieldName;
-    if (operand.isKeyword()) {
-      fieldName = operand.name;
-      LookupResult lookup = emitter.shared.lookupAndResolveDecl(
-          fieldName.getValue(), operand.getLoc(), *typeDecl,
-          /*searchParentScopes=*/false);
-      if (lookup.isErroneous())
-        return {};
-      if (!lookup.isSuccess() || lookup.getIfSuccess().size() != 1) {
-        emitter.emitError(operand.getLoc(), "'")
-            << fieldName.getValue() << "' is not a field of " << subjectType
-            << operand.expr->getRange();
-        return {};
-      }
-      fieldOp = dyn_cast_or_null<StructFieldOp>(
-          lookup.getIfSuccess().front()->getIfOperation());
-      if (!fieldOp) {
-        emitter.emitError(operand.getLoc(), "'")
-            << fieldName.getValue() << "' is not a stored field of "
-            << subjectType << operand.expr->getRange();
-        return {};
-      }
-    } else {
-      if (nextPositional >= storedFields.size()) {
-        emitter.emitError(operand.getLoc(),
-                          "too many positional subpatterns for ")
-            << subjectType << " which has " << storedFields.size() << " field"
-            << plural(storedFields.size()) << operand.expr->getRange();
-        return {};
-      }
-      fieldOp = storedFields[nextPositional++];
-      fieldName = fieldOp.getNameAttr();
+    StringAttr fieldName = operand.name;
+    LookupResult lookup = emitter.shared.lookupAndResolveDecl(
+        fieldName.getValue(), operand.getLoc(), *typeDecl,
+        /*searchParentScopes=*/false);
+    if (lookup.isErroneous())
+      return {};
+    if (!lookup.isSuccess() || lookup.getIfSuccess().size() != 1) {
+      emitter.emitError(operand.getLoc(), "'")
+          << fieldName.getValue() << "' is not a field of " << subjectType
+          << operand.expr->getRange();
+      return {};
+    }
+    auto fieldOp = dyn_cast_or_null<StructFieldOp>(
+        lookup.getIfSuccess().front()->getIfOperation());
+    if (!fieldOp) {
+      emitter.emitError(operand.getLoc(), "'")
+          << fieldName.getValue() << "' is not a stored field of "
+          << subjectType << operand.expr->getRange();
+      return {};
     }
 
     if (!seenFields.insert(fieldName).second) {

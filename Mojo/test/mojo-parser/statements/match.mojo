@@ -527,15 +527,6 @@ def match_vec3(v: Vec3):
         _ = x
         case_callee[1]()
 
-    # Positional subpatterns bind stored fields in declaration order.
-    # CHECK:       lit.var.decl "x" var
-    # CHECK:       lit.var.decl "y" var
-    # CHECK:       lit.var.decl "z" var
-    __match v:
-    case var Vec3(x, y, z):
-        _ = x + y + z
-        case_callee[2]()
-
 
 # CHECK-LABEL: lit.fn @"match_optional
 def match_optional(opt: Optional[Int], mut mut_opt: Optional[Int]):
