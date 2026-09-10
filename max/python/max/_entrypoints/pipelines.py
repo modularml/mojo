@@ -596,7 +596,16 @@ def cli_warm_cache(target: str | None, **config_kwargs) -> None:
         )
 
     pipeline_args = PipelineArgs.from_flat_kwargs(**config_kwargs)
-    PIPELINE_REGISTRY.retrieve(PipelineConfig.from_args(pipeline_args))
+    pipeline_config = PipelineConfig.from_args(pipeline_args)
+    # Resolve the task rather than taking `retrieve`'s text-generation default,
+    # which sends a diffusion pipeline down a branch that reads the main
+    # model's HuggingFace config. Diffusion pipelines have no "main" model, so
+    # warming their cache failed before compiling anything. Architectures
+    # serving several tasks still resolve to text generation.
+    task = PIPELINE_REGISTRY.retrieve_pipeline_task(
+        pipeline_config.models.main_architecture_name
+    )
+    PIPELINE_REGISTRY.retrieve(pipeline_config, task=task)
 
 
 def _render_warm_progress(

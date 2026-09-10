@@ -23,6 +23,7 @@ modular_py_test(
         "//max/python/max/experimental/torch",
         "//max/python/max/nn",
         "//max/python/max/graph",
+        "//max/python/max/pipelines",
         "//max/python/max/pipelines/architectures",
         "//max/python/max/pipelines/architectures/deepseekV3_modulev3",
         "//max/python/max/pipelines/architectures/eagle_common",
