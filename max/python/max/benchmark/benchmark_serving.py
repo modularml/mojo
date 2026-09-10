@@ -1053,20 +1053,34 @@ def _session_sort_key(sid: str) -> tuple[int, int, str]:
         return (1, 0, sid)
 
 
+_PATH_SUPPORTING_WORKLOAD_KEYS = (
+    "dataset-path",
+    "output-lengths",
+    "extra-body",
+)
+"""Workload keys whose value may name a file rather than hold content."""
+
+
 def _load_workload_yaml(args: ServingBenchmarkConfig) -> None:
     if not args.workload_config:
         return
     with open(args.workload_config) as workload_file:
         workload = yaml.safe_load(workload_file)
     # Resolve relative paths against the YAML's directory.
-    for key in ("dataset-path", "output-lengths"):
-        if workload.get(key) is not None:
-            if is_castable_to_int(str(workload[key])):
-                continue
-            path = Path(os.path.expandvars(workload[key]))
-            if not path.is_absolute():
-                path = Path(args.workload_config).parent / path
-            workload[key] = path
+    for key in _PATH_SUPPORTING_WORKLOAD_KEYS:
+        value = workload.get(key)
+        # A key may hold the value itself -- a mapping, or inline JSON --
+        # rather than a path to it.
+        if (
+            not isinstance(value, str)
+            or value.lstrip().startswith("{")
+            or is_castable_to_int(value)
+        ):
+            continue
+        path = Path(os.path.expandvars(value))
+        if not path.is_absolute():
+            path = Path(args.workload_config).parent / path
+        workload[key] = path
     # Resolve max_concurrency: CLI > YAML.
     yaml_max_concurrency = workload.pop("max-concurrency", None)
     if (

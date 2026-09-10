@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 import yaml
 from max.benchmark.benchmark_serving import (
+    _load_workload_yaml,
     _resolve_seed,
     main_with_parsed_args,
     parse_args,
@@ -453,6 +454,33 @@ class TestExtraBodyValidator:
         """A path that does not exist surfaces a clear, dual-cause error."""
         with pytest.raises(ValueError, match="not a readable file path"):
             self._build_with_extra("/nonexistent/payload.yaml")
+
+    def test_file_beside_a_workload_resolves(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A path in a workload YAML is relative to that file, not to cwd."""
+        _write_yaml(tmp_path / "payload.yaml", self._NESTED)
+        workload = tmp_path / "workload.yaml"
+        workload.write_text("extra-body: payload.yaml\nnum-prompts: 4\n")
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+
+        args = ServingBenchmarkConfig(model="m", workload_config=str(workload))
+        _load_workload_yaml(args)
+        assert args.extra_body == self._NESTED
+
+    def test_inline_json_in_a_workload_is_not_a_path(
+        self, tmp_path: Path
+    ) -> None:
+        """Path resolution must not touch a value that is the content itself."""
+        workload = tmp_path / "workload.yaml"
+        workload.write_text(
+            f"extra-body: '{json.dumps(self._NESTED)}'\nnum-prompts: 4\n"
+        )
+        args = ServingBenchmarkConfig(model="m", workload_config=str(workload))
+        _load_workload_yaml(args)
+        assert args.extra_body == self._NESTED
 
 
 # ---------------------------------------------------------------------------
