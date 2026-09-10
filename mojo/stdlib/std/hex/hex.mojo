@@ -61,8 +61,16 @@ def hex_encode(input_bytes: Span[mut=False, Byte, _]) -> String:
 
 
 @always_inline
-def hex_decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
+def hex_decode[
+    *,
+    is_lowercase: Bool = True
+](str: StringSlice[mut=False, _]) raises -> List[Byte]:
     """Performs hex decoding on the input string.
+
+    Parameters:
+        is_lowercase: Whether `str` uses lowercase (`a`-`f`) hex digits,
+            or uppercase (`A`-`F`) if `False`; raises if it uses the other
+            case.
 
     Args:
         str: A hex encoded string.
@@ -75,18 +83,23 @@ def hex_decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
     """
 
     var result = List[Byte](length=str.byte_length() // 2, fill=0)
-    hex_decode(str, result)
+    hex_decode[is_lowercase=is_lowercase](str, result)
     return result^
 
 
 @always_inline
 def hex_decode[
-    length: Int
+    length: Int,
+    *,
+    is_lowercase: Bool = True
 ](str: StringSlice[mut=False, _]) raises -> Array[Byte, length]:
     """Performs hex decoding on the input string.
 
     Parameters:
         length: Resulting fixed-sized array length.
+        is_lowercase: Whether `str` uses lowercase (`a`-`f`) hex digits,
+            or uppercase (`A`-`F`) if `False`; raises if it uses the other
+            case.
 
     Args:
         str: A hex encoded string.
@@ -99,15 +112,23 @@ def hex_decode[
     """
 
     var result = Array[Byte, length](uninitialized=True)
-    hex_decode(str, result)
+    hex_decode[is_lowercase=is_lowercase](str, result)
     return result^
 
 
 @always_inline
-def hex_decode(
+def hex_decode[
+    *,
+    is_lowercase: Bool = True
+](
     str: StringSlice[mut=False, _], result: Span[mut=True, Byte, _]
 ) raises:
     """Performs hex decoding on the input string.
+
+    Parameters:
+        is_lowercase: Whether `str` uses lowercase (`a`-`f`) hex digits,
+            or uppercase (`A`-`F`) if `False`; raises if it uses the other
+            case.
 
     Args:
         str: A hex encoded string.
@@ -128,20 +149,24 @@ def hex_decode(
     for i in range(len(result)):
         var hi = ptr[unsafe_offset=2 * i]
         var lo = ptr[unsafe_offset=2 * i + 1]
-        result[i] = _decode_hex_byte(hi, lo, 2 * i)
+        result[i] = _decode_hex_byte[is_lowercase](hi, lo, 2 * i)
 
 
 @always_inline
-def _decode_hex_byte(hi: Byte, lo: Byte, pos: Int) raises -> Byte:
-    return (_nibble(hi, pos) << 4) | _nibble(lo, pos + 1)
+def _decode_hex_byte[
+    is_lowercase: Bool
+](hi: Byte, lo: Byte, pos: Int) raises -> Byte:
+    return (_nibble[is_lowercase](hi, pos) << 4) | _nibble[is_lowercase](lo, pos + 1)
 
 
 @always_inline
-def _nibble(c: Byte, pos: Int) raises -> Byte:
+def _nibble[is_lowercase: Bool](c: Byte, pos: Int) raises -> Byte:
     if c >= 48 and c <= 57:
         return c - 48
-    if c >= 97 and c <= 102:
-        return c - 87
-    if c >= 65 and c <= 70:
-        return c - 55
+    comptime if is_lowercase:
+        if c >= 97 and c <= 102:
+            return c - 87
+    else:
+        if c >= 65 and c <= 70:
+            return c - 55
     raise Error("ValueError: Invalid hex character at position {}".format(pos))
