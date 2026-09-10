@@ -1269,7 +1269,8 @@ struct List[T: AnyType, /](
             With no new value provided, the new length must be smaller than or
             equal to the current one. Elements at the end are discarded.
 
-            Calls abort() if the new length is larger than the current length.
+            Calls abort() if the new length is larger than the current length,
+            or if the new length is negative.
 
         Examples:
 
@@ -1285,6 +1286,13 @@ struct List[T: AnyType, /](
                 " current size. If you want to make the List bigger, provide a"
                 " value to fill the new slots with. If not, make sure the new"
                 " size is smaller than the current size."
+            )
+
+        if new_length < 0:
+            abort(
+                t"You are calling List.shrink with a negative value:"
+                t" {new_length}. The new size must be in the range [0,"
+                t" {len(self)}]."
             )
 
         unsafe_destroy_n(
