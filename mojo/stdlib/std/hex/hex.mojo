@@ -19,12 +19,20 @@ from std.hex import hex_encode, hex_decode
 ```
 """
 
-comptime _HEX_CHARS: StaticString = "0123456789abcdef"
+comptime _HEX_CHARS_LOWER: StaticString = "0123456789abcdef"
+comptime _HEX_CHARS_UPPER: StaticString = "0123456789ABCDEF"
 
 
 @always_inline
-def hex_encode(input_bytes: Span[mut=False, Byte, _], mut result: String):
+def hex_encode[
+    *,
+    is_lowercase: Bool = True
+](input_bytes: Span[mut=False, Byte, _], mut result: String):
     """Performs hex encoding on the input bytes.
+
+    Parameters:
+        is_lowercase: Whether to emit lowercase (`a`-`f`) hex digits, or
+            uppercase (`A`-`F`) if `False`.
 
     Args:
         input_bytes: The input bytes buffer.
@@ -35,10 +43,14 @@ def hex_encode(input_bytes: Span[mut=False, Byte, _], mut result: String):
         capacity string.
     """
 
+    comptime hex_chars_str: StaticString = (
+        _HEX_CHARS_LOWER if is_lowercase else _HEX_CHARS_UPPER
+    )
+
     result.resize(len(input_bytes) * 2)
 
     var dest = result.unsafe_ptr_mut()
-    var hex_chars = _HEX_CHARS.unsafe_ptr()
+    var hex_chars = hex_chars_str.unsafe_ptr()
     for i in range(len(input_bytes)):
         var b = Int(input_bytes[i])
         dest[unsafe_offset=2 * i] = hex_chars[unsafe_offset=b >> 4]
@@ -46,8 +58,15 @@ def hex_encode(input_bytes: Span[mut=False, Byte, _], mut result: String):
 
 
 @always_inline
-def hex_encode(input_bytes: Span[mut=False, Byte, _]) -> String:
+def hex_encode[
+    *,
+    is_lowercase: Bool = True
+](input_bytes: Span[mut=False, Byte, _]) -> String:
     """Performs hex encoding on the input bytes.
+
+    Parameters:
+        is_lowercase: Whether to emit lowercase (`a`-`f`) hex digits, or
+            uppercase (`A`-`F`) if `False`.
 
     Args:
         input_bytes: The input bytes buffer.
@@ -56,7 +75,7 @@ def hex_encode(input_bytes: Span[mut=False, Byte, _]) -> String:
         The ASCII hex encoded string.
     """
     var result = String()
-    hex_encode(input_bytes, result)
+    hex_encode[is_lowercase=is_lowercase](input_bytes, result)
     return result^
 
 

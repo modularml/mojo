@@ -29,6 +29,8 @@ def test_hex_encode() raises:
         0xFF,
     ]
     assert_equal(hex_encode(random_bytes[:]), "012356789abcdeff")
+    assert_equal(hex_encode[is_lowercase=True](random_bytes[:]), "012356789abcdeff")
+    assert_equal(hex_encode[is_lowercase=False](random_bytes[:]), "012356789ABCDEFF")
 
 
 def test_hex_decode() raises:
