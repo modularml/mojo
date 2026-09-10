@@ -55,6 +55,7 @@
         "serve/prefix-caching",
         "serve/lora-adapters",
         "serve/speculative-decoding",
+        "serve/parallelism",
         "serve/recipes",
         "serve/metrics"
       ]
