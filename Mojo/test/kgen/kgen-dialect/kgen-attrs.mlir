@@ -651,3 +651,13 @@ kgen.param.assert <rebind(:i73 rebind(:i53 42))>, "rebind must fold"
   // CHECK: f = #kgen.param.expr<floor_div_s, #kgen<simd 9223372036854775807>
   f = #kgen.param.expr<floor_div_s,  #kgen.simd<9223372036854775807> : !kgen.scalar<index>, #kgen.simd<-3> : !kgen.scalar<index>> : !kgen.scalar<index>
 } : () -> ()
+
+// `opaque_plugin` itself round-trips in Support/test/m-ir/m-attrs.mlir; what
+// matters here is that a KGEN param value survives the `#kgen.target` spelling,
+// which wraps TargetInfoAttr rather than printing it directly.
+"some.op"() {
+  // CHECK: a = #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128> : !kgen.target
+  a = #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128> : !kgen.target,
+  // CHECK-SAME: b = #kgen.target<triple = "unknown", arch = "", opaque_plugin = #kgen.param_list<index, struct<(index)>> : !kgen.param_list<type>, simd_bit_width = 128> : !kgen.target
+  b = #kgen.target<triple = "unknown", arch = "", simd_bit_width = 128, opaque_plugin = #kgen.param_list<index, !kgen.struct<(index)>> : !kgen.param_list<!kgen.type>> : !kgen.target
+} : () -> ()

@@ -1989,8 +1989,12 @@ void TargetParamAttr::print(AsmPrinter &p) const { getTarget().print(p); }
 
 Type TargetParamAttr::getType() const { return TargetType::get(getContext()); }
 
-/// Always a constant.
-bool TargetParamAttr::isConstant() const { return true; }
+/// A target is a constant unless its opaque plugin payload carries an
+/// unevaluated parameter expression.
+bool TargetParamAttr::isConstant() const {
+  Attribute plugin = getTarget().getOpaquePlugin();
+  return !plugin || ParameterAttr::isSimpleConstant(plugin);
+}
 
 //===----------------------------------------------------------------------===//
 // StructAttr

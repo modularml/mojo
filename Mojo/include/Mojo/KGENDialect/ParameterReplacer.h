@@ -64,8 +64,8 @@ protected:
               FloatType>(value))
         return value;
     } else {
-      if (isa<NoneAttr, IntegerAttr, FloatAttr, DTypeConstantAttr,
-              TargetParamAttr, MLIROpAttr>(value))
+      if (isa<NoneAttr, IntegerAttr, FloatAttr, DTypeConstantAttr, MLIROpAttr>(
+              value))
         return value;
     }
 
