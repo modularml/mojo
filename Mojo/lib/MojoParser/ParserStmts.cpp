@@ -1564,8 +1564,9 @@ static SRValue emitMatchCasePredicate(StmtParser &parser,
                                       const MatchCaseEntry &caseEntry,
                                       BValue subjectBVal) {
   IREmitter emitter = parser.getEmitter();
-  CValue condCVal = caseEntry.patternExpr->emitMatch(emitter, subjectBVal,
-                                                     PatternDeclKind::kBind);
+  SmallVector<ExprNode::BoundName> bindings;
+  CValue condCVal = caseEntry.patternExpr->emitMatch(
+      emitter, subjectBVal, PatternDeclKind::kBind, bindings);
 
   // If a guard predicate is present, AND it with the pattern predicate.
   // Always evaluate the guard even when the pattern is known-false so
