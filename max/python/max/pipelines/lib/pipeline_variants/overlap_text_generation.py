@@ -400,6 +400,7 @@ def _should_verify_drafts(
             ctx.matcher is not None
             or ctx.grammar is not None
             or ctx.json_schema is not None
+            or getattr(ctx, "needs_vision_encoding", False)
         ):
             return False
         has_decode_row = has_decode_row or ctx.tokens.generated_length > 0

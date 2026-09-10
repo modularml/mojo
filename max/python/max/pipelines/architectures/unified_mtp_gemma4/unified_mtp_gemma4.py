@@ -38,8 +38,14 @@ from max.nn.transformer import ReturnHiddenStates, ReturnLogits
 from max.pipelines.kv_cache.paged_kv_cache.increment_cache_lengths import (
     increment_cache_lengths_from_counts,
 )
-from max.pipelines.speculative.config import SpeculativeConfig
-from max.pipelines.speculative.ragged_token_merger import RaggedTokenMerger
+from max.pipelines.speculative.config import (
+    MAGIC_DRAFT_TOKEN_ID,
+    SpeculativeConfig,
+)
+from max.pipelines.speculative.ragged_token_merger import (
+    RaggedTokenMerger,
+    _shape_to_scalar,
+)
 from max.pipelines.speculative.spec_input_types import (
     SpecDecodeInputTypeSpec,
     build_spec_decode_input_types,
@@ -218,6 +224,51 @@ class UnifiedMTPGemma4(Module):
                     in_thinking_phase=in_thinking_phase,
                     token_bitmasks=effective_bitmasks,
                 )
+            )
+
+            num_steps_u32 = _shape_to_scalar(
+                draft_tokens.shape[1], device0, dtype=DType.uint32
+            )
+            zero_u32 = ops.constant(0, DType.uint32, device=device0)
+            is_prefill = (num_steps_u32 == zero_u32).broadcast_to(
+                ["batch_size"]
+            )
+            magic_token = ops.constant(
+                MAGIC_DRAFT_TOKEN_ID, DType.int64, device=device0
+            )
+            padded_drafts = ops.concat(
+                [draft_tokens, magic_token.broadcast_to(["batch_size", 1])],
+                axis=1,
+            )
+            num_magic_tokens = ops.squeeze(
+                ops.sum(
+                    (padded_drafts == magic_token).cast(DType.int32), axis=-1
+                ),
+                axis=-1,
+            )
+            num_steps_plus_one_i32 = _shape_to_scalar(
+                draft_tokens.shape[1], device0, dtype=DType.int32
+            ) + ops.constant(1, DType.int32, device=device0)
+            is_dummy_draft = (
+                num_magic_tokens
+                == num_steps_plus_one_i32.broadcast_to(["batch_size"])
+            )
+            zero_accepted = ops.constant(
+                0, num_accepted_draft_tokens.dtype, device=device0
+            ).broadcast_to(["batch_size"])
+            num_accepted_draft_tokens = ops.where(
+                is_prefill,
+                zero_accepted,
+                ops.where(
+                    is_dummy_draft, zero_accepted, num_accepted_draft_tokens
+                ),
+            )
+            # Re-pick the committed token at the zeroed index: a dummy row's
+            # next token is the target argmax at its last prompt position.
+            next_tokens = ops.gather_nd(
+                ops.concat([recovered, bonus], axis=1),
+                ops.unsqueeze(num_accepted_draft_tokens, axis=-1),
+                batch_dims=1,
             )
 
         with Graph.current.profile_scope(

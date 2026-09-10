@@ -542,8 +542,9 @@ the [container](/container) page now links to the new page.
   decoding, prefill requests are batched into decode steps (implies in-flight
   batching) and the riding decode rows keep verifying their draft tokens
   instead of advancing one token at a time. Supported by the Gemma 4 DSpark
-  architectures; other architectures fall back to plain in-flight batching, as
-  do batches containing grammar-constrained rows.
+  and MTP architectures; other architectures fall back to plain in-flight
+  batching, as do batches containing grammar-constrained rows or rows with
+  images awaiting vision encoding.
 - `--num-speculative-tokens` is now unset by default, and each speculative
   method resolves its own default: `eagle` and `mtp` keep drafting 2 tokens
   per step, while `dflash`-style block drafters (DFlash, DSpark) derive the

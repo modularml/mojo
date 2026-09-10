@@ -20,7 +20,9 @@ import numpy as np
 import pytest
 from llguidance import LLMatcher
 from max.pipelines.context import (
+    ImageMetadata,
     StructuredOutputRegionDelimiters,
+    TextAndVisionContext,
     TextContext,
     TokenBuffer,
 )
@@ -444,6 +446,25 @@ def _inputs(*contexts: TextContext) -> TextGenerationInputs[TextContext]:
     return TextGenerationInputs(batches=[list(contexts)])
 
 
+def _vision_prefill_ctx() -> TextAndVisionContext:
+    tokens = np.array([51, 52, 53, 54, 98, 98, 98, 98, 59, 60], dtype=np.int64)
+    ctx = TextAndVisionContext(
+        request_id=RequestID(),
+        max_length=1000,
+        tokens=TokenBuffer(tokens),
+        images=[
+            ImageMetadata(
+                start_idx=4,
+                end_idx=8,
+                pixel_values=np.zeros((4, 3), dtype=np.float32),
+            )
+        ],
+        vision_token_ids=[98],
+    )
+    assert ctx.needs_vision_encoding
+    return ctx
+
+
 class TestShouldVerifyDrafts:
     """Batch-level draft-verification gate for the spec-decode path."""
 
@@ -472,6 +493,19 @@ class TestShouldVerifyDrafts:
         # The same batch without the constraint verifies.
         assert _should_verify_drafts(
             _inputs(_prefill_ctx(), _decode_ctx()), allow_mixed_batches=True
+        )
+
+    def test_mixed_batch_with_vision_row_falls_back(self) -> None:
+        # Vision scatter indices are computed against the unmerged token
+        # layout (compute_windowed_merge_indices); a K>0 merge shifts row
+        # starts by +i*K, so a batch with an unencoded-image row keeps the
+        # all-or-nothing path.
+        batch = _inputs(_vision_prefill_ctx(), _decode_ctx())
+        assert not _should_verify_drafts(batch, allow_mixed_batches=True)
+        # A pure decode batch is unaffected by the vision history of its
+        # requests once every image is encoded.
+        assert _should_verify_drafts(
+            _inputs(_decode_ctx(), _decode_ctx()), allow_mixed_batches=True
         )
 
     def test_empty_batch_matches_all_decode_convention(self) -> None:
