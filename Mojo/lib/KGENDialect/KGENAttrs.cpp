@@ -1989,6 +1989,23 @@ void TargetParamAttr::print(AsmPrinter &p) const { getTarget().print(p); }
 
 Type TargetParamAttr::getType() const { return TargetType::get(getContext()); }
 
+//===----------------------------------------------------------------------===//
+// GetTargetPluginAttr
+//===----------------------------------------------------------------------===//
+
+TypedAttr GetTargetPluginAttr::get(TypedAttr target, Type type) {
+  if (auto targetAttr = dyn_cast<TargetParamAttr>(target)) {
+    if (auto plugin = dyn_cast_if_present<TypedAttr>(
+            targetAttr.getTarget().getOpaquePlugin()))
+      if (plugin.getType() == type)
+        return plugin;
+  }
+
+  return Base::get(target.getContext(), target, type);
+}
+
+bool GetTargetPluginAttr::isConstant() const { return false; }
+
 /// A target is a constant unless its opaque plugin payload carries an
 /// unevaluated parameter expression.
 bool TargetParamAttr::isConstant() const {

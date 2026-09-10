@@ -1993,6 +1993,52 @@ def KGEN_TargetParamAttr : KGEN_ExprAttr<"TargetParam", "target"> {
 }
 
 //===----------------------------------------------------------------------===//
+// GetTargetPluginAttr
+//===----------------------------------------------------------------------===//
+
+def KGEN_GetTargetPluginAttr : KGEN_ExprAttr<"GetTargetPlugin",
+    "get_target_plugin"> {
+  let summary = "Get the opaque plugin payload carried by a target.";
+  let description = [{
+    The `#kgen.get_target_plugin` attribute returns the `opaque_plugin` payload
+    of a target if the plugin type matches the requested type.
+
+    Example:
+
+    ```mlir
+    kgen.generator @plugin_for<t0: target>() {
+      kgen.param.constant: !kgen.param_list<!kgen.type> =
+        <#kgen.get_target_plugin<t0> : !kgen.param_list<!kgen.type>>
+      kgen.return
+    }
+    ```
+  }];
+
+  let parameters = (ins
+    "TypedAttr":$target,
+    AttributeSelfTypeParameter<"", "Type">:$type
+  );
+
+  let assemblyFormat = [{
+    `<` custom<ParamValue>($target, "TargetType::get($_ctxt)") `>`
+  }];
+
+  let builders = [
+    // Override the default builder used by the generated parser because this
+    // may not return a GetTargetPluginAttr.
+    AttrBuilderWithInferredContext<(ins
+      "TypedAttr":$target, "Type":$type), "", "TypedAttr">,
+
+    // Verbose form with MLIRContext, needed for ODS constructors.
+    AttrBuilder<(ins "TypedAttr":$target, "Type":$type), [{
+      return get(target, type);
+    }], "TypedAttr">,
+  ];
+
+  let skipDefaultBuilders = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // StructDefFieldAttr
 //===----------------------------------------------------------------------===//
 
