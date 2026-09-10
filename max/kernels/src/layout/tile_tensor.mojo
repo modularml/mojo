@@ -2911,9 +2911,9 @@ struct NullableTileTensor[
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
     *,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
     address_space: AddressSpace = .GENERIC,
     linear_idx_type: DType = _get_index_type[LayoutType](address_space),
-    element_size: Int = 1,
 ](ImplicitlyCopyable, RegisterPassable):
     """A TileTensor variant whose pointer may be absent (null).
 
@@ -2930,9 +2930,11 @@ struct NullableTileTensor[
         LayoutType: A type implementing `TensorLayout` that defines the
             tensor's shape and stride structure.
         origin: The origin of the underlying pointer for lifetime tracking.
+        Engine: A type implementing `TensorEngine` that supplies the storage
+            handle. Defaults to `DefaultEngine[element_width=1]`, a plain
+            `Pointer` handle over non-vectorized elements.
         address_space: Memory address space. Defaults to GENERIC.
         linear_idx_type: Integer type for memory indexing.
-        element_size: The number of scalar elements per logical element.
     """
 
     comptime rank = Self.LayoutType.rank
@@ -2940,6 +2942,9 @@ struct NullableTileTensor[
 
     comptime flat_rank = _Flattened[*Self.LayoutType._shape_types].length
     """The flattened rank."""
+
+    comptime element_size = Self.Engine.element_size
+    """Number of scalar elements per logical element, derived from `Engine`."""
 
     comptime ElementType = SIMD[Self.dtype, Self.element_size]
     """The SIMD type used for element access."""
@@ -2992,8 +2997,10 @@ struct NullableTileTensor[
     ]
     """The non-null pointer type for the underlying data storage."""
 
-    var ptr: Optional[Self.PtrType]
-    """Optional pointer to the tensor's underlying data storage.
+    var _storage: Optional[
+        Self.Engine.StorageType[Self.dtype, Self.origin, Self.address_space]
+    ]
+    """Optional handle to the tensor's underlying data storage.
 
     When `None`, represents a tensor with layout metadata but no backing
     memory (e.g. an output buffer that the callee should allocate).
@@ -3006,6 +3013,7 @@ struct NullableTileTensor[
         Self.dtype,
         Self.LayoutType,
         Self.origin,
+        Engine=Self.Engine,
         address_space=.GENERIC,
         linear_idx_type=Self.linear_idx_type,
     ]
@@ -3023,9 +3031,9 @@ struct NullableTileTensor[
             other.dtype,
             other.LayoutType,
             ImmOrigin(other.origin),
+            Engine=other.Engine,
             address_space=other.address_space,
             linear_idx_type=other.linear_idx_type,
-            element_size=other.element_size,
         ],
     ):
         """Implicitly cast a mutable NullableTileTensor to immutable.
@@ -3033,7 +3041,9 @@ struct NullableTileTensor[
         Args:
             other: The mutable NullableTileTensor to cast from.
         """
-        self.ptr = unsafe_cast[origin=type_of(self).origin](other.ptr)
+        self._storage = other._unsafe_storage_cast[
+            to_origin=type_of(self).origin
+        ]()
         self.layout = other.layout
 
     @always_inline
@@ -3044,9 +3054,9 @@ struct NullableTileTensor[
             other.dtype,
             other.LayoutType,
             other.origin,
+            Engine=other.Engine,
             address_space=other.address_space,
             linear_idx_type=other.linear_idx_type,
-            element_size=other.element_size,
         ],
     ):
         """Implicitly cast a TileTensor to a NullableTileTensor.
@@ -3054,7 +3064,7 @@ struct NullableTileTensor[
         Args:
             other: The TileTensor to cast from.
         """
-        self.ptr = other.ptr
+        self._storage = other._storage
         self.layout = other.layout
 
     @always_inline
@@ -3065,9 +3075,9 @@ struct NullableTileTensor[
             other.dtype,
             other.LayoutType,
             ImmOrigin(other.origin),
+            Engine=other.Engine,
             address_space=other.address_space,
             linear_idx_type=other.linear_idx_type,
-            element_size=other.element_size,
         ],
     ):
         """Implicitly cast a mutable TileTensor to an immutable NullableTileTensor.
@@ -3075,10 +3085,42 @@ struct NullableTileTensor[
         Args:
             other: The mutable TileTensor to cast from.
         """
-        self.ptr = other.ptr.unsafe_mut_cast[
-            type_of(self).mut
-        ]().unsafe_origin_cast[type_of(self).origin]()
+        self._storage = other._unsafe_storage_cast[
+            to_origin=type_of(self).origin
+        ]()
         self.layout = other.layout
+
+    @doc_hidden
+    @always_inline
+    def __getattr_param__[
+        name: StringLiteral
+    ](self, out result: Optional[Self.PtrType],):
+        comptime assert (
+            name == "ptr"
+        ), "NullableTileTensor.__getattr_param__ only support 'ptr'"
+        if not self._storage:
+            result = None
+            return
+        try:
+            result = Self.Engine.unsafe_ptr(self._storage.unsafe_value())
+        except e:
+            abort(t"NullableTileTensor.ptr access not possible: {e}")
+
+    @always_inline("nodebug")
+    def _unsafe_storage_cast[
+        to_mut: Bool = Self.mut,
+        //,
+        to_dtype: DType = Self.dtype,
+        to_origin: Origin[mut=to_mut] = Self.origin.unsafe_mut_cast[to_mut](),
+        to_address_space: AddressSpace = Self.address_space,
+    ](self) -> Optional[
+        Self.Engine.StorageType[to_dtype, to_origin, to_address_space]
+    ]:
+        if not self._storage:
+            return None
+        return Self.Engine.unsafe_cast[to_dtype, to_origin, to_address_space](
+            self._storage.unsafe_value()
+        )
 
     @always_inline
     def value(
@@ -3087,25 +3129,20 @@ struct NullableTileTensor[
         Self.dtype,
         Self.LayoutType,
         Self.origin,
+        Engine=Self.Engine,
         address_space=Self.address_space,
         linear_idx_type=Self.linear_idx_type,
     ]:
-        """Returns a regular TileTensor with the underlying pointer.
+        """Returns a regular TileTensor with the underlying storage handle.
 
-        The caller must ensure the underlying pointer is non-null before
-        calling this method.
+        The caller must ensure the storage handle is present before calling
+        this method.
 
         Returns:
-            A `TileTensor` backed by the stored pointer and layout.
+            A `TileTensor` backed by the stored handle and layout.
         """
-        assert Bool(self.ptr), "TileTensor cannot be null"
-        return TileTensor[
-            Self.dtype,
-            Self.LayoutType,
-            Self.origin,
-            address_space=Self.address_space,
-            linear_idx_type=Self.linear_idx_type,
-        ](self.ptr.unsafe_value(), self.layout)
+        assert Bool(self._storage), "TileTensor cannot be null"
+        return {self._storage.unsafe_value(), self.layout}
 
     # ===------------------------------------------------------------------=== #
     # Layout query methods
@@ -3225,6 +3262,7 @@ comptime _ComptimeConditionalTileTensor[
     origin: Origin[mut=mut],
     *,
     engaged: Bool = False,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
     address_space: AddressSpace = .GENERIC,
     linear_idx_type: DType = _get_index_type[LayoutType](address_space),
 ] = _ComptimeConditional[
@@ -3232,6 +3270,7 @@ comptime _ComptimeConditionalTileTensor[
         dtype,
         LayoutType,
         origin,
+        Engine=Engine,
         address_space=address_space,
         linear_idx_type=linear_idx_type,
     ],
