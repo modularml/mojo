@@ -246,6 +246,24 @@ public:
   /// it. Otherwise return null.
   static RefType getCommonRefType(RefType ref1, RefType ref2);
 
+  /// Merge `thenVal`/`elseVal` across an if-like op (`HLCF::ElifOp` or
+  /// `ParamIfOp`) whose then/else regions already contain the branch
+  /// computations. Produces a single value into `dest` by:
+  ///   1. yielding a unioned MValue when both sides are dominating refs,
+  ///   2. otherwise coercing types and yielding a register-passable SSA value,
+  ///   3. otherwise storing both sides into a scratch buffer and recreating
+  ///      the op without a result.
+  ///
+  /// Branch terminators are chosen from the op kind (`ParamYieldOp` vs
+  /// `HLCF::YieldOp`). Regions are assumed to be unterminated when this is
+  /// called.
+  AnyValue mergeCValuesAcrossIfLikeOp(Operation *ifLikeOp, Location loc,
+                                      SMLoc smLoc, CValue thenVal,
+                                      const ExprNode *thenExpr, CValue elseVal,
+                                      const ExprNode *elseExpr,
+                                      const ExprNode *resultExpr,
+                                      ExprDest &dest);
+
   //===--------------------------------------------------------------------===//
   // Emission helpers for various value classifications.
 
