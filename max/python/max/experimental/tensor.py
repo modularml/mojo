@@ -1742,6 +1742,27 @@ class Tensor(DLPackArray, HasTensorValue):
         assert isinstance(value, graph.TensorValue)
         return value
 
+    def _as_mutable(self) -> Tensor:
+        """Backs this tensor with a buffer holding its value, and returns it.
+
+        A store promotes on its own, so this is only written out where the
+        promotion would land in the wrong graph: an operand's type is the
+        subgraph body's argument type, so a value the body writes has to be
+        a buffer before the call.
+
+        Returns:
+            ``self``, now backed by a buffer. Already a buffer, unchanged.
+        """
+        self._check_not_distributed("_as_mutable")
+        if isinstance(self._backing_value, graph.BufferValue):
+            return self
+        # Copy the value in, so a later read sees the writes.
+        tensor = self.__tensorvalue__()
+        assert self._state is not None
+        self._state.value = buffer = ops.buffer_create(tensor.type.as_buffer())
+        buffer[...] = tensor
+        return self
+
     def __buffervalue__(self) -> graph.BufferValue:
         """Gets a BufferValue for the underlying data.
 
@@ -1749,12 +1770,12 @@ class Tensor(DLPackArray, HasTensorValue):
         the resulting BufferValue is passed into a staged mutating op,
         and the backing data is not accurate until the graph has executed.
 
-        If self is backed by a TensorValue
-            - create a new BufferValue via `ops.buffer_create` and
-            `ops.buffer_store` containing the same data
-            - `self` is updated to be backed by the new BufferValue
-            - further ops on the same tensor will then load from the
-            buffer to ensure proper sequencing with mutation
+        A tensor backed by a value is promoted here: a buffer is created and
+        the value copied in, so a later read sees the writes.
+
+        Raises:
+            TypeError: If self is backed by a graph argument, whose type is
+                already fixed. Stage that argument as a buffer instead.
         """
         self._check_not_distributed("__buffervalue__")
         if not self.real:
@@ -1772,12 +1793,22 @@ class Tensor(DLPackArray, HasTensorValue):
         if isinstance(value := self._backing_value, graph.BufferValue):
             return value
 
-        # This tensor is currently backed by an unrealized TensorValue.
-        # Create a BufferValue and assign the current value to it
-        tensor = self.__tensorvalue__()
-        assert self._state is not None
-        self._state.value = buffer = ops.buffer_create(tensor.type.as_buffer())
-        buffer[...] = tensor
+        # An argument's type is fixed where it crossed the boundary, so a
+        # buffer created for one is local to this graph and the store would
+        # never reach the caller.
+        if isinstance(value, graph.TensorValue) and any(
+            isinstance(argument, graph.TensorValue)
+            and argument._mlir_value == value._mlir_value
+            for argument in graph.Graph.current.inputs
+        ):
+            raise TypeError(
+                "cannot mutate a tensor argument that was staged as a tensor. "
+                "Stage it as a buffer instead, by passing a BufferType "
+                "or DistributedBufferType as its spec."
+            )
+
+        buffer = self._as_mutable()._backing_value
+        assert isinstance(buffer, graph.BufferValue)
         return buffer
 
     def __bool__(self) -> bool:
