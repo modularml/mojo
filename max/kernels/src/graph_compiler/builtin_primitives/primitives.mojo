@@ -108,25 +108,37 @@ def pack_string_res(
 # ===-----------------------------------------------------------------------===#
 
 
-@no_inline
-def create_index_async(value: Int, async_ptr: OpaquePointer[MutAnyOrigin]):
-    external_call["MGP_RT_CreateAsync_ssizet", NoneType](value, async_ptr)
+def create_index_async_value(value: Int) -> AnyAsyncValueRef:
+    var handle = external_call[
+        "MGP_RT_CreateAsync_ssizet", _AsyncValuePtr[mut=True]
+    ](value)
+    return AnyAsyncValueRef(handle)
 
 
-@no_inline
-@export
-def create_si64_async(
-    value: Int64, async_ptr: OpaquePointer[MutAnyOrigin]
-) abi("Mojo"):
-    external_call["MGP_RT_CreateAsync_int64t", NoneType](value, async_ptr)
+def create_si64_async_value(value: Int64) -> AnyAsyncValueRef:
+    var handle = external_call[
+        "MGP_RT_CreateAsync_int64t", _AsyncValuePtr[mut=True]
+    ](value)
+    return AnyAsyncValueRef(handle)
 
 
-@no_inline
-def create_i1_async(
-    value: Bool,
-    async_ptr: OpaquePointer[MutAnyOrigin],
-):
-    external_call["MGP_RT_CreateAsync_bool", NoneType](value, async_ptr)
+def create_i1_async_value(value: Bool) -> AnyAsyncValueRef:
+    var handle = external_call[
+        "MGP_RT_CreateAsync_bool", _AsyncValuePtr[mut=True]
+    ](value)
+    return AnyAsyncValueRef(handle)
+
+
+def create_tensor_spec_async_value[
+    spec_rank: Int
+](spec: IndexList[spec_rank]) -> AnyAsyncValueRef:
+    var storage = Array[_, spec_rank](
+        fill_with=lambda (i: Int) {imm spec} -> Int: spec[i]
+    )
+    var handle = external_call[
+        "MGP_RT_CreateAsyncTensorShape", _AsyncValuePtr[mut=True]
+    ](storage.unsafe_ptr(), spec_rank)
+    return AnyAsyncValueRef(handle)
 
 
 struct OwnedByteBuffer(DeviceGraphInput, ImplicitlyCopyable, Movable):
@@ -434,22 +446,6 @@ struct OwnedTensor[
             return Self(view, AnyAsyncValueRef(storage_buf=buffer^))
 
 
-@no_inline
-def create_tensor_spec_async[
-    spec_rank: Int
-](spec: IndexList[spec_rank], async_ptr: OpaquePointer[MutAnyOrigin]):
-    # Mojo impl is bitwise compatible with cpp variant, can construct TensorSpec in mojo
-    # and pass it back to C++ -- However, this is an issue for the heap allocated dims.
-    # For the benefit of simplicity, allocate the shapes and ptrs and free explicitly after
-    var storage = Array[_, spec_rank](
-        fill_with=lambda (i: Int) {imm spec} -> Int: spec[i]
-    )
-
-    external_call["MGP_RT_CreateAsyncTensorShape", NoneType](
-        storage.unsafe_ptr(), spec_rank, async_ptr
-    )
-
-
 @export
 def empty_destructor(ptr: Pointer[UInt8, MutUntrackedOrigin]) abi("Mojo"):
     pass
@@ -457,44 +453,43 @@ def empty_destructor(ptr: Pointer[UInt8, MutUntrackedOrigin]) abi("Mojo"):
 
 @no_inline
 def unpack_state_ctx(
-    async_ptr: OpaquePointer[MutAnyOrigin],
+    async_ref: AnyAsyncValueRef,
 ) -> StateContext:
     var ptr = external_call[
         "MGP_RT_UnpackStateContext",
         StateContextRef,
-    ](async_ptr)
+    ](async_ref.get_handle())
 
     return StateContext(ptr)
 
 
 @no_inline
 def unpack_device_ctx(
-    async_ptr: OpaquePointer[MutAnyOrigin],
+    async_ref: AnyAsyncValueRef,
 ) -> DeviceContext:
     var ptr = external_call[
         "MGP_RT_UnpackDeviceContext",
         _DeviceContextPtr[mut=True],
-    ](async_ptr)
+    ](async_ref.get_handle())
 
     return DeviceContext(ptr)
 
 
 @no_inline
 def unpack_buffer_ref(
-    async_ptr: OpaquePointer[MutAnyOrigin],
+    async_ref: AnyAsyncValueRef,
 ) -> OwnedByteBuffer:
+    var value = async_ref.get_handle()
     var size: UInt64 = 0
     var data_ptr = external_call[
         "MGP_RT_GetDataFromBuffer",
         OpaquePointer[MutAnyOrigin],
-    ](async_ptr, Pointer(to=size))
+    ](value, Pointer(to=size))
     var shape = IndexList[1](Int(size))
     var view = MutByteBuffer(data_ptr.unsafe_bitcast[Int8](), shape)
     # Retain the backing storage of the source async value so this composite
     # keeps the memory alive if it (or a derivative) is re-packed as an output.
-    return OwnedByteBuffer(
-        view, AnyAsyncValueRef(retained_storage_of=async_ptr)
-    )
+    return OwnedByteBuffer(view, AnyAsyncValueRef(retained_storage_of=value))
 
 
 @no_inline
@@ -504,22 +499,18 @@ def unpack_tensor[
     dtype: DType,
     mut: Bool = False,
     host: Bool = False,
-](tensor_async_ptr: OpaquePointer[MutAnyOrigin]) -> OwnedTensor[
-    dtype, buffer_rank, mut, host
-]:
+](async_ref: AnyAsyncValueRef) -> OwnedTensor[dtype, buffer_rank, mut, host]:
     # Tensor and the underlying buffer must have the same rank, unless it is a
     # scalar tensor stored with a DynamicTensor<[1]>
     comptime assert tensor_rank == buffer_rank or (
         tensor_rank == 0 and buffer_rank == 1
     )
+    var value = async_ref.get_handle()
     var shapes = IndexList[buffer_rank]()
     var buffer_ptr = external_call[
         "MGP_RT_GetShapeAndDataFromTensor",
         OpaquePointer[MutAnyOrigin],
-    ](
-        Pointer(to=shapes.data),
-        tensor_async_ptr,
-    )
+    ](Pointer(to=shapes.data), value)
 
     comptime if tensor_rank == 0:
         shapes[0] = 1
@@ -529,18 +520,18 @@ def unpack_tensor[
     )
     # Retain the backing storage of the source async value so this composite
     # keeps the memory alive if it (or a derivative) is re-packed as an output.
-    return {view, AnyAsyncValueRef(retained_storage_of=tensor_async_ptr)}
+    return {view, AnyAsyncValueRef(retained_storage_of=value)}
 
 
 @no_inline
 def unpack_tensor_spec[
     spec_rank: Int
-](async_ptr: OpaquePointer[MutAnyOrigin]) -> IndexList[spec_rank]:
+](async_ref: AnyAsyncValueRef) -> IndexList[spec_rank]:
     var storage = Array[Int, spec_rank](uninitialized=True)
     external_call[
         "MGP_RT_GetTensorShapeFromAsync",
         NoneType,
-    ](storage.unsafe_ptr(), spec_rank, async_ptr)
+    ](storage.unsafe_ptr(), spec_rank, async_ref.get_handle())
     var shape = IndexList[spec_rank]()
 
     comptime for i in range(spec_rank):
@@ -1495,22 +1486,22 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
     @always_inline
     def get_cached_buffer(
         self, slot: Int
-    ) -> Tuple[MutByteBuffer, AnyAsyncValueRefPtr]:
+    ) -> Tuple[MutByteBuffer, AnyAsyncValueRef]:
         """Returns a reference to the buffer cached in the given state slot.
 
         Args:
             slot: The index of the state slot to read.
 
         Returns:
-            A tuple of the buffer view and the backing storage handle of the
-            cached `TensorBufferRef` (its `AnyAsyncValueRef` memory handle, not
-            the `TensorBufferRef` itself).
+            A tuple of the buffer view and an owning `AsyncValue*` handle to the
+            cached `TensorBufferRef`'s backing storage. The caller takes ownership
+            of this reference.
         """
         var buffer_size: UInt64 = 0
         var buffer_data = Optional[OpaquePointer[MutAnyOrigin]]()
 
-        var mem_handle = external_call[
-            "MGP_RT_GetCachedBuffer", AnyAsyncValueRefPtr
+        var async_value = external_call[
+            "MGP_RT_GetCachedBuffer", _AsyncValuePtr[mut=True]
         ](
             slot,
             self._handle,
@@ -1523,7 +1514,7 @@ struct StateContext(ImplicitlyCopyable, RegisterPassable):
             Index(buffer_size),
         )
 
-        return {buffer, mem_handle}
+        return {buffer, AnyAsyncValueRef(handle=async_value)}
 
     @always_inline
     def get_device_graph_cache(
@@ -1570,195 +1561,163 @@ def mogg_as_scalar(tensor: ManagedTensorSlice) -> Scalar[tensor.dtype]:
     return _get_scalar_from_managed_tensor_slice(tensor)
 
 
-@register_internal("mogg.async.__del__")
-@no_inline
-def mogg_async_del(
-    async_ptr: Pointer[AnyAsyncValueRefPtr, MutAnyOrigin], size: Int
-):
-    """
-    Decrement the AnyAsyncValueRef. Typically called at the end of a kernel for
-    all input and output operands.
-    """
-    external_call["MGP_RT_DestructAsyncRefs", NoneType](size, async_ptr, False)
-
-
 @register_internal("mogg.async.unpack")
 @no_inline
 def mogg_async_unpack[
     T: TrivialRegisterPassable
-](async_ptr: AnyAsyncValueRefPtr) -> T:
+](async_ref: AnyAsyncValueRef) -> T:
     """
     Returns the value stored in the AnyAsyncValueRef.
     """
     var ptr = external_call[
         "MGP_RT_GetValueFromAsync", OpaquePointer[MutAnyOrigin]
-    ](async_ptr).unsafe_bitcast[T]()
+    ](async_ref.get_handle()).unsafe_bitcast[T]()
 
     return ptr[]
 
 
-struct MoggAsyncPackHelper:
-    """
-    Helper struct for packing various data types into an asynchronous context
-    for MOGG operations. Provides constructor overloads for different supported
-    types.
-    """
-
-    def __init__(out self, data: Int, async_ptr: AnyAsyncValueRefPtr):
-        """
-        Packs an integer value into the asynchronous context.
-        Calls create_index_async to handle the packing.
-        """
-        create_index_async(data, async_ptr)
-
-    def __init__(out self, data: Int64, async_ptr: AnyAsyncValueRefPtr):
-        """
-        Packs a 64-bit integer value into the asynchronous context.
-        Calls create_si64_async to handle the packing.
-        """
-        create_si64_async(data, async_ptr)
-
-    def __init__(out self, data: Bool, async_ptr: AnyAsyncValueRefPtr):
-        """
-        Packs a boolean value into the asynchronous context.
-        Calls create_i1_async to handle the packing.
-        """
-        create_i1_async(data, async_ptr)
-
-    def __init__[
-        spec_rank: Int
-    ](out self, data: IndexList[spec_rank], async_ptr: AnyAsyncValueRefPtr):
-        """
-        Packs an IndexList of specified rank into the asynchronous context.
-        Calls create_tensor_spec_async to handle the packing.
-        """
-        create_tensor_spec_async(data, async_ptr)
-
-    def __init__(
-        out self,
-        var data: OwnedByteBuffer,
-        async_ptr: AnyAsyncValueRefPtr,
-    ):
-        """
-        Packs an OwnedByteBuffer into a real TensorBufferRef. The storage handle
-        is copied (retained) rather than moved out, so the composite may be
-        borrowed -- including from an `Array` element (e.g. bulk_slice),
-        which cannot be moved out of. The runtime adopts the copied reference
-        net-zero; the borrowed composite releases its own reference at scope end.
-        """
-        var ptr = data.unsafe_ptr()
-        var n = data.size()
-        var storage = data^.take_storage()
-        # void MGP_RT_CreateAsyncBufferRefFromStorage(
-        #     AsyncValue *storage, void *data, size_t size, AnyAsyncValueRef *async)
-        external_call["MGP_RT_CreateAsyncBufferRefFromStorage", NoneType](
-            storage^.take_handle(), ptr, n, async_ptr
-        )
-
-    def __init__(
-        out self,
-        var data: DeviceGraph,
-        async_ptr: AnyAsyncValueRefPtr,
-    ):
-        """Packs a `DeviceGraph` into an `AsyncValue[DeviceGraphRef]`.
-
-        The graph handle is surrendered net-zero (`take_handle`) and adopted by
-        the runtime, so no extra reference is created. Used to pack the graph
-        produced by `mgp.device_graph.create` so that `mgp.device_graph.execute`
-        can consume it as a first-class device-graph reference rather than an
-        opaque Mojo value.
-        """
-        # void MGP_RT_CreateAsyncDeviceGraphRefByTakingHandle(
-        #     DeviceGraph *handle, AnyAsyncValueRef *async)
-        external_call[
-            "MGP_RT_CreateAsyncDeviceGraphRefByTakingHandle", NoneType
-        ](data^.take_handle(), async_ptr)
-
-    def __init__(
-        out self,
-        var data: Some[Movable & Deinitable],
-        async_ptr: AnyAsyncValueRefPtr,
-    ):
-        """
-        Packs a generic Movable value into the asynchronous context.
-        Used for opaque types like SIMDPair.
-        """
-        comptime Type = type_of(data)
-
-        # MGP_RT_CreateOwnedAsyncMojoValue expects a type erased destructor
-        @always_inline("nodebug")
-        def erased_destructor(ptr: Pointer[UInt8, MutUntrackedOrigin]):
-            ptr.unsafe_bitcast[Type]().unsafe_deinit_pointee()
-
-        var dst_ptr = external_call[
-            "MGP_RT_MojoValueAllocateBuffer",
-            Pointer[UInt8, MutUntrackedOrigin],
-        ](size_of[Type](), align_of[Type]())
-
-        dst_ptr.unsafe_bitcast[Type]().unsafe_write(data^)
-
-        external_call["MGP_RT_CreateOwnedAsyncMojoValue", NoneType](
-            dst_ptr,
-            erased_destructor,
-            async_ptr,
-        )
+# ===-----------------------------------------------------------------------===#
+# Value-returning async pack / ready / error primitives
+# ===-----------------------------------------------------------------------===#
 
 
-@no_inline
-def mogg_async_pack_owned_tensor[
-    spec_rank: Int,
-](var data: OwnedTensor, async_ptr: AnyAsyncValueRefPtr):
-    """Packs an `OwnedTensor` into a real tensor `TensorBufferRef`.
+def mogg_async_pack_value(data: Int) -> AnyAsyncValueRef:
+    """Packs an `Int` into a fresh async value."""
+    return create_index_async_value(data)
 
-    This is a dedicated (non-overloaded) entry point rather than a
-    `MoggAsyncPackHelper` constructor: the parametric `OwnedTensor` overload
-    would lose overload resolution to the generic `Some[Movable &
-    Deinitable]` constructor and get mis-packed as an opaque Mojo
-    value. The emitter calls this directly for `!mgp.tensor` pack sites.
 
-    The storage handle is copied (retained) rather than moved out, so the
-    composite may be borrowed; the runtime adopts the copied reference net-zero
-    and the borrowed composite releases its own reference at scope end.
+def mogg_async_pack_value(data: Int64) -> AnyAsyncValueRef:
+    """Packs an `Int64` into a fresh async value."""
+    return create_si64_async_value(data)
 
-    Parameters:
-        spec_rank: The true tensor-spec rank (0 for a scalar), supplied by the
-            emitter so the packed `TensorSpec` preserves scalar-ness rather than
-            the promoted rank-1 buffer view.
-    """
-    # Read the view metadata (shape/ptr/size).
-    var shape = data.shape()
+
+def mogg_async_pack_value(data: Bool) -> AnyAsyncValueRef:
+    """Packs a `Bool` into a fresh async value."""
+    return create_i1_async_value(data)
+
+
+def mogg_async_pack_value[
+    spec_rank: Int
+](data: IndexList[spec_rank]) -> AnyAsyncValueRef:
+    """Packs an `IndexList` into a fresh async value."""
+    return create_tensor_spec_async_value(data)
+
+
+def mogg_async_pack_value(var data: OwnedByteBuffer) -> AnyAsyncValueRef:
+    """Packs an `OwnedByteBuffer` into a fresh `AsyncValue[TensorBufferRef]`."""
     var ptr = data.unsafe_ptr()
-    var n = data.bytecount()
+    var n = data.size()
 
     # Transfer storage ownership to the newly constructed TensorBufferRef async
     # value.
     var storage = data^.take_storage()
-    # void MGP_RT_CreateAsyncTensorRefFromStorage(
+    # AsyncValue *MGP_RT_CreateBufferRefAsyncValue(
+    #     AsyncValue *storage, void *data, size_t size)
+    var handle = external_call[
+        "MGP_RT_CreateBufferRefAsyncValue", _AsyncValuePtr[mut=True]
+    ](storage^.take_handle(), ptr, n)
+    return AnyAsyncValueRef(handle=handle)
+
+
+def mogg_async_pack_owned_tensor_value[
+    spec_rank: Int,
+](var data: OwnedTensor) -> AnyAsyncValueRef:
+    """Packs an `OwnedTensor` into a fresh `AsyncValue[Tensor]`."""
+    var shape = data.shape()
+    var ptr = data.unsafe_ptr()
+    var n = data.bytecount()
+
+    # Transfer storage ownership to the newly constructed Tensor async value.
+    var storage = data^.take_storage()
+    # AsyncValue *MGP_RT_CreateTensorRefAsyncValue(
     #     AsyncValue *storage, void *data, size_t size, size_t rank,
-    #     const size_t *shape, DType dtype, AnyAsyncValueRef *async)
-    external_call["MGP_RT_CreateAsyncTensorRefFromStorage", NoneType](
+    #     const size_t *shape, DType dtype)
+    var handle = external_call[
+        "MGP_RT_CreateTensorRefAsyncValue", _AsyncValuePtr[mut=True]
+    ](
         storage^.take_handle(),
         ptr.unsafe_bitcast[NoneType](),
         n,
         spec_rank,
         Pointer(to=shape.data),
         data.dtype,
-        async_ptr,
     )
+    return AnyAsyncValueRef(handle=handle)
 
 
-@register_internal("mogg.async.pack")
-@no_inline
-def mogg_async_pack(pack_helper: MoggAsyncPackHelper):
+def mogg_async_pack_value(var data: DeviceGraph) -> AnyAsyncValueRef:
+    """Packs a `DeviceGraph` into a fresh `AsyncValue[DeviceGraphRef]`."""
+    # AsyncValue *MGP_RT_CreateAsyncDeviceGraphRefByTakingHandle(
+    #     DeviceGraph *handle)
+    var handle = external_call[
+        "MGP_RT_CreateAsyncDeviceGraphRefByTakingHandle",
+        _AsyncValuePtr[mut=True],
+    ](data^.take_handle())
+    return AnyAsyncValueRef(handle=handle)
+
+
+def mogg_async_pack_value(
+    var data: Some[Movable & Deinitable],
+) -> AnyAsyncValueRef:
+    """Packs a generic Mojo value into a fresh `AsyncValue[MojoValue]`.
+
+    Uses `Some[Movable & Deinitable]` rather than an explicit type parameter so
+    that non-copyable opaque values are accepted without an implicit copy and
+    can be consumed with `data^`.
     """
-    Packs asynchronous data using the provided MoggAsyncPackHelper.
+    comptime Type = type_of(data)
 
-    This function serves as an entry point for packing data into an asynchronous
-    reference. The actual packing logic is handled by the MoggAsyncPackHelper struct,
-    which provides specialized constructors for different data types. This function
-    itself is a no-op and exists to satisfy the internal registration mechanism.
-    """
-    return
+    @always_inline("nodebug")
+    def erased_destructor(ptr: Pointer[UInt8, MutUntrackedOrigin]):
+        ptr.unsafe_bitcast[Type]().unsafe_deinit_pointee()
+
+    var dst_ptr = external_call[
+        "MGP_RT_MojoValueAllocateBuffer",
+        Pointer[UInt8, MutUntrackedOrigin],
+    ](size_of[Type](), align_of[Type]())
+
+    dst_ptr.unsafe_bitcast[Type]().unsafe_write(data^)
+
+    # AsyncValue *MGP_RT_CreateOwnedAsyncMojoValue(
+    #     void *data, void (*destructorFn)(void *))
+    var handle = external_call[
+        "MGP_RT_CreateOwnedAsyncMojoValue", _AsyncValuePtr[mut=True]
+    ](dst_ptr, erased_destructor)
+    return AnyAsyncValueRef(handle=handle)
+
+
+def mogg_async_ready_value() -> AnyAsyncValueRef:
+    """Returns a fresh chain `AsyncValue`."""
+    var handle = external_call[
+        "MGP_RT_CreateAsync_chain", _AsyncValuePtr[mut=True]
+    ]()
+    return AnyAsyncValueRef(handle=handle)
+
+
+def mogg_async_error_value(
+    err: Error, source_notes: String = ""
+) -> AnyAsyncValueRef:
+    """Returns a fresh error `AsyncValue`."""
+    var error_message = String(err)
+    if source_notes:
+        error_message = "\n" + source_notes + "\n\n" + error_message
+    var handle = external_call[
+        "MGP_RT_AsyncRT_CreateAsync_Error", _AsyncValuePtr[mut=True]
+    ](
+        error_message.as_c_string_span(),
+        error_message.byte_length(),
+    )
+    return AnyAsyncValueRef(handle=handle)
+
+
+def mogg_assign_async_value(
+    slot: AnyAsyncValueRefPtr, var value: AnyAsyncValueRef
+):
+    """Assigns `value` to the async output slot."""
+    # void MGP_RT_AssignAsyncValue(AnyAsyncValueRef *slot, AsyncValue *src)
+    external_call["MGP_RT_AssignAsyncValue", NoneType](
+        slot, value.take_handle()
+    )
 
 
 @register_internal("mogg.tensor.__init__")
@@ -1792,15 +1751,6 @@ def mogg_tensor_init[
     }
 
 
-@register_internal("mogg.async.ready")
-@no_inline
-def mogg_async_ready(async_ptr: AnyAsyncValueRefPtr):
-    """
-    Marks the chain as ready.
-    """
-    external_call["MGP_RT_CreateAsync_chain", NoneType](async_ptr)
-
-
 @register_internal("mogg.async.join")
 @no_inline
 def mogg_async_check_task_error(mut error: Optional[Error]) raises:
@@ -1811,30 +1761,6 @@ def mogg_async_check_task_error(mut error: Optional[Error]) raises:
     """
     if error:
         raise error.take()
-
-
-@register_internal("mogg.async.error")
-@no_inline
-def mogg_async_error(
-    async_ptr: AnyAsyncValueRefPtr,
-    err: Error,
-    source_notes: String = "",
-):
-    """Indicates to the C++ runtime that the kernel has failed.
-
-    When source_notes is non-empty it is prepended to the error message.
-    The "Source Traceback:" header is included by the compiler only when
-    actual Python tracebacks are present (see buildNotesString in MOGGOps.cpp).
-    See GEX-2678.
-    """
-    var error_message = String(err)
-    if source_notes:
-        error_message = "\n" + source_notes + "\n\n" + error_message
-    external_call["MGP_RT_AsyncRT_CreateAsync_Error", NoneType](
-        async_ptr,
-        error_message.as_c_string_span(),
-        error_message.byte_length(),
-    )
 
 
 @register_internal("mogg.raise")
@@ -1916,10 +1842,10 @@ def mgp_buffer_get_cached(
     """
     Get a reference to the cached buffer, retaining its backing storage.
     """
-    var cached = ctx.get_cached_buffer(buffer_slot)
+    var ptr, storage = ctx.get_cached_buffer(buffer_slot)
     # cached is (view, mem_handle); fold the cached buffer's memory handle into
     # the composite's storage by retaining it.
-    return OwnedByteBuffer(cached[0], AnyAsyncValueRef(retain_handle=cached[1]))
+    return OwnedByteBuffer(ptr, storage^)
 
 
 @register_internal("mgp.assert")
