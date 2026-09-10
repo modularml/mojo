@@ -2762,6 +2762,61 @@ def foreach[
     ](elementwise_fn_wrapper, tensor.shape_coord(), ctx)
 
 
+def foreach[
+    dtype: DType,
+    rank: Int,
+    //,
+    FuncType: ImplicitlyCopyable
+    & RegisterPassable
+    & (def[width: Int](Coord) -> SIMD[dtype, width]),
+    *,
+    target: StaticString = "cpu",
+    simd_width: Int = get_kernel_simd_width[dtype, target](),
+    _trace_name: StaticString = "mogg.for_each",
+](
+    var func: FuncType,
+    tensor: ManagedTensorSlice[mut=True, dtype=dtype, rank=rank, ...],
+    ctx: DeviceContext,
+) raises:
+    """Apply a `RegisterPassable` body to each element of the tensor slice.
+
+    Value-argument twin of the `foreach` overload above: the body is a runtime
+    closure passed by value rather than a comptime parameter, so callers write
+    a unified closure instead of a `capturing` one. The body receives the
+    element index as a `Coord`; use `coord_to_index_list` to convert it to an
+    `IndexList` if integer index arithmetic is needed.
+
+    The wrapper captures both `func` and `tensor` and routes the store through
+    `tensor._fused_store`, which preserves the fused store path that
+    `FusedOutputTensor` depends on.
+
+    Parameters:
+        dtype: The data type of the elements in the tensor slice.
+        rank: The rank of the tensor slice.
+        FuncType: The type of the per-element body closure.
+        target: Indicates the type of the target device (e.g. "cpu", "gpu").
+        simd_width: The SIMD width for the target (usually leave this as its default value).
+        _trace_name: Name of the executed operation displayed in the trace_description.
+
+    Args:
+        func: The function to apply to each element of the tensor slice.
+        tensor: The output tensor slice which receives the return values from `func`.
+        ctx: The call context (forward this from the custom operation).
+    """
+
+    def wrapper[
+        width: Int, alignment: Int = 1
+    ](index: Coord) {var func^, var tensor}:
+        var val = func[width](index)
+        tensor._fused_store[element_alignment=alignment](index, val)
+
+    elementwise[
+        simd_width=simd_width,
+        target=target,
+        _trace_description=_trace_name,
+    ](wrapper, tensor.shape_coord(), ctx)
+
+
 def _shape_types_compatible[
     x_types: TypeList[Trait=CoordLike, ...],
     y_types: TypeList[Trait=CoordLike, ...],

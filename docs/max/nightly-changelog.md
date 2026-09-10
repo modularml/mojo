@@ -1049,6 +1049,13 @@ the [container](/container) page now links to the new page.
   and down projection 18.2-19.6% (etm > 2048) and 6.9-23.3% (etm <= 2048)
   across real ragged-M, skewed routing scenarios.
 
+- `extensibility.foreach` now accepts its elementwise body as a runtime
+  argument as well as a compile-time parameter, so a custom op can pass a
+  unified closure with a capture list instead of a `capturing` one. Call it as
+  `foreach[target=target](body, output, ctx)`, with the body as the first
+  argument. The compile-time-parameter overload is unchanged, so no existing
+  caller needs edits.
+
 ## Breaking changes
 
 - Removed the `NPU` device class from `max.driver` and the corresponding
