@@ -48,6 +48,7 @@ from std.utils.numerics import get_accum_type
 from .allgather import allgather_tuning_table
 from .device_query import dispatch_select_comm_config, get_sm_version
 from .reducescatter import _target_address_space
+from .relay import _relay_pairs
 from .sync import MAX_GPUS, Signal, _multi_gpu_barrier, is_p2p_enabled
 
 
@@ -700,8 +701,9 @@ def _dispatch_ag_norm[
 
     # Gates on the full replicated row count, identical on every rank: the two
     # paths issue different barriers on shared `rank_sigs`, so disagreement
-    # deadlocks. Invariance is per-GROUP -- sibling groups may legitimately
-    # diverge, their `rank_sigs` being disjoint, so do not widen this gate.
+    # deadlocks. That is per group normally, but across a whole relay pair
+    # where the relay may engage, since only the two-launch arm reaches its
+    # pair-wide barrier.
     comptime last_dim_idx = in_layout.rank - 1
     var cols = Int(input_buffers[0].dim[last_dim_idx]())
     # Fuse only at the calibrated H (else the byte threshold maps to the wrong
@@ -715,17 +717,27 @@ def _dispatch_ag_norm[
         ),
     )
 
-    # Gate on THIS device's own group's replicated rows, not the whole
-    # world's -- sibling groups may legitimately diverge.
+    # Fusing only when every group in the span fuses keeps the threshold's
+    # per-group meaning.
     var global_rank = my_rank.value() if my_rank else Int(ctx.id())
-    var group_start = ualign_down(global_rank, group_size)
+    comptime gate_groups = 2 if _relay_pairs[ngpus, group_size](
+        ctx.default_device_info.version
+    ) else 1
+    comptime gate_width = gate_groups * group_size
+    var gate_start = ualign_down(global_rank, gate_width)
 
-    var rows = 0
-    comptime for i in range(group_size):
-        rows += input_buffers[group_start + i].num_elements() // cols
-    var full_bytes = rows * cols * size_of[in_dtype]()
+    var fuse = True
+    comptime for g in range(gate_groups):
+        var group_rows = 0
+        comptime for i in range(group_size):
+            group_rows += (
+                input_buffers[gate_start + g * group_size + i].num_elements()
+                // cols
+            )
+        if group_rows * cols * size_of[in_dtype]() > threshold:
+            fuse = False
 
-    if full_bytes <= threshold:
+    if fuse:
         # Hand the fused kernel the whole world plus the group width, and
         # let it derive the group-local slice, rank, and barrier domain
         # itself.
@@ -816,8 +828,9 @@ def _dispatch_ag_norm_quant[
 
     # Gates on the full replicated row count, identical on every rank: the two
     # paths issue different barriers on shared `rank_sigs`, so disagreement
-    # deadlocks. Invariance is per-GROUP -- sibling groups may legitimately
-    # diverge, their `rank_sigs` being disjoint, so do not widen this gate.
+    # deadlocks. That is per group normally, but across a whole relay pair
+    # where the relay may engage, since only the two-launch arm reaches its
+    # pair-wide barrier.
     comptime last_dim_idx = in_layout.rank - 1
     var cols = Int(input_buffers[0].dim[last_dim_idx]())
     debug_assert(
@@ -829,17 +842,27 @@ def _dispatch_ag_norm_quant[
         ),
     )
 
-    # Gate on THIS device's own group's replicated rows, not the whole
-    # world's -- sibling groups may legitimately diverge.
+    # Fusing only when every group in the span fuses keeps the threshold's
+    # per-group meaning.
     var global_rank = my_rank.value() if my_rank else Int(ctx.id())
-    var group_start = ualign_down(global_rank, group_size)
+    comptime gate_groups = 2 if _relay_pairs[ngpus, group_size](
+        ctx.default_device_info.version
+    ) else 1
+    comptime gate_width = gate_groups * group_size
+    var gate_start = ualign_down(global_rank, gate_width)
 
-    var rows = 0
-    comptime for i in range(group_size):
-        rows += input_buffers[group_start + i].num_elements() // cols
-    var full_bytes = rows * cols * size_of[in_dtype]()
+    var fuse = True
+    comptime for g in range(gate_groups):
+        var group_rows = 0
+        comptime for i in range(group_size):
+            group_rows += (
+                input_buffers[gate_start + g * group_size + i].num_elements()
+                // cols
+            )
+        if group_rows * cols * size_of[in_dtype]() > threshold:
+            fuse = False
 
-    if full_bytes <= threshold:
+    if fuse:
         # Hand the fused kernel the whole world plus the group width, and
         # let it derive the group-local slice, rank, and barrier domain
         # itself.
