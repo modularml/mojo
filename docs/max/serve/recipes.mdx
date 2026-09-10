@@ -55,7 +55,9 @@ In this example, each top-level section configures one part of the pipeline:
 
 - `model`: the model to serve, its device placement, and its KV cache settings.
 - `draft_model`: the draft model that speculative decoding uses.
-- `speculative`: the speculative decoding method and token count.
+- `speculative`: the speculative decoding method and token count. For the
+  supported methods, see the [speculative decoding method
+  table](/serve/speculative-decoding#supported-methods).
 - `runtime`: batching and execution tuning.
 
 This recipe optimizes serving performance by storing the KV cache in FP8,
