@@ -142,13 +142,54 @@ def parse_json_document(
         return None, f"{label} is not JSON: {repr(document)[:60]}"
 
 
+def leading_json(text: str) -> tuple[object, str] | None:
+    """The first complete JSON value in ``text``, and whatever follows it.
+
+    ``None`` when the text does not begin with a value: ``raw_decode``
+    anchors at index 0, so text that opens with prose is unknown rather
+    than bad. It also does not skip leading whitespace, hence the strip.
+    """
+    stripped = text.lstrip()
+    if not stripped:
+        return None
+    try:
+        value, end = json.JSONDecoder().raw_decode(stripped)
+    except ValueError:
+        return None
+    return value, stripped[end:].strip()
+
+
+def overrun_detail(trailing: str) -> str:
+    """Bounded diagnostic for text generated past a completed document."""
+    return (
+        f"grammar stopped being applied: a complete document was followed by "
+        f"{len(trailing)} unconstrained chars {trailing[:80]!r}"
+    )
+
+
+def enforcement_overrun(output: str) -> str | None:
+    """Reports a complete JSON document followed by unconstrained text.
+
+    Truncation ends mid-document; a dropped grammar finishes one and keeps
+    going. Returns a bounded diagnostic, or ``None`` -- including when the
+    leading text is not a document at all, which is unknown rather than bad.
+    """
+    parsed = leading_json(output)
+    if parsed is None:
+        return None
+    _, trailing = parsed
+    return overrun_detail(trailing) if trailing else None
+
+
 def classify_served_json(
     body: str, schema: Mapping[str, object]
 ) -> tuple[str, str | None]:
     """Grades a non-streaming chat-completion body against ``schema``.
 
     Returns ``truncated``, ``conformant``, or ``invalid``. Length
-    truncation is not conformance.
+    truncation is not conformance. A length finish whose content is a
+    complete document plus trailing text is ``invalid``, not ``truncated``:
+    the constraint was dropped rather than the budget exhausted.
     """
     try:
         choice = json.loads(body)["choices"][0]
@@ -157,6 +198,10 @@ def classify_served_json(
     except (json.JSONDecodeError, KeyError, IndexError, TypeError):
         return "invalid", "served but body was not schema JSON"
     if finish == "length":
+        if isinstance(content, str) and (
+            overrun := enforcement_overrun(content)
+        ):
+            return "invalid", overrun
         return "truncated", None
     parsed, parse_error = parse_json_document(content, label="served content")
     if parse_error:
