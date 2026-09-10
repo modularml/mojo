@@ -44,10 +44,8 @@ the cursor rather than removed is what it is calibrated against.
 
 from std.compile import compile_info
 from std._gpu import block_dim, thread_idx
-from std._gpu.host import get_gpu_target
 from std.testing import assert_equal, assert_false, assert_true
-
-comptime _TargetType = __mlir_type.`!kgen.target`
+from std.sys import CompilationTarget
 
 # What a strided forward loop costs while it still tests for the wrap each trip:
 # the 7 an affine cursor compiles to, plus the test and the flag it sets. The
@@ -146,7 +144,7 @@ def _assert_tight_loop[
     //,
     func: func_type,
     *,
-    target: _TargetType,
+    target: CompilationTarget,
 ](name: String, budget: Int = FORWARD_BUDGET) raises:
     var body = _innermost_loop_body(compile_info[func, target=target]().asm)
     var count = _instruction_count(body)
@@ -172,14 +170,14 @@ def _assert_no_division[
     //,
     func: func_type,
     *,
-    target: _TargetType,
+    target: CompilationTarget,
 ](name: String) raises:
     var asm = compile_info[func, target=target]().asm
     assert_false("div." in asm, String(name, " divides:\n", asm))
     assert_false("rem." in asm, String(name, " takes a remainder:\n", asm))
 
 
-def test_loops_stay_tight[target: _TargetType]() raises:
+def test_loops_stay_tight[target: CompilationTarget]() raises:
     _assert_tight_loop[zero_based, target=target]("zero_based")
     _assert_tight_loop[two_arg, target=target]("two_arg")
     _assert_tight_loop[grid_stride, target=target]("grid_stride")
@@ -197,7 +195,7 @@ def test_loops_stay_tight[target: _TargetType]() raises:
     )
 
 
-def test_signed_ranges_never_divide[target: _TargetType]() raises:
+def test_signed_ranges_never_divide[target: CompilationTarget]() raises:
     """Terminating on a comparison needs no division, so no forward form has one.
 
     Only the signed forms are held to that, though the unsigned one also has
@@ -237,7 +235,9 @@ def test_amd_register_pressure() raises:
     exec-mask bookkeeping moves under scheduling, so counting its instructions
     needs a parser that can tell that apart from the loop's own arithmetic.
     """
-    var asm = compile_info[grid_stride, target=get_gpu_target["mi355x"]()]().asm
+    var asm = compile_info[
+        grid_stride, target=CompilationTarget.from_gpu_arch["mi355x"]()
+    ]().asm
     assert_true(
         _amd_directive(asm, ".vgpr_count") <= 7,
         String("grid_stride: too many VGPRs\n", asm),
@@ -247,8 +247,12 @@ def test_amd_register_pressure() raises:
 
 
 def main() raises:
-    test_loops_stay_tight[get_gpu_target["sm_90"]()]()
-    test_loops_stay_tight[get_gpu_target["sm_100a"]()]()
-    test_signed_ranges_never_divide[get_gpu_target["sm_90"]()]()
-    test_signed_ranges_never_divide[get_gpu_target["sm_100a"]()]()
+    test_loops_stay_tight[CompilationTarget.from_gpu_arch["sm_90"]()]()
+    test_loops_stay_tight[CompilationTarget.from_gpu_arch["sm_100a"]()]()
+    test_signed_ranges_never_divide[
+        CompilationTarget.from_gpu_arch["sm_90"]()
+    ]()
+    test_signed_ranges_never_divide[
+        CompilationTarget.from_gpu_arch["sm_100a"]()
+    ]()
     test_amd_register_pressure()

@@ -13,7 +13,6 @@
 
 from std.collections import OptionalReg
 from std.reflection.location import SourceLocation
-from std.sys.info import _TargetType, _current_target
 
 from std.utils.index import IndexList
 from std.math.math import _ExpPluginHookFnType, _TanhPluginHookFnType

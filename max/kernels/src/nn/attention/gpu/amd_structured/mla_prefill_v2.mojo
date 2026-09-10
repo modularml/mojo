@@ -2234,9 +2234,9 @@ def mla_prefill_v2_ragged[
     output_dtype: DType,
     //,
     config: MlaConfigV2,
-    compile_options: StaticString = CompilationTarget[
-        DeviceContext.default_device_info.target()
-    ].default_compile_options(),
+    compile_options: StaticString = CompilationTarget.from_gpu_info[
+        DeviceContext.default_device_info
+    ]().default_compile_options(),
 ](
     q_ptr: UnsafePointer[Scalar[qkv_dtype], ImmutAnyOrigin],
     k_nope: k_nope_t,

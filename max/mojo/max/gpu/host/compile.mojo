@@ -40,10 +40,8 @@ def _compile_code[
     /,
     *,
     emission_kind: StaticString = "asm",
-    target: _TargetType = get_gpu_target(),
-    compile_options: StaticString = CompilationTarget[
-        target
-    ].default_compile_options(),
+    target: CompilationTarget = CompilationTarget.current_accelerator(),
+    compile_options: StaticString = target.default_compile_options(),
     link_options: StaticString = "",
 ]() -> CompiledFunctionInfo[func_type, func, target]:
     return compile_info[
@@ -55,6 +53,32 @@ def _compile_code[
     ]()
 
 
+# TODO(MSTDL-3189): Remove this `_TargetType`-taking overload
+@always_inline
+def _compile_code[
+    func_type: TrivialRegisterPassable,
+    //,
+    func: func_type,
+    /,
+    *,
+    emission_kind: StaticString = "asm",
+    target: _TargetType = CompilationTarget.current_accelerator()._mlir_value,
+    compile_options: StaticString = CompilationTarget[
+        _mlir_value=target
+    ]().default_compile_options(),
+    link_options: StaticString = "",
+]() -> CompiledFunctionInfo[
+    func_type, func, CompilationTarget[_mlir_value=target]()
+]:
+    return compile_info[
+        func,
+        emission_kind=emission_kind,
+        compile_options=compile_options,
+        link_options=link_options,
+        target=CompilationTarget[_mlir_value=target](),
+    ]()
+
+
 # ===-----------------------------------------------------------------------===#
 # _to_sass
 # ===-----------------------------------------------------------------------===#
@@ -62,7 +86,7 @@ def _compile_code[
 
 @no_inline
 def _to_sass[
-    target: _TargetType = get_gpu_target()
+    target: CompilationTarget = CompilationTarget.current_accelerator()
 ](asm: String, *, nvdisasm_opts: String = "") raises -> String:
     comptime nvdisasm_path = Path("/usr/local/cuda/bin/nvdisasm")
     if not nvdisasm_path.exists():
@@ -88,7 +112,7 @@ def _to_sass[
 
 @no_inline
 def _ptxas_compile[
-    target: _TargetType = get_gpu_target()
+    target: CompilationTarget = CompilationTarget.current_accelerator()
 ](
     asm: String, *, options: String = "", output_file: Optional[Path] = None
 ) raises -> String:
@@ -104,7 +128,7 @@ def _ptxas_compile[
             String(
                 ptxas_path,
                 " --gpu-name ",
-                CompilationTarget[target]._arch(),
+                target._arch(),
                 " -O4 ",
                 ptx_file,
                 " ",

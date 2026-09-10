@@ -1873,7 +1873,9 @@ struct GPUInfo(Copyable, Equatable, Movable, RegisterPassable, Writable):
         Returns:
             GPU info corresponding to the target.
         """
-        return _get_info_from_target[CompilationTarget[target]._arch()]()
+        return _get_info_from_target[
+            CompilationTarget[_mlir_value=target]._arch()
+        ]()
 
     @staticmethod
     def from_name[name: StaticString]() -> Self:

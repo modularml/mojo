@@ -24,6 +24,8 @@ print(CompilationTarget.is_x86())
 from std.collections.string.string_span import _get_kgen_string
 from std.ffi import _external_call_const, external_call
 
+from std._gpu.host.info import GPUInfo, get_gpu_target
+
 comptime _TargetType = __mlir_type.`!kgen.target`
 
 
@@ -32,7 +34,7 @@ def _current_target() -> _TargetType:
     return __mlir_attr.`#kgen.param.expr<current_target> : !kgen.target`
 
 
-struct CompilationTarget[value: _TargetType = _current_target()](
+struct CompilationTarget[_mlir_value: _TargetType = _current_target(), //](
     TrivialRegisterPassable
 ):
     """A struct that provides information about a target architecture.
@@ -42,12 +44,65 @@ struct CompilationTarget[value: _TargetType = _current_target()](
     memory characteristics.
 
     Parameters:
-        value: The target architecture to query. Defaults to the current target.
+        _mlir_value: The raw target architecture to query. Defaults to the current target.
     """
 
     def __init__(out self):
         """Initialize a `CompilationTarget` with the default target."""
         pass
+
+    @staticmethod
+    @always_inline("nodebug")
+    def current() -> CompilationTarget[_mlir_value=_current_target()]:
+        """Get the current compilation target.
+
+        This can vary within a single Mojo compiler invocation, depending on
+        the compilation context of a given piece of Mojo code:
+
+        * Typically, this is the host compilation target, configured by the
+          [target options](https://mojolang.org/docs/cli/build/#target-options),
+          such as `--target-triple`, `--target-cpu`, and `--target-features`.
+
+        * Within an accelerator "offload" compilation, this is the accelerator
+          target, equivalent to `CompilationTarget.current_accelerator()`.
+
+        Returns:
+            A value representing the current compilation target.
+        """
+        return {}
+
+    @staticmethod
+    @always_inline("nodebug")
+    def current_accelerator() -> (
+        CompilationTarget[_mlir_value=get_gpu_target()]
+    ):
+        """Get the accelerator target.
+
+        This value is derived from the `--target-accelerator` command line flag.
+
+        Constraints:
+            An accelerator target must be configured.
+
+        Returns:
+            A value representing the current accelerator target.
+        """
+        return {}
+
+    @doc_hidden
+    @staticmethod
+    @always_inline("nodebug")
+    def from_gpu_info[
+        info: GPUInfo
+    ]() -> CompilationTarget[_mlir_value=info.target()]:
+        return {}
+
+    @doc_hidden
+    @staticmethod
+    @always_inline("nodebug")
+    def from_gpu_arch[
+        target_arch: StaticString
+    ]() -> CompilationTarget[_mlir_value=get_gpu_target[target_arch]()]:
+        return {}
 
     @always_inline("nodebug")
     @staticmethod
@@ -85,7 +140,7 @@ struct CompilationTarget[value: _TargetType = _current_target()](
         """
         return __mlir_attr[
             `#kgen.param.expr<target_has_feature,`,
-            Self.value,
+            Self._mlir_value,
             `,`,
             _get_kgen_string[name](),
             `> : i1`,
@@ -108,7 +163,7 @@ struct CompilationTarget[value: _TargetType = _current_target()](
         """
         return __mlir_attr[
             `#kgen.param.expr<target_get_field,`,
-            Self.value,
+            Self._mlir_value,
             `, "arch" : !kgen.string`,
             `> : !kgen.string`,
         ]
@@ -149,7 +204,7 @@ struct CompilationTarget[value: _TargetType = _current_target()](
         """
         return __mlir_attr[
             `#kgen.param.expr<target_get_field,`,
-            Self.value,
+            Self._mlir_value,
             `, "triple_arch" : !kgen.string`,
             `> : !kgen.string`,
         ]
@@ -183,7 +238,7 @@ struct CompilationTarget[value: _TargetType = _current_target()](
     def _os() -> StaticString:
         var res = __mlir_attr[
             `#kgen.param.expr<target_get_field,`,
-            Self.value,
+            Self._mlir_value,
             `, "os" : !kgen.string`,
             `> : !kgen.string`,
         ]
@@ -198,7 +253,7 @@ struct CompilationTarget[value: _TargetType = _current_target()](
             The string of default compile options for the compilation target.
         """
 
-        comptime if is_triple["nvptx64-nvidia-cuda", Self.value]():
+        comptime if is_triple["nvptx64-nvidia-cuda", Self._mlir_value]():
             # TODO: use `is_nvidia_gpu` when moved to into this struct.
             return "target-abi=shortptr"
         else:
@@ -1326,8 +1381,45 @@ def stdlib_plugin[target: _TargetType = _current_target()]() -> StaticString:
     )
 
 
+# TODO(MSTDL-3189): Remove this `_TargetType`-taking overload
 @always_inline("nodebug")
 def size_of[type: AnyType, target: _TargetType = _current_target()]() -> Int:
+    """Returns the size of (in bytes) of the type.
+
+    The size includes any padding required by the type's alignment, so it is
+    always a multiple of `align_of[type]()` and always matches the stride
+    between adjacent elements of an array of the type.
+
+    Parameters:
+        type: The type in question.
+        target: The target architecture.
+
+    Returns:
+        The size of the type in bytes.
+
+    Example:
+    ```mojo
+    from std.sys.info import size_of
+    def main() raises:
+        print(
+            size_of[UInt8]() == 1,
+            size_of[UInt16]() == 2,
+            size_of[Int32]() == 4,
+            size_of[Float64]() == 8,
+            size_of[
+                SIMD[.uint8, 4]
+            ]() == 4,
+        )
+    ```
+    Note: `align_of` is in same module.
+    """
+    return size_of[type, CompilationTarget[_mlir_value=target]()]()
+
+
+@always_inline("nodebug")
+def size_of[
+    type: AnyType, target: CompilationTarget = CompilationTarget.current()
+]() -> Int:
     """Returns the size of (in bytes) of the type.
 
     The size includes any padding required by the type's alignment, so it is
@@ -1370,7 +1462,7 @@ def size_of[type: AnyType, target: _TargetType = _current_target()]() -> Int:
                 `#kgen.param.expr<get_sizeof, #kgen.type<`,
                 mlir_type,
                 `> : !kgen.type,`,
-                target,
+                target._mlir_value,
                 `> : index`,
             ]
         )
@@ -1399,8 +1491,25 @@ def size_of[dtype: DType, target: _TargetType = _current_target()]() -> Int:
     )
 
 
+# TODO(MSTDL-3189): Remove this `_TargetType`-taking overload
 @always_inline("builtin")
 def align_of[type: AnyType, target: _TargetType = _current_target()]() -> Int:
+    """Returns the align of (in bytes) of the type.
+
+    Parameters:
+        type: The type in question.
+        target: The target architecture.
+
+    Returns:
+        The alignment of the type in bytes.
+    """
+    return align_of[type, CompilationTarget[_mlir_value=target]()]()
+
+
+@always_inline("builtin")
+def align_of[
+    type: AnyType, target: CompilationTarget = CompilationTarget.current()
+]() -> Int:
     """Returns the align of (in bytes) of the type.
 
     Parameters:
@@ -1423,7 +1532,7 @@ def align_of[type: AnyType, target: _TargetType = _current_target()]() -> Int:
                 `#kgen.param.expr<get_alignof, #kgen.type<`,
                 +mlir_type,
                 `> : !kgen.type,`,
-                target,
+                target._mlir_value,
                 `> : index`,
             ]
         )

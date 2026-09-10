@@ -32,7 +32,7 @@ from max.gpu.host import (
 from std.collections.optional import OptionalReg
 from std.ffi import c_size_t, external_call
 from std.logger import Logger
-from std.sys import align_of, bit_width_of, size_of
+from std.sys import align_of, bit_width_of, size_of, CompilationTarget
 from std.memory import unsafe_memcpy
 from std.memory.unsafe import bitcast
 from std.reflection import call_location, SourceLocation
@@ -1317,7 +1317,9 @@ struct DeviceGraphBuilder[arena_origin: ImmOrigin](Movable):
         # The compiled kernel is `FuncType.__call__`; the launch argument is
         # the encoded `FuncType.device_type` instance. Layout punning is only
         # safe while those sizes and alignments coincide on the launch target.
-        comptime launch_target = DeviceContext.default_device_info.target()
+        comptime launch_target = CompilationTarget.from_gpu_info[
+            DeviceContext.default_device_info
+        ]()
         comptime host_size = size_of[FuncType, target=launch_target]()
         comptime device_size = size_of[
             FuncType.device_type, target=launch_target
@@ -1446,7 +1448,9 @@ struct DeviceGraphBuilder[arena_origin: ImmOrigin](Movable):
         )
         dependencies = self._merge_implicit(dependencies^)
 
-        comptime launch_target = DeviceContext.default_device_info.target()
+        comptime launch_target = CompilationTarget.from_gpu_info[
+            DeviceContext.default_device_info
+        ]()
         comptime n = size_of[FuncType, target=launch_target]()
         comptime a = align_of[FuncType, target=launch_target]()
         var bits = _LaunchBits[n, a](StaticTuple[UInt8, n]())

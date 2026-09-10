@@ -201,7 +201,7 @@ def test_get_type_name_struct() raises:
 
 
 def test_get_type_name_unprintable() raises:
-    var name = reflect[CompilationTarget[_current_target()]].name()
+    var name = reflect[CompilationTarget[_mlir_value=_current_target()]].name()
     assert_equal(name, "std.sys.info.CompilationTarget[<unprintable>]")
 
 

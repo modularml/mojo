@@ -2849,8 +2849,8 @@ struct DeviceEvent(ImplicitlyCopyable):
         )
 
 
-def _is_nvidia_gpu[target: _TargetType]() -> Bool:
-    return is_triple["nvptx64-nvidia-cuda", target]()
+def _is_nvidia_gpu[target: CompilationTarget]() -> Bool:
+    return is_triple["nvptx64-nvidia-cuda", target._mlir_value]()
 
 
 def _is_path_like(ss: StringSlice) -> Bool:
@@ -2863,10 +2863,8 @@ struct DeviceFunction[
     func: func_type,
     declared_arg_types: TypeList[Trait=AnyType, ...],
     *,
-    target: _TargetType = get_gpu_target(),
-    compile_options: StaticString = CompilationTarget[
-        target
-    ].default_compile_options(),
+    target: CompilationTarget = CompilationTarget.current_accelerator(),
+    compile_options: StaticString = target.default_compile_options(),
     link_options: StaticString = "",
     _ptxas_info_verbose: Bool = False,
 ](ImplicitlyCopyable):
@@ -4363,9 +4361,9 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         //,
         func: def(* args: * declared_arg_types) thin -> None,
         *,
-        compile_options: StaticString = CompilationTarget[
-            Self.default_device_info.target()
-        ].default_compile_options(),
+        compile_options: StaticString = CompilationTarget.from_gpu_info[
+            Self.default_device_info
+        ]().default_compile_options(),
         link_options: StaticString = "",
         dump_asm: _DumpPath = False,
         dump_llvm: _DumpPath = False,
@@ -4378,7 +4376,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         out result: DeviceFunction[
             func,
             declared_arg_types,
-            target=Self.default_device_info.target(),
+            target=CompilationTarget.from_gpu_info[Self.default_device_info](),
             compile_options=compile_options,
             link_options=link_options,
             _ptxas_info_verbose=_ptxas_info_verbose,
@@ -4440,9 +4438,9 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         //,
         func: def(* args: * declared_arg_types) capturing -> None,
         *,
-        compile_options: StaticString = CompilationTarget[
-            Self.default_device_info.target()
-        ].default_compile_options(),
+        compile_options: StaticString = CompilationTarget.from_gpu_info[
+            Self.default_device_info
+        ]().default_compile_options(),
         link_options: StaticString = "",
         dump_asm: _DumpPath = False,
         dump_llvm: _DumpPath = False,
@@ -4455,7 +4453,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         out result: DeviceFunction[
             func,
             declared_arg_types,
-            target=Self.default_device_info.target(),
+            target=CompilationTarget.from_gpu_info[Self.default_device_info](),
             compile_options=compile_options,
             link_options=link_options,
             _ptxas_info_verbose=_ptxas_info_verbose,
@@ -4762,7 +4760,9 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         # The compiled kernel is FuncType.__call__; the launch argument is the
         # encoded FuncType.device_type instance. Layout punning is only safe
         # while those sizes and alignments coincide on the launch target.
-        comptime launch_target = Self.default_device_info.target()
+        comptime launch_target = CompilationTarget.from_gpu_info[
+            Self.default_device_info
+        ]()
         comptime host_size = size_of[FuncType, target=launch_target]()
         comptime device_size = size_of[
             FuncType.device_type, target=launch_target
@@ -4873,7 +4873,9 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
             block_dim, location=call_location()
         )
 
-        comptime launch_target = Self.default_device_info.target()
+        comptime launch_target = CompilationTarget.from_gpu_info[
+            Self.default_device_info
+        ]()
         comptime n = size_of[FuncType, target=launch_target]()
         comptime a = align_of[FuncType, target=launch_target]()
         var bits = _LaunchBits[n, a](StaticTuple[UInt8, n]())
