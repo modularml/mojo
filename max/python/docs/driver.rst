@@ -38,6 +38,7 @@ Buffers
    Buffer
    DevicePinnedBuffer
    DLPackArray
+   HostHazardError
    Usage
 
 .. autosummary::
