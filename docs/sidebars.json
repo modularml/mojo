@@ -481,6 +481,7 @@
                 "api/python/pipelines.architectures.qwen_image",
                 "api/python/pipelines.architectures.qwen_image_edit",
                 "api/python/pipelines.architectures.step3p5",
+                "api/python/pipelines.architectures.unified_dflash2_qwen3_5",
                 "api/python/pipelines.architectures.unified_dflash_gemma4_31b",
                 "api/python/pipelines.architectures.unified_dflash_kimi_k25",
                 "api/python/pipelines.architectures.unified_dflash_llama3",

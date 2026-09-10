@@ -320,6 +320,11 @@ def register_all_models() -> None:
         ),
         _LazyArch("Step3p5ForCausalLM", ".step3p5", "step3p5_arch"),
         _LazyArch(
+            "UnifiedDflash2Qwen3_5ForConditionalGeneration",
+            ".unified_dflash2_qwen3_5",
+            "unified_dflash2_qwen3_5_arch",
+        ),
+        _LazyArch(
             "UnifiedDflashKimiK25ForCausalLM",
             ".unified_dflash_kimi_k25",
             "unified_dflash_kimi_k25_arch",

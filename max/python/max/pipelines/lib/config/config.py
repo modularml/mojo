@@ -731,8 +731,22 @@ def _apply_speculative_target_architecture(
             models["main"].huggingface_config,
         )
         has_mtp = (getattr(text_config, "mtp_num_hidden_layers", 0) or 0) > 0
+        draft_archs = (
+            draft_model.huggingface_config.architectures
+            if draft_model is not None
+            else None
+        )
         if speculative.is_mtp() and models.get("draft") is None and has_mtp:
             target_archs[0] = "UnifiedMTPQwen3_5ForConditionalGeneration"
+        elif (
+            speculative.is_dflash2()
+            and draft_archs
+            # "DFlash2DraftModel" is a registered placeholder arch, so
+            # unlike v1's "DFlashDraftModel" it is never rewritten to
+            # "LlamaForCausalLM" and only the one spelling reaches here.
+            and draft_archs[0] == "DFlash2DraftModel"
+        ):
+            target_archs[0] = "UnifiedDflash2Qwen3_5ForConditionalGeneration"
     if target_archs[0] == "GlmMoeDsaForCausalLM":
         # GLM-5.2 bakes a NextN MTP layer into the target checkpoint, so
         # there is no separate draft model. GLM-5.1 shares the arch name

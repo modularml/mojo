@@ -39,7 +39,7 @@ from max.nn.linear import MLP, ColumnParallelLinear, Linear
 from max.nn.norm import RMSNorm
 from max.nn.quant_config import QuantConfig
 from max.nn.rotary_embedding import Llama3RotaryEmbedding
-from max.nn.transformer import forward_sequential_layers
+from max.nn.transformer import ReturnHiddenStates, forward_sequential_layers
 from max.nn.transformer.distributed_transformer import (
     DistributedLogitsPostprocessMixin,
 )
@@ -635,10 +635,28 @@ class Qwen3_5(DistributedLogitsPostprocessMixin, Module):
             g for g in (full_attn_indices, self.linear_layer_indices) if g
         ]
 
+        # DFlash-style drafters read the target's hidden state at a few
+        # chosen layers. `on_layer_output` fires for both layer kinds and
+        # through the subgraph path, so the taps need no per-kind casing.
+        capture_hidden_states: list[list[TensorValue]] | None = None
+        on_layer_output = None
+        if (
+            self.return_hidden_states == ReturnHiddenStates.SELECTED_LAYERS
+            and self.config.target_layer_ids
+        ):
+            capture_layer_set = set(self.config.target_layer_ids)
+            captures: list[list[TensorValue]] = []
+            capture_hidden_states = captures
+
+            def on_layer_output(idx: int, h: list[TensorValue]) -> None:
+                if idx in capture_layer_set:
+                    captures.append(list(h))
+
         hs = forward_sequential_layers(
             list(self.layers),
             inputs_for_layer=inputs_for_layer,
             initial_hidden_states=hs,
+            on_layer_output=on_layer_output,
             subgraph_layer_groups=(
                 groups if self.config.use_subgraphs else None
             ),
@@ -649,7 +667,11 @@ class Qwen3_5(DistributedLogitsPostprocessMixin, Module):
         )
 
         logits = self._postprocess_logits(
-            hs, row_offsets, return_n_logits, signal_buffers
+            hs,
+            row_offsets,
+            return_n_logits,
+            signal_buffers,
+            capture_hidden_states=capture_hidden_states,
         )
         return tuple(logits)
 

@@ -44,6 +44,22 @@ the [container](/container) page now links to the new page.
   speculative decoding. The fused spec-decode architectures now inherit the
   base architecture's settings instead of redeclaring them, so `--tool-parser`
   no longer has to be passed by hand.
+- Added DFlash2 speculative decoding for `Qwen/Qwen3.8-27B`. DFlash2 is a
+  block-diffusion drafter: it proposes a whole block of tokens in one
+  forward pass, from hidden states tapped at five target layers, rather
+  than running a draft head autoregressively once per speculated token.
+  Two mechanisms are new relative to the existing DFlash architectures — a
+  two-tap grouped dynamic convolution wrapping both sides of each
+  sublayer, and a low-rank candidate selector that keeps several
+  candidates per block position and traces one path through them. Against
+  this model's own multi-token-prediction drafter at a draft width of
+  seven, end-to-end serving improves 3-5% in output tokens per second and
+  4.2-4.7% in median time-per-output-token across concurrency 1 to 8.
+  Acceptance length is strongly workload-dependent — 12.0% better on GSM8K
+  under greedy decoding, but only 3.0% on a copy-from-prompt workload
+  where both drafters approach a ceiling — so the throughput gain comes
+  mostly from a cheaper speculative step rather than from accepting more
+  tokens.
 - Fixed unbounded host-memory usage in Gemma 4 video pre-processing: the
   server now decodes only the sampled frames of a video instead of
   materializing every frame before sampling, bounding peak memory at the
