@@ -170,6 +170,11 @@ This version is still a work in progress.
 
 ## Library changes
 
+- `CStringSlice` has been renamed to `CStringSpan`, matching the `Span`-based
+  naming of the other non-owning view types (`StringSpan`, `Span`). The old
+  `CStringSlice` name remains available as a compatibility alias. Likewise,
+  `as_c_string_slice()` has been renamed to `as_c_string_span()`.
+
 - `Counter` can now be constructed from any iterable of values, not just a
   `List`, e.g. `Counter(["a", "a", "b"])` or `Counter(String("aaab").bytes())`.
   This replaces the previous `Counter(items: List[V])` constructor.

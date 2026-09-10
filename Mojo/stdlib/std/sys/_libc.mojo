@@ -24,7 +24,7 @@ from std.ffi import (
     c_pid_t,
     external_call,
     get_errno,
-    CStringSlice,
+    CStringSpan,
 )
 from std.sys import CompilationTarget
 
@@ -75,7 +75,7 @@ comptime FILE_ptr = OptionalPointer[NoneType, UntrackedOrigin[mut=True]]
 
 
 @always_inline
-def fdopen(fd: c_int, mode: CStringSlice[_]) -> FILE_ptr:
+def fdopen(fd: c_int, mode: CStringSpan[_]) -> FILE_ptr:
     return external_call["fdopen", FILE_ptr](fd, mode)
 
 
@@ -91,8 +91,8 @@ def fflush(stream: FILE_ptr) -> c_int:
 
 @always_inline
 def popen(
-    command: CStringSlice[_],
-    type: CStringSlice[_],
+    command: CStringSpan[_],
+    type: CStringSpan[_],
 ) -> FILE_ptr:
     return external_call["popen", FILE_ptr](command, type)
 
@@ -136,10 +136,10 @@ def posix_spawnp[
     //,
 ](
     pid: MutPointer[c_pid_t, _],
-    file: CStringSlice[_],
-    argv: Pointer[Optional[CStringSlice[argv_origin]], _],
+    file: CStringSpan[_],
+    argv: Pointer[Optional[CStringSpan[argv_origin]], _],
     envp: OptionalPointer[
-        Optional[CStringSlice[ImmutAnyOrigin]], ImmutAnyOrigin
+        Optional[CStringSpan[ImmutAnyOrigin]], ImmutAnyOrigin
     ],
 ) -> c_int:
     """[`posix_spawn`](https://pubs.opengroup.org/onlinepubs/007904975/functions/posix_spawn.html)
@@ -147,7 +147,7 @@ def posix_spawnp[
 
     Args:
         pid: `Pointer` destination for the process id if spawned successfully.
-        file: NUL-terminated C string (`CStringSlice`) with the path to the executable.
+        file: NUL-terminated C string (`CStringSpan`) with the path to the executable.
         argv: The argument array; must be terminated with a NULL (`None`) entry.
         envp: The environment array; must be terminated with a NULL (`None`) entry.
     """
@@ -165,7 +165,7 @@ def posix_spawnp[
 
 @always_inline
 def _get_environ() -> (
-    OptionalPointer[Optional[CStringSlice[ImmutAnyOrigin]], ImmutAnyOrigin]
+    OptionalPointer[Optional[CStringSpan[ImmutAnyOrigin]], ImmutAnyOrigin]
 ):
     """Returns the process environment pointer (POSIX `environ`).
 
@@ -174,7 +174,7 @@ def _get_environ() -> (
         suitable for passing as the `envp` argument to `posix_spawnp`.
     """
     comptime _EnvpType = OptionalPointer[
-        Optional[CStringSlice[ImmutAnyOrigin]], ImmutAnyOrigin
+        Optional[CStringSpan[ImmutAnyOrigin]], ImmutAnyOrigin
     ]
     comptime if CompilationTarget.is_macos():
         # _NSGetEnviron() from <crt_externs.h> returns char ***,
@@ -188,7 +188,7 @@ def _get_environ() -> (
         # RTLD_DEFAULT is ((void *)0) on Linux.
         return dlsym[_EnvpType](
             OptionalPointer[NoneType, MutUntrackedOrigin](),
-            "environ".as_c_string_slice().ptr(),
+            "environ".as_c_string_span().ptr(),
         ).value()[]
     else:
         CompilationTarget.unsupported_target_error[operation="_get_environ"]()
@@ -362,7 +362,7 @@ def dlsym[
 
 
 def realpath(
-    path: CStringSlice[_],
+    path: CStringSpan[_],
     resolved_path: MutPointer[c_char, _],
     out result: OptionalPointer[c_char, MutUntrackedOrigin],
 ):

@@ -23,7 +23,7 @@ from std.reflection.type_info import _unqualified_type_name
 from std.sys import size_of
 from std.sys.info import is_gpu
 from std.sys.defines import get_defined_int
-from std.ffi import CStringSlice
+from std.ffi import CStringSpan
 
 from std.bit import byte_swap
 from std.memory import bitcast, unsafe_memcpy
@@ -430,13 +430,13 @@ struct _FixedWriteBuffer(Writer):
 
     def nul_terminate(
         mut self,
-    ) -> CStringSlice[origin_of(self).unsafe_mut_cast[False]()]:
+    ) -> CStringSpan[origin_of(self).unsafe_mut_cast[False]()]:
         if self._pos + 1 > FIXED_WRITE_BUFFER_BYTES:
             _fixed_buffer_exceeded()
         self._data.unsafe_ptr()[unsafe_offset=self._pos] = 0
         self._pos += 1
 
-        return CStringSlice(
+        return CStringSpan(
             unsafe_from_ptr=self._data.unsafe_ptr()
             .unsafe_bitcast[Int8]()
             .as_imm()

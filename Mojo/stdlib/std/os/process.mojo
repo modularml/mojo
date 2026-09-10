@@ -36,7 +36,7 @@ from std.sys._libc import (
     close,
     WaitFlags,
 )
-from std.ffi import c_char, c_int, c_pid_t, get_errno, CStringSlice
+from std.ffi import c_char, c_int, c_pid_t, get_errno, CStringSpan
 from .os import abort, sep
 
 
@@ -395,22 +395,22 @@ struct Process:
 
         var arg_count = len(argv)
         var argv_array_ptr_cstr_ptr = List[
-            Optional[CStringSlice[ImmutAnyOrigin]]
+            Optional[CStringSpan[ImmutAnyOrigin]]
         ](
             length=arg_count + 2,
             fill={},
         )
         var offset = 0
         # Arg 0 in `argv` ptr array should be the file name
-        argv_array_ptr_cstr_ptr[offset] = rebind[CStringSlice[ImmutAnyOrigin]](
-            file_name.as_c_string_slice()
+        argv_array_ptr_cstr_ptr[offset] = rebind[CStringSpan[ImmutAnyOrigin]](
+            file_name.as_c_string_span()
         )
         offset += 1
 
         for var arg in argv:
             argv_array_ptr_cstr_ptr[offset] = rebind[
-                CStringSlice[ImmutAnyOrigin]
-            ](arg.as_c_string_slice())
+                CStringSpan[ImmutAnyOrigin]
+            ](arg.as_c_string_span())
             offset += 1
 
         # `argv` ptr array terminates with NULL PTR
@@ -420,7 +420,7 @@ struct Process:
 
         var has_error_code = posix_spawnp(
             Pointer(to=pid),
-            path.as_c_string_slice(),
+            path.as_c_string_span(),
             # Safety: `argv_array_ptr_cstr_ptr` has at least 2 elements so is non-null
             argv_array_ptr_cstr_ptr.unsafe_ptr(),
             _get_environ(),  # inherit parent's environment

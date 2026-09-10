@@ -40,8 +40,8 @@ def setenv(var name: String, var value: String, overwrite: Bool = True) -> Bool:
       case, True is returned.
     """
     var status = external_call["setenv", Int32](
-        name.as_c_string_slice(),
-        value.as_c_string_slice(),
+        name.as_c_string_span(),
+        value.as_c_string_span(),
         Int32(1 if overwrite else 0),
     )
     return status == 0
@@ -56,7 +56,7 @@ def unsetenv(var name: String) -> Bool:
     Returns:
         True if unsetting the variable succeeded. Otherwise, False is returned.
     """
-    return external_call["unsetenv", c_int](name.as_c_string_slice()) == 0
+    return external_call["unsetenv", c_int](name.as_c_string_span()) == 0
 
 
 def getenv(var name: String, default: String = "") -> String:
@@ -76,7 +76,7 @@ def getenv(var name: String, default: String = "") -> String:
     """
     var ptr = external_call[
         "getenv", OptionalPointer[UInt8, ImmUntrackedOrigin]
-    ](name.as_c_string_slice())
+    ](name.as_c_string_span())
     if not ptr:
         return default
     return String(unsafe_from_utf8_ptr=ptr.value())

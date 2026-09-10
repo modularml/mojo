@@ -23,7 +23,7 @@ from std.collections.string.string_span import (
     StaticString,
 )
 from std.os import PathLike
-from std.ffi import c_char, CStringSlice
+from std.ffi import c_char, CStringSpan
 
 # ===-----------------------------------------------------------------------===#
 # StringLiteral
@@ -343,16 +343,29 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         return self.ptr()
 
     @always_inline
-    def as_c_string_slice(
+    def as_c_string_span(
         self,
-    ) -> CStringSlice[ImmStaticOrigin]:
-        """Return a `CStringSlice` to the underlying memory of the string.
+    ) -> CStringSpan[ImmStaticOrigin]:
+        """Return a `CStringSpan` to the underlying memory of the string.
 
         Returns:
-            The `CStringSlice` of the string.
+            The `CStringSpan` of the string.
         """
         # Safety: StringLiteral is guaranteed to be nul-terminated.
-        return CStringSlice(unsafe_from_ptr=self.ptr().unsafe_bitcast[c_char]())
+        return CStringSpan(unsafe_from_ptr=self.ptr().unsafe_bitcast[c_char]())
+
+    @deprecated(use=as_c_string_span)
+    @always_inline
+    def as_c_string_slice(
+        self,
+    ) -> CStringSpan[ImmStaticOrigin]:
+        """Return a `CStringSpan` to the underlying memory of the string.
+
+        Returns:
+            The `CStringSpan` of the string.
+        """
+        # Safety: StringLiteral is guaranteed to be nul-terminated.
+        return self.as_c_string_span()
 
     @always_inline("nodebug")
     def as_string_slice(self) -> StaticString:

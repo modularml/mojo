@@ -791,13 +791,13 @@ def test_optional_unsafe_pointer_across_c_ffi() raises:
     var not_found = external_call[
         "strchr",
         Result,
-    ](string.as_c_string_slice(), Int8(ord("z")))
+    ](string.as_c_string_span(), Int8(ord("z")))
     assert_false(not_found)
 
     var found = external_call[
         "strchr",
         Result,
-    ](string.as_c_string_slice(), Int8(ord("a")))
+    ](string.as_c_string_span(), Int8(ord("a")))
     assert_true(found)
     assert_equal(Int(found[]), Int(string.as_bytes().unsafe_ptr()))
 

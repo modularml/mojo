@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.ffi import external_call, CStringSlice, c_size_t
+from std.ffi import external_call, CStringSpan, c_size_t
 from std.builtin.device_passable import DevicePassable
 from std.collections.optional import OptionalReg
 from std.reflection import get_linkage_name, call_location, SourceLocation
@@ -173,22 +173,22 @@ __extension DeviceFunction:
                 _CString[],
                 Pointer[_DeviceFunctionPtr[mut=True], origin_of(result)],
                 _DeviceContextPtr[mut=True],
-                CStringSlice[ImmStaticOrigin],
-                CStringSlice[ImmStaticOrigin],
-                CStringSlice[ImmStaticOrigin],
+                CStringSpan[ImmStaticOrigin],
+                CStringSpan[ImmStaticOrigin],
+                CStringSpan[ImmStaticOrigin],
                 c_size_t,
                 Int32,
-                CStringSlice[origin_of(debug_level)],
+                CStringSpan[origin_of(debug_level)],
                 Int32,
             ](
                 Pointer(to=result),
                 ctx._handle,
-                self._func_impl.module_name.as_c_string_slice(),
-                self._func_impl.function_name.as_c_string_slice(),
-                self._func_impl.asm.as_c_string_slice(),
+                self._func_impl.module_name.as_c_string_span(),
+                self._func_impl.function_name.as_c_string_span(),
+                self._func_impl.asm.as_c_string_span(),
                 c_size_t(self._func_impl.asm.byte_length()),
                 max_dynamic_shared_size_bytes,
-                debug_level.as_c_string_slice(),
+                debug_level.as_c_string_span(),
                 Int32(Int(OptimizationLevel)),
             ),
         )

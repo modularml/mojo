@@ -585,7 +585,7 @@ def _debug_assert_msg(
             from std._gpu.primitives.id import block_idx, thread_idx
 
             _printf[fmt](
-                loc.file_name().as_c_string_slice(),
+                loc.file_name().as_c_string_span(),
                 loc.line(),
                 loc.column(),
                 UInt(block_idx.x),
@@ -651,7 +651,7 @@ def _debug_assert_msg(
             )
         else:
             _printf["At: %s:%llu:%llu: Assert Error: %s\n"](
-                loc.file_name().as_c_string_slice(),
+                loc.file_name().as_c_string_span(),
                 loc.line(),
                 loc.column(),
                 message,

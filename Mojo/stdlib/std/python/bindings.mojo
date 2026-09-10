@@ -679,7 +679,7 @@ struct PythonTypeBuilder(Copyable):
 
         var type_spec = PyType_Spec(
             # FIXME(MOCO-1306): This should be `T.__name__`.
-            self.type_name.as_c_string_slice(),
+            self.type_name.as_c_string_span(),
             c_int(self.basicsize),
             0,
             Py_TPFLAGS_DEFAULT,
@@ -1202,7 +1202,7 @@ def _set_python_error(
     var error_type = cpython.get_error_global(exc_type.global_name)
     cpython.PyErr_SetString(
         error_type,
-        error_message.as_c_string_slice().ptr().as_unsafe_any_origin(),
+        error_message.as_c_string_span().ptr().as_unsafe_any_origin(),
     )
 
 
@@ -1258,7 +1258,7 @@ def _py_init_function_nonregistered(
     cpython.PyErr_SetString(
         error_type,
         "No initializer registered for this type. Use def_py_init() or"
-        " def_init_defaultable() to register an initializer.".as_c_string_slice()
+        " def_init_defaultable() to register an initializer.".as_c_string_span()
         .ptr()
         .as_unsafe_any_origin(),
     )

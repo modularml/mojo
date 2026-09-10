@@ -29,7 +29,7 @@ from std.memory import alloc
 # after them are variadic.
 # CHECK-DAG: declare i32 @snprintf(ptr, i64, ptr, ...)
 def format_into(buf: Pointer[c_char, _], size: Int) -> c_int:
-    var fmt = "%d/%d".as_c_string_slice()
+    var fmt = "%d/%d".as_c_string_span()
     return external_call["snprintf", c_int, num_fixed_args=3](
         buf, size, fmt.ptr(), c_int(6), c_int(7)
     )

@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 import std.os
-from std.ffi import CStringSlice, c_char, c_int, external_call
+from std.ffi import CStringSpan, c_char, c_int, external_call
 from std.memory import alloc
 from std.os import remove
 from std.pathlib import Path
@@ -29,7 +29,7 @@ def test_external_call_handles_rp_return_types() raises:
     var path = "/does/not/exist/here/file.file"
     var mode = "r"
     var result = external_call["fopen", RegisterPassablePointer](
-        path.as_c_string_slice(), mode.as_c_string_slice()
+        path.as_c_string_span(), mode.as_c_string_span()
     )
     assert_false(result.pointer)
 
@@ -45,8 +45,8 @@ def test_snprintf_mixed_variadic_args() raises:
     comptime SIZE = 64
     var allocation = alloc[c_char]({count = SIZE}).into_managed()
     var buf = allocation.unsafe_ptr()
-    var fmt = "[%d|%s|%d|%.2f|%c]".as_c_string_slice()
-    var word = "mid".as_c_string_slice()
+    var fmt = "[%d|%s|%d|%.2f|%c]".as_c_string_span()
+    var word = "mid".as_c_string_span()
 
     var written = external_call["snprintf", c_int, num_fixed_args=3](
         buf,
@@ -60,7 +60,7 @@ def test_snprintf_mixed_variadic_args() raises:
     )
 
     var formatted = String(
-        StringSlice(unsafe_from_utf8=CStringSlice(unsafe_from_ptr=buf))
+        StringSlice(unsafe_from_utf8=CStringSpan(unsafe_from_ptr=buf))
     )
 
     assert_equal(formatted, "[42|mid|-7|2.50|z]")

@@ -38,7 +38,7 @@ from std.format._utils import (
 from std.os import PathLike, abort
 from std.atomic import Atomic, Ordering, fence
 from std.sys import size_of, bit_width_of
-from std.ffi import c_char, CStringSlice
+from std.ffi import c_char, CStringSpan
 from std.sys.info import is_32bit, is_apple_gpu
 
 from std.bit import count_leading_zeros
@@ -571,7 +571,7 @@ struct String(
         # Copy the data.
         self = String(
             StringSlice(
-                unsafe_from_utf8=CStringSlice(
+                unsafe_from_utf8=CStringSpan(
                     unsafe_from_ptr=unsafe_from_utf8_ptr.unsafe_bitcast[Int8]()
                 )
             )
@@ -590,7 +590,7 @@ struct String(
         # Copy the data.
         self = String(
             StringSlice(
-                unsafe_from_utf8=CStringSlice(
+                unsafe_from_utf8=CStringSpan(
                     unsafe_from_ptr=unsafe_from_utf8_ptr.unsafe_bitcast[Int8]()
                 )
             )
@@ -1454,14 +1454,26 @@ struct String(
 
         return self.unsafe_ptr().unsafe_mut_cast[True]()
 
+    @deprecated(use=as_c_string_span)
     @always_inline
     def as_c_string_slice(
         mut self,
-    ) -> CStringSlice[ImmOrigin(origin_of(self))]:
-        """Return a `CStringSlice` to the underlying memory of the string.
+    ) -> CStringSpan[ImmOrigin(origin_of(self))]:
+        """Return a `CStringSpan` to the underlying memory of the string.
 
         Returns:
-            The `CStringSlice` of the string.
+            The `CStringSpan` of the string.
+        """
+        return self.as_c_string_span()
+
+    @always_inline
+    def as_c_string_span(
+        mut self,
+    ) -> CStringSpan[ImmOrigin(origin_of(self))]:
+        """Return a `CStringSpan` to the underlying memory of the string.
+
+        Returns:
+            The `CStringSpan` of the string.
         """
         # Add a nul terminator, making the string mutable if not already
         if not self._has_nul_terminator():
@@ -1471,7 +1483,7 @@ struct String(
             self._capacity_or_data |= Self.FLAG_HAS_NUL_TERMINATOR
 
         # Safety: we ensure the string is null-terminated above.
-        return CStringSlice(
+        return CStringSpan(
             unsafe_from_ptr=self.unsafe_ptr().unsafe_bitcast[c_char]()
         )
 

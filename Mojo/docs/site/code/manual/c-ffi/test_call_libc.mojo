@@ -100,7 +100,7 @@ def test_snprintf_variadic() raises:
     var written = external_call["snprintf", c_int, num_fixed_args=3](
         buf.unsafe_ptr(),
         c_size_t(64),
-        "score: %d/%d".as_c_string_slice(),
+        "score: %d/%d".as_c_string_span(),
         c_int(7),
         c_int(10),
     )

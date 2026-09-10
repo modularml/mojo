@@ -38,7 +38,7 @@ from std.ffi import (
     c_uint,
     c_size_t,
     external_call,
-    CStringSlice,
+    CStringSpan,
 )
 from std.sys import (
     align_of,
@@ -216,7 +216,7 @@ comptime _DeviceContextScopePtr[
 ] = OptionalPointer[_DeviceContextScopeCpp, origin]
 
 comptime _CString[origin: ImmOrigin = ImmUntrackedOrigin] = Optional[
-    CStringSlice[origin]
+    CStringSpan[origin]
 ]
 
 comptime _DumpPath = Variant[Bool, Path, StaticString, def() capturing -> Path]
@@ -2958,13 +2958,13 @@ struct DeviceFunction[
                 "AsyncRT_DeviceFunction_copyToConstantMemory",
                 _CString[],
                 _DeviceFunctionPtr[mut=True],
-                CStringSlice[ImmStaticOrigin],
+                CStringSpan[ImmStaticOrigin],
                 c_size_t,
                 OpaquePointer[type_of(mapping.ptr).origin],
                 c_size_t,
             ](
                 self._handle,
-                mapping.name.as_c_string_slice(),
+                mapping.name.as_c_string_span(),
                 c_size_t(mapping.name.byte_length()),
                 mapping.ptr,
                 c_size_t(mapping.byte_count),
@@ -3777,22 +3777,22 @@ struct DeviceExternalFunction:
                 _CString[],
                 Pointer[_DeviceFunctionPtr[mut=True], origin_of(result)],
                 _DeviceContextPtr[mut=True],
-                CStringSlice[ImmStaticOrigin],
-                CStringSlice[origin_of(function_name)],
-                CStringSlice[origin_of(asm)],
+                CStringSpan[ImmStaticOrigin],
+                CStringSpan[origin_of(function_name)],
+                CStringSpan[origin_of(asm)],
                 c_size_t,
                 Int32,
-                CStringSlice[origin_of(debug_level)],
+                CStringSpan[origin_of(debug_level)],
                 Int32,
             ](
                 Pointer(to=result),
                 ctx._handle,
-                module_name.as_c_string_slice(),
-                function_name.as_c_string_slice(),
-                asm.as_c_string_slice(),
+                module_name.as_c_string_span(),
+                function_name.as_c_string_span(),
+                asm.as_c_string_span(),
                 c_size_t(asm.byte_length()),
                 max_dynamic_shared_size_bytes,
-                debug_level.as_c_string_slice(),
+                debug_level.as_c_string_span(),
                 Int32(Int(OptimizationLevel)),
             )
         )
@@ -3819,13 +3819,13 @@ struct DeviceExternalFunction:
                 "AsyncRT_DeviceFunction_copyToConstantMemory",
                 _CString[],
                 _DeviceFunctionPtr[mut=True],
-                type_of(mapping.name.as_c_string_slice()),
+                type_of(mapping.name.as_c_string_span()),
                 c_size_t,
                 OpaquePointer[MutAnyOrigin],
                 c_size_t,
             ](
                 self._handle,
-                mapping.name.as_c_string_slice(),
+                mapping.name.as_c_string_span(),
                 c_size_t(mapping.name.byte_length()),
                 mapping.ptr.as_unsafe_any_origin(),
                 c_size_t(mapping.byte_count),
@@ -4014,11 +4014,11 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
                 "AsyncRT_DeviceContext_create",
                 _CString[],
                 Pointer[_DeviceContextPtr[mut=True], origin_of(result)],
-                CStringSlice[ImmOrigin(origin_of(api))],
+                CStringSpan[ImmOrigin(origin_of(api))],
                 Int32,
             ](
                 Pointer(to=result),
-                api.as_c_string_slice(),
+                api.as_c_string_span(),
                 Int32(device_id),
             )
         )
@@ -6746,7 +6746,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
             external_call[
                 "AsyncRT_DeviceContext_numberOfDevices",
                 Int32,
-            ](api.as_c_string_slice())
+            ](api.as_c_string_span())
         )
 
     @staticmethod

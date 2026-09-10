@@ -21,7 +21,7 @@ foreign code. It includes:
   at runtime and calling their functions.
 - **External function calls**: `external_call()` for calling C functions
   by name with compile-time resolution.
-- **String interop**: `CStringSlice` for working with null-terminated C strings.
+- **String interop**: `CStringSpan` for working with null-terminated C strings.
 
 Example:
 
@@ -59,7 +59,7 @@ from std.memory.alloc import dealloc, ThinAllocation
 from std.memory.unsafe_pointer import unsafe_cast
 
 from std.sys.info import CompilationTarget, is_32bit, is_64bit, size_of
-from .cstring import CStringSlice
+from .cstring import CStringSpan, CStringSlice
 from .unsafe_union import UnsafeUnion
 
 # ===-----------------------------------------------------------------------===#
@@ -411,7 +411,7 @@ struct OwnedDLHandle(Boolable, Movable):
             " `get_function[Ret](name)`."
         )
         var ptr = self._handle.get_symbol[NoneType](
-            cstr_name=name.as_c_string_slice()
+            cstr_name=name.as_c_string_span()
         )
         if not ptr:
             raise Error(t"symbol not found: {name}")
@@ -439,7 +439,7 @@ struct OwnedDLHandle(Boolable, Movable):
     @always_inline
     def _get_function[
         result_type: TrivialRegisterPassable
-    ](self, *, cstr_name: CStringSlice[_]) -> result_type:
+    ](self, *, cstr_name: CStringSpan[_]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -489,12 +489,12 @@ struct OwnedDLHandle(Boolable, Movable):
         """
         var name_copy = String(name)
         return self.get_symbol[result_type](
-            cstr_name=name_copy.as_c_string_slice()
+            cstr_name=name_copy.as_c_string_span()
         )
 
     def get_symbol[
         mut: Bool, origin: Origin[mut=mut], //, result_type: AnyType
-    ](ref[origin] self, *, cstr_name: CStringSlice[_]) -> Optional[
+    ](ref[origin] self, *, cstr_name: CStringSpan[_]) -> Optional[
         Pointer[result_type, origin]
     ]:
         """Returns a pointer to the symbol with the given name in the dynamic
@@ -626,7 +626,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
 
         var fspath = path.__fspath__()
         var file = (
-            fspath.as_c_string_slice()
+            fspath.as_c_string_span()
             .ptr()
             .as_imm()
             .unsafe_origin_cast[ImmUntrackedOrigin]()
@@ -645,8 +645,8 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
         var handle = dlopen(file, Int32(flags))
         if not handle:
             var error_message = dlerror()
-            var message = StringSlice(
-                unsafe_from_utf8=CStringSlice(
+            var message = StringSpan(
+                unsafe_from_utf8=CStringSpan(
                     unsafe_from_ptr=error_message.value().as_imm()
                 )
             ) if error_message else {}
@@ -664,7 +664,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
         """
         var opaque_function_ptr = dlsym(
             self.handle,
-            name.as_c_string_slice().ptr(),
+            name.as_c_string_span().ptr(),
         )
 
         return Bool(opaque_function_ptr)
@@ -718,7 +718,7 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
         )
 
         return self._get_function[result_type](
-            cstr_name=name.as_c_string_slice()
+            cstr_name=name.as_c_string_span()
         )
 
     @always_inline
@@ -738,13 +738,13 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
         # Force unique the func_name so we know that it is nul-terminated.
         comptime func_name_literal = get_static_string[func_name]()
         return self._get_function[result_type](
-            cstr_name=func_name_literal.as_c_string_slice(),
+            cstr_name=func_name_literal.as_c_string_span(),
         )
 
     @always_inline
     def _get_function[
         result_type: TrivialRegisterPassable
-    ](self, *, cstr_name: CStringSlice[_]) -> result_type:
+    ](self, *, cstr_name: CStringSpan[_]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -785,12 +785,12 @@ struct _DLHandle(Boolable, ImplicitlyCopyable, RegisterPassable):
         """
         var name_copy = String(name)
         return self.get_symbol[result_type](
-            cstr_name=name_copy.as_c_string_slice()
+            cstr_name=name_copy.as_c_string_span()
         )
 
     def get_symbol[
         result_type: AnyType
-    ](self, *, cstr_name: CStringSlice[_]) -> Optional[
+    ](self, *, cstr_name: CStringSpan[_]) -> Optional[
         Pointer[result_type, MutUntrackedOrigin]
     ]:
         """Returns a pointer to the symbol with the given name in the dynamic
@@ -1156,7 +1156,7 @@ def external_call[
     # int open(const char *path, int oflag, ...);
     var path_str = path
     var fd = external_call["open", c_int, num_fixed_args=2](
-        path_str.as_c_string_slice(), c_int(flags), c_int(0o666)
+        path_str.as_c_string_span(), c_int(flags), c_int(0o666)
     )
     ```
 
@@ -1189,10 +1189,10 @@ def external_call[
     comptime if types.contains[String]():
         comptime assert False, (
             "Passing a `String` to `external_call` is never correct. Instead,"
-            " first call `as_c_string_slice()` to pass a C-FFI compatible"
-            " `CStringSlice` type (synonymous with C's `const char*`). Example"
+            " first call `as_c_string_span()` to pass a C-FFI compatible"
+            " `CStringSpan` type (synonymous with C's `const char*`). Example"
             ' `external_call["foo", NoneType]("some'
-            ' string".as_c_string_slice())'
+            ' string".as_c_string_span())'
         )
 
     # The argument pack will contain references for each value in the pack,

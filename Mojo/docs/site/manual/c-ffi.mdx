@@ -82,7 +82,7 @@ def main():
     var written = external_call["snprintf", c_int, num_fixed_args=3](
         buf.unsafe_ptr(),
         c_size_t(64),
-        "score: %d/%d".as_c_string_slice(),
+        "score: %d/%d".as_c_string_span(),
         c_int(7),
         c_int(10),
     )
@@ -416,14 +416,14 @@ length-prefixed UTF-8.
 
 ### Convert a Mojo string to a C string
 
-Call `as_c_string_slice()` on a `String` to ensure null termination, and get
-a type safe `CStringSlice` back.
+Call `as_c_string_span()` on a `String` to ensure null termination, and get
+a type safe `CStringSpan` back.
 
 ```mojo
-name.as_c_string_slice()
+name.as_c_string_span()
 ```
 
-The source string must be mutable because `as_c_string_slice()` may append
+The source string must be mutable because `as_c_string_span()` may append
 a terminating zero byte. It may also move the string's buffer, so call it
 once and reuse the result.
 
@@ -448,7 +448,7 @@ free the C-owned memory:
 var name: String = "Echo"
 var cptr = external_call[
     "strdup", Optional[Pointer[c_char, MutUntrackedOrigin]]
-](name.as_c_string_slice())
+](name.as_c_string_span())
 if cptr:
     var ptr = cptr.value()
     # Ask C for the length. A Mojo string's `byte_length()` measures the
@@ -462,10 +462,10 @@ if cptr:
 ### Convert Mojo string literals to C strings
 
 String literals can be passed to C APIs that expect a null-terminated
-`char*`. Call `as_c_string_slice()` to access the C string:
+`char*`. Call `as_c_string_span()` to access the C string:
 
 ```mojo
-"libm.so.6".as_c_string_slice()
+"libm.so.6".as_c_string_span()
 ```
 
 Mojo performs the conversion at compile time and embeds the null-terminated
@@ -563,7 +563,7 @@ def main() raises:
     var name: String = "PATH"
     var found = external_call[
         "getenv", Optional[Pointer[c_char, MutUntrackedOrigin]]
-    ](name.as_c_string_slice())
+    ](name.as_c_string_span())
     if found:
         print(String(unsafe_from_utf8_ptr=found.value()))
     else:
@@ -590,12 +590,12 @@ def main() raises:
 
     # The pointer carries `line`'s origin, so `line` outlives the call.
     var line = String("Hello")
-    var n = c_strlen(line.as_c_string_slice())
+    var n = c_strlen(line.as_c_string_span())
     print(t"length of '{line}': {n}")  # 5
 
     # Refill the same variable and call again. The origin still holds.
     line = "Hello, Mojo!"
-    n = c_strlen(line.as_c_string_slice())
+    n = c_strlen(line.as_c_string_span())
     print(t"length of '{line}': {n}")  # 12
 ```
 
@@ -635,7 +635,7 @@ Each `unsafe_` operation marks a guarantee and responsibility you've taken
 over from the compiler.
 
 Origins still help wherever a pointer stays inside Mojo's view. Deriving a
-pointer from a variable, as in `line.as_c_string_slice()`,
+pointer from a variable, as in `line.as_c_string_span()`,
 keeps that variable alive for as long as the pointer lives. That protection
 ends when C stores the pointer somewhere Mojo can't see.
 
@@ -667,7 +667,7 @@ Each entry names the API it applies to.
   `String` at compile time, but a callable from `get_function()` accepts one
   and reads whatever the struct's bytes happen to be. Passing a 53-byte
   `String` to `strlen` returns 5. Always pass
-  `as_c_string_slice()`.
+  `as_c_string_span()`.
 - **Pointers returned into a library** (`OwnedDLHandle`): When a C function
   returns a pointer into its own library, the return type must borrow from
   the handle, as in `Pointer[c_char, lib_origin]` where
@@ -690,7 +690,7 @@ Each entry names the API it applies to.
   Check the C documentation for whether a function retains the pointer.
 - **Non-nul-terminated buffers** (both): A bare `Pointer[c_char]` into a
   buffer with no terminator sends a C string function reading off the end.
-  `CStringSlice` is the guardrail for this, ensuring a null terminator is
+  `CStringSpan` is the guardrail for this, ensuring a null terminator is
   present.
 
 ### Caught at build time
@@ -704,7 +704,7 @@ These fail the build, but not always where you'd expect.
   disagree. `get_function()` casts a runtime pointer instead, so it has no
   module-level declaration to collide.
 - **String arguments** (`external_call()`): Passing a `String` is rejected at
-  compile time, and the error names `as_c_string_slice()` as the fix. This is
+  compile time, and the error names `as_c_string_span()` as the fix. This is
   the one signature mistake the API catches for you. Take care because the
   checking is narrow, and `OwnedDLHandle` doesn't repeat it.
 - **Return types must be `RegisterPassable`** (both): `return_type` is bound

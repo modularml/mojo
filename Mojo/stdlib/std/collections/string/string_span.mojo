@@ -43,7 +43,7 @@ from std.format._utils import _TotalWritableBytes, _FlushingWriteBuffer
 from std.math import align_down
 from std.os import PathLike, abort
 from std.sys import simd_width_of
-from std.ffi import c_char, CStringSlice
+from std.ffi import c_char, CStringSpan
 from std.sys.intrinsics import likely, unlikely
 
 from std.bit import count_trailing_zeros
@@ -267,15 +267,15 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
     ](
         out self: StringSpan[cstring_origin],
         *,
-        unsafe_from_utf8: CStringSlice[cstring_origin],
+        unsafe_from_utf8: CStringSpan[cstring_origin],
     ):
-        """Construct a new `StringSpan` from a UTF-8 encoded `CStringSlice`.
+        """Construct a new `StringSpan` from a UTF-8 encoded `CStringSpan`.
 
         Parameters:
-            cstring_origin: The origin of the source `CStringSlice`.
+            cstring_origin: The origin of the source `CStringSpan`.
 
         Args:
-            unsafe_from_utf8: A `CStringSlice` encoded in UTF-8.
+            unsafe_from_utf8: A `CStringSpan` encoded in UTF-8.
 
         Safety:
             `unsafe_from_utf8` MUST be valid UTF-8 encoded data.
@@ -1034,15 +1034,28 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
     # Methods
     # ===------------------------------------------------------------------===#
 
+    @deprecated(use=as_c_string_span)
     @__allow_legacy_custom_self_type
     @always_inline
     def as_c_string_slice(
         self: StaticString,
-    ) -> CStringSlice[ImmStaticOrigin]:
-        """Return a CStringSlice for this StaticString.
+    ) -> CStringSpan[ImmStaticOrigin]:
+        """Return a CStringSpan for this StaticString.
 
         Returns:
-            A c-compatible CStringSlice.
+            A c-compatible CStringSpan.
+        """
+        return self.as_c_string_span()
+
+    @__allow_legacy_custom_self_type
+    @always_inline
+    def as_c_string_span(
+        self: StaticString,
+    ) -> CStringSpan[ImmStaticOrigin]:
+        """Return a CStringSpan for this StaticString.
+
+        Returns:
+            A c-compatible CStringSpan.
         """
         return {unsafe_from_ptr = self.unsafe_ptr().unsafe_bitcast[Int8]()}
 

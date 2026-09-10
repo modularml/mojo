@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.ffi import CStringSlice, c_int, external_call
+from std.ffi import CStringSpan, c_int, external_call
 from std.sys.info import CompilationTarget, platform_map
 
 
@@ -421,7 +421,7 @@ struct ErrNo(Equatable, TrivialRegisterPassable, Writable):
             self.value
         )
         var string = StringSlice(
-            unsafe_from_utf8=CStringSlice(
+            unsafe_from_utf8=CStringSpan(
                 unsafe_from_ptr=ptr.unsafe_bitcast[Int8]().unsafe_mut_cast[
                     False
                 ]()

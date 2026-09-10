@@ -102,7 +102,7 @@ struct _DirHandle:
 
         var handle = external_call[
             "opendir", OptionalPointer[NoneType, UntrackedOrigin[mut=True]]
-        ](path.as_c_string_slice())
+        ](path.as_c_string_span())
 
         if not handle:
             var err = get_errno()
@@ -387,7 +387,7 @@ def remove[PathLike: stdPathLike](path: PathLike) raises:
         If the operation fails.
     """
     var fspath = path.__fspath__()
-    var error = external_call["unlink", Int32](fspath.as_c_string_slice())
+    var error = external_call["unlink", Int32](fspath.as_c_string_span())
 
     if error != 0:
         var err = get_errno()
@@ -441,8 +441,8 @@ def symlink[
     var linkpath_fspath = linkpath.__fspath__()
 
     var error = external_call["symlink", c_int](
-        target_fspath.as_c_string_slice(),
-        linkpath_fspath.as_c_string_slice(),
+        target_fspath.as_c_string_span(),
+        linkpath_fspath.as_c_string_span(),
     )
 
     if error != 0:
@@ -482,8 +482,8 @@ def link[
     var newpath_fspath = newpath.__fspath__()
 
     var error = external_call["link", Int32](
-        oldpath_fspath.as_c_string_slice(),
-        newpath_fspath.as_c_string_slice(),
+        oldpath_fspath.as_c_string_span(),
+        newpath_fspath.as_c_string_span(),
     )
 
     if error != 0:
@@ -521,7 +521,7 @@ def mkdir[PathLike: stdPathLike](path: PathLike, mode: Int = 0o777) raises:
     """
 
     var fspath = path.__fspath__()
-    var error = external_call["mkdir", Int32](fspath.as_c_string_slice(), mode)
+    var error = external_call["mkdir", Int32](fspath.as_c_string_span(), mode)
     if error != 0:
         var err = get_errno()
         raise Error("Can not create directory: ", fspath, " Err: ", String(err))
@@ -584,7 +584,7 @@ def rmdir[PathLike: stdPathLike](path: PathLike) raises:
         If the operation fails.
     """
     var fspath = path.__fspath__()
-    var error = external_call["rmdir", Int32](fspath.as_c_string_slice())
+    var error = external_call["rmdir", Int32](fspath.as_c_string_span())
     if error != 0:
         var err = get_errno()
         raise Error("Can not remove directory: ", fspath, " Err: ", String(err))
@@ -669,7 +669,7 @@ def chdir[PathLike: stdPathLike](path: PathLike) raises:
         If the operation fails.
     """
     var fspath = path.__fspath__()
-    var error = external_call["chdir", Int32](fspath.as_c_string_slice())
+    var error = external_call["chdir", Int32](fspath.as_c_string_span())
     if error != 0:
         var err = get_errno()
         raise Error("chdir failed: ", fspath, " Err: ", String(err))

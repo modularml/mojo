@@ -280,9 +280,9 @@ def test_owned_dlhandle_get_function_pointer_arg() raises:
     var lib = _load_libc()
     var atoi_fn = lib.get_function[Int32]("atoi")
     var s = String("123")
-    assert_equal(atoi_fn(s.as_c_string_slice()), Int32(123), "atoi(123)")
+    assert_equal(atoi_fn(s.as_c_string_span()), Int32(123), "atoi(123)")
     var s2 = String("-42")
-    assert_equal(atoi_fn(s2.as_c_string_slice()), Int32(-42), "atoi(-42)")
+    assert_equal(atoi_fn(s2.as_c_string_span()), Int32(-42), "atoi(-42)")
 
 
 @fieldwise_init
