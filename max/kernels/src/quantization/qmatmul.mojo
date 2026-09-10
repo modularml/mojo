@@ -21,11 +21,14 @@ from std.algorithm import tile
 from max.algorithm import sync_parallelize
 from max.gpu.host import DeviceContext
 from layout import (
-    Layout,
-    LayoutTensor,
-    RuntimeLayout,
     TileTensor,
     DefaultEngine,
+    TensorLayout,
+    RowMajorLayout,
+    ComptimeInt,
+    Coord,
+    Idx,
+    row_major,
 )
 from linalg.accumulate import _Accumulator
 from linalg.arch.cpu.neon_intrinsics import _neon_dotprod_lane, _neon_matmul
@@ -151,9 +154,9 @@ def _quantize_a_buffer[
     *,
     aq_interleave: Int = group_size,
 ](
-    a: LayoutTensor[mut=False, dtype, address_space=.GENERIC, ...],
-    a_quant: LayoutTensor[mut=True, aq_type, ...],
-    a_scale: LayoutTensor[mut=True, .float32, ...],
+    a: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+    a_quant: TileTensor[mut=True, aq_type, ...],
+    a_scale: TileTensor[mut=True, .float32, ...],
 ):
     """Converts a floating point buffer to a symmetrically quantized
     representation. The data is in a packed layout that can be efficiently
@@ -166,8 +169,8 @@ def _quantize_a_buffer[
     comptime assert a_quant.rank == 2
     comptime assert a_scale.rank == 2
 
-    var M = a.dim[0]()
-    var K = a.dim[1]()
+    var M = Int(a.dim[0]())
+    var K = Int(a.dim[1]())
 
     var a_quant_ptr = a_quant.ptr
     var a_scale_ptr = a_scale.ptr
@@ -417,9 +420,9 @@ trait _MatmulQInt4Kernel:
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
     ](
-        a: LayoutTensor[mut=False, dtype, address_space=.GENERIC, ...],
-        a_quant: LayoutTensor[mut=True, aq_type, ...],
-        a_scale: LayoutTensor[mut=True, .float32, ...],
+        a: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+        a_quant: TileTensor[mut=True, aq_type, ...],
+        a_scale: TileTensor[mut=True, .float32, ...],
     ):
         ...
 
@@ -464,9 +467,9 @@ struct _MatmulQInt4Kernel_x86_vnni(_MatmulQInt4Kernel):
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
     ](
-        a: LayoutTensor[mut=False, dtype, address_space=.GENERIC, ...],
-        a_quant: LayoutTensor[mut=True, aq_type, ...],
-        a_scale: LayoutTensor[mut=True, .float32, ...],
+        a: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+        a_quant: TileTensor[mut=True, aq_type, ...],
+        a_scale: TileTensor[mut=True, .float32, ...],
     ):
         comptime assert a.rank == 2
         comptime assert a_quant.rank == 2
@@ -600,9 +603,9 @@ struct _MatmulQInt4Kernel_x86_avx(_MatmulQInt4Kernel):
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
     ](
-        a: LayoutTensor[mut=False, dtype, address_space=.GENERIC, ...],
-        a_quant: LayoutTensor[mut=True, aq_type, ...],
-        a_scale: LayoutTensor[mut=True, .float32, ...],
+        a: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+        a_quant: TileTensor[mut=True, aq_type, ...],
+        a_scale: TileTensor[mut=True, .float32, ...],
     ):
         comptime assert a.rank == 2
         comptime assert a_quant.rank == 2
@@ -761,9 +764,9 @@ struct _MatmulQInt4Kernel_neon_dotprod(_MatmulQInt4Kernel):
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
     ](
-        a: LayoutTensor[mut=False, dtype, address_space=.GENERIC, ...],
-        a_quant: LayoutTensor[mut=True, aq_type, ...],
-        a_scale: LayoutTensor[mut=True, .float32, ...],
+        a: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+        a_quant: TileTensor[mut=True, aq_type, ...],
+        a_scale: TileTensor[mut=True, .float32, ...],
     ):
         comptime assert a.rank == 2
         comptime assert a_quant.rank == 2
@@ -870,9 +873,9 @@ struct _MatmulQInt4Kernel_neon_i8mm(_MatmulQInt4Kernel):
     def quantize_a_buffer[
         group_size: Int, dtype: DType, aq_type: DType
     ](
-        a: LayoutTensor[mut=False, dtype, address_space=.GENERIC, ...],
-        a_quant: LayoutTensor[mut=True, aq_type, ...],
-        a_scale: LayoutTensor[mut=True, .float32, ...],
+        a: TileTensor[mut=False, dtype, address_space=.GENERIC, ...],
+        a_quant: TileTensor[mut=True, aq_type, ...],
+        a_scale: TileTensor[mut=True, .float32, ...],
     ):
         comptime assert a.rank == 2
         comptime assert a_quant.rank == 2
@@ -977,19 +980,19 @@ def _matmul_qint4_m_1[
     kernel: _MatmulQInt4Kernel,
     group_size: Int,
     aq_type: DType,
-    b_layout: Layout = Layout.row_major[2](),
+    b_layout: TensorLayout = RowMajorLayout[ComptimeInt[2]],
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    a_quant: LayoutTensor[mut=False, aq_type, address_space=.GENERIC, ...],
-    a_scale: LayoutTensor[mut=False, .float32, address_space=.GENERIC, ...],
-    b: LayoutTensor[
+    a_quant: TileTensor[mut=False, aq_type, address_space=.GENERIC, ...],
+    a_scale: TileTensor[mut=False, .float32, address_space=.GENERIC, ...],
+    b: TileTensor[
         mut=False,
         .uint8,
         b_layout,
         address_space=.GENERIC,
         ...,
     ],
-    c: LayoutTensor[mut=True, .float32, address_space=.GENERIC, ...],
+    c: TileTensor[mut=True, .float32, address_space=.GENERIC, ...],
     ctx: Optional[DeviceContext] = None,
 ):
     comptime assert a_quant.rank == 2
@@ -1000,8 +1003,8 @@ def _matmul_qint4_m_1[
     comptime simd_width = simd_width_of[DType.float32]()
     comptime bytes_per_group_int4 = size_of[DType.float16]() + (group_size // 2)
 
-    var N = b.dim[0]()
-    var K = a_quant.dim[1]()
+    var N = Int(b.dim[0]())
+    var K = Int(a_quant.dim[1]())
     var k_groups = K // group_size
 
     comptime grain_size = simd_width * 2
@@ -1043,7 +1046,7 @@ def _matmul_qint4_m_1[
                     tile_n * simd_width * bytes_per_group_int4
                 )
 
-            c_float.store(c.ptr.unsafe_offset(c._offset(Index(0, n))), N)
+            c_float.store(c.ptr.unsafe_offset(c.layout(Coord(Idx[0], n))), N)
 
             comptime if elementwise_lambda_fn:
                 comptime func = elementwise_lambda_fn.value()
@@ -1063,28 +1066,28 @@ def _matmul_qint4_m_any[
     kernel: _MatmulQInt4Kernel,
     group_size: Int,
     aq_type: DType,
-    b_layout: Layout = Layout.row_major[2](),
+    b_layout: TensorLayout = RowMajorLayout[ComptimeInt[2]],
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    a_quant: LayoutTensor[mut=False, aq_type, address_space=.GENERIC, ...],
-    a_scale: LayoutTensor[mut=False, .float32, address_space=.GENERIC, ...],
-    b: LayoutTensor[
+    a_quant: TileTensor[mut=False, aq_type, address_space=.GENERIC, ...],
+    a_scale: TileTensor[mut=False, .float32, address_space=.GENERIC, ...],
+    b: TileTensor[
         mut=False,
         .uint8,
         b_layout,
         address_space=.GENERIC,
         ...,
     ],
-    c: LayoutTensor[mut=True, .float32, address_space=.GENERIC, ...],
+    c: TileTensor[mut=True, .float32, address_space=.GENERIC, ...],
     ctx: Optional[DeviceContext] = None,
 ):
     comptime simd_width = simd_width_of[DType.float32]()
     comptime alignment = align_of[SIMD[.float32, simd_width]]()
     comptime bytes_per_group_int4 = size_of[DType.float16]() + (group_size // 2)
 
-    var M = a_quant.dim[0]()
-    var N = b.dim[0]()
-    var K = a_quant.dim[1]()
+    var M = Int(a_quant.dim[0]())
+    var N = Int(b.dim[0]())
+    var K = Int(a_quant.dim[1]())
     var k_groups = K // group_size
 
     comptime grain_size = simd_width * 2
@@ -1164,7 +1167,7 @@ def _matmul_qint4_m_any[
                 def process_rows[
                     tile_m: Int
                 ](m: Int) {mut ak_scale_ptr, mut ak_ptr, imm}:
-                    var c_ptr = c.ptr.unsafe_offset(c._offset(Index(m, n)))
+                    var c_ptr = c.ptr.unsafe_offset(c.layout(Coord(m, n)))
                     var c_float = _Accumulator[
                         .float32, tile_m, tile_n, simd_width
                     ]()
@@ -1230,25 +1233,25 @@ def _matmul_qint4_m_any[
 def _matmul_qint4[
     kernel: _MatmulQInt4Kernel,
     group_size: Int,
-    b_layout: Layout = Layout.row_major[2](),
+    b_layout: TensorLayout = RowMajorLayout[ComptimeInt[2]],
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    a: LayoutTensor[mut=False, .float32, address_space=.GENERIC, ...],
-    b: LayoutTensor[
+    a: TileTensor[mut=False, .float32, address_space=.GENERIC, ...],
+    b: TileTensor[
         mut=False,
         .uint8,
         b_layout,
         address_space=.GENERIC,
         ...,
     ],
-    c: LayoutTensor[mut=True, .float32, address_space=.GENERIC, ...],
+    c: TileTensor[mut=True, .float32, address_space=.GENERIC, ...],
     ctx: Optional[DeviceContext] = None,
 ):
     comptime simd_width = simd_width_of[DType.float32]()
     comptime alignment = align_of[SIMD[.float32, simd_width]]()
 
-    var M = a.dim[0]()
-    var K = a.dim[1]()
+    var M = Int(a.dim[0]())
+    var K = Int(a.dim[1]())
     var k_groups = K // group_size
 
     comptime aq_type = kernel.aq_type()
@@ -1261,17 +1264,11 @@ def _matmul_qint4[
     var a_quant_ptr: MutPointer[
         Scalar[aq_type], origin_of(a_quant_base._alloc)
     ] = a_quant_base.unsafe_ptr()
-    var a_quant = LayoutTensor[aq_type, Layout.row_major[2]()](
-        a_quant_ptr,
-        RuntimeLayout[Layout.row_major[2]()].row_major(Index(M, K)),
-    )
+    var a_quant = TileTensor(a_quant_ptr, row_major((M, K)))
     var a_scale_ptr: MutPointer[
         Float32, origin_of(a_scale_base._alloc)
     ] = a_scale_base.unsafe_ptr()
-    var a_scale = LayoutTensor[.float32, Layout.row_major[2]()](
-        a_scale_ptr,
-        RuntimeLayout[Layout.row_major[2]()].row_major(Index(M, k_groups)),
-    )
+    var a_scale = TileTensor(a_scale_ptr, row_major((M, k_groups)))
 
     kernel.quantize_a_buffer[group_size](a, a_quant, a_scale)
 
@@ -1292,9 +1289,9 @@ def matmul_qint4[
     group_size: Int,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
 ](
-    a_tt: TileTensor[mut=False, .float32, address_space=.GENERIC, ...],
-    b_tt: TileTensor[mut=False, .uint8, address_space=.GENERIC, ...],
-    c_tt: TileTensor[mut=True, .float32, address_space=.GENERIC, ...],
+    a: TileTensor[mut=False, .float32, address_space=.GENERIC, ...],
+    b: TileTensor[mut=False, .uint8, address_space=.GENERIC, ...],
+    c: TileTensor[mut=True, .float32, address_space=.GENERIC, ...],
     ctx: Optional[DeviceContext] = None,
 ):
     """Computes a matrix multiply of a float32 A matrix against block-wise
@@ -1308,14 +1305,11 @@ def matmul_qint4[
         elementwise_lambda_fn: Optional epilogue applied to each output element.
 
     Args:
-        a_tt: Input A tensor in float32.
-        b_tt: Input B tensor holding packed uint8 int4 weights.
-        c_tt: Output C tensor in float32.
+        a: Input A tensor in float32.
+        b: Input B tensor holding packed uint8 int4 weights.
+        c: Output C tensor in float32.
         ctx: Optional device context for parallel execution.
     """
-    var a = a_tt.to_layout_tensor()
-    var b = b_tt.to_layout_tensor()
-    var c = c_tt.to_layout_tensor()
 
     @__parameter
     def kernel_dispatch[kernel: _MatmulQInt4Kernel]():
