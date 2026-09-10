@@ -27,6 +27,7 @@ kernel closes with an end barrier, which the AR+norm kernels do not (their
 """
 
 from std.collections import Array
+from std.math.uutils import ualign_down
 from std.math import ceildiv, rsqrt
 from std.sys import (
     align_of,
@@ -395,7 +396,7 @@ def reducescatter_rmsnorm[
     in_origin: Origin,
     //,
     has_residual: Bool = False,
-    domain_id: Int = 0,
+    group_size: Int = ngpus,
     pdl_level: PDLLevel = PDLLevel(),
 ](
     input_buffers: Array[TileTensor[in_dtype, in_layout, in_origin], ngpus],
@@ -406,7 +407,7 @@ def reducescatter_rmsnorm[
     weight_offset: Scalar[in_dtype],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
-    local_rank: Optional[Int] = None,
+    my_rank: Optional[Int] = None,
     residual: _ComptimeConditionalTileTensor[
         in_dtype, engaged=has_residual, ...
     ] = _ComptimeConditionalTileTensor[
@@ -416,7 +417,7 @@ def reducescatter_rmsnorm[
         engaged=False,
     ](),
 ) raises:
-    """Fused reduce-scatter + RMSNorm across `ngpus` GPUs (bf16 in/out).
+    """Fused reduce-scatter + RMSNorm (bf16 in/out).
 
     Reduce-scatters `input_buffers` (each `[rows, cols]`, one per GPU) along
     rows and RMSNorm-normalizes each owned row. Writes this GPU's
@@ -424,37 +425,49 @@ def reducescatter_rmsnorm[
     RMSNorm to `normed_out`. `weight_offset` (1.0 for M3, Gemma-style) is folded
     into gamma in f32.
 
+    World view vs. group: `ngpus` is the total number of devices in the
+    world; `input_buffers` and `rank_sigs` carry every device's data,
+    indexed by GLOBAL device rank. `group_size` (defaults to `ngpus`) is the
+    number of devices that actually cooperate on this reduce-scatter; it
+    must evenly divide `ngpus`. `my_rank` is this device's GLOBAL rank in
+    `[0, ngpus)` -- the group-local rank and this device's own group's
+    slice of the world arrays are derived here, so the whole world stays
+    addressable from this function.
+
+    NOTE: unlike `reducescatter`'s output, `normed_out`/`sum_out` stay
+    single-tensor (not widened to a world-indexed `Array`). Both outputs
+    reach this function through `.to_tile_tensor()`'s origin-erased
+    `MutUntrackedOrigin`; passing TWO such origin-erased tensors as
+    separate mutable `Array` arguments makes Mojo's exclusivity checker
+    treat them as possibly-aliasing and reject the call, even though they
+    are backed by disjoint device buffers. `reducescatter`'s own widening
+    doesn't hit this because it has only ONE mutable output array.
+
     Parameters:
         in_dtype: Input/output data type (bf16).
-        ngpus: Number of GPUs participating.
+        ngpus: Total number of devices in the world.
         in_layout: Layout of the input TileTensors.
         in_origin: Origin of the input TileTensors.
         has_residual: Fold `residual` into the reduce-scatter sum.
-        domain_id: Barrier counter bank (0 for full-world, nonzero for a
-            grouped collective so its counters never poison the full-world
-            bank). Ops of the same width deliberately share a bank, which
-            requires every rank in the domain to issue the same barrier
-            sequence -- see `NUM_BARRIER_DOMAINS` in `sync.mojo` for the full
-            invariant. Enforced here by the `rows == 0` guard and
-            `_dispatch_rs_norm`'s group-invariant fuse gate.
+        group_size: Number of devices per independent reduce-scatter group.
+            Must evenly divide `ngpus`. Defaults to `ngpus`.
         pdl_level: Enables PDL, so this kernel can start before the previous one
             retires and the next one is released once the end barrier clears.
 
     Args:
-        input_buffers: Per-GPU input buffers as TileTensors (peer access
-            required). Grouped collectives pass only their own group's buffers.
+        input_buffers: Input buffers from ALL `ngpus` devices as TileTensors
+            (peer access required), indexed by GLOBAL device rank.
         normed_out: This GPU's normed output shard `[rank_units, cols]`.
         sum_out: This GPU's reduce-scatter sum shard `[rank_units, cols]` (the
             residual stream).
         gamma: RMSNorm gamma weights (1D TileTensor of length cols).
         epsilon: RMSNorm epsilon for numerical stability.
         weight_offset: Additive offset for gamma weights.
-        rank_sigs: Per-GPU signal pointers for synchronization.
+        rank_sigs: All `ngpus` devices' Signal pointers, indexed by GLOBAL
+            device rank.
         ctx: Device context for this GPU.
-        local_rank: Optional rank of THIS GPU within the collective's group.
-            Defaults to the physical device id for full-world collectives.
-            Grouped collectives MUST pass it: `input_buffers`/`rank_sigs` are
-            group-local, so a global device id indexes them out of range.
+        my_rank: Optional GLOBAL rank of THIS GPU in `[0, ngpus)`. Defaults to
+            the physical device id.
         residual: Optional FULL `[rows, cols]` tensor added to the sum, in f32,
             before the pre-norm round. Each rank adds only its own shard of it.
             PRECONDITION: it must be bit-identical on every rank of the group.
@@ -469,24 +482,50 @@ def reducescatter_rmsnorm[
         reused once this op retires. The outputs are still safe to read only on
         the local GPU; a remote-GPU consumer must insert its own barrier.
     """
-    comptime assert ngpus >= 2, "reducescatter_rmsnorm requires at least 2 GPUs"
+    comptime assert (
+        group_size >= 2
+    ), "reducescatter_rmsnorm requires at least 2 GPUs per group"
+    comptime assert (
+        ngpus % group_size == 0
+    ), "group_size must evenly divide ngpus"
     comptime assert (
         in_dtype.is_floating_point()
     ), "in_dtype must be floating point"
+    comptime domain_id = 0 if group_size == ngpus else group_size
 
     if not is_p2p_enabled():
         raise Error("reducescatter_rmsnorm requires P2P access between GPUs")
 
-    # Compute rows/cols from the full (pre-scatter) input.
-    var in_num_elems = input_buffers[0].num_elements()
+    var global_rank = my_rank.value() if my_rank else Int(ctx.id())
+    if not 0 <= global_rank < ngpus:
+        raise Error(
+            String(
+                "reducescatter_rmsnorm: my_rank (",
+                global_rank,
+                ") must be in [0, ",
+                ngpus,
+                ")",
+            )
+        )
+
+    # This device's group. `group_start` is 0 for a full-world collective, so
+    # every group_start-relative read below is byte-identical to the
+    # pre-grouping code path in that case.
+    var group_start = ualign_down(global_rank, group_size)
+    var loc_rank = global_rank - group_start
+
+    # Compute rows/cols from THIS DEVICE'S GROUP's (pre-scatter) input, not
+    # world index 0 -- sibling groups may carry different (symbolic) shapes.
+    var in_num_elems = input_buffers[group_start].num_elements()
     comptime last_dim_idx = in_layout.rank - 1
-    var cols = Int(input_buffers[0].dim[last_dim_idx]())
+    var cols = Int(input_buffers[group_start].dim[last_dim_idx]())
     var rows = in_num_elems // cols
 
-    # Raw peer pointers, origin erased to ImmutAnyOrigin (matches standalone RS).
+    # This device's GROUP's raw peer pointers, origin erased to
+    # ImmutAnyOrigin (matches standalone RS).
     comptime PtrType = ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]
-    var src_ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: input_buffers[i]
+    var src_ptrs = Array[_, group_size](
+        fill_with=lambda (i: Int) -> PtrType: input_buffers[group_start + i]
         ._storage.as_imm()
         .as_unsafe_any_origin()
     )
@@ -519,31 +558,14 @@ def reducescatter_rmsnorm[
             )
         )
 
-    # The rank is caller-supplied and indexes the group-local `src_ptrs` and
-    # `rank_sigs` arrays, so a global device id is out of range here.
-    var my_rank = local_rank.value() if local_rank else Int(ctx.id())
-    if not 0 <= my_rank < ngpus:
-        raise Error(
-            String(
-                "reducescatter_rmsnorm: local_rank (",
-                my_rank,
-                ") must be the GROUP-local rank in [0, ",
-                ngpus,
-                (
-                    "); a global device id indexes the group-local peer and"
-                    " signal arrays out of range"
-                ),
-            )
-        )
-
     # Nothing ties the rank-derived shard height to the caller's allocation.
     # Under a ragged partition a mismatched rank overruns both outputs by one
     # row with CORRECT values, which a byte-compare oracle cannot see. Mirrors
     # `reducescatter`'s output validation.
-    var config_check = ReduceScatterConfig[in_dtype, ngpus](
+    var config_check = ReduceScatterConfig[in_dtype, group_size](
         axis_size=rows, unit_numel=cols, threads_per_gpu=0
     )
-    var expected_numel = config_check.rank_num_elements(my_rank)
+    var expected_numel = config_check.rank_num_elements(loc_rank)
     if normed_out.num_elements() != expected_numel:
         raise Error(
             String(
@@ -552,9 +574,9 @@ def reducescatter_rmsnorm[
                 " elements, expected ",
                 expected_numel,
                 " for rank ",
-                my_rank,
+                loc_rank,
                 " of ",
-                ngpus,
+                group_size,
                 " over ",
                 rows,
                 " rows",
@@ -568,9 +590,9 @@ def reducescatter_rmsnorm[
                 " elements, expected ",
                 expected_numel,
                 " for rank ",
-                my_rank,
+                loc_rank,
                 " of ",
-                ngpus,
+                group_size,
                 " over ",
                 rows,
                 " rows",
@@ -579,10 +601,18 @@ def reducescatter_rmsnorm[
 
     _check_residual_extent[has_residual](residual, rows, cols)
 
+    # This device's GROUP's signal pointers, re-indexed to [0, group_size).
+    # Byte-identical to `rank_sigs` for a full-world collective.
+    var group_sigs = Array[UnsafePointer[Signal, MutAnyOrigin], MAX_GPUS](
+        uninitialized=True
+    )
+    comptime for i in range(group_size):
+        group_sigs[i] = rank_sigs[group_start + i]
+
     _reducescatter_rmsnorm_launch[
         simd_width,
         in_dtype,
-        ngpus,
+        group_size,
         threads_per_block,
         has_residual=has_residual,
         domain_id=domain_id,
@@ -596,8 +626,8 @@ def reducescatter_rmsnorm[
         gamma,
         epsilon,
         weight_offset,
-        rank_sigs,
-        my_rank,
+        group_sigs,
+        loc_rank,
         ctx,
         residual=residual,
     )
@@ -614,7 +644,7 @@ def _dispatch_rs_norm[
     //,
     two_launch: def() raises capturing -> None,
     has_residual: Bool = False,
-    domain_id: Int = 0,
+    group_size: Int = ngpus,
     pdl_level: PDLLevel = PDLLevel(),
 ](
     input_buffers: Array[TileTensor[in_dtype, in_layout, in_origin], ngpus],
@@ -626,7 +656,7 @@ def _dispatch_rs_norm[
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
     threshold: Int = RS_NORM_FUSE_THRESHOLD,
-    local_rank: Optional[Int] = None,
+    my_rank: Optional[Int] = None,
     residual: _ComptimeConditionalTileTensor[
         in_dtype, engaged=has_residual, ...
     ] = _ComptimeConditionalTileTensor[
@@ -642,35 +672,49 @@ def _dispatch_rs_norm[
     `comm` stays free of `nn` (nn -> comm already exists). The graph op and the
     bench share this one selector.
 
+    World view vs. group
+    - `ngpus` is the TOTAL number of devices in the world; `input_buffers` and
+      `rank_sigs` carry every device's data, indexed by GLOBAL device rank.
+    - `group_size` (defaults to `ngpus`) is the number of devices that
+      actually cooperate on one reduce-scatter. It must evenly divide `ngpus`.
+    - `my_rank` is this device's GLOBAL rank in `[0, ngpus)`, not its rank
+      within the group -- the group-local rank (and the fused kernel's own
+      group-local peer/signal arrays) are derived internally.
+
+    NOTE: unlike `reducescatter`'s output, `normed_out`/`sum_out` stay
+    single-tensor (see `reducescatter_rmsnorm`'s docstring for why widening
+    them hits Mojo's exclusivity checker).
+
     Parameters:
         in_dtype: Input/output data type (bf16).
-        ngpus: Number of GPUs participating.
+        ngpus: Total number of devices in the world.
         in_layout: Layout of the input TileTensors.
         in_origin: Origin of the input TileTensors.
         two_launch: Caller-supplied standalone reduce-scatter + RMSNorm closure.
             It must fold `residual` itself when `has_residual` -- this selector
             only threads the residual into the FUSED arm.
         has_residual: Fold `residual` into the fused arm's reduce-scatter sum.
-        domain_id: Barrier counter bank for the fused kernel (0 for full-world;
-            nonzero for grouped collectives, which deliberately share a bank per
-            width). See `reducescatter_rmsnorm` for the invariant a shared bank
-            requires, and `_multi_gpu_barrier`.
+        group_size: Number of devices per independent reduce-scatter group.
+            Must evenly divide `ngpus`. Defaults to `ngpus` (one full-world
+            group, byte-identical to the pre-grouping behavior).
         pdl_level: PDL setting for the fused kernel; see `reducescatter_rmsnorm`.
             Comptime, so it cannot make the fuse gate below group-variant.
 
     Args:
-        input_buffers: Per-GPU input buffers as TileTensors.
+        input_buffers: Input buffers from ALL `ngpus` devices as TileTensors,
+            indexed by GLOBAL device rank.
         normed_out: This GPU's normed output shard `[rank_units, cols]`.
         sum_out: This GPU's reduce-scatter sum shard `[rank_units, cols]`.
         gamma: RMSNorm gamma weights (1D TileTensor of length cols).
         epsilon: RMSNorm epsilon for numerical stability.
         weight_offset: Additive offset for gamma weights.
-        rank_sigs: Per-GPU signal pointers for synchronization.
+        rank_sigs: All `ngpus` devices' Signal pointers, indexed by GLOBAL
+            device rank.
         ctx: Device context for this GPU.
         threshold: Per-rank-bytes fuse threshold; fuse at/below, else
             `two_launch`. Defaults to `RS_NORM_FUSE_THRESHOLD`.
-        local_rank: Optional rank of THIS GPU within the collective's group;
-            defaults to the physical device id. Required when grouped.
+        my_rank: Optional GLOBAL rank of THIS GPU in `[0, ngpus)`. Defaults to
+            the physical device id.
         residual: Optional FULL `[rows, cols]` residual for the fused arm; see
             `reducescatter_rmsnorm` for the group-replication precondition.
     """
@@ -679,6 +723,15 @@ def _dispatch_rs_norm[
     comptime assert (
         in_dtype == .bfloat16
     ), "_dispatch_rs_norm fuse threshold is bf16-calibrated (bf16 in/out only)"
+    comptime assert (
+        ngpus % group_size == 0
+    ), "group_size must evenly divide ngpus"
+
+    # This device's group. `group_start` is 0 for a full-world collective
+    # (group_size == ngpus), so every group_start-relative read below is
+    # byte-identical to the pre-grouping `input_buffers[0]` in that case.
+    var global_rank = my_rank.value() if my_rank else Int(ctx.id())
+    var group_start = ualign_down(global_rank, group_size)
 
     # Fuse-vs-two-launch MUST be group-invariant: the paths issue different
     # barrier sequences on shared `rank_sigs`, so disagreement deadlocks. Gate
@@ -687,9 +740,9 @@ def _dispatch_rs_norm[
     # Invariance is per-GROUP: sibling groups may legitimately diverge, their
     # `rank_sigs` being disjoint, so do not "fix" this to a world-wide gate.
     comptime last_dim_idx = in_layout.rank - 1
-    var cols = Int(input_buffers[0].dim[last_dim_idx]())
-    var rows = input_buffers[0].num_elements() // cols
-    var config = ReduceScatterConfig[in_dtype, ngpus](
+    var cols = Int(input_buffers[group_start].dim[last_dim_idx]())
+    var rows = input_buffers[group_start].num_elements() // cols
+    var config = ReduceScatterConfig[in_dtype, group_size](
         axis_size=rows, unit_numel=cols, threads_per_gpu=0
     )
     var per_rank_bytes = config.rank_units(0) * cols * size_of[in_dtype]()
@@ -700,9 +753,11 @@ def _dispatch_rs_norm[
     _check_residual_extent[has_residual](residual, rows, cols)
 
     if use_fused:
+        # Hand the fused kernel the whole world plus the group width, and let
+        # it derive the group-local slice, rank, and barrier domain itself.
         reducescatter_rmsnorm[
             has_residual=has_residual,
-            domain_id=domain_id,
+            group_size=group_size,
             pdl_level=pdl_level,
         ](
             input_buffers,
@@ -713,7 +768,7 @@ def _dispatch_rs_norm[
             weight_offset,
             rank_sigs,
             ctx,
-            local_rank,
+            my_rank,
             residual=residual,
         )
     else:

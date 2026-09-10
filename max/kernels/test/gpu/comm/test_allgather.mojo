@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
+from std.math.uutils import ualign_down
 from std.sys import size_of, has_amd_gpu_accelerator
 
 from comm.allgather import allgather
@@ -161,13 +162,10 @@ def all_gather_test[
     print("  Testing implementation with rank_sigs (P2P-capable)")
 
     for gpu_idx in range(ngpus):
-        var device_out = Array[_, ngpus](
-            fill_with=lambda (src_idx: Int) -> OutTileType: tt_out_bufs[
-                gpu_idx * ngpus + src_idx
-            ]
-        )
+        # `tt_out_bufs` is already the world-view output array `allgather`
+        # expects (`ngpus * ngpus` for this full-world, ungrouped test).
         allgather(
-            tt_in_bufs, device_out, rank_sigs, list_of_ctx[gpu_idx], gpu_idx
+            tt_in_bufs, tt_out_bufs, rank_sigs, list_of_ctx[gpu_idx], gpu_idx
         )
 
     # Synchronize all devices.
@@ -265,7 +263,7 @@ def grouped_all_gather_test[
         host_buffers.append(host_buffer^)
 
     for device_idx in range(ngpus):
-        var group_start = (device_idx // group_size) * group_size
+        var group_start = ualign_down(device_idx, group_size)
         var device_outputs = List[DeviceBuffer[dtype]](capacity=group_size)
         for local_idx in range(group_size):
             var input_idx = group_start + local_idx
@@ -298,7 +296,7 @@ def grouped_all_gather_test[
     def tt_out_bufs_at(i: Int) {mut out_bufs_list, imm} -> OutTileType:
         var device_idx = i // group_size
         var local_idx = i % group_size
-        var group_start = (device_idx // group_size) * group_size
+        var group_start = ualign_down(device_idx, group_size)
         var input_idx = group_start + local_idx
         return TileTensor(
             out_bufs_list[device_idx][local_idx],
@@ -307,41 +305,23 @@ def grouped_all_gather_test[
 
     var tt_out_bufs = Array[_, ngpus * group_size](fill_with=tt_out_bufs_at)
 
-    comptime for group_idx in range(ngpus // group_size):
-        comptime group_start = group_idx * group_size
-        var group_in_bufs = Array[_, group_size](
-            fill_with=lambda (local_idx: Int) -> InTileType: tt_in_bufs[
-                group_start + local_idx
-            ]
+    # `tt_in_bufs`/`tt_out_bufs`/`rank_sigs` are already the WORLD-view arrays
+    # `allgather` expects (indexed by GLOBAL device rank); it does its own
+    # group-local slicing internally from `group_size` + `my_rank`.
+    for device_idx in range(ngpus):
+        allgather[group_size=group_size](
+            tt_in_bufs,
+            tt_out_bufs,
+            rank_sigs,
+            list_of_ctx[device_idx],
+            device_idx,
         )
-        var group_rank_sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
-            uninitialized=True
-        )
-
-        comptime for local_idx in range(group_size):
-            group_rank_sigs[local_idx] = rank_sigs[group_start + local_idx]
-
-        comptime for local_idx in range(group_size):
-            comptime device_idx = group_start + local_idx
-            var device_out = Array[_, group_size](
-                fill_with=lambda (src_idx: Int) -> OutTileType: tt_out_bufs[
-                    device_idx * group_size + src_idx
-                ]
-            )
-
-            allgather[domain_id=group_size](
-                group_in_bufs,
-                device_out,
-                group_rank_sigs,
-                list_of_ctx[device_idx],
-                local_idx,
-            )
 
     for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
     for device_idx in range(ngpus):
-        var group_start = (device_idx // group_size) * group_size
+        var group_start = ualign_down(device_idx, group_size)
         for local_idx in range(group_size):
             var input_idx = group_start + local_idx
             var length = lengths[input_idx]

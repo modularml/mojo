@@ -11,6 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from std.math.uutils import ualign_down
 from std.sys import size_of, simd_width_of
 from std.itertools import product
 from std.utils.coord import _coerce_dynamic
@@ -263,6 +264,13 @@ def reducescatter_test[
             rebind[SIMD[dtype, _width]](-val),
         )
 
+    # `reducescatter`'s output is a world-view `Array`, not a `StaticTuple`;
+    # convert once (the actual write goes through `outputs_lambda` above,
+    # which still reads the `StaticTuple` directly).
+    var out_bufs_arr = Array[OutputTileType, ngpus](
+        fill_with=lambda (k: Int) -> OutputTileType: out_bufs[k]
+    )
+
     comptime for i in range(ngpus):
         reducescatter[
             ngpus=ngpus,
@@ -271,7 +279,13 @@ def reducescatter_test[
             ) if use_custom_epilogue else None,
             axis=axis,
             use_multimem=use_multimem,
-        ](in_bufs, out_bufs[i], rank_sigs, list_of_ctx[i])
+        ](
+            in_bufs,
+            out_bufs_arr,
+            rank_sigs,
+            list_of_ctx[i],
+            my_rank=Optional[Int](i),
+        )
 
     comptime for i in range(ngpus):
         list_of_ctx[i].synchronize()
@@ -472,7 +486,7 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
         )
     )
     var in_bufs = StaticTuple[InputTileType, ngpus]()
-    var out_bufs = StaticTuple[OutputTileType, ngpus]()
+    var out_bufs = Array[OutputTileType, ngpus](uninitialized=True)
 
     for gpu_idx in range(ngpus):
         var group_rows = 5 if gpu_idx < group_size else 3
@@ -494,43 +508,36 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
             config.rank_units(local_rank)
         )
         output_shape[1] = _coerce_dynamic[output_shape.element_types[1]](D)
-        out_bufs._unsafe_ref(gpu_idx) = OutputTileType(
+        out_bufs[gpu_idx] = OutputTileType(
             out_bufs_list[gpu_idx].unsafe_ptr().as_unsafe_any_origin(),
             row_major(output_shape),
         )
 
-    comptime for group_idx in range(ngpus // group_size):
-        comptime group_start = group_idx * group_size
-        var group_in_bufs = Array[_, group_size](
-            fill_with=lambda (local_idx: Int) -> InputTileType: in_bufs[
-                group_start + local_idx
-            ]
-        )
-        var group_rank_sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
-            uninitialized=True
-        )
+    # World-view input array `reducescatter` expects (indexed by GLOBAL
+    # device rank); it does its own group-local slicing internally from
+    # `group_size` + `my_rank`. `rank_sigs` is already world-view above.
+    var world_in_bufs = Array[InputTileType, ngpus](
+        fill_with=lambda (i: Int) -> InputTileType: in_bufs[i]
+    )
 
-        comptime for local_idx in range(group_size):
-            group_rank_sigs[local_idx] = rank_sigs[group_start + local_idx]
-
-        comptime for local_idx in range(group_size):
-            comptime gpu_idx = group_start + local_idx
-            reducescatter[
-                ngpus=group_size,
-                axis=axis,
-            ](
-                group_in_bufs,
-                out_bufs[gpu_idx],
-                group_rank_sigs,
-                list_of_ctx[gpu_idx],
-                local_rank=Optional[Int](local_idx),
-            )
+    comptime for gpu_idx in range(ngpus):
+        reducescatter[
+            ngpus=ngpus,
+            group_size=group_size,
+            axis=axis,
+        ](
+            world_in_bufs,
+            out_bufs,
+            rank_sigs,
+            list_of_ctx[gpu_idx],
+            my_rank=Optional[Int](gpu_idx),
+        )
 
     comptime for i in range(ngpus):
         list_of_ctx[i].synchronize()
 
     for gpu_idx in range(ngpus):
-        var group_start = (gpu_idx // group_size) * group_size
+        var group_start = ualign_down(gpu_idx, group_size)
         var group_rows = 5 if gpu_idx < group_size else 3
         var local_rank = gpu_idx % group_size
         var config = ReduceScatterConfig[dtype, group_size](group_rows, D, 0)

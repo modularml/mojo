@@ -29,6 +29,7 @@ hardware capabilities:
 """
 
 from std.collections import Array
+from std.math.uutils import ualign_down
 from std.math import ceildiv
 from std.sys import simd_width_of, align_of, size_of
 
@@ -446,46 +447,73 @@ def _allgather_p2p[
     out_origin: MutOrigin,
     in_engine: TensorEngine,
     out_engine: TensorEngine,
-    domain_id: Int = 0,
+    group_size: Int = ngpus,
 ](
     input_buffers: Array[
         TileTensor[dtype, in_layout, in_origin, Engine=in_engine], ngpus
     ],
     output_buffers: Array[
         TileTensor[mut=True, dtype, out_layout, out_origin, Engine=out_engine],
-        ngpus,
+        ngpus * group_size,
     ],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     _max_num_blocks: Optional[Int],
     ctx: DeviceContext,
     my_rank: Int,
 ) raises:
-    """Per-device P2P allgather: each GPU reads from all peers directly."""
+    """Per-device P2P allgather: each GPU reads from all peers directly.
+
+    World view vs. group: `ngpus` is the total number of devices in the
+    world; `input_buffers` and `rank_sigs` carry every device's data,
+    indexed by GLOBAL device rank. `output_buffers` holds EVERY device's
+    own `group_size` outputs, laid out `[device * group_size +
+    group_local_source]`. `group_size` (defaults to `ngpus`) is the number
+    of devices that actually cooperate on this all-gather; it must evenly
+    divide `ngpus`. `my_rank` is this device's GLOBAL rank in `[0, ngpus)`.
+    """
+    comptime assert (
+        ngpus % group_size == 0
+    ), "group_size must evenly divide ngpus"
+    comptime domain_id = 0 if group_size == ngpus else group_size
+
+    # This device's group. `group_start` is 0 for a full-world collective, so
+    # every group_start-relative read below is byte-identical to the
+    # pre-grouping code path in that case.
+    var group_start = ualign_down(my_rank, group_size)
+    var loc_rank = my_rank - group_start
 
     var list_of_in_ptrs = StaticTuple[
-        ImmPointer[Scalar[dtype], ImmutAnyOrigin], ngpus
+        ImmPointer[Scalar[dtype], ImmutAnyOrigin], group_size
     ]()
-    var lengths = StaticTuple[Int, ngpus]()
+    var lengths = StaticTuple[Int, group_size]()
 
-    comptime for i in range(ngpus):
+    comptime for i in range(group_size):
         list_of_in_ptrs[i] = rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
-            input_buffers[i].ptr
+            input_buffers[group_start + i].ptr
         )
-        lengths[i] = input_buffers[i].num_elements()
+        lengths[i] = input_buffers[group_start + i].num_elements()
 
-    # Prepare output pointers.
+    # Prepare output pointers: this device's own slice of the world outputs.
     var output_ptrs = StaticTuple[
-        MutPointer[Scalar[dtype], MutAnyOrigin], ngpus
+        MutPointer[Scalar[dtype], MutAnyOrigin], group_size
     ]()
 
-    comptime for src_idx in range(ngpus):
+    comptime for src_idx in range(group_size):
         output_ptrs[src_idx] = rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](
-            output_buffers[src_idx].ptr
+            output_buffers[my_rank * group_size + src_idx].ptr
         )
+
+    # This device's GROUP's signal pointers, re-indexed to [0, group_size).
+    # Byte-identical to `rank_sigs` for a full-world collective.
+    var group_sigs = Array[UnsafePointer[Signal, MutAnyOrigin], MAX_GPUS](
+        uninitialized=True
+    )
+    comptime for i in range(group_size):
+        group_sigs[i] = rank_sigs[group_start + i]
 
     # Build Int32 versions for passing to GPU kernels.
-    var lengths_i32 = StaticTuple[Int32, ngpus]()
-    comptime for i in range(ngpus):
+    var lengths_i32 = StaticTuple[Int32, group_size]()
+    comptime for i in range(group_size):
         lengths_i32[i] = Int32(lengths[i])
 
     # TMA path: NVIDIA sm100+ with 16-byte-aligned (possibly zero) inputs.
@@ -493,7 +521,7 @@ def _allgather_p2p[
     comptime _use_tma = _is_sm10x_gpu(ctx.default_device_info)
     comptime if _use_tma:
         var tma_ok = True
-        comptime for i in range(ngpus):
+        comptime for i in range(group_size):
             if (lengths[i] * size_of[dtype]()) % 16 != 0:
                 tma_ok = False
 
@@ -501,24 +529,24 @@ def _allgather_p2p[
             return _allgather_p2p_tma[domain_id=domain_id](
                 output_ptrs,
                 list_of_in_ptrs,
-                rank_sigs,
+                group_sigs,
                 lengths_i32,
                 ctx,
-                my_rank,
+                loc_rank,
             )
 
     comptime BLOCK_SIZE = 256
 
     # Calculate grid size.
     var max_length = 0
-    for i in range(ngpus):
+    for i in range(group_size):
         max_length = max(max_length, lengths[i])
 
     comptime sm_version = ctx.default_device_info.version
     var max_num_blocks = _max_num_blocks.or_else(
-        dispatch_select_comm_config[ngpus, sm_version, allgather_tuning_table](
-            max_length * size_of[dtype]()
-        ).get_num_blocks()
+        dispatch_select_comm_config[
+            group_size, sm_version, allgather_tuning_table
+        ](max_length * size_of[dtype]()).get_num_blocks()
     )
 
     comptime simd_width = simd_width_of[dtype, target=get_gpu_target()]()
@@ -532,17 +560,17 @@ def _allgather_p2p[
     comptime allgather_p2p_kernel = _allgather_p2p_kernel[
         dtype,
         rank,
-        ngpus,
+        group_size,
         BLOCK_SIZE=BLOCK_SIZE,
         domain_id=domain_id,
     ]
     ctx.enqueue_function[allgather_p2p_kernel](
         output_ptrs,
         list_of_in_ptrs,
-        rank_sigs,
+        group_sigs,
         lengths_i32,
         Int32(max_num_blocks),
-        Int32(my_rank),
+        Int32(loc_rank),
         grid_dim=grid_size,
         block_dim=BLOCK_SIZE,
         attributes=pdl_launch_attributes(PDLLevel.ON),
@@ -559,14 +587,15 @@ def allgather[
     out_origin: MutOrigin,
     in_engine: TensorEngine,
     out_engine: TensorEngine,
-    domain_id: Int = 0,
+    *,
+    group_size: Int = ngpus,
 ](
     input_buffers: Array[
         TileTensor[dtype, in_layout, in_origin, Engine=in_engine], ngpus
     ],
     output_buffers: Array[
         TileTensor[mut=True, dtype, out_layout, out_origin, Engine=out_engine],
-        ngpus,
+        ngpus * group_size,
     ],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
@@ -575,56 +604,101 @@ def allgather[
 ) raises:
     """Per-device all-gather: one instance per GPU builds its own outputs.
 
-    Each instance reads all input buffers and writes to its own ngpus output
-    buffers. The caller is responsible for launching one instance per device
-    in parallel (e.g. via _launch_device_collective).
+    Each instance reads all input buffers and writes to its own group_size
+    output buffers. The caller is responsible for launching one instance per
+    device in parallel (e.g. via _launch_device_collective).
 
     The implementation automatically selects between P2P and non-P2P paths
-    based on hardware capabilities.
+    based on hardware capabilities (non-P2P is full-world only; see Raises).
+
+    World view vs. group
+    - `ngpus` is the TOTAL number of devices in the world; `input_buffers` and
+      `rank_sigs` carry every device's data, indexed by GLOBAL device rank.
+    - `group_size` (defaults to `ngpus`) is the number of devices that
+      actually cooperate on one all-gather. It must evenly divide `ngpus`.
+      Devices `[g*group_size, (g+1)*group_size)` form group `g`; this call's
+      group is derived from `my_rank`.
+    - `output_buffers` holds EVERY device's own `group_size` outputs, laid out
+      `[device * group_size + group_local_source]`. `my_rank` selects this
+      device's own slice; the source dimension within that slice is the
+      GROUP-local rank, not the global one.
+    - `my_rank` is this device's GLOBAL rank in `[0, ngpus)`, not its rank
+      within the group -- the group-local rank is derived internally.
 
     Parameters:
         dtype: Data type of the tensor elements.
-        ngpus: Number of GPUs participating in all-gather.
+        ngpus: Total number of devices in the world.
         in_layout: Layout of the input TileTensors.
         in_origin: Origin of the input TileTensors.
         out_layout: Layout of the output TileTensors.
         out_origin: Origin of the output TileTensors.
         in_engine: Engine of the input TileTensors.
         out_engine: Engine of the output TileTensors.
-        domain_id: Barrier counter bank to use (0 for full-world; a distinct
-            nonzero value for grouped collectives sharing the same Signal
-            buffers). See `_multi_gpu_barrier`.
+        group_size: Number of devices per independent all-gather group. Must
+            evenly divide `ngpus`. Defaults to `ngpus` (one full-world group,
+            byte-identical to the pre-grouping behavior).
 
     Args:
-        input_buffers: Input buffers from ALL GPUs as TileTensors.
-        output_buffers: Output buffers for THIS GPU (ngpus TileTensors).
-                       output_buffers[i] receives the data from GPU i.
-        rank_sigs: Per-GPU Signal pointers for P2P synchronization.
+        input_buffers: Input buffers from ALL `ngpus` devices as TileTensors,
+            indexed by GLOBAL device rank.
+        output_buffers: Output buffers for EVERY device (`ngpus * group_size`
+            TileTensors); `output_buffers[my_rank * group_size + i]` receives
+            the data from group-local source `i`.
+        rank_sigs: All `ngpus` devices' Signal pointers, indexed by GLOBAL
+            device rank.
         ctx: Device context for THIS GPU.
-        my_rank: Index of this GPU among the participants.
+        my_rank: GLOBAL rank of this GPU in `[0, ngpus)`.
         _max_num_blocks: Maximum number of blocks for kernel launch (optional).
+
+    Raises:
+        Error: `group_size != ngpus` (a grouped collective) and P2P access is
+            not available -- the non-P2P fallback assumes a full-world,
+            contiguous `0..ngpus-1` device layout and cannot be grouped.
     """
-    comptime assert ngpus >= 2, "allgather requires at least 2 GPUs"
+    comptime assert (
+        group_size >= 2
+    ), "allgather requires at least 2 GPUs per group"
+    comptime assert (
+        ngpus % group_size == 0
+    ), "group_size must evenly divide ngpus"
 
-    # Return early if all input buffers are empty.
+    # This device's group. `group_start` is 0 for a full-world collective
+    # (group_size == ngpus), so the emptiness check below is byte-identical
+    # to the pre-grouping `range(ngpus)` scan from world index 0 in that case.
+    var group_start = ualign_down(my_rank, group_size)
+
+    # Return early if all of THIS DEVICE'S GROUP's input buffers are empty --
+    # not the whole world's; sibling groups may legitimately be non-empty
+    # while this one is.
     var all_empty = True
-
-    comptime for i in range(ngpus):
-        if input_buffers[i].num_elements() > 0:
+    comptime for i in range(group_size):
+        if input_buffers[group_start + i].num_elements() > 0:
             all_empty = False
             break
     if all_empty:
         return
 
-    # Check P2P availability.
+    # Non-P2P fallback: full-world only (it assumes a contiguous 0..ngpus-1
+    # device layout, so it cannot be grouped).
     if not is_p2p_enabled():
-        return _allgather_naive(input_buffers, output_buffers, ctx)
-    else:
-        return _allgather_p2p[rank=1, domain_id=domain_id](
-            input_buffers,
-            output_buffers,
-            rank_sigs,
-            _max_num_blocks,
-            ctx,
-            my_rank,
-        )
+        comptime if group_size != ngpus:
+            raise Error(
+                "grouped allgather (group_size != ngpus) requires P2P access"
+                " between GPUs"
+            )
+        comptime OutputTensorType = type_of(output_buffers[0])
+        var my_outputs = Array[OutputTensorType, ngpus](uninitialized=True)
+        comptime for i in range(ngpus):
+            my_outputs[i] = output_buffers[my_rank * ngpus + i]
+        return _allgather_naive(input_buffers, my_outputs, ctx)
+
+    # P2P path: hand the collective the whole world plus the group width, and
+    # let it derive the group-local slice, rank, and barrier domain itself.
+    return _allgather_p2p[rank=1, group_size=group_size](
+        input_buffers,
+        output_buffers,
+        rank_sigs,
+        _max_num_blocks,
+        ctx,
+        my_rank,
+    )

@@ -231,6 +231,9 @@ def bench_reducescatter_2d[
                     row_major(M, D),
                 )
 
+            # `reducescatter` takes a world-view output array (every device's
+            # own partition, indexed by global rank); `out_bufs` is already
+            # that array.
             reducescatter[
                 dtype=dtype,
                 ngpus=ngpus,
@@ -238,7 +241,7 @@ def bench_reducescatter_2d[
                 axis=axis,
             ](
                 in_bufs,
-                out_bufs[ctx_idx],
+                out_bufs,
                 rank_sigs,
                 ctx_inner,
                 max_num_blocks,
@@ -466,7 +469,7 @@ def bench_reducescatter[
 
             reducescatter[dtype=dtype, ngpus=ngpus, use_multimem=use_multimem](
                 in_bufs,
-                out_bufs[ctx_idx],
+                out_bufs,
                 rank_sigs,
                 ctx_inner,
                 max_num_blocks,

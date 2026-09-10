@@ -187,8 +187,13 @@ def _verify_results[
             v_rs_shard[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
+        # `reducescatter`'s output is a world-view array (every device's own
+        # shard, indexed by global rank); only THIS device's slot is ever
+        # read back, so the rest is left uninitialized.
+        var world_out_shard = Array[OutShardType, ngpus](uninitialized=True)
+        world_out_shard[i] = out_shard
         reducescatter[dtype=in_dtype, ngpus=ngpus, axis=0](
-            in_bufs, out_shard, rank_sigs, list_of_ctx[i]
+            in_bufs, world_out_shard, rank_sigs, list_of_ctx[i], my_rank=i
         )
     group_end()
     for i in range(ngpus):
@@ -708,7 +713,7 @@ def bench_reducescatter_rmsnorm[
                     row_major(Coord(Index(num_rows, num_cols))),
                 )
             reducescatter[dtype=in_dtype, ngpus=ngpus, axis=0](
-                in_bufs, out_shards[ctx_idx], rank_sigs, ctx_inner
+                in_bufs, out_shards, rank_sigs, ctx_inner, my_rank=ctx_idx
             )
 
         bencher_iter_custom(bench, call_fn, ctx)
@@ -770,7 +775,7 @@ def bench_reducescatter_rmsnorm[
                     row_major(Coord(Index(num_rows, num_cols))),
                 )
             reducescatter[dtype=in_dtype, ngpus=ngpus, axis=0](
-                in_bufs, out_shards[ctx_idx], rank_sigs, ctx_inner
+                in_bufs, out_shards, rank_sigs, ctx_inner, my_rank=ctx_idx
             )
             if local_rows > 0:
                 _launch_norm[in_dtype, num_cols](
@@ -858,7 +863,7 @@ def bench_reducescatter_rmsnorm[
             @always_inline
             def two_launch() raises:
                 reducescatter[dtype=in_dtype, ngpus=ngpus, axis=0](
-                    in_bufs, out_shards[ctx_idx], rank_sigs, ctx_inner
+                    in_bufs, out_shards, rank_sigs, ctx_inner, my_rank=ctx_idx
                 )
                 if local_rows > 0:
                     _launch_norm[in_dtype, num_cols](

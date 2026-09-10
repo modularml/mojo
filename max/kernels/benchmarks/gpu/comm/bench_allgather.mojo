@@ -233,15 +233,11 @@ def bench_allgather[
                     row_major(lengths[i]),
                 ).as_immut()
 
-            var device_out = Array[OutTileType, ngpus](
-                fill_with_unrolled=lambda [
-                    src_idx: Int
-                ]() -> OutTileType: tt_out[ctx_idx * ngpus + src_idx]
-            )
-
+            # `tt_out` is already the world-view output array `allgather`
+            # expects (`ngpus * ngpus` for this full-world, ungrouped bench).
             allgather(
                 tt_in,
-                device_out,
+                tt_out,
                 rank_sigs,
                 ctx_inner,
                 ctx_idx,

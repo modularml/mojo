@@ -38,6 +38,7 @@ from std.sys import (
     size_of,
 )
 
+from std.math.uutils import ualign_down
 from std.math import rsqrt
 from max.gpu.host import DeviceBuffer, DeviceContext, get_gpu_target
 from std.utils.index import Index
@@ -495,7 +496,7 @@ def _allgather_full[
     in_dtype: DType,
     ngpus: Int,
     num_cols: Int,
-    domain_id: Int = 0,
+    group_size: Int = ngpus,
 ](
     in_shards: Array[
         TileTensor[
@@ -506,7 +507,7 @@ def _allgather_full[
         ngpus,
     ],
     out_full: DeviceBuffer[in_dtype],
-    config: ReduceScatterConfig[in_dtype, ngpus],
+    config: ReduceScatterConfig[in_dtype, group_size],
     rank_sigs: Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS],
     ctx: DeviceContext,
     my_rank: Int,
@@ -516,9 +517,11 @@ def _allgather_full[
     into `out_full`), so `out_full` is the full gathered tensor -- the exact
     residual the fused kernel's `sum_out` must match.
 
-    Grouped callers pass group-local `in_shards`/`rank_sigs`, a `group_size`
-    config, this GPU's rank WITHIN the group and the group's `domain_id`, exactly
-    as the handler's two-launch fallback does."""
+    World view vs. group: `ngpus` is the total number of devices in the
+    world; `in_shards`/`rank_sigs` are indexed by GLOBAL device rank, and
+    `my_rank` is GLOBAL too -- the public `allgather` derives the group-local
+    slice, rank, and barrier domain internally from `group_size` (defaults
+    to `ngpus`)."""
     comptime OutViewType = TileTensor[
         mut=True,
         in_dtype,
@@ -529,16 +532,20 @@ def _allgather_full[
         out_full.unsafe_ptr()
     )
 
-    def out_views_at(src: Int) {imm} -> OutViewType:
+    # `allgather`'s world-view output array holds every device's own
+    # `group_size` outputs; only THIS device's slice is ever read back, so
+    # the rest is left uninitialized.
+    var world_out_views = Array[OutViewType, ngpus * group_size](
+        uninitialized=True
+    )
+    comptime for src in range(group_size):
         var start = config.rank_unit_start(src)
-        return OutViewType(
+        world_out_views[my_rank * group_size + src] = OutViewType(
             out_base + start * num_cols,
             row_major(Coord(Index(config.rank_units(src), num_cols))),
         )
-
-    var out_views = Array[_, ngpus](fill_with=out_views_at)
-    allgather[domain_id=domain_id](
-        in_shards, out_views, rank_sigs, ctx, my_rank
+    allgather[group_size=group_size](
+        in_shards, world_out_views, rank_sigs, ctx, my_rank
     )
 
 
@@ -580,9 +587,6 @@ def _run_prod_oracle_case[
     comptime assert (
         ngpus % group_size == 0
     ), "group_size must evenly divide the device count"
-    # Mirrors the handler: a full-world collective keeps barrier domain 0; a
-    # subgroup gets its own counter bank so both can share `Signal` buffers.
-    comptime domain_id = 0 if group_size == ngpus else group_size
     comptime num_groups = ngpus // group_size
 
     var config = ReduceScatterConfig[in_dtype, group_size](
@@ -671,28 +675,25 @@ def _run_prod_oracle_case[
     comptime GammaType = TileTensor[
         in_dtype, type_of(row_major(Coord(Index(0)))), ImmutAnyOrigin
     ]
+
+    # World-view input array `_dispatch_ag_norm` expects (indexed by GLOBAL
+    # device rank); it does its own group-local slicing internally from
+    # `group_size` + `my_rank`. `rank_sigs` is already world-view above.
+    var world_shards = Array[ShardType, ngpus](
+        fill_with=lambda (i: Int) -> ShardType: ShardType(
+            rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
+                shard_dev[i].unsafe_ptr()
+            ),
+            row_major(
+                Coord(Index(config.rank_units(i % group_size), num_cols))
+            ),
+        )
+    )
+
     # --- Fused kernel directly, or the op's dispatch with the production
     # two-launch fallback. ---
     group_start()
     for i in range(ngpus):
-        var local = i % group_size
-        var base = (i // group_size) * group_size
-        # Group-local peer/signal arrays: entries 0..group_size-1 are this
-        # device's own group, exactly what the handler hands the kernel.
-        var in_shards = Array[_, group_size](
-            fill_with=lambda (k: Int) -> ShardType: ShardType(
-                rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
-                    shard_dev[base + k].unsafe_ptr()
-                ),
-                row_major(Coord(Index(config.rank_units(k), num_cols))),
-            )
-        )
-        var sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
-            uninitialized=True
-        )
-        for k in range(group_size):
-            sigs[k] = rank_sigs[base + k]
-
         var normed_view = FullType(
             normed[i].unsafe_ptr().as_unsafe_any_origin(),
             row_major(Coord(Index(num_rows, num_cols))),
@@ -714,8 +715,15 @@ def _run_prod_oracle_case[
             @always_inline
             def two_launch() raises:
                 _allgather_full[
-                    in_dtype, group_size, num_cols, domain_id=domain_id
-                ](in_shards, sum_full[i], config, sigs, list_of_ctx[i], local)
+                    in_dtype, ngpus, num_cols, group_size=group_size
+                ](
+                    world_shards,
+                    sum_full[i],
+                    config,
+                    rank_sigs,
+                    list_of_ctx[i],
+                    i,
+                )
                 _rms_norm_full[in_dtype, num_cols](
                     num_rows,
                     sum_full[i],
@@ -726,28 +734,28 @@ def _run_prod_oracle_case[
                     list_of_ctx[i],
                 )
 
-            _dispatch_ag_norm[two_launch=two_launch, domain_id=domain_id](
-                in_shards,
+            _dispatch_ag_norm[two_launch=two_launch, group_size=group_size](
+                world_shards,
                 normed_view,
                 sum_view,
                 gamma_view,
                 epsilon,
                 weight_offset,
-                sigs,
+                rank_sigs,
                 list_of_ctx[i],
-                local_rank=local,
+                my_rank=i,
             )
         else:
-            allgather_rmsnorm[domain_id=domain_id](
-                in_shards,
+            allgather_rmsnorm[group_size=group_size](
+                world_shards,
                 normed_view,
                 sum_view,
                 gamma_view,
                 epsilon,
                 weight_offset,
-                sigs,
+                rank_sigs,
                 list_of_ctx[i],
-                local,
+                my_rank=i,
             )
     group_end()
     for i in range(ngpus):
@@ -761,23 +769,8 @@ def _run_prod_oracle_case[
         list_of_ctx[i].synchronize()
     group_start()
     for i in range(ngpus):
-        var local = i % group_size
-        var base = (i // group_size) * group_size
-        var in_shards = Array[_, group_size](
-            fill_with=lambda (k: Int) -> ShardType: ShardType(
-                rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
-                    shard_dev[base + k].unsafe_ptr()
-                ),
-                row_major(Coord(Index(config.rank_units(k), num_cols))),
-            )
-        )
-        var sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
-            uninitialized=True
-        )
-        for k in range(group_size):
-            sigs[k] = rank_sigs[base + k]
-        _allgather_full[in_dtype, group_size, num_cols, domain_id=domain_id](
-            in_shards, ag_ref[i], config, sigs, list_of_ctx[i], local
+        _allgather_full[in_dtype, ngpus, num_cols, group_size=group_size](
+            world_shards, ag_ref[i], config, rank_sigs, list_of_ctx[i], i
         )
     group_end()
     for i in range(ngpus):
@@ -941,7 +934,6 @@ def _run_interleaved_barrier_case[
     comptime assert (
         group_size < ngpus
     ), "interleaving is only meaningful for a subgroup collective"
-    comptime domain_id = group_size
 
     var grp_rows = group_size * rows_per_dev
     var world_rows = ngpus * rows_per_dev
@@ -1048,22 +1040,6 @@ def _run_interleaved_barrier_case[
     for _round in range(rounds):
         group_start()
         for i in range(ngpus):
-            var local = i % group_size
-            var base = (i // group_size) * group_size
-            var in_shards = Array[_, group_size](
-                fill_with=lambda (k: Int) -> ShardType: ShardType(
-                    rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
-                        shard_dev[base + k].unsafe_ptr()
-                    ),
-                    row_major(Coord(Index(rows_per_dev, num_cols))),
-                )
-            )
-            var sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
-                uninitialized=True
-            )
-            for k in range(group_size):
-                sigs[k] = rank_sigs[base + k]
-
             var normed_view = FullType(
                 normed[i].unsafe_ptr().as_unsafe_any_origin(),
                 row_major(Coord(Index(grp_rows, num_cols))),
@@ -1078,16 +1054,16 @@ def _run_interleaved_barrier_case[
                 ),
                 row_major(Coord(Index(num_cols))),
             )
-            allgather_rmsnorm[domain_id=domain_id](
-                in_shards,
+            allgather_rmsnorm[group_size=group_size](
+                world_shards,
                 normed_view,
                 sum_view,
                 gamma_view,
                 epsilon,
                 weight_offset,
-                sigs,
+                rank_sigs,
                 list_of_ctx[i],
-                local,
+                my_rank=i,
             )
         group_end()
 
@@ -1113,7 +1089,7 @@ def _run_interleaved_barrier_case[
     var grp_bad = 0
     var world_bad = 0
     for i in range(ngpus):
-        var base = (i // group_size) * group_size
+        var base = ualign_down(i, group_size)
 
         var got = List[Scalar[in_dtype]](
             length=grp_rows * num_cols, fill=Scalar[in_dtype](0)
@@ -1292,12 +1268,10 @@ def _run_rank_validation_case[
         row_major(Coord(Index(world_rows, num_cols))),
     )
 
-    comptime domain_id = group_size
-
     # 1. A global device id on the trailing group: out of range for arrays that
     #    only hold `group_size` entries.
-    with assert_raises(contains="local_rank"):
-        allgather_rmsnorm[domain_id=domain_id](
+    with assert_raises(contains="my_rank"):
+        allgather_rmsnorm(
             shards,
             normed_ok,
             sum_ok,
@@ -1306,12 +1280,12 @@ def _run_rank_validation_case[
             weight_offset,
             sigs,
             list_of_ctx[0],
-            local_rank=group_size,
+            my_rank=group_size,
         )
 
     # 2. Outputs sized for the whole world instead of this group.
     with assert_raises(contains="normed_out"):
-        allgather_rmsnorm[domain_id=domain_id](
+        allgather_rmsnorm(
             shards,
             normed_world,
             sum_ok,
@@ -1320,11 +1294,11 @@ def _run_rank_validation_case[
             weight_offset,
             sigs,
             list_of_ctx[0],
-            local_rank=0,
+            my_rank=0,
         )
 
     with assert_raises(contains="sum_out"):
-        allgather_rmsnorm[domain_id=domain_id](
+        allgather_rmsnorm(
             shards,
             normed_ok,
             sum_world,
@@ -1333,7 +1307,7 @@ def _run_rank_validation_case[
             weight_offset,
             sigs,
             list_of_ctx[0],
-            local_rank=0,
+            my_rank=0,
         )
 
     print("rank / output-size validation passed.")
