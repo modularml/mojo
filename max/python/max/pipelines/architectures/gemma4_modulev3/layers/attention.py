@@ -100,6 +100,18 @@ class Gemma4Attention(Module[..., Tensor]):
             in_dim=self.q_weight_dim, out_dim=hidden_size, bias=False
         )
 
+    @property
+    def wqkv(self) -> Tensor:
+        """Q, K (and V when present) weights stacked along the output dim.
+
+        The concat runs on weights only, so it constant-folds at graph
+        compile time and decode issues a single fused QKV matmul.
+        """
+        weights = [self.q_proj.weight, self.k_proj.weight]
+        if self._has_v_proj:
+            weights.append(self.v_proj.weight)
+        return F.concat(weights, axis=0)
+
     def forward(
         self,
         x: Tensor,
@@ -115,9 +127,12 @@ class Gemma4Attention(Module[..., Tensor]):
         q_dim, kv_dim = self.q_weight_dim, self.kv_weight_dim
         num_kv_heads = self.num_key_value_heads
 
-        x_q = self.q_proj(x)
-        x_k = self.k_proj(x)
-        x_v = self.v_proj(x) if self._has_v_proj else x_k
+        fused = x @ self.wqkv.T
+        splits = (
+            [q_dim, kv_dim, kv_dim] if self._has_v_proj else [q_dim, kv_dim]
+        )
+        parts = fused.split(splits, axis=-1)
+        x_q, x_k, x_v = parts[0], parts[1], parts[-1]
 
         x_q = self.q_norm(x_q.reshape((-1, self.n_heads, head_dim))).reshape(
             (-1, q_dim)
