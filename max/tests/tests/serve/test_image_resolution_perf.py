@@ -17,11 +17,11 @@ downloads without an LLM in the loop:
 
 * base64 ``data:`` decoding is offloaded to a worker thread (does not block the
   event loop) for large payloads, and runs inline for small ones;
-* oversized media is rejected *before* its bytes are downloaded/decoded -- via
-  the advertised ``Content-Length`` and a streamed-total guard for ``http(s)``,
-  and via the base64 length for ``data:`` URIs;
-* the OpenAI route enforces the per-request video count and per-video byte caps
-  up front, mirroring the image caps.
+* media size is bounded in aggregate by ``max_media_bytes``: an ``http(s)``
+  download is aborted via the advertised ``Content-Length`` or a streamed-total
+  guard once the request's cumulative media crosses that limit;
+* the OpenAI route enforces the per-request video count up front, mirroring the
+  image count cap.
 
 The headline reproducer is ``test_event_loop_not_blocked_during_decode``: it
 deadlocks (and fails) if the decode runs on the event loop, and passes only
@@ -49,9 +49,6 @@ from PIL import Image
 from pydantic import AnyUrl
 
 pytestmark = pytest.mark.asyncio
-
-# A 64MB cap, matching the MiniMax-M3 tokenizer's ``max_image_bytes``.
-_CAP = 64 * 1024 * 1024
 
 
 def _data_uri(payload: bytes) -> str:
@@ -84,7 +81,7 @@ async def test_large_data_uri_decode_runs_off_event_loop(monkeypatch) -> None:  
     # >256KiB of base64 -> exceeds the offload threshold.
     payload = b"\x00" * (400 * 1024)
     out = await resolve_image_from_url(
-        AnyUrl(_data_uri(payload)), settings=Settings(), max_bytes=_CAP
+        AnyUrl(_data_uri(payload)), settings=Settings()
     )
     assert out == payload
     assert recorded["thread"] != main_thread
@@ -104,7 +101,7 @@ async def test_small_data_uri_decode_runs_inline(monkeypatch) -> None:  # noqa: 
 
     payload = b"\x01" * 512
     out = await resolve_image_from_url(
-        AnyUrl(_data_uri(payload)), settings=Settings(), max_bytes=_CAP
+        AnyUrl(_data_uri(payload)), settings=Settings()
     )
     assert out == payload
     assert recorded["thread"] == main_thread
@@ -144,9 +141,7 @@ async def test_event_loop_not_blocked_during_decode(monkeypatch) -> None:  # noq
         release.set()
 
     resolve_task = asyncio.create_task(
-        resolve_image_from_url(
-            AnyUrl(_data_uri(payload)), settings=Settings(), max_bytes=_CAP
-        )
+        resolve_image_from_url(AnyUrl(_data_uri(payload)), settings=Settings())
     )
     out, _ = await asyncio.wait_for(
         asyncio.gather(resolve_task, releaser()), timeout=15.0
@@ -159,31 +154,26 @@ async def test_event_loop_not_blocked_during_decode(monkeypatch) -> None:  # noq
 # ---------------------------------------------------------------------------
 
 
-async def test_oversized_data_uri_rejected_before_decode(monkeypatch) -> None:  # noqa: ANN001
-    """An over-cap ``data:`` payload is rejected without ever decoding it."""
-    decode_called = False
-    original = _image_resolution._decode_base64
+async def test_oversized_data_uri_rejected() -> None:
+    """A ``data:`` payload over the request media budget is rejected (400).
 
-    def spy(b64: str) -> bytes:
-        nonlocal decode_called
-        decode_called = True
-        return original(b64)
-
-    monkeypatch.setattr(_image_resolution, "_decode_base64", spy)
-
-    payload = b"\x00" * 4096  # decodes to 4096 bytes, cap is 1024
-    with pytest.raises(InputError, match="image exceeds the maximum"):
+    (Data URIs are also bounded by the body-size middleware, which caps the
+    whole request body under its own ``max_request_bytes``; this exercises the
+    resolver's aggregate media charge directly.)
+    """
+    payload = b"\x00" * 4096  # decodes to 4096 bytes, budget is 1024
+    with pytest.raises(InputError, match="exceeds the maximum media size"):
         await resolve_image_from_url(
-            AnyUrl(_data_uri(payload)), settings=Settings(), max_bytes=1024
+            AnyUrl(_data_uri(payload)),
+            settings=Settings(max_media_bytes=1024),
         )
-    assert not decode_called
 
 
-async def test_data_uri_within_cap_roundtrips() -> None:
-    """A within-cap ``data:`` payload resolves to the exact original bytes."""
+async def test_data_uri_within_budget_roundtrips() -> None:
+    """A within-budget ``data:`` payload resolves to the exact original bytes."""
     payload = bytes(range(256)) * 8
     out = await resolve_image_from_url(
-        AnyUrl(_data_uri(payload)), settings=Settings(), max_bytes=_CAP
+        AnyUrl(_data_uri(payload)), settings=Settings()
     )
     assert out == payload
 
@@ -193,11 +183,11 @@ async def test_data_uri_within_cap_roundtrips() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _no_ssrf() -> Settings:
+def _no_ssrf(**overrides: Any) -> Settings:
     # These fetch tests drive the fake ``client.stream(...)`` directly, so they
     # exercise the break-glass (unvalidated) streaming path rather than the
     # SSRF-guarded path that would resolve the host through real DNS.
-    return Settings(media_url_ssrf_protection_enabled=False)
+    return Settings(media_url_ssrf_protection_enabled=False, **overrides)
 
 
 class _FakeResponse:
@@ -269,17 +259,16 @@ def _install_fake_client(
 async def test_http_oversized_content_length_rejected_without_download(
     monkeypatch,  # noqa: ANN001
 ) -> None:
-    """An over-cap advertised ``Content-Length`` rejects before any body read."""
+    """An over-budget advertised ``Content-Length`` rejects before any body read."""
     read_log = _install_fake_client(
         monkeypatch,
         headers={"content-length": str(100 * 1024 * 1024)},
         chunks=[b"x" * 1024],
     )
-    with pytest.raises(InputError, match="video exceeds the maximum"):
+    with pytest.raises(InputError, match="exceeds the maximum media size"):
         await resolve_image_from_url(
             AnyUrl("https://example.com/big.mp4"),
-            settings=_no_ssrf(),
-            max_bytes=50 * 1024 * 1024,
+            settings=_no_ssrf(max_media_bytes=50 * 1024 * 1024),
             media_kind="video",
         )
     # Body was never streamed.
@@ -290,18 +279,17 @@ async def test_http_stream_aborts_when_total_exceeds_cap(
     monkeypatch,  # noqa: ANN001
 ) -> None:
     """With no/short Content-Length, the stream aborts once the total is over."""
-    # Ten 60-byte chunks (600 bytes total), cap is 100 bytes; only the first
+    # Ten 60-byte chunks (600 bytes total), budget is 100 bytes; only the first
     # two chunks should be read before the abort.
     read_log = _install_fake_client(
         monkeypatch,
         headers={},  # no content-length advertised
         chunks=[b"a" * 60 for _ in range(10)],
     )
-    with pytest.raises(InputError, match="image exceeds the maximum"):
+    with pytest.raises(InputError, match="exceeds the maximum media size"):
         await resolve_image_from_url(
             AnyUrl("https://example.com/sneaky.png"),
-            settings=_no_ssrf(),
-            max_bytes=100,
+            settings=_no_ssrf(max_media_bytes=100),
         )
     assert len(read_log) == 2  # aborted early, not all ten chunks
 
@@ -316,7 +304,6 @@ async def test_http_within_cap_downloads_fully(monkeypatch) -> None:  # noqa: AN
     out = await resolve_image_from_url(
         AnyUrl("https://example.com/ok.png"),
         settings=_no_ssrf(),
-        max_bytes=_CAP,
     )
     assert out == b"abcdefghijkl"
     assert len(read_log) == 3
@@ -379,7 +366,6 @@ async def test_http_read_timeout_raises_clean_input_error(
         await resolve_image_from_url(
             AnyUrl("https://example.com/slow.mp4"),
             settings=_no_ssrf(),
-            max_bytes=_CAP,
             media_kind="video",
         )
 
@@ -397,7 +383,6 @@ async def test_http_transport_error_raises_clean_input_error(
         await resolve_image_from_url(
             AnyUrl("https://example.com/unreachable.mp4"),
             settings=_no_ssrf(),
-            max_bytes=_CAP,
             media_kind="video",
         )
 
@@ -426,7 +411,6 @@ async def test_http_client_uses_explicit_non_default_timeout(
     await resolve_image_from_url(
         AnyUrl("https://example.com/ok.png"),
         settings=_no_ssrf(),
-        max_bytes=_CAP,
     )
     assert "timeout" in captured, (
         "fetch client must be given an explicit timeout"
@@ -475,15 +459,14 @@ async def test_parse_rejects_too_many_videos_before_download(
     assert resolve_calls == 0
 
 
-async def test_parse_rejects_oversized_video_before_decode() -> None:
-    """An over-cap video data URI -> 400 with a video-specific message."""
+async def test_parse_rejects_oversized_video() -> None:
+    """A video data URI over the request media budget -> 400 (video message)."""
     request = _video_request([_data_uri(b"\x00" * 8192)])
-    with pytest.raises(InputError, match="video exceeds the maximum"):
+    with pytest.raises(InputError, match="video media exceeds the maximum"):
         await openai_parse_chat_completion_request(
             request,
             wrap_content=True,
-            settings=Settings(),
-            max_video_bytes=1024,
+            settings=Settings(max_media_bytes=1024),
         )
 
 
@@ -512,9 +495,7 @@ async def test_parse_accepts_within_cap_image_and_video() -> None:
         wrap_content=True,
         settings=Settings(),
         max_images_per_request=200,
-        max_image_bytes=_CAP,
         max_videos_per_request=20,
-        max_video_bytes=50 * 1024 * 1024,
     )
     assert len(parsed.images) == 1
     assert len(parsed.videos) == 1
@@ -523,47 +504,50 @@ async def test_parse_accepts_within_cap_image_and_video() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Settings: server-level max_bytes cap and default media_kind.
+# Settings: aggregate max_media_bytes media budget and default media_kind.
 # ---------------------------------------------------------------------------
 
 
 def test_settings_media_defaults() -> None:
-    """The new media fields default to no server cap / image labelling."""
+    """The media label defaults to 'image'."""
     settings = Settings()
-    assert settings.max_bytes == 0
     assert settings.media_kind == "image"
 
 
-async def test_settings_max_bytes_applies_when_no_per_call_cap() -> None:
-    """``Settings.max_bytes`` caps media even when the caller passes no cap."""
-    settings = Settings(max_bytes=1024)
-    with pytest.raises(InputError, match="image exceeds the maximum"):
+async def test_request_budget_bounds_media() -> None:
+    """``Settings.max_media_bytes`` bounds resolved media in aggregate."""
+    settings = Settings(max_media_bytes=1024)
+    with pytest.raises(InputError, match="exceeds the maximum media size"):
         await resolve_image_from_url(
             AnyUrl(_data_uri(b"\x00" * 4096)), settings=settings
         )
-    # Within the server cap -> resolves fine.
+    # Within the request budget -> resolves fine.
     out = await resolve_image_from_url(
         AnyUrl(_data_uri(b"\x00" * 512)), settings=settings
     )
     assert out == b"\x00" * 512
 
 
-async def test_settings_max_bytes_is_a_ceiling_over_per_call_cap() -> None:
-    """The effective cap is the smaller of the per-call and server caps."""
-    settings = Settings(max_bytes=1024)
-    # Per-call cap is larger (8192), so the 1024 server cap should win.
-    with pytest.raises(InputError, match="image exceeds the maximum"):
+async def test_request_budget_is_shared_across_media() -> None:
+    """One budget spans every item: two half-budget items together overrun it."""
+    settings = Settings(max_media_bytes=1024)
+    budget = _image_resolution._request_media_budget(settings)
+    # First 600-byte item fits (600 <= 1024)...
+    out = await resolve_image_from_url(
+        AnyUrl(_data_uri(b"\x00" * 600)), settings=settings, budget=budget
+    )
+    assert out == b"\x00" * 600
+    # ...but a second 600-byte item pushes the shared total to 1200 > 1024.
+    with pytest.raises(InputError, match="exceeds the maximum media size"):
         await resolve_image_from_url(
-            AnyUrl(_data_uri(b"\x00" * 4096)),
-            settings=settings,
-            max_bytes=8192,
+            AnyUrl(_data_uri(b"\x00" * 600)), settings=settings, budget=budget
         )
 
 
 async def test_settings_media_kind_used_in_error_message() -> None:
     """``Settings.media_kind`` labels the error when the caller omits it."""
-    settings = Settings(max_bytes=1024, media_kind="video")
-    with pytest.raises(InputError, match="video exceeds the maximum"):
+    settings = Settings(max_media_bytes=1024, media_kind="video")
+    with pytest.raises(InputError, match="video media exceeds the maximum"):
         await resolve_image_from_url(
             AnyUrl(_data_uri(b"\x00" * 4096)), settings=settings
         )

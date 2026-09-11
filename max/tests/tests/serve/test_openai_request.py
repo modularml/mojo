@@ -1389,7 +1389,7 @@ async def test_openai_accepts_complete_tool_call_replies() -> None:
 
 
 async def test_openai_rejects_oversized_image() -> None:
-    """An image whose resolved bytes exceed 10MB -> 400 (verifier 11_04)."""
+    """An image over the request media budget -> 400 (verifier 11_04)."""
     import base64 as _base64
 
     from max.pipelines.context.exceptions import InputError
@@ -1414,8 +1414,7 @@ async def test_openai_rejects_oversized_image() -> None:
         await openai_parse_chat_completion_request(
             request,
             wrap_content=True,
-            settings=Settings(),
-            max_image_bytes=10 * 1024 * 1024,
+            settings=Settings(max_media_bytes=10 * 1024 * 1024),
         )
 
 

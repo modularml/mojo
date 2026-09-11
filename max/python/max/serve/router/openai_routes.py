@@ -102,6 +102,7 @@ from max.serve.pipelines.llm import (
 )
 from max.serve.router._image_resolution import (
     MediaRef,
+    _request_media_budget,
     decode_and_validate_images,
     make_media_ref,
     resolve_image_from_url,
@@ -1562,9 +1563,7 @@ async def openai_parse_chat_completion_request(
     wrap_content: bool,
     settings: Settings,
     max_images_per_request: int | None = None,
-    max_image_bytes: int | None = None,
     max_videos_per_request: int | None = None,
-    max_video_bytes: int | None = None,
     allowed_roles: frozenset[str] | None = None,
 ) -> _ParsedChatRequest:
     """Parse the OpenAI ChatCompletionRequest to build TextGenerationRequestMessages.
@@ -1573,12 +1572,14 @@ async def openai_parse_chat_completion_request(
     can be downloaded and bundled alongside the request for preprocessing by
     pipelines.
 
-    ``max_images_per_request``/``max_image_bytes`` and
-    ``max_videos_per_request``/``max_video_bytes`` are model-specific media
-    limits supplied by the caller (read off the tokenizer); ``None`` means the
-    corresponding limit is not enforced. The per-item byte caps are enforced
-    while resolving each reference, so an oversized image/video is rejected
-    before its bytes are fully downloaded or decoded.
+    ``max_images_per_request``/``max_videos_per_request`` are model-specific
+    per-request count limits supplied by the caller (read off the tokenizer);
+    ``None`` means the corresponding limit is not enforced. Media *size* is not
+    limited per item: a single :class:`_MediaByteBudget` seeded from
+    :attr:`Settings.max_media_bytes` is shared across every image and video, so
+    the request is rejected once the total fetched and decoded media crosses
+    that aggregate limit. That limit is separate from the body-size
+    middleware's ``max_request_bytes``, which bounds only the request body.
 
     ``allowed_roles`` is the set of message roles the model accepts; ``None``
     skips role validation (vendor roles are only allowed for models that
@@ -1735,12 +1736,15 @@ async def openai_parse_chat_completion_request(
             f"{max_videos_per_request} videos per request"
         )
 
-    # Resolve each reference into bytes, enforcing the per-item byte cap during
-    # the download/decode so an oversized item is rejected before it is fully
-    # materialized (CENG-640).
+    # Resolve every reference into bytes under a single per-request media
+    # budget shared across all images and videos, so the total fetched and
+    # decoded media for the request stays within ``max_media_bytes`` (rather
+    # than each item being capped independently). An over-budget download is
+    # aborted before it is fully materialized (CENG-640).
+    budget = _request_media_budget(settings)
     resolve_image_tasks = [
         resolve_image_from_url(
-            image_url, settings, max_bytes=max_image_bytes, media_kind="image"
+            image_url, settings, budget=budget, media_kind="image"
         )
         for image_url in image_refs
     ]
@@ -1751,13 +1755,16 @@ async def openai_parse_chat_completion_request(
     # codecs release the GIL during decode, so this is genuinely concurrent.
     # The decoded images are carried on the request and reused by the tokenizer
     # (decode-once), so this is the only place a request's images are decoded.
+    # The same ``max_media_bytes`` knob bounds decoded memory: no single image
+    # may decode to more than the request budget, rejected from its header
+    # before ``load()`` allocates the pixel buffer.
     decoded_images = await asyncio.to_thread(
-        decode_and_validate_images, request_images, max_image_bytes
+        decode_and_validate_images, request_images, budget.limit
     )
 
     resolve_video_tasks = [
         resolve_image_from_url(
-            video_url, settings, max_bytes=max_video_bytes, media_kind="video"
+            video_url, settings, budget=budget, media_kind="video"
         )
         for video_url in video_refs
     ]
@@ -1991,11 +1998,9 @@ async def openai_create_chat_completion(
             max_images_per_request=getattr(
                 tokenizer, "max_images_per_request", None
             ),
-            max_image_bytes=getattr(tokenizer, "max_image_bytes", None),
             max_videos_per_request=getattr(
                 tokenizer, "max_videos_per_request", None
             ),
-            max_video_bytes=getattr(tokenizer, "max_video_bytes", None),
             allowed_roles=_STANDARD_CHAT_ROLES
             | getattr(tokenizer, "extra_chat_roles", frozenset()),
         )

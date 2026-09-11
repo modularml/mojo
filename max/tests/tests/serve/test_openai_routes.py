@@ -71,6 +71,7 @@ from max.serve.pipelines.echo_gen import (
 )
 from max.serve.pipelines.llm import TokenGeneratorOutput, TokenGeneratorPipeline
 from max.serve.router._image_resolution import (
+    _ALLOWED_IMAGE_FORMATS,
     _decode_data_uri_base64,
     decode_and_validate_images,
     resolve_image_from_url,
@@ -568,21 +569,66 @@ def test_decode_and_validate_images_rejects_truncated_image() -> None:
         decode_and_validate_images([full[: int(len(full) * 0.88)]])
 
 
-def test_decode_and_validate_images_rejects_decompression_bomb(
-    monkeypatch,  # noqa: ANN001
-) -> None:
-    # An image whose pixel count blows past PIL's decompression-bomb guard must
-    # become a clean 400 (InputError), not an unhandled DecompressionBombError
-    # (which is not an OSError/ValueError, so it would otherwise escape as 500).
-    # (MXSERV-162.)
+def test_decode_and_validate_images_rejects_oversized_decode() -> None:
+    # A decompression bomb -- small on the wire, huge once decoded -- must
+    # become a clean 400 (InputError). The decoded-memory bound is the one
+    # request-memory knob (max_media_bytes), so an image whose header says it
+    # decodes to more than that limit is rejected before load() allocates the
+    # pixel buffer. (MXSERV-389, finding 6.)
     buf = io.BytesIO()
     Image.new("RGB", (64, 64)).save(buf, format="PNG")
     data = buf.getvalue()
-    # Lower the limit *after* building the bytes so 64*64 px trips the guard
-    # (DecompressionBombError fires above 2x MAX_IMAGE_PIXELS).
-    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 16)
+    # 64x64 RGB decodes to 64*64*3 = 12288 bytes, over the 1024-byte budget.
+    with pytest.raises(
+        InputError, match=r"decodes to .*exceeding the maximum media size"
+    ):
+        decode_and_validate_images([data], max_decoded_bytes=1024)
+
+
+def test_decode_and_validate_images_allows_within_decode_budget() -> None:
+    # Within the decoded-memory budget, a valid image decodes normally.
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64)).save(buf, format="PNG")
+    decoded = decode_and_validate_images(
+        [buf.getvalue()], max_decoded_bytes=64 * 64 * 3
+    )
+    assert decoded[0].size == (64, 64)
+
+
+def test_decode_and_validate_images_rejects_disallowed_format() -> None:
+    # Image.open is pinned to an explicit formats allowlist (MXSERV-389,
+    # finding 7), so a format outside it -- here EPS, whose PIL plugin shells
+    # out to Ghostscript -- is never handed to its decoder and fails as a clean
+    # 400 instead of reaching a native plugin.
+    eps = b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 10 10\nshowpage\n"
     with pytest.raises(InputError):
-        decode_and_validate_images([data])
+        decode_and_validate_images([eps])
+
+
+def test_decode_and_validate_images_accepts_allowlisted_formats() -> None:
+    # Every format on the allowlist (common web formats plus the semi-popular
+    # additions -- PPM, TIFF, TGA, AVIF -- that this build actually registered)
+    # must decode cleanly. Iterating the live allowlist keeps this test in step
+    # with the module and with the codecs present on the running platform.
+    # Name the live allowlist in every failure message: which formats this
+    # build registered is the first thing you need to know, and it varies by
+    # platform for the optional codecs.
+    allowed = set(_ALLOWED_IMAGE_FORMATS)
+    assert {"PNG", "JPEG", "WEBP", "GIF", "BMP"} <= allowed, (
+        f"allowlist lost a common web format: {_ALLOWED_IMAGE_FORMATS}"
+    )
+    size = (16, 16)
+    for fmt in _ALLOWED_IMAGE_FORMATS:
+        buf = io.BytesIO()
+        Image.new("RGB", size).save(buf, format=fmt)
+        decoded = decode_and_validate_images([buf.getvalue()])
+        assert len(decoded) == 1, (
+            f"{fmt} did not decode; allowlist is {_ALLOWED_IMAGE_FORMATS}"
+        )
+        assert decoded[0].size == size, (
+            f"{fmt} decoded to {decoded[0].size}, expected {size}; "
+            f"allowlist is {_ALLOWED_IMAGE_FORMATS}"
+        )
 
 
 def test_open_image_carry_path_matches_bytes_path() -> None:

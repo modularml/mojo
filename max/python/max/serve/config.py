@@ -214,18 +214,27 @@ class Settings(BaseSettings):
         alias="MAX_SERVE_MAX_LOCAL_IMAGE_BYTES",
     )
     # Media (image/video) resolution configuration for http(s):// and data:
-    # URIs. ``max_bytes`` is a server-level cap applied on top of any
-    # per-model cap (the smaller of the two wins); 0 disables the
-    # server-level cap. ``media_kind`` is only the default label used in
-    # size-limit error messages when a resolver caller does not pass one.
-    max_bytes: int = Field(
+    # URIs. The size of resolved media is bounded in aggregate by
+    # ``max_media_bytes`` (all fetched and decoded media for a request must fit
+    # within it), not by a per-item cap. ``media_kind`` is only the default
+    # label used in size-limit error messages when a resolver caller does not
+    # pass one.
+    max_media_bytes: int = Field(
         description=(
-            "Server-level maximum size in bytes for media resolved from "
-            "http(s):// or data: URIs. Applied on top of any per-model cap "
-            "(the smaller wins). 0 disables the server-level cap."
+            "Maximum total size in bytes of the media (images and videos) one "
+            "request may pull in, across every http(s)://, data:, and file: "
+            "reference it names. Bounds both what is fetched and what a single "
+            "image may decode to, so a small on-the-wire image that expands to "
+            "hundreds of MB is rejected from its header before the pixel "
+            "buffer is allocated. Distinct from 'max_request_bytes', which "
+            "bounds the request body itself: a tiny body can name URLs the "
+            "server then fetches on the client's behalf, so the two limits "
+            "govern different resources and are set independently. Set 0 to "
+            "disable the limit."
         ),
-        default=0,
-        alias="MAX_SERVE_MAX_BYTES",
+        default=100 * 1024 * 1024,  # 100 MiB
+        ge=0,
+        alias="MAX_SERVE_MAX_MEDIA_BYTES",
     )
     media_kind: str = Field(
         description=(
@@ -519,6 +528,12 @@ class Settings(BaseSettings):
             else "unbounded"
         )
         logger.info(f"    max_request_bytes      : {max_request_str}")
+        max_media_str = (
+            to_human_readable_bytes(self.max_media_bytes)
+            if self.max_media_bytes
+            else "unbounded"
+        )
+        logger.info(f"    max_media_bytes        : {max_media_str}")
         logger.info("")
 
         # File System Configuration
@@ -528,12 +543,6 @@ class Settings(BaseSettings):
         logger.info(
             f"    max_local_image_bytes  : {to_human_readable_bytes(self.max_local_image_bytes)}"
         )
-        max_bytes_str = (
-            to_human_readable_bytes(self.max_bytes)
-            if self.max_bytes
-            else "None"
-        )
-        logger.info(f"    max_bytes              : {max_bytes_str}")
         logger.info(f"    media_kind             : {self.media_kind}")
         media_url_allowed_hosts_str = (
             ", ".join(self.media_url_allowed_hosts)
