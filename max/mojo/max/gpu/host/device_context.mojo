@@ -2846,8 +2846,8 @@ def _is_nvidia_gpu[target: CompilationTarget]() -> Bool:
     return is_triple["nvptx64-nvidia-cuda", target._mlir_value]()
 
 
-def _is_apple_gpu[target: _TargetType]() -> Bool:
-    return is_triple["air64-apple-macosx", target]()
+def _is_apple_gpu[target: CompilationTarget]() -> Bool:
+    return is_triple["air64-apple-macosx", target._mlir_value]()
 
 
 def _is_path_like(ss: StringSlice) -> Bool:
@@ -3646,7 +3646,7 @@ struct DeviceFunction[
 
 struct DeviceExternalFunction[
     *,
-    target: _TargetType = get_gpu_target(),
+    target: CompilationTarget = get_gpu_target(),
 ]:
     """Represents an external device function loaded from PTX/SASS assembly.
 
