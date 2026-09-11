@@ -900,6 +900,7 @@ class TestAdvanceFsmAndComputeBitmasks:
         mock_matcher.deep_copy.return_value.try_consume_tokens = MagicMock(
             return_value=ret
         )
+        mock_matcher.deep_copy.return_value.is_stopped.return_value = False
         ctx._matcher = mock_matcher
         return ctx, mock_matcher
 

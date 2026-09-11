@@ -128,6 +128,21 @@ class _CompletedMatcher(_RecordingMatcher):
         return _CompletedMatcher()
 
 
+class _TerminatesAfterOneMatcher(_RecordingMatcher):
+    """Stopped once it has consumed a token; its copy is observable."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.copy: _TerminatesAfterOneMatcher | None = None
+
+    def is_stopped(self) -> bool:
+        return bool(self.consumed)
+
+    def deep_copy(self) -> _TerminatesAfterOneMatcher:
+        self.copy = _TerminatesAfterOneMatcher()
+        return self.copy
+
+
 class _FillCountingBackend(_NoopBackend):
     """Backend whose fill is observable, so a skipped fill can be asserted on."""
 
@@ -1189,6 +1204,27 @@ class TestSpeculativeBitmaskWindowWidth:
         truncating would drop constraints the sampler needs."""
         with pytest.raises(ValueError, match="bitmask window"):
             self._run(drafts=[3, 4, 5, 6], num_positions=4)
+
+    def test_walk_stops_at_a_terminated_matcher(self) -> None:
+        """Drafts past the grammar's end are not fed to the copy: xgrammar
+        warns on every token an already-terminated matcher receives."""
+        helper = StructuredOutputHelper(
+            enabled=True, vocab_size=32, backend=_FillRecordingBackend()
+        )
+        ctx = create_text_context(prompt_len=4, max_length=128)
+        ctx.update(new_token=99)
+        matcher = _TerminatesAfterOneMatcher()
+        ctx.set_matcher(matcher)
+        ctx.grammar_enforced = True
+
+        helper._speculatively_fill_bitmask_window(
+            ctx,
+            drafts=np.array([3, 4, 5], dtype=np.int64),
+            bitmask_window=np.full((4, 1), -1, dtype=np.int32),
+        )
+
+        assert matcher.copy is not None
+        assert matcher.copy.consumed == [[3]]
 
 
 def _xgrammar_backend() -> XgrammarBackend:
