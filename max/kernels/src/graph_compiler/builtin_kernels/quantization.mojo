@@ -277,20 +277,26 @@ struct ResizeLinear:
 
     @staticmethod
     def execute[
+        dtype: DType,
+        //,
         coordinate_transform_mode: Int,
         antialias: Bool,
         rank: Int,
-        dtype: DType,
+        target: StaticString,
     ](
         output: OutputTensor[dtype=dtype, rank=rank, ...],
         input: InputTensor[dtype=dtype, rank=rank, ...],
         size: InputTensor[rank=1, ...],
-    ):
+        ctx: DeviceContext,
+    ) raises:
         resize_linear[
-            CoordinateTransformationMode(coordinate_transform_mode), antialias
+            CoordinateTransformationMode(coordinate_transform_mode),
+            antialias,
+            target=target,
         ](
             input.to_tile_tensor[.int64](),
             output.to_tile_tensor[.int64](),
+            ctx,
         )
 
 
