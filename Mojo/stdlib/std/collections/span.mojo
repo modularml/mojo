@@ -321,6 +321,25 @@ struct Span[
         self._data = array.unsafe_ptr()
         self._len = array.length
 
+    @always_inline
+    def _unchecked_get(
+        self,
+        index: Int,
+    ) -> ref[Self.origin, Self.address_space] Self.T:
+        return self._data[unsafe_offset=index]
+
+    @always_inline
+    def _unchecked_subspan(
+        self,
+        *,
+        start: Int,
+        end: Optional[Int] = None,
+    ) -> Self:
+        return Self(
+            unsafe_ptr=self._data.unsafe_offset(start),
+            length=end.or_else(len(self)) - start,
+        )
+
     # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
@@ -390,9 +409,7 @@ struct Span[
             A new span that points to the same data as the current span.
         """
         var start, end = check_slice_bounds(slc, len(self))
-        return Self(
-            unsafe_ptr=self._data.unsafe_offset(start), length=end - start
-        )
+        return self._unchecked_subspan(start=start, end=end)
 
     @always_inline
     def __iter__(var self) -> Self.IteratorOwnedType where Self._is_generic_as:
