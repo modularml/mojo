@@ -433,6 +433,79 @@ def test_release_commits_nothing() -> None:
     assert len(published(bm)) == before
 
 
+# ===--------------------------------------------------------------------=== #
+# Checkpointing while the newest token is a placeholder
+# ===--------------------------------------------------------------------=== #
+
+PROMPT_TOKENS = 16
+"""Long enough that generated tokens reach a published block."""
+
+
+def overlap_forward(
+    bm: JengaBlockManager, ctx: TextContext, token: int = 42
+) -> None:
+    """Runs one step the way the overlap pipeline does.
+
+    The token the forward is producing is not sampled yet, so the context
+    carries a placeholder until it is realized. Everything the cache does
+    happens while that placeholder is the newest token.
+    """
+    bm.alloc(ctx)
+    resume(bm, ctx)
+    ctx.update_with_future_token()
+    checkpoint(bm, ctx)
+    bm.step(ctx)
+    ctx.realize_future_token(token)
+
+
+def test_a_placeholder_newest_token_publishes_the_hashes_a_real_one_does() -> (
+    None
+):
+    # A placeholder stands in for a token nobody has sampled, so if its value
+    # reached a block hash the two pipelines would file the same prefix under
+    # different keys and neither would ever reuse the other's state.
+    realized = make_manager()
+    first = make_ctx(PROMPT_TOKENS)
+    realized.claim(first)
+    for _ in range(20):
+        forward(realized, first)
+
+    placeholder = make_manager()
+    second = make_ctx(PROMPT_TOKENS)
+    placeholder.claim(second)
+    for _ in range(20):
+        overlap_forward(placeholder, second)
+
+    # The first block published is the prompt's last, so the comparison only
+    # covers a *generated* token once more than that many have landed. Stop
+    # short and it compares prompt hashes, which agree however badly the
+    # newest token is handled.
+    assert len(published(realized)) > PROMPT_TOKENS // BLOCK_SIZE
+    assert published(placeholder) == published(realized)
+
+
+def test_a_state_published_under_a_placeholder_licenses_a_hit() -> None:
+    # The checkpoint is what makes a state reusable, and it runs while the
+    # placeholder is newest, so this is the reuse the overlap guard forbids.
+    bm = make_manager()
+    first = make_ctx(16)
+    bm.claim(first)
+    for _ in range(4):
+        overlap_forward(bm, first)
+    bm.release(first)
+    assert published(bm)
+
+    second = make_ctx(24)
+    bm.claim(second)
+    bm.alloc(second)
+
+    assert second.cached_prefix_length == 16
+    resumed = resume(bm, second)
+    assert resumed, "a hit must give the forward a block to copy in"
+    for src, _ in resumed.values():
+        assert src is not None, "the hit named a block to read"
+
+
 # ============================================================================
 # The run every group accepts at once
 # ============================================================================
