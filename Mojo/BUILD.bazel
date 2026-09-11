@@ -839,6 +839,19 @@ modular_cc_library(
     ],
 )
 
+# The ODS-generated enums (e.g. EmitAs) without the rest of the dialect
+# headers, whose header target drags tool-level link dependencies.
+modular_cc_library(
+    name = "KGENEnums.headers",
+    hdrs = ["include/Mojo/KGENDialect/KGENEnums.h"],
+    tags = ["no-clang-tidy-headers"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":KGENEnumsIncGen",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
 modular_cc_library(
     name = "KGENDialect.headers",
     hdrs = glob(["include/Mojo/KGENDialect/*.h"]),
@@ -1113,6 +1126,7 @@ modular_cc_library(
         "//Mojo:plugin_consumers",
     ],
     deps = [
+        ":KGENEnums.headers",
         ":Support",
         "//Support:Configuration",
         "@llvm-project//llvm:Support",

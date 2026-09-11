@@ -274,11 +274,11 @@ public:
   void setDefaultCPU();
 };
 
-// Return true if target triple is `air64-`
-bool isMetalTriple(const llvm::Triple &triple);
-
 // Return true if `triple` is a registered GPU target.
 bool isGPUTriple(const llvm::Triple &triple);
+
+// Return true if `triple` is the registered Metal target.
+bool isMetalTriple(const llvm::Triple &triple);
 
 // Whether the standalone module should export all symbols (GPU targets do, so
 // offloaded kernels resolve by symbol at runtime).

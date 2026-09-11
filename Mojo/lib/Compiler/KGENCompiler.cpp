@@ -777,10 +777,13 @@ static ElaboratorCompileOffloadRetType compileOffloads(
             if (traitsOr.isError())
               return Error(traitsOr.getError());
             const TargetTraits *traits = *traitsOr;
-            llvm::StringRef ext =
-                compilationOptions.offloadOutputKind == EmitAs::LLVM
-                    ? traits->getLLVMExtension()
-                    : traits->getAsmExtension();
+            EmitAs outKind = compilationOptions.offloadOutputKind;
+            llvm::StringRef ext = outKind == EmitAs::LLVM
+                                      ? traits->getLLVMExtension()
+                                  : outKind == EmitAs::LLVM_BITCODE ||
+                                          outKind == EmitAs::LLVM_OPT_BITCODE
+                                      ? traits->getBitcodeExtension()
+                                      : traits->getAsmExtension();
             constexpr size_t kFileNameMaxChars = 64;
             std::string fileName =
                 reserveOffloadOutputBaseName(

@@ -140,55 +140,87 @@ bool CommandLineFuncParser::parse(llvm::cl::Option &o, StringRef argName,
   return false;
 }
 
+llvm::ArrayRef<KGENCLOptionsParser::CommandInfo>
+KGENCLOptionsParser::commands() {
+  static constexpr CommandInfo kCommands[] = {
+      {"elaborate", "Elaborate the input."},
+      {"elaborate=use-parametric-interpreter",
+       "Elaborate the input with the parametric interpreter."},
+      {"elaborate=no-use-parametric-interpreter",
+       "Elaborate the input but don't use the parametric interpreter."},
+      {"emit",
+       "Emit funcs as the given kind of output file (default: object). The "
+       "accepted kinds are listed in the EMISSION KINDS section below."},
+      {"execute", "Execute funcs."},
+      {"lsp",
+       "Process the input as the language server does: lazy parse + check "
+       "pipeline, printing the checked IR to stdout and reporting "
+       "diagnostics on stderr."},
+      {"lsp=no-dump",
+       "Same as -lsp, but skips printing the checked IR to stdout. "
+       "Diagnostics on stderr and the exit status are unaffected; only "
+       "useful when a caller checks for crashes/diagnostics and never reads "
+       "stdout, since serializing the IR is not free."},
+  };
+  return kCommands;
+}
+
+void KGENCLOptionsParser::getExtraOptionNames(
+    llvm::SmallVectorImpl<StringRef> &names) {
+  for (const CommandInfo &info : commands())
+    names.push_back(info.name);
+  for (const std::string &spelling : emitSpellings)
+    names.push_back(spelling);
+}
+
+size_t KGENCLOptionsParser::getOptionWidth(const llvm::cl::Option &o) const {
+  size_t width = 0;
+  for (const CommandInfo &info : commands())
+    width = std::max(width, info.name.size() + 8);
+  return width;
+}
+
+void KGENCLOptionsParser::printOptionInfo(const llvm::cl::Option &o,
+                                          size_t globalWidth) const {
+  if (!o.HelpStr.empty())
+    llvm::outs() << "  " << o.HelpStr << '\n';
+  for (const CommandInfo &info : commands()) {
+    llvm::outs() << "      --" << info.name;
+    llvm::cl::Option::printHelpStr(info.description, globalWidth,
+                                   info.name.size() + 8);
+  }
+}
+
 bool KGENCLOptionsParser::parse(llvm::cl::Option &o, StringRef argName,
-                                StringRef argValue, Command &val) {
+                                StringRef argValue, std::string &val) {
   if (argName == "elaborate") {
-    if (argValue == "no-use-parametric-interpreter")
-      val = Command::kElaborateNoUseParametricInterpreter;
-    else if (argValue == "use-parametric-interpreter")
-      val = Command::kElaborateUseParametricInterpreter;
+    if (argValue == "no-use-parametric-interpreter" ||
+        argValue == "use-parametric-interpreter")
+      val = ("elaborate=" + argValue).str();
     else
-      val = Command::kElaborate;
+      val = "elaborate";
 
     return false;
   }
   if (argName == "emit") {
-    if (argValue == "llvm")
-      val = Command::kEmitLLVM;
-    else if (argValue == "llvm-bitcode")
-      val = Command::kEmitLLVMBitcode;
-    else if (argValue == "llvm-opt")
-      val = Command::kEmitLLVMOpt;
-    else if (argValue == "llvm-opt-bitcode")
-      val = Command::kEmitLLVMOptBitcode;
-    else if (argValue == "asm")
-      val = Command::kEmitAssembly;
-    else if (argValue == "asm-verbose")
-      val = Command::kEmitAssemblyVerbose;
-    else if (argValue == "object")
-      val = Command::kEmit;
-    else if (argValue == "shared-lib")
-      val = Command::kEmitSharedObject;
-    else if (argValue == "header")
-      val = Command::kEmitHeader;
-    else if (argValue.empty())
-      val = Command::kEmit;
-    else
-      return o.error("unsupported 'emit' option value '" + argValue + "'");
-
+    // Any kind is recorded; the tool validates it after parsing, against
+    // its emission kinds and the target's traits.
+    emissionKind = argValue.empty() ? stringifyEmitAs(EmitAs::OBJECT).str()
+                                    : argValue.str();
+    val = "emit=" + emissionKind;
     return false;
   }
 
   if (argName == "execute") {
-    val = Command::kExecute;
+    val = "execute";
     return false;
   }
 
   if (argName == "lsp") {
     if (argValue == "no-dump")
-      val = Command::kLSPNoDump;
+      val = "lsp=no-dump";
     else if (argValue.empty())
-      val = Command::kLSP;
+      val = "lsp";
     else
       return o.error("unsupported 'lsp' option value '" + argValue + "'");
 

@@ -3619,8 +3619,9 @@ void ModuleBitcodeWriter::writeInstruction(const Instruction &I,
     FunctionType *FTy = CI.getFunctionType();
 
     // PointerRewriter typed the emask callee `i8*`; the call's explicit type
-    // must match it, else the AIR reader rejects "explicit call type does not
-    // match pointee". Gated to the emask family; every other call is unchanged.
+    // must match it, else the platform bitcode reader rejects "explicit call
+    // type does not match pointee". Gated to the emask family; every other
+    // call is unchanged.
     if (const Function *F = dyn_cast<Function>(CI.getCalledOperand())) {
       StringRef CalleeName = F->getName();
       if (CalleeName.starts_with("llvm.agx3.") &&

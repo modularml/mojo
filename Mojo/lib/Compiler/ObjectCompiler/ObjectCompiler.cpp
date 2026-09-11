@@ -1304,7 +1304,7 @@ ErrorOrSuccess ObjectCompiler::emitAssembly(OwningOpRef<ModuleOp> module,
 ErrorOrSuccess ObjectCompiler::emitBitcode(llvm::Module &llvmModule,
                                            llvm::raw_pwrite_stream &os) {
   CompilerTimeTraceScope traceScope("emitBitcode");
-  // The backend owns the bitcode format (e.g. Metal emits AIR bitcode).
+  // The backend owns the bitcode format.
   ErrorOr<const TargetBackend *> backendOr =
       TargetBackendRegistry::get().lookup(llvmModule.getTargetTriple());
   if (backendOr.isError())

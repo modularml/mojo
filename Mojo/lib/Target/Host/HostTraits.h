@@ -33,6 +33,12 @@ struct HostTraits final : TargetTraits {
   llvm::StringRef getObjectExtension() const override { return ".o"; }
   llvm::StringRef defaultCPU(const llvm::Triple &triple) const override;
 
+  llvm::StringRef getBitcodeExtension() const override { return ".bc"; }
+
+  llvm::ArrayRef<EmissionKind> supportedEmissionKinds() const override {
+    return commonEmissionKinds();
+  }
+
   /// Shared stateless instance for the backend `traits()`.
   static const HostTraits &get();
 
