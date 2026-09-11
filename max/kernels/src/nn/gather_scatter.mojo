@@ -15,7 +15,7 @@
 from std.collections.string.string_span import get_static_string
 from std.math import align_down, ceildiv, iota
 from std.sys import align_of, bit_width_of, simd_width_of, size_of
-from std.sys.info import CompilationTarget, _current_target, is_apple_gpu
+from std.sys.info import CompilationTarget, is_apple_gpu
 from std.utils.numerics import neg_inf
 
 from max.algorithm import elementwise, sync_parallelize, unsafe_parallel_memcpy
@@ -678,9 +678,11 @@ def gather[
         output_fn: Callback that stores values into the output tensor.
         context: Device context for execution.
     """
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
 
     gather_guards(axis, input_shape, indices_shape, output_shape)
     with Trace[TraceLevel.OP, target=target](
@@ -745,7 +747,7 @@ def gather[
             )
         else:
             elementwise[
-                simd_width=simd_width_of[dtype, target=compile_target](),
+                simd_width=target_simd_width,
                 target=target,
                 _trace_description="gather",
             ](
@@ -1742,10 +1744,11 @@ def gather_nd[
             output_coord, data.load[width=simd_width, alignment=1](data_coord)
         )
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime target_simd_width = simd_width_of[dtype, target=compile_target]()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
 
     # Only use SIMD if:
     #   - the input data is contiguous

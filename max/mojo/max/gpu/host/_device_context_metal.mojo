@@ -67,14 +67,7 @@ struct MetalDeviceTypeEncoder(DeviceTypeEncoder):
         """Initializes the encoder with an empty buffer list."""
         self._buffers = []
 
-    @staticmethod
-    def target() -> _TargetType:
-        """Returns the target architecture this encoder is encoding for.
-
-        Returns:
-            The target architecture this encoder is encoding for.
-        """
-        return _current_target()
+    comptime _raw_mlir_target = _current_target()
 
     def encode_device_ptr[
         DevicePointerType: DevicePointerLike

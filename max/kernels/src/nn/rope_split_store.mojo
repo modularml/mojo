@@ -24,7 +24,7 @@ from max.gpu.host import DeviceContext, get_gpu_target
 from max.gpu.host.info import is_cpu, is_gpu
 from std.math import gcd
 from std.sys import align_of
-from std.sys.info import _current_target, simd_width_of
+from std.sys.info import CompilationTarget, simd_width_of
 
 from internal_utils.fp8_utils import cast_saturating
 from kv_cache.types import KVCacheT, PagedKVCacheCollection
@@ -348,10 +348,11 @@ def _rope_split_store_ragged_impl[
             )
 
     var launch_shape = (total_seq_len, combined_dim)
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime target_simd_width = simd_width_of[dtype, target=compile_target]()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
     comptime kernel_simd_width = gcd(target_simd_width, head_size)
     comptime assert (
         kernel_simd_width >= 2
@@ -543,10 +544,11 @@ def _rope_split_store_ragged_with_position_ids[
     # Validate mrope_section alignment with kernel SIMD width.
     comptime kv_params = cache_t.kv_params
     comptime head_size = kv_params.head_size
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime target_simd_width = simd_width_of[dtype, target=compile_target]()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
     comptime kernel_simd_width = gcd(target_simd_width, head_size)
     comptime if mrope_section:
         comptime for i in range(len(mrope_section.value())):

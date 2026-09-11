@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from std.sys.info import _current_target, simd_width_of
+from std.sys.info import CompilationTarget, simd_width_of
 from std.math.uutils import ufloordiv
 
 from max.algorithm.functional import elementwise
@@ -182,10 +182,11 @@ def merge_ragged_tensors[
                 var total_size = Int(a.dim[0]()) + Int(b.dim[0]())
                 c_row_offsets[batch_id + 1] = UInt32(total_size)
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime target_simd_width = simd_width_of[dtype, target=compile_target]()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
     comptime kernel_simd_width = 1 if rank == 1 else target_simd_width
 
     elementwise[

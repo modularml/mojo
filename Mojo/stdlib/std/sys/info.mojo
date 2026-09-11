@@ -73,9 +73,7 @@ struct CompilationTarget[_mlir_value: _TargetType = _current_target(), //](
 
     @staticmethod
     @always_inline("nodebug")
-    def current_accelerator() -> (
-        CompilationTarget[_mlir_value=get_gpu_target()]
-    ):
+    def current_accelerator() -> type_of(get_gpu_target()):
         """Get the accelerator target.
 
         This value is derived from the `--target-accelerator` command line flag.
@@ -101,7 +99,7 @@ struct CompilationTarget[_mlir_value: _TargetType = _current_target(), //](
     @always_inline("nodebug")
     def from_gpu_arch[
         target_arch: StaticString
-    ]() -> CompilationTarget[_mlir_value=get_gpu_target[target_arch]()]:
+    ]() -> type_of(get_gpu_target[target_arch]()):
         return {}
 
     @always_inline("nodebug")
@@ -1302,7 +1300,7 @@ def is_big_endian[target: _TargetType = _current_target()]() -> Bool:
 
 
 @always_inline("nodebug")
-def is_32bit[target: _TargetType = _current_target()]() -> Bool:
+def is_32bit[target: CompilationTarget = CompilationTarget.current()]() -> Bool:
     """Returns True if the maximum integral value is 32 bit.
 
     Parameters:
@@ -1315,7 +1313,7 @@ def is_32bit[target: _TargetType = _current_target()]() -> Bool:
 
 
 @always_inline("nodebug")
-def is_64bit[target: _TargetType = _current_target()]() -> Bool:
+def is_64bit[target: CompilationTarget = CompilationTarget.current()]() -> Bool:
     """Returns True if the maximum integral value is 64 bit.
 
     Parameters:
@@ -1328,7 +1326,9 @@ def is_64bit[target: _TargetType = _current_target()]() -> Bool:
 
 
 @always_inline("nodebug")
-def simd_bit_width[target: _TargetType = _current_target()]() -> Int:
+def simd_bit_width[
+    target: CompilationTarget = CompilationTarget.current()
+]() -> Int:
     """Returns the vector size (in bits) of the specified target.
 
     Parameters:
@@ -1340,7 +1340,7 @@ def simd_bit_width[target: _TargetType = _current_target()]() -> Int:
     return Int(
         mlir_value=__mlir_attr[
             `#kgen.param.expr<target_get_field,`,
-            target,
+            target._mlir_value,
             `, "simd_bit_width" : !kgen.string`,
             `> : index`,
         ]
@@ -1348,7 +1348,9 @@ def simd_bit_width[target: _TargetType = _current_target()]() -> Int:
 
 
 @always_inline("nodebug")
-def simd_byte_width[target: _TargetType = _current_target()]() -> Int:
+def simd_byte_width[
+    target: CompilationTarget = CompilationTarget.current()
+]() -> Int:
     """Returns the vector size (in bytes) of the specified target.
 
     Parameters:
@@ -1379,41 +1381,6 @@ def stdlib_plugin[target: _TargetType = _current_target()]() -> StaticString:
             `> : !kgen.string`,
         ]
     )
-
-
-# TODO(MSTDL-3189): Remove this `_TargetType`-taking overload
-@always_inline("nodebug")
-def size_of[type: AnyType, target: _TargetType = _current_target()]() -> Int:
-    """Returns the size of (in bytes) of the type.
-
-    The size includes any padding required by the type's alignment, so it is
-    always a multiple of `align_of[type]()` and always matches the stride
-    between adjacent elements of an array of the type.
-
-    Parameters:
-        type: The type in question.
-        target: The target architecture.
-
-    Returns:
-        The size of the type in bytes.
-
-    Example:
-    ```mojo
-    from std.sys.info import size_of
-    def main() raises:
-        print(
-            size_of[UInt8]() == 1,
-            size_of[UInt16]() == 2,
-            size_of[Int32]() == 4,
-            size_of[Float64]() == 8,
-            size_of[
-                SIMD[.uint8, 4]
-            ]() == 4,
-        )
-    ```
-    Note: `align_of` is in same module.
-    """
-    return size_of[type, CompilationTarget[_mlir_value=target]()]()
 
 
 @always_inline("nodebug")
@@ -1470,7 +1437,9 @@ def size_of[
 
 
 @always_inline("nodebug")
-def size_of[dtype: DType, target: _TargetType = _current_target()]() -> Int:
+def size_of[
+    dtype: DType, target: CompilationTarget = CompilationTarget.current()
+]() -> Int:
     """Returns the size of (in bytes) of the dtype.
 
     Parameters:
@@ -1485,25 +1454,10 @@ def size_of[dtype: DType, target: _TargetType = _current_target()]() -> Int:
             `#kgen.param.expr<get_sizeof, #kgen.type<`,
             Scalar[dtype]._mlir_type,
             `> : !kgen.type,`,
-            target,
+            target._mlir_value,
             `> : index`,
         ]
     )
-
-
-# TODO(MSTDL-3189): Remove this `_TargetType`-taking overload
-@always_inline("builtin")
-def align_of[type: AnyType, target: _TargetType = _current_target()]() -> Int:
-    """Returns the align of (in bytes) of the type.
-
-    Parameters:
-        type: The type in question.
-        target: The target architecture.
-
-    Returns:
-        The alignment of the type in bytes.
-    """
-    return align_of[type, CompilationTarget[_mlir_value=target]()]()
 
 
 @always_inline("builtin")
@@ -1540,7 +1494,9 @@ def align_of[
 
 
 @always_inline("nodebug")
-def align_of[dtype: DType, target: _TargetType = _current_target()]() -> Int:
+def align_of[
+    dtype: DType, target: CompilationTarget = CompilationTarget.current()
+]() -> Int:
     """Returns the align of (in bytes) of the dtype.
 
     Parameters:
@@ -1556,7 +1512,7 @@ def align_of[dtype: DType, target: _TargetType = _current_target()]() -> Int:
                 `#kgen.param.expr<get_alignof, #kgen.type<`,
                 Scalar[dtype]._mlir_type,
                 `> : !kgen.type,`,
-                target,
+                target._mlir_value,
                 `> : index`,
             ]
         )
@@ -1565,7 +1521,8 @@ def align_of[dtype: DType, target: _TargetType = _current_target()]() -> Int:
 
 @always_inline("nodebug")
 def bit_width_of[
-    type: RegisterPassable, target: _TargetType = _current_target()
+    type: RegisterPassable,
+    target: CompilationTarget = CompilationTarget.current(),
 ]() -> Int:
     """Returns the size of (in bits) of the type.
 
@@ -1582,7 +1539,7 @@ def bit_width_of[
 
 @always_inline("nodebug")
 def bit_width_of[
-    dtype: DType, target: _TargetType = _current_target()
+    dtype: DType, target: CompilationTarget = CompilationTarget.current()
 ]() -> Int:
     """Returns the size of (in bits) of the dtype.
 
@@ -1598,7 +1555,8 @@ def bit_width_of[
 
 @always_inline("nodebug")
 def simd_width_of[
-    type: RegisterPassable, target: _TargetType = _current_target()
+    type: RegisterPassable,
+    target: CompilationTarget = CompilationTarget.current(),
 ]() -> Int:
     """Returns the vector size of the type on the host system.
 
@@ -1614,7 +1572,7 @@ def simd_width_of[
 
 @always_inline("nodebug")
 def simd_width_of[
-    dtype: DType, target: _TargetType = _current_target()
+    dtype: DType, target: CompilationTarget = CompilationTarget.current()
 ]() -> Int:
     """Returns the vector size of the type on the host system.
 

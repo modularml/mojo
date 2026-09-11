@@ -18,7 +18,7 @@
 
 """Registers KV-cache graph ops backed by the `kv_cache` and `nn.kv_cache` kernels."""
 
-from std.sys.info import simd_width_of, _current_target
+from std.sys.info import CompilationTarget, simd_width_of
 import extensibility
 
 # ===-----------------------------------------------------------------------===#
@@ -263,12 +263,13 @@ struct Struct_kv_cache_store_k_scales_paged:
                 loaded_val,
             )
 
-        comptime compile_target = get_gpu_target() if is_gpu[
-            target
-        ]() else _current_target()
-        comptime simd_width = simd_width_of[
-            scale_dtype, target=compile_target
-        ]()
+        comptime simd_width = (
+            simd_width_of[scale_dtype, target=get_gpu_target()]() if is_gpu[
+                target
+            ]() else simd_width_of[
+                scale_dtype, target=CompilationTarget.current()
+            ]()
+        )
 
         elementwise[simd_width=simd_width, target=target](
             write_scale_to_cache, input_k_scales.shape_coord(), context

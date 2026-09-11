@@ -13,7 +13,7 @@
 
 from std.collections import OptionalReg
 from std.math import gcd
-from std.sys.info import _current_target, simd_width_of
+from std.sys.info import CompilationTarget, simd_width_of
 
 from max.algorithm.functional import elementwise
 from std.complex import ComplexSIMD
@@ -278,10 +278,11 @@ def rope_ragged[
                 alignment=alignment,
             ](x, idx, f_c_temp, output_fn)
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime target_simd_width = simd_width_of[dtype, target=compile_target]()
+    comptime target_simd_width = (
+        simd_width_of[dtype, target=CompilationTarget.current()]() if is_cpu[
+            target
+        ]() else simd_width_of[dtype, target=get_gpu_target()]()
+    )
     comptime kernel_simd_width = gcd(target_simd_width, rope_dim)
 
     comptime if mrope_section:

@@ -111,12 +111,12 @@ from std.math import ceildiv, iota
 from std.memory import bitcast, stack_allocation
 from std.memory.unsafe_pointer import UnsafePointer
 from std.sys.info import (
-    _current_target,
     align_of,
     bit_width_of,
     is_apple_gpu,
     simd_width_of,
     size_of,
+    CompilationTarget,
 )
 from std.sys.intrinsics import strided_load as _strided_load
 from std.utils.coord import Coord, CoordLike
@@ -319,11 +319,15 @@ def pick_simd_width[
     # `simd_width_of` defaults to `_current_target()` (host = CPU),
     # giving wrong widths for a GPU-bound body. Resolve against the
     # actual launch target.
-    comptime resolved_target = get_gpu_target() if is_gpu_target else _current_target()
-
     var w_out = 1
     comptime for T in Ts:
-        comptime wi = simd_width_of[T, resolved_target]()
+        comptime wi = (
+            simd_width_of[
+                T, get_gpu_target()
+            ]() if is_gpu_target else simd_width_of[
+                T, CompilationTarget.current()
+            ]()
+        )
         if wi > w_out:
             w_out = wi
 

@@ -19,7 +19,7 @@ from max.gpu.host import DeviceContext, get_gpu_target
 from layout import Coord, TileTensor, coord_to_index_list
 from layout.coord import DynamicCoord
 from layout.tile_layout import Layout
-from std.sys.info import simd_width_of, _current_target
+from std.sys.info import CompilationTarget, simd_width_of
 
 from std.utils._select import _select_register_value as select
 from std.utils.index import IndexList
@@ -429,7 +429,7 @@ def sliced_add[
             ctx,
         )
     else:
-        comptime compile_target = _current_target()
+        comptime compile_target = CompilationTarget.current()
         comptime simd_width = simd_width_of[dtype, target=compile_target]()
 
         elementwise[simd_width, target=target](

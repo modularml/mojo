@@ -34,7 +34,7 @@ from std.sys.info import (
 def get_gpu_target[
     # TODO: Ideally this is an Optional[StaticString] but blocked by MOCO-1039
     target_arch: StaticString = _accelerator_arch(),
-]() -> _TargetType:
+]() -> CompilationTarget[_mlir_value=_get_gpu_target[target_arch]()]:
     """Gets the GPU target information for the specified architecture.
 
     Parameters:
@@ -43,6 +43,14 @@ def get_gpu_target[
     Returns:
         Target type information for the specified GPU architecture.
     """
+    return {}
+
+
+@always_inline
+def _get_gpu_target[
+    # TODO: Ideally this is an Optional[StaticString] but blocked by MOCO-1039
+    target_arch: StaticString = _accelerator_arch(),
+]() -> _TargetType:
     comptime assert (
         target_arch != ""
     ), "target_arch must be a valid GPU architecture."

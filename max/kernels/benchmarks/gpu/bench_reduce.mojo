@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from std.sys import align_of, get_defined_int, get_defined_string, simd_width_of
-from std.sys.info import _TargetType
+from std.sys.info import CompilationTarget
 
 from max.algorithm.backend.gpu.reduction import reduce_launch
 from max.benchmark import bencher_iter_custom
@@ -36,7 +36,7 @@ from std.testing import assert_equal
 from std.utils import IndexList, StaticTuple
 
 
-def align_of_simd[dtype: DType, simd_target: _TargetType]() -> Int:
+def align_of_simd[dtype: DType, simd_target: CompilationTarget]() -> Int:
     # TODO: move this utility function to a module.
     comptime pack_size = simd_width_of[dtype, target=simd_target]()
     return align_of[SIMD[dtype, pack_size]]()

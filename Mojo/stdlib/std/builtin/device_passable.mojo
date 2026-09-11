@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the `DevicePassable` trait for types transferable to accelerator devices."""
 
-from std.sys import size_of
+from std.sys import size_of, CompilationTarget
 from std.sys.info import _TargetType
 from std.builtin.rebind import downcast
 from std.collections.array import Array
@@ -173,8 +173,10 @@ trait DeviceTypeEncoder:
     execution on an accelerator device.
     """
 
+    comptime _raw_mlir_target: _TargetType
+
     @staticmethod
-    def target() -> _TargetType:
+    def target() -> CompilationTarget[_mlir_value=Self._raw_mlir_target]:
         """Returns the target architecture this encoder is encoding for.
 
         Layout-sensitive queries (`size_of`, `align_of`,
@@ -186,7 +188,7 @@ trait DeviceTypeEncoder:
         Returns:
             The target architecture this encoder is encoding for.
         """
-        ...
+        return {}
 
     def encode[
         ValueType: AnyType

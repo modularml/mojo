@@ -13,7 +13,7 @@
 """Implements KV-cache kernels for ragged (variable-length) sequences used in continuous batching."""
 
 from std.sys.info import (
-    _current_target,
+    CompilationTarget,
     has_amd_gpu_accelerator,
     simd_width_of,
 )
@@ -5193,7 +5193,7 @@ def generic_kv_cache_radd_dispatch[
             Coord(a.runtime_layout.shape.value), ctx
         )
     else:
-        comptime compile_target = _current_target()
+        comptime compile_target = CompilationTarget.current()
         comptime simd_width = simd_width_of[dtype, target=compile_target]()
 
         elementwise[do_radd, simd_width, target=target](
@@ -5275,10 +5275,13 @@ def kv_cache_store_ragged[
             loaded_val,
         )
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime simd_width = simd_width_of[cache_t.dtype, target=compile_target]()
+    comptime simd_width = (
+        simd_width_of[
+            cache_t.dtype, target=CompilationTarget.current()
+        ]() if is_cpu[target]() else simd_width_of[
+            cache_t.dtype, target=get_gpu_target()
+        ]()
+    )
 
     elementwise[
         write_to_cache,
@@ -5361,10 +5364,13 @@ def kv_cache_store_padded[
             loaded_val,
         )
 
-    comptime compile_target = _current_target() if is_cpu[
-        target
-    ]() else get_gpu_target()
-    comptime simd_width = simd_width_of[cache_t.dtype, target=compile_target]()
+    comptime simd_width = (
+        simd_width_of[
+            cache_t.dtype, target=CompilationTarget.current()
+        ]() if is_cpu[target]() else simd_width_of[
+            cache_t.dtype, target=get_gpu_target()
+        ]()
+    )
 
     elementwise[
         write_to_cache,
@@ -5512,7 +5518,7 @@ def kv_cache_2m_iadd_dispatch[
                 Coord(elementwise_shape), ctx
             )
     else:
-        comptime compile_target = _current_target()
+        comptime compile_target = CompilationTarget.current()
         comptime simd_width = simd_width_of[dtype, target=compile_target]()
 
         elementwise[iadd, simd_width, target=target](
