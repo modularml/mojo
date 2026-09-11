@@ -72,6 +72,40 @@ max benchmark \
 This attaches an image to the last user turn of every session. Use `every` to
 attach an image to every user turn instead of just one.
 
+## Matching a real image-size distribution
+
+`--image-count`, `--image-long-side`, and `--image-aspect-ratio` each accept
+any distribution string supported by this codebase's distribution
+grammar—not just a constant. Beyond the usual parametric shapes (`N(mean,std)`,
+`U(lower,upper)`, `DU(lower,upper)`, `NB(n,p)`, `G(shape,scale)`,
+`LN(mean,std)`, `Burr12(c,d,scale)`), there's `Cat(v1:w1, v2:w2, ...)`: an
+explicit, weighted set of values. Use it when you've measured a real image-size
+distribution (for example, from production traffic) and want to reproduce it
+exactly, rather than approximate it with a bell curve or a uniform range.
+
+For example, given measured production stats showing 70% of images at 1024px,
+20% at 512px, and 10% at 2048px on the long side:
+
+```bash
+max benchmark \
+  --model google/gemma-3-27b-it \
+  --dataset-name sonnet \
+  --num-prompts 100 \
+  --image-fraction 0.1 \
+  --image-long-side "Cat(1024:0.7, 512:0.2, 2048:0.1)" \
+  --image-aspect-ratio 1.0
+```
+
+The `:weight` suffix is optional per entry—omit it for a uniform choice among
+the listed values, so `Cat(1,2,3)` picks each of `1`, `2`, and `3` with equal
+probability. Weights don't need to sum to `1`; they're normalized
+automatically, so `Cat(1024:7, 512:2, 2048:1)` behaves identically to the
+example above.
+
+`Cat(...)` isn't image-specific—it works with any distribution-accepting flag
+in this codebase, including `--random-input-len`, `--random-output-len`, and
+`--random-num-turns`.
+
 ## Checking your workload before running live
 
 Use `--dry-run` to sample the workload and print distribution statistics

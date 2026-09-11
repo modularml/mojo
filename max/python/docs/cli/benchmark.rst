@@ -333,7 +333,10 @@
 
       - `--random-input-len`: Input tokens per request. Accepts a constant or a
         distribution string: `N(mean,std)`, `U(lower,upper)`, `DU(lower,upper)`,
-        `NB(n,p)`, `G(shape,scale)`, or `LN(mean,std)`. Use `;` to set
+        `NB(n,p)`, `G(shape,scale)`, `LN(mean,std)`, `Burr12(c,d,scale)`, or
+        `Cat(v1:w1,v2:w2,...)` for an explicit weighted set of values (for
+        example, `Cat(512:0.7,1024:0.2,2048:0.1)`; omit `:weight` for a
+        uniform choice among the listed values). Use `;` to set
         separate distributions for the first and subsequent turns (for example,
         `N(2048,200);N(512,50)`). Default: `1024`.
       - `--random-output-len`: Output tokens per request. Same format as
@@ -359,6 +362,11 @@
         mixing, usable with any text-generation dataset (including
         `instruct-coder`). See the "Multimodal" flag group. Mutually
         exclusive with `--random-image-count` / `--random-image-size`.
+        `--image-long-side` and `--image-aspect-ratio` both accept any
+        distribution string, including `Cat(...)`, so you can match an
+        empirical shape distribution measured from real traffic instead of
+        approximating it with a parametric one — for example,
+        `--image-long-side "Cat(1024:0.7,512:0.2,2048:0.1)"`.
 
     - `synthetic`: Synthetic text generation workload that uses the same
       distribution flags as `random`, but generates synthetic token IDs instead

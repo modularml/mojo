@@ -28,6 +28,23 @@ This version is still a work in progress.
   deliberately separate from `MAX_SERVE_MAX_REQUEST_BYTES`, which bounds only
   the request body. A small body can name URLs the server then fetches, so
   raising one limit should not silently widen the other.
+- Added dataset-agnostic image mixing to `max benchmark` (`--image-fraction`,
+  `--image-count`, `--image-long-side`, `--image-aspect-ratio`, `--image-turn`),
+  so any dataset (`sonnet`, `sharegpt`, `instruct-coder`, and so on) can have
+  generated images mixed into a fraction of its requests or chat turns, not just
+  the `random` dataset's existing fixed
+  `--random-image-count`/`--random-image-size`. `--dry-run` reports an
+  image-count distribution table (and a decoded image-long-side-pixel table)
+  when a workload has images. See the
+  [image mixing quick-start guide](https://github.com/modular/modular/blob/main/max/python/max/benchmark/benchmarking_mixed_images.md).
+- Added a `Cat(v1:w1, v2:w2, ...)` categorical distribution for every
+  `max benchmark` config field that accepts a distribution string (for
+  example `--image-long-side`, `--image-count`, `--random-input-len`), so an
+  explicit, empirically-measured distribution (such as image sizes measured
+  from real production traffic) can be reproduced exactly instead of
+  approximated with a parametric shape like `N`/`U`/`LN`. The `:weight`
+  suffix is optional per entry (uniform when omitted), and weights don't need
+  to sum to 1.
 
 ### Inference server
 
