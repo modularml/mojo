@@ -155,8 +155,9 @@ from ..structured_kernels.warp_context import (
 
 from .grouped_1d1d_smem import Grouped1D1DSmem, SchedulerSlot
 from .grouped_1d1d_tile_scheduler import (
-    GroupedWorkIterator1D1D,
     GroupedWorkContext1D1D,
+    GroupedWorkIterator1D1D,
+    GroupedWorkLookup1D1D,
 )
 from ..structured_kernels.output_writer import TileWriter
 
@@ -981,6 +982,15 @@ struct Grouped1D1DMatmulKernel[
         ExpertScalesEngine=Self.expert_scales_engine,
     ]
 
+    # ========== Warp-Cooperative Work Lookup Type ==========
+
+    # Geometry (tile shape, cluster, storages) comes from the iterator,
+    # so both scheduler paths share one block space.
+    comptime WorkLookup = GroupedWorkLookup1D1D[
+        Self.WorkIterator,
+        walk_cache_slots=Self.SmemType.SCHED_GROUP_CACHE_CAP,
+    ]
+
     # ========== TMA Load Size Constants ==========
 
     # TMA transaction sizes count the bytes the copy engine READS from global
@@ -1293,9 +1303,9 @@ struct Grouped1D1DMatmulKernel[
 
         Each consumer warp calls this independently at kernel start,
         eliminating the latency of waiting for the scheduler warp to
-        publish slot 0. Only lane 0 runs the GMEM scan; results are
-        broadcast to all lanes via warp.broadcast (which also provides
-        the implicit __syncwarp memory fence).
+        publish slot 0. Lane 0 scans the group slots here and
+        broadcasts the result. The warp lookup stays with the scheduler
+        warp so its priming is paid once per CTA.
         """
         var s_m: UInt32 = 0
         var s_n: UInt32 = 0
@@ -1340,6 +1350,23 @@ struct Grouped1D1DMatmulKernel[
             UInt32(0),
             UInt32(0),
             Float32(1.0),
+            UInt32(0),
+        )
+
+    @staticmethod
+    @always_inline
+    def _ctx_to_sched_slot(ctx: GroupedWorkContext1D1D) -> SchedulerSlot:
+        """Convert a work context into a scheduler slot."""
+        if ctx.is_done():
+            return Self._sched_terminal_slot()
+        return SchedulerSlot(
+            ctx.m(),
+            ctx.n(),
+            ctx.group_idx(),
+            ctx.expert_id(),
+            ctx.m_start(),
+            ctx.m_end,
+            ctx.expert_scale,
             UInt32(0),
         )
 
@@ -2473,14 +2500,18 @@ struct Grouped1D1DMatmulKernel[
                     ctx = Self._consume_sched_ctx(smem, sched_ci, sched_phase)
 
         # ===== SCHEDULER WARP =====
-        # Sequential single-lane producer: 2-slot ProducerConsumer.
-        # Consumers compute iter 0 inline, so the scheduler starts at iter 1:
-        # bootstrap publishes iters 1,2 to slots 0,1, then steady-state uses
-        # slot = (it-1) % 2 to stay aligned with consumers reading slot = ci % 2.
+        # 2-slot ProducerConsumer. Consumers compute iter 0 inline, so the
+        # scheduler starts at iter 1: bootstrap publishes iters 1,2 to slots
+        # 0,1, then steady-state uses slot = (it-1) % 2 to stay aligned with
+        # consumers reading slot = ci % 2.
         if Self.WarpRole.is_scheduler():
-            var use_group_cache = (
-                _num_active_experts <= Self.SmemType.SCHED_GROUP_CACHE_CAP
-            )
+            # Token total across every slot. This is the only scheduler
+            # input still in GMEM, so load it only when it decides the
+            # choice.
+            var total_m = UInt32(0)
+            if Self.WorkLookup.needs_total_m(_num_active_experts, num_k_iters):
+                total_m = a_offsets[_num_active_experts][0]
+
             var cta_stride = UInt32(
                 ufloordiv(grid_dim.x, Self.config.cta_group)
             )
@@ -2488,94 +2519,135 @@ struct Grouped1D1DMatmulKernel[
                 ufloordiv(block_idx.x, Self.config.cta_group)
             )
 
-            var grp: UInt32 = 0
-            var cumsum: UInt32 = 0
-            var bstart: UInt32 = 0
-            var has_steady_state = Int32(0)
-
-            # --- Bootstrap: iters 1,2 from GMEM (cache not primed yet) ---
-            if lane_id() == 0:
-                var slot0 = Self._compute_sched_slot(
-                    smem,
-                    _num_active_experts,
-                    a_offsets,
-                    expert_ids,
-                    expert_scales,
-                    False,  # GMEM — cache not primed yet
-                    cta_stride + cta_offset,  # iter 1
-                    grp,
-                    cumsum,
-                    bstart,
+            if Self.WorkLookup.can_handle(
+                _num_active_experts, total_m, num_k_iters
+            ):
+                # Fast path: the warp shares one block prefix, so a
+                # slot costs a ballot and a shuffle. All lanes take part
+                # in the lookups; lane 0 publishes.
+                var lookup = Self.WorkLookup(
+                    _num_active_experts, a_offsets, expert_ids, expert_scales
                 )
-                Self._publish_sched_slot(smem, 0, slot0)
 
-                if slot0.expert_id >= 0:
-                    var slot1 = Self._compute_sched_slot(
+                # Iters 1,2 bootstrap without waiting. From iter 3 the
+                # consumer must free the slot first.
+                var it = Int32(1)
+                var prod_phase = UInt32(0)
+                while True:
+                    # Align with consumer's `ci % 2`: iter=ci+1, so the
+                    # slot the producer writes is (iter-1)%2.
+                    var slot = Int(it - 1) % 2
+                    if it >= 3:
+                        smem.sched_empty_mbar()[slot].wait(prod_phase)
+                        if slot == 1:
+                            prod_phase ^= 1
+
+                    var ctx = lookup.lookup(
+                        UInt32(it) * cta_stride + cta_offset
+                    )
+                    if lane_id() == 0:
+                        Self._publish_sched_slot(
+                            smem, slot, Self._ctx_to_sched_slot(ctx)
+                        )
+
+                    if ctx.is_done():
+                        break
+                    it += 1
+            else:
+                # Sequential single-lane producer, for launches the
+                # lookup declines.
+                var use_group_cache = (
+                    _num_active_experts <= Self.SmemType.SCHED_GROUP_CACHE_CAP
+                )
+                var grp: UInt32 = 0
+                var cumsum: UInt32 = 0
+                var bstart: UInt32 = 0
+                var has_steady_state = Int32(0)
+
+                # --- Bootstrap: iters 1,2 from GMEM (cache not primed yet) ---
+                if lane_id() == 0:
+                    var slot0 = Self._compute_sched_slot(
                         smem,
                         _num_active_experts,
                         a_offsets,
                         expert_ids,
                         expert_scales,
                         False,  # GMEM — cache not primed yet
-                        UInt32(2) * cta_stride + cta_offset,  # iter 2
+                        cta_stride + cta_offset,  # iter 1
                         grp,
                         cumsum,
                         bstart,
                     )
-                    Self._publish_sched_slot(smem, 1, slot1)
+                    Self._publish_sched_slot(smem, 0, slot0)
 
-                    if slot1.expert_id >= 0:
-                        has_steady_state = Int32(1)
-
-            # --- Prime SMEM group cache (all 32 lanes, fire-and-forget) ---
-            # Steady-state empty_mbar.wait() below fences these stores before
-            # any cache reads.
-            if use_group_cache:
-                var sched_group_offsets = smem.sched_group_offsets()
-                var sched_expert_ids = smem.sched_expert_ids()
-                var sched_expert_scales = smem.sched_expert_scales()
-                var lane = Int(lane_id())
-                for i in range(lane, _num_active_experts + 1, WARP_SIZE):
-                    sched_group_offsets[i] = a_offsets[i][0]
-                for i in range(lane, _num_active_experts, WARP_SIZE):
-                    var eid = expert_ids[i][0]
-                    sched_expert_ids[i] = eid
-                    sched_expert_scales[i] = expert_scales[Int(eid)][
-                        0
-                    ] if eid >= 0 else Float32(1.0)
-
-            # --- Steady-state: use SMEM cache (fast) ---
-            # warp.broadcast() is shuffle_idx with full mask — it includes an
-            # implicit __syncwarp that fences the cache priming stores above.
-            if warp.broadcast(has_steady_state) > 0:
-                if lane_id() == 0:
-                    var it = Int32(3)
-                    var prod_phase = UInt32(0)
-                    while True:
-                        # Align with consumer's `ci % 2`: iter=ci+1, so the
-                        # slot the producer writes is (iter-1)%2.
-                        var slot = Int(it - 1) % 2
-                        smem.sched_empty_mbar()[slot].wait(prod_phase)
-                        if slot == 1:
-                            prod_phase ^= 1
-
-                        var sched_slot = Self._compute_sched_slot(
+                    if slot0.expert_id >= 0:
+                        var slot1 = Self._compute_sched_slot(
                             smem,
                             _num_active_experts,
                             a_offsets,
                             expert_ids,
                             expert_scales,
-                            use_group_cache,
-                            UInt32(it) * cta_stride + cta_offset,
+                            False,  # GMEM — cache not primed yet
+                            UInt32(2) * cta_stride + cta_offset,  # iter 2
                             grp,
                             cumsum,
                             bstart,
                         )
-                        Self._publish_sched_slot(smem, slot, sched_slot)
+                        Self._publish_sched_slot(smem, 1, slot1)
 
-                        if sched_slot.expert_id < 0:
-                            break
-                        it += 1
+                        if slot1.expert_id >= 0:
+                            has_steady_state = Int32(1)
+
+                # --- Prime SMEM group cache (all 32 lanes, fire-and-forget) ---
+                # Steady-state empty_mbar.wait() below fences these stores
+                # before any cache reads.
+                if use_group_cache:
+                    var sched_group_offsets = smem.sched_group_offsets()
+                    var sched_expert_ids = smem.sched_expert_ids()
+                    var sched_expert_scales = smem.sched_expert_scales()
+                    var lane = Int(lane_id())
+                    for i in range(lane, _num_active_experts + 1, WARP_SIZE):
+                        sched_group_offsets[i] = a_offsets[i][0]
+                    for i in range(lane, _num_active_experts, WARP_SIZE):
+                        var eid = expert_ids[i][0]
+                        sched_expert_ids[i] = eid
+                        sched_expert_scales[i] = expert_scales[Int(eid)][
+                            0
+                        ] if eid >= 0 else Float32(1.0)
+
+                # --- Steady-state: use SMEM cache (fast) ---
+                # warp.broadcast() is shuffle_idx with full mask — it includes
+                # an implicit __syncwarp that fences the cache priming
+                # stores above.
+                if warp.broadcast(has_steady_state) > 0:
+                    if lane_id() == 0:
+                        var it = Int32(3)
+                        var prod_phase = UInt32(0)
+                        while True:
+                            # Align with consumer's `ci % 2`: iter=ci+1, so
+                            # the slot the producer writes is (iter-1)%2.
+                            var slot = Int(it - 1) % 2
+                            smem.sched_empty_mbar()[slot].wait(prod_phase)
+                            if slot == 1:
+                                prod_phase ^= 1
+
+                            var sched_slot = Self._compute_sched_slot(
+                                smem,
+                                _num_active_experts,
+                                a_offsets,
+                                expert_ids,
+                                expert_scales,
+                                use_group_cache,
+                                UInt32(it) * cta_stride + cta_offset,
+                                grp,
+                                cumsum,
+                                bstart,
+                            )
+                            Self._publish_sched_slot(smem, slot, sched_slot)
+
+                            if sched_slot.expert_id < 0:
+                                break
+                            it += 1
 
     # ========== SFB Load to TMEM (MMA_N < 64) ==========
 

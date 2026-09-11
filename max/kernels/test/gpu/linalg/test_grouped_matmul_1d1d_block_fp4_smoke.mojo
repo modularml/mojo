@@ -269,11 +269,14 @@ def _test_grouped_1d1d_mixed_experts[
     ctx: DeviceContext,
     num_active_experts: Int,
     tokens_per_expert_ptr: ImmPointer[Int, _],
+    eids_ptr: ImmPointer[Int32, _],
 ) raises:
     """Test with non-uniform runtime tokens per expert (dynamic switching).
 
     Some experts may have group_size < 128 (cp.async), others >= 128 (TMA).
-    Token counts are fully runtime — not known at compile time.
+    Token counts are fully runtime. A group with a negative id in
+    `eids_ptr` is masked: it keeps its token rows (still counted in
+    `total_tokens`) but the scheduler must skip it.
     """
     comptime a_type = DType.uint8
     comptime b_type = DType.uint8
@@ -318,7 +321,7 @@ def _test_grouped_1d1d_mixed_experts[
         )
         a_offsets_host[i + 1] = a_offsets_host[i] + UInt32(tpe)
         a_scale_dim0 += ceildiv(tpe, SF_MN_GROUP_SIZE)
-        expert_ids_host[i] = Int32(i)
+        expert_ids_host[i] = eids_ptr[i]
 
     var a_host = ctx.enqueue_create_host_buffer[a_type](total_tokens * packed_K)
     var b_host = ctx.enqueue_create_host_buffer[b_type](
@@ -622,8 +625,8 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
 
     # --- Mixed-expert tests: dynamic TMA/cp.async switching ---
     # Some experts have group_size < 128 (cp.async), others >= 128 (TMA).
-    # Token counts are fully runtime — the kernel dynamically selects the
-    # load method per expert based on group_size vs SF_MN_GROUP_SIZE.
+    # Token counts are fully runtime, so the kernel selects the load
+    # method per expert from group_size vs SF_MN_GROUP_SIZE.
     print("\n=== Grouped 1D1D NVFP4 Mixed-Expert Dynamic Switching Tests ===")
 
     @__parameter
@@ -636,6 +639,7 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
         AB_swapped: Bool = False,
     ](ctx: DeviceContext, t0: Int, t1: Int, t2: Int, t3: Int) raises:
         var tpe = [t0, t1, t2, t3]
+        var eids = [Int32(0), Int32(1), Int32(2), Int32(3)]
         _test_grouped_1d1d_mixed_experts[
             num_experts,
             N,
@@ -645,7 +649,7 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
             sf_dtype=sf_dtype,
             sf_vector_size=sf_vector_size,
             scaling_kind=scaling_kind,
-        ](ctx, 4, tpe.unsafe_ptr())
+        ](ctx, 4, tpe.unsafe_ptr(), eids.unsafe_ptr())
 
     # experts 0,2: cp.async (gs=4,1); experts 1,3: TMA (gs=256,200)
     mixed4[4, 1024, 1024, 8](ctx, 4, 256, 1, 200)
@@ -658,6 +662,48 @@ def run_grouped_1d1d_block_fp4_smoke_suite[
     mixed4[4, 1024, 1024, 16](ctx, 32, 512, 1, 128)
     # MMA_N=32 mixed
     mixed4[4, 1024, 1024, 32](ctx, 64, 200, 8, 300)
+
+    # Scheduler lookup boundary: the warp lookup addresses 256 groups,
+    # 8 per lane.
+    print("\n=== Grouped 1D1D NVFP4 Sched Lookup Boundary Tests ===")
+    # 256 groups, dense: every lane's segment exactly full. Group i
+    # gets expert id i, so the expert count must cover the groups.
+    test_grouped_1d1d_block_fp4[256, 128, 256](ctx, 256, 64)
+    # 257 groups: one past the lookup's reach, so the sequential path
+    # serves the launch.
+    test_grouped_1d1d_block_fp4[257, 128, 256](ctx, 257, 64)
+
+    # 255 groups, sparse: a partial segment on lane 31, populated
+    # groups straddling the 63/64 lane boundary, and a masked group
+    # (id -1) whose tokens the scheduler must still skip.
+    comptime sparse_groups = 255
+    var sparse_tokens = List[Int]()
+    var sparse_eids = List[Int32]()
+    for _ in range(sparse_groups):
+        sparse_tokens.append(0)
+        sparse_eids.append(-1)
+    var populated = [0, 63, 64, 100, 128, 192, 250, sparse_groups - 1]
+    var counts = [300, 64, 128, 1, 200, 33, 65, 127]
+    var next_eid = Int32(0)
+    for k in range(len(populated)):
+        var g = populated[k]
+        sparse_tokens[g] = counts[k]
+        sparse_eids[g] = -1 if g == 100 else next_eid
+        if g != 100:
+            next_eid += 1
+    _test_grouped_1d1d_mixed_experts[
+        16,
+        128,
+        256,
+        sf_dtype=sf_dtype,
+        sf_vector_size=sf_vector_size,
+        scaling_kind=scaling_kind,
+    ](
+        ctx,
+        sparse_groups,
+        sparse_tokens.unsafe_ptr(),
+        sparse_eids.unsafe_ptr(),
+    )
 
     print("=== ALL TESTS PASSED ===")
     _ = ctx^

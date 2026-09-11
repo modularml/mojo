@@ -73,8 +73,12 @@ from structured_kernels.trace_buf import GmemTrace, NullTrace
 
 
 def _string_to_int_list(s: String) raises -> List[Int]:
-    """Parse `[a, b, c]` (or `a,b,c`) into a `List[Int]`."""
-    var stripped = s.strip("[]")
+    """Parse `[a, b, c]`, `a,b,c` or `a;b;c` into a `List[Int]`.
+
+    kbench splits a swept value on commas, so a per-group list that is
+    itself swept must separate its entries with semicolons.
+    """
+    var stripped = s.strip("[]").replace(";", ",")
     var out = List[Int]()
     for tok in stripped.split(","):
         try:
