@@ -1178,6 +1178,28 @@ class Buffer:
         """
 
     @property
+    def strides(self) -> tuple:
+        """
+        How far apart consecutive elements are, per dimension.
+
+        Counted in elements, not bytes.
+
+        Slicing does not move any data, so a slice keeps its parent's
+        strides. Narrow a 10-wide buffer to 6 columns and it still takes
+        10 elements to reach the next row:
+
+        .. code-block:: python
+
+            parent = driver.Buffer(shape=[8, 10], dtype=DType.uint8)
+            rows = parent[:, :6]
+            rows.shape          # (8, 6)
+            rows.strides        # (10, 1) -- still 10 to the next row
+            rows.is_contiguous  # False
+
+        A buffer must be contiguous to be passed into model execution.
+        """
+
+    @property
     def is_host(self) -> bool:
         """
         Whether or not buffer is host-resident.
