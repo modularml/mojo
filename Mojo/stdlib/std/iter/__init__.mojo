@@ -56,6 +56,7 @@ from std.builtin.rebind import downcast
 
 
 from std.builtin.variadics import TypeList
+from std.os import abort
 
 
 # ===-----------------------------------------------------------------------===#
@@ -216,6 +217,49 @@ trait Iterator(Deinitable, Movable):
             return self.__next__()
         except StopIteration:
             return None
+
+    def count(var self) -> Int:
+        """Consumes the iterator and returns how many elements it yielded.
+
+        Each element is advanced past and destroyed, so the iterator is
+        exhausted afterwards. Unlike `len()`, which is O(1), this walks the
+        whole iterator. An iterator that can compute its remaining length
+        cheaply can override this method.
+
+        Returns:
+            The number of elements the iterator yielded before it stopped.
+
+        Preconditions:
+            The iterator must yield at most `Int.MAX` elements.
+
+        Constraints:
+            `Self.Element` must conform to `Deinitable` so the elements can
+            be discarded.
+
+        Performance:
+            O(n), where n is the number of remaining elements.
+
+        Examples:
+
+        ```mojo
+        var nums = [10, 20, 30]
+        print(iter(nums).count())  # 3
+        ```
+        """
+        # Same workaround as `nth`: drop it once MOCO-3947 lets us put the
+        # bound in a `where` clause on the method.
+        comptime assert conforms_to(Self.Element, Deinitable)
+
+        var n = 0
+        try:
+            while True:
+                _ = self.__next__()
+                if n == Int.MAX:
+                    abort("Iterator.count: overflow encountered")
+                n += 1
+        except StopIteration:
+            pass
+        return n
 
 
 @always_inline
