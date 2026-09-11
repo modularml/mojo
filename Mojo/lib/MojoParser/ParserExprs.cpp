@@ -1430,7 +1430,7 @@ ParseResult ExprParser::parseFunctionType(ExprNode *&result) {
 
   // Parse trailing body constraints if present (only supported for thin
   // functions for now).
-  if (paramList.parseTrailingConstraintsIfPresent(*this))
+  if (paramList.parseTrailingConstraintsIfPresent(*this, stmtIndent))
     return failure();
 
   if (!paramList.bodyConstraints.empty() && !fnSignature.isThin) {

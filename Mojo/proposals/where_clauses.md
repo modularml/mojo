@@ -275,6 +275,24 @@ entry. Putting the comma inside the parentheses removes the ambiguity: the
 message is simply the second element of a two-element tuple expression, and the
 entry-separator comma is unambiguous.
 
+**The `else` spelling.** `where condition else "message"` is accepted as a new,
+preferred alternative, and reads as a condition with an explanation rather
+than as a tuple:
+
+```mojo
+def foo[sc: Int]() where sc > 1 else "scaling factor must be greater than 1":
+    ...
+```
+
+It escapes the ambiguity that ruled out the bare comma because `else` is a
+keyword rather than a separator, so it cannot be confused with the comma
+between conformance-list entries. It does not collide with the conditional
+expression `a if c else b` either: the expression parser only consumes an
+`else` for which it has already consumed a matching `if`, so a trailing `else`
+after a complete condition is always the message. The two forms differ only in
+surface syntax — both produce the same `message` field on the constraint — and
+writing both on one clause is an error.
+
 **String literals only, for now.** Unlike `comptime assert` (below) — whose
 message is checked by the elaborator and so may be any comptime string
 expression — a `where` message is captured by the parser, which has no

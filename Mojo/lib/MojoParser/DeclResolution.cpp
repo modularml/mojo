@@ -2254,7 +2254,8 @@ LogicalResult DeclResolver::resolveSignature(FnOp funcOp, Lexer &lexer,
   fnSignature.parseResultIfPresent(p);
 
   // Parse trailing body constraints if present.
-  if (failed(parsedParamList.parseTrailingConstraintsIfPresent(p)))
+  if (failed(parsedParamList.parseTrailingConstraintsIfPresent(
+          p, decl.getIndentation())))
     return failure();
 
   // Reject where clauses on trait methods. Users almost certainly expect
@@ -2823,7 +2824,7 @@ LogicalResult DeclResolver::resolveSignature(AliasDeclOp aliasDeclOp,
   }
 
   // Parse trailing 'where' clauses if present.
-  if (parsedParams.parseTrailingConstraintsIfPresent(p))
+  if (parsedParams.parseTrailingConstraintsIfPresent(p, decl.getIndentation()))
     return failure();
 
   // The alias signature is a self-contained scope where the input parameters
@@ -3246,11 +3247,10 @@ static ParseResult parseOptionalConformanceListSyntax(
       ExprNode *parsed;
       if (p.parseExpression(parsed, stmtIndent))
         return failure();
-      // A message is written `where (condition, "message")`. Because the
-      // message lives inside the parentheses, the trailing comma that
-      // separates the next conformance entry is unambiguous -- no lookahead
-      // is needed here.
-      if (constraint.extractParenthesizedMessage(p, parsed))
+      // A message is written `where (condition, "message")` or
+      // `where condition else "message"`. Neither collides with the comma
+      // that separates the next conformance entry, So  no lookahead is needed.
+      if (constraint.parseOptionalMessage(p, parsed, stmtIndent))
         return failure();
       conformance.constraint = constraint;
     }
@@ -3699,7 +3699,8 @@ LogicalResult DeclResolver::resolveSignature(StructDeclOp structOp,
       parseOptionalConformanceListSyntax(
           p, parsedConformances, sigDecl.getIndentation(),
           /*allowConformanceConstraints=*/true) ||
-      parsedParams.parseTrailingConstraintsIfPresent(p) ||
+      parsedParams.parseTrailingConstraintsIfPresent(
+          p, sigDecl.getIndentation()) ||
       p.parseToken(Token::colon, "expected ':' in struct definition") ||
       decl.isErroneous())
     return failure();

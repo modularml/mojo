@@ -10,6 +10,21 @@ This version is still a work in progress.
 
 ## Language enhancements
 
+- The message on a `where` clause can now be written
+  `where <condition> else "<message>"`, as the preferred alternative to the
+  existing `where (<condition>, "<message>")`, which will be deprecated over
+  time.
+
+  ```mojo
+  def foo[sc: Int]() where sc > 1 else "scaling factor must be greater than 1":
+      ...
+
+  struct Box[T: Deinitable](
+      Marker where conforms_to(T, Marker) else "Box[T] is a Marker only when T is",
+  ):
+      ...
+  ```
+
 ## Language changes
 
 ## Library stabilizations

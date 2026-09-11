@@ -31,7 +31,7 @@ decorator: '@' namedexpr_test NEWLINE
 decorators: decorator+
 decorated: decorators (classdef | funcdef | async_funcdef | if_stmt | for_stmt | var_stmt NEWLINE | comptime_stmt | import_stmt)
 async_funcdef: ASYNC funcdef
-where_clause: WHERE top_test
+where_clause: WHERE top_test ['else' test]
 # Mojo terms: metaparams [..] = parameter list; parameters (..) = argument list;
 # captures {..} = capture list (production names kept from black's Python grammar).
 funcdef: ('def' | MLIR_REGION) NAME [metaparams] parameters [named_effect*] [global_effects] [captures] ['->' result_type] (where_clause)* ':' suite

@@ -82,19 +82,28 @@ enum class CaptureConvention : uint8_t {
 struct ParsedConstraint {
   SMLoc loc;
   ExprNode *propExpr;
-  /// Optional user-provided failure message from `where (condition,
-  /// "message")` syntax. Null if no message was written.
+  /// Optional user-provided failure message, from either the
+  /// `where (condition, "message")` or the `where condition else "message"`
+  /// form. Null if no message was written.
   StringAttr message;
 
-  ParseResult parse(ParserBase &p);
+  ParseResult parse(ParserBase &p,
+                    std::optional<size_t> stmtIndent = std::nullopt);
 
-  /// Split the parsed `where` expression into `propExpr` (the condition) and
-  /// `message`. If `parsed` has the shape `(condition, "message")` -- a
-  /// parenthesized two-element tuple whose second element is a string literal
-  /// -- both fields are set; a tuple whose second element is not a string
-  /// literal is a targeted error (only string-literal messages are supported).
-  /// Any other expression becomes `propExpr` as the bare condition.
-  ParseResult extractParenthesizedMessage(ParserBase &p, ExprNode *parsed);
+  /// Split the already-parsed `where` expression into `propExpr` (the
+  /// condition) and `message`, then consume an optional `else "message"`
+  /// suffix. `parsed` carries a message when it has the shape
+  /// `(condition, "message")` -- a parenthesized two-element tuple whose
+  /// second element is a string literal; any other expression is the bare
+  /// condition. A tuple whose second element is not a string literal is a
+  /// targeted error (only string-literal messages are supported).
+  ParseResult
+  parseOptionalMessage(ParserBase &p, ExprNode *parsed,
+                       std::optional<size_t> stmtIndent = std::nullopt);
+
+  /// Consume an optional `else "message"` suffix following the condition.
+  /// Writing a message in both forms on one clause is an error.
+  ParseResult parseElseMessage(ParserBase &p, std::optional<size_t> stmtIndent);
 
   /// Print the constraint for debugging.
   void print(mlir::raw_indented_ostream &os) const;
@@ -182,10 +191,12 @@ public:
 
   /// Parse trailing constraints if present.
   ///
-  /// constraint_clauses ::= ("where" expression)*
-  /// A message is carried inside the expression as a parenthesized pair:
-  /// `where ( condition , string_literal )`.
-  ParseResult parseTrailingConstraintsIfPresent(ParserBase &p);
+  /// constraint_clauses ::= ("where" constraint)*
+  /// constraint         ::= expression ["else" message]
+  ///                      | "(" expression "," message ")"
+  /// message            ::= string_literal+ | "(" string_literal+ ")"
+  ParseResult parseTrailingConstraintsIfPresent(
+      ParserBase &p, std::optional<size_t> stmtIndent = std::nullopt);
 };
 
 /// This contains the result state from type checking a parameter signature.
