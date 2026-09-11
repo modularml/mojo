@@ -1,12 +1,14 @@
+# Generics
+
 This doc explains all the non-obvious parts of handling generics in the parser.
 
 ## `IndexRefAttrInterface`, Depths, and Indexes (IRAIDAI)
 
-These two aliases have equal types.
+These two declarations have equal types.
 
 ```mojo
-alias A: def[T: AnyType](x: T)->None = ...
-alias B: def[Y: AnyType](x: Y)->None = ...
+comptime A: def[T: AnyType](x: T)->None = ...
+comptime B: def[Y: AnyType](x: Y)->None = ...
 ```
 
 It's a bit easier to know this if the names are erased away, and the param-refs
@@ -15,8 +17,8 @@ describe the parameter-decls (`T: AnyType` or `Y: AnyType`) they're referring
 to. Something like:
 
 ```mojo
-alias A: def[_: AnyType](x: *(0,0))->None = ...
-alias B: def[_: AnyType](x: *(0,0))->None = ...
+comptime A: def[_: AnyType](x: *(0,0))->None = ...
+comptime B: def[_: AnyType](x: *(0,0))->None = ...
 ```
 
 `IndexRefAttrInterface`s, like those `*(0,0)`s, are made of two parts:
@@ -32,18 +34,19 @@ alias B: def[_: AnyType](x: *(0,0))->None = ...
 Another example, to illustrate a non-zero depth:
 
 ```mojo
-alias bar: def[
+comptime bar: def[
     D: DType,
     N: Int,
-    f: def[Y: AnyType](Y, SIMD[N, D])->None
+    f: def[Y: AnyType](Y, SIMD[D, N])->None
 ](...) = ...
 ```
 
-The `SIMD[N, D]`'s `N` is a #kgen.param.index.ref<1, 0> : !lit.struct<@Int>,
-(sometimes written as `*(1,0)`) because it's not referring to the containing
+The `SIMD[D, N]`'s `N` is a #kgen.param.index.ref<1, 1> : !lit.struct<@Int>,
+(sometimes written as `*(1,1)`) because it's not referring to the containing
 signature but instead a signature outside of it. In other words, there is 1
 signature between the param-ref and the param-decl it's referring to, so its
-depth is 1.
+depth is 1. Its index is 1 because `N` is the second parameter-decl of that
+outer signature; `D` is that signature's index 0, so `D` is `*(1,0)`.
 
 Be careful when calculating that `depth`, it's easy to get wrong.
 
@@ -52,11 +55,11 @@ Note: not all param-refs use indexes and depths. There are also normal
 
 ## Depths Cannot Refer To Op-Declared Signatures (DCRTODS)
 
-Given this alias:
+Given this comptime binding:
 
 ```mojo
 def foo[X: AnyType](x: X):
-    alias bar: def[Y: AnyType](X, Y) = ...
+    comptime bar: def[Y: AnyType](X, Y) = ...
 ```
 
 Given IRAIDAI, one might assume that `bar`'s type is
@@ -75,8 +78,8 @@ It's because of this rule:
 Here are the parameter-decls involved:
 
 - `X` is declared by the `def foo` op.
-- `bar` is declared by the `alias bar` op.
-- `Y: AnyType` is declared by the `fn` type.
+- `bar` is declared by the `comptime bar` op.
+- `Y: AnyType` is declared by the `def` function type.
 
 `X` and `bar` are declared by ops, so we use `ParamDeclRefAttr`s to refer to
 them.
@@ -96,17 +99,17 @@ If a `depth` is 0, then it's referring to the nearest enclosing signature, like
 the `T` in this:
 
 ```mojo
-alias A: def[T: AnyType](x: T)->None = ...
+comptime A: def[T: AnyType](x: T)->None = ...
 ```
 
 If a `depth` is 1, then it's referring to the signature containing that one,
-like the `N` in the `SIMD[N, D]` in this:
+like the `N` in the `SIMD[D, N]` in this:
 
 ```mojo
-alias bar: def[
+comptime bar: def[
     D: DType,
     N: Int,
-    f: def[Y: AnyType](Y, SIMD[N, D])->None
+    f: def[Y: AnyType](Y, SIMD[D, N])->None
 ](...) = ...
 ```
 
@@ -117,7 +120,7 @@ To manage this, we make all signatures inherit from
 For example, if we're looking for all mentions of `T` in this Mojo snippet:
 
 ```mojo
-alias bar: def[
+comptime bar: def[
     T: AnyType,
     L: List[T],
     f: def[Y: AnyType](Y, List[T])->None
@@ -127,7 +130,7 @@ alias bar: def[
 ...which is interpreted like this:
 
 ```mojo
-alias bar: def[
+comptime bar: def[
     _: AnyType,
     _: List[*(0,0)],
     _: def[_: AnyType](*(0,0), List[*(1,0)])->None
@@ -149,12 +152,12 @@ a signature, even indirectly.
 
 For this reason, think twice when using `AttrTypeReplacer` or `AttrTypeWalker`,
 and consider using something like `IndexParameterReplacer`, `ParameterReplacer`,
-`ParameterEvaluator`, `ParserParameterEvaluator`, or `IndexRefRemapper` which
-are all depth-aware.
+`ParameterEvaluator`, `IndexRefRemapper`, or `IndexDepthAdjuster` which are all
+depth-aware.
 
 For example, from `IndexParameterReplacer`'s comments:
 
-```mojo
+```text
 /// Handing this `depth` to replaceImpl is the main point of this class,
 /// it enables the replaceImpl implementation to know how deep into
 /// signature scopes we currently are in our recursive walk.
@@ -174,7 +177,7 @@ STCHDDDOS.
 Looking at the example from PSTIAIRAID:
 
 ```mojo
-alias bar: def[
+comptime bar: def[
     T: AnyType,
     L: List[T],
     f: def[Y: AnyType](Y, List[T])->None
@@ -184,7 +187,7 @@ alias bar: def[
 ...which is interpreted like this:
 
 ```mojo
-alias bar: def[
+comptime bar: def[
     _: AnyType,
     _: List[*(0,0)],
     _: def[_: AnyType](*(0,0), List[*(1,0)])->None

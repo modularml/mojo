@@ -346,8 +346,8 @@ class ParamIndexRefAttr(max._core.Attribute):
     ```mlir
     // Second input parameter of the nearest signature.
     #kgen.param.index.ref<0, 1> : index
-    // First input parameter of next enclosing signature.
-    #kgen.param.index.ref<1, 0> : !lit.struct<@Int>
+    // Second input parameter of next enclosing signature.
+    #kgen.param.index.ref<1, 1> : !lit.struct<@Int>
     ```
 
     The latter would appear in something like this:
@@ -356,11 +356,13 @@ class ParamIndexRefAttr(max._core.Attribute):
     comptime bar: def[
       D: DType,
       N: Int,
-      f: def[Y: AnyType](Y, SIMD[N, D])->None
+      f: def[Y: AnyType](Y, SIMD[D, N])->None
     ](...) = ...
     ```
 
-    The `SIMD[N, D]`'s `N` is a #kgen.param.index.ref<1, 0> : !lit.struct<@Int>.
+    The `SIMD[D, N]`'s `N` is a #kgen.param.index.ref<1, 1> : !lit.struct<@Int>,
+    because `N` is declared at index 1 of the signature one level out. `D` is
+    that signature's index 0, so it is a #kgen.param.index.ref<1, 0>.
 
     But, per DCRTODS, it can NOT be used inside a generator's body to refer to
     one of the generator's parameters, like this:

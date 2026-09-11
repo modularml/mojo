@@ -12,7 +12,10 @@ and conformances.
 
 - ConformanceOp: A table that tracks how a struct conforms to a trait. For
 every struct, and for every trait that the struct conforms to, there is a
-ConformanceOp. The name of the ConformanceOp is the mangled name of the trait.
+ConformanceOp. Its `sym_name` is the flattened name of the trait, which is what
+a `#kgen.get_witness` looks the table up by. It also carries `immediateParents`
+(the first level of inherited conformance tables, sorted by flattened name) and
+a `constraint`.
 
 - WitnessOp: A specific entry in a ConformanceOp that maps a name & type pair
 (required by the trait) to an implementation (provided by the struct). For
@@ -20,6 +23,16 @@ example, if the trait requires a particular function (with a particular name &
 type), there will be a WitnessOp in the ConformanceOp that has that name, and
 has a symbol reference to the actual function declared in the struct that
 satisfies that requirement.
+
+### Conditional Conformances
+
+A conformance is not necessarily unconditional. A ConformanceOp's `constraint`
+records the condition under which the conformance applies, so a struct can
+conform to a trait only when its parameters satisfy that condition (for
+example, `List[T]` is `Copyable` only when `T` is). An unconditional
+conformance carries a trivially true constraint and prints without a `where`
+clause, so the common case is invisible; do not assume the presence of a
+ConformanceOp alone means the struct conforms.
 
 ## Lazy Resolution of Conformances (CALROC)
 

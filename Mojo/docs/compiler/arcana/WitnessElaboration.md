@@ -31,8 +31,8 @@ during elaboration.
 - GetWitnessAttr: A parameter operator that fetches a particular witness entry
 from a struct type. It has three operands:
   - A type reference (parameter value).
-  - A trait name (constant string).
-  - A witness name (constant string).
+  - A trait (a TraitSymbolAttr, not a plain string).
+  - A witness name (a StringAttr).
 
 ## IREvaluator GetWitness Evaluation
 
