@@ -34,6 +34,39 @@ def make_string_set[size: Int]() -> Set[String]:
 
 
 # ===-----------------------------------------------------------------------===#
+# Benchmark Set.__init__ from List
+# ===-----------------------------------------------------------------------===#
+@parameter
+def bench_set_init_from_list[size: Int](mut b: Bencher) raises:
+    """Benchmark Set construction from a List of size elements."""
+    var elements = List[Int]()
+    for i in range(size):
+        elements.append(i)
+
+    @always_inline
+    def call_fn() unified {read}:
+        var s = Set[Int](black_box(elements))
+        keep(len(s))
+
+    b.iter(call_fn)
+
+
+# ===-----------------------------------------------------------------------===#
+# Benchmark Set.__init__ from variadic args
+# ===-----------------------------------------------------------------------===#
+@parameter
+def bench_set_init_variadic(mut b: Bencher) raises:
+    """Benchmark Set construction from 10 variadic Int elements."""
+
+    @always_inline
+    def call_fn() unified {}:
+        var s = Set[Int](0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+        keep(len(s))
+
+    b.iter(call_fn)
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark Set.__eq__ (Int keys)
 # ===-----------------------------------------------------------------------===#
 def bench_set_eq_int[size: Int](mut b: Bencher) raises:
@@ -245,8 +278,18 @@ def main() raises:
     var m = Bench(BenchConfig(num_repetitions=10))
     comptime sizes = (10, 100, 1000, 10_000)
 
+    # Init benchmarks (variadic, fixed 10 elements)
+    m.bench_function[bench_set_init_variadic](
+        BenchId("bench_set_init_variadic[10]")
+    )
+
     comptime for i in range(len(sizes)):
         comptime size = rebind[Int](sizes[i])
+
+        # Init from List
+        m.bench_function[bench_set_init_from_list[size]](
+            BenchId(String("bench_set_init_from_list[", size, "]"))
+        )
 
         # Equality benchmarks
         m.bench_function(
