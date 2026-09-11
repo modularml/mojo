@@ -415,8 +415,36 @@ Three things to get right:
   line rather than continuing the existing one. A model name must not contain a
   dot.
 
-The results land in BigQuery and Looker. See the Kepler docs for the table and
-the dashboard: `docs/internal/KeplerBenchmarking.md`.
+### Reading the results
+
+Every run uploads to BigQuery, and the series are plotted at
+<https://benchmark-visibility.prod.modular-internal.com/perf/mojo-compile-time>.
+See `docs/internal/KeplerBenchmarking.md` for the table itself.
+
+The page draws three charts per source, because the series do not share an
+axis: `wall.total` on its own, the pipeline phases from the flagged compile,
+and the `input.*` counts. Points come from main only, one per CI run, and each
+links to the commit it measured.
+
+### Comparing a pull request
+
+The daily series says compile time moved; to ask whether your branch moved it,
+label the pull request `ci-mojo-compile-time-benchmark`. The `Mojo Compile Time
+A/B` workflow then measures the two *arms* — the merge base and the branch
+head — on one runner, and posts the comparison as a comment, refreshed on every
+push while the label is on. The benchmark takes about an hour, and needs the
+machine to itself for the timings to be stable, so it is label-gated rather
+than run on every pull request.
+
+Each arm builds its own compiler and emits its own Mojo, so a graph-compiler or
+kernel-library change counts the same way a Mojo-compiler change does. The arms
+are interleaved rather than run back to back, so drift over the run lands on
+both of them, and a difference smaller than the spread between one arm's own
+repeats is reported as noise rather than as a number to act on. The comment
+uses the same word.
+
+A regression is reported, never enforced: more compile time is often the honest
+cost of more work. The check fails only when an arm fails to build or compile.
 
 ## Notes for benchmarking
 
