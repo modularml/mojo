@@ -2417,7 +2417,7 @@ def mha_prefill_v2_ragged[
     config: MhaConfigV2,
     cross_attention: Bool = False,
     sink: Bool = False,
-    compile_options: StaticString = CompilationTarget.from_gpu_info[
+    compile_options: StaticString = CompilationTarget.from[
         DeviceContext.default_device_info
     ]().default_compile_options(),
 ](
@@ -2537,7 +2537,7 @@ def mha_prefill_v2[
     //,
     config: MhaConfigV2,
     sink: Bool = False,
-    compile_options: StaticString = CompilationTarget.from_gpu_info[
+    compile_options: StaticString = CompilationTarget.from[
         DeviceContext.default_device_info
     ]().default_compile_options(),
 ](

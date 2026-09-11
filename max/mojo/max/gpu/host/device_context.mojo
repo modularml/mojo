@@ -4365,7 +4365,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         //,
         func: def(* args: * declared_arg_types) thin -> None,
         *,
-        compile_options: StaticString = CompilationTarget.from_gpu_info[
+        compile_options: StaticString = CompilationTarget.from[
             Self.default_device_info
         ]().default_compile_options(),
         link_options: StaticString = "",
@@ -4380,7 +4380,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         out result: DeviceFunction[
             func,
             declared_arg_types,
-            target=CompilationTarget.from_gpu_info[Self.default_device_info](),
+            target=CompilationTarget.from[Self.default_device_info](),
             compile_options=compile_options,
             link_options=link_options,
             _ptxas_info_verbose=_ptxas_info_verbose,
@@ -4442,7 +4442,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         //,
         func: def(* args: * declared_arg_types) capturing -> None,
         *,
-        compile_options: StaticString = CompilationTarget.from_gpu_info[
+        compile_options: StaticString = CompilationTarget.from[
             Self.default_device_info
         ]().default_compile_options(),
         link_options: StaticString = "",
@@ -4457,7 +4457,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         out result: DeviceFunction[
             func,
             declared_arg_types,
-            target=CompilationTarget.from_gpu_info[Self.default_device_info](),
+            target=CompilationTarget.from[Self.default_device_info](),
             compile_options=compile_options,
             link_options=link_options,
             _ptxas_info_verbose=_ptxas_info_verbose,
@@ -4764,7 +4764,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         # The compiled kernel is FuncType.__call__; the launch argument is the
         # encoded FuncType.device_type instance. Layout punning is only safe
         # while those sizes and alignments coincide on the launch target.
-        comptime launch_target = CompilationTarget.from_gpu_info[
+        comptime launch_target = CompilationTarget.from[
             Self.default_device_info
         ]()
         comptime host_size = size_of[FuncType, target=launch_target]()
@@ -4877,7 +4877,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
             block_dim, location=call_location()
         )
 
-        comptime launch_target = CompilationTarget.from_gpu_info[
+        comptime launch_target = CompilationTarget.from[
             Self.default_device_info
         ]()
         comptime n = size_of[FuncType, target=launch_target]()

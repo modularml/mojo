@@ -1317,7 +1317,7 @@ struct DeviceGraphBuilder[arena_origin: ImmOrigin](Movable):
         # The compiled kernel is `FuncType.__call__`; the launch argument is
         # the encoded `FuncType.device_type` instance. Layout punning is only
         # safe while those sizes and alignments coincide on the launch target.
-        comptime launch_target = CompilationTarget.from_gpu_info[
+        comptime launch_target = CompilationTarget.from[
             DeviceContext.default_device_info
         ]()
         comptime host_size = size_of[FuncType, target=launch_target]()
@@ -1448,7 +1448,7 @@ struct DeviceGraphBuilder[arena_origin: ImmOrigin](Movable):
         )
         dependencies = self._merge_implicit(dependencies^)
 
-        comptime launch_target = CompilationTarget.from_gpu_info[
+        comptime launch_target = CompilationTarget.from[
             DeviceContext.default_device_info
         ]()
         comptime n = size_of[FuncType, target=launch_target]()

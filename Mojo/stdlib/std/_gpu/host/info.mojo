@@ -54,7 +54,7 @@ def _get_gpu_target[
     comptime assert (
         target_arch != ""
     ), "target_arch must be a valid GPU architecture."
-    return GPUInfo.from_name[target_arch]().target()
+    return GPUInfo.from_name[target_arch]()._mlir_target()
 
 
 comptime _KB = 1024
@@ -1776,12 +1776,16 @@ struct GPUInfo(Copyable, Equatable, Movable, RegisterPassable, Writable):
     var max_thread_block_size: Int
     """Maximum number of threads allowed in a thread block."""
 
+    @deprecated("Use CompilationTarget.from[info]() instead")
     def target(self) -> _TargetType:
         """Gets the MLIR target configuration for this GPU.
 
         Returns:
             MLIR target configuration for the GPU.
         """
+        return self._mlir_target()
+
+    def _mlir_target(self) -> _TargetType:
         if self.name == "NVIDIA Tesla P100":
             return _get_teslap100_target()
         if self.name == "NVIDIA GeForce GTX 1060":

@@ -13,11 +13,13 @@
 # RUN: %mojo-no-debug %s | FileCheck %s
 # RUN: %mojo-no-debug -D USE_EXPERIMENTAL_AMD_BLOCK_SYNC_LDS_WITHOUT_SYNC_VMEM=True %s | FileCheck --check-prefix=CHECK-BLOCK-SYNC %s
 
+from std.sys import CompilationTarget
+
 from max.gpu.sync import barrier
 from max.gpu.host.compile import _compile_code
 from max.gpu.host.info import MI355X
 
-comptime MI355X_TARGET = MI355X.target()
+comptime MI355X_TARGET = CompilationTarget.from[MI355X]()
 
 
 # CHECK-LABEL: test_barrier
