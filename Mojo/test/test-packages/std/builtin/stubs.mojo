@@ -512,9 +512,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
 comptime StringSlice = StringSpan
 
 
-struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
-    TrivialRegisterPassable
-):
+struct StringSpan[origin: ImmOrigin](TrivialRegisterPassable):
     var _slice: Span[Byte, Self.origin]
 
     @implicit
@@ -609,13 +607,13 @@ struct String(ErrorConversionTrait, ImplicitlyCopyable, KeyElement):
     def __len__(self) -> Int:
         return 0
 
-    def __contains__(self, substr: StringSlice[mut=False, ...]) -> Bool:
+    def __contains__(self, substr: StringSlice) -> Bool:
         return True
 
     def __add__(self, other: StringSlice) -> String:
         pass
 
-    def __iadd__(mut self, rhs: StringSlice[mut=False, ...]):
+    def __iadd__(mut self, rhs: StringSlice):
         pass
 
     def byte_length(self) -> Int:

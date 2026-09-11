@@ -648,7 +648,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return self.lstrip().rstrip()
 
-    def strip(self, chars: ImmStringSlice) -> StaticString:
+    def strip(self, chars: StringSlice) -> StaticString:
         """Returns a view of the string literal with leading and trailing
         characters removed.
 
@@ -662,7 +662,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
 
         return self.lstrip(chars).rstrip(chars)
 
-    def rstrip(self, chars: ImmStringSlice) -> StaticString:
+    def rstrip(self, chars: StringSlice) -> StaticString:
         """Returns a view of the string literal with trailing characters
         removed.
 
@@ -684,7 +684,7 @@ struct StringLiteral[value: __mlir_type.`!kgen.string`](
         """
         return StringSlice(self).rstrip()
 
-    def lstrip(self, chars: ImmStringSlice) -> StaticString:
+    def lstrip(self, chars: StringSlice) -> StaticString:
         """Returns a view of the string literal with leading characters removed.
 
         Args:

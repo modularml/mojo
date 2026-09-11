@@ -2116,7 +2116,7 @@ struct StringDict[V: Movable](
     @__unsafe_nested_origins_read_only
     @always_inline
     def __getitem__(
-        ref self, key: ImmStringSpan
+        ref self, key: StringSpan
     ) raises DictKeyError[Self.key_type] -> ref[
         origin_of(self._dict)._get_owned_interior["value"]
     ] Self.V:

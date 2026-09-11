@@ -60,16 +60,6 @@ from std.format._utils import _write_hex
 comptime StringSlice = StringSpan
 """Provides a compatibility alias for `StringSpan`."""
 
-comptime MutStringSpan[origin: MutOrigin] = StringSpan[origin]
-"""Provides mutable access to the string data it views.
-
-Parameters:
-    origin: The origin of the string data.
-"""
-
-comptime MutStringSlice = MutStringSpan
-"""Provides a compatibility alias for `MutStringSpan`."""
-
 comptime ImmStringSpan[origin: ImmOrigin] = StringSpan[origin]
 """Provides read-only access to the string data it views.
 
@@ -108,7 +98,7 @@ print(format_string.format("bats", 6))     # => bats: 6
 """
 
 
-struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
+struct StringSpan[origin: ImmOrigin](
     Boolable,
     Defaultable,
     Equatable,
@@ -121,19 +111,22 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
     TrivialRegisterPassable,
     Writable,
 ):
-    """A non-owning view into encoded string data.
+    """An immutable, non-owning view into encoded string data.
 
     A `StringSpan` is a lightweight view into string data that lets you look
-    at part (or all) of an string without copying the data. Unlike a
+    at part (or all) of a string without copying the data. Unlike a
     [`String`](/docs/std/collections/string/string/String/), a `StringSpan`
     doesn't own the string data, but it knows where to find it and how long it
     is. It's designed for efficient zero-copy string operations without memory
     allocation, while maintaining memory safety and UTF-8 awareness.
 
+    `StringSpan` is always immutable. To mutate string storage, operate on an
+    owning `String` or a mutable `Span[Byte]` instead.
+
     Key features:
 
     - Zero-copy string operations for high performance.
-    - Lightweight view that doesn't own or allocate memory.
+    - Lightweight immutable view that doesn't own or allocate memory.
     - UTF-8 aware string processing and character iteration.
     - Compatible ABI with `llvm::StringRef` for C++ interoperability.
     - Memory-safe slicing and substring operations.
@@ -170,7 +163,6 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
       string literal. String literals are compile-time values.
 
     Parameters:
-        mut: Whether the slice is mutable.
         origin: The origin of the underlying string data.
 
     Notes:
@@ -180,7 +172,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
 
     # Aliases
     comptime Immutable = StringSpan[ImmOrigin(Self.origin)]
-    """The immutable version of the `StringSpan`."""
+    """A `StringSpan` with a canonical immutable origin."""
     # Fields
     var _slice: Span[Byte, Self.origin]
 
@@ -200,11 +192,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         other: StringSpan,
         out self: StringSpan[ImmOrigin(other.origin)],
     ):
-        """Implicitly cast the mutable origin of self to an immutable one.
-
-        Args:
-            other: The Span to cast.
-        """
+        """Converts a string span to its canonical immutable origin."""
         self = rebind[type_of(self)](other)
 
     @doc_hidden
@@ -238,7 +226,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         self = StaticString(lit.value)
 
     @always_inline("builtin")
-    def __init__(out self, *, unsafe_from_utf8: Span[Byte, Self.origin]):
+    def __init__(out self, *, unsafe_from_utf8: ImmSpan[Byte, Self.origin]):
         """Construct a new `StringSpan` from a sequence of UTF-8 encoded bytes.
 
         Args:
@@ -282,7 +270,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         """
         self._slice = unsafe_from_utf8.as_bytes()
 
-    def __init__(out self, *, from_utf8: Span[Byte, Self.origin]) raises:
+    def __init__(out self, *, from_utf8: ImmSpan[Byte, Self.origin]) raises:
         """Construct a new `StringSpan` from a buffer containing UTF-8 encoded
         data.
 
@@ -302,29 +290,10 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
     def __init__(out self, ref[Self.origin] value: String):
         """Construct a StringSpan from a String.
 
-        This constructor propagates the mutability of the reference. If you
-        have a mutable reference to a String, you get a mutable StringSpan.
-        If you have an immutable reference, you get an immutable StringSpan.
-
         Args:
             value: The string value.
         """
-        comptime if Self.origin.mut:
-            # FIXME(MOCO-3906): Needs `unsafe_mut_cast()` because type refinement
-            #   based on the `if origin.mut` knowledge is not supported.
-            ref value_mut = Pointer(to=value).unsafe_mut_cast[True]()[]
-
-            # Note: unsafe_as_bytes_mut() reallocates the `String` data if it
-            #   was originally constructed from a read-only static string.
-            # SAFETY:
-            #   This is safe because the resulting UTF-8 byte slice is
-            #   accessible only through the APIs of StringSpan, which
-            #   either guarantee UTF-8 validity, or are unsafe themselves.
-            self._slice = rebind[type_of(self._slice)](
-                value_mut.unsafe_as_bytes_mut()
-            )
-        else:
-            self._slice = rebind[type_of(self._slice)](value.as_bytes())
+        self._slice = rebind[type_of(self._slice)](value.as_bytes())
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
@@ -1023,9 +992,9 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         """
         return {
             unsafe_from_utf8 = Span[Byte, result.origin](
-                unsafe_ptr=self.unsafe_ptr()
-                .unsafe_mut_cast[result.mut]()
-                .unsafe_origin_cast[result.origin](),
+                unsafe_ptr=self.unsafe_ptr().unsafe_origin_cast[
+                    result.origin
+                ](),
                 length=self.byte_length(),
             )
         }
@@ -1125,7 +1094,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
             res += codepoint
         return res^
 
-    def _strip[forward: Bool](self, chars: ImmStringSpan) -> Self:
+    def _strip[forward: Bool](self, chars: StringSpan) -> Self:
         var iter = CodepointSliceIter[forward=forward](self)
         while True:
             try:
@@ -1139,7 +1108,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         return iter._slice
 
     @always_inline
-    def strip(self, chars: ImmStringSpan) -> Self:
+    def strip(self, chars: StringSpan) -> Self:
         """Returns a view of the string with leading and trailing characters
         removed. Note character is defined as a single unicode code-point,
         not any kind of displayed character, and strip can break apart
@@ -1178,7 +1147,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         return self.lstrip().rstrip()
 
     @always_inline
-    def rstrip(self, chars: ImmStringSpan) -> Self:
+    def rstrip(self, chars: StringSpan) -> Self:
         """Returns a view of the string with trailing characters removed.
 
         Args:
@@ -1224,7 +1193,7 @@ struct StringSpan[mut: Bool, //, origin: Origin[mut=mut]](
         return Self(unsafe_from_utf8=self.as_bytes()[:r_idx])
 
     @always_inline
-    def lstrip(self, chars: ImmStringSpan) -> Self:
+    def lstrip(self, chars: StringSpan) -> Self:
         """Returns a view of the string with leading characters removed.
 
         Args:
@@ -2854,7 +2823,7 @@ def _split[
     out output: List[type_of(src_str).Immutable],
 ):
     comptime S = type_of(src_str).Immutable
-    var ptr = src_str.unsafe_ptr().as_imm()
+    var ptr = src_str.unsafe_ptr()
     var sep_len = sep.byte_length()
     if sep_len == 0:
         var iterator = src_str.codepoint_slices()
@@ -2924,7 +2893,7 @@ def _split[
     var lhs = 0
     var rhs: Int
     var items = 0
-    var ptr = src_str.unsafe_ptr().as_imm()
+    var ptr = src_str.unsafe_ptr()
 
     comptime PointerType = type_of(ptr)
 

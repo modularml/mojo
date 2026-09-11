@@ -94,7 +94,7 @@ def b64encode(input_bytes: ImmSpan[Byte, _], mut result: String):
 
 
 @always_inline
-def b64encode(input_string: StringSlice[mut=False, _]) -> String:
+def b64encode(input_string: StringSlice[_]) -> String:
     """Performs base64 encoding on the input string.
 
     Args:
@@ -171,7 +171,7 @@ def _next_significant_byte(
     return data[i], i + 1
 
 
-def b64decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
+def b64decode(str: StringSlice[_]) raises -> List[Byte]:
     """Performs base64 decoding on the input string.
 
     Whitespace (spaces, tabs, newlines, carriage returns, form feeds, and
@@ -240,7 +240,7 @@ def b64decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
 # ===-----------------------------------------------------------------------===#
 
 
-def b16encode(str: StringSlice[mut=False, _]) -> String:
+def b16encode(str: StringSlice[_]) -> String:
     """Performs base16 encoding on the input string slice.
 
     Args:
@@ -271,7 +271,7 @@ def b16encode(str: StringSlice[mut=False, _]) -> String:
 # ===-----------------------------------------------------------------------===#
 
 
-def b16decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
+def b16decode(str: StringSlice[_]) raises -> List[Byte]:
     """Performs base16 decoding on the input string.
 
     Args:

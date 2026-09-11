@@ -1068,7 +1068,7 @@ struct String(
         )
         self._set_byte_length(new_length)
 
-    def __radd__(self, other: StringSlice[mut=False, _]) -> String:
+    def __radd__(self, other: StringSlice[_]) -> String:
         """Creates a string by prepending another string slice to the start.
 
         Args:
@@ -1093,7 +1093,7 @@ struct String(
         self._set_byte_length(new_len)
         self._clear_nul_terminator()
 
-    def __iadd__(mut self, other: StringSlice[mut=False, _]):
+    def __iadd__(mut self, other: StringSlice[_]):
         """Appends another string slice to this string.
 
         Args:
@@ -1827,7 +1827,7 @@ struct String(
         return StringSlice(self).replace(old, new)
 
     def strip(
-        self, chars: ImmStringSlice
+        self, chars: StringSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
         """Returns a view of the string with leading and trailing characters
         removed.
@@ -1856,7 +1856,7 @@ struct String(
         return self.lstrip().rstrip()
 
     def rstrip(
-        self, chars: ImmStringSlice
+        self, chars: StringSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
         """Returns a view of the string with trailing characters removed.
 
@@ -1882,7 +1882,7 @@ struct String(
         return self._interior_slice().rstrip()
 
     def lstrip(
-        self, chars: ImmStringSlice
+        self, chars: StringSlice
     ) -> StringSlice[origin_of(self)._get_owned_interior["bytes"]]:
         """Returns a view of the string with leading characters removed.
 

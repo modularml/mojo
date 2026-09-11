@@ -27,7 +27,7 @@ from std.benchmark import (
 # Benchmarks
 # ===-----------------------------------------------------------------------===#
 def bench_parsing_all_floats_in_file[
-    origin: Origin
+    origin: ImmOrigin
 ](mut b: Bencher, items_to_parse: List[StringSlice[origin]]) raises:
     @always_inline
     def call_fn() raises {imm items_to_parse}:
@@ -39,7 +39,7 @@ def bench_parsing_all_floats_in_file[
 
 
 def add_atof_benchmark[
-    origin: Origin
+    origin: ImmOrigin
 ](
     mut bench: Bench,
     items_to_parse: List[StringSlice[origin]],

@@ -215,7 +215,7 @@ struct Codepoint(Comparable, ImplicitlyCopyable, Intable, Movable, Writable):
             return None
 
     @staticmethod
-    def ord(string: StringSlice[mut=False, _]) -> Codepoint:
+    def ord(string: StringSlice[_]) -> Codepoint:
         """Returns the `Codepoint` that represents the given single-character
         string.
 

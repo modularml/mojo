@@ -38,8 +38,6 @@ from std.collections.string import (
     Codepoint,
     ImmStringSpan,
     ImmStringSlice,
-    MutStringSpan,
-    MutStringSlice,
     StaticString,
     String,
     StringSpan,

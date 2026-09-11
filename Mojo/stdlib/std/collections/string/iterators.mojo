@@ -29,16 +29,13 @@ from std.collections.span import _SpanIter
 
 
 struct CodepointSliceIter[
-    mut: Bool,
-    //,
-    origin: Origin[mut=mut],
+    origin: ImmOrigin,
     forward: Bool = True,
 ](ImplicitlyCopyable, Iterable, Iterator, Sized):
     """Iterator for `StringSlice` over substring slices containing a single
     Unicode codepoint.
 
     Parameters:
-        mut: Whether the slice is mutable.
         origin: The origin of the underlying string data.
         forward: The iteration direction. `False` is backwards.
 
@@ -279,14 +276,13 @@ struct CodepointSliceIter[
         return result
 
 
-struct CodepointsIter[mut: Bool, //, origin: Origin[mut=mut]](
+struct CodepointsIter[origin: ImmOrigin](
     ImplicitlyCopyable, Iterable, Iterator, Sized
 ):
     """Iterator over the `Codepoint`s in a string slice, constructed by
     `StringSlice.codepoints()`.
 
     Parameters:
-        mut: Mutability of the underlying string data.
         origin: Origin of the underlying string data.
     """
 
@@ -428,9 +424,7 @@ struct CodepointsIter[mut: Bool, //, origin: Origin[mut=mut]](
 
 
 struct GraphemeSliceIter[
-    mut: Bool,
-    //,
-    origin: Origin[mut=mut],
+    origin: ImmOrigin,
     forward: Bool = True,
 ](ImplicitlyCopyable, Iterable, Iterator, Sized):
     """Iterator over grapheme clusters in a string, yielding each cluster as a
@@ -442,7 +436,6 @@ struct GraphemeSliceIter[
     as defined by UAX #29.
 
     Parameters:
-        mut: Whether the slice is mutable.
         origin: The origin of the underlying string data.
         forward: The iteration direction. `False` is backwards.
 
@@ -798,7 +791,7 @@ struct GraphemeSliceIter[
         return last_boundary
 
 
-struct GraphemeIndicesIter[mut: Bool, //, origin: Origin[mut=mut]](
+struct GraphemeIndicesIter[origin: ImmOrigin](
     ImplicitlyCopyable, Iterable, Iterator
 ):
     """Iterator over grapheme clusters paired with their starting byte offset.
@@ -809,7 +802,6 @@ struct GraphemeIndicesIter[mut: Bool, //, origin: Origin[mut=mut]](
     itself.
 
     Parameters:
-        mut: Whether the slice is mutable.
         origin: The origin of the underlying string data.
 
     Mirrors `str::grapheme_indices` from Rust's `unicode-segmentation` crate.
@@ -885,7 +877,7 @@ struct GraphemeIndicesIter[mut: Bool, //, origin: Origin[mut=mut]](
         return (offset, g.unsafe_value())
 
 
-struct BytesIter[mut: Bool, //, origin: Origin[mut=mut]](
+struct BytesIter[origin: ImmOrigin](
     ImplicitlyCopyable, Iterable, Iterator, Sized
 ):
     """Iterator over the raw UTF-8 bytes of a string slice, constructed by
@@ -897,7 +889,6 @@ struct BytesIter[mut: Bool, //, origin: Origin[mut=mut]](
     UTF-8 sequences as codepoints or grapheme clusters.
 
     Parameters:
-        mut: Whether the underlying string data is mutable.
         origin: The origin of the underlying string data.
     """
 

@@ -333,19 +333,21 @@ struct Foo[x: Int, y: Int](FooTrait, Movable where False):
 
 # INLINE-LABEL: lit.trait.decl @PluginHooks
 # INLINE: lit.alias.decl *"print_emit_fn{{[`0-9]*}}":
-# INLINE-SAME: !lit.generator<<"[[OMUT:O.mut`2x]]": !Bool,
-# INLINE-SAME: "[[OORIGIN:O._mlir_origin`2x1]]": origin<
+# INLINE-SAME: !lit.generator<<"[[OORIGIN:O._mlir_origin`2x]]": origin<
 trait PluginHooks:
-    comptime print_emit_fn: Optional[def[O: Origin](str: StringSlice[O]) thin]
+    comptime print_emit_fn: Optional[
+        def[O: ImmOrigin](str: StringSlice[O]) thin
+    ]
 
 
 # INLINE-LABEL: lit.struct.decl @DefaultPlugin
 # INLINE: lit.alias.decl *"print_emit_fn{{[`0-9]*}}":
-# INLINE-SAME: !lit.generator<<"[[OMUT]]": !Bool,
-# INLINE-SAME: "[[OORIGIN]]": origin<
+# INLINE-SAME: !lit.generator<<"[[OORIGIN]]": origin<
 # INLINE: kgen.conformance{{.*}}@PluginHooks
 # INLINE: kgen.witness "print_emit_fn"
 struct DefaultPlugin(PluginHooks, Movable where False):
-    comptime print_emit_fn: Optional[def[O: Origin](str: StringSlice[O]) thin] = (
+    comptime print_emit_fn: Optional[
+        def[O: ImmOrigin](str: StringSlice[O]) thin
+    ] = (
         None
     )

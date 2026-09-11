@@ -430,7 +430,7 @@ struct _FixedWriteBuffer(Writer):
 
     def nul_terminate(
         mut self,
-    ) -> CStringSpan[origin_of(self).unsafe_mut_cast[False]()]:
+    ) -> CStringSpan[origin_of(self)]:
         if self._pos + 1 > FIXED_WRITE_BUFFER_BYTES:
             _fixed_buffer_exceeded()
         self._data.unsafe_ptr()[unsafe_offset=self._pos] = 0
@@ -439,8 +439,7 @@ struct _FixedWriteBuffer(Writer):
         return CStringSpan(
             unsafe_from_ptr=self._data.unsafe_ptr()
             .unsafe_bitcast[Int8]()
-            .as_imm()
-            .unsafe_origin_cast[ImmOrigin(origin_of(self))]()
+            .unsafe_origin_cast[origin_of(self)]()
         )
 
 

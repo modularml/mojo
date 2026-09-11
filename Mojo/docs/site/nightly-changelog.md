@@ -44,6 +44,10 @@ This version is still a work in progress.
   `Scalar[Coord.DTYPE]`. A `T` too narrow to hold the result wraps rather
   than widening, so a caller that picks one owns the overflow.
 
+- `StringSpan` now only provides immutable byte access. `MutStringSpan` and
+  `MutStringSlice` have been removed, and the `mut` parameter on `StringSpan`
+  has been removed.
+
 - `Layout` now carries its alignment as a keyword-only parameter of
   the new `Alignment` type, instead of storing it as a runtime field. It
   defaults to the element type's natural alignment, so `Layout[T](count=n)` is

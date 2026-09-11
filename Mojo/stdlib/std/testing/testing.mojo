@@ -184,8 +184,8 @@ def assert_equal[
 
 @always_inline
 def assert_equal(
-    lhs: StringSlice[mut=False, _],
-    rhs: StringSlice[mut=False, _],
+    lhs: StringSlice,
+    rhs: StringSlice,
     msg: String = "",
     *,
     location: Optional[SourceLocation] = None,

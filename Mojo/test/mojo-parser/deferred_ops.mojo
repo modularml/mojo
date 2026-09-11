@@ -50,7 +50,7 @@ def to_string[
     ]
 
 
-# CHECK-LABEL: lit.fn @"test2[::StringSpan[False
+# CHECK-LABEL: lit.fn @"test2[::StringSpan[ImmStaticOrigin,
 def test2[pred: StaticString](x: Int, y: Int) -> Bool:
     def get_pred[pred: StaticString]() -> __mlir_type.`!kgen.deferred`:
         return __mlir_deferred_attr[

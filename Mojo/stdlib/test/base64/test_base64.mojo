@@ -18,7 +18,7 @@ from std.testing import assert_equal, assert_raises
 from std.testing import TestSuite
 
 
-def bytes_of(str: StringSlice[mut=False, _]) -> List[Byte]:
+def bytes_of(str: StringSlice[_]) -> List[Byte]:
     return List[Byte](str.as_bytes())
 
 

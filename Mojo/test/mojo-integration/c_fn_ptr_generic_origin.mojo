@@ -27,8 +27,8 @@ comptime MyFnType = def(ImmPointer[c_char, _], Int) thin abi("C") -> Int32
 # CHECK: lit.bind_params
 # CHECK-SAME: :origin<false> (mutcast mut=
 # CHECK-SAME: to !lit.generator<
-def call_it(c_fn: MyFnType, s: StringSlice) -> Int32:
+def call_it(c_fn: MyFnType, s: Span[Byte, _]) -> Int32:
     return c_fn(
-        s.as_bytes().unsafe_ptr().unsafe_bitcast[c_char](),
-        s.byte_length(),
+        s.unsafe_ptr().unsafe_bitcast[c_char](),
+        len(s),
     )
