@@ -251,7 +251,7 @@ struct CompilationTarget[_mlir_value: _TargetType = _current_target(), //](
             The string of default compile options for the compilation target.
         """
 
-        comptime if is_triple["nvptx64-nvidia-cuda", Self._mlir_value]():
+        comptime if is_triple["nvptx64-nvidia-cuda", Self()]():
             # TODO: use `is_nvidia_gpu` when moved to into this struct.
             return "target-abi=shortptr"
         else:
@@ -746,7 +746,7 @@ def _triple_attr[
 
 @always_inline("nodebug")
 def is_triple[
-    name: StringLiteral, target: _TargetType = _current_target()
+    name: StringLiteral, target: CompilationTarget = CompilationTarget.current()
 ]() -> Bool:
     """Returns True if the target triple of the compiler matches the input and
     False otherwise.
@@ -760,7 +760,7 @@ def is_triple[
     """
     return __mlir_attr[
         `#kgen.param.identical<`,
-        _triple_attr[target](),
+        _triple_attr[target._mlir_value](),
         `, `,
         name.value,
         `> : !kgen.scalar<bool>`,
@@ -1252,7 +1252,9 @@ def is_gpu() -> Bool:
 
 
 @always_inline("nodebug")
-def is_little_endian[target: _TargetType = _current_target()]() -> Bool:
+def is_little_endian[
+    target: CompilationTarget = CompilationTarget.current()
+]() -> Bool:
     """Returns True if the target's endianness is little and False otherwise.
 
     Parameters:
@@ -1265,7 +1267,7 @@ def is_little_endian[target: _TargetType = _current_target()]() -> Bool:
         `#kgen.param.identical<`,
         __mlir_attr[
             `#kgen.param.expr<target_get_field,`,
-            target,
+            target._mlir_value,
             `, "endianness" : !kgen.string`,
             `> : !kgen.string`,
         ],
@@ -1276,7 +1278,9 @@ def is_little_endian[target: _TargetType = _current_target()]() -> Bool:
 
 
 @always_inline("nodebug")
-def is_big_endian[target: _TargetType = _current_target()]() -> Bool:
+def is_big_endian[
+    target: CompilationTarget = CompilationTarget.current()
+]() -> Bool:
     """Returns True if the target's endianness is big and False otherwise.
 
     Parameters:
@@ -1289,7 +1293,7 @@ def is_big_endian[target: _TargetType = _current_target()]() -> Bool:
         `#kgen.param.identical<`,
         __mlir_attr[
             `#kgen.param.expr<target_get_field,`,
-            target,
+            target._mlir_value,
             `, "endianness" : !kgen.string`,
             `> : !kgen.string`,
         ],

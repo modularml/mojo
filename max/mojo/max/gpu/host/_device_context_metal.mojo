@@ -26,7 +26,7 @@ from std.memory import (
 )
 from std.reflection import SourceLocation
 from std.sys import size_of
-from std.sys.info import _current_target, _TargetType
+from std.sys.info import _current_target
 
 from .device_context import (
     _checked_call,

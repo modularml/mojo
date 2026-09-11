@@ -14,7 +14,7 @@
 from ._overlay import MAX_PLUGINS
 from ._trait import MaxPluginHooks
 
-from std.sys.info import _TargetType, CompilationTarget
+from std.sys.info import CompilationTarget
 
 
 comptime CurrentMaxPlugin: MaxPluginHooks = MAX_PLUGINS.current

@@ -15,12 +15,12 @@
 import std.subprocess
 import std.tempfile
 from std.pathlib import Path
-from std.sys.info import CompilationTarget, _accelerator_arch, _TargetType
+from std.sys.info import CompilationTarget
 
 from std.compile import CompiledFunctionInfo, compile_info
 from std._gpu.host import get_gpu_target
 
-from .info import A100, GPUInfo
+from .info import GPUInfo
 
 # ===-----------------------------------------------------------------------===#
 # Compilation
@@ -50,32 +50,6 @@ def _compile_code[
         compile_options=compile_options,
         link_options=link_options,
         target=target,
-    ]()
-
-
-# TODO(MSTDL-3189): Remove this `_TargetType`-taking overload
-@always_inline
-def _compile_code[
-    func_type: TrivialRegisterPassable,
-    //,
-    func: func_type,
-    /,
-    *,
-    emission_kind: StaticString = "asm",
-    target: _TargetType = CompilationTarget.current_accelerator()._mlir_value,
-    compile_options: StaticString = CompilationTarget[
-        _mlir_value=target
-    ]().default_compile_options(),
-    link_options: StaticString = "",
-]() -> CompiledFunctionInfo[
-    func_type, func, CompilationTarget[_mlir_value=target]()
-]:
-    return compile_info[
-        func,
-        emission_kind=emission_kind,
-        compile_options=compile_options,
-        link_options=link_options,
-        target=CompilationTarget[_mlir_value=target](),
     ]()
 
 

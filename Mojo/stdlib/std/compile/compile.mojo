@@ -276,81 +276,9 @@ def compile_info[
 
     return CompiledFunctionInfo[func_type, func, target](
         asm=StaticString(offload.asm),
-        function_name=get_linkage_name[func, target=target._mlir_value](),
+        function_name=get_linkage_name[func, target=target](),
         module_name=StaticString(offload.module_name),
         num_captures=Int(SIMDLength(mlir_value=offload.num_captures)),
         capture_sizes=offload.capture_sizes,
         emission_kind=emission_kind,
     )
-
-
-# TODO(MSTDL-3189): Remove this `_TargetType`-taking overload
-@always_inline
-def compile_info[
-    func_type: TrivialRegisterPassable,
-    //,
-    func: func_type,
-    /,
-    *,
-    emission_kind: StaticString = "asm",
-    target: _TargetType = CompilationTarget.current()._mlir_value,
-    compile_options: StaticString = CompilationTarget[
-        _mlir_value=target
-    ].default_compile_options(),
-    link_options: StaticString = "",
-]() -> CompiledFunctionInfo[
-    func_type, func, CompilationTarget[_mlir_value=target]()
-]:
-    """Compiles a function and returns detailed compilation information.
-
-    This function takes a Mojo function and compiles it, providing access to the
-    generated assembly code, linkage information, and other compilation
-    artifacts. It can be used for inspection, debugging, and low-level
-    optimization.
-
-    Parameters:
-        func_type: Type of the function to compile. Must be a trivially-copyable
-            register type.
-        func: The function to compile. Must match the specified func_type.
-        emission_kind: The desired output format. Valid options are:
-            - "asm": Assembly code (default).
-            - "llvm": Unoptimized LLVM IR.
-            - "llvm-opt": Optimized LLVM IR.
-            - "object": Object code.
-        target: The target architecture to compile for. Defaults to current
-            architecture.
-        compile_options: Additional compiler flags and options as a string.
-        link_options: Additional linking flags and options as a string.
-
-    Returns:
-        A `CompiledFunctionInfo` struct containing:
-        - asm: The generated code in the requested format
-        - linkage_name: The mangled function name for linking
-        - module_hash: A unique hash of the compiled module
-        - num_captures: Number of captured variables
-        - error: Any error message (empty if successful)
-        - failed: Boolean indicating if compilation failed
-
-    Example:
-
-        ```mojo
-        from std.compile import compile_info
-
-        def my_func(x: Int) -> Int:
-            return x
-
-        info = compile_info[my_func]()
-        print(info)  # Print assembly
-        ```
-
-    Note:
-        The compilation is always performed, even if the function is not used.
-        For performance-critical code, consider caching the compilation results.
-    """
-    return compile_info[
-        func,
-        emission_kind=emission_kind,
-        target=CompilationTarget[_mlir_value=target](),
-        compile_options=compile_options,
-        link_options=link_options,
-    ]()

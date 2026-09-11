@@ -54,7 +54,6 @@ from std.sys.info import (
     CompilationTarget,
     _accelerator_arch,
     _current_target,
-    _TargetType,
     is_triple,
 )
 from std.sys.defines import _is_bool_like
@@ -2843,11 +2842,11 @@ struct DeviceEvent(ImplicitlyCopyable):
 
 
 def _is_nvidia_gpu[target: CompilationTarget]() -> Bool:
-    return is_triple["nvptx64-nvidia-cuda", target._mlir_value]()
+    return is_triple["nvptx64-nvidia-cuda", target]()
 
 
 def _is_apple_gpu[target: CompilationTarget]() -> Bool:
-    return is_triple["air64-apple-macosx", target._mlir_value]()
+    return is_triple["air64-apple-macosx", target]()
 
 
 def _is_path_like(ss: StringSlice) -> Bool:

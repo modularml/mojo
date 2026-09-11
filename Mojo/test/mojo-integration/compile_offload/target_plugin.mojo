@@ -16,7 +16,7 @@
 from std.builtin.variadics import TypeList, _MLIR
 from std.compile import compile_info
 from std.sys import size_of
-from std.sys.info import _current_target, _TargetType
+from std.sys.info import CompilationTarget, _current_target, _TargetType
 
 # Target generator that bakes in a TypeList as the opaque plugin.
 comptime ParametricTargetWithTypeListPlugin[
@@ -68,7 +68,9 @@ def main():
     print(
         compile_info[
             check_plugin[Ts],
-            target=ParametricTargetWithTypeListPlugin[Ts],
+            target=CompilationTarget[
+                _mlir_value=ParametricTargetWithTypeListPlugin[Ts]
+            ](),
             emission_kind="llvm",
         ]().asm
     )
@@ -82,7 +84,9 @@ def main():
     print(
         compile_info[
             check_plugin[Us],
-            target=ParametricTargetWithTypeListPlugin[Us],
+            target=CompilationTarget[
+                _mlir_value=ParametricTargetWithTypeListPlugin[Us]
+            ](),
             emission_kind="llvm",
         ]().asm
     )
