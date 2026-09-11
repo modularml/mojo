@@ -2911,7 +2911,7 @@ struct NullableTileTensor[
     LayoutType: TensorLayout,
     origin: Origin[mut=mut],
     *,
-    Engine: TensorEngine = DefaultEngine[element_width=1],
+    Engine: TensorEngine,
     address_space: AddressSpace = .GENERIC,
     linear_idx_type: DType = _get_index_type[LayoutType](address_space),
 ](ImplicitlyCopyable, RegisterPassable):
@@ -2991,11 +2991,6 @@ struct NullableTileTensor[
         Self.LayoutType._shape_types, Self.LayoutType._stride_types
     ]
     """True if the tensor has row-major (contiguous) strides."""
-
-    comptime PtrType = Pointer[
-        Scalar[Self.dtype], Self.origin, address_space=Self.address_space
-    ]
-    """The non-null pointer type for the underlying data storage."""
 
     var _storage: Optional[
         Self.Engine.StorageType[Self.dtype, Self.origin, Self.address_space]
@@ -3094,7 +3089,16 @@ struct NullableTileTensor[
     @always_inline
     def __getattr_param__[
         name: StringLiteral
-    ](self, out result: Optional[Self.PtrType],):
+    ](
+        self,
+        out result: Optional[
+            Pointer[
+                Scalar[Self.dtype],
+                Self.origin,
+                address_space=Self.address_space,
+            ]
+        ],
+    ):
         comptime assert (
             name == "ptr"
         ), "NullableTileTensor.__getattr_param__ only support 'ptr'"
