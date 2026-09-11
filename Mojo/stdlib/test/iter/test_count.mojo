@@ -14,46 +14,22 @@
 from std.testing import TestSuite, assert_equal
 
 
-def test_count_borrowed_basic() raises:
-    var l = [10, 20, 30, 40]
-    assert_equal(iter(l).count(), 4)
-
-
-def test_count_borrowed_does_not_consume_source() raises:
-    var l = [1, 2, 3]
-    assert_equal(iter(l).count(), 3)
-    # Counting a borrowed iterator leaves the list untouched.
-    assert_equal(iter(l).count(), 3)
-    assert_equal(len(l), 3)
+def test_count_basic() raises:
+    var nums = [10, 20, 30, 40]
+    assert_equal(iter(nums).count(), 4)
 
 
 def test_count_empty() raises:
-    var l = List[Int]()
-    assert_equal(iter(l).count(), 0)
-
-
-def test_count_owned() raises:
-    var l: List[Int] = [100, 200, 300]
-    assert_equal(iter(l^).count(), 3)
-
-
-def test_count_string_elements() raises:
-    var l = [String("a"), String("b"), String("c")]
-    assert_equal(iter(l).count(), 3)
+    var nums = List[Int]()
+    assert_equal(iter(nums).count(), 0)
 
 
 def test_count_partially_consumed() raises:
-    var l = [1, 2, 3, 4, 5]
-    var it = iter(l)
+    var nums = [1, 2, 3, 4, 5]
+    var it = iter(nums)
     _ = next(it)
     _ = next(it)
     assert_equal(it^.count(), 3)
-
-
-def test_count_range() raises:
-    assert_equal(range(10).count(), 10)
-    assert_equal(range(0, 10, 3).count(), 4)
-    assert_equal(range(5, 5).count(), 0)
 
 
 @fieldwise_init

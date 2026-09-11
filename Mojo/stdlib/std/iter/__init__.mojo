@@ -242,10 +242,8 @@ trait Iterator(Deinitable, Movable):
         Examples:
 
         ```mojo
-        var l = [10, 20, 30]
-        print(iter(l).count())          # 3
-        print(iter(l).count())          # 3: the list itself is not consumed
-        print(range(0, 10, 3).count())  # 4
+        var nums = [10, 20, 30]
+        print(iter(nums).count())  # 3
         ```
         """
         # Same workaround as `nth`: drop it once MOCO-3947 lets us put the
