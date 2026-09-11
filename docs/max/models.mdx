@@ -185,9 +185,20 @@ You can also see the
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/gemma4"><code>Gemma4ForConditionalGeneration</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
-        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>
+        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>,<br/>
+        <a href="https://huggingface.co/nvidia/Gemma-4-26B-A4B-NVFP4">nvidia/Gemma-4-26B-A4B-NVFP4</a>,<br/>
+        <a href="https://huggingface.co/google/gemma-4-26B-A4B-it">google/gemma-4-26B-A4B-it</a>
       </td>
       <td className='modality'>image-to-text,<br/>text-to-text,<br/>video-to-text</td>
+      <td className='encodings'>bfloat16, float16, float4_e2m1fnx2</td>
+      <td className='gpus'>Yes</td>
+    </tr>
+    <tr>
+      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/gemma4"><code>Gemma4UnifiedForConditionalGeneration</code></a></td>
+      <td className='models'>
+        <a href="https://huggingface.co/google/gemma-4-12B-it">google/gemma-4-12B-it</a>
+      </td>
+      <td className='modality'>text-to-text</td>
       <td className='encodings'>bfloat16, float16, float4_e2m1fnx2</td>
       <td className='gpus'>Yes</td>
     </tr>
@@ -484,7 +495,8 @@ You can also see the
       <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/qwen3_5"><code>Qwen3_5ForConditionalGeneration</code></a></td>
       <td className='models'>
         <a href="https://huggingface.co/Qwen/Qwen3.5-27B">Qwen/Qwen3.5-27B</a>,<br/>
-        <a href="https://huggingface.co/Qwen/Qwen3.8-27B">Qwen/Qwen3.8-27B</a>
+        <a href="https://huggingface.co/Qwen/Qwen3.8-27B">Qwen/Qwen3.8-27B</a>,<br/>
+        <a href="https://huggingface.co/RadixArk/Qwen3.8-27B-NVFP4">RadixArk/Qwen3.8-27B-NVFP4</a>
       </td>
       <td className='modality'>text-to-text</td>
       <td className='encodings'>bfloat16, float32, float4_e2m1fnx2, float8_e4m3fn</td>
@@ -566,110 +578,6 @@ You can also see the
       </td>
       <td className='modality'>text-to-text</td>
       <td className='encodings'>bfloat16</td>
-      <td className='gpus'>Yes</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dflash2_qwen3_5"><code>UnifiedDflash2Qwen3_5ForConditionalGeneration</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/RadixArk/Qwen3.8-27B-NVFP4">RadixArk/Qwen3.8-27B-NVFP4</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float32, float4_e2m1fnx2, float8_e4m3fn</td>
-      <td className='gpus'>No</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dflash_gemma4_31b"><code>UnifiedDflashGemma4_31BForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
-        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
-      <td className='gpus'>No</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dflash_kimi_k25"><code>UnifiedDflashKimiK25ForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/nvidia/Kimi-K2.5-NVFP4">nvidia/Kimi-K2.5-NVFP4</a>
-      </td>
-      <td className='modality'>image-to-text,<br/>text-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2, float8_e4m3fn</td>
-      <td className='gpus'>Yes</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dflash_llama3"><code>UnifiedDflashLlama3ForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct">meta-llama/Llama-3.2-3B-Instruct</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float32</td>
-      <td className='gpus'>No</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dspark_gemma4_12b"><code>UnifiedDSparkGemma4_12BForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/google/gemma-4-12B-it">google/gemma-4-12B-it</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16</td>
-      <td className='gpus'>No</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_dspark_gemma4_31b"><code>UnifiedDSparkGemma4_31BForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
-        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
-      <td className='gpus'>No</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_deepseekV3"><code>UnifiedMTPDeepseekV3ForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/deepseek-ai/DeepSeek-V3">deepseek-ai/DeepSeek-V3</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2, float8_e4m3fn</td>
-      <td className='gpus'>Yes</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_gemma4"><code>UnifiedMTPGemma4ForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/nvidia/Gemma-4-31B-IT-NVFP4">nvidia/Gemma-4-31B-IT-NVFP4</a>,<br/>
-        <a href="https://huggingface.co/google/gemma-4-31B-it">google/gemma-4-31B-it</a>,<br/>
-        <a href="https://huggingface.co/nvidia/Gemma-4-26B-A4B-NVFP4">nvidia/Gemma-4-26B-A4B-NVFP4</a>,<br/>
-        <a href="https://huggingface.co/google/gemma-4-26B-A4B-it">google/gemma-4-26B-A4B-it</a>
-      </td>
-      <td className='modality'>image-to-text,<br/>text-to-text,<br/>video-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
-      <td className='gpus'>Yes</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_glm5_2"><code>UnifiedMTPGlmMoeDsaForCausalLM</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/zai-org/GLM-5.2-FP8">zai-org/GLM-5.2-FP8</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2, float8_e4m3fn</td>
-      <td className='gpus'>Yes</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_inkling"><code>UnifiedMTPInklingForConditionalGeneration</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/thinkingmachines/Inkling">thinkingmachines/Inkling</a>
-      </td>
-      <td className='modality'>image-to-text,<br/>text-to-text</td>
-      <td className='encodings'>bfloat16, float4_e2m1fnx2</td>
-      <td className='gpus'>Yes</td>
-    </tr>
-    <tr>
-      <td className='arch'><a href="https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/unified_mtp_qwen3_5"><code>UnifiedMTPQwen3_5ForConditionalGeneration</code></a></td>
-      <td className='models'>
-        <a href="https://huggingface.co/RadixArk/Qwen3.8-27B-NVFP4">RadixArk/Qwen3.8-27B-NVFP4</a>
-      </td>
-      <td className='modality'>text-to-text</td>
-      <td className='encodings'>bfloat16, float32, float4_e2m1fnx2, float8_e4m3fn</td>
       <td className='gpus'>Yes</td>
     </tr>
     <tr>
