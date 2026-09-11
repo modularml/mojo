@@ -91,19 +91,19 @@ def bench_conv(mut m: Bench, spec: ConvSpec) raises:
 
     # Allocate input and output buffers.
     var input_alloc = alloc(
-        AllocLayout[Scalar[input_type]].aligned[alignment](
+        AllocLayout[Scalar[input_type], alignment=.of_bytes[alignment]()](
             count=num_copies * input_alloc_size
         )
     ).into_managed()
     var input_ptr = input_alloc.unsafe_ptr()
     var filter_alloc = alloc(
-        AllocLayout[Scalar[filter_type]].aligned[alignment](
+        AllocLayout[Scalar[filter_type], alignment=.of_bytes[alignment]()](
             count=num_copies * filter_alloc_size
         )
     ).into_managed()
     var filter_ptr = filter_alloc.unsafe_ptr()
     var output_alloc = alloc(
-        AllocLayout[Scalar[output_type]].aligned[alignment](
+        AllocLayout[Scalar[output_type], alignment=.of_bytes[alignment]()](
             count=num_copies * output_alloc_size
         )
     ).into_managed()

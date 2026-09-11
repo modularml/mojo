@@ -32,7 +32,7 @@ from layout import (
 )
 from layout.tile_layout import TensorLayout, row_major
 from std.memory import alloc, dealloc, Allocation
-from std.memory.alloc import Layout as AllocLayout
+from std.memory.alloc import Alignment, Layout as AllocLayout
 from max.runtime.asyncrt import parallelism_level
 
 from std.utils.index import Index, IndexList
@@ -553,18 +553,26 @@ def _matmul_cpu_impl[
 
         comptime use_i8mm = kernel_id == InnerKernelID.I8MM
         comptime simd_size = config.simd_size
-        comptime alignment = align_of[SIMD[c.dtype, simd_size]]()
+        comptime alignment = Alignment.of[SIMD[c.dtype, simd_size]]()
         var kh = align_up(k, 8)
         var mh = align_up(m, 2)
 
-        var a_packed_alloc: Optional[Allocation[Scalar[a.dtype]]] = None
+        var a_packed_alloc: Optional[
+            Allocation[Scalar[a.dtype], alignment=alignment]
+        ] = None
+
+        def _dealloc_packed(
+            var packed: Allocation[Scalar[a.dtype], alignment=alignment],
+        ):
+            dealloc(packed^)
+
         comptime if use_i8mm:
             # Retire the empty `None` before reassigning: `Optional[Allocation]`
             # is not implicitly deletable, so overwriting it cannot drop the old
             # value implicitly.
-            a_packed_alloc^.deinit_with(dealloc[Scalar[a.dtype]])
+            a_packed_alloc^.deinit_with(_dealloc_packed)
             a_packed_alloc = alloc(
-                AllocLayout[Scalar[a.dtype]](count=mh * kh, alignment=alignment)
+                AllocLayout[Scalar[a.dtype], alignment=alignment](count=mh * kh)
             )
 
         @always_inline
@@ -656,7 +664,7 @@ def _matmul_cpu_impl[
         # to be synchronous in order to keep that state alive
         sync_parallelize(task_func, num_tasks, ctx)
 
-        a_packed_alloc^.deinit_with(dealloc[Scalar[a.dtype]])
+        a_packed_alloc^.deinit_with(_dealloc_packed)
 
 
 @always_inline
@@ -717,10 +725,12 @@ def matmul[
         var scratch_n = scratch_shape.N
 
         comptime scratch_simd = simd_width_of[scratch_type]()
-        comptime scratch_align = align_of[SIMD[scratch_type, scratch_simd]]()
+        comptime scratch_align = Alignment.of[
+            SIMD[scratch_type, scratch_simd]
+        ]()
         var scratch_alloc = alloc(
-            AllocLayout[Scalar[scratch_type]](
-                count=scratch_m * scratch_n, alignment=scratch_align
+            AllocLayout[Scalar[scratch_type], alignment=scratch_align](
+                count=scratch_m * scratch_n
             )
         ).into_managed()
         var scratch_ptr: UnsafePointer[

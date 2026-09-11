@@ -92,10 +92,14 @@ def run_elementwise[
     var cb_out = CacheBustingBuffer[dtype](N, pack_size, ctx)
 
     var in_host_alloc = alloc(
-        Layout[Scalar[dtype]].aligned[align](count=cb_in.alloc_size())
+        Layout[Scalar[dtype], alignment=.of_bytes[align]()](
+            count=cb_in.alloc_size()
+        )
     ).into_managed()
     var out_host_alloc = alloc(
-        Layout[Scalar[dtype]].aligned[align](count=cb_out.alloc_size())
+        Layout[Scalar[dtype], alignment=.of_bytes[align]()](
+            count=cb_out.alloc_size()
+        )
     ).into_managed()
 
     var in_host = TileTensor(in_host_alloc.unsafe_ptr(), row_major(Coord(dims)))

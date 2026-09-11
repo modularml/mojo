@@ -25,7 +25,14 @@ specialized memory. Most code should prefer higher-level collections and
 automatic memory management.
 """
 
-from .alloc import Allocation, ThinAllocation, alloc, dealloc, Layout
+from .alloc import (
+    Alignment,
+    Allocation,
+    ThinAllocation,
+    alloc,
+    dealloc,
+    Layout,
+)
 from .arc_pointer import ArcPointer
 from .memory import (
     unsafe_memcmp,

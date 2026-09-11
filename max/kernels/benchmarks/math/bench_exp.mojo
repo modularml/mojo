@@ -30,7 +30,13 @@ from std.benchmark import (
 from layout import Coord, TileTensor, row_major
 from std.builtin.range import _StridedRange
 from std.compile import compile_info
-from std.memory import bitcast, dealloc, unsafe_stack_allocation
+from std.memory import (
+    Alignment,
+    Layout as AllocLayout,
+    bitcast,
+    dealloc,
+    unsafe_stack_allocation,
+)
 
 
 def _ri(v: Int) -> Int64:
@@ -71,13 +77,13 @@ def bench_unary[
     ],
     dtype: DType,
 ](mut m: Bench, size: Int, op_name: String) raises:
-    comptime alignment = 64
-    var input_ptr_alloc = alloc[Scalar[dtype]](
-        {count = size, alignment = alignment}
+    comptime alignment = Alignment.of_bytes[64]()
+    var input_ptr_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=alignment](count=size)
     ).into_managed()
     var input_ptr = input_ptr_alloc.unsafe_ptr()
-    var output_ptr_alloc = alloc[Scalar[dtype]](
-        {count = size, alignment = alignment}
+    var output_ptr_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=alignment](count=size)
     ).into_managed()
     var output_ptr = output_ptr_alloc.unsafe_ptr()
 

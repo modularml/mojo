@@ -50,7 +50,7 @@ from layout.tma_async import TMATensorTile, create_tensor_tile
 from layout.tile_layout import Layout as TileLayout
 from std.logger import Logger
 from std.memory import dealloc
-from std.memory.alloc import Layout as AllocLayout
+from std.memory.alloc import Alignment, Layout as AllocLayout
 from max.runtime.asyncrt import parallelism_level
 from max.runtime.tracing import Trace, TraceLevel, get_safe_task_id, trace_arg
 from max.gpu.host.info import H100, _is_sm10x_gpu
@@ -379,7 +379,7 @@ def _batched_matmul_cpu[
             comptime config = get_kernel_config[a_type, b_type, c_type]()
             comptime use_i8mm = use_i8mm_fn[a_type, b_type, c_type]()
             comptime simd_size = config.simd_size
-            comptime alignment = align_of[SIMD[c_type, simd_size]]()
+            comptime alignment = Alignment.of[SIMD[c_type, simd_size]]()
             var kh = align_up(k, 8)
             var mh = align_up(m, 2)
 
@@ -417,8 +417,8 @@ def _batched_matmul_cpu[
 
             comptime if use_i8mm:
                 var a_packed_alloc = alloc(
-                    AllocLayout[Scalar[a_type]](
-                        count=mh * kh, alignment=alignment
+                    AllocLayout[Scalar[a_type], alignment=alignment](
+                        count=mh * kh
                     )
                 )
                 var a_packed = TileTensor(

@@ -45,7 +45,7 @@ from std.memory import (
     dealloc,
     unsafe_stack_allocation,
 )
-from std.memory.alloc import Layout as AllocLayout
+from std.memory.alloc import Alignment, Layout as AllocLayout
 
 from max.runtime.asyncrt import parallelism_level
 
@@ -1251,7 +1251,7 @@ def _matmul_qint4[
     ctx: Optional[DeviceContext] = None,
 ):
     comptime simd_width = simd_width_of[DType.float32]()
-    comptime alignment = align_of[SIMD[.float32, simd_width]]()
+    comptime alignment = Alignment.of[SIMD[.float32, simd_width]]()
 
     var M = Int(a.dim[0]())
     var K = Int(a.dim[1]())
@@ -1260,7 +1260,7 @@ def _matmul_qint4[
     comptime aq_type = kernel.aq_type()
 
     var a_quant_base = alloc(
-        AllocLayout[Scalar[aq_type]](count=M * K, alignment=alignment)
+        AllocLayout[Scalar[aq_type], alignment=alignment](count=M * K)
     )
     var a_scale_base = alloc(AllocLayout[Float32](count=M * k_groups))
 

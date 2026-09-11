@@ -14,7 +14,7 @@
 # Meant to be run on an AVX512 system
 
 from std.math import align_up
-from std.memory import dealloc
+from std.memory import Layout as AllocLayout, dealloc
 from std.sys import align_of, prefetch, simd_width_of
 from std.sys.intrinsics import PrefetchOptions
 
@@ -194,21 +194,31 @@ def main() raises:
     print("x", end="")
     print(k)
 
-    var a_alloc = (
-        alloc[Scalar[dtype]].aligned[alignment](count=m * k).into_managed()
-    )
-    var b_alloc = (
-        alloc[Scalar[dtype]].aligned[alignment](count=k * n).into_managed()
-    )
-    var b2_alloc = (
-        alloc[Scalar[dtype]].aligned[alignment](count=k * n).into_managed()
-    )
-    var c_alloc = (
-        alloc[Scalar[dtype]].aligned[alignment](count=m * n).into_managed()
-    )
-    var c2_alloc = (
-        alloc[Scalar[dtype]].aligned[alignment](count=m * n).into_managed()
-    )
+    var a_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=.of_bytes[alignment]()](
+            count=m * k
+        )
+    ).into_managed()
+    var b_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=.of_bytes[alignment]()](
+            count=k * n
+        )
+    ).into_managed()
+    var b2_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=.of_bytes[alignment]()](
+            count=k * n
+        )
+    ).into_managed()
+    var c_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=.of_bytes[alignment]()](
+            count=m * n
+        )
+    ).into_managed()
+    var c2_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=.of_bytes[alignment]()](
+            count=m * n
+        )
+    ).into_managed()
 
     var a = TileTensor(a_alloc.unsafe_ptr(), row_major(m * k))
     var b = TileTensor(b_alloc.unsafe_ptr(), row_major(k * n))

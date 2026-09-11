@@ -428,7 +428,7 @@ def test_issue_1625() raises:
 
 
 def test_issue_20421() raises:
-    var a_layout = Layout[UInt8](count=16 * 64, alignment=64)
+    var a_layout = Layout[UInt8, alignment=.of_bytes[64]()](count=16 * 64)
     var ptr = alloc(a_layout).unsafe_leak()
     for i in range(16 * 64):
         ptr[unsafe_offset=i] = UInt8(i & 255)
@@ -437,7 +437,9 @@ def test_issue_20421() raises:
         .unsafe_bitcast[Int32]()
         .unsafe_load[width=4, alignment=1]()
     )
-    dealloc(ThinAllocation(unsafe_owned_ptr=ptr).unsafe_with_layout(a_layout))
+    dealloc(
+        ThinAllocation[UInt8](unsafe_owned_ptr=ptr).unsafe_with_layout(a_layout)
+    )
     assert_equal(
         av16,
         SIMD[.int32, 4](-943274556, -875902520, -808530484, -741158448),

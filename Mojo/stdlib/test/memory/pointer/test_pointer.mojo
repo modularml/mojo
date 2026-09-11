@@ -14,7 +14,7 @@
 from std.compile import compile_info
 from std.ffi import external_call
 from max.gpu.host import get_gpu_target
-from std.memory import Allocation, MaybeUninit, alloc, dealloc
+from std.memory import Allocation, Layout, MaybeUninit, alloc, dealloc
 from std.memory.unsafe_pointer import pointer_to_int
 from std.sys import align_of, bit_width_of, size_of
 import std.memory.alloc
@@ -308,24 +308,24 @@ def test_unsafepointer_address_space() raises:
 
 def test_unsafepointer_aligned_alloc() raises:
     comptime alignment_1 = 32
-    var ptr_allocation = alloc[UInt8](
-        {count = 1, alignment = alignment_1}
+    var ptr_allocation = alloc(
+        Layout[UInt8, alignment=.of_bytes[alignment_1]()](count=1)
     ).into_managed()
     var ptr = ptr_allocation.unsafe_ptr()
     var ptr_uint64 = UInt64(Int(ptr))
     assert_equal(ptr_uint64 % alignment_1, 0)
 
     comptime alignment_2 = 64
-    var ptr_2_allocation = alloc[UInt8](
-        {count = 1, alignment = alignment_2}
+    var ptr_2_allocation = alloc(
+        Layout[UInt8, alignment=.of_bytes[alignment_2]()](count=1)
     ).into_managed()
     var ptr_2 = ptr_2_allocation.unsafe_ptr()
     var ptr_uint64_2 = UInt64(Int(ptr_2))
     assert_equal(ptr_uint64_2 % alignment_2, 0)
 
     comptime alignment_3 = 128
-    var ptr_3_allocation = alloc[UInt8](
-        {count = 1, alignment = alignment_3}
+    var ptr_3_allocation = alloc(
+        Layout[UInt8, alignment=.of_bytes[alignment_3]()](count=1)
     ).into_managed()
     var ptr_3 = ptr_3_allocation.unsafe_ptr()
     var ptr_uint64_3 = UInt64(Int(ptr_3))
@@ -426,14 +426,14 @@ def test_indexing_simd() raises:
 
 
 def test_alignment() raises:
-    var ptr_allocation = alloc[Int64](
-        {count = 8, alignment = 64}
+    var ptr_allocation = alloc(
+        Layout[Int64, alignment=.of_bytes[64]()](count=8)
     ).into_managed()
     var ptr = ptr_allocation.unsafe_ptr()
     assert_equal(Int(ptr) % 64, 0)
 
-    var ptr_2_allocation = alloc[UInt8](
-        {count = 32, alignment = 32}
+    var ptr_2_allocation = alloc(
+        Layout[UInt8, alignment=.of_bytes[32]()](count=32)
     ).into_managed()
     var ptr_2 = ptr_2_allocation.unsafe_ptr()
     assert_equal(Int(ptr_2) % 32, 0)

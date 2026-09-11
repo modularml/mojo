@@ -25,7 +25,7 @@ from std.benchmark import (
 )
 from layout import Layout, LayoutTensor, RuntimeLayout
 from max.gpu.host import DeviceContext, get_gpu_target
-from std.memory import dealloc
+from std.memory import Layout as AllocLayout, dealloc
 from internal_utils import (
     CacheBustingBuffer,
     get_defined_shape,
@@ -66,8 +66,8 @@ def run_reduce[
     var cb_in = CacheBustingBuffer[dtype](in_size, align, ctx, cache_busting)
 
     # Allocate & initialize host data
-    var expected_vals_alloc = alloc[Scalar[dtype]](
-        {count = out_size, alignment = align}
+    var expected_vals_alloc = alloc(
+        AllocLayout[Scalar[dtype], alignment=.of_bytes[align]()](count=out_size)
     ).into_managed()
     var expected_vals = expected_vals_alloc.unsafe_ptr()
 

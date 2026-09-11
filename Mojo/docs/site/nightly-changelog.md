@@ -29,6 +29,27 @@ This version is still a work in progress.
   `Scalar[Coord.DTYPE]`. A `T` too narrow to hold the result wraps rather
   than widening, so a caller that picks one owns the overflow.
 
+- `Layout` now carries its alignment as a keyword-only parameter of
+  the new `Alignment` type, instead of storing it as a runtime field. It
+  defaults to the element type's natural alignment, so `Layout[T](count=n)` is
+  unchanged. Build an `Alignment` with `Alignment.of[T]()` for a type's natural
+  alignment or `Alignment.of_bytes[n]()` for an explicit byte count.
+
+  `Allocation` and `ManagedAllocation` carry the same parameter.
+  `ThinAllocation` deliberately does not: it records only the element type, so
+  the alignment travels with the `Layout` you supply to `unsafe_with_layout`.
+
+  ```mojo
+  var layout = Layout[Int32, alignment = .of_bytes[64]()](count=8)
+  var thin = alloc(layout).into_thin()
+  dealloc(thin^.unsafe_with_layout(layout))
+  ```
+
+  Only compile-time alignments are supported for now. This makes the common case
+  (natural type alignment) simple - so the `Layout` and `Allocation` type don't
+  pay the cost of holding an extra `Int` field. Dynamic (runtime) alignment will
+  eventually be supported after some more design considerations.
+
 ## GPU programming
 
 ## Tooling changes

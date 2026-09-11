@@ -35,44 +35,38 @@ from std.testing import (
 def test_layout_with_default_alignment_uses_type_alignment() raises:
     var layout = Layout[Int32](count=4)
     assert_equal(layout.count(), 4)
-    assert_equal(layout.alignment(), align_of[Int32]())
+    assert_equal(type_of(layout).alignment.bytes(), align_of[Int32]())
 
 
-def test_layout_with_runtime_alignment() raises:
-    var layout = Layout[Int32](count=4, alignment=64)
+def test_layout_with_explicit_alignment() raises:
+    var layout = Layout[Int32, alignment=.of_bytes[128]()](count=4)
     assert_equal(layout.count(), 4)
-    assert_equal(layout.alignment(), 64)
-
-
-def test_layout_aligned_uses_comptime_alignment() raises:
-    var layout = Layout[Int32].aligned[128](count=4)
-    assert_equal(layout.count(), 4)
-    assert_equal(layout.alignment(), 128)
+    assert_equal(type_of(layout).alignment.bytes(), 128)
 
 
 def test_layout_single_has_count_one_and_default_alignment() raises:
     var layout = Layout[Int64].single()
     assert_equal(layout.count(), 1)
-    assert_equal(layout.alignment(), align_of[Int64]())
+    assert_equal(type_of(layout).alignment.bytes(), align_of[Int64]())
 
 
 def test_layout_as_byte_layout_scales_count_and_preserves_alignment() raises:
-    var layout = Layout[Int32](count=4, alignment=64)
+    var layout = Layout[Int32, alignment=.of_bytes[64]()](count=4)
     var byte_layout = layout.as_byte_layout()
     assert_equal(byte_layout.count(), 4 * size_of[Int32]())
-    assert_equal(byte_layout.alignment(), 64)
+    assert_equal(type_of(byte_layout).alignment.bytes(), 64)
 
 
 def test_layout_write_to_and_repr() raises:
-    var layout = Layout[Int](count=8, alignment=64)
+    var layout = Layout[Int, alignment=.of_bytes[64]()](count=8)
     check_write_to(
         layout,
-        expected="Layout[SIMD[DType.int, 1]](count=8, alignment=64)",
+        expected="Layout[SIMD[DType.int, 1], alignment=64](count=8)",
         is_repr=False,
     )
     check_write_to(
         layout,
-        expected="Layout[SIMD[DType.int, 1]](count=8, alignment=64)",
+        expected="Layout[SIMD[DType.int, 1], alignment=64](count=8)",
         is_repr=True,
     )
 
@@ -94,7 +88,7 @@ def test_alloc_and_free_round_trip_reads_and_writes_values() raises:
 
 
 def test_alloc_returns_pointer_meeting_layout_alignment() raises:
-    var layout = Layout[UInt8](count=1, alignment=128)
+    var layout = Layout[UInt8, alignment=.of_bytes[128]()](count=1)
     var a = alloc(layout)
     var addr = Int(a.unsafe_ptr())
     dealloc(a^)
@@ -185,7 +179,9 @@ def test_deletable_allocation_into_allocation_round_trip() raises:
 def test_deletable_allocation_layout_matches() raises:
     var deletable = ManagedAllocation(alloc(Layout[Int32](count=7)))
     assert_equal(deletable.layout().count(), 7)
-    assert_equal(deletable.layout().alignment(), align_of[Int32]())
+    assert_equal(
+        type_of(deletable.layout()).alignment.bytes(), align_of[Int32]()
+    )
 
 
 def test_deletable_allocation_auto_deallocs_at_last_use() raises:

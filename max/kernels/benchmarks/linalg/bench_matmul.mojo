@@ -20,7 +20,7 @@ from std.benchmark import keep
 from layout import Coord, TileTensor, row_major
 from linalg.matmul import matmul
 from linalg.packing import pack_b_ndbuffer, pack_matmul_b_shape_func
-from std.memory import ThinAllocation, dealloc, Layout
+from std.memory import Alignment, ThinAllocation, dealloc, Layout
 from std.testing import assert_almost_equal
 
 
@@ -87,15 +87,15 @@ def bench_matmul[
     comptime b_type = spec.static_info.b_type
     comptime c_type = spec.static_info.c_type
     comptime b_packed = spec.static_info.b_packed
-    comptime alignment = 64
+    comptime alignment = Alignment.of_bytes[64]()
     var a_alloc = alloc(
-        Layout[Scalar[a_type]].aligned[alignment](count=spec.m * spec.k)
+        Layout[Scalar[a_type], alignment=alignment](count=spec.m * spec.k)
     ).into_managed()
     var b_alloc = alloc(
-        Layout[Scalar[b_type]].aligned[alignment](count=spec.k * spec.n)
+        Layout[Scalar[b_type], alignment=alignment](count=spec.k * spec.n)
     ).into_managed()
     var c_alloc = alloc(
-        Layout[Scalar[c_type]].aligned[alignment](count=spec.m * spec.n)
+        Layout[Scalar[c_type], alignment=alignment](count=spec.m * spec.n)
     ).into_managed()
     var a = TileTensor(
         a_alloc.unsafe_ptr(), row_major(Coord(_ri(spec.m), _ri(spec.k)))
@@ -115,8 +115,8 @@ def bench_matmul[
     var padded_n = padded_n_k[1] if b_packed else spec.n
     var padded_k = padded_n_k[0] if b_packed else spec.k
 
-    var bp_alloc = alloc[Scalar[b_type]](
-        {count = padded_k * padded_n, alignment = alignment}
+    var bp_alloc = alloc(
+        Layout[Scalar[b_type], alignment=alignment](count=padded_k * padded_n)
     ).into_managed()
     var bp = TileTensor(
         bp_alloc.unsafe_ptr(), row_major(Coord(_ri(padded_k), _ri(padded_n)))

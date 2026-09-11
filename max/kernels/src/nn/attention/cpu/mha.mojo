@@ -55,7 +55,11 @@ from std.memory import (
     unsafe_memset_zero,
     unsafe_stack_allocation,
 )
-from std.memory.alloc import ManagedAllocation, Layout as AllocLayout
+from std.memory.alloc import (
+    Alignment,
+    ManagedAllocation,
+    Layout as AllocLayout,
+)
 from nn.attention.mha_mask import MHAMask
 from max.runtime.asyncrt import parallelism_level
 from max.runtime.tracing import Trace, TraceLevel, trace_arg
@@ -766,16 +770,22 @@ struct _FlashAttention[
                 Span(sum_vals_storage), row_major[Self._config.block_m]()
             )
 
-            var packed_alloc = Optional[ManagedAllocation[Scalar[Self.dtype]]]()
+            comptime packed_alignment = Alignment.of[
+                SIMD[Self.dtype, Self.simd_width]
+            ]()
+            var packed_alloc = Optional[
+                ManagedAllocation[
+                    Scalar[Self.dtype], alignment=packed_alignment
+                ]
+            ]()
             var packed_ptr = type_of(
                 packed_alloc.value().unsafe_ptr()
             ).unsafe_dangling()
 
             if max_seq_len != 1:
                 packed_alloc = alloc(
-                    AllocLayout[Scalar[Self.dtype]](
-                        count=packed_size,
-                        alignment=align_of[SIMD[Self.dtype, Self.simd_width]](),
+                    AllocLayout[Scalar[Self.dtype], alignment=packed_alignment](
+                        count=packed_size
                     )
                 ).into_managed()
                 packed_ptr = packed_alloc.unsafe_value().unsafe_ptr()
@@ -953,7 +963,9 @@ struct _FlashAttention[
             # NOTE: passing `dealloc[Scalar[Self.dtype]]` directly crashes the
             # when the dtype is parametric; wrap it in a local function as a workaround.
             def _dealloc_packed(
-                var packed: ManagedAllocation[Scalar[Self.dtype]],
+                var packed: ManagedAllocation[
+                    Scalar[Self.dtype], alignment=packed_alignment
+                ],
             ):
                 dealloc(packed^)
 
