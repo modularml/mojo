@@ -474,12 +474,19 @@ def _run_until_committed(
 ) -> None:
     """Drives a request until a checkpoint's boundary can be committed.
 
-    A checkpoint stands at the boundary its forward ended on, whose own last
-    token that forward produced, so the chain reaches it a step or more
-    later.
+    A checkpoint's boundary ends on a token that forward produced, so the hash
+    chain reaches it a step or more later.
+
+    The cut to that boundary stands in for the scheduler.
     """
     mgr.claim(ctx)
+    align = mgr.chunk_alignment_tokens
     for _ in range(steps):
+        if align:
+            end = ctx.tokens.processed_length + ctx.tokens.active_length
+            cut = end - (end % align) - ctx.tokens.processed_length
+            if 0 < cut < ctx.tokens.active_length:
+                ctx.tokens.chunk(cut)
         mgr.alloc(ctx)
         mgr.runtime_inputs([[ctx]])
         ctx.update(42)

@@ -229,8 +229,8 @@ class RecurrentKVGroupCoordinator(KVGroupCoordinatorInterface):
         from it. Runs before the commit, so the copy reads a block nothing
         has freed yet.
 
-        Empty unless the request has processed at least one full block and
-        the row holds no unpublished predecessor already.
+        Empty unless the forward ended exactly on a block boundary and the
+        row holds no unpublished predecessor already.
         """
         row = self.rows.get(ctx.request_id)
         if row is None:
@@ -244,8 +244,10 @@ class RecurrentKVGroupCoordinator(KVGroupCoordinatorInterface):
         if ran_in is None:
             return {}
 
-        num_committed_blocks = ctx.tokens.processed_length // self.page_size
-        if num_committed_blocks == 0:
+        num_committed_blocks, past_boundary = divmod(
+            ctx.tokens.processed_length, self.page_size
+        )
+        if num_committed_blocks == 0 or past_boundary:
             return {}
         if any(
             not block.is_null and block.block_hash is None

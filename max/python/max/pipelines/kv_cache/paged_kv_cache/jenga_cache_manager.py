@@ -763,3 +763,10 @@ class JengaKVCacheManager(JengaBlockManager, PagedKVCacheManagerInterface):
     def get_device_buffer(self, replica_idx: int) -> KVCacheBufferInterface:
         """Returns the device buffer for the given replica."""
         return self._kv_buffers[replica_idx]
+
+    @property
+    def chunk_alignment_tokens(self) -> int:
+        """Returns the page size if any group needs the alignment, else zero."""
+        if any(group_id.is_recurrent() for group_id in self._groups):
+            return self.params.page_size
+        return 0

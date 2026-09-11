@@ -73,6 +73,7 @@ class TokenBudget(ABC):
         allow_chunking: bool,
         applicable_types: list[RequestType],
         min_chunk_tokens: int = 0,
+        align_tokens: int = 0,
     ) -> None:
         """Initialize a generic token budget.
 
@@ -85,6 +86,8 @@ class TokenBudget(ABC):
             applicable_types: Request types that this budget applies to. If the
                 active or incoming request type is not in this list, the budget
                 is effectively a no-op for that context.
+            align_tokens: When > 0, a context-encoding cut moves back to a
+                multiple of this many tokens. 0 disables the alignment.
             min_chunk_tokens: When > 0, a split never creates a piece
                 (chunk or remainder) smaller than this: the cut moves
                 earlier to protect the remainder, and contexts with no
@@ -97,6 +100,7 @@ class TokenBudget(ABC):
         self.applicable_types = applicable_types
         self.min_chunk_tokens = min_chunk_tokens
         """Floor on the size of any split piece (0 = no floor)."""
+        self.align_tokens = align_tokens
 
         self.used = 0
         """Number of tokens currently consumed from this budget."""
@@ -106,6 +110,23 @@ class TokenBudget(ABC):
     def remaining(self) -> int:
         """Return the remaining token capacity for this budget."""
         return self.capacity - self.used
+
+    def boundary_cut(
+        self, context: TextContext, cut: int, request_type: RequestType
+    ) -> int | None:
+        """Returns a shorter ``cut`` ending on a boundary, or ``None``.
+
+        ``None`` when alignment is off, this is not context encoding, or no
+        earlier boundary falls inside ``cut``.
+        """
+        if self.align_tokens <= 0 or request_type is not RequestType.CE:
+            return None
+        processed = context.tokens.processed_length
+        end = processed + cut
+        aligned_end = end - (end % self.align_tokens)
+        if aligned_end <= processed or aligned_end == end:
+            return None
+        return aligned_end - processed
 
     @abstractmethod
     def status_after_context(
@@ -291,10 +312,16 @@ class ActiveTokenBudget(TokenBudget):
         if tokens_remaining <= 0:
             return BudgetStatus.BUDGET_EXHAUSTED
 
-        # Fits without any modification.
-        if context.tokens.active_length == tokens_remaining:
-            return BudgetStatus.BUDGET_REACHED
-        elif context.tokens.active_length < tokens_remaining:
+        # Fits without any modification, apart from a cut back to a boundary.
+        if context.tokens.active_length <= tokens_remaining:
+            aligned = self.boundary_cut(
+                context, context.tokens.active_length, request_type
+            )
+            if aligned is not None:
+                context.tokens.chunk(aligned)
+                return BudgetStatus.BUDGET_AVAILABLE
+            if context.tokens.active_length == tokens_remaining:
+                return BudgetStatus.BUDGET_REACHED
             return BudgetStatus.BUDGET_AVAILABLE
 
         # Would exceed the remaining capacity.
@@ -312,6 +339,9 @@ class ActiveTokenBudget(TokenBudget):
                 chunk_size = active_length - self.min_chunk_tokens
             if chunk_size < self.min_chunk_tokens:
                 return BudgetStatus.BUDGET_EXHAUSTED
+        aligned = self.boundary_cut(context, chunk_size, request_type)
+        if aligned is not None and aligned >= self.min_chunk_tokens:
+            chunk_size = aligned
         try:
             context.tokens.chunk(chunk_size)
             return BudgetStatus.BUDGET_REACHED

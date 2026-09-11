@@ -543,6 +543,7 @@ class TextBatchConstructor:
                 allow_chunking=self.scheduler_config.enable_chunked_prefill,
                 applicable_types=RequestType.all(),
                 min_chunk_tokens=self.scheduler_config.chunked_prefill_min_chunk_size,
+                align_tokens=self.kv_cache.chunk_alignment_tokens,
             )
         ]
 

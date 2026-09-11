@@ -336,6 +336,19 @@ def test_a_forward_ending_mid_block_rotates_nothing() -> None:
     assert checkpoint(bm, ctx) == {}
 
 
+def test_a_forward_ending_past_a_boundary_checkpoints_nothing() -> None:
+    # Past a boundary and off it; the case above is num_blocks zero.
+    bm = make_manager()
+    ctx = make_ctx(18)
+    bm.claim(ctx)
+    bm.alloc(ctx)
+    ctx.update(42)
+
+    assert ctx.tokens.processed_length % BLOCK_SIZE != 0, "fixture must be off"
+    assert ctx.tokens.processed_length // BLOCK_SIZE > 0, "and past a boundary"
+    assert checkpoint(bm, ctx) == {}
+
+
 def test_one_checkpoint_is_outstanding_at_a_time() -> None:
     # The row holds a published block until its boundary is committed.
     bm = make_manager()
