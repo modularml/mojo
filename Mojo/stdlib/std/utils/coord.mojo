@@ -286,7 +286,6 @@ struct Coord[*element_types: CoordLike](
     comptime static_value: Int = -1
     """Always -1 for tuple types (value not applicable)."""
 
-    # TODO(GPUA-11): Expand `Coord.DTYPE` so that it can take narrower dtypes.
     comptime DTYPE = DType.int
     """The scalar dtype used for tuple-level aggregate operations."""
 
@@ -453,17 +452,32 @@ struct Coord[*element_types: CoordLike](
         Returns:
             The product of all leaf values in the `Coord`.
         """
-        var result: Scalar[Self.DTYPE] = 1
+        return self.product[Self.DTYPE]()
+
+    @always_inline("nodebug")
+    def product[result_dtype: DType](self) -> Scalar[result_dtype]:
+        """Calculate the product of all elements recursively at `result_dtype`
+        precision.
+
+        Parameters:
+            result_dtype: The dtype the product is accumulated and returned in.
+
+        Returns:
+            The product of all leaf values in the `Coord`.
+        """
+        var result: Scalar[result_dtype] = 1
 
         # `Coord` is a heterogeneous tuple: children may have different
         # `DTYPE`s (e.g. `CompileTimeInt` with `DType.int` alongside a
-        # `Int32`). Aggregating into `Self.DTYPE` is
-        # intentional — callers expect a single integer answer at the
-        # tuple's dtype, regardless of per-leaf dtype.
+        # `Int32`). Aggregating into a single `T` is intentional — callers
+        # expect one answer at the dtype they asked for, regardless of
+        # per-leaf dtype. A nested child still forms its own sub-product at
+        # its `DTYPE` before being narrowed to `T`, since `CoordLike` only
+        # guarantees the unparameterized `product()`.
         # TODO(GPUA-12): Add comptime asserts to make sure that Coord's
         # product and sum do not overflow.
         comptime for i in range(Self.__len__()):
-            result *= Scalar[Self.DTYPE](self[i].product())
+            result *= Scalar[result_dtype](self[i].product())
 
         return result
 
