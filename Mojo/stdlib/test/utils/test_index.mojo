@@ -15,6 +15,7 @@ from std.testing import TestSuite, assert_equal
 
 from test_utils import check_write_to
 from std.utils import Index, IndexList
+from std.utils.index import product
 
 
 def test_basics() raises:
@@ -110,6 +111,29 @@ def test_write_repr_to() raises:
         expected="IndexList[2, int32]((1, 2))",
         is_repr=True,
     )
+
+
+def test_product_basic() raises:
+    """Computes the element product of an IndexList."""
+    assert_equal(product(Index(2, 3, 4)), 24)
+    assert_equal(product(Index(1, 1, 1)), 1)
+    assert_equal(product(Index(5)), 5)
+
+
+def test_product_with_zero() raises:
+    """Returns 0 when any dimension is 0."""
+    assert_equal(product(Index(2, 0, 4)), 0)
+
+
+def test_product_partial_range() raises:
+    """Computes a partial product over a start/end range."""
+    assert_equal(product(Index(2, 3, 4), 0, 2), 6)
+    assert_equal(product(Index(2, 3, 4), 1, 3), 12)
+
+
+def test_product_end_idx() raises:
+    """Stops at end_idx, not including it."""
+    assert_equal(product(Index(2, 3, 4), 2), 6)
 
 
 def main() raises:
