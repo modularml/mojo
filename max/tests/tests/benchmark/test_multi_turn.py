@@ -24,6 +24,8 @@ import pytest
 from max.benchmark.benchmark_shared.config import SamplingConfig
 from max.benchmark.benchmark_shared.datasets.types import (
     ChatSession,
+    ImageContentBlock,
+    OpenAIImage,
     SessionMessage,
     TextContentBlock,
 )
@@ -225,6 +227,57 @@ def test_chat_session_driver_run_prefix_prepends_first_turn() -> None:
     assert second_user_text == "Again"
 
 
+def test_chat_session_driver_attaches_turn_images() -> None:
+    """A user turn carrying images gets an ImageContentBlock appended after
+    the TextContentBlock; turns without images stay text-only."""
+    image: OpenAIImage = {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64,AAA"},
+    }
+
+    async def run_test() -> list[RequestFuncInput]:
+        chat_session = ChatSession(
+            id=0,
+            messages=[
+                SessionMessage(
+                    source="user", content="Hi", num_tokens=5, images=[image]
+                ),
+                SessionMessage(
+                    source="assistant", content="Hello", num_tokens=5
+                ),
+                SessionMessage(source="user", content="Again", num_tokens=5),
+                SessionMessage(source="assistant", content="Hi", num_tokens=5),
+            ],
+        )
+        driver = _CapturingDriver()
+        await chat_session_driver(
+            model_id="test-model",
+            api_url="http://localhost:8000/v1/chat/completions",
+            request_driver=driver,
+            request_counter=RequestCounter(max_requests=10),
+            chat_session=chat_session,
+            max_chat_len=4096,
+            sampling=SamplingConfig(),
+        )
+        return driver.calls
+
+    calls = asyncio.run(run_test())
+    assert len(calls) == 2
+
+    assert isinstance(calls[0].prompt, list)
+    first_user_content = calls[0].prompt[0].content
+    assert len(first_user_content) == 2
+    assert isinstance(first_user_content[0], TextContentBlock)
+    image_block = first_user_content[1]
+    assert isinstance(image_block, ImageContentBlock)
+    assert image_block.image_url.url == image["image_url"]["url"]
+
+    assert isinstance(calls[1].prompt, list)
+    second_user_content = calls[1].prompt[2].content
+    assert len(second_user_content) == 1
+    assert isinstance(second_user_content[0], TextContentBlock)
+
+
 def test_prefix_turns_excluded_from_results() -> None:
     """With prefix_turns=2, a 4-turn session should return only 2 results."""
 
@@ -416,6 +469,39 @@ def test_prerun_warmup_turns_request_prompt_is_last_turn_prefix() -> None:
     assert isinstance(block, TextContentBlock)
     assert block.text == msgs[4].content  # user_3
     assert call.max_tokens == msgs[5].num_tokens  # dataset turn-3 output
+
+
+def test_prerun_warmup_turns_attaches_prefix_images() -> None:
+    """The single warmup request for a prefix session carries any images
+    attached to the prefix's user turns."""
+    image: OpenAIImage = {
+        "type": "image_url",
+        "image_url": {"url": "data:image/jpeg;base64,BBB"},
+    }
+    session = _make_session_with_id(0, prefix_turns=1)
+    session.messages[0].images.append(image)  # first user turn (in prefix)
+    driver = _CapturingDriver()
+
+    async def run() -> None:
+        await prerun_warmup_turns(
+            sessions=[session],
+            request_driver=driver,
+            model_id="test",
+            api_url="http://localhost:8000/v1/chat/completions",
+            max_chat_len=4096,
+            sampling=SamplingConfig(),
+            max_concurrency=128,
+        )
+
+    asyncio.run(run())
+    assert len(driver.calls) == 1
+    last = driver.calls[0].prompt[-1]
+    assert not isinstance(last, str)
+    assert len(last.content) == 2
+    assert isinstance(last.content[0], TextContentBlock)
+    image_block = last.content[1]
+    assert isinstance(image_block, ImageContentBlock)
+    assert image_block.image_url.url == image["image_url"]["url"]
 
 
 def test_prerun_warmup_turns_cross_session_parallelism() -> None:
