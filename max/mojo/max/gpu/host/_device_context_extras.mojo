@@ -42,6 +42,7 @@ from .device_context import (
     _DeviceFunctionPtr,
     _DeviceContextPtr,
     _FunctionEnqueuer,
+    _is_apple_gpu,
 )
 
 
@@ -260,7 +261,7 @@ __extension DeviceExternalFunction:
         # sizes are passed to the enqueuer (matching the previous direct call).
         var no_arg_sizes = OptionalPointer[UInt64, MutAnyOrigin](None)
 
-        if self._context.api() == "metal":
+        comptime if _is_apple_gpu[Self.target]():
             # Metal takes the launch payload via `args[0]`; see
             # `MetalDeviceContext::enqueueFunctionExecDirect`.
             var dense_args_sizes = Array[UInt64, num_args](fill=0)

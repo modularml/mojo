@@ -2853,6 +2853,10 @@ def _is_nvidia_gpu[target: CompilationTarget]() -> Bool:
     return is_triple["nvptx64-nvidia-cuda", target._mlir_value]()
 
 
+def _is_apple_gpu[target: _TargetType]() -> Bool:
+    return is_triple["air64-apple-macosx", target]()
+
+
 def _is_path_like(ss: StringSlice) -> Bool:
     return ss.startswith("/") or ss.startswith("~") or ss.startswith("./")
 
@@ -3258,7 +3262,7 @@ struct DeviceFunction[
                 dense_args_sizes=dense_args_sizes,
             )
 
-        if self._context.api() == "metal":
+        comptime if _is_apple_gpu[Self.target]():
             call_with_pack_metal[
                 Self.func,
                 num_args=num_args,
@@ -3470,7 +3474,7 @@ struct DeviceFunction[
                 ]().as_unsafe_any_origin()
             )
 
-        if self._context.api() == "metal":
+        comptime if _is_apple_gpu[Self.target]():
             call_with_pack_checked_metal[
                 Self.func,
                 num_passed_args=num_passed_args,
@@ -3647,7 +3651,10 @@ struct DeviceFunction[
         return Int(result)
 
 
-struct DeviceExternalFunction:
+struct DeviceExternalFunction[
+    *,
+    target: _TargetType = get_gpu_target(),
+]:
     """Represents an external device function loaded from PTX/SASS assembly.
 
     This class provides functionality to load and execute pre-compiled GPU functions
@@ -3658,6 +3665,10 @@ struct DeviceExternalFunction:
     The `DeviceExternalFunction` handles reference counting of the underlying device
     function handle and provides methods for launching the function on a GPU with
     specified execution configuration.
+
+    Parameters:
+        target: The target architecture the loaded assembly runs on. Defaults
+            to the current GPU target.
     """
 
     var _handle: _DeviceFunctionPtr[mut=True]
@@ -4519,7 +4530,7 @@ struct DeviceContext(ImplicitlyCopyable, RegisterPassable, _FunctionEnqueuer):
         var function_name: String,
         var asm: String,
         func_attribute: OptionalReg[FuncAttribute] = None,
-        out result: DeviceExternalFunction,
+        out result: DeviceExternalFunction[],
     ) raises:
         """Loads a pre-compiled device function from assembly code.
 
