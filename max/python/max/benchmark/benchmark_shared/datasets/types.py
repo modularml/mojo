@@ -136,6 +136,9 @@ class SessionMessage:
     delay_until_next_message: float | None = None
     # An agent-loop round; the wire role is still "user".
     is_agentic: bool = False
+    # Any image tokens are already counted in `num_tokens`, so consumers
+    # must not add them again.
+    images: list[OpenAIImage] = field(default_factory=list)
 
 
 @dataclass
