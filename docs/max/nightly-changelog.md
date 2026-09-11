@@ -60,6 +60,14 @@ This version is still a work in progress.
 
 ## Breaking changes
 
+- `KVCacheMetrics` drops `nixl_read_blocks_local`, `nixl_read_blocks_remote`,
+  and the `remote_read_ratio` property computed over them. No code path ever
+  populated either field, so the ratio returned `0.0` for every caller. Six
+  populated counters are added in their place: `dkv_peer_attaches`,
+  `dkv_peer_attach_failures`, `dkv_peers_dropped`, `dkv_peer_loads`,
+  `dkv_peer_load_failures`, and `dkv_hints_rejected`. They are zero unless the
+  external KV-cache connector is in use.
+
 ## Fixes
 
 ## Mojo language

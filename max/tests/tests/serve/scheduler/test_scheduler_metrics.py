@@ -456,6 +456,99 @@ def test_dkv_read_counts_follow_the_console_clause_on_a_write_only_batch() -> (
     assert extra["dkv_read_bytes"] == 0
 
 
+def test_dkv_peer_counters_report_zero_while_a_tier_is_attached() -> None:
+    """An attached tier that pulled from no peer still reports all five zeros.
+
+    This is the whole point of the counters: a flat zero says no cache hint
+    reached the connector, which is a different fault from hints arriving and
+    being rejected, and a missing series distinguishes neither.
+    """
+    metrics = _make_metrics(dkv_connected_clients=1, dkv_total_clients=1)
+
+    with patch("max.serve.scheduler.utils.METRICS") as mock_metrics:
+        metrics.publish_metrics()
+
+    mock_metrics.dkv_peer_attaches.assert_called_once_with(0)
+    mock_metrics.dkv_peer_attach_failures.assert_called_once_with(0)
+    mock_metrics.dkv_peers_dropped.assert_called_once_with(0)
+    mock_metrics.dkv_peer_loads.assert_called_once_with(0)
+    mock_metrics.dkv_peer_load_failures.assert_called_once_with(0)
+    mock_metrics.dkv_hints_rejected.assert_called_once_with(0)
+
+    extra = metrics.to_log_extra()
+    assert extra["dkv_peer_loads"] == 0
+    assert extra["dkv_hints_rejected"] == 0
+
+    # the console line stays quiet, since there is nothing to say about peers
+    assert "dKV peers" not in metrics.pretty_format()
+
+
+def test_dkv_peer_counters_are_silent_without_a_tier() -> None:
+    """No dKV tier attached publishes nothing and logs nothing."""
+    metrics = _make_metrics()
+
+    with patch("max.serve.scheduler.utils.METRICS") as mock_metrics:
+        metrics.publish_metrics()
+
+    mock_metrics.dkv_peer_attaches.assert_not_called()
+    mock_metrics.dkv_peer_loads.assert_not_called()
+    mock_metrics.dkv_hints_rejected.assert_not_called()
+
+    extra = metrics.to_log_extra()
+    assert "dkv_peer_loads" not in extra
+    assert "dkv_hints_rejected" not in extra
+
+
+def test_dkv_peer_counters_carry_their_values_to_every_surface() -> None:
+    """A batch that pulled cross-node reports it on the line, log, and counters."""
+    metrics = _make_metrics(
+        dkv_connected_clients=2,
+        dkv_total_clients=2,
+        dkv_peer_attaches=1,
+        dkv_peer_attach_failures=2,
+        dkv_peers_dropped=6,
+        dkv_peer_loads=3,
+        dkv_peer_load_failures=4,
+        dkv_hints_rejected=5,
+    )
+
+    assert (
+        "dKV peers: 3 loads (4 failed), 1 attaches (2 failed, 6 dropped), "
+        "5 hints rejected" in metrics.pretty_format()
+    )
+
+    extra = metrics.to_log_extra()
+    assert extra["dkv_peer_attaches"] == 1
+    assert extra["dkv_peer_attach_failures"] == 2
+    assert extra["dkv_peers_dropped"] == 6
+    assert extra["dkv_peer_loads"] == 3
+    assert extra["dkv_peer_load_failures"] == 4
+    assert extra["dkv_hints_rejected"] == 5
+
+    with patch("max.serve.scheduler.utils.METRICS") as mock_metrics:
+        metrics.publish_metrics()
+
+    mock_metrics.dkv_peer_attaches.assert_called_once_with(1)
+    mock_metrics.dkv_peer_attach_failures.assert_called_once_with(2)
+    mock_metrics.dkv_peers_dropped.assert_called_once_with(6)
+    mock_metrics.dkv_peer_loads.assert_called_once_with(3)
+    mock_metrics.dkv_peer_load_failures.assert_called_once_with(4)
+    mock_metrics.dkv_hints_rejected.assert_called_once_with(5)
+
+
+def test_dkv_peer_clause_appears_on_rejected_hints_alone() -> None:
+    """Rejected hints with no successful pull still print the clause.
+
+    The gate is any peer activity, not a successful one: a batch whose every
+    hint was rejected is exactly the batch an operator needs the line for.
+    """
+    metrics = _make_metrics(
+        dkv_connected_clients=1, dkv_total_clients=1, dkv_hints_rejected=7
+    )
+
+    assert "7 hints rejected" in metrics.pretty_format()
+
+
 def test_to_log_extra_required_fields() -> None:
     extra = _make_metrics().to_log_extra()
 

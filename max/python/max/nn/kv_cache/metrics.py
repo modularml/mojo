@@ -94,10 +94,6 @@ class KVCacheMetrics:
     """Total bytes transferred via NIXL READ."""
     nixl_write_bytes: int = 0
     """Total bytes transferred via NIXL WRITE."""
-    nixl_read_blocks_local: int = 0
-    """NIXL reads from co-located (default) block store."""
-    nixl_read_blocks_remote: int = 0
-    """NIXL reads from non-default (remote) block stores."""
 
     # dKV external-tier health. These are a level and a lifetime-cumulative
     # counter read live from the connector rather than per-batch transfer
@@ -108,6 +104,36 @@ class KVCacheMetrics:
     """Total number of dKV connector clients, one per data-parallel replica."""
     dkv_reconnect_attempts: int = 0
     """Cumulative dKV reconnect attempts across all clients over the process lifetime."""
+
+    # Cross-node pull. Per-window deltas like nixl_read_blocks and the latency
+    # pairs, so they sum and reset_metrics clears them, unlike the three dKV
+    # health keys above. The connector's ConnectorMetrics is the canonical
+    # account of each one's unit.
+    dkv_peer_attaches: int = 0
+    """Remote peers attached from a cache hint.
+
+    Cached per peer, so a stable peer set leaves this at zero while pulls keep
+    succeeding. ``dkv_peer_loads`` is the steady-state signal.
+    """
+    dkv_peer_attach_failures: int = 0
+    """Peer attaches that failed at dial, probe, handshake, or timeout."""
+    dkv_peers_dropped: int = 0
+    """Remote peers dropped, whether replaced after a restart, evicted over the
+    peer table's cap, or torn down by the caller. Read against
+    ``dkv_peer_attaches`` to tell a churning peer table from a stable one."""
+    dkv_peer_loads: int = 0
+    """Loads served from a hint-routed peer."""
+    dkv_peer_load_failures: int = 0
+    """Hinted peer loads that fell through to another source or to the
+    co-located tier.
+
+    Memo-capped rather than per-request: a failed source suppresses further
+    attempts against the same instance and epoch for a fixed window, so one
+    dead peer charges roughly one failure per window however many requests it
+    affects.
+    """
+    dkv_hints_rejected: int = 0
+    """Cache hints that were present but the connector could not use."""
 
     @property
     def prompt_tokens(self) -> int:
@@ -179,14 +205,6 @@ class KVCacheMetrics:
         )
 
     @property
-    def remote_read_ratio(self) -> float:
-        """Fraction of NIXL reads hitting non-default (remote) block stores."""
-        total = self.nixl_read_blocks_local + self.nixl_read_blocks_remote
-        if total == 0:
-            return 0.0
-        return self.nixl_read_blocks_remote / total
-
-    @property
     def dkv_degraded(self) -> bool:
         """Whether a dKV tier is present but not every client is connected.
 
@@ -250,13 +268,18 @@ class KVCacheMetrics:
             + other.rpc_read_latency_count,
             nixl_read_bytes=self.nixl_read_bytes + other.nixl_read_bytes,
             nixl_write_bytes=self.nixl_write_bytes + other.nixl_write_bytes,
-            nixl_read_blocks_local=self.nixl_read_blocks_local
-            + other.nixl_read_blocks_local,
-            nixl_read_blocks_remote=self.nixl_read_blocks_remote
-            + other.nixl_read_blocks_remote,
             dkv_connected_clients=self.dkv_connected_clients
             + other.dkv_connected_clients,
             dkv_total_clients=self.dkv_total_clients + other.dkv_total_clients,
             dkv_reconnect_attempts=self.dkv_reconnect_attempts
             + other.dkv_reconnect_attempts,
+            dkv_peer_attaches=self.dkv_peer_attaches + other.dkv_peer_attaches,
+            dkv_peer_attach_failures=self.dkv_peer_attach_failures
+            + other.dkv_peer_attach_failures,
+            dkv_peers_dropped=self.dkv_peers_dropped + other.dkv_peers_dropped,
+            dkv_peer_loads=self.dkv_peer_loads + other.dkv_peer_loads,
+            dkv_peer_load_failures=self.dkv_peer_load_failures
+            + other.dkv_peer_load_failures,
+            dkv_hints_rejected=self.dkv_hints_rejected
+            + other.dkv_hints_rejected,
         )

@@ -1242,5 +1242,15 @@ class DKVConnector(KVConnector):
                 dkv_connected_clients=1 if m["connected"] else 0,
                 dkv_total_clients=1,
                 dkv_reconnect_attempts=m["reconnect_attempts"],
+                # Cross-node pull. Ordinary per-window deltas that
+                # reset_metrics clears, unlike the health keys above, so they
+                # fold in the same way as the transfer keys. The dict also
+                # carries attached_peers, a level neither engine exports yet.
+                dkv_peer_attaches=m["peer_attaches"],
+                dkv_peer_attach_failures=m["peer_attach_failures"],
+                dkv_peers_dropped=m["peers_dropped"],
+                dkv_peer_loads=m["peer_loads"],
+                dkv_peer_load_failures=m["peer_load_failures"],
+                dkv_hints_rejected=m["hints_rejected"],
             )
         return total

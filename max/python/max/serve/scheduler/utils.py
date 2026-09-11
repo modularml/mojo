@@ -186,6 +186,20 @@ class BatchMetrics:
     # that bridges the two is published nowhere.
     dkv_read_bytes: int = 0
 
+    # Cross-node pull this batch. Per-window deltas, reported even when every
+    # one is zero while a tier is attached, the same way the health gauges
+    # above are, so a rejected hint and a failed pull are readable rather than
+    # absent. All zero does not prove no hint arrived: the connector counts no
+    # hints_seen, and a hint naming only co-located sources, one whose run does
+    # not align with the request, and one whose peers are all
+    # failure-memo-suppressed all exit without touching any of these.
+    dkv_peer_attaches: int = 0
+    dkv_peer_attach_failures: int = 0
+    dkv_peers_dropped: int = 0
+    dkv_peer_loads: int = 0
+    dkv_peer_load_failures: int = 0
+    dkv_hints_rejected: int = 0
+
     # How many of ``cache_hit_tokens`` the KV connector served. The remainder
     # came from the device prefix cache, which is how ``cache_hits`` splits per
     # ``tier``. Always 0 without a connector.
@@ -306,6 +320,12 @@ class BatchMetrics:
         dkv_reconnect_attempts = 0
         dkv_read_blocks = 0
         dkv_read_bytes = 0
+        dkv_peer_attaches = 0
+        dkv_peer_attach_failures = 0
+        dkv_peers_dropped = 0
+        dkv_peer_loads = 0
+        dkv_peer_load_failures = 0
+        dkv_hints_rejected = 0
         num_replicas = sch_config.data_parallel_degree
 
         # Data-parallel balance, along two axes: active tokens (compute load
@@ -393,6 +413,14 @@ class BatchMetrics:
             dkv_reconnect_attempts = metrics_agg.dkv_reconnect_attempts
             dkv_read_blocks = metrics_agg.nixl_read_blocks
             dkv_read_bytes = metrics_agg.nixl_read_bytes
+
+            # Cross-node pull, read before reset_metrics clears it.
+            dkv_peer_attaches = metrics_agg.dkv_peer_attaches
+            dkv_peer_attach_failures = metrics_agg.dkv_peer_attach_failures
+            dkv_peers_dropped = metrics_agg.dkv_peers_dropped
+            dkv_peer_loads = metrics_agg.dkv_peer_loads
+            dkv_peer_load_failures = metrics_agg.dkv_peer_load_failures
+            dkv_hints_rejected = metrics_agg.dkv_hints_rejected
 
             kv_cache.reset_metrics()
 
@@ -513,6 +541,12 @@ class BatchMetrics:
             dkv_reconnect_attempts=dkv_reconnect_attempts,
             dkv_read_blocks=dkv_read_blocks,
             dkv_read_bytes=dkv_read_bytes,
+            dkv_peer_attaches=dkv_peer_attaches,
+            dkv_peer_attach_failures=dkv_peer_attach_failures,
+            dkv_peers_dropped=dkv_peers_dropped,
+            dkv_peer_loads=dkv_peer_loads,
+            dkv_peer_load_failures=dkv_peer_load_failures,
+            dkv_hints_rejected=dkv_hints_rejected,
             nixl_read_latency_max_ms=nixl_read_latency_max_ms,
             overlap_active=overlap_active,
             completed=completed_batch_stats,
@@ -640,6 +674,28 @@ class BatchMetrics:
                 f"{self.dkv_reconnect_attempts} reconnect attempts | "
             )
 
+        # Gated on activity so a single-node deployment's line stays quiet.
+        # The zeros are still in to_log_extra and in the published counters.
+        dkv_peer_str = ""
+        if any(
+            (
+                self.dkv_peer_loads,
+                self.dkv_peer_load_failures,
+                self.dkv_hints_rejected,
+                self.dkv_peer_attaches,
+                self.dkv_peer_attach_failures,
+                self.dkv_peers_dropped,
+            )
+        ):
+            dkv_peer_str = (
+                f"dKV peers: {self.dkv_peer_loads} loads "
+                f"({self.dkv_peer_load_failures} failed), "
+                f"{self.dkv_peer_attaches} attaches "
+                f"({self.dkv_peer_attach_failures} failed, "
+                f"{self.dkv_peers_dropped} dropped), "
+                f"{self.dkv_hints_rejected} hints rejected | "
+            )
+
         vision_str = ""
         vm = self.vision_metrics
         if vm is not None and vm.num_images_total > 0:
@@ -679,7 +735,7 @@ class BatchMetrics:
         # these stay valid under either path below.
         state_str = (
             f"{dp_str}{kv_str}{host_kv_str}{disk_kv_str}{dkv_str}"
-            f"{dkv_health_str}"
+            f"{dkv_health_str}{dkv_peer_str}"
         )
         encoder_str = f"{vision_str}{video_str}"
 
@@ -907,6 +963,13 @@ class BatchMetrics:
             extra["dkv_connected_clients"] = self.dkv_connected_clients
             extra["dkv_total_clients"] = self.dkv_total_clients
             extra["dkv_reconnect_attempts"] = self.dkv_reconnect_attempts
+            # Same guard as the health gauges above.
+            extra["dkv_peer_attaches"] = self.dkv_peer_attaches
+            extra["dkv_peer_attach_failures"] = self.dkv_peer_attach_failures
+            extra["dkv_peers_dropped"] = self.dkv_peers_dropped
+            extra["dkv_peer_loads"] = self.dkv_peer_loads
+            extra["dkv_peer_load_failures"] = self.dkv_peer_load_failures
+            extra["dkv_hints_rejected"] = self.dkv_hints_rejected
 
         return extra
 
@@ -1057,6 +1120,14 @@ class BatchMetrics:
             METRICS.dkv_connected_clients(self.dkv_connected_clients)
             METRICS.dkv_total_clients(self.dkv_total_clients)
             METRICS.dkv_reconnect_attempts(self.dkv_reconnect_attempts)
+            # Same guard as the health gauges: per-window deltas, so a window
+            # skipped here loses its count for good.
+            METRICS.dkv_peer_attaches(self.dkv_peer_attaches)
+            METRICS.dkv_peer_attach_failures(self.dkv_peer_attach_failures)
+            METRICS.dkv_peers_dropped(self.dkv_peers_dropped)
+            METRICS.dkv_peer_loads(self.dkv_peer_loads)
+            METRICS.dkv_peer_load_failures(self.dkv_peer_load_failures)
+            METRICS.dkv_hints_rejected(self.dkv_hints_rejected)
 
         if self.draft_tokens_generated > 0:
             METRICS.spec_decode_avg_acceptance_length(
