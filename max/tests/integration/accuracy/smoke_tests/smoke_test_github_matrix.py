@@ -122,6 +122,7 @@ HF_MODELS: Mapping[str, set[str]] = {
 CUSTOM_MODELS: Mapping[str, set[str]] = {
     "meta-llama/Llama-3.1-8B-Instruct__modulev3": MULTI,
     "google/gemma-3-27b-it__modulev3": XL,
+    "google/gemma-4-31B-it__modulev3": MULTI | {"max"},
     "microsoft/Phi-3.5-mini-instruct__modulev3": MULTI,
     "microsoft/phi-4__modulev3": MULTI,
     "deepseek-ai/DeepSeek-V2-Lite-Chat__modulev3": MULTI,
