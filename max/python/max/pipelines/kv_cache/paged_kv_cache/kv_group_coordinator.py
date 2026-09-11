@@ -18,6 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from max.nn.kv_cache import KVCacheGroupId
+from max.pipelines.context import TextContext
 from max.pipelines.modeling.types import RequestID
 
 from .block_utils import LittleKVCacheBlock
@@ -37,6 +38,21 @@ class KVGroupCoordinatorInterface:
     The leaves of a group are written in lockstep, so a hash is only reusable
     when every one of them holds it, and how deep the group can resume depends
     on how far back its attention reads.
+
+    The lifecycle every group implements, in order:
+
+    * :meth:`claim`: a request arrives.
+    * :meth:`longest_cache_hit`, :meth:`claim_hit_blocks`: find a prefix hit
+      and take it.
+    * :meth:`blocks_to_allocate`, :meth:`grow`: size and draw the next
+      forward's blocks; :meth:`grow_with_padding` for a padding dummy.
+    * :meth:`forward_blocks`: name the blocks the next forward touches.
+    * :meth:`resume`: name the block its incoming state is read from.
+    * :meth:`checkpoint`: copy anything overwritten in place.
+    * :meth:`commit`: publish what the forward filled.
+    * :meth:`advance`: release what the group no longer reads.
+    * :meth:`shrink_to_fit`: trim the row to the committed prefix.
+    * :meth:`release`: the request is done.
     """
 
     pools: Sequence[JengaBlockPool]
@@ -237,7 +253,7 @@ class KVGroupCoordinatorInterface:
         last_block: int,
         replica_idx: int,
     ) -> None:
-        """Commits every block below ``last_block`` not committed yet.
+        """Commits every uncommitted block below ``last_block``.
 
         Scans from the start of the row, not just this forward's blocks: a
         group can hold a block whose hash the chain only reaches later.
@@ -272,6 +288,58 @@ class KVGroupCoordinatorInterface:
     def num_blocks_needed_for_connector_load(self, num_hashes: int) -> int:
         """The number of blocks needed to service a connector cache hit for all hashes."""
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def forward_blocks(
+        self, batch: Sequence[TextContext], num_blocks: Sequence[int]
+    ) -> dict[str, list[list[int]]]:
+        """Returns the blocks each leaf's forward touches, per request.
+
+        Args:
+            batch: The requests the next forward runs, in row order.
+            num_blocks: How far into each request's row the forward reaches.
+        """
+        plans: dict[str, list[list[int]]] = {
+            leaf_id: [] for leaf_id in self.leaf_ids
+        }
+        for batch_idx, ctx in enumerate(batch):
+            required = num_blocks[batch_idx]
+            row = self.rows[ctx.request_id]
+            for leaf_id in self.leaf_ids:
+                blocks = row[leaf_id]
+                assert len(blocks) >= required, (
+                    f"leaf {leaf_id!r} holds {len(blocks)} blocks, needs"
+                    f" {required}"
+                )
+                plans[leaf_id].append([b.bid for b in blocks[:required]])
+        return plans
+
+    def resume(
+        self, ctx: TextContext, replica_idx: int
+    ) -> Mapping[str, tuple[int | None, int]]:
+        """Returns the block each leaf's next forward resumes its state from.
+
+        Empty for a group whose blocks a forward only appends to, which is
+        every group whose entry is a page of tokens rather than a state.
+
+        Args:
+            ctx: The request whose forward runs next.
+            replica_idx: Which pool its blocks belong to.
+        """
+        return {}
+
+    def checkpoint(
+        self, ctx: TextContext, replica_idx: int
+    ) -> Mapping[str, tuple[int, int]]:
+        """Returns the block to copy and the block to copy it to, per leaf.
+
+        Empty for a group whose blocks are not overwritten in place. The leaf
+        folds these into the rows the copy runs over.
+
+        Args:
+            ctx: The request whose forward just ran.
+            replica_idx: Which pool its blocks belong to.
+        """
+        return {}
 
 
 @dataclass(frozen=True)

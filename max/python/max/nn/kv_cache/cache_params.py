@@ -51,6 +51,7 @@ from .utils import (
     MLAAttnKey,
     MSAAttnKey,
     MultiAttnKey,
+    padded_lut_cols,
 )
 
 # Mirror of max.pipelines.speculative.config.SpeculativeMethod. Defined
@@ -594,6 +595,47 @@ class KVLeafRegion:
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
+    def staged_input_shapes(
+        self, batch_size: int, num_blocks: int
+    ) -> Mapping[str, tuple[tuple[int, ...], DType]]:
+        """Returns the shape and dtype of each input a forward stages.
+
+        Called once at the widest bounds a forward can reach, to allocate the
+        tensors the graph binds, and again per forward to size host staging.
+
+        Args:
+            batch_size: Requests the forward runs.
+            num_blocks: Blocks the deepest row of the batch reaches.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def write_staged_inputs(
+        self,
+        plans: Sequence[Sequence[int]],
+        into: Mapping[str, np.ndarray],
+    ) -> None:
+        """Writes one forward's blocks into the arrays declared for them.
+
+        Args:
+            plans: The blocks each row touches, in batch-row order.
+            into: The array to fill, per staged key.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def bound_row_copies(
+        self, src: int, dst: int
+    ) -> Mapping[str, tuple[range, range]]:
+        """Returns the rows to copy between, per bound input.
+
+        Empty for a leaf the graph reaches through a per-forward table, whose
+        blocks are never overwritten in place.
+
+        Args:
+            src: The block to copy.
+            dst: The block to copy it to.
+        """
+        return {}
+
 
 @dataclass(frozen=True)
 class PagedKVLeafRegion(KVLeafRegion):
@@ -608,6 +650,27 @@ class PagedKVLeafRegion(KVLeafRegion):
         return min(
             num_blocks, ceildiv(self.group_id.window_size, self.page_size)
         )
+
+    def staged_input_shapes(
+        self, batch_size: int, num_blocks: int
+    ) -> Mapping[str, tuple[tuple[int, ...], DType]]:
+        """Returns this leaf's lookup table."""
+        # Padded so ``PagedKVCache``'s SIMD ``populate`` can load 16 uint32s
+        # past any valid ``first_lut_idx`` without leaving the allocation.
+        shape = (batch_size, padded_lut_cols(num_blocks))
+        return {self.leaf_id: (shape, DType.uint32)}
+
+    def write_staged_inputs(
+        self,
+        plans: Sequence[Sequence[int]],
+        into: Mapping[str, np.ndarray],
+    ) -> None:
+        """Writes each row's block ids, zeroing the slots it does not reach."""
+        table = into[self.leaf_id]
+        # 0 is the pool's null block, so an unreached slot reads nothing.
+        table.fill(0)
+        for batch_idx, blocks in enumerate(plans):
+            table[batch_idx, : len(blocks)] = blocks
 
 
 @runtime_checkable
