@@ -29,7 +29,7 @@ from max.graph import (
 )
 from max.nn.data_parallelism import split_batch
 from max.nn.kv_cache import KVCacheInputs, KVCacheParamInterface
-from max.nn.layer import Module
+from max.nn.layer import LayerList, Module
 
 from .llama3 import Llama3
 from .model_config import Llama3Config
@@ -41,23 +41,21 @@ class DataParallelLlama(Module):
     def __init__(self, config: Llama3Config):
         self.config = config
         self.devices = config.devices
-        self.models = []
+        models = []
         for device in config.devices:
             # TODO: dataclasses.replace doesn't work for model config objects:
             # "... has no attribute 'draft_pipeline_parallel_degree'"
             new_config = copy.deepcopy(config)
             new_config.devices = [device]
-            self.models.append(Llama3(new_config))
+            models.append(Llama3(new_config))
 
-        # Sets up weight tracking for the first model.
-        self.model = self.models[0]
-
-        # Replace all weights from the other distributed models with weights
-        # from the first model.
-        model_weights = self.model.raw_state_dict()
-        for model in self.models[1:]:
-            for key, value in model_weights.items():
-                _assign_weight(model, key, value)
+        # A LayerList, not a plain list, so weight tracking sees every
+        # replica and each rank's weights land on that rank. Sharing rank
+        # 0's weights instead makes every `weight.to(x.device)` a
+        # peer-to-peer copy of the whole model, on every execution.
+        # Don't also alias a replica to an attribute: every `Module`
+        # attribute is registered, so rank 0 would get two sets of weights.
+        self.models = LayerList(models)
 
     def __call__(
         self, all_model_args: Sequence[Sequence[Any]]
@@ -99,7 +97,10 @@ class DataParallelLlama(Module):
         tokens and input_row_offsets into data parallel splits.
         """
         inputs = []
-        single_model_inputs = self.model.input_types(kv_params)
+        first_model = self.models[0]
+        # `LayerList.__getitem__` is typed as returning `Layer`.
+        assert isinstance(first_model, Llama3)
+        single_model_inputs = first_model.input_types(kv_params)
         (
             token_type,
             input_row_offsets_type,
@@ -164,66 +165,6 @@ class DataParallelLlama(Module):
         return self(all_model_args)
 
 
-def _assign_weight(module: Module, key: str, value: Any) -> None:
-    path = key.split(".")
-    for attr in path[:-1]:
-        if attr.isnumeric():
-            module = module[int(attr)]  # type: ignore
-        else:
-            module = _resolve_attr(module, attr)
-    # The leaf segment is set on whichever container actually owns it,
-    # which may be a (possibly nested) name-omitting descendant of
-    # ``module``.
-    leaf = path[-1]
-    setattr(_owner_of(module, leaf), leaf, value)
-
-
-def _resolve_attr(module: Module, attr: str) -> Module:
-    """Resolve ``attr`` on ``module``, descending through name-omitting children.
-
-    State-dict FQNs flatten across modules with
-    ``_omit_module_attr_name`` (notably :class:`~max.nn.StackedLinear` in
-    unfused mode), so a key segment may live one or more levels deeper
-    than the attribute hierarchy suggests. Direct ``getattr`` is tried
-    first; on miss we recurse into each name-omitting child until one
-    exposes ``attr``.
-    """
-    if hasattr(module, attr):
-        return getattr(module, attr)
-    for child in module.sublayers.values():
-        if not child._omit_module_attr_name:
-            continue
-        try:
-            return _resolve_attr(child, attr)
-        except AttributeError:
-            continue
-    raise AttributeError(
-        f"{type(module).__name__!s} has no attribute {attr!r} (also "
-        "checked name-omitting descendants)."
-    )
-
-
-def _owner_of(module: Module, attr: str) -> Module:
-    """Return the (possibly nested name-omitting) submodule that owns ``attr``.
-
-    Mirrors :func:`_resolve_attr` but returns the *owning module* rather
-    than the resolved attribute itself. Used to set a flattened leaf
-    weight on the actual child whose namespace was elided. If no
-    descendant already owns ``attr``, falls back to ``module`` so the
-    caller's ``setattr`` preserves the original (attribute-creating)
-    behavior for new weights.
-    """
-    if hasattr(module, attr):
-        return module
-    for child in module.sublayers.values():
-        if not child._omit_module_attr_name:
-            continue
-        owner = _owner_of(child, attr)
-        if hasattr(owner, attr):
-            return owner
-    return module
-
-
 def create_graph(
     config: Llama3Config,
     kv_params: KVCacheParamInterface,
@@ -231,11 +172,16 @@ def create_graph(
 ) -> tuple[Graph, dict[str, Any]]:
     model = DataParallelLlama(config)
 
-    new_state_dict = {}
     state_dict.pop("rope_freqs.weight", None)
-    for key, value in state_dict.items():
-        new_key = "model." + key
-        new_state_dict[new_key] = value
+    # One prefix per replica. The copy is shallow (the weight buffer stays
+    # shared) and is needed because `load_state_dict` rewrites the value's
+    # dtype and shape in place.
+    new_state_dict = {}
+    for replica_idx in range(len(config.devices)):
+        # Must match the attribute the replicas are registered under.
+        prefix = f"models.{replica_idx}."
+        for key, value in state_dict.items():
+            new_state_dict[prefix + key] = copy.copy(value)
     model.load_state_dict(
         new_state_dict,
         override_quantization_encoding=True,
