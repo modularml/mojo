@@ -77,18 +77,7 @@ struct _ListStrategy[T: Strategy](Movable, Strategy):
     def value(mut self, mut rng: Rng) raises -> Self.Value:
         var result = List[Self.T.Value](capacity=self._min_len)
 
-        while len(result) < self._min_len:
-            result.append(self._strat.value(rng))
-
-        var average_len = Float64(self._min_len + self._max_len) / 2.0
-
-        # geometric distribution
-        var probability = 1.0 - 1.0 / (1.0 + average_len)
-        while len(result) < self._max_len:
-            var should_append = rng.rand_bool(true_probability=probability)
-            if not should_append:
-                break
-
+        while rng._rand_more(len(result), min=self._min_len, max=self._max_len):
             result.append(self._strat.value(rng))
 
         return result^

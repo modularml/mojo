@@ -125,16 +125,16 @@ struct _StringStrategy(Strategy):
         self.only_printable = only_printable
 
     def value(mut self, mut rng: Rng, out s: Self.Value) raises:
-        var size = rng.rand_int(min=self.min_len, max=self.max_len)
-
-        s = String(capacity_bytes=size)
+        s = String()
 
         var char_strategy = _CodepointStrategy(
             self.unicode, self.only_printable
         )
 
-        for _ in range(size):
+        var count = 0
+        while rng._rand_more(count, min=self.min_len, max=self.max_len):
             s.write(char_strategy.value(rng))
+            count += 1
 
 
 __extension Codepoint:

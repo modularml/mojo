@@ -15,6 +15,7 @@
 from .random import Rng
 from .strategy import Strategy
 from std.time import perf_counter_ns
+from ._shrinking._shrinker import Shrinker, ShrinkResult
 
 
 struct PropTestConfig(Copyable):
@@ -26,15 +27,32 @@ struct PropTestConfig(Copyable):
     var seed: Int
     """The seed for the random number generator."""
 
-    def __init__(out self, *, runs: Int = 100, seed: Optional[Int] = None):
+    var shrink: Bool
+    """Run test case reduction on failed test."""
+
+    var max_shrink_steps: Int
+    """Max number of successful shrink steps to run in test case reduction."""
+
+    def __init__(
+        out self,
+        *,
+        runs: Int = 100,
+        seed: Optional[Int] = None,
+        shrink: Bool = True,
+        max_shrink_steps: Int = 1000,
+    ):
         """Construct a new property test configuration.
 
         Args:
             runs: The number of successful test runs to achieve before stopping the test.
             seed: The seed for the random number generator.
+            shrink: Whether to run test case reduction on failed tests.
+            max_shrink_steps: The maximum number of successful shrink steps to run.
         """
         self.runs = runs
         self.seed = seed.or_else(Int(perf_counter_ns()))
+        self.shrink = shrink
+        self.max_shrink_steps = max_shrink_steps
 
 
 struct PropTest(Movable):
@@ -80,25 +98,71 @@ struct PropTest(Movable):
         for i in range(self._config.runs):
             var value = strategy.value(rng)
             try:
-                f(value^)
+                f(value.copy())
             except e:
-                raise Error(
-                    _PropTestError(runs=i, seed=self._config.seed, error=e^)
+                if (
+                    len(rng.history) == 0
+                    or not self._config.shrink
+                    or self._config.max_shrink_steps == 0
+                ):
+                    # If the history is empty, we have no information to shrink,
+                    # so we just raise the error.
+                    raise _PropTestError(
+                        shrink_result=ShrinkResult(value^, 0),
+                        runs=i,
+                        seed=self._config.seed,
+                        error=e^,
+                    )
+
+                var shrinker = Shrinker[type_of(strategy), f](
+                    strategy^,
+                    rng.history.copy(),
+                    e.copy(),
+                    self._config.max_shrink_steps,
+                )
+                var shrink_result = shrinker.shrink()
+                raise _PropTestError(
+                    shrink_result=shrink_result^,
+                    original_value=value^,
+                    runs=i,
+                    seed=self._config.seed,
+                    error=e^,
                 )
 
 
-struct _PropTestError(Copyable, Writable):
+struct _PropTestError[T: Copyable & Deinitable & Writable, //](
+    Copyable, Writable
+):
     var runs: Int
     var seed: Int
     var error: Error
+    var shrink_result: ShrinkResult[Self.T]
+    var original_value: Optional[Self.T]
 
-    def __init__(out self, *, runs: Int, seed: Int, var error: Error = {}):
+    def __init__(
+        out self,
+        *,
+        var shrink_result: ShrinkResult[Self.T],
+        runs: Int,
+        seed: Int,
+        var error: Error = {},
+        var original_value: Optional[Self.T] = None,
+    ):
         self.runs = runs
         self.seed = seed
         self.error = error^
+        self.shrink_result = shrink_result^
+        self.original_value = original_value^
 
     def write_to(self, mut writer: Some[Writer]):
-        writer.write("PropTestError: ", "\n")
-        writer.write("\tRuns: ", self.runs, "\n")
-        writer.write("\tSeed: ", self.seed, "\n")
-        writer.write("\tError: ", self.error)
+        writer.write(
+            t"PropTest failed after {self.runs} runs (seed: {self.seed})\n"
+        )
+        writer.write(t"Falsifying input: {self.shrink_result.value}\n")
+        if self.original_value:
+            ref value = self.original_value.value()
+            writer.write(
+                t"(shrunk from {value} in {self.shrink_result.runs} shrink"
+                t" steps)\n"
+            )
+        writer.write(t"Error: {self.error}")

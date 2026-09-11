@@ -25,7 +25,7 @@ trait Strategy(Deinitable, Movable):
     produce the random input values for the properties being tested.
     """
 
-    comptime Value: Copyable & Deinitable
+    comptime Value: Copyable & Writable & Deinitable
     """The type the strategy produces."""
 
     def value(mut self, mut rng: Rng) raises -> Self.Value:
