@@ -38,6 +38,66 @@ from .types import (
 logger = logging.getLogger(__name__)
 
 
+def fetch_instruct_coder_dataset_path(dataset_path: str | None = None) -> str:
+    """Return a local path to the InstructCoder ``train.json`` file.
+
+    Downloads the dataset from HuggingFace Hub (``likaixin/InstructCoder``)
+    when ``dataset_path`` is not already provided.
+
+    Args:
+        dataset_path: Existing local path to reuse, if any.
+
+    Returns:
+        Local filesystem path to the dataset's ``train.json``.
+    """
+    if dataset_path is not None:
+        return dataset_path
+    return hf_hub_download_with_retry(
+        repo_id="likaixin/InstructCoder",
+        filename="train.json",
+        repo_type="dataset",
+    )
+
+
+def load_instruct_coder_pairs(
+    dataset_path: str | None = None,
+) -> list[tuple[str, str]]:
+    """Load (prompt, completion) pairs from the InstructCoder dataset.
+
+    Fetches the dataset via :func:`fetch_instruct_coder_dataset_path` and
+    parses each entry into a prompt (the instruction, plus any input code)
+    and a completion (the expected edited code). Reused by
+    :class:`InstructCoderBenchmarkDataset` and by other benchmark tools that
+    only need the raw text pairs (e.g. the engine benchmark's
+    ``InstructCoderTokenSource``).
+
+    Args:
+        dataset_path: Existing local path to reuse, if any. Downloaded from
+            HuggingFace Hub otherwise.
+
+    Returns:
+        List of (prompt, completion) text pairs.
+    """
+    resolved_path = fetch_instruct_coder_dataset_path(dataset_path)
+
+    with open(resolved_path, encoding="utf-8") as f:
+        dataset = json.load(f)
+
+    pairs: list[tuple[str, str]] = []
+    for entry in dataset:
+        instruction = entry.get("instruction", "").strip()
+        code_input = entry.get("input", "").strip()
+        output = entry.get("output", "").strip()
+        if not instruction or not output:
+            continue
+        if code_input:
+            prompt = f"{instruction}\n\n{code_input}"
+        else:
+            prompt = instruction
+        pairs.append((prompt, output))
+    return pairs
+
+
 class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
     """Benchmark dataset backed by the likaixin/InstructCoder HuggingFace dataset.
 
@@ -65,36 +125,14 @@ class InstructCoderBenchmarkDataset(HuggingFaceBenchmarkDataset):
     """
 
     def fetch(self) -> None:
-        if self.dataset_path is not None:
-            return
-        self.dataset_path = hf_hub_download_with_retry(
-            repo_id="likaixin/InstructCoder",
-            filename="train.json",
-            repo_type="dataset",
-        )
+        self.dataset_path = fetch_instruct_coder_dataset_path(self.dataset_path)
 
     def _load_pairs(self) -> list[tuple[str, str]]:
         """Load and return (prompt, completion) pairs from the dataset file."""
         assert self.dataset_path is not None, (
             "dataset_path must be set before loading"
         )
-
-        with open(self.dataset_path, encoding="utf-8") as f:
-            dataset = json.load(f)
-
-        pairs: list[tuple[str, str]] = []
-        for entry in dataset:
-            instruction = entry.get("instruction", "").strip()
-            code_input = entry.get("input", "").strip()
-            output = entry.get("output", "").strip()
-            if not instruction or not output:
-                continue
-            if code_input:
-                prompt = f"{instruction}\n\n{code_input}"
-            else:
-                prompt = instruction
-            pairs.append((prompt, output))
-        return pairs
+        return load_instruct_coder_pairs(self.dataset_path)
 
     def sample_requests(
         self,
