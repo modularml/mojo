@@ -17,6 +17,7 @@ import os
 import time
 
 import opentelemetry.trace as otel_trace
+from max._core import request_context as _request_context
 from max.pipelines.context import (
     TextAndVisionContext,
     TextContext,
@@ -318,8 +319,13 @@ class TokenGenerationScheduler(Scheduler):
             )
 
         try:
-            # Execute the batch.
-            responses = self.pipeline.execute(inputs)
+            # Execute the batch. C++ telemetry that opts in reads the batch id
+            # set here.
+            _request_context.set_batch_id(batch_id)
+            try:
+                responses = self.pipeline.execute(inputs)
+            finally:
+                _request_context.clear_batch_id()
 
             # Filter out all responses for requests that are already released.
             # We can get a response for a request that is already released due to

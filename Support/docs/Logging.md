@@ -124,6 +124,41 @@ across threads without a shared counter. Records logged inside the scope do not
 pick up the `span_id` automatically; pass `span.getSpanId()` explicitly if a
 record needs to join the span.
 
+#### Correlating records with a request
+
+`MLOG_KV_REQ`, from `Support/RequestLog.h`, is `MLOG_KV` plus the batch id of
+the request the calling thread is serving:
+
+```cpp
+{
+  M::Request::BatchScope batch(batchId);
+  MLOG_KV_REQ(LogLevel::INFO, "event", "kv_evict");
+}
+```
+
+```text
+event=kv_evict batch_id=42
+```
+
+Outside a `BatchScope` the same call site emits `event=kv_evict` with no
+`batch_id`, rather than a sentinel, so a reader can tell "no batch" from
+"batch 0".
+
+This is a layer over the logger, not part of it. `batch_id` arrives as an
+ordinary key-value pair, nothing is added to `LogRecord`, and a call site that
+does not want request correlation writes `MLOG_KV` and pays nothing. `MLOG_KV`
+takes at most four pairs, so `MLOG_KV_REQ` takes at most three.
+
+The ambient batch id lives in `Support/RequestContext.h`, which does not depend
+on the logger — metrics and traces want the same answer. `BatchScope` nests, so
+an inner scope restores the enclosing id rather than clearing it. From Python
+the pair is `max._core.request_context.set_batch_id(batch_id)` and
+`clear_batch_id()`; the scheduler wraps each forward pass in them.
+
+The context is thread-local and does not cross a dispatch boundary, so work
+that AsyncRT's `WorkQueue` fans out to its thread pool logs without a
+`batch_id`. Task-local propagation is the follow-on that closes that gap.
+
 ### Mojo
 
 There is a Mojo interface wrapping the C++ Log library. It uses the same `fmt`

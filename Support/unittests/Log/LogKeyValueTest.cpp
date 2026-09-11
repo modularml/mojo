@@ -200,4 +200,19 @@ TEST_F(LogKeyValueTest, FormattedRecordsStillRenderNormally) {
   EXPECT_EQ(out.find('='), std::string::npos);
 }
 
+// The pre-built-args constructor is the one the Mojo FFI shim uses, and it is
+// the only one that does not name `kind` in its init list. Records built
+// through it must still be Formatted: a KeyValue misread sends them down
+// renderKVRecord, which reinterprets a format string's positional args as
+// alternating key-value pairs.
+TEST_F(LogKeyValueTest, PrebuiltArgsRecordsDefaultToFormatted) {
+  std::array<LogArg, LogRecord::maxArgs> args{};
+  args[0] = Detail::toLogArg(42);
+  // The count must already be uint8_t: an int makes the variadic constructor a
+  // better match, and the record is then built as a two-arg formatted record.
+  LogRecord record(std::chrono::system_clock::now(), LogLevel::INFO,
+                   Channel::Default, "value {}", args, uint8_t{1});
+  EXPECT_EQ(record.kind, RecordKind::Formatted);
+}
+
 } // namespace

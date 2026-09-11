@@ -1191,6 +1191,20 @@ modular_cc_library(
 )
 
 modular_cc_library(
+    name = "RequestContext",
+    hdrs = ["include/Support/RequestContext.h"],
+)
+
+modular_cc_library(
+    name = "RequestLog",
+    hdrs = ["include/Support/RequestLog.h"],
+    deps = [
+        ":Log",
+        ":RequestContext",
+    ],
+)
+
+modular_cc_library(
     name = "Metrics",
     srcs = ["lib/Metrics.cpp"],
     hdrs = ["include/Support/Metrics.h"],
