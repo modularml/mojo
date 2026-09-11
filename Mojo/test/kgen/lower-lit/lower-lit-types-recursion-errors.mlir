@@ -5,43 +5,13 @@
 // is broken by an indirection, so the layout is finite and the struct should
 // lower. Each `expected-error` records today's incorrect behaviour.
 //
-// Two distinct defects are covered here, in this order:
-//
-// 1. An indirection is only recognised as the immediate field type, so a
-//    pointer nested one level deeper is not erased.
-// 2. The recursion reaches the layout through the parameter list of a
-//    parametric type, where there is no indirection to erase at all: a layout
-//    is built from element type values, and a type value carries the layout of
-//    each of its type arguments.
+// Every case here has one cause: the recursion reaches the layout through the
+// parameter list of a parametric type, where there is no indirection to erase
+// at all. A layout is built from element type values, and a type value carries
+// the layout of each of its type arguments.
 
 //===----------------------------------------------------------------------===//
-// 1. A raw pointer nested inside a struct.
-//===----------------------------------------------------------------------===//
-
-// FIXME: should lower. `!kgen.pointer` is erased to `pointer<none>`
-// only when it is the field's declared type; nested one level deeper the
-// pointee is still expanded.
-// expected-error @below {{struct has recursive reference to itself}}
-lit.struct.decl @Node {
-  lit.struct.field next : !kgen.struct<(!kgen.pointer<:type !lit.struct<@Node>>)>
-}
-
-// -----
-
-//===----------------------------------------------------------------------===//
-// 1. The same, nested inside an array.
-//===----------------------------------------------------------------------===//
-
-// FIXME: should lower, same cause as above.
-// expected-error @below {{struct has recursive reference to itself}}
-lit.struct.decl @Node {
-  lit.struct.field next : !kgen.array<2, !kgen.pointer<:type !lit.struct<@Node>>>
-}
-
-// -----
-
-//===----------------------------------------------------------------------===//
-// 2. A parametric pointer wrapper inside an aggregate. A `!kgen.struct` holds
+// A parametric pointer wrapper inside an aggregate. A `!kgen.struct` holds
 // its elements as type values, so building @Node's layout demands the value
 // form of `@Ptr<:type @Node>`, which carries @Node's layout.
 //===----------------------------------------------------------------------===//
@@ -61,7 +31,7 @@ lit.struct.decl @Node {
 // -----
 
 //===----------------------------------------------------------------------===//
-// 2. One wrapper deeper, reached through a parametric struct's field.
+// One wrapper deeper, reached through a parametric struct's field.
 //===----------------------------------------------------------------------===//
 
 // FIXME: should lower, same cause as above.
@@ -82,7 +52,7 @@ lit.struct.decl @Node {
 // -----
 
 //===----------------------------------------------------------------------===//
-// 2. Tuple stores `!kgen.struct<: <type values> isParamPack>`, and param
+// Tuple stores `!kgen.struct<: <type values> isParamPack>`, and param
 // packs deliberately opt out of `normalizeVariadicForUniquing` (see #84445),
 // which is what keeps ordinary structs from reaching this. Mojo equivalent:
 // struct Node: var next: Tuple[Pointer[Node, MutUntrackedOrigin]]
@@ -108,7 +78,7 @@ lit.struct.decl @Node {
 // -----
 
 //===----------------------------------------------------------------------===//
-// 2. Through a variant with a concrete element list. Mojo reaches this via
+// Through a variant with a concrete element list. Mojo reaches this via
 // Variant's non-niche storage, so Optional[Span[Node, ...]] fails while
 // Optional[Pointer[Node, ...]] compiles; the latter takes the niche path and
 // never builds a variant.
@@ -128,7 +98,7 @@ lit.struct.decl @Node {
 // -----
 
 //===----------------------------------------------------------------------===//
-// 2. Through a variant whose element list is a rebind over a variadic.
+// Through a variant whose element list is a rebind over a variadic.
 //===----------------------------------------------------------------------===//
 
 // FIXME: should lower, same cause as above.
@@ -149,7 +119,7 @@ lit.struct.decl @Node {
 // -----
 
 //===----------------------------------------------------------------------===//
-// 2. No concrete instantiation needed: a generic struct recursing at its own
+// No concrete instantiation needed: a generic struct recursing at its own
 // parameter hits the same defect, and every generic struct's generator body is
 // built at its own parameters.
 //===----------------------------------------------------------------------===//

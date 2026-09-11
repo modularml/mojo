@@ -128,3 +128,29 @@ lit.struct.decl @Aligned register_passable attributes {
 lit.struct.decl @User {
   lit.struct.field f : !lit.struct<@Aligned>
 }
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// A raw pointer nested inside an aggregate rather than being the whole field
+// type. The pointee is erased at any depth, so these need no wrapper struct to
+// break the recursion.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: kgen.struct.generator @Node
+// CHECK-SAME:    pointer<none>
+lit.struct.decl @Node {
+  lit.struct.field next : !kgen.struct<(!kgen.pointer<:type !lit.struct<@Node>>)>
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// The same, nested inside an array.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: kgen.struct.generator @Node
+// CHECK-SAME:    pointer<none>
+lit.struct.decl @Node {
+  lit.struct.field next : !kgen.array<2, !kgen.pointer<:type !lit.struct<@Node>>>
+}

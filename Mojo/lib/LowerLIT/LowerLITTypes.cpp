@@ -189,6 +189,16 @@ lowerStructType(StructDecls &decls, LowerLITReplacer &replacer,
     replacer.erasedStructs[ref] = *erasedOr;
   }
 
+  // An erased layout only has to stand in for the real one while a cycle is
+  // broken, so it need only agree on size and alignment.
+  mlir::AttrTypeReplacer erasePointees;
+  erasePointees.addReplacement([&](PointerType type) {
+    return std::make_pair(
+        Type(PointerType::get(noneType, type.getAddressSpace(),
+                              type.getIsNonNull())),
+        WalkResult::skip());
+  });
+
   SmallVector<Type> fieldTypes;
   for (Type type : llvm::make_second_range(decl.fields)) {
     if (auto ptrType = dyn_cast<PointerType>(type)) {
@@ -201,10 +211,14 @@ lowerStructType(StructDecls &decls, LowerLITReplacer &replacer,
     Type reboundType = evaluator.getReboundType(type);
     if (!reboundType)
       return failure();
-    if (eraseIndirections &&
-        isa<LIT::StructType, FuncTypeGeneratorType>(reboundType)) {
-      fieldTypes.push_back(PointerType::get(noneType));
-      continue;
+    if (eraseIndirections) {
+      if (isa<LIT::StructType, FuncTypeGeneratorType>(reboundType)) {
+        fieldTypes.push_back(PointerType::get(noneType));
+        continue;
+      }
+      reboundType = erasePointees.replace(reboundType);
+      if (!reboundType)
+        return failure();
     }
 
     fieldTypes.push_back(reboundType);
@@ -672,26 +686,27 @@ static void populateReplacer(StructDecls &decls, LowerLITReplacer &replacer,
 // Check if there exists an illegal recursion among struct decls.
 static LogicalResult detectIllegalStructDeclsRecursion(StructDecls &decls) {
   struct RecursionFrame {
-    Type funcType;
+    // The type forming an indirection boundary (a function type or a pointer)
+    Type boundary;
     StringAttr structName;
 
-    bool isFuncType() const { return static_cast<bool>(funcType); }
+    bool isBoundary() const { return static_cast<bool>(boundary); }
   };
-  enum class StructRecursionStatus { NoMatch, FunctionBoundary, Recursive };
+  enum class StructRecursionStatus { NoMatch, Boundary, Recursive };
 
   SmallVector<RecursionFrame> recursionStack;
-  auto containsFuncType = [&](FuncTypeGeneratorType type) {
+  auto containsBoundary = [&](Type type) {
     return llvm::any_of(recursionStack, [&](const RecursionFrame &frame) {
-      return frame.isFuncType() && frame.funcType == Type(type);
+      return frame.boundary == type;
     });
   };
   auto getStructRecursionStatus = [&](StringAttr name) {
-    bool crossedFuncType = false;
+    bool crossedBoundary = false;
     for (const RecursionFrame &frame : llvm::reverse(recursionStack)) {
-      if (frame.isFuncType())
-        crossedFuncType = true;
+      if (frame.isBoundary())
+        crossedBoundary = true;
       if (frame.structName == name)
-        return crossedFuncType ? StructRecursionStatus::FunctionBoundary
+        return crossedBoundary ? StructRecursionStatus::Boundary
                                : StructRecursionStatus::Recursive;
     }
     return StructRecursionStatus::NoMatch;
@@ -699,35 +714,37 @@ static LogicalResult detectIllegalStructDeclsRecursion(StructDecls &decls) {
 
   // DFS through the parametric types to see if there is recursion.
   mlir::AttrTypeReplacer dfs;
-  auto walkFuncType =
-      [&](FuncTypeGeneratorType type) -> std::pair<Type, WalkResult> {
-    if (containsFuncType(type))
-      return std::make_pair(Type(type), WalkResult::skip());
+  auto walkBehindBoundary =
+      [&](Type boundary, llvm::function_ref<LogicalResult()> walkContents)
+      -> std::pair<Type, WalkResult> {
+    if (containsBoundary(boundary))
+      return std::make_pair(boundary, WalkResult::skip());
 
-    recursionStack.push_back({Type(type), StringAttr()});
-    for (Type inputParamType : type.getInputParamTypes()) {
-      if (!dfs.replace(inputParamType)) {
-        recursionStack.pop_back();
-        return std::make_pair(Type(), WalkResult::interrupt());
-      }
-    }
-    if (!dfs.replace(type.getBody())) {
-      recursionStack.pop_back();
-      return std::make_pair(Type(), WalkResult::interrupt());
-    }
-    if (PogListAttr metadata = type.getParamListAttrs()) {
-      if (!dfs.replace(metadata)) {
-        recursionStack.pop_back();
-        return std::make_pair(Type(), WalkResult::interrupt());
-      }
-    }
+    recursionStack.push_back({boundary, StringAttr()});
+    LogicalResult walked = walkContents();
     recursionStack.pop_back();
-    return std::make_pair(Type(type), WalkResult::skip());
+    if (failed(walked))
+      return std::make_pair(Type(), WalkResult::interrupt());
+    return std::make_pair(boundary, WalkResult::skip());
   };
-  dfs.addReplacement(
-      [&](FuncTypeGeneratorType type) { return walkFuncType(type); });
-  dfs.addReplacement([](PointerType type) {
-    return std::make_pair(Type(type), WalkResult::skip());
+  dfs.addReplacement([&](FuncTypeGeneratorType type) {
+    return walkBehindBoundary(type, [&] {
+      for (Type inputParamType : type.getInputParamTypes())
+        if (!dfs.replace(inputParamType))
+          return failure();
+      if (!dfs.replace(type.getBody()))
+        return failure();
+      if (PogListAttr metadata = type.getParamListAttrs())
+        if (!dfs.replace(metadata))
+          return failure();
+      return LogicalResult::success();
+    });
+  });
+  dfs.addReplacement([&](PointerType type) {
+    return walkBehindBoundary(type, [&] {
+      return LogicalResult::success(
+          static_cast<bool>(dfs.replace(type.getElementType())));
+    });
   });
 
   std::function<LogicalResult(StringAttr)> computeLoweredType =
@@ -742,8 +759,7 @@ static LogicalResult detectIllegalStructDeclsRecursion(StructDecls &decls) {
       mlir::emitError(decl.loc, "struct has recursive reference to itself");
       return failure();
     }
-    if (getStructRecursionStatus(name) ==
-        StructRecursionStatus::FunctionBoundary)
+    if (getStructRecursionStatus(name) == StructRecursionStatus::Boundary)
       return success();
 
     recursionStack.push_back({Type(), name});
@@ -771,7 +787,7 @@ static LogicalResult detectIllegalStructDeclsRecursion(StructDecls &decls) {
                       "struct has recursive reference to itself");
       return {{}, WalkResult::interrupt()};
     }
-    if (status == StructRecursionStatus::FunctionBoundary) {
+    if (status == StructRecursionStatus::Boundary) {
       decls.get(name).needsErasure = true;
       return {ref, WalkResult::skip()};
     }
