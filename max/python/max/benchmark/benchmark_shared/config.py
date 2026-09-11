@@ -25,7 +25,7 @@ from max.config import ConfigFileModel
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from .backend_names import Backend
-from .datasets import DatasetMode, DistributionParameter
+from .datasets import DatasetMode, DistributionParameter, ImageTurn
 from .utils import int_or_none, parse_comma_separated
 
 # Fixed default seed for the workload generator and request sampling. Scheduled
@@ -106,6 +106,13 @@ VIDEO_GEN_DEFAULT_ENDPOINT: Mapping[Backend, Endpoint] = {
 PIXEL_GENERATION_ENDPOINTS: frozenset[Endpoint] = frozenset(
     set(PIXEL_GEN_DEFAULT_ENDPOINT.values())
     | set(VIDEO_GEN_DEFAULT_ENDPOINT.values())
+)
+
+# Endpoints whose request drivers actually put input images on the wire.
+# Mixing images into a workload aimed anywhere else would inflate num_tokens
+# and --dry-run image stats for content the server never receives.
+IMAGE_MIXING_ENDPOINTS: frozenset[Endpoint] = frozenset(
+    {"/v1/chat/completions"}
 )
 
 
@@ -761,6 +768,34 @@ class ServingBenchmarkConfig(BaseServingBenchmarkConfig):
         description="Size of random images to generate.",
         json_schema_extra={"group": "Dataset-Specific Parameters"},
     )
+    image_fraction: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Fraction (0.0-1.0) of requests (single-turn) or chat sessions (multi-turn) that get at least one generated image mixed in, on top of whatever dataset is selected via --dataset-name. Mutually exclusive with --random-image-count/--random-image-size.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_count: DistributionParameter = Field(
+        default=1,
+        description="Distribution for the number of images on a request/turn selected to have images (used with --image-fraction). E.g. 'DU(1,4)'.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_long_side: DistributionParameter = Field(
+        default=512,
+        description="Distribution for each generated image's longer side, in pixels (used with --image-fraction). E.g. 'U(224,1024)'.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_aspect_ratio: DistributionParameter = Field(
+        default=1.0,
+        description="Distribution for each generated image's width/height ratio (used with --image-fraction). 1.0 produces square images.",
+        json_schema_extra={"group": "Multimodal"},
+    )
+    image_turn: ImageTurn = Field(
+        default="first",
+        description="Which user turn(s) in a multi-turn chat session get images when selected: 'first', 'last', or 'every'. Ignored for single-turn requests.",
+        json_schema_extra={"group": "Multimodal"},
+    )
     random_input_len: DistributionParameter = Field(
         default=1024,
         description="Number of input tokens per request, used by the random and artificial-analysis datasets. Use ';' to separate first-turn and remaining-turn distributions for multiturn.",
@@ -1100,6 +1135,35 @@ class ServingBenchmarkConfig(BaseServingBenchmarkConfig):
                 "--warmup-delay-estimated-ttft-ms /"
                 " --warmup-delay-estimated-tpot-ms require"
                 " --warmup-delay-biased to be set."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_image_flags_mutually_exclusive(self) -> ServingBenchmarkConfig:
+        """--image-fraction and --random-image-* are separate mechanisms."""
+        if self.image_fraction > 0 and (
+            self.random_image_count or self.random_image_size
+        ):
+            raise ValueError(
+                "--image-fraction cannot be combined with"
+                " --random-image-count/--random-image-size; use one"
+                " mechanism or the other."
+            )
+        if (
+            self.image_fraction > 0
+            and self.endpoint not in IMAGE_MIXING_ENDPOINTS
+        ):
+            raise ValueError(
+                f"--image-fraction requires an image-capable endpoint"
+                f" ({', '.join(sorted(IMAGE_MIXING_ENDPOINTS))}); got"
+                f" {self.endpoint!r}, whose driver sends text only."
+            )
+        if self.image_fraction > 0 and self.benchmark_task in (
+            PIXEL_GENERATION_TASKS + VIDEO_GENERATION_TASKS
+        ):
+            raise ValueError(
+                "--image-fraction mixes generated images into text prompts and"
+                f" does not apply to the {self.benchmark_task!r} task."
             )
         return self
 

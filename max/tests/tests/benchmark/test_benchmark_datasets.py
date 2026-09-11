@@ -64,6 +64,9 @@ from max.benchmark.benchmark_shared.datasets.all import (
 from max.benchmark.benchmark_shared.datasets.chat_judge import (
     ChatJudgeBenchmarkDataset,
 )
+from max.benchmark.benchmark_shared.datasets.image_augmentation import (
+    augment_samples_with_images,
+)
 
 # Import the module under test
 from max.benchmark.benchmark_shared.datasets.multiturn_distribution_fit import (
@@ -487,6 +490,36 @@ def test_random_sample_requests() -> None:
     assert len(samples.requests) == 2
     for request in samples.requests:
         assert isinstance(request, SampledRequest)
+
+
+def test_random_sample_requests_with_images() -> None:
+    """--random-image-count/--random-image-size still work after the
+    _generate_random_image extraction into image_augmentation.py."""
+    tok = _FakeTokenizer(model_max_length=200)
+    dataset = BenchmarkDataset.from_flags(dataset_name="random")
+    assert isinstance(dataset, RandomBenchmarkDataset)
+
+    with TokenizerPool(tok, loader=_fake_loader) as pool:
+        samples = dataset.sample_requests(
+            num_requests=3,
+            tokenizer=tok,
+            pool=pool,
+            input_len="50",
+            output_len="10",
+            sys_prompt_ratio=0.0,
+            max_num_unique_sys_prompt=1,
+            image_size="64,64",
+            image_count=2,
+        )
+
+    assert len(samples.requests) == 3
+    for request in samples.requests:
+        assert len(request.encoded_images) == 2
+        for image in request.encoded_images:
+            assert image["type"] == "image_url"
+            assert image["image_url"]["url"].startswith(
+                "data:image/jpeg;base64,"
+            )
 
 
 def test_shared_contexts_empty_when_no_sys_prompt() -> None:
@@ -1057,6 +1090,51 @@ def test_instruct_coder_multiturn_fit_distributions(
         for user in session.messages[0::2]:
             assert user.source == "user"
             assert user.num_tokens == 80
+
+
+@patch.object(InstructCoderBenchmarkDataset, "_load_pairs")
+def test_instruct_coder_multiturn_compatible_with_image_augmentation(
+    mock_load_pairs: Mock,
+) -> None:
+    """MXTOOLS-398: instruct-coder's --fit-distributions sessions can have
+    the general, dataset-agnostic image augmentation mixed in on top,
+    without instruct-coder needing its own image-generation logic."""
+    body = "hello world " * 80
+    mock_load_pairs.return_value = [(body, "line\n" * 60)] * 400
+
+    tok = _FakeTokenizer(model_max_length=50_000)
+    dataset = InstructCoderBenchmarkDataset()
+    dataset.dataset_path = "/tmp/instruct_coder_mock.json"
+
+    with TokenizerPool(tok, loader=_fake_loader) as pool:
+        samples = dataset.gen_multiturn_sessions(
+            num_sessions=4,
+            tokenizer=tok,
+            pool=pool,
+            shuffle=False,
+            fit_length_distributions=True,
+            num_turns="DU(3,3)",
+            input_len="80",
+            output_len="20",
+            delay_between_turns_dist="100",
+            sys_prompt_ratio=0.0,
+        )
+
+    augment_samples_with_images(
+        samples,
+        image_fraction=1.0,
+        image_count=1,
+        image_long_side=256,
+        image_aspect_ratio=1.0,
+        image_turn="first",
+    )
+
+    assert len(samples.chat_sessions) == 4
+    for session in samples.chat_sessions:
+        user_messages = [m for m in session.messages if m.source == "user"]
+        assert len(user_messages[0].images) == 1
+        for later in user_messages[1:]:
+            assert len(later.images) == 0
 
 
 def _write_chat_judge_file(path: Path) -> None:

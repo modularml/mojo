@@ -76,10 +76,9 @@ class ChatMessage(BaseModel):
     # TODO: wire sys_prompt_ratio support with "system" role through the
     # multi-turn path.
     role: str
-    # content is always list[TextContentBlock] in prompts produced by this
-    # codebase.  The str variant exists to match the OpenAI spec and to support
-    # _prepend_run_prefix_to_formatted_prompt, which handles both shapes
-    # defensively.
+    # Usually list[TextContentBlock], but not guaranteed: agentic-code passes
+    # plain-string content straight through from its dataset. Consumers that
+    # index or append to content must handle both shapes.
     content: str | list[TextContentBlock | ImageContentBlock]
 
 
@@ -126,6 +125,9 @@ class PixelGenerationSampledRequest(SampledRequest):
 
 
 MessageSource = Literal["user", "assistant", "system"]
+
+# Which user turn(s) of a multi-turn session get images.
+ImageTurn = Literal["first", "last", "every"]
 
 
 @dataclass

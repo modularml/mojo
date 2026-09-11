@@ -66,6 +66,9 @@ from max.benchmark.benchmark_shared.datasets.all import sample_requests
 from max.benchmark.benchmark_shared.datasets.chat_judge import (
     ChatJudgeChatSamples,
 )
+from max.benchmark.benchmark_shared.datasets.image_augmentation import (
+    augment_samples_with_images,
+)
 from max.benchmark.benchmark_shared.datasets.types import (
     ChatSamples,
     ChatSession,
@@ -1178,6 +1181,28 @@ def _seed_for_concurrency(seed: int | None, max_concurrency: int | None) -> int:
     return int.from_bytes(digest[:4], "big")
 
 
+def _run_prefix_len(
+    args: ServingBenchmarkConfig,
+    benchmark_task: BenchmarkTask,
+    tokenizer: PreTrainedTokenizerBase | None,
+) -> int:
+    """Tokens ``--force-unique-runs`` adds to a session's first measured turn.
+
+    Zero when the flag is off, when there is no tokenizer, and for
+    pixel-generation tasks, which do not track ``prompt_len`` at all.
+
+    ``benchmark()`` builds the real prefix, but that runs after sampling, so
+    the budget check here has to measure an equivalent one. Only the length
+    matters and every ``uuid4()`` has the same shape, so a throwaway one is
+    as good as the prefix the run will actually use.
+    """
+    if not args.force_unique_runs or tokenizer is None:
+        return 0
+    if benchmark_task in PIXEL_GENERATION_TASKS:
+        return 0
+    return len(tokenizer.encode(f"{uuid4()}: ", add_special_tokens=False))
+
+
 def _sample_for_seed(
     args: ServingBenchmarkConfig,
     benchmark_task: BenchmarkTask,
@@ -1214,6 +1239,21 @@ def _sample_for_seed(
                 "response_format is only supported for single-turn benchmarks, "
                 "ignoring for multi-turn chat sessions"
             )
+
+    if args.image_fraction > 0:
+        augment_samples_with_images(
+            samples,
+            image_fraction=args.image_fraction,
+            image_count=args.image_count,
+            image_long_side=args.image_long_side,
+            image_aspect_ratio=args.image_aspect_ratio,
+            image_turn=args.image_turn,
+            max_chat_len=(
+                tokenizer.model_max_length if tokenizer is not None else None
+            ),
+            run_prefix_len=_run_prefix_len(args, benchmark_task, tokenizer),
+        )
+
     return samples
 
 
@@ -1264,11 +1304,17 @@ def _build_session(args: ServingBenchmarkConfig) -> BenchmarkSession:
 
     if benchmark_task == "text-generation":
         model_max_length = args.model_max_length
-        if model_max_length is None and not args.dry_run:
+        if model_max_length is None:
             # Best-effort: when the server is already up (e.g. benchmarking a
             # running deployment), adopt its real context limit so the
             # context-length guards derived from tokenizer.model_max_length
             # bind even when the tokenizer reports the HF unbounded sentinel.
+            #
+            # --dry-run asks this too. It returns before the later clamp in
+            # main_with_parsed_args, so this is its only chance to learn the
+            # real bound, and without it a preview reports a workload the
+            # server would truncate. Costs one 2s-timeout request when no
+            # server is listening.
             model_max_length = fetch_server_max_model_len(
                 base_url, model_id, timeout_s=2.0
             )
@@ -1276,6 +1322,13 @@ def _build_session(args: ServingBenchmarkConfig) -> BenchmarkSession:
                 logger.info(
                     "Using server-reported max_model_len=%d from %s/v1/models",
                     model_max_length,
+                    base_url,
+                )
+            elif args.dry_run:
+                logger.warning(
+                    "No server reachable at %s; --dry-run is using the"
+                    " tokenizer's context limit, so any workload the server"
+                    " would truncate is reported here as if it fit.",
                     base_url,
                 )
         logger.info(f"getting tokenizer. api url: {api_url}")

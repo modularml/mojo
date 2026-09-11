@@ -35,6 +35,7 @@ from max.benchmark.benchmark_shared.datasets import DistributionParameter
 from max.benchmark.benchmark_shared.datasets.all import (
     _resolve_agentic_tool_profiles,
 )
+from pydantic import ValidationError
 
 
 class TestServingSweepFields:
@@ -663,3 +664,93 @@ def test_workload_yaml_spellings_agree(
     assert [(t.weight, t.input_len, t.output_len) for t in tools] == [
         (5.0, "N(30,20)", "N(25,8)")
     ]
+
+
+# ===----------------------------------------------------------------------=== #
+# General image-mixing flags
+# ===----------------------------------------------------------------------=== #
+
+
+class TestImageFlags:
+    """--image-fraction is mutually exclusive with --random-image-*."""
+
+    def test_defaults_allow_construction(self) -> None:
+        config = ServingBenchmarkConfig()
+        assert config.image_fraction == 0.0
+        assert config.image_turn == "first"
+
+    def test_conflicts_with_random_image_count(self) -> None:
+        with pytest.raises(ValueError, match="cannot be combined"):
+            ServingBenchmarkConfig(image_fraction=0.1, random_image_count=1)
+
+    def test_conflicts_with_random_image_size(self) -> None:
+        with pytest.raises(ValueError, match="cannot be combined"):
+            ServingBenchmarkConfig(
+                image_fraction=0.1, random_image_size="512,512"
+            )
+
+    def test_rejects_unknown_image_turn(self) -> None:
+        """Rejected by the ImageTurn literal itself, so there is no hand-rolled
+        check to keep in sync with the type.
+
+        Goes through ``model_validate`` rather than the constructor: mypy now
+        rejects a bad literal statically, which is the point of the change, so
+        the runtime check has to come in through the untyped parsing entry
+        point the CLI itself uses.
+        """
+        with pytest.raises(ValidationError, match="image_turn"):
+            ServingBenchmarkConfig.model_validate(
+                {"image_fraction": 0.1, "image_turn": "middle"}
+            )
+
+    def test_accepts_every_image_turn_value(self) -> None:
+        for value in ("first", "last", "every"):
+            config = ServingBenchmarkConfig(
+                image_fraction=0.1, image_turn=value
+            )
+            assert config.image_turn == value
+
+    def test_rejects_out_of_range_fraction(self) -> None:
+        """The description promises 0.0-1.0; -0.1 used to slip past `> 0` and
+        silently produce a text-only run."""
+        for bad in (-0.1, 1.5, float("nan"), float("inf")):
+            with pytest.raises(ValidationError):
+                ServingBenchmarkConfig(image_fraction=bad)
+
+    def test_rejects_pixel_generation_task(self) -> None:
+        with pytest.raises(ValueError, match="does not apply"):
+            ServingBenchmarkConfig(
+                image_fraction=0.1, benchmark_task="text-to-image"
+            )
+
+    def test_rejects_text_only_endpoint(self) -> None:
+        """A text-only driver would drop the images while stats still count them."""
+        with pytest.raises(ValueError, match="image-capable endpoint"):
+            ServingBenchmarkConfig(
+                image_fraction=0.1, endpoint="/v1/completions"
+            )
+
+    def test_rejects_responses_endpoint(self) -> None:
+        """/v1/responses only routes to OpenResponsesRequestDriver for
+        pixel-generation tasks, and that driver takes only
+        PixelGenerationRequestFuncInput, so it never carries input images."""
+        with pytest.raises(ValueError, match="image-capable endpoint"):
+            ServingBenchmarkConfig(image_fraction=0.1, endpoint="/v1/responses")
+
+    def test_allows_chat_completions_endpoint(self) -> None:
+        config = ServingBenchmarkConfig(
+            image_fraction=0.1, endpoint="/v1/chat/completions"
+        )
+        assert config.image_fraction == 0.1
+
+    def test_accepts_distribution_strings(self) -> None:
+        config = ServingBenchmarkConfig(
+            image_fraction=0.2,
+            image_count="DU(1,3)",
+            image_long_side="U(256,1024)",
+            image_aspect_ratio=1.0,
+            image_turn="last",
+        )
+        assert config.image_count == "DU(1,3)"
+        assert config.image_long_side == "U(256,1024)"
+        assert config.image_turn == "last"

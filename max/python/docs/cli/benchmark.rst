@@ -353,7 +353,12 @@
       - `--random-image-count`: Images to attach per request (enables vision
         mode on this dataset). Default: `0`.
       - `--random-image-size`: Pixel dimensions of generated images (for
-        example, `512x512`). Used with `--random-image-count`.
+        example, `512,512`). Used with `--random-image-count`.
+      - `--image-fraction`, `--image-count`, `--image-long-side`,
+        `--image-aspect-ratio`, `--image-turn`: Dataset-agnostic image
+        mixing, usable with any text-generation dataset (including
+        `instruct-coder`). See the "Multimodal" flag group. Mutually
+        exclusive with `--random-image-count` / `--random-image-size`.
 
     - `synthetic`: Synthetic text generation workload that uses the same
       distribution flags as `random`, but generates synthetic token IDs instead
