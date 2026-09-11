@@ -519,6 +519,34 @@ def score_catalog(
 VerdictStatus = Literal["pass", "fail", "error"]
 
 
+def rate_from_k(cutoff: int | None, n_rows: int) -> float | None:
+    """Pass-bar rate: S ≤ k is equivalent to the rate being at least this."""
+    if cutoff is None or n_rows <= 0:
+        return None
+    return (n_rows - cutoff) / n_rows
+
+
+def subset_park_rates(
+    spec: GateSpec, hist: GateHist | None = None
+) -> tuple[float | None, float | None, float | None, float | None]:
+    """Subset-mean H/R rates implied by the designed coins.
+
+    Returns ``(acc_h, acc_r, stop_h, stop_r)``. Accuracy coins are error
+    rates; stop coins are truncation rates.
+    """
+    data = hist or load_gate_hist()
+    acc_h = acc_r = stop_h = stop_r = None
+    if spec.want_acc:
+        err_h, err_r = _acc_coins(spec, data)
+        acc_h = 1.0 - sum(err_h) / len(err_h)
+        acc_r = 1.0 - sum(err_r) / len(err_r)
+    if spec.want_stop:
+        trunc_h, trunc_r = _stop_coins(spec, data)
+        stop_h = 1.0 - sum(trunc_h) / len(trunc_h)
+        stop_r = 1.0 - sum(trunc_r) / len(trunc_r)
+    return acc_h, acc_r, stop_h, stop_r
+
+
 @dataclass(frozen=True)
 class LiveVerdict:
     status: VerdictStatus
@@ -528,6 +556,14 @@ class LiveVerdict:
     n_wrong: int
     stop_cutoff: int | None
     acc_cutoff: int | None
+    stop_status: VerdictStatus | None = None
+    acc_status: VerdictStatus | None = None
+    stop_rate: float | None = None
+    acc_rate: float | None = None
+    stop_rate_cutoff: float | None = None
+    acc_rate_cutoff: float | None = None
+    model: str | None = None
+    base_url: str | None = None
 
 
 def score_results(results_path: Path, scored: ScoredGate) -> LiveVerdict:
@@ -554,20 +590,27 @@ def score_results(results_path: Path, scored: ScoredGate) -> LiveVerdict:
         )
     n_trunc = sum(1 for row in rows if row.get("finish_reason") == "length")
     n_wrong = sum(1 for row in rows if not row.get("correct"))
+    n_rows = len(rows)
     stop_ok = scored.stop_cutoff is None or n_trunc <= scored.stop_cutoff
     acc_ok = scored.acc_cutoff is None or n_wrong <= scored.acc_cutoff
     status: VerdictStatus = "pass" if stop_ok and acc_ok else "fail"
     parts: list[str] = []
     if scored.stop_cutoff is not None:
-        parts.append(f"stop: {n_trunc} vs k={scored.stop_cutoff}")
+        parts.append(f"stop ratio: {n_trunc} vs k={scored.stop_cutoff}")
     if scored.acc_cutoff is not None:
         parts.append(f"accuracy: {n_wrong} vs k={scored.acc_cutoff}")
     return LiveVerdict(
         status,
         "; ".join(parts),
-        len(rows),
+        n_rows,
         n_trunc,
         n_wrong,
         scored.stop_cutoff,
         scored.acc_cutoff,
+        None if scored.stop_cutoff is None else ("pass" if stop_ok else "fail"),
+        None if scored.acc_cutoff is None else ("pass" if acc_ok else "fail"),
+        (n_rows - n_trunc) / n_rows,
+        (n_rows - n_wrong) / n_rows,
+        rate_from_k(scored.stop_cutoff, n_rows),
+        rate_from_k(scored.acc_cutoff, n_rows),
     )
