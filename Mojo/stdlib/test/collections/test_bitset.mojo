@@ -838,6 +838,120 @@ def test_bitset_small_size() raises:
     )
 
 
+def test_bitset_contains() raises:
+    var bs = BitSet[128]()
+    bs.set(1)
+    bs.set(42)
+    bs.set(127)
+
+    assert_true(1 in bs)
+    assert_true(42 in bs)
+    assert_true(127 in bs)
+    assert_false(0 in bs)
+    assert_false(2 in bs)
+    assert_false(126 in bs)
+
+
+def test_bitset_operators() raises:
+    var a = BitSet[128]()
+    a.set(1)
+    a.set(2)
+    a.set(3)
+
+    var b = BitSet[128]()
+    b.set(3)
+    b.set(4)
+    b.set(5)
+
+    # Test __or__ (union)
+    var u = a | b
+    assert_equal(len(u), 5)
+    assert_true(u.test(1))
+    assert_true(u.test(2))
+    assert_true(u.test(3))
+    assert_true(u.test(4))
+    assert_true(u.test(5))
+
+    # Test __ior__ (in-place union)
+    var ior = a.copy()
+    ior |= b
+    assert_equal(len(ior), 5)
+    assert_true(ior.test(4))
+
+    # Test __and__ (intersection)
+    var i = a & b
+    assert_equal(len(i), 1)
+    assert_true(i.test(3))
+    assert_false(i.test(1))
+    assert_false(i.test(4))
+
+    # Test __iand__ (in-place intersection)
+    var iand = a.copy()
+    iand &= b
+    assert_equal(len(iand), 1)
+    assert_true(iand.test(3))
+
+    # Test __sub__ (difference)
+    var d = a - b
+    assert_equal(len(d), 2)
+    assert_true(d.test(1))
+    assert_true(d.test(2))
+    assert_false(d.test(3))
+
+    # Test __isub__ (in-place difference)
+    var isub = a.copy()
+    isub -= b
+    assert_equal(len(isub), 2)
+    assert_false(isub.test(3))
+
+    # Test __xor__ (symmetric difference)
+    var x = a ^ b
+    assert_equal(len(x), 4)
+    assert_true(x.test(1))
+    assert_true(x.test(2))
+    assert_false(x.test(3))
+    assert_true(x.test(4))
+    assert_true(x.test(5))
+
+    # Test __ixor__ (in-place symmetric difference)
+    var ixor = a.copy()
+    ixor ^= b
+    assert_equal(len(ixor), 4)
+    assert_false(ixor.test(3))
+    assert_true(ixor.test(4))
+
+
+def test_bitset_symmetric_difference() raises:
+    var a = BitSet[128]()
+    a.set(1)
+    a.set(2)
+    a.set(3)
+
+    var b = BitSet[128]()
+    b.set(3)
+    b.set(4)
+    b.set(5)
+
+    var sd = a.symmetric_difference(b)
+    assert_equal(len(sd), 4)
+    assert_true(sd.test(1))
+    assert_true(sd.test(2))
+    assert_false(sd.test(3))
+    assert_true(sd.test(4))
+    assert_true(sd.test(5))
+
+    # Symmetric difference with self is empty
+    var empty = a.symmetric_difference(a)
+    assert_equal(len(empty), 0)
+
+    # Symmetric difference with empty is self
+    var empty_bs = BitSet[128]()
+    var same = a.symmetric_difference(empty_bs)
+    assert_equal(len(same), 3)
+    assert_true(same.test(1))
+    assert_true(same.test(2))
+    assert_true(same.test(3))
+
 def test_bitset_test_all_before_after_single_word() raises:
     # Bits 0..9 set, rest clear (within a single word).
     var bs = BitSet[64]()
